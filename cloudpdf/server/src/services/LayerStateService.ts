@@ -10,6 +10,7 @@ import {
   changesAnnotationList,
   invalidatesWeakIndexRefs,
   knownWeakAnnotationState,
+  toPageRef,
 } from '@embedpdf/engine-core/runtime';
 import type { Transaction } from 'kysely';
 
@@ -155,7 +156,7 @@ export class LayerStateService {
     await this.documentPages.upsertForDocument(
       docId,
       observed.map((page) => ({
-        pageObjectNumber: page.pageObjectNumber,
+        pageObjectNumber: page.page.pageObjectNumber,
         hasWeakAnnotations: requireKnownWeakAnnotationBoolean(page),
       })),
     );
@@ -355,7 +356,7 @@ export class LayerStateService {
       // and refreshes the manifest instead of sending a delta).
       working: true,
       pages: input.pages.map((page) => ({
-        pageObjectNumber: page.pageObjectNumber,
+        page: toPageRef(page.pageObjectNumber),
         cache: this.toCachePins(page),
       })),
     };
@@ -524,10 +525,10 @@ export class LayerStateService {
 
   private toPageState(scopeId: string, page: DurablePageRow): PageState {
     return {
-      pageObjectNumber: page.pageObjectNumber,
+      page: toPageRef(page.pageObjectNumber),
       revision: {
         docSessionId: scopeId,
-        pageObjectNumber: page.pageObjectNumber,
+        page: toPageRef(page.pageObjectNumber),
         generation: page.annotationGeneration,
       },
       weakAnnotationState: {
@@ -541,7 +542,7 @@ export class LayerStateService {
 function requireKnownWeakAnnotationBoolean(page: PageState): boolean {
   if (page.weakAnnotationState.kind !== 'known') {
     throw new Error(
-      `cannot initialize durable manifest state from unknown weak annotation state for page ${page.pageObjectNumber}`,
+      `cannot initialize durable manifest state from unknown weak annotation state for page ${page.page.pageObjectNumber}`,
     );
   }
   return page.weakAnnotationState.hasAnyWeakAnnotations;

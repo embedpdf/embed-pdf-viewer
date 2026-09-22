@@ -1,5 +1,5 @@
-import type { AnnotationDTO, PdfRect } from '@embedpdf/engine-core/runtime';
 import { geomRotation, type Annot, type PropKey } from '@embedpdf/core-annotation';
+import type { AnnotationDTO, PdfRect } from '@embedpdf/engine-core/runtime';
 
 import { boxGeomFields } from './seam';
 

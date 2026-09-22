@@ -20,14 +20,21 @@ It never loads page content, so it's cheap.
 const { pageCount, pages } = await doc.pages.list();
 
 for (const page of pages) {
-  console.log(page.index, page.pageObjectNumber, page.label, page.width, page.height, page.rotation);
+  console.log(page.index, page.ref, page.label, page.width, page.height, page.rotation);
 }
 ```
 
-Each entry is a `PageLayout`: display `index`, durable `pageObjectNumber`,
+Each entry is a `PageLayout`: display `index`, durable `ref`,
 `label` (or `null`), un-rotated crop `width`/`height` in PDF points, `rotation`,
 `userUnit`, and the raw PDF `boxes` (`media`, `crop`, and any declared
 `bleed`/`trim`/`art`).
+
+`ref` is the page's `PageRef` — `{ kind: 'objectNumber', pageObjectNumber }`,
+its indirect object number — and the only key to correlate pages across
+calls: it survives reorder, rotate and every edit, and a deleted page's
+number is retired, never recycled. `index` is display order and shifts on a
+move. Every verb below takes refs; `toPageRef(n)` builds one from a number
+you hold.
 
 <Callout type="info">
   Sizes are <strong>un-rotated</strong>. For 90°/270° pages, swap width and
@@ -52,7 +59,7 @@ interface PageRenderService {
 elements and HTTP caching.
 
 ```ts
-const page = doc.page(pageObjectNumber);
+const page = doc.page(pageRef);
 
 const image = await page.render.image({
   viewport: { kind: 'width', width: 1400 },
@@ -148,7 +155,7 @@ import { snapFullPageViewport } from '@cloudpdf/engine';
 const viewport = snapFullPageViewport(policy, { kind: 'scale', scale: 2 }, {
   pageWidth: page.size.width,
 });
-await doc.page(pon).render.image({ viewport }); // always on the lattice
+await doc.page(page.ref).render.image({ viewport }); // always on the lattice
 ```
 </Engine>
 
@@ -160,13 +167,14 @@ never call `policy()` yourself. See the
 
 ## Reordering pages
 
-`doc.pages.move(pageObjectNumbers, destIndex)` detaches the listed pages and
+`doc.pages.move(pages, destIndex)` detaches the listed pages (a `PageRef[]`) and
 re-inserts them as a contiguous block at `destIndex` (in the post-removal index
 space), preserving the order you pass them.
 
 ```ts
-// Move pages 7 and 9 so they sit starting at display index 0.
-await doc.pages.move([7, 9], 0);
+// Move the pages at display index 6 and 8 so they sit starting at index 0.
+const { pages } = await doc.pages.list();
+await doc.pages.move([pages[6].ref, pages[8].ref], 0);
 ```
 
 Per-page revision tokens survive a move, so index-based annotation references
@@ -181,15 +189,15 @@ untouched. (The relative "+90° from here" button belongs in the page-edit
 plugin, which derives the absolute value for you.)
 
 ```ts
-await doc.pages.rotate([pon], 90); // 0 | 90 | 180 | 270
+await doc.pages.rotate([page.ref], 90); // 0 | 90 | 180 | 270
 ```
 
 `delete` removes pages by identity. Deleting every page is rejected — a
-document keeps at least one — and deleted PONs are retired, never recycled;
+document keeps at least one — and a deleted page's object number is retired, never recycled;
 surviving pages keep their identity and revisions.
 
 ```ts
-await doc.pages.delete([pon]);
+await doc.pages.delete([page.ref]);
 ```
 
 ## Adding pages
@@ -209,7 +217,7 @@ const added = await doc.pages.insertBlank!(
   1,
 );
 
-added.insertedPageObjectNumbers; // fresh PONs, in insertion order
+added.insertedPages; // fresh refs, in insertion order
 added.layout; // the full new layout — same shape as pages.list()
 ```
 
@@ -226,7 +234,7 @@ pages, in the order you pass them, serialized as a standalone PDF. The source
 document is untouched — nothing changes, no event fires.
 
 ```ts
-const bytes = await doc.pages.extract!([ponA, ponB]);
+const bytes = await doc.pages.extract!([pageA.ref, pageB.ref]);
 // …hand to pages.insert on another document, or download it.
 ```
 
@@ -244,10 +252,10 @@ the same version an insert or delete does.
 
 ```ts
 const layout = await doc.pages.list();
-layout.namedPages; // [{ name: 'Approved=Approved', target: { kind: 'page', pageObjectNumber } }, …]
+layout.namedPages; // [{ name: 'Approved=Approved', target: { kind: 'page', page } }, …]
 
 // Register (or retarget) a name; `replace` drops another key in the same job — a rename.
-await doc.pages.setName!({ name: 'Draft=Concept', pageObjectNumber: pon, replace: 'Draft=Draft' });
+await doc.pages.setName!({ name: 'Draft=Concept', page: page.ref, replace: 'Draft=Draft' });
 
 // Drop the registration; the page stays.
 await doc.pages.removeName!({ name: 'Draft=Concept' });

@@ -1,0 +1,15 @@
+# @embedpdf/plugin-selection — ./contract
+
+SelectionAnchor [InterfaceDeclaration]: export interface SelectionAnchor{ page: PageRef; bounds: Rect; }
+SelectionCapability [InterfaceDeclaration]: export interface SelectionCapability{ canSelect(): boolean; canCopy(): boolean; select(range: SelectionRangeInput): void; selectAll(): void; selectPage(page: PageRef): void; selectWordAt(page: PageRef, point: Point): boolean; selectLineAt(page: PageRef, point: Point): boolean; extendTo(page: PageRef, point: Point): void; clear(): void; hasSelection(): boolean; getSnapshot(): SelectionSnapshot; getRange(): TextRange | null; listSelectedPages(): readonly PageRef[]; listSegments(page: PageRef): readonly SelectionSegment[]; listRects(page: PageRef): readonly Rect[]; getAnchor(): SelectionAnchor | null; readText(options?: OperationOptions): Promise<string>; readTextInRange(range: TextRange, options?: OperationOptions): Promise<string>; readonly onChanged: EventHook<SelectionChangedEvent>; readonly onCommitted: EventHook<SelectionCommittedEvent>; readonly onCleared: EventHook<SelectionClearedEvent>; }
+SelectionChangedEvent [InterfaceDeclaration]: export interface SelectionChangedEvent{ readonly range: TextRange | null; readonly pages: readonly PageRef[]; readonly origin: ChangeOrigin; }
+SelectionClearedEvent [InterfaceDeclaration]: export interface SelectionClearedEvent{ readonly origin: ChangeOrigin; }
+SelectionCommittedEvent [InterfaceDeclaration]: export interface SelectionCommittedEvent{ readonly range: TextRange; }
+SelectionConfig [InterfaceDeclaration]: export interface SelectionConfig{ dragThreshold?: number; }
+SelectionEndpoint [InterfaceDeclaration]: export interface SelectionEndpoint{ page: PageRef; glyphQuad: TextQuad; advance: 1 | -1; rect: Rect; }
+SelectionRangeInput [TypeAliasDeclaration]: export type SelectionRangeInput = TextRange |{ page: PageRef; start: number; count: number} ;
+SelectionSegment [InterfaceDeclaration] (from packages/plugin/selection/src/geometry.ts): export interface SelectionSegment{ quad: TextQuad; rect: Rect; advance: 1 | -1; }
+SelectionSnapshot [InterfaceDeclaration]: export interface SelectionSnapshot{ readonly pages: readonly{ page: PageRef; segments: readonly SelectionSegment[]} []; readonly start: SelectionEndpoint | null; readonly end: SelectionEndpoint | null; readonly direction: 'forward' | 'backward'; readonly range: TextRange | null; }
+SelectionToken [VariableDeclaration] (from packages/plugin/selection/src/token.ts): SelectionToken = createCapabilityToken<SelectionCapability>('selection', { hint: `add selectionPlugin() from '@embedpdf/plugin-selection' to your plugins list`, } )
+TextPosition [InterfaceDeclaration]: export interface TextPosition{ page: PageRef; index: number; }
+TextRange [InterfaceDeclaration]: export interface TextRange{ start: TextPosition; end: TextPosition; }

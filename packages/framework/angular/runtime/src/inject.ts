@@ -7,9 +7,9 @@
  * construction — they return signals or lazy methods, so they are safe in
  * component-hosted mode where the kernel materializes after construction.
  */
-import { computed, inject, type Signal } from '@angular/core';
+import { computed, effect, inject, type Signal } from '@angular/core';
 import { docInfoListEquals } from '@embedpdf/core';
-import type { CapabilityToken, DocInfo, Kernel } from '@embedpdf/core';
+import type { CapabilityToken, DocInfo, EventHook, Kernel } from '@embedpdf/core';
 import { EpdfKernelHost } from './kernel-host';
 import { EPDF_DOCUMENT_SCOPE } from './tokens';
 
@@ -42,7 +42,7 @@ export function injectKernelValue<R>(
 }
 
 export function injectActiveDocumentId(): Signal<string | null> {
-  return injectKernelValue((k) => k.documents.activeId());
+  return injectKernelValue((k) => k.documents.getActiveId());
 }
 
 /** The document id for this injector subtree: the nearest `[epdfDocumentScope]`,
@@ -145,10 +145,45 @@ export function injectOptionalSelector<C, R>(
   return injectOptionalSelectorFor(() => token, select, fallback, equal);
 }
 
+/**
+ * Subscribe to a capability's {@link EventHook} for the injector's lifetime —
+ * `injectCapabilityEvent(ActionsToken, (c) => c.onExecuted, handler)`; React's
+ * `useCapabilityEvent`. Events carry occurrences, never state (a late
+ * subscriber that needs the current value reads a selector). Null-safe: no
+ * plugin/document → no subscription; the subscription follows the resolved
+ * capability across document switches.
+ */
+export function injectCapabilityEvent<C, T>(
+  token: CapabilityToken<C>,
+  select: (cap: C) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  const cap = injectOptionalCapability(token);
+  effect((onCleanup) => {
+    const current = cap();
+    if (!current) return;
+    onCleanup(select(current)(handler));
+  });
+}
+
+/** Subscribe to one document lifecycle event for the injector's lifetime:
+ *  `injectDocumentEvent((d) => d.onOpened, handler)` — React's `useDocumentEvent`. */
+export function injectDocumentEvent<T>(
+  select: (documents: Kernel['documents']) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  const host = injectKernelHost();
+  // Runs after construction (an effect), so reading the kernel here honours
+  // the construction rule in kernel-host.ts.
+  effect((onCleanup) => {
+    onCleanup(select(host.kernel.documents)(handler));
+  });
+}
+
 /** The document registry (open/close/active/list), reactive — `useDocuments`.
  *  Methods late-bind the kernel, so this is construction-safe. */
 export interface EpdfDocuments {
-  docs: Signal<DocInfo[]>;
+  docs: Signal<readonly DocInfo[]>;
   activeId: Signal<string | null>;
   open: Kernel['documents']['open'];
   unlock: Kernel['documents']['unlock'];
@@ -156,22 +191,28 @@ export interface EpdfDocuments {
   setActive: Kernel['documents']['setActive'];
   move: Kernel['documents']['move'];
   swap: Kernel['documents']['swap'];
-  download: Kernel['documents']['download'];
-  downloadLayer: Kernel['documents']['downloadLayer'];
+  setOrder: Kernel['documents']['setOrder'];
+  retry: Kernel['documents']['retry'];
+  rename: Kernel['documents']['rename'];
+  save: Kernel['documents']['save'];
+  saveLayer: Kernel['documents']['saveLayer'];
 }
 
 export function injectDocuments(): EpdfDocuments {
   const host = injectKernelHost();
   return {
     docs: host.value((k) => k.documents.list(), docInfoListEquals),
-    activeId: host.value((k) => k.documents.activeId()),
+    activeId: host.value((k) => k.documents.getActiveId()),
     open: (input, options) => host.kernel.documents.open(input, options),
     unlock: (id, input) => host.kernel.documents.unlock(id, input),
     close: (id) => host.kernel.documents.close(id),
     setActive: (id) => host.kernel.documents.setActive(id),
     move: (id, toIndex) => host.kernel.documents.move(id, toIndex),
     swap: (a, b) => host.kernel.documents.swap(a, b),
-    download: (id, opts) => host.kernel.documents.download(id, opts),
-    downloadLayer: (id) => host.kernel.documents.downloadLayer(id),
+    setOrder: (ids) => host.kernel.documents.setOrder(ids),
+    retry: (id) => host.kernel.documents.retry(id),
+    rename: (id, name) => host.kernel.documents.rename(id, name),
+    save: (id, options) => host.kernel.documents.save(id, options),
+    saveLayer: (id, options) => host.kernel.documents.saveLayer(id, options),
   };
 }

@@ -3,7 +3,7 @@
  * the mode is `ask` — or a "sign here" flow wants the facts first. Shows
  * the mark as it will sit in the field, takes reason and location, offers
  * a certification when the config allows it, and either SEALS the field
- * (`signField`) or only draws the mark into it (`fillField`).
+ * (`sign`) or only draws the mark into it (`fillField`).
  */
 import { useState } from 'react';
 import { useSurface } from '@embedpdf/react/shell';
@@ -41,7 +41,7 @@ export function SignDialog() {
     setError(null);
     try {
       if (kind === 'sign') {
-        await signature.signField({
+        await signature.sign({
           field,
           mark,
           attribution,

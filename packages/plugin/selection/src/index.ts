@@ -7,9 +7,10 @@
  * address), geometry needs `doc.text.select`, text extraction needs
  * `doc.text.copy`, and neither permission implies the other.
  *
- * Framework/host plumbing (gesture intents, geometry warming, the reducer,
- * the coordinate seam) lives behind `@embedpdf/plugin-selection/internal`.
- * Clipboard writes live in `@embedpdf/web` — this package is DOM-free.
+ * Framework/host plumbing (gesture bracketing, geometry warming, the model,
+ * the coordinate seam) lives behind `@embedpdf/plugin-selection/contract/host`
+ * and `/internal`. Clipboard writes live in `@embedpdf/web` — this package is
+ * DOM-free.
  */
 export { selectionPlugin } from './selection.plugin';
 export * from './contract';

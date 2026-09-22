@@ -10,7 +10,7 @@
     const { pages } = await doc.pages.list();
     const page = pages[pageNumber - 1];
     const image = await doc
-      .page(page.pageObjectNumber)
+      .page(page.ref)
       .render.image({ viewport: { kind: 'scale', scale: 1.5 } });
     src = (await image.objectUrl()).url;
   });

@@ -3,6 +3,7 @@ import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
+import { toPageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
 import { PageListSnapshotSchema, PageNameResultSchema } from '../wire/schemas';
 
@@ -46,11 +47,11 @@ export function runNamedPagesConformance(
         const layout = await doc.pages.list();
         PageListSnapshotSchema.parse(layout);
         expect(Array.isArray(layout.namedPages)).toBe(true);
-        const pons = new Set(layout.pages.map((page) => page.pageObjectNumber));
+        const pons = new Set(layout.pages.map((page) => page.ref.pageObjectNumber));
         for (const entry of layout.namedPages ?? []) {
           expect(entry.name.length > 0).toBe(true);
           if (entry.target.kind === 'page') {
-            expect(pons.has(entry.target.pageObjectNumber)).toBe(true);
+            expect(pons.has(entry.target.page.pageObjectNumber)).toBe(true);
           }
         }
       } finally {
@@ -69,13 +70,13 @@ export function runNamedPagesConformance(
         // Create.
         const created = await doc.pages.setName({
           name: 'Approved=Goedgekeurd',
-          pageObjectNumber: first.pageObjectNumber,
+          page: first.ref,
         });
         PageNameResultSchema.parse(created);
         expect(created.layout.pages.length).toBe(before.pages.length);
         expect(find(created, 'Approved=Goedgekeurd')).toEqual({
           kind: 'page',
-          pageObjectNumber: first.pageObjectNumber,
+          page: toPageRef(first.ref.pageObjectNumber),
         });
         expect((created.layout.namedPages ?? []).length).toBe(baseline + 1);
         if (created.cache) {
@@ -90,24 +91,24 @@ export function runNamedPagesConformance(
         // Replace by key: still one entry, now pointing at the second page.
         const replaced = await doc.pages.setName({
           name: 'Approved=Goedgekeurd',
-          pageObjectNumber: second.pageObjectNumber,
+          page: second.ref,
         });
         expect(find(replaced, 'Approved=Goedgekeurd')).toEqual({
           kind: 'page',
-          pageObjectNumber: second.pageObjectNumber,
+          page: toPageRef(second.ref.pageObjectNumber),
         });
         expect((replaced.layout.namedPages ?? []).length).toBe(baseline + 1);
 
         // Rename in one job.
         const renamed = await doc.pages.setName({
           name: 'Approved=Approved',
-          pageObjectNumber: second.pageObjectNumber,
+          page: second.ref,
           replace: 'Approved=Goedgekeurd',
         });
         expect(find(renamed, 'Approved=Goedgekeurd')).toBe(undefined);
         expect(find(renamed, 'Approved=Approved')).toEqual({
           kind: 'page',
-          pageObjectNumber: second.pageObjectNumber,
+          page: toPageRef(second.ref.pageObjectNumber),
         });
         expect((renamed.layout.namedPages ?? []).length).toBe(baseline + 1);
       } finally {
@@ -123,11 +124,11 @@ export function runNamedPagesConformance(
         const key = 'Stämpel=Stämpel 日本';
         const result = await doc.pages.setName({
           name: key,
-          pageObjectNumber: before.pages[0].pageObjectNumber,
+          page: before.pages[0].ref,
         });
         expect(find(result, key)).toEqual({
           kind: 'page',
-          pageObjectNumber: before.pages[0].pageObjectNumber,
+          page: toPageRef(before.pages[0].ref.pageObjectNumber),
         });
         const listed = await doc.pages.list();
         expect((listed.namedPages ?? []).some((entry) => entry.name === key)).toBe(true);
@@ -143,7 +144,7 @@ export function runNamedPagesConformance(
         const before = await doc.pages.list();
         await doc.pages.setName({
           name: 'Draft=Concept',
-          pageObjectNumber: before.pages[0].pageObjectNumber,
+          page: before.pages[0].ref,
         });
         const removed = await doc.pages.removeName({ name: 'Draft=Concept' });
         PageNameResultSchema.parse(removed);
@@ -164,11 +165,11 @@ export function runNamedPagesConformance(
         if (!doc.pages.setName) return;
         const before = await doc.pages.list();
         await expect(
-          doc.pages.setName({ name: '', pageObjectNumber: before.pages[0].pageObjectNumber }),
+          doc.pages.setName({ name: '', page: before.pages[0].ref }),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
         let unknownPage: unknown = null;
         try {
-          await doc.pages.setName({ name: 'Ghost=Ghost', pageObjectNumber: 987654321 });
+          await doc.pages.setName({ name: 'Ghost=Ghost', page: toPageRef(987654321) });
         } catch (error) {
           unknownPage = error;
         }
@@ -187,11 +188,11 @@ export function runNamedPagesConformance(
         if (!doc.pages.setName) return;
         const before = await doc.pages.list();
         if (before.pages.length < 2) return;
-        const victim = before.pages[1].pageObjectNumber;
-        const survivor = before.pages[0].pageObjectNumber;
-        await doc.pages.setName({ name: 'Victim=One', pageObjectNumber: victim });
-        await doc.pages.setName({ name: 'Victim=Two', pageObjectNumber: victim });
-        await doc.pages.setName({ name: 'Survivor', pageObjectNumber: survivor });
+        const victim = before.pages[1].ref;
+        const survivor = before.pages[0].ref;
+        await doc.pages.setName({ name: 'Victim=One', page: victim });
+        await doc.pages.setName({ name: 'Victim=Two', page: victim });
+        await doc.pages.setName({ name: 'Survivor', page: survivor });
 
         const deleted = await doc.pages.delete([victim]);
         const names = (deleted.layout.namedPages ?? []).map((entry) => entry.name);
@@ -214,7 +215,7 @@ export function runNamedPagesConformance(
         const before = await doc.pages.list();
         const promise = doc.pages.setName({
           name: 'Aborted=Aborted',
-          pageObjectNumber: before.pages[0].pageObjectNumber,
+          page: before.pages[0].ref,
         });
         promise.abort();
         await expect(promise).rejects.toBeInstanceOf(AbortError);

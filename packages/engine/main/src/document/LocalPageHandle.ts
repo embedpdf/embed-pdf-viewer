@@ -3,6 +3,7 @@ import {
   type EngineRenderPolicy,
   type PageHandle,
   type PageObjectNumber,
+  type PageRef,
 } from '@embedpdf/engine-core/runtime';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
@@ -34,7 +35,7 @@ export class LocalPageHandle implements PageHandle {
   readonly measure: LocalPageMeasureService;
 
   constructor(
-    readonly pageObjectNumber: PageObjectNumber,
+    readonly ref: PageRef,
     readonly pageIndex: number,
     docId: string,
     queue: WorkerQueue,
@@ -46,7 +47,7 @@ export class LocalPageHandle implements PageHandle {
   ) {
     this.annotations = new LocalPageAnnotationsService(
       docId,
-      pageObjectNumber,
+      ref,
       queue,
       view,
       imageEncoder,
@@ -54,25 +55,18 @@ export class LocalPageHandle implements PageHandle {
       publisher,
       renderPolicy,
     );
-    this.text = new LocalPageTextService(docId, pageObjectNumber, queue, view, guard);
-    this.geometry = new LocalPageGeometryService(docId, pageObjectNumber, queue, view, guard);
+    this.text = new LocalPageTextService(docId, ref, queue, view, guard);
+    this.geometry = new LocalPageGeometryService(docId, ref, queue, view, guard);
     this.render = new LocalPageRenderService(
       docId,
-      pageObjectNumber,
+      ref,
       queue,
       view,
       imageEncoder,
       guard,
       renderPolicy,
     );
-    this.pieceInfo = new LocalPieceInfoService(docId, queue, view, guard, pageObjectNumber);
-    this.measure = new LocalPageMeasureService(
-      docId,
-      pageObjectNumber,
-      queue,
-      view,
-      guard,
-      publisher,
-    );
+    this.pieceInfo = new LocalPieceInfoService(docId, queue, view, guard, ref);
+    this.measure = new LocalPageMeasureService(docId, ref, queue, view, guard, publisher);
   }
 }

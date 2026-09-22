@@ -46,7 +46,7 @@ const signature = useSignature();
 await signature.placeMark({ assetId }, { field: { kind: 'fqn', name: 'sig' } });
 
 // Anywhere else: a stamp, exactly as the stamp plugin would place it.
-await signature.placeMark({ assetId }, { pageObjectNumber, at: { x: 120, y: 90 } });
+await signature.placeMark({ assetId }, { page: page.ref, at: { x: 120, y: 90 } });
 ```
 
 The pointer follows the same rule. With the interaction hub and the stamp

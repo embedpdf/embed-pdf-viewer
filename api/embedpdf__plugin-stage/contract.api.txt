@@ -1,0 +1,50 @@
+# @embedpdf/plugin-stage — ./contract
+
+Align [TypeAliasDeclaration] (from packages/core/stage/src/index.ts): export type Align = 'start' | 'center' | 'end';
+AlignValue [TypeAliasDeclaration] (from packages/core/stage/src/index.ts): export type AlignValue = Align | number;
+Alignment [InterfaceDeclaration] (from packages/core/stage/src/index.ts): export interface Alignment{ x: Align; y: Align; }
+AlignmentValue [InterfaceDeclaration] (from packages/core/stage/src/index.ts): export interface AlignmentValue{ x: AlignValue; y: AlignValue; }
+ArrivalAlignValue [TypeAliasDeclaration]: export type ArrivalAlignValue = AlignValue | 'keep';
+ArrivalAlignment [InterfaceDeclaration]: export interface ArrivalAlignment{ x: ArrivalAlignValue; y: ArrivalAlignValue; }
+BoxQuery [InterfaceDeclaration]: export interface BoxQuery{ minWidth?: number; maxWidth?: number; minHeight?: number; maxHeight?: number; orientation?: 'portrait' | 'landscape'; }
+Camera [InterfaceDeclaration] (from packages/core/stage/src/index.ts): export interface Camera{ x: number; y: number; zoom: number; }
+Direction [TypeAliasDeclaration] (from packages/core/stage/src/index.ts): export type Direction = 'ltr' | 'rtl';
+FlowMode [TypeAliasDeclaration]: export type FlowMode = 'continuous' | 'paged';
+Gap [TypeAliasDeclaration]: export type Gap = number |{ px: number} ;
+GoToOptions [InterfaceDeclaration]: export interface GoToOptions{ behavior?: ScrollBehaviorKind; viewpoint?: Viewpoint; arrivalAlign?: Partial<ArrivalAlignment>; }
+GridColumns [TypeAliasDeclaration]: export type GridColumns = 'square' | 'auto' | number;
+LayoutKind [TypeAliasDeclaration]: export type LayoutKind = 'vertical' | 'horizontal' | 'grid';
+PageFrame [InterfaceDeclaration] (from packages/core/geometry/src/index.ts): export interface PageFrame{ top: number; right: number; bottom: number; left: number; }
+Point [InterfaceDeclaration] (from packages/core/geometry/src/index.ts): export interface Point{ x: number; y: number; }
+ResponsiveRule [InterfaceDeclaration]: export interface ResponsiveRule{ name?: string; when: BoxQuery | ((box: StageBox) => boolean); settings?: Partial<StageSettings>; }
+RevealAnchor [InterfaceDeclaration]: export interface RevealAnchor{ x?: RevealAnchorValue; y?: RevealAnchorValue; }
+RevealAnchorValue [TypeAliasDeclaration]: export type RevealAnchorValue = 'keep' | 'start' | 'center' | 'end' | number;
+RevealOptions [InterfaceDeclaration]: export interface RevealOptions{ behavior?: ScrollBehaviorKind; rect?: Rect | null; zoom?: RevealZoom; anchor?: RevealAnchor; }
+RevealZoom [TypeAliasDeclaration]: export type RevealZoom = 'keep' | 'fit' | 'fit-width' | 'fit-height' |{ level: number} ;
+Scheduler [InterfaceDeclaration]: export interface Scheduler{ raf(callback: (timestampMs: number) => void): number; caf(handle: number): void; }
+ScrollBehaviorKind [TypeAliasDeclaration]: export type ScrollBehaviorKind = 'smooth' | 'instant';
+ScrollMetrics [InterfaceDeclaration] (from packages/core/stage/src/index.ts): export interface ScrollMetrics{ scrollLeft: number; scrollTop: number; scrollWidth: number; scrollHeight: number; clientWidth: number; clientHeight: number; scrollableX: boolean; scrollableY: boolean; }
+Size [InterfaceDeclaration] (from packages/core/geometry/src/index.ts): export interface Size{ width: number; height: number; }
+SizingMode [TypeAliasDeclaration] (from packages/core/stage/src/index.ts): export type SizingMode = 'intrinsic' | 'uniform';
+SpreadMode [TypeAliasDeclaration] (from packages/core/stage/src/index.ts): export type SpreadMode = 'none' | 'odd' | 'even';
+StageBox [InterfaceDeclaration]: export interface StageBox{ width: number; height: number; orientation: 'portrait' | 'landscape'; }
+StageCameraChangedEvent [InterfaceDeclaration]: export interface StageCameraChangedEvent{ readonly camera: Camera; }
+StageCapability [InterfaceDeclaration]: export interface StageCapability{ getCamera(): Camera; setCamera(camera: Camera): void; getViewportSize(): Size; getZoomLevel(): number; getZoomMode(): ZoomModeValue | 'custom'; getViewRotation(): PageRotation; getCurrentPage(): PageInfo | null; getCurrentPageIndex(): number; listCurrentItemPages(): readonly PageInfo[]; listVisiblePages(): readonly VisiblePage[]; isPageVisible(page: PageRef): boolean; getViewpoint(): Viewpoint; getViewState(): StageViewState; applyViewState(view: StageViewState): void; isMoving(): boolean; stopMotion(): void; zoomTo(zoom: number | ZoomSpec, options?: ZoomToOptions): void; zoomBy(factor: number, options?: ZoomToOptions): void; zoomIn(): void; zoomOut(): void; fitWidth(): void; fitPage(): void; fitAll(): void; fitAutomatic(): void; goToPage(page: PageRef, options?: GoToOptions): void; goToPageIndex(index: number, options?: GoToOptions): void; goToFirstPage(options?: GoToOptions): void; goToLastPage(options?: GoToOptions): void; nextPage(options?: GoToOptions): void; previousPage(options?: GoToOptions): void; canGoNext(): boolean; canGoPrevious(): boolean; reveal(page: PageRef, options?: RevealOptions): void; revealIndex(index: number, options?: RevealOptions): void; revealRect(page: PageRef, rect: Rect, options?: Omit<RevealOptions, 'rect'>): void; scrollTo(options: StageScrollToOptions): void; scrollBy(options: StageScrollToOptions): void; panBy(dxViewport: number, dyViewport: number): void; resetView(): void; setViewRotation(rotation: PageRotation): void; rotateViewBy(delta: 90 | -90): void; getSettings(): StageSettings; updateSettings(patch: Partial<StageSettings>): void; resetSettings(): void; setFlow(flow: FlowMode): void; setLayout(layout: LayoutKind): void; setSpread(spread: SpreadMode): void; setSizing(sizing: SizingMode): void; setResponsiveRules(rules: readonly ResponsiveRule[]): void; listActiveRules(): readonly string[]; matchesRule(name: string): boolean; getPageAt(point: ViewportPoint):{ ref: PageRef; point: Point; scale: number; rotation: PageRotation; zoom: number; } | null; viewportToPage(page: PageRef, point: ViewportPoint): Point | null; pageToViewport(page: PageRef, point: Point): ViewportPoint | null; pageRectToViewport(page: PageRef, rect: Rect): ViewportRect | null; getPageFrame(page: PageRef): VisiblePage | null; readonly onPageChanged: EventHook<StagePageChangedEvent>; readonly onZoomChanged: EventHook<StageZoomChangedEvent>; readonly onCameraChanged: EventHook<StageCameraChangedEvent>; readonly onMotionEnded: EventHook<StageMotionEndedEvent>; readonly onSettingsChanged: EventHook<StageSettingsChangedEvent>; readonly onViewportChanged: EventHook<StageViewportChangedEvent>; }
+StageConfig [InterfaceDeclaration]: export interface StageConfig extends Partial<StageSettings>{ scheduler?: Scheduler; responsive?: readonly ResponsiveRule[]; }
+StageMotionEndedEvent [InterfaceDeclaration]: export interface StageMotionEndedEvent{ readonly camera: Camera; }
+StagePageChangedEvent [InterfaceDeclaration]: export interface StagePageChangedEvent{ readonly page: PageInfo | null; readonly pageIndex: number; readonly previousPageIndex: number; }
+StageScrollToOptions [InterfaceDeclaration]: export interface StageScrollToOptions{ left?: number; top?: number; behavior?: ScrollBehaviorKind; }
+StageSettings [InterfaceDeclaration]: export interface StageSettings{ flow: FlowMode; layout: LayoutKind; spread: SpreadMode; sizing: SizingMode; columns: GridColumns; bounded: boolean; padding: number; gap: Gap; pageFrame: PageFrame; direction: Direction; fitAlign: Alignment; arrivalAlign: ArrivalAlignment; zoomAlign: AlignmentValue; anchorAlign: AlignmentValue; viewRotation: PageRotation; zoom: ZoomSpec; scrollBehavior: ScrollBehaviorKind; viewUnitsPerPoint: number; }
+StageSettingsChangedEvent [InterfaceDeclaration]: export interface StageSettingsChangedEvent{ readonly settings: StageSettings; readonly changed: readonly (keyof StageSettings)[]; }
+StageToken [VariableDeclaration] (from packages/plugin/stage/src/token.ts): StageToken = createCapabilityToken<StageCapability>('stage', { hint: `add stagePlugin() from '@embedpdf/plugin-stage' to your plugins list`, } )
+StageViewState [InterfaceDeclaration]: export interface StageViewState extends StageSettings{ cursor: number; anchor: Anchor; }
+StageViewportChangedEvent [InterfaceDeclaration]: export interface StageViewportChangedEvent{ readonly size: Size; }
+StageZoomChangedEvent [InterfaceDeclaration]: export interface StageZoomChangedEvent{ readonly level: number; readonly previousLevel: number; readonly mode: ZoomModeValue | 'custom'; }
+Viewpoint [InterfaceDeclaration]: export interface Viewpoint{ anchor: Anchor; zoom: ZoomSpec; }
+ViewportPoint [TypeAliasDeclaration]: export type ViewportPoint = Point;
+ViewportRect [TypeAliasDeclaration]: export type ViewportRect = Rect;
+VisiblePage [InterfaceDeclaration]: export interface VisiblePage extends PageBox{ ref: PageRef; screenX: number; screenY: number; transform: PageTransform; visibleRect: Rect; }
+ZoomMode [VariableDeclaration] (from packages/core/stage/src/index.ts): ZoomMode ={ Automatic: 'automatic', FitPage: 'fit-page', FitWidth: 'fit-width', FitAll: 'fit-all', } as const
+ZoomModeValue [TypeAliasDeclaration] (from packages/core/stage/src/index.ts): export type ZoomModeValue = (typeof ZoomMode)[keyof typeof ZoomMode];
+ZoomSpec [TypeAliasDeclaration] (from packages/core/stage/src/index.ts): export type ZoomSpec = |{ mode: ZoomModeValue} |{ level: number} |{ pageWidth: number} |{ pageHeight: number} ;
+ZoomToOptions [InterfaceDeclaration]: export interface ZoomToOptions{ readonly around?: ViewportPoint; }

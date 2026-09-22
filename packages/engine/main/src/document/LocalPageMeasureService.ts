@@ -8,6 +8,7 @@ import {
   type PageMeasurementViewport,
   type PageObjectNumber,
   type WorkerResultPayload,
+  type PageRef,
 } from '@embedpdf/engine-core/runtime';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 import type { ScopeGuard } from '../scope';
@@ -17,7 +18,7 @@ import type { WorkerQueue } from '../worker/WorkerQueue';
 export class LocalPageMeasureService implements PageMeasureService {
   constructor(
     private readonly docId: string,
-    private readonly pageObjectNumber: PageObjectNumber,
+    private readonly ref: PageRef,
     private readonly queue: WorkerQueue,
     private readonly view: { isClosed(): boolean },
     private readonly guard: ScopeGuard,
@@ -33,7 +34,7 @@ export class LocalPageMeasureService implements PageMeasureService {
               kind: 'measure.viewports',
               jobId,
               docId: this.docId,
-              pageObjectNumber: this.pageObjectNumber,
+              page: this.ref,
             }),
         },
         { priority: Priority.MEDIUM },
@@ -57,7 +58,7 @@ export class LocalPageMeasureService implements PageMeasureService {
               kind: 'measure.setScale',
               jobId,
               docId: this.docId,
-              pageObjectNumber: this.pageObjectNumber,
+              page: this.ref,
               measure,
             }),
         },

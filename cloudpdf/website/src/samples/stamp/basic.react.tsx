@@ -50,7 +50,7 @@ function useStandardStamps() {
   useEffect(() => {
     if (libraries.length > 0) return;
     loadDefaultLibrary('en')
-      .then((bytes) => stamp.importLibraryPdf(bytes))
+      .then((bytes) => stamp.importLibrary(bytes))
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
     // Import once per workspace; the library list changing is the outcome.
     // eslint-disable-next-line react-hooks/exhaustive-deps

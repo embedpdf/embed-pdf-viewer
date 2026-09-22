@@ -59,6 +59,12 @@ const ProjectorContext = createContext<ProjectorBinding | null>(null);
 /** Installed by page surfaces (<Stage>, <PageView>) — not by app code. */
 export const ProjectorProvider = ProjectorContext.Provider;
 
+/** The surface's projector binding, or null outside any page surface — for
+ *  chrome that degrades (and warns) instead of throwing. */
+export function useOptionalProjectorBinding(): ProjectorBinding | null {
+  return useContext(ProjectorContext);
+}
+
 /** The surface's projector binding. Reading it subscribes the caller to
  *  projection changes (the binding's identity IS the revision). */
 export function useProjectorBinding(): ProjectorBinding {

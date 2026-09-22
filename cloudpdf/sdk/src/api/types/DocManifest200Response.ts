@@ -71,16 +71,42 @@ export namespace DocManifest200Response {
 
         export namespace Item {
             export interface State {
-                pageObjectNumber: number;
+                page: State.Page;
                 revision: State.Revision;
                 weakAnnotationState: CloudPDF.DocManifest200ResponsePagesItemStateWeakAnnotationState;
             }
 
             export namespace State {
+                export interface Page {
+                    kind: Page.Kind;
+                    pageObjectNumber: number;
+                }
+
+                export namespace Page {
+                    export const Kind = {
+                        ObjectNumber: "objectNumber",
+                    } as const;
+                    export type Kind = (typeof Kind)[keyof typeof Kind];
+                }
+
                 export interface Revision {
                     docSessionId: string;
-                    pageObjectNumber: number;
+                    page: Revision.Page;
                     generation: number;
+                }
+
+                export namespace Revision {
+                    export interface Page {
+                        kind: Page.Kind;
+                        pageObjectNumber: number;
+                    }
+
+                    export namespace Page {
+                        export const Kind = {
+                            ObjectNumber: "objectNumber",
+                        } as const;
+                        export type Kind = (typeof Kind)[keyof typeof Kind];
+                    }
                 }
             }
 

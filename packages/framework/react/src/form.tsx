@@ -40,9 +40,20 @@ import * as React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PdfAnnotationEventKind } from '@embedpdf/plugin-actions/contract';
 import type { AnnotationRef } from '@embedpdf/plugin-annotation/contract';
-import { FormToken } from '@embedpdf/plugin-form';
+// The fill layer is a HOST of the form plugin (render feed, geometry warming, widget events).
+// Re-exported as `FormHostToken` for chrome that reads the fill feed; same runtime token.
+import { FormToken } from '@embedpdf/plugin-form/contract/host';
+export { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
 import { SignatureToken } from '@embedpdf/plugin-signature/contract';
-import type { FormFieldRef, FillItem, FormFieldDTO } from '@embedpdf/plugin-form';
+import { FormToken as FormPublicToken } from '@embedpdf/plugin-form';
+import type {
+  FormCapability,
+  FormFieldRef,
+  FormFieldValue,
+  FillItem,
+  FormFieldDTO,
+} from '@embedpdf/plugin-form';
+import type { EventHook } from '@embedpdf/core';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
 import type { Rect } from '@embedpdf/core-annotation';
@@ -52,11 +63,13 @@ import type { AnnotationRenderer, AnnotationRendererProps } from './annotation';
 import {
   shallowArray,
   useCapability,
+  useCapabilityEvent,
   useOptionalCapability,
   useOptionalSelector,
   usePage,
   useSelector,
 } from './runtime';
+import { usePageLayerFact } from './dev-registry';
 import type { PageContextValue } from './runtime';
 import { FormFocusRing } from './form-focus-ring';
 import { NativeListBox } from './form-listbox';
@@ -94,7 +107,7 @@ function useIsolated<T extends HTMLElement>() {
  * see hover tooltips (session Hide needs no write authority).
  */
 function useWidgetEvents(
-  key: string,
+  fieldRef: FormFieldRef,
   annotationRef: AnnotationRef | null,
 ): Pick<
   React.DOMAttributes<HTMLElement>,
@@ -106,7 +119,7 @@ function useWidgetEvents(
   return useMemo(() => {
     const notify = (event: PdfAnnotationEventKind) => {
       const target = refBox.current;
-      if (target) form.notifyWidgetEvent(key, target, event);
+      if (target) form.notifyWidgetEvent(fieldRef, target, event);
     };
     return {
       onPointerEnter: () => notify('cursorEnter'),
@@ -119,7 +132,7 @@ function useWidgetEvents(
       onFocus: () => notify('focus'),
       onBlur: () => notify('blur'),
     };
-  }, [form, key]);
+  }, [form, fieldRef]);
 }
 
 /**
@@ -133,14 +146,14 @@ function useWidgetEvents(
  * Push buttons keep their own gated door: `disabled` still blocks
  * activation there — unchanged shipped semantics.
  */
-function useWidgetActivation(key: string, annotationRef: AnnotationRef | null): () => void {
+function useWidgetActivation(annotationRef: AnnotationRef | null): () => void {
   const form = useCapability(FormToken);
   const refBox = useRef(annotationRef);
   refBox.current = annotationRef;
   return useCallback(() => {
     const target = refBox.current;
-    if (target) void form.activateWidget(key, target);
-  }, [form, key]);
+    if (target) void form.activateWidget(target);
+  }, [form]);
 }
 
 /* ══════════════════════════ behavior widgets ══════════════════════════ */
@@ -202,7 +215,7 @@ interface WidgetProps<C extends FillItem['control']> {
 function FormWidget({ item, page, appearance }: AnnotationRendererProps) {
   const annot = item.ref?.kind === 'objectNumber' ? item.ref.annotObjectNumber : 0;
   // Reference-stable per model change, so the default Object.is equality holds.
-  const fill = useSelector(FormToken, (c) => (annot > 0 ? c.fillItem(annot) : null));
+  const fill = useSelector(FormToken, (c) => (annot > 0 ? c.getFillItem(annot) : null));
   // Field plane not loaded (or no fill control for this family) → picture only.
   if (!fill) return <Picture page={page} appearance={appearance} apBox={item.apBox} />;
   switch (fill.control) {
@@ -219,12 +232,6 @@ function FormWidget({ item, page, appearance }: AnnotationRendererProps) {
   }
 }
 
-/** The form plugin's field key → the engine ref (the inverse of `fieldKeyOf`). */
-const fieldRefOfKey = (key: string): FormFieldRef =>
-  key.startsWith('obj:')
-    ? { kind: 'objectNumber', fieldObjectNumber: Number(key.slice(4)) }
-    : { kind: 'fqn', name: key.slice(4) };
-
 /**
  * A signature field's widget: the picture (the mark drawn into it, once
  * there is one) with a click target on top. Unsigned → "sign here": the
@@ -236,14 +243,14 @@ const fieldRefOfKey = (key: string): FormFieldRef =>
 function SignatureWidget({ fill, item, page, appearance }: WidgetProps<'signature'>) {
   const signature = useOptionalCapability(SignatureToken);
   const wrap = useIsolated<HTMLDivElement>();
-  const events = useWidgetEvents(fill.key, item.ref);
+  const events = useWidgetEvents(fill.fieldRef, item.ref);
   const b = viewBox(item.box, page);
-  const ref = fieldRefOfKey(fill.key);
+  const ref = fill.fieldRef;
   // The signature plugin's snapshot is the authority on signed-ness (it
   // re-reads on every new version); the field plane's /V is the fallback.
   const signed = useOptionalSelector(
     SignatureToken,
-    (c) => c.signatureOf(ref)?.signed ?? fill.signed,
+    (c) => c.getSignature(ref)?.signed ?? fill.signed,
     fill.signed,
   );
   const actionable = signature != null && (signed || !fill.disabled);
@@ -259,7 +266,7 @@ function SignatureWidget({ fill, item, page, appearance }: WidgetProps<'signatur
           type="button"
           aria-label={fill.label}
           data-signed={signed ? '' : undefined}
-          onClick={() => (signed ? signature.inspect(ref) : signature.setTarget(ref))}
+          onClick={() => (signed ? signature.requestInspection(ref) : signature.setTarget(ref))}
           style={{
             ...fillControl,
             padding: 0,
@@ -276,7 +283,7 @@ function SignatureWidget({ fill, item, page, appearance }: WidgetProps<'signatur
 function ButtonWidget({ fill, item, page, appearance }: WidgetProps<'button'>) {
   const form = useCapability(FormToken);
   const wrap = useIsolated<HTMLDivElement>();
-  const events = useWidgetEvents(fill.key, item.ref);
+  const events = useWidgetEvents(fill.fieldRef, item.ref);
   const b = viewBox(item.box, page);
   // The OUTER div is the event surface — always pointer-active so /AA hover
   // and pointer triggers fire even for a disabled/read-only button; the
@@ -300,7 +307,7 @@ function ButtonWidget({ fill, item, page, appearance }: WidgetProps<'button'>) {
         aria-label={fill.label}
         disabled={fill.disabled}
         onClick={() => {
-          if (item.ref) void form.activateWidget(fill.key, item.ref);
+          if (item.ref) void form.activateWidget(item.ref);
         }}
         style={{
           position: 'absolute',
@@ -326,8 +333,8 @@ function ButtonWidget({ fill, item, page, appearance }: WidgetProps<'button'>) {
 function TextWidget({ fill, item, page, appearance }: WidgetProps<'text'>) {
   const form = useCapability(FormToken);
   const wrap = useIsolated<HTMLDivElement>();
-  const events = useWidgetEvents(fill.key, item.ref);
-  const activate = useWidgetActivation(fill.key, item.ref);
+  const events = useWidgetEvents(fill.fieldRef, item.ref);
+  const activate = useWidgetActivation(item.ref);
   // The editor is ALWAYS MOUNTED (v2's pattern): transparent over the picture
   // at rest, visible while focused. That makes the DOM the focus manager —
   // native Tab order reaches every field, focus enters edit, blur commits —
@@ -339,7 +346,6 @@ function TextWidget({ fill, item, page, appearance }: WidgetProps<'text'>) {
   // Adopt engine truth whenever it changes under us — but never mid-edit.
   useEffect(() => {
     if (!focused) setDraft(fill.value);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fill.value, focused]);
 
   const b = viewBox(item.box, page);
@@ -392,7 +398,7 @@ function TextWidget({ fill, item, page, appearance }: WidgetProps<'text'>) {
         setDraft(fill.value);
         return;
       }
-      if (draft !== fill.value) void form.setText(fill.key, draft);
+      if (draft !== fill.value) void form.setText(fill.fieldRef, draft);
     },
     style: editorStyle,
   };
@@ -437,8 +443,8 @@ function TextWidget({ fill, item, page, appearance }: WidgetProps<'text'>) {
 function ToggleWidget({ fill, item, page, appearance }: WidgetProps<'toggle'>) {
   const form = useCapability(FormToken);
   const wrap = useIsolated<HTMLDivElement>();
-  const events = useWidgetEvents(fill.key, item.ref);
-  const activate = useWidgetActivation(fill.key, item.ref);
+  const events = useWidgetEvents(fill.fieldRef, item.ref);
+  const activate = useWidgetActivation(item.ref);
   const [focused, setFocused] = useState(false);
   const b = viewBox(item.box, page);
   const press = () => {
@@ -449,7 +455,10 @@ function ToggleWidget({ fill, item, page, appearance }: WidgetProps<'toggle'>) {
     // activates (it just doesn't flip).
     const flipped = fill.disabled
       ? undefined
-      : form.toggle(fill.key, fill.kind === 'checkbox' && fill.checked ? null : fill.onState);
+      : form.setChecked(
+          fill.fieldRef,
+          fill.kind === 'checkbox' && fill.checked ? null : fill.onState,
+        );
     void Promise.resolve(flipped).then(activate, activate);
   };
   return (
@@ -508,8 +517,8 @@ function ChoiceFrame({
   innerRef: React.RefObject<HTMLDivElement>;
   children: React.ReactNode;
 }) {
-  const events = useWidgetEvents(fill.key, item.ref);
-  const activate = useWidgetActivation(fill.key, item.ref);
+  const events = useWidgetEvents(fill.fieldRef, item.ref);
+  const activate = useWidgetActivation(item.ref);
   const b = viewBox(item.box, page);
   return (
     <div
@@ -552,7 +561,7 @@ function ComboBoxWidget({ fill, item, page, appearance }: WidgetProps<'choice'>)
         onBlur={() => setFocused(false)}
         onChange={(e) => {
           const values = Array.from(e.currentTarget.selectedOptions).map((o) => o.value);
-          void form.choose(fill.key, values);
+          void form.setChoice(fill.fieldRef, values);
         }}
         style={{
           position: 'absolute',
@@ -594,7 +603,7 @@ function ListBoxWidget({ fill, item, page }: WidgetProps<'choice'>) {
         selected={fill.selected}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        onSelect={(values) => form.choose(fill.key, values)}
+        onSelect={(values) => void form.setChoice(fill.fieldRef, values)}
         style={{
           position: 'absolute',
           inset: 0,
@@ -666,14 +675,14 @@ function FillEventBox({
   activate?: boolean;
   children: React.ReactNode;
 }) {
-  const events = useWidgetEvents(item.key, {
+  const events = useWidgetEvents(item.fieldRef, {
     kind: 'objectNumber',
-    pageObjectNumber: page.pon,
+    page: page.ref,
     annotObjectNumber: item.annotObjectNumber,
   });
-  const onActivate = useWidgetActivation(item.key, {
+  const onActivate = useWidgetActivation({
     kind: 'objectNumber',
-    pageObjectNumber: page.pon,
+    page: page.ref,
     annotObjectNumber: item.annotObjectNumber,
   });
   const css = fillBox(item, page);
@@ -712,7 +721,8 @@ function FillText({
   const css = fillBox(item, page);
   const fontSize = Math.max(9, Math.min(css.height * 0.62, 24));
   const commit = () => {
-    if (draft !== item.value) void form.setText(item.key, draft).catch(() => setDraft(item.value));
+    if (draft !== item.value)
+      void form.setText(item.fieldRef, draft).catch(() => setDraft(item.value));
   };
   const shared: React.CSSProperties = {
     ...controlBase,
@@ -762,9 +772,9 @@ function FillToggle({
   page: PageContextValue;
 }) {
   const form = useCapability(FormToken);
-  const activate = useWidgetActivation(item.key, {
+  const activate = useWidgetActivation({
     kind: 'objectNumber',
-    pageObjectNumber: page.pon,
+    page: page.ref,
     annotObjectNumber: item.annotObjectNumber,
   });
   const css = fillBox(item, page);
@@ -785,7 +795,10 @@ function FillToggle({
           // Checkbox re-click clears; radio click always selects its state.
           // Acrobat's order: the VALUE change first, THEN the /A.
           void Promise.resolve(
-            form.toggle(item.key, item.kind === 'checkbox' && item.checked ? null : item.onState),
+            form.setChecked(
+              item.fieldRef,
+              item.kind === 'checkbox' && item.checked ? null : item.onState,
+            ),
           ).then(activate, activate);
         }}
         style={{
@@ -830,7 +843,7 @@ function FillChoice({
           multi={item.multi}
           options={item.options}
           selected={item.selected}
-          onSelect={(values) => form.choose(item.key, values)}
+          onSelect={(values) => void form.setChoice(item.fieldRef, values)}
           style={{
             ...controlBase,
             ...fillControl,
@@ -847,7 +860,7 @@ function FillChoice({
         aria-label={item.label}
         disabled={item.disabled}
         value={item.selected[0] ?? ''}
-        onChange={(e) => void form.choose(item.key, [e.target.value])}
+        onChange={(e) => void form.setChoice(item.fieldRef, [e.target.value])}
         style={{
           ...controlBase,
           ...fillControl,
@@ -881,9 +894,9 @@ function FillButton({
         aria-label={item.label}
         disabled={item.disabled}
         onClick={() =>
-          void form.activateWidget(item.key, {
+          void form.activateWidget({
             kind: 'objectNumber',
-            pageObjectNumber: page.pon,
+            page: page.ref,
             annotObjectNumber: item.annotObjectNumber,
           })
         }
@@ -912,10 +925,10 @@ function FillSignature({
   page: PageContextValue;
 }) {
   const signature = useOptionalCapability(SignatureToken);
-  const ref = fieldRefOfKey(item.key);
+  const ref = item.fieldRef;
   const signed = useOptionalSelector(
     SignatureToken,
-    (c) => c.signatureOf(ref)?.signed ?? item.signed,
+    (c) => c.getSignature(ref)?.signed ?? item.signed,
     item.signed,
   );
   const actionable = signature != null && (signed || !item.disabled);
@@ -926,7 +939,7 @@ function FillSignature({
           type="button"
           aria-label={item.label}
           data-signed={signed ? '' : undefined}
-          onClick={() => (signed ? signature.inspect(ref) : signature.setTarget(ref))}
+          onClick={() => (signed ? signature.requestInspection(ref) : signature.setTarget(ref))}
           style={{
             ...fillControl,
             padding: 0,
@@ -951,13 +964,14 @@ function FillSignature({
 export function FormLayer() {
   const page = usePage();
   const form = useCapability(FormToken);
-  const active = useSelector(InteractionToken, (c) => c.activeTool().enables.has('form-fill'));
+  usePageLayerFact(page, 'formLayer', true);
+  const active = useSelector(InteractionToken, (c) => c.getActiveTool().enables.has('form-fill'));
 
   useEffect(() => {
-    if (active) form.ensureGeom(page.pon);
-  }, [active, form, page.pon]);
+    if (active) form.ensureLoaded(page.ref);
+  }, [active, form, page.ref]);
 
-  const items = useSelector(FormToken, (c) => c.fillItems(page.pon), shallowArray);
+  const items = useSelector(FormToken, (c) => c.listFillItems(page.ref), shallowArray);
   if (!active) return null;
 
   return (
@@ -986,10 +1000,25 @@ export function useForm() {
   return useCapability(FormToken);
 }
 
+/** Subscribe to one form event for the mounted lifetime: `useFormEvent((c) => c.onValueChanged, handler)`. */
+export function useFormEvent<T>(
+  select: (cap: FormCapability) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  useCapabilityEvent(FormPublicToken, select, handler);
+}
+
 /** The reconciled form snapshot (null until the first load lands),
  *  re-rendering on every form model change. */
 export function useFormSnapshot() {
-  return useSelector(FormToken, (c) => c.snapshot());
+  return useSelector(FormToken, (c) => c.getSnapshot());
+}
+
+/** One field's current value, subscribed (null for an unknown field). */
+export function useFormValue(ref: FormFieldRef): FormFieldValue | null {
+  const key = ref.kind === 'fqn' ? `n:${ref.name}` : `o:${ref.fieldObjectNumber}`;
+  const stable = useMemo(() => ref, [key]);
+  return useSelector(FormPublicToken, (c) => c.getValue(stable));
 }
 
 /**
@@ -999,7 +1028,10 @@ export function useFormSnapshot() {
  */
 export function useFormField(): FormFieldDTO | null {
   const selected = useAnnotationSelected();
-  const widget = selected.length === 1 && selected[0]!.subtype === 'widget' ? selected[0]! : null;
+  const widget =
+    selected.length === 1 && selected[0]!.subtype.startsWith('widget') ? selected[0]! : null;
   const objnum = widget && widget.ref.kind === 'objectNumber' ? widget.ref.annotObjectNumber : 0;
-  return useSelector(FormToken, (c) => (objnum > 0 ? c.fieldForWidget(objnum) : null));
+  return useSelector(FormToken, (c) =>
+    objnum > 0 ? c.getFieldForWidget({ annotObjectNumber: objnum }) : null,
+  );
 }

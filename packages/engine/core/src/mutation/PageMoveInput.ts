@@ -1,4 +1,5 @@
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PageRef } from '../identity/PageRef';
 
 /**
  * Input to `pages.move()`. Always addresses pages by their durable
@@ -16,7 +17,7 @@ export interface PageMoveInput {
    * Pages to move, in the order they should appear after the move.
    * Duplicates and unknown PONs are rejected with `EngineError(InvalidArg)`.
    */
-  pageObjectNumbers: PageObjectNumber[];
+  pages: PageRef[];
   /**
    * Insertion point in the post-removal index space. Must be in
    * `[0, pageCount - pageObjectNumbers.length]`.

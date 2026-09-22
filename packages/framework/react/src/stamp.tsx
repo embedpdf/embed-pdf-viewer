@@ -18,29 +18,50 @@ import { useEffect, useState } from 'react';
 import {
   StampToken,
   type StampAsset,
+  type StampCapability,
   type StampLibrary,
-  type StampLibraryQuery,
+  type StampLibraryFilter,
 } from '@embedpdf/plugin-stamp';
-import { shallowArray, useCapability, useDocumentId, useSelector } from './runtime';
+import type { EventHook } from '@embedpdf/core';
+import {
+  shallowArray,
+  useCapability,
+  useCapabilityEvent,
+  useDocumentId,
+  useSelector,
+} from './runtime';
 
 /** The stamp capability (workspace-scoped: one library set for every document). */
 export function useStamp() {
   return useCapability(StampToken);
 }
 
+/** Subscribe to one stamp event for the mounted lifetime: `useStampEvent((c) => c.onAssetCreated, handler)`. */
+export function useStampEvent<T>(
+  select: (cap: StampCapability) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  useCapabilityEvent(StampToken, select, handler);
+}
+
 /** Libraries, optionally of one kind or several (`{ kind: 'stamps' }`, `{ kind: ['stamps', 'toolbar'] }`). */
-export function useStampLibraries(query?: StampLibraryQuery): StampLibrary[] {
-  const kinds = query?.kind === undefined ? undefined : ([] as string[]).concat(query.kind).join('\u0000');
+export function useStampLibraries(query?: StampLibraryFilter): readonly StampLibrary[] {
+  const kinds =
+    query?.kind === undefined ? undefined : ([] as string[]).concat(query.kind).join('\u0000');
   return useSelector(
     StampToken,
-    (c) => c.libraries(kinds === undefined ? undefined : { kind: kinds.split('\u0000') }),
+    (c) => c.listLibraries(kinds === undefined ? undefined : { kind: kinds.split('\u0000') }),
     shallowArray,
   );
 }
 
 /** Assets of one library, or every asset when `libraryId` is omitted. */
-export function useStampAssets(libraryId?: string): StampAsset[] {
-  return useSelector(StampToken, (c) => c.assets(libraryId), shallowArray);
+export function useStampAssets(libraryId?: string): readonly StampAsset[] {
+  return useSelector(
+    StampToken,
+    (c) => c.listAssets(libraryId ? { libraryId } : undefined),
+    shallowArray,
+  );
 }
 
 /**
@@ -53,7 +74,7 @@ export function useStampAssetPreviewUrl(assetId: string | null): string | null {
   const stamp = useCapability(StampToken);
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
-    const preview = assetId ? stamp.assetPreview(assetId) : null;
+    const preview = assetId ? stamp.getAssetPreview(assetId) : null;
     if (!preview) {
       setUrl(null);
       return;

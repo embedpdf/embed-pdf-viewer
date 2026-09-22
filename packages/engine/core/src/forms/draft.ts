@@ -1,6 +1,6 @@
 import type { WidgetAppearance } from '../annotation/kinds/widget.shared';
 import type { PdfRect } from '../geometry/primitives';
-import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PageRef } from '../identity/PageRef';
 
 export type { WidgetAppearance } from '../annotation/kinds/widget.shared';
 
@@ -10,7 +10,7 @@ export type { WidgetAppearance } from '../annotation/kinds/widget.shared';
  * engine job.
  */
 export interface WidgetPlacement {
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
   /** PDF user space. */
   rect: PdfRect;
   /**

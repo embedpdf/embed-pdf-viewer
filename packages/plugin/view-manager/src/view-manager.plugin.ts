@@ -1,22 +1,22 @@
 import { definePlugin, DocumentsToken } from '@embedpdf/core';
-import { createViewManagerCapability } from './capability';
-import { registerViewManagerEffects } from './effects';
-import { initialViewManagerState, viewManagerReducer } from './reducer';
-import { ViewManagerToken } from './types';
-import type { ViewManagerAction, ViewManagerCapability, ViewManagerState } from './types';
+
+import { createViewManagerController } from './controller';
+import { ViewManagerToken } from './host-contract';
+import type { ViewManagerHostCapability } from './host-contract';
+import { initialViewManagerState, viewManagerReducer } from './model';
+import type { ViewManagerAction, ViewManagerState } from './model';
 
 /**
  * The view-manager plugin: workspace-scoped (one instance that sees every
  * document) because panes are a workspace concern, not a per-document one.
  */
 export const viewManagerPlugin = () =>
-  definePlugin<ViewManagerState, ViewManagerAction, ViewManagerCapability>({
+  definePlugin<ViewManagerState, ViewManagerAction, ViewManagerHostCapability>({
     id: 'view-manager',
     scope: 'workspace',
     token: ViewManagerToken,
     requires: [DocumentsToken],
     initialState: initialViewManagerState,
     reduce: viewManagerReducer,
-    capability: createViewManagerCapability,
-    effects: registerViewManagerEffects,
+    create: (ctx) => createViewManagerController(ctx),
   });

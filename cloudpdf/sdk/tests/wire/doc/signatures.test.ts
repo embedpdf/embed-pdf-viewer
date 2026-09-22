@@ -17,7 +17,7 @@ describe("SignaturesClient", () => {
                     index: 1,
                     field: { kind: "objectNumber", fieldObjectNumber: 1 },
                     fieldName: "fieldName",
-                    widget: { annotObjectNumber: 1, pageObjectNumber: 1 },
+                    widget: { ref: null, annotObjectNumber: 1, page: null },
                     signed: true,
                     kind: "signature",
                     filter: "filter",
@@ -145,7 +145,15 @@ describe("SignaturesClient", () => {
                 index: 1,
                 field: { kind: "objectNumber", fieldObjectNumber: 1 },
                 fieldName: "fieldName",
-                widget: { annotObjectNumber: 1, pageObjectNumber: 1 },
+                widget: {
+                    ref: {
+                        kind: "objectNumber",
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        annotObjectNumber: 1,
+                    },
+                    annotObjectNumber: 1,
+                    page: { kind: "objectNumber", pageObjectNumber: 1 },
+                },
                 signed: true,
                 kind: "signature",
                 filter: "filter",
@@ -189,8 +197,12 @@ describe("SignaturesClient", () => {
             meta: {
                 affectedPages: [
                     {
-                        pageObjectNumber: 1,
-                        revision: { docSessionId: "docSessionId", pageObjectNumber: 1, generation: 1 },
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        revision: {
+                            docSessionId: "docSessionId",
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            generation: 1,
+                        },
                         weakAnnotationState: { kind: "unknown" },
                     },
                 ],
@@ -200,7 +212,12 @@ describe("SignaturesClient", () => {
                     annotationsVersion: 1,
                     layerVersion: 1,
                     working: true,
-                    pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1 },
+                        },
+                    ],
                 },
             },
         };

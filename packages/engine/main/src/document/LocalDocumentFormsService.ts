@@ -15,7 +15,8 @@ import {
   type FormFieldUpdateResult,
   type SignatureAppearanceInput,
   type FormWidgetLinkResult,
-  type FormWidgetRef,
+  type FormWidget,
+  type AnnotationRef,
   type FormFieldValue,
   type FormImportResult,
   type FormRepairOptions,
@@ -206,7 +207,9 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'forms.setSignatureAppearance', jobId, docId, ref, pdf, pageIndex }, [pdf]),
+          wirePack({ kind: 'forms.setSignatureAppearance', jobId, docId, ref, pdf, pageIndex }, [
+            pdf,
+          ]),
       },
       { priority: Priority.HIGH },
     );
@@ -251,7 +254,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
 
   attachWidget(
     ref: FormFieldRef,
-    widget: FormWidgetRef,
+    widget: AnnotationRef,
     options?: { onState?: string },
   ): AbortablePromise<FormWidgetLinkResult> {
     const rejected = this.gate('doc.forms.modify');
@@ -278,7 +281,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     });
   }
 
-  detachWidget(ref: FormFieldRef, widget: FormWidgetRef): AbortablePromise<FormWidgetLinkResult> {
+  detachWidget(ref: FormFieldRef, widget: AnnotationRef): AbortablePromise<FormWidgetLinkResult> {
     const rejected = this.gate('doc.forms.modify');
     if (rejected) return rejected;
     const docId = this.docId;

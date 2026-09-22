@@ -15,52 +15,164 @@ export type PdfDestination =
 export namespace PdfDestination {
     export interface Xyz {
         kind: "xyz";
-        pageObjectNumber: number;
+        page: PdfDestinationXyz.Page;
         left?: (number | null) | undefined;
         top?: (number | null) | undefined;
         zoom?: (number | null) | undefined;
     }
 
+    export namespace PdfDestinationXyz {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+    }
+
     export interface Fit {
         kind: "fit";
-        pageObjectNumber: number;
+        page: PdfDestinationFit.Page;
+    }
+
+    export namespace PdfDestinationFit {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
     }
 
     export interface FitH {
         kind: "fitH";
-        pageObjectNumber: number;
+        page: PdfDestinationFitH.Page;
         top?: (number | null) | undefined;
+    }
+
+    export namespace PdfDestinationFitH {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
     }
 
     export interface FitV {
         kind: "fitV";
-        pageObjectNumber: number;
+        page: PdfDestinationFitV.Page;
         left?: (number | null) | undefined;
+    }
+
+    export namespace PdfDestinationFitV {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
     }
 
     export interface FitR {
         kind: "fitR";
-        pageObjectNumber: number;
+        page: PdfDestinationFitR.Page;
         left: number;
         bottom: number;
         right: number;
         top: number;
     }
 
+    export namespace PdfDestinationFitR {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+    }
+
     export interface FitB {
         kind: "fitB";
-        pageObjectNumber: number;
+        page: PdfDestinationFitB.Page;
+    }
+
+    export namespace PdfDestinationFitB {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
     }
 
     export interface FitBh {
         kind: "fitBH";
-        pageObjectNumber: number;
+        page: PdfDestinationFitBh.Page;
         top?: (number | null) | undefined;
+    }
+
+    export namespace PdfDestinationFitBh {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
     }
 
     export interface FitBv {
         kind: "fitBV";
-        pageObjectNumber: number;
+        page: PdfDestinationFitBv.Page;
         left?: (number | null) | undefined;
+    }
+
+    export namespace PdfDestinationFitBv {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
     }
 }

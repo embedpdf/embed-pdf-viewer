@@ -1,7 +1,7 @@
 import type { MutationMeta } from './MutationMeta';
 import type { PageFlattenUsage } from './PageFlattenResult';
 import type { AnnotationRef } from '../identity/AnnotationRef';
-import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PageRef } from '../identity/PageRef';
 
 /** Input for `page(pon).annotations.flatten()`: the refs (all on that page). */
 export interface AnnotationFlattenInput {
@@ -27,7 +27,7 @@ export interface AnnotationFlattenItemResult {
  * `PageFlattenResult`.
  */
 export interface AnnotationFlattenResult {
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
   usage: PageFlattenUsage;
   results: AnnotationFlattenItemResult[];
   meta: MutationMeta | null;

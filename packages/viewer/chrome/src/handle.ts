@@ -14,11 +14,29 @@
  * between "what our UI can do" and "what el.viewer can do" is structural.
  */
 import type {
+  ActiveDocumentChangedEvent,
   CapabilityToken,
+  DocumentClosedEvent,
+  DocumentLockedEvent,
+  DocumentOpenedEvent,
+  DocumentOpenFailedEvent,
+  DocumentPagesChangedEvent,
   DocumentsCapability,
+  EventHook,
   Kernel,
   Unsubscribe,
 } from '@embedpdf/react/runtime';
+
+/** The document lifecycle events `viewer.on(event, listener)` subscribes, by
+ *  short name — the same hooks as `viewer.documents.on*`. */
+export interface ViewerEvents {
+  opened: DocumentOpenedEvent;
+  openFailed: DocumentOpenFailedEvent;
+  locked: DocumentLockedEvent;
+  closed: DocumentClosedEvent;
+  activeChanged: ActiveDocumentChangedEvent;
+  pagesChanged: DocumentPagesChangedEvent;
+}
 import { CommandsToken, resolvedCommandsEqual } from '@embedpdf/react/commands';
 import type { ResolvedCommand } from '@embedpdf/react/commands';
 
@@ -49,6 +67,13 @@ export interface ViewerHandle extends ScopedViewerHandle {
     isEqual?: (a: T, b: T) => boolean,
   ): Unsubscribe;
 
+  /** Subscribe to one document lifecycle event (`'opened'`, `'closed'`,
+   *  `'activeChanged'`, …) — occurrences, never state; read state with `watch`. */
+  on<K extends keyof ViewerEvents>(
+    event: K,
+    listener: (event: ViewerEvents[K]) => void,
+  ): Unsubscribe;
+
   // ── commands: the UI vocabulary layered on the same capabilities ──────────
   execute(id: string, documentId?: string): void;
   resolve(id: string, documentId?: string): ResolvedCommand | null;
@@ -73,6 +98,14 @@ export function createViewerHandle(kernel: Kernel): ViewerHandle {
   };
 
   const commands = () => kernel.capability(CommandsToken);
+  const hooks: { [K in keyof ViewerEvents]: EventHook<ViewerEvents[K]> } = {
+    opened: kernel.documents.onOpened,
+    openFailed: kernel.documents.onOpenFailed,
+    locked: kernel.documents.onLocked,
+    closed: kernel.documents.onClosed,
+    activeChanged: kernel.documents.onActiveChanged,
+    pagesChanged: kernel.documents.onPagesChanged,
+  };
 
   return {
     documents: kernel.documents,
@@ -83,9 +116,10 @@ export function createViewerHandle(kernel: Kernel): ViewerHandle {
       tryGet: (token) => kernel.tryCapability(token, documentId),
     }),
     watch,
-    execute: (id, documentId) => commands().execute(id, documentId),
-    resolve: (id, documentId) => commands().resolve(id, documentId) ?? null,
+    on: (event, listener) => hooks[event](listener as (e: ViewerEvents[typeof event]) => void),
+    execute: (id, documentId) => void commands().execute(id, { documentId }),
+    resolve: (id, documentId) => commands().resolveCommand(id, documentId) ?? null,
     watchCommand: (id, cb) =>
-      watch(() => commands().resolve(id) ?? null, cb, resolvedCommandsEqual),
+      watch(() => commands().resolveCommand(id) ?? null, cb, resolvedCommandsEqual),
   };
 }

@@ -12,6 +12,6 @@
  * cached capability instance with every method visible.
  */
 export * from './host-contract';
-export { createAnnotationCapability } from './capability';
-export { buildToolRegistry } from './tools';
-export type { ResolvedTool } from './tools';
+export { createAnnotationController } from './controller';
+export { buildToolRegistry } from './tools/definitions';
+export type { ResolvedTool } from './tools/definitions';

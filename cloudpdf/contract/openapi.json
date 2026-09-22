@@ -209,7 +209,7 @@
         }
       }
     },
-    "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pon}/items": {
+    "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pageKey}/items": {
       "get": {
         "operationId": "doc.annotations.list",
         "x-fern-sdk-group-name": ["doc", "annotations"],
@@ -246,12 +246,14 @@
             }
           },
           {
-            "name": "pon",
+            "name": "pageKey",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "minimum": 0
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^obj:[1-9][0-9]*$",
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
             }
           },
           {
@@ -334,12 +336,14 @@
             }
           },
           {
-            "name": "pon",
+            "name": "pageKey",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "minimum": 0
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^obj:[1-9][0-9]*$",
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
             }
           },
           {
@@ -406,7 +410,7 @@
         }
       }
     },
-    "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pon}/items/{annotKey}": {
+    "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pageKey}/items/{annotKey}": {
       "patch": {
         "operationId": "doc.annotations.update",
         "x-fern-sdk-group-name": ["doc", "annotations"],
@@ -443,12 +447,14 @@
             }
           },
           {
-            "name": "pon",
+            "name": "pageKey",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "minimum": 0
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^obj:[1-9][0-9]*$",
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
             }
           },
           {
@@ -559,12 +565,14 @@
             }
           },
           {
-            "name": "pon",
+            "name": "pageKey",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "minimum": 0
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^obj:[1-9][0-9]*$",
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
             }
           },
           {
@@ -620,7 +628,7 @@
         }
       }
     },
-    "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pon}/items/appearance": {
+    "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pageKey}/items/appearance": {
       "post": {
         "operationId": "doc.annotations.exportAppearance",
         "x-fern-sdk-group-name": ["doc", "annotations"],
@@ -657,12 +665,14 @@
             }
           },
           {
-            "name": "pon",
+            "name": "pageKey",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "minimum": 0
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^obj:[1-9][0-9]*$",
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
             }
           },
           {
@@ -730,7 +740,7 @@
         }
       }
     },
-    "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pon}/items/flatten": {
+    "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pageKey}/items/flatten": {
       "post": {
         "operationId": "doc.annotations.flatten",
         "x-fern-sdk-group-name": ["doc", "annotations"],
@@ -767,12 +777,14 @@
             }
           },
           {
-            "name": "pon",
+            "name": "pageKey",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "minimum": 0
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^obj:[1-9][0-9]*$",
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
             }
           },
           {
@@ -1552,7 +1564,7 @@
         }
       }
     },
-    "/v1/docs/{docId}/layers/{layerName}/pages/{pon}/scale": {
+    "/v1/docs/{docId}/layers/{layerName}/pages/{pageKey}/scale": {
       "put": {
         "operationId": "doc.pages.setScale",
         "x-fern-sdk-group-name": ["doc", "pages"],
@@ -1589,12 +1601,14 @@
             }
           },
           {
-            "name": "pon",
+            "name": "pageKey",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "minimum": 0
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^obj:[1-9][0-9]*$",
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
             }
           },
           {
@@ -1661,7 +1675,7 @@
         }
       }
     },
-    "/v1/docs/{docId}/layers/{layerName}/pages/{pon}/viewports": {
+    "/v1/docs/{docId}/layers/{layerName}/pages/{pageKey}/viewports": {
       "get": {
         "operationId": "doc.pages.viewports",
         "x-fern-sdk-group-name": ["doc", "pages"],
@@ -1698,12 +1712,14 @@
             }
           },
           {
-            "name": "pon",
+            "name": "pageKey",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "minimum": 0
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^obj:[1-9][0-9]*$",
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
             }
           },
           {
@@ -2761,7 +2777,7 @@
         }
       }
     },
-    "/v1/docs/{docId}/layers/{layerName}/render/pages/{pon}/data": {
+    "/v1/docs/{docId}/layers/{layerName}/render/pages/{pageKey}/data": {
       "get": {
         "operationId": "doc.render",
         "x-fern-sdk-group-name": ["doc"],
@@ -2799,12 +2815,14 @@
             }
           },
           {
-            "name": "pon",
+            "name": "pageKey",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "minimum": 0
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^obj:[1-9][0-9]*$",
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
             }
           },
           {
@@ -3378,7 +3396,7 @@
         }
       }
     },
-    "/v1/docs/{docId}/layers/{layerName}/text/pages/{pon}/data": {
+    "/v1/docs/{docId}/layers/{layerName}/text/pages/{pageKey}/data": {
       "get": {
         "operationId": "doc.text",
         "x-fern-sdk-group-name": ["doc"],
@@ -3415,12 +3433,14 @@
             }
           },
           {
-            "name": "pon",
+            "name": "pageKey",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "minimum": 0
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^obj:[1-9][0-9]*$",
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
             }
           },
           {
@@ -6141,10 +6161,21 @@
                 "type": "string",
                 "enum": ["xyz"]
               },
-              "pageObjectNumber": {
-                "type": "integer",
-                "exclusiveMinimum": true,
-                "minimum": 0
+              "page": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": ["objectNumber"]
+                  },
+                  "pageObjectNumber": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  }
+                },
+                "required": ["kind", "pageObjectNumber"],
+                "additionalProperties": false
               },
               "left": {
                 "type": "number",
@@ -6157,7 +6188,7 @@
                 "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/left"
               }
             },
-            "required": ["kind", "pageObjectNumber"],
+            "required": ["kind", "page"],
             "additionalProperties": false
           },
           {
@@ -6167,11 +6198,11 @@
                 "type": "string",
                 "enum": ["fit"]
               },
-              "pageObjectNumber": {
-                "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/pageObjectNumber"
+              "page": {
+                "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/page"
               }
             },
-            "required": ["kind", "pageObjectNumber"],
+            "required": ["kind", "page"],
             "additionalProperties": false
           },
           {
@@ -6181,14 +6212,14 @@
                 "type": "string",
                 "enum": ["fitH"]
               },
-              "pageObjectNumber": {
-                "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/pageObjectNumber"
+              "page": {
+                "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/page"
               },
               "top": {
                 "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/left"
               }
             },
-            "required": ["kind", "pageObjectNumber"],
+            "required": ["kind", "page"],
             "additionalProperties": false
           },
           {
@@ -6198,14 +6229,14 @@
                 "type": "string",
                 "enum": ["fitV"]
               },
-              "pageObjectNumber": {
-                "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/pageObjectNumber"
+              "page": {
+                "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/page"
               },
               "left": {
                 "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/left"
               }
             },
-            "required": ["kind", "pageObjectNumber"],
+            "required": ["kind", "page"],
             "additionalProperties": false
           },
           {
@@ -6215,8 +6246,8 @@
                 "type": "string",
                 "enum": ["fitR"]
               },
-              "pageObjectNumber": {
-                "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/pageObjectNumber"
+              "page": {
+                "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/page"
               },
               "left": {
                 "type": "number"
@@ -6231,7 +6262,7 @@
                 "type": "number"
               }
             },
-            "required": ["kind", "pageObjectNumber", "left", "bottom", "right", "top"],
+            "required": ["kind", "page", "left", "bottom", "right", "top"],
             "additionalProperties": false
           },
           {
@@ -6241,11 +6272,11 @@
                 "type": "string",
                 "enum": ["fitB"]
               },
-              "pageObjectNumber": {
-                "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/pageObjectNumber"
+              "page": {
+                "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/page"
               }
             },
-            "required": ["kind", "pageObjectNumber"],
+            "required": ["kind", "page"],
             "additionalProperties": false
           },
           {
@@ -6255,14 +6286,14 @@
                 "type": "string",
                 "enum": ["fitBH"]
               },
-              "pageObjectNumber": {
-                "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/pageObjectNumber"
+              "page": {
+                "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/page"
               },
               "top": {
                 "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/left"
               }
             },
-            "required": ["kind", "pageObjectNumber"],
+            "required": ["kind", "page"],
             "additionalProperties": false
           },
           {
@@ -6272,14 +6303,14 @@
                 "type": "string",
                 "enum": ["fitBV"]
               },
-              "pageObjectNumber": {
-                "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/pageObjectNumber"
+              "page": {
+                "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/page"
               },
               "left": {
                 "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/left"
               }
             },
-            "required": ["kind", "pageObjectNumber"],
+            "required": ["kind", "page"],
             "additionalProperties": false
           }
         ]
@@ -9479,10 +9510,21 @@
                 "state": {
                   "type": "object",
                   "properties": {
-                    "pageObjectNumber": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "minimum": 0
+                    "page": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["objectNumber"]
+                        },
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["kind", "pageObjectNumber"],
+                      "additionalProperties": false
                     },
                     "revision": {
                       "type": "object",
@@ -9490,17 +9532,15 @@
                         "docSessionId": {
                           "type": "string"
                         },
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocManifest200Response/properties/pages/items/properties/state/properties/page"
                         },
                         "generation": {
                           "type": "integer",
                           "minimum": 0
                         }
                       },
-                      "required": ["docSessionId", "pageObjectNumber", "generation"],
+                      "required": ["docSessionId", "page", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -9533,7 +9573,7 @@
                       ]
                     }
                   },
-                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
+                  "required": ["page", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 },
                 "cache": {
@@ -9810,16 +9850,109 @@
                 "widget": {
                   "type": "object",
                   "properties": {
+                    "ref": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["objectNumber"]
+                            },
+                            "page": {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": ["objectNumber"]
+                                },
+                                "pageObjectNumber": {
+                                  "type": "integer",
+                                  "exclusiveMinimum": true,
+                                  "minimum": 0
+                                }
+                              },
+                              "required": ["kind", "pageObjectNumber"],
+                              "additionalProperties": false
+                            },
+                            "annotObjectNumber": {
+                              "type": "integer",
+                              "exclusiveMinimum": true,
+                              "minimum": 0
+                            }
+                          },
+                          "required": ["kind", "page", "annotObjectNumber"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["nm"]
+                            },
+                            "page": {
+                              "$ref": "#/components/schemas/DocSignaturesList200Response/properties/signatures/items/properties/widget/properties/ref/anyOf/0/properties/page"
+                            },
+                            "nm": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["kind", "page", "nm"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["index"]
+                            },
+                            "page": {
+                              "$ref": "#/components/schemas/DocSignaturesList200Response/properties/signatures/items/properties/widget/properties/ref/anyOf/0/properties/page"
+                            },
+                            "index": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "revision": {
+                              "type": "object",
+                              "properties": {
+                                "docSessionId": {
+                                  "type": "string"
+                                },
+                                "page": {
+                                  "$ref": "#/components/schemas/DocSignaturesList200Response/properties/signatures/items/properties/widget/properties/ref/anyOf/0/properties/page"
+                                },
+                                "generation": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                }
+                              },
+                              "required": ["docSessionId", "page", "generation"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": ["kind", "page", "index", "revision"],
+                          "additionalProperties": false
+                        }
+                      ],
+                      "nullable": true
+                    },
                     "annotObjectNumber": {
                       "type": "integer",
                       "minimum": 0
                     },
-                    "pageObjectNumber": {
-                      "type": "integer",
-                      "minimum": 0
+                    "page": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/DocSignaturesList200Response/properties/signatures/items/properties/widget/properties/ref/anyOf/0/properties/page"
+                        }
+                      ],
+                      "nullable": true
                     }
                   },
-                  "required": ["annotObjectNumber", "pageObjectNumber"],
+                  "required": ["ref", "annotObjectNumber", "page"],
                   "additionalProperties": false,
                   "nullable": true
                 },
@@ -10758,16 +10891,109 @@
               "widget": {
                 "type": "object",
                 "properties": {
+                  "ref": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["objectNumber"]
+                          },
+                          "page": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": ["objectNumber"]
+                              },
+                              "pageObjectNumber": {
+                                "type": "integer",
+                                "exclusiveMinimum": true,
+                                "minimum": 0
+                              }
+                            },
+                            "required": ["kind", "pageObjectNumber"],
+                            "additionalProperties": false
+                          },
+                          "annotObjectNumber": {
+                            "type": "integer",
+                            "exclusiveMinimum": true,
+                            "minimum": 0
+                          }
+                        },
+                        "required": ["kind", "page", "annotObjectNumber"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["nm"]
+                          },
+                          "page": {
+                            "$ref": "#/components/schemas/DocSignaturesComplete200Response/properties/signature/properties/widget/properties/ref/anyOf/0/properties/page"
+                          },
+                          "nm": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["kind", "page", "nm"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["index"]
+                          },
+                          "page": {
+                            "$ref": "#/components/schemas/DocSignaturesComplete200Response/properties/signature/properties/widget/properties/ref/anyOf/0/properties/page"
+                          },
+                          "index": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "revision": {
+                            "type": "object",
+                            "properties": {
+                              "docSessionId": {
+                                "type": "string"
+                              },
+                              "page": {
+                                "$ref": "#/components/schemas/DocSignaturesComplete200Response/properties/signature/properties/widget/properties/ref/anyOf/0/properties/page"
+                              },
+                              "generation": {
+                                "type": "integer",
+                                "minimum": 0
+                              }
+                            },
+                            "required": ["docSessionId", "page", "generation"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": ["kind", "page", "index", "revision"],
+                        "additionalProperties": false
+                      }
+                    ],
+                    "nullable": true
+                  },
                   "annotObjectNumber": {
                     "type": "integer",
                     "minimum": 0
                   },
-                  "pageObjectNumber": {
-                    "type": "integer",
-                    "minimum": 0
+                  "page": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/DocSignaturesComplete200Response/properties/signature/properties/widget/properties/ref/anyOf/0/properties/page"
+                      }
+                    ],
+                    "nullable": true
                   }
                 },
-                "required": ["annotObjectNumber", "pageObjectNumber"],
+                "required": ["ref", "annotObjectNumber", "page"],
                 "additionalProperties": false,
                 "nullable": true
               },
@@ -11094,29 +11320,11 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "pageObjectNumber": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "minimum": 0
+                    "page": {
+                      "$ref": "#/components/schemas/DocSignaturesComplete200Response/properties/signature/properties/widget/properties/ref/anyOf/0/properties/page"
                     },
                     "revision": {
-                      "type": "object",
-                      "properties": {
-                        "docSessionId": {
-                          "type": "string"
-                        },
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
-                        },
-                        "generation": {
-                          "type": "integer",
-                          "minimum": 0
-                        }
-                      },
-                      "required": ["docSessionId", "pageObjectNumber", "generation"],
-                      "additionalProperties": false
+                      "$ref": "#/components/schemas/DocSignaturesComplete200Response/properties/signature/properties/widget/properties/ref/anyOf/2/properties/revision"
                     },
                     "weakAnnotationState": {
                       "anyOf": [
@@ -11148,7 +11356,7 @@
                       ]
                     }
                   },
-                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
+                  "required": ["page", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -11182,10 +11390,8 @@
                     "items": {
                       "type": "object",
                       "properties": {
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocSignaturesComplete200Response/properties/signature/properties/widget/properties/ref/anyOf/0/properties/page"
                         },
                         "cache": {
                           "type": "object",
@@ -11205,7 +11411,7 @@
                           "additionalProperties": false
                         }
                       },
-                      "required": ["pageObjectNumber", "cache"],
+                      "required": ["page", "cache"],
                       "additionalProperties": false
                     }
                   }
@@ -11613,16 +11819,109 @@
                 "widget": {
                   "type": "object",
                   "properties": {
+                    "ref": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["objectNumber"]
+                            },
+                            "page": {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": ["objectNumber"]
+                                },
+                                "pageObjectNumber": {
+                                  "type": "integer",
+                                  "exclusiveMinimum": true,
+                                  "minimum": 0
+                                }
+                              },
+                              "required": ["kind", "pageObjectNumber"],
+                              "additionalProperties": false
+                            },
+                            "annotObjectNumber": {
+                              "type": "integer",
+                              "exclusiveMinimum": true,
+                              "minimum": 0
+                            }
+                          },
+                          "required": ["kind", "page", "annotObjectNumber"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["nm"]
+                            },
+                            "page": {
+                              "$ref": "#/components/schemas/DocVersionsSignatures200Response/properties/signatures/items/properties/widget/properties/ref/anyOf/0/properties/page"
+                            },
+                            "nm": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["kind", "page", "nm"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["index"]
+                            },
+                            "page": {
+                              "$ref": "#/components/schemas/DocVersionsSignatures200Response/properties/signatures/items/properties/widget/properties/ref/anyOf/0/properties/page"
+                            },
+                            "index": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "revision": {
+                              "type": "object",
+                              "properties": {
+                                "docSessionId": {
+                                  "type": "string"
+                                },
+                                "page": {
+                                  "$ref": "#/components/schemas/DocVersionsSignatures200Response/properties/signatures/items/properties/widget/properties/ref/anyOf/0/properties/page"
+                                },
+                                "generation": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                }
+                              },
+                              "required": ["docSessionId", "page", "generation"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": ["kind", "page", "index", "revision"],
+                          "additionalProperties": false
+                        }
+                      ],
+                      "nullable": true
+                    },
                     "annotObjectNumber": {
                       "type": "integer",
                       "minimum": 0
                     },
-                    "pageObjectNumber": {
-                      "type": "integer",
-                      "minimum": 0
+                    "page": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/DocVersionsSignatures200Response/properties/signatures/items/properties/widget/properties/ref/anyOf/0/properties/page"
+                        }
+                      ],
+                      "nullable": true
                     }
                   },
-                  "required": ["annotObjectNumber", "pageObjectNumber"],
+                  "required": ["ref", "annotObjectNumber", "page"],
                   "additionalProperties": false,
                   "nullable": true
                 },
@@ -12584,10 +12883,21 @@
           "pageState": {
             "type": "object",
             "properties": {
-              "pageObjectNumber": {
-                "type": "integer",
-                "exclusiveMinimum": true,
-                "minimum": 0
+              "page": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": ["objectNumber"]
+                  },
+                  "pageObjectNumber": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  }
+                },
+                "required": ["kind", "pageObjectNumber"],
+                "additionalProperties": false
               },
               "revision": {
                 "type": "object",
@@ -12595,17 +12905,15 @@
                   "docSessionId": {
                     "type": "string"
                   },
-                  "pageObjectNumber": {
-                    "type": "integer",
-                    "exclusiveMinimum": true,
-                    "minimum": 0
+                  "page": {
+                    "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/pageState/properties/page"
                   },
                   "generation": {
                     "type": "integer",
                     "minimum": 0
                   }
                 },
-                "required": ["docSessionId", "pageObjectNumber", "generation"],
+                "required": ["docSessionId", "page", "generation"],
                 "additionalProperties": false
               },
               "weakAnnotationState": {
@@ -12638,7 +12946,7 @@
                 ]
               }
             },
-            "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
+            "required": ["page", "revision", "weakAnnotationState"],
             "additionalProperties": false
           },
           "annotations": {
@@ -12657,10 +12965,8 @@
                               "type": "string",
                               "enum": ["objectNumber"]
                             },
-                            "pageObjectNumber": {
-                              "type": "integer",
-                              "exclusiveMinimum": true,
-                              "minimum": 0
+                            "page": {
+                              "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/pageState/properties/page"
                             },
                             "annotObjectNumber": {
                               "type": "integer",
@@ -12668,7 +12974,7 @@
                               "minimum": 0
                             }
                           },
-                          "required": ["kind", "pageObjectNumber", "annotObjectNumber"],
+                          "required": ["kind", "page", "annotObjectNumber"],
                           "additionalProperties": false
                         },
                         {
@@ -12678,16 +12984,14 @@
                               "type": "string",
                               "enum": ["nm"]
                             },
-                            "pageObjectNumber": {
-                              "type": "integer",
-                              "exclusiveMinimum": true,
-                              "minimum": 0
+                            "page": {
+                              "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/pageState/properties/page"
                             },
                             "nm": {
                               "type": "string"
                             }
                           },
-                          "required": ["kind", "pageObjectNumber", "nm"],
+                          "required": ["kind", "page", "nm"],
                           "additionalProperties": false
                         },
                         {
@@ -12697,10 +13001,8 @@
                               "type": "string",
                               "enum": ["index"]
                             },
-                            "pageObjectNumber": {
-                              "type": "integer",
-                              "exclusiveMinimum": true,
-                              "minimum": 0
+                            "page": {
+                              "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/pageState/properties/page"
                             },
                             "index": {
                               "type": "integer",
@@ -12710,15 +13012,13 @@
                               "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/pageState/properties/revision"
                             }
                           },
-                          "required": ["kind", "pageObjectNumber", "index", "revision"],
+                          "required": ["kind", "page", "index", "revision"],
                           "additionalProperties": false
                         }
                       ]
                     },
-                    "pageObjectNumber": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "minimum": 0
+                    "page": {
+                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/pageState/properties/page"
                     },
                     "index": {
                       "type": "integer",
@@ -12936,7 +13236,7 @@
                   },
                   "required": [
                     "ref",
-                    "pageObjectNumber",
+                    "page",
                     "index",
                     "identityQuality",
                     "nm",
@@ -12963,8 +13263,8 @@
                     "ref": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/ref"
                     },
-                    "pageObjectNumber": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                    "page": {
+                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/pageState/properties/page"
                     },
                     "index": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/index"
@@ -13036,7 +13336,7 @@
                   },
                   "required": [
                     "ref",
-                    "pageObjectNumber",
+                    "page",
                     "index",
                     "identityQuality",
                     "nm",
@@ -13063,8 +13363,8 @@
                     "ref": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/ref"
                     },
-                    "pageObjectNumber": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                    "page": {
+                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/pageState/properties/page"
                     },
                     "index": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/index"
@@ -13136,7 +13436,7 @@
                   },
                   "required": [
                     "ref",
-                    "pageObjectNumber",
+                    "page",
                     "index",
                     "identityQuality",
                     "nm",
@@ -13163,8 +13463,8 @@
                     "ref": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/ref"
                     },
-                    "pageObjectNumber": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                    "page": {
+                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/pageState/properties/page"
                     },
                     "index": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/index"
@@ -13241,7 +13541,7 @@
                   },
                   "required": [
                     "ref",
-                    "pageObjectNumber",
+                    "page",
                     "index",
                     "identityQuality",
                     "nm",
@@ -13269,8 +13569,8 @@
                     "ref": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/ref"
                     },
-                    "pageObjectNumber": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                    "page": {
+                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/pageState/properties/page"
                     },
                     "index": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/index"
@@ -13398,7 +13698,7 @@
                   },
                   "required": [
                     "ref",
-                    "pageObjectNumber",
+                    "page",
                     "index",
                     "identityQuality",
                     "nm",
@@ -13429,8 +13729,8 @@
                     "ref": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/ref"
                     },
-                    "pageObjectNumber": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                    "page": {
+                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/pageState/properties/page"
                     },
                     "index": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/index"
@@ -13523,7 +13823,7 @@
                   },
                   "required": [
                     "ref",
-                    "pageObjectNumber",
+                    "page",
                     "index",
                     "identityQuality",
                     "nm",
@@ -13699,8 +13999,8 @@
                     "ref": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/ref"
                     },
-                    "pageObjectNumber": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                    "page": {
+                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/pageState/properties/page"
                     },
                     "index": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/index"
@@ -13797,7 +14097,7 @@
                   },
                   "required": [
                     "ref",
-                    "pageObjectNumber",
+                    "page",
                     "index",
                     "identityQuality",
                     "nm",
@@ -13838,8 +14138,8 @@
                     "ref": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/ref"
                     },
-                    "pageObjectNumber": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                    "page": {
+                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/pageState/properties/page"
                     },
                     "index": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/index"
@@ -13955,7 +14255,7 @@
                   },
                   "required": [
                     "ref",
-                    "pageObjectNumber",
+                    "page",
                     "index",
                     "identityQuality",
                     "nm",
@@ -14036,8 +14336,8 @@
                     "ref": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/ref"
                     },
-                    "pageObjectNumber": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                    "page": {
+                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/pageState/properties/page"
                     },
                     "index": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/index"
@@ -14137,7 +14437,7 @@
                   },
                   "required": [
                     "ref",
-                    "pageObjectNumber",
+                    "page",
                     "index",
                     "identityQuality",
                     "nm",
@@ -14168,8 +14468,8 @@
                     "ref": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/ref"
                     },
-                    "pageObjectNumber": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                    "page": {
+                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/pageState/properties/page"
                     },
                     "index": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/index"
@@ -14329,7 +14629,7 @@
                   },
                   "required": [
                     "ref",
-                    "pageObjectNumber",
+                    "page",
                     "index",
                     "identityQuality",
                     "nm",
@@ -14354,8 +14654,8 @@
                     "ref": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/ref"
                     },
-                    "pageObjectNumber": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                    "page": {
+                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/pageState/properties/page"
                     },
                     "index": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/index"
@@ -14450,7 +14750,7 @@
                   },
                   "required": [
                     "ref",
-                    "pageObjectNumber",
+                    "page",
                     "index",
                     "identityQuality",
                     "nm",
@@ -14480,8 +14780,8 @@
                     "ref": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/ref"
                     },
-                    "pageObjectNumber": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                    "page": {
+                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/pageState/properties/page"
                     },
                     "index": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/index"
@@ -14824,7 +15124,7 @@
                   },
                   "required": [
                     "ref",
-                    "pageObjectNumber",
+                    "page",
                     "index",
                     "identityQuality",
                     "nm",
@@ -14859,8 +15159,8 @@
                     "ref": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/ref"
                     },
-                    "pageObjectNumber": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                    "page": {
+                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/pageState/properties/page"
                     },
                     "index": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/index"
@@ -14948,7 +15248,7 @@
                   },
                   "required": [
                     "ref",
-                    "pageObjectNumber",
+                    "page",
                     "index",
                     "identityQuality",
                     "nm",
@@ -14976,8 +15276,8 @@
                     "ref": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/ref"
                     },
-                    "pageObjectNumber": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                    "page": {
+                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/pageState/properties/page"
                     },
                     "index": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/index"
@@ -15066,7 +15366,7 @@
                   },
                   "required": [
                     "ref",
-                    "pageObjectNumber",
+                    "page",
                     "index",
                     "identityQuality",
                     "nm",
@@ -15095,8 +15395,8 @@
                     "ref": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/ref"
                     },
-                    "pageObjectNumber": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                    "page": {
+                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/pageState/properties/page"
                     },
                     "index": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/index"
@@ -15169,7 +15469,7 @@
                   },
                   "required": [
                     "ref",
-                    "pageObjectNumber",
+                    "page",
                     "index",
                     "identityQuality",
                     "nm",
@@ -15194,8 +15494,8 @@
                     "ref": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/ref"
                     },
-                    "pageObjectNumber": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                    "page": {
+                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/pageState/properties/page"
                     },
                     "index": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/index"
@@ -15294,7 +15594,7 @@
                   },
                   "required": [
                     "ref",
-                    "pageObjectNumber",
+                    "page",
                     "index",
                     "identityQuality",
                     "nm",
@@ -15322,8 +15622,8 @@
                     "ref": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/ref"
                     },
-                    "pageObjectNumber": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                    "page": {
+                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/pageState/properties/page"
                     },
                     "index": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/index"
@@ -15455,7 +15755,7 @@
                   },
                   "required": [
                     "ref",
-                    "pageObjectNumber",
+                    "page",
                     "index",
                     "identityQuality",
                     "nm",
@@ -15486,8 +15786,8 @@
                     "ref": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/ref"
                     },
-                    "pageObjectNumber": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                    "page": {
+                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/pageState/properties/page"
                     },
                     "index": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/index"
@@ -15592,7 +15892,7 @@
                   },
                   "required": [
                     "ref",
-                    "pageObjectNumber",
+                    "page",
                     "index",
                     "identityQuality",
                     "nm",
@@ -15626,8 +15926,8 @@
                     "ref": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/ref"
                     },
-                    "pageObjectNumber": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                    "page": {
+                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/pageState/properties/page"
                     },
                     "index": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/index"
@@ -15697,7 +15997,7 @@
                   },
                   "required": [
                     "ref",
-                    "pageObjectNumber",
+                    "page",
                     "index",
                     "identityQuality",
                     "nm",
@@ -15783,10 +16083,21 @@
                 "pageState": {
                   "type": "object",
                   "properties": {
-                    "pageObjectNumber": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "minimum": 0
+                    "page": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["objectNumber"]
+                        },
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["kind", "pageObjectNumber"],
+                      "additionalProperties": false
                     },
                     "revision": {
                       "type": "object",
@@ -15794,17 +16105,15 @@
                         "docSessionId": {
                           "type": "string"
                         },
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/pageState/properties/page"
                         },
                         "generation": {
                           "type": "integer",
                           "minimum": 0
                         }
                       },
-                      "required": ["docSessionId", "pageObjectNumber", "generation"],
+                      "required": ["docSessionId", "page", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -15837,7 +16146,7 @@
                       ]
                     }
                   },
-                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
+                  "required": ["page", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 },
                 "annotations": {
@@ -15856,10 +16165,8 @@
                                     "type": "string",
                                     "enum": ["objectNumber"]
                                   },
-                                  "pageObjectNumber": {
-                                    "type": "integer",
-                                    "exclusiveMinimum": true,
-                                    "minimum": 0
+                                  "page": {
+                                    "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/pageState/properties/page"
                                   },
                                   "annotObjectNumber": {
                                     "type": "integer",
@@ -15867,7 +16174,7 @@
                                     "minimum": 0
                                   }
                                 },
-                                "required": ["kind", "pageObjectNumber", "annotObjectNumber"],
+                                "required": ["kind", "page", "annotObjectNumber"],
                                 "additionalProperties": false
                               },
                               {
@@ -15877,16 +16184,14 @@
                                     "type": "string",
                                     "enum": ["nm"]
                                   },
-                                  "pageObjectNumber": {
-                                    "type": "integer",
-                                    "exclusiveMinimum": true,
-                                    "minimum": 0
+                                  "page": {
+                                    "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/pageState/properties/page"
                                   },
                                   "nm": {
                                     "type": "string"
                                   }
                                 },
-                                "required": ["kind", "pageObjectNumber", "nm"],
+                                "required": ["kind", "page", "nm"],
                                 "additionalProperties": false
                               },
                               {
@@ -15896,10 +16201,8 @@
                                     "type": "string",
                                     "enum": ["index"]
                                   },
-                                  "pageObjectNumber": {
-                                    "type": "integer",
-                                    "exclusiveMinimum": true,
-                                    "minimum": 0
+                                  "page": {
+                                    "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/pageState/properties/page"
                                   },
                                   "index": {
                                     "type": "integer",
@@ -15909,15 +16212,13 @@
                                     "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/pageState/properties/revision"
                                   }
                                 },
-                                "required": ["kind", "pageObjectNumber", "index", "revision"],
+                                "required": ["kind", "page", "index", "revision"],
                                 "additionalProperties": false
                               }
                             ]
                           },
-                          "pageObjectNumber": {
-                            "type": "integer",
-                            "exclusiveMinimum": true,
-                            "minimum": 0
+                          "page": {
+                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/pageState/properties/page"
                           },
                           "index": {
                             "type": "integer",
@@ -16135,7 +16436,7 @@
                         },
                         "required": [
                           "ref",
-                          "pageObjectNumber",
+                          "page",
                           "index",
                           "identityQuality",
                           "nm",
@@ -16162,8 +16463,8 @@
                           "ref": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/ref"
                           },
-                          "pageObjectNumber": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                          "page": {
+                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/pageState/properties/page"
                           },
                           "index": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/index"
@@ -16235,7 +16536,7 @@
                         },
                         "required": [
                           "ref",
-                          "pageObjectNumber",
+                          "page",
                           "index",
                           "identityQuality",
                           "nm",
@@ -16262,8 +16563,8 @@
                           "ref": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/ref"
                           },
-                          "pageObjectNumber": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                          "page": {
+                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/pageState/properties/page"
                           },
                           "index": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/index"
@@ -16335,7 +16636,7 @@
                         },
                         "required": [
                           "ref",
-                          "pageObjectNumber",
+                          "page",
                           "index",
                           "identityQuality",
                           "nm",
@@ -16362,8 +16663,8 @@
                           "ref": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/ref"
                           },
-                          "pageObjectNumber": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                          "page": {
+                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/pageState/properties/page"
                           },
                           "index": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/index"
@@ -16440,7 +16741,7 @@
                         },
                         "required": [
                           "ref",
-                          "pageObjectNumber",
+                          "page",
                           "index",
                           "identityQuality",
                           "nm",
@@ -16468,8 +16769,8 @@
                           "ref": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/ref"
                           },
-                          "pageObjectNumber": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                          "page": {
+                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/pageState/properties/page"
                           },
                           "index": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/index"
@@ -16597,7 +16898,7 @@
                         },
                         "required": [
                           "ref",
-                          "pageObjectNumber",
+                          "page",
                           "index",
                           "identityQuality",
                           "nm",
@@ -16628,8 +16929,8 @@
                           "ref": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/ref"
                           },
-                          "pageObjectNumber": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                          "page": {
+                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/pageState/properties/page"
                           },
                           "index": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/index"
@@ -16722,7 +17023,7 @@
                         },
                         "required": [
                           "ref",
-                          "pageObjectNumber",
+                          "page",
                           "index",
                           "identityQuality",
                           "nm",
@@ -16898,8 +17199,8 @@
                           "ref": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/ref"
                           },
-                          "pageObjectNumber": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                          "page": {
+                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/pageState/properties/page"
                           },
                           "index": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/index"
@@ -16996,7 +17297,7 @@
                         },
                         "required": [
                           "ref",
-                          "pageObjectNumber",
+                          "page",
                           "index",
                           "identityQuality",
                           "nm",
@@ -17037,8 +17338,8 @@
                           "ref": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/ref"
                           },
-                          "pageObjectNumber": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                          "page": {
+                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/pageState/properties/page"
                           },
                           "index": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/index"
@@ -17154,7 +17455,7 @@
                         },
                         "required": [
                           "ref",
-                          "pageObjectNumber",
+                          "page",
                           "index",
                           "identityQuality",
                           "nm",
@@ -17235,8 +17536,8 @@
                           "ref": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/ref"
                           },
-                          "pageObjectNumber": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                          "page": {
+                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/pageState/properties/page"
                           },
                           "index": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/index"
@@ -17336,7 +17637,7 @@
                         },
                         "required": [
                           "ref",
-                          "pageObjectNumber",
+                          "page",
                           "index",
                           "identityQuality",
                           "nm",
@@ -17367,8 +17668,8 @@
                           "ref": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/ref"
                           },
-                          "pageObjectNumber": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                          "page": {
+                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/pageState/properties/page"
                           },
                           "index": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/index"
@@ -17528,7 +17829,7 @@
                         },
                         "required": [
                           "ref",
-                          "pageObjectNumber",
+                          "page",
                           "index",
                           "identityQuality",
                           "nm",
@@ -17553,8 +17854,8 @@
                           "ref": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/ref"
                           },
-                          "pageObjectNumber": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                          "page": {
+                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/pageState/properties/page"
                           },
                           "index": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/index"
@@ -17649,7 +17950,7 @@
                         },
                         "required": [
                           "ref",
-                          "pageObjectNumber",
+                          "page",
                           "index",
                           "identityQuality",
                           "nm",
@@ -17679,8 +17980,8 @@
                           "ref": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/ref"
                           },
-                          "pageObjectNumber": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                          "page": {
+                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/pageState/properties/page"
                           },
                           "index": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/index"
@@ -18023,7 +18324,7 @@
                         },
                         "required": [
                           "ref",
-                          "pageObjectNumber",
+                          "page",
                           "index",
                           "identityQuality",
                           "nm",
@@ -18058,8 +18359,8 @@
                           "ref": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/ref"
                           },
-                          "pageObjectNumber": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                          "page": {
+                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/pageState/properties/page"
                           },
                           "index": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/index"
@@ -18147,7 +18448,7 @@
                         },
                         "required": [
                           "ref",
-                          "pageObjectNumber",
+                          "page",
                           "index",
                           "identityQuality",
                           "nm",
@@ -18175,8 +18476,8 @@
                           "ref": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/ref"
                           },
-                          "pageObjectNumber": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                          "page": {
+                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/pageState/properties/page"
                           },
                           "index": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/index"
@@ -18265,7 +18566,7 @@
                         },
                         "required": [
                           "ref",
-                          "pageObjectNumber",
+                          "page",
                           "index",
                           "identityQuality",
                           "nm",
@@ -18294,8 +18595,8 @@
                           "ref": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/ref"
                           },
-                          "pageObjectNumber": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                          "page": {
+                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/pageState/properties/page"
                           },
                           "index": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/index"
@@ -18368,7 +18669,7 @@
                         },
                         "required": [
                           "ref",
-                          "pageObjectNumber",
+                          "page",
                           "index",
                           "identityQuality",
                           "nm",
@@ -18393,8 +18694,8 @@
                           "ref": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/ref"
                           },
-                          "pageObjectNumber": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                          "page": {
+                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/pageState/properties/page"
                           },
                           "index": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/index"
@@ -18493,7 +18794,7 @@
                         },
                         "required": [
                           "ref",
-                          "pageObjectNumber",
+                          "page",
                           "index",
                           "identityQuality",
                           "nm",
@@ -18521,8 +18822,8 @@
                           "ref": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/ref"
                           },
-                          "pageObjectNumber": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                          "page": {
+                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/pageState/properties/page"
                           },
                           "index": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/index"
@@ -18654,7 +18955,7 @@
                         },
                         "required": [
                           "ref",
-                          "pageObjectNumber",
+                          "page",
                           "index",
                           "identityQuality",
                           "nm",
@@ -18685,8 +18986,8 @@
                           "ref": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/ref"
                           },
-                          "pageObjectNumber": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                          "page": {
+                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/pageState/properties/page"
                           },
                           "index": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/index"
@@ -18791,7 +19092,7 @@
                         },
                         "required": [
                           "ref",
-                          "pageObjectNumber",
+                          "page",
                           "index",
                           "identityQuality",
                           "nm",
@@ -18825,8 +19126,8 @@
                           "ref": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/ref"
                           },
-                          "pageObjectNumber": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/pageObjectNumber"
+                          "page": {
+                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/pageState/properties/page"
                           },
                           "index": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/index"
@@ -18896,7 +19197,7 @@
                         },
                         "required": [
                           "ref",
-                          "pageObjectNumber",
+                          "page",
                           "index",
                           "identityQuality",
                           "nm",
@@ -19043,10 +19344,21 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "pageObjectNumber": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "minimum": 0
+                    "page": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["objectNumber"]
+                        },
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["kind", "pageObjectNumber"],
+                      "additionalProperties": false
                     },
                     "revision": {
                       "type": "object",
@@ -19054,17 +19366,15 @@
                         "docSessionId": {
                           "type": "string"
                         },
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocAnnotationsCreate200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "generation": {
                           "type": "integer",
                           "minimum": 0
                         }
                       },
-                      "required": ["docSessionId", "pageObjectNumber", "generation"],
+                      "required": ["docSessionId", "page", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -19097,7 +19407,7 @@
                       ]
                     }
                   },
-                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
+                  "required": ["page", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -19131,10 +19441,8 @@
                     "items": {
                       "type": "object",
                       "properties": {
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocAnnotationsCreate200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "cache": {
                           "type": "object",
@@ -19154,7 +19462,7 @@
                           "additionalProperties": false
                         }
                       },
-                      "required": ["pageObjectNumber", "cache"],
+                      "required": ["page", "cache"],
                       "additionalProperties": false
                     }
                   }
@@ -19282,10 +19590,21 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "pageObjectNumber": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "minimum": 0
+                    "page": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["objectNumber"]
+                        },
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["kind", "pageObjectNumber"],
+                      "additionalProperties": false
                     },
                     "revision": {
                       "type": "object",
@@ -19293,17 +19612,15 @@
                         "docSessionId": {
                           "type": "string"
                         },
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocAnnotationsUpdate200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "generation": {
                           "type": "integer",
                           "minimum": 0
                         }
                       },
-                      "required": ["docSessionId", "pageObjectNumber", "generation"],
+                      "required": ["docSessionId", "page", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -19336,7 +19653,7 @@
                       ]
                     }
                   },
-                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
+                  "required": ["page", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -19370,10 +19687,8 @@
                     "items": {
                       "type": "object",
                       "properties": {
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocAnnotationsUpdate200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "cache": {
                           "type": "object",
@@ -19393,7 +19708,7 @@
                           "additionalProperties": false
                         }
                       },
-                      "required": ["pageObjectNumber", "cache"],
+                      "required": ["page", "cache"],
                       "additionalProperties": false
                     }
                   }
@@ -19517,10 +19832,21 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "pageObjectNumber": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "minimum": 0
+                    "page": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["objectNumber"]
+                        },
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["kind", "pageObjectNumber"],
+                      "additionalProperties": false
                     },
                     "revision": {
                       "type": "object",
@@ -19528,17 +19854,15 @@
                         "docSessionId": {
                           "type": "string"
                         },
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocAnnotationsDelete200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "generation": {
                           "type": "integer",
                           "minimum": 0
                         }
                       },
-                      "required": ["docSessionId", "pageObjectNumber", "generation"],
+                      "required": ["docSessionId", "page", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -19571,7 +19895,7 @@
                       ]
                     }
                   },
-                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
+                  "required": ["page", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -19605,10 +19929,8 @@
                     "items": {
                       "type": "object",
                       "properties": {
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocAnnotationsDelete200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "cache": {
                           "type": "object",
@@ -19628,7 +19950,7 @@
                           "additionalProperties": false
                         }
                       },
-                      "required": ["pageObjectNumber", "cache"],
+                      "required": ["page", "cache"],
                       "additionalProperties": false
                     }
                   }
@@ -19708,10 +20030,21 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "pageObjectNumber": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "minimum": 0
+                    "page": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["objectNumber"]
+                        },
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["kind", "pageObjectNumber"],
+                      "additionalProperties": false
                     },
                     "revision": {
                       "type": "object",
@@ -19719,17 +20052,15 @@
                         "docSessionId": {
                           "type": "string"
                         },
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocAnnotationsFlatten200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "generation": {
                           "type": "integer",
                           "minimum": 0
                         }
                       },
-                      "required": ["docSessionId", "pageObjectNumber", "generation"],
+                      "required": ["docSessionId", "page", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -19762,7 +20093,7 @@
                       ]
                     }
                   },
-                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
+                  "required": ["page", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -19796,10 +20127,8 @@
                     "items": {
                       "type": "object",
                       "properties": {
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocAnnotationsFlatten200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "cache": {
                           "type": "object",
@@ -19819,7 +20148,7 @@
                           "additionalProperties": false
                         }
                       },
-                      "required": ["pageObjectNumber", "cache"],
+                      "required": ["page", "cache"],
                       "additionalProperties": false
                     }
                   }
@@ -20191,16 +20520,109 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "ref": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": ["objectNumber"]
+                                  },
+                                  "page": {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["objectNumber"]
+                                      },
+                                      "pageObjectNumber": {
+                                        "type": "integer",
+                                        "exclusiveMinimum": true,
+                                        "minimum": 0
+                                      }
+                                    },
+                                    "required": ["kind", "pageObjectNumber"],
+                                    "additionalProperties": false
+                                  },
+                                  "annotObjectNumber": {
+                                    "type": "integer",
+                                    "exclusiveMinimum": true,
+                                    "minimum": 0
+                                  }
+                                },
+                                "required": ["kind", "page", "annotObjectNumber"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": ["nm"]
+                                  },
+                                  "page": {
+                                    "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
+                                  },
+                                  "nm": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["kind", "page", "nm"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": ["index"]
+                                  },
+                                  "page": {
+                                    "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
+                                  },
+                                  "index": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  },
+                                  "revision": {
+                                    "type": "object",
+                                    "properties": {
+                                      "docSessionId": {
+                                        "type": "string"
+                                      },
+                                      "page": {
+                                        "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
+                                      },
+                                      "generation": {
+                                        "type": "integer",
+                                        "minimum": 0
+                                      }
+                                    },
+                                    "required": ["docSessionId", "page", "generation"],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": ["kind", "page", "index", "revision"],
+                                "additionalProperties": false
+                              }
+                            ],
+                            "nullable": true
+                          },
                           "annotObjectNumber": {
                             "type": "integer",
                             "minimum": 0
                           },
-                          "pageObjectNumber": {
-                            "type": "integer",
-                            "minimum": 0
+                          "page": {
+                            "allOf": [
+                              {
+                                "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
+                              }
+                            ],
+                            "nullable": true
                           }
                         },
-                        "required": ["annotObjectNumber", "pageObjectNumber"],
+                        "required": ["ref", "annotObjectNumber", "page"],
                         "additionalProperties": false
                       }
                     },
@@ -20289,11 +20711,14 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "ref": {
+                            "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref"
+                          },
                           "annotObjectNumber": {
                             "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/annotObjectNumber"
                           },
-                          "pageObjectNumber": {
-                            "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/pageObjectNumber"
+                          "page": {
+                            "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/page"
                           },
                           "onState": {
                             "type": "string"
@@ -20306,8 +20731,9 @@
                           }
                         },
                         "required": [
+                          "ref",
                           "annotObjectNumber",
-                          "pageObjectNumber",
+                          "page",
                           "onState",
                           "exportValue",
                           "checked"
@@ -20829,10 +21255,21 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "pageObjectNumber": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "minimum": 0
+                    "page": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["objectNumber"]
+                        },
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["kind", "pageObjectNumber"],
+                      "additionalProperties": false
                     },
                     "revision": {
                       "type": "object",
@@ -20840,17 +21277,15 @@
                         "docSessionId": {
                           "type": "string"
                         },
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "generation": {
                           "type": "integer",
                           "minimum": 0
                         }
                       },
-                      "required": ["docSessionId", "pageObjectNumber", "generation"],
+                      "required": ["docSessionId", "page", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -20883,7 +21318,7 @@
                       ]
                     }
                   },
-                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
+                  "required": ["page", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -20917,10 +21352,8 @@
                     "items": {
                       "type": "object",
                       "properties": {
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "cache": {
                           "type": "object",
@@ -20940,7 +21373,7 @@
                           "additionalProperties": false
                         }
                       },
-                      "required": ["pageObjectNumber", "cache"],
+                      "required": ["page", "cache"],
                       "additionalProperties": false
                     }
                   }
@@ -21064,10 +21497,21 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "pageObjectNumber": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "minimum": 0
+                    "page": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["objectNumber"]
+                        },
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["kind", "pageObjectNumber"],
+                      "additionalProperties": false
                     },
                     "revision": {
                       "type": "object",
@@ -21075,17 +21519,15 @@
                         "docSessionId": {
                           "type": "string"
                         },
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocFormsReset200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "generation": {
                           "type": "integer",
                           "minimum": 0
                         }
                       },
-                      "required": ["docSessionId", "pageObjectNumber", "generation"],
+                      "required": ["docSessionId", "page", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -21118,7 +21560,7 @@
                       ]
                     }
                   },
-                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
+                  "required": ["page", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -21152,10 +21594,8 @@
                     "items": {
                       "type": "object",
                       "properties": {
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocFormsReset200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "cache": {
                           "type": "object",
@@ -21175,7 +21615,7 @@
                           "additionalProperties": false
                         }
                       },
-                      "required": ["pageObjectNumber", "cache"],
+                      "required": ["page", "cache"],
                       "additionalProperties": false
                     }
                   }
@@ -21303,10 +21743,21 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "pageObjectNumber": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "minimum": 0
+                    "page": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["objectNumber"]
+                        },
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["kind", "pageObjectNumber"],
+                      "additionalProperties": false
                     },
                     "revision": {
                       "type": "object",
@@ -21314,17 +21765,15 @@
                         "docSessionId": {
                           "type": "string"
                         },
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "generation": {
                           "type": "integer",
                           "minimum": 0
                         }
                       },
-                      "required": ["docSessionId", "pageObjectNumber", "generation"],
+                      "required": ["docSessionId", "page", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -21357,7 +21806,7 @@
                       ]
                     }
                   },
-                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
+                  "required": ["page", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -21391,10 +21840,8 @@
                     "items": {
                       "type": "object",
                       "properties": {
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "cache": {
                           "type": "object",
@@ -21414,7 +21861,7 @@
                           "additionalProperties": false
                         }
                       },
-                      "required": ["pageObjectNumber", "cache"],
+                      "required": ["page", "cache"],
                       "additionalProperties": false
                     }
                   }
@@ -21853,10 +22300,21 @@
       "DocPagesSetScale200Response": {
         "type": "object",
         "properties": {
-          "pageObjectNumber": {
-            "type": "integer",
-            "exclusiveMinimum": true,
-            "minimum": 0
+          "page": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["objectNumber"]
+              },
+              "pageObjectNumber": {
+                "type": "integer",
+                "exclusiveMinimum": true,
+                "minimum": 0
+              }
+            },
+            "required": ["kind", "pageObjectNumber"],
+            "additionalProperties": false
           },
           "meta": {
             "type": "object",
@@ -21866,10 +22324,8 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "pageObjectNumber": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "minimum": 0
+                    "page": {
+                      "$ref": "#/components/schemas/DocPagesSetScale200Response/properties/page"
                     },
                     "revision": {
                       "type": "object",
@@ -21877,17 +22333,15 @@
                         "docSessionId": {
                           "type": "string"
                         },
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocPagesSetScale200Response/properties/page"
                         },
                         "generation": {
                           "type": "integer",
                           "minimum": 0
                         }
                       },
-                      "required": ["docSessionId", "pageObjectNumber", "generation"],
+                      "required": ["docSessionId", "page", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -21920,7 +22374,7 @@
                       ]
                     }
                   },
-                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
+                  "required": ["page", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -21954,10 +22408,8 @@
                     "items": {
                       "type": "object",
                       "properties": {
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocPagesSetScale200Response/properties/page"
                         },
                         "cache": {
                           "type": "object",
@@ -21977,7 +22429,7 @@
                           "additionalProperties": false
                         }
                       },
-                      "required": ["pageObjectNumber", "cache"],
+                      "required": ["page", "cache"],
                       "additionalProperties": false
                     }
                   }
@@ -21991,7 +22443,7 @@
             "additionalProperties": false
           }
         },
-        "required": ["pageObjectNumber", "meta"],
+        "required": ["page", "meta"],
         "additionalProperties": false
       },
       "DocPagesSetScale400Response": {
@@ -22105,10 +22557,21 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "pageObjectNumber": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "minimum": 0
+                    "page": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["objectNumber"]
+                        },
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["kind", "pageObjectNumber"],
+                      "additionalProperties": false
                     },
                     "revision": {
                       "type": "object",
@@ -22116,17 +22579,15 @@
                         "docSessionId": {
                           "type": "string"
                         },
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocPagesMove200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "generation": {
                           "type": "integer",
                           "minimum": 0
                         }
                       },
-                      "required": ["docSessionId", "pageObjectNumber", "generation"],
+                      "required": ["docSessionId", "page", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -22159,7 +22620,7 @@
                       ]
                     }
                   },
-                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
+                  "required": ["page", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -22193,10 +22654,8 @@
                     "items": {
                       "type": "object",
                       "properties": {
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocPagesMove200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "cache": {
                           "type": "object",
@@ -22216,7 +22675,7 @@
                           "additionalProperties": false
                         }
                       },
-                      "required": ["pageObjectNumber", "cache"],
+                      "required": ["page", "cache"],
                       "additionalProperties": false
                     }
                   }
@@ -22344,10 +22803,21 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "pageObjectNumber": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "minimum": 0
+                    "page": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["objectNumber"]
+                        },
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["kind", "pageObjectNumber"],
+                      "additionalProperties": false
                     },
                     "revision": {
                       "type": "object",
@@ -22355,17 +22825,15 @@
                         "docSessionId": {
                           "type": "string"
                         },
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocPagesRotate200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "generation": {
                           "type": "integer",
                           "minimum": 0
                         }
                       },
-                      "required": ["docSessionId", "pageObjectNumber", "generation"],
+                      "required": ["docSessionId", "page", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -22398,7 +22866,7 @@
                       ]
                     }
                   },
-                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
+                  "required": ["page", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -22432,10 +22900,8 @@
                     "items": {
                       "type": "object",
                       "properties": {
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocPagesRotate200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "cache": {
                           "type": "object",
@@ -22455,7 +22921,7 @@
                           "additionalProperties": false
                         }
                       },
-                      "required": ["pageObjectNumber", "cache"],
+                      "required": ["page", "cache"],
                       "additionalProperties": false
                     }
                   }
@@ -22583,10 +23049,21 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "pageObjectNumber": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "minimum": 0
+                    "page": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["objectNumber"]
+                        },
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["kind", "pageObjectNumber"],
+                      "additionalProperties": false
                     },
                     "revision": {
                       "type": "object",
@@ -22594,17 +23071,15 @@
                         "docSessionId": {
                           "type": "string"
                         },
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocPagesDelete200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "generation": {
                           "type": "integer",
                           "minimum": 0
                         }
                       },
-                      "required": ["docSessionId", "pageObjectNumber", "generation"],
+                      "required": ["docSessionId", "page", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -22637,7 +23112,7 @@
                       ]
                     }
                   },
-                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
+                  "required": ["page", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -22671,10 +23146,8 @@
                     "items": {
                       "type": "object",
                       "properties": {
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocPagesDelete200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "cache": {
                           "type": "object",
@@ -22694,7 +23167,7 @@
                           "additionalProperties": false
                         }
                       },
-                      "required": ["pageObjectNumber", "cache"],
+                      "required": ["page", "cache"],
                       "additionalProperties": false
                     }
                   }
@@ -22822,10 +23295,21 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "pageObjectNumber": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "minimum": 0
+                    "page": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["objectNumber"]
+                        },
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["kind", "pageObjectNumber"],
+                      "additionalProperties": false
                     },
                     "revision": {
                       "type": "object",
@@ -22833,17 +23317,15 @@
                         "docSessionId": {
                           "type": "string"
                         },
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocPagesSetName200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "generation": {
                           "type": "integer",
                           "minimum": 0
                         }
                       },
-                      "required": ["docSessionId", "pageObjectNumber", "generation"],
+                      "required": ["docSessionId", "page", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -22876,7 +23358,7 @@
                       ]
                     }
                   },
-                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
+                  "required": ["page", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -22910,10 +23392,8 @@
                     "items": {
                       "type": "object",
                       "properties": {
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocPagesSetName200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "cache": {
                           "type": "object",
@@ -22933,7 +23413,7 @@
                           "additionalProperties": false
                         }
                       },
-                      "required": ["pageObjectNumber", "cache"],
+                      "required": ["page", "cache"],
                       "additionalProperties": false
                     }
                   }
@@ -23061,10 +23541,21 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "pageObjectNumber": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "minimum": 0
+                    "page": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["objectNumber"]
+                        },
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["kind", "pageObjectNumber"],
+                      "additionalProperties": false
                     },
                     "revision": {
                       "type": "object",
@@ -23072,17 +23563,15 @@
                         "docSessionId": {
                           "type": "string"
                         },
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocPagesRemoveName200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "generation": {
                           "type": "integer",
                           "minimum": 0
                         }
                       },
-                      "required": ["docSessionId", "pageObjectNumber", "generation"],
+                      "required": ["docSessionId", "page", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -23115,7 +23604,7 @@
                       ]
                     }
                   },
-                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
+                  "required": ["page", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -23149,10 +23638,8 @@
                     "items": {
                       "type": "object",
                       "properties": {
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocPagesRemoveName200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "cache": {
                           "type": "object",
@@ -23172,7 +23659,7 @@
                           "additionalProperties": false
                         }
                       },
-                      "required": ["pageObjectNumber", "cache"],
+                      "required": ["page", "cache"],
                       "additionalProperties": false
                     }
                   }
@@ -23300,10 +23787,21 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "pageObjectNumber": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "minimum": 0
+                    "page": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["objectNumber"]
+                        },
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["kind", "pageObjectNumber"],
+                      "additionalProperties": false
                     },
                     "revision": {
                       "type": "object",
@@ -23311,17 +23809,15 @@
                         "docSessionId": {
                           "type": "string"
                         },
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocPagesFlatten200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "generation": {
                           "type": "integer",
                           "minimum": 0
                         }
                       },
-                      "required": ["docSessionId", "pageObjectNumber", "generation"],
+                      "required": ["docSessionId", "page", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -23354,7 +23850,7 @@
                       ]
                     }
                   },
-                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
+                  "required": ["page", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -23388,10 +23884,8 @@
                     "items": {
                       "type": "object",
                       "properties": {
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocPagesFlatten200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "cache": {
                           "type": "object",
@@ -23411,7 +23905,7 @@
                           "additionalProperties": false
                         }
                       },
-                      "required": ["pageObjectNumber", "cache"],
+                      "required": ["page", "cache"],
                       "additionalProperties": false
                     }
                   }
@@ -23535,10 +24029,21 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "pageObjectNumber": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "minimum": 0
+                    "page": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["objectNumber"]
+                        },
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["kind", "pageObjectNumber"],
+                      "additionalProperties": false
                     },
                     "revision": {
                       "type": "object",
@@ -23546,17 +24051,15 @@
                         "docSessionId": {
                           "type": "string"
                         },
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocPagesInsert200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "generation": {
                           "type": "integer",
                           "minimum": 0
                         }
                       },
-                      "required": ["docSessionId", "pageObjectNumber", "generation"],
+                      "required": ["docSessionId", "page", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -23589,7 +24092,7 @@
                       ]
                     }
                   },
-                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
+                  "required": ["page", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -23623,10 +24126,8 @@
                     "items": {
                       "type": "object",
                       "properties": {
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocPagesInsert200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "cache": {
                           "type": "object",
@@ -23646,7 +24147,7 @@
                           "additionalProperties": false
                         }
                       },
-                      "required": ["pageObjectNumber", "cache"],
+                      "required": ["page", "cache"],
                       "additionalProperties": false
                     }
                   }
@@ -23774,10 +24275,21 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "pageObjectNumber": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "minimum": 0
+                    "page": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["objectNumber"]
+                        },
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["kind", "pageObjectNumber"],
+                      "additionalProperties": false
                     },
                     "revision": {
                       "type": "object",
@@ -23785,17 +24297,15 @@
                         "docSessionId": {
                           "type": "string"
                         },
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocPagesInsertBlank200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "generation": {
                           "type": "integer",
                           "minimum": 0
                         }
                       },
-                      "required": ["docSessionId", "pageObjectNumber", "generation"],
+                      "required": ["docSessionId", "page", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -23828,7 +24338,7 @@
                       ]
                     }
                   },
-                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
+                  "required": ["page", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -23862,10 +24372,8 @@
                     "items": {
                       "type": "object",
                       "properties": {
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocPagesInsertBlank200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "cache": {
                           "type": "object",
@@ -23885,7 +24393,7 @@
                           "additionalProperties": false
                         }
                       },
-                      "required": ["pageObjectNumber", "cache"],
+                      "required": ["page", "cache"],
                       "additionalProperties": false
                     }
                   }
@@ -24113,10 +24621,21 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "pageObjectNumber": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "minimum": 0
+                    "page": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["objectNumber"]
+                        },
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["kind", "pageObjectNumber"],
+                      "additionalProperties": false
                     },
                     "revision": {
                       "type": "object",
@@ -24124,17 +24643,15 @@
                         "docSessionId": {
                           "type": "string"
                         },
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocRedactionsApply200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "generation": {
                           "type": "integer",
                           "minimum": 0
                         }
                       },
-                      "required": ["docSessionId", "pageObjectNumber", "generation"],
+                      "required": ["docSessionId", "page", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -24167,7 +24684,7 @@
                       ]
                     }
                   },
-                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
+                  "required": ["page", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -24201,10 +24718,8 @@
                     "items": {
                       "type": "object",
                       "properties": {
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                        "page": {
+                          "$ref": "#/components/schemas/DocRedactionsApply200Response/properties/meta/properties/affectedPages/items/properties/page"
                         },
                         "cache": {
                           "type": "object",
@@ -24224,7 +24739,7 @@
                           "additionalProperties": false
                         }
                       },
-                      "required": ["pageObjectNumber", "cache"],
+                      "required": ["page", "cache"],
                       "additionalProperties": false
                     }
                   }

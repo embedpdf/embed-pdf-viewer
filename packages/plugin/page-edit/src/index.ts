@@ -1,7 +1,6 @@
 /**
- * @embedpdf/plugin-page-edit — document-scoped, PON-addressed page edits
- * (rotate/move/delete) over the engine DocumentHandle.
- * Standard layout: types.ts · capability.ts · page-edit.plugin.ts.
+ * @embedpdf/plugin-page-edit — document-scoped, ref-addressed page edits
+ * (rotate / move / delete / insert / duplicate / extract) over the engine handle.
  */
 export { pageEditPlugin } from './page-edit.plugin';
 export * from './contract';

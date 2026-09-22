@@ -9,6 +9,7 @@ import type { Engine } from '../engine/Engine';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { AnnotationRef } from '../identity/AnnotationRef';
+import { toPageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
 import { PageListSnapshotSchema, PageMoveResultSchema } from '../wire/schemas';
 
@@ -102,14 +103,14 @@ export function runPageReorderConformance(
           // Strictly contiguous, 0..N-1.
           expect(list.pages[i].index).toBe(i);
           // Pages are durable by construction; PON > 0.
-          expect(list.pages[i].pageObjectNumber > 0).toBe(true);
+          expect(list.pages[i].ref.pageObjectNumber > 0).toBe(true);
         }
 
         // PONs are unique across the document.
         const seen = new Set<number>();
         for (const p of list.pages) {
-          expect(seen.has(p.pageObjectNumber)).toBe(false);
-          seen.add(p.pageObjectNumber);
+          expect(seen.has(p.ref.pageObjectNumber)).toBe(false);
+          seen.add(p.ref.pageObjectNumber);
         }
       } finally {
         await doc.close();
@@ -122,36 +123,36 @@ export function runPageReorderConformance(
         const before = await doc.pages.list();
         if (before.pages.length < 3) return;
         const pons = pickReorderPons(
-          before.pages.map((p) => p.pageObjectNumber),
+          before.pages.map((p) => p.ref.pageObjectNumber),
           fix,
         );
         if (!pons) return;
 
         // Move the LAST of the three to the FRONT.
         const target = pons[pons.length - 1];
-        const result = await doc.pages.move([target], 0);
+        const result = await doc.pages.move([toPageRef(target)], 0);
         expect(PageMoveResultSchema.safeParse(result).success).toBe(true);
 
         // The result carries the new geometry: same count, contiguous
         // indices, moved page leads.
         const after = result.layout;
         expect(after.pages.length).toBe(before.pages.length);
-        expect(after.pages[0].pageObjectNumber).toBe(target);
+        expect(after.pages[0].ref.pageObjectNumber).toBe(target);
         for (let i = 0; i < after.pages.length; i++) {
           expect(after.pages[i].index).toBe(i);
         }
 
         // Set of PONs is preserved (no page lost or fabricated).
-        const beforePons = new Set(before.pages.map((p) => p.pageObjectNumber));
-        const afterPons = new Set(after.pages.map((p) => p.pageObjectNumber));
+        const beforePons = new Set(before.pages.map((p) => p.ref.pageObjectNumber));
+        const afterPons = new Set(after.pages.map((p) => p.ref.pageObjectNumber));
         expect(beforePons.size).toBe(afterPons.size);
         for (const pon of beforePons) expect(afterPons.has(pon)).toBe(true);
 
         // A subsequent `pages.list()` agrees with the returned layout
         // (the move result is not a one-off view).
         const relisted = await doc.pages.list();
-        expect(relisted.pages.map((p) => p.pageObjectNumber)).toEqual(
-          after.pages.map((p) => p.pageObjectNumber),
+        expect(relisted.pages.map((p) => p.ref.pageObjectNumber)).toEqual(
+          after.pages.map((p) => p.ref.pageObjectNumber),
         );
       } finally {
         await doc.close();
@@ -168,8 +169,8 @@ export function runPageReorderConformance(
         // by index after the move. The created annotation is durable
         // (so we use its index ref via FPDFPage_GetAnnot, which yields
         // a working index-style ref bound to the current revision).
-        const hostPon = fix.weakRefHostPon ?? list.pages[0].pageObjectNumber;
-        const hostPage = doc.page(hostPon);
+        const hostPon = fix.weakRefHostPon ?? list.pages[0].ref.pageObjectNumber;
+        const hostPage = doc.page(toPageRef(hostPon));
         const beforePageList = await hostPage.annotations.list();
 
         const draft: HighlightDraft = {
@@ -196,16 +197,17 @@ export function runPageReorderConformance(
 
         const indexRef: AnnotationRef = {
           kind: 'index',
-          pageObjectNumber: hostPon,
+          page: toPageRef(hostPon),
           index: targetIndex,
           revision: afterCreate.pageState.revision,
         };
 
         // Move some OTHER page (not the host page) to the front. The
         // host page's revision must stay put.
-        const otherPon = list.pages.find((p) => p.pageObjectNumber !== hostPon)?.pageObjectNumber;
+        const otherPon = list.pages.find((p) => p.ref.pageObjectNumber !== hostPon)?.ref
+          .pageObjectNumber;
         if (otherPon === undefined) return;
-        await doc.pages.move([otherPon], 0);
+        await doc.pages.move([toPageRef(otherPon)], 0);
 
         // Use the captured weak-style ref to update the annotation.
         // This is the locked invariant: per-page RevisionToken survives
@@ -232,7 +234,7 @@ export function runPageReorderConformance(
       try {
         const list = await doc.pages.list();
         if (list.pages.length < 1) return;
-        const target = list.pages[0].pageObjectNumber;
+        const target = list.pages[0].ref;
         let caught: unknown;
         try {
           await doc.pages.move([target, target], 0);
@@ -250,7 +252,7 @@ export function runPageReorderConformance(
       try {
         const list = await doc.pages.list();
         if (list.pages.length < 1) return;
-        const target = list.pages[0].pageObjectNumber;
+        const target = list.pages[0].ref;
         let caught: unknown;
         try {
           // Post-removal count is `pages.length - 1`; destIndex one past that
@@ -271,12 +273,12 @@ export function runPageReorderConformance(
         const list = await doc.pages.list();
         // Pick a PON that is guaranteed to not exist.
         let bogus = 0;
-        for (const p of list.pages) bogus = Math.max(bogus, p.pageObjectNumber);
+        for (const p of list.pages) bogus = Math.max(bogus, p.ref.pageObjectNumber);
         bogus += 9999;
 
         let caught: unknown;
         try {
-          await doc.pages.move([bogus], 0);
+          await doc.pages.move([toPageRef(bogus)], 0);
         } catch (err) {
           caught = err;
         }
@@ -294,7 +296,7 @@ export function runPageReorderConformance(
       try {
         const list = await doc.pages.list();
         if (list.pages.length < 1) return;
-        const target = list.pages[0].pageObjectNumber;
+        const target = list.pages[0].ref;
         const p = doc.pages.move([target], 0);
         p.abort('test');
         await expect(p).rejects.toBeInstanceOf(AbortError);

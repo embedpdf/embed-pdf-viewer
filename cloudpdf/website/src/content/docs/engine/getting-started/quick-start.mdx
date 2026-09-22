@@ -57,13 +57,14 @@ const doc = await engine.open({ kind: 'id', id: 'doc_proposal_2026' });
 
 ## 3. List pages and render the first one
 
-Pages are addressed by their durable **page object number**, never by index.
+Pages are addressed by their durable **`PageRef`** (`{ kind: 'objectNumber',
+pageObjectNumber }` — the page's indirect object number), never by index.
 `pages.list()` returns every page's geometry in display order, so grab the first
-one's `pageObjectNumber` and render it.
+one's `ref` and render it.
 
 ```ts
 const { pages } = await doc.pages.list();
-const first = doc.page(pages[0].pageObjectNumber);
+const first = doc.page(pages[0].ref);
 
 const image = await first.render.image({
   viewport: { kind: 'width', width: 1200 }, // 1200px wide, aspect preserved

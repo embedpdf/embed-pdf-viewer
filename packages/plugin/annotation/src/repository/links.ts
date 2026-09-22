@@ -4,7 +4,6 @@
  * parent's `link` prop, and the reconciler derives the children it should
  * have from the parent's committed geometry.
  */
-import { textQuadBounds } from '@embedpdf/core-geometry';
 import {
   propsFor,
   selectionQuad,
@@ -13,8 +12,9 @@ import {
   type Quad,
   type Rect,
 } from '@embedpdf/core-annotation';
+import { textQuadBounds } from '@embedpdf/core-geometry';
 
-import { refKey } from './seam';
+import { annotationKey } from './seam';
 
 /** Does this kind's table declare the `link` prop (may it carry an attached
  *  link)? Widgets/caret/redact/file-attachment deliberately don't. */

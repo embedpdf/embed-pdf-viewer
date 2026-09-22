@@ -40,7 +40,8 @@ export const SPRING_OMEGA = 0.015;
  * finger travels. `rubberOut(0) === 0` — inside the bounds the curve is
  * invisible.
  */
-export const rubberOut = (d: number, dim: number): number => (1 - 1 / ((d * RUBBER) / dim + 1)) * dim;
+export const rubberOut = (d: number, dim: number): number =>
+  (1 - 1 / ((d * RUBBER) / dim + 1)) * dim;
 /** Exact inverse of `rubberOut` (defined for `out < dim`). */
 export const rubberIn = (out: number, dim: number): number => (out * dim) / (RUBBER * (dim - out));
 

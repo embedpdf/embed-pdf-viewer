@@ -30,7 +30,7 @@ export function resolveAnnotPtr(
       if (!annotPtr) {
         throw new EngineError(
           EngineErrorCode.InvalidReference,
-          `no annotation with object number ${ref.annotObjectNumber} on page ${ref.pageObjectNumber}`,
+          `no annotation with object number ${ref.annotObjectNumber} on page ${ref.page.pageObjectNumber}`,
         );
       }
       return annotPtr;
@@ -42,7 +42,7 @@ export function resolveAnnotPtr(
         if (!annotPtr) {
           throw new EngineError(
             EngineErrorCode.InvalidReference,
-            `no annotation with /NM '${ref.nm}' on page ${ref.pageObjectNumber}`,
+            `no annotation with /NM '${ref.nm}' on page ${ref.page.pageObjectNumber}`,
           );
         }
         return annotPtr;
@@ -56,7 +56,7 @@ export function resolveAnnotPtr(
       if (!annotPtr) {
         throw new EngineError(
           EngineErrorCode.InvalidReference,
-          `index ${ref.index} out of range on page ${ref.pageObjectNumber}`,
+          `index ${ref.index} out of range on page ${ref.page.pageObjectNumber}`,
         );
       }
       return annotPtr;

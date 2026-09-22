@@ -62,7 +62,7 @@ describe('derived renders', () => {
     const baseSha = await seedDocument(fx, tenantId, docId, { pageCount: 2 });
 
     const renders = spyPagesRenderCount(fx);
-    const url = `${fx.baseUrl}/v1/docs/${docId}/render/pages/1/data@${THUMB_TOKEN}`;
+    const url = `${fx.baseUrl}/v1/docs/${docId}/render/pages/obj:1/data@${THUMB_TOKEN}`;
     const headers = { Authorization: `Bearer ${docToken(tenantId, docId)}` };
 
     const first = await fetch(url, { headers });
@@ -90,7 +90,7 @@ describe('derived renders', () => {
     await seedDocument(fx, tenantId, docId, { pageCount: 1 });
 
     const renders = spyPagesRenderCount(fx);
-    const url = `${fx.baseUrl}/v1/docs/${docId}/render/pages/1/data@${THUMB_TOKEN}`;
+    const url = `${fx.baseUrl}/v1/docs/${docId}/render/pages/obj:1/data@${THUMB_TOKEN}`;
     const headers = { Authorization: `Bearer ${docToken(tenantId, docId)}` };
 
     const responses = await Promise.all(Array.from({ length: 10 }, () => fetch(url, { headers })));
@@ -108,7 +108,7 @@ describe('derived renders', () => {
     // token is ANNOTATED, so it lives under the annotated family (the prefix
     // rule makes `/render/pages/` serve annotation-free tokens only).
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/render/annotated/pages/1/data@${OFFLATTICE_TOKEN}`,
+      `${fx.baseUrl}/v1/docs/${docId}/render/annotated/pages/obj:1/data@${OFFLATTICE_TOKEN}`,
       {
         headers,
       },
@@ -126,7 +126,7 @@ describe('derived renders', () => {
       await seedDocument(strict, tenantId, strictDoc, { pageCount: 1 });
       const strictHeaders = { Authorization: `Bearer ${docToken(tenantId, strictDoc)}` };
       const rejected = await fetch(
-        `${strict.baseUrl}/v1/docs/${strictDoc}/render/annotated/pages/1/data@${OFFLATTICE_TOKEN}`,
+        `${strict.baseUrl}/v1/docs/${strictDoc}/render/annotated/pages/obj:1/data@${OFFLATTICE_TOKEN}`,
         { headers: strictHeaders },
       );
       expect(rejected.status).toBe(400);
@@ -139,13 +139,13 @@ describe('derived renders', () => {
       // they belong to the (future) tile policy, and rejecting them here
       // would kill tiling before it exists.
       const rectRender = await fetch(
-        `${strict.baseUrl}/v1/docs/${strictDoc}/render/pages/1/data@${RECT_TOKEN}`,
+        `${strict.baseUrl}/v1/docs/${strictDoc}/render/pages/obj:1/data@${RECT_TOKEN}`,
         { headers: strictHeaders },
       );
       expect(rectRender.status).toBe(200);
 
       const accepted = await fetch(
-        `${strict.baseUrl}/v1/docs/${strictDoc}/render/pages/1/data@${W640_TOKEN}`,
+        `${strict.baseUrl}/v1/docs/${strictDoc}/render/pages/obj:1/data@${W640_TOKEN}`,
         { headers: strictHeaders },
       );
       expect(accepted.status).toBe(200);
@@ -193,7 +193,7 @@ describe('derived renders', () => {
     await seedDocument(fx, tenantId, docId, { pageCount: 1 });
     const headers = { Authorization: `Bearer ${docToken(tenantId, docId)}` };
     const appearancesUrl = (base: string, doc: string, token: string) =>
-      `${base}/v1/docs/${doc}/layers/default/annotations/pages/1/appearances@${token}`;
+      `${base}/v1/docs/${doc}/layers/default/annotations/pages/obj:1/appearances@${token}`;
 
     // Default fixture (enforce=false): an off-lattice scale still computes.
     const lax = await fetch(
@@ -229,7 +229,7 @@ describe('derived renders', () => {
 
       // The UNVERSIONED alias is the escape hatch: never enforced (no-store).
       const unversioned = await fetch(
-        `${strict.baseUrl}/v1/docs/${strictDoc}/layers/default/annotations/pages/1/appearances?scale=3`,
+        `${strict.baseUrl}/v1/docs/${strictDoc}/layers/default/annotations/pages/obj:1/appearances?scale=3`,
         { headers: strictHeaders },
       );
       expect(unversioned.status).toBe(200);
@@ -251,7 +251,7 @@ describe('derived renders', () => {
       const headers = { Authorization: `Bearer ${docToken(tenantId, docId)}` };
 
       const blown = await fetch(
-        `${tiny.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/1/appearances@annotationVersion=1,format=webp,scale=4`,
+        `${tiny.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/obj:1/appearances@annotationVersion=1,format=webp,scale=4`,
         { headers },
       );
       expect(blown.status).toBe(400);
@@ -259,7 +259,7 @@ describe('derived renders', () => {
       expect(body.error.message).toContain('budget');
 
       const fits = await fetch(
-        `${tiny.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/1/appearances@annotationVersion=1,format=webp,scale=1`,
+        `${tiny.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/obj:1/appearances@annotationVersion=1,format=webp,scale=1`,
         { headers },
       );
       expect(fits.status).toBe(200);
@@ -339,7 +339,9 @@ describe('derived renders', () => {
       expect((await adminGetDoc(fx, tenantId, adminHeaders, docA)).thumbnailState).toBe('ready');
     });
 
-    const docB = await adminUpload(fx, tenantId, adminHeaders, bytes, { idempotencyKey: 'second-copy' });
+    const docB = await adminUpload(fx, tenantId, adminHeaders, bytes, {
+      idempotencyKey: 'second-copy',
+    });
     await vi.waitFor(async () => {
       expect((await adminGetDoc(fx, tenantId, adminHeaders, docB)).thumbnailState).toBe('ready');
     });
@@ -367,7 +369,7 @@ describe('derived renders', () => {
     const token =
       'annotationVersion=1,background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=320';
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/alice/render/annotated/pages/1/data@${token}`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/alice/render/annotated/pages/obj:1/data@${token}`,
       { headers },
     );
     expect(res.status).toBe(200);
@@ -539,13 +541,16 @@ async function adminUpload(
 
   const form = new FormData();
   form.append('file', new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }), 'doc.pdf');
-  const upload = await fetch(`${fx.baseUrl}/v1/tenants/${tenantId}/documents/${docId}/upload-proxy`, {
-    method: 'POST',
-    headers: {
-      Authorization: headers.Authorization!,
+  const upload = await fetch(
+    `${fx.baseUrl}/v1/tenants/${tenantId}/documents/${docId}/upload-proxy`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: headers.Authorization!,
+      },
+      body: form,
     },
-    body: form,
-  });
+  );
   expect(upload.status).toBe(200);
 
   const commit = await fetch(`${fx.baseUrl}/v1/tenants/${tenantId}/documents/${docId}/commit`, {

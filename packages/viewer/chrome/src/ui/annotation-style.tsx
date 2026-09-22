@@ -16,6 +16,7 @@
  * tokens to this app's semantic ones (bg-surface / text-fg / border-border …).
  */
 import { useEffect, useRef, useState } from 'react';
+import { annotationKey } from '@embedpdf/react/annotation';
 import type { ReactNode } from 'react';
 import {
   useAnnotation,
@@ -814,10 +815,10 @@ export function AnnotationStylePanel() {
   const selected = useAnnotationSelected();
 
   const hasSel = sel.specs.length > 0;
-  const specs = hasSel ? sel.specs : annotation.propsForTool(activeToolId);
+  const specs = hasSel ? sel.specs : annotation.listPropSpecs(activeToolId);
   const values = hasSel ? sel.values : defaults;
   const write = (patch: AnnotationPropsPatch) =>
-    hasSel ? annotation.updateSelection(patch) : annotation.setDefaults(activeToolId, patch);
+    hasSel ? annotation.updateSelection(patch) : annotation.setToolDefaults(activeToolId, patch);
 
   // A selection with no editable props (e.g. a stamp, or a LOCKED annotation —
   // its style is frozen) still shows its flags: that's how you unlock it.
@@ -850,7 +851,7 @@ export function AnnotationStylePanel() {
         ),
       )}
       {/* Redaction label (`/OverlayText` + `/Repeat`) — kind content, not a
-          style prop, so it writes through the redaction plugin's setLabel. */}
+          style prop, so it writes through the redaction plugin's updateLabel. */}
       <RedactionLabelSection />
       {/* `/F` flags for whatever is selected — the live flags test surface. */}
       <AnnotationFlagsSection />
@@ -870,13 +871,13 @@ function RedactionLabelSection() {
   const selected = useAnnotationSelected();
   const mark = selected.length === 1 && selected[0]!.subtype === 'redact' ? selected[0]! : null;
   const [draft, setDraft] = useState<string | null>(null);
-  useEffect(() => setDraft(null), [mark?.ref && refKeyOfRedact(mark.ref)]);
+  useEffect(() => setDraft(null), [mark?.ref && annotationKey(mark.ref)]);
   if (!redaction || !mark || mark.subtype !== 'redact') return null;
 
-  const value = draft ?? mark.overlayText ?? '';
+  const value = draft ?? (mark.raw?.subtype === 'redact' ? mark.raw.overlayText : null) ?? '';
   const commit = () => {
     if (draft === null) return;
-    void redaction.setLabel(mark.ref, { overlayText: draft.length > 0 ? draft : null });
+    void redaction.updateLabel(mark.ref, { overlayText: draft.length > 0 ? draft : null });
     setDraft(null);
   };
 
@@ -897,16 +898,11 @@ function RedactionLabelSection() {
       <label className="text-fg mt-2 flex items-center gap-2 text-sm">
         <input
           type="checkbox"
-          checked={mark.repeat}
-          onChange={(e) => void redaction.setLabel(mark.ref, { repeat: e.target.checked })}
+          checked={mark.raw?.subtype === 'redact' ? mark.raw.repeat : false}
+          onChange={(e) => void redaction.updateLabel(mark.ref, { repeat: e.target.checked })}
         />
         {t('demo.redactLabelRepeat')}
       </label>
     </div>
   );
-}
-
-/** Stable key for the effect dep — mirrors the annotation model's ref keys. */
-function refKeyOfRedact(ref: { kind: string } & Record<string, unknown>): string {
-  return JSON.stringify(ref);
 }

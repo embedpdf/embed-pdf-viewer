@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PluginContext } from '@embedpdf/core';
 import type { ScriptDiagnostic } from '@embedpdf/core-acrojs';
 
-import { createActionsCapability } from '../src/capability';
-import type { ActionsAction, ActionsState } from '../src/types';
+import { createActionsController } from '../src/controller';
+import type { ActionsAction, ActionsState } from '../src/host-contract';
 
 function harness() {
   const ctx = {
@@ -14,7 +14,7 @@ function harness() {
     tryGet: () => null,
     cleanup: () => {},
   } as unknown as PluginContext<ActionsState, ActionsAction>;
-  return createActionsCapability(ctx);
+  return createActionsController(ctx);
 }
 
 describe('detached-realm script surfaces', () => {

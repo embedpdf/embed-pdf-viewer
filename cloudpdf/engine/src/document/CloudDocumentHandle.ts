@@ -21,7 +21,7 @@ import {
   type MetadataCache,
   type MutationMeta,
   type PageHandle,
-  type PageObjectNumber,
+  type PageRef,
   type PageStructureCache,
   type PdfSaveMode,
 } from '@embedpdf/engine-core/runtime';
@@ -76,7 +76,7 @@ export interface ManifestAccessor {
   applyPageStructure(cache: PageStructureCache): void;
   /** Same advance for a page delete, additionally dropping the deleted
    *  pages' manifest rows so per-page leaf URLs stop resolving locally. */
-  applyPageDelete(cache: PageStructureCache, deletedPages: PageObjectNumber[]): void;
+  applyPageDelete(cache: PageStructureCache, deletedPages: readonly PageRef[]): void;
   /** Page insert: the cached manifest has no rows for the fresh PONs (the
    *  result carries only their object numbers), so the absorb drops the
    *  cache for a lazy refetch instead of patching. */
@@ -288,9 +288,9 @@ export class CloudDocumentHandle implements DocumentHandle {
     );
   }
 
-  page(pageObjectNumber: PageObjectNumber): PageHandle {
+  page(ref: PageRef): PageHandle {
     return new CloudPageHandle(
-      pageObjectNumber,
+      ref,
       -1,
       this.http,
       this.id,
@@ -394,12 +394,12 @@ export class CloudDocumentHandle implements DocumentHandle {
     }
 
     const byPageObjectNumber = new Map(
-      this.manifestCache.pages.map((page) => [page.state.pageObjectNumber, page]),
+      this.manifestCache.pages.map((page) => [page.state.page.pageObjectNumber, page]),
     );
     for (const pageState of meta.affectedPages) {
-      const existing = byPageObjectNumber.get(pageState.pageObjectNumber);
+      const existing = byPageObjectNumber.get(pageState.page.pageObjectNumber);
       if (existing) {
-        byPageObjectNumber.set(pageState.pageObjectNumber, {
+        byPageObjectNumber.set(pageState.page.pageObjectNumber, {
           ...existing,
           state: pageState,
         });
@@ -407,9 +407,9 @@ export class CloudDocumentHandle implements DocumentHandle {
     }
     if (delta) {
       for (const page of delta.pages) {
-        const existing = byPageObjectNumber.get(page.pageObjectNumber);
+        const existing = byPageObjectNumber.get(page.page.pageObjectNumber);
         if (existing) {
-          byPageObjectNumber.set(page.pageObjectNumber, {
+          byPageObjectNumber.set(page.page.pageObjectNumber, {
             ...existing,
             cache: page.cache,
           });
@@ -434,7 +434,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       // (/layout). Keep a deterministic order by PON so cache merges are
       // stable; display order is the SDK's concern via PageLayout.index.
       pages: Array.from(byPageObjectNumber.values()).sort(
-        (a, b) => a.state.pageObjectNumber - b.state.pageObjectNumber,
+        (a, b) => a.state.page.pageObjectNumber - b.state.page.pageObjectNumber,
       ),
     };
   }
@@ -474,7 +474,7 @@ export class CloudDocumentHandle implements DocumentHandle {
    * for a retired PON can be built from the cache (a stale request would
    * 404 anyway — this keeps the failure local and instant).
    */
-  private absorbPageDelete(cache: PageStructureCache, deletedPages: PageObjectNumber[]): void {
+  private absorbPageDelete(cache: PageStructureCache, deletedPages: readonly PageRef[]): void {
     // Delete changes the page SET: a view that removed content must never
     // resolve base artifacts again, so content AND annotations flip with
     // layout.
@@ -488,12 +488,14 @@ export class CloudDocumentHandle implements DocumentHandle {
       this.manifestCache = null;
       return;
     }
-    const deleted = new Set(deletedPages);
+    const deleted = new Set(deletedPages.map((page) => page.pageObjectNumber));
     this.manifestCache = {
       ...this.manifestCache,
       docVersion: cache.docVersion,
       layoutVersion: cache.layoutVersion,
-      pages: this.manifestCache.pages.filter((page) => !deleted.has(page.state.pageObjectNumber)),
+      pages: this.manifestCache.pages.filter(
+        (page) => !deleted.has(page.state.page.pageObjectNumber),
+      ),
     };
   }
 
@@ -716,7 +718,7 @@ export class CloudDocumentHandle implements DocumentHandle {
         if (event.cache) this.absorbPageStructure(event.cache);
         return;
       case 'pages.deleted':
-        if (event.cache) this.absorbPageDelete(event.cache, event.pageObjectNumbers);
+        if (event.cache) this.absorbPageDelete(event.cache, event.pages);
         return;
       case 'pages.inserted':
         if (event.cache) this.absorbPageInsert(event.cache);

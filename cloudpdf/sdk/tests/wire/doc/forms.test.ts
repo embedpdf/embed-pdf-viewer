@@ -24,7 +24,7 @@ describe("FormsClient", () => {
                     mappingName: "mappingName",
                     valueEntry: { kind: "none" },
                     defaultValueEntry: { kind: "none" },
-                    widgets: [{ annotObjectNumber: 1, pageObjectNumber: 1 }],
+                    widgets: [{ ref: null, annotObjectNumber: 1, page: null }],
                     value: "value",
                     defaultValue: "defaultValue",
                     maxLength: 1,
@@ -81,8 +81,12 @@ describe("FormsClient", () => {
             meta: {
                 affectedPages: [
                     {
-                        pageObjectNumber: 1,
-                        revision: { docSessionId: "docSessionId", pageObjectNumber: 1, generation: 1 },
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        revision: {
+                            docSessionId: "docSessionId",
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            generation: 1,
+                        },
                         weakAnnotationState: { kind: "unknown" },
                     },
                 ],
@@ -92,7 +96,12 @@ describe("FormsClient", () => {
                     annotationsVersion: 1,
                     layerVersion: 1,
                     working: true,
-                    pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1 },
+                        },
+                    ],
                 },
             },
         };
@@ -180,8 +189,12 @@ describe("FormsClient", () => {
             meta: {
                 affectedPages: [
                     {
-                        pageObjectNumber: 1,
-                        revision: { docSessionId: "docSessionId", pageObjectNumber: 1, generation: 1 },
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        revision: {
+                            docSessionId: "docSessionId",
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            generation: 1,
+                        },
                         weakAnnotationState: { kind: "unknown" },
                     },
                 ],
@@ -191,7 +204,12 @@ describe("FormsClient", () => {
                     annotationsVersion: 1,
                     layerVersion: 1,
                     working: true,
-                    pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1 },
+                        },
+                    ],
                 },
             },
         };
@@ -243,8 +261,12 @@ describe("FormsClient", () => {
             meta: {
                 affectedPages: [
                     {
-                        pageObjectNumber: 1,
-                        revision: { docSessionId: "docSessionId", pageObjectNumber: 1, generation: 1 },
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        revision: {
+                            docSessionId: "docSessionId",
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            generation: 1,
+                        },
                         weakAnnotationState: { kind: "unknown" },
                     },
                 ],
@@ -254,7 +276,12 @@ describe("FormsClient", () => {
                     annotationsVersion: 1,
                     layerVersion: 1,
                     working: true,
-                    pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1 },
+                        },
+                    ],
                 },
             },
         };

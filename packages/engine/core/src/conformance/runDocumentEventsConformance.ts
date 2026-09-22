@@ -3,6 +3,7 @@ import type { HighlightDraft } from '../annotation/kinds';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import type { DocumentEvent } from '../events/DocumentEvent';
+import { toPageRef } from '../identity/PageRef';
 
 const QUAD: HighlightDraft['quadPoints'] = [
   {
@@ -56,8 +57,8 @@ export function runDocumentEventsConformance(
 
         const list = await doc.pages.list();
         if (list.pages.length < 3) return;
-        const pon = list.pages[0].pageObjectNumber;
-        const page = doc.page(pon);
+        const pon = list.pages[0].ref.pageObjectNumber;
+        const page = doc.page(toPageRef(pon));
 
         const draft: HighlightDraft = {
           subtype: 'highlight',
@@ -69,9 +70,9 @@ export function runDocumentEventsConformance(
           subtype: 'highlight',
           contents: 'updated',
         });
-        const rotated = await doc.pages.rotate([pon], 90);
-        const victim = list.pages[2].pageObjectNumber;
-        const deleted = await doc.pages.delete([victim]);
+        const rotated = await doc.pages.rotate([toPageRef(pon)], 90);
+        const victim = list.pages[2].ref.pageObjectNumber;
+        const deleted = await doc.pages.delete([toPageRef(victim)]);
         const meta = await doc.metadata.update({ title: 'events conformance' });
 
         expect(events.map((event) => event.type)).toEqual([
@@ -85,7 +86,7 @@ export function runDocumentEventsConformance(
         // The embedded results are the returned results, field for field.
         const [evCreated, evUpdated, evRotated, evDeleted, evMeta] = events;
         if (evCreated.type === 'annotation.created') {
-          expect(evCreated.pageObjectNumber).toBe(pon);
+          expect(evCreated.page).toEqual(toPageRef(pon));
           expect(evCreated.created).toEqual(created.created);
           expect(evCreated.meta).toEqual(created.meta);
         }
@@ -93,13 +94,13 @@ export function runDocumentEventsConformance(
           expect(evUpdated.updated).toEqual(updated.updated);
         }
         if (evRotated.type === 'pages.rotated') {
-          expect(evRotated.pageObjectNumbers).toEqual([pon]);
+          expect(evRotated.pages).toEqual([toPageRef(pon)]);
           expect(evRotated.rotation).toBe(90);
           expect(evRotated.layout).toEqual(rotated.layout);
           expect(evRotated.cache).toEqual(rotated.cache);
         }
         if (evDeleted.type === 'pages.deleted') {
-          expect(evDeleted.pageObjectNumbers).toEqual([victim]);
+          expect(evDeleted.pages).toEqual([toPageRef(victim)]);
           expect(evDeleted.layout).toEqual(deleted.layout);
         }
         if (evMeta.type === 'metadata.updated') {
@@ -140,9 +141,7 @@ export function runDocumentEventsConformance(
         expect(events.map((event) => event.type)).toEqual(['pages.inserted']);
         const [evInserted] = events;
         if (evInserted.type === 'pages.inserted') {
-          expect(evInserted.insertedPageObjectNumbers).toEqual(
-            inserted.insertedPageObjectNumbers,
-          );
+          expect(evInserted.insertedPages).toEqual(inserted.insertedPages);
           expect(evInserted.layout).toEqual(inserted.layout);
           expect(evInserted.cache).toEqual(inserted.cache);
           expect(evInserted.destIndex).toBe(0);
@@ -162,7 +161,7 @@ export function runDocumentEventsConformance(
         let caught: unknown;
         try {
           // Deleting every page is rejected — see PageDeleteInput.
-          await doc.pages.delete(list.pages.map((p) => p.pageObjectNumber));
+          await doc.pages.delete(list.pages.map((p) => p.ref));
         } catch (err) {
           caught = err;
         }
@@ -180,7 +179,7 @@ export function runDocumentEventsConformance(
         const unsubscribe = doc.events.subscribe((event) => events.push(event));
         unsubscribe();
         const list = await doc.pages.list();
-        await doc.pages.rotate([list.pages[0].pageObjectNumber], 180);
+        await doc.pages.rotate([list.pages[0].ref], 180);
         expect(events.length).toBe(0);
       } finally {
         await doc.close();

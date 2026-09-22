@@ -65,10 +65,10 @@ export function writeAnnotationRelationship(
 
   // Set / relink.
   if (rel.inReplyTo) {
-    if (rel.inReplyTo.pageObjectNumber !== pageObjectNumber) {
+    if (rel.inReplyTo.page.pageObjectNumber !== pageObjectNumber) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
-        `/IRT parent must be on the same page as the reply (parent page ${rel.inReplyTo.pageObjectNumber}, reply page ${pageObjectNumber})`,
+        `/IRT parent must be on the same page as the reply (parent page ${rel.inReplyTo.page.pageObjectNumber}, reply page ${pageObjectNumber})`,
       );
     }
     const parentPtr = resolveAnnotPtr(runtime, session, pagePtr, rel.inReplyTo);

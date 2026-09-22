@@ -109,7 +109,7 @@ export function StampsPanel() {
     // The file name is only a FALLBACK: an Acrobat-authored or previously
     // exported library names itself through its /Title.
     stamp
-      .importLibraryPdf(file, { name: file.name.replace(/\.pdf$/i, '') })
+      .importLibrary(file, { name: file.name.replace(/\.pdf$/i, '') })
       .then((id) => setPicked(id))
       .catch((err) => {
         console.error('[embedpdf] stamp library import failed:', err);
@@ -120,8 +120,8 @@ export function StampsPanel() {
 
   /** The library as the PDF it is — title, registry, artwork — for Acrobat
    *  or another viewer. */
-  const exportPdf = (libraryId: string, name: string) => {
-    const bytes = stamp.exportLibrary(libraryId);
+  const exportPdf = async (libraryId: string, name: string) => {
+    const bytes = await stamp.exportLibrary(libraryId).catch(() => null);
     if (!bytes) return;
     const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
@@ -181,7 +181,7 @@ export function StampsPanel() {
               {!isDefault(selected.id) && (
                 <button
                   type="button"
-                  onClick={() => void stamp.removeLibrary(selected.id)}
+                  onClick={() => void stamp.deleteLibrary(selected.id)}
                   title={t('demo.stampsRemoveLibrary')}
                   className="text-fg-muted hover:text-fg grid h-7 w-7 shrink-0 place-items-center rounded"
                 >
@@ -216,7 +216,7 @@ export function StampsPanel() {
                 {!isDefault(asset.libraryId) && (
                   <button
                     type="button"
-                    onClick={() => void stamp.removeAsset(asset.id)}
+                    onClick={() => void stamp.deleteAsset(asset.id)}
                     title={t('demo.stampsRemoveStamp')}
                     className="bg-surface border-border text-fg-muted hover:text-fg absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full border opacity-0 shadow-sm focus:opacity-100 group-hover:opacity-100"
                   >

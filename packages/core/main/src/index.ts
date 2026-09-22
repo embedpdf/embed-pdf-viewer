@@ -2,6 +2,12 @@ export * from './types';
 export * from './kernel';
 export * from './event-hook';
 export * from './serial-queue';
+export * from './errors';
+export { composeApi } from './compose';
+export type { LatestCancellation, LatestLane, LatestRun } from './lanes';
+export { createLatestLane } from './lanes';
+export { guardHandle } from './guarded-handle';
+export type { SliceLease } from './store';
 export { CancelledError, isCancelled } from './scope';
 
 // Re-export the engine contracts so plugins/adapters import them from @embedpdf/core.
@@ -14,9 +20,16 @@ export {
   snapAppearanceScale,
   snapFullPageViewport,
   snapTileScale,
+  toPageRef,
+  pageRefsEqual,
+  encodePageKey,
+  decodePageKey,
+  annotationKey,
+  refFromStableId,
 } from '@embedpdf/engine-core/runtime';
 export type {
   EngineRenderPolicy,
+  PageRef,
   PageHandle,
   PageRaster,
   PageRenderOptions,

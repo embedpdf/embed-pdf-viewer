@@ -17,6 +17,21 @@ import {
 import type { DocumentHandle } from '@embedpdf/engine-core/runtime';
 import type { DocumentMeta } from '@embedpdf/core';
 
+/**
+ * The realm's default budget: production limits for memory, stack, effects
+ * and output, but a generous WALL-CLOCK deadline. `DEFAULT_SCRIPT_BUDGET`'s
+ * 50ms is a hostile-script containment limit measured on the wall clock and
+ * shared by a whole K → F → C chain (`Date.now() + maxExecutionMs` in
+ * QuickJsSandbox); a shared CI runner, with turbo running sibling packages'
+ * wasm suites alongside, starves a legitimate chain past it and the commit
+ * spuriously reports 'failed'. Deadline semantics themselves are proven by
+ * `@embedpdf/core-js-sandbox`'s suite; the suites here test AcroJS behavior.
+ */
+export const TEST_SCRIPT_BUDGET: Readonly<ScriptBudget> = Object.freeze({
+  ...DEFAULT_SCRIPT_BUDGET,
+  maxExecutionMs: 5_000,
+});
+
 export interface StandaloneRealmConfig {
   sandboxFactory?: ScriptSandboxFactory;
   identity?: Partial<ScriptIdentity> | (() => Partial<ScriptIdentity>);
@@ -38,7 +53,7 @@ export function standaloneRealm(
   document: () => DocumentMeta | null,
   config: StandaloneRealmConfig = {},
 ): StandaloneRealm {
-  const budget = config.budget ?? DEFAULT_SCRIPT_BUDGET;
+  const budget = config.budget ?? TEST_SCRIPT_BUDGET;
   const host = createScriptHost({
     sandboxFactory:
       config.sandboxFactory ??

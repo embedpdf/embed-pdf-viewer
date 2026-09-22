@@ -17,21 +17,51 @@ import {
   personalSigner,
   remoteSigner,
 } from '@embedpdf/core-signature';
-import type { DocumentHandle, FormFieldDTO, FormFieldRef } from '@embedpdf/engine-core/runtime';
+import {
+  toPageRef,
+  type DocumentHandle,
+  type FormFieldDTO,
+  type FormFieldRef,
+} from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '@embedpdf/engine';
 import { FormToken } from '@embedpdf/plugin-form/contract';
 import type { PointerSample } from '@embedpdf/plugin-interaction/contract';
 import { StampToken } from '@embedpdf/plugin-stamp/contract';
 
-import { createSignatureCapability } from '../src/capability';
-import { createArmedMarkHandler } from '../src/handler';
-import { initialSignatureState, signatureReducer } from '../src/reducer';
+import { createSignatureCapability } from '../src/controller';
+import { createArmedMarkHandler } from '../src/tools/armed-mark';
+import { initialSignatureState, signatureReducer } from '../src/model';
 import type {
   SignatureAction,
-  SignatureChange,
+  SignatureCapability,
   SignatureConfig,
   SignatureState,
-} from '../src/types';
+} from '../src/host-contract';
+
+/** The old change union, folded from the per-event hooks so the cases read as before. */
+type SignatureChange =
+  | { type: 'signed'; field: FormFieldRef }
+  | { type: 'filled'; field: FormFieldRef }
+  | { type: 'cleared'; field: FormFieldRef }
+  | { type: 'ask'; field: FormFieldRef; mark: unknown }
+  | { type: 'inspect'; field: FormFieldRef }
+  | { type: 'target'; field: FormFieldRef | null }
+  | { type: 'validated'; verdicts: readonly unknown[] }
+  | { type: 'invalidating'; field: FormFieldRef; detail: string }
+  | { type: 'protectionChanged' };
+const collectEvents = (signature: SignatureCapability, into: SignatureChange[]): void => {
+  signature.onSigned((e) => into.push({ type: 'signed', field: e.field }));
+  signature.onFilled((e) => into.push({ type: 'filled', field: e.field }));
+  signature.onCleared((e) => into.push({ type: 'cleared', field: e.field }));
+  signature.onSignRequested((e) => into.push({ type: 'ask', field: e.field, mark: e.mark }));
+  signature.onInspectionRequested((e) => into.push({ type: 'inspect', field: e.field }));
+  signature.onTargetChanged((e) => into.push({ type: 'target', field: e.field }));
+  signature.onValidated((e) => into.push({ type: 'validated', verdicts: e.verdicts }));
+  signature.onInvalidating((e) =>
+    into.push({ type: 'invalidating', field: e.field, detail: e.detail }),
+  );
+  signature.onProtectionChanged(() => into.push({ type: 'protectionChanged' }));
+};
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = resolve(here, '../../../engine/main/test/fixtures');
@@ -65,7 +95,7 @@ function signatureField(over: Partial<FormFieldDTO> = {}): FormFieldDTO {
     mappingName: null,
     valueEntry: { kind: 'none' },
     defaultValueEntry: { kind: 'none' },
-    widgets: [{ annotObjectNumber: 9, pageObjectNumber: 3 }],
+    widgets: [{ annotObjectNumber: 9, page: toPageRef(3) }],
     ...over,
   } as FormFieldDTO;
 }
@@ -77,7 +107,7 @@ function makeCtx(
 ) {
   let state: SignatureState = initialSignatureState();
   const cleanups: Array<() => void | Promise<void>> = [];
-  const form = { refresh: vi.fn(async () => {}), fieldForWidget: () => null, ...opts.form };
+  const form = { refresh: vi.fn(async () => {}), getFieldForWidget: () => null, ...opts.form };
   const ctx = {
     id: 'signature',
     engine,
@@ -104,14 +134,14 @@ async function openDoc() {
 }
 
 const stampStub = (bytes: Uint8Array) => ({
-  assetBytes: (id: string) => (id === 'people:signature' ? bytes : null),
-  library: (id: string) => (id === 'people' ? { id, kind: 'signatures', name: 'Bob' } : null),
-  armedAsset: vi.fn(() => ({ id: 'people:signature', libraryId: 'people', name: 'signature' })),
+  readAssetBytes: (id: string) => (id === 'people:signature' ? bytes : null),
+  getLibrary: (id: string) => (id === 'people' ? { id, kind: 'signatures', name: 'Bob' } : null),
+  getArmedAsset: vi.fn(() => ({ id: 'people:signature', libraryId: 'people', name: 'signature' })),
   disarm: vi.fn(),
   placeAsset: vi.fn(async () => ({
     kind: 'objectNumber',
     annotObjectNumber: 1,
-    pageObjectNumber: 3,
+    page: toPageRef(3),
   })),
 });
 
@@ -120,11 +150,11 @@ describe('mode', () => {
     const doc = await openDoc();
     try {
       const a = createSignatureCapability(makeCtx(doc).ctx, {});
-      expect(a.mode()).toBe('visual');
+      expect(a.getMode()).toBe('visual');
       expect(a.canSign()).toBe(false);
       const signer = await createTestSigner();
       const b = createSignatureCapability(makeCtx(doc).ctx, { signer });
-      expect(b.mode()).toBe('sign');
+      expect(b.getMode()).toBe('sign');
       expect(b.canSign()).toBe(true);
       expect(b.canCertify()).toBe(false);
       const c = createSignatureCapability(makeCtx(doc).ctx, {
@@ -132,7 +162,7 @@ describe('mode', () => {
         mode: 'ask',
         allowCertify: true,
       });
-      expect(c.mode()).toBe('ask');
+      expect(c.getMode()).toBe('ask');
       expect(c.canCertify()).toBe(true);
     } finally {
       await doc.close();
@@ -147,14 +177,14 @@ describe('visual fill', () => {
     try {
       const signature = createSignatureCapability(ctx, {});
       const events: SignatureChange[] = [];
-      signature.onChanged((e) => events.push(e));
+      collectEvents(signature, events);
       await signature.refresh();
-      expect(signature.signatureOf(SIG)).toMatchObject({ fieldName: 'sig', signed: false });
+      expect(signature.getSignature(SIG)).toMatchObject({ fieldName: 'sig', signed: false });
 
       await signature.fillField(SIG, { assetId: 'people:signature' });
       expect(form.refresh).toHaveBeenCalled();
       expect(events.at(-1)).toMatchObject({ type: 'filled', field: SIG });
-      expect(signature.busy()).toBe(false);
+      expect(signature.isBusy()).toBe(false);
       expect((await doc.signatures!.list()).signatures[0]!.signed).toBe(false);
 
       await signature.clearField(SIG);
@@ -182,25 +212,25 @@ describe('signing', () => {
         trust: { anchors: async () => [signer.certificate] },
       });
       const events: SignatureChange[] = [];
-      signature.onChanged((e) => events.push(e));
+      collectEvents(signature, events);
       await signature.refresh();
       signature.setTarget(SIG);
       expect(events.at(-1)).toMatchObject({ type: 'target', field: SIG });
 
-      const result = await signature.signField({
+      const result = await signature.sign({
         field: SIG,
         mark: { assetId: 'people:signature' },
         attribution: { reason: 'approved' },
       });
       expect(result.status).toBe('completed');
       expect(result.signature.signer).toMatchObject({ name: 'Bob Singor', reason: 'approved' });
-      expect(signature.target()).toBeNull(); // the signed field is no longer the target
-      expect(signature.signatureOf(SIG)).toMatchObject({
+      expect(signature.getTarget()).toBeNull(); // the signed field is no longer the target
+      expect(signature.getSignature(SIG)).toMatchObject({
         signed: true,
         coverage: 'whole-revision',
       });
       expect(
-        signature.signatureOf({ annotObjectNumber: result.signature.widget!.annotObjectNumber })
+        signature.getSignature({ annotObjectNumber: result.signature.widget!.annotObjectNumber })
           ?.signed,
       ).toBe(true);
       expect(events.some((e) => e.type === 'signed')).toBe(true);
@@ -209,8 +239,8 @@ describe('signing', () => {
       const verdicts = await signature.validate();
       expect(verdicts).toHaveLength(1);
       expect(verdicts[0]!.summary).toBe('valid');
-      expect(signature.verdictOf(SIG)?.integrity).toBe('valid');
-      expect(signature.verdicts()).toBe(verdicts);
+      expect(signature.getVerdict(SIG)?.integrity).toBe('valid');
+      expect(signature.listVerdicts()).toBe(verdicts);
 
       // Sealed: no visual fill, no second seal of the same field.
       await expect(signature.fillField(SIG, { assetId: 'people:signature' })).rejects.toThrow(
@@ -218,7 +248,7 @@ describe('signing', () => {
       );
       await expect(signature.clearField(SIG)).rejects.toThrow(/is signed/);
 
-      const analysis = await signature.analyze({ since: { signatureIndex: 0 } });
+      const analysis = await signature.analyzeChanges({ since: { signatureIndex: 0 } });
       expect(analysis.verdict).toBe('unchanged');
     } finally {
       await doc.close();
@@ -243,7 +273,7 @@ describe('signing', () => {
           }),
       });
       const signature = createSignatureCapability(ctx, { signer: () => Promise.resolve(remote) });
-      const result = await signature.signField({ field: SIG, mark: { source: artwork } });
+      const result = await signature.sign({ field: SIG, mark: { source: artwork } });
       expect(result.status).toBe('completed');
       // No certificate on a CMS signer → no default name.
       expect(result.signature.signer.name).toBeNull();
@@ -265,7 +295,7 @@ describe('signing', () => {
           trust: { anchors: async () => [first.certificate] },
         },
       );
-      const result = await signature.signField({ field: SIG, mark: { source: artwork } });
+      const result = await signature.sign({ field: SIG, mark: { source: artwork } });
       expect(result.signature.signer.name).toBe('Ada Lovelace');
       expect((await signature.validate())[0]!.summary).toBe('valid');
     } finally {
@@ -282,7 +312,7 @@ describe('the destination rule', () => {
     try {
       const events: SignatureChange[] = [];
       const ask = createSignatureCapability(ctx, { mode: 'ask' });
-      ask.onChanged((e) => events.push(e));
+      collectEvents(ask, events);
       await ask.placeMark({ assetId: 'people:signature' }, { field: SIG });
       expect(events.at(-1)).toMatchObject({
         type: 'ask',
@@ -293,16 +323,16 @@ describe('the destination rule', () => {
 
       await ask.placeMark(
         { assetId: 'people:signature' },
-        { pageObjectNumber: 3, at: { x: 10, y: 10 } },
+        { page: toPageRef(3), at: { x: 10, y: 10 } },
       );
       expect(stamp.placeAsset).toHaveBeenCalledWith('doc-1', 'people:signature', {
-        pageObjectNumber: 3,
+        page: toPageRef(3),
         at: { x: 10, y: 10 },
       });
 
       const visual = createSignatureCapability(makeCtx(doc, { stamp }).ctx, { mode: 'visual' });
       const seen: SignatureChange[] = [];
-      visual.onChanged((e) => seen.push(e));
+      collectEvents(visual, seen);
       await visual.placeMark({ assetId: 'people:signature' }, { field: SIG });
       expect(seen.at(-1)).toMatchObject({ type: 'filled' });
     } finally {
@@ -316,13 +346,13 @@ describe('the armed mark over a field', () => {
     ({
       phase: 'down',
       viewport: point,
-      page: { pon, point },
+      page: { ref: toPageRef(pon), point },
       modifiers: {},
     }) as unknown as PointerSample;
 
   it('captures only for a signatures-library mark over an unsigned signature widget', () => {
     const placeMark = vi.fn(async () => {});
-    const signature = { placeMark, signatureOf: () => null } as never;
+    const signature = { placeMark, getSignature: () => null } as never;
     const stamp = stampStub(artwork);
     const hits: Record<string, ReturnType<typeof signatureField> | null> = {
       sig: signatureField(),
@@ -331,7 +361,7 @@ describe('the armed mark over a field', () => {
     };
     let where: keyof typeof hits | 'nothing' = 'sig';
     const form = {
-      widgetAt: () =>
+      getWidgetAt: () =>
         where === 'nothing'
           ? null
           : { annotObjectNumber: 9, field: hits[where], box: { x: 0, y: 0, width: 1, height: 1 } },
@@ -359,10 +389,10 @@ describe('the armed mark over a field', () => {
     expect(placeMark).toHaveBeenCalledTimes(1);
 
     // A plain stamp (any other library) never captures.
-    stamp.armedAsset.mockReturnValue({ id: 'std:Approved', libraryId: 'std', name: 'Approved' });
+    stamp.getArmedAsset.mockReturnValue({ id: 'std:Approved', libraryId: 'std', name: 'Approved' });
     where = 'sig';
     expect(handler.onDown(sample(3, { x: 0.5, y: 0.5 }))).toBe(false);
-    stamp.armedAsset.mockReturnValue(null as never);
+    stamp.getArmedAsset.mockReturnValue(null as never);
     expect(handler.onDown(sample(3, { x: 0.5, y: 0.5 }))).toBe(false);
   });
 });
@@ -378,11 +408,11 @@ describe('judging what a save would write', () => {
         trust: { anchors: async () => [signer.certificate] },
       });
       const events: SignatureChange[] = [];
-      signature.onChanged((e) => events.push(e));
+      collectEvents(signature, events);
       await signature.refresh();
-      await signature.signField({ field: SIG, mark: { assetId: 'people:signature' } });
+      await signature.sign({ field: SIG, mark: { assetId: 'people:signature' } });
       await signature.validate();
-      expect(signature.verdictOf(SIG)).toMatchObject({
+      expect(signature.getVerdict(SIG)).toMatchObject({
         summary: 'valid',
         modifications: { verdict: 'unchanged', basis: 'persisted' },
       });
@@ -393,7 +423,7 @@ describe('judging what a save would write', () => {
       // nothing warns.
       const page = (await doc.pages.list()).pages[0]!;
       const ink = () =>
-        doc.page(page.pageObjectNumber).annotations.create({
+        doc.page(page.ref).annotations.create({
           subtype: 'ink',
           inkList: [
             [
@@ -407,7 +437,7 @@ describe('judging what a save would write', () => {
         } as never);
       const stroke = await ink();
       await new Promise((r) => setTimeout(r, 700));
-      expect(signature.verdictOf(SIG)).toMatchObject({
+      expect(signature.getVerdict(SIG)).toMatchObject({
         summary: 'valid',
         modifications: { verdict: 'permitted', basis: 'working-copy' },
       });
@@ -416,9 +446,9 @@ describe('judging what a save would write', () => {
       // Remove the stroke: the document is the loaded one again, and the
       // plugin re-judges it as such — unchanged on the persisted basis (the
       // appearance stream left behind is an orphan the save never writes).
-      await doc.page(page.pageObjectNumber).annotations.delete(stroke.created.ref);
+      await doc.page(page.ref).annotations.delete(stroke.created.ref);
       await new Promise((r) => setTimeout(r, 700));
-      expect(signature.verdictOf(SIG)).toMatchObject({
+      expect(signature.getVerdict(SIG)).toMatchObject({
         summary: 'valid',
         modifications: { verdict: 'unchanged', basis: 'persisted' },
       });
@@ -428,7 +458,7 @@ describe('judging what a save would write', () => {
       // working copy is judged forbidden and the plugin warns, once.
       await doc.forms.createField({ family: 'text', name: 'late_field' } as never);
       await new Promise((r) => setTimeout(r, 700));
-      expect(signature.verdictOf(SIG)).toMatchObject({
+      expect(signature.getVerdict(SIG)).toMatchObject({
         summary: 'invalid',
         modifications: { verdict: 'forbidden', basis: 'working-copy' },
       });
@@ -460,7 +490,7 @@ describe('judging what a save would write', () => {
     try {
       const signature = createSignatureCapability(ctx, { signer, allowCertify: true });
       const events: SignatureChange[] = [];
-      signature.onChanged((e) => events.push(e));
+      collectEvents(signature, events);
       await signature.refresh();
       // Mode 'sign', but nothing is signed yet and a certification is on the
       // table: the chrome decides (its dialog), the plugin does not seal.
@@ -468,7 +498,7 @@ describe('judging what a save would write', () => {
       expect(events.at(-1)).toMatchObject({ type: 'ask', field: SIG });
       expect((await doc.signatures!.list()).signatures[0]!.signed).toBe(false);
       // The chrome's answer: certify with P=3.
-      const result = await signature.signField({
+      const result = await signature.sign({
         field: SIG,
         mark: { assetId: 'people:signature' },
         certify: { permission: 3 },

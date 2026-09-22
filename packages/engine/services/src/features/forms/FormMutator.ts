@@ -8,12 +8,18 @@ import type {
   FormImportResult,
   FormRepairResult,
   FormSetValueResult,
-  FormWidgetRef,
+  FormWidget,
   MutationMeta,
   WidgetPlacement,
   PageObjectNumber,
 } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode, fieldLockFor } from '@embedpdf/engine-core/runtime';
+import {
+  EngineError,
+  EngineErrorCode,
+  fieldLockFor,
+  formWidget,
+} from '@embedpdf/engine-core/runtime';
+import type { AnnotationRef } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
@@ -23,7 +29,10 @@ import { createUnattachedWidget } from './internal/authorWidget';
 import { flagMasks } from './internal/fieldFlagBits';
 import { acquireFormModel } from './internal/formModelCache';
 import { bakeWidgetAppearance } from '../signature/internal/appearance';
-import { readSignaturesFromModel, withSignatureModel } from '../signature/internal/readSignatureModel';
+import {
+  readSignaturesFromModel,
+  withSignatureModel,
+} from '../signature/internal/readSignatureModel';
 import { withWideStringArray } from './internal/wideStringArray';
 import { readFieldAt, readFormSnapshot } from './internal/readFormSnapshot';
 import { resolveFieldRef, type ResolvedField } from './internal/resolveFieldRef';
@@ -76,7 +85,12 @@ export class FormMutator {
     const resolved = resolveFieldRef(this.runtime, model, ref);
     this.assertWritable(resolved);
 
-    const before = readFieldAt(this.runtime, model, resolved.fieldIndex, this.session.requireDocPtr());
+    const before = readFieldAt(
+      this.runtime,
+      model,
+      resolved.fieldIndex,
+      this.session.requireDocPtr(),
+    );
     const allowed = FAMILY_BY_VALUE_TYPE[value.type];
     if (!allowed.includes(before.family)) {
       throw new EngineError(
@@ -305,13 +319,18 @@ export class FormMutator {
       );
     }
     if (before.widgets.length === 0) {
-      throw new EngineError(EngineErrorCode.InvalidArg, `'${before.name}' has no widget to draw into`);
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `'${before.name}' has no widget to draw into`,
+      );
     }
     for (const widget of before.widgets) {
       bakeWidgetAppearance(this.runtime, docPtr, widget, pdf, pageIndex);
     }
     this.session.noteMutation();
-    const pages = [...new Set(before.widgets.map((w) => w.pageObjectNumber))];
+    const pages = [
+      ...new Set(before.widgets.flatMap((w) => (w.page ? [w.page.pageObjectNumber] : []))),
+    ];
     for (const pon of pages) this.session.bumpRevision(pon);
     return { field: this.readBackField(resolved.fieldObjectNumber), pages };
   }
@@ -327,7 +346,12 @@ export class FormMutator {
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
     this.assertWritable(resolved);
-    const before = readFieldAt(this.runtime, model, resolved.fieldIndex, this.session.requireDocPtr());
+    const before = readFieldAt(
+      this.runtime,
+      model,
+      resolved.fieldIndex,
+      this.session.requireDocPtr(),
+    );
     if (before.family !== patch.family) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
@@ -401,13 +425,18 @@ export class FormMutator {
   deleteField(
     ref: FormFieldRef,
     signal: AbortSignal,
-  ): { deletedFieldObjectNumber: number; detachedWidgets: FormWidgetRef[] } {
+  ): { deletedFieldObjectNumber: number; detachedWidgets: FormWidget[] } {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
     this.assertWritable(resolved);
-    const before = readFieldAt(this.runtime, model, resolved.fieldIndex, this.session.requireDocPtr());
+    const before = readFieldAt(
+      this.runtime,
+      model,
+      resolved.fieldIndex,
+      this.session.requireDocPtr(),
+    );
 
     const ok = withScratchN(mem, [256 * 4, 4], ([buf, countPtr]) => {
       mem.poke(countPtr, 'i32', 0);
@@ -426,16 +455,13 @@ export class FormMutator {
     this.session.noteMutation();
     return {
       deletedFieldObjectNumber: resolved.fieldObjectNumber,
-      detachedWidgets: before.widgets.map((w) => ({
-        annotObjectNumber: w.annotObjectNumber,
-        pageObjectNumber: w.pageObjectNumber,
-      })),
+      detachedWidgets: before.widgets.map((w) => formWidget(w.annotObjectNumber, w.page)),
     };
   }
 
   attachWidget(
     ref: FormFieldRef,
-    widget: FormWidgetRef,
+    widget: AnnotationRef,
     onState: string | undefined,
     signal: AbortSignal,
   ): { field: FormFieldDTO } {
@@ -444,7 +470,12 @@ export class FormMutator {
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
     this.assertWritable(resolved);
-    const before = readFieldAt(this.runtime, model, resolved.fieldIndex, this.session.requireDocPtr());
+    const before = readFieldAt(
+      this.runtime,
+      model,
+      resolved.fieldIndex,
+      this.session.requireDocPtr(),
+    );
     const toggle = before.family === 'checkbox' || before.family === 'radio';
     const state = toggle ? (onState ?? (before.family === 'checkbox' ? 'Yes' : '')) : '';
     if (toggle && (!state || state === 'Off')) {
@@ -457,7 +488,7 @@ export class FormMutator {
       !fn.EPDFForm_AttachWidget(
         this.session.requireDocPtr(),
         resolved.fieldObjectNumber,
-        widget.annotObjectNumber,
+        widgetObjectNumber(widget),
         state,
       )
     ) {
@@ -472,7 +503,7 @@ export class FormMutator {
 
   detachWidget(
     ref: FormFieldRef,
-    widget: FormWidgetRef,
+    widget: AnnotationRef,
     signal: AbortSignal,
   ): { field: FormFieldDTO } {
     throwIfAborted(signal);
@@ -484,7 +515,7 @@ export class FormMutator {
       !fn.EPDFForm_DetachWidget(
         this.session.requireDocPtr(),
         resolved.fieldObjectNumber,
-        widget.annotObjectNumber,
+        widgetObjectNumber(widget),
       )
     ) {
       throw new EngineError(EngineErrorCode.InvalidArg, 'widget is not attached to this field');
@@ -686,12 +717,9 @@ export class FormMutator {
       this.session.requireDocPtr(),
     );
     const changedSet = new Set(changedObjNums);
-    const changedWidgets: FormWidgetRef[] = field.widgets
+    const changedWidgets: FormWidget[] = field.widgets
       .filter((w) => changedSet.has(w.annotObjectNumber))
-      .map((w) => ({
-        annotObjectNumber: w.annotObjectNumber,
-        pageObjectNumber: w.pageObjectNumber,
-      }));
+      .map((w) => formWidget(w.annotObjectNumber, w.page));
     return { field, changedWidgets, meta: EMPTY_META };
   }
 }
@@ -706,4 +734,12 @@ function sniffFormat(bytes: Uint8Array): FormDataFormat {
     return c === 0x3c /* '<' */ ? 'xfdf' : 'fdf';
   }
   return 'fdf';
+}
+
+/** Widgets are addressed by object number: a name or index address cannot join a field. */
+function widgetObjectNumber(widget: AnnotationRef): number {
+  if (widget.kind !== 'objectNumber') {
+    throw new EngineError(EngineErrorCode.InvalidArg, 'widget must be addressed by object number');
+  }
+  return widget.annotObjectNumber;
 }

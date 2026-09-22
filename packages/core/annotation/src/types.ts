@@ -10,10 +10,10 @@ import type {
   InkIntent,
   LineEnding,
   LineEndings,
+  PageRef,
   PdfLinkTarget,
   StrikeoutIntent,
 } from '@embedpdf/engine-core/runtime';
-import type { PageObjectNumber } from '@embedpdf/core';
 import type { PageRotation, Point, Rect as GeometryRect, TextQuad } from '@embedpdf/core-geometry';
 
 export type { TextQuad } from '@embedpdf/core-geometry';
@@ -232,7 +232,9 @@ export type AnnotationPropsPatch = {
 export interface Annot {
   id: Id;
   ref: AnnotationRef | null;
-  pon: PageObjectNumber;
+  /** The page this annotation lives on. Internals may key by
+   *  `page.pageObjectNumber`; the address itself is what callers pass around. */
+  page: PageRef;
   subtype: Subtype;
   geom: Geom;
   style: Style;
@@ -367,7 +369,7 @@ export type Draft =
       g: 'create-rect';
       subtype: Subtype;
       preset?: string;
-      pon: PageObjectNumber;
+      page: PageRef;
       from: Vec;
       to: Vec;
       ellipse: boolean;
@@ -387,7 +389,7 @@ export type Draft =
       step: 'endpoints' | 'offset';
       subtype: 'line';
       preset: string;
-      pon: PageObjectNumber;
+      page: PageRef;
       from: Vec;
       to: Vec;
       measure: DistanceAppearance;
@@ -399,7 +401,7 @@ export type Draft =
       capture?: string;
       subtype: Subtype;
       preset?: string;
-      pon: PageObjectNumber;
+      page: PageRef;
       from: Vec;
       to: Vec;
       /** The tool's click-create policy, captured at DOWN like `upright`. */
@@ -412,7 +414,7 @@ export type Draft =
       measure?: ShapeMeasurementAppearance;
       subtype: Subtype;
       preset?: string;
-      pon: PageObjectNumber;
+      page: PageRef;
       points: Vec[];
       cur: Vec;
       closed: boolean;
@@ -423,7 +425,7 @@ export type Draft =
       g: 'create-ink';
       subtype: Subtype;
       preset?: string;
-      pon: PageObjectNumber;
+      page: PageRef;
       strokes: Vec[][];
       intent?: InkIntent;
       /** The tool's `/F` seed, captured at DOWN (see the rect draft). */
@@ -437,7 +439,7 @@ export type Draft =
       g: 'create-callout';
       subtype: Subtype;
       preset?: string;
-      pon: PageObjectNumber;
+      page: PageRef;
       step: 'knee' | 'box';
       tip: Vec;
       knee?: Vec;
@@ -489,7 +491,7 @@ export type Draft =
     }
   | { g: 'caption'; id: Id; start: Vec; delta: Vec }
   | { g: 'leader'; id: Id; start: Vec; delta: number }
-  | { g: 'marquee'; pon: PageObjectNumber; from: Vec; to: Vec };
+  | { g: 'marquee'; page: PageRef; from: Vec; to: Vec };
 
 /** A live text-markup preview (the in-progress selection rendered as the markup it
  *  will become). Per page, since a selection can span pages. */
@@ -497,6 +499,7 @@ export interface MarkupPreview {
   subtype: Subtype;
   /** Defaults key, distinct from subtype for presets such as replace-text. */
   preset: string;
+  /** Keyed by `page.pageObjectNumber` (an internal lookup, not an address). */
   byPage: Record<number, TextQuad[]>;
 }
 
@@ -504,7 +507,7 @@ export interface MarkupPreview {
 export interface CreationDraftAnchor {
   kind: 'poly';
   subtype: PolySubtype;
-  pon: PageObjectNumber;
+  page: PageRef;
   bounds: Rect;
   pointCount: number;
   minPoints: number;
@@ -556,7 +559,8 @@ export interface ChromeGeom {
 }
 
 export interface PointerInput {
-  pon: PageObjectNumber;
+  /** The page the sample resolved against (its own content-space frame). */
+  page: PageRef;
   point: Vec;
   shift: boolean;
   finish?: boolean;
@@ -650,15 +654,32 @@ export type Msg =
     }
   | { t: 'finishInkDraft' }
   | { t: 'finishCreationDraft' }
+  /**
+   * Programmatic creation from page-space geometry — the data API's `create`.
+   * Mints the same optimistic `tmp:` annotation a draw tool commits, from the
+   * preset's defaults with `props` layered on top, and emits the same `create`
+   * effect: ONE commit path for pointer and API. `preset` defaults to `subtype`.
+   */
+  | {
+      t: 'createAnnot';
+      page: PageRef;
+      subtype: Subtype;
+      geom: Geom;
+      preset?: string;
+      props?: AnnotationPropsPatch;
+      flags?: Partial<AnnotationFlags>;
+      /** Select the new annotation (a tool would); default false for API creates. */
+      select?: boolean;
+    }
   | {
       t: 'createCaret';
-      pon: PageObjectNumber;
+      page: PageRef;
       anchor: TextEndAnchor;
       flags?: Partial<AnnotationFlags>;
     }
   | {
       t: 'createReplaceText';
-      pon: PageObjectNumber;
+      page: PageRef;
       quads: TextQuad[];
       anchor: TextEndAnchor;
       preset?: string;
@@ -669,7 +690,7 @@ export type Msg =
   | {
       t: 'createMarkup';
       subtype: Subtype;
-      pon: PageObjectNumber;
+      page: PageRef;
       quads: TextQuad[];
       preset?: string;
       /** The tool's `/F` seed — merged over {@link DRAWN_FLAGS} at commit. */
@@ -679,6 +700,7 @@ export type Msg =
   | {
       t: 'setMarkupPreview';
       subtype: Subtype;
+      /** Per-page quads keyed by `page.pageObjectNumber` (a lookup, not an address). */
       quadsByPage: Record<number, TextQuad[]>;
       preset?: string;
     }
@@ -759,7 +781,7 @@ export type Msg =
   | { t: 'endTextEdit' };
 
 export type Effect =
-  | { fx: 'captured'; tool: string; pon: number; geom: Geom }
+  | { fx: 'captured'; tool: string; page: PageRef; geom: Geom }
   | { fx: 'create'; id: Id }
   | { fx: 'createGroup'; primary: Id; members: Id[] }
   /** `apChanged` is set (to `true`) ONLY when this patch INVALIDATED a baked

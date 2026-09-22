@@ -3,6 +3,7 @@ import {
   EngineError,
   EngineErrorCode,
   searchContentEpoch,
+  toPageRef,
   wirePack,
   type SearchMode,
   type SearchQuery,
@@ -119,7 +120,7 @@ async function runSearchSlice(
       request: {
         query: state.query,
         mode,
-        ...(state.startPage !== undefined ? { startPage: state.startPage } : {}),
+        ...(state.startPage !== undefined ? { startPage: toPageRef(state.startPage) } : {}),
         ...(state.skip > 0 ? { skip: state.skip } : {}),
         ...(state.budget !== undefined ? { budget: state.budget } : {}),
       },

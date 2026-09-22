@@ -1,7 +1,7 @@
 import type { PageScaleResult } from '../mutation/PageScaleResult';
 import type { FormEffectsResult } from '../forms/effects';
 import type { PdfRotation } from '../geometry/primitives';
-import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PageRef } from '../identity/PageRef';
 import type {
   AnnotationCreateResult,
   AnnotationDeleteResult,
@@ -84,22 +84,22 @@ export type DocumentEvent =
   | ({ type: 'page.viewportsChanged'; origin: EventOrigin } & PageScaleResult)
   | ({
       type: 'annotation.created';
-      pageObjectNumber: PageObjectNumber;
+      page: PageRef;
       origin: EventOrigin;
     } & AnnotationCreateResult)
   | ({
       type: 'annotation.updated';
-      pageObjectNumber: PageObjectNumber;
+      page: PageRef;
       origin: EventOrigin;
     } & AnnotationUpdateResult)
   | ({
       type: 'annotation.deleted';
-      pageObjectNumber: PageObjectNumber;
+      page: PageRef;
       origin: EventOrigin;
     } & AnnotationDeleteResult)
   | ({
       type: 'annotation.moved';
-      pageObjectNumber: PageObjectNumber;
+      page: PageRef;
       origin: EventOrigin;
     } & AnnotationMoveResult)
   | ({
@@ -111,21 +111,21 @@ export type DocumentEvent =
       /** Locally: the moved block. Remotely the audit row only records the
        *  outcome, so this is the full new order — consumers should read
        *  `layout` for positions, never reconstruct the gesture. */
-      pageObjectNumbers: PageObjectNumber[];
+      pages: PageRef[];
       /** The originator's insertion point; absent on remote events. */
       destIndex?: number;
       origin: EventOrigin;
     } & PageMoveResult)
   | ({
       type: 'pages.rotated';
-      pageObjectNumbers: PageObjectNumber[];
+      pages: PageRef[];
       rotation: PdfRotation;
       origin: EventOrigin;
     } & PageRotateResult)
   | ({
       type: 'pages.deleted';
-      /** The RETIRED pons — not derivable from the surviving `layout`. */
-      pageObjectNumbers: PageObjectNumber[];
+      /** The RETIRED pages — not derivable from the surviving `layout`. */
+      pages: PageRef[];
       origin: EventOrigin;
     } & PageDeleteResult)
   | ({
@@ -139,7 +139,7 @@ export type DocumentEvent =
       /** The decoded key that was registered, renamed, or removed. */
       name: string;
       /** The page it now points at; `null` when the registration was removed. */
-      pageObjectNumber: PageObjectNumber | null;
+      page: PageRef | null;
       origin: EventOrigin;
     } & PageNameResult)
   | ({ type: 'attachment.created'; origin: EventOrigin } & AttachmentCreateResult)
@@ -156,7 +156,7 @@ export type DocumentEvent =
   | ({ type: 'form.effectsApplied'; origin: EventOrigin } & FormEffectsResult)
   | ({
       type: 'pages.flattened';
-      pageObjectNumbers: PageObjectNumber[];
+      pages: PageRef[];
       usage: PageFlattenUsage;
       origin: EventOrigin;
     } & PageFlattenResult)

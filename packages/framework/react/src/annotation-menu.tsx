@@ -11,7 +11,7 @@
  * progress facts); the annotation-selection menu takes plain children.
  */
 import * as React from 'react';
-import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
+import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
 import type { CreationDraftAnchor } from '@embedpdf/core-annotation';
 import { Anchored, useProjectorBinding, type AnchoredPlacement } from './anchored';
 import { useSelector } from './runtime';
@@ -39,12 +39,12 @@ export function AnnotationMenu({ children, gap = 15, placement = 'top' }: Annota
   // live view scale.
   const { projector } = useProjectorBinding();
   const anchor = useSelector(
-    AnnotationHostToken,
+    AnnotationToken,
     (c) => {
-      const a = c.selectionAnchor();
+      const a = c.getSelectionAnchor();
       if (!a) return null;
-      const env = projector.viewEnv(a.pon);
-      return env ? c.selectionAnchor(env.scale, env.rotation, env.zoom) : a;
+      const env = projector.viewEnv(a.page);
+      return env ? c.getSelectionAnchor(env) : a;
     },
     sameAnchor,
   );
@@ -52,7 +52,7 @@ export function AnnotationMenu({ children, gap = 15, placement = 'top' }: Annota
   return (
     <Anchored
       anchor={{
-        pon: anchor.pon,
+        page: anchor.page,
         bounds: anchor.bounds,
         ...(anchor.knob ? { avoid: [anchor.knob] } : {}),
       }}
@@ -81,11 +81,7 @@ export function AnnotationDraftMenu({
   gap = 8,
   placement = 'top',
 }: AnnotationDraftMenuProps) {
-  const anchor = useSelector(
-    AnnotationHostToken,
-    (c) => c.creationDraftAnchor(),
-    sameCreationDraftAnchor,
-  );
+  const anchor = useSelector(AnnotationToken, (c) => c.getCreationDraft(), sameCreationDraftAnchor);
   if (!anchor) return null;
   return (
     <Anchored anchor={anchor} placement={placement} gap={gap}>

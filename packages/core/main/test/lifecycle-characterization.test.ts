@@ -45,14 +45,14 @@ describe('characterization: activation handoff on close', () => {
     await kernel.documents.open(bytesInput('a'));
     await kernel.documents.open(bytesInput('b'));
     await kernel.documents.open(bytesInput('c'));
-    expect(kernel.documents.activeId()).toBe('c');
+    expect(kernel.documents.getActiveId()).toBe('c');
 
     await kernel.documents.close('c');
-    expect(kernel.documents.activeId()).toBe('b');
+    expect(kernel.documents.getActiveId()).toBe('b');
     await kernel.documents.close('b');
-    expect(kernel.documents.activeId()).toBe('a');
+    expect(kernel.documents.getActiveId()).toBe('a');
     await kernel.documents.close('a');
-    expect(kernel.documents.activeId()).toBeNull();
+    expect(kernel.documents.getActiveId()).toBeNull();
   });
 
   it('closing an INACTIVE tab never moves the active tab', async () => {
@@ -62,7 +62,7 @@ describe('characterization: activation handoff on close', () => {
     kernel.documents.setActive('a');
 
     await kernel.documents.close('b');
-    expect(kernel.documents.activeId()).toBe('a');
+    expect(kernel.documents.getActiveId()).toBe('a');
   });
 
   it('closing the first (active) of three activates the new first', async () => {
@@ -70,10 +70,10 @@ describe('characterization: activation handoff on close', () => {
     await kernel.documents.open(bytesInput('a'));
     await kernel.documents.open(bytesInput('b'), { activate: false });
     await kernel.documents.open(bytesInput('c'), { activate: false });
-    expect(kernel.documents.activeId()).toBe('a');
+    expect(kernel.documents.getActiveId()).toBe('a');
 
     await kernel.documents.close('a');
-    expect(kernel.documents.activeId()).toBe('b');
+    expect(kernel.documents.getActiveId()).toBe('b');
   });
 });
 
@@ -180,7 +180,7 @@ describe('characterization: what plugin code observes', () => {
 
     await kernel.documents.closeAll();
     expect(kernel.documents.list()).toEqual([]);
-    expect(kernel.documents.activeId()).toBeNull();
-    expect(kernel.documents.count()).toBe(0);
+    expect(kernel.documents.getActiveId()).toBeNull();
+    expect(kernel.documents.getCount()).toBe(0);
   });
 });

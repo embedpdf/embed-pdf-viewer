@@ -1,27 +1,21 @@
 import { definePlugin } from '@embedpdf/core';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
-
-import { createSearchCapability } from './capability';
-import { registerSearchEffects } from './effects';
-import { initialSearchState, searchReducer } from './reducer';
-import { SearchToken } from './types';
-import type { SearchAction, SearchCapability, SearchPluginConfig, SearchState } from './types';
+import { SearchToken, type SearchCapability, type SearchConfig } from './contract';
+import { createSearchController } from './controller';
+import { initialSearchState, reduceSearch, type SearchAction, type SearchState } from './model';
 
 /**
- * Document text search over `doc.search` — the engine's budgeted,
- * cursor-resumable slices. Document-scoped; no pointer handling, so it
- * needs no interaction hub. The Stage is optional: when present, scans
- * start at the current page (viewport-first) and hit navigation reveals
- * the hit's page; without it the host owns scrolling.
+ * Document text search over the engine's budgeted, cursor-resumable slices.
+ * Document-scoped; no pointer handling. The Stage is optional: with one, scans
+ * start at the current page (viewport-first) and navigation reveals hits.
  */
-export const searchPlugin = (config?: SearchPluginConfig) =>
+export const searchPlugin = (config?: SearchConfig) =>
   definePlugin<SearchState, SearchAction, SearchCapability>({
     id: 'search',
     token: SearchToken,
     scope: 'document',
     optional: [StageToken],
     initialState: initialSearchState,
-    reduce: searchReducer,
-    capability: (ctx) => createSearchCapability(ctx, config),
-    effects: registerSearchEffects,
+    reduce: reduceSearch,
+    create: (ctx) => createSearchController(ctx, config),
   });

@@ -19,8 +19,8 @@ export function RedactConfirmModal() {
 
   if (!surface.isOpen) return null;
 
-  const count = redaction.pendingCount();
-  const collateral = redaction.estimateCollateral();
+  const count = redaction.getPendingCount();
+  const collateral = redaction.estimateCollateral().count;
 
   const apply = async () => {
     setBusy(true);

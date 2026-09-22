@@ -10,6 +10,7 @@ import {
 } from '../dto/PageGeometrySnapshot';
 import { pdfQuadBounds } from '../geometry/convert';
 import type { Engine } from '../engine/Engine';
+import { toPageRef } from '../identity/PageRef';
 import { PageGeometrySnapshotSchema } from '../wire/schemas';
 
 const FLAG_EMPTY = 2;
@@ -76,7 +77,7 @@ export function runPageGeometryOrientationConformance(
       close: () => Promise<void>;
     }> => {
       const doc = await openFixture(engine, opts);
-      const snapshot = await doc.page(opts.fixture.pageObjectNumber).geometry.read();
+      const snapshot = await doc.page(toPageRef(opts.fixture.pageObjectNumber)).geometry.read();
       return { snapshot, close: () => doc.close() };
     };
 

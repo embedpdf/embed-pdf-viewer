@@ -3,11 +3,23 @@
 import type * as CloudPDF from "../index.js";
 
 export interface DocPagesSetScale200Response {
-    pageObjectNumber: number;
+    page: DocPagesSetScale200Response.Page;
     meta: DocPagesSetScale200Response.Meta;
 }
 
 export namespace DocPagesSetScale200Response {
+    export interface Page {
+        kind: Page.Kind;
+        pageObjectNumber: number;
+    }
+
+    export namespace Page {
+        export const Kind = {
+            ObjectNumber: "objectNumber",
+        } as const;
+        export type Kind = (typeof Kind)[keyof typeof Kind];
+    }
+
     export interface Meta {
         affectedPages: Meta.AffectedPages.Item[];
         cacheDelta: Meta.CacheDelta | null;
@@ -18,16 +30,42 @@ export namespace DocPagesSetScale200Response {
 
         export namespace AffectedPages {
             export interface Item {
-                pageObjectNumber: number;
+                page: Item.Page;
                 revision: Item.Revision;
                 weakAnnotationState: CloudPDF.DocPagesSetScale200ResponseMetaAffectedPagesItemWeakAnnotationState;
             }
 
             export namespace Item {
+                export interface Page {
+                    kind: Page.Kind;
+                    pageObjectNumber: number;
+                }
+
+                export namespace Page {
+                    export const Kind = {
+                        ObjectNumber: "objectNumber",
+                    } as const;
+                    export type Kind = (typeof Kind)[keyof typeof Kind];
+                }
+
                 export interface Revision {
                     docSessionId: string;
-                    pageObjectNumber: number;
+                    page: Revision.Page;
                     generation: number;
+                }
+
+                export namespace Revision {
+                    export interface Page {
+                        kind: Page.Kind;
+                        pageObjectNumber: number;
+                    }
+
+                    export namespace Page {
+                        export const Kind = {
+                            ObjectNumber: "objectNumber",
+                        } as const;
+                        export type Kind = (typeof Kind)[keyof typeof Kind];
+                    }
                 }
             }
         }
@@ -46,11 +84,23 @@ export namespace DocPagesSetScale200Response {
 
             export namespace Pages {
                 export interface Item {
-                    pageObjectNumber: number;
+                    page: Item.Page;
                     cache: Item.Cache;
                 }
 
                 export namespace Item {
+                    export interface Page {
+                        kind: Page.Kind;
+                        pageObjectNumber: number;
+                    }
+
+                    export namespace Page {
+                        export const Kind = {
+                            ObjectNumber: "objectNumber",
+                        } as const;
+                        export type Kind = (typeof Kind)[keyof typeof Kind];
+                    }
+
                     export interface Cache {
                         contentVersion: number;
                         annotationVersion: number;

@@ -6,11 +6,16 @@
  * UI effects are tagged so embedders can suppress doc-open nags.
  */
 import { describe, expect, it, vi } from 'vitest';
-import type { DocumentHandle, FormEffect, FormSnapshot } from '@embedpdf/engine-core/runtime';
+import {
+  toPageRef,
+  type DocumentHandle,
+  type FormEffect,
+  type FormSnapshot,
+} from '@embedpdf/engine-core/runtime';
 import type { ScriptSandbox } from '@embedpdf/core-js-sandbox';
 import type { ScriptInput, ScriptOutput } from '@embedpdf/core-acrojs';
 
-import { createFormScriptingController } from '../src/scripting';
+import { createFormScriptingController } from '../src/scripting/controller';
 import { standaloneRealm } from './helpers/standalone-realm';
 
 const okEvent = (value: unknown = '') => ({
@@ -54,7 +59,7 @@ function textField(objnum: number, name: string) {
     flags: { readOnly: false, required: false, noExport: false, raw: 0 },
     alternateName: null,
     mappingName: null,
-    widgets: [{ annotObjectNumber: objnum + 100, pageObjectNumber: 3 }],
+    widgets: [{ annotObjectNumber: objnum + 100, page: toPageRef(3) }],
     value: '',
     defaultValue: '',
     valueEntry: { kind: 'none' as const },

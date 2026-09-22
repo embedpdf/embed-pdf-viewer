@@ -8,7 +8,7 @@
  * Data flow:
  *   type / toggle → validateSearchQuery → (debounced) search(draftQuery)
  *   useSearchState() → query / status / hitCount / activeIndex (reactive)
- *   useSelector(SearchToken, c => c.hits()) → the streamed hit list
+ *   useSelector(SearchToken, c => c.listHits()) → the streamed hit list
  *   click a hit / prev / next → goTo/prev/next (capability reveals it on-page)
  *
  * The look is ported 1:1 from viewers/snippet's search-sidebar (magnifier
@@ -125,7 +125,7 @@ export function SearchPanel() {
   const t = useT();
   const search = useSearch();
   const { query, status, hitCount, activeIndex } = useSearchState();
-  const hits = useSelector(SearchToken, (c) => c.hits());
+  const hits = useSelector(SearchToken, (c) => c.listHits());
 
   // `query` is the document-scoped stored search (survives the sidebar
   // closing). The box is a controlled draft that STARTS from it; the panel is
@@ -233,7 +233,7 @@ export function SearchPanel() {
                   type="button"
                   title="Previous"
                   className={buttonClass(false)}
-                  onClick={() => search.prev()}
+                  onClick={() => search.previousHit()}
                 >
                   <Icon name="chevronLeft" size={20} />
                 </button>
@@ -241,7 +241,7 @@ export function SearchPanel() {
                   type="button"
                   title="Next"
                   className={buttonClass(false)}
-                  onClick={() => search.next()}
+                  onClick={() => search.nextHit()}
                 >
                   <Icon name="chevronRight" size={20} />
                 </button>
@@ -264,7 +264,7 @@ export function SearchPanel() {
                   key={index}
                   hit={hit}
                   active={index === activeIndex}
-                  onClick={() => search.goTo(index)}
+                  onClick={() => search.goToHit(index)}
                 />
               ))}
             </div>

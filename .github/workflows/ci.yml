@@ -1,0 +1,146 @@
+# The pull-request gate. One workflow owns what "green" means:
+#
+#   - packages       always            typecheck + tests + contract checks
+#   - build-runtime  engine or server  the nine-target engine runtime, ONCE per run
+#   - engine         engine paths      Engine v3 Conformance (local + cloud parity, CDN snippet)
+#   - server         server or engine  the @cloudpdf/server matrix
+#   - sdk            contract or fern  SDK generation + API reference
+#   - hygiene        manifests/tooling build:release leaves the worktree clean
+#   - ci-ok          always            the ONE required check: fails if any of the above failed
+#
+# Path detection happens INSIDE the run (the `changes` job), never as a
+# workflow-level `paths:` filter, so every PR gets a ci-ok verdict — a
+# docs-only PR is green in seconds instead of waiting on a check that never
+# starts. Branch protection requires `ci-ok` alone; the matrix cells stay
+# visible for debugging but are not the contract.
+#
+# Build PDF Runtime keeps its own push trigger for every branch but main (it
+# publishes content-addressed payloads for feature branches); pull requests
+# and pushes to main run it only here, once — the main run publishes.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # Superseded pull-request pushes are cancelled; a main run never is — it may
+  # be the one publishing the runtime payload for its hash.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  changes:
+    name: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      # paths-filter lists a pull request's files through the API.
+      pull-requests: read
+    outputs:
+      engine: ${{ steps.filter.outputs.engine }}
+      server: ${{ steps.filter.outputs.server }}
+      sdk: ${{ steps.filter.outputs.sdk }}
+      manifests: ${{ steps.filter.outputs.manifests }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            engine:
+              - 'packages/engine-core/**'
+              - 'packages/engine-services/**'
+              - 'packages/engine/**'
+              - 'packages/core/signature/**'
+              - 'cloudpdf/engine/**'
+              - 'cloudpdf/server/**'
+              - 'packages/viewer/**'
+              - 'packages/default-stamps/**'
+              - '.github/workflows/engine-conformance.yml'
+              - '.github/workflows/build-engine-runtime.yml'
+            server:
+              - 'packages/engine/**'
+              - 'cloudpdf/server/**'
+              - '.github/workflows/server-tests.yml'
+            sdk:
+              - 'cloudpdf/contract/**'
+              - 'cloudpdf/sdk/**'
+              - 'cloudpdf/website/scripts/**api-reference*'
+              - 'cloudpdf/website/scripts/extract-sdk-snippets.mjs'
+              - 'cloudpdf/website/scripts/sdk-snippets*'
+              - 'cloudpdf/website/src/generated/sdk-snippets.json'
+              - 'cloudpdf/website/src/content/docs/api-reference/**'
+              - 'fern/**'
+              - '.github/workflows/sdk-generate.yml'
+            manifests:
+              - '**/package.json'
+              - 'tooling/**'
+              - 'pnpm-lock.yaml'
+              - '.github/workflows/build-hygiene.yml'
+
+  packages:
+    name: packages
+    uses: ./.github/workflows/packages.yml
+    secrets: inherit
+
+  # One runtime build feeds engine and server through this run's artifacts.
+  build-runtime:
+    name: build-runtime
+    needs: changes
+    if: needs.changes.outputs.engine == 'true' || needs.changes.outputs.server == 'true'
+    uses: ./.github/workflows/build-engine-runtime.yml
+    secrets: inherit
+
+  engine:
+    name: engine
+    needs: [changes, build-runtime]
+    if: ${{ !cancelled() && needs.changes.outputs.engine == 'true' && needs.build-runtime.result == 'success' }}
+    uses: ./.github/workflows/engine-conformance.yml
+    with:
+      runtime_artifacts: true
+    secrets: inherit
+
+  server:
+    name: server
+    needs: [changes, build-runtime]
+    if: ${{ !cancelled() && needs.changes.outputs.server == 'true' && needs.build-runtime.result == 'success' }}
+    uses: ./.github/workflows/server-tests.yml
+    with:
+      runtime_artifacts: true
+    secrets: inherit
+
+  sdk:
+    name: sdk
+    needs: changes
+    if: needs.changes.outputs.sdk == 'true'
+    uses: ./.github/workflows/sdk-generate.yml
+    secrets: inherit
+
+  hygiene:
+    name: hygiene
+    needs: changes
+    if: needs.changes.outputs.manifests == 'true'
+    uses: ./.github/workflows/build-hygiene.yml
+    secrets: inherit
+
+  ci-ok:
+    name: ci-ok
+    needs: [changes, packages, build-runtime, engine, server, sdk, hygiene]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every gated job succeeded or was skipped
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          echo "$RESULTS" | jq -e 'to_entries | all(.value.result == "success" or .value.result == "skipped")' >/dev/null \
+            || { echo "::error::a gated job failed or was cancelled"; exit 1; }

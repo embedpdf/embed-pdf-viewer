@@ -3,6 +3,7 @@ import type { SquareDraft } from '../annotation/kinds';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
+import { toPageRef } from '../identity/PageRef';
 
 const PDF_MAGIC = [0x25, 0x50, 0x44, 0x46]; // %PDF
 
@@ -44,8 +45,8 @@ export function runAnnotationAppearanceExportConformance(
       const doc = await openFixture(engine, opts);
       let exported: DocumentHandle | null = null;
       try {
-        const pon = (await doc.pages.list()).pages[0].pageObjectNumber;
-        const page = doc.page(pon);
+        const pon = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
+        const page = doc.page(toPageRef(pon));
         if (!page.annotations.exportAppearance) return;
         const a = (await page.annotations.create(square(20, 20))).created.ref;
         const b = (await page.annotations.create(square(100, 60, 30))).created.ref;
@@ -66,7 +67,7 @@ export function runAnnotationAppearanceExportConformance(
         // Union of [20..60]×[20..60] and [100..130]×[60..90] → 110 × 70.
         expect(Math.round(layout.pages[0].size.width)).toBe(110);
         expect(Math.round(layout.pages[0].size.height)).toBe(70);
-        const exportedPage = exported.page(layout.pages[0].pageObjectNumber);
+        const exportedPage = exported.page(layout.pages[0].ref);
         expect((await exportedPage.annotations.list()).annotations).toHaveLength(0);
       } finally {
         if (exported) await exported.close();
@@ -78,13 +79,13 @@ export function runAnnotationAppearanceExportConformance(
       const doc = await openFixture(engine, opts);
       try {
         const layout = await doc.pages.list();
-        const page0 = doc.page(layout.pages[0].pageObjectNumber);
+        const page0 = doc.page(layout.pages[0].ref);
         if (!page0.annotations.exportAppearance) return;
         await expect(page0.annotations.exportAppearance([])).rejects.toMatchObject({
           code: EngineErrorCode.InvalidArg,
         });
         if (layout.pages.length < 2) return;
-        const page1 = doc.page(layout.pages[1].pageObjectNumber);
+        const page1 = doc.page(layout.pages[1].ref);
         const own = (await page0.annotations.create(square(20, 100))).created.ref;
         const foreign = (await page1.annotations.create(square(20, 100))).created.ref;
         await expect(page0.annotations.exportAppearance([own, foreign])).rejects.toMatchObject({

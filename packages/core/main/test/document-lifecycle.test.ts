@@ -88,7 +88,7 @@ describe('kernel: request-time tab slots', () => {
     const docs = kernel.documents.list();
     expect(docs.map((d) => d.id)).toEqual(['a', 'b', 'c']);
     expect(docs.map((d) => d.status)).toEqual(['loading', 'loading', 'loading']);
-    expect(kernel.documents.activeId()).toBe('a');
+    expect(kernel.documents.getActiveId()).toBe('a');
   });
 
   it('keeps request order under ANY completion order', async () => {
@@ -108,7 +108,7 @@ describe('kernel: request-time tab slots', () => {
     const docs = kernel.documents.list();
     expect(docs.map((d) => d.id)).toEqual(['a', 'b', 'c']);
     expect(docs.map((d) => d.status)).toEqual(['ready', 'ready', 'ready']);
-    expect(kernel.documents.activeId()).toBe('a');
+    expect(kernel.documents.getActiveId()).toBe('a');
   });
 
   it('activation is decided at request time and slow docs never steal focus', async () => {
@@ -121,14 +121,14 @@ describe('kernel: request-time tab slots', () => {
       kernel.documents.open(bytesInput('c'), { activate: false }),
     ];
     // First open activates regardless (no active doc yet), then b claims it.
-    expect(kernel.documents.activeId()).toBe('b');
+    expect(kernel.documents.getActiveId()).toBe('b');
     resolve('c'); // c finishing first must not grab the active tab
     await settle();
-    expect(kernel.documents.activeId()).toBe('b');
+    expect(kernel.documents.getActiveId()).toBe('b');
     resolve('a');
     resolve('b');
     await Promise.all(opens);
-    expect(kernel.documents.activeId()).toBe('b');
+    expect(kernel.documents.getActiveId()).toBe('b');
   });
 
   it('imperative open() defaults to activating the new tab', async () => {
@@ -139,10 +139,10 @@ describe('kernel: request-time tab slots', () => {
     await first;
 
     const second = kernel.documents.open(bytesInput('b'));
-    expect(kernel.documents.activeId()).toBe('b'); // selected at request time
+    expect(kernel.documents.getActiveId()).toBe('b'); // selected at request time
     resolve('b');
     await second;
-    expect(kernel.documents.activeId()).toBe('b');
+    expect(kernel.documents.getActiveId()).toBe('b');
   });
 
   it('a pending tab is selectable via setActive', () => {
@@ -152,7 +152,7 @@ describe('kernel: request-time tab slots', () => {
     void kernel.documents.open(bytesInput('b'), { activate: false }).catch(() => {});
 
     kernel.documents.setActive('b');
-    expect(kernel.documents.activeId()).toBe('b');
+    expect(kernel.documents.getActiveId()).toBe('b');
   });
 
   it('closing a loading tab removes it and disposes the late handle', async () => {
@@ -210,7 +210,7 @@ describe('kernel: request-time tab slots', () => {
     const id = await open;
     expect(id).toBe('real-id');
     expect(kernel.documents.list().map((d) => [d.id, d.status])).toEqual([['real-id', 'ready']]);
-    expect(kernel.documents.activeId()).toBe('real-id');
+    expect(kernel.documents.getActiveId()).toBe('real-id');
   });
 });
 
@@ -292,7 +292,7 @@ describe('kernel: locked documents (password)', () => {
     await kernel.documents.close('a');
     expect(handle.close).toHaveBeenCalled();
     expect(kernel.documents.list()).toEqual([]);
-    expect(kernel.documents.activeId()).toBeNull();
+    expect(kernel.documents.getActiveId()).toBeNull();
   });
 });
 

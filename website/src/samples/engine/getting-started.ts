@@ -23,7 +23,7 @@ export async function inspectPdf(url: string) {
       const { pageCount, pages } = await document.pages.list();
       return {
         pageCount,
-        firstPageObjectNumber: pages[0]?.pageObjectNumber,
+        firstPage: pages[0]?.ref,
       };
     } finally {
       await document.close();

@@ -3,6 +3,7 @@ import * as React from 'react';
 import { StrictMode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { toPageRef } from '@embedpdf/core';
 import type { DocumentHandle, Engine, PageLayout } from '@embedpdf/core';
 import { Viewer, useKernel, DocumentGate } from '../src/runtime';
 import type { AnyPlugin, PluginContext } from '@embedpdf/core';
@@ -21,7 +22,7 @@ import type { AnyPlugin, PluginContext } from '@embedpdf/core';
 const box = { left: 0, bottom: 0, right: 600, top: 800 } as const;
 const page = (pon: number, index: number): PageLayout => ({
   index,
-  pageObjectNumber: pon,
+  ref: toPageRef(pon),
   label: null,
   size: { width: 600, height: 800 },
   rotation: 0,

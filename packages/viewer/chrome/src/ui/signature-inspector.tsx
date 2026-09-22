@@ -9,7 +9,8 @@
 import { useEffect, useState } from 'react';
 import { Anchored } from '@embedpdf/react/anchored';
 import { useSelector } from '@embedpdf/react/runtime';
-import { FormToken } from '@embedpdf/react/form';
+// The inspector reads the fill feed (a host projection); same runtime token, wider type.
+import { FormHostToken } from '@embedpdf/react/form';
 import { useSurface } from '@embedpdf/react/shell';
 import { useT } from '@embedpdf/react/i18n';
 import {
@@ -64,12 +65,12 @@ export function SignatureInspector() {
   const verdicts = useSignatureVerdicts();
   const [validating, setValidating] = useState(false);
   const field = surface.props?.field as FormFieldRef | undefined;
-  const dto = field ? signature.signatureOf(field) : null;
-  const verdict = field ? signature.verdictOf(field) : null;
+  const dto = field ? signature.getSignature(field) : null;
+  const verdict = field ? signature.getVerdict(field) : null;
   const widget = dto?.widget ?? null;
-  const box = useSelector(FormToken, (c) =>
+  const box = useSelector(FormHostToken, (c) =>
     widget && widget.annotObjectNumber > 0
-      ? (c.fillItem(widget.annotObjectNumber)?.box ?? null)
+      ? (c.getFillItem(widget.annotObjectNumber)?.box ?? null)
       : null,
   );
 
@@ -165,9 +166,9 @@ export function SignatureInspector() {
     </div>
   );
 
-  if (widget && widget.pageObjectNumber > 0 && box) {
+  if (widget?.page && box) {
     return (
-      <Anchored anchor={{ pon: widget.pageObjectNumber, bounds: box }} placement="bottom" gap={8}>
+      <Anchored anchor={{ page: widget.page, bounds: box }} placement="bottom" gap={8}>
         {card}
       </Anchored>
     );
@@ -179,14 +180,14 @@ export function SignatureInspector() {
 function DownloadRevision({ field }: { field: FormFieldRef }) {
   const t = useT();
   const signature = useSignature();
-  const dto = signature.signatureOf(field);
+  const dto = signature.getSignature(field);
   const [busy, setBusy] = useState(false);
   if (!dto || dto.revisionIndex === null) return null;
   const revisionIndex = dto.revisionIndex;
   const run = async () => {
     setBusy(true);
     try {
-      const bytes = await signature.revisionBytes(revisionIndex);
+      const bytes = await signature.readRevision({ revisionIndex });
       const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');

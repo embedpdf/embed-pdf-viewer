@@ -10,6 +10,7 @@ import type {
   WorkerRequest,
   WorkerResponse,
 } from '@embedpdf/engine-core/runtime';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { createPdfRuntime } from '@embedpdf/engine-runtime';
 import { InlineTransport, LazyTransport, LocalEngine, type Transport } from '../src/index';
 
@@ -130,7 +131,7 @@ describe('stamp annotations: resource buffers survive a detaching transport', ()
   });
 
   test('the same Uint8Array can be placed twice, and updated with, without being detached', async () => {
-    const page = handle.page(PAGE_OBJECT_NUMBER);
+    const page = handle.page(toPageRef(PAGE_OBJECT_NUMBER));
     // A full-span view — the case the resolver used to hand over by reference.
     const png = makePng(8, 4, [0, 128, 255, 255]);
     const original = Array.from(png);

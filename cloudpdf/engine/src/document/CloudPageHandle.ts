@@ -1,4 +1,4 @@
-import type { PageHandle, PageObjectNumber } from '@embedpdf/engine-core/runtime';
+import type { PageHandle, PageRef } from '@embedpdf/engine-core/runtime';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
@@ -9,6 +9,12 @@ import { CloudPageTextService } from './CloudPageTextService';
 import { CloudPageMeasureService } from './CloudPageMeasureService';
 import type { HttpClient } from '../transport/HttpClient';
 
+/**
+ * Cloud page handle, keyed on `ref` — the page's durable address (its
+ * object number). Every service below addresses the wire by it
+ * (`/pages/obj:N/…`), keys the manifest by its number, and publishes
+ * that number in events.
+ */
 export class CloudPageHandle implements PageHandle {
   readonly annotations: CloudPageAnnotationsService;
   readonly text: CloudPageTextService;
@@ -17,7 +23,7 @@ export class CloudPageHandle implements PageHandle {
   readonly measure: CloudPageMeasureService;
 
   constructor(
-    readonly pageObjectNumber: PageObjectNumber,
+    readonly ref: PageRef,
     readonly pageIndex: number,
     http: HttpClient,
     docId: string,
@@ -30,7 +36,7 @@ export class CloudPageHandle implements PageHandle {
       http,
       docId,
       layerName,
-      pageObjectNumber,
+      ref,
       isClosed,
       manifest,
       publisher,
@@ -39,34 +45,13 @@ export class CloudPageHandle implements PageHandle {
       http,
       docId,
       layerName,
-      pageObjectNumber,
+      ref,
       isClosed,
       manifest,
       publisher,
     );
-    this.text = new CloudPageTextService(
-      http,
-      docId,
-      layerName,
-      pageObjectNumber,
-      isClosed,
-      manifest,
-    );
-    this.geometry = new CloudPageGeometryService(
-      http,
-      docId,
-      layerName,
-      pageObjectNumber,
-      isClosed,
-      manifest,
-    );
-    this.render = new CloudPageRenderService(
-      http,
-      docId,
-      layerName,
-      pageObjectNumber,
-      isClosed,
-      manifest,
-    );
+    this.text = new CloudPageTextService(http, docId, layerName, ref, isClosed, manifest);
+    this.geometry = new CloudPageGeometryService(http, docId, layerName, ref, isClosed, manifest);
+    this.render = new CloudPageRenderService(http, docId, layerName, ref, isClosed, manifest);
   }
 }

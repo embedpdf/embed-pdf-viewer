@@ -2,7 +2,11 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { EngineErrorCode, type FreeTextAnnotationDTO } from '@embedpdf/engine-core/runtime';
+import {
+  EngineErrorCode,
+  toPageRef,
+  type FreeTextAnnotationDTO,
+} from '@embedpdf/engine-core/runtime';
 import { afterEach, beforeAll, describe, expect, test } from 'vitest';
 
 import { createLocalEngine, type LocalEngine } from '../src/index';
@@ -48,7 +52,7 @@ const latin1 = (bytes: Uint8Array): string =>
   Array.from(bytes, (b) => String.fromCharCode(b)).join('');
 
 async function readBack(doc: Awaited<ReturnType<LocalEngine['open']>>, id: string) {
-  const snapshot = await doc.page(PAGE).annotations.list();
+  const snapshot = await doc.page(toPageRef(PAGE)).annotations.list();
   const dto = snapshot.annotations.find((a) => a.subtype === 'free-text' && a.id === id);
   if (!dto) throw new Error(`free-text ${id} not found`);
   return dto as FreeTextAnnotationDTO;
@@ -64,7 +68,7 @@ describe('rich text FreeText (local engine)', () => {
   test('every FreeText reads back with richText, a plain one as body-style paragraphs', async () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
     const doc = await engine.open({ kind: 'bytes', id: 'rt-plain', bytes: annotationsPdf });
-    const created = await doc.page(PAGE).annotations.create({
+    const created = await doc.page(toPageRef(PAGE)).annotations.create({
       subtype: 'free-text',
       intent: 'free-text',
       fontFamily: 'helvetica-bold',
@@ -92,7 +96,7 @@ describe('rich text FreeText (local engine)', () => {
   test('a draft with richText writes RC/DS/DA/Contents and reads back the runs', async () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
     const doc = await engine.open({ kind: 'bytes', id: 'rt-draft', bytes: annotationsPdf });
-    const created = await doc.page(PAGE).annotations.create({
+    const created = await doc.page(toPageRef(PAGE)).annotations.create({
       subtype: 'free-text',
       intent: 'free-text',
       fontFamily: 'helvetica',
@@ -138,7 +142,7 @@ describe('rich text FreeText (local engine)', () => {
   test('alignment survives the plain → rich transition and follows textAlign', async () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
     const doc = await engine.open({ kind: 'bytes', id: 'rt-align', bytes: annotationsPdf });
-    const created = await doc.page(PAGE).annotations.create({
+    const created = await doc.page(toPageRef(PAGE)).annotations.create({
       subtype: 'free-text',
       intent: 'free-text',
       fontFamily: 'helvetica',
@@ -153,7 +157,7 @@ describe('rich text FreeText (local engine)', () => {
     expect(plain.richText.body.align).toBe('center');
     // The first bold: paragraphs only, no body, no alignment (the editor's commit).
     const rich = (
-      await doc.page(PAGE).annotations.update(ref, {
+      await doc.page(toPageRef(PAGE)).annotations.update(ref, {
         subtype: 'free-text',
         richText: {
           paragraphs: [{ runs: [{ text: 'cen' }, { text: 'tred', style: { weight: 700 } }] }],
@@ -165,7 +169,9 @@ describe('rich text FreeText (local engine)', () => {
     expect(rich.richText.paragraphs[0]!.align).toBeUndefined();
     // Align on a rich box moves the body (and /Q), not only /Q.
     const right = (
-      await doc.page(PAGE).annotations.update(ref, { subtype: 'free-text', textAlign: 'right' })
+      await doc
+        .page(toPageRef(PAGE))
+        .annotations.update(ref, { subtype: 'free-text', textAlign: 'right' })
     ).updated as FreeTextAnnotationDTO;
     expect(right.textAlign).toBe('right');
     expect(right.richText.body.align).toBe('right');
@@ -178,7 +184,7 @@ describe('rich text FreeText (local engine)', () => {
   test('patch table: contents-only rewrites a rich box as body-style paragraphs', async () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
     const doc = await engine.open({ kind: 'bytes', id: 'rt-contents', bytes: annotationsPdf });
-    const created = await doc.page(PAGE).annotations.create({
+    const created = await doc.page(toPageRef(PAGE)).annotations.create({
       subtype: 'free-text',
       intent: 'free-text',
       fontFamily: 'helvetica',
@@ -191,7 +197,7 @@ describe('rich text FreeText (local engine)', () => {
       },
     });
     const ref = created.created.ref;
-    const updated = await doc.page(PAGE).annotations.update(ref, {
+    const updated = await doc.page(toPageRef(PAGE)).annotations.update(ref, {
       subtype: 'free-text',
       contents: 'one\rtwo',
     });
@@ -209,7 +215,7 @@ describe('rich text FreeText (local engine)', () => {
   test('patch table: fontSize / fontColor move the body, runs keep their deltas', async () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
     const doc = await engine.open({ kind: 'bytes', id: 'rt-body', bytes: annotationsPdf });
-    const created = await doc.page(PAGE).annotations.create({
+    const created = await doc.page(toPageRef(PAGE)).annotations.create({
       subtype: 'free-text',
       intent: 'free-text',
       fontFamily: 'helvetica',
@@ -222,7 +228,7 @@ describe('rich text FreeText (local engine)', () => {
       },
     });
     const ref = created.created.ref;
-    const updated = await doc.page(PAGE).annotations.update(ref, {
+    const updated = await doc.page(toPageRef(PAGE)).annotations.update(ref, {
       subtype: 'free-text',
       fontSize: 20,
       fontColor: { r: 255, g: 0, b: 0 },
@@ -241,7 +247,7 @@ describe('rich text FreeText (local engine)', () => {
   test('patch table: contents and richText that disagree are rejected', async () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
     const doc = await engine.open({ kind: 'bytes', id: 'rt-agree', bytes: annotationsPdf });
-    const created = await doc.page(PAGE).annotations.create({
+    const created = await doc.page(toPageRef(PAGE)).annotations.create({
       subtype: 'free-text',
       intent: 'free-text',
       fontFamily: 'helvetica',
@@ -252,7 +258,7 @@ describe('rich text FreeText (local engine)', () => {
     });
     const ref = created.created.ref;
     const err = await rejection(
-      doc.page(PAGE).annotations.update(ref, {
+      doc.page(toPageRef(PAGE)).annotations.update(ref, {
         subtype: 'free-text',
         contents: 'stale',
         richText: { paragraphs: [{ runs: [{ text: 'fresh' }] }] },
@@ -260,7 +266,7 @@ describe('rich text FreeText (local engine)', () => {
     );
     expect(err.code).toBe(EngineErrorCode.InvalidArg);
     // Agreeing is fine, and the text comes from the rich document.
-    const updated = await doc.page(PAGE).annotations.update(ref, {
+    const updated = await doc.page(toPageRef(PAGE)).annotations.update(ref, {
       subtype: 'free-text',
       contents: 'fresh',
       richText: { paragraphs: [{ runs: [{ text: 'fresh' }] }] },
@@ -284,7 +290,7 @@ describe('rich text FreeText (local engine)', () => {
     expect(handle.instanced).toBe(false);
 
     const doc = await engine.open({ kind: 'bytes', id: 'rt-key', bytes: annotationsPdf });
-    const rich = await doc.page(PAGE).annotations.create({
+    const rich = await doc.page(toPageRef(PAGE)).annotations.create({
       subtype: 'free-text',
       intent: 'free-text',
       fontFamily: 'my-roboto',
@@ -300,7 +306,7 @@ describe('rich text FreeText (local engine)', () => {
     expect(richDto.fontFamily).toBe('my-roboto');
     expect(richDto.richText.body.family).toBe('Roboto');
 
-    const plain = await doc.page(PAGE).annotations.create({
+    const plain = await doc.page(toPageRef(PAGE)).annotations.create({
       subtype: 'free-text',
       intent: 'free-text',
       fontFamily: 'my-roboto',
@@ -318,7 +324,7 @@ describe('rich text FreeText (local engine)', () => {
     await engine.fonts.register({ key: 'roboto', familyName: 'Roboto', data: roboto });
     const doc = await engine.open({ kind: 'bytes', id: 'rt-settings', bytes: annotationsPdf });
     expect(doc.fonts).toBeDefined();
-    const created = await doc.page(PAGE).annotations.create({
+    const created = await doc.page(toPageRef(PAGE)).annotations.create({
       subtype: 'free-text',
       intent: 'free-text',
       fontFamily: 'roboto',
@@ -332,7 +338,7 @@ describe('rich text FreeText (local engine)', () => {
     // the two saves are compared, not the raw font size).
     const subsetSave = await doc.download();
     await doc.fonts!.setEmbeddingPolicy('full');
-    await doc.page(PAGE).annotations.update(created.created.ref, {
+    await doc.page(toPageRef(PAGE)).annotations.update(created.created.ref, {
       subtype: 'free-text',
       contents: 'Whole program',
     });
@@ -351,7 +357,7 @@ describe('rich text FreeText (local engine)', () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
     const bytes = new Uint8Array(await readFile(subsetHelveticaPath));
     const doc = await engine.open({ kind: 'bytes', id: 'rt-subset', bytes });
-    const page = doc.page((await doc.pages.list()).pages[0]!.pageObjectNumber);
+    const page = doc.page((await doc.pages.list()).pages[0]!.ref);
     const created = await page.annotations.create({
       subtype: 'free-text',
       intent: 'free-text',

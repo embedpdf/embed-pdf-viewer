@@ -63,6 +63,15 @@ module.exports = [
     },
   },
   {
+    // Plugin sources stay readable one file at a time: a concern is a folder,
+    // a file is one area of it. Types-only entries and tests are exempt.
+    files: ['packages/plugin/*/src/**/*.ts'],
+    ignores: ['**/contract.ts', '**/host-contract.ts', '**/*.test.ts'],
+    rules: {
+      'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
+    },
+  },
+  {
     // The two-door invariant, enforced (naming.md + packages/viewer/*/src/component.*).
     //
     // A framework wrapper's component module must stay ENGINE-BLIND: the local

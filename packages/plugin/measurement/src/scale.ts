@@ -13,7 +13,7 @@ import type {
   PdfMeasure,
   PdfRect,
 } from '@embedpdf/engine-core/runtime';
-import type { MeasurementConfig, PageScale, ScalePreset } from './types';
+import type { MeasurementConfig, PageScale, ScalePreset } from './contract';
 
 export const DEFAULT_PRESETS: ScalePreset[] = [
   ...[1, 10, 20, 50, 100, 200].map((real) => ({

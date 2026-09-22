@@ -918,6 +918,9 @@ importers:
 
   packages/core/main:
     dependencies:
+      '@embedpdf/core-geometry':
+        specifier: workspace:*
+        version: link:../geometry
       '@embedpdf/engine-core':
         specifier: workspace:*
         version: link:../../engine/core
@@ -1432,6 +1435,9 @@ importers:
       '@embedpdf/core-acrojs':
         specifier: workspace:*
         version: link:../../core/acrojs
+      '@embedpdf/core-geometry':
+        specifier: workspace:*
+        version: link:../../core/geometry
       '@embedpdf/core-js-sandbox':
         specifier: workspace:*
         version: link:../../core/js-sandbox
@@ -1538,6 +1544,9 @@ importers:
       '@embedpdf/core':
         specifier: workspace:*
         version: link:../../core/main
+      '@embedpdf/core-geometry':
+        specifier: workspace:*
+        version: link:../../core/geometry
       '@embedpdf/engine-core':
         specifier: workspace:*
         version: link:../../engine/core
@@ -1557,7 +1566,6 @@ importers:
       vitest:
         specifier: ^2.1.9
         version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
-
 
   packages/plugin/metadata:
     dependencies:
@@ -1596,15 +1604,18 @@ importers:
       '@embedpdf/core':
         specifier: workspace:*
         version: link:../../core/main
+      '@embedpdf/core-geometry':
+        specifier: workspace:*
+        version: link:../../core/geometry
       '@embedpdf/engine-core':
         specifier: workspace:*
         version: link:../../engine/core
       '@embedpdf/plugin-annotation':
         specifier: workspace:*
         version: link:../annotation
-      '@embedpdf/plugin-interaction':
+      '@embedpdf/plugin-search':
         specifier: workspace:*
-        version: link:../interaction
+        version: link:../search
       '@embedpdf/plugin-selection':
         specifier: workspace:*
         version: link:../selection
@@ -1824,6 +1835,9 @@ importers:
       typescript:
         specifier: ^5.0.0
         version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
 
   packages/viewer/chrome:
     dependencies:

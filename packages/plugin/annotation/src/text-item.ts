@@ -12,14 +12,16 @@ import {
   type Model,
   type ViewEnv,
 } from '@embedpdf/core-annotation';
+import type { PageRef } from '@embedpdf/engine-core/runtime';
+
+import type { TextItem } from './contract';
 import { cssFontFamilyForFont, richDocOf, stripBodyDefaults } from './rich-text';
-import type { TextItem } from './types';
 
 /** Project the model's free-text boxes into render-ready {@link TextItem}s — the
  *  core geometry (`textBoxes`) joined with the DTO-derived CSS. Pure; memoized by
  *  model identity at the call site so selectors get a stable reference. */
-export function buildTextItems(m: Model, pon: number, view?: ViewEnv): TextItem[] {
-  return textBoxes(m, pon, view).map((tb) => {
+export function buildTextItems(m: Model, page: PageRef, view?: ViewEnv): TextItem[] {
+  return textBoxes(m, page, view).map((tb) => {
     const a = m.byId[tb.id];
     // `text`/`style` are the OPTIMISTIC content projections (a props edit lands
     // here before the engine round-trips), so the editor restyles instantly.

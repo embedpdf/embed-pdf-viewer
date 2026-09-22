@@ -4,6 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 import {
@@ -143,7 +144,7 @@ describe('GET /events — the SSE half of the document event stream', () => {
         'Content-Type': 'application/json',
         'X-Engine-Session-Id': 'engine-session-A',
       },
-      body: JSON.stringify({ pageObjectNumbers: [1], rotation: 90 }),
+      body: JSON.stringify({ pages: [1].map(toPageRef), rotation: 90 }),
     });
     expect(res.status).toBe(200);
     const responseBody = (await res.json()) as unknown;
@@ -207,13 +208,13 @@ describe('GET /events — the SSE half of the document event stream', () => {
     const first = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/rotate`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ pageObjectNumbers: [1], rotation: 90 }),
+      body: JSON.stringify({ pages: [1].map(toPageRef), rotation: 90 }),
     });
     expect(first.status).toBe(200);
     const second = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/move`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ pageObjectNumbers: [3], destIndex: 0 }),
+      body: JSON.stringify({ pages: [3].map(toPageRef), destIndex: 0 }),
     });
     expect(second.status).toBe(200);
 
@@ -241,7 +242,7 @@ describe('GET /events — the SSE half of the document event stream', () => {
     const old = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/rotate`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ pageObjectNumbers: [1], rotation: 180 }),
+      body: JSON.stringify({ pages: [1].map(toPageRef), rotation: 180 }),
     });
     expect(old.status).toBe(200);
 
@@ -251,7 +252,7 @@ describe('GET /events — the SSE half of the document event stream', () => {
     const fresh = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/rotate`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ pageObjectNumbers: [2], rotation: 90 }),
+      body: JSON.stringify({ pages: [2].map(toPageRef), rotation: 90 }),
     });
     expect(fresh.status).toBe(200);
 
@@ -310,7 +311,7 @@ describe('GET /events — the SSE half of the document event stream', () => {
     const res = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/rotate`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pageObjectNumbers: [1], rotation: 90 }),
+      body: JSON.stringify({ pages: [1].map(toPageRef), rotation: 90 }),
     });
     expect(res.status).toBe(200);
     await sse.waitFor(1);
@@ -335,7 +336,7 @@ describe('GET /events — the SSE half of the document event stream', () => {
     const res = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/rotate`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pageObjectNumbers: [1], rotation: 90 }),
+      body: JSON.stringify({ pages: [1].map(toPageRef), rotation: 90 }),
     });
     expect(res.status).toBe(200);
 

@@ -14,7 +14,7 @@ import type { PageHandle } from './PageHandle';
 import type { PieceInfoService } from './PieceInfoService';
 import type { PdfSaveMode } from '../dto/PdfSaveMode';
 import type { DocumentEventStream } from '../events/DocumentEventStream';
-import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PageRef } from '../identity/PageRef';
 import type { BaseVersionInfo } from '../signature/types';
 import { AbortablePromise } from '../promise/AbortablePromise';
 
@@ -94,11 +94,11 @@ export interface DocumentHandle {
    */
   readonly events: DocumentEventStream;
   /**
-   * Returns a handle scoped to a page by PDF indirect object number.
-   * Throws `EngineError(NotFound)` if the document has no such page.
-   * Synchronous because page records are cached on `DocumentSession`.
+   * Returns a handle scoped to a page by its `PageRef`. Throws
+   * `EngineError(NotFound)` when the document has no such page. Synchronous
+   * because page records are cached on `DocumentSession`.
    */
-  page(pageObjectNumber: PageObjectNumber): PageHandle;
+  page(ref: PageRef): PageHandle;
   download(opts?: { mode?: PdfSaveMode }): AbortablePromise<Uint8Array>;
   /**
    * Local Node engines only: write the document to a local file without

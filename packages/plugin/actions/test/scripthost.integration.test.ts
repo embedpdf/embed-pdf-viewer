@@ -6,11 +6,11 @@ import { describe, expect, it } from 'vitest';
 import { createKernel } from '@embedpdf/core';
 import { createQuickJsSandbox } from '@embedpdf/core-js-sandbox';
 import { createLocalEngine } from '@embedpdf/engine';
-import type { PdfActionNode, PdfActionTree } from '@embedpdf/engine-core/runtime';
+import { toPageRef, type PdfActionNode, type PdfActionTree } from '@embedpdf/engine-core/runtime';
 
 import { actionsPlugin } from '../src/actions.plugin';
 import { ActionsToken } from '../src/internal';
-import type { ActionsHostCapability, AnnotCommitEntry } from '../src/types';
+import type { ActionsHostCapability, AnnotCommitEntry } from '../src/host-contract';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(
@@ -83,8 +83,8 @@ const hoverCtx = {
   origin: 'hover' as const,
   source: {
     kind: 'annotation' as const,
-    annotation: { kind: 'objectNumber' as const, pageObjectNumber: 3, annotObjectNumber: 5 },
-    pon: 3,
+    annotation: { kind: 'objectNumber' as const, page: toPageRef(3), annotObjectNumber: 5 },
+    page: toPageRef(3),
   },
   event: { scope: 'annotation' as const, name: 'cursorEnter' as const },
 };
@@ -105,7 +105,7 @@ describe('the ScriptHost executor (real VM, real engine world)', () => {
     expect(t.committed).toHaveLength(1);
     expect(t.committed[0]).toMatchObject({
       annotObjectNumber: 6, // the `tip` square
-      pageObjectNumber: 3,
+      page: toPageRef(3),
       patch: {
         strokeColor: ['RGB', 0.14, 0.43, 0.89],
         // Trigger provenance reached the VM: an Annot-plane hover event.

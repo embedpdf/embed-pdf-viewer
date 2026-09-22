@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import type { FormFieldDTO, FormSnapshot } from '@embedpdf/engine-core/runtime';
+import { toPageRef, type FormFieldDTO, type FormSnapshot } from '@embedpdf/engine-core/runtime';
 
 import { fillItemForWidget, fillItems } from '../src/core/fill-items';
 import {
@@ -20,7 +20,7 @@ const text = (over: Partial<Extract<FormFieldDTO, { family: 'text' }>> = {}): Fo
   flags: { readOnly: false, required: false, noExport: false, raw: 0 },
   alternateName: null,
   mappingName: null,
-  widgets: [{ annotObjectNumber: 4, pageObjectNumber: 3 }],
+  widgets: [{ annotObjectNumber: 4, page: toPageRef(3) }],
   value: 'abc',
   defaultValue: '',
   maxLength: 5,
@@ -127,7 +127,7 @@ const signature = (
   mappingName: null,
   valueEntry: { kind: 'none' },
   defaultValueEntry: { kind: 'none' },
-  widgets: [{ annotObjectNumber: 9, pageObjectNumber: 3 }],
+  widgets: [{ annotObjectNumber: 9, page: toPageRef(3) }],
   ...over,
 });
 
@@ -151,7 +151,7 @@ describe('signature widgets', () => {
       t: 'snapshot',
       snapshot: snapshot([
         text(),
-        signature({ widgets: [{ annotObjectNumber: 9, pageObjectNumber: 3 }] }),
+        signature({ widgets: [{ annotObjectNumber: 9, page: toPageRef(3) }] }),
       ]),
     });
     expect(widgetAt(m, 3, { x: 10, y: 10 })).toBeNull(); // geometry not loaded

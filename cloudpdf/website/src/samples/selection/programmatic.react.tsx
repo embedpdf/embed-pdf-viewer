@@ -1,6 +1,6 @@
 import { Viewer, DocumentGate, useSelector } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
+import { Stage, stagePlugin, usePageList, usePages } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import {
@@ -22,23 +22,19 @@ import {
 } from '../stage/_shared/chrome';
 
 const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
-const plugins = [
-  stagePlugin(),
-  renderPlugin(),
-  interactionPlugin(),
-  selectionPlugin(),
-];
+const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPlugin()];
 
 const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 function SelectionToolbar() {
-  const stage = useStage();
+  const { currentPage } = usePages();
+  const { pages } = usePageList();
   const selection = useSelection();
   const hasSelection = useSelector(SelectionToken, (value) => value.hasSelection());
 
   const selectCurrentPage = () => {
-    const page = stage.pages()[stage.currentPage()];
-    if (page) selection.select({ pon: page.pon, start: 0, count: 120 });
+    const page = pages[currentPage];
+    if (page) selection.select({ page: page.ref, start: 0, count: 120 });
   };
 
   return (

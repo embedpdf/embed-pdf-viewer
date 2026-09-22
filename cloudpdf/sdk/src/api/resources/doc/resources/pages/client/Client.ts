@@ -35,7 +35,7 @@ export class PagesClient {
      *     await client.doc.pages.setScale({
      *         docId: "docId",
      *         layerName: "layerName",
-     *         pon: 1
+     *         pageKey: "pageKey"
      *     })
      */
     public setScale(
@@ -49,7 +49,7 @@ export class PagesClient {
         request: CloudPDF.doc.DocPagesSetScaleRequest,
         requestOptions?: PagesClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocPagesSetScale200Response>> {
-        const { docId, layerName, pon, "X-Document-Password": documentPassword, ..._body } = request;
+        const { docId, layerName, pageKey, "X-Document-Password": documentPassword, ..._body } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -61,7 +61,7 @@ export class PagesClient {
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)),
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/pages/${core.url.encodePathParam(pon)}/scale`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/pages/${core.url.encodePathParam(pageKey)}/scale`,
             ),
             method: "PUT",
             headers: _headers,
@@ -98,7 +98,7 @@ export class PagesClient {
             _response.error,
             _response.rawResponse,
             "PUT",
-            "/v1/docs/{docId}/layers/{layerName}/pages/{pon}/scale",
+            "/v1/docs/{docId}/layers/{layerName}/pages/{pageKey}/scale",
         );
     }
 
@@ -114,7 +114,7 @@ export class PagesClient {
      *     await client.doc.pages.viewports({
      *         docId: "docId",
      *         layerName: "layerName",
-     *         pon: 1
+     *         pageKey: "pageKey"
      *     })
      */
     public viewports(
@@ -128,7 +128,7 @@ export class PagesClient {
         request: CloudPDF.doc.ViewportsPagesRequest,
         requestOptions?: PagesClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocPagesViewports200Response>> {
-        const { docId, layerName, pon, "X-Document-Password": documentPassword } = request;
+        const { docId, layerName, pageKey, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -140,7 +140,7 @@ export class PagesClient {
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)),
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/pages/${core.url.encodePathParam(pon)}/viewports`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/pages/${core.url.encodePathParam(pageKey)}/viewports`,
             ),
             method: "GET",
             headers: _headers,
@@ -175,7 +175,7 @@ export class PagesClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/layers/{layerName}/pages/{pon}/viewports",
+            "/v1/docs/{docId}/layers/{layerName}/pages/{pageKey}/viewports",
         );
     }
 

@@ -27,7 +27,7 @@ Editing is split in three layers, so no framework carries its own text
 editor:
 
 - **The plugin decides** (`@embedpdf/plugin-annotation`, DOM-free). Its
-  `textItems(pon)` projection hands the framework one editable element per
+  `textItems(page)` projection hands the framework one editable element per
   free text: the box, `richText.paragraphs`, and the body as ready-to-spread
   CSS (font, size, colour, weight, style, decoration, alignment, the text
   inset). It owns the text truth, the debounced engine write, and where a

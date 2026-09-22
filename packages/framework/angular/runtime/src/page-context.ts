@@ -16,12 +16,14 @@
  * `makePageContext` exactly).
  */
 import { InjectionToken, inject, type Signal } from '@angular/core';
+import type { PageRef } from '@embedpdf/core';
 import type { PageFrame, PageTransform, Point, Rect } from '@embedpdf/core-geometry';
 
 export interface EpdfPageContext {
   readonly documentId: string;
-  /** Durable page identity (PDF object number) — use for keys / render / annotations. */
-  readonly pon: number;
+  /** The page's durable address — use for keys / render / annotations (read
+   *  `ref.pageObjectNumber` where a map key is needed). */
+  readonly ref: PageRef;
   /** Display index (page N) — can shift under page reorders, hence a signal. */
   readonly pageIndex: Signal<number>;
   /** Reserved chrome bands around the page (screen px per side). */
@@ -49,11 +51,11 @@ export function injectPage(): EpdfPageContext {
   return page;
 }
 
-/** Build a page context from its reactive parts. `documentId`/`pon` are thunks
+/** Build a page context from its reactive parts. `documentId`/`ref` are thunks
  *  because inputs aren't readable at construction — both are stable per surface. */
 export function createPageContext(parts: {
   documentId: () => string;
-  pon: () => number;
+  ref: () => PageRef;
   pageIndex: Signal<number>;
   frame: Signal<PageFrame>;
   transform: Signal<PageTransform>;
@@ -65,8 +67,8 @@ export function createPageContext(parts: {
     get documentId() {
       return parts.documentId();
     },
-    get pon() {
-      return parts.pon();
+    get ref() {
+      return parts.ref();
     },
     pageIndex: parts.pageIndex,
     frame: parts.frame,

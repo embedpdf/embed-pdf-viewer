@@ -1,3 +1,5 @@
+import { PageRefSchema } from '../identity/PageRef.schema';
+import type { PageRef } from '../identity/PageRef';
 import { z } from 'zod';
 
 import type {
@@ -48,7 +50,7 @@ import type { DocumentSecurityState, PdfPermissionInfo } from '../engine/Documen
 import type { SerializedEngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { FormEffectsResult, FormEffect } from '../forms/effects';
-import { FormFieldDTOSchema, FormSnapshotSchema, FormWidgetRefSchema } from '../forms/schema';
+import { FormFieldDTOSchema, FormSnapshotSchema, FormWidgetSchema } from '../forms/schema';
 import { FormFieldRefSchema, FormFieldValueSchema } from '../forms/schema';
 import {
   PdfQuadSchema,
@@ -401,7 +403,7 @@ export const WeakAnnotationStateSchema: z.ZodType<WeakAnnotationState> = z.discr
 );
 
 export const PageStateSchema: z.ZodType<PageState> = z.object({
-  pageObjectNumber: z.number().int().positive(),
+  page: PageRefSchema,
   revision: RevisionTokenSchema,
   weakAnnotationState: WeakAnnotationStateSchema,
 });
@@ -579,7 +581,7 @@ export const SearchRequestSchema: z.ZodType<SearchRequest> = z.object({
   query: SearchQuerySchema,
   mode: SearchModeSchema.optional(),
   cursor: z.string().optional(),
-  startPage: z.number().int().positive().optional(),
+  startPage: PageRefSchema.optional(),
   skip: z.number().int().nonnegative().optional(),
   budget: z
     .object({
@@ -602,7 +604,7 @@ export const PdfTextSegmentSchema: z.ZodType<PdfTextSegment> = z.object({
 });
 
 export const SearchMatchSchema: z.ZodType<SearchMatch> = z.object({
-  pageObjectNumber: z.number().int().positive(),
+  page: PageRefSchema,
   charStart: z.number().int().nonnegative(),
   charCount: z.number().int().positive(),
   segments: z.array(PdfTextSegmentSchema),
@@ -846,7 +848,7 @@ export const CacheDeltaSchema: z.ZodType<CacheDelta> = z.object({
   working: z.boolean().optional(),
   pages: z.array(
     z.object({
-      pageObjectNumber: z.number().int().positive(),
+      page: PageRefSchema,
       cache: CachePinsSchema,
     }),
   ),
@@ -912,7 +914,7 @@ export const AnnotationMoveResultSchema: z.ZodType<AnnotationMoveResult> = z.obj
 
 export const FormSetValueResultSchema: z.ZodType<FormSetValueResult> = z.object({
   field: FormFieldDTOSchema,
-  changedWidgets: z.array(FormWidgetRefSchema),
+  changedWidgets: z.array(FormWidgetSchema),
   meta: MutationMetaSchema,
 });
 
@@ -933,11 +935,11 @@ export const FormEffectsResultSchema: z.ZodType<FormEffectsResult> = z.object({
       index: z.number().int().nonnegative(),
       status: z.enum(['applied', 'unchanged', 'rejected', 'failed', 'skipped']),
       fields: z.array(FormFieldDTOSchema),
-      changedWidgets: z.array(FormWidgetRefSchema),
+      changedWidgets: z.array(FormWidgetSchema),
       error: EngineErrorPayloadSchema.optional(),
     }),
   ),
-  changedWidgets: z.array(FormWidgetRefSchema),
+  changedWidgets: z.array(FormWidgetSchema),
   meta: MutationMetaSchema.nullable(),
 });
 
@@ -962,7 +964,7 @@ export const FormFieldUpdateResultSchema: z.ZodType<FormFieldUpdateResult> = z.o
 
 export const FormFieldDeleteResultSchema: z.ZodType<FormFieldDeleteResult> = z.object({
   deletedFieldObjectNumber: z.number().int().positive(),
-  removedWidgets: z.array(FormWidgetRefSchema),
+  removedWidgets: z.array(FormWidgetSchema),
   meta: MutationMetaSchema,
 });
 
@@ -1002,7 +1004,7 @@ export const PageBoxesSchema: z.ZodType<PageBoxes> = z.object({
  */
 export const PageLayoutSchema: z.ZodType<PageLayout> = z.object({
   index: z.number().int().nonnegative(),
-  pageObjectNumber: z.number().int().positive(),
+  ref: PageRefSchema,
   label: z.string().nullable(),
   size: PdfSizeSchema,
   rotation: PdfRotationSchema,
@@ -1012,11 +1014,11 @@ export const PageLayoutSchema: z.ZodType<PageLayout> = z.object({
 });
 
 export const PageFlattenResultSchema: z.ZodType<PageFlattenResult> = z.object({
-  pageObjectNumbers: z.array(z.number().int().positive()),
+  pages: z.array(PageRefSchema),
   usage: z.enum(['display', 'print']),
   results: z.array(
     z.object({
-      pageObjectNumber: z.number().int().positive(),
+      page: PageRefSchema,
       status: z.enum(['applied', 'unchanged', 'failed', 'skipped']),
       error: EngineErrorPayloadSchema.optional(),
     }),
@@ -1026,7 +1028,7 @@ export const PageFlattenResultSchema: z.ZodType<PageFlattenResult> = z.object({
 
 /** See `AnnotationFlattenResult`. */
 export const AnnotationFlattenResultSchema: z.ZodType<AnnotationFlattenResult> = z.object({
-  pageObjectNumber: z.number().int().positive(),
+  page: PageRefSchema,
   usage: z.enum(['display', 'print']),
   results: z.array(
     z.object({
@@ -1050,7 +1052,7 @@ export const AnnotationAppearanceExportInputSchema: z.ZodType<AnnotationAppearan
   });
 
 export const PageFlattenInputSchema: z.ZodType<PageFlattenInput> = z.object({
-  pageObjectNumbers: z.array(z.number().int().positive()),
+  pages: z.array(PageRefSchema),
   usage: z.enum(['display', 'print']),
 });
 
@@ -1059,7 +1061,7 @@ export const RedactionApplyScopeSchema: z.ZodType<RedactionApplyScope> = z.discr
   [
     z.object({
       kind: z.literal('pages'),
-      pageObjectNumbers: z.array(z.number().int().positive()),
+      pages: z.array(PageRefSchema),
     }),
     z.object({
       kind: z.literal('annotations'),
@@ -1072,7 +1074,7 @@ export const RedactionApplyResultSchema: z.ZodType<RedactionApplyResult> = z.obj
   scope: RedactionApplyScopeSchema,
   results: z.array(
     z.object({
-      pageObjectNumber: z.number().int().positive(),
+      page: PageRefSchema,
       status: z.enum(['applied', 'unchanged', 'failed', 'skipped']),
       removedAnnotationCount: z.number().int().nonnegative(),
       error: EngineErrorPayloadSchema.optional(),
@@ -1091,7 +1093,7 @@ export const RedactionApplyResultSchema: z.ZodType<RedactionApplyResult> = z.obj
 export const NamedPageEntrySchema: z.ZodType<NamedPageEntry> = z.object({
   name: z.string(),
   target: z.discriminatedUnion('kind', [
-    z.object({ kind: z.literal('page'), pageObjectNumber: z.number().int().positive() }),
+    z.object({ kind: z.literal('page'), page: PageRefSchema }),
     z.object({ kind: z.literal('template'), objectNumber: z.number().int().positive() }),
     z.object({ kind: z.literal('dangling') }),
   ]),
@@ -1106,7 +1108,7 @@ export const PageListSnapshotSchema: z.ZodType<PageListSnapshot> = z.object({
 /** `pages.setName` input — see `PageNameInput`. */
 export const PageNameInputSchema: z.ZodType<PageNameInput> = z.object({
   name: z.string().min(1),
-  pageObjectNumber: z.number().int().positive(),
+  page: PageRefSchema,
   replace: z.string().min(1).optional(),
 });
 
@@ -1116,11 +1118,11 @@ export const PageRemoveNameInputSchema: z.ZodType<PageRemoveNameInput> = z.objec
 });
 
 /**
- * Page reorder input. Pages are always addressed by `pageObjectNumber`;
- * `destIndex` is the insertion point in the post-removal index space.
+ * Page reorder input. Pages are addressed by `PageRef`; `destIndex` is the
+ * insertion point in the post-removal index space.
  */
 export const PageMoveInputSchema: z.ZodType<PageMoveInput> = z.object({
-  pageObjectNumbers: z.array(z.number().int().positive()),
+  pages: z.array(PageRefSchema),
   destIndex: z.number().int().nonnegative(),
 });
 
@@ -1155,7 +1157,7 @@ export const PageNameResultSchema: z.ZodType<PageNameResult> = z.object({
  * one value applied to every listed page.
  */
 export const PageRotateInputSchema: z.ZodType<PageRotateInput> = z.object({
-  pageObjectNumbers: z.array(z.number().int().positive()),
+  pages: z.array(PageRefSchema),
   rotation: PdfRotationSchema,
 });
 
@@ -1171,7 +1173,7 @@ export const PageRotateResultSchema: z.ZodType<PageRotateResult> = z.object({
 
 /** Page delete input. Deleting every page is rejected server/worker-side. */
 export const PageDeleteInputSchema: z.ZodType<PageDeleteInput> = z.object({
-  pageObjectNumbers: z.array(z.number().int().positive()),
+  pages: z.array(PageRefSchema),
 });
 
 /**
@@ -1212,8 +1214,8 @@ export const PageInsertBlankInputSchema: z.ZodType<{
 });
 
 /** Page extract input: the pages to export, in the order they should appear. */
-export const PageExtractInputSchema: z.ZodType<{ pageObjectNumbers: number[] }> = z.object({
-  pageObjectNumbers: z.array(z.number().int().positive()).min(1),
+export const PageExtractInputSchema: z.ZodType<{ pages: PageRef[] }> = z.object({
+  pages: z.array(PageRefSchema).min(1),
 });
 
 /**
@@ -1221,7 +1223,7 @@ export const PageExtractInputSchema: z.ZodType<{ pageObjectNumbers: number[] }> 
  * PONs in insertion order plus the full new layout (see `PageInsertResult`).
  */
 export const PageInsertResultSchema: z.ZodType<PageInsertResult> = z.object({
-  insertedPageObjectNumbers: z.array(z.number().int().positive()),
+  insertedPages: z.array(PageRefSchema),
   layout: PageListSnapshotSchema,
   cache: PageStructureCacheSchema.nullable(),
 });
@@ -1263,12 +1265,12 @@ export const WeakAnnotationSessionResponseSchema = z.object({
   sessionId: z.string().min(1),
   expiresAt: z.number().int().positive(),
   heartbeatIntervalMs: z.number().int().positive(),
-  pageObjectNumbers: z.array(z.number().int().positive()),
+  pages: z.array(PageRefSchema),
 });
 export type WeakAnnotationSessionResponse = z.infer<typeof WeakAnnotationSessionResponseSchema>;
 
 export const WeakAnnotationSessionPagesRequestSchema = z.object({
-  pageObjectNumbers: z.array(z.number().int().positive()).transform((pages) => [...new Set(pages)]),
+  pages: z.array(PageRefSchema),
 });
 export type WeakAnnotationSessionPagesRequest = z.infer<
   typeof WeakAnnotationSessionPagesRequestSchema
@@ -1401,7 +1403,7 @@ export const SignatureDTOSchema: z.ZodType<SignatureDTO> = z.object({
   index: z.number().int().nonnegative(),
   field: FormFieldRefSchema,
   fieldName: z.string(),
-  widget: FormWidgetRefSchema.nullable(),
+  widget: FormWidgetSchema.nullable(),
   signed: z.boolean(),
   kind: z.enum(['signature', 'timestamp']),
   filter: z.string().nullable(),
@@ -1630,6 +1632,6 @@ export type DocumentVersions = z.infer<typeof DocumentVersionsSchema>;
 export { DigestAlgorithmSchema, ModificationLevelSchema };
 
 export const PageScaleResultSchema = z.object({
-  pageObjectNumber: z.number().int().positive(),
+  page: PageRefSchema,
   meta: MutationMetaSchema,
 });

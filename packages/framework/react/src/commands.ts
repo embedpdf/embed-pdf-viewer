@@ -15,18 +15,32 @@ export * from '@embedpdf/plugin-commands';
 import { useEffect } from 'react';
 import { CommandsToken, resolvedCommandsEqual } from '@embedpdf/plugin-commands';
 import type { CommandsCapability, ResolvedCommand } from '@embedpdf/plugin-commands';
-import { useCapability, useDocumentId, useKernelValue } from './runtime';
+// The keystroke matcher is a host fact.
+import { CommandsToken as CommandsHostToken } from '@embedpdf/plugin-commands/contract/host';
+import type { EventHook } from '@embedpdf/core';
+import { useCapability, useCapabilityEvent, useDocumentId, useKernelValue } from './runtime';
 
-/** The commands capability (register/execute/search/categories). */
+/** The commands capability (registerCommand / execute / searchCommands / categories). */
 export function useCommands(): CommandsCapability {
   return useCapability(CommandsToken);
+}
+
+/** Subscribe to one commands event for the mounted lifetime: `useCommandsEvent((c) => c.onExecuted, handler)`. */
+export function useCommandsEvent<T>(
+  select: (cap: CommandsCapability) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  useCapabilityEvent(CommandsToken, select, handler);
 }
 
 /** A command resolved against this subtree's document, reactively. */
 export function useCommand(id: string): ResolvedCommand | null {
   const commands = useCapability(CommandsToken);
   const documentId = useDocumentId();
-  return useKernelValue(() => commands.resolve(id, documentId ?? undefined), resolvedCommandsEqual);
+  return useKernelValue(
+    () => commands.resolveCommand(id, documentId ?? undefined),
+    resolvedCommandsEqual,
+  );
 }
 
 /** Is this environment mac-like? Decides how 'Mod' resolves and displays. */
@@ -45,7 +59,7 @@ const isEditableTarget = (target: EventTarget | null): boolean => {
  * Strokes from editable elements are ignored.
  */
 export function useCommandShortcuts(options?: { isMac?: boolean }): void {
-  const commands = useCapability(CommandsToken);
+  const commands = useCapability(CommandsHostToken);
   const isMac = options?.isMac;
   useEffect(() => {
     const mac = isMac ?? isMacPlatform();
@@ -54,7 +68,7 @@ export function useCommandShortcuts(options?: { isMac?: boolean }): void {
       const id = commands.matchStroke(event, { isMac: mac });
       if (!id) return;
       event.preventDefault();
-      commands.execute(id);
+      void commands.execute(id);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);

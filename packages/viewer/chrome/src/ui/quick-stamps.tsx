@@ -35,16 +35,16 @@ export function QuickStamps() {
   const assets = useStampAssets();
   const documentId = useDocumentId();
   const { armAsset } = useArmStampAsset();
-  const activeToolId = useOptionalSelector(InteractionToken, (c) => c.activeToolId(), null);
+  const activeToolId = useOptionalSelector(InteractionToken, (c) => c.getActiveToolId(), null);
   const armedId = useOptionalSelector(
     StampToken,
-    (c) => (documentId ? (c.armedAsset(documentId)?.id ?? null) : null),
+    (c) => (documentId ? (c.getArmedAsset(documentId)?.id ?? null) : null),
     null,
   );
   const ids = Array.isArray(config.toolbar)
     ? config.toolbar
     : config.toolbar && 'library' in config.toolbar
-      ? (stamp.library(config.toolbar.library)?.assetIds ?? [])
+      ? (stamp.getLibrary(config.toolbar.library)?.assetIds ?? [])
       : [];
 
   // A quick mark from the built-in library needs that library loaded — the

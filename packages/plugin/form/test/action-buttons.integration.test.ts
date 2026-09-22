@@ -15,8 +15,8 @@ import { interactionPlugin } from '@embedpdf/plugin-interaction';
 
 import { fieldKeyOf } from '../src/core/model';
 import { formPlugin } from '../src/form.plugin';
-import { FormToken } from '../src/types'; // the WIDE token — package-internal view
-import type { WidgetActivationResult } from '../src/types';
+import { FormToken } from '../src/host-contract'; // the WIDE token — package-internal view
+import type { WidgetActivationResult } from '../src/host-contract';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(
@@ -70,13 +70,13 @@ async function boot(scripting: boolean, scope?: string[]) {
   const form = kernel.capability(FormToken);
   const annotation = kernel.capability(AnnotationHostToken);
   await form.refresh();
-  const snapshot = form.snapshot();
+  const snapshot = form.getSnapshot();
   if (!snapshot) throw new Error('form snapshot did not load');
-  const pon = snapshot.fields[0]!.widgets[0]!.pageObjectNumber;
-  await annotation.reloadPage(pon); // hydrate the annotation plane for paint asserts
+  const page = snapshot.fields[0]!.widgets[0]!.page!;
+  await annotation.reloadPage(page); // hydrate the annotation plane for paint asserts
 
   const fieldOf = (name: string) => {
-    const field = form.snapshot()?.fields.find((candidate) => candidate.name === name);
+    const field = form.getSnapshot()?.fields.find((candidate) => candidate.name === name);
     if (!field) throw new Error(`field '${name}' is missing`);
     return field;
   };
@@ -88,16 +88,16 @@ async function boot(scripting: boolean, scope?: string[]) {
     const widget = fieldOf(name).widgets[0]!;
     return {
       kind: 'objectNumber',
-      pageObjectNumber: widget.pageObjectNumber,
+      page: widget.page!,
       annotObjectNumber: widget.annotObjectNumber,
     };
   };
   const press = (name: string): Promise<WidgetActivationResult> =>
-    form.activateWidget(fieldKeyOf(fieldOf(name)), widgetRefOf(name));
-  const paintedIds = () => annotation.pageItems(pon).map((item) => item.id);
+    form.activateWidget(widgetRefOf(name));
+  const paintedIds = () => annotation.listPageItems(page).map((item) => item.id);
   const widgetId = (name: string) => `obj:${fieldOf(name).widgets[0]!.annotObjectNumber}`;
   const notify = (name: string, event: PdfAnnotationEventKind) =>
-    form.notifyWidgetEvent(fieldKeyOf(fieldOf(name)), widgetRefOf(name), event);
+    form.notifyWidgetEvent(fieldOf(name).ref, widgetRefOf(name), event);
   // notifyWidgetEvent is fire-and-forget; a bogus hover dispatch drains the
   // actions queue behind everything already submitted.
   const actions = kernel.capability(ActionsToken);
@@ -105,8 +105,8 @@ async function boot(scripting: boolean, scope?: string[]) {
     actions.dispatch({
       scope: 'annotation',
       event: 'cursorEnter',
-      ref: { kind: 'objectNumber', pageObjectNumber: pon, annotObjectNumber: 999_999 },
-      pon,
+      ref: { kind: 'objectNumber', page, annotObjectNumber: 999_999 },
+      page,
     });
 
   return {
@@ -115,7 +115,7 @@ async function boot(scripting: boolean, scope?: string[]) {
     form,
     actions,
     annotation,
-    pon,
+    page,
     fieldOf,
     valueOf,
     widgetRefOf,
@@ -226,7 +226,7 @@ describe('action buttons e2e (scripting ON)', () => {
     // the ACTIONS queue and its executors enter the form queue; the write
     // enters the form queue directly. form → actions → form would hang here.
     const dispatched = t.press('btn-chain');
-    const committed = t.form.setText(fieldKeyOf(t.fieldOf('beta')), 'raced');
+    const committed = t.form.setText(t.fieldOf('beta').ref, 'raced');
     const [chain] = await Promise.all([dispatched, committed]);
     expect(chain.kind).toBe('dispatched');
     expect(t.valueOf('log')).toBe('AB');

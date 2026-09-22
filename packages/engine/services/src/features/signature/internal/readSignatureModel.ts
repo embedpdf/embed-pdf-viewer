@@ -8,13 +8,14 @@ import type {
   SignatureDTO,
   SignatureSeedValue,
 } from '@embedpdf/engine-core/runtime';
+import { formWidget } from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runtime';
 
 import { withScratch, withScratchN } from '../../../runtime/memory/scratch';
 import { readUtf16String } from '../../../runtime/memory/strings';
 import { U64_BYTES, peekU64, pokeU64 } from '../../../runtime/memory/u64';
-import { readFormSnapshot } from '../../forms/internal/readFormSnapshot';
+import { readFormSnapshot, widgetPageRef } from '../../forms/internal/readFormSnapshot';
 
 // Mirrors public/epdf_signature.h.
 const KIND_DOC_TIMESTAMP = 1;
@@ -166,10 +167,7 @@ export function readSignaturesFromModel(runtime: PdfRuntimeModule, model: Ptr): 
       fieldName: readWide(runtime, (buf, cap) => fn.EPDFSig_GetFieldName(model, i, buf, cap)) ?? '',
       widget:
         widgetObjNum > 0
-          ? {
-              annotObjectNumber: widgetObjNum,
-              pageObjectNumber: fn.EPDFSig_GetWidgetPageObjNum(model, i),
-            }
+          ? formWidget(widgetObjNum, widgetPageRef(fn.EPDFSig_GetWidgetPageObjNum(model, i)))
           : null,
       signed,
       kind: fn.EPDFSig_GetKind(model, i) === KIND_DOC_TIMESTAMP ? 'timestamp' : 'signature',

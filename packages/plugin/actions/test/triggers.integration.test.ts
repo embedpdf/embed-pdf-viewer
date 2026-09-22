@@ -5,18 +5,18 @@ import { describe, expect, it } from 'vitest';
 
 import { createKernel } from '@embedpdf/core';
 import { createLocalEngine } from '@embedpdf/engine';
-import type { AnnotationRef } from '@embedpdf/engine-core/runtime';
+import { toPageRef, type AnnotationRef } from '@embedpdf/engine-core/runtime';
 
 import { actionsPlugin } from '../src/actions.plugin';
 import { ActionsToken } from '../src/internal';
-import type { ActionsHostCapability, ActionsPluginConfig } from '../src/types';
+import type { ActionsHostCapability, ActionsConfig } from '../src/host-contract';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixture = (name: string) =>
   resolve(here, '..', '..', '..', 'engine', 'main', 'test', 'fixtures', name);
 
 /** Kernel + real engine + recording seams over one fixture. */
-async function boot(file: string, opts?: { config?: ActionsPluginConfig }) {
+async function boot(file: string, opts?: { config?: ActionsConfig }) {
   const engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
   const kernel = createKernel({
     engine,
@@ -54,12 +54,12 @@ async function boot(file: string, opts?: { config?: ActionsPluginConfig }) {
     actions.dispatch({
       scope: 'annotation',
       event: 'cursorEnter',
-      ref: { kind: 'objectNumber', pageObjectNumber: pon, annotObjectNumber: 999 },
-      pon,
+      ref: { kind: 'objectNumber', page: toPageRef(pon), annotObjectNumber: 999 },
+      page: toPageRef(pon),
     });
   const ref = (annotObjectNumber: number): AnnotationRef => ({
     kind: 'objectNumber',
-    pageObjectNumber: pon,
+    page: toPageRef(pon),
     annotObjectNumber,
   });
 
@@ -83,11 +83,11 @@ describe('trigger integration (real engine)', () => {
     await using t = await boot('action_triggers.pdf', {
       config: { openSequence: 'off' },
     });
-    await t.actions.dispatch({ scope: 'page', event: 'open', pon: t.pon });
+    await t.actions.dispatch({ scope: 'page', event: 'open', page: toPageRef(t.pon) });
     // Page /O (shows pageTip 7) BEFORE the /PO set (shows lifeTip 9).
     expect(t.seam).toEqual(['show:7', 'show:9']);
     t.seam.length = 0;
-    await t.actions.dispatch({ scope: 'page', event: 'close', pon: t.pon });
+    await t.actions.dispatch({ scope: 'page', event: 'close', page: toPageRef(t.pon) });
     // /PC set (hides lifeTip 9) BEFORE page /C (hides pageTip 7).
     expect(t.seam).toEqual(['hide:9', 'hide:7']);
   });
@@ -96,8 +96,8 @@ describe('trigger integration (real engine)', () => {
     await using t = await boot('action_triggers.pdf', {
       config: { openSequence: 'off' },
     });
-    await t.actions.dispatch({ scope: 'page', event: 'visible', pon: t.pon });
-    await t.actions.dispatch({ scope: 'page', event: 'invisible', pon: t.pon });
+    await t.actions.dispatch({ scope: 'page', event: 'visible', page: toPageRef(t.pon) });
+    await t.actions.dispatch({ scope: 'page', event: 'invisible', page: toPageRef(t.pon) });
     expect(t.seam).toEqual(['show:12', 'hide:12']);
   });
 
@@ -109,14 +109,14 @@ describe('trigger integration (real engine)', () => {
       scope: 'annotation',
       event: 'cursorEnter',
       ref: t.ref(5),
-      pon: t.pon,
+      page: toPageRef(t.pon),
     });
     expect(t.seam).toEqual(['show:6']);
     await t.actions.dispatch({
       scope: 'annotation',
       event: 'cursorExit',
       ref: t.ref(5),
-      pon: t.pon,
+      page: toPageRef(t.pon),
     });
     expect(t.seam).toEqual(['show:6', 'hide:6']);
   });
@@ -129,8 +129,8 @@ describe('trigger integration (real engine)', () => {
       scope: 'annotation',
       event: 'cursorEnter',
       ref: t.ref(10),
-      pon: t.pon,
-      source: { kind: 'link', annotation: t.ref(10), pon: t.pon },
+      page: toPageRef(t.pon),
+      source: { kind: 'link', annotation: t.ref(10), page: toPageRef(t.pon) },
     });
     expect(result.status).toBe('executed');
     expect(t.seam).toEqual(['show:11']);

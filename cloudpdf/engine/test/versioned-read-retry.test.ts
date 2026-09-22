@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { createCloudEngine } from '../src/index';
 import { HttpClient } from '../src/transport/HttpClient';
 import { CloudDocumentHandle } from '../src/document/CloudDocumentHandle';
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import {
+  EngineError,
+  EngineErrorCode,
+  encodePageKey,
+  toPageRef,
+} from '@embedpdf/engine-core/runtime';
 import {
   AnnotationListPageSnapshotSchema,
   DocumentHeadSchema,
@@ -18,7 +23,7 @@ import {
  *
  *   GET /v1/docs/:docId/head             → current head (`docVersion`)
  *   GET /v1/docs/:docId/manifest@docVersion=N     → current manifest, 404 if `D` ≠ current
- *   GET /v1/docs/:docId/text/pages/:pon/data@contentVersion=N → page text, 404 if `P` ≠ current page contentVersion
+ *   GET /v1/docs/:docId/text/pages/:pageKey/data@contentVersion=N → page text, 404 if `P` ≠ current page contentVersion
  *   (any other path)                     → 404 (so we'd notice spurious calls)
  *
  * The test rewrites the "current" version mid-flight to model a
@@ -65,6 +70,8 @@ interface StubbedFixture {
 const DOC_ID = 'doc-retry-stub';
 const LAYER_NAME = 'default';
 const PAGE_OBJECT_NUMBER = 5;
+/** The `:pageKey` path segment the stub page is addressed by (`obj%3A5`). */
+const PAGE_KEY = encodeURIComponent(encodePageKey(toPageRef(PAGE_OBJECT_NUMBER)));
 
 function docToken(): string {
   return [
@@ -83,10 +90,10 @@ function annotation(index: number) {
     subtype: 'unsupported',
     ref: {
       kind: 'objectNumber',
-      pageObjectNumber: PAGE_OBJECT_NUMBER,
+      page: toPageRef(PAGE_OBJECT_NUMBER),
       annotObjectNumber: 10_000 + index,
     },
-    pageObjectNumber: PAGE_OBJECT_NUMBER,
+    page: toPageRef(PAGE_OBJECT_NUMBER),
     index,
     identityQuality: 'durable',
     nm: `stub-${index}`,
@@ -118,10 +125,10 @@ function annotation(index: number) {
 
 function pageState(generation = 0) {
   return {
-    pageObjectNumber: PAGE_OBJECT_NUMBER,
+    page: toPageRef(PAGE_OBJECT_NUMBER),
     revision: {
       docSessionId: 'stub-session',
-      pageObjectNumber: PAGE_OBJECT_NUMBER,
+      page: toPageRef(PAGE_OBJECT_NUMBER),
       generation,
     },
     weakAnnotationState: { kind: 'known', hasAnyWeakAnnotations: false },
@@ -137,7 +144,7 @@ function layoutSnapshot() {
     pages: [
       {
         index: 0,
-        pageObjectNumber: PAGE_OBJECT_NUMBER,
+        ref: toPageRef(PAGE_OBJECT_NUMBER),
         label: null,
         size: { width: 612, height: 792 },
         rotation: 0 as const,
@@ -292,7 +299,7 @@ function buildStub(initial: ServerState): StubbedFixture {
     }
 
     const textMatch = path.match(
-      /^\/v1\/docs\/([^/]+)\/layers\/([^/]+)\/text\/pages\/(\d+)\/data@contentVersion=(\d+)$/,
+      /^\/v1\/docs\/([^/]+)\/layers\/([^/]+)\/text\/pages\/obj%3A(\d+)\/data@contentVersion=(\d+)$/,
     );
     if (textMatch && method === 'GET') {
       const requestedPon = Number(textMatch[3]);
@@ -320,7 +327,7 @@ function buildStub(initial: ServerState): StubbedFixture {
     }
 
     const annotationsMatch = path.match(
-      /^\/v1\/docs\/([^/]+)\/layers\/([^/]+)\/annotations\/pages\/(\d+)\/items@annotationVersion=(\d+)$/,
+      /^\/v1\/docs\/([^/]+)\/layers\/([^/]+)\/annotations\/pages\/obj%3A(\d+)\/items@annotationVersion=(\d+)$/,
     );
     if (annotationsMatch && method === 'GET') {
       const requestedPon = Number(annotationsMatch[3]);
@@ -349,7 +356,7 @@ function buildStub(initial: ServerState): StubbedFixture {
     }
 
     const annotationCreateMatch = path.match(
-      /^\/v1\/docs\/([^/]+)\/layers\/([^/]+)\/annotations\/pages\/(\d+)\/items$/,
+      /^\/v1\/docs\/([^/]+)\/layers\/([^/]+)\/annotations\/pages\/obj%3A(\d+)\/items$/,
     );
     if (annotationCreateMatch && method === 'POST') {
       const requestedPon = Number(annotationCreateMatch[3]);
@@ -373,7 +380,7 @@ function buildStub(initial: ServerState): StubbedFixture {
               docVersion: state.docVersion,
               pages: [
                 {
-                  pageObjectNumber: PAGE_OBJECT_NUMBER,
+                  page: toPageRef(PAGE_OBJECT_NUMBER),
                   cache: {
                     contentVersion: state.pageContentVersion,
                     annotationVersion: state.pageAnnotationVersion,
@@ -506,7 +513,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
   test('first read with cold cache: fetches head + manifest + leaf', async () => {
     const doc = new CloudDocumentHandle(fx.http, DOC_ID);
     try {
-      const page = doc.page(PAGE_OBJECT_NUMBER);
+      const page = doc.page(toPageRef(PAGE_OBJECT_NUMBER));
       const snap = await page.text.read();
       expect(snap.text).toBe('initial');
       expect(PageTextSnapshotSchema.safeParse(snap).success).toBe(true);
@@ -514,7 +521,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
       expect(paths).toEqual([
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/head`,
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/manifest@docVersion=1`,
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_OBJECT_NUMBER}/data@contentVersion=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=1`,
       ]);
     } finally {
       await doc.close();
@@ -529,7 +536,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
     const doc = await engine.open({ kind: 'token', token: docToken() });
     try {
       const list = await doc.pages.list();
-      expect(list.pages.map((page) => page.pageObjectNumber)).toEqual([PAGE_OBJECT_NUMBER]);
+      expect(list.pages.map((page) => page.ref.pageObjectNumber)).toEqual([PAGE_OBJECT_NUMBER]);
       const paths = fx.calls.map((call) => call.path);
       // pages.list reads layoutVersion off the (seeded) manifest, then fetches
       // the content-addressed /layout leaf — no extra /head.
@@ -554,7 +561,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
     try {
       fx.bump({ docVersion: 2, pageContentVersion: 2, pageAnnotationVersion: 2 });
       const list = await doc.pages.list();
-      expect(list.pages.map((page) => page.pageObjectNumber)).toEqual([PAGE_OBJECT_NUMBER]);
+      expect(list.pages.map((page) => page.ref.pageObjectNumber)).toEqual([PAGE_OBJECT_NUMBER]);
       const paths = fx.calls.map((call) => call.path);
       // Stale seed → manifest ladder refreshes to v2 first, then the /layout
       // leaf is fetched at the refreshed layoutVersion.
@@ -581,15 +588,15 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
       await doc.pages.list();
       fx.bump({ docVersion: 2, pageContentVersion: 2, pageAnnotationVersion: 2 });
       const callsBeforeRefresh = fx.calls.length;
-      const page = doc.page(PAGE_OBJECT_NUMBER);
+      const page = doc.page(toPageRef(PAGE_OBJECT_NUMBER));
       const snap = await page.text.read();
       expect(snap.text).toBe('initial');
       const paths = fx.calls.slice(callsBeforeRefresh).map((call) => call.path);
       expect(paths).toEqual([
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_OBJECT_NUMBER}/data@contentVersion=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=1`,
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/head`,
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/manifest@docVersion=2`,
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_OBJECT_NUMBER}/data@contentVersion=2`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=2`,
       ]);
     } finally {
       await doc.close();
@@ -600,13 +607,13 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
   test('warm cache: second read on the same page skips head + manifest', async () => {
     const doc = new CloudDocumentHandle(fx.http, DOC_ID);
     try {
-      const page = doc.page(PAGE_OBJECT_NUMBER);
+      const page = doc.page(toPageRef(PAGE_OBJECT_NUMBER));
       await page.text.read();
       const callsAfterFirst = fx.calls.length;
       await page.text.read();
       const newPaths = fx.calls.slice(callsAfterFirst).map((c) => c.path);
       expect(newPaths).toEqual([
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_OBJECT_NUMBER}/data@contentVersion=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=1`,
       ]);
     } finally {
       await doc.close();
@@ -616,7 +623,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
   test('server flips manifest mid-flight: SDK transparently re-fetches and retries', async () => {
     const doc = new CloudDocumentHandle(fx.http, DOC_ID);
     try {
-      const page = doc.page(PAGE_OBJECT_NUMBER);
+      const page = doc.page(toPageRef(PAGE_OBJECT_NUMBER));
       // Warm the cache so the SDK has docVersion=1 / pageContentVersion=1
       // squirrelled away.
       const first = await page.text.read();
@@ -636,10 +643,10 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
       //   [fresh-leaf v2]   → 200
       const retryPaths = fx.calls.slice(callsBeforeRetry).map((c) => c.path);
       expect(retryPaths).toEqual([
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_OBJECT_NUMBER}/data@contentVersion=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=1`,
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/head`,
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/manifest@docVersion=2`,
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_OBJECT_NUMBER}/data@contentVersion=2`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=2`,
       ]);
 
       // Cache is now warm with v2; a third read uses the new version
@@ -649,7 +656,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
       expect(third.text).toBe('after-mutation');
       const thirdPaths = fx.calls.slice(callsBeforeThird).map((c) => c.path);
       expect(thirdPaths).toEqual([
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_OBJECT_NUMBER}/data@contentVersion=2`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=2`,
       ]);
     } finally {
       await doc.close();
@@ -659,7 +666,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
   test('annotation list uses the same layer refresh-on-404 ladder', async () => {
     const doc = new CloudDocumentHandle(fx.http, DOC_ID);
     try {
-      const page = doc.page(PAGE_OBJECT_NUMBER);
+      const page = doc.page(toPageRef(PAGE_OBJECT_NUMBER));
       const first = await page.annotations.list();
       expect(first.annotations).toEqual([]);
       expect(AnnotationListPageSnapshotSchema.safeParse(first).success).toBe(true);
@@ -672,10 +679,10 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
 
       const retryPaths = fx.calls.slice(callsBeforeRetry).map((c) => c.path);
       expect(retryPaths).toEqual([
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/${PAGE_OBJECT_NUMBER}/items@annotationVersion=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/${PAGE_KEY}/items@annotationVersion=1`,
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/head`,
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/manifest@docVersion=2`,
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/${PAGE_OBJECT_NUMBER}/items@annotationVersion=2`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/${PAGE_KEY}/items@annotationVersion=2`,
       ]);
     } finally {
       await doc.close();
@@ -736,7 +743,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
   test('mutation manifest delta moves the next annotation list to the fresh URL without 404 refresh', async () => {
     const doc = new CloudDocumentHandle(fx.http, DOC_ID);
     try {
-      const page = doc.page(PAGE_OBJECT_NUMBER);
+      const page = doc.page(toPageRef(PAGE_OBJECT_NUMBER));
       const first = await page.annotations.list();
       expect(first.annotations).toEqual([]);
 
@@ -760,7 +767,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
       expect(second.annotations).toHaveLength(1);
       const paths = fx.calls.slice(callsBeforeList).map((call) => call.path);
       expect(paths).toEqual([
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/${PAGE_OBJECT_NUMBER}/items@annotationVersion=2`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/${PAGE_KEY}/items@annotationVersion=2`,
       ]);
     } finally {
       await doc.close();
@@ -770,7 +777,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
   test('partial manifest delta with a skipped docVersion invalidates instead of manufacturing a mixed manifest', async () => {
     const doc = new CloudDocumentHandle(fx.http, DOC_ID);
     try {
-      const page = doc.page(PAGE_OBJECT_NUMBER);
+      const page = doc.page(toPageRef(PAGE_OBJECT_NUMBER));
       await page.annotations.list();
 
       doc.absorbMutation({
@@ -780,7 +787,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
           docVersion: 3,
           pages: [
             {
-              pageObjectNumber: PAGE_OBJECT_NUMBER,
+              page: toPageRef(PAGE_OBJECT_NUMBER),
               cache: {
                 contentVersion: 1,
                 annotationVersion: 3,
@@ -797,7 +804,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
       expect(paths).toEqual([
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/head`,
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/manifest@docVersion=3`,
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/${PAGE_OBJECT_NUMBER}/items@annotationVersion=3`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/${PAGE_KEY}/items@annotationVersion=3`,
       ]);
     } finally {
       await doc.close();
@@ -807,7 +814,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
   test('two concurrent first-reads share a single head+manifest round-trip (singleflight)', async () => {
     const doc = new CloudDocumentHandle(fx.http, DOC_ID);
     try {
-      const page = doc.page(PAGE_OBJECT_NUMBER);
+      const page = doc.page(toPageRef(PAGE_OBJECT_NUMBER));
       const [a, b] = await Promise.all([page.text.read(), page.text.read()]);
       expect(a.text).toBe('initial');
       expect(b.text).toBe('initial');
@@ -826,7 +833,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
   test('read on a non-existent page surfaces NotFound without spuriously refreshing', async () => {
     const doc = new CloudDocumentHandle(fx.http, DOC_ID);
     try {
-      const ghost = doc.page(999_999);
+      const ghost = doc.page(toPageRef(999_999));
       let caught: unknown;
       try {
         await ghost.text.read();
@@ -870,8 +877,8 @@ describe('CloudEngine schema parity — DocumentHeadSchema / DocumentManifestSch
       pages: [
         {
           state: {
-            pageObjectNumber: 5,
-            revision: { docSessionId: 's', pageObjectNumber: 5, generation: 0 },
+            page: toPageRef(5),
+            revision: { docSessionId: 's', page: toPageRef(5), generation: 0 },
             weakAnnotationState: { kind: 'known', hasAnyWeakAnnotations: false },
           },
           cache: {
@@ -911,7 +918,7 @@ describe('CloudPageAnnotationsService — binary payload wire shape', () => {
     const fx = freshStub();
     const doc = new CloudDocumentHandle(fx.http, DOC_ID);
     try {
-      await doc.page(PAGE_OBJECT_NUMBER).annotations.create({
+      await doc.page(toPageRef(PAGE_OBJECT_NUMBER)).annotations.create({
         subtype: 'stamp',
         rect: { left: 10, bottom: 10, right: 110, top: 60 },
         source: TINY_PNG,
@@ -945,7 +952,7 @@ describe('CloudPageAnnotationsService — binary payload wire shape', () => {
     const fx = freshStub();
     const doc = new CloudDocumentHandle(fx.http, DOC_ID);
     try {
-      await doc.page(PAGE_OBJECT_NUMBER).annotations.create({
+      await doc.page(toPageRef(PAGE_OBJECT_NUMBER)).annotations.create({
         subtype: 'highlight',
         quadPoints: [
           {

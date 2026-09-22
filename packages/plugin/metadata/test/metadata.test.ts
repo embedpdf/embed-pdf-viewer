@@ -1,8 +1,21 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createMetadataCapability } from '../src/capability';
-import { registerMetadataEffects } from '../src/effects';
-import { initialMetadataState, metadataReducer } from '../src/reducer';
-import type { DocumentMetadata } from '@embedpdf/core';
+import {
+  createKernel,
+  isPluginError,
+  PermissionDenied,
+  type DocumentHandle,
+  type DocumentMetadata,
+  type Engine,
+  type PageLayout,
+} from '@embedpdf/core';
+import { metadataPlugin, MetadataToken } from '../src';
+import { changedKeys, initialMetadataState, reduceMetadata } from '../src/model';
+
+/**
+ * Pilot A of the road-to-3.0 plan, tested through the real kernel: the
+ * `create()` hook, the guarded handle, the one publication path (the confirmed
+ * event), and the seed race (G6).
+ */
 
 const META = (over: Partial<DocumentMetadata> = {}): DocumentMetadata => ({
   title: null,
@@ -18,96 +31,191 @@ const META = (over: Partial<DocumentMetadata> = {}): DocumentMetadata => ({
   ...over,
 });
 
+const box = { left: 0, bottom: 0, right: 600, top: 800 } as const;
+const page: PageLayout = {
+  index: 0,
+  ref: { kind: 'objectNumber', pageObjectNumber: 1 },
+  label: null,
+  size: { width: 600, height: 800 },
+  rotation: 0,
+  userUnit: 1,
+  boxes: { media: { ...box }, crop: { ...box } },
+} as PageLayout;
+
+function deferred<T>() {
+  let resolve!: (v: T) => void;
+  let reject!: (e: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+/** A document handle whose reads are controllable and whose writes emit the confirmed event. */
+function fakeDocument(options: { allowEdit?: boolean; readRejects?: unknown } = {}) {
+  const listeners = new Set<(event: unknown) => void>();
+  const reads: Array<ReturnType<typeof deferred<DocumentMetadata>>> = [];
+  const emit = (event: unknown) => listeners.forEach((l) => l(event));
+  const origin = { kind: 'local', sessionId: 's1', sub: null, ts: 1 };
+  const handle = {
+    id: 'doc',
+    events: {
+      subscribe: (l: (event: unknown) => void) => {
+        listeners.add(l);
+        return () => listeners.delete(l);
+      },
+      lastServerId: () => null,
+    },
+    pages: { list: () => Promise.resolve({ pageCount: 1, pages: [page] }) },
+    security: { allows: () => options.allowEdit ?? true },
+    metadata: {
+      read: () => {
+        if (options.readRejects) return Promise.reject(options.readRejects);
+        const d = deferred<DocumentMetadata>();
+        reads.push(d);
+        return d.promise;
+      },
+      update: vi.fn(async (patch: { title?: string | null }) => {
+        const metadata = META({ title: patch.title ?? null });
+        const result = { metadata, cache: null };
+        // the engine confirms every write with the same result on the event stream
+        queueMicrotask(() => emit({ type: 'metadata.updated', origin, ...result }));
+        return result;
+      }),
+    },
+    close: () => Promise.resolve(),
+  } as unknown as DocumentHandle;
+  const engine = {
+    open: () => Promise.resolve(handle),
+    destroy: () => Promise.resolve(),
+  } as unknown as Engine;
+  return { engine, handle, reads, emit };
+}
+
+const open = (kernel: ReturnType<typeof createKernel>) =>
+  kernel.documents.open({ kind: 'bytes', id: 'doc', bytes: new Uint8Array() });
 const tick = () => new Promise((r) => setTimeout(r));
 
-describe('metadataReducer', () => {
-  it('SET replaces the snapshot', () => {
-    const m = META({ title: 'X' });
-    expect(metadataReducer(initialMetadataState(), { type: 'SET', metadata: m }).metadata).toBe(m);
+describe('model', () => {
+  it('bumps the revision on every confirmed value and tracks status', () => {
+    let s = initialMetadataState();
+    expect(s.status).toBe('idle');
+    s = reduceMetadata(s, { type: 'loading' });
+    expect(s.status).toBe('loading');
+    s = reduceMetadata(s, { type: 'set', metadata: META({ title: 'a' }) });
+    expect(s).toMatchObject({ status: 'ready', revision: 1 });
+    s = reduceMetadata(s, { type: 'error', forbidden: true });
+    expect(s.status).toBe('forbidden');
+  });
+
+  it('changedKeys is shallow, with custom compared by entries', () => {
+    const a = META({ title: 'x', custom: { k: '1' } });
+    expect(changedKeys(null, a)).toHaveLength(Object.keys(a).length);
+    expect(changedKeys(a, META({ title: 'y', custom: { k: '1' } }))).toEqual(['title']);
+    expect(changedKeys(a, META({ title: 'x', custom: { k: '2' } }))).toEqual(['custom']);
   });
 });
 
-describe('createMetadataCapability', () => {
-  function makeCtx(metadata: DocumentMetadata | null = null) {
-    let state = { metadata };
-    const read = vi.fn(async () => META({ title: 'read' }));
-    const update = vi.fn(async (patch: { title?: string | null }) => ({
-      metadata: META({ title: patch.title ?? null }),
+describe('metadata controller', () => {
+  it('seeds through load(): idle → loading → ready', async () => {
+    const doc = fakeDocument();
+    const kernel = createKernel({ engine: doc.engine, plugins: [metadataPlugin()] });
+    await kernel.start();
+    await open(kernel);
+    const api = kernel.capability(MetadataToken, 'doc');
+    expect(api.getStatus()).toBe('loading');
+    expect(api.getSnapshot()).toBeNull();
+    doc.reads[0].resolve(META({ title: 'seed' }));
+    await tick();
+    expect(api.getStatus()).toBe('ready');
+    expect(api.getSnapshot()?.title).toBe('seed');
+    expect(api.getSnapshot()).toBe(api.getSnapshot()); // reference-stable
+    await kernel.destroy();
+  });
+
+  it('G6: a seed read that resolves after a newer confirmed value is dropped', async () => {
+    const doc = fakeDocument();
+    const kernel = createKernel({ engine: doc.engine, plugins: [metadataPlugin()] });
+    await kernel.start();
+    await open(kernel);
+    const api = kernel.capability(MetadataToken, 'doc');
+    const seen: string[] = [];
+    api.onUpdated((e) => seen.push(`${e.origin.locality}:${e.metadata.title}`));
+
+    doc.emit({
+      type: 'metadata.updated',
+      origin: { kind: 'remote', sessionId: 's2', sub: 'alice', ts: 2 },
+      metadata: META({ title: 'newer' }),
       cache: null,
-    }));
-    const ctx = {
-      doc: { metadata: { read, update } },
-      getState: () => state,
-      dispatch: (a: { type: 'SET'; metadata: DocumentMetadata | null }) => {
-        state = metadataReducer(state, a);
-      },
-    } as unknown as Parameters<typeof createMetadataCapability>[0];
-    return { cap: createMetadataCapability(ctx), state: () => state, read, update };
-  }
+    });
+    doc.reads[0].resolve(META({ title: 'stale' }));
+    await tick();
 
-  it('current() reads state', () => {
-    const m = META({ title: 'cur' });
-    expect(makeCtx(m).cap.current()).toBe(m);
+    expect(api.getSnapshot()?.title).toBe('newer');
+    expect(api.getStatus()).toBe('ready');
+    expect(seen).toEqual(['remote:newer']); // the stale read never published
+    await kernel.destroy();
   });
 
-  it('update() writes through the handle and sets state from the result', async () => {
-    const h = makeCtx();
-    await h.cap.update({ title: 'New' });
-    expect(h.update).toHaveBeenCalledWith({ title: 'New' });
-    expect(h.state().metadata?.title).toBe('New');
-  });
+  it('update(): resolves with the engine result after the snapshot and onUpdated reflect it', async () => {
+    const doc = fakeDocument();
+    const kernel = createKernel({ engine: doc.engine, plugins: [metadataPlugin()] });
+    await kernel.start();
+    await open(kernel);
+    const api = kernel.capability(MetadataToken, 'doc');
+    doc.reads[0].resolve(META());
+    await tick();
 
-  it('reload() re-reads from the engine', async () => {
-    const h = makeCtx();
-    await h.cap.reload();
-    expect(h.read).toHaveBeenCalled();
-    expect(h.state().metadata?.title).toBe('read');
-  });
-
-  it('rejects when no document is bound', async () => {
-    const ctx = {
-      doc: null,
-      getState: () => ({ metadata: null }),
-      dispatch: () => {},
-    } as unknown as Parameters<typeof createMetadataCapability>[0];
-    await expect(createMetadataCapability(ctx).update({ title: 'x' })).rejects.toThrow(
-      /no document/,
+    const order: string[] = [];
+    api.onUpdated((e) =>
+      order.push(`event:${e.metadata.title}:${e.changedKeys.join(',')}:${e.origin.locality}`),
     );
+    const result = await api.update({ title: 'New' }).then((r) => (order.push('resolved'), r));
+    expect(result.metadata.title).toBe('New');
+    expect(api.getSnapshot()?.title).toBe('New');
+    expect(order).toEqual(['event:New:title:local', 'resolved']);
+    await kernel.destroy();
   });
-});
 
-describe('registerMetadataEffects — reactive state', () => {
-  it('seeds from read, then updates live on metadata.updated (ignoring other events)', async () => {
-    let state: { metadata: DocumentMetadata | null } = { metadata: null };
-    const listeners = new Set<(e: unknown) => void>();
-    const ctx = {
-      doc: {
-        metadata: { read: vi.fn(async () => META({ title: 'seed' })) },
-        events: {
-          subscribe: (fn: (e: unknown) => void) => {
-            listeners.add(fn);
-            return () => listeners.delete(fn);
-          },
-        },
-      },
-      dispatch: (a: { type: 'SET'; metadata: DocumentMetadata | null }) => {
-        state = metadataReducer(state, a);
-      },
-      cleanup: () => {},
-    } as unknown as Parameters<typeof registerMetadataEffects>[0];
-
-    registerMetadataEffects(ctx);
-    await tick(); // flush the seed read().then
-    expect(state.metadata?.title).toBe('seed');
-
-    // an own- or remote (SSE) metadata edit
-    listeners.forEach((fn) =>
-      fn({ type: 'metadata.updated', origin: {}, metadata: META({ title: 'live' }), cache: null }),
+  it('update() refuses without doc.metadata.modify, with the permission code', async () => {
+    const doc = fakeDocument({ allowEdit: false });
+    const kernel = createKernel({ engine: doc.engine, plugins: [metadataPlugin()] });
+    await kernel.start();
+    await open(kernel);
+    const api = kernel.capability(MetadataToken, 'doc');
+    expect(api.canEdit()).toBe(false);
+    await expect(api.update({ title: 'x' })).rejects.toSatisfy((e) =>
+      isPluginError(e, 'permission-denied'),
     );
-    expect(state.metadata?.title).toBe('live');
+    expect(doc.handle.metadata.update).not.toHaveBeenCalled();
+    await kernel.destroy();
+  });
 
-    // an unrelated event leaves metadata untouched
-    listeners.forEach((fn) => fn({ type: 'pages.rotated', layout: {} }));
-    expect(state.metadata?.title).toBe('live');
+  it('a forbidden read reports status forbidden, and refresh() re-reads', async () => {
+    const doc = fakeDocument({ readRejects: new PermissionDenied('doc.metadata.read') });
+    const kernel = createKernel({ engine: doc.engine, plugins: [metadataPlugin()] });
+    await kernel.start();
+    await open(kernel);
+    const api = kernel.capability(MetadataToken, 'doc');
+    await tick();
+    expect(api.getStatus()).toBe('forbidden');
+    await expect(api.refresh()).rejects.toSatisfy((e) => isPluginError(e, 'permission-denied'));
+    await kernel.destroy();
+  });
+
+  it('closing the document during a read leaves no dangling state and update rejects instance-closed', async () => {
+    const doc = fakeDocument();
+    const kernel = createKernel({ engine: doc.engine, plugins: [metadataPlugin()] });
+    await kernel.start();
+    await open(kernel);
+    const api = kernel.capability(MetadataToken, 'doc');
+    const closing = kernel.documents.close('doc');
+    doc.reads[0].resolve(META({ title: 'late' }));
+    await closing;
+    await expect(api.update({ title: 'x' })).rejects.toSatisfy(
+      (e) => isPluginError(e, 'instance-closed') || isPluginError(e, 'permission-denied'),
+    );
+    await kernel.destroy();
   });
 });

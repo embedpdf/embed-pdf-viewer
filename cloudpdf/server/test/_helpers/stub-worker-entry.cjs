@@ -80,6 +80,18 @@ function sessionKey(msg) {
   return msg.layerName ? `${msg.docId}::layer:${msg.layerName}` : msg.docId;
 }
 
+// Page addresses arrive as `PageRef`s (`{ kind: 'objectNumber', pageObjectNumber }`),
+// the wire vocabulary of every `/pages/{pageKey}` route and page body.
+function ponOf(page) {
+  return page.pageObjectNumber;
+}
+function pageRef(pon) {
+  return { kind: 'objectNumber', pageObjectNumber: pon };
+}
+function ponsOf(msg) {
+  return msg.pages.map(ponOf);
+}
+
 /** Serialize session annotation state into the v2 artifact format. */
 function serializeAnnots(annots) {
   const json = Buffer.from(JSON.stringify({ annots }), 'utf8');
@@ -140,8 +152,8 @@ function layerMeta(msg) {
 
 function pageState(pon, generation = 0, hasWeak = false) {
   return {
-    pageObjectNumber: pon,
-    revision: { docSessionId: 'stub-session', pageObjectNumber: pon, generation },
+    page: pageRef(pon),
+    revision: { docSessionId: 'stub-session', page: pageRef(pon), generation },
     weakAnnotationState: { kind: 'known', hasAnyWeakAnnotations: hasWeak },
   };
 }
@@ -153,7 +165,7 @@ function pageLayout(pon, index, rotation = 0) {
   const box = [0, 0, 612, 792];
   return {
     index,
-    pageObjectNumber: pon,
+    ref: { kind: 'objectNumber', pageObjectNumber: pon },
     label: null,
     width: 612,
     height: 792,
@@ -180,10 +192,10 @@ function annotationDto(a, index) {
     subtype: 'unsupported',
     ref: {
       kind: 'objectNumber',
-      pageObjectNumber: a.pon,
+      page: pageRef(a.pon),
       annotObjectNumber: OBJECT_NUMBER_BASE + a.seq,
     },
-    pageObjectNumber: a.pon,
+    page: pageRef(a.pon),
     index,
     identityQuality: 'durable',
     nm: a.nm,
@@ -230,9 +242,9 @@ function resolveRef(meta, ref) {
     return annots.find((a) => OBJECT_NUMBER_BASE + a.seq === ref.annotObjectNumber) ?? null;
   }
   if (ref.kind === 'nm') {
-    return annots.find((a) => a.pon === ref.pageObjectNumber && a.nm === ref.nm) ?? null;
+    return annots.find((a) => a.pon === ponOf(ref.page) && a.nm === ref.nm) ?? null;
   }
-  const page = annots.filter((a) => a.pon === ref.pageObjectNumber);
+  const page = annots.filter((a) => a.pon === ponOf(ref.page));
   return page[ref.index] ?? null;
 }
 
@@ -552,7 +564,7 @@ parentPort.on('message', (msg) => {
         rejectNotOpen(msg);
         return;
       }
-      const pon = msg.pageObjectNumber;
+      const pon = ponOf(msg.page);
       if (pon < 1 || pon > meta.pageCount) {
         parentPort.postMessage({
           kind: 'reject',
@@ -594,7 +606,7 @@ parentPort.on('message', (msg) => {
         rejectNotOpen(msg);
         return;
       }
-      const pon = msg.pageObjectNumber;
+      const pon = ponOf(msg.page);
       if (pon < 1 || pon > meta.pageCount) {
         parentPort.postMessage({
           kind: 'reject',
@@ -630,7 +642,7 @@ parentPort.on('message', (msg) => {
         rejectNotOpen(msg);
         return;
       }
-      const pon = msg.pageObjectNumber;
+      const pon = ponOf(msg.page);
       meta.annots = meta.annots ?? [];
       meta.seq = meta.seq ?? 1;
       const a = {
@@ -658,7 +670,7 @@ parentPort.on('message', (msg) => {
         rejectNotOpen(msg);
         return;
       }
-      const pon = msg.ref.pageObjectNumber;
+      const pon = ponOf(msg.ref.page);
       const found = resolveRef(meta, msg.ref);
       if (found) {
         if (msg.patch && 'contents' in msg.patch) found.contents = msg.patch.contents ?? null;
@@ -696,7 +708,7 @@ parentPort.on('message', (msg) => {
         rejectNotOpen(msg);
         return;
       }
-      const pon = msg.ref.pageObjectNumber;
+      const pon = ponOf(msg.ref.page);
       const found = resolveRef(meta, msg.ref);
       if (found) {
         meta.annots = (meta.annots ?? []).filter((x) => x !== found);
@@ -730,7 +742,7 @@ parentPort.on('message', (msg) => {
         rejectNotOpen(msg);
         return;
       }
-      const pon = msg.pageObjectNumber;
+      const pon = ponOf(msg.page);
       const annots = meta.annots ?? [];
       const moving = msg.refs.map((ref) => resolveRef(meta, ref)).filter(Boolean);
       if (moving.length === msg.refs.length && moving.length > 0) {
@@ -767,11 +779,12 @@ parentPort.on('message', (msg) => {
         return;
       }
       const current = meta.pageOrder ?? Array.from({ length: meta.pageCount }, (_, i) => i + 1);
-      const moving = new Set(msg.pageObjectNumbers);
+      const movingPons = ponsOf(msg);
+      const moving = new Set(movingPons);
       const remaining = current.filter((pon) => !moving.has(pon));
       const next = [
         ...remaining.slice(0, msg.destIndex),
-        ...msg.pageObjectNumbers,
+        ...movingPons,
         ...remaining.slice(msg.destIndex),
       ];
       meta.pageOrder = next;
@@ -797,7 +810,7 @@ parentPort.on('message', (msg) => {
       // Rotation is presentation metadata: same pages, same order, new
       // per-page rotation values (the real mutator's exact contract).
       meta.pageRotations = meta.pageRotations ?? {};
-      for (const pon of msg.pageObjectNumbers) {
+      for (const pon of ponsOf(msg)) {
         meta.pageRotations[pon] = msg.rotation;
       }
       resolveMutation(msg, {
@@ -814,7 +827,8 @@ parentPort.on('message', (msg) => {
         return;
       }
       const current = meta.pageOrder ?? Array.from({ length: meta.pageCount }, (_, i) => i + 1);
-      if (msg.pageObjectNumbers.length >= current.length) {
+      const deletingPons = ponsOf(msg);
+      if (deletingPons.length >= current.length) {
         // Mirrors PagesMutator: a document must keep at least one page.
         parentPort.postMessage({
           kind: 'reject',
@@ -827,7 +841,7 @@ parentPort.on('message', (msg) => {
         });
         return;
       }
-      const deleting = new Set(msg.pageObjectNumbers);
+      const deleting = new Set(deletingPons);
       meta.pageOrder = current.filter((pon) => !deleting.has(pon));
       resolveMutation(msg, {
         tag: 'pages.delete',
@@ -856,12 +870,15 @@ parentPort.on('message', (msg) => {
         return;
       }
       const raster = stubRaster(msg.options);
-      encodeStubRaster(raster, msg.encode).then((image) => {
-        parentPort.postMessage(
-          { kind: 'resolve', jobId: msg.jobId, result: { tag: 'pages.renderEncoded', image } },
-          [image.bytes.buffer],
-        );
-      }, (err) => rejectEncodeError(msg, err));
+      encodeStubRaster(raster, msg.encode).then(
+        (image) => {
+          parentPort.postMessage(
+            { kind: 'resolve', jobId: msg.jobId, result: { tag: 'pages.renderEncoded', image } },
+            [image.bytes.buffer],
+          );
+        },
+        (err) => rejectEncodeError(msg, err),
+      );
       return;
     }
     case 'annotations.renderAppearances': {
@@ -870,7 +887,7 @@ parentPort.on('message', (msg) => {
         rejectNotOpen(msg);
         return;
       }
-      const pon = msg.pageObjectNumber;
+      const pon = ponOf(msg.page);
       if (pon < 1 || pon > meta.pageCount) {
         parentPort.postMessage({
           kind: 'reject',
@@ -912,7 +929,7 @@ parentPort.on('message', (msg) => {
               pageState: pageState(pon),
               appearances: [
                 {
-                  ref: { kind: 'objectNumber', pageObjectNumber: pon, annotObjectNumber: 9001 },
+                  ref: { kind: 'objectNumber', page: pageRef(pon), annotObjectNumber: 9001 },
                   mode: 'normal',
                   rect: { left: 0, bottom: 0, right: 8, top: 8 },
                   raster: { width: side, height: side, data: data.buffer },
@@ -931,7 +948,7 @@ parentPort.on('message', (msg) => {
         rejectNotOpen(msg);
         return;
       }
-      const pon = msg.pageObjectNumber;
+      const pon = ponOf(msg.page);
       if (pon < 1 || pon > meta.pageCount) {
         parentPort.postMessage({
           kind: 'reject',
@@ -961,29 +978,32 @@ parentPort.on('message', (msg) => {
       }
       const data = new Uint8Array(side * side * 4).fill(0x77);
       const raster = { width: side, height: side, data: data.buffer };
-      encodeStubRaster(raster, msg.encode).then((image) => {
-        parentPort.postMessage(
-          {
-            kind: 'resolve',
-            jobId: msg.jobId,
-            result: {
-              tag: 'annotations.renderAppearancesEncoded',
+      encodeStubRaster(raster, msg.encode).then(
+        (image) => {
+          parentPort.postMessage(
+            {
+              kind: 'resolve',
+              jobId: msg.jobId,
               result: {
-                pageState: pageState(pon),
-                appearances: [
-                  {
-                    ref: { kind: 'objectNumber', pageObjectNumber: pon, annotObjectNumber: 9001 },
-                    mode: 'normal',
-                    rect: { left: 0, bottom: 0, right: 8, top: 8 },
-                    image,
-                  },
-                ],
+                tag: 'annotations.renderAppearancesEncoded',
+                result: {
+                  pageState: pageState(pon),
+                  appearances: [
+                    {
+                      ref: { kind: 'objectNumber', page: pageRef(pon), annotObjectNumber: 9001 },
+                      mode: 'normal',
+                      rect: { left: 0, bottom: 0, right: 8, top: 8 },
+                      image,
+                    },
+                  ],
+                },
               },
             },
-          },
-          [image.bytes.buffer],
-        );
-      }, (err) => rejectEncodeError(msg, err));
+            [image.bytes.buffer],
+          );
+        },
+        (err) => rejectEncodeError(msg, err),
+      );
       return;
     }
     case 'document.renderPageFile': {
@@ -1010,7 +1030,7 @@ parentPort.on('message', (msg) => {
           jobId: msg.jobId,
           result: {
             tag: 'document.renderPageFile',
-            pageObjectNumber: msg.pageIndex + 1,
+            page: pageRef(msg.pageIndex + 1),
             pageCount,
             raster,
           },
@@ -1035,21 +1055,24 @@ parentPort.on('message', (msg) => {
         return;
       }
       const raster = stubRaster(msg.options);
-      encodeStubRaster(raster, msg.encode).then((image) => {
-        parentPort.postMessage(
-          {
-            kind: 'resolve',
-            jobId: msg.jobId,
-            result: {
-              tag: 'document.renderPageFileEncoded',
-              pageObjectNumber: msg.pageIndex + 1,
-              pageCount,
-              image,
+      encodeStubRaster(raster, msg.encode).then(
+        (image) => {
+          parentPort.postMessage(
+            {
+              kind: 'resolve',
+              jobId: msg.jobId,
+              result: {
+                tag: 'document.renderPageFileEncoded',
+                page: pageRef(msg.pageIndex + 1),
+                pageCount,
+                image,
+              },
             },
-          },
-          [image.bytes.buffer],
-        );
-      }, (err) => rejectEncodeError(msg, err));
+            [image.bytes.buffer],
+          );
+        },
+        (err) => rejectEncodeError(msg, err),
+      );
       return;
     }
     case 'attachments.list': {

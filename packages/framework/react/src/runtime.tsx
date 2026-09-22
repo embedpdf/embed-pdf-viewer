@@ -12,8 +12,10 @@ export * from '@embedpdf/core';
 import * as React from 'react';
 import {
   createContext,
+  forwardRef,
   useContext,
   useEffect,
+  useImperativeHandle,
   useRef,
   useState,
   useSyncExternalStore,
@@ -27,6 +29,7 @@ import type {
   EventHook,
   InitialDocument,
   Kernel,
+  PageRef,
 } from '@embedpdf/core';
 // Pure coordinate math from the geometry base — NOT from stage-core. The
 // PageContext seam stays stage-agnostic (it must also serve standalone PageView).
@@ -63,7 +66,7 @@ export function useKernelValue<R>(
 }
 
 export function useActiveDocumentId(): string | null {
-  return useKernelValue((k) => k.documents.activeId());
+  return useKernelValue((k) => k.documents.getActiveId());
 }
 
 /** The document id for this subtree: the nearest <DocumentScope>, else the active doc. */
@@ -195,7 +198,7 @@ export function useOptionalSelector<C, R>(
 
 /**
  * Subscribe to a capability's {@link EventHook} for the mounted lifetime —
- * `useCapabilityEvent(ActionsToken, (c) => c.onAction, handler)`. Events
+ * `useCapabilityEvent(ActionsToken, (c) => c.onExecuted, handler)`. Events
  * carry occurrences, never state (a late subscriber that needs the current
  * value uses `useSelector`). The handler rides a ref, so a fresh closure per
  * render never resubscribes. Null-safe: no plugin/document → no subscription.
@@ -225,14 +228,28 @@ export function useDocuments() {
     docs,
     activeId,
     open: kernel.documents.open,
+    retry: kernel.documents.retry,
     unlock: kernel.documents.unlock,
     close: kernel.documents.close,
+    rename: kernel.documents.rename,
     setActive: kernel.documents.setActive,
     move: kernel.documents.move,
     swap: kernel.documents.swap,
-    download: kernel.documents.download,
-    downloadLayer: kernel.documents.downloadLayer,
+    setOrder: kernel.documents.setOrder,
+    save: kernel.documents.save,
+    saveLayer: kernel.documents.saveLayer,
   };
+}
+
+/** Subscribe to one document lifecycle event for the mounted lifetime: `useDocumentEvent((d) => d.onOpened, handler)`. */
+export function useDocumentEvent<T>(
+  select: (documents: Kernel['documents']) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  const kernel = useKernel();
+  const handlerRef = useRef(handler);
+  handlerRef.current = handler;
+  useEffect(() => select(kernel.documents)((event) => handlerRef.current(event)), [kernel, select]);
 }
 
 // `InitialDocument` is the KERNEL's type (re-exported via `export * from
@@ -265,6 +282,10 @@ export interface ViewerProps {
   /** Rendered when kernel construction or `start()` fails. Without it a boot
    *  failure renders nothing — but never a silent forever-fallback. */
   renderError?: (error: unknown) => React.ReactNode;
+  /** Called once the kernel has started — before `children` mount and before
+   *  `initialDocuments` open. The imperative door for code outside React
+   *  (register commands, subscribe events). The `ref` carries the same kernel. */
+  onReady?: (kernel: Kernel) => void;
   children: React.ReactNode;
 }
 
@@ -301,14 +322,10 @@ type BootState =
  * leak-detection contract StrictMode exists to exercise; production mounts
  * once and boots once.
  */
-export function Viewer({
-  engine,
-  plugins,
-  initialDocuments,
-  fallback,
-  renderError,
-  children,
-}: ViewerProps) {
+export const Viewer = forwardRef<Kernel | null, ViewerProps>(function Viewer(
+  { engine, plugins, initialDocuments, fallback, renderError, onReady, children }: ViewerProps,
+  ref,
+) {
   // Init-only inputs: the kernel's lifetime is the component's lifetime, so a
   // changed engine/plugins identity cannot mean "rebuild the workspace" —
   // that would silently drop every open document. Capture once, warn in dev.
@@ -326,6 +343,14 @@ export function Viewer({
   }
 
   const [boot, setBoot] = useState<BootState>({ phase: 'booting', kernel: null });
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
+  // The ref is the started kernel (null before boot and after an error).
+  useImperativeHandle<Kernel | null, Kernel | null>(
+    ref,
+    () => (boot.phase === 'ready' ? boot.kernel : null),
+    [boot],
+  );
   useEffect(() => {
     const captured = initial.current;
     // A thunk is viewer-owned: call it now, destroy on unmount. An instance is
@@ -350,6 +375,7 @@ export function Viewer({
     kernel.start().then(
       () => {
         if (!alive) return; // unmounted mid-boot — don't open anything
+        onReadyRef.current?.(kernel);
         setBoot({ phase: 'ready', kernel });
         // Kernel-owned boot policy: all tabs appear immediately in array
         // order; the `active` entry (else the first) is selected; failures
@@ -381,7 +407,7 @@ export function Viewer({
       {boot.phase === 'ready' ? children : (fallback ?? null)}
     </KernelCtx.Provider>
   );
-}
+});
 export const EmbedPDF = Viewer;
 
 /**
@@ -390,8 +416,12 @@ export const EmbedPDF = Viewer;
  */
 export interface PageContextValue {
   documentId: string;
-  /** Durable page identity (PDF object number) — use for keys / render / annotations. */
-  pon: number;
+  /**
+   * The page's durable address — use for keys / render / annotations (read
+   * `ref.pageObjectNumber` where a map key is needed). Identity-stable for
+   * the surface's lifetime, so layers may key effects on it.
+   */
+  ref: PageRef;
   /** Display index (page N) — use for ordering / human-facing page numbers. */
   pageIndex: number;
   /**
@@ -430,7 +460,7 @@ export interface PageContextValue {
    */
   getViewDemand?: () => PageViewDemand;
   /**
-   * The hosting VIEW's identity — the stage lens id (`stage.lensId()`) or a
+   * The hosting VIEW's identity — the stage lens id (`stage.getLensId()`) or a
    * per-instance PageView id. IDENTITY, not an option: per-view raster
    * planning (tiles) keys its state by this, so two views showing the SAME
    * page never fight over one plan (a thumbnail rail's never-engaging demand
@@ -452,7 +482,7 @@ export function usePage(): PageContextValue {
 export function makePageContext(
   documentId: string,
   view: string,
-  pon: number,
+  ref: PageRef,
   pageIndex: number,
   frame: PageFrame,
   transform: PageTransform,
@@ -462,7 +492,7 @@ export function makePageContext(
   return {
     documentId,
     view,
-    pon,
+    ref,
     pageIndex,
     frame,
     transform,

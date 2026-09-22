@@ -6,6 +6,7 @@ import {
   type PageNameInput,
   type PageNameResult,
   type PageObjectNumber,
+  type PageRef,
   type PageRemoveNameInput,
   type PageRotateResult,
   type PageRotation,
@@ -69,11 +70,8 @@ export class PagesMutator {
    *   - every `pon` resolvable via the session's page registry;
    *   - `destIndex` in `[0, pageCount - len]`.
    */
-  move(
-    pageObjectNumbers: PageObjectNumber[],
-    destIndex: number,
-    signal: AbortSignal,
-  ): PageMoveResult {
+  move(pages: PageRef[], destIndex: number, signal: AbortSignal): PageMoveResult {
+    const pageObjectNumbers = this.session.resolvePageRefs(pages);
     throwIfAborted(signal);
     this.requireUniquePons('pages.move', pageObjectNumbers);
     if (destIndex < 0 || !Number.isInteger(destIndex)) {
@@ -153,11 +151,8 @@ export class PagesMutator {
    * fault converges to the requested state. Abort is honored BEFORE the
    * loop, never inside it.
    */
-  rotate(
-    pageObjectNumbers: PageObjectNumber[],
-    rotation: PageRotation,
-    signal: AbortSignal,
-  ): PageRotateResult {
+  rotate(pages: PageRef[], rotation: PageRotation, signal: AbortSignal): PageRotateResult {
+    const pageObjectNumbers = this.session.resolvePageRefs(pages);
     throwIfAborted(signal);
     this.requireUniquePons('pages.rotate', pageObjectNumbers);
     if (rotation !== 0 && rotation !== 90 && rotation !== 180 && rotation !== 270) {
@@ -205,7 +200,8 @@ export class PagesMutator {
    *
    * Abort is honored BEFORE the apply loop, never inside it.
    */
-  delete(pageObjectNumbers: PageObjectNumber[], signal: AbortSignal): PageDeleteResult {
+  delete(pages: PageRef[], signal: AbortSignal): PageDeleteResult {
+    const pageObjectNumbers = this.session.resolvePageRefs(pages);
     throwIfAborted(signal);
     this.requireUniquePons('pages.delete', pageObjectNumbers);
 
@@ -262,20 +258,20 @@ export class PagesMutator {
     }
     const { fn, mem } = this.runtime;
     const docPtr = this.session.requireDocPtr();
-    this.session.recordByObjectNumber(input.pageObjectNumber); // NotFound on an unknown pon
+    const pageObjectNumber = this.session.resolvePageRef(input.page).pageObjectNumber; // NotFound on an unknown page
 
     if (input.replace !== undefined && input.replace !== input.name && input.replace.length > 0) {
       writeUtf16String(mem, input.replace, (ptr) => fn.EPDFDoc_RemoveNamedPage(docPtr, ptr));
     }
     const ok = writeUtf16String(mem, input.name, (ptr) =>
-      fn.EPDFDoc_SetNamedPage(docPtr, ptr, input.pageObjectNumber),
+      fn.EPDFDoc_SetNamedPage(docPtr, ptr, pageObjectNumber),
     );
     if (!ok) {
       // The fork refuses only what we already validated (empty key, a page
       // outside the tree) — reaching here means the catalog is unwritable.
       throw new EngineError(
         EngineErrorCode.Unknown,
-        `EPDFDoc_SetNamedPage rejected '${input.name}' for page ${input.pageObjectNumber}`,
+        `EPDFDoc_SetNamedPage rejected '${input.name}' for page ${pageObjectNumber}`,
       );
     }
     const layout = new PagesReader(this.runtime, this.session).read(signal);

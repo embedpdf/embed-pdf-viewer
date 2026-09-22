@@ -17,6 +17,7 @@ import {
   type PageRotation,
   type PageFlattenResult,
   type PageFlattenUsage,
+  type PageRef,
 } from '@embedpdf/engine-core/runtime';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
@@ -86,7 +87,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     });
   }
 
-  move(pageObjectNumbers: PageObjectNumber[], destIndex: number): AbortablePromise<PageMoveResult> {
+  move(pages: PageRef[], destIndex: number): AbortablePromise<PageMoveResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -107,7 +108,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
             kind: 'pages.move',
             jobId,
             docId,
-            pageObjectNumbers,
+            pages,
             destIndex,
           }),
       },
@@ -123,7 +124,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       }
       this.publisher.publishLocal({
         type: 'pages.moved',
-        pageObjectNumbers,
+        pages,
         destIndex,
         ...payload.result,
       });
@@ -132,12 +133,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
   }
 
   setName(input: PageNameInput): AbortablePromise<PageNameResult> {
-    return this.runNameJob(
-      { kind: 'pages.setName', ...input },
-      'pages.setName',
-      input.name,
-      input.pageObjectNumber,
-    );
+    return this.runNameJob({ kind: 'pages.setName', ...input }, 'pages.setName', input.name);
   }
 
   removeName(input: PageRemoveNameInput): AbortablePromise<PageNameResult> {
@@ -145,7 +141,6 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       { kind: 'pages.removeName', name: input.name },
       'pages.removeName',
       input.name,
-      null,
     );
   }
 
@@ -160,13 +155,12 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       | {
           kind: 'pages.setName';
           name: string;
-          pageObjectNumber: PageObjectNumber;
+          page: PageRef;
           replace?: string;
         }
       | { kind: 'pages.removeName'; name: string },
     tag: 'pages.setName' | 'pages.removeName',
     name: string,
-    pageObjectNumber: PageObjectNumber | null,
   ): AbortablePromise<PageNameResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
@@ -196,17 +190,14 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       this.publisher.publishLocal({
         type: 'pages.named',
         name,
-        pageObjectNumber,
+        page: request.kind === 'pages.setName' ? request.page : null,
         ...payload.result,
       });
       return payload.result;
     });
   }
 
-  rotate(
-    pageObjectNumbers: PageObjectNumber[],
-    rotation: PageRotation,
-  ): AbortablePromise<PageRotateResult> {
+  rotate(pages: PageRef[], rotation: PageRotation): AbortablePromise<PageRotateResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -227,7 +218,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
             kind: 'pages.rotate',
             jobId,
             docId,
-            pageObjectNumbers,
+            pages,
             rotation,
           }),
       },
@@ -243,7 +234,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       }
       this.publisher.publishLocal({
         type: 'pages.rotated',
-        pageObjectNumbers,
+        pages,
         rotation,
         ...payload.result,
       });
@@ -251,7 +242,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     });
   }
 
-  delete(pageObjectNumbers: PageObjectNumber[]): AbortablePromise<PageDeleteResult> {
+  delete(pages: PageRef[]): AbortablePromise<PageDeleteResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -272,7 +263,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
             kind: 'pages.delete',
             jobId,
             docId,
-            pageObjectNumbers,
+            pages,
           }),
       },
       { priority: Priority.HIGH },
@@ -287,7 +278,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       }
       this.publisher.publishLocal({
         type: 'pages.deleted',
-        pageObjectNumbers,
+        pages,
         ...payload.result,
       });
       return payload.result;
@@ -295,7 +286,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
   }
 
   flatten(
-    pageObjectNumbers: PageObjectNumber[],
+    pages: PageRef[],
     usage: PageFlattenUsage = 'display',
   ): AbortablePromise<PageFlattenResult> {
     if (this.view.isClosed()) {
@@ -316,7 +307,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'pages.flatten', jobId, docId, pageObjectNumbers, usage }),
+          wirePack({ kind: 'pages.flatten', jobId, docId, pages, usage }),
       },
       { priority: Priority.HIGH },
     );
@@ -426,7 +417,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     });
   }
 
-  extract(pageObjectNumbers: PageObjectNumber[]): AbortablePromise<Uint8Array> {
+  extract(pages: PageRef[]): AbortablePromise<Uint8Array> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -448,7 +439,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
             kind: 'pages.extract',
             jobId,
             docId,
-            pageObjectNumbers,
+            pages,
           }),
       },
       { priority: Priority.MEDIUM },

@@ -1,23 +1,25 @@
 import { definePlugin } from '@embedpdf/core';
-import { createStampCapability } from './capability';
-import { initialStampState, stampReducer } from './reducer';
-import { StampToken } from './types';
-import type { StampAction, StampCapability, StampConfig, StampState } from './types';
+import { ActionsToken } from '@embedpdf/plugin-actions/contract';
+import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
+
+import type { StampConfig } from './contract';
+import { createStampController } from './controller';
+import { StampToken } from './host-contract';
+import type { StampHostCapability } from './host-contract';
+import { initialStampState, stampReducer } from './model';
+import type { StampAction, StampState } from './model';
 
 /**
- * The stamp plugin. WORKSPACE-scoped: libraries are shared across every open
- * document; placement names its document explicitly (`armAsset(documentId, …)`)
- * and delegates to that document's annotation plugin — no hard `requires`,
- * because the annotation token is document-scoped and resolved lazily per
- * placement (a viewer without the annotation plugin fails at the arm call,
- * with the kernel's own missing-capability error).
+ * Stamp libraries and assets — WORKSPACE-scoped (libraries outlive any one
+ * document); placement targets a document through its annotation plugin.
  */
 export const stampPlugin = (config: StampConfig = {}) =>
-  definePlugin<StampState, StampAction, StampCapability>({
+  definePlugin<StampState, StampAction, StampHostCapability>({
     id: 'stamp',
     token: StampToken,
     scope: 'workspace',
+    optional: [AnnotationToken, ActionsToken],
     initialState: initialStampState,
     reduce: stampReducer,
-    capability: (ctx) => createStampCapability(ctx, config),
+    create: (ctx) => ({ api: createStampController(ctx, config) }),
   });

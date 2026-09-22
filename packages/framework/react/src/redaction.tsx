@@ -1,10 +1,14 @@
+import { annotationKey } from '@embedpdf/core';
+import type { EventHook } from '@embedpdf/core';
+import { useMemo } from 'react';
 import { RedactionToken } from '@embedpdf/plugin-redaction';
 import type {
   RedactionApplyResult,
   RedactionCapability,
-  RedactionPendingItem,
+  RedactionMark,
+  RedactionMarkFilter,
 } from '@embedpdf/plugin-redaction';
-import { useCapability, useSelector } from './runtime';
+import { useCapability, useCapabilityEvent, useSelector } from './runtime';
 
 /**
  * Redaction for the surrounding `DocumentScope`: the pending-marks view plus
@@ -12,30 +16,43 @@ import { useCapability, useSelector } from './runtime';
  * `redact` tool); `useRedaction` surfaces the workflow around it.
  *
  *   const redaction = useRedaction();
- *   redaction.toggleRedact();
+ *   await redaction.markSelection();
  *   await redaction.applyAll();          // irreversible — confirm first
  */
 
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-redaction';
 
+/** The capability plus the two reactive facts chrome shows (`applying`, `lastResult`). */
 export function useRedaction(): RedactionCapability & {
   applying: boolean;
-  lastApplyResult: RedactionApplyResult | null;
+  lastResult: RedactionApplyResult | null;
 } {
   const cap = useCapability(RedactionToken);
   const applying = useSelector(RedactionToken, (c) => c.isApplying());
-  const lastApplyResult = useSelector(RedactionToken, (c) => c.lastResult());
-  return { ...cap, applying, lastApplyResult };
+  const lastResult = useSelector(RedactionToken, (c) => c.getLastResult());
+  return useMemo(() => ({ ...cap, applying, lastResult }), [cap, applying, lastResult]);
 }
 
-/** The pending marks, reactive against the annotation plane. Note the view
- *  covers LOADED pages — call `preparePending()` (e.g. on panel open) to load
- *  the whole document. */
-export function usePendingRedactions(): RedactionPendingItem[] {
-  return useSelector(RedactionToken, (c) => c.getPending(), pendingEqual);
+/** Subscribe to one redaction event for the mounted lifetime: `useRedactionEvent((c) => c.onApplied, handler)`. */
+export function useRedactionEvent<T>(
+  select: (cap: RedactionCapability) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  useCapabilityEvent(RedactionToken, select, handler);
 }
 
-const pendingEqual = (a: RedactionPendingItem[], b: RedactionPendingItem[]): boolean =>
+/** The pending marks (optionally of one page), reactive against the annotation plane. */
+export function usePendingRedactions(filter?: RedactionMarkFilter): readonly RedactionMark[] {
+  const pon = filter?.page?.pageObjectNumber;
+  const stable = useMemo(() => filter, [pon]);
+  return useSelector(RedactionToken, (c) => c.listPending(stable), pendingEqual);
+}
+
+const pendingEqual = (a: readonly RedactionMark[], b: readonly RedactionMark[]): boolean =>
   a.length === b.length &&
-  a.every((item, i) => item.id === b[i]!.id && item.overlayText === b[i]!.overlayText);
+  a.every(
+    (item, i) =>
+      annotationKey(item.ref) === annotationKey(b[i]!.ref) &&
+      item.overlayText === b[i]!.overlayText,
+  );

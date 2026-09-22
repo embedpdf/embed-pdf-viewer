@@ -10,6 +10,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./contract": "./src/contract.ts",
+    "./contract/host": "./src/host-contract.ts",
     "./destination": "./src/destination.ts",
     "./package.json": "./package.json"
   },
@@ -25,6 +26,10 @@
       "./contract": {
         "import": "./dist/contract.js",
         "require": "./dist/contract.cjs"
+      },
+      "./contract/host": {
+        "import": "./dist/contract/host.js",
+        "require": "./dist/contract/host.cjs"
       },
       "./destination": {
         "import": "./dist/destination.js",

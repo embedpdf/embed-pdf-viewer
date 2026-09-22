@@ -28,7 +28,7 @@ import {
   type PageAnnotationsService,
   type PageImageResult,
   type PageNetworkRenderFormat,
-  type PageObjectNumber,
+  type PageRef,
 } from '@embedpdf/engine-core/runtime';
 import {
   AnnotationCreateResultSchema,
@@ -63,7 +63,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     private readonly http: HttpClient,
     private readonly docId: string,
     private readonly layerName: string,
-    private readonly pageObjectNumber: PageObjectNumber,
+    private readonly pageRef: PageRef,
     private readonly isClosed: () => boolean,
     private readonly manifest: ManifestAccessor,
     private readonly publisher: SessionEventPublisher,
@@ -78,11 +78,12 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     return AbortablePromise.run<AnnotationListPageSnapshot>(async (signal) => {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        const page = manifest.pages.find((p) => p.state.pageObjectNumber === this.pageObjectNumber);
+        const pon = this.pageRef.pageObjectNumber;
+        const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pon);
         if (!page) {
           throw new EngineError(
             EngineErrorCode.NotFound,
-            `no page with object number ${this.pageObjectNumber} in document ${this.docId}`,
+            `no page with object number ${pon} in document ${this.docId}`,
           );
         }
         // Plane-scope rule: the list depends on the `annotations` plane. A
@@ -90,15 +91,11 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         // VISIBLE through an inheriting layer, so every visitor reads ONE
         // doc-level URL served from the base session.
         return planesInherited(manifest, ['annotations'])
-          ? wirePaths.docPageAnnotations(
-              this.docId,
-              this.pageObjectNumber,
-              page.cache.annotationVersion,
-            )
+          ? wirePaths.docPageAnnotations(this.docId, this.pageRef, page.cache.annotationVersion)
           : wirePaths.layerPageAnnotations(
               this.docId,
               this.layerName,
-              this.pageObjectNumber,
+              this.pageRef,
               page.cache.annotationVersion,
             );
       };
@@ -139,11 +136,12 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       const format: PageNetworkRenderFormat = options.format ?? 'webp';
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        const page = manifest.pages.find((p) => p.state.pageObjectNumber === this.pageObjectNumber);
+        const pon = this.pageRef.pageObjectNumber;
+        const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pon);
         if (!page) {
           throw new EngineError(
             EngineErrorCode.NotFound,
-            `no page with object number ${this.pageObjectNumber} in document ${this.docId}`,
+            `no page with object number ${pon} in document ${this.docId}`,
           );
         }
         const wireToken = annotationAppearancesImageOptionsToWire(
@@ -153,11 +151,11 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         // Same `annotations` plane switch as list(): the appearance
         // batch shares too.
         return planesInherited(manifest, ['annotations'])
-          ? wirePaths.docPageAnnotationAppearances(this.docId, this.pageObjectNumber, wireToken)
+          ? wirePaths.docPageAnnotationAppearances(this.docId, this.pageRef, wireToken)
           : wirePaths.layerPageAnnotationAppearances(
               this.docId,
               this.layerName,
-              this.pageObjectNumber,
+              this.pageRef,
               wireToken,
             );
       };
@@ -187,11 +185,11 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
-    if (ref.pageObjectNumber !== this.pageObjectNumber) {
+    if (ref.page.pageObjectNumber !== this.pageRef.pageObjectNumber) {
       return AbortablePromise.rejectReason(
         new EngineError(
           EngineErrorCode.InvalidArg,
-          `ref.pageObjectNumber ${ref.pageObjectNumber} != page ${this.pageObjectNumber}`,
+          `ref.page ${ref.page.pageObjectNumber} != page ${this.pageRef.pageObjectNumber}`,
         ),
       );
     }
@@ -213,14 +211,14 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         return planesInherited(manifest, ['annotations', 'attachments'])
           ? wirePaths.docAnnotationFile(
               this.docId,
-              this.pageObjectNumber,
+              this.pageRef,
               annotKey,
               manifest.attachmentsVersion,
             )
           : wirePaths.layerAnnotationFile(
               this.docId,
               this.layerName,
-              this.pageObjectNumber,
+              this.pageRef,
               annotKey,
               manifest.attachmentsVersion,
             );
@@ -249,11 +247,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       // multipart: a `body` JSON part + one `resource:{key}` part each —
       // the mirror image of the appearance-render response.
       const { wire, resources } = await normalizeAnnotationDraft(draft);
-      const path = wirePaths.layerPageAnnotationsCreate(
-        this.docId,
-        this.layerName,
-        this.pageObjectNumber,
-      );
+      const path = wirePaths.layerPageAnnotationsCreate(this.docId, this.layerName, this.pageRef);
       const parse = (raw: unknown) => AnnotationCreateResultSchema.parse(raw);
       const result = hasResources(resources)
         ? await this.http.postMultipartJson(path, buildMutationForm(wire, resources), parse, signal)
@@ -268,11 +262,11 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
-    if (ref.pageObjectNumber !== this.pageObjectNumber) {
+    if (ref.page.pageObjectNumber !== this.pageRef.pageObjectNumber) {
       return AbortablePromise.rejectReason(
         new EngineError(
           EngineErrorCode.InvalidArg,
-          `ref.pageObjectNumber ${ref.pageObjectNumber} != page ${this.pageObjectNumber}`,
+          `ref.page ${ref.page.pageObjectNumber} != page ${this.pageRef.pageObjectNumber}`,
         ),
       );
     }
@@ -283,7 +277,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       const path = wirePaths.layerAnnotationByKey(
         this.docId,
         this.layerName,
-        ref.pageObjectNumber,
+        this.pageRef,
         'index',
       );
       return AbortablePromise.run<AnnotationUpdateResult>(async (signal) => {
@@ -296,7 +290,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     const path = wirePaths.layerAnnotationByKey(
       this.docId,
       this.layerName,
-      ref.pageObjectNumber,
+      this.pageRef,
       stableKey,
     );
     return AbortablePromise.run<AnnotationUpdateResult>(async (signal) => {
@@ -326,11 +320,11 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
-    if (ref.pageObjectNumber !== this.pageObjectNumber) {
+    if (ref.page.pageObjectNumber !== this.pageRef.pageObjectNumber) {
       return AbortablePromise.rejectReason(
         new EngineError(
           EngineErrorCode.InvalidArg,
-          `ref.pageObjectNumber ${ref.pageObjectNumber} != page ${this.pageObjectNumber}`,
+          `ref.page ${ref.page.pageObjectNumber} != page ${this.pageRef.pageObjectNumber}`,
         ),
       );
     }
@@ -341,7 +335,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       const path = wirePaths.layerAnnotationByKey(
         this.docId,
         this.layerName,
-        ref.pageObjectNumber,
+        this.pageRef,
         'index',
       );
       return AbortablePromise.run<AnnotationDeleteResult>(async (signal) => {
@@ -358,7 +352,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     const path = wirePaths.layerAnnotationByKey(
       this.docId,
       this.layerName,
-      ref.pageObjectNumber,
+      this.pageRef,
       stableKey,
     );
     return AbortablePromise.run<AnnotationDeleteResult>(async (signal) => {
@@ -380,20 +374,16 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     // The page is part of the URL; the worker validates per-ref consistency
     // again, but rejecting up front gives a cleaner error from the client side.
     for (const r of refs) {
-      if (r.pageObjectNumber !== this.pageObjectNumber) {
+      if (r.page.pageObjectNumber !== this.pageRef.pageObjectNumber) {
         return AbortablePromise.rejectReason(
           new EngineError(
             EngineErrorCode.InvalidArg,
-            `move ref points at page ${r.pageObjectNumber}; service is bound to page ${this.pageObjectNumber}`,
+            `move ref points at page ${r.page.pageObjectNumber}; service is bound to page ${this.pageRef.pageObjectNumber}`,
           ),
         );
       }
     }
-    const path = wirePaths.layerPageAnnotationsMove(
-      this.docId,
-      this.layerName,
-      this.pageObjectNumber,
-    );
+    const path = wirePaths.layerPageAnnotationsMove(this.docId, this.layerName, this.pageRef);
     return AbortablePromise.run<AnnotationMoveResult>(async (signal) => {
       const result = await this.http.postJson(
         path,
@@ -415,20 +405,16 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       );
     }
     for (const r of refs) {
-      if (r.pageObjectNumber !== this.pageObjectNumber) {
+      if (r.page.pageObjectNumber !== this.pageRef.pageObjectNumber) {
         return AbortablePromise.rejectReason(
           new EngineError(
             EngineErrorCode.InvalidArg,
-            `flatten ref points at page ${r.pageObjectNumber}; service is bound to page ${this.pageObjectNumber}`,
+            `flatten ref points at page ${r.page.pageObjectNumber}; service is bound to page ${this.pageRef.pageObjectNumber}`,
           ),
         );
       }
     }
-    const path = wirePaths.layerPageAnnotationsFlatten(
-      this.docId,
-      this.layerName,
-      this.pageObjectNumber,
-    );
+    const path = wirePaths.layerPageAnnotationsFlatten(this.docId, this.layerName, this.pageRef);
     return AbortablePromise.run<AnnotationFlattenResult>(async (signal) => {
       const result = await this.http.postJson(
         path,
@@ -452,11 +438,11 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       );
     }
     for (const r of refs) {
-      if (r.pageObjectNumber !== this.pageObjectNumber) {
+      if (r.page.pageObjectNumber !== this.pageRef.pageObjectNumber) {
         return AbortablePromise.rejectReason(
           new EngineError(
             EngineErrorCode.InvalidArg,
-            `exportAppearance ref points at page ${r.pageObjectNumber}; service is bound to page ${this.pageObjectNumber}`,
+            `exportAppearance ref points at page ${r.page.pageObjectNumber}; service is bound to page ${this.pageRef.pageObjectNumber}`,
           ),
         );
       }
@@ -464,7 +450,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     // A read (gated by doc.download server-side): no absorb, no event.
     return AbortablePromise.run<Uint8Array>(async (signal) =>
       this.http.postJsonBytes(
-        wirePaths.layerPageAnnotationsAppearance(this.docId, this.layerName, this.pageObjectNumber),
+        wirePaths.layerPageAnnotationsAppearance(this.docId, this.layerName, this.pageRef),
         { refs },
         signal,
       ),
@@ -485,7 +471,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     this.manifest.apply(result.meta, ['annotations']);
     this.publisher.publishLocal({
       type,
-      pageObjectNumber: this.pageObjectNumber,
+      page: this.pageRef,
       ...result,
     } as unknown as DocumentEventInit);
     return result;

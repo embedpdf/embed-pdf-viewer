@@ -6,8 +6,8 @@ import {
   type AnnotationListPageSnapshot,
   type AnnotationListSnapshotAllPages,
   type DocumentAnnotationsService,
-  type PageObjectNumber,
   type WeakAnnotationEditSession,
+  type PageRef,
 } from '@embedpdf/engine-core/runtime';
 
 import type { ScopeGuard } from '../scope';
@@ -64,7 +64,7 @@ export class LocalDocumentAnnotationsService implements DocumentAnnotationsServi
     });
   }
 
-  listRaw(pageObjectNumber: PageObjectNumber): AbortablePromise<AnnotationListPageSnapshot> {
+  listRaw(page: PageRef): AbortablePromise<AnnotationListPageSnapshot> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -83,7 +83,7 @@ export class LocalDocumentAnnotationsService implements DocumentAnnotationsServi
             kind: 'annotations.listRawPage',
             jobId,
             docId,
-            pageObjectNumber,
+            page,
           }),
       },
       { priority: Priority.MEDIUM },
@@ -100,10 +100,8 @@ export class LocalDocumentAnnotationsService implements DocumentAnnotationsServi
     });
   }
 
-  beginWeakEdit(
-    pageObjectNumbers: readonly PageObjectNumber[],
-  ): AbortablePromise<WeakAnnotationEditSession> {
-    const session = new LocalWeakAnnotationEditSession(pageObjectNumbers);
+  beginWeakEdit(pages: readonly PageRef[]): AbortablePromise<WeakAnnotationEditSession> {
+    const session = new LocalWeakAnnotationEditSession(pages);
     return AbortablePromise.resolveValue(session);
   }
 }
@@ -112,22 +110,22 @@ class LocalWeakAnnotationEditSession implements WeakAnnotationEditSession {
   readonly id = 'local-noop';
   readonly expiresAt = Number.MAX_SAFE_INTEGER;
   readonly heartbeatIntervalMs = Number.MAX_SAFE_INTEGER;
-  private pages: readonly PageObjectNumber[];
+  private _pages: readonly PageRef[];
 
-  constructor(pageObjectNumbers: readonly PageObjectNumber[]) {
-    this.pages = [...pageObjectNumbers];
+  constructor(pages: readonly PageRef[]) {
+    this._pages = [...pages];
   }
 
-  get pageObjectNumbers(): readonly PageObjectNumber[] {
-    return this.pages;
+  get pages(): readonly PageRef[] {
+    return this._pages;
   }
 
-  covers(pageObjectNumber: PageObjectNumber): boolean {
-    return this.pages.includes(pageObjectNumber);
+  covers(page: PageRef): boolean {
+    return this._pages.some((p) => p.pageObjectNumber === page.pageObjectNumber);
   }
 
-  updatePages(pageObjectNumbers: readonly PageObjectNumber[]): AbortablePromise<void> {
-    this.pages = [...pageObjectNumbers];
+  updatePages(pages: readonly PageRef[]): AbortablePromise<void> {
+    this._pages = [...pages];
     return AbortablePromise.resolveValue(undefined);
   }
 
@@ -136,7 +134,7 @@ class LocalWeakAnnotationEditSession implements WeakAnnotationEditSession {
   }
 
   release(): AbortablePromise<void> {
-    this.pages = [];
+    this._pages = [];
     return AbortablePromise.resolveValue(undefined);
   }
 }

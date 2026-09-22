@@ -1,4 +1,9 @@
-import { EngineError, EngineErrorCode, type PageObjectNumber } from '@embedpdf/engine-core/runtime';
+import {
+  EngineError,
+  EngineErrorCode,
+  type PageObjectNumber,
+  type PageRef,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
@@ -25,14 +30,12 @@ export class PagesExtractor {
    * duplicates, every PON resolvable (`NotFound` from the session on a
    * bad one). The scratch document is always closed, success or throw.
    */
-  extract(
-    pageObjectNumbers: PageObjectNumber[],
-    signal: AbortSignal,
-  ): { bytes: ArrayBuffer; size: number } {
+  extract(pages: PageRef[], signal: AbortSignal): { bytes: ArrayBuffer; size: number } {
     throwIfAborted(signal);
-    if (pageObjectNumbers.length === 0) {
+    if (pages.length === 0) {
       throw new EngineError(EngineErrorCode.InvalidArg, 'pages.extract requires at least one page');
     }
+    const pageObjectNumbers = this.session.resolvePageRefs(pages);
     const seen = new Set<PageObjectNumber>();
     for (const pon of pageObjectNumbers) {
       if (seen.has(pon)) {

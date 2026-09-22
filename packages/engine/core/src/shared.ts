@@ -138,6 +138,8 @@ export { EngineErrorCode } from './errors/EngineErrorCode';
 
 export { isValidPageObjectNumber } from './identity/PageObjectNumber';
 export type { PageObjectNumber } from './identity/PageObjectNumber';
+export type { PageRef } from './identity/PageRef';
+export { toPageRef, pageRefsEqual, encodePageKey, decodePageKey } from './identity/PageRef';
 export type { AnnotationStableId } from './identity/AnnotationStableId';
 export { encodeStableIdKey, decodeStableIdKey } from './identity/AnnotationStableId';
 export type { AnnotationRef } from './identity/AnnotationRef';
@@ -319,7 +321,8 @@ export type {
   AnnotationListSnapshotAllPages,
 } from './annotation/AnnotationListSnapshot';
 
-export { classifyRelation, buildThreads, refKey } from './annotation/relationships';
+export { classifyRelation, buildThreads } from './annotation/relationships';
+export { annotationKey, refFromStableId } from './identity/annotationKey';
 export type { AnnotationRelationKind, AnnotationThread } from './annotation/relationships';
 
 export { buildCommentThreads, isStateAnnotation } from './annotation/comments';
@@ -355,7 +358,8 @@ export type {
   AppearanceOutcome,
 } from './annotation/appearance';
 export { appearanceImpactOf, semanticEqual } from './annotation/appearance';
-export type { FormFieldRef, FormWidgetRef } from './identity/FormFieldRef';
+export type { FormFieldRef, FormWidget } from './identity/FormFieldRef';
+export { formWidget } from './identity/FormFieldRef';
 export { encodeFieldRefKey, decodeFieldRefKey } from './identity/FormFieldRef';
 export type {
   FormFieldFamily,

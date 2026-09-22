@@ -5,7 +5,7 @@ import type {
   PageFlattenUsage,
   PageObjectNumber,
 } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import { EngineError, EngineErrorCode, toPageRef } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { AnnotationReader } from './AnnotationReader';
@@ -89,7 +89,7 @@ export class AnnotationFlattener {
         status: statuses[i] === STATUS_APPLIED ? ('applied' as const) : ('skipped' as const),
       }));
       if (code === FLATTEN_NOTHING_TO_DO || code !== FLATTEN_SUCCESS) {
-        return { pageObjectNumber, usage, results, meta: null };
+        return { page: toPageRef(pageObjectNumber), usage, results, meta: null };
       }
 
       // Content + annotation liveness changed on this page — the same
@@ -106,7 +106,7 @@ export class AnnotationFlattener {
         affectedPages: [this.session.pageState(pageObjectNumber)],
         cacheDelta: null,
       };
-      return { pageObjectNumber, usage, results, meta };
+      return { page: toPageRef(pageObjectNumber), usage, results, meta };
     } finally {
       pool.release(pageObjectNumber);
     }
@@ -199,10 +199,10 @@ export class AnnotationFlattener {
       throw new EngineError(EngineErrorCode.InvalidArg, `${op} requires at least one ref`);
     }
     for (const ref of refs) {
-      if (ref.pageObjectNumber !== pageObjectNumber) {
+      if (ref.page.pageObjectNumber !== pageObjectNumber) {
         throw new EngineError(
           EngineErrorCode.InvalidArg,
-          `${op} refs must all target page ${pageObjectNumber}; got ref on page ${ref.pageObjectNumber}`,
+          `${op} refs must all target page ${pageObjectNumber}; got ref on page ${ref.page.pageObjectNumber}`,
         );
       }
     }

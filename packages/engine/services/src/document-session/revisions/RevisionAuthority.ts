@@ -8,6 +8,7 @@ import {
   EngineErrorCode,
   UNKNOWN_WEAK_ANNOTATION_STATE,
   revisionTokensEqual,
+  toPageRef,
 } from '@embedpdf/engine-core/runtime';
 
 export interface RevisionAuthority {
@@ -48,7 +49,7 @@ export class LocalRevisionAuthority implements RevisionAuthority {
   token(pageObjectNumber: PageObjectNumber): RevisionToken {
     return {
       docSessionId: this.docSessionId,
-      pageObjectNumber,
+      page: toPageRef(pageObjectNumber),
       generation: this.current(pageObjectNumber),
     };
   }
@@ -75,7 +76,7 @@ export class LocalRevisionAuthority implements RevisionAuthority {
         { details: { token } },
       );
     }
-    const current = this.token(token.pageObjectNumber);
+    const current = this.token(token.page.pageObjectNumber);
     if (!revisionTokensEqual(current, token)) {
       throw new EngineError(EngineErrorCode.InvalidReference, 'revision token is stale', {
         details: { provided: token, current },

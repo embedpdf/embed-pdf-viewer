@@ -9,7 +9,7 @@ onMounted(async () => {
   const { pages } = await props.doc.pages.list();
   const page = pages[props.pageNumber - 1];
   const image = await props.doc
-    .page(page.pageObjectNumber)
+    .page(page.ref)
     .render.image({ viewport: { kind: 'scale', scale: 1.5 } });
   src.value = (await image.objectUrl()).url;
 });

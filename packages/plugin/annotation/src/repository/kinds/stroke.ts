@@ -6,7 +6,6 @@
  * `/EMBD_Metadata/Rotation` is an advisory scalar (the points are already
  * rotated; shape measurement captions use it to orient their text).
  */
-import type { AnnotationDTO, PdfRect } from '@embedpdf/engine-core/runtime';
 import {
   distanceLabel,
   measurementLayout,
@@ -16,10 +15,11 @@ import {
   pdfToContentPoint,
   type Annot,
 } from '@embedpdf/core-annotation';
+import type { AnnotationDTO, PdfRect } from '@embedpdf/engine-core/runtime';
 
 import type { KindProjection, Wire } from '../projection';
 import { borderSlice } from '../props';
-import { contentToPdfPoint, rotFromDTO, toPdfRotation } from '../seam';
+import { contentToPdfPoint, contentToPdfRect, rotFromDTO, toPdfRotation } from '../seam';
 
 /** Advisory rotation, TOTAL: rotation 0 states `null` (tri-state clear) —
  *  omission would preserve a stale advisory angle. */
@@ -42,14 +42,7 @@ const visualRect = (a: Annot, crop: PdfRect): Wire => {
   if (a.measure) {
     const bounds = measurementLayout(g, a.measure, a.style)?.visualBounds;
     if (bounds) {
-      return {
-        rect: {
-          left: crop.left + bounds.x,
-          right: crop.left + bounds.x + bounds.width,
-          top: crop.top - bounds.y,
-          bottom: crop.top - bounds.y - bounds.height,
-        },
-      };
+      return { rect: contentToPdfRect(bounds, crop) };
     }
   }
   if (g.t === 'line' || g.t === 'ink') return { rect: geomPdfBounds(g, a.style.strokeWidth, crop) };

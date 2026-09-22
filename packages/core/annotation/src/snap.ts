@@ -5,6 +5,7 @@
  * and reports a guide line to draw. One snap per axis — the closest wins.
  * Threshold is in content units (the `hitMargin` convention).
  */
+import type { PageRef } from '@embedpdf/engine-core/runtime';
 import { anchorModeOf } from './anchor';
 import { selectionQuad, unionRect } from './geometry';
 import { isSelectable } from './hit';
@@ -48,11 +49,12 @@ const annotQuad = (m: Model, id: Id): Vec[] =>
 export function computeMoveSnap(
   m: Model,
   ids: Id[],
-  pon: number,
+  page: PageRef,
   raw: Vec,
   threshold: number,
   pageBox: Rect | undefined,
 ): SnapResult {
+  const pon = page.pageObjectNumber;
   const moving = new Set(ids);
   // Screen-anchored (`noZoom`/`noRotate`) annotations sit OUTSIDE the snapping
   // system, both ways: their content-space footprint depends on the view, so
@@ -72,7 +74,7 @@ export function computeMoveSnap(
       .filter(
         (id) =>
           !moving.has(id) &&
-          m.byId[id].pon === pon &&
+          m.byId[id].page.pageObjectNumber === pon &&
           isSelectable(m, id) &&
           !anchorModeOf(m.byId[id]),
       )

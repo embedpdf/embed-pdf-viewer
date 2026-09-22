@@ -818,8 +818,9 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
+    const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
     const reader = new RawAnnotationReader(this.runtime, session, this.fonts);
-    const snapshot = reader.listOne(req.pageObjectNumber, signal);
+    const snapshot = reader.listOne(pageObjectNumber, signal);
     return wirePack({ tag: 'annotations.listRawPage', snapshot });
   }
 
@@ -828,8 +829,9 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
+    const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
     const reader = new AnnotationReader(this.runtime, session, this.fonts);
-    const snapshot = reader.list(req.pageObjectNumber, signal);
+    const snapshot = reader.list(pageObjectNumber, signal);
     return wirePack({ tag: 'annotations.listFullPage', snapshot });
   }
 
@@ -838,8 +840,9 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
+    const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
     const reader = new AnnotationAppearanceReader(this.runtime, session);
-    const result = reader.render(req.pageObjectNumber, req.options ?? {}, signal);
+    const result = reader.render(pageObjectNumber, req.options ?? {}, signal);
     // Transfer every appearance raster buffer back zero-copy, like pages.render.
     const transfer = result.appearances.map((a) => a.raster.data);
     return wirePack({ tag: 'annotations.renderAppearances', result }, transfer);
@@ -850,14 +853,9 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
+    const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
     const mutator = new AnnotationMutator(this.runtime, session, this.fonts);
-    const result = mutator.create(
-      req.pageObjectNumber,
-      req.draft,
-      signal,
-      req.actor,
-      req.resources,
-    );
+    const result = mutator.create(pageObjectNumber, req.draft, signal, req.actor, req.resources);
     return this.finishMutation(session, { tag: 'annotations.create', result }, req.artifactPath);
   }
 
@@ -886,8 +884,9 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
+    const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
     const result = new AnnotationFlattener(this.runtime, session).flatten(
-      req.pageObjectNumber,
+      pageObjectNumber,
       req.refs,
       req.usage,
       signal,
@@ -901,8 +900,9 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
+    const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
     const exported = new AnnotationFlattener(this.runtime, session).exportAppearance(
-      req.pageObjectNumber,
+      pageObjectNumber,
       req.refs,
       signal,
     );
@@ -918,8 +918,9 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
+    const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
     const mutator = new AnnotationMutator(this.runtime, session);
-    const result = mutator.move(req.pageObjectNumber, req.refs, req.toIndex, signal);
+    const result = mutator.move(pageObjectNumber, req.refs, req.toIndex, signal);
     return this.finishMutation(session, { tag: 'annotations.move', result }, req.artifactPath);
   }
 
@@ -939,7 +940,7 @@ export class WorkerHost {
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
     const mutator = new PagesMutator(this.runtime, session);
-    const result = mutator.move(req.pageObjectNumbers, req.destIndex, signal);
+    const result = mutator.move(req.pages, req.destIndex, signal);
     return this.finishMutation(session, { tag: 'pages.move', result }, req.artifactPath);
   }
 
@@ -949,7 +950,7 @@ export class WorkerHost {
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
     const mutator = new PagesMutator(this.runtime, session);
-    const result = mutator.rotate(req.pageObjectNumbers, req.rotation, signal);
+    const result = mutator.rotate(req.pages, req.rotation, signal);
     return this.finishMutation(session, { tag: 'pages.rotate', result }, req.artifactPath);
   }
 
@@ -959,7 +960,7 @@ export class WorkerHost {
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
     const mutator = new PagesMutator(this.runtime, session);
-    const result = mutator.delete(req.pageObjectNumbers, signal);
+    const result = mutator.delete(req.pages, signal);
     return this.finishMutation(session, { tag: 'pages.delete', result }, req.artifactPath);
   }
 
@@ -972,7 +973,7 @@ export class WorkerHost {
     const result = mutator.setName(
       {
         name: req.name,
-        pageObjectNumber: req.pageObjectNumber,
+        page: req.page,
         ...(req.replace !== undefined ? { replace: req.replace } : {}),
       },
       signal,
@@ -995,11 +996,7 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
-    const result = new PagesFlattener(this.runtime, session).flatten(
-      req.pageObjectNumbers,
-      req.usage,
-      signal,
-    );
+    const result = new PagesFlattener(this.runtime, session).flatten(req.pages, req.usage, signal);
     if (result.meta === null) return wirePack({ tag: 'pages.flatten', result });
     return this.finishMutation(session, { tag: 'pages.flatten', result }, req.artifactPath);
   }
@@ -1019,10 +1016,7 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
-    const extracted = new PagesExtractor(this.runtime, session).extract(
-      req.pageObjectNumbers,
-      signal,
-    );
+    const extracted = new PagesExtractor(this.runtime, session).extract(req.pages, signal);
     // A read: no finishMutation, no layer artifact. Bytes transfer zero-copy.
     return wirePack({ tag: 'pages.extract', bytes: extracted.bytes, size: extracted.size }, [
       extracted.bytes,
@@ -1107,7 +1101,7 @@ export class WorkerHost {
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
     const content = new AttachmentReader(this.runtime, session).readAnnotationFile(
-      req.pageObjectNumber,
+      session.resolvePageRef(req.page).pageObjectNumber,
       req.ref,
       req.path,
       req.maxDecodedBytes,
@@ -1126,7 +1120,10 @@ export class WorkerHost {
     const session = this.requireSession(req);
     return wirePack({
       tag: 'measure.viewports',
-      viewports: new MeasureReader(this.runtime, session).viewports(req.pageObjectNumber, signal),
+      viewports: new MeasureReader(this.runtime, session).viewports(
+        session.resolvePageRef(req.page).pageObjectNumber,
+        signal,
+      ),
     });
   }
   private handleMeasureSetScale(
@@ -1134,13 +1131,17 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
-    new MeasureMutator(this.runtime, session).setScale(req.pageObjectNumber, req.measure, signal);
+    new MeasureMutator(this.runtime, session).setScale(
+      session.resolvePageRef(req.page).pageObjectNumber,
+      req.measure,
+      signal,
+    );
     return this.finishMutation(
       session,
       {
         tag: 'measure.setScale',
         result: {
-          pageObjectNumber: req.pageObjectNumber,
+          page: req.page,
           meta: { affectedPages: [], cacheDelta: null },
         },
       },
@@ -1153,7 +1154,11 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
-    const accessor = new PieceInfoAccessor(this.runtime, session, req.pageObjectNumber);
+    const accessor = new PieceInfoAccessor(
+      this.runtime,
+      session,
+      req.page ? session.resolvePageRef(req.page).pageObjectNumber : undefined,
+    );
     const snapshot = accessor.read(req.application, signal);
     return wirePack({ tag: 'pieceInfo.read', snapshot });
   }
@@ -1163,7 +1168,11 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
-    const accessor = new PieceInfoAccessor(this.runtime, session, req.pageObjectNumber);
+    const accessor = new PieceInfoAccessor(
+      this.runtime,
+      session,
+      req.page ? session.resolvePageRef(req.page).pageObjectNumber : undefined,
+    );
     accessor.update(req.application, req.patch, signal);
     // A mutation: layer sessions persist the artifact like every other write.
     return this.finishMutation(session, { tag: 'pieceInfo.update' }, req.artifactPath);
@@ -1174,7 +1183,11 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
-    const accessor = new PieceInfoAccessor(this.runtime, session, req.pageObjectNumber);
+    const accessor = new PieceInfoAccessor(
+      this.runtime,
+      session,
+      req.page ? session.resolvePageRef(req.page).pageObjectNumber : undefined,
+    );
     const applications = accessor.applications(signal);
     return wirePack({ tag: 'pieceInfo.applications', applications });
   }
@@ -1184,7 +1197,11 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
-    const accessor = new PieceInfoAccessor(this.runtime, session, req.pageObjectNumber);
+    const accessor = new PieceInfoAccessor(
+      this.runtime,
+      session,
+      req.page ? session.resolvePageRef(req.page).pageObjectNumber : undefined,
+    );
     accessor.clear(req.application, signal);
     return this.finishMutation(session, { tag: 'pieceInfo.clear' }, req.artifactPath);
   }
@@ -1195,7 +1212,7 @@ export class WorkerHost {
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
     const reader = new PageTextReader(this.runtime, session);
-    const snapshot = reader.read(req.pageObjectNumber, signal);
+    const snapshot = reader.read(session.resolvePageRef(req.page).pageObjectNumber, signal);
     return wirePack({ tag: 'pages.text', snapshot });
   }
 
@@ -1205,7 +1222,7 @@ export class WorkerHost {
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
     const reader = new PageGeometryReader(this.runtime, session);
-    const snapshot = reader.read(req.pageObjectNumber, signal);
+    const snapshot = reader.read(session.resolvePageRef(req.page).pageObjectNumber, signal);
     return wirePack({ tag: 'pages.geometry', snapshot });
   }
 
@@ -1225,7 +1242,11 @@ export class WorkerHost {
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
     const reader = new PageRenderReader(this.runtime, session);
-    const raster = reader.render(req.pageObjectNumber, req.options ?? {}, signal);
+    const raster = reader.render(
+      session.resolvePageRef(req.page).pageObjectNumber,
+      req.options ?? {},
+      signal,
+    );
     return wirePack({ tag: 'pages.render', raster }, [raster.data]);
   }
 
@@ -1336,7 +1357,7 @@ export class WorkerHost {
     return wirePack(
       {
         tag: 'document.renderPageFileEncoded',
-        pageObjectNumber: inner.payload.pageObjectNumber,
+        page: inner.payload.page,
         pageCount: inner.payload.pageCount,
         image,
       },
@@ -1480,14 +1501,14 @@ export class WorkerHost {
         );
       }
       const raster = new PageRenderReader(this.runtime, session).render(
-        page.pageObjectNumber,
+        page.ref.pageObjectNumber,
         req.options ?? {},
         signal,
       );
       return wirePack(
         {
           tag: 'document.renderPageFile',
-          pageObjectNumber: page.pageObjectNumber,
+          page: page.ref,
           pageCount: layout.pageCount,
           raster,
         },
@@ -1797,15 +1818,8 @@ export class WorkerHost {
     // bookkeeping, weak-ref invalidation, and page revisions in ONE place.
     const annotations = new AnnotationMutator(this.runtime, session);
     for (const widget of detachedWidgets) {
-      if (widget.annotObjectNumber <= 0 || widget.pageObjectNumber <= 0) continue;
-      annotations.delete(
-        {
-          kind: 'objectNumber',
-          pageObjectNumber: widget.pageObjectNumber,
-          annotObjectNumber: widget.annotObjectNumber,
-        },
-        signal,
-      );
+      if (!widget.ref) continue; // direct or unplaced: nothing the annotation plane can delete
+      annotations.delete(widget.ref, signal);
     }
     // The annotation deletes above mutated /Annots after the form
     // mutator's own bump; bump again so the form-model cache rebuilds.

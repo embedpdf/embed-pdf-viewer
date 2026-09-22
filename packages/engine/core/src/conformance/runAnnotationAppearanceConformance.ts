@@ -7,6 +7,7 @@ import type { AnnotationAppearanceMode } from '../dto/AnnotationRender';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import type { AnnotationRef } from '../identity/AnnotationRef';
+import { toPageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
 import type { PageState } from '../revision/PageState';
 
@@ -79,7 +80,7 @@ export function runAnnotationAppearanceConformance(
       try {
         const { pageState, appearances } = await collect(doc, opts, useRaw);
 
-        expect(pageState.pageObjectNumber).toBe(opts.fixture.pageObjectNumber);
+        expect(pageState.page.pageObjectNumber).toBe(opts.fixture.pageObjectNumber);
         expect(appearances.length >= opts.fixture.minAppearanceCount).toBe(true);
 
         for (const appearance of appearances) {
@@ -131,7 +132,7 @@ export function runAnnotationAppearanceConformance(
     test('abort() rejects with AbortError', async () => {
       const doc = await openFixture(engine, opts);
       try {
-        const page = doc.page(opts.fixture.pageObjectNumber);
+        const page = doc.page(toPageRef(opts.fixture.pageObjectNumber));
         const p = useRaw
           ? page.annotations.renderAppearances({ scale: 1 })
           : page.annotations.renderAppearanceImages({ format: 'png', scale: 1 });
@@ -149,7 +150,7 @@ async function collect(
   opts: AnnotationAppearanceConformanceOptions,
   useRaw: boolean,
 ): Promise<{ pageState: PageState; appearances: NormalizedAppearance[] }> {
-  const page = doc.page(opts.fixture.pageObjectNumber);
+  const page = doc.page(toPageRef(opts.fixture.pageObjectNumber));
   if (useRaw) {
     const result = await page.annotations.renderAppearances({ scale: 1 });
     return {

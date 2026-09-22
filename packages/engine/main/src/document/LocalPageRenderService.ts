@@ -12,6 +12,7 @@ import {
   type PageRaster,
   type PageRenderOptions,
   type PageRenderService,
+  type PageRef,
 } from '@embedpdf/engine-core/runtime';
 
 import type { LocalImageEncoder } from '../render/BrowserImageEncoder';
@@ -28,7 +29,7 @@ interface DocClosedView {
 export class LocalPageRenderService implements PageRenderService {
   constructor(
     private readonly docId: string,
-    private readonly pageObjectNumber: PageObjectNumber,
+    private readonly ref: PageRef,
     private readonly queue: WorkerQueue,
     private readonly view: DocClosedView,
     private readonly encoder: LocalImageEncoder,
@@ -58,7 +59,7 @@ export class LocalPageRenderService implements PageRenderService {
     }
     const effectiveOptions = withRenderBudget(this.policy, options);
     const docId = this.docId;
-    const pon = this.pageObjectNumber;
+    const ref = this.ref;
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
@@ -66,7 +67,7 @@ export class LocalPageRenderService implements PageRenderService {
             kind: 'pages.render',
             jobId,
             docId,
-            pageObjectNumber: pon,
+            page: ref,
             options: effectiveOptions,
           }),
       },

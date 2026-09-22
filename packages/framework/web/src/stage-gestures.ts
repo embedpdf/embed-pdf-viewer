@@ -27,7 +27,7 @@
  * the camera moves at display rate.
  *
  * Dependency note: this module speaks to the stage through the STRUCTURAL
- * {@link StageGestureHost} interface (satisfied by `StageCapability`) and to
+ * {@link StageGestureHost} interface (satisfied by `StageHostCapability`) and to
  * the interaction hub through {@link StageGestureSink} (a closure the adapter
  * builds) — @embedpdf/web stays free of plugin imports, per the layering law.
  */
@@ -36,7 +36,7 @@ import { wheelZoomFactor } from './wheel';
 
 export type StagePointerKind = 'mouse' | 'pen' | 'touch';
 
-/** What the controller needs from the camera — `StageCapability` satisfies it. */
+/** What the controller needs from the camera — `StageHostCapability` satisfies it. */
 export interface StageGestureHost {
   panBy(dxScreen: number, dyScreen: number): void;
   zoomAround(screenPt: { x: number; y: number }, factor: number): void;
@@ -45,7 +45,7 @@ export interface StageGestureHost {
   /** Momentum pan from a release velocity in screen px/s. */
   fling(velocityX: number, velocityY: number): void;
   /** True while a tween/fling runs — a touch-down then is a "catch", not a tap. */
-  cameraInMotion(): boolean;
+  isMoving(): boolean;
   doubleTapZoom(screenPt: { x: number; y: number }): void;
 }
 
@@ -220,8 +220,7 @@ export function createStageGestureController(
   let mCount = 0;
   const clickCount = (e: PointerEvent): number => {
     const now = Date.now();
-    mCount =
-      now - mLast <= 400 && Math.hypot(e.clientX - mX, e.clientY - mY) <= 6 ? mCount + 1 : 1;
+    mCount = now - mLast <= 400 && Math.hypot(e.clientX - mX, e.clientY - mY) <= 6 ? mCount + 1 : 1;
     mLast = now;
     mX = e.clientX;
     mY = e.clientY;
@@ -402,7 +401,7 @@ export function createStageGestureController(
         // Consent pre-flight — but a MOVING camera always catches first: while
         // content flies under the finger, the touch means "stop", never "grab
         // whatever happens to pass beneath it".
-        const moving = host.cameraInMotion();
+        const moving = host.isMoving();
         if (!moving && sink?.claimsPoint?.(e)) {
           // A tool owns this contact from the first pixel (selected-annotation
           // drag, or an armed drawing tool). No camera transaction — this is

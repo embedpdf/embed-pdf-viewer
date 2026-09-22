@@ -1,5 +1,5 @@
 import type { Size } from '@embedpdf/core-stage';
-import type { BoxQuery, ResponsiveRule, StageBox, StageSettings } from './types';
+import type { BoxQuery, ResponsiveRule, StageBox, StageSettings } from './contract';
 
 /**
  * Container queries for the settings bag — the pure half. The capability owns
@@ -32,7 +32,10 @@ const ruleMatches = (rule: ResponsiveRule, box: StageBox): boolean =>
   typeof rule.when === 'function' ? !!rule.when(box) : matchesQuery(rule.when, box);
 
 /** Merge a patch over settings, skipping undefined values (Partial semantics). */
-export const mergeSettings = (into: StageSettings, patch: Partial<StageSettings>): StageSettings => {
+export const mergeSettings = (
+  into: StageSettings,
+  patch: Partial<StageSettings>,
+): StageSettings => {
   const out = { ...into };
   let key: keyof StageSettings;
   for (key in patch) {

@@ -5,9 +5,9 @@
  * full projection is their geometry fallback), while an AREA redact and a
  * caret are box-like and move by `/Rect`.
  */
-import type { AnnotationDTO, PdfRect } from '@embedpdf/engine-core/runtime';
-import { normalizeQuad } from '@embedpdf/core-geometry';
 import { type Annot, type TextQuad } from '@embedpdf/core-annotation';
+import { normalizeQuad } from '@embedpdf/core-geometry';
+import type { AnnotationDTO, PdfRect } from '@embedpdf/engine-core/runtime';
 
 import type { KindProjection } from '../projection';
 import {

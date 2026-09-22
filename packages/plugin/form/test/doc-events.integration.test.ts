@@ -12,7 +12,7 @@ import { annotationPlugin } from '@embedpdf/plugin-annotation';
 import { interactionPlugin } from '@embedpdf/plugin-interaction';
 
 import { formPlugin } from '../src/form.plugin';
-import { FormToken } from '../src/types';
+import { FormToken } from '../src/host-contract';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(
@@ -63,7 +63,7 @@ async function boot(options: { scope?: string[]; openSequence?: 'auto' | 'off' }
   const actions = kernel.capability(ActionsToken);
   await form.refresh();
   const valueOf = (name: string): string => {
-    const field = form.snapshot()?.fields.find((candidate) => candidate.name === name);
+    const field = form.getSnapshot()?.fields.find((candidate) => candidate.name === name);
     return field?.valueEntry.kind === 'scalar' ? field.valueEntry.value : '';
   };
   const diagnostics: ActionDiagnostic[] = [];
@@ -98,7 +98,7 @@ async function readSavedFields(bytes: Uint8Array): Promise<Record<string, string
   const form = kernel.capability(FormToken);
   await form.refresh();
   const out: Record<string, string> = {};
-  for (const field of form.snapshot()?.fields ?? []) {
+  for (const field of form.getSnapshot()?.fields ?? []) {
     out[field.name] = field.valueEntry.kind === 'scalar' ? field.valueEntry.value : '';
   }
   await kernel.destroy();
@@ -114,7 +114,7 @@ describe('the Phase-4 lifecycle gate: WS/DS/WP/DP/WC on a real document', () => 
     expect(t.valueOf('eventLog')).toBe(''); // nothing ran yet
 
     const bytes = await t.actions.runDocumentVerb('save', () =>
-      t.kernel.documents.download('doc-events'),
+      t.kernel.documents.save('doc-events'),
     );
 
     // The saved bytes: the D1 ordering + the D5 name bridge + the
@@ -129,7 +129,7 @@ describe('the Phase-4 lifecycle gate: WS/DS/WP/DP/WC on a real document', () => 
 
     // ...and the next save includes it (plus its own WillSave).
     const bytes2 = await t.actions.runDocumentVerb('save', () =>
-      t.kernel.documents.download('doc-events'),
+      t.kernel.documents.save('doc-events'),
     );
     const saved2 = await readSavedFields(bytes2);
     expect(saved2.eventLog).toBe('Open WillSave DidSave WillSave');

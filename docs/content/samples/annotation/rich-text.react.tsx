@@ -49,7 +49,7 @@ function RichTextToolbar() {
   // differ from it. `contents` becomes the plain projection automatically.
   const addTextBox = async () => {
     if (!page) return;
-    const ref = await annotation.create(page.pon, {
+    const ref = await annotation.createRaw(page.ref, {
       subtype: 'free-text',
       intent: 'free-text',
       rect: { left: 60, bottom: 640, right: 400, top: 700 },

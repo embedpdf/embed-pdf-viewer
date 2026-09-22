@@ -70,7 +70,7 @@ interface DocumentHandle {
   readonly pages: DocumentPagesService;
   readonly render: DocumentRenderService;
 
-  page(pageObjectNumber: PageObjectNumber): PageHandle;
+  page(ref: PageRef): PageHandle;
   download(opts?: { mode?: PdfSaveMode }): AbortablePromise<Uint8Array>;
   close(): AbortablePromise<void>;
 }
@@ -79,9 +79,9 @@ interface DocumentHandle {
 - `metadata`, `annotations`, `pages`, and `security` are **document-scoped
   services** (covered in their own pages).
 - `render` carries the document's render *policy* — not pixels; per-page
-  rendering stays on `page(pon).render`. See
+  rendering stays on `page(ref).render`. See
   [Render policy](/docs/engine/core-concepts/pages-and-rendering#render-policy).
-- `page(pon)` returns a page handle (below).
+- `page(ref)` returns a page handle (below).
 - `download()` returns the full PDF bytes — see [Downloading](/docs/engine/core-concepts/downloading).
 - `close()` releases the handle. It's idempotent and safe to call more than
   once.
@@ -103,13 +103,24 @@ annotation edits need an active edit session) and `pageEditSessions` is
 
 ## The page handle
 
-`doc.page(pon)` returns a `PageHandle` keyed on the page's **indirect object
-number**, never its display index — so the handle stays valid across page
-reorders.
+`doc.page(ref)` returns a `PageHandle` keyed on the page's **identity**, never
+its display index — so the handle stays valid across page reorders.
+
+A page is addressed by a `PageRef` — `{ kind: 'objectNumber', pageObjectNumber }`,
+the page's indirect object number. Every `PageLayout.ref` carries one, and it
+survives reorder, rotate and every edit: a deleted page's number is retired,
+never recycled. Anything that points at a page carries the same ref as `page`
+(`annotation.ref.page`, an event's `page`), so you never build an address by
+hand; `toPageRef(n)` exists for a bare number.
+
+<Engine cloud>
+On the wire the same address is the `:pageKey` path segment — `/pages/obj:12/…`
+— mirroring `annotKey` and `fieldKey`.
+</Engine>
 
 ```ts
 interface PageHandle {
-  readonly pageObjectNumber: PageObjectNumber;
+  readonly ref: PageRef; // the address the handle was minted with
   readonly pageIndex: number; // advisory display index at mint time
   readonly annotations: PageAnnotationsService;
   readonly text: PageTextService;
@@ -119,18 +130,17 @@ interface PageHandle {
 ```
 
 `page()` is synchronous — page records are already known to the handle. To
-discover page object numbers, call `doc.pages.list()`:
+discover page refs, call `doc.pages.list()`:
 
 ```ts
 const { pageCount, pages } = await doc.pages.list();
-const firstPon = pages[0].pageObjectNumber;
-const page = doc.page(firstPon);
+const page = doc.page(pages[0].ref);
 ```
 
 <Callout type="warn">
   Treat <code>pageIndex</code> as advisory metadata. It reflects display order
   at the time the handle was minted; the durable key is always
-  <code>pageObjectNumber</code>.
+  <code>ref</code>.
 </Callout>
 
 ## Lifecycle at a glance
@@ -140,7 +150,7 @@ const page = doc.page(firstPon);
 const engine = cloudEngine({ baseUrl });
 
 const doc = await engine.open({ kind: 'id', id: 'doc_123' }); // open
-const page = doc.page((await doc.pages.list()).pages[0].pageObjectNumber); // work
+const page = doc.page((await doc.pages.list()).pages[0].ref); // work
 await page.render.image();
 
 await doc.close();    // release the document
@@ -153,7 +163,7 @@ await engine.destroy(); // tear down the engine
 const engine = localEngine();
 
 const doc = await engine.open({ kind: 'bytes', id: 'doc_123', bytes }); // open
-const page = doc.page((await doc.pages.list()).pages[0].pageObjectNumber); // work
+const page = doc.page((await doc.pages.list()).pages[0].ref); // work
 await page.render.image();
 
 await doc.close();    // release the document

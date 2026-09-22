@@ -5,11 +5,13 @@ import type {
   FormFieldOption,
   FormKind,
   FormSnapshot,
-  FormWidgetRef,
+  PageRef,
+  FormWidget,
   ToggleFieldWidget,
   FormValueEntry,
   PdfFieldActions,
 } from '@embedpdf/engine-core/runtime';
+import { formWidget, toPageRef } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { readUtf16String, readUtf8String } from '../../../runtime/memory/strings';
@@ -67,8 +69,10 @@ function readToggleWidgets(
   const widgets: ToggleFieldWidget[] = [];
   for (let w = 0; w < count; w++) {
     widgets.push({
-      annotObjectNumber: fn.EPDFForm_GetFieldWidgetObjNum(model, fieldIndex, w),
-      pageObjectNumber: fn.EPDFForm_GetFieldWidgetPageObjNum(model, fieldIndex, w),
+      ...formWidget(
+        fn.EPDFForm_GetFieldWidgetObjNum(model, fieldIndex, w),
+        widgetPageRef(fn.EPDFForm_GetFieldWidgetPageObjNum(model, fieldIndex, w)),
+      ),
       onState:
         readUtf8String(runtime.mem, (buf, cap) =>
           fn.EPDFForm_GetFieldWidgetOnState(model, fieldIndex, w, buf, cap),
@@ -82,19 +86,17 @@ function readToggleWidgets(
   return widgets;
 }
 
-function readPlainWidgets(
-  runtime: PdfRuntimeModule,
-  model: Ptr,
-  fieldIndex: number,
-): FormWidgetRef[] {
+function readPlainWidgets(runtime: PdfRuntimeModule, model: Ptr, fieldIndex: number): FormWidget[] {
   const { fn } = runtime;
   const count = fn.EPDFForm_CountFieldWidgets(model, fieldIndex);
-  const widgets: FormWidgetRef[] = [];
+  const widgets: FormWidget[] = [];
   for (let w = 0; w < count; w++) {
-    widgets.push({
-      annotObjectNumber: fn.EPDFForm_GetFieldWidgetObjNum(model, fieldIndex, w),
-      pageObjectNumber: fn.EPDFForm_GetFieldWidgetPageObjNum(model, fieldIndex, w),
-    });
+    widgets.push(
+      formWidget(
+        fn.EPDFForm_GetFieldWidgetObjNum(model, fieldIndex, w),
+        widgetPageRef(fn.EPDFForm_GetFieldWidgetPageObjNum(model, fieldIndex, w)),
+      ),
+    );
   }
   return widgets;
 }
@@ -323,4 +325,12 @@ function readFieldActions(
     if (action) actions[key] = action;
   }
   return Object.keys(actions).length > 0 ? actions : undefined;
+}
+
+/**
+ * The page a widget is placed on, as the runtime reports it: `0` means the
+ * widget is not reachable from any page's /Annots (unplaced) → `null`.
+ */
+export function widgetPageRef(pageObjectNumber: number): PageRef | null {
+  return pageObjectNumber > 0 ? toPageRef(pageObjectNumber) : null;
 }

@@ -11,11 +11,29 @@
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-actions';
 import { useEffect, useRef } from 'react';
-import { ActionsToken, type ActionUiAdapter } from '@embedpdf/plugin-actions';
+import {
+  ActionsToken,
+  type ActionsCapability,
+  type ActionUiAdapter,
+} from '@embedpdf/plugin-actions';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
+import type { EventHook } from '@embedpdf/core';
 import { createDefaultActionsUiAdapter } from '@embedpdf/web';
 
-import { useOptionalCapability } from './runtime';
+import { useCapability, useCapabilityEvent, useOptionalCapability } from './runtime';
+
+/** The actions capability (execute / executeNamed / policy) for app code. */
+export function useActions(): ActionsCapability {
+  return useCapability(ActionsToken);
+}
+
+/** Subscribe to one actions event for the mounted lifetime: `useActionsEvent((c) => c.onExecuted, handler)`. */
+export function useActionsEvent<T>(
+  select: (cap: ActionsCapability) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  useCapabilityEvent(ActionsToken, select, handler);
+}
 
 /** Override any subset of the default adapter policy. */
 export type ActionsUiHandlers = Partial<ActionUiAdapter>;
@@ -39,7 +57,7 @@ export function useActionsUiAdapter(handlers?: ActionsUiHandlers): void {
     if (!actions) return;
     const adapter: ActionUiAdapter = createDefaultActionsUiAdapter({
       overrides: () => handlersRef.current,
-      goToPage: (page) => stage?.goToPage(page),
+      goToPage: (page) => stage?.goToPageIndex(page),
     });
     return actions.setUiAdapter(adapter);
   }, [actions, stage]);

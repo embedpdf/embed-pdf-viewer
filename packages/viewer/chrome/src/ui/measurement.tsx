@@ -20,13 +20,14 @@ const control =
 const button =
   'border-border text-fg hover:bg-hover rounded-md border px-3 py-1.5 text-sm disabled:opacity-50';
 
-const useCurrentPon = () => useSelector(StageToken, (c) => c.pages()[c.currentPage()]?.pon ?? -1);
+/** The current page's address, or null with no page (empty document). */
+const useCurrentPage = () => useSelector(StageToken, (c) => c.getCurrentPage()?.ref ?? null);
 
 export function MeasurementScaleButton() {
   const t = useT();
 
-  const pon = useCurrentPon();
-  const scale = usePageScale(pon);
+  const page = useCurrentPage();
+  const scale = usePageScale(page);
 
   const surface = useSurface('measurement');
   return (
@@ -38,7 +39,7 @@ export function MeasurementScaleButton() {
       <Icon name="updateScale" size={20} className="shrink-0" />
       <span>
         {t('measurement.scale')}:{' '}
-        {scale.measure?.subtype === 'RL'
+        {scale?.measure?.subtype === 'RL'
           ? (scale.measure.ratio ?? t('measurement.custom'))
           : t('measurement.unavailable')}
       </span>
@@ -49,22 +50,24 @@ export function MeasurementScaleButton() {
 export function MeasurementSection() {
   const t = useT();
 
-  const pon = useCurrentPon();
+  const page = useCurrentPage();
 
   const measurement = useMeasurement();
 
-  const scale = usePageScale(pon);
+  const scale = usePageScale(page);
   const anno = useCapability(AnnotationToken);
-  const selected = useSelector(AnnotationToken, (c) => c.selection());
+  const selected = useSelector(AnnotationToken, (c) => c.getSelection());
   const resettable = useSelector(
     AnnotationToken,
     (c) =>
       c
-        .getSelected()
+        .listSelected()
         .filter(
           (annotation) =>
             (annotation.subtype === 'polygon' || annotation.subtype === 'polyline') &&
-            annotation.caption?.center &&
+            annotation.raw &&
+            (annotation.raw.subtype === 'polygon' || annotation.raw.subtype === 'polyline') &&
+            annotation.raw.caption?.center &&
             c.canEdit(annotation.ref) &&
             !annotation.flags.lockedContents,
         ),
@@ -74,19 +77,20 @@ export function MeasurementSection() {
     MeasurementToken,
     (c) =>
       anno
-        .getSelected()
-        .map((d) => c.readout(d.ref))
+        .listSelected()
+        .map((d) => c.getReadout(d.ref))
         .filter((r): r is MeasurementReadout => !('unavailable' in r)),
     (a, b) => JSON.stringify(a) === JSON.stringify(b),
   );
-  const reports = useSelector(MeasurementToken, (c) => c.lastReports());
+  const reports = useSelector(MeasurementToken, (c) => c.listLastReports());
   const [allPages, setAllPages] = useState(false);
 
   const [recalculate, setRecalculate] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const disabled = measurement.busy || !measurement.canCalibratePage || !scale.ready;
-  const rectilinear = scale.measure?.subtype === 'RL' ? scale.measure : null;
-  const options = { allPages, recalculate };
+  const disabled = !page || measurement.busy || !measurement.canCalibratePage || !scale?.ready;
+  const rectilinear = scale?.measure?.subtype === 'RL' ? scale.measure : null;
+  const target = allPages ? 'all' : page!;
+  const options = { recalculate };
   const run = async (work: () => Promise<unknown>) => {
     setError(null);
     try {
@@ -103,12 +107,12 @@ export function MeasurementSection() {
         <span className="text-fg-muted">{t('measurement.scale')}: </span>
         <strong>{rectilinear?.ratio ?? t('measurement.unavailable')}</strong>
       </div>
-      {scale.error && (
+      {scale?.error && (
         <p role="alert" className="text-red-600">
           {scale.error.message}
         </p>
       )}
-      {!scale.persistent && scale.ready && (
+      {scale && !scale.persistent && scale.ready && (
         <p className="text-fg-muted">{t('measurement.sessionOnly')}</p>
       )}
       <label className="flex items-center gap-2">
@@ -136,12 +140,12 @@ export function MeasurementSection() {
           className={control}
           value=""
           disabled={disabled}
-          onChange={(e) => void run(() => measurement.setPreset(pon, e.target.value, options))}
+          onChange={(e) => void run(() => measurement.setPreset(target, e.target.value, options))}
         >
           <option value="" disabled>
             {t('measurement.choosePreset')}
           </option>
-          {measurement.presets().map((p) => (
+          {measurement.listPresets().map((p) => (
             <option key={p.id} value={p.id}>
               {p.label}
             </option>
@@ -156,17 +160,17 @@ export function MeasurementSection() {
           value={rectilinear?.distance[0]?.unit.trim() ?? ''}
           disabled={disabled || !rectilinear}
           onChange={(e) =>
-            void run(() =>
-              measurement.setUnit(pon, e.target.value as LengthUnit, undefined, options),
-            )
+            void run(() => measurement.setUnit(target, e.target.value as LengthUnit, options))
           }
         >
-          {!measurement.units().includes(rectilinear?.distance[0]?.unit.trim() as LengthUnit) && (
+          {!measurement
+            .listUnits()
+            .includes(rectilinear?.distance[0]?.unit.trim() as LengthUnit) && (
             <option value={rectilinear?.distance[0]?.unit.trim() ?? ''}>
               {t('measurement.custom')}
             </option>
           )}
-          {measurement.units().map((u) => (
+          {measurement.listUnits().map((u) => (
             <option key={u} value={u}>
               {u}
             </option>
@@ -181,17 +185,17 @@ export function MeasurementSection() {
           value={rectilinear?.area[0]?.unit.trim().replace('²', '2') ?? ''}
           disabled={disabled || !rectilinear}
           onChange={(e) =>
-            void run(() => measurement.setAreaUnit(pon, e.target.value as AreaUnit, options))
+            void run(() => measurement.setAreaUnit(target, e.target.value as AreaUnit, options))
           }
         >
           {!measurement
-            .areaUnits()
+            .listAreaUnits()
             .includes(rectilinear?.area[0]?.unit.trim().replace('²', '2') as AreaUnit) && (
             <option value={rectilinear?.area[0]?.unit.trim().replace('²', '2') ?? ''}>
               {t('measurement.custom')}
             </option>
           )}
-          {measurement.areaUnits().map((unit) => (
+          {measurement.listAreaUnits().map((unit) => (
             <option key={unit} value={unit}>
               {unit.replace('2', '²')}
             </option>
@@ -206,7 +210,7 @@ export function MeasurementSection() {
           value={precision}
           disabled={disabled || !rectilinear}
           onChange={(e) =>
-            void run(() => measurement.setPrecision(pon, Number(e.target.value), options))
+            void run(() => measurement.setPrecision(target, Number(e.target.value), options))
           }
         >
           {![1, 10, 100, 1000, 10000].includes(precision) && (
@@ -248,9 +252,10 @@ export function MeasurementSection() {
               onClick={() =>
                 void run(async () => {
                   for (const annotation of resettable) {
-                    if (annotation.subtype === 'polygon' || annotation.subtype === 'polyline') {
-                      await anno.update(annotation.ref, {
-                        subtype: annotation.subtype,
+                    const raw = annotation.raw;
+                    if (raw && (raw.subtype === 'polygon' || raw.subtype === 'polyline')) {
+                      await anno.updateRaw(annotation.ref, {
+                        subtype: raw.subtype,
                         caption: { center: null },
                       });
                     }
@@ -290,7 +295,7 @@ export function CalibrationDialog() {
   const t = useT();
 
   const measurement = useMeasurement();
-  const request = useSelector(MeasurementToken, (c) => c.calibrationRequest());
+  const request = useSelector(MeasurementToken, (c) => c.getCalibrationRequest());
   const input = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState('');
 
@@ -309,11 +314,13 @@ export function CalibrationDialog() {
     setError(null);
     try {
       await measurement.calibrate(
-        request.pon,
-        request.from,
-        request.to,
-        { value: Number(value), unit },
-        { allPages, recalculate },
+        {
+          page: request.page,
+          from: request.from,
+          to: request.to,
+          distance: { value: Number(value), unit },
+        },
+        { recalculate, applyTo: allPages ? 'all' : undefined },
       );
       measurement.dismissCalibration();
     } catch (e) {
@@ -362,7 +369,7 @@ export function CalibrationDialog() {
             value={unit}
             onChange={(e) => setUnit(e.target.value as LengthUnit)}
           >
-            {measurement.units().map((u) => (
+            {measurement.listUnits().map((u) => (
               <option key={u}>{u}</option>
             ))}
           </select>

@@ -1,6 +1,6 @@
 import type { RevisionToken } from './RevisionToken';
 import type { WeakAnnotationState } from './WeakAnnotationState';
-import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PageRef } from '../identity/PageRef';
 
 /**
  * Per-page liveness envelope returned with annotation reads and mutation
@@ -8,12 +8,12 @@ import type { PageObjectNumber } from '../identity/PageObjectNumber';
  * weak-ref revision state, and explicit knowledge about weak annotations.
  *
  * Geometry/display order is NOT here — it lives in `PageLayout` (returned by
- * `pages.list()`), joined to this by `pageObjectNumber`. The two change on
+ * `pages.list()`), joined to this by `page`. The two change on
  * different cadences (annotation edits vs. structural ops), so they are kept
  * orthogonal and never merged into one struct.
  */
 export interface PageState {
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
   revision: RevisionToken;
   /**
    * Explicit knowledge state for the weak-annotation scan. `unknown` means the

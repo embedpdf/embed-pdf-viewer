@@ -1,3 +1,4 @@
+import type { PageRef } from '@embedpdf/engine-core/runtime';
 import { annotationSelectionFrame } from './selection';
 /**
  * Pure view selectors. `pageItems` is the per-annotation render list (live gesture
@@ -198,13 +199,14 @@ function textIsLive(m: Model, id: Id): boolean {
   return m.editing === id || effSource(m, id) === 'vector';
 }
 
-export function pageItems(m: Model, pon: number, view?: ViewEnv): RenderItem[] {
+export function pageItems(m: Model, page: PageRef, view?: ViewEnv): RenderItem[] {
+  const pon = page.pageObjectNumber;
   const items: RenderItem[] = [];
   // `paintOrder` puts text-layer markups beneath every other kind (back→front),
   // so a highlight drawn after a circle still paints under it — and culls what
   // `/F` hides. The SAME order hit-testing uses, so what you click matches
   // what you see.
-  for (const id of paintOrder(m, pon)) {
+  for (const id of paintOrder(m, page)) {
     const a = m.byId[id];
     // Free text stays in the render list in EVERY state, like a shape: a baked,
     // idle box renders as its engine /AP image; a live one (editing / resizing /
@@ -247,7 +249,7 @@ export function pageItems(m: Model, pon: number, view?: ViewEnv): RenderItem[] {
       d?.g === 'create-distance' ||
       d?.g === 'create-poly' ||
       d?.g === 'create-ink') &&
-    d.pon === pon
+    d.page.pageObjectNumber === pon
   ) {
     // Preview with the tool's RESOLVED defaults (base + per-subtype override), so the
     // ghost is a faithful WYSIWYG of what will commit — not the bare base style. A
@@ -295,7 +297,7 @@ export function pageItems(m: Model, pon: number, view?: ViewEnv): RenderItem[] {
   }
   // Callout creation ghost: the in-progress leader (tip → cur, then tip → knee →
   // box) and the text-box preview, painted through the SAME vector scene.
-  if (d?.g === 'create-callout' && d.pon === pon) {
+  if (d?.g === 'create-callout' && d.page.pageObjectNumber === pon) {
     const def = defaultsFor(m, d.preset ?? d.subtype);
     const style = styleFromProps(def);
     const ending = def.lineEndings.end !== 'none' ? def.lineEndings.end : 'open-arrow';
@@ -354,11 +356,12 @@ export interface TextBox {
 }
 
 /** The free-text boxes on a page — the text counterpart of `pageItems`. */
-export function textBoxes(m: Model, pon: number, view?: ViewEnv): TextBox[] {
+export function textBoxes(m: Model, page: PageRef, view?: ViewEnv): TextBox[] {
+  const pon = page.pageObjectNumber;
   const out: TextBox[] = [];
   for (const id of m.order) {
     const a = m.byId[id];
-    if (a.pon !== pon || a.geom.t !== 'text') continue;
+    if (a.page.pageObjectNumber !== pon || a.geom.t !== 'text') continue;
     if (!viewable(a.flags, m.selected.includes(id))) continue; // `/F`-hidden
     if (!textIsLive(m, id)) continue; // baked → rendered as the /AP image instead
     const g = effGeom(m, id, view);
@@ -413,31 +416,35 @@ function effectiveSelectionFrame(m: Model, id: Id, geometry: Geom, view?: ViewEn
 /** Union of the effective frames; group chrome and rotation use this box. */
 function unionBoundsOf(
   m: Model,
-  pon: number,
+  page: PageRef,
   geomOf: (id: Id) => Geom,
   view?: ViewEnv,
 ): Rect | null {
+  const pon = page.pageObjectNumber;
   const corners: Vec[] = [];
   for (const id of m.selected) {
     const a = m.byId[id];
-    if (!a || a.pon !== pon) continue;
+    if (!a || a.page.pageObjectNumber !== pon) continue;
     corners.push(...effectiveSelectionFrame(m, id, geomOf(id), view).corners);
   }
   return corners.length ? unionRect(corners) : null;
 }
 
-/** The page-bound knob placement for the selection on `pon`, reading each
+/** The page-bound knob placement for the selection on `page`, reading each
  *  member's geometry through `geomOf` — `effGeom` for the live view, the
  *  COMMITTED geometry for a rotate gesture's rest anchor (see `selectionKnob`). */
 function placeSelectionKnob(
   m: Model,
-  pon: number,
+  page: PageRef,
   pageBox: Rect | undefined,
   knobOffset: number,
   geomOf: (id: Id) => Geom,
   view?: ViewEnv,
 ): { at: Vec; from: Vec } | null {
-  const sel = m.selected.filter((id) => isSelectable(m, id) && m.byId[id].pon === pon);
+  const pon = page.pageObjectNumber;
+  const sel = m.selected.filter(
+    (id) => isSelectable(m, id) && m.byId[id].page.pageObjectNumber === pon,
+  );
   if (sel.length === 1) {
     const a = m.byId[sel[0]];
     // No knob for a locked (frozen) annotation — the SAME gate hitTest
@@ -451,14 +458,14 @@ function placeSelectionKnob(
     return placeRotateKnob(frame.corners, knobOffset, pageBox);
   }
   if (sel.length > 1 && groupCaps(m, sel).rotatable) {
-    const union = unionBoundsOf(m, pon, geomOf, view);
+    const union = unionBoundsOf(m, page, geomOf, view);
     if (union) return placeRotateKnob(boxCorners(union), knobOffset, pageBox);
   }
   return null;
 }
 
 /**
- * The rotate knob for the current selection on `pon` — the SAME knob `chrome`
+ * The rotate knob for the current selection on `page` — the SAME knob `chrome`
  * draws — or null when the selection has none (non-rotatable single, or a group
  * whose caps aren't rotatable). A single shape's knob hangs off its OBB top edge;
  * a group's off the union box. With `pageBox` the knob is placed PAGE-BOUND
@@ -475,16 +482,16 @@ function placeSelectionKnob(
  */
 export function selectionKnob(
   m: Model,
-  pon: number,
+  page: PageRef,
   pageBox?: Rect,
   knobOffset: number = ROTATE_KNOB_OFFSET,
   view?: ViewEnv,
 ): { at: Vec; from: Vec } | null {
   const d = m.draft;
-  if (d?.g === 'rotate' && m.byId[d.ids[0]]?.pon === pon) {
+  if (d?.g === 'rotate' && m.byId[d.ids[0]]?.page.pageObjectNumber === page.pageObjectNumber) {
     const rest = placeSelectionKnob(
       m,
-      pon,
+      page,
       pageBox,
       knobOffset,
       (id) => anchoredGeom(m.byId[id].geom, anchorModeOf(m.byId[id]), view),
@@ -497,23 +504,28 @@ export function selectionKnob(
       from: rotatePoint(rest.from, d.pivot, delta),
     };
   }
-  return placeSelectionKnob(m, pon, pageBox, knobOffset, (id) => effGeom(m, id, view), view);
+  return placeSelectionKnob(m, page, pageBox, knobOffset, (id) => effGeom(m, id, view), view);
 }
 
 export function chrome(
   m: Model,
-  pon: number,
+  page: PageRef,
   pageBox?: Rect,
   knobOffset: number = ROTATE_KNOB_OFFSET,
   view?: ViewEnv,
 ): ChromeNode[] {
+  const pon = page.pageObjectNumber;
   const nodes: ChromeNode[] = [];
-  if (m.draft?.g === 'marquee' && m.draft.pon === pon) {
+  if (m.draft?.g === 'marquee' && m.draft.page.pageObjectNumber === pon) {
     nodes.push({ kind: 'marquee', rect: rectFromPoints(m.draft.from, m.draft.to) });
   }
   // Live alignment guides of a snapped move (the gesture lives on ONE page —
   // its members' page).
-  if (m.draft?.g === 'move' && m.draft.guides.length && m.byId[m.draft.ids[0]]?.pon === pon) {
+  if (
+    m.draft?.g === 'move' &&
+    m.draft.guides.length &&
+    m.byId[m.draft.ids[0]]?.page.pageObjectNumber === pon
+  ) {
     for (const g of m.draft.guides)
       nodes.push({ kind: 'guide', axis: g.axis, at: g.at, lo: g.lo, hi: g.hi });
   }
@@ -521,7 +533,10 @@ export function chrome(
   // modes (v2 behaviour): the readout chip + full-bleed guides appear, and the
   // handles/knob are suppressed below — the pointer holds capture, so grab
   // affordances are noise; "how far am I" feedback is everything.
-  const rd = m.draft?.g === 'rotate' && m.byId[m.draft.ids[0]]?.pon === pon ? m.draft : null;
+  const rd =
+    m.draft?.g === 'rotate' && m.byId[m.draft.ids[0]]?.page.pageObjectNumber === pon
+      ? m.draft
+      : null;
   if (rd) {
     const { angle } = rotateDraftDelta(m, rd);
     nodes.push({ kind: 'angle-chip', at: rd.cur, angle: Math.round(angle) });
@@ -541,7 +556,9 @@ export function chrome(
     }
     nodes.push({ kind: 'rotate-guides', center: rd.pivot, angle, lines });
   }
-  const sel = m.selected.filter((id) => isSelectable(m, id) && m.byId[id].pon === pon);
+  const sel = m.selected.filter(
+    (id) => isSelectable(m, id) && m.byId[id].page.pageObjectNumber === pon,
+  );
   if (sel.length === 1) {
     const a = m.byId[sel[0]];
     const g = effGeom(m, sel[0], view);
@@ -580,7 +597,7 @@ export function chrome(
     // ride a group move/scale exactly like single-selection chrome. During a
     // live rotate the members spin away from any axis-aligned box, so the
     // whole block is suppressed — the guides own that mode.
-    const union = unionBoundsOf(m, pon, (id) => effGeom(m, id, view), view);
+    const union = unionBoundsOf(m, page, (id) => effGeom(m, id, view), view);
     if (union) {
       nodes.push({ kind: 'outline', rect: union });
       const gc = groupCaps(m, sel);
@@ -594,17 +611,20 @@ export function chrome(
   // anchor, so the menu is always pushed clear of exactly this point. Hidden
   // while a rotate runs (the gesture holds capture; the guides own the mode).
   if (!rd) {
-    const knob = selectionKnob(m, pon, pageBox, knobOffset, view);
+    const knob = selectionKnob(m, page, pageBox, knobOffset, view);
     if (knob) nodes.push({ kind: 'rotate-knob', at: knob.at, from: knob.from });
   }
   return nodes;
 }
 
-/** The content-space union of the selectable selected items on `pon`, or null if
+/** The content-space union of the selectable selected items on `page`, or null if
  *  the page holds none. This is the SAME box the chrome outline draws, so a
  *  floating menu sits exactly on the selection. */
-export function selectionBoundsOnPage(m: Model, pon: number, view?: ViewEnv): Rect | null {
-  const sel = m.selected.filter((id) => isSelectable(m, id) && m.byId[id].pon === pon);
+export function selectionBoundsOnPage(m: Model, page: PageRef, view?: ViewEnv): Rect | null {
+  const pon = page.pageObjectNumber;
+  const sel = m.selected.filter(
+    (id) => isSelectable(m, id) && m.byId[id].page.pageObjectNumber === pon,
+  );
   if (sel.length === 0) return null;
   // The rotated AABB: the axis-aligned box that encloses the ORIENTED selection
   // quad. For a tilted shape this tracks the live `rot`, so the upright floating
@@ -623,30 +643,30 @@ export function selectionBoundsOnPage(m: Model, pon: number, view?: ViewEnv): Re
  *  placement — the menu then dodges the knob where it ACTUALLY sits. */
 export function selectionAnchor(
   m: Model,
-  pageBoxOf?: (pon: number) => Rect | undefined,
-  knobOffsetOf?: (pon: number) => number | undefined,
-  viewOf?: (pon: number) => ViewEnv | undefined,
-): { pon: number; bounds: Rect; knob?: Vec } | null {
+  pageBoxOf?: (page: PageRef) => Rect | undefined,
+  knobOffsetOf?: (page: PageRef) => number | undefined,
+  viewOf?: (page: PageRef) => ViewEnv | undefined,
+): { page: PageRef; bounds: Rect; knob?: Vec } | null {
   // No menu while a rotate gesture runs (v2 behaviour): the chrome is in
   // guides mode and a floating menu chasing a spinning box is pure noise.
   if (m.draft?.g === 'rotate') return null;
   const id = m.selected.find((x) => isSelectable(m, x));
   if (id == null) return null;
-  const pon = m.byId[id].pon;
-  const view = viewOf?.(pon);
-  const bounds = selectionBoundsOnPage(m, pon, view);
+  const page = m.byId[id].page;
+  const view = viewOf?.(page);
+  const bounds = selectionBoundsOnPage(m, page, view);
   if (!bounds) return null;
   // `bounds` is the plain selection box (the menu stays centred on it). The knob
   // rides ALONGSIDE it so the menu can nudge ONLY the edge it sits on, and only
   // when the handle would otherwise hide under it — never shifting the centre.
   const knob = selectionKnob(
     m,
-    pon,
-    pageBoxOf?.(pon),
-    knobOffsetOf?.(pon) ?? ROTATE_KNOB_OFFSET,
+    page,
+    pageBoxOf?.(page),
+    knobOffsetOf?.(page) ?? ROTATE_KNOB_OFFSET,
     view,
   );
-  return knob ? { pon, bounds, knob: knob.at } : { pon, bounds };
+  return knob ? { page, bounds, knob: knob.at } : { page, bounds };
 }
 
 /** Anchor for controls that finish/cancel an active multi-click creation draft.
@@ -660,7 +680,7 @@ export function creationDraftAnchor(m: Model): CreationDraftAnchor | null {
   return {
     kind: 'poly',
     subtype: d.closed ? 'polygon' : 'polyline',
-    pon: d.pon,
+    page: d.page,
     bounds: unionRect(d.points),
     pointCount: d.points.length,
     minPoints,

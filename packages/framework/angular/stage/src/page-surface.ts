@@ -1,5 +1,5 @@
 /**
- * INTERNAL page shell — one per visible page, tracked by `pon` so the instance
+ * INTERNAL page shell — one per visible page, tracked by its page address so the instance
  * (and everything below) survives camera motion and page reorders.
  *
  * THE STABILITY INVARIANT (see page-context.ts): `page` (the context) and
@@ -119,7 +119,7 @@ export class EpdfPageSurface {
   /** ONE stable context per surface — volatile parts are signals inside it. */
   readonly page: EpdfPageContext = createPageContext({
     documentId: () => this.documentId(),
-    pon: () => this.vp().pon,
+    ref: () => this.vp().ref,
     pageIndex: computed(() => this.vp().pageIndex),
     frame: this.frame,
     transform: this.t,

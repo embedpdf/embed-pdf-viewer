@@ -1,29 +1,22 @@
 import { definePlugin } from '@embedpdf/core';
 import { ActionsToken } from '@embedpdf/plugin-actions/contract';
 import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
-// Behavior registration lives on the HOST capability (framework/plugin
-// surface) — same runtime token, wider type. The form plugin's precedent.
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
-
-import { createLinkCapability } from './capability';
-import { registerLinkEffects } from './effects';
-import { initialLinkState, linkReducer } from './reducer';
-import { LinkToken } from './types';
-import type { LinkAction, LinkCapability, LinkPluginConfig, LinkState } from './types';
+import { createLinkController } from './controller';
+import { initialLinkState, linkReducer } from './model';
+import { LinkToken } from './host-contract';
+import type { LinkHostCapability } from './host-contract';
+import type { LinkAction, LinkState } from './model';
 
 /**
- * The link plugin: the NAVIGATION plane. Document-scoped; requires only the
- * interaction hub. Navigation works with no annotation plugin at all —
- * links are read from the engine's link DTOs. When the annotation plugin IS
- * present, its folded model becomes the data source (no double fetch) and a
- * Behavior keeps links navigation-owned while a `link-nav` tool is active
- * (pointer/pan/form-fill by default) — the single-active-tool hub IS the
- * mode switch: grab the link tool and every link becomes an editable rect.
+ * Clickable link regions and their activation. Document-scoped; needs the
+ * interaction hub (the navigation tool tag), optionally the stage (reveal),
+ * the annotation plugin (the folded link model) and actions (`/A` trees).
  */
-export const linkPlugin = (config?: LinkPluginConfig) =>
-  definePlugin<LinkState, LinkAction, LinkCapability>({
+export const linkPlugin = () =>
+  definePlugin<LinkState, LinkAction, LinkHostCapability>({
     id: 'link',
     token: LinkToken,
     scope: 'document',
@@ -31,17 +24,24 @@ export const linkPlugin = (config?: LinkPluginConfig) =>
     optional: [StageToken, AnnotationToken, ActionsToken],
     initialState: initialLinkState,
     reduce: linkReducer,
-    capability: (ctx) => createLinkCapability(ctx, config),
-    effects: registerLinkEffects,
-    init: (ctx) => {
-      const interaction = ctx.get(InteractionToken);
-      const annotation = ctx.tryGet(AnnotationHostToken);
-      if (annotation) {
-        annotation.registerBehavior({
-          id: 'link-nav',
-          matches: (a) => a.subtype === 'link',
-          engaged: () => interaction.activeTool()?.enables.has('link-nav') ?? false,
-        });
-      }
+    create: (ctx) => {
+      const { api, connect } = createLinkController(ctx);
+      return {
+        api,
+        connect() {
+          connect();
+          // Links are annotations: while a navigation tool is active the
+          // link plane owns their pixels, so the annotation plane stands down.
+          const interaction = ctx.get(InteractionToken);
+          const annotation = ctx.tryGet(AnnotationHostToken);
+          if (annotation) {
+            annotation.registerBehavior({
+              id: 'link-nav',
+              matches: (a) => a.subtype === 'link',
+              engaged: () => interaction.getActiveTool()?.enables.has('link-nav') ?? false,
+            });
+          }
+        },
+      };
     },
   });

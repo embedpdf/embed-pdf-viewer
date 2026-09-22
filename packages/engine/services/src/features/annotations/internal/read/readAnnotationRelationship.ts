@@ -3,6 +3,7 @@ import type {
   AnnotationReplyType,
   PageObjectNumber,
 } from '@embedpdf/engine-core/runtime';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { readAnnotString } from './annotationReadPrimitives';
@@ -58,11 +59,15 @@ function readParentRef(
 ): AnnotationRef | null {
   const objectNumber = fn.EPDFAnnot_GetObjectNumber(parentPtr);
   if (objectNumber > 0) {
-    return { kind: 'objectNumber', pageObjectNumber, annotObjectNumber: objectNumber };
+    return {
+      kind: 'objectNumber',
+      page: toPageRef(pageObjectNumber),
+      annotObjectNumber: objectNumber,
+    };
   }
   const nm = readAnnotString(fn, mem, parentPtr, 'NM');
   if (nm && nm.length > 0) {
-    return { kind: 'nm', pageObjectNumber, nm };
+    return { kind: 'nm', page: toPageRef(pageObjectNumber), nm };
   }
   return null;
 }

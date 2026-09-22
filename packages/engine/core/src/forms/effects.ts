@@ -1,5 +1,5 @@
 import type { SerializedEngineError } from '../errors/EngineError';
-import type { FormFieldRef, FormWidgetRef } from '../identity/FormFieldRef';
+import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
 import type { MutationMeta } from '../mutation/MutationMeta';
 import type { FormFieldDTO } from './field';
 import type { FormFieldValue } from './value';
@@ -20,7 +20,7 @@ export interface FormEffectResult {
   status: FormEffectStatus;
   /** Re-read terminal fields affected by this effect, when available. */
   fields: FormFieldDTO[];
-  changedWidgets: FormWidgetRef[];
+  changedWidgets: FormWidget[];
   error?: SerializedEngineError;
 }
 
@@ -33,6 +33,6 @@ export interface FormEffectResult {
  */
 export interface FormEffectsResult {
   results: FormEffectResult[];
-  changedWidgets: FormWidgetRef[];
+  changedWidgets: FormWidget[];
   meta: MutationMeta | null;
 }

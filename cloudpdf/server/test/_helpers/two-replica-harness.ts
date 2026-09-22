@@ -319,7 +319,7 @@ export async function listAnnotations(
 ): Promise<AnnotationListBody> {
   const pon = input.pon ?? 1;
   const res = await fetch(
-    `${replica.baseUrl}/v1/docs/${input.docId}/layers/${input.layerName}/annotations/pages/${pon}/items`,
+    `${replica.baseUrl}/v1/docs/${input.docId}/layers/${input.layerName}/annotations/pages/obj:${pon}/items`,
     {
       headers: {
         Authorization: `Bearer ${docToken(input.tenantId, input.docId, input.layerName)}`,
@@ -339,7 +339,7 @@ export async function createAnnotation(
 ): Promise<{ status: number; body: unknown }> {
   const pon = input.pon ?? 1;
   const res = await fetch(
-    `${replica.baseUrl}/v1/docs/${input.docId}/layers/${input.layerName}/annotations/pages/${pon}/items`,
+    `${replica.baseUrl}/v1/docs/${input.docId}/layers/${input.layerName}/annotations/pages/obj:${pon}/items`,
     {
       method: 'POST',
       headers: {
@@ -367,7 +367,7 @@ export async function updateAnnotation(
 ): Promise<{ status: number; body: unknown }> {
   const pon = input.pon ?? 1;
   const res = await fetch(
-    `${replica.baseUrl}/v1/docs/${input.docId}/layers/${input.layerName}/annotations/pages/${pon}/items/obj:${input.objectNumber}`,
+    `${replica.baseUrl}/v1/docs/${input.docId}/layers/${input.layerName}/annotations/pages/obj:${pon}/items/obj:${input.objectNumber}`,
     {
       method: 'PATCH',
       headers: {
@@ -389,7 +389,7 @@ export async function deleteAnnotation(
 ): Promise<{ status: number; body: unknown }> {
   const pon = input.pon ?? 1;
   const res = await fetch(
-    `${replica.baseUrl}/v1/docs/${input.docId}/layers/${input.layerName}/annotations/pages/${pon}/items/obj:${input.objectNumber}`,
+    `${replica.baseUrl}/v1/docs/${input.docId}/layers/${input.layerName}/annotations/pages/obj:${pon}/items/obj:${input.objectNumber}`,
     {
       method: 'DELETE',
       headers: {

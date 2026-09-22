@@ -81,7 +81,7 @@ A FreeText annotation's `fontFamily` accepts either a standard font name or a fo
 you registered. Just pass the key:
 
 ```ts
-const page = doc.page(pageObjectNumber);
+const page = doc.page(pageRef);
 
 await page.annotations.create({
   subtype: 'free-text',

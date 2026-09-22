@@ -3,13 +3,13 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-import { createKernel } from '@embedpdf/core';
+import { createKernel, toPageRef } from '@embedpdf/core';
 import { createLocalEngine } from '@embedpdf/engine';
 import { actionsPlugin } from '@embedpdf/plugin-actions';
 import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/contract/host';
 
 import { stagePlugin } from '../src/stage.plugin';
-import { StageToken } from '../src/types';
+import { StageToken } from '../src/host-contract';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(
@@ -69,8 +69,8 @@ async function boot() {
     actions.dispatch({
       scope: 'annotation',
       event: 'cursorEnter',
-      ref: { kind: 'objectNumber', pageObjectNumber: pon, annotObjectNumber: 999 },
-      pon,
+      ref: { kind: 'objectNumber', page: toPageRef(pon), annotObjectNumber: 999 },
+      page: toPageRef(pon),
     });
 
   return {
@@ -92,14 +92,14 @@ describe('the stage → actions trigger feed (real engine)', () => {
     t.actions.setUiAdapter({ openUri: () => {}, print: () => {} });
     await t.drain();
     expect(t.seam).toEqual([]); // no stage report yet, no fallback in auto
-    stage.setViewport({ width: 800, height: 600 }); // placement → report
+    stage.setViewportSize({ width: 800, height: 600 }); // placement → report
     await t.drain();
     await t.drain();
     // Canonical coordinator order: the visible set (/PV shows 12) precedes
     // the open fan-out (page /O shows 7, then the /PO set shows 9).
     expect(t.seam).toEqual(['show:12', 'show:7', 'show:9']);
     t.seam.length = 0;
-    stage.goToPage(1); // programmatic navigation to page 2 (no /AA there)
+    stage.goToPageIndex(1); // programmatic navigation to page 2 (no /AA there)
     await t.drain();
     await t.drain();
     // Leaving page 3: close fires (/PC set then /C — ISO order). The /PI

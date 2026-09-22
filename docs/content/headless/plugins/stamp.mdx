@@ -132,7 +132,7 @@ annotation from the same inputs — one placement law, two entry points:
 
 ```ts
 const ref = await stamp.placeAsset(documentId, assetId, {
-  pageObjectNumber: pon,
+  page: page.ref,
   at: { x: 120, y: 90 }, // page points, origin top-left: the box is centred here
   targetWidth: 160, // optional; default the stamp's own size
   rotation: 0, // optional, degrees clockwise
@@ -153,7 +153,7 @@ plugin files it as a page of the library you name:
 <Example name="stamp/from-selection" mode="open" />
 
 ```ts
-const assetId = await stamp.addAssetFromAnnotations(documentId, pon, refs, {
+const assetId = await stamp.addAssetFromAnnotations(documentId, page.ref, refs, {
   libraryId, // omit to create a library named after the label
   label: 'Custom stamp 1',
 });

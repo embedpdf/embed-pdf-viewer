@@ -1,6 +1,6 @@
 import type { SerializedEngineError } from '../errors/EngineError';
 import type { AnnotationRef } from '../identity/AnnotationRef';
-import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PageRef } from '../identity/PageRef';
 import type { MutationMeta } from './MutationMeta';
 
 export type RedactionApplyStatus = 'applied' | 'unchanged' | 'failed' | 'skipped';
@@ -13,11 +13,11 @@ export type RedactionApplyStatus = 'applied' | 'unchanged' | 'failed' | 'skipped
  * `InvalidArg` before anything is written.
  */
 export type RedactionApplyScope =
-  | { kind: 'pages'; pageObjectNumbers: PageObjectNumber[] }
+  | { kind: 'pages'; pages: PageRef[] }
   | { kind: 'annotations'; refs: AnnotationRef[] };
 
 export interface RedactionApplyItemResult {
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
   status: RedactionApplyStatus;
   /**
    * Annotations OTHER than REDACT ones removed on this page as a side

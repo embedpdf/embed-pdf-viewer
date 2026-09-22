@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { DocumentHandle, Engine, PageRaster } from '@embedpdf/engine-core/runtime';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '../src/index';
 
 /** Small independent PDF fixtures: asymmetric vector bands expose wrong crops. */
@@ -58,7 +59,7 @@ function pixel(raster: PageRaster, x: number, y: number): number[] {
 }
 
 async function appearance(doc: DocumentHandle, index = 0): Promise<PageRaster> {
-  return (await doc.page(3).annotations.renderAppearances()).appearances[index]!.raster;
+  return (await doc.page(toPageRef(3)).annotations.renderAppearances()).appearances[index]!.raster;
 }
 
 describe('vector stamp resizing (wasm)', () => {
@@ -80,7 +81,7 @@ describe('vector stamp resizing (wasm)', () => {
     const original = fixture();
     const doc = await open(original);
     try {
-      const page = doc.page(3);
+      const page = doc.page(toPageRef(3));
       const ref = (await page.annotations.list()).annotations[0]!.ref;
       await page.annotations.update(ref, {
         subtype: 'stamp',
@@ -91,7 +92,7 @@ describe('vector stamp resizing (wasm)', () => {
       // Render the full annotation through the page renderer: appearance
       // thumbnails deliberately remove rotation for the viewer to apply it.
       const render = (document: DocumentHandle) =>
-        document.page(3).render.raw({
+        document.page(toPageRef(3)).render.raw({
           includeAnnotations: true,
           target: { kind: 'rect', rect: { left: 0, bottom: -50, right: 520, top: 220 } },
         });
@@ -107,7 +108,7 @@ describe('vector stamp resizing (wasm)', () => {
           { scope: ['*'] },
         );
         try {
-          const updated = (await reopened.page(3).annotations.list()).annotations[0]!;
+          const updated = (await reopened.page(toPageRef(3)).annotations.list()).annotations[0]!;
           expect(updated.subtype).toBe('stamp');
           if (updated.subtype === 'stamp') expect(updated.rotation).toBe(270);
           const raster = await render(reopened);
@@ -127,7 +128,7 @@ describe('vector stamp resizing (wasm)', () => {
     async (vertical) => {
       let doc = await open(fixture({ vertical }));
       try {
-        const page = doc.page(3);
+        const page = doc.page(toPageRef(3));
         const ref = (await page.annotations.list()).annotations[0]!.ref;
         await page.annotations.update(ref, {
           subtype: 'stamp',
@@ -162,7 +163,7 @@ describe('vector stamp resizing (wasm)', () => {
     async (shared) => {
       let doc = await open(fixture({ shared }));
       try {
-        const page = doc.page(3);
+        const page = doc.page(toPageRef(3));
         const ref = (await page.annotations.list()).annotations[0]!.ref;
         const before = await appearance(doc, 1);
         await page.annotations.update(ref, {
@@ -195,7 +196,7 @@ describe('vector stamp resizing (wasm)', () => {
     async (extraContent) => {
       const doc = await open(fixture({ stale: true, extraContent }));
       try {
-        const page = doc.page(3);
+        const page = doc.page(toPageRef(3));
         const ref = (await page.annotations.list()).annotations[0]!.ref;
         await page.annotations.update(ref, {
           subtype: 'stamp',
@@ -217,7 +218,7 @@ describe('vector stamp resizing (wasm)', () => {
     try {
       const before = await appearance(doc);
       for (let cycle = 0; cycle < 3; cycle++) {
-        const page = doc.page(3);
+        const page = doc.page(toPageRef(3));
         const ref = (await page.annotations.list()).annotations[0]!.ref;
         for (const fit of ['cover', 'contain', 'fill'] as const) {
           await page.annotations.update(ref, {

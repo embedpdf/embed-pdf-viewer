@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
-import type { AnnotationRef } from '@embedpdf/engine-core/runtime';
+import { toPageRef, type AnnotationRef } from '@embedpdf/engine-core/runtime';
 
 import { createHoverPump, type HoverTarget } from '../src/hover-pump';
-import type { ActionTrigger, ActionTriggerResult } from '../src/types';
+import type { ActionTrigger, ActionTriggerResult } from '../src/host-contract';
 
 const ref = (objectNumber: number): AnnotationRef => ({
   kind: 'objectNumber',
-  pageObjectNumber: 1,
+  page: toPageRef(1),
   annotObjectNumber: objectNumber,
 });
 const target = (objectNumber: number, events?: HoverTarget['events']): HoverTarget => ({
   ref: ref(objectNumber),
-  pon: 1,
+  page: toPageRef(1),
   ...(events ? { events } : {}),
 });
 
@@ -22,8 +22,7 @@ function fakeDispatch() {
   const pending: Array<() => void> = [];
   const dispatch = (trigger: ActionTrigger): Promise<ActionTriggerResult> => {
     if (trigger.scope !== 'annotation') throw new Error('unexpected scope');
-    const objectNumber =
-      trigger.ref.kind === 'objectNumber' ? trigger.ref.annotObjectNumber : -1;
+    const objectNumber = trigger.ref.kind === 'objectNumber' ? trigger.ref.annotObjectNumber : -1;
     submitted.push(`${trigger.event === 'cursorEnter' ? 'E' : 'X'}:${objectNumber}`);
     return new Promise((resolve) =>
       pending.push(() => resolve({ status: 'executed', steps: [], diagnostics: [] })),

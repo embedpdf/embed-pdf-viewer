@@ -108,7 +108,7 @@ export class CloudRevisionBridge {
       (opts?.aliasDocSessionIds?.includes(ref.revision.docSessionId) ?? false);
     if (
       !scopeMatches ||
-      ref.revision.pageObjectNumber !== ref.pageObjectNumber ||
+      ref.revision.page.pageObjectNumber !== ref.page.pageObjectNumber ||
       ref.revision.generation !== pageState.revision.generation
     ) {
       throw new EngineError(EngineErrorCode.InvalidReference, 'revision token is stale', {

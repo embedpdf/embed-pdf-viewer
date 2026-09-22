@@ -1304,7 +1304,13 @@ export const DocLayerParamsSchema = DocIdParamsSchema.extend({
   layerName: z.string().min(1),
 });
 export const DocPageParamsSchema = DocLayerParamsSchema.extend({
-  pon: z.coerce.number().int().min(0),
+  pageKey: z
+    .string()
+    .min(1)
+    .regex(/^obj:[1-9][0-9]*$/)
+    .describe(
+      "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`.",
+    ),
 });
 export const DocAnnotationParamsSchema = DocPageParamsSchema.extend({
   annotKey: z.string().min(1),

@@ -211,7 +211,7 @@ export function SignatureMakerModal() {
   const [error, setError] = useState<string | null>(null);
 
   const existingId = surface.props?.libraryId as string | undefined;
-  const existing = existingId ? stamp.library(existingId) : null;
+  const existing = existingId ? stamp.getLibrary(existingId) : null;
   const wantsInitials = (config.kinds ?? ['signature', 'initials']).includes('initials');
   const fonts = [
     ...(config.fonts ?? []).map((f) => ({ key: f.key, label: f.label })),
@@ -237,7 +237,7 @@ export function SignatureMakerModal() {
     setError(null);
     try {
       if (existing) {
-        await stamp.addAsset({
+        await stamp.createAsset({
           libraryId: existing.id,
           name: INITIALS_MARK_NAME,
           label: t('demo.initialsLabel'),
@@ -245,14 +245,14 @@ export function SignatureMakerModal() {
         });
       } else {
         const libraryId = await stamp.createLibrary(name.trim(), { kind: SIGNATURES_LIBRARY_KIND });
-        await stamp.addAsset({
+        await stamp.createAsset({
           libraryId,
           name: SIGNATURE_MARK_NAME,
           label: t('demo.signatureLabel'),
           mark: signatureMark!,
         });
         if (initialsMark) {
-          await stamp.addAsset({
+          await stamp.createAsset({
             libraryId,
             name: INITIALS_MARK_NAME,
             label: t('demo.initialsLabel'),

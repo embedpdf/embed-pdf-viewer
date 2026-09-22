@@ -58,7 +58,26 @@ export interface PDFViewerExtras {
   /** The DRIVE surface, once the viewer is live (v2's onReady, reborn):
    *  capabilities via `viewer.get(Token)`, `watch`, and the command trio. */
   onReady?: (viewer: ViewerHandle) => void;
+  /** The active document changed (a tab switch, an open, the last close) —
+   *  the React face of the element's `epdf:documentchange` event. */
+  onDocumentChange?: (documentId: string | null) => void;
 }
+
+/** Init-only config: after mount, a changed prop is ignored. Dev warns once. */
+const warnConfigChange = (initial: ElementConfig, next: ElementConfig): void => {
+  const keys = new Set([...Object.keys(initial), ...Object.keys(next)]);
+  for (const key of keys) {
+    if (
+      !Object.is((initial as Record<string, unknown>)[key], (next as Record<string, unknown>)[key])
+    ) {
+      console.warn(
+        `[embedpdf] <PDFViewer> config is init-only: the changed \`${key}\` prop is ignored. ` +
+          'Pass stable references (module scope, useState, useMemo), or remount with a `key` to rebuild the viewer.',
+      );
+      return;
+    }
+  }
+};
 
 /**
  * Props for the shared implementation. Each entry re-exports <PDFViewer>
@@ -73,6 +92,7 @@ export function PDFViewer({
   children,
   elementRef,
   onReady,
+  onDocumentChange,
   ...config
 }: PDFViewerImplProps) {
   const ref = useRef<EmbedPdfViewerElement | null>(null);
@@ -80,6 +100,20 @@ export function PDFViewer({
   configRef.current = config;
   const onReadyRef = useRef(onReady);
   onReadyRef.current = onReady;
+  const onDocumentChangeRef = useRef(onDocumentChange);
+  onDocumentChangeRef.current = onDocumentChange;
+  // Init-only, like <Viewer engine/plugins>: the element boots once with the
+  // first config. A later change cannot mean "rebuild" without dropping every
+  // open document, so it is ignored — loudly, in development.
+  const initialConfig = useRef<ElementConfig | null>(null);
+  const warned = useRef(false);
+  if (process.env.NODE_ENV !== 'production') {
+    if (initialConfig.current === null) initialConfig.current = config;
+    else if (!warned.current) {
+      warned.current = true;
+      warnConfigChange(initialConfig.current, config);
+    }
+  }
 
   // Layout effects run in the insertion task, BEFORE the element's deferred
   // (microtask) declarative mount — so the viewer boots exactly once, with
@@ -89,11 +123,19 @@ export function PDFViewer({
     const el = ref.current;
     if (!el) return;
     const onEvent = () => el.viewer && onReadyRef.current?.(el.viewer);
+    const onDocumentChangeEvent = (event: Event) =>
+      onDocumentChangeRef.current?.(
+        (event as CustomEvent<{ documentId: string | null }>).detail.documentId,
+      );
     el.addEventListener('epdf:ready', onEvent);
+    el.addEventListener('epdf:documentchange', onDocumentChangeEvent);
     el.config = configRef.current;
     // A remount-with-key that reuses a live element cannot miss the event.
     if (el.viewer) onEvent();
-    return () => el.removeEventListener('epdf:ready', onEvent);
+    return () => {
+      el.removeEventListener('epdf:ready', onEvent);
+      el.removeEventListener('epdf:documentchange', onDocumentChangeEvent);
+    };
   }, []);
 
   return createElement(

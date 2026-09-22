@@ -2,11 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useCapability } from '@embedpdf/react/runtime';
 import {
   AnnotationToken,
-  refKey,
+  annotationKey,
   useAnnotationSelection,
   useComments,
   useCommentThreads,
-  useCommentsHydration,
+  useAnnotationStatus,
   type AnnotationDTO,
   type AnnotationRef,
   type CommentThreadView,
@@ -48,7 +48,7 @@ const dateLabel = (iso: string | null): string => {
 
 export function CommentsPanel() {
   const t = useT();
-  const hydration = useCommentsHydration();
+  const status = useAnnotationStatus();
   const comments = useComments();
   const threads = useCommentThreads();
   const anno = useCapability(AnnotationToken);
@@ -60,15 +60,13 @@ export function CommentsPanel() {
   /** Which thread the document's selection points at — ANY member counts, so
    *  selecting a reply's parent shape highlights the same card. */
   const selectedThreadKey = useMemo(() => {
-    for (const id of selection) {
-      const dto = anno.getSelected().find((a) => refKey(a.ref) === id || a.nm === id);
-      const ref = dto?.ref ?? null;
-      const thread = ref ? comments.thread(ref) : null;
-      if (thread) return refKey(thread.root.ref);
+    for (const ref of selection) {
+      const thread = comments.getThread(ref);
+      if (thread) return annotationKey(thread.root.ref);
     }
     return null;
     // `selection` identity changes on every selection write — the right key.
-  }, [selection, anno, comments]);
+  }, [selection, comments]);
 
   // Reverse sync: the selected card scrolls itself into view (v2 centered it).
   useEffect(() => {
@@ -87,7 +85,7 @@ export function CommentsPanel() {
     if (view.pageIndex < 0) return;
     // Anchor values are viewport FRACTIONS (0–1), not v2's percentages:
     // the annotation lands a third down the viewport, the find-bar feel.
-    stage?.reveal(view.pageIndex, {
+    stage?.revealIndex(view.pageIndex, {
       ...(view.contentRect ? { rect: view.contentRect } : {}),
       anchor: { x: 'center', y: 0.35 },
       behavior: 'smooth',
@@ -105,15 +103,14 @@ export function CommentsPanel() {
     return [...groups.entries()].sort((a, b) => a[0] - b[0]);
   }, [threads]);
 
-  if (hydration.status === 'loading') return <Empty icon="comment" text={t('demo.commentsLoading')} />;
-  if (hydration.status === 'forbidden')
-    return <Empty icon="lock" text={t('demo.commentsForbidden')} />;
-  if (hydration.status === 'error') {
+  if (status === 'loading') return <Empty icon="comment" text={t('demo.commentsLoading')} />;
+  if (status === 'forbidden') return <Empty icon="lock" text={t('demo.commentsForbidden')} />;
+  if (status === 'error') {
     return (
       <Empty icon="alertTriangle" text={t('demo.commentsError')}>
         <button
           type="button"
-          onClick={() => void comments.rehydrate()}
+          onClick={() => void anno.refresh()}
           className="bg-accent text-on-accent rounded-md px-3 py-1.5 text-sm font-medium"
         >
           {t('demo.commentsRetry')}
@@ -142,7 +139,7 @@ export function CommentsPanel() {
             </div>
             <ul className="flex flex-col gap-2">
               {group.map((view) => {
-                const key = refKey(view.root.ref);
+                const key = annotationKey(view.root.ref);
                 return (
                   <ThreadCard
                     key={key}
@@ -195,7 +192,7 @@ function ThreadCard({
   const t = useT();
   const comments = useComments();
   const [reply, setReply] = useState('');
-  const perms = comments.permissionsFor(view.root.ref);
+  const perms = comments.getPermissions(view.root.ref);
   const config = commentTypeConfig(view.root);
   const status = view.review.mine?.state ?? 'none';
   const latest = view.review.lastChange;
@@ -245,7 +242,7 @@ function ThreadCard({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                void comments.removeThread(view.root.ref);
+                void comments.deleteThread(view.root.ref);
               }}
               className="text-fg-muted hover:text-fg grid h-6 w-6 shrink-0 place-items-center rounded"
               title={t('demo.commentsDeleteThread')}
@@ -255,12 +252,16 @@ function ThreadCard({
           )}
         </div>
 
-        <CommentBody annotationRef={view.root.ref} text={view.root.contents ?? ''} deletable={false} />
+        <CommentBody
+          annotationRef={view.root.ref}
+          text={view.root.contents ?? ''}
+          deletable={false}
+        />
 
         {view.replies.length > 0 && (
           <div className="border-border-subtle flex flex-col gap-2 border-t pt-2">
             {view.replies.map((r) => (
-              <Reply key={refKey(r.ref)} dto={r} />
+              <Reply key={annotationKey(r.ref)} dto={r} />
             ))}
           </div>
         )}
@@ -324,9 +325,7 @@ function Reply({ dto }: { dto: AnnotationDTO }) {
         <span className="text-fg-secondary text-xs font-medium">
           {dto.author ?? t('demo.commentsAnonymous')}
         </span>
-        <span className="text-fg-muted text-[11px]">
-          {dateLabel(dto.modified ?? dto.created)}
-        </span>
+        <span className="text-fg-muted text-[11px]">{dateLabel(dto.modified ?? dto.created)}</span>
       </div>
       <CommentBody annotationRef={dto.ref} text={dto.contents ?? ''} deletable />
     </div>
@@ -345,14 +344,14 @@ function CommentBody({
 }) {
   const t = useT();
   const comments = useComments();
-  const perms = comments.permissionsFor(annotationRef);
+  const perms = comments.getPermissions(annotationRef);
   const [draft, setDraft] = useState<string | null>(null);
 
   if (draft !== null) {
     const save = () => {
       const next = draft.trim();
       setDraft(null);
-      if (next && next !== text) void comments.edit(annotationRef, next);
+      if (next && next !== text) void comments.setText(annotationRef, next);
     };
     return (
       <textarea
@@ -395,7 +394,7 @@ function CommentBody({
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            void comments.remove(annotationRef);
+            void comments.delete(annotationRef);
           }}
           className="text-fg-muted hover:text-fg grid h-5 w-5 shrink-0 place-items-center rounded opacity-0 group-hover/body:opacity-100"
           title={t('demo.commentsDelete')}

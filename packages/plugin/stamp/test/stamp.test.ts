@@ -2,10 +2,11 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import { EngineError, EngineErrorCode, toPageRef } from '@embedpdf/engine-core/runtime';
 import type {
   DocumentHandle,
   Engine,
+  PageRef,
   PieceInfoEntry,
   PieceInfoPatch,
   PieceInfoSnapshot,
@@ -14,10 +15,10 @@ import type { DocumentMeta, PluginContext } from '@embedpdf/core';
 import { createLocalEngine } from '@embedpdf/engine';
 import type { ScriptRealmTarget } from '@embedpdf/plugin-actions/contract/host';
 
-import { createScriptRealmFactory } from '../../actions/src/script-environment';
-import { createStampCapability } from '../src/capability';
-import { initialStampState, stampReducer } from '../src/reducer';
-import type { StampAction, StampState } from '../src/types';
+import { createScriptRealmFactory } from '../../actions/src/scripting/environment';
+import { createStampController } from '../src/controller';
+import { initialStampState, stampReducer } from '../src/model';
+import type { StampAction, StampState } from '../src/host-contract';
 
 /** Minimal PDF bytes — enough for the magic-byte sniff. */
 const pdfBytes = () => new TextEncoder().encode('%PDF-1.7\n%fake fixture\n');
@@ -96,7 +97,7 @@ function makeAssetEngine(
   },
 ) {
   let pages = Array.from({ length: pageCount }, (_, i) => ({
-    pageObjectNumber: 100 + i,
+    ref: toPageRef(100 + i),
     index: i,
     size: { width: 200 + i, height: 100 + i },
   }));
@@ -106,8 +107,8 @@ function makeAssetEngine(
   const namedPages = () => [
     ...[...names.entries()].map(([name, pon]) => ({
       name,
-      target: pages.some((page) => page.pageObjectNumber === pon)
-        ? { kind: 'page' as const, pageObjectNumber: pon }
+      target: pages.some((page) => page.ref.pageObjectNumber === pon)
+        ? { kind: 'page' as const, page: toPageRef(pon) }
         : { kind: 'dangling' as const },
     })),
     ...[...templates.entries()].map(([name, objectNumber]) => ({
@@ -116,14 +117,12 @@ function makeAssetEngine(
     })),
   ];
   const layout = () => ({ pageCount: pages.length, pages, namedPages: namedPages() });
-  const setName = vi.fn(
-    async (input: { name: string; pageObjectNumber: number; replace?: string }) => {
-      if (input.replace !== undefined) names.delete(input.replace);
-      names.delete(input.name);
-      names.set(input.name, input.pageObjectNumber);
-      return { layout: layout(), cache: null };
-    },
-  );
+  const setName = vi.fn(async (input: { name: string; page: PageRef; replace?: string }) => {
+    if (input.replace !== undefined) names.delete(input.replace);
+    names.delete(input.name);
+    names.set(input.name, input.page.pageObjectNumber);
+    return { layout: layout(), cache: null };
+  });
   const removeName = vi.fn(async (input: { name: string }) => {
     names.delete(input.name);
     return { layout: layout(), cache: null };
@@ -131,45 +130,51 @@ function makeAssetEngine(
   const catalogEntries = { ...(seed?.catalog ?? {}) };
   const pageEntries = new Map<number, MetadataSeed>(
     pages.map((page) => [
-      page.pageObjectNumber,
-      { ...(seed?.pages?.[page.pageObjectNumber] ?? {}) },
+      page.ref.pageObjectNumber,
+      { ...(seed?.pages?.[page.ref.pageObjectNumber] ?? {}) },
     ]),
   );
   const close = vi.fn(async () => {});
-  const extract = vi.fn(async (pons: number[]) => new TextEncoder().encode(`%PDF-page-${pons[0]}`));
+  const extract = vi.fn(async (refs: PageRef[]) =>
+    new TextEncoder().encode(`%PDF-page-${refs[0].pageObjectNumber}`),
+  );
   const insert = vi.fn(async () => {
-    const pageObjectNumber = Math.max(99, ...pages.map((page) => page.pageObjectNumber)) + 1;
+    const pageObjectNumber = Math.max(99, ...pages.map((page) => page.ref.pageObjectNumber)) + 1;
     pages = [
       ...pages,
       {
-        pageObjectNumber,
+        ref: toPageRef(pageObjectNumber),
         index: pages.length,
         size: { width: 300, height: 120 },
       },
     ];
     pageEntries.set(pageObjectNumber, {});
     return {
-      insertedPageObjectNumbers: [pageObjectNumber],
+      insertedPages: [toPageRef(pageObjectNumber)],
       layout: layout(),
       cache: null,
     };
   });
   const insertBlank = vi.fn(async (spec: { size: { width: number; height: number } }) => {
-    const pageObjectNumber = Math.max(99, ...pages.map((page) => page.pageObjectNumber)) + 1;
-    pages = [...pages, { pageObjectNumber, index: pages.length, size: { ...spec.size } }];
+    const pageObjectNumber = Math.max(99, ...pages.map((page) => page.ref.pageObjectNumber)) + 1;
+    pages = [
+      ...pages,
+      { ref: toPageRef(pageObjectNumber), index: pages.length, size: { ...spec.size } },
+    ];
     pageEntries.set(pageObjectNumber, {});
-    return { insertedPageObjectNumbers: [pageObjectNumber], layout: layout(), cache: null };
+    return { insertedPages: [toPageRef(pageObjectNumber)], layout: layout(), cache: null };
   });
   const createAnnotation = vi.fn(async () => ({ created: { ref: {} } }));
-  const flatten = vi.fn(async (pons: number[]) => ({
-    pageObjectNumbers: pons,
+  const flatten = vi.fn(async (refs: PageRef[]) => ({
+    pages: refs,
     usage: 'display',
-    results: pons.map((pageObjectNumber) => ({ pageObjectNumber, status: 'applied' })),
+    results: refs.map((page) => ({ page, status: 'applied' })),
     meta: null,
   }));
-  const deletePages = vi.fn(async (pons: number[]) => {
+  const deletePages = vi.fn(async (refs: PageRef[]) => {
+    const pons = refs.map((ref) => ref.pageObjectNumber);
     pages = pages
-      .filter((page) => !pons.includes(page.pageObjectNumber))
+      .filter((page) => !pons.includes(page.ref.pageObjectNumber))
       .map((page, index) => ({ ...page, index }));
     for (const pon of pons) {
       pageEntries.delete(pon);
@@ -228,7 +233,7 @@ function makeAssetEngine(
       setName,
       removeName,
     },
-    page: (pon: number) => ({
+    page: ({ pageObjectNumber: pon }: PageRef) => ({
       pieceInfo: pageService(pon),
       annotations: { create: createAnnotation },
       render: {
@@ -265,18 +270,20 @@ function makeAssetEngine(
 describe('stamp plugin — library import', () => {
   it('imports a PDF: one vector asset per page, previews cached, doc closed', async () => {
     const { engine, close, extract, names, title } = makeAssetEngine(2);
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
 
-    const libraryId = await cap.importLibraryPdf(pdfBytes(), { name: 'Approvals' });
+    const libraryId = await cap.importLibrary(pdfBytes(), { name: 'Approvals' });
 
-    const libs = cap.libraries();
+    const libs = cap.listLibraries();
     expect(libs).toHaveLength(1);
     // No /Title in the PDF → the caller's fallback names it, and is written
     // back as the title so the exported library names itself from now on.
     expect(libs[0]).toMatchObject({ name: 'Approvals' });
     expect(title()).toBe('Approvals');
-    expect(new TextDecoder().decode(cap.exportLibrary(libraryId)!)).toBe('%PDF-canonical-1');
-    const assets = cap.assets(libraryId);
+    expect(new TextDecoder().decode(await await cap.exportLibrary(libraryId))).toBe(
+      '%PDF-canonical-1',
+    );
+    const assets = cap.listAssets({ libraryId: libraryId });
     expect(assets).toHaveLength(2);
     // A plain PDF: every page is a stamp, registered so the export is
     // Acrobat-readable. Identity = `${libraryId}:${identifier}`.
@@ -292,8 +299,8 @@ describe('stamp plugin — library import', () => {
       ['Stamp2=Stamp2', 101],
     ]);
     // Per-asset binaries: the extracted single-page PDF + its preview render.
-    expect(new TextDecoder().decode(cap.assetBytes(assets[0].id)!)).toBe('%PDF-page-100');
-    expect(cap.assetPreview(assets[0].id)).toMatchObject({ mimeType: 'image/png' });
+    expect(new TextDecoder().decode(cap.readAssetBytes(assets[0].id)!)).toBe('%PDF-page-100');
+    expect(cap.getAssetPreview(assets[0].id)).toMatchObject({ mimeType: 'image/png' });
     expect(extract).toHaveBeenCalledTimes(2);
     expect(close).toHaveBeenCalledTimes(1);
   });
@@ -315,26 +322,26 @@ describe('stamp plugin — library import', () => {
         },
       },
     });
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
 
-    const libraryId = await cap.importLibraryPdf(pdfBytes());
+    const libraryId = await cap.importLibrary(pdfBytes());
 
     expect(libraryId).toBe('review-library');
-    expect(cap.library(libraryId)).toMatchObject({
+    expect(cap.getLibrary(libraryId)).toMatchObject({
       name: 'Review',
       categories: ['Team'],
     });
     // v1 `Name` is the identifier and v1 `Subject` the label — now the
     // registry key; the asset id derives from them instead of the v1 `Id`.
-    expect(cap.assets(libraryId)[0]).toMatchObject({
+    expect(cap.listAssets({ libraryId: libraryId })[0]).toMatchObject({
       id: 'review-library:Approved',
       name: 'Approved',
       label: 'Approval signature',
       kind: 'signature',
       categories: ['Review'],
-      pageObjectNumber: 100,
+      page: toPageRef(100),
     });
-    expect(cap.assets(libraryId)[0].subject).toBeUndefined();
+    expect(cap.listAssets({ libraryId: libraryId })[0].subject).toBeUndefined();
     expect([...names.entries()]).toEqual([['Approved=Approval signature', 100]]);
     expect(title()).toBe('Review');
     // Import moves the schema to v2: names leave PieceInfo for their standard homes.
@@ -352,12 +359,16 @@ describe('stamp plugin — library import', () => {
       names: { 'Approved=Goedgekeurd': 101, '#alpha=Alpha': 100, 'Draft=Concept': 102 },
       templates: { 'Tpl=Hidden': 900 },
     });
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
 
-    const libraryId = await cap.importLibraryPdf(pdfBytes(), { name: 'ignored fallback' });
+    const libraryId = await cap.importLibrary(pdfBytes(), { name: 'ignored fallback' });
 
-    expect(cap.library(libraryId)?.name).toBe('Standaard stempels');
-    expect(cap.assets(libraryId).map((a) => [a.name, a.label, a.pageObjectNumber])).toEqual([
+    expect(cap.getLibrary(libraryId)?.name).toBe('Standaard stempels');
+    expect(
+      cap
+        .listAssets({ libraryId: libraryId })
+        .map((a) => [a.name, a.label, a.page.pageObjectNumber]),
+    ).toEqual([
       ['#alpha', 'Alpha', 100],
       ['Approved', 'Goedgekeurd', 101],
       ['Draft', 'Concept', 102],
@@ -370,8 +381,8 @@ describe('stamp plugin — library import', () => {
     const { engine } = makeAssetEngine(2, {
       names: { 'Approved=One': 100, 'Approved=Two': 101 },
     });
-    const cap = createStampCapability(makeCtx(engine));
-    await expect(cap.importLibraryPdf(pdfBytes())).rejects.toMatchObject({
+    const cap = createStampController(makeCtx(engine));
+    await expect(cap.importLibrary(pdfBytes())).rejects.toMatchObject({
       code: EngineErrorCode.InvalidArg,
       message: expect.stringContaining("duplicate stamp identifier 'Approved'"),
     });
@@ -379,8 +390,8 @@ describe('stamp plugin — library import', () => {
 
   it('rejects non-PDF bytes with InvalidArg', async () => {
     const { engine } = makeAssetEngine(1);
-    const cap = createStampCapability(makeCtx(engine));
-    await expect(cap.importLibraryPdf(pngBytes())).rejects.toMatchObject({
+    const cap = createStampController(makeCtx(engine));
+    await expect(cap.importLibrary(pngBytes())).rejects.toMatchObject({
       code: EngineErrorCode.InvalidArg,
     });
   });
@@ -394,8 +405,8 @@ describe('stamp plugin — library import', () => {
         );
       },
     } as unknown as Engine;
-    const cap = createStampCapability(makeCtx(cloudish));
-    await expect(cap.importLibraryPdf(pdfBytes())).rejects.toMatchObject({
+    const cap = createStampController(makeCtx(cloudish));
+    await expect(cap.importLibrary(pdfBytes())).rejects.toMatchObject({
       code: EngineErrorCode.NotImplemented,
       message: expect.stringContaining('assetEngine'),
     });
@@ -405,68 +416,68 @@ describe('stamp plugin — library import', () => {
 describe('stamp plugin — assets', () => {
   it('a raster asset becomes a PAGE: blank page its size, image flattened in, registered', async () => {
     const { engine, insertBlank, createAnnotation, flatten, names, title } = makeAssetEngine(0);
-    const cap = createStampCapability(makeCtx(engine));
-    const id = await cap.addAsset({ name: 'Logo', label: 'Company logo', source: pngBytes() });
+    const cap = createStampController(makeCtx(engine));
+    const id = await cap.createAsset({ name: 'Logo', label: 'Company logo', source: pngBytes() });
 
     // No library named → one of its own, a real PDF titled after the label.
-    const [library] = cap.libraries();
+    const [library] = cap.listLibraries();
     expect(library).toMatchObject({ name: 'Company logo', assetIds: [id] });
     expect(title()).toBe('Company logo');
     expect(insertBlank).toHaveBeenCalledWith({ size: { width: 100, height: 50 } });
     expect(createAnnotation).toHaveBeenCalledWith(
       expect.objectContaining({ subtype: 'stamp', fit: 'fill' }),
     );
-    expect(flatten).toHaveBeenCalledWith([100], 'display');
+    expect(flatten).toHaveBeenCalledWith([toPageRef(100)], 'display');
     expect(names.get('Logo=Company logo')).toBe(100);
-    expect(cap.asset(id)).toMatchObject({
+    expect(cap.getAsset(id)).toMatchObject({
       id: `${library.id}:Logo`,
       name: 'Logo',
       label: 'Company logo',
       size: { width: 100, height: 50 },
-      pageObjectNumber: 100,
+      page: toPageRef(100),
     });
-    expect(cap.assetPreview(id)?.mimeType).toBe('image/png');
+    expect(cap.getAssetPreview(id)?.mimeType).toBe('image/png');
   });
 
   it('a PDF asset needs no size — its page has one; a supplied preview wins', async () => {
     const { engine } = makeAssetEngine(0);
-    const cap = createStampCapability(makeCtx(engine));
-    const id = await cap.addAsset({ name: 'Sig', source: pdfBytes(), preview: pngBytes() });
-    expect(cap.asset(id)).toMatchObject({
+    const cap = createStampController(makeCtx(engine));
+    const id = await cap.createAsset({ name: 'Sig', source: pdfBytes(), preview: pngBytes() });
+    expect(cap.getAsset(id)).toMatchObject({
       size: { width: 300, height: 120 },
-      pageObjectNumber: 100,
+      page: toPageRef(100),
     });
-    expect(cap.assetPreview(id)?.mimeType).toBe('image/png');
+    expect(cap.getAssetPreview(id)?.mimeType).toBe('image/png');
   });
 
   it('createLibrary makes an empty PDF library; removing the last asset keeps it', async () => {
     const { engine, deletePages } = makeAssetEngine(0);
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
     const seen: string[] = [];
     cap.onLibraryChanged((c) => seen.push(c.reason));
     const libraryId = await cap.createLibrary('Mine', { id: 'mine', categories: ['custom'] });
     expect(libraryId).toBe('mine');
-    expect(cap.library(libraryId)).toMatchObject({
+    expect(cap.getLibrary(libraryId)).toMatchObject({
       name: 'Mine',
       categories: ['custom'],
       assetIds: [],
     });
-    expect(cap.exportLibrary(libraryId)).not.toBeNull();
+    expect(await cap.exportLibrary(libraryId)).not.toBeNull();
 
-    const id = await cap.addAsset({ libraryId, name: 'One', source: pdfBytes() });
-    await cap.removeAsset(id);
-    expect(deletePages).toHaveBeenCalledWith([100]);
-    expect(cap.library(libraryId)).toMatchObject({ assetIds: [] });
-    expect(cap.exportLibrary(libraryId)).not.toBeNull();
+    const id = await cap.createAsset({ libraryId, name: 'One', source: pdfBytes() });
+    await cap.deleteAsset(id);
+    expect(deletePages).toHaveBeenCalledWith([toPageRef(100)]);
+    expect(cap.getLibrary(libraryId)).toMatchObject({ assetIds: [] });
+    expect(await cap.exportLibrary(libraryId)).not.toBeNull();
     expect(seen).toEqual(['created', 'asset-added', 'asset-removed']);
   });
 
   it('appends a PDF page to a canonical library and writes its PieceInfo', async () => {
     const { engine, insert, pageEntries, names } = makeAssetEngine(1);
-    const cap = createStampCapability(makeCtx(engine));
-    const libraryId = await cap.importLibraryPdf(pdfBytes());
+    const cap = createStampController(makeCtx(engine));
+    const libraryId = await cap.importLibrary(pdfBytes());
 
-    const id = await cap.addAsset({
+    const id = await cap.createAsset({
       libraryId,
       name: 'Signed',
       kind: 'signature',
@@ -477,15 +488,17 @@ describe('stamp plugin — assets', () => {
 
     expect(insert).toHaveBeenCalledTimes(1);
     expect(id).toBe(`${libraryId}:Signed`);
-    expect(cap.asset(id)).toMatchObject({
+    expect(cap.getAsset(id)).toMatchObject({
       name: 'Signed',
       label: 'Signed',
-      pageObjectNumber: 101,
+      page: toPageRef(101),
       size: { width: 300, height: 120 },
       kind: 'signature',
       subject: 'Customer sign-off',
     });
-    expect(new TextDecoder().decode(cap.exportLibrary(libraryId)!)).toBe('%PDF-canonical-2');
+    expect(new TextDecoder().decode(await await cap.exportLibrary(libraryId))).toBe(
+      '%PDF-canonical-2',
+    );
     // Insert copies the page only; the registry entry is written in the same mutation.
     expect(names.get('Signed=Signed')).toBe(101);
     expect(pageEntries.get(101)).toMatchObject({
@@ -494,61 +507,65 @@ describe('stamp plugin — assets', () => {
       Categories: { type: 'string-array', value: ['Signature'] },
     });
     expect(pageEntries.get(101)?.Name).toBeUndefined();
-    expect(cap.assetPreview(id)?.mimeType).toBe('image/png');
+    expect(cap.getAssetPreview(id)?.mimeType).toBe('image/png');
   });
 
   it('rejects a duplicate identifier within a library', async () => {
     const { engine, insert } = makeAssetEngine(1);
-    const cap = createStampCapability(makeCtx(engine));
-    const libraryId = await cap.importLibraryPdf(pdfBytes());
+    const cap = createStampController(makeCtx(engine));
+    const libraryId = await cap.importLibrary(pdfBytes());
 
     await expect(
-      cap.addAsset({ libraryId, name: 'Stamp1', source: pdfBytes() }),
+      cap.createAsset({ libraryId, name: 'Stamp1', source: pdfBytes() }),
     ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
     expect(insert).not.toHaveBeenCalled();
   });
 
   it('deletes a canonical page before removing its asset descriptor', async () => {
     const { engine, deletePages } = makeAssetEngine(2);
-    const cap = createStampCapability(makeCtx(engine));
-    const libraryId = await cap.importLibraryPdf(pdfBytes());
-    const [asset] = cap.assets(libraryId);
+    const cap = createStampController(makeCtx(engine));
+    const libraryId = await cap.importLibrary(pdfBytes());
+    const [asset] = cap.listAssets({ libraryId: libraryId });
 
-    await cap.removeAsset(asset.id);
+    await cap.deleteAsset(asset.id);
 
-    expect(deletePages).toHaveBeenCalledWith([100]);
-    expect(cap.asset(asset.id)).toBeNull();
-    expect(cap.assets(libraryId)).toHaveLength(1);
-    expect(new TextDecoder().decode(cap.exportLibrary(libraryId)!)).toBe('%PDF-canonical-2');
+    expect(deletePages).toHaveBeenCalledWith([toPageRef(100)]);
+    expect(cap.getAsset(asset.id)).toBeNull();
+    expect(cap.listAssets({ libraryId: libraryId })).toHaveLength(1);
+    expect(new TextDecoder().decode(await await cap.exportLibrary(libraryId))).toBe(
+      '%PDF-canonical-2',
+    );
   });
 
   it('serializes concurrent removals: each rewrite starts from the previous bytes', async () => {
     const { engine, deletePages } = makeAssetEngine(2);
-    const cap = createStampCapability(makeCtx(engine));
-    const libraryId = await cap.importLibraryPdf(pdfBytes());
-    const [first, second] = cap.assets(libraryId);
+    const cap = createStampController(makeCtx(engine));
+    const libraryId = await cap.importLibrary(pdfBytes());
+    const [first, second] = cap.listAssets({ libraryId: libraryId });
 
-    await Promise.all([cap.removeAsset(first.id), cap.removeAsset(second.id)]);
+    await Promise.all([cap.deleteAsset(first.id), cap.deleteAsset(second.id)]);
 
     expect(deletePages).toHaveBeenCalledTimes(2);
-    expect(cap.library(libraryId)).toMatchObject({ assetIds: [] });
-    expect(new TextDecoder().decode(cap.exportLibrary(libraryId)!)).toBe('%PDF-canonical-3');
-    expect(cap.assets()).toHaveLength(0);
+    expect(cap.getLibrary(libraryId)).toMatchObject({ assetIds: [] });
+    expect(new TextDecoder().decode(await await cap.exportLibrary(libraryId))).toBe(
+      '%PDF-canonical-3',
+    );
+    expect(cap.listAssets()).toHaveLength(0);
   });
 
   it('keeps state and canonical bytes unchanged when an append cannot be saved', async () => {
     const { engine, download } = makeAssetEngine(1);
-    const cap = createStampCapability(makeCtx(engine));
-    const libraryId = await cap.importLibraryPdf(pdfBytes());
-    const beforeBytes = cap.exportLibrary(libraryId);
+    const cap = createStampController(makeCtx(engine));
+    const libraryId = await cap.importLibrary(pdfBytes());
+    const beforeBytes = await cap.exportLibrary(libraryId);
     download.mockRejectedValueOnce(new Error('save failed'));
 
     await expect(
-      cap.addAsset({ libraryId, name: 'Not saved', source: pdfBytes() }),
+      cap.createAsset({ libraryId, name: 'Not saved', source: pdfBytes() }),
     ).rejects.toThrow('save failed');
 
-    expect(cap.assets(libraryId)).toHaveLength(1);
-    expect(cap.exportLibrary(libraryId)).toBe(beforeBytes);
+    expect(cap.listAssets({ libraryId: libraryId })).toHaveLength(1);
+    expect(await cap.exportLibrary(libraryId)).toEqual(beforeBytes);
   });
 
   it('allocates new embedded ids when the same canonical library is imported twice', async () => {
@@ -556,27 +573,27 @@ describe('stamp plugin — assets', () => {
       catalog: { Id: { type: 'string', value: 'shared-library-id' } },
       pages: { 100: { Id: { type: 'string', value: 'shared-asset-id' } } },
     });
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
 
-    const firstLibraryId = await cap.importLibraryPdf(pdfBytes());
-    const secondLibraryId = await cap.importLibraryPdf(pdfBytes());
+    const firstLibraryId = await cap.importLibrary(pdfBytes());
+    const secondLibraryId = await cap.importLibrary(pdfBytes());
 
     expect(firstLibraryId).toBe('shared-library-id');
     expect(secondLibraryId).not.toBe(firstLibraryId);
-    expect(cap.libraries()).toHaveLength(2);
-    expect(cap.assets()[0].id).not.toBe(cap.assets()[1].id);
+    expect(cap.listLibraries()).toHaveLength(2);
+    expect(cap.listAssets()[0].id).not.toBe(cap.listAssets()[1].id);
   });
 
   it('removeLibrary drops the library, its assets, and their binaries', async () => {
     const { engine } = makeAssetEngine(2);
-    const cap = createStampCapability(makeCtx(engine));
-    const libraryId = await cap.importLibraryPdf(pdfBytes());
-    const [a] = cap.assets(libraryId);
-    await cap.removeLibrary(libraryId);
-    expect(cap.libraries()).toHaveLength(0);
-    expect(cap.assets()).toHaveLength(0);
-    expect(cap.assetBytes(a.id)).toBeNull();
-    expect(cap.exportLibrary(libraryId)).toBeNull();
+    const cap = createStampController(makeCtx(engine));
+    const libraryId = await cap.importLibrary(pdfBytes());
+    const [a] = cap.listAssets({ libraryId: libraryId });
+    await cap.deleteLibrary(libraryId);
+    expect(cap.listLibraries()).toHaveLength(0);
+    expect(cap.listAssets()).toHaveLength(0);
+    expect(cap.readAssetBytes(a.id)).toBeNull();
+    await expect(cap.exportLibrary(libraryId)).rejects.toMatchObject({ code: 'not-found' });
   });
 });
 
@@ -585,44 +602,46 @@ describe('stamp plugin — authoring', () => {
     const { engine, setName, names, pageEntries } = makeAssetEngine(1, {
       names: { 'Approved=Approved': 100 },
     });
-    const cap = createStampCapability(makeCtx(engine));
-    const libraryId = await cap.importLibraryPdf(pdfBytes());
-    const [asset] = cap.assets(libraryId);
+    const cap = createStampController(makeCtx(engine));
+    const libraryId = await cap.importLibrary(pdfBytes());
+    const [asset] = cap.listAssets({ libraryId: libraryId });
 
     await cap.updateAsset(asset.id, { label: 'Goedgekeurd', subject: 'Akkoord' });
 
     expect(setName).toHaveBeenCalledWith({
       name: 'Approved=Goedgekeurd',
-      pageObjectNumber: 100,
+      page: toPageRef(100),
       replace: 'Approved=Approved',
     });
     expect([...names.entries()]).toEqual([['Approved=Goedgekeurd', 100]]);
-    expect(cap.asset(asset.id)).toMatchObject({
+    expect(cap.getAsset(asset.id)).toMatchObject({
       id: asset.id,
       name: 'Approved',
       label: 'Goedgekeurd',
       subject: 'Akkoord',
     });
     expect(pageEntries.get(100)?.SubjectOverride).toEqual({ type: 'string', value: 'Akkoord' });
-    expect(new TextDecoder().decode(cap.exportLibrary(libraryId)!)).toBe('%PDF-canonical-2');
+    expect(new TextDecoder().decode(await await cap.exportLibrary(libraryId))).toBe(
+      '%PDF-canonical-2',
+    );
 
     await cap.updateAsset(asset.id, { subject: null });
-    expect(cap.asset(asset.id)?.subject).toBeUndefined();
+    expect(cap.getAsset(asset.id)?.subject).toBeUndefined();
   });
 
   it('onLibraryChanged fires for every canonical change with its reason', async () => {
     const { engine } = makeAssetEngine(2);
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
     const seen: string[] = [];
     const off = cap.onLibraryChanged((change) => seen.push(`${change.libraryId}:${change.reason}`));
 
-    const libraryId = await cap.importLibraryPdf(pdfBytes());
-    const added = await cap.addAsset({ libraryId, name: 'New', source: pdfBytes() });
+    const libraryId = await cap.importLibrary(pdfBytes());
+    const added = await cap.createAsset({ libraryId, name: 'New', source: pdfBytes() });
     await cap.updateAsset(added, { label: 'Renamed' });
-    await cap.removeAsset(added);
-    await cap.removeLibrary(libraryId);
+    await cap.deleteAsset(added);
+    await cap.deleteLibrary(libraryId);
     off();
-    await cap.importLibraryPdf(pdfBytes());
+    await cap.importLibrary(pdfBytes());
 
     expect(seen).toEqual([
       `${libraryId}:imported`,
@@ -639,7 +658,7 @@ describe('stamp plugin — from a selection', () => {
     const { engine, insert } = makeAssetEngine(1);
     const exportAppearance = vi.fn(async () => new TextEncoder().encode('%PDF-exported'));
     const target = {
-      page: (pon: number) => ({ annotations: { exportAppearance }, pon }),
+      page: (page: PageRef) => ({ annotations: { exportAppearance }, page }),
     } as unknown as DocumentHandle;
     const meta: DocumentMeta = {
       id: 'doc-1',
@@ -648,17 +667,20 @@ describe('stamp plugin — from a selection', () => {
       pages: [],
       revision: 0,
     };
-    const cap = createStampCapability(
+    const cap = createStampController(
       makeCtx(engine, undefined, { id: 'doc-1', handle: target, meta }),
     );
-    const libraryId = await cap.importLibraryPdf(pdfBytes());
-    const refs = [{ kind: 'objectNumber' as const, pageObjectNumber: 5, annotObjectNumber: 9 }];
+    const libraryId = await cap.importLibrary(pdfBytes());
+    const refs = [{ kind: 'objectNumber' as const, page: toPageRef(5), annotObjectNumber: 9 }];
 
-    const id = await cap.addAssetFromAnnotations('doc-1', 5, refs, { libraryId, label: 'My mark' });
+    const id = await cap.createAssetFromAnnotations('doc-1', toPageRef(5), refs, {
+      libraryId,
+      label: 'My mark',
+    });
 
     expect(exportAppearance).toHaveBeenCalledWith(refs);
     expect(new TextDecoder().decode(insert.mock.calls[0][0] as Uint8Array)).toBe('%PDF-exported');
-    const asset = cap.asset(id)!;
+    const asset = cap.getAsset(id)!;
     // An Acrobat-style identifier, the caller's label.
     expect(asset.name).toMatch(/^#[A-Za-z0-9]{22}$/);
     expect(asset.label).toBe('My mark');
@@ -675,14 +697,12 @@ describe('stamp plugin — from a selection', () => {
       pages: [],
       revision: 0,
     };
-    const cap = createStampCapability(
+    const cap = createStampController(
       makeCtx(engine, undefined, { id: 'doc-1', handle: target, meta }),
     );
-    await expect(cap.addAssetFromAnnotations('doc-1', 5, [], { label: 'x' })).rejects.toMatchObject(
-      {
-        code: EngineErrorCode.NotImplemented,
-      },
-    );
+    await expect(
+      cap.createAssetFromAnnotations('doc-1', toPageRef(5), [], { label: 'x' }),
+    ).rejects.toMatchObject({ code: EngineErrorCode.NotImplemented });
   });
 });
 
@@ -690,9 +710,9 @@ describe('stamp plugin — placement', () => {
   it('armAsset delegates to the document annotation plugin with bytes + preview + intrinsic size', async () => {
     const { engine } = makeAssetEngine(1);
     const armStamp = vi.fn(async () => {});
-    const cap = createStampCapability(makeCtx(engine, { armStamp }));
-    const libraryId = await cap.importLibraryPdf(pdfBytes());
-    const [asset] = cap.assets(libraryId);
+    const cap = createStampController(makeCtx(engine, { armStamp }));
+    const libraryId = await cap.importLibrary(pdfBytes());
+    const [asset] = cap.listAssets({ libraryId: libraryId });
 
     await cap.armAsset('doc-1', asset.id, { targetWidth: 120 });
 
@@ -716,14 +736,14 @@ describe('stamp plugin — placement', () => {
 
   it('placeAsset places without the pointer through the same payload', async () => {
     const { engine } = makeAssetEngine(1, { names: { 'Approved=Goedgekeurd': 100 } });
-    const ref = { kind: 'objectNumber', pageObjectNumber: 7, annotObjectNumber: 42 };
+    const ref = { kind: 'objectNumber', page: toPageRef(7), annotObjectNumber: 42 };
     const placeStamp = vi.fn(async () => ref);
-    const cap = createStampCapability(makeCtx(engine, { placeStamp }));
-    const libraryId = await cap.importLibraryPdf(pdfBytes());
-    const [asset] = cap.assets(libraryId);
+    const cap = createStampController(makeCtx(engine, { placeStamp }));
+    const libraryId = await cap.importLibrary(pdfBytes());
+    const [asset] = cap.listAssets({ libraryId: libraryId });
 
     const placed = await cap.placeAsset('doc-1', asset.id, {
-      pageObjectNumber: 7,
+      page: toPageRef(7),
       at: { x: 100, y: 200 },
       targetWidth: 90,
     });
@@ -739,12 +759,12 @@ describe('stamp plugin — placement', () => {
       subject: 'Goedgekeurd',
       intrinsicSize: { width: 200, height: 100 },
     });
-    expect(placement).toEqual({ pageObjectNumber: 7, at: { x: 100, y: 200 }, targetWidth: 90 });
+    expect(placement).toEqual({ page: toPageRef(7), at: { x: 100, y: 200 }, targetWidth: 90 });
   });
 
   it('arming an unknown asset rejects with NotFound', async () => {
     const { engine } = makeAssetEngine(0);
-    const cap = createStampCapability(makeCtx(engine, { armStamp: vi.fn() }));
+    const cap = createStampController(makeCtx(engine, { armStamp: vi.fn() }));
     await expect(cap.armAsset('doc-1', 'nope')).rejects.toMatchObject({
       code: EngineErrorCode.NotFound,
     });
@@ -763,8 +783,8 @@ describe('stamp plugin — placement', () => {
         return new Proxy(doc, {
           get(targetDoc, property) {
             if (property === 'page') {
-              return (pageObjectNumber: number) => {
-                const page = targetDoc.page(pageObjectNumber);
+              return (ref: PageRef) => {
+                const page = targetDoc.page(ref);
                 return new Proxy(page, {
                   get(targetPage, pageProperty) {
                     if (pageProperty === 'render') {
@@ -840,7 +860,7 @@ describe('stamp plugin — placement', () => {
         surfaced.push({ commit, context });
       },
     };
-    const cap = createStampCapability(
+    const cap = createStampController(
       makeCtx(
         engine,
         { armStamp },
@@ -852,15 +872,15 @@ describe('stamp plugin — placement', () => {
 
     let materialized: DocumentHandle | null = null;
     try {
-      const libraryId = await cap.importLibraryPdf(fixtureBytes);
-      const [asset] = cap.assets(libraryId);
-      const canonicalBefore = new Uint8Array(cap.exportLibrary(libraryId)!);
-      const baseBefore = new Uint8Array(cap.assetBytes(asset.id)!);
+      const libraryId = await cap.importLibrary(fixtureBytes);
+      const [asset] = cap.listAssets({ libraryId: libraryId });
+      const canonicalBefore = new Uint8Array(await await cap.exportLibrary(libraryId));
+      const baseBefore = new Uint8Array(cap.readAssetBytes(asset.id)!);
 
       await cap.armAsset(target.id, asset.id);
 
-      expect(cap.exportLibrary(libraryId)).toEqual(canonicalBefore);
-      expect(cap.assetBytes(asset.id)).toEqual(baseBefore);
+      expect(await cap.exportLibrary(libraryId)).toEqual(canonicalBefore);
+      expect(cap.readAssetBytes(asset.id)).toEqual(baseBefore);
       expect(armStamp).toHaveBeenCalledTimes(1);
       const armed = armStamp.mock.calls[0][0] as {
         source: Uint8Array;
@@ -880,9 +900,7 @@ describe('stamp plugin — placement', () => {
       );
       const forms = await materialized.forms.list();
       const pages = await materialized.pages.list();
-      const annotations = await materialized
-        .page(pages.pages[0].pageObjectNumber)
-        .annotations.list();
+      const annotations = await materialized.page(pages.pages[0].ref).annotations.list();
       expect(forms.fields).toHaveLength(0);
       expect(annotations.annotations).toHaveLength(0);
     } finally {
@@ -896,20 +914,23 @@ describe('stamp plugin — placement', () => {
 describe('stamp plugin — library kinds', () => {
   it('a library is created for a kind, written to the file, and filtered by it', async () => {
     const { engine, catalogEntries } = makeAssetEngine(0);
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
     const stamps = await cap.createLibrary('Mine');
     const signer = await cap.createLibrary('Bob Singor', { kind: 'signatures' });
     const custom = await cap.createLibrary('Review marks', { kind: 'toolbar' });
 
-    expect(cap.library(stamps)).toMatchObject({ kind: 'stamps' });
-    expect(cap.library(signer)).toMatchObject({ kind: 'signatures', name: 'Bob Singor' });
+    expect(cap.getLibrary(stamps)).toMatchObject({ kind: 'stamps' });
+    expect(cap.getLibrary(signer)).toMatchObject({ kind: 'signatures', name: 'Bob Singor' });
     // The last write is the toolbar library's: its kind is written as given.
     expect(catalogEntries.Kind).toEqual({ type: 'name', value: 'toolbar' });
 
-    expect(cap.libraries().map((l) => l.id)).toEqual([stamps, signer, custom]);
-    expect(cap.libraries({ kind: 'stamps' }).map((l) => l.id)).toEqual([stamps]);
-    expect(cap.libraries({ kind: 'signatures' }).map((l) => l.id)).toEqual([signer]);
-    expect(cap.libraries({ kind: ['stamps', 'toolbar'] }).map((l) => l.id)).toEqual([stamps, custom]);
+    expect(cap.listLibraries().map((l) => l.id)).toEqual([stamps, signer, custom]);
+    expect(cap.listLibraries({ kind: 'stamps' }).map((l) => l.id)).toEqual([stamps]);
+    expect(cap.listLibraries({ kind: 'signatures' }).map((l) => l.id)).toEqual([signer]);
+    expect(cap.listLibraries({ kind: ['stamps', 'toolbar'] }).map((l) => l.id)).toEqual([
+      stamps,
+      custom,
+    ]);
   });
 
   it('imports the kind the file declares, defaults v2 files to stamps, and lets the caller override', async () => {
@@ -917,31 +938,31 @@ describe('stamp plugin — library kinds', () => {
       catalog: { Kind: { type: 'name', value: 'SignatureLibrary' } },
       title: 'Alice',
     });
-    const cap = createStampCapability(makeCtx(signatures.engine));
-    const aliceId = await cap.importLibraryPdf(pdfBytes());
-    expect(cap.library(aliceId)).toMatchObject({ kind: 'signatures', name: 'Alice' });
+    const cap = createStampController(makeCtx(signatures.engine));
+    const aliceId = await cap.importLibrary(pdfBytes());
+    expect(cap.getLibrary(aliceId)).toMatchObject({ kind: 'signatures', name: 'Alice' });
     expect(signatures.catalogEntries.Kind).toEqual({ type: 'name', value: 'SignatureLibrary' });
 
     const v2 = makeAssetEngine(1, { catalog: { Kind: { type: 'name', value: 'StampLibrary' } } });
-    const cap2 = createStampCapability(makeCtx(v2.engine));
-    expect(cap2.library(await cap2.importLibraryPdf(pdfBytes()))).toMatchObject({ kind: 'stamps' });
+    const cap2 = createStampController(makeCtx(v2.engine));
+    expect(cap2.getLibrary(await cap2.importLibrary(pdfBytes()))).toMatchObject({ kind: 'stamps' });
 
     const overridden = makeAssetEngine(1);
-    const cap3 = createStampCapability(makeCtx(overridden.engine));
-    const id = await cap3.importLibraryPdf(pdfBytes(), { libraryKind: 'toolbar' });
-    expect(cap3.library(id)).toMatchObject({ kind: 'toolbar' });
+    const cap3 = createStampController(makeCtx(overridden.engine));
+    const id = await cap3.importLibrary(pdfBytes(), { libraryKind: 'toolbar' });
+    expect(cap3.getLibrary(id)).toMatchObject({ kind: 'toolbar' });
     expect(overridden.catalogEntries.Kind).toEqual({ type: 'name', value: 'toolbar' });
   });
 
   it('updateLibrary renames through the document title and keeps the kind', async () => {
     const { engine, metadata, catalogEntries } = makeAssetEngine(0);
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
     const seen: string[] = [];
     cap.onLibraryChanged((c) => seen.push(c.reason));
     const id = await cap.createLibrary('Bob', { kind: 'signatures' });
     await cap.updateLibrary(id, { name: 'Bob Singor', categories: ['personal'] });
     expect(metadata.update).toHaveBeenLastCalledWith({ title: 'Bob Singor' });
-    expect(cap.library(id)).toMatchObject({
+    expect(cap.getLibrary(id)).toMatchObject({
       name: 'Bob Singor',
       kind: 'signatures',
       categories: ['personal'],
@@ -956,13 +977,13 @@ describe('stamp plugin — library kinds', () => {
 
   it('addAsset takes exactly one of source / mark', async () => {
     const { engine } = makeAssetEngine(0);
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
     const id = await cap.createLibrary('Mine');
-    await expect(cap.addAsset({ libraryId: id, name: 'A' })).rejects.toMatchObject({
+    await expect(cap.createAsset({ libraryId: id, name: 'A' })).rejects.toMatchObject({
       code: EngineErrorCode.InvalidArg,
     });
     await expect(
-      cap.addAsset({
+      cap.createAsset({
         libraryId: id,
         name: 'A',
         source: pdfBytes(),
@@ -972,7 +993,6 @@ describe('stamp plugin — library kinds', () => {
   });
 });
 
-
 /** A real engine whose page renders answer a fixed PNG: Node has no canvas encoder, thumbnails do not matter here. */
 function withFakeRenders(engine: Engine): Engine {
   return {
@@ -981,8 +1001,8 @@ function withFakeRenders(engine: Engine): Engine {
       return new Proxy(doc, {
         get(targetDoc, property) {
           if (property === 'page') {
-            return (pageObjectNumber: number) => {
-              const page = targetDoc.page(pageObjectNumber);
+            return (ref: PageRef) => {
+              const page = targetDoc.page(ref);
               return new Proxy(page, {
                 get(targetPage, pageProperty) {
                   if (pageProperty === 'render') {
@@ -1017,10 +1037,10 @@ function withFakeRenders(engine: Engine): Engine {
 describe('stamp plugin — authoring marks (real engine)', () => {
   it('renders a drawn mark and a typed mark into vector pages the size of the mark', async () => {
     const engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
-    const cap = createStampCapability(makeCtx(withFakeRenders(engine)));
+    const cap = createStampController(makeCtx(withFakeRenders(engine)));
     try {
       const libraryId = await cap.createLibrary('Bob Singor', { kind: 'signatures' });
-      const drawn = await cap.addAsset({
+      const drawn = await cap.createAsset({
         libraryId,
         name: 'sig',
         label: 'Signature',
@@ -1038,7 +1058,7 @@ describe('stamp plugin — authoring marks (real engine)', () => {
           strokeWidth: 3,
         },
       });
-      const signature = cap.asset(drawn)!;
+      const signature = cap.getAsset(drawn)!;
       expect(signature.kind).toBe('signature');
       // The page is the mark's bounds (200 × 60) plus the stroke padding.
       expect(signature.size.width).toBeGreaterThan(200);
@@ -1046,19 +1066,23 @@ describe('stamp plugin — authoring marks (real engine)', () => {
       expect(signature.size.height).toBeGreaterThan(60);
       expect(signature.size.height).toBeLessThan(75);
 
-      const typed = await cap.addAsset({
+      const typed = await cap.createAsset({
         libraryId,
         name: 'ini',
         label: 'Initials',
         kind: 'initials',
         mark: { kind: 'text', text: 'BS', fontFamily: 'helvetica', fontSize: 40 },
       });
-      const initials = cap.asset(typed)!;
+      const initials = cap.getAsset(typed)!;
       expect(initials.size.width).toBeGreaterThan(20);
       expect(initials.size.height).toBeGreaterThan(20);
 
       // Both are pages of the one library PDF: reopening it lists them by kind.
-      const doc = await engine.open({ kind: 'bytes', id: 'lib', bytes: cap.exportLibrary(libraryId)! });
+      const doc = await engine.open({
+        kind: 'bytes',
+        id: 'lib',
+        bytes: await await cap.exportLibrary(libraryId),
+      });
       try {
         // Two registered marks (a created library keeps its blank first page, unregistered).
         const layout = await doc.pages.list();
@@ -1067,8 +1091,11 @@ describe('stamp plugin — authoring marks (real engine)', () => {
       } finally {
         await doc.close();
       }
-      expect(cap.libraries({ kind: 'signatures' })).toHaveLength(1);
-      expect(cap.assets(libraryId).map((a) => a.kind)).toEqual(['signature', 'initials']);
+      expect(cap.listLibraries({ kind: 'signatures' })).toHaveLength(1);
+      expect(cap.listAssets({ libraryId: libraryId }).map((a) => a.kind)).toEqual([
+        'signature',
+        'initials',
+      ]);
     } finally {
       await engine.destroy();
     }

@@ -6,8 +6,8 @@
  * and `/RD` insets the drawn geometry so the scallops bulge back out to it —
  * derived, never stored on the model.
  */
-import type { AnnotationDTO, PdfRect } from '@embedpdf/engine-core/runtime';
 import { cloudyBorderExtent, type Annot } from '@embedpdf/core-annotation';
+import type { AnnotationDTO, PdfRect } from '@embedpdf/engine-core/runtime';
 
 import { boxEmit, type KindProjection, type Wire } from '../projection';
 import { borderSlice } from '../props';

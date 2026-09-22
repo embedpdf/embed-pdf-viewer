@@ -7,6 +7,7 @@ import {
   type Engine,
   type LineDraft,
   type PolygonDraft,
+  toPageRef,
 } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '../src/index';
 
@@ -59,7 +60,7 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
   test('derived contents overrides clients, style preserves imported formatting, caption patches preserve placement', async () => {
     const doc = await open();
     try {
-      const page = doc.page(3),
+      const page = doc.page(toPageRef(3)),
         created = (await page.annotations.create(line())).created;
       expect(created).toMatchObject({
         contents: '3 m',
@@ -104,7 +105,7 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
   test('manual area center moves with rigid geometry, stays fixed on vertex edits, and (0,0) survives', async () => {
     const doc = await open();
     try {
-      const page = doc.page(3);
+      const page = doc.page(toPageRef(3));
       const draft: PolygonDraft = {
         subtype: 'polygon',
         intent: 'PolygonDimension',
@@ -163,7 +164,7 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
       { scope: ['*'] },
     );
     try {
-      const p = doc.page(3);
+      const p = doc.page(toPageRef(3));
       await p.measure!.setScale(scale);
       await p.annotations.create(line());
       await p.annotations.create({
@@ -201,17 +202,17 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
         },
         { scope: ['*'] },
       );
-      const annotations = (await doc.page(3).annotations.list()).annotations;
+      const annotations = (await doc.page(toPageRef(3)).annotations.list()).annotations;
       expect(annotations.map((a) => a.contents)).toEqual(['3 m', '6 m', '4.5 m²']);
       expect(annotations[1]).toMatchObject({ caption: { center: { x: 0, y: 0 } } });
-      const viewports = await doc.page(3).measure!.viewports();
+      const viewports = await doc.page(toPageRef(3)).measure!.viewports();
       expect(viewports).toHaveLength(2);
       expect(viewports[1]).toMatchObject({
         owned: true,
         bbox: { left: -20, bottom: -40, right: 592, top: 752 },
       });
-      await doc.page(3).measure!.setScale(null);
-      expect(await doc.page(3).measure!.viewports()).toEqual([viewports[0]]);
+      await doc.page(toPageRef(3)).measure!.setScale(null);
+      expect(await doc.page(toPageRef(3)).measure!.viewports()).toEqual([viewports[0]]);
     } finally {
       await doc.close();
     }
@@ -225,15 +226,15 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
         linePoints: { start: { x: 0, y: 0 }, end: { x: 3.4450000001, y: 0 } },
       };
       const expected = measurementReadout(draft);
-      const created = (await doc.page(3).annotations.create(draft)).created;
+      const created = (await doc.page(toPageRef(3)).annotations.create(draft)).created;
       expect(created.contents).toBe('label' in expected && expected.label);
       const saved = await doc.download();
       await doc.close();
       doc = await open(saved);
-      const a = (await doc.page(3).annotations.list()).annotations[0];
+      const a = (await doc.page(toPageRef(3)).annotations.list()).annotations[0];
       expect(a.contents).toBe(created.contents);
       const changed = await doc
-        .page(3)
+        .page(toPageRef(3))
         .annotations.update(a.ref, { subtype: 'line', color: { r: 0, g: 0, b: 255 } });
       expect(changed.updated.contents).toBe(created.contents);
     } finally {
@@ -243,7 +244,7 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
   test('invalid measure fails before geometry or label writes, unavailable scales keep contents', async () => {
     const doc = await open();
     try {
-      const page = doc.page(3),
+      const page = doc.page(toPageRef(3)),
         a = (await page.annotations.create(line())).created;
       await expect(
         page.annotations.update(a.ref, {
@@ -282,8 +283,8 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
       );
       const doc = await open(bytes);
       try {
-        const pon = (await doc.pages.list()).pages[0].pageObjectNumber;
-        const annotations = (await doc.page(pon).annotations.list()).annotations;
+        const pon = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
+        const annotations = (await doc.page(toPageRef(pon)).annotations.list()).annotations;
         const dimensions = annotations.filter((a) =>
           ['line', 'polyline', 'polygon'].includes(a.subtype),
         );
@@ -297,7 +298,7 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
             expect(Number.parseFloat(readout.label)).toBe(Number.parseFloat(a.contents!));
           if (a.subtype === 'polygon' || a.subtype === 'polyline')
             expect(a.caption).toBeUndefined();
-          const updated = await doc.page(pon).annotations.update(a.ref, {
+          const updated = await doc.page(toPageRef(pon)).annotations.update(a.ref, {
             subtype: a.subtype,
             color: { r: 0, g: 0, b: 255 },
           } as never);
@@ -320,7 +321,7 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
     ]);
     const doc = await open(bytes);
     try {
-      const page = doc.page(3),
+      const page = doc.page(toPageRef(3)),
         before = (await page.annotations.list()).annotations;
       expect(measurementReadout(before[3])).toEqual({ unavailable: 'no-scale' });
       await page.annotations.update(before[0].ref, { subtype: 'line', measure: scale });
@@ -347,7 +348,7 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
   test('manual shape center follows rotation and an explicit center wins', async () => {
     const doc = await open();
     try {
-      const page = doc.page(3);
+      const page = doc.page(toPageRef(3));
       const vertices = [
         { x: 10, y: 10 },
         { x: 110, y: 10 },

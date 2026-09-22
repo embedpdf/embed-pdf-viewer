@@ -33,7 +33,7 @@ function substitutedUrl(template: string): string {
   return template
     .replace(':docId', 'reg-missing-doc')
     .replace(':layerName', 'default')
-    .replace(':pon', '1')
+    .replace(':pageKey', 'obj:1')
     .replace(':annotKey', 'reg-annot')
     .replace(':fieldKey', 'reg-field');
 }

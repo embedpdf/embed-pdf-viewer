@@ -12,9 +12,6 @@
  */
 import * as React from 'react';
 import { useEffect, useState } from 'react';
-import { stagePlugin } from '@embedpdf/plugin-stage';
-import { renderPlugin } from '@embedpdf/plugin-render';
-import { pageEditPlugin } from '@embedpdf/plugin-page-edit';
 import {
   Viewer,
   Stage,
@@ -22,6 +19,9 @@ import {
   RenderLayer,
   usePageEditor,
   type PageContextValue,
+  stagePlugin,
+  renderPlugin,
+  pageEditPlugin,
 } from '@embedpdf/react';
 import { useDocuments } from '@embedpdf/react';
 import type { Engine, OpenInput, PdfSaveMode } from '@embedpdf/core';
@@ -73,7 +73,7 @@ export function LayerLab() {
 type OpenKind = { name: string; layered: boolean } | null;
 
 function LayerShell() {
-  const { docs, activeId, open, close, setActive, download, downloadLayer } = useDocuments();
+  const { docs, activeId, open, close, setActive, save, saveLayer } = useDocuments();
   const [sampleId, setSampleId] = useState(SAMPLES[0].id);
   const [openKind, setOpenKind] = useState<OpenKind>(null);
   const [status, setStatus] = useState('Open a base to begin.');
@@ -136,10 +136,10 @@ function LayerShell() {
     );
   };
 
-  const saveLayer = async () => {
+  const saveLayerToDisk = async () => {
     busy('saving layer…');
     try {
-      const bytes = await downloadLayer();
+      const bytes = await saveLayer();
       saveToDisk(bytes, `${sample().id}.layer`);
       setStatus(
         `Saved layer (${bytes.byteLength.toLocaleString()} bytes) — reopen it with “Open + saved layer”.`,
@@ -152,7 +152,7 @@ function LayerShell() {
   const savePdf = async (mode: PdfSaveMode) => {
     busy(`saving ${mode} PDF…`);
     try {
-      const bytes = await download(undefined, { mode });
+      const bytes = await save(undefined, { mode });
       saveToDisk(bytes, `${sample().id}-${mode}.pdf`);
       setStatus(`Saved ${mode} PDF (${bytes.byteLength.toLocaleString()} bytes).`);
     } catch (e) {
@@ -195,7 +195,7 @@ function LayerShell() {
         {openKind?.layered && (
           <button
             style={btn}
-            onClick={saveLayer}
+            onClick={saveLayerToDisk}
             title="Export just the layer (re-openable .layer)"
           >
             ⬇ Save layer
@@ -254,7 +254,7 @@ function RotateButton({ page }: { page: PageContextValue }) {
   if (!editor.canEdit()) return null;
   return (
     <button
-      onClick={() => editor.rotateBy(page.pon, 90)}
+      onClick={() => editor.rotateBy([page.ref], 90)}
       title="Rotate this page 90° (writes to the layer)"
       style={{
         position: 'absolute',

@@ -11,7 +11,14 @@ const ARM_FIXTURES: PdfActionNode[] = [
   {
     type: 'goto',
     subtype: 'GoTo',
-    destination: { kind: 'fitR', pageObjectNumber: 3, left: 1, bottom: 2, right: 3, top: 4 },
+    destination: {
+      kind: 'fitR',
+      page: { kind: 'objectNumber', pageObjectNumber: 3 },
+      left: 1,
+      bottom: 2,
+      right: 3,
+      top: 4,
+    },
     next: [],
   },
   { type: 'uri', subtype: 'URI', uri: 'https://example.test/?a=1', isMap: true, next: [] },
@@ -150,7 +157,9 @@ describe('PDF action schemas', () => {
     expect(decodeSubmitFormFlags(8192).embedForm).toBe(true);
 
     // Exclude is DERIVED from bit 1 — the raw word is the single source.
-    const excluding = decodeSubmitFormFlags(bit(1) | bit(2) | bit(5) | bit(7) | bit(8) | bit(10) | bit(11));
+    const excluding = decodeSubmitFormFlags(
+      bit(1) | bit(2) | bit(5) | bit(7) | bit(8) | bit(10) | bit(11),
+    );
     expect(excluding.exclude).toBe(true);
     expect(excluding.includeNoValueFields).toBe(true);
     expect(excluding.submitCoordinates).toBe(true);
@@ -208,7 +217,13 @@ describe('PDF action schemas', () => {
   });
 
   test('carries a destination-form OpenAction and rejects both forms at once', () => {
-    const destination = { kind: 'xyz' as const, pageObjectNumber: 5, left: 10, top: 700, zoom: 1.5 };
+    const destination = {
+      kind: 'xyz' as const,
+      page: { kind: 'objectNumber', pageObjectNumber: 5 },
+      left: 10,
+      top: 700,
+      zoom: 1.5,
+    };
     const withDestination = {
       nameTreeScripts: [],
       openAction: null,

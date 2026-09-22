@@ -12,8 +12,8 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import {
   abortSignalFromRequest,
   parseOrInvalidArg,
-  parsePageObjectNumber,
   parseTokenOrInvalidArg,
+  resolvePageKeyParam,
   setImmutableCache,
   setNoStore,
 } from './_helpers';
@@ -42,7 +42,7 @@ export interface AttachmentRouteDeps {
  *
  *   /attachments@{v}                       — metadata listing (doc.open)
  *   /attachment-files/{key}/data@{v}       — doc-level bytes (doc.download)
- *   /attachment-files/pages/{pon}/items/{annotKey}/data@{v}
+ *   /attachment-files/pages/{pageKey}/items/{annotKey}/data@{v}
  *                                          — annotation bytes (doc.download)
  *
  * Every read is versioned by the manifest's `attachmentsVersion` pin and
@@ -120,11 +120,11 @@ export async function registerAttachmentRoutes(
   });
 
   app.get(
-    '/v1/docs/:docId/attachment-files/pages/:pon/items/:annotKey/data@:token',
+    '/v1/docs/:docId/attachment-files/pages/:pageKey/items/:annotKey/data@:token',
     async (req, reply) => {
-      const { docId, pon, annotKey, token } = req.params as {
+      const { docId, pageKey, annotKey, token } = req.params as {
         docId: string;
-        pon: string;
+        pageKey: string;
         annotKey: string;
         token: string;
       };
@@ -146,7 +146,7 @@ export async function registerAttachmentRoutes(
           `attachments version ${requested} no longer current (current=${manifest.attachmentsVersion})`,
         );
       }
-      const pageObjectNumber = parsePageObjectNumber(pon);
+      const pageObjectNumber = resolvePageKeyParam(pageKey);
       // Durable keys only, mirroring the layer route: weak index refs need
       // a revision-validated body, which a cacheable GET does not have.
       const ref = refFromKey(annotKey, pageObjectNumber);
@@ -224,12 +224,12 @@ export async function registerAttachmentRoutes(
   );
 
   app.get(
-    '/v1/docs/:docId/layers/:layerName/attachment-files/pages/:pon/items/:annotKey/data@:token',
+    '/v1/docs/:docId/layers/:layerName/attachment-files/pages/:pageKey/items/:annotKey/data@:token',
     async (req, reply) => {
-      const { docId, layerName, pon, annotKey, token } = req.params as {
+      const { docId, layerName, pageKey, annotKey, token } = req.params as {
         docId: string;
         layerName: string;
-        pon: string;
+        pageKey: string;
         annotKey: string;
         token: string;
       };
@@ -245,7 +245,7 @@ export async function registerAttachmentRoutes(
           `attachments version ${requested} no longer current (current=${manifest.attachmentsVersion})`,
         );
       }
-      const pageObjectNumber = parsePageObjectNumber(pon);
+      const pageObjectNumber = resolvePageKeyParam(pageKey);
       // Only durable keys are addressable on this content-addressed leaf:
       // weak index refs need a revision-validated request body, which a
       // cacheable GET deliberately does not have.

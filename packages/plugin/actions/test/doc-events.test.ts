@@ -8,14 +8,14 @@ import type {
   SubmitFormPayload,
 } from '@embedpdf/engine-core/runtime';
 
-import { createActionsCapability } from '../src/capability';
+import { createActionsController } from '../src/controller';
 import type {
   ActionContext,
   ActionDiagnostic,
   ActionsAction,
-  ActionsPluginConfig,
+  ActionsConfig,
   ActionsState,
-} from '../src/types';
+} from '../src/host-contract';
 
 const USER: ActionContext = {
   origin: 'user',
@@ -35,7 +35,12 @@ const js = (script: string, next: PdfActionNode[] = []): PdfActionNode => ({
   script,
   next,
 });
-const named = (name: string): PdfActionNode => ({ type: 'named', subtype: 'Named', name, next: [] });
+const named = (name: string): PdfActionNode => ({
+  type: 'named',
+  subtype: 'Named',
+  name,
+  next: [],
+});
 
 const FLAGS_ZERO = {
   raw: 0,
@@ -73,7 +78,7 @@ const tick = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0
  * read (the D11 eviction probe), and an optional `forms.submit` home.
  */
 function docHarness(options: {
-  config?: ActionsPluginConfig;
+  config?: ActionsConfig;
   trees?: Partial<
     Record<'willSave' | 'didSave' | 'willPrint' | 'didPrint' | 'willClose', PdfActionTree>
   >;
@@ -109,7 +114,7 @@ function docHarness(options: {
     tryGet: () => null,
     cleanup: () => undefined,
   } as unknown as PluginContext<ActionsState, ActionsAction>;
-  const capability = createActionsCapability(ctx, { openSequence: 'off', ...options.config });
+  const capability = createActionsController(ctx, { openSequence: 'off', ...options.config });
   const log: string[] = [];
   capability.registerExecutor('javascript', (node) => {
     if (node.type === 'javascript') log.push(node.script);
@@ -215,9 +220,7 @@ describe('document lifecycle events (WC/WS/DS/WP/DP)', () => {
         throw new Error('dialog exploded');
       },
     });
-    await expect(capability.execute(tree(named('Print')), USER)).rejects.toThrow(
-      'dialog exploded',
-    );
+    await expect(capability.execute(tree(named('Print')), USER)).rejects.toThrow('dialog exploded');
     expect(log).toEqual(['wp']);
     // The latch reset in finally: a later print works again.
     capability.setUiAdapter({ openUri: vi.fn(), print: () => log.push('print-2') });

@@ -14,7 +14,7 @@ import { interactionPlugin } from '@embedpdf/plugin-interaction';
 
 import { fieldKeyOf } from '../src/core/model';
 import { formPlugin } from '../src/form.plugin';
-import { FormToken } from '../src/types';
+import { FormToken } from '../src/host-contract';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(
@@ -62,7 +62,7 @@ async function boot() {
   const actions = kernel.capability(ActionsToken);
   await form.refresh();
   const fieldOf = (name: string) => {
-    const field = form.snapshot()?.fields.find((candidate) => candidate.name === name);
+    const field = form.getSnapshot()?.fields.find((candidate) => candidate.name === name);
     if (!field) throw new Error(`field '${name}' is missing`);
     return field;
   };
@@ -70,11 +70,11 @@ async function boot() {
     const widget = fieldOf(name).widgets[0]!;
     return {
       kind: 'objectNumber',
-      pageObjectNumber: widget.pageObjectNumber,
+      page: widget.page!,
       annotObjectNumber: widget.annotObjectNumber,
     };
   };
-  const press = (name: string) => form.activateWidget(fieldKeyOf(fieldOf(name)), widgetRefOf(name));
+  const press = (name: string) => form.activateWidget(widgetRefOf(name));
   const requests: ActionSubmitRequest[] = [];
   const diagnostics: ActionDiagnostic[] = [];
   actions.onDiagnostic((diagnostic) => diagnostics.push(diagnostic));

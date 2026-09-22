@@ -1,0 +1,7 @@
+---
+'@embedpdf/plugin-selection': minor
+---
+
+Rewritten on the kernel's `create()` controller hook with a public contract (`/contract`) and a host lens (`/contract/host`). Public: `canSelect`/`canCopy`; `select`, `selectAll`, new `selectPage`, `selectWordAt`, `selectLineAt`, `extendTo` (the last three were host-only), `clear`; `hasSelection`, `getSnapshot` (was `snapshot`, now reference-stable), new `getRange`, `listSelectedPages` (was `selectedPages`), `listSegments` (was `segmentsForPage`), `listRects` (was `rectsForPage`), `getAnchor` (was `menuAnchor`; `SelectionMenuAnchor` is `SelectionAnchor`); `readText(options?)` and new `readTextInRange(range, options?)`. Events are kernel event hooks with a `ChangeOrigin`: `onChanged`, `onCommitted` (gesture end only, carries the range), `onCleared`. Writes without `doc.text.select` throw `PluginError('permission-denied')`; an unknown page is `not-found`. `SelectionConfig.dragThreshold` replaces the hard-coded drag threshold.
+
+Host (`SelectionHostCapability`): `ensureLoaded(page): Promise<void>` (was `ensurePage`), `isLoaded`, `isOverText`, `beginGesture`, `beginGestureAt` (was `beginAt`), `endGesture` (was `end`), `isGestureActive` (was the public `isSelecting`), `setHighlightVisible`, `isHighlightVisible` (was `highlightVisible`). `clear()` no longer settles the gesture — `endGesture` owns that. `SelectionHandleTarget` speaks the same verbs.

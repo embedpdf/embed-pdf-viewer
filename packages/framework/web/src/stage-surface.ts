@@ -18,7 +18,7 @@
  * Dependency note: like the gesture controller, this module speaks to the
  * stage and the hub through STRUCTURAL interfaces ({@link StageSurfaceHost},
  * {@link StageSurfaceHub}) — satisfied by `StageCapability` and
- * `InteractionCapability`, imported by neither. @embedpdf/web stays free of
+ * `InteractionHostCapability`, imported by neither. @embedpdf/web stays free of
  * plugin imports, per the layering law.
  *
  * Browser-only by nature (ResizeObserver, matchMedia): call from a mounted
@@ -26,26 +26,27 @@
  */
 import { createStageGestureController } from './stage-gestures';
 import type { StageGestureHost, StageGestureSink, StageWheelSample } from './stage-gestures';
+import type { PageRef } from './page-ref';
 
 interface SurfacePoint {
   x: number;
   y: number;
 }
 
-/** What the binding needs from the stage — `StageCapability` satisfies it. */
+/** What the binding needs from the stage — `StageHostCapability` satisfies it. */
 export interface StageSurfaceHost extends StageGestureHost {
-  setViewport(size: { width: number; height: number }): void;
+  setViewportSize(size: { width: number; height: number }): void;
   setDevicePixelRatio(ratio: number): void;
   /** Viewport point → the page under it (with per-page display context), or null over a gap. */
-  pageAt(screen: SurfacePoint): {
-    pon: number;
+  getPageAt(screen: SurfacePoint): {
+    ref: PageRef;
     point: SurfacePoint;
     scale?: number;
     rotation?: 0 | 90 | 180 | 270;
     zoom?: number;
   } | null;
   /** Viewport point → a SPECIFIC page's content space, unclamped (frame-stable projection). */
-  pointOnPage(pon: number, screen: SurfacePoint): SurfacePoint | null;
+  viewportToPage(page: PageRef, screen: SurfacePoint): SurfacePoint | null;
 }
 
 /**
@@ -58,13 +59,13 @@ export interface StageSurfaceSample {
   phase: 'down' | 'move' | 'up' | 'cancel';
   viewport: SurfacePoint;
   page?: {
-    pon: number;
+    ref: PageRef;
     point: SurfacePoint;
     scale?: number;
     rotation?: 0 | 90 | 180 | 270;
     zoom?: number;
   };
-  project: (pon: number) => SurfacePoint | null;
+  project: (page: PageRef) => SurfacePoint | null;
   modifiers: { shift: boolean; alt: boolean; ctrl: boolean; meta: boolean };
   clickCount: number;
   pointerType: 'mouse' | 'pen' | 'touch';
@@ -72,10 +73,10 @@ export interface StageSurfaceSample {
   source?: string;
 }
 
-/** What the binding needs from the interaction hub — `InteractionCapability` satisfies it. */
+/** What the binding needs from the interaction hub — `InteractionHostCapability` satisfies it. */
 export interface StageSurfaceHub {
-  dispatch(sample: StageSurfaceSample): void;
-  activeTool(): { touchDirect?: boolean };
+  dispatchPointer(sample: StageSurfaceSample): void;
+  getActiveTool(): { touchDirect?: boolean };
   wouldClaimTouch(sample: StageSurfaceSample): boolean;
 }
 
@@ -83,7 +84,7 @@ export interface StageSurfaceOptions {
   /** Route pointer input to the interaction hub (page-resolved samples) instead
    *  of built-in drag-to-pan. Omit/null for a hub-less stage. */
   hub?: StageSurfaceHub | null;
-  /** The lens identity stamped on every sample (`StageCapability.lensId()`),
+  /** The lens identity stamped on every sample (`StageHostCapability.getLensId()`),
    *  so lens-scoped handlers only see their own stage's input. */
   source?: string;
   /** Ambient zoom gestures (see {@link StageGestureOptions}). Default true. */
@@ -104,7 +105,8 @@ export function createStageSurface(
   // Only report the viewport size. Initial placement (home) is the stage
   // plugin's job — it places when it first learns a real size (and a
   // higher-priority initial-view provider can override). The shell stays dumb.
-  const setViewport = () => stage.setViewport({ width: el.clientWidth, height: el.clientHeight });
+  const setViewport = () =>
+    stage.setViewportSize({ width: el.clientWidth, height: el.clientHeight });
   const ro = new ResizeObserver(setViewport);
   ro.observe(el);
   setViewport();
@@ -136,10 +138,10 @@ export function createStageSurface(
     return {
       phase,
       viewport,
-      page: stage.pageAt(viewport) ?? undefined,
+      page: stage.getPageAt(viewport) ?? undefined,
       // Page-anchored gestures (annotation move/resize) track the origin
       // page's frame through this even when the cursor is off that page.
-      project: (pon) => stage.pointOnPage(pon, viewport),
+      project: (page) => stage.viewportToPage(page, viewport),
       modifiers: { shift: e.shiftKey, alt: e.altKey, ctrl: e.ctrlKey, meta: e.metaKey },
       clickCount,
       pointerType: (e.pointerType || 'mouse') as StageSurfaceSample['pointerType'],
@@ -153,7 +155,7 @@ export function createStageSurface(
     clickCount = 1,
     gesture?: StageSurfaceSample['gesture'],
   ) => {
-    hub?.dispatch(sampleOf(phase, e, clickCount, gesture));
+    hub?.dispatchPointer(sampleOf(phase, e, clickCount, gesture));
   };
   const sink: StageGestureSink | null = hub
     ? {
@@ -170,7 +172,7 @@ export function createStageSurface(
         // otherwise per-point claims (a selected annotation's body or handles)
         // decide. A pure pre-flight — nothing captures.
         claimsPoint: (e) =>
-          !!hub.activeTool().touchDirect || hub.wouldClaimTouch(sampleOf('down', e)),
+          !!hub.getActiveTool().touchDirect || hub.wouldClaimTouch(sampleOf('down', e)),
       }
     : null;
   cleanups.push(

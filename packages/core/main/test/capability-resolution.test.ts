@@ -114,14 +114,14 @@ describe('kernel: documents.openAll', () => {
       { source: bytesInput('c') },
     ]);
     expect(kernel.documents.list().map((d) => d.id)).toEqual(['a', 'b', 'c']);
-    expect(kernel.documents.activeId()).toBe('b');
+    expect(kernel.documents.getActiveId()).toBe('b');
 
     resolve('c'); // completion order must change nothing
     resolve('a');
     resolve('b');
     await settle();
     expect(kernel.documents.list().map((d) => d.status)).toEqual(['ready', 'ready', 'ready']);
-    expect(kernel.documents.activeId()).toBe('b');
+    expect(kernel.documents.getActiveId()).toBe('b');
   });
 
   it('defaults to the first tab; one failure never disturbs its siblings', async () => {
@@ -129,7 +129,7 @@ describe('kernel: documents.openAll', () => {
     const kernel = createKernel({ engine, plugins: [] });
 
     kernel.documents.openAll([{ source: bytesInput('a') }, { source: bytesInput('b') }]);
-    expect(kernel.documents.activeId()).toBe('a');
+    expect(kernel.documents.getActiveId()).toBe('a');
 
     reject('b', new Error('boom')); // contained: openAll never surfaces a rejection
     resolve('a');
@@ -138,6 +138,6 @@ describe('kernel: documents.openAll', () => {
       ['a', 'ready'],
       ['b', 'error'],
     ]);
-    expect(kernel.documents.activeId()).toBe('a');
+    expect(kernel.documents.getActiveId()).toBe('a');
   });
 });

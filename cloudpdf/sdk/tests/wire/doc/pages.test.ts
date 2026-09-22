@@ -10,12 +10,16 @@ describe("PagesClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = {};
         const rawResponseBody = {
-            pageObjectNumber: 1,
+            page: { kind: "objectNumber", pageObjectNumber: 1 },
             meta: {
                 affectedPages: [
                     {
-                        pageObjectNumber: 1,
-                        revision: { docSessionId: "docSessionId", pageObjectNumber: 1, generation: 1 },
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        revision: {
+                            docSessionId: "docSessionId",
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            generation: 1,
+                        },
                         weakAnnotationState: { kind: "unknown" },
                     },
                 ],
@@ -25,14 +29,19 @@ describe("PagesClient", () => {
                     annotationsVersion: 1,
                     layerVersion: 1,
                     working: true,
-                    pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1 },
+                        },
+                    ],
                 },
             },
         };
 
         server
             .mockEndpoint()
-            .put("/v1/docs/docId/layers/layerName/pages/1/scale")
+            .put("/v1/docs/docId/layers/layerName/pages/pageKey/scale")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(200)
@@ -42,7 +51,7 @@ describe("PagesClient", () => {
         const response = await client.doc.pages.setScale({
             docId: "docId",
             layerName: "layerName",
-            pon: 1,
+            pageKey: "pageKey",
         });
         expect(response).toEqual(rawResponseBody);
     });
@@ -55,7 +64,7 @@ describe("PagesClient", () => {
 
         server
             .mockEndpoint()
-            .put("/v1/docs/docId/layers/layerName/pages/1/scale")
+            .put("/v1/docs/docId/layers/layerName/pages/pageKey/scale")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(400)
@@ -66,7 +75,7 @@ describe("PagesClient", () => {
             return await client.doc.pages.setScale({
                 docId: "docId",
                 layerName: "layerName",
-                pon: 1,
+                pageKey: "pageKey",
                 measure: null,
             });
         }).rejects.toThrow(CloudPDF.BadRequestError);
@@ -80,7 +89,7 @@ describe("PagesClient", () => {
 
         server
             .mockEndpoint()
-            .put("/v1/docs/docId/layers/layerName/pages/1/scale")
+            .put("/v1/docs/docId/layers/layerName/pages/pageKey/scale")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(404)
@@ -91,7 +100,7 @@ describe("PagesClient", () => {
             return await client.doc.pages.setScale({
                 docId: "docId",
                 layerName: "layerName",
-                pon: 1,
+                pageKey: "pageKey",
                 measure: null,
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
@@ -123,7 +132,7 @@ describe("PagesClient", () => {
 
         server
             .mockEndpoint()
-            .get("/v1/docs/docId/layers/layerName/pages/1/viewports")
+            .get("/v1/docs/docId/layers/layerName/pages/pageKey/viewports")
             .respondWith()
             .statusCode(200)
             .jsonBody(rawResponseBody)
@@ -132,7 +141,7 @@ describe("PagesClient", () => {
         const response = await client.doc.pages.viewports({
             docId: "docId",
             layerName: "layerName",
-            pon: 1,
+            pageKey: "pageKey",
         });
         expect(response).toEqual(rawResponseBody);
     });
@@ -145,7 +154,7 @@ describe("PagesClient", () => {
 
         server
             .mockEndpoint()
-            .get("/v1/docs/docId/layers/layerName/pages/1/viewports")
+            .get("/v1/docs/docId/layers/layerName/pages/pageKey/viewports")
             .respondWith()
             .statusCode(404)
             .jsonBody(rawResponseBody)
@@ -155,7 +164,7 @@ describe("PagesClient", () => {
             return await client.doc.pages.viewports({
                 docId: "docId",
                 layerName: "layerName",
-                pon: 1,
+                pageKey: "pageKey",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });
@@ -168,8 +177,12 @@ describe("PagesClient", () => {
             meta: {
                 affectedPages: [
                     {
-                        pageObjectNumber: 1,
-                        revision: { docSessionId: "docSessionId", pageObjectNumber: 1, generation: 1 },
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        revision: {
+                            docSessionId: "docSessionId",
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            generation: 1,
+                        },
                         weakAnnotationState: { kind: "unknown" },
                     },
                 ],
@@ -179,7 +192,12 @@ describe("PagesClient", () => {
                     annotationsVersion: 1,
                     layerVersion: 1,
                     working: true,
-                    pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1 },
+                        },
+                    ],
                 },
             },
         };
@@ -267,8 +285,12 @@ describe("PagesClient", () => {
             meta: {
                 affectedPages: [
                     {
-                        pageObjectNumber: 1,
-                        revision: { docSessionId: "docSessionId", pageObjectNumber: 1, generation: 1 },
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        revision: {
+                            docSessionId: "docSessionId",
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            generation: 1,
+                        },
                         weakAnnotationState: { kind: "unknown" },
                     },
                 ],
@@ -278,7 +300,12 @@ describe("PagesClient", () => {
                     annotationsVersion: 1,
                     layerVersion: 1,
                     working: true,
-                    pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1 },
+                        },
+                    ],
                 },
             },
         };
@@ -366,8 +393,12 @@ describe("PagesClient", () => {
             meta: {
                 affectedPages: [
                     {
-                        pageObjectNumber: 1,
-                        revision: { docSessionId: "docSessionId", pageObjectNumber: 1, generation: 1 },
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        revision: {
+                            docSessionId: "docSessionId",
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            generation: 1,
+                        },
                         weakAnnotationState: { kind: "unknown" },
                     },
                 ],
@@ -377,7 +408,12 @@ describe("PagesClient", () => {
                     annotationsVersion: 1,
                     layerVersion: 1,
                     working: true,
-                    pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1 },
+                        },
+                    ],
                 },
             },
         };
@@ -465,8 +501,12 @@ describe("PagesClient", () => {
             meta: {
                 affectedPages: [
                     {
-                        pageObjectNumber: 1,
-                        revision: { docSessionId: "docSessionId", pageObjectNumber: 1, generation: 1 },
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        revision: {
+                            docSessionId: "docSessionId",
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            generation: 1,
+                        },
                         weakAnnotationState: { kind: "unknown" },
                     },
                 ],
@@ -476,7 +516,12 @@ describe("PagesClient", () => {
                     annotationsVersion: 1,
                     layerVersion: 1,
                     working: true,
-                    pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1 },
+                        },
+                    ],
                 },
             },
         };
@@ -564,8 +609,12 @@ describe("PagesClient", () => {
             meta: {
                 affectedPages: [
                     {
-                        pageObjectNumber: 1,
-                        revision: { docSessionId: "docSessionId", pageObjectNumber: 1, generation: 1 },
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        revision: {
+                            docSessionId: "docSessionId",
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            generation: 1,
+                        },
                         weakAnnotationState: { kind: "unknown" },
                     },
                 ],
@@ -575,7 +624,12 @@ describe("PagesClient", () => {
                     annotationsVersion: 1,
                     layerVersion: 1,
                     working: true,
-                    pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1 },
+                        },
+                    ],
                 },
             },
         };
@@ -663,8 +717,12 @@ describe("PagesClient", () => {
             meta: {
                 affectedPages: [
                     {
-                        pageObjectNumber: 1,
-                        revision: { docSessionId: "docSessionId", pageObjectNumber: 1, generation: 1 },
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        revision: {
+                            docSessionId: "docSessionId",
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            generation: 1,
+                        },
                         weakAnnotationState: { kind: "unknown" },
                     },
                 ],
@@ -674,7 +732,12 @@ describe("PagesClient", () => {
                     annotationsVersion: 1,
                     layerVersion: 1,
                     working: true,
-                    pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1 },
+                        },
+                    ],
                 },
             },
         };
@@ -762,8 +825,12 @@ describe("PagesClient", () => {
             meta: {
                 affectedPages: [
                     {
-                        pageObjectNumber: 1,
-                        revision: { docSessionId: "docSessionId", pageObjectNumber: 1, generation: 1 },
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        revision: {
+                            docSessionId: "docSessionId",
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            generation: 1,
+                        },
                         weakAnnotationState: { kind: "unknown" },
                     },
                 ],
@@ -773,7 +840,12 @@ describe("PagesClient", () => {
                     annotationsVersion: 1,
                     layerVersion: 1,
                     working: true,
-                    pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1 },
+                        },
+                    ],
                 },
             },
         };

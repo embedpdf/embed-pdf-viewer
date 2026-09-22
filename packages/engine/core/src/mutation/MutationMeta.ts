@@ -1,5 +1,5 @@
 import type { CachePins } from '../dto/CachePins';
-import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PageRef } from '../identity/PageRef';
 import type { PageState } from '../revision/PageState';
 
 /**
@@ -35,7 +35,7 @@ export interface CacheDelta {
   layerVersion?: number;
   working?: boolean;
   pages: Array<{
-    pageObjectNumber: PageObjectNumber;
+    page: PageRef;
     cache: CachePins;
   }>;
 }
