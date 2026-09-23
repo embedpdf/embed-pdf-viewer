@@ -3,9 +3,8 @@
  * `setText` / `setRichText` puts the edited record in the change set, the
  * view shows it at once, and its `text` effect waits for the next engine
  * write of that record. The write runs after a pause in typing (or at once
- * when editing ends) and sends the latest text; when it settles, only the
- * newest keystroke's entry can drop, so an older echo never replaces newer
- * typing.
+ * when editing ends) and sends the latest text, so it carries every keystroke
+ * that waited for it: they settle together, accepted or refused.
  */
 import type { Id, Point } from '@embedpdf/core-annotation';
 import {
@@ -32,7 +31,7 @@ interface Waiter {
 
 export function createTextEditing(
   ctx: Pick<AnnotationContext, 'doc' | 'state' | 'cleanup'>,
-  { store, newRecords, fonts }: Pick<AnnotationServices, 'store' | 'newRecords' | 'fonts'>,
+  { store, identity, fonts }: Pick<AnnotationServices, 'store' | 'identity' | 'fonts'>,
   annotations: Pick<AnnotationReads, 'loadedOrThrow'>,
   chrome: Pick<ChromeReads, 'hitAt'>,
 ) {
@@ -42,19 +41,28 @@ export function createTextEditing(
   const waiting = new Map<Id, Waiter[]>();
   ctx.cleanup(() => timers.forEach((timer) => clearTimeout(timer)));
 
+  /** Write the record's text once typing pauses. */
+  const writeAfterPause = (id: Id): void => {
+    clearTimeout(timers.get(id));
+    timers.set(
+      id,
+      setTimeout(() => flushText(id), TEXT_WRITE_DELAY_MS),
+    );
+  };
+
   /**
    * Write the record's current text now, and settle every keystroke that
-   * waited for it. A record the engine has not confirmed yet is written once
-   * its create is, under its real key. Resolves when the write settled; never
-   * rejects (the newest keystroke reports a refusal, the older ones only
-   * settle).
+   * waited for it: they are all in this one write. A record the engine has
+   * not confirmed yet is written once its create is, under its real key.
+   * Resolves when the write settled; never rejects (each keystroke's own
+   * write reports a refusal).
    */
   const flushText = (id: Id): Promise<void> => {
     clearTimeout(timers.get(id));
     timers.delete(id);
     const waiters = waiting.get(id) ?? [];
     waiting.delete(id);
-    return newRecords
+    return identity
       .withRef(id, async (ref) => {
         const record = store.model().byId[annotationKey(ref)];
         if (!record) return;
@@ -63,13 +71,20 @@ export function createTextEditing(
       })
       .then(
         () => waiters.forEach((waiter) => waiter.resolve()),
-        (error: unknown) => {
-          const newest = waiters.pop();
-          waiters.forEach((waiter) => waiter.resolve());
-          newest?.reject(error);
-        },
+        (error: unknown) => waiters.forEach((waiter) => waiter.reject(error)),
       );
   };
+
+  // Typing waiting for its write moves with its record to a new key.
+  identity.onFollow((from, to) => {
+    const moved = waiting.get(from);
+    if (!moved) return;
+    waiting.delete(from);
+    clearTimeout(timers.get(from));
+    timers.delete(from);
+    waiting.set(to, [...moved, ...(waiting.get(to) ?? [])]);
+    writeAfterPause(to);
+  });
 
   /** Write every record with typing still waiting. */
   const flushAllText = (): Promise<void>[] => [...waiting.keys()].map(flushText);
@@ -80,11 +95,7 @@ export function createTextEditing(
     perform: () =>
       new Promise<void>((resolve, reject) => {
         waiting.set(effect.id, [...(waiting.get(effect.id) ?? []), { resolve, reject }]);
-        clearTimeout(timers.get(effect.id));
-        timers.set(
-          effect.id,
-          setTimeout(() => flushText(effect.id), TEXT_WRITE_DELAY_MS),
-        );
+        writeAfterPause(effect.id);
       }),
   }));
 

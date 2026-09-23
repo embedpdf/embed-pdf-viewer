@@ -7,8 +7,12 @@
  *
  * After every step, each field shows the newest change the engine has not
  * settled for that field (a change stays until every older change of the
- * record settled), or else the engine's value. Once everything settled, the
- * view is the engine's record and nothing is pending.
+ * record settled), or else the engine's value. The record renders the way it
+ * did when the user made the newest unsettled change (a restyle renders live,
+ * whatever another session does meanwhile), or else by its render preference:
+ * live once this session restyled it, the engine's raster again after
+ * another session's update. Once everything settled, the view is the engine's
+ * record and nothing is pending.
  */
 import type { DocumentEvent } from '@embedpdf/core';
 import type { AnnotationDTO, AnnotationFlags, AnnotationRef } from '@embedpdf/engine-core/runtime';
@@ -90,11 +94,15 @@ interface HeldWrite {
   reject(error: unknown): void;
 }
 
+type Source = 'vector' | 'baked';
+
 /** One change the user made, as the test expects the view to treat it. */
 interface UserChange {
   field: 'color' | 'print';
   value: string | boolean;
   state: 'pending' | 'accepted' | 'refused';
+  /** How the record rendered once the user made the change. */
+  source: Source;
 }
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -115,22 +123,32 @@ async function play(seed: number, steps: number) {
 
   // Writes are held in the order they were made, one per change.
   const inFlight: UserChange[] = [];
+  /** Whether the record renders live once nothing is pending. */
+  let preferVector = false;
 
-  const expected = (field: UserChange['field']) => {
-    const outstanding = changes.filter(
+  /** The changes still showing: not refused, and unsettled or behind an unsettled older one. */
+  const outstanding = () =>
+    changes.filter(
       (change, index) =>
         change.state !== 'refused' &&
         (change.state === 'pending' ||
           changes.slice(0, index).some((older) => older.state === 'pending')),
     );
-    const newest = outstanding.filter((change) => change.field === field).at(-1);
+  const expected = (field: UserChange['field']) => {
+    const newest = outstanding()
+      .filter((change) => change.field === field)
+      .at(-1);
     if (newest) return newest.value;
     return field === 'color' ? engine.color : engine.print;
   };
+  const expectedSource = (): Source =>
+    outstanding().at(-1)?.source ?? (preferVector ? 'vector' : 'baked');
   const check = (label: string) => {
     const annotation = harness.capability.get(REF)!;
     expect(annotation.props.color, `${label}: color`).toBe(expected('color'));
     expect(annotation.flags.print, `${label}: print`).toBe(expected('print'));
+    const item = harness.capability.listPageItems(PAGE).find(({ id }) => id === 'obj:20')!;
+    expect(item.source, `${label}: source`).toBe(expectedSource());
   };
 
   for (let step = 0; step < steps; step++) {
@@ -139,13 +157,23 @@ async function play(seed: number, steps: number) {
     if (roll < 0.3) {
       const color = rng.pick(COLORS);
       void harness.capability.updateSelection({ color });
-      const change: UserChange = { field: 'color', value: color, state: 'pending' };
+      // A restyle renders live: this session owns the appearance now.
+      const change: UserChange = {
+        field: 'color',
+        value: color,
+        state: 'pending',
+        source: 'vector',
+      };
+      preferVector = true;
       changes.push(change);
       inFlight.push(change);
     } else if (roll < 0.5) {
       const print = !harness.capability.get(REF)!.flags.print;
+      // Flags leave the appearance alone: the record renders as it did.
+      const source = expectedSource();
       void harness.capability.updateSelectionFlags({ print });
-      const change: UserChange = { field: 'print', value: print, state: 'pending' };
+      const change: UserChange = { field: 'print', value: print, state: 'pending', source };
+      if (source === 'vector') preferVector = true;
       changes.push(change);
       inFlight.push(change);
     } else if (roll < 0.85 && held.length) {
@@ -163,9 +191,10 @@ async function play(seed: number, steps: number) {
       }
       await flush();
     } else {
-      // Another session changes the record.
+      // Another session changes the record: its raster is the truth again.
       if (rng.next() < 0.5) engine.color = rng.pick(COLORS);
       else engine.print = !engine.print;
+      preferVector = false;
       harness.emit({
         type: 'annotation.updated',
         page: PAGE,

@@ -68,20 +68,29 @@ write, say) is untouched when it settles. The rules:
 The same pipeline carries every kind of change:
 
 - **New annotations** show under a `new:<n>` id. The create carries a fresh
-  `/NM` (`write/named.ts`); when the confirmed record comes back with it,
-  `sync/confirmed.ts` moves the selection, the text editing and the record's
-  other pending changes to the real key (`services/new-records.ts`,
-  `followRecord`). An edit or a delete made before that is written once the
-  create is, against the real key (`newRecords.withRef`).
+  `/NM` (`write/named.ts`); when the confirmed record comes back with it (or
+  the create's own result arrives first), the record moves to the real key.
+  The create change moves too and stays until its write settles, so the
+  record stays on screen while a page read that started earlier finishes. An
+  edit, a delete or a link made before that is written once the create is,
+  against the real key (`identity.withRef`).
 - **Deletes** stage a `delete` change: the record disappears at once, and
   comes back if the engine refuses.
 - **Typing** stages a change per keystroke. The `text` effect waits for a
-  pause, then writes the latest text once (`write/text-editing.ts`). An older
-  write's echo cannot replace newer typing: a write only settles its own
-  changes.
+  pause, then writes the latest text once (`write/text-editing.ts`). That one
+  write carries every keystroke that waited for it: they settle together, and
+  a refusal is reported once. An older write's echo cannot replace newer
+  typing: a write only settles its own changes.
 - **Weak annotations** (direct objects without `/NM`, addressed by position)
-  that the engine names keep their pending changes and selection under the
-  new key (`renamesBetween` in `services/store.ts`).
+  that the engine names move to the new key.
+
+Both kinds of key change go through one door, `follow` in
+`services/record-identity.ts`: the session (selection, hover, text editing,
+the gesture), the pending changes, the render preference and the text range
+move, and so does what an area keeps per record (`onFollow`: typing waiting
+for its write, a link sync in progress). An id taken before the move still
+finds the record (`identity.current`).
+
 - **Programmatic verbs** that show nothing before the engine answers
   (`update`, `delete`, `createRaw`) write straight to the engine; the mirror
   shows their result before they resolve.
@@ -92,6 +101,9 @@ A confirmed record renders from the engine's appearance raster (`baked`)
 unless this session edited or created it, in which case it renders live from
 its description (`vector`): the `vector` preference in the state. Another
 session's change hands the record back to the raster (`sync/confirmed.ts`).
+While a change of this session is pending, the record renders the way it did
+when the user made it (each edit change records its `source`), so another
+session's update cannot swap a pending restyle for the old raster.
 Stamps and widgets have no live rendering and always use the raster. The
 raster is fetched again exactly when the record's appearance version changes,
 which the mirror advances when the engine reports a re-baked appearance.
@@ -101,8 +113,8 @@ which the mirror advances when the engine reports a re-baked appearance.
 | Folder          | What is in it                                                                         |
 | --------------- | ------------------------------------------------------------------------------------- |
 | `controller.ts` | the composition root: builds the services, wires every area, assembles the capability |
-| `model.ts`      | the plugin state and its transitions (`stage`, `settle`, `confirmCreate`, …)          |
-| `services/`     | what every area is built on: the store, intents, new records, events, authority       |
+| `model.ts`      | the plugin state and its transitions (`stage`, `writeSettled`, `followRecord`, …)     |
+| `services/`     | what every area is built on: the store, intents, record identity, events, authority   |
 | `sync/`         | the records mirror and what follows a confirmed change                                |
 | `read/`         | the view, and the reads the capability exposes (annotations, render items, chrome)    |
 | `write/`        | the verbs, and the effect runners that turn core effects into engine writes           |
@@ -118,4 +130,5 @@ confirmed event before its promise resolves, and every create must carry an
 `/NM`. `test/intents.test.ts` is the place to start: what the user sees
 while, and after, a write runs. `test/interleavings.test.ts` plays seeded
 random sequences of changes, refusals, remote updates and out-of-order
-answers, and checks the view after every step.
+answers, and checks the view (values and how the record renders) after every
+step.

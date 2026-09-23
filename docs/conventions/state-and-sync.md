@@ -323,8 +323,10 @@ two. The rules:
 The annotation plugin is the reference
 (`packages/plugin/annotation/README.md`): `services/intents.ts` stages a
 message's changes and settles them, `model.ts` holds the transitions
-(`stage`, `writeSettled`, `followRecord`), and `services/new-records.ts`
-matches new records to their confirmation by `/NM`.
+(`stage`, `writeSettled`, `followRecord`), and `services/record-identity.ts`
+is the one place a record changes its key: it matches new records to their
+confirmation by `/NM`, notices weak records the engine named, and moves
+everything keyed by the record, including what other areas keep per record.
 
 A write that shows no value before it is confirmed needs no overlay. An in-flight flag in
 session state is enough: the form plugin marks a field in `writing` for the

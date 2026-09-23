@@ -184,11 +184,18 @@ export function writeSettled(
 
 /**
  * A record got another key: a new record was confirmed (`new:<n>` becomes the
- * engine's key), or the engine named a weak record. Its pending changes and
- * render preference follow it, and so do records that point at it. A new
- * record's `create` change goes: the confirmed record shows now.
+ * engine's key, and `ref` its engine ref), or the engine named a weak record.
+ * Its pending changes, render preference and text range follow it, and so do
+ * records that point at it. A new record's `create` change stays, under the
+ * confirmed key, until its write settles: the records mirror may not hold the
+ * record yet (a page read that started before the create is still running).
  */
-export function followRecord(state: AnnotationState, from: Id, to: Id): AnnotationState {
+export function followRecord(
+  state: AnnotationState,
+  from: Id,
+  to: Id,
+  ref: ModelAnnotation['ref'],
+): AnnotationState {
   const points = (record: Partial<ModelAnnotation>) => record.irt === from || record.group === from;
   const repoint = <T extends Partial<ModelAnnotation>>(record: T): T => ({
     ...record,
@@ -201,21 +208,33 @@ export function followRecord(state: AnnotationState, from: Id, to: Id): Annotati
       (pending.change.kind === 'create' && points(pending.change.record)) ||
       (pending.change.kind === 'edit' && points(pending.change.fields)),
   );
-  if (!touched && !state.vector[from]) return state;
-  const pending: PendingChange[] = [];
-  for (const entry of state.pending) {
-    if (entry.id === from && entry.change.kind === 'create') continue;
+  const textSelection =
+    state.textSelection?.id === from ? { ...state.textSelection, id: to } : state.textSelection;
+  if (!touched && !state.vector[from] && textSelection === state.textSelection) return state;
+  const pending = state.pending.map((entry): PendingChange => {
+    const { change } = entry;
+    const followed: RecordChange =
+      change.kind === 'create' && (entry.id === from || points(change.record))
+        ? {
+            kind: 'create',
+            record: {
+              ...repoint(change.record),
+              ...(entry.id === from ? { id: to, ref: ref ?? change.record.ref } : {}),
+            },
+          }
+        : change.kind === 'edit' && points(change.fields)
+          ? { kind: 'edit', fields: repoint(change.fields) }
+          : change;
     const id = entry.id === from ? to : entry.id;
-    const change: RecordChange =
-      entry.change.kind === 'create' && points(entry.change.record)
-        ? { kind: 'create', record: repoint(entry.change.record) }
-        : entry.change.kind === 'edit' && points(entry.change.fields)
-          ? { kind: 'edit', fields: repoint(entry.change.fields) }
-          : entry.change;
-    pending.push(id === entry.id && change === entry.change ? entry : { ...entry, id, change });
-  }
+    return id === entry.id && followed === change ? entry : { ...entry, id, change: followed };
+  });
   const { [from]: preferred, ...vector } = state.vector;
-  return { ...state, pending, vector: preferred ? { ...vector, [to]: true } : state.vector };
+  return {
+    ...state,
+    pending,
+    vector: preferred ? { ...vector, [to]: true } : state.vector,
+    textSelection,
+  };
 }
 
 /** Render these records live from their description. */

@@ -4,7 +4,7 @@
  * engine write and touches no state; the intents service runs the write and
  * settles the pending changes it carries (services/intents.ts).
  *
- * A write to a record runs through `newRecords.withRef`, so an edit or a
+ * A write to a record runs through `identity.withRef`, so an edit or a
  * delete of a record the engine has not confirmed yet is written after its
  * create, against the real ref.
  *
@@ -26,7 +26,7 @@ import { named } from './named';
 
 export function registerEffectRunners(
   ctx: Pick<AnnotationContext, 'doc'>,
-  { store, geometry, newRecords }: Pick<AnnotationServices, 'store' | 'geometry' | 'newRecords'>,
+  { store, geometry, identity }: Pick<AnnotationServices, 'store' | 'geometry' | 'identity'>,
   links: Pick<LinkWrites, 'scheduleSync'>,
 ): void {
   // A new record: written with a fresh /NM, matched back to its id by that name.
@@ -36,16 +36,16 @@ export function registerEffectRunners(
     const draft = record && crop ? toCreateDraft(record, crop) : null;
     if (!record || !draft) return;
     const create = named(draft);
-    newRecords.expect(create.nm, effect.id);
+    identity.expect(create.nm, effect.id);
     return {
       ids: [effect.id],
       perform: async () => {
         try {
           const { created } = await ctx.doc.page(record.page).annotations.create(create);
-          newRecords.confirm(effect.id, created.ref);
+          identity.confirm(effect.id, created.ref);
           return { [effect.id]: created.ref };
         } catch (error) {
-          newRecords.abandon(effect.id);
+          identity.abandon(effect.id);
           throw error;
         }
       },
@@ -72,7 +72,7 @@ export function registerEffectRunners(
     const drafts = records.map((record) => (record && crop ? toCreateDraft(record, crop) : null));
     if (drafts.some((draft) => !draft)) return;
     const creates = drafts.map((draft) => named(draft!));
-    ids.forEach((id, index) => newRecords.expect(creates[index]!.nm, id));
+    ids.forEach((id, index) => identity.expect(creates[index]!.nm, id));
     return {
       ids,
       perform: async () => {
@@ -89,7 +89,7 @@ export function registerEffectRunners(
                     replyType: 'group',
                   } as AnnotationDraft);
             const { created } = await page.annotations.create(draft);
-            newRecords.confirm(id, created.ref);
+            identity.confirm(id, created.ref);
             written.push({ id, ref: created.ref });
           }
           return Object.fromEntries(written.map(({ id, ref }) => [id, ref]));
@@ -97,7 +97,7 @@ export function registerEffectRunners(
           for (const part of [...written].reverse()) {
             await page.annotations.delete(part.ref).catch(() => {});
           }
-          ids.forEach(newRecords.abandon);
+          ids.forEach(identity.abandon);
           throw error;
         }
       },
@@ -113,7 +113,7 @@ export function registerEffectRunners(
     return {
       ids: [effect.id],
       perform: () =>
-        newRecords.withRef(effect.id, async (ref) => {
+        identity.withRef(effect.id, async (ref) => {
           await ctx.doc.page(ref.page).annotations.update(ref, patch);
           // Attached link children follow their parent's written geometry.
           const parent = annotationKey(ref);
@@ -135,7 +135,7 @@ export function registerEffectRunners(
     return {
       ids: [effect.id],
       perform: () =>
-        newRecords.withRef(effect.id, async (ref) => {
+        identity.withRef(effect.id, async (ref) => {
           await ctx.doc.page(ref.page).annotations.update(ref, patch);
         }),
     };
@@ -144,7 +144,7 @@ export function registerEffectRunners(
   store.onEffect('delete', (effect) => ({
     ids: [effect.id],
     perform: () =>
-      newRecords.withRef(effect.id, async (ref) => {
+      identity.withRef(effect.id, async (ref) => {
         await ctx.doc.page(ref.page).annotations.delete(ref);
       }),
   }));

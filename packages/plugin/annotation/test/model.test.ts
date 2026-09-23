@@ -93,7 +93,8 @@ describe('pending changes', () => {
     expect(tokens(state)).toEqual([]); // 1 gone, so 3 is released
   });
 
-  it('followRecord moves changes and the vector preference; a create goes; pointers follow', () => {
+  it('followRecord moves changes, the vector preference and the text range; pointers follow', () => {
+    const REF = { kind: 'objectNumber', page: record('x').page, annotObjectNumber: 9 } as const;
     const state = followRecord(
       {
         ...withPending([
@@ -106,16 +107,31 @@ describe('pending changes', () => {
           edit(3, 'new:1', { flags: DRAWN_FLAGS }),
         ]),
         vector: { 'new:1': true },
+        textSelection: { id: 'new:1', start: 0, end: 2 },
       },
       'new:1',
       'obj:9',
+      REF,
     );
     expect(state.pending.map((change) => [change.token, change.id])).toEqual([
+      [1, 'obj:9'],
       [2, 'new:2'],
       [3, 'obj:9'],
     ]);
-    const member = state.pending[0]!.change;
+    // The create stays until its write settles, under the confirmed key and ref.
+    const created = state.pending[0]!.change;
+    expect(created.kind === 'create' && [created.record.id, created.record.ref]).toEqual([
+      'obj:9',
+      REF,
+    ]);
+    const member = state.pending[1]!.change;
     expect(member.kind === 'create' && member.record.group).toBe('obj:9');
     expect(state.vector).toEqual({ 'obj:9': true });
+    expect(state.textSelection).toEqual({ id: 'obj:9', start: 0, end: 2 });
+  });
+
+  it('followRecord leaves a state with nothing of the record alone', () => {
+    const state = withPending([edit(1, 'a', {})]);
+    expect(followRecord(state, 'b', 'c', null)).toBe(state);
   });
 });

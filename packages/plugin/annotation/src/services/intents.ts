@@ -19,6 +19,9 @@
  *
  * Rollback is therefore deletion: a refused change disappears and the view
  * shows the engine's record, including anything another session changed.
+ *
+ * Several messages can share one engine write (keystrokes typed before a
+ * pause): each settles its own change, and the refusal is reported once.
  */
 import { toPluginError, toPluginErrorInfo, type Mirror, type PluginError } from '@embedpdf/core';
 import type { Id, Model, UpdateResult } from '@embedpdf/core-annotation';
@@ -72,7 +75,21 @@ export function createIntents(
     ctx.state.update(writeSettled, released, 'accepted');
   });
 
-  /** The change a message made to each record, against the model it acted on. */
+  /** The engine errors already reported: one write can carry several messages' changes. */
+  const reported = new WeakSet<object>();
+  const firstReport = (error: unknown): boolean => {
+    if (typeof error !== 'object' || error === null) return true;
+    if (reported.has(error)) return false;
+    reported.add(error);
+    return true;
+  };
+
+  /**
+   * The change a message made to each record, against the model it acted on.
+   * An edit also records how the record renders: until it settles, the
+   * record looks the way it did when the user made it, whoever else changes
+   * the record meanwhile.
+   */
   const changesOf = (before: Model, result: UpdateResult): PendingChange[] => {
     const changes: PendingChange[] = [];
     for (const record of result.change.put) {
@@ -81,7 +98,7 @@ export function createIntents(
         token: ++token,
         id: record.id,
         change: previous
-          ? { kind: 'edit', fields: changedFields(previous, record) }
+          ? { kind: 'edit', fields: { ...changedFields(previous, record), source: record.source } }
           : { kind: 'create', record },
       });
     }
@@ -89,6 +106,22 @@ export function createIntents(
       changes.push({ token: ++token, id, change: { kind: 'delete' } });
     }
     return changes;
+  };
+
+  /**
+   * The refs of the records these changes belong to now: a change follows its
+   * record to a new key, so it names the record better than the id the write
+   * was made under.
+   */
+  const refsNow = (tokens: readonly number[]): AnnotationRef[] => {
+    const carried = new Set(tokens);
+    const ids = new Set(
+      ctx.state
+        .get()
+        .pending.filter((change) => carried.has(change.token))
+        .map((change) => change.id),
+    );
+    return [...ids].map(refOf).filter((ref): ref is AnnotationRef => ref !== null);
   };
 
   /** Step 1: record the message's result against the model it acted on. */
@@ -111,6 +144,7 @@ export function createIntents(
     }
     let created: Record<Id, AnnotationRef> = {};
     const failed: { ids: readonly Id[]; error: PluginError }[] = [];
+    const reports: { refs: AnnotationRef[]; error: PluginError }[] = [];
     await Promise.all(
       writes.map(async (write) => {
         const tokens = tokensOf(write.ids);
@@ -118,7 +152,9 @@ export function createIntents(
           const refs = await write.perform();
           if (refs) created = { ...created, ...refs };
         } catch (error) {
-          failed.push({ ids: write.ids, error: toPluginError('annotation', error) });
+          const refusal = { ids: write.ids, error: toPluginError('annotation', error) };
+          failed.push(refusal);
+          if (firstReport(error)) reports.push({ refs: refsNow(tokens), error: refusal.error });
           ctx.state.update(writeSettled, tokens, 'refused');
           return;
         }
@@ -129,11 +165,8 @@ export function createIntents(
       }),
     );
     if (uncarried.length) ctx.state.update(writeSettled, tokensOf(uncarried), 'refused');
-    for (const { ids, error } of failed) {
-      events.writeFailed.emit({
-        refs: ids.map(refOf).filter((ref): ref is AnnotationRef => ref !== null),
-        error: toPluginErrorInfo(error),
-      });
+    for (const { refs, error } of reports) {
+      events.writeFailed.emit({ refs, error: toPluginErrorInfo(error) });
     }
     return { created, failed };
   };

@@ -2,7 +2,8 @@
  * What happens when the engine confirms a change, whoever made it:
  *
  *   - a new record this session created finds its real key (by its /NM), and
- *     the selection and text editing follow it;
+ *     the selection and text editing follow it; once the records hold it,
+ *     its create change settles, whatever confirmed it;
  *   - how the record renders follows who changed it: this session's creates
  *     render live from their description, another session's changes render
  *     from the engine's raster (their appearance is the truth it baked);
@@ -11,19 +12,25 @@
  *
  * The data itself is already in the records mirror when this runs.
  */
-import { originOf } from '@embedpdf/core';
+import { originOf, type MirrorChange } from '@embedpdf/core';
 import { annotationKey, refFromStableId } from '@embedpdf/engine-core/runtime';
 
 import { preferBaked, preferVector } from '../model';
+import type { AnnotationRecords } from './records';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import type { Announcer } from '../services/announce';
 
 export function followConfirmedChanges(
   ctx: Pick<AnnotationContext, 'state'>,
-  { events, newRecords }: Pick<AnnotationServices, 'events' | 'newRecords'>,
+  { events, identity }: Pick<AnnotationServices, 'events' | 'identity'>,
   announce: Announcer,
 ): void {
   events.recordsChanged.on((change) => {
+    follow(change);
+    identity.settleHeldCreates();
+  });
+
+  function follow(change: MirrorChange<AnnotationRecords>): void {
     if (change.cause === 'load') {
       events.resynced.emit({ pages: change.pages ?? 'all' });
       return;
@@ -35,7 +42,7 @@ export function followConfirmedChanges(
     switch (event.type) {
       case 'annotation.created': {
         const { created } = event;
-        newRecords.confirmByName(created.nm, created.ref);
+        identity.confirmByName(created.nm, created.ref);
         const key = annotationKey(created.ref);
         ctx.state.update(remote ? preferBaked : preferVector, [key]);
         announce.created(created, origin);
@@ -53,5 +60,5 @@ export function followConfirmedChanges(
       default:
         return;
     }
-  });
+  }
 }

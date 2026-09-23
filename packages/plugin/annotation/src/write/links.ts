@@ -25,15 +25,23 @@ import { named } from './named';
  */
 export function createLinkWrites(
   ctx: Pick<AnnotationContext, 'doc'>,
-  { store, geometry }: Pick<AnnotationServices, 'store' | 'geometry'>,
+  { store, geometry, identity }: Pick<AnnotationServices, 'store' | 'geometry' | 'identity'>,
 ) {
   /**
    * Per-parent serialization of attached-link reconciles: rapid edits chain
    * instead of interleaving (two overlapping runs could double-create
    * children). Each run reads the current model at execution time, so a
-   * chained run converges on the latest desired state.
+   * chained run converges on the latest desired state. A chain moves with
+   * its parent to a new key, and its runs reconcile the parent's key then.
    */
-  const chains = new Map<Id, Promise<void>>();
+  const chains = new Map<Id, { parent: Id; tail: Promise<void> }>();
+  identity.onFollow((from, to) => {
+    const chain = chains.get(from);
+    if (!chain) return;
+    chains.delete(from);
+    chain.parent = to;
+    chains.set(to, chain);
+  });
 
   /**
    * The one place attached link children are created, retargeted, re-rected,
@@ -99,13 +107,17 @@ export function createLinkWrites(
     id: Id,
     intent: { target: PdfLinkTarget | null } | 'keep',
   ): Promise<void> => {
-    const previous = chains.get(id) ?? Promise.resolve();
-    const next = previous.then(() =>
-      reconcileChildren(id, intent === 'keep' ? linkOf(store.model(), id) : intent.target),
+    const chain = chains.get(id) ?? { parent: id, tail: Promise.resolve() };
+    chains.set(id, chain);
+    const next = chain.tail.then(() =>
+      reconcileChildren(
+        chain.parent,
+        intent === 'keep' ? linkOf(store.model(), chain.parent) : intent.target,
+      ),
     );
-    chains.set(id, next);
+    chain.tail = next;
     void next.finally(() => {
-      if (chains.get(id) === next) chains.delete(id);
+      if (chain.tail === next && chains.get(chain.parent) === chain) chains.delete(chain.parent);
     });
     return next;
   };
@@ -128,10 +140,15 @@ export function createLinkWrites(
       .annotations.update(record.ref, relationshipPatch(record.data.subtype, relationship));
   };
 
-  // A restyle that set or cleared a link: the verb that made it waits for the children.
+  // A restyle that set or cleared a link: the verb that made it waits for the
+  // children. A new record's children are written once its create is.
   store.onEffect('syncLink', (effect) => ({
     ids: [],
-    perform: () => scheduleSync(effect.id, { target: effect.target }),
+    perform: () =>
+      identity
+        .withRef(effect.id, (ref) => scheduleSync(annotationKey(ref), { target: effect.target }))
+        // A record never created has no children; its create reports the refusal.
+        .catch(() => {}),
   }));
 
   const api = {

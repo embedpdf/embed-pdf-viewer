@@ -13,18 +13,16 @@
 import {
   creationDraftAnchor,
   update,
-  type AnnotationView,
   type Effect,
   type Id,
   type Model,
   type Message,
 } from '@embedpdf/core-annotation';
-import { positionKey, type AnnotationRef } from '@embedpdf/engine-core/runtime';
+import type { AnnotationRef } from '@embedpdf/engine-core/runtime';
 
 import type { AnnotationContext } from './context';
 import type { AnnotationEvents } from './events';
 import type { IntentOutcome, Intents, IntentWrite } from './intents';
-import { followRecord } from '../model';
 import type { View } from '../read/view';
 
 /**
@@ -60,29 +58,8 @@ export const refsOfIn = (model: Model, ids: readonly Id[]): AnnotationRef[] =>
 const sameIds = (left: readonly Id[], right: readonly Id[]): boolean =>
   left === right || (left.length === right.length && left.every((id, i) => id === right[i]));
 
-/**
- * Weak records (addressed by their position on the page) that the engine
- * named between two views: gone under their position key, present under a
- * new key at the same position.
- */
-function renamesBetween(previous: AnnotationView, next: AnnotationView): Map<Id, Id> {
-  const appearedAt = new Map<string, Id>();
-  for (const id of next.order) {
-    const record = next.byId[id];
-    if (!(id in previous.byId) && record?.data) {
-      appearedAt.set(positionKey(record.page, record.data.index), id);
-    }
-  }
-  const renamed = new Map<Id, Id>();
-  for (const id of previous.order) {
-    const to = previous.byId[id]?.ref?.kind === 'index' ? appearedAt.get(id) : undefined;
-    if (to !== undefined && !(id in next.byId)) renamed.set(id, to);
-  }
-  return renamed;
-}
-
 export function createStore(
-  ctx: Pick<AnnotationContext, 'state' | 'watch'>,
+  ctx: Pick<AnnotationContext, 'state'>,
   view: View,
   intents: Intents,
   events: AnnotationEvents,
@@ -123,23 +100,6 @@ export function createStore(
         ref: next.editing ? (next.byId[next.editing]?.ref ?? null) : null,
       });
     }
-  });
-
-  // Session references follow the view. A weak record the engine named is
-  // the same record under a new key: the session and its pending changes
-  // follow it. Any other record that left the view (deleted elsewhere, a
-  // refused create, a page read again) leaves the selection, the hover and
-  // the text editor, and a gesture on it ends.
-  ctx.watch(view.view, (next, previous) => {
-    const gone = previous.order.filter((id) => !(id in next.byId));
-    if (!gone.length) return;
-    const renamed = renamesBetween(previous, next);
-    for (const [from, to] of renamed) {
-      commit({ type: 'rekey', from, to });
-      ctx.state.update(followRecord, from, to);
-    }
-    const forgotten = gone.filter((id) => !renamed.has(id));
-    if (forgotten.length) commit({ type: 'forget', ids: forgotten });
   });
 
   return {

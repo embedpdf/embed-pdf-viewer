@@ -9,7 +9,7 @@ import { createAnnotationEvents, type AnnotationEvents } from './events';
 import { createFilePickerPort, type FilePickerPort } from './file-picker';
 import { createCropLookup, type CropLookup } from './geometry';
 import { createIntents } from './intents';
-import { createNewRecords, type NewRecords } from './new-records';
+import { createRecordIdentity, type RecordIdentity } from './record-identity';
 import { createStore, type AnnotationStore } from './store';
 import { createRecordsMirror, type AnnotationRecords } from '../sync/records';
 import { createBehaviors, type Behaviors } from '../tools/behaviors';
@@ -31,7 +31,8 @@ export interface AnnotationServices {
   readonly view: View;
   /** The one door user actions go through. */
   readonly store: AnnotationStore;
-  readonly newRecords: NewRecords;
+  /** Where a record changes its key, and how a write finds its engine ref. */
+  readonly identity: RecordIdentity;
   readonly geometry: CropLookup;
   readonly authority: Authority;
   readonly filePicker: FilePickerPort;
@@ -53,12 +54,13 @@ export function createServices(
   const refOf = (id: string) => view.model().byId[id]?.ref ?? null;
   const intents = createIntents(ctx, records, events, refOf);
   const store = createStore(ctx, view, intents, events);
+  const identity = createRecordIdentity(ctx, store, view, records);
   return {
     events,
     records,
     view,
     store,
-    newRecords: createNewRecords(ctx, store, records),
+    identity,
     geometry,
     authority: createAuthority(ctx, store),
     filePicker: createFilePickerPort(ctx),
