@@ -139,7 +139,8 @@ export function getApiVersion() {
     // Every contract release moves this version, so a plain version bump
     // is the common cause and re-extracting is the whole fix. Only an
     // actual operation change needs the SDKs regenerated first, since
-    // the manifest is extracted from their reference.md.
+    // the manifest is extracted from their generated reference docs
+    // (for TypeScript, `cloudpdf/sdk/reference.md`).
     throw new Error(
       `API reference version mismatch: OpenAPI is ${openapi.info.version}, snippets are ${snippets.canonicalVersion}.\n` +
         `Regenerate the manifest: pnpm --filter @cloudpdf/website api:snippets\n` +
@@ -270,7 +271,7 @@ export function getGrantIndex(kind: 'x-required-capability' | 'x-required-scope'
 }
 
 /**
- * A `$ref` target. Reused sub-schemas are emitted as pointers INTO the
+ * A `$ref` target. Reused sub-schemas are emitted as pointers into the
  * component that first declared them (`.../DocAnnotationsList200Response/
  * properties/annotations/items/anyOf/0/properties/color`), so resolving only
  * `#/components/schemas/{name}` left several hundred refs unresolved — they
@@ -347,7 +348,7 @@ function literalOf(schema: JsonSchema): string | undefined {
 }
 
 /**
- * The property every branch of a union pins to a DIFFERENT literal — computed
+ * The property every branch of a union pins to a different literal — computed
  * across the branches rather than per branch, because a branch can pin more
  * than one: three of the nineteen annotation variants pin `intent` as well as
  * `subtype`, and labelling each branch by its own first literal mixed the two

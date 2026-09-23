@@ -5,7 +5,7 @@ import type { AnnotationBorderStyle } from '@embedpdf/engine-core/runtime';
  * this PDFium-specific mapping in engine-services so engine-core stays free
  * of any PDFium dependency (mirrors `PDF_SUBTYPE_TO_CODE`).
  *
- *   UNKNOWN=0, SOLID=1, DASHED=2, BEVELED=3, INSET=4, UNDERLINE=5, CLOUDY=6
+ *   Unknown=0, solid=1, dashed=2, beveled=3, inset=4, underline=5, cloudy=6
  *
  * The wire-stable `AnnotationBorderStyle` union covers the four styles a
  * shape annotation realistically authors; cloudy borders are surfaced

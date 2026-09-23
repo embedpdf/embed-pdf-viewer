@@ -3,12 +3,12 @@ import { AbortError } from '@embedpdf/engine-core/runtime';
 import { HttpClient } from '../src/transport/HttpClient';
 
 /**
- * Transport backpressure + affinity header (plan
- * `2026-08-26-client-backpressure-affinity-header.md`).
+ * Transport backpressure + the `X-CloudPDF-Doc` affinity header (see
+ * `cloudpdf/server/deploy/helm/DEPLOY.md`, "Load balancing & doc affinity").
  *
- * Retry is keyed on OUR 503 codes (`EngineBusy`, `EngineRestarting`) —
- * both mean NOTHING HAPPENED server-side, so retrying is
- * method-agnostic-safe. Foreign 503s keep their old semantics.
+ * Retry is keyed on our 503 codes (`EngineBusy`, `EngineRestarting`) —
+ * both mean nothing happened server-side, so retrying is
+ * method-agnostic-safe. Foreign 503s are returned without a retry.
  */
 
 type FetchStep =

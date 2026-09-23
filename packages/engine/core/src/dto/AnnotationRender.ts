@@ -30,7 +30,7 @@ export interface AnnotationAppearanceRenderOptions {
    */
   modes?: AnnotationAppearanceMode[];
   /**
-   * Output-pixel budget PER APPEARANCE — same semantics as
+   * Output-pixel budget per appearance — same semantics as
    * `PageRenderOptions.maxOutputPixels`: appearances are sized by
    * `rect × scale`, and a page-sized stamp at a high scale is the same
    * memory bomb a full-page render is. Server requests carry the
@@ -50,13 +50,13 @@ export interface AnnotationAppearanceImageOptions extends AnnotationAppearanceRe
 }
 
 /**
- * HTTP/token shape: encoded options plus the version field used to make the
+ * HTTP/token shape: encoded options plus the version field that makes the
  * response content-addressed and CDN-cacheable.
  *
  * Only `annotationVersion` matters here: an appearance bitmap is rendered
  * purely from the annotation's own `/AP` stream, so it changes iff the
  * annotation changes. Page base content (`contentVersion`/`docVersion`) does
- * not affect appearances and is deliberately NOT part of the cache key —
+ * not affect appearances and is deliberately not part of the cache key —
  * same as the annotation list endpoint.
  */
 export interface AnnotationAppearancesQuery {
@@ -71,8 +71,8 @@ export interface AnnotationAppearancesQuery {
  *
  * Rotation convention: for annotations whose rotation lives in the AP
  * `/Matrix` — box-family kinds (square/circle/free-text/stamp/caret) whose
- * DTO carries BOTH `rotation` and `unrotatedRect` — the raster renders
- * ROTATION-STRIPPED and `rect` is the logical `unrotatedRect`; the consumer
+ * DTO carries both `rotation` and `unrotatedRect` — the raster renders
+ * rotation-stripped and `rect` is the logical `unrotatedRect`; the consumer
  * re-applies the DTO's `rotation` as a view transform about the box centre
  * (e.g. CSS `rotate`), which makes the raster rotation-invariant (rotating
  * never re-renders). Everything else — vertex kinds, whose rotation is

@@ -26,7 +26,7 @@ import { FormSnapshotSchema } from '../forms/schema';
  *   `opt_check` (/Opt "Alpha", on-state "On"), hierarchical text field
  *   `billing.name`.
  * - `orphanWidgets` — orphan_widgets.pdf: `linked_text` in /AcroForm
- *   /Fields plus RECOVERED `orphan_check` and `orphan_radio`.
+ *   /Fields plus recovered `orphan_check` and `orphan_radio`.
  * - `choiceFields` — listbox_form.pdf: `Listbox_MultiSelect` (options
  *   Apple..), `Listbox_SingleSelect`.
  */
@@ -180,10 +180,10 @@ export function runFormConformance(
     test('rejects family/value mismatches without touching the field', async () => {
       const doc = await open(opts.fixtures.toggleFields);
       try {
-        // Compare against the CURRENT value, not the fixture seed: on
+        // Compare against the current value, not the fixture seed: on
         // transports with durable server state (cloud), earlier tests'
         // legitimate writes persist. The invariant under test is that a
-        // rejected write changes NOTHING.
+        // rejected write changes nothing.
         const before = await doc.forms.get({ kind: 'fqn', name: 'maxlen_text' });
         if (before.family !== 'text') throw new Error('expected text family');
         await expect(
@@ -392,10 +392,10 @@ export function runFormConformance(
 
     test('widgets live the full annotation-plane loop', async () => {
       const doc = await open(opts.fixtures.toggleFields);
-      const pon = opts.fixtures.toggleFields.pageObjectNumber;
+      const pageObjectNumber = opts.fixtures.toggleFields.pageObjectNumber;
       try {
         // 1. Born as an annotation: inert, styled with the house vocabulary.
-        const page = doc.page(toPageRef(pon));
+        const page = doc.page(toPageRef(pageObjectNumber));
         const created = await page.annotations.create({
           subtype: 'widget',
           rect: { left: 20, bottom: 20, right: 200, top: 44 },
@@ -422,7 +422,7 @@ export function runFormConformance(
         if (widgetDto?.subtype !== 'widget') throw new Error('expected widget DTO');
         expect(widgetDto.fieldObjectNumber).toBe(field.field.fieldObjectNumber);
 
-        // 3. Restyled/moved through the SAME annotation path as every kind.
+        // 3. Restyled/moved through the same annotation path as every kind.
         const patched = await page.annotations.update(widgetRef, {
           subtype: 'widget',
           interiorColor: { r: 255, g: 247, b: 219 },
@@ -430,7 +430,7 @@ export function runFormConformance(
         if (patched.updated.subtype !== 'widget') throw new Error('expected widget DTO');
         expect(patched.updated.interiorColor).toEqual({ r: 255, g: 247, b: 219 });
 
-        // 4. Deleting an ATTACHED widget is refused - the field-tree owns it.
+        // 4. Deleting an attached widget is refused - the field-tree owns it.
         await expect(page.annotations.delete(widgetRef)).rejects.toMatchObject({
           code: EngineErrorCode.InvalidArg,
         });
@@ -449,7 +449,7 @@ export function runFormConformance(
 
     test('createField composes styled widgets atomically', async () => {
       const doc = await open(opts.fixtures.toggleFields);
-      const pon = opts.fixtures.toggleFields.pageObjectNumber;
+      const pageObjectNumber = opts.fixtures.toggleFields.pageObjectNumber;
       try {
         const created = await doc.forms.createField({
           family: 'radio',
@@ -457,13 +457,13 @@ export function runFormConformance(
           noToggleToOff: true,
           widgets: [
             {
-              page: toPageRef(pon),
+              page: toPageRef(pageObjectNumber),
               rect: { left: 20, bottom: 60, right: 40, top: 80 },
               onState: 'yes',
               appearance: { color: { r: 0, g: 0, b: 0 }, strokeWidth: 1 },
             },
             {
-              page: toPageRef(pon),
+              page: toPageRef(pageObjectNumber),
               rect: { left: 60, bottom: 60, right: 80, top: 80 },
               onState: 'no',
             },
@@ -490,11 +490,11 @@ export function runFormConformance(
           doc.forms.updateField(created.field.ref, { family: 'radio', name: 'unison_radio' }),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
 
-        // deleteField cascades: field gone AND its widgets gone.
-        const before = await doc.page(toPageRef(pon)).annotations.list();
+        // deleteField cascades: field gone and its widgets gone.
+        const before = await doc.page(toPageRef(pageObjectNumber)).annotations.list();
         const removed = await doc.forms.deleteField(created.field.ref);
         expect(removed.removedWidgets.length).toBe(2);
-        const after = await doc.page(toPageRef(pon)).annotations.list();
+        const after = await doc.page(toPageRef(pageObjectNumber)).annotations.list();
         expect(after.annotations.length).toBe(before.annotations.length - 2);
         await expect(doc.forms.get({ kind: 'fqn', name: 'renamed_radio' })).rejects.toMatchObject({
           code: EngineErrorCode.NotFound,

@@ -237,7 +237,7 @@ export {
 } from './wire/renderOptionsCodec';
 export type { AnnotationRenderVersion, RenderVersions } from './wire/renderOptionsCodec';
 
-// Canonical PDF-document geometry schemas (zod). Exported from `wire` ONLY.
+// Canonical PDF-document geometry schemas (zod). Exported from `wire` only.
 export {
   PdfPointSchema,
   PdfRectSchema,

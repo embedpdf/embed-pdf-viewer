@@ -105,7 +105,7 @@ describe('derived renders', () => {
     const headers = { Authorization: `Bearer ${docToken(tenantId, docId)}` };
 
     // Default fixture: enforce=false → width-kind renders still work. The
-    // token is ANNOTATED, so it lives under the annotated family (the prefix
+    // token is annotated, so it lives under the annotated family (the prefix
     // rule makes `/render/pages/` serve annotation-free tokens only).
     const res = await fetch(
       `${fx.baseUrl}/v1/docs/${docId}/render/annotated/pages/obj:1/data@${OFFLATTICE_TOKEN}`,
@@ -135,7 +135,7 @@ describe('derived renders', () => {
       };
       expect(body.error.details?.renderPolicy?.fullPage.widths).toEqual([320, 640, 1280, 2560]);
 
-      // Rect-target region renders are EXEMPT from full-page enforcement:
+      // Rect-target region renders are exempt from full-page enforcement:
       // they belong to the (future) tile policy, and rejecting them here
       // would kill tiling before it exists.
       const rectRender = await fetch(
@@ -227,7 +227,7 @@ describe('derived renders', () => {
       );
       expect(accepted.status).toBe(200);
 
-      // The UNVERSIONED alias is the escape hatch: never enforced (no-store).
+      // The unversioned alias is the escape hatch: never enforced (no-store).
       const unversioned = await fetch(
         `${strict.baseUrl}/v1/docs/${strictDoc}/layers/default/annotations/pages/obj:1/appearances?scale=3`,
         { headers: strictHeaders },
@@ -241,7 +241,7 @@ describe('derived renders', () => {
 
   test('appearance renders carry the output-pixel budget into the worker', async () => {
     // Tiny budget: the stub raster is (8×scale)² px, so scale=4 → 1024 px
-    // blows a 100 px budget even though 4 is ON the lattice — the budget is
+    // blows a 100 px budget even though 4 is on the lattice — the budget is
     // the memory guard, the lattice is the canonical-point guard.
     const tiny = await buildFixture({ renderLattice: { maxRenderPixels: 100 } });
     try {
@@ -293,7 +293,7 @@ describe('derived renders', () => {
     expect(tile.headers.get('content-type')).toBe('image/webp');
     expect((await tile.arrayBuffer()).byteLength).toBeGreaterThan(0);
 
-    // The warmed artifact is the SAME canonical object the doc-plane
+    // The warmed artifact is the same canonical object the doc-plane
     // read-through would produce — one door.
     const baseSha = createHash('sha256').update(bytes).digest('hex');
     expect(
@@ -363,8 +363,8 @@ describe('derived renders', () => {
     await seedDocument(fx, tenantId, docId, { pageCount: 1 });
     const headers = { Authorization: `Bearer ${docToken(tenantId, docId, 'alice')}` };
 
-    // Layer view at the base epoch. Annotatedness is PATH-only (token/path
-    // law): the annotated FAMILY pins both counters, its token carrying the
+    // Layer view at the base epoch. Annotatedness is path-only (token/path
+    // law): the annotated family pins both counters, its token carrying the
     // annotationVersion pin — never an includeAnnotations key.
     const token =
       'annotationVersion=1,background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=320';

@@ -1,12 +1,12 @@
 /**
  * `scene(item)` — the render contract. Turns an annotation render-item into a flat
- * list of fully-PAINTED nodes (geometry + how to paint it). A framework renderer
+ * list of fully-painted nodes (geometry + how to paint it). A framework renderer
  * just maps each node to one element and applies `paint`; it owns no per-kind
  * appearance logic, so adding a framework (or a kind) never duplicates drawing.
  *
  * Geometry comes from `geomScene` (shared with hit-testing); paint is layered on
- * here. Text markup is the one family whose paint varies per node (highlight FILLS,
- * underline/strikeout/squiggly STROKE, widths derived from the line height), so it
+ * here. Text markup is the one family whose paint varies per node (highlight fills,
+ * underline/strikeout/squiggly stroke, widths derived from the line height), so it
  * has its own small painter — but it still emits the same generic SceneNodes.
  */
 import { distanceScene, measurementCaptionScene } from './measurement';
@@ -14,7 +14,7 @@ import { shapeMeasurementLayout } from './measurement-shape';
 import { textQuadBounds, textQuadRing } from '@embedpdf/core-geometry';
 import { geomScene } from './geometry';
 import type {
-  Geom,
+  ContentGeometry,
   Paint,
   Rect,
   RenderItem,
@@ -23,10 +23,10 @@ import type {
   Subtype,
   TextQuad,
   TextStyle,
-  Vec,
+  Point,
 } from './types';
 
-const num = (n: number): number => Number(n.toFixed(3));
+const num = (value: number): number => Number(value.toFixed(3));
 
 /** Uniform paint for a shape/line/poly node. Fill only lands on closed nodes; the
  *  dash comes solely from the border style — so a live draft (ghost) previews
@@ -51,27 +51,33 @@ function shapePaint(style: Style, closed: boolean): Paint {
   };
 }
 
-/** A smooth squiggle (quadratic-bezier wave) along an ARBITRARY baseline,
+/** A smooth squiggle (quadratic-bezier wave) along an arbitrary baseline,
  *  generated in the (û, n̂) basis: one `Q` hump then reflected `T` segments
  *  alternate across the run. Reflection is affine-invariant, so an upright
  *  quad reproduces the old axis-aligned wave byte-for-byte. `n̂` points from
  *  the baseline toward the ascent side; humps rise toward the text. */
-function squigglePath(start: Vec, u: Vec, n: Vec, w: number, amp: number): string {
+function squigglePath(
+  start: Point,
+  direction: Point,
+  normal: Point,
+  length: number,
+  amp: number,
+): string {
   const half = Math.max(2, amp * 1.5); // half a wavelength
-  const at = (t: number, off: number): Vec => ({
-    x: start.x + u.x * t + n.x * off,
-    y: start.y + u.y * t + n.y * off,
+  const at = (distance: number, off: number): Point => ({
+    x: start.x + direction.x * distance + normal.x * off,
+    y: start.y + direction.y * distance + normal.y * off,
   });
-  const p = (v: Vec) => `${num(v.x)} ${num(v.y)}`;
+  const formatPoint = (point: Point) => `${num(point.x)} ${num(point.y)}`;
   const hump = at(half / 2, amp);
-  let d = `M ${p(at(0, 0))} Q ${p(hump)} ${p(at(half, 0))}`;
-  for (let t = half; t + half <= w + 0.5; t += half) {
-    d += ` T ${p(at(t + half, 0))}`;
+  let pathData = `M ${formatPoint(at(0, 0))} Q ${formatPoint(hump)} ${formatPoint(at(half, 0))}`;
+  for (let position = half; position + half <= length + 0.5; position += half) {
+    pathData += ` T ${formatPoint(at(position + half, 0))}`;
   }
-  return d;
+  return pathData;
 }
 
-/** Per-subtype markup nodes on the quads' own edges (corner-NAMED TextQuads:
+/** Per-subtype markup nodes on the quads' own edges (corner-named TextQuads:
  *  upper = ascent side, lower = baseline side, start → end along the frame).
  *  The colour is the markup `/C` (our model keeps stroke==fill). Rotated and
  *  sheared cells draw along their true baselines; upright output is identical
@@ -80,47 +86,56 @@ function markupScene(subtype: Subtype, quads: TextQuad[], style: Style): SceneNo
   const color = style.color;
   const opacity = style.opacity;
   const nodes: SceneNode[] = [];
-  for (const q of quads) {
-    const down = { x: q.lowerStart.x - q.upperStart.x, y: q.lowerStart.y - q.upperStart.y };
-    const h = Math.hypot(down.x, down.y); // true ink height
-    const wVec = { x: q.lowerEnd.x - q.lowerStart.x, y: q.lowerEnd.y - q.lowerStart.y };
-    const w = Math.hypot(wVec.x, wVec.y); // true baseline length
-    if (w <= 0 || h <= 0) continue;
-    const n = { x: down.x / h, y: down.y / h }; // unit, toward the baseline
-    const lw = Math.min(2.5, Math.max(0.75, h * 0.06));
+  for (const quad of quads) {
+    const down = {
+      x: quad.lowerStart.x - quad.upperStart.x,
+      y: quad.lowerStart.y - quad.upperStart.y,
+    };
+    const inkHeight = Math.hypot(down.x, down.y); // true ink height
+    const wVec = { x: quad.lowerEnd.x - quad.lowerStart.x, y: quad.lowerEnd.y - quad.lowerStart.y };
+    const baselineLength = Math.hypot(wVec.x, wVec.y); // true baseline length
+    if (baselineLength <= 0 || inkHeight <= 0) continue;
+    const normal = { x: down.x / inkHeight, y: down.y / inkHeight }; // unit, toward the baseline
+    const lw = Math.min(2.5, Math.max(0.75, inkHeight * 0.06));
     if (subtype === 'underline') {
       // the baseline edge, inset lw off the descent side (the old `y + h − lw`)
       nodes.push({
         kind: 'line',
-        a: { x: q.lowerStart.x - n.x * lw, y: q.lowerStart.y - n.y * lw },
-        b: { x: q.lowerEnd.x - n.x * lw, y: q.lowerEnd.y - n.y * lw },
+        a: { x: quad.lowerStart.x - normal.x * lw, y: quad.lowerStart.y - normal.y * lw },
+        b: { x: quad.lowerEnd.x - normal.x * lw, y: quad.lowerEnd.y - normal.y * lw },
         paint: { stroke: color, width: lw, opacity, blend: blendFor(style) },
       });
     } else if (subtype === 'strikeout') {
       nodes.push({
         kind: 'line',
         a: {
-          x: (q.upperStart.x + q.lowerStart.x) / 2,
-          y: (q.upperStart.y + q.lowerStart.y) / 2,
+          x: (quad.upperStart.x + quad.lowerStart.x) / 2,
+          y: (quad.upperStart.y + quad.lowerStart.y) / 2,
         },
-        b: { x: (q.upperEnd.x + q.lowerEnd.x) / 2, y: (q.upperEnd.y + q.lowerEnd.y) / 2 },
+        b: {
+          x: (quad.upperEnd.x + quad.lowerEnd.x) / 2,
+          y: (quad.upperEnd.y + quad.lowerEnd.y) / 2,
+        },
         paint: { stroke: color, width: lw, opacity, blend: blendFor(style) },
       });
     } else if (subtype === 'squiggly') {
-      const amp = Math.min(2, Math.max(1, h * 0.08));
-      const u = { x: wVec.x / w, y: wVec.y / w };
-      const start = { x: q.lowerStart.x - n.x * amp, y: q.lowerStart.y - n.y * amp };
+      const amp = Math.min(2, Math.max(1, inkHeight * 0.08));
+      const direction = { x: wVec.x / baselineLength, y: wVec.y / baselineLength };
+      const start = {
+        x: quad.lowerStart.x - normal.x * amp,
+        y: quad.lowerStart.y - normal.y * amp,
+      };
       nodes.push({
         kind: 'path',
         // n̂ toward ascent = −(toward baseline)
-        d: squigglePath(start, u, { x: -n.x, y: -n.y }, w, amp),
+        d: squigglePath(start, direction, { x: -normal.x, y: -normal.y }, baselineLength, amp),
         paint: { stroke: color, width: lw, opacity, blend: blendFor(style) },
       });
     } else {
       // highlight: translucent fill with `multiply` so the text reads through it
       nodes.push({
         kind: 'poly',
-        points: textQuadRing(q),
+        points: textQuadRing(quad),
         closed: true,
         paint: { fill: color, opacity, blend: blendFor(style) },
       });
@@ -133,34 +148,34 @@ function markupScene(subtype: Subtype, quads: TextQuad[], style: Style): SceneNo
  *  `bounds` feeds the (axis-aligned) label layout; `ring` is what gets drawn,
  *  so rotated text marks outline and fill their true cells. */
 interface RedactRegion {
-  ring: [Vec, Vec, Vec, Vec];
+  ring: [Point, Point, Point, Point];
   bounds: Rect;
 }
 
-const rectRing = (r: Rect): [Vec, Vec, Vec, Vec] => [
-  { x: r.x, y: r.y },
-  { x: r.x + r.width, y: r.y },
-  { x: r.x + r.width, y: r.y + r.height },
-  { x: r.x, y: r.y + r.height },
+const rectRing = (rect: Rect): [Point, Point, Point, Point] => [
+  { x: rect.x, y: rect.y },
+  { x: rect.x + rect.width, y: rect.y },
+  { x: rect.x + rect.width, y: rect.y + rect.height },
+  { x: rect.x, y: rect.y + rect.height },
 ];
 
-function redactRegions(geom: Geom): RedactRegion[] {
-  if (geom.t === 'quads') {
+function redactRegions(geometry: ContentGeometry): RedactRegion[] {
+  if (geometry.kind === 'quads') {
     const out: RedactRegion[] = [];
-    for (const q of geom.quads) {
-      const bounds = textQuadBounds(q);
-      if (bounds.width > 0 && bounds.height > 0) out.push({ ring: textQuadRing(q), bounds });
+    for (const quad of geometry.quads) {
+      const bounds = textQuadBounds(quad);
+      if (bounds.width > 0 && bounds.height > 0) out.push({ ring: textQuadRing(quad), bounds });
     }
     return out;
   }
-  if (geom.t === 'rect') return [{ ring: rectRing(geom.rect), bounds: geom.rect }];
+  if (geometry.kind === 'rect') return [{ ring: rectRing(geometry.rect), bounds: geometry.rect }];
   return [];
 }
 
 /**
- * Redaction label layout — the SAME reading of ISO 32000-2 the engine's
+ * Redaction label layout — the same reading of ISO 32000-2 the engine's
  * apply-time painter uses, as pure math: top-aligned, `/Q` horizontal
- * alignment, `/Repeat` tiling a full grid that FITS the region (no partial
+ * alignment, `/Repeat` tiling a full grid that fits the region (no partial
  * glyph bleed — the scene has no clipping). Character advance is estimated
  * (0.55em Helvetica-ish); this is a live preview, the engine bakes the truth.
  */
@@ -192,11 +207,11 @@ export function layoutRedactLabel(
   const cols = Math.max(1, Math.floor((region.width + charW) / (textW + charW)));
   const rows = Math.max(1, Math.floor(region.height / lineH));
   const nodes: SceneNode[] = [];
-  for (let r = 0; r < rows && nodes.length < 400; r++) {
-    for (let c = 0; c < cols && nodes.length < 400; c++) {
+  for (let row = 0; row < rows && nodes.length < 400; row++) {
+    for (let column = 0; column < cols && nodes.length < 400; column++) {
       nodes.push({
         kind: 'text',
-        at: { x: region.x + c * (textW + charW), y: baseline(region.y + r * lineH) },
+        at: { x: region.x + column * (textW + charW), y: baseline(region.y + row * lineH) },
         text: label.text,
         ...base,
       });
@@ -206,13 +221,13 @@ export function layoutRedactLabel(
 }
 
 /**
- * Redaction marks: at REST an outline per region, nothing filled. On HOVER
+ * Redaction marks: at REST an outline per region, nothing filled. On hover
  * the applied-look preview — the `/IC` fill plus the tiled `/OverlayText`
  * label — exactly what the destructive apply will paint. All pure data, so
  * every framework renders the preview from the same scene.
  */
 function redactScene(item: RenderItem): SceneNode[] {
-  const regions = redactRegions(item.geom);
+  const regions = redactRegions(item.geometry);
   if (!item.hovered) {
     const paint = {
       stroke: item.style.color,
@@ -242,17 +257,18 @@ function redactScene(item: RenderItem): SceneNode[] {
 
 /** The full painted scene for one annotation. */
 export function scene(item: RenderItem): SceneNode[] {
-  // Links paint NOTHING: an invisible hit rectangle is the norm (any visible
+  // Links paint nothing: an invisible hit rectangle is the norm (any visible
   // border a PDF authored shows through the page raster). Selection chrome
   // still outlines it, so an editable link is findable when selected.
   if (item.subtype === 'link') return [];
   if (item.measure?.intent === 'LineDimension')
-    return distanceScene(item.geom, item.measure, item.style);
+    return distanceScene(item.geometry, item.measure, item.style);
   if (item.subtype === 'redact') return redactScene(item);
-  if (item.geom.t === 'quads') return markupScene(item.subtype, item.geom.quads, item.style);
-  if (item.geom.t === 'caret') {
-    return geomScene(item.geom).map((n) => ({
-      ...n,
+  if (item.geometry.kind === 'quads')
+    return markupScene(item.subtype, item.geometry.quads, item.style);
+  if (item.geometry.kind === 'caret') {
+    return geomScene(item.geometry).map((node) => ({
+      ...node,
       paint: {
         fill: item.style.color,
         stroke: item.style.color,
@@ -261,21 +277,24 @@ export function scene(item: RenderItem): SceneNode[] {
       },
     })) as SceneNode[];
   }
-  const ink = item.geom.t === 'ink'; // freehand: round the pen-stroke ends (caps)
-  const nodes = geomScene(item.geom, item.style.strokeWidth, item.style.border).map((n) => {
+  const ink = item.geometry.kind === 'ink'; // freehand: round the pen-stroke ends (caps)
+  const nodes = geomScene(item.geometry, item.style.strokeWidth, item.style.border).map((node) => {
     const closed =
-      n.kind === 'rect' ||
-      n.kind === 'ellipse' ||
-      n.kind === 'path' ||
-      (n.kind === 'poly' && n.closed);
+      node.kind === 'rect' ||
+      node.kind === 'ellipse' ||
+      node.kind === 'path' ||
+      (node.kind === 'poly' && node.closed);
     const paint = { ...shapePaint(item.style, closed), blend: blendFor(item.style) };
-    // Ink is freehand: round the pen-stroke ends AND joins. Every other kind keeps
+    // Ink is freehand: round the pen-stroke ends and joins. Every other kind keeps
     // the default butt caps + sharp (miter) joins — square corners and poly knees
     // stay crisp.
-    return { ...n, paint: ink ? { ...paint, cap: 'round', join: 'round' } : paint } as SceneNode;
+    return {
+      ...node,
+      paint: ink ? { ...paint, lineCap: 'round', join: 'round' } : paint,
+    } as SceneNode;
   });
   if (item.measure) {
-    const layout = shapeMeasurementLayout(item.geom, item.measure, item.style);
+    const layout = shapeMeasurementLayout(item.geometry, item.measure, item.style);
     nodes.push(...measurementCaptionScene(layout?.caption ?? null, item.style));
   }
   return nodes;

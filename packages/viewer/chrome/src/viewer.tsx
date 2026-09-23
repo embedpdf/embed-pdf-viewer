@@ -1,23 +1,23 @@
 /**
- * The full viewer, as a component — and the customization CONTRACT. The
+ * The full viewer, as a component — and the customization contract. The
  * `ViewerCustomization` surface here is the exact shape that later powers
  * `EmbedPDF.init({...})` and every framework wrapper, because all of it is
  * plain data (see README.md).
  *
  * Two semantics, on purpose:
- *  - REGISTRIES (commands / icons / strings) merge ADDITIVELY over the
+ *  - registries (commands / icons / strings) merge additively over the
  *    defaults by id; a colliding id overrides.
- *  - STRUCTURE (chrome) is an owned VALUE: the default, a transform of it,
+ *  - structure (chrome) is an owned value: the default, a transform of it,
  *    or the host's own schema — never merged.
  *
  * The engine stays a prop — choosing local-wasm vs cloud is the host's
- * decision, and each delivery wires its own. The chrome —
- * toolbars, translations, theme — renders at t≈0; only the pages wait on
- * the engine. Customization is mount-time (exactly like v2's init config);
- * changing these props on a mounted viewer does not rebuild the workspace.
+ * decision, and each delivery wires its own. The chrome — toolbars,
+ * translations, theme — renders at t≈0; only the pages wait on the engine.
+ * Customization is mount-time: changing these props on a mounted viewer does
+ * not rebuild the workspace.
  */
 // One import line per feature: each subpath carries the
-// plugin AND its UI; delete a line and the feature leaves the bundle.
+// plugin and its UI; delete a line and the feature leaves the bundle.
 import { useEffect, useState, type ReactNode } from 'react';
 import { Viewer, useKernel } from '@embedpdf/react/runtime';
 import type { Engine, EngineFactory, InitialDocument } from '@embedpdf/react/runtime';
@@ -45,7 +45,6 @@ import type { ChromeHelpers, ChromeSchema } from '@embedpdf/react/toolbar';
 import { ThumbsStageToken } from './config/stage';
 import { defaultChrome } from './config/chrome';
 import { defaultCommands } from './config/commands';
-import { demoToolsPlugin } from './config/demo-tools.plugin';
 import { en } from './locales/en';
 import {
   ViewerConfigProvider,
@@ -60,10 +59,11 @@ import { Shell } from './Shell';
 
 /** Lazy built-in packs — a strings override for one of these wraps its loader. */
 const BUILTIN_LOADERS: Record<string, () => Promise<Locale>> = {
-  es: () => import('./locales/es').then((m) => m.es),
+  es: () => import('./locales/es').then((module) => module.es),
 };
 
-const isDict = (v: unknown): v is TranslationDictionary => typeof v === 'object' && v !== null;
+const isDict = (value: unknown): value is TranslationDictionary =>
+  typeof value === 'object' && value !== null;
 
 /**
  * Deep-merge `over` into `base` (immutably), expanding dotted keys —
@@ -78,16 +78,18 @@ function mergeTranslations(
     const path = key.split('.');
     let node = out;
     for (let i = 0; i < path.length - 1; i++) {
-      const prev = node[path[i]];
-      node = (node[path[i]] = isDict(prev) ? { ...prev } : {}) as Record<
+      const previous = node[path[i]];
+      node = (node[path[i]] = isDict(previous) ? { ...previous } : {}) as Record<
         string,
         string | TranslationDictionary
       >;
     }
     const leaf = path[path.length - 1];
-    const prev = node[leaf];
+    const existing = node[leaf];
     node[leaf] =
-      typeof value === 'string' ? value : mergeTranslations(isDict(prev) ? prev : {}, value);
+      typeof value === 'string'
+        ? value
+        : mergeTranslations(isDict(existing) ? existing : {}, value);
   }
   return out;
 }
@@ -100,9 +102,9 @@ const mergeLocale = (pack: Locale, over?: TranslationDictionary): Locale =>
  * framework wrapper. See README.md for the ladder this implements.
  */
 export interface ViewerCustomization {
-  /** ADDITIVE over the default vocabulary; a colliding id overrides. */
+  /** Additive over the default vocabulary; a colliding id overrides. */
   commands?: readonly CommandDef[];
-  /** ADDITIVE 24×24 stroke icons by name; a colliding name overrides. */
+  /** Additive 24×24 stroke icons by name; a colliding name overrides. */
   icons?: Readonly<Record<string, IconDef>>;
   /** Per-locale translation overrides/additions; dotted keys expand. A code
    *  with no built-in pack becomes a new locale (falls back to English). */
@@ -111,7 +113,7 @@ export interface ViewerCustomization {
   locale?: 'auto' | (string & {});
   /** Feature gating: a disabled category vanishes from every surface. */
   disabledCategories?: readonly string[];
-  /** The structure — a value you OWN: the default (pass nothing), a transform
+  /** The structure — a value you own: the default (pass nothing), a transform
    *  of it, or your own schema. Never merged. */
   chrome?: ChromeSchema | ((base: ChromeSchema, helpers: ChromeHelpers) => ChromeSchema);
   /** The stamps sidebar's built-in library. `false`: none (air-gapped, no
@@ -127,19 +129,19 @@ export interface ViewerCustomization {
    *  14 — fetched, registered on the engine and mounted for the live editor. */
   annotations?: AnnotationsCustomization;
   /** Light/dark preference (string shorthand), or the full theme config with
-   *  `--ep-*` token overrides. Tokens are applied by the DELIVERY (the custom
+   *  `--ep-*` token overrides. Tokens are applied by the delivery (the custom
    *  element adopts them into its shadow root); direct consumers of this
    *  package set the `--ep-*` variables in their own CSS instead. */
   theme?: ThemePreference | ThemeConfig;
 }
 
-/** Token overrides — names WITHOUT the `--ep-` prefix ('accent', 'surface'…). */
+/** Token overrides — names without the `--ep-` prefix ('accent', 'surface'…). */
 export type ThemeTokens = Readonly<Record<string, string>>;
 
 export interface ThemeConfig {
   /** 'system' (default) follows the OS. */
   preference?: ThemePreference;
-  /** Applied in BOTH modes (a later sheet: wins over the defaults). */
+  /** Applied in both modes (a later sheet: wins over the defaults). */
   tokens?: ThemeTokens;
   /** Dark-mode-only overrides, applied over `tokens`. */
   dark?: ThemeTokens;
@@ -156,12 +158,12 @@ export interface FullViewerProps extends ViewerCustomization {
   initialDocuments?: InitialDocument[];
   /** Shown while the workspace boots. Default: a translated pulse line. */
   fallback?: ReactNode;
-  /** Where the theme's `.dark` class goes — a DELIVERY concern, not user
+  /** Where the theme's `.dark` class goes — a delivery concern, not user
    *  config: the custom element passes its shadow wrapper so theming never
    *  touches the host page. Default: document.documentElement. */
   themeTarget?: HTMLElement | null;
   /** Called once the workspace kernel is live, with the viewer handle — the
-   *  DRIVE surface (`el.viewer` on the custom element, `onReady` on the
+   *  Drive surface (`el.viewer` on the custom element, `onReady` on the
    *  wrappers). Capabilities resolve from the moment this fires; document-
    *  scoped calls simply await their document. */
   onViewer?: (viewer: ViewerHandle) => void;
@@ -172,7 +174,7 @@ function HandleBridge({ onViewer }: { onViewer: (viewer: ViewerHandle) => void }
   const kernel = useKernel();
   useEffect(() => {
     onViewer(createViewerHandle(kernel));
-    // Init-only like everything else: re-fires only if the KERNEL changes
+    // Init-only like everything else: re-fires only if the kernel changes
     // (a remount), never because the callback prop identity churned.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kernel]);
@@ -205,14 +207,14 @@ export function FullViewer({
   themeTarget,
   onViewer,
 }: FullViewerProps) {
-  // Customization is INIT-ONLY, exactly like v2's `EmbedPDF.init` (and like
-  // the Viewer's own engine/plugins contract): the whole config resolves ONCE
-  // from the mount-time props, so inline literals — the idiomatic way to pass
-  // it — never churn plugin identities. Later prop changes are ignored.
+  // Customization is init-only, like the Viewer's own engine/plugins
+  // contract: the whole config resolves once from the mount-time props, so
+  // inline literals — the idiomatic way to pass it — never churn plugin
+  // identities. Later prop changes are ignored.
   const [resolved] = useState(() => {
     // ── registries: additive, user wins by id ───────────────────────────────
-    const byId = new Map(defaultCommands.map((c) => [c.id, c]));
-    for (const c of commands ?? []) byId.set(c.id, c);
+    const byId = new Map(defaultCommands.map((command) => [command.id, command]));
+    for (const command of commands ?? []) byId.set(command.id, command);
     const resolvedCommands = [...byId.values()];
 
     // ── structure: an owned value (default | transform | replacement) ───────
@@ -256,33 +258,33 @@ export function FullViewer({
   // command names must resolve. Warnings name the exact id (README promise).
   useEffect(() => {
     if (process.env.NODE_ENV === 'production') return;
-    const ids = new Set(resolved.commands.map((c) => c.id));
+    const ids = new Set(resolved.commands.map((command) => command.id));
     for (const problem of validateChrome(resolved.chrome, ids)) {
       console.warn(`[embedpdf] chrome: ${problem}`);
     }
-    for (const c of resolved.commands) {
-      if (c.icon && !(c.icon in ICON_PATHS) && !(c.icon in resolved.icons)) {
-        console.warn(`[embedpdf] command "${c.id}": unknown icon "${c.icon}"`);
+    for (const command of resolved.commands) {
+      if (command.icon && !(command.icon in ICON_PATHS) && !(command.icon in resolved.icons)) {
+        console.warn(`[embedpdf] command "${command.id}": unknown icon "${command.icon}"`);
       }
     }
   }, [resolved]);
 
   const [plugins] = useState(() => [
     stagePlugin({ layout: 'vertical' }), // main lens (tools engage via interactionPlugin below)
-    // Thumbnail lens over the SAME document: a single-column grid at a fixed small
+    // Thumbnail lens over the same document: a single-column grid at a fixed small
     // zoom, its own camera. Click a thumb to navigate the main lens; the sidebar
     // follows the main view (see ui/panels ThumbnailList).
     stagePlugin({
       id: 'stage-thumbs',
       token: ThumbsStageToken,
       layout: 'grid',
-      columns: 1, // single column, like the v2 snippet's thumbnail rail
+      columns: 1, // a single-column thumbnail rail
       sizing: 'uniform', // equalize pages so the pixel target hits every thumb
-      zoom: { pageWidth: 150 }, // thumbs are 150 SCREEN px wide — for ANY document
+      zoom: { pageWidth: 150 }, // thumbs are 150 screen px wide — for any document
       padding: 12,
       gap: { px: 16 }, // UI-stable spacing between thumbs
       pageFrame: { top: 0, right: 0, bottom: 20, left: 0 }, // reserved label band (screen px)
-      fitAlign: { x: 'center', y: 'start' }, // few pages? thumbs hug the TOP
+      fitAlign: { x: 'center', y: 'start' }, // few pages? thumbs hug the top
       scrollBehavior: 'instant',
     }),
     renderPlugin(),
@@ -316,12 +318,12 @@ export function FullViewer({
         },
       ],
     }),
-    // Stamp LIBRARIES (workspace-scoped): named reusable assets — the built-in
+    // Stamp libraries (workspace-scoped): named reusable assets — the built-in
     // set plus any PDF the user imports, each page one vector stamp. The
     // stamps sidebar is the picker; placement rides annotation's armed stamp.
     stampPlugin(),
     // The action engine: /A and /AA trees dispatch through one policy-gated
-    // executor spine, and THE JavaScript switch lives here (the per-document
+    // executor spine, and the JavaScript switch lives here (the per-document
     // ScriptHost realm; form's K/V/C/F pipeline rides its transaction port,
     // stamp's dynamic templates evaluate in detached realms it mints).
     actionsPlugin({
@@ -330,7 +332,7 @@ export function FullViewer({
     // Forms: fillable under the default pointer/pan (widgets render as fill
     // controls), editable under the Form tab's 'form-edit' + palette tools.
     formPlugin(),
-    // Signatures: the ACT — a mark (a signatures-library asset) dropped on a
+    // Signatures: the act — a mark (a signatures-library asset) dropped on a
     // signature field signs it through the configured signer, or is drawn in
     // without sealing when there is none. Marks themselves are the stamp
     // plugin's; the panel lists libraries of kind 'signatures'.
@@ -349,7 +351,6 @@ export function FullViewer({
     redactionPlugin(),
     measurementPlugin(),
     searchPlugin(),
-    demoToolsPlugin(),
     i18nPlugin({
       locale: resolved.i18n.initial,
       fallbackLocale: 'en',

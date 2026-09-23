@@ -1,5 +1,5 @@
 /**
- * @embedpdf/plugin-form/contract — the PUBLIC form vocabulary. Fields are
+ * @embedpdf/plugin-form/contract — the public form vocabulary. Fields are
  * addressed by `FormFieldRef` (`fieldRef.byName` / `fieldRef.byObjectNumber`),
  * widgets by their `AnnotationRef`; the render feed and the actions seams
  * are the host lens (`/contract/host`).
@@ -32,13 +32,13 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 import type { ActionOrigin, ActionTriggerResult } from '@embedpdf/plugin-actions/contract';
 
-import type { FillItem } from './core/fill-items';
-import type { Box, WidgetHit } from './core/model';
+import type { Box, WidgetHit } from './model';
+import type { FillItem } from './read/fill-items';
 import type { AuthorableFormFamily } from './tools/definitions';
 
 export { FormToken } from './token';
-export type { FillItem } from './core/fill-items';
-export type { Box, WidgetHit } from './core/model';
+export type { FillItem } from './read/fill-items';
+export type { Box, WidgetHit } from './model';
 export type {
   FormDataExport,
   FormDataFormat,
@@ -55,8 +55,7 @@ export type {
   WidgetAppearance,
 } from '@embedpdf/engine-core/runtime';
 
-/** The scripting switch moved to `actionsPlugin({ javascript })` (D8). */
-/** `formPlugin(config)`. */
+/** `formPlugin(config)`. Whether document scripts run is set on `actionsPlugin({ javascript })`. */
 export interface FormConfig {
   /**
    * Whether `setValue` runs the document's keystroke, validate, calculate and
@@ -79,18 +78,18 @@ export interface FormCommitResult {
 
 /**
  * One DOM-free UI request produced by the curated Acrobat scripting surface.
- * `phase` says WHO asked: `'boot'` = a document-open script (Adobe's
+ * `phase` says who asked: `'boot'` = a document-open script (Adobe's
  * version-check boilerplate lives here — embedders typically suppress these
  * nags), `'user'` = a script triggered by the user's own interaction (a
  * validation alert — show it).
  */
 export type FormUiEffect = ScriptUiEffect & {
-  /** WHO asked, script-model axis: `'boot'` = a name-tree/document-open boot
+  /** Who asked, script-model axis: `'boot'` = a name-tree/document-open boot
    *  script, `'user'` = a runtime script. */
   phase: 'boot' | 'user';
   /**
    * The dispatch-origin axis (present when the script ran inside an action
-   * dispatch): a lifecycle `/OpenAction` script is NOT a name-tree boot
+   * dispatch): a lifecycle `/OpenAction` script is not a name-tree boot
    * script — the two axes are deliberately separate. Providers use this for
    * the default visibility matrix (suppress lifecycle alerts, block
    * non-user print); embedder handlers receive it and may decide otherwise.
@@ -119,7 +118,7 @@ export interface CreatedField {
 }
 
 /**
- * The form plugin's public capability: the FIELD plane. Widgets stay
+ * The form plugin's public capability: the field plane. Widgets stay
  * annotations (geometry/appearance live there); this surface owns values,
  * interchange, and the fill-mode projection.
  */

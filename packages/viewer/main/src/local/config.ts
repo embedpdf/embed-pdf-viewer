@@ -1,5 +1,5 @@
 /**
- * The LOCAL door's vocabulary. It lives here — next to `register.ts`, the only
+ * The local door's vocabulary. It lives here — next to `register.ts`, the only
  * code that can interpret it — and not in the kernel, because the options bag
  * below is meaningless anywhere the built-in engine was not imported.
  */

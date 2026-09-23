@@ -1,7 +1,9 @@
-import { describe, expect, it } from 'vitest';
 import { measureFromKnownLength, toPageRef } from '@embedpdf/engine-core/runtime';
+import { describe, expect, it } from 'vitest';
+
+import { step } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
-import { DEFAULT_CHROME_GEOM, geomTranslate, pointInPoly, rotatePoint } from '../src/geometry';
+import { DEFAULT_CHROME_GEOMETRY, geomTranslate, pointInPoly, rotatePoint } from '../src/geometry';
 import { hitTest } from '../src/hit';
 import {
   automaticShapeCaptionCenter,
@@ -11,11 +13,11 @@ import {
   withShapeCaptionPoint,
   type ShapeMeasurementAppearance,
 } from '../src/measurement-shape';
-import { annotationSelectionFrame } from '../src/selection';
 import { scene } from '../src/scene';
-import { initialModel, initialStyle, update } from '../src/update';
+import { annotationSelectionFrame } from '../src/selection';
+import type { ModelAnnotation, ContentGeometry, Model, Message, Point } from '../src/types';
+import { initialModel, initialStyle } from '../src/update';
 import { chrome, creationDraftAnchor, pageItems } from '../src/view';
-import type { Annot, Geom, Model, Msg, Vec } from '../src/types';
 
 const PAGE = toPageRef(1);
 const crop = { left: -20, bottom: -40, right: 580, top: 760 };
@@ -32,15 +34,15 @@ const points = [
   { x: 300, y: 200 },
   { x: 100, y: 200 },
 ];
-const geometry: Geom = { t: 'poly', closed: true, points };
+const geometry: ContentGeometry = { kind: 'poly', closed: true, points };
 
-function annotation(measure = appearance, geom = geometry): Annot {
+function annotation(measure = appearance, geom = geometry): ModelAnnotation {
   return {
     id: 'shape',
     ref: null,
     page: toPageRef(1),
-    subtype: geom.t === 'poly' && geom.closed ? 'polygon' : 'polyline',
-    geom,
+    subtype: geom.kind === 'poly' && geom.closed ? 'polygon' : 'polyline',
+    geometry: geom,
     measure,
     style: initialStyle,
     flags: DRAWN_FLAGS,
@@ -48,25 +50,25 @@ function annotation(measure = appearance, geom = geometry): Annot {
   };
 }
 
-function selected(a = annotation()): Model {
+function selected(shape = annotation()): Model {
   return {
     ...initialModel,
     snap: { ...initialModel.snap, rotation: false },
-    byId: { shape: a },
+    byId: { shape },
     order: ['shape'],
     selected: ['shape'],
   };
 }
 
-function pointer(model: Model, phase: 'down' | 'move' | 'up', point: Vec): Model {
-  return update(model, {
-    t: 'editPointer',
+function pointer(model: Model, phase: 'down' | 'move' | 'up', point: Point): Model {
+  return step(model, {
+    type: 'editPointer',
     phase,
     in: { page: toPageRef(1), point, shift: false },
   })[0];
 }
 
-function expectPoint(actual: Vec, expected: Vec) {
+function expectPoint(actual: Point, expected: Point) {
   expect(actual.x).toBeCloseTo(expected.x, 5);
   expect(actual.y).toBeCloseTo(expected.y, 5);
 }
@@ -77,27 +79,27 @@ describe('area and perimeter authoring', () => {
       ...appearance,
       intent: closed ? 'PolygonDimension' : 'PolyLineDimension',
     };
-    const create = (point: Vec, nextMeasure = measure): Msg => ({
-      t: 'createPointer',
+    const create = (point: Point, nextMeasure = measure): Message => ({
+      type: 'createPointer',
       phase: 'down',
       subtype: closed ? 'polygon' : 'polyline',
       preset: closed ? 'area' : 'perimeter',
       measure: nextMeasure,
       in: { page: toPageRef(1), point, shift: false },
     });
-    let model = update(initialModel, create(points[0]))[0];
-    model = update(model, create(points[1], { ...measure, measure: null }))[0];
-    model = update(model, create(points[2], { ...measure, measure: null }))[0];
+    let model = step(initialModel, create(points[0]))[0];
+    model = step(model, create(points[1], { ...measure, measure: null }))[0];
+    model = step(model, create(points[2], { ...measure, measure: null }))[0];
     const ghost = pageItems(model, PAGE)[0];
     expect(ghost.measure?.measure).toEqual(measure.measure);
     expect(
       scene(ghost).some((node) => node.kind === 'text' && node.text === (closed ? '4 m²' : '6 m')),
     ).toBe(true);
     expect(creationDraftAnchor(model)?.canFinish).toBe(true);
-    const [committed, effects] = update(model, { t: 'finishCreationDraft' });
-    expect(effects).toMatchObject([{ fx: 'create' }]);
+    const [committed, effects] = step(model, { type: 'finishCreationDraft' });
+    expect(effects).toMatchObject([{ type: 'create' }]);
     const created = committed.byId[committed.order[0]];
-    expect(created.geom).toMatchObject({ closed, points: points.slice(0, 3) });
+    expect(created.geometry).toMatchObject({ closed, points: points.slice(0, 3) });
     expect(created.measure).toBe(measure);
     expect(created.source).toBe('vector');
   });
@@ -135,7 +137,7 @@ describe('area and perimeter authoring', () => {
   it('drags text directly, preserves vertices, and emits only a caption patch', () => {
     let model = selected();
     const center = shapeMeasurementLayout(geometry, appearance, initialStyle)!.caption!.center;
-    expect(hitTest(model, PAGE, center, DEFAULT_CHROME_GEOM, 6)).toMatchObject({
+    expect(hitTest(model, PAGE, center, DEFAULT_CHROME_GEOMETRY, 6)).toMatchObject({
       handle: 'caption',
     });
     expect(chrome(model, PAGE).filter((node) => node.kind === 'handle')).toHaveLength(4);
@@ -144,15 +146,15 @@ describe('area and perimeter authoring', () => {
     const preview = pageItems(model, PAGE)[0];
     expect(preview.source).toBe('vector');
     expect(preview.measure?.caption).toEqual({ enabled: true, center: { x: 330, y: 710 } });
-    expect(update(model, { t: 'cancel' })[0].byId.shape.measure).toBe(appearance);
-    const [committed, effects] = update(model, {
-      t: 'editPointer',
+    expect(step(model, { type: 'cancel' })[0].byId.shape.measure).toBe(appearance);
+    const [committed, effects] = step(model, {
+      type: 'editPointer',
       phase: 'up',
       in: { page: toPageRef(1), point: center, shift: false },
     });
-    expect(committed.byId.shape.geom).toBe(geometry);
+    expect(committed.byId.shape.geometry).toBe(geometry);
     expect(committed.byId.shape.measure).toEqual(preview.measure);
-    expect(effects).toEqual([{ fx: 'patch', id: 'shape', scope: { kind: 'caption' } }]);
+    expect(effects).toEqual([{ type: 'patch', id: 'shape', scope: { kind: 'caption' } }]);
   });
 
   it.each([false, true])(
@@ -171,15 +173,15 @@ describe('area and perimeter authoring', () => {
         const item = pageItems(moving, PAGE)[0];
         if (item.measure?.intent === 'LineDimension' || !item.measure)
           throw new Error('Missing shape');
-        const layout = shapeMeasurementLayout(item.geom, item.measure, item.style)!;
+        const layout = shapeMeasurementLayout(item.geometry, item.measure, item.style)!;
         expectPoint(layout.caption!.center, rotatePoint(caption.center, frame.center, angle));
         const committed = pointer(moving, 'up', at);
         expectPoint(annotationSelectionFrame(committed.byId.shape).center, frame.center);
         expect(committed.byId.shape.measure).toEqual(item.measure);
         expect(committed.byId.shape.source).toBe('vector');
       }
-      const quarter = update(initial, { t: 'rotate90' })[0];
-      const reset = update(quarter, { t: 'resetRotation' })[0];
+      const quarter = step(initial, { type: 'rotate90' })[0];
+      const reset = step(quarter, { type: 'resetRotation' })[0];
       expectPoint(annotationSelectionFrame(reset.byId.shape).center, frame.center);
     },
   );
@@ -203,8 +205,8 @@ describe('area and perimeter authoring', () => {
   it('does not finish a crossing area boundary', () => {
     let model = initialModel;
     for (const point of [points[0], points[2], points[1], points[3]]) {
-      model = update(model, {
-        t: 'createPointer',
+      model = step(model, {
+        type: 'createPointer',
         phase: 'down',
         subtype: 'polygon',
         measure: appearance,
@@ -215,8 +217,8 @@ describe('area and perimeter authoring', () => {
     expect(
       scene(pageItems(model, PAGE)[0]).some((node) => node.kind === 'text' && node.text === '—'),
     ).toBe(true);
-    expect(update(model, { t: 'finishCreationDraft' })[0].order).toEqual([]);
-    expect(update(model, { t: 'cancel' })[0].draft).toBeNull();
+    expect(step(model, { type: 'finishCreationDraft' })[0].order).toEqual([]);
+    expect(step(model, { type: 'cancel' })[0].draft).toBeNull();
   });
 
   it('reverts a vertex edit that would cross the area boundary', () => {
@@ -224,11 +226,11 @@ describe('area and perimeter authoring', () => {
     let model = pointer(original, 'down', points[0]);
     model = pointer(model, 'move', { x: 350, y: 150 });
     const preview = pageItems(model, PAGE)[0];
-    expect(shapeMeasurementReadout(preview.geom, appearance)).toMatchObject({
+    expect(shapeMeasurementReadout(preview.geometry, appearance)).toMatchObject({
       unavailable: 'invalid-geometry',
     });
-    const [committed, effects] = update(model, {
-      t: 'editPointer',
+    const [committed, effects] = step(model, {
+      type: 'editPointer',
       phase: 'up',
       in: { page: toPageRef(1), point: { x: 350, y: 150 }, shift: false },
     });
@@ -259,18 +261,18 @@ describe('area and perimeter authoring', () => {
     const target = { x: corner.x + 100, y: corner.y + 70 };
     model = pointer(model, 'down', corner);
     model = pointer(model, 'move', target);
-    if (model.draft?.g !== 'group') throw new Error('Missing group resize');
+    if (model.draft?.kind !== 'group') throw new Error('Missing group resize');
     const draft = model.draft;
     const center = shapeCaptionPoint(measure)!;
     const expected = {
-      x: draft.anchor.x + (center.x - draft.anchor.x) * (draft.cur.width / draft.base.width),
-      y: draft.anchor.y + (center.y - draft.anchor.y) * (draft.cur.height / draft.base.height),
+      x: draft.anchor.x + (center.x - draft.anchor.x) * (draft.current.width / draft.base.width),
+      y: draft.anchor.y + (center.y - draft.anchor.y) * (draft.current.height / draft.base.height),
     };
     const preview = pageItems(model, PAGE).find((item) => item.id === 'shape')!;
     expectPoint(shapeCaptionPoint(preview.measure as ShapeMeasurementAppearance)!, expected);
     const committed = pointer(model, 'up', target);
     expect(committed.byId.shape.measure).toEqual(preview.measure);
-    expect(committed.byId.shape.geom).toEqual(preview.geom);
+    expect(committed.byId.shape.geometry).toEqual(preview.geometry);
     expect(committed.byId.shape.source).toBe('vector');
   });
 });

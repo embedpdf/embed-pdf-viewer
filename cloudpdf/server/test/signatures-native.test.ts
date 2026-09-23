@@ -66,7 +66,7 @@ beforeAll(async () => {
   const bundle = await buildAppForTesting({
     licenseGate: createValidTestLicenseGate(),
     verifier: { mode: 'hs256', secret: SECRET },
-    // The BUILT worker entry: worker threads (and the host process) load
+    // The built worker entry: worker threads (and the host process) load
     // plain ESM, and the native runtime lives behind it.
     workerEntry: new URL('../dist/runtime/worker-entry.js', import.meta.url),
     poolSize: 1,

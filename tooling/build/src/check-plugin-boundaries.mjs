@@ -9,7 +9,7 @@ import ts from 'typescript';
 const PLUGIN_ROOT = /^@embedpdf\/plugin-[^/]+$/;
 const PLUGIN_PACKAGE = /^(@embedpdf\/plugin-[^/]+)(?:\/(.+))?$/;
 const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'];
-const IMPLEMENTATION_MODULE = /(?:^|\/)(?:[^/]+\.plugin|capability|effects|reducer)$/;
+const IMPLEMENTATION_MODULE = /(?:^|\/)(?:[^/]+\.plugin|controller|connect)$/;
 
 function normalize(file) {
   return file.split(path.sep).join('/');

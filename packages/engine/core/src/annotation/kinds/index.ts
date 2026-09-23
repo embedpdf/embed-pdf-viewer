@@ -111,7 +111,7 @@ type PatchFromKind<K> =
 export type AnnotationDTO = DTOFromKind<AnnotationKind>;
 
 /**
- * WIRE drafts/patches: pure JSON, what the worker protocol and HTTP
+ * Wire drafts/patches: pure JSON, what the worker protocol and HTTP
  * surface carry and what the Zod schemas below validate. Kind modules are
  * wire-typed, so these derive straight from the registry.
  */
@@ -119,7 +119,7 @@ export type WireAnnotationDraft = Exclude<DraftFromKind<AnnotationKind>, never>;
 export type WireAnnotationPatch = Exclude<PatchFromKind<AnnotationKind>, never>;
 
 /**
- * AUTHORING drafts/patches: what callers pass to `create()`/`update()`.
+ * Authoring drafts/patches: what callers pass to `create()`/`update()`.
  * Identical to the wire forms except for binary-carrying kinds, whose
  * inline-`BinarySource` authoring types are swapped in here. Engines
  * bridge the two via `annotation/normalize.ts` — see that module for the
@@ -163,7 +163,7 @@ export const AnnotationDTOSchema: z.ZodType<AnnotationDTO> = z.discriminatedUnio
 ]) as unknown as z.ZodType<AnnotationDTO>;
 
 /**
- * Validates the WIRE draft form (post-normalization) — binary-carrying
+ * Validates the wire draft form (post-normalization) — binary-carrying
  * kinds appear here with `{ resource }` refs, never inline bytes.
  */
 export const AnnotationDraftSchema: z.ZodType<WireAnnotationDraft> = z.discriminatedUnion(
@@ -193,7 +193,7 @@ export const AnnotationDraftSchema: z.ZodType<WireAnnotationDraft> = z.discrimin
   ],
 ) as unknown as z.ZodType<WireAnnotationDraft>;
 
-/** Validates the WIRE patch form (post-normalization). */
+/** Validates the wire patch form (post-normalization). */
 export const AnnotationPatchSchema: z.ZodType<WireAnnotationPatch> = z.discriminatedUnion(
   'subtype',
   [

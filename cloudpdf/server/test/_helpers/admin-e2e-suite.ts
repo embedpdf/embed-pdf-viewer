@@ -40,11 +40,12 @@ export interface AdminE2eDialectFixture {
 }
 
 /**
- * Phase 1 admin E2E suite, dialect-parameterized.
+ * Admin E2E suite, dialect-parameterized.
  *
- * The original assertions live here unchanged from
- * `admin-documents.test.ts`; the goal is to **prove** Phase 1
- * works identically on Postgres without any source-code branch. If
+ * `admin-documents.test.ts` runs it on SQLite and
+ * `admin-documents-postgres.test.ts` on Postgres; the goal is to
+ * **prove** the admin surface works identically on Postgres without
+ * any source-code branch. If
  * the SQLite suite passes and the PG suite fails, the dialect
  * abstraction is broken.
  */
@@ -193,7 +194,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
         admin.documents.create({ bytes: fakePdf(30, 1024), docId }),
       ).rejects.toMatchObject({ status: 409 });
 
-      // The classic client mistake: a FRESH key per attempt. Still a
+      // The classic client mistake: a fresh key per attempt. Still a
       // clean 409 — the key lookup misses, the pkey collision must not
       // escape as a driver error.
       await expect(

@@ -1,11 +1,11 @@
 /**
- * Engine-host child entry. Boots the UNCHANGED WorkerThreadPool with the
- * UNCHANGED worker-entry inside a separate process, so a native PDFium
+ * Engine-host child entry. Boots the unchanged WorkerThreadPool with the
+ * unchanged worker-entry inside a separate process, so a native PDFium
  * crash costs this process — never the API.
  *
  * Supervision composition: the pool's default `onFatalWorkerExit`
  * (process.exit(70)) is exactly right here — a dead worker thread kills
- * THIS host, the parent observes the exit, journals the in-flight
+ * this host, the parent observes the exit, journals the in-flight
  * suspects, and respawns. The same fail-fast that meant "pod restart"
  * in inline mode means "sub-second engine respawn" in host mode.
  */
@@ -34,13 +34,13 @@ if (!rawConfig) {
 const config: HostBootConfig = JSON.parse(rawConfig);
 
 // Boot config crosses IPC as JSON, so a URL workerEntry arrives as a
-// 'file://…' STRING — which `new Worker(string)` treats as a filesystem
+// 'file://…' string — which `new Worker(string)` treats as a filesystem
 // path and ENOENTs on. Rehydrate it into a URL instance.
 const workerEntry = config.workerEntry.startsWith('file:')
   ? new URL(config.workerEntry)
   : config.workerEntry;
 
-/** Per-call abort controllers; registered BEFORE the dispatch awaits. */
+/** Per-call abort controllers; registered before the dispatch awaits. */
 const aborts = new Map<number, AbortController>();
 
 (async () => {

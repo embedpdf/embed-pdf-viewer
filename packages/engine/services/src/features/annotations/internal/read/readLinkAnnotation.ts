@@ -14,7 +14,7 @@ import type { AnnotationReadContext } from './annotationReadContext';
  * annotation is plain `inReplyTo` + `replyType: 'group'`); this module only
  * materialises the normalized target.
  *
- * ONE truth, one projection: the target is a pure function of the SAME
+ * One truth, one projection: the target is a pure function of the same
  * payload-carrying action tree the scripting plane reads
  * (`base.actions.activate`) — no second native read exists any more, so the
  * two action-shaped surfaces cannot drift by construction.
@@ -23,7 +23,7 @@ import type { AnnotationReadContext } from './annotationReadContext';
  * executed (an `incomplete` tree, a degraded/unreadable root) projects
  * `unsupported` — a broken action is a dead link, never an invitation to
  * guess. The direct `/Dest` (which is data, not an action) is consulted
- * ONLY when no `/A` exists at all.
+ * only when no `/A` exists at all.
  */
 export function readLink(
   fn: PdfFunctions,

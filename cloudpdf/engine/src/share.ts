@@ -3,7 +3,7 @@ import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 /**
  * Share-session exchange: the client half of the no-backend embed flow.
  *
- * A share token (`shr_…`) is a REFERENCE to a stored grant on the
+ * A share token (`shr_…`) is a reference to a stored grant on the
  * server, not a credential — `exchangeShareToken` trades it for an
  * ordinary short-lived doc JWT, and `shareSessionSource` wraps that in
  * a self-renewing token source. Because the engine's transport

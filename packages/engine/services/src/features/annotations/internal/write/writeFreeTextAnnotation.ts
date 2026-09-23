@@ -73,7 +73,7 @@ function hexColor(color: Color): string {
  * Apply a free-text draft to a freshly-created annotation. Colour model:
  *   - `color` -> `/DA` colour = border + default text colour.
  *   - `fontColor` (optional) -> `TextColor` channel, overriding text only;
- *     written AFTER `/DA` so the override wins.
+ *     written after `/DA` so the override wins.
  *   - `interiorColor` -> `/C` box background (`null`/omitted clears it).
  *
  * Order:
@@ -128,7 +128,7 @@ export function applyFreeTextDraft(
     setLineEndings(fn, annotPtr, { start: 'none', end: draft.lineEnding });
   }
   // A plain text box rotates like square/circle (box model). A callout's
-  // rotation applies to its text BOX only (`unrotatedRect` = the logical text
+  // rotation applies to its text box only (`unrotatedRect` = the logical text
   // box; the /CL leader stays page-space) — the AP generator bakes it as an
   // inline matrix, not the form /Matrix. Absent fields simply clear the keys.
   writeBoxTransformMetadata(fn, mem, annotPtr, {
@@ -152,12 +152,12 @@ export function applyFreeTextDraft(
 
 /**
  * Apply a free-text patch to an existing annotation. Only present fields are
- * touched. `/DA` packs the font, size, and `color` into ONE string, so a
- * partial patch preserves the unpatched members by READING the current triple
+ * touched. `/DA` packs the font, size, and `color` into one string, so a
+ * partial patch preserves the unpatched members by reading the current triple
  * first (the same read-modify-write as {@link applyBorderPatch}'s shared
  * `/BS` call) — a `{fontSize}` patch must never reset the font or colour.
  * Registered (embedded) fonts are the one caveat: the current `/DA` reads
- * back as a font CODE, so preserving a registered family requires the patch
+ * back as a font code, so preserving a registered family requires the patch
  * to restate `fontFamily` (an unknown code falls back to the standard-font
  * default).
  *
@@ -197,11 +197,10 @@ export function applyFreeTextPatch(
 
   applyBorderPatch(fn, mem, annotPtr, patch);
 
-  // The patch table (plan §4.7, one engine since D4): every text write goes
-  // through the rich document — the body style lives there and the engine
-  // derives /DA from it — so the legacy /DA read-modify-write only carries
-  // the DA COLOUR (the border and leader), and the font, size, text colour
-  // and alignment are body-style changes.
+  // Every text write goes through the rich document — the body style lives
+  // there and the engine derives /DA from it — so the /DA read-modify-write
+  // only carries the DA colour (the border and leader), and the font, size,
+  // text colour and alignment are body-style changes.
   const current = readEngineRichText(fn, mem, annotPtr);
   if (patch.color !== undefined) {
     const cur = readDefaultAppearance(fn, mem, annotPtr);

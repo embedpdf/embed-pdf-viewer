@@ -5,7 +5,7 @@
  *
  * The engine surfaces `/IRT` + `/RT` as flat edges on every DTO
  * ({@link AnnotationBase.inReplyTo} / {@link AnnotationBase.replyType}); it
- * deliberately does NOT nest replies/group members, because each of those
+ * deliberately does not nest replies/group members, because each of those
  * is itself a first-class annotation in the page list. This module turns
  * those edges into the shape a comments sidebar wants.
  *
@@ -46,13 +46,13 @@ export function classifyRelation(
  * point at it.
  *
  *   - `groupedParts` (`/RT /Group`) are visual/helper parts of one logical
- *     annotation — a sidebar should fold them into the primary, NOT list
+ *     annotation — a sidebar should fold them into the primary, not list
  *     them as separate comments. Group-level fields (Contents, T, Subj, …)
  *     come from the primary; the subordinate's copies are ignored.
  *   - `replies` (`/RT /R`) are real comment-thread entries shown threaded
  *     under the primary.
  *
- * A primary may legitimately have BOTH (e.g. a StrikeOut with a Caret
+ * A primary may legitimately have both (e.g. a StrikeOut with a Caret
  * group part and a Text reply).
  */
 export interface AnnotationThread<T extends AnnotationDTO = AnnotationDTO> {

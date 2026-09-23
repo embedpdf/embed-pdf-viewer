@@ -130,7 +130,7 @@ export interface CheckboxFieldDTO extends FormFieldBase {
   widgets: ToggleFieldWidget[];
 }
 
-/** A radio group: ONE field, N widgets. Write with `{ type: 'toggle', state }`. */
+/** A radio group: One field, N widgets. Write with `{ type: 'toggle', state }`. */
 export interface RadioFieldDTO extends FormFieldBase {
   family: 'radio';
   /** The checked widget's export value, or `"Off"` when the group is clear. */
@@ -170,8 +170,8 @@ export interface PushButtonFieldDTO extends FormFieldBase {
 }
 
 /**
- * A signature field. Identity and placement only for now — the engine
- * never writes signature values; signing is a future capability.
+ * A signature field: identity and placement only. Form writes never set a
+ * signature value; signing goes through the signatures API.
  */
 export interface SignatureFieldDTO extends FormFieldBase {
   family: 'signature';

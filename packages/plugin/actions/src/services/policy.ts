@@ -3,6 +3,7 @@
  * `never` / unsupported sets, the row-wise merge, and the live policy with
  * its one decision function.
  */
+import type { PluginContext } from '@embedpdf/core';
 import type { PdfActionNode, PdfActionType } from '@embedpdf/engine-core/runtime';
 
 import type {
@@ -14,7 +15,6 @@ import type {
   ActionsCapability,
   ActionsConfig,
 } from '../contract';
-import type { ActionsContext } from './context';
 
 const ALLOW_ALL: ActionPolicyRow = { user: 'allow', hover: 'allow', lifecycle: 'allow' };
 
@@ -43,7 +43,7 @@ const NEVER_TYPES: ReadonlySet<PdfActionType> = new Set([
   'import-data',
 ]);
 
-/** Recognized types with no Phase-1 interpreter. */
+/** Recognized types with no interpreter: reported, never executed. */
 const UNSUPPORTED_TYPES: ReadonlySet<PdfActionType> = new Set([
   'rendition',
   'thread',
@@ -70,10 +70,10 @@ function mergePolicy(base: ActionPolicy, patch: ActionPolicyPatch | undefined): 
   return next;
 }
 
-export function createPolicy(ctx: ActionsContext, config: ActionsConfig) {
+export function createPolicy(ctx: PluginContext<void>, config: ActionsConfig) {
   let policy: ActionPolicy = mergePolicy(DEFAULT_POLICY, config.policy);
 
-  /** Policy lookup — `null` means "recognized, no interpreter" (inert). */
+  /** The decision for one node and origin; `'never'` and `'unsupported'` are fixed, not configurable. */
   const decisionFor = (
     node: PdfActionNode,
     origin: ActionOrigin,
@@ -93,7 +93,7 @@ export function createPolicy(ctx: ActionsContext, config: ActionsConfig) {
       getPolicy: () => policy,
       updatePolicy: (patch) => {
         policy = mergePolicy(policy, patch);
-        ctx.dispatch({ type: 'ACTIONS_POLICY_CHANGED' });
+        ctx.notify(); // the policy lives outside state: wake `getPolicy()` readers
       },
     } satisfies Partial<ActionsCapability>,
   };

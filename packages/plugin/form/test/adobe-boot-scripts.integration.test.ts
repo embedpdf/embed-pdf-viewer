@@ -3,7 +3,7 @@
  * XFA/version-check boilerplate) that probe `app` viewer identity and call
  * `app.findComponent`. Regression for the i-140 bug class: those scripts must
  * run cleanly against the prelude's viewer identity (or at worst degrade to a
- * diagnostic) and the user's fill commit must ALWAYS apply. The one visible
+ * diagnostic) and the user's fill commit must always apply. The one visible
  * side effect — Adobe's "upgrade your viewer" alert — must be tagged as
  * boot-phase so embedders can suppress it.
  */
@@ -31,7 +31,9 @@ describe('Adobe boot-script boilerplate (i-140, hybrid-XFA AcroForm)', () => {
       doc = await engine.open({ kind: 'bytes', id: 'i-140-boot', bytes });
       const snapshot = await doc.forms.list();
       expect(snapshot.formKind).toBe('xfa'); // hybrid: filled via its AcroForm plane
-      const text = snapshot.fields.find((f) => f.family === 'text' && !f.flags.readOnly)!;
+      const text = snapshot.fields.find(
+        (field) => field.family === 'text' && !field.flags.readOnly,
+      )!;
 
       // The scripting controller runs inside a realm (sandbox + budget +
       // transaction): the same standalone realm the other integration suites use.
@@ -49,7 +51,7 @@ describe('Adobe boot-script boilerplate (i-140, hybrid-XFA AcroForm)', () => {
       });
       controller.dispose();
 
-      // The commit APPLIES — the boot boilerplate can never brick filling.
+      // The commit applies — the boot boilerplate can never brick filling.
       expect(result.status).toBe('applied');
       expect(result.error).toBeUndefined();
 
@@ -61,7 +63,9 @@ describe('Adobe boot-script boilerplate (i-140, hybrid-XFA AcroForm)', () => {
 
       // And the value really landed engine-side.
       const after = await doc.forms.list();
-      const same = after.fields.find((f) => f.fieldObjectNumber === text.fieldObjectNumber)!;
+      const same = after.fields.find(
+        (field) => field.fieldObjectNumber === text.fieldObjectNumber,
+      )!;
       expect(same.valueEntry).toEqual({ kind: 'scalar', value: 'FAMILY-NAME' });
     } finally {
       await doc?.close().catch(() => {});

@@ -10,16 +10,16 @@ import { defineConfig, type Plugin } from 'vite';
 import { discoverSampleVariants } from './src/lib/sample-discovery';
 
 /**
- * The live-demo half of the samples pipeline (DOCS-PLATFORM-ARCHITECTURE.md).
+ * The live-demo half of the samples pipeline (docs/conventions/docs-architecture.md).
  *
  * Every sample variant (single `<base>.<fw>.<ext>` file or `<base>.<fw>/`
  * directory — see src/lib/sample-discovery.ts) is wrapped in a virtual entry
  * exporting `mount(el) => unmount`, compiled by the framework's own Vite
  * plugin (this is how .vue/.svelte run inside a Next site with zero webpack
  * surgery), and emitted self-contained into `public/demos/` — the docs load
- * them with a NATIVE dynamic import at runtime.
+ * them with a native dynamic import at runtime.
  *
- * On this site the samples are the CLOUD emissions: they provision
+ * On this site the samples are the cloud emissions: they provision
  * `cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' })` and open the
  * shared demo document with its share grant — the demo a visitor watches is
  * the same HTTPS traffic the code panel tells them to write. No wasm rides
@@ -101,7 +101,7 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       // Vite's app builds drop entry exports (HTML entries don't need them);
-      // demo modules ARE their exports — keep mount().
+      // demo modules are their exports — keep mount().
       preserveEntrySignatures: 'strict',
       input: Object.fromEntries(demos.map((d) => [d.name, `${VIRTUAL_PREFIX}${d.name}.entry.js`])),
       output: {

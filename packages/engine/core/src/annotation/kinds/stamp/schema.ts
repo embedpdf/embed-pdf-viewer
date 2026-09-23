@@ -12,7 +12,7 @@ import type { StampAnnotationDTO } from './dto';
 import type { StampWirePatch } from './patch';
 
 /**
- * Schemas validate the WIRE forms. The authoring types (`StampDraft`,
+ * Schemas validate the wire forms. The authoring types (`StampDraft`,
  * `StampPatch`) carry inline `BinarySource` bytes and are normalized to
  * these shapes before validation — see `annotation/normalize.ts`.
  */

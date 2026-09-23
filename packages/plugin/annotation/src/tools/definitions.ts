@@ -1,14 +1,14 @@
 /**
- * The annotation TOOL registry — the one place that says which tools exist and
- * what each one authors. A tool is a named authoring PRESET, not a new kind: it
+ * The annotation tool registry — the one place that says which tools exist and
+ * what each one authors. A tool is a named authoring preset, not a new kind: it
  * binds an `id` to a PDF `subtype`, a bag of per-tool `defaults`, a cursor, and
- * the interaction TAGS it turns on. Two tools can share a subtype but differ in
+ * the interaction tags it turns on. Two tools can share a subtype but differ in
  * defaults (an "arrow" is a `line` with an arrowhead default), which is exactly
  * why defaults are keyed by the tool id (the `preset`), never by the subtype.
  *
- * The built-in {@link DEFAULT_TOOLS} reproduce v2's tool set; an embedder tweaks
- * or extends them with `annotationPlugin({ tools: [...] })`. Same-id entries MERGE
- * over the built-in (configure it); a new id ADDS a tool; `extends` inherits an
+ * The built-in {@link DEFAULT_TOOLS} are the standard tool set; an embedder tweaks
+ * or extends them with `annotationPlugin({ tools: [...] })`. Same-id entries merge
+ * over the built-in (configure it); a new id adds a tool; `extends` inherits an
  * existing tool's subtype/cursor/tags so a preset is one line.
  */
 import type {
@@ -28,12 +28,12 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 
 /**
- * How a stamp-family tool resolves the image bytes it places — pure DATA, so a
+ * How a stamp-family tool resolves the image bytes it places — pure data, so a
  * tool table stays JSON-serializable (config can come from a file, a DB, or the
- * server). Evaluated at CLICK time, so the user picks the spot first, then the
+ * server). Evaluated at click time, so the user picks the spot first, then the
  * source:
  *   - `{ kind: 'bytes' }` — fixed bytes: a company rubber-stamp.
- *   - `{ kind: 'prompt' }` — ask the environment for bytes. The plugin does NOT
+ *   - `{ kind: 'prompt' }` — ask the environment for bytes. The plugin does not
  *     know how (a file dialog is DOM); the file-picker port (`FilePickerProvider`),
  *     installed by the framework adapter, fulfils it. Resolve `null` there to cancel.
  */
@@ -54,7 +54,7 @@ export interface PromptSourceSpec {
  * The tool `armStamp` activates — and the only tool an armed payload survives
  * onto (plus the legacy `annotation-stamp` tag, honoured for embedder configs
  * written before the tags were unified). Placement consults the armed payload
- * BEFORE the active tool's own `source` spec, so a payload must not outlive
+ * before the active tool's own `source` spec, so a payload must not outlive
  * its tool onto a sibling stamp preset: an `image` preset's click has to open
  * its own picker, not silently place whatever the stamp panel last armed.
  */
@@ -66,12 +66,12 @@ export type SelectionAuthoring =
   | { kind: 'text-edit'; operation: 'insert' | 'replace' };
 
 /**
- * The armed tool's IN-PAGE preview:
- *   - `footprint` — the EXACT box a click would place, in the page (content
+ * The armed tool's in-page preview:
+ *   - `footprint` — the exact box a click would place, in the page (content
  *     space, page-clamped, WYSIWYG). Meaningful only when the box is
  *     determinable: an armed stamp payload, or a `clickCreate` size.
  *   - `false` — no preview.
- * WHICH tool is armed is the CURSOR's job, not a ghost's: give the tool an
+ * Which tool is armed is the cursor's job, not a ghost's: give the tool an
  * image cursor built from your toolbar icon (the hub's `setToolCursor` + the
  * web package's `svgCursor`), and the hub's claim/gap arbitration keeps it
  * honest over annotations, form fields, and page gaps.
@@ -135,11 +135,11 @@ export const TOOL_DEFAULT_KEYS = {
   caret: ['color', 'opacity'],
   redact: ['color', 'interiorColor', 'opacity', 'fontFamily', 'fontSize', 'fontColor', 'textAlign'],
   stamp: [],
-  // A link preset may carry a FIXED target ('docs-link' style one-click links).
+  // A link preset may carry a fixed target ('docs-link' style one-click links).
   link: ['link'],
   text: ['icon', 'color', 'opacity'],
   'file-attachment': ['icon', 'color', 'opacity'],
-  // Widget CLIENT kinds (the form plugin's palette tools): the same key sets
+  // Widget client kinds (the form plugin's palette tools): the same key sets
   // the kind table declares — box styling for every family, /DA text styling
   // for the text-bearing ones. The engine maps them onto /MK //BS //DA //Q.
   'widget-text': [
@@ -186,18 +186,18 @@ export interface AnnotationToolDef<K extends ToolAuthoringKind = ToolAuthoringKi
    *  `selection` / `intent` / `ink` / `meta`
    *  from an existing tool id (a built-in or another entry). Own fields win. */
   extends?: string;
-  /** The ROUTING KIND this tool authors — the core's client kind (the geometry
+  /** The routing kind this tool authors — the core's client kind (the geometry
    *  it draws + the props key). Usually the PDF subtype, but not always:
    *  `free-text-callout` routes the callout gesture onto a free-text
    *  annotation, and `widget-text`/`widget-choice`/`widget-toggle` are client
-   *  views of the ONE PDF `widget` subtype (a form tool's commit goes through
+   *  views of the one PDF `widget` subtype (a form tool's commit goes through
    *  `doc.forms`, never this plugin — see the form plugin's tool table).
    *  Defaults to the inherited kind, or the id when neither is given. */
   subtype?: Subtype;
   /** The kind whose editable-property specs a style panel shows for this tool.
    *  Defaults to `subtype` (a callout authors `free-text` props, for example). */
   propsKind?: string;
-  /** ADVANCED: the `defaults` key this tool reads/writes. Defaults to the id, and
+  /** Advanced: the `defaults` key this tool reads/writes. Defaults to the id, and
    *  that is almost always right — override it only to alias a shared defaults bag
    *  (the built-in insert-caret tool points its preset at the `caret` key). */
   preset?: string;
@@ -247,8 +247,8 @@ export interface AnnotationToolDef<K extends ToolAuthoringKind = ToolAuthoringKi
   /** Ink-only stroke grouping and straightening policy. */
   ink?: K extends 'ink' ? InkAuthoringOptions : never;
   /**
-   * Place annotations UPRIGHT: counter-rotate what this tool creates against the
-   * page's TOTAL display rotation (document /Rotate + any stage view rotation),
+   * Place annotations upright: counter-rotate what this tool creates against the
+   * page's total display rotation (document /Rotate + any stage view rotation),
    * so it reads horizontally exactly as the author saw it — Adobe's behaviour
    * for stamps and text on rotated pages. WYSIWYG at authoring time: the
    * rotation is baked into the annotation, so a save keeps what the author saw
@@ -259,7 +259,7 @@ export interface AnnotationToolDef<K extends ToolAuthoringKind = ToolAuthoringKi
    */
   upright?: boolean;
   /**
-   * What a bare CLICK creates (v2's `clickBehavior`): a default-size shape
+   * What a bare click creates: a default-size shape
    * centred on the point / a default-length line from it / free-text's
    * type-here box — page-clamped, in PDF pt. `false` = drag-only. Defaults:
    * on for the built-in square/circle/line/free-text, off elsewhere.
@@ -363,10 +363,10 @@ const DRAW_TAGS = ['annotation-draw', 'annotation-edit'];
 const MARKUP_TAGS = ['text-select', 'annotation-edit'];
 
 /**
- * Whether arming this ANNOTATION tool is touch consent (`Tool.touchDirect`):
- * drag-CREATE tools — shape/ink draw and text-markup select — take
+ * Whether arming this annotation tool is touch consent (`Tool.touchDirect`):
+ * drag-create tools — shape/ink draw and text-markup select — take
  * single-finger touch wholesale (finger draws/marks, two fingers navigate:
- * the drawing-app convention). Click-to-PLACE tools (stamp, note) do not: a
+ * the drawing-app convention). Click-to-place tools (stamp, note) do not: a
  * tap places without any claim, and drags keep scrolling. Derived from the
  * gesture tags, so custom registered tools inherit the right behavior. Only
  * annotation-owned tools run through this — the built-in `pointer` tool also
@@ -376,13 +376,13 @@ export const isTouchDirect = (enables: ReadonlySet<string>): boolean =>
   enables.has('annotation-draw') || enables.has('text-select');
 
 /**
- * The built-in tools — a data mirror of v2's registrations (shapes + lines + ink
+ * The built-in tools, as data (shapes + lines + ink
  * + free text in the draw channel, text markup + caret behind text selection, and
  * the click-to-place stamp). Order is display-neutral; the toolbar owns layout.
  */
 export const DEFAULT_TOOLS: AnnotationToolInput[] = [
   // shapes / lines / ink / free text — the `annotation-draw` gesture.
-  // Draw tools carry v2's click-create defaults (a bare click places a
+  // Draw tools carry click-create defaults (a bare click places a
   // default-size annotation); armed-tool identity rides the cursor, so none
   // of them needs a ghost.
   {
@@ -487,7 +487,7 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
   {
     // Routes on the `free-text-callout` subtype token but authors a `free-text`
     // annotation (leader + box). Its leader defaults to an open arrowhead.
-    // `upright` applies to the text BOX only: on a rotated page it commits
+    // `upright` applies to the text box only: on a rotated page it commits
     // counter-rotated (readable), while the leader tip/knee stay page-space
     // anchors — see the core's `calloutPointer`.
     id: 'free-text-callout',
@@ -510,7 +510,7 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     defaults: { color: '#ffe16a', blendMode: 'multiply' },
     selection: { kind: 'markup' },
   },
-  // Redaction marking — the COMPOSED tool: over text it rides the selection
+  // Redaction marking — the composed tool: over text it rides the selection
   // gesture (per-line quad marks, like a highlight); anywhere else it drag-
   // draws an area mark. One tool, both modes; the destructive apply lives in
   // plugin-redaction.
@@ -572,7 +572,7 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     defaults: { color: '#ef4444' },
     selection: { kind: 'text-edit', operation: 'replace' },
   },
-  // stamp — click-to-place; 'prompt' asks the environment through the ONE
+  // stamp — click-to-place; 'prompt' asks the environment through the one
   // file-picker port (the React adapter wires a file dialog by default; an
   // embedder can pass fixed bytes instead). `accept` narrows the dialog to
   // what the engine's stamp sniffer takes anyway.
@@ -626,15 +626,16 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
   },
 ];
 
-/** Merge two default patches, `b` over `a`, with line endings merged per side. */
+/** Merge two default patches, `right` over `left`, with line endings merged per side. */
 function mergeDefaults(
-  a?: AnnotationPropsPatch,
-  b?: AnnotationPropsPatch,
+  left?: AnnotationPropsPatch,
+  right?: AnnotationPropsPatch,
 ): AnnotationPropsPatch | undefined {
-  if (!a) return b;
-  if (!b) return a;
-  const merged: AnnotationPropsPatch = { ...a, ...b };
-  if (a.lineEndings || b.lineEndings) merged.lineEndings = { ...a.lineEndings, ...b.lineEndings };
+  if (!left) return right;
+  if (!right) return left;
+  const merged: AnnotationPropsPatch = { ...left, ...right };
+  if (left.lineEndings || right.lineEndings)
+    merged.lineEndings = { ...left.lineEndings, ...right.lineEndings };
   return merged;
 }
 
@@ -675,10 +676,10 @@ export function buildToolRegistry(
   overrides: AnnotationToolInput[] = [],
 ): Map<string, ResolvedTool> {
   const defs = new Map<string, AnnotationToolDef>();
-  for (const d of DEFAULT_TOOLS) defs.set(d.id, d);
-  for (const o of overrides) {
-    const prev = defs.get(o.id);
-    defs.set(o.id, prev ? mergeDef(prev, o) : o);
+  for (const definition of DEFAULT_TOOLS) defs.set(definition.id, definition);
+  for (const override of overrides) {
+    const previous = defs.get(override.id);
+    defs.set(override.id, previous ? mergeDef(previous, override) : override);
   }
 
   const out = new Map<string, ResolvedTool>();
@@ -686,34 +687,34 @@ export function buildToolRegistry(
   const resolve = (id: string): ResolvedTool => {
     const cached = out.get(id);
     if (cached) return cached;
-    const def = defs.get(id);
-    if (!def) throw new Error(`[annotation] tool '${id}' extends an unknown tool`);
+    const definition = defs.get(id);
+    if (!definition) throw new Error(`[annotation] tool '${id}' extends an unknown tool`);
     // Inherit from the base first (guarding self / cyclic extends), then own fields win.
     let base: ResolvedTool | undefined;
-    if (def.extends && def.extends !== id && !resolving.has(def.extends)) {
+    if (definition.extends && definition.extends !== id && !resolving.has(definition.extends)) {
       resolving.add(id);
-      base = resolve(def.extends);
+      base = resolve(definition.extends);
       resolving.delete(id);
     }
-    const subtype = (def.subtype ?? base?.subtype ?? def.id) as Subtype;
+    const subtype = (definition.subtype ?? base?.subtype ?? definition.id) as Subtype;
     const resolved: ResolvedTool = {
-      id: def.id,
+      id: definition.id,
       subtype,
-      preset: def.preset ?? def.id,
-      propsKind: def.propsKind ?? base?.propsKind ?? subtype,
-      cursor: def.cursor ?? base?.cursor ?? 'crosshair',
-      enables: new Set(def.enables ?? (base ? [...base.enables] : [])),
-      defaults: mergeDefaults(base?.defaults, def.defaults),
-      flags: base?.flags || def.flags ? { ...base?.flags, ...def.flags } : undefined,
-      source: def.source ?? base?.source,
-      selection: def.selection ?? base?.selection,
-      intent: def.intent ?? base?.intent,
-      measurement: def.measurement ?? base?.measurement,
-      ink: base?.ink || def.ink ? { ...base?.ink, ...def.ink } : undefined,
-      upright: def.upright ?? base?.upright ?? false,
-      clickCreate: def.clickCreate ?? base?.clickCreate ?? false,
-      ghost: def.ghost ?? base?.ghost ?? false,
-      meta: base?.meta || def.meta ? { ...base?.meta, ...def.meta } : undefined,
+      preset: definition.preset ?? definition.id,
+      propsKind: definition.propsKind ?? base?.propsKind ?? subtype,
+      cursor: definition.cursor ?? base?.cursor ?? 'crosshair',
+      enables: new Set(definition.enables ?? (base ? [...base.enables] : [])),
+      defaults: mergeDefaults(base?.defaults, definition.defaults),
+      flags: base?.flags || definition.flags ? { ...base?.flags, ...definition.flags } : undefined,
+      source: definition.source ?? base?.source,
+      selection: definition.selection ?? base?.selection,
+      intent: definition.intent ?? base?.intent,
+      measurement: definition.measurement ?? base?.measurement,
+      ink: base?.ink || definition.ink ? { ...base?.ink, ...definition.ink } : undefined,
+      upright: definition.upright ?? base?.upright ?? false,
+      clickCreate: definition.clickCreate ?? base?.clickCreate ?? false,
+      ghost: definition.ghost ?? base?.ghost ?? false,
+      meta: base?.meta || definition.meta ? { ...base?.meta, ...definition.meta } : undefined,
     };
     validateDefaults(resolved);
     out.set(id, resolved);

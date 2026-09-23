@@ -1,4 +1,4 @@
-/* AUTO-GENERATED - DO NOT EDIT BY HAND. */
+/* Auto-generated - do not edit by hand. */
 import type { Ptr } from './pdf-runtime-module';
 
 export interface PdfFunctions {

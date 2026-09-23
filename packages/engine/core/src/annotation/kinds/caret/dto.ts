@@ -8,7 +8,7 @@ import type { ColorStyleFields } from '../style.shared';
  * point. It carries no geometry of its own beyond `/Rect`: just a `/C` color,
  * `/CA` opacity, and an optional `/RD` inset of the drawn symbol from `/Rect`.
  *
- * A caret anchored to ROTATED text carries the box-family rotation pair:
+ * A caret anchored to rotated text carries the box-family rotation pair:
  * `rotation` (`/EMBD_Metadata/Rotation`, PDF-convention degrees) tilts the
  * baked symbol to ride its text's baseline, `unrotatedRect` is the logical
  * box, and `/Rect` stays the rotated visual AABB — exactly the shape/free-text

@@ -24,7 +24,7 @@ import {
 
 /**
  * Markdown projections for the API-reference components — the `.md` export
- * and (later) the search corpus render the SAME data the pages do, from the
+ * and (later) the search corpus render the same data the pages do, from the
  * same lib, so the projection can never claim something the page does not.
  * Wired into the kit's Markdown pipeline via `DocsMarkdownSite.projectComponent`.
  */

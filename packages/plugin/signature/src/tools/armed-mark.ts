@@ -11,11 +11,11 @@ import { SIGNATURES_LIBRARY_KIND, type SignatureCapability } from '../contract';
 /**
  * The armed mark over a field. The annotation plugin places an armed stamp
  * on click (`annotation-place`, priority 95) and selects an existing
- * annotation under the pointer before that (`annotation-edit`, 100 — a
- * widget is an annotation). This handler sits above BOTH, enabled for the
+ * annotation under the pointer before that (`annotation-edit`, 100; a
+ * widget is an annotation). This handler sits above both, enabled for the
  * armed stamp's tool only, and captures exactly when the armed asset is a
  * person's mark (a library of kind `signatures`) and the pointer is over a
- * signature field: then the destination decides — the mark goes INTO the
+ * signature field: then the destination decides, and the mark goes into the
  * field (`placeMark` by mode) instead of onto the page. Everywhere else it
  * declines and the click stays a stamp placement, as in Preview.
  */

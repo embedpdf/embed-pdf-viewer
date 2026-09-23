@@ -24,8 +24,8 @@ export interface AnnotationAppearanceConformanceFixture extends ConformanceFixtu
   minAppearanceCount: number;
   /**
    * `true` when the page has at least one weak (index-only) annotation that
-   * carries an appearance stream. The whole point of this suite: that weak
-   * appearance must still be emitted (it used to be dropped on the wire).
+   * carries an appearance stream. The point of this suite: that weak
+   * appearance must still be emitted on the wire.
    */
   expectsWeakAppearance: boolean;
 }

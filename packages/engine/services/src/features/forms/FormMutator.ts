@@ -280,7 +280,7 @@ export class FormMutator {
   }
 
   /**
-   * Draw a PDF page into every widget of an UNSIGNED signature field: the
+   * Draw a PDF page into every widget of an unsigned signature field: the
    * visual "sign" of a viewer without a signer. The field's value stays
    * empty and nothing is sealed; a signed field is refused (its appearance
    * is part of what the signature covers). Pages whose widgets changed are
@@ -331,7 +331,7 @@ export class FormMutator {
     const pages = [
       ...new Set(before.widgets.flatMap((w) => (w.page ? [w.page.pageObjectNumber] : []))),
     ];
-    for (const pon of pages) this.session.bumpRevision(pon);
+    for (const pageObjectNumber of pages) this.session.bumpRevision(pageObjectNumber);
     return { field: this.readBackField(resolved.fieldObjectNumber), pages };
   }
 
@@ -418,7 +418,7 @@ export class FormMutator {
   }
 
   /**
-   * Delete a terminal field. Widgets are DETACHED here (they become inert
+   * Delete a terminal field. Widgets are detached here (they become inert
    * annotations); the worker host cascades their annotation deletion so
    * page /Annots bookkeeping flows through the annotation feature.
    */
@@ -649,7 +649,7 @@ export class FormMutator {
           }
         }
         case 'toggle':
-          // Empty string clears the group, same as the C API's NULL.
+          // Empty string clears the group, same as the C API's null.
           return fn.EPDFForm_SetToggle(
             docPtr,
             fieldObjectNumber,

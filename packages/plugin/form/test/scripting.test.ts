@@ -11,15 +11,17 @@ import {
 } from '@embedpdf/core-acrojs';
 import type { ScriptSandbox } from '@embedpdf/core-js-sandbox';
 import {
+  formWidget,
   toPageRef,
   type DocumentHandle,
   type FormEffect,
   type FormFieldDTO,
   type FormSnapshot,
+  type PageLayout,
   type PdfActionTree,
 } from '@embedpdf/engine-core/runtime';
 
-import { createSerialMutationQueue } from '../src/mutationQueue';
+import { createSerialQueue } from '@embedpdf/core';
 import { createFormScriptingController } from '../src/scripting/controller';
 import { standaloneRealm } from './helpers/standalone-realm';
 
@@ -54,7 +56,7 @@ const text = (
   multiline: false,
   password: false,
   comb: false,
-  widgets: [{ annotObjectNumber: fieldObjectNumber, page: toPageRef(10) }],
+  widgets: [formWidget(fieldObjectNumber, toPageRef(10))],
   ...(actions ? { actions } : {}),
 });
 
@@ -69,7 +71,7 @@ const pushbutton = (fieldObjectNumber: number, name: string): FormFieldDTO => ({
   mappingName: null,
   valueEntry: { kind: 'none' },
   defaultValueEntry: { kind: 'none' },
-  widgets: [{ annotObjectNumber: fieldObjectNumber, page: toPageRef(10) }],
+  widgets: [formWidget(fieldObjectNumber, toPageRef(10))],
 });
 
 class NodeSandbox implements ScriptSandbox {
@@ -99,14 +101,16 @@ class NodeSandbox implements ScriptSandbox {
   }
 }
 
-const documentMeta = (): DocumentMeta =>
-  ({
-    id: 'form-doc',
-    name: 'proposal.pdf',
-    pageCount: 1,
-    pages: [{ ref: toPageRef(10) }],
-    revision: 0,
-  }) as DocumentMeta;
+const documentMeta = (): DocumentMeta => ({
+  id: 'form-doc',
+  instanceId: 'form-doc',
+  name: 'proposal.pdf',
+  pageCount: 1,
+  // Only the page's identity matters to the scripting controller.
+  pages: [{ ref: toPageRef(10) } as PageLayout],
+  revision: 0,
+  renderPolicy: { kind: 'continuous' },
+});
 
 function harness(snapshot: FormSnapshot, nameTreeScript?: string) {
   const batches: FormEffect[][] = [];
@@ -268,10 +272,10 @@ describe('form scripting transaction', () => {
   });
 
   it('DEGRADES a name-tree boot exception — the user still fills (never bricks)', async () => {
-    // The i-140 class of bug: Adobe's `!ADBE::…VersChk…` boilerplate throwing
-    // (an API we don't emulate) used to poison every commit. The invariant
-    // now: a boot failure is a `script-error` DIAGNOSTIC; the user's own
-    // value still commits, on this transaction and every later one.
+    // Adobe's `!ADBE::…VersChk…` boilerplate throws (it calls an API the
+    // sandbox does not emulate). A boot failure is a `script-error`
+    // diagnostic; the user's own value still commits, on this transaction
+    // and every later one.
     const snapshot: FormSnapshot = {
       formKind: 'acroform',
       needsAppearances: false,
@@ -286,10 +290,13 @@ describe('form scripting transaction', () => {
     expect(first.status).toBe('applied');
     expect(first.error).toBeUndefined();
     expect(
-      first.diagnostics.some((d) => d.code === 'script-error' && d.message.includes('boot failed')),
+      first.diagnostics.some(
+        (diagnostic) =>
+          diagnostic.code === 'script-error' && diagnostic.message.includes('boot failed'),
+      ),
     ).toBe(true);
     expect(second.status).toBe('applied');
-    expect(second.diagnostics.some((d) => d.code === 'script-error')).toBe(false);
+    expect(second.diagnostics.some((diagnostic) => diagnostic.code === 'script-error')).toBe(false);
     expect(fx.readActions).toHaveBeenCalledTimes(1); // boot never retried
     expect(fx.applyEffects).toHaveBeenCalledTimes(2); // both user values landed
   });
@@ -297,7 +304,7 @@ describe('form scripting transaction', () => {
 
 describe('form mutation queue', () => {
   it('serializes overlapping operations and continues after a rejection', async () => {
-    const enqueue = createSerialMutationQueue();
+    const enqueue = createSerialQueue();
     const order: string[] = [];
     let release!: () => void;
     const held = new Promise<void>((resolve) => {

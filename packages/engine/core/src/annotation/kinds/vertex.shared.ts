@@ -23,8 +23,8 @@ import { AnnotationBaseShape } from '../base.schema';
  * geometry is fully described by `/Vertices` + `/Rect`, so `/RD` is for the
  * shape family only.)
  *
- * Like shapes, the engine takes an explicit `/Rect` on the Draft (the v3
- * plugin owns the bounding-box + rotation math, so the engine stays a
+ * Like shapes, the engine takes an explicit `/Rect` on the Draft (the
+ * annotation plugin owns the bounding-box + rotation math, so the engine stays a
  * faithful persistence layer); the DTO inherits `rect` from
  * `AnnotationBase`.
  */
@@ -32,10 +32,10 @@ export interface VertexAnnotationFields extends FilledStyleFields {
   /** `/Vertices` — the ordered point list (PDF user space, y-up). */
   vertices: PdfPoint[];
   /**
-   * `/EMBD_Metadata/Rotation` — ADVISORY rotation (degrees, PDF convention). The
-   * vertices are already rotated (they ARE the portable visual); this scalar
+   * `/EMBD_Metadata/Rotation` — advisory rotation (degrees, PDF convention). The
+   * vertices are already rotated (they are the portable visual); this scalar
    * just records the applied angle so EmbedPDF can show an oriented selection
-   * box and offer reset. It carries NO `unrotatedRect`, so it is inert for AP
+   * box and offer reset. It carries no `unrotatedRect`, so it is inert for AP
    * (PDFium ignores a lone `Rotation`).
    */
   rotation?: number;

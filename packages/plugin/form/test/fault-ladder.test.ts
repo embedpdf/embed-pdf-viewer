@@ -11,11 +11,13 @@ import {
 } from '@embedpdf/core-acrojs';
 import type { ScriptSandbox } from '@embedpdf/core-js-sandbox';
 import {
+  formWidget,
   toPageRef,
   type DocumentHandle,
   type FormEffect,
   type FormFieldDTO,
   type FormSnapshot,
+  type PageLayout,
   type PdfActionTree,
 } from '@embedpdf/engine-core/runtime';
 
@@ -53,7 +55,7 @@ const text = (
   multiline: false,
   password: false,
   comb: false,
-  widgets: [{ annotObjectNumber: fieldObjectNumber, page: toPageRef(10) }],
+  widgets: [formWidget(fieldObjectNumber, toPageRef(10))],
   ...(actions ? { actions } : {}),
 });
 
@@ -96,6 +98,7 @@ class BudgetFaultSandbox extends NodeSandbox {
         selEnd: 0,
       },
       formEffects: [],
+      annotEffects: [],
       uiEffects: [],
       diagnostics: [],
       error: { kind: 'budget', message: 'synthetic budget fault' },
@@ -103,14 +106,16 @@ class BudgetFaultSandbox extends NodeSandbox {
   }
 }
 
-const documentMeta = (): DocumentMeta =>
-  ({
-    id: 'form-doc',
-    name: 'proposal.pdf',
-    pageCount: 1,
-    pages: [{ ref: toPageRef(10) }],
-    revision: 0,
-  }) as DocumentMeta;
+const documentMeta = (): DocumentMeta => ({
+  id: 'form-doc',
+  instanceId: 'form-doc',
+  name: 'proposal.pdf',
+  pageCount: 1,
+  // Only the page's identity matters to the scripting controller.
+  pages: [{ ref: toPageRef(10) } as PageLayout],
+  revision: 0,
+  renderPolicy: { kind: 'continuous' },
+});
 
 function harness(snapshot: FormSnapshot, sandbox: ScriptSandbox = new NodeSandbox()) {
   const batches: FormEffect[][] = [];

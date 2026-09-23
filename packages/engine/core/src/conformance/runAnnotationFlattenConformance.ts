@@ -48,8 +48,8 @@ export function runAnnotationFlattenConformance(
       const doc = await openFixture(engine, opts);
       try {
         const layoutBefore = await doc.pages.list();
-        const pon = layoutBefore.pages[0].ref.pageObjectNumber;
-        const page = doc.page(toPageRef(pon));
+        const pageObjectNumber = layoutBefore.pages[0].ref.pageObjectNumber;
+        const page = doc.page(toPageRef(pageObjectNumber));
         if (!page.annotations.flatten) return;
 
         const a = (await page.annotations.create(square(20, 20))).created.ref;
@@ -67,7 +67,7 @@ export function runAnnotationFlattenConformance(
         unsubscribe();
 
         expect(AnnotationFlattenResultSchema.safeParse(result).success).toBe(true);
-        expect(result.page.pageObjectNumber).toBe(pon);
+        expect(result.page.pageObjectNumber).toBe(pageObjectNumber);
         expect(result.usage).toBe('display');
         expect(result.results.map((item) => item.status)).toEqual(['applied', 'skipped']);
         expect(result.meta === null).toBe(false);
@@ -112,8 +112,8 @@ export function runAnnotationFlattenConformance(
     test('an empty ref list rejects InvalidArg; an unknown ref rejects', async () => {
       const doc = await openFixture(engine, opts);
       try {
-        const pon = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
-        const page = doc.page(toPageRef(pon));
+        const pageObjectNumber = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
+        const page = doc.page(toPageRef(pageObjectNumber));
         if (!page.annotations.flatten) return;
         await expect(page.annotations.flatten([])).rejects.toMatchObject({
           code: EngineErrorCode.InvalidArg,
@@ -121,7 +121,11 @@ export function runAnnotationFlattenConformance(
         let unknown: unknown = null;
         try {
           await page.annotations.flatten([
-            { kind: 'objectNumber', page: toPageRef(pon), annotObjectNumber: 987654321 },
+            {
+              kind: 'objectNumber',
+              page: toPageRef(pageObjectNumber),
+              annotObjectNumber: 987654321,
+            },
           ]);
         } catch (error) {
           unknown = error;

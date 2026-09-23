@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import type { DocumentMeta } from '@embedpdf/core';
 import { createQuickJsSandbox } from '@embedpdf/core-js-sandbox';
 import { createLocalEngine } from '@embedpdf/engine';
 import { createFormScriptingController } from '../src/scripting/controller';
@@ -23,12 +24,14 @@ describe('plugin-form dynamic-stamp acceptance', () => {
       { scope: ['*'] },
     );
     const pages = await doc.pages.list();
-    const document = () => ({
+    const document = (): DocumentMeta => ({
       id: doc.id,
+      instanceId: doc.id,
       name: 'proposal.pdf',
       pageCount: pages.pageCount,
       pages: pages.pages,
       revision: 0,
+      renderPolicy: { kind: 'continuous' },
     });
     const realm = standaloneRealm(doc, document, {
       identity: {

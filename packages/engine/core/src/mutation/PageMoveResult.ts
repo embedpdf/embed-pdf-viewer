@@ -11,7 +11,7 @@ export type PageMoveCache = PageStructureCache;
  *
  *   - Pages are always identified by `pageObjectNumber`; there is no "weak
  *     page ref", so no revision needs bumping to invalidate caller state.
- *   - Per-page `RevisionToken`s are NOT bumped on a move — each page's
+ *   - Per-page `RevisionToken`s are not bumped on a move — each page's
  *     /Annots array is untouched, so weak `AnnotationRef.kind === 'index'`
  *     references survive a reorder. (That liveness invariant is verified by
  *     the annotation conformance suite, not here.)

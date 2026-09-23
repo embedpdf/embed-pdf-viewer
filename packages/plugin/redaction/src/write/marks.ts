@@ -1,5 +1,5 @@
 /** Marking: every mark is a `redact` annotation created through the annotation plugin. */
-import { PluginError, annotationKey, toPluginError, toPluginErrorInfo } from '@embedpdf/core';
+import { PluginError, annotationKey, toPluginError } from '@embedpdf/core';
 import type { BatchResult } from '@embedpdf/core';
 import type { Rect } from '@embedpdf/core-geometry';
 import type { AnnotationRef, PageRef, SearchQuery } from '@embedpdf/engine-core';
@@ -48,7 +48,7 @@ export function createMarking(
     return annotation.createFromSelection('redact', { preset: 'redact', clear: true });
   };
 
-  const markArea = (page: PageRef, bounds: Rect): Promise<AnnotationRef> => {
+  const markArea = async (page: PageRef, bounds: Rect): Promise<AnnotationRef> => {
     assertCanMark();
     return annotation.create({
       page,
@@ -59,10 +59,8 @@ export function createMarking(
     });
   };
 
-  const markPage = (page: PageRef): Promise<AnnotationRef> => {
-    const layout = ctx
-      .document()
-      ?.pages.find((p) => p.ref.pageObjectNumber === page.pageObjectNumber);
+  const markPage = async (page: PageRef): Promise<AnnotationRef> => {
+    const layout = ctx.getPage(page);
     if (!layout) throw new PluginError('not-found', 'redaction', 'no such page');
     return markArea(page, { x: 0, y: 0, width: layout.size.width, height: layout.size.height });
   };
@@ -75,7 +73,9 @@ export function createMarking(
     const finder = search();
     if (!finder) throw new PluginError('unsupported', 'redaction', 'no search plugin');
     await finder.search(query);
-    const wanted = options?.pages ? new Set(options.pages.map((p) => p.pageObjectNumber)) : null;
+    const wanted = options?.pages
+      ? new Set(options.pages.map((page) => page.pageObjectNumber))
+      : null;
     const refs: AnnotationRef[] = [];
     for (const hit of finder.listHits()) {
       if (wanted && !wanted.has(hit.page.pageObjectNumber)) continue;
@@ -143,5 +143,3 @@ export function createMarking(
     } satisfies Partial<RedactionCapability>,
   };
 }
-// `toPluginErrorInfo` is what a batch failure carries; re-exported for the apply area.
-export { toPluginErrorInfo };

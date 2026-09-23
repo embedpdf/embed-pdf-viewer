@@ -44,7 +44,10 @@ export function profileFor(subFilter: SignatureSubFilter): SignatureProfile {
  * failure aborts the candidate and rethrows; the document is never left
  * with a pending signing.
  */
-export async function sign(doc: DocumentHandle, input: SignInput): Promise<SignatureCompleteResult> {
+export async function sign(
+  doc: DocumentHandle,
+  input: SignInput,
+): Promise<SignatureCompleteResult> {
   if (!doc.signatures) throw new Error('this engine does not implement signatures');
   const { signer, ...rest } = input;
   const subFilter: SignatureSubFilter = rest.subFilter ?? 'ETSI.CAdES.detached';
@@ -69,8 +72,8 @@ export async function sign(doc: DocumentHandle, input: SignInput): Promise<Signa
       cms,
       expectedVersion: prepared.expectedVersion,
     });
-  } catch (err) {
+  } catch (error) {
     await doc.signatures.abort(prepared.signingId).catch(() => undefined);
-    throw err;
+    throw error;
   }
 }

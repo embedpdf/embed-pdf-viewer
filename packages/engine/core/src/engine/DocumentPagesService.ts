@@ -46,7 +46,7 @@ export interface DocumentPagesService {
   move(pages: PageRef[], destIndex: number): AbortablePromise<PageMoveResult>;
 
   /**
-   * Set the ABSOLUTE display rotation of the supplied pages (one value
+   * Set the absolute display rotation of the supplied pages (one value
    * for all — the multi-select thumbnail gesture). Pure presentation
    * metadata: content coordinates are normalized, so cached renders,
    * annotation refs, and `RevisionToken`s all survive untouched. See
@@ -56,7 +56,7 @@ export interface DocumentPagesService {
 
   /**
    * Delete pages. Deleting every page is rejected (`InvalidArg`) — a
-   * document must keep at least one. Deleted PONs are retired, never
+   * document must keep at least one. Deleted page object numbers are retired, never
    * recycled; surviving pages keep their identity and revisions.
    */
   delete(pages: PageRef[]): AbortablePromise<PageDeleteResult>;
@@ -64,7 +64,7 @@ export interface DocumentPagesService {
   /**
    * Register `name` → page in the catalog's `/Names /Pages` tree (create,
    * or replace what an existing key points at); with `replace`, drop that
-   * other key in the same job (rename). Named pages are LAYOUT — read them
+   * other key in the same job (rename). Named pages are layout — read them
    * back from `list().namedPages` — so this is a page-structure mutation:
    * `docVersion` + `layoutVersion` advance, per-page pins do not. Gated like
    * `move` (`doc.pages.assemble`). Optional while transports ship;
@@ -77,7 +77,7 @@ export interface DocumentPagesService {
 
   /**
    * Remove one `/Names /Pages` registration; the page itself is untouched.
-   * `NotFound` when no registration has that decoded key. Page DELETION
+   * `NotFound` when no registration has that decoded key. Page deletion
    * removes registrations by itself — callers never need to pair the two.
    */
   removeName?(input: PageRemoveNameInput): AbortablePromise<PageNameResult>;
@@ -91,27 +91,27 @@ export interface DocumentPagesService {
 
   /**
    * Export the given pages, in the supplied order, as a standalone PDF
-   * (bytes of a new document containing copies of those pages). A READ:
+   * (bytes of a new document containing copies of those pages). A read:
    * the source document is untouched — no revisions bump, no event is
    * published. This is how a page becomes a portable asset (a vector
    * stamp, a signature) that re-enters a document as a stamp draft's
    * `source` bytes. Gated by `doc.download` (it egresses content), not
    * `doc.pages.assemble`.
    *
-   * REQUIRED-parity, delivered: the local engine runs it in the worker,
+   * Required-parity, delivered: the local engine runs it in the worker,
    * the cloud engine as POST /pages/extract.
    */
   extract(pages: PageRef[]): AbortablePromise<Uint8Array>;
 
   /**
    * Insert every page of a standalone PDF (`bytes`) at `destIndex`
-   * (omitted → append). The pages are COPIED in; the inserted copies get
+   * (omitted → append). The pages are copied in; the inserted copies get
    * fresh object numbers, returned in insertion order. Bytes are a call
-   * ARGUMENT (the same law as annotation binaries): the local engine
+   * argument (the same law as annotation binaries): the local engine
    * transfers them to its worker, the cloud engine ships them as a
    * multipart mutation (POST /pages/insert).
    *
-   * REQUIRED-parity, delivered — a cloud viewer must be able to add pages,
+   * Required-parity, delivered — a cloud viewer must be able to add pages,
    * so this is a mandatory member: any engine implements it or is not a
    * conforming engine.
    */

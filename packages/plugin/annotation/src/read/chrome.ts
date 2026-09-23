@@ -4,12 +4,12 @@ import {
   cursorAt,
   hitTest,
   selectionAnchor as coreSelectionAnchor,
-  type ChromeGeom,
+  type ChromeGeometry,
   type ChromeNode,
   type Id,
   type Model,
   type Rect,
-  type Vec,
+  type Point,
 } from '@embedpdf/core-annotation';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 
@@ -35,24 +35,24 @@ export const TOUCH_GRAB_BOOST = 2;
  * projected through the live chrome settings and the page's view scale.
  */
 export function createChromeReads(
-  ctx: Pick<AnnotationContext, 'getState'>,
+  ctx: Pick<AnnotationContext, 'state'>,
   { store, geometry, behaviors }: Pick<AnnotationServices, 'store' | 'geometry' | 'behaviors'>,
 ) {
-  const chromeSettings = (): ChromeSettings => ctx.getState().chrome;
+  const chromeSettings = (): ChromeSettings => ctx.state.get().chrome;
 
-  /** The CSS-px chrome settings converted to CONTENT units by the page's view
+  /** The CSS-px chrome settings converted to content units by the page's view
    *  scale (px per content unit) — screen-constant grab zones + stalk at every
    *  zoom. No scale → the values are read as content units (headless callers).
-   *  `boost` widens the GRAB tolerances only (never the drawn chrome or the
+   *  `boost` widens the grab tolerances only (never the drawn chrome or the
    *  knob's position) — the touch path passes {@link TOUCH_GRAB_BOOST} so
    *  handles present finger-sized targets. */
-  const chromeGeomAt = (scale?: number, boost = 1): ChromeGeom => {
+  const chromeGeomAt = (scale?: number, boost = 1): ChromeGeometry => {
     const cs = chromeSettings();
-    const s = scale || 1;
+    const effectiveScale = scale || 1;
     return {
-      handleTol: (cs.handles.hitSize / 2 / s) * boost,
-      knobTol: (cs.knob.hitSize / 2 / s) * boost,
-      knobOffset: cs.knob.offset / s,
+      handleTol: (cs.handles.hitSize / 2 / effectiveScale) * boost,
+      knobTol: (cs.knob.hitSize / 2 / effectiveScale) * boost,
+      knobOffset: cs.knob.offset / effectiveScale,
     };
   };
   const grabBoost = (touch?: boolean): number => (touch ? TOUCH_GRAB_BOOST : 1);
@@ -62,27 +62,27 @@ export function createChromeReads(
    *  `inert: null` to test with no inert set at all. */
   const hitAt = (
     page: PageRef,
-    point: Vec,
+    point: Point,
     view: HitView = {},
     boost = 1,
     inert: ReadonlySet<Id> | null | undefined = undefined,
   ) => {
-    const m = store.model();
-    const pon = page.pageObjectNumber;
+    const model = store.model();
+    const pageObjectNumber = page.pageObjectNumber;
     return hitTest(
-      m,
+      model,
       page,
       point,
       chromeGeomAt(view.scale, boost),
-      m.hitMargin,
-      geometry.pageBoxOf(pon),
-      inert === undefined ? behaviors.engagedIdsOn(pon) : (inert ?? undefined),
+      model.hitMargin,
+      geometry.pageBoxOf(pageObjectNumber),
+      inert === undefined ? behaviors.engagedIdsOn(pageObjectNumber) : (inert ?? undefined),
       viewEnv(view.zoom, view.rotation),
     );
   };
 
   // Memoize the derived per-page arrays by input identity, so a selector returns
-  // a STABLE reference between dispatches (useSyncExternalStore needs this — the
+  // a stable reference between dispatches (useSyncExternalStore needs this — the
   // model object only changes when `update` produces a new one; chrome also keys
   // on the settings object + the page scale it was projected with).
   const chromeCache = new Map<
@@ -102,31 +102,31 @@ export function createChromeReads(
     rotation?: number,
     zoom?: number,
   ): ChromeNode[] => {
-    const pon = page.pageObjectNumber;
-    const m = store.model();
+    const pageObjectNumber = page.pageObjectNumber;
+    const model = store.model();
     const cs = chromeSettings();
-    const c = chromeCache.get(pon);
+    const cached = chromeCache.get(pageObjectNumber);
     if (
-      c &&
-      c.model === m &&
-      c.cs === cs &&
-      c.scale === scale &&
-      c.rotation === rotation &&
-      c.zoom === zoom
+      cached &&
+      cached.model === model &&
+      cached.cs === cs &&
+      cached.scale === scale &&
+      cached.rotation === rotation &&
+      cached.zoom === zoom
     )
-      return c.v;
-    let v = coreChrome(
-      m,
+      return cached.v;
+    let nodes = coreChrome(
+      model,
       page,
-      geometry.pageBoxOf(pon),
+      geometry.pageBoxOf(pageObjectNumber),
       chromeGeomAt(scale).knobOffset,
       viewEnv(zoom, rotation),
     );
-    // `guides.enabled` is presentation config, filtered HERE so the emitted
+    // `guides.enabled` is presentation config, filtered here so the emitted
     // chrome stays authoritative for every painter (default and headless alike).
-    if (!cs.guides.enabled) v = v.filter((n) => n.kind !== 'rotate-guides');
-    chromeCache.set(pon, { model: m, cs, scale, rotation, zoom, v });
-    return v;
+    if (!cs.guides.enabled) nodes = nodes.filter((node) => node.kind !== 'rotate-guides');
+    chromeCache.set(pageObjectNumber, { model: model, cs, scale, rotation, zoom, v: nodes });
+    return nodes;
   };
 
   // Anchor for the selection menu — memoized by input identity so the selector
@@ -137,32 +137,32 @@ export function createChromeReads(
     scale: number | undefined;
     rotation: number | undefined;
     zoom: number | undefined;
-    v: { page: PageRef; bounds: Rect; knob?: Vec } | null;
+    v: { page: PageRef; bounds: Rect; knob?: Point } | null;
   } | null = null;
   const selectionAnchorOf = (
     scale?: number,
     rotation?: number,
     zoom?: number,
-  ): { page: PageRef; bounds: Rect; knob?: Vec } | null => {
-    const m = store.model();
+  ): { page: PageRef; bounds: Rect; knob?: Point } | null => {
+    const model = store.model();
     const cs = chromeSettings();
     if (
       anchorCache &&
-      anchorCache.model === m &&
+      anchorCache.model === model &&
       anchorCache.cs === cs &&
       anchorCache.scale === scale &&
       anchorCache.rotation === rotation &&
       anchorCache.zoom === zoom
     )
       return anchorCache.v;
-    const v = coreSelectionAnchor(
-      m,
+    const anchor = coreSelectionAnchor(
+      model,
       (page) => geometry.pageBoxOf(page.pageObjectNumber),
       () => chromeGeomAt(scale).knobOffset,
       () => viewEnv(zoom, rotation),
     );
-    anchorCache = { model: m, cs, scale, rotation, zoom, v };
-    return v;
+    anchorCache = { model: model, cs, scale, rotation, zoom, v: anchor };
+    return anchor;
   };
 
   const api = {
@@ -170,55 +170,64 @@ export function createChromeReads(
       chromeNodesOf(page, scale, rotation, zoom),
     getSelectionAnchor: (view?: HitView) =>
       selectionAnchorOf(view?.scale, view?.rotation, view?.zoom),
-    hitTestAt: (page: PageRef, point: Vec) => {
-      const m = store.model();
-      const t = hitAt(page, point);
-      if (t.t === 'annot') return m.byId[t.id]?.ref ?? null;
-      if (t.t === 'empty') return null;
-      return refsOfIn(m, m.selected)[0] ?? null; // a handle or the knob belongs to the selection
+    hitTestAt: (page: PageRef, point: Point) => {
+      const model = store.model();
+      const target = hitAt(page, point);
+      if (target.kind === 'annot') return model.byId[target.id]?.ref ?? null;
+      if (target.kind === 'empty') return null;
+      return refsOfIn(model, model.selected)[0] ?? null; // a handle or the knob belongs to the selection
     },
     getHitKind: (
       page: PageRef,
-      point: Vec,
+      point: Point,
       scale?: number,
       rotation?: number,
       zoom?: number,
       touch?: boolean,
-    ) => hitAt(page, point, { scale, rotation, zoom }, grabBoost(touch)).t,
+    ) => hitAt(page, point, { scale, rotation, zoom }, grabBoost(touch)).kind,
     claimsTouchAt: (
       page: PageRef,
-      point: Vec,
+      point: Point,
       scale?: number,
       rotation?: number,
       zoom?: number,
     ) => {
-      const m = store.model();
-      const t = hitAt(page, point, { scale, rotation, zoom }, TOUCH_GRAB_BOOST);
-      // Selection chrome only exists FOR the selection — always a claim (the
+      const model = store.model();
+      const target = hitAt(page, point, { scale, rotation, zoom }, TOUCH_GRAB_BOOST);
+      // Selection chrome only exists for the selection — always a claim (the
       // hit-tester already suppresses handles on kinds/states that can't
       // resize or rotate).
-      if (t.t === 'handle' || t.t === 'rotate' || t.t === 'group-handle') return true;
-      // A body claims only when a drag would actually ARM A MOVE — mirror the
+      if (target.kind === 'handle' || target.kind === 'rotate' || target.kind === 'group-handle')
+        return true;
+      // A body claims only when a drag would actually arm A move — mirror the
       // core's edit-down exactly (update.ts editPointer: a hit on a selected
-      // member moves the WHOLE selection only if every member canMove). A
+      // member moves the whole selection only if every member canMove). A
       // selected highlight/caret (selectable, not movable) and a locked
       // annotation must keep scrolling, never eat the drag into a dead zone.
-      if (t.t === 'annot') {
-        return m.selected.includes(t.id) && m.selected.every((id) => canMove(m, id));
+      if (target.kind === 'annot') {
+        return (
+          model.selected.includes(target.id) && model.selected.every((id) => canMove(model, id))
+        );
       }
       return false;
     },
-    getCursorAt: (page: PageRef, point: Vec, scale?: number, rotation?: number, zoom?: number) => {
-      const pon = page.pageObjectNumber;
-      const m = store.model();
+    getCursorAt: (
+      page: PageRef,
+      point: Point,
+      scale?: number,
+      rotation?: number,
+      zoom?: number,
+    ) => {
+      const pageObjectNumber = page.pageObjectNumber;
+      const model = store.model();
       return cursorAt(
-        m,
+        model,
         page,
         point,
         chromeGeomAt(scale),
-        m.hitMargin,
-        geometry.pageBoxOf(pon),
-        behaviors.engagedIdsOn(pon),
+        model.hitMargin,
+        geometry.pageBoxOf(pageObjectNumber),
+        behaviors.engagedIdsOn(pageObjectNumber),
         viewEnv(zoom, rotation),
       );
     },

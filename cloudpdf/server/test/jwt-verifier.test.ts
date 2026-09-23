@@ -13,7 +13,7 @@ import {
 } from '../src/auth/JwtVerifier';
 
 /**
- * Phase 2 JWT verifier conformance.
+ * JWT verifier conformance.
  *
  * Every mode (HS256, RS256, ES256, JWKS) gets covered for:
  *   - happy path: a valid token verifies and exposes the right claims

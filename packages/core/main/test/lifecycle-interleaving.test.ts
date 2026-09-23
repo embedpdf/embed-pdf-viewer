@@ -1,9 +1,10 @@
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it, vi } from 'vitest';
 import { AbortablePromise } from '@embedpdf/engine-core/runtime';
 import type { DocumentHandle, Engine, PageLayout } from '@embedpdf/engine-core/runtime';
 import { createKernel } from '../src/kernel';
 import { isCancelled } from '../src/scope';
-import type { AnyPlugin, EffectContext, PluginContext } from '../src/types';
+import type { AnyPlugin, PluginContext } from '../src/types';
 
 /**
  * Interleaving tests for the session lifecycle: close/destroy racing every
@@ -14,9 +15,9 @@ import type { AnyPlugin, EffectContext, PluginContext } from '../src/types';
  */
 
 const box = { left: 0, bottom: 0, right: 600, top: 800 } as const;
-const page = (pon: number, index: number): PageLayout => ({
+const page = (pageObjectNumber: number, index: number): PageLayout => ({
   index,
-  pageObjectNumber: pon,
+  ref: toPageRef(pageObjectNumber),
   label: null,
   size: { width: 600, height: 800 },
   rotation: 0,
@@ -25,8 +26,8 @@ const page = (pon: number, index: number): PageLayout => ({
 });
 
 class FakeEvents {
-  private readonly listeners = new Set<(e: unknown) => void>();
-  subscribe(listener: (e: unknown) => void): () => void {
+  private readonly listeners = new Set<(event: unknown) => void>();
+  subscribe(listener: (event: unknown) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
@@ -42,21 +43,29 @@ interface FakeHandleOptions {
   security?: unknown;
   listGate?: Promise<void>;
   listRejection?: unknown;
+  /** Holds the render-policy read, the last await of bring-up. */
+  policyGate?: Promise<void>;
 }
 
-function makeHandle(id: string, opts: FakeHandleOptions = {}) {
+function makeHandle(id: string, options: FakeHandleOptions = {}) {
   const events = new FakeEvents();
   const handle = {
     id,
     events,
     pages: {
       list: async () => {
-        await opts.listGate;
-        if (opts.listRejection) throw opts.listRejection;
+        await options.listGate;
+        if (options.listRejection) throw options.listRejection;
         return { pageCount: 1, pages: [page(1, 0)] };
       },
     },
-    security: opts.security,
+    security: options.security,
+    render: {
+      policy: async () => {
+        await options.policyGate;
+        return { kind: 'continuous' };
+      },
+    },
     close: vi.fn(() => Promise.resolve()),
   };
   return { handle: handle as unknown as DocumentHandle, events, close: handle.close };
@@ -88,10 +97,10 @@ function controllableEngine() {
 }
 
 const bytesInput = (id: string) => ({ kind: 'bytes' as const, id, bytes: new Uint8Array() });
-const settle = () => new Promise((r) => setTimeout(r, 0));
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 const gate = () => {
   let open!: () => void;
-  const promise = new Promise<void>((r) => (open = r));
+  const promise = new Promise<void>((resolve) => (open = resolve));
   return { promise, open };
 };
 
@@ -138,7 +147,7 @@ describe('interleaving: close racing every open await', () => {
     const open = kernel.documents.open(bytesInput('a'));
 
     await kernel.documents.close('a');
-    expect(abortedReason).not.toBeNull(); // close reached INTO the engine call
+    expect(abortedReason).not.toBeNull(); // close reached into the engine call
     await expect(open).rejects.toSatisfy(isCancelled);
     expect(kernel.documents.list()).toEqual([]);
   });
@@ -161,63 +170,56 @@ describe('interleaving: close racing every open await', () => {
     expect(events.subscriberCount).toBe(0);
   });
 
-  it('close during a plugin init: close JOINS the init, then rolls everything back', async () => {
+  it('close during the render-policy read: close joins it, then rolls everything back', async () => {
     const { engine, resolve } = controllableEngine();
-    const initGate = gate();
-    const lateCleanup = vi.fn();
-    const initSettled = vi.fn();
-    const effectsInstalled = vi.fn();
+    const policyGate = gate();
+    const created = vi.fn();
     const plugin: AnyPlugin = {
       id: 'slow',
       scope: 'document',
-      init: async (ctx: PluginContext<unknown>) => {
-        await initGate.promise;
-        ctx.cleanup(lateCleanup); // registered while close is already in flight
-        initSettled();
-      },
-      effects: effectsInstalled,
+      create: () => (created(), { api: {} }),
     };
     const kernel = createKernel({ engine, plugins: [plugin], report: () => {} });
-    const { handle, events, close } = makeHandle('a');
+    const { handle, events, close } = makeHandle('a', { policyGate: policyGate.promise });
 
     const open = kernel.documents.open(bytesInput('a'));
     resolve('a', handle);
-    await settle(); // bring-up is awaiting the plugin init
+    await settle(); // bring-up is awaiting the render policy
 
     let closeResolved = false;
     const closed = kernel.documents.close('a').then(() => (closeResolved = true));
     await settle();
-    expect(closeResolved).toBe(false); // close is JOINING the in-flight init
+    expect(closeResolved).toBe(false); // close is joining the in-flight read
     expect(kernel.documents.list()).toEqual([]); // but the tab is already gone
 
-    initGate.open();
+    policyGate.open();
     await closed;
-    expect(initSettled).toHaveBeenCalledTimes(1); // join means the producer finished
-    expect(effectsInstalled).not.toHaveBeenCalled(); // checkpoint stopped the bring-up
-    expect(lateCleanup).toHaveBeenCalledTimes(1); // late registration ran, not dropped
+    expect(created).not.toHaveBeenCalled(); // the checkpoint stopped the bring-up
     expect(close).toHaveBeenCalledTimes(1);
     expect(events.subscriberCount).toBe(0);
-    expect(Object.keys(kernel.getState().plugins)).toEqual([]); // slice rolled back
+    expect(Object.keys(kernel.getState().plugins)).toEqual([]); // no slice survived
     await expect(open).rejects.toSatisfy(isCancelled);
   });
 });
 
 describe('interleaving: transactional open (publish-last)', () => {
-  it('a failing plugin init rolls back: error tab, handle closed, nothing half-alive', async () => {
+  it('a throwing create() rolls back: error tab, handle closed, nothing half-alive', async () => {
     const { engine, resolve } = controllableEngine();
     const plugin: AnyPlugin = {
       id: 'broken',
       scope: 'document',
-      init: () => Promise.reject(new Error('init exploded')),
+      create: () => {
+        throw new Error('create exploded');
+      },
     };
     const kernel = createKernel({ engine, plugins: [plugin], report: () => {} });
     const { handle, events, close } = makeHandle('a');
 
     const open = kernel.documents.open(bytesInput('a'));
     resolve('a', handle);
-    await expect(open).rejects.toThrow('init exploded');
+    await expect(open).rejects.toThrow('create exploded');
 
-    expect(kernel.documents.get('a')!.status).toBe('error'); // NOT a zombie 'ready'
+    expect(kernel.documents.get('a')!.status).toBe('error'); // not a zombie 'ready'
     expect(close).toHaveBeenCalledTimes(1);
     expect(events.subscriberCount).toBe(0);
     expect(Object.keys(kernel.getState().plugins)).toEqual([]);
@@ -227,45 +229,64 @@ describe('interleaving: transactional open (publish-last)', () => {
     expect(kernel.documents.get('a')).toBeNull();
   });
 
-  it('a throwing effect SETUP is part of the transaction: same rollback as init', async () => {
+  it('a throwing connect() is part of the transaction: same rollback as create()', async () => {
     const { engine, resolve } = controllableEngine();
     const plugin: AnyPlugin = {
-      id: 'bad-effects',
+      id: 'bad-connect',
       scope: 'document',
-      effects: () => {
-        throw new Error('effect setup exploded');
-      },
+      create: () => ({
+        api: {},
+        connect: () => {
+          throw new Error('connect exploded');
+        },
+      }),
     };
     const kernel = createKernel({ engine, plugins: [plugin], report: () => {} });
     const { handle, close } = makeHandle('a');
 
     const open = kernel.documents.open(bytesInput('a'));
     resolve('a', handle);
-    await expect(open).rejects.toThrow('effect setup exploded');
+    await expect(open).rejects.toThrow('connect exploded');
     expect(kernel.documents.get('a')!.status).toBe('error');
     expect(close).toHaveBeenCalledTimes(1);
   });
 
-  it('effect CALLBACKS that throw post-commit are isolated, never unwind a transition', async () => {
+  it('listeners that throw post-commit are isolated, never unwind a transition', async () => {
     const { engine, resolve } = controllableEngine();
     const report = vi.fn();
     const sane: string[] = [];
+    // Registered first: its watch throws on every change after the first read.
     const throwing: AnyPlugin = {
       id: 'throwing',
       scope: 'document',
-      effects: (ctx: EffectContext<unknown>) => {
-        ctx.onAction('poke', () => {
-          throw new Error('callback exploded');
-        });
-      },
+      create: (ctx: PluginContext<unknown>) => ({
+        api: {},
+        connect: () => {
+          let reads = 0;
+          ctx.watch(
+            () => {
+              if (++reads > 1) throw new Error('callback exploded');
+              return 0;
+            },
+            () => {},
+          );
+        },
+      }),
     };
+    const increment = (count: number) => count + 1;
     const observer: AnyPlugin = {
       id: 'observer',
       scope: 'document',
-      effects: (ctx: EffectContext<unknown>) => {
-        ctx.onAction('poke', () => sane.push('saw it'));
-      },
-      capability: (ctx) => ({ poke: () => ctx.dispatch({ type: 'poke' }) }),
+      state: () => 0,
+      create: (ctx: PluginContext<number>) => ({
+        api: { poke: () => ctx.state.update(increment) },
+        connect: () => {
+          ctx.watch(
+            () => ctx.state.get(),
+            () => sane.push('saw it'),
+          );
+        },
+      }),
       token: { name: 'observer' },
     };
     const kernel = createKernel({ engine, plugins: [throwing, observer], report });
@@ -293,7 +314,9 @@ describe('interleaving: transactional open (publish-last)', () => {
     expect(kernel.documents.get('dup')!.status).toBe('ready'); // original untouched
     expect(first.close).not.toHaveBeenCalled();
     // The ticket slot parked as error — closable, like any failed open.
-    const errorSlot = kernel.documents.list().find((d) => d.status === 'error');
+    const errorSlot = kernel.documents
+      .list()
+      .find((documentInfo) => documentInfo.status === 'error');
     expect(errorSlot).toBeDefined();
     await kernel.documents.close(errorSlot!.id);
     expect(kernel.documents.getCount()).toBe(1);
@@ -351,7 +374,7 @@ describe('interleaving: locked documents', () => {
     await expect(kernel.documents.unlock('a', { password: 'pw' })).rejects.toThrow(
       'pages exploded',
     );
-    expect(kernel.documents.get('a')!.status).toBe('error'); // NOT still locked
+    expect(kernel.documents.get('a')!.status).toBe('error'); // not still locked
     expect(close).toHaveBeenCalledTimes(1);
   });
 
@@ -416,41 +439,41 @@ describe('kernel status machine', () => {
     expect(kernel.documents.list()).toEqual([]); // reads stay legal
   });
 
-  it('destroy during start joins it: effects never run, workspace unwinds', async () => {
-    const initGate = gate();
-    const effectsRan = vi.fn();
+  it('destroy right after start joins it and unwinds what the workspace connected', async () => {
     const teardown = vi.fn();
     const plugin: AnyPlugin = {
-      id: 'slow-ws',
-      init: async (ctx: PluginContext<unknown>) => {
-        ctx.cleanup(teardown);
-        await initGate.promise;
-      },
-      effects: effectsRan,
+      id: 'ws',
+      create: (ctx: PluginContext<unknown>) => ({
+        api: {},
+        connect: () => ctx.cleanup(teardown),
+      }),
     };
     const kernel = createKernel({ engine: instantEngine(), plugins: [plugin], report: () => {} });
     const start = kernel.start();
-    const destroy = kernel.destroy();
-    initGate.open();
-    await destroy;
+    await kernel.destroy();
 
-    expect(effectsRan).not.toHaveBeenCalled(); // the status check stopped the loop
     expect(teardown).toHaveBeenCalledTimes(1);
     expect(kernel.status()).toBe('destroyed');
-    await start; // start resolves (stopped early), never rejects here
+    await start; // start resolves, never rejects here
   });
 
-  it('a workspace init failure fails the kernel and unwinds what start registered', async () => {
+  it('a workspace connect failure fails the kernel and unwinds what start registered', async () => {
     const teardown = vi.fn();
     const good: AnyPlugin = {
       id: 'good',
-      init: (ctx: PluginContext<unknown>) => {
-        ctx.cleanup(teardown);
-      },
+      create: (ctx: PluginContext<unknown>) => ({
+        api: {},
+        connect: () => ctx.cleanup(teardown),
+      }),
     };
     const bad: AnyPlugin = {
       id: 'bad',
-      init: () => Promise.reject(new Error('workspace init exploded')),
+      create: () => ({
+        api: {},
+        connect: () => {
+          throw new Error('workspace connect exploded');
+        },
+      }),
     };
     const kernel = createKernel({
       engine: instantEngine(),
@@ -458,7 +481,7 @@ describe('kernel status machine', () => {
       report: () => {},
     });
 
-    await expect(kernel.start()).rejects.toThrow('workspace init exploded');
+    await expect(kernel.start()).rejects.toThrow('workspace connect exploded');
     expect(kernel.status()).toBe('failed');
     expect(teardown).toHaveBeenCalledTimes(1); // rollback, not a limbo 'starting'
     await expect(kernel.documents.open(bytesInput('a'))).rejects.toThrow(/failed kernel/);
@@ -467,11 +490,11 @@ describe('kernel status machine', () => {
   });
 
   it('start is idempotent: a second call joins the first', async () => {
-    const initCount = vi.fn();
-    const plugin: AnyPlugin = { id: 'once', init: initCount };
+    const connected = vi.fn();
+    const plugin: AnyPlugin = { id: 'once', create: () => ({ api: {}, connect: connected }) };
     const kernel = createKernel({ engine: instantEngine(), plugins: [plugin], report: () => {} });
     await Promise.all([kernel.start(), kernel.start()]);
-    expect(initCount).toHaveBeenCalledTimes(1);
+    expect(connected).toHaveBeenCalledTimes(1);
   });
 
   it('concurrent close and destroy join the same teardown: the handle closes once', async () => {
@@ -487,14 +510,21 @@ describe('kernel status machine', () => {
     expect(kernel.status()).toBe('destroyed');
   });
 
-  it('the StrictMode script: destroyed kernel stays dead; a fresh kernel has exactly one effects pass', async () => {
+  it('the StrictMode script: destroyed kernel stays dead; a fresh kernel connects exactly once', async () => {
     const pokes: string[] = [];
+    const increment = (count: number) => count + 1;
     const makePlugin = (tag: string): AnyPlugin => ({
-      id: 'ws-effects',
-      effects: (ctx: EffectContext<unknown>) => {
-        ctx.onAction('poke', () => pokes.push(tag));
-      },
-      capability: (ctx) => ({ poke: () => ctx.dispatch({ type: 'poke' }) }),
+      id: 'ws-listener',
+      state: () => 0,
+      create: (ctx: PluginContext<number>) => ({
+        api: { poke: () => ctx.state.update(increment) },
+        connect: () => {
+          ctx.watch(
+            () => ctx.state.get(),
+            () => pokes.push(tag),
+          );
+        },
+      }),
       token: { name: 'poker' },
     });
 
@@ -513,7 +543,7 @@ describe('kernel status machine', () => {
     const k2 = createKernel({ engine: instantEngine(), plugins: [k2Plugin], report: () => {} });
     await k2.start();
     k2.capability<{ poke: () => void }>(k2Plugin.token as never).poke();
-    expect(pokes).toEqual(['k2']); // exactly one listener — no duplicated effects
+    expect(pokes).toEqual(['k2']); // exactly one listener, no duplicated connection
     await k2.destroy();
   });
 });

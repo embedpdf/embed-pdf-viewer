@@ -3,17 +3,17 @@ import { foldText } from './fold';
 import type { SearchQuery } from './types';
 
 /**
- * The search CONTENT EPOCH: a deterministic fingerprint of everything a
+ * The search content epoch: a deterministic fingerprint of everything a
  * search result depends on — page order/structure (`layoutVersion`) and
  * each page's text content (`contentVersion`), nothing else. Annotation
- * and metadata churn deliberately do NOT move it, so cached search
+ * and metadata churn deliberately do not move it, so cached search
  * responses in a collaborative document survive comment storms.
  *
  * Both sides compute it from the manifest they already hold: the client
  * to mint versioned search URLs, the server to validate them (mismatch →
  * NotFound, the standard stale-versioned-read signal). FNV-1a 64-bit —
  * dependency-free and stable; not cryptographic, and doesn't need to be:
- * an adversary can only vary his OWN authorized query results.
+ * an adversary can only vary his own authorized query results.
  */
 export function searchContentEpoch(manifest: DocumentManifest): string {
   let input = `${manifest.layoutVersion}`;
@@ -37,12 +37,12 @@ function fnv1a64(input: string): string {
 }
 
 /**
- * Canonicalize a query for CACHE KEYING: default-fold literal queries are
+ * Canonicalize a query for cache keying: default-fold literal queries are
  * pre-folded ("Café", "café" and "CAFE" are the same search, so they
  * should be the same cache entry). Semantics are unchanged — the fold is
  * idempotent and exactly what the matcher applies to the needle anyway.
  * Case- or diacritic-sensitive literals and regex patterns pass through
- * untouched (their raw form IS the query).
+ * untouched (their raw form is the query).
  */
 export function canonicalSearchQuery(query: SearchQuery): SearchQuery {
   if (query.regex || query.matchCase || query.matchDiacritics || query.ignoreWhitespace) {

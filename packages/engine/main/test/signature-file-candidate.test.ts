@@ -1,5 +1,5 @@
 /**
- * C2–C4: a file-backed session (a base FILE, Node native runtime) signs
+ * C2–C4: a file-backed session (a base file, Node native runtime) signs
  * through a file candidate beside its base: the base streams through the
  * writer, only the signature object's span is ever held in memory, the
  * sealed file becomes the session's new file base, and an untouched
@@ -69,7 +69,7 @@ describe('file-backed signing candidate', () => {
       expect(result.signature.coverage).toBe('whole-revision');
       expect(result.signature.docMdp).toBe(2);
 
-      // The session's version IS the sealed file's hash, and a download returns it verbatim.
+      // The session's version is the sealed file's hash, and a download returns it verbatim.
       const sealed = await readFile(candidatePath);
       expect(result.version.sha256).toBe(sha256(sealed));
       const downloaded = new Uint8Array(await doc.download());
@@ -114,7 +114,7 @@ describe('file-backed signing candidate', () => {
     let artifact: Uint8Array;
     try {
       await editing.forms.setValue({ kind: 'fqn', name: 'group.total' }, { type: 'text', value: 'delta' });
-      artifact = new Uint8Array(await editing.downloadLayer());
+      artifact = new Uint8Array(await editing.downloadLayer!());
     } finally {
       await editing.close();
     }

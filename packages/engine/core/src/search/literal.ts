@@ -3,7 +3,7 @@ import type { FoldedText, FoldOptions, SearchMatchRange } from './fold';
 import type { SearchQuery } from './types';
 
 /**
- * The fold flavor a literal query needs. Haystack and needle MUST be
+ * The fold flavor a literal query needs. Haystack and needle must be
  * folded with the same options; corpus caches key their pre-folded text
  * on this (the default `{}` fold is the persistable one — non-default
  * queries fold the original page text at query time).
@@ -16,7 +16,7 @@ export function foldOptionsFor(query: SearchQuery): FoldOptions {
   };
 }
 
-// ONE definition of "word character" for the whole search subsystem —
+// One definition of "word character" for the whole search subsystem —
 // Unicode letters/digits, not JS \b's ASCII set — shared by the literal
 // boundary check and the regex wholeWord post-filter, so the wholeWord
 // toggle means the same thing in both modes ("caf" never whole-word
@@ -24,7 +24,7 @@ export function foldOptionsFor(query: SearchQuery): FoldOptions {
 const WORD_UNIT = /[\p{L}\p{N}_]/u;
 const MARK = /\p{M}/u;
 
-/** Whether the code point ENDING at `index` (exclusive) is a word char. */
+/** Whether the code point ending at `index` (exclusive) is a word char. */
 export function wordBefore(text: string, index: number): boolean {
   if (index <= 0) return false;
   // Step back over a low surrogate to test the full code point.
@@ -43,7 +43,7 @@ export function wordAt(text: string, index: number): boolean {
  * Whether the folded hit at `at` sits on word boundaries. Checked on the
  * folded plane, except under `ignoreWhitespace`: dropping whitespace glues
  * neighbouring words together ("i n v o i c e 42" folds to "invoice42"), so there the
- * boundaries are read off the ORIGINAL text around the mapped range.
+ * boundaries are read off the original text around the mapped range.
  */
 function isWholeWordHit(
   haystack: FoldedText,

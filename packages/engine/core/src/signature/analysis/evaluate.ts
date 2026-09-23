@@ -43,7 +43,7 @@ const ACROFORM_KEYS = new Set(['DR', 'DA', 'Q', 'SigFlags', 'NeedAppearances', '
  *   are allowed"): everything but the field's identity and its place in
  *   the tree. v1/08 /V+/AP, 09 /Ff, 10 /Rect, 11 /F, 18 /TU, 21 /DA; 13 /T
  *   forbidden. /AA (v1/12) and /A are accepted by Acrobat and deliberately
- *   NOT listed: an action on a signed form is executable content.
+ *   not listed: an action on a signed form is executable content.
  *
  *   fill (a P=2 certification): value and appearance. v1/26 /V+/AP, v3/64
  *   /Ff (ReadOnly added), 65 /DA, 68 /AP stream; v3/66 /TU, 67 /F, v2/50
@@ -61,7 +61,7 @@ const WIDGET_KEYS_BY_LEVEL: Record<'annotate' | 'fill', ReadonlySet<string>> = {
   fill: new Set(['AS', 'AP', 'DA']),
 };
 /**
- * Signing an EXISTING field: its value, appearance and ReadOnly at any
+ * Signing an existing field: its value, appearance and ReadOnly at any
  * level; after an approval signature also its tooltip and a /Lock installed
  * with the signature (v1/18, 19: both valid; under P=2 the combination is
  * rejected, v3/69, so neither is allowed at `fill`).
@@ -84,27 +84,27 @@ function signedFieldKeysFor(level: ModificationLevel): ReadonlySet<string> {
 }
 
 /**
- * Rules whose permitted findings do not make a revision a CHANGE of the
+ * Rules whose permitted findings do not make a revision a change of the
  * document: an object written again with the sealed value, an object nobody
  * references, a cross-reference container, the trailer's own bookkeeping.
  * A window with nothing else is `unchanged` (Acrobat: "not modified").
  */
 const NON_EFFECTIVE_RULES = new Set(['identical-rewrite', 'orphan', 'xref-container', 'trailer']);
 
-/** The level a step runs at, and the locks it enforces: what the OLDER revision's signatures established. */
+/** The level a step runs at, and the locks it enforces: what the older revision's signatures established. */
 export function restrictionsOf(before: RevisionStructure): {
   level: ModificationLevel;
   locks: DocumentFieldLock[];
 } {
   const protection = deriveProtection(before.signatures);
-  // The JUDGED level: what a validator holds this step to. Nothing signed
+  // The judged level: what a validator holds this step to. Nothing signed
   // yet: nothing forbids, the rule set explains what it can.
   return { level: protection.judged ?? 'annotate', locks: protection.fieldLocks };
 }
 
 /**
  * Judge one pairwise step. Every reference to a changed object, in the
- * older AND the newer revision, must be claimed by a rule that inspected
+ * older and the newer revision, must be claimed by a rule that inspected
  * that use; an unclaimed reference is `unexplained` and forbidden. A
  * truncated value is `incomplete`, never permitted. Pure: JSON in, JSON
  * out, the same code in the browser worker, on the server and in tests.
@@ -262,7 +262,7 @@ class StepContext {
   /**
    * `${objectNumber}:${side}:${edge}` → the rule that inspected the use, and
    * whether it allowed it. A claim explains an edge in the report; only an
-   * ALLOWING claim can vouch for a shared object joining a subtree.
+   * allowing claim can vouch for a shared object joining a subtree.
    */
   private readonly claims = new Map<string, { rule: string; allow: boolean }>();
   /** Objects a lock forbids touching this step. */
@@ -353,9 +353,9 @@ class StepContext {
     accept: (label: string) => boolean,
     rule: string,
   ): void {
-    // Two sets, never merged: an edge from a ROOT is inside the subtree
+    // Two sets, never merged: an edge from a root is inside the subtree
     // only through an accepted label, on every pass; an edge from an object
-    // that JOINED is inside through any label. Folding the roots into the
+    // that joined is inside through any label. Folding the roots into the
     // frontier would let one accepted child (an appearance stream, a DSS
     // update) vouch for every other edge off the same parent.
     const joined = new Set<number>();
@@ -373,7 +373,7 @@ class StepContext {
         if (inside.length === 0) continue;
         for (const e of inside) this.claimEdge(c, side, e, rule);
         // A changed object joins the subtree - and brings its own children
-        // in - only when EVERY use of it is allowed: by this subtree, or by
+        // in - only when every use of it is allowed: by this subtree, or by
         // another rule that permitted the owner (a font shared between a
         // filled field's appearance and /AcroForm /DR, corpus v1/16, 21). A
         // use nobody allowed - a signed page's content (v1/30, v2/39, 52),
@@ -517,7 +517,7 @@ function ruleCatalog(ctx: StepContext): void {
     ctx.forbidden(c, 'catalog-housekeeping', `catalog keys changed: ${bad.join(', ')}`);
     return;
   }
-  // A DIRECT /AcroForm dictionary changes with the catalog: judge it by the
+  // A direct /AcroForm dictionary changes with the catalog: judge it by the
   // AcroForm rules, and let its default resources ride the catalog's edges.
   if (changed.has('AcroForm') && !ctx.input.after.acroForm && !ctx.input.before.acroForm) {
     const problem = acroFormProblem(
@@ -718,7 +718,7 @@ function ruleSignatureAdded(ctx: StepContext): void {
     for (const w of field?.widgets ?? []) parents.add(w);
 
     // A field added in this very step was judged, and its edges claimed, by
-    // signature-field-added; the table below is for signing an EXISTING
+    // signature-field-added; the table below is for signing an existing
     // field. Before the first signature nothing governs the document, and
     // the /Lock mirror written at authoring time is legitimate whatever the
     // level.
@@ -887,7 +887,7 @@ function ruleFormFill(ctx: StepContext): void {
         changed.has('Ff') &&
         !readOnlyOnlyChange(fc, ctx.before.fieldByObj.get(num)?.flags)
       ) {
-        // ReadOnly may be ADDED, on its own (v1/09, v3/64, 76); no other bit
+        // ReadOnly may be added, on its own (v1/09, v3/64, 76); no other bit
         // has a case behind it.
         ctx.forbidden(fc, rule, `field "${field.name}" flags changed beyond adding ReadOnly`);
         ctx.claimStable(fc, rule, false);

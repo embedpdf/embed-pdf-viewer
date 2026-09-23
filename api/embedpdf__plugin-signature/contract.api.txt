@@ -20,7 +20,7 @@ SignatureCompleteResult [InterfaceDeclaration] (from packages/engine/core/src/si
 SignatureConfig [InterfaceDeclaration]: export interface SignatureConfig{ mode?: SignatureMode; signer?: SignerPort | (() => Promise<SignerPort>); trust?: TrustPort; allowCertify?: boolean; }
 SignatureDTO [InterfaceDeclaration] (from packages/engine/core/src/signature/types.ts): export interface SignatureDTO{ index: number; field: FormFieldRef; fieldName: string; widget: FormWidget | null; signed: boolean; kind: SignatureKind; filter: string | null; subFilter: string | null; byteRange: [number, number, number, number] | null; contentsSize: number; coverage: SignatureCoverage | null; revisionIndex: number | null; signer: SignatureSigner; docMdp: DocMdpPermission | null; catalogCertification: boolean; fieldMdp: FieldLockSpec | null; lock: FieldLockSpec | null; seedValue: SignatureSeedValue | null; }
 SignatureFieldAddress [TypeAliasDeclaration]: export type SignatureFieldAddress = FormFieldRef | AnnotationRef |{ annotObjectNumber: number} ;
-SignatureFieldEvent [InterfaceDeclaration]: export interface SignatureFieldEvent{ readonly field: FormFieldRef; readonly origin: ChangeOrigin; }
+SignatureFieldEvent [InterfaceDeclaration]: export interface SignatureFieldEvent{ readonly field: FormFieldRef; }
 SignatureInspectionRequestedEvent [InterfaceDeclaration]: export interface SignatureInspectionRequestedEvent{ readonly field: FormFieldRef; }
 SignatureInvalidatingEvent [InterfaceDeclaration]: export interface SignatureInvalidatingEvent{ readonly field: FormFieldRef; readonly detail: string; }
 SignatureMode [TypeAliasDeclaration]: export type SignatureMode = 'sign' | 'visual' | 'ask';

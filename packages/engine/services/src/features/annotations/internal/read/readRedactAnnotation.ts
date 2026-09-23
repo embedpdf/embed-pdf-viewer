@@ -21,7 +21,7 @@ const DEFAULT_REDACT_COLOR: Color = { r: 255, g: 0, b: 0 };
 /** Default label colour (black) when a redaction carries no `/DA`. */
 const DEFAULT_LABEL_COLOR: Color = { r: 0, g: 0, b: 0 };
 
-/** Default label size when there is no `/DA`. When a `/DA` IS present its
+/** Default label size when there is no `/DA`. When a `/DA` is present its
  *  size is kept verbatim — including `0`, which means auto-fit for a
  *  redaction label (unlike free text, which normalizes 0 away). */
 const DEFAULT_FONT_SIZE = 12;

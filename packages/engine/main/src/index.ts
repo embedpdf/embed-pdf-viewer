@@ -1,12 +1,12 @@
 /**
- * @embedpdf/engine - Engine v3 local implementation.
+ * @embedpdf/engine - the local engine implementation.
  *
  * Public API:
  *   localEngine(options?)               -> LocalEngine (Web Worker; boots lazily on first use)
  *   createLocalEngine()                 -> LocalEngine using inline transport (Node, tests)
  *   createLocalEngineWithWorker(worker) -> LocalEngine using a caller-supplied Web Worker
  *
- * All three construct SYNCHRONOUSLY and allocate nothing until the first
+ * All three construct synchronously and allocate nothing until the first
  * operation (or `engine.warmup()`): readiness lives inside {@link LazyTransport},
  * so no caller ever awaits engine construction.
  */
@@ -145,9 +145,9 @@ export function createLocalEngineWithWorker(opts: CreateLocalEngineWithWorkerOpt
  * Resolve a `worker` option into a boot-time transport factory plus
  * LazyTransport options — the one place the delivery asymmetries are handled:
  *
- *   - LIVE `Worker`: it began initializing at `new Worker()`, and its
+ *   - live `Worker`: it began initializing at `new Worker()`, and its
  *     `ready`/`init-error` message is dropped if nothing is listening when it
- *     fires. So the init message is posted and the handshake latched HERE,
+ *     fires. So the init message is posted and the handshake latched here,
  *     synchronously at engine construction, and the latch is what the
  *     deferred spawn awaits. The abandon hook terminates the worker if the
  *     engine is destroyed without ever booting (the boot factory never ran,
@@ -204,10 +204,10 @@ function workerBoot(
 
   return {
     spawn: async () => {
-      // Resolve BEFORE spawning: if the sibling-url module can't load, no
+      // Resolve before spawning: if the sibling-url module can't load, no
       // worker is left orphaned. Only the inline blob worker gets the default.
-      // No extra tick for explicit sources: a thunk/URL worker boots on the
-      // same schedule as before; only a lazy `wasmLoader` awaits its bytes.
+      // No extra tick for explicit sources: a thunk/URL source resolves
+      // synchronously; only a lazy `wasmLoader` awaits its bytes.
       const wasm =
         delivery === 'inline'
           ? await resolveInlineWasmSource(wasmOptions)
@@ -320,13 +320,13 @@ export interface LocalEngineRecipeOptions extends WasmSourceOptions {
    */
   encoderWorker?: EncoderWorkerSource;
   /**
-   * Fonts registered AND appended to the ordered glyph-fallback chain, in
-   * order — the ones used to substitute missing glyphs during rendering and
+   * Fonts registered and appended to the ordered glyph-fallback chain, in
+   * order — the ones that substitute missing glyphs during rendering and
    * appearance generation (e.g. a CJK fallback). This is the common case.
    */
   fallbackFonts?: RecipeFontSpec[];
   /**
-   * Fonts registered but NOT added to the fallback chain — available for
+   * Fonts registered but not added to the fallback chain — available for
    * explicit annotation authoring (a FreeText `fontFamily`) without affecting
    * automatic substitution.
    */
@@ -347,7 +347,7 @@ export interface LocalEngineRecipeOptions extends WasmSourceOptions {
 /**
  * Create a local (PDFium-in-a-Worker) {@link LocalEngine}.
  *
- * SYNCHRONOUS AND CHEAP: the returned object is a fully usable {@link Engine},
+ * Synchronous and cheap: the returned object is a fully usable {@link Engine},
  * but it allocates nothing — no Worker, no WASM — until the first operation
  * (or an explicit `engine.warmup()`). That makes it safe to create at module
  * scope, including on a server (Next/Nuxt SSR): nothing browser-specific runs
@@ -429,7 +429,7 @@ async function resolveRecipeFonts(
 }
 
 /**
- * Register boot-config fonts by RAW transport send, bypassing the WorkerQueue.
+ * Register boot-config fonts by raw transport send, bypassing the WorkerQueue.
  *
  * The bypass is load-bearing, not an optimization: during boot the queue's
  * concurrency slot may already be held by a buffered user `open()`, so a
@@ -445,7 +445,7 @@ async function registerBootFonts(
   fonts: ResolvedRecipeFont[],
 ): Promise<void> {
   for (const { spec, fallback } of fonts) {
-    // Seed BEFORE the raw send: seeding copies the bytes, and the wire buffer
+    // Seed before the raw send: seeding copies the bytes, and the wire buffer
     // is transferred (neutered) by the worker transport.
     fontService.seedRegistered(spec, { fallback });
     const bytes = toStandaloneArrayBuffer(spec.data);

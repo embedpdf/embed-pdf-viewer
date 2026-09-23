@@ -1,18 +1,13 @@
 /**
- * @embedpdf/plugin-selection/contract — the PUBLIC selection vocabulary.
+ * @embedpdf/plugin-selection/contract — the public selection vocabulary.
  *
- * Selection ranges live in CHARACTER space (half-open `TextRange`, the same
+ * Selection ranges live in character space (half-open `TextRange`, the same
  * space search hits address). Geometry needs `doc.text.select`, text
  * extraction needs `doc.text.copy`, and neither permission implies the other.
  * Segments, endpoints and anchors are in page space (content space: y-down,
  * PDF units, crop-relative), the space every layer paints in.
  */
-import {
-  type ChangeOrigin,
-  type EventHook,
-  type OperationOptions,
-  type PageRef,
-} from '@embedpdf/core';
+import type { EventHook, OperationOptions, PageRef } from '@embedpdf/core';
 import type { Point, Rect, TextQuad } from '@embedpdf/core-geometry';
 import type { SelectionSegment } from './geometry';
 
@@ -28,9 +23,9 @@ export interface SelectionConfig {
 // ── the range vocabulary ────────────────────────────────────────────────────
 
 /**
- * A position in a page's CHARACTER space — the space the engine's geometry
+ * A position in a page's character space — the space the engine's geometry
  * runs tile (`PageGeometryRun.charStart`) and search hits address
- * (`SearchMatch.charStart`). NOT a string offset into extracted text; the
+ * (`SearchMatch.charStart`). Not a string offset into extracted text; the
  * two spaces are joined by the engine's `charMap` (see engine-core
  * `text/charmap.ts`), which `readText()` applies for you.
  */
@@ -61,7 +56,7 @@ export type SelectionRangeInput = TextRange | { page: PageRef; start: number; co
 // ── the read model ──────────────────────────────────────────────────────────
 
 /**
- * A selection boundary, anchored to the boundary GLYPH's own oriented cell.
+ * A selection boundary, anchored to the boundary glyph's own oriented cell.
  * `advance` is the reading direction of the segment it belongs to (+1 = the
  * frame's +x), so caret consumers place at the trailing edge without
  * re-deriving bidi from geometry. `rect` is the AABB (scroll targets).
@@ -81,7 +76,7 @@ export interface SelectionAnchor {
 }
 
 export interface SelectionSnapshot {
-  /** Per-page canonical segments — the ONE geometry consumers act on.
+  /** Per-page canonical segments — the one geometry consumers act on.
    *  Boxes are derived views (`segment.rect`, or `listRects()`). */
   readonly pages: readonly { page: PageRef; segments: readonly SelectionSegment[] }[];
   readonly start: SelectionEndpoint | null;
@@ -100,34 +95,35 @@ export interface SelectionSnapshot {
 
 // ── events ──────────────────────────────────────────────────────────────────
 
-/** Any change to the selection: a gesture step, a programmatic select, a
- *  derived recompute (page geometry arrived, pages rotated), or a clear. */
+/**
+ * The selection's range or segments changed: a gesture step, a programmatic
+ * select, a boundary page's text geometry arriving, or a clear. Selection is
+ * session state, so the event carries no document origin.
+ */
 export interface SelectionChangedEvent {
   readonly range: TextRange | null;
   /** The pages that carry a segment right now. */
   readonly pages: readonly PageRef[];
-  readonly origin: ChangeOrigin;
 }
 
-/** A selection GESTURE ended (pointer-up, handle release) with a selection in
+/** A selection gesture ended (pointer-up, handle release) with a selection in
  *  place — the commit point markup creation and clipboard prefetch act on.
  *  Never fires for programmatic selection. */
 export interface SelectionCommittedEvent {
   readonly range: TextRange;
 }
 
-export interface SelectionClearedEvent {
-  readonly origin: ChangeOrigin;
-}
+/** The selection went from a range to nothing. */
+export type SelectionClearedEvent = Record<string, never>;
 
-// ── the PUBLIC capability ───────────────────────────────────────────────────
+// ── the public capability ───────────────────────────────────────────────────
 
 /**
- * The PUBLIC selection API — the documented, stable surface for application
+ * The public selection API — the documented, stable surface for application
  * code (toolbars, context menus, automation).
  *
- * The permission model: GEOMETRY enables selection (`doc.text.select`),
- * TEXT enables extraction (`doc.text.copy`) — neither implies the other.
+ * The permission model: geometry enables selection (`doc.text.select`),
+ * text enables extraction (`doc.text.copy`) — neither implies the other.
  * Everything here except the `readText` pair works with the select scope
  * alone, so a deployment can allow selecting and highlighting while denying
  * copy. Writes without the scope throw `PluginError('permission-denied')`;
@@ -142,7 +138,7 @@ export interface SelectionClearedEvent {
  * Framework-only plumbing (gesture bracketing, geometry warming, the
  * highlight-visibility handshake) lives on `SelectionHostCapability`,
  * reachable through `@embedpdf/plugin-selection/contract/host`. Both are the
- * SAME runtime object — two typed lenses on one token.
+ * same runtime object — two typed lenses on one token.
  */
 export interface SelectionCapability {
   // ── authorization (mirrors the engine's own enforcement) ──
@@ -193,7 +189,7 @@ export interface SelectionCapability {
   listRects(page: PageRef): readonly Rect[];
   /**
    * Where selection-scoped floating UI should attach: the union box of the
-   * selection's segments on its END page (where the gesture finished),
+   * selection's segments on its end page (where the gesture finished),
    * falling back to the last page with materialized segments while a
    * boundary page's geometry is still loading. One anchor regardless of
    * cross-page selection. Null when nothing is selected (or nothing has
@@ -206,7 +202,7 @@ export interface SelectionCapability {
    * The selected text. Each page's text snapshot is fetched once per content
    * version and sliced through the engine's `charMap`; pages are joined with
    * `\n`. Resolves `''` when nothing is selected; rejects `permission-denied`
-   * without `doc.text.copy`. Clipboard writes are deliberately NOT here —
+   * without `doc.text.copy`. Clipboard writes are deliberately not here —
    * this package is DOM-free; use `@embedpdf/web`'s clipboard helpers.
    */
   readText(options?: OperationOptions): Promise<string>;
@@ -214,8 +210,12 @@ export interface SelectionCapability {
   readTextInRange(range: TextRange, options?: OperationOptions): Promise<string>;
 
   // ── events ──
+  /** The range or its segments changed, whoever changed them. */
   readonly onChanged: EventHook<SelectionChangedEvent>;
+  /** A selection gesture ended with a selection in place. */
   readonly onCommitted: EventHook<SelectionCommittedEvent>;
+  /** The selection went from a range to nothing: a clear, an empty range, or
+   *  its pages' content changed or left the document. */
   readonly onCleared: EventHook<SelectionClearedEvent>;
 }
 

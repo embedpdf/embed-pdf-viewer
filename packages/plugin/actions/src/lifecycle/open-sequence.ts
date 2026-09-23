@@ -1,9 +1,11 @@
 /**
- * The §3.9 document-open sequence and its latch: fires once at the earliest
- * of a UI adapter installing or the first user-origin dispatch (`'auto'`),
- * at bringup (`'headless'`), or never (`'off'` — the page barrier still
- * releases). D1's open-ordering law: the sequence runs before the first
- * verb-shaped document event.
+ * The document-open sequence and its latch. The sequence runs the open
+ * destination (as a lifecycle GoTo), then the catalog /OpenAction, and only
+ * then releases the page-lifecycle barrier, so the first page /O fires after
+ * both. It fires once: at the earliest of a UI adapter installing or the
+ * first user-origin dispatch (`'auto'`), at bringup (`'headless'`), or never
+ * (`'off'`, which still releases the barrier). Unless it is off, it runs
+ * before the first verb-shaped document event (/WS, /WP, /WC, …).
  */
 import type { Unsubscribe } from '@embedpdf/core';
 import type { PdfActionTree } from '@embedpdf/engine-core/runtime';
@@ -18,11 +20,10 @@ import type {
 } from '../contract';
 import type { DispatchCore } from '../dispatch/core';
 import { foldSteps } from '../dispatch/fold';
-import type { ActionsContext, ActionsServices } from '../services';
+import type { ActionsServices } from '../services';
 import type { ActionsPageLifecycle } from './page-lifecycle';
 
 export function createOpenSequence(
-  ctx: ActionsContext,
   services: Pick<ActionsServices, 'events' | 'catalog' | 'queue' | 'ports'>,
   config: ActionsConfig,
   { releaseBarrier, resetCascade }: Pick<ActionsPageLifecycle, 'releaseBarrier' | 'resetCascade'>,
@@ -35,12 +36,12 @@ export function createOpenSequence(
   let openFired = false;
   let sawUserActivity = false;
 
-  /** The §3.9 sequence body — runs INSIDE the queue (via dispatch or the
-   *  latch's own enqueue; callers guarantee openFired was set). */
+  /** The sequence body. Runs inside the queue (through dispatch or the
+   *  latch's own enqueue); callers guarantee `openFired` was set. */
   const runOpenSequenceOp = async (): Promise<ActionTriggerResult> => {
     const diagnostics: ActionDiagnostic[] = [];
     const steps: ActionStepResult[] = [];
-    const lifecycleCtx: ActionContext = {
+    const openContext: ActionContext = {
       origin: 'lifecycle',
       source: { kind: 'document' },
       event: { scope: 'document', name: 'open' },
@@ -64,14 +65,14 @@ export function createOpenSequence(
         steps.push({
           source: { kind: 'document' },
           tree,
-          result: await runAndEmit(tree, lifecycleCtx),
+          result: await runAndEmit(tree, openContext),
         });
       }
       if (snapshot?.openAction?.root || snapshot?.openAction?.incomplete) {
         steps.push({
           source: { kind: 'document' },
           tree: snapshot.openAction,
-          result: await runAndEmit(snapshot.openAction, lifecycleCtx),
+          result: await runAndEmit(snapshot.openAction, openContext),
         });
       }
     } catch (error) {
@@ -82,9 +83,9 @@ export function createOpenSequence(
       diagnostics.push(diagnostic);
       diagnosticHook.emit(diagnostic);
     } finally {
-      // Release AFTER the document steps, on EVERY path; page-open emission
-      // enqueues BEHIND this op (never awaited here — awaiting our own
-      // queue self-deadlocks).
+      // Release after the document steps, on every path; page-open emission
+      // enqueues behind this operation (never awaited here: awaiting our own
+      // queue would deadlock).
       releaseBarrier(true);
     }
     const result = foldSteps(steps, diagnostics);
@@ -93,11 +94,11 @@ export function createOpenSequence(
   };
 
   /**
-   * D1's open-ordering law: catalog `OpenAction` may never run AFTER a
-   * WillSave/WillPrint/WillClose script. Before the first verb-shaped
-   * document event, an armed-but-unfired open sequence runs inline (we are
-   * already inside the queue; `runOpenSequenceOp` never enqueues). It does
-   * NOT wait for the initial page `/O` — the guarantee is catalog-level.
+   * The catalog /OpenAction never runs after a /WS, /WP or /WC script: before
+   * the first verb-shaped document event, an armed but unfired open sequence
+   * runs inline (the caller is already inside the queue; `runOpenSequenceOp`
+   * never enqueues). It does not wait for the initial page /O: the guarantee
+   * is catalog-level.
    */
   const ensureOpenSequenceBeforeDocEvent = async (): Promise<void> => {
     if (openFired || config.openSequence === 'off') return;
@@ -145,7 +146,7 @@ export function createOpenSequence(
     api: {
       setUiAdapter: (adapter): Unsubscribe => {
         ports.uiAdapter = adapter;
-        // An adapter arriving is the §3.9 latch's usual release.
+        // An adapter arriving is the usual trigger of the open sequence.
         if (adapter) maybeFireOpenSequence();
         return () => {
           // Identity-safe: never wipe a successor installed after us.

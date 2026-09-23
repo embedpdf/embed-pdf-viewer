@@ -6,11 +6,11 @@ import {
 import type { PdfPoint, PdfQuad, PdfRect } from '../geometry/primitives';
 
 /**
- * The canonical text-interaction layout — the ONE place glyph geometry
+ * The canonical text-interaction layout — the one place glyph geometry
  * becomes hit targets, word/line ranges, and visual-line segments.
  *
  * Selection owns gestures and state; search owns matching and cursors;
- * NEITHER owns segmentation. Both consume this module, so a text range has
+ * neither owns segmentation. Both consume this module, so a text range has
  * exactly one canonical segmentation regardless of how it was produced, and
  * coordinate conversion (PDF → content/view) happens strictly afterward at
  * the plugin seam.
@@ -21,18 +21,18 @@ import type { PdfPoint, PdfQuad, PdfRect } from '../geometry/primitives';
  * 2010 The Chromium Authors); hit-testing mirrors PDFium `GetIndexAtPos`
  * (exact tight box first, then a tolerance pass).
  *
- * ORIENTATION MODEL — frames. Every run belongs to a FRAME: frame 0 is page
+ * Orientation model — frames. Every run belongs to a frame: frame 0 is page
  * space itself (all upright runs — the dominant case takes a byte-identical
  * fast path), and each rotated orientation cluster gets an orthonormal frame
  * in which its text reads upright (baseline +x, ascent +y). Frames are
- * derived from the SEMANTIC EDGES of the first classifiable glyph's quad —
+ * derived from the semantic edges of the first classifiable glyph's quad —
  * never from advisory wire fields — and keyed by (baseline direction,
  * ascent handedness):
  *
  *   - Rotated and mirrored text become upright inside their frame.
- *   - Shear (fake italic) is deliberately NOT part of the frame key or the
+ *   - Shear (fake italic) is deliberately not part of the frame key or the
  *     basis: a sheared run shares the frame of its unsheared neighbours, so
- *     a mixed roman/italic line merges into ONE segment (Acrobat parity),
+ *     a mixed roman/italic line merges into one segment (Acrobat parity),
  *     and the shear is absorbed as a small in-frame AABB residue. This is
  *     the deterministic, order-independent contract — an affine
  *     (shear-preserving) basis would either fragment mixed lines or make
@@ -40,7 +40,7 @@ import type { PdfPoint, PdfQuad, PdfRect } from '../geometry/primitives';
  *   - Runs of different frames never merge into one line.
  *
  * All algorithms run on frame-local boxes; every participating run of a
- * cluster is transformed through the SAME frame, so merged coordinates are
+ * cluster is transformed through the same frame, so merged coordinates are
  * always commensurable. Only the output maps back to page space, as
  * oriented quads.
  */
@@ -61,10 +61,10 @@ const EDGE_EPSILON = 1e-6;
 /**
  * One merged visual line of a text range, in PDF user space. `quad` is the
  * geometric authority (frame-geometric slot order: `p1..p4` = upper-start,
- * upper-end, lower-start, lower-end — visual semantics, NOT reading order);
+ * upper-end, lower-start, lower-end — visual semantics, not reading order);
  * `rect` is its axis-aligned bounds, produced by the same constructor.
- * `advance` is the READING direction along the baseline, derived from the
- * glyph SEQUENCE (+1 = the frame's +x), never inferred from geometry.
+ * `advance` is the reading direction along the baseline, derived from the
+ * glyph sequence (+1 = the frame's +x), never inferred from geometry.
  */
 export interface PdfTextSegment {
   quad: PdfQuad;
@@ -247,7 +247,7 @@ function pointPerFrame(layout: PageTextLayout, p: PdfPoint): PdfPoint[] {
  * (so callers can show the pointer cursor off-text). PDFium `GetIndexAtPos`:
  * exact tight-box containment first, then a tolerance pass (closest by
  * Manhattan distance within `toleranceFactor × average glyph height`). Each
- * run tests the point in ITS OWN frame, so rotated text hit-tests exactly.
+ * run tests the point in its own frame, so rotated text hit-tests exactly.
  */
 export function textGlyphAt(
   layout: PageTextLayout,
@@ -313,7 +313,7 @@ export function expandTextRangeToWord(layout: PageTextLayout, glyph: number): [n
   return [from, to];
 }
 
-/** Triple-click: the full visual line — SAME-FRAME runs whose vertical extent
+/** Triple-click: the full visual line — same-frame runs whose vertical extent
  *  overlaps the anchor run's. A differently-oriented run is a line boundary. */
 export function expandTextRangeToLine(layout: PageTextLayout, glyph: number): [number, number] {
   const ri = layout.runs.findIndex((r) => glyph >= r.charStart && glyph < r.charStart + r.count);
@@ -359,7 +359,7 @@ interface SubRun {
   charCount: number;
   fontSize?: number;
   frame: number;
-  /** Baseline x of the FIRST/LAST glyph in sequence order (frame space) —
+  /** Baseline x of the first/last glyph in sequence order (frame space) —
    *  the reading-direction signal. */
   firstX: number;
   lastX: number;
@@ -367,7 +367,7 @@ interface SubRun {
 
 /**
  * Merged visual-line segments for the half-open char range
- * `[charStart, charStart + charCount)` — THE canonical segmentation. Chars
+ * `[charStart, charStart + charCount)` — the canonical segmentation. Chars
  * outside the layout are ignored.
  */
 export function textSegmentsForRange(
@@ -453,8 +453,8 @@ function mergeAdjacentSubRuns(runs: SubRun[]): MergedSubRun[] {
   let prev: SubRun | null = null;
   let cur: MergedSubRun | null = null;
   for (const run of runs) {
-    // Frames are canonical per cluster, so index equality IS the "same
-    // orientation" test — every participant was projected through the SAME
+    // Frames are canonical per cluster, so index equality is the "same
+    // orientation" test — every participant was projected through the same
     // frame, keeping merged coordinates commensurable.
     if (prev && cur && prev.frame === run.frame && shouldMerge(prev, run)) {
       cur = {
@@ -480,7 +480,7 @@ function mergeAdjacentSubRuns(runs: SubRun[]): MergedSubRun[] {
 
 /** Segment quad for a frame-local rect (frame 0: the rect's own corners,
  *  no float round-trip). Slot order US, UE, LS, LE; frame is y-up, so the
- *  upper corners sit at the frame TOP. */
+ *  upper corners sit at the frame top. */
 function quadOfFrameRect(f: TextLayoutFrame, frameIndex: number, r: PdfRect): PdfQuad {
   if (frameIndex === 0) {
     return {

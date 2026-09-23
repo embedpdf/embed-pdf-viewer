@@ -1,14 +1,10 @@
 /**
  * Logical database schema for @cloudpdf/server.
  *
- * Source of truth for both SQLite (Phase 1) and Postgres (Phase 2). The
- * column shapes here are the dialect-agnostic view; per-dialect migration
- * files under `db/migrations/{sqlite,postgres}/` adapt them to actual
- * column types (TEXT/INTEGER for SQLite, equivalents for PG).
- *
- * Phase 1 ships only `tenants`, `documents`, and `schema_migrations`.
- * Later phases add `document_pages`, `layers`, `layer_pages`,
- * `revoked_jtis`, `jwks_cache`, `audit_log`, and weak annotation sessions.
+ * Source of truth for both SQLite and Postgres. The column shapes here
+ * are the dialect-agnostic view; per-dialect migration files under
+ * `db/migrations/{sqlite,postgres}/` adapt them to actual column types
+ * (TEXT/INTEGER for SQLite, equivalents for PG).
  */
 
 import type { Generated } from 'kysely';
@@ -76,7 +72,7 @@ export interface DocumentsTable {
   failure_reason: string | null;
   /**
    * Thumbnail lifecycle for dashboards: `pending` (not warmed yet — the
-   * read-through still works), `ready`, `locked` (user-password doc: NO
+   * read-through still works), `ready`, `locked` (user-password doc: No
    * derived artifact by design), `failed` (warm errored; read-through is
    * the repair path). Defaults `pending` via migration 015.
    */
@@ -132,8 +128,8 @@ export interface LayersTable {
   /**
    * Bulk-annotations pointer epoch for the whole-document
    * `/annotations/items@annotationsVersion` leaf. Bumps only when
-   * annotation list BODIES change (annotation CRUD, page insert/delete,
-   * redaction, flatten, form field/widget structure) — deliberately NOT
+   * annotation list bodies change (annotation CRUD, page insert/delete,
+   * redaction, flatten, form field/widget structure) — deliberately not
    * on form value writes, metadata, attachments, or page move/rotate.
    * The `metadata_version` independent-cadence design.
    */
@@ -282,8 +278,8 @@ export interface SecurityEventsTable {
 
 /**
  * Share grants: standing, revocable authorization decisions for the
- * no-backend embed flow. The row id IS the public share token — a
- * REFERENCE evaluated at exchange time, never a bearer credential,
+ * no-backend embed flow. The row id is the public share token — a
+ * reference evaluated at exchange time, never a bearer credential,
  * which is what makes grants long-lived, editable, and revocable while
  * every credential that reaches a browser stays a short-lived doc JWT.
  */
@@ -313,7 +309,7 @@ export interface ShareGrantsTable {
 }
 
 /**
- * Per-tenant usage FACTS, one row per (tenant, metric, UTC month).
+ * Per-tenant usage facts, one row per (tenant, metric, UTC month).
  * Deliberately separate from `license_usage_counter`: that table
  * answers "is this deployment within its license" and stays
  * deployment-wide; this one answers "what did each tenant consume"
@@ -366,7 +362,7 @@ export interface SchemaMigrationsTable {
 }
 
 /**
- * Phase 2 — per-token denylist consulted on every authenticated
+ * Per-token denylist consulted on every authenticated
  * request. Fronted by `RevokedJtisGuard`'s in-memory LRU so the DB
  * round-trip happens only on cache misses.
  */
@@ -384,7 +380,7 @@ export interface RevokedJtisTable {
 }
 
 /**
- * Phase 2 — persistent JWKS cache keyed by issuer. The actual
+ * Persistent JWKS cache keyed by issuer. The actual
  * verifier uses `jose`'s in-memory cache; this table is the
  * cold-boot warm-up so we don't slam the customer's IdP on every
  * pod restart.

@@ -11,8 +11,8 @@ import { protectedCapabilities } from '../../signature/protection';
 import type { DocumentProtection } from '../../signature/types';
 
 /**
- * Resolved collab subject — the per-record identity bits used to test
- * collab filters against. Sourced from the target record's stored
+ * Resolved collab subject — the per-record identity bits that collab
+ * filters are tested against. Sourced from the target record's stored
  * `/EMBD_Metadata/UserID` and `/GroupID` at mutation time.
  */
 export interface CollabTarget {
@@ -42,9 +42,9 @@ export function checkCapability(
 }
 
 /**
- * True iff the scope grants AT LEAST ONE of `capabilities`. Convenience
- * for routes like `/text` (`doc.text.copy` OR `doc.text.search`) and
- * `/geometry` (`doc.text.select` OR `doc.text.search`).
+ * True iff the scope grants at least one of `capabilities`. Convenience
+ * for routes like `/text` (`doc.text.copy` or `doc.text.search`) and
+ * `/geometry` (`doc.text.select` or `doc.text.search`).
  */
 export function checkAnyCapability(
   capabilities: ReadonlyArray<DocCapability>,
@@ -60,7 +60,7 @@ export function checkAnyCapability(
  *
  * Narrowing model. For each action independently:
  *   1. wildcard `*` → allow (global escape hatch)
- *   2. if any collab scope applies to this action → NARROW: only those
+ *   2. if any collab scope applies to this action → narrow: only those
  *      collab filters decide. If none match the target, deny — even if
  *      `doc.annotate.modify` is also present. This is what makes
  *      `[modify, update:self]` correctly mean "edit own only" rather
@@ -117,7 +117,7 @@ export function checkCollab(
  *     mutation routes need to see the target row to evaluate the
  *     collab filter against its current owner.
  *
- * Does NOT short-circuit on wildcard — callers do that themselves
+ * Does not short-circuit on wildcard — callers do that themselves
  * before calling this. Returning the expanded set is useful for the
  * `/access` response's `effectiveScope` and for advisory UI surfacing.
  */
@@ -176,7 +176,7 @@ export function expandRawScope(
  *   self             → matches if identity.user_id === target.userId
  *   createdBy=<X>    → matches if target.userId === X
  *   group=<X>        → matches if target.groupId === X
- *                      AND identity.groups includes X
+ *                      and identity.groups includes X
  *
  * The group-membership check on `group=X` prevents a token from
  * matching annotations in a group it doesn't belong to, even if the
@@ -273,7 +273,7 @@ export function filterMatches(
  *   bit 6+4 → doc.forms.modify
  *
  * Note: this same expansion lives in builders.ts as
- * `materializePdfPermissions` for SDK-side use. The two MUST stay in
+ * `materializePdfPermissions` for SDK-side use. The two must stay in
  * sync; a test in resolver.test.ts pins them together.
  */
 function addPdfPermissions(out: Set<DocCapability>, b: PdfBits): void {

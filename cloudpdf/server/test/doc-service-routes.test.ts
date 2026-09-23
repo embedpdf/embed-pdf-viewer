@@ -116,9 +116,8 @@ function tenantOnlyToken(tenantId: string): string {
 
 /**
  * Seed a `ready` document by inserting a tenant row + documents row
- * directly + uploading the bytes. Phase 5's lifecycle service will
- * do this for us; for Phase 3 we sidestep it because the upload
- * pipeline isn't the unit under test.
+ * directly + uploading the bytes, bypassing the lifecycle service
+ * because the upload pipeline isn't the unit under test.
  *
  * The stub worker interprets the first byte of the payload as the
  * page count, so callers can vary `pageCount` via the bytes pattern.
@@ -874,7 +873,7 @@ describe('Phase 6 access route — owner-password upgrade (permission-only encry
     expect(afterOwner).toHaveLength(1);
 
     // user password is empty (requiresPassword=false) and owner is cached,
-    // so a non-matching password is provably wrong: rejected WITHOUT the
+    // so a non-matching password is provably wrong: rejected without the
     // worker. The stub would otherwise return 'user' facts and write a new
     // verification row + downgrade the session, so we assert neither happens.
     const wrong = await postAccess(docId, token, { password: 'definitely-wrong', mode: 'any' });
@@ -967,7 +966,7 @@ describe('Phase 6 access route — owner-password upgrade (permission-only encry
     const { passwordGrant } = (await elevate.json()) as { passwordGrant: string | null };
     expect(passwordGrant).toBeTruthy();
 
-    // No password but a valid grant -> renew (NOT downgrade). Session
+    // No password but a valid grant -> renew (not downgrade). Session
     // persists and page-text stays readable.
     const renew = await postAccess(docId, token, { passwordGrant });
     expect(renew.status, await renew.clone().text()).toBe(200);

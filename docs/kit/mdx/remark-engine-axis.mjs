@@ -1,7 +1,7 @@
 import { visit, SKIP } from 'unist-util-visit';
 
 /**
- * Build-time resolution of the engine axis (DOCS-PLATFORM-ARCHITECTURE.md).
+ * Build-time resolution of the engine axis (docs/conventions/docs-architecture.md).
  *
  * Shared MDX marks engine-specific content with `<Engine>` blocks:
  *

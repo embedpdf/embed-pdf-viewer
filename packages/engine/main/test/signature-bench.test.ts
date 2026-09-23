@@ -28,7 +28,7 @@ async function timed<T>(label: string, rows: string[], fn: () => Promise<T>): Pr
   return out;
 }
 
-/** Catalog 1, pages 2, pages 3..3+PAGES, images after, AcroForm 10, fields after. */
+/** Catalog 1, pages 2, pages 3..3+pages, images after, AcroForm 10, fields after. */
 function buildDocument(): Uint8Array {
   const objects: Objects = {};
   const pageNums = Array.from({ length: PAGES }, (_, i) => 100 + i);
@@ -78,7 +78,7 @@ describe.skipIf(!ENABLED)('signature analysis cost on a large multi-revision doc
     } finally {
       await doc.close();
     }
-    // REVS fill revisions after the certification, each rewriting one field.
+    // Revs fill revisions after the certification, each rewriting one field.
     for (let r = 0; r < REVS; r++) {
       const i = r % FIELDS;
       signed = append(signed, {

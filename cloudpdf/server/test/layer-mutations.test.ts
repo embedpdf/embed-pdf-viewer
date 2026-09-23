@@ -613,7 +613,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     ]);
     expect(body.cache).toEqual({ previousDocVersion: 1, docVersion: 2, layoutVersion: 2 });
 
-    // The audit trail records the rotate against the AFFECTED pages only.
+    // The audit trail records the rotate against the affected pages only.
     const audit = await fx.db
       .selectFrom('audit_log')
       .select(['kind', 'affected_pages_json'])
@@ -701,7 +701,7 @@ describe('Phase 5 layer mutation pipeline', () => {
 
   test('the audited payload is byte-identical to the HTTP response (event-stream invariant)', async () => {
     // What we tell the caller is what we tell history: the audit row must
-    // store the FINALIZED result (cloud-stable revision tokens, real
+    // store the finalized result (cloud-stable revision tokens, real
     // cacheDelta / coherence pins), never the worker's session-relative
     // draft. A remote event subscriber replays exactly these payloads.
     const tenantId = 'tenant-layer-pages';
@@ -1105,7 +1105,7 @@ function tinyPng(): Uint8Array {
 }
 
 /**
- * Assert an artifact key is a per-ATTEMPT variant of the expected
+ * Assert an artifact key is a per-attempt variant of the expected
  * versioned key: `v{version}-{nonce}.layer` (see LayerService.nextArtifactKey
  * — racing replicas must never share an upload target).
  */
@@ -1116,7 +1116,7 @@ function expectAttemptKey(actual: string | null, versionedKey: string): void {
   );
 }
 
-/** Parse the stub worker's v2 layer artifact ([0x4c, 0x02, ...JSON]). */
+/** Parse the stub worker's layer artifact, format 2 ([0x4c, 0x02, ...JSON]). */
 function parseStubArtifact(bytes: Uint8Array): Array<Record<string, unknown>> {
   const buf = Buffer.from(bytes);
   if (buf.byteLength < 2 || buf[0] !== 0x4c || buf[1] !== 0x02) return [];

@@ -1,5 +1,5 @@
 /**
- * Text-selection authoring: the bridge that turns a TEXT SELECTION into markup
+ * Text-selection authoring: the bridge that turns a text selection into markup
  * or a text-edit annotation (Insert / Replace). These tools have no gesture of
  * their own — they enable the selection plugin's `text-select` gesture, and this
  * module consumes its typed events (`onCommitted` to create, `onChanged` to preview).
@@ -12,7 +12,7 @@ import type { SelectionHostCapability } from '@embedpdf/plugin-selection/contrac
 import type { AnnotationHostCapability } from '../host-contract';
 
 /**
- * Wire the selection → annotation BRIDGE. The markup / caret TOOLS and their
+ * Wire the selection → annotation bridge. The markup / caret tools and their
  * defaults are registered by the plugin `init` from the tool registry; this
  * function only consumes the selection plugin's typed signals — so call it from
  * `init` only when a selection plugin is present. Selection is the producer,
@@ -42,7 +42,7 @@ export function wireMarkup(
         ReturnType<typeof selection.listSegments>[number]['quad'][]
       > = {};
       for (const entry of selection.getSnapshot().pages) {
-        quadsByPage[entry.page.pageObjectNumber] = entry.segments.map((s) => s.quad);
+        quadsByPage[entry.page.pageObjectNumber] = entry.segments.map((segment) => segment.quad);
       }
       annotation.previewMarkup(previewSubtype, quadsByPage, tool.preset);
     } else {
@@ -82,7 +82,7 @@ export function wireMarkup(
             : { glyphQuad: last.quad, advance: last.advance };
         annotation.createReplaceText(
           entry.page,
-          entry.segments.map((s) => s.quad),
+          entry.segments.map((segment) => segment.quad),
           anchor,
           tool.preset,
         );
@@ -94,7 +94,7 @@ export function wireMarkup(
       annotation.createMarkup(
         tool.subtype,
         entry.page,
-        entry.segments.map((s) => s.quad),
+        entry.segments.map((segment) => segment.quad),
         tool.preset,
       );
     }

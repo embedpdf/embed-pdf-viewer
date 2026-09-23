@@ -8,7 +8,7 @@ import { AbortError } from '../promise/AbortError';
 import { PageListSnapshotSchema, PageNameResultSchema } from '../wire/schemas';
 
 /**
- * Named-pages conformance: the catalog's `/Names /Pages` registry as LAYOUT
+ * Named-pages conformance: the catalog's `/Names /Pages` registry as layout
  * data. Locks the invariants both engines must share — do not loosen
  * without re-reading `NamedPageEntry` and `PageNameResult`:
  *
@@ -16,7 +16,7 @@ import { PageListSnapshotSchema, PageNameResultSchema } from '../wire/schemas';
  *      registration resolves to a page in `pages`, a template, or is
  *      reported dangling — never silently dropped.
  *   2. `pages.setName()` creates or replaces by decoded key (idempotent),
- *      `replace` renames in one job, and the result IS the new layout.
+ *      `replace` renames in one job, and the result is the new layout.
  *   3. `pages.removeName()` drops the registration and nothing else.
  *   4. Deleting a page removes every registration pointing at it — inside
  *      the delete, with no plugin in the loop.
@@ -47,11 +47,11 @@ export function runNamedPagesConformance(
         const layout = await doc.pages.list();
         PageListSnapshotSchema.parse(layout);
         expect(Array.isArray(layout.namedPages)).toBe(true);
-        const pons = new Set(layout.pages.map((page) => page.ref.pageObjectNumber));
+        const pageObjectNumbers = new Set(layout.pages.map((page) => page.ref.pageObjectNumber));
         for (const entry of layout.namedPages ?? []) {
           expect(entry.name.length > 0).toBe(true);
           if (entry.target.kind === 'page') {
-            expect(pons.has(entry.target.page.pageObjectNumber)).toBe(true);
+            expect(pageObjectNumbers.has(entry.target.page.pageObjectNumber)).toBe(true);
           }
         }
       } finally {
@@ -84,7 +84,7 @@ export function runNamedPagesConformance(
           expect(created.cache.layoutVersion > 0).toBe(true);
         }
 
-        // The result IS the new layout.
+        // The result is the new layout.
         const listed = await doc.pages.list();
         expect(listed.namedPages).toEqual(created.layout.namedPages);
 

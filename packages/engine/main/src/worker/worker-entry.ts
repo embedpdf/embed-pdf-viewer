@@ -1,5 +1,5 @@
 /**
- * Web Worker bootstrap for engine-local, shipped as raw TS source AND used as
+ * Web Worker bootstrap for engine-local, shipped as raw TS source and used as
  * the entry for the built `workers/embedpdf-worker.js` artifact (see
  * scripts/build-workers.mjs).
  *
@@ -10,7 +10,7 @@
  * them. Reach for this only for a custom worker setup (CSP nonces, a shared
  * worker, a custom bundler pipeline, ...).
  *
- * Lives in src/ so consumers can import it as a worker source. It is NOT
+ * Lives in src/ so consumers can import it as a worker source. It is not
  * exported by index.ts. The actual bootstrap lives in `./bootstrap` so the
  * raw, built, and inline deliveries can never drift.
  */

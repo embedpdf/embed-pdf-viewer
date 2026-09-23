@@ -302,7 +302,7 @@ describe('share grants', () => {
     expect(session.status).toBe(200);
     expect((await usageSnapshot()).metrics['pdf.views']).toBe(before + 1);
 
-    // The share session establishing access is NOT a second view.
+    // The share session establishing access is not a second view.
     const access = await fetch(`${fx.baseUrl}/v1/access`, {
       method: 'POST',
       headers: {

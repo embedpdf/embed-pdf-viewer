@@ -20,10 +20,10 @@ import { createValidTestLicenseGate } from '../src/licensing/testing';
  * registered doc operation must exist on the wire at its method+path.
  *
  * The probe needs no seeded document or worker: with a valid API token
- * and a nonexistent docId, a MOUNTED route reaches the api-token
+ * and a nonexistent docId, a mounted route reaches the api-token
  * synthesis hook, which answers an app-envelope 404 (`error` is an
- * OBJECT); an UNMOUNTED path falls through to Fastify's router 404,
- * whose default body carries `error` as the STRING "Not Found".
+ * object); an unmounted path falls through to Fastify's router 404,
+ * whose default body carries `error` as the string "Not Found".
  */
 
 const API_TOKEN = 'doc-registry-root-token';

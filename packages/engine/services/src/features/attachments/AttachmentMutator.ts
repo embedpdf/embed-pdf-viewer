@@ -22,9 +22,9 @@ import { throwIfAborted } from '../../shared/abort';
  * write path (`writeAttachmentFilePayload`) with the file-attachment
  * annotation writer.
  *
- * Identity is the name-tree KEY (unique by construction), so unlike
+ * Identity is the name-tree key (unique by construction), so unlike
  * annotations there is no weak-ref/revision bookkeeping here. Note the
- * tree is key-sorted: both mutations shift OTHER entries' indices; keys
+ * tree is key-sorted: both mutations shift other entries' indices; keys
  * never move. Layer persistence (`finishMutation`) and event publication
  * happen in the callers, exactly like every other mutation family.
  */

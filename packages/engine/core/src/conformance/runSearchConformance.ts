@@ -257,7 +257,7 @@ export function runSearchConformance(
         });
         const key = (m: SearchMatch) => `${m.page.pageObjectNumber}:${m.charStart}:${m.charCount}`;
         const allKeys = new Set(all.matches.map(key));
-        // Each flag can only REMOVE matches, never invent them — true for
+        // Each flag can only remove matches, never invent them — true for
         // any fixture pattern, so the suite needs no per-fixture counts.
         for (const flags of [{ matchCase: true }, { wholeWord: true }]) {
           const restricted = await collectAll(doc, {
@@ -276,7 +276,7 @@ export function runSearchConformance(
       try {
         const key = (m: SearchMatch) => `${m.page.pageObjectNumber}:${m.charStart}:${m.charCount}`;
         const plain = await collectAll(doc, { query: { text: fixture.presentLiteral } });
-        // Dropping whitespace can only ADD matches over the collapsing default
+        // Dropping whitespace can only add matches over the collapsing default
         // fold — every default hit survives, at the same place.
         const relaxed = await collectAll(doc, {
           query: { text: fixture.presentLiteral, ignoreWhitespace: true },

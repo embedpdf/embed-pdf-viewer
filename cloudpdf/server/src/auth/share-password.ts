@@ -4,7 +4,7 @@ import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
  * Passphrase hashing for share grants.
  *
  * A share token is machine randomness and safe to store plaintext; a
- * grant passphrase is HUMAN-chosen — people reuse passwords from their
+ * grant passphrase is human-chosen — people reuse passwords from their
  * real lives — so the moment we accept one it gets password
  * discipline: scrypt with a per-grant salt, constant-time compare,
  * never logged, never returned by any read endpoint.

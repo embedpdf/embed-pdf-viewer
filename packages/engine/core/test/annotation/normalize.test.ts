@@ -16,7 +16,7 @@ import {
 import { AnnotationDraftSchema } from '../../src/wire';
 
 /** Minimal valid RGBA PNG built from scratch. */
-function makePng(width: number, height: number): Uint8Array {
+function makePng(width: number, height: number): Uint8Array<ArrayBuffer> {
   const crcTable = Array.from({ length: 256 }, (_, n) => {
     let c = n;
     for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;

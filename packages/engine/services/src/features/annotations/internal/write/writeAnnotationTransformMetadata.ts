@@ -7,36 +7,36 @@ import { EMBD_METADATA_SCHEMA_VERSION } from './writeEmbedMetadata';
 
 /**
  * Write the EmbedPDF transform keys under /EMBD_Metadata. This is the seam
- * PDFium's native AP generator reads to bake a ROTATED appearance:
+ * PDFium's native AP generator reads to bake a rotated appearance:
  *
  *   /EMBD_Metadata <<
  *     /Rotation      45                    % degrees, PDF convention (CCW)
- *     /UnrotatedRect [x0 y0 x1 y1]         % BOX kinds only — the logical box
+ *     /UnrotatedRect [x0 y0 x1 y1]         % box kinds only — the logical box
  *   >>
  *
- * The family split (see the v3 plan):
- *   - BOX kinds (square/circle/free-text): `/Rotation` + `/UnrotatedRect`.
- *     With BOTH present the AP generator emits an `/AP /Matrix` that rotates a
+ * The family split:
+ *   - box kinds (square/circle/free-text): `/Rotation` + `/UnrotatedRect`.
+ *     With both present the AP generator emits an `/AP /Matrix` that rotates a
  *     box-sized appearance about the box centre, and `/Rect` is the enclosing
  *     AABB. This is the portable, externally-correct rotation.
- *   - VERTEX kinds (line/polyline/polygon/ink): `/Rotation` ONLY (advisory).
+ *   - vertex kinds (line/polyline/polygon/ink): `/Rotation` only (advisory).
  *     The points are already rotated (they are the visual), so a lone
- *     `/Rotation` is INERT for the AP generator (it ignores `/Rotation` with no
+ *     `/Rotation` is inert for the AP generator (it ignores `/Rotation` with no
  *     `/UnrotatedRect`) — it just records the applied angle so EmbedPDF can
  *     reconstruct an oriented selection box + offer reset.
  *
  * Both fields follow the engine-wide tri-state law ("a patch touches what it
  * states, preserves what it omits"):
- *   - `undefined` → the key is UNTOUCHED (a rect-only move keeps its rotation).
- *   - `null` or `0` → CLEAR just that key via `EPDFAnnot_ClearEmbedMetadataKey`
+ *   - `undefined` → the key is untouched (a rect-only move keeps its rotation).
+ *   - `null` or `0` → clear just that key via `EPDFAnnot_ClearEmbedMetadataKey`
  *     (0 ≡ no rotation is the canonical identity, not a sentinel; never clear
  *     the whole dict — identity fields UserID/GroupID/CreatedBy/UpdatedBy must
  *     survive).
- *   - a value → SET the key. Setting a nonzero rotation with no
+ *   - a value → set the key. Setting a nonzero rotation with no
  *     `/UnrotatedRect` (neither in the patch nor already on the annotation)
  *     is an unsatisfiable state for the AP generator and throws `InvalidArg`.
  *
- * MUST run BEFORE `EPDFAnnot_GenerateAppearance` so the bake sees the rotation.
+ * Must run before `EPDFAnnot_GenerateAppearance` so the bake sees the rotation.
  * `/SchemaVersion` is seeded (stays 1) if this is the first key in the dict.
  */
 
@@ -48,7 +48,7 @@ const KEY_UNROTATED_RECT = 'UnrotatedRect';
 export interface AnnotationTransform {
   /** `/EMBD_Metadata/Rotation` — degrees, PDF convention. 0 ≡ none. */
   rotation?: number | null;
-  /** `/EMBD_Metadata/UnrotatedRect` — the logical box (BOX kinds only). */
+  /** `/EMBD_Metadata/UnrotatedRect` — the logical box (box kinds only). */
   unrotatedRect?: PdfRect | null;
 }
 
@@ -86,7 +86,7 @@ function setUnrotatedRect(
 }
 
 /**
- * Write transform metadata for a BOX kind (square/circle/free-text/stamp),
+ * Write transform metadata for a box kind (square/circle/free-text/stamp),
  * tri-state per field: `undefined` never touches the document (safe to call on
  * every patch), `null`/`0` clears, a value sets. A nonzero rotation with no
  * unrotated box anywhere (patch or annotation) is unsatisfiable — the AP
@@ -121,7 +121,7 @@ export function writeBoxTransformMetadata(
 }
 
 /**
- * Write the advisory `/Rotation` scalar for a VERTEX kind
+ * Write the advisory `/Rotation` scalar for a vertex kind
  * (line/polyline/polygon/ink), tri-state: `undefined` never touches the
  * document, `null`/`0` clears, a value sets. Whenever it does write, any
  * `/UnrotatedRect` is defensively cleared — that key is an impossible state on

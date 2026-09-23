@@ -1,22 +1,20 @@
 import { definePlugin } from '@embedpdf/core';
 
+import { ShellToken, type ShellCapability } from './contract';
 import { createShellController } from './controller';
-import { ShellToken } from './host-contract';
-import type { ShellHostCapability } from './host-contract';
-import { initialShellState, shellReducer } from './model';
-import type { ShellAction, ShellState } from './model';
+import { initialShellState, type ShellState } from './model';
 
 /**
- * The shell plugin: document-scoped (each document keeps its own panels, so
- * switching tabs restores them). Pure state, no effects — the app renders
- * surfaces; commands toggle them.
+ * The shell plugin: which surfaces (panels, modals, overlays) and menus are
+ * open. Document-scoped, so each document keeps its own panels and switching
+ * tabs restores them. The app renders the surfaces; the shell only stores
+ * their state.
  */
 export const shellPlugin = () =>
-  definePlugin<ShellState, ShellAction, ShellHostCapability>({
+  definePlugin<ShellState, ShellCapability>({
     id: 'shell',
     scope: 'document',
     token: ShellToken,
-    initialState: initialShellState,
-    reduce: shellReducer,
-    create: (ctx) => ({ api: createShellController(ctx) }),
+    state: initialShellState,
+    create: createShellController,
   });

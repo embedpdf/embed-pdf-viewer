@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import type { DocumentHandle, PdfEngine } from '@embedpdf/engine-core/runtime';
+import type { DocumentHandle, Engine } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '../src/index';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -20,13 +20,13 @@ const fixturePath = resolve(
 
 /**
  * The `security.allowsAnnotation*` mirrors on engine-local: every case
- * here exercises the SAME `checkCollab`/`checkSetGroup` resolvers the
+ * here exercises the same `checkCollab`/`checkSetGroup` resolvers the
  * annotation service enforces with, through a real WASM open — so
  * these are contract tests for the mirror wiring, not the resolver
  * (the resolver has its own unit suite in engine-core).
  */
 describe('security collab mirrors (engine-local, wasm runtime)', () => {
-  let engine: PdfEngine;
+  let engine: Engine;
   let bytes: Uint8Array;
   const handles: DocumentHandle[] = [];
 
@@ -82,7 +82,7 @@ describe('security collab mirrors (engine-local, wasm runtime)', () => {
     // The applicable narrowed grant shadows the coarse fallback…
     expect(doc.security.allowsAnnotationMutation('update', { userId: 'alice' })).toBe(false);
     expect(doc.security.allowsAnnotationMutation('update', {})).toBe(false);
-    // …but ONLY for its action: delete has no collab scope, falls back to modify.
+    // …but only for its action: delete has no collab scope, falls back to modify.
     expect(doc.security.allowsAnnotationMutation('delete', { userId: 'alice' })).toBe(true);
   });
 

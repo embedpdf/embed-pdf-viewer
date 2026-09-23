@@ -1,16 +1,16 @@
 /**
- * INTERNAL page shell — one per visible page, tracked by its page address so the instance
+ * Internal page shell — one per visible page, tracked by its page address so the instance
  * (and everything below) survives camera motion and page reorders.
  *
- * THE STABILITY INVARIANT (see page-context.ts): `page` (the context) and
- * `pageInjector` are created ONCE per surface. Camera frames arrive as new
+ * The stability invariant (see page-context.ts): `page` (the context) and
+ * `pageInjector` are created once per surface. Camera frames arrive as new
  * `vp` input values; only the signals inside the context change. Changing the
  * injector or context object identity would make `NgTemplateOutlet` recreate
  * the embedded views — destroying layers at 120Hz. Don't.
  *
  * Geometry mirrors React's PageSurface: the outer box = content footprint +
  * reserved chrome bands; the shadow is axis-aligned and stays put under
- * rotation; the content wrapper is the ONLY thing rotation turns, and carries
+ * rotation; the content wrapper is the only thing rotation turns, and carries
  * no transform at rotation 0 so it pixel-snaps like the shadow behind it.
  * All numbers come from the transform — never re-derive `* zoom` / `* dpr`.
  */
@@ -102,7 +102,7 @@ export class EpdfPageSurface {
     () => this.t().viewHeight + this.frame().top + this.frame().bottom,
   );
   // Center the (possibly rotated) content box on the display box and rotate
-  // about its center — NO translate(), so rotation 0 carries no transform.
+  // about its center — no translate(), so rotation 0 carries no transform.
   protected readonly contentLeft = computed(
     () => this.frame().left + (this.t().viewWidth - this.t().contentWidth) / 2,
   );
@@ -116,7 +116,7 @@ export class EpdfPageSurface {
 
   private readonly contentEl = viewChild.required<ElementRef<HTMLDivElement>>('content');
 
-  /** ONE stable context per surface — volatile parts are signals inside it. */
+  /** One stable context per surface — volatile parts are signals inside it. */
   readonly page: EpdfPageContext = createPageContext({
     documentId: () => this.documentId(),
     ref: () => this.vp().ref,
@@ -126,7 +126,7 @@ export class EpdfPageSurface {
     getRect: () => this.contentEl().nativeElement.getBoundingClientRect(),
   });
 
-  /** ONE stable injector per surface (see the invariant above), parented to
+  /** One stable injector per surface (see the invariant above), parented to
    *  this surface's node injector so layers also reach the kernel host. */
   protected readonly pageInjector = Injector.create({
     providers: [{ provide: EPDF_PAGE, useValue: this.page }],

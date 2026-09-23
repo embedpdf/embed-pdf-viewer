@@ -1,5 +1,5 @@
 /**
- * The annotation FLAGS section — a live test surface for `/F` (ISO 32000
+ * The annotation flags section — a live test surface for `/F` (ISO 32000
  * Table 167). Select any annotation(s) and toggle flags; the writes go through
  * the plugin's `updateSelectionFlags` (optimistic, flags-only engine patch),
  * and the reads come from `useSelectionFlags` (per-flag value, `null` when the

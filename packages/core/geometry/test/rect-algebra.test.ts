@@ -14,23 +14,23 @@ describe('rect algebra (y-down rects)', () => {
   });
 
   it('contains points on its edges and rejects those outside', () => {
-    const r = { x: 0, y: 0, width: 10, height: 5 };
-    expect(rectContains(r, { x: 10, y: 5 })).toBe(true);
-    expect(rectContains(r, { x: 10.1, y: 5 })).toBe(false);
+    const rect = { x: 0, y: 0, width: 10, height: 5 };
+    expect(rectContains(rect, { x: 10, y: 5 })).toBe(true);
+    expect(rectContains(rect, { x: 10.1, y: 5 })).toBe(false);
   });
 
   it('overlaps only with positive area', () => {
-    const r = { x: 0, y: 0, width: 10, height: 10 };
-    expect(rectsOverlap(r, { x: 9, y: 9, width: 5, height: 5 })).toBe(true);
-    expect(rectsOverlap(r, { x: 10, y: 0, width: 5, height: 5 })).toBe(false); // abutting
+    const rect = { x: 0, y: 0, width: 10, height: 10 };
+    expect(rectsOverlap(rect, { x: 9, y: 9, width: 5, height: 5 })).toBe(true);
+    expect(rectsOverlap(rect, { x: 10, y: 0, width: 5, height: 5 })).toBe(false); // abutting
   });
 });
 
 describe('PDF edges (y-up)', () => {
   it('overlap only with positive area — the collateral rule', () => {
-    const a = { left: 0, bottom: 0, right: 10, top: 10 };
-    expect(edgesOverlap(a, { left: 9, bottom: 9, right: 20, top: 20 })).toBe(true);
-    expect(edgesOverlap(a, { left: 10, bottom: 0, right: 20, top: 10 })).toBe(false);
+    const edges = { left: 0, bottom: 0, right: 10, top: 10 };
+    expect(edgesOverlap(edges, { left: 9, bottom: 9, right: 20, top: 20 })).toBe(true);
+    expect(edgesOverlap(edges, { left: 10, bottom: 0, right: 20, top: 10 })).toBe(false);
   });
 
   it('encloses a quad in its axis-aligned edges', () => {

@@ -17,7 +17,7 @@ export {
 export { normalizeStampDraft, normalizeStampPatch } from './normalize';
 
 /**
- * The kind module is WIRE-typed (schemas validate the post-normalization
+ * The kind module is wire-typed (schemas validate the post-normalization
  * form). The authoring types with inline bytes (`StampDraft`, `StampPatch`)
  * are swapped into the public `AnnotationDraft`/`AnnotationPatch` unions in
  * `kinds/index.ts`; `annotation/normalize.ts` bridges the two.

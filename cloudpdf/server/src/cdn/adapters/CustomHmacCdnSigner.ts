@@ -12,13 +12,13 @@
  *
  * Two transports — pick one based on what the edge can read:
  *   - 'query' (recommended) : ?cdn_sig=<sig>&cdn_exp=<expires>&cdn_nonce=<nonce>
- *                              appended to every CDN URL. ONE
+ *                              appended to every CDN URL. One
  *                              `signedPathPolicies` entry per granted
  *                              resource prefix — per-resource scope is
  *                              enforced at the edge because each prefix
  *                              has its own HMAC.
  *   - 'header'              : X-EmbedPDF-CDN-Signature: v1.<expires>.<nonce>.<sig>
- *                              attached to every CDN request. ONE
+ *                              attached to every CDN request. One
  *                              global signature over the doc-wide
  *                              prefix `/v1/docs/{id}/`. Use only when
  *                              the edge can't verify per-prefix query
@@ -37,9 +37,8 @@
  * Spec is versioned (prefix `v1.` in header / no version in query
  * params) so future format changes are detectable.
  *
- * Purge: when `purgeWebhookUrl` is set on the config, commit H will
- * POST to it; otherwise purge returns a `failed` receipt with a
- * helpful message. Today, both paths return `no-op`.
+ * Purge is not implemented: `purgeWebhookUrl` is accepted but never
+ * called, and purge always returns a `no-op` receipt.
  */
 
 import { randomBytes } from 'node:crypto';

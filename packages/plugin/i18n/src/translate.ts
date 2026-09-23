@@ -3,17 +3,16 @@ import type { I18nState } from './model';
 
 /**
  * The pure lookup core — state in, string out. No platform access anywhere
- * (`Intl.PluralRules` is core ECMAScript, not DOM); this is the part that
- * ports to Rust verbatim.
+ * (`Intl.PluralRules` is core ECMAScript, not DOM).
  */
 
 /** Walk a dotted path ('commands.zoom.in') through a dictionary tree. */
 function lookup(
-  dict: TranslationDictionary | undefined,
+  dictionary: TranslationDictionary | undefined,
   key: string,
 ): string | TranslationDictionary | undefined {
-  if (!dict) return undefined;
-  let node: string | TranslationDictionary | undefined = dict;
+  if (!dictionary) return undefined;
+  let node: string | TranslationDictionary | undefined = dictionary;
   for (const part of key.split('.')) {
     if (node === undefined || typeof node === 'string') return undefined;
     node = node[part];
@@ -21,8 +20,8 @@ function lookup(
   return node;
 }
 
-/** CLDR plural category for a count, with a safe fallback when the runtime
- *  lacks ICU data for the locale. */
+/** The locale's plural category for a count, with a safe fallback when the
+ *  runtime lacks plural data for the locale. */
 function pluralCategory(locale: string, count: number): string {
   try {
     return new Intl.PluralRules(locale).select(count);
@@ -45,7 +44,7 @@ function resolveNode(
   return undefined;
 }
 
-/** Replace `{slot}` markers; unknown slots stay verbatim (visible in QA). */
+/** Replace `{slot}` markers; unknown slots stay verbatim, so they stay visible in testing. */
 export function interpolate(text: string, params?: Record<string, string | number>): string {
   if (!params) return text;
   return text.replace(/\{(\w+)\}/g, (match, slot) =>

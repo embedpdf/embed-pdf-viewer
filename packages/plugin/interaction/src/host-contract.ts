@@ -1,4 +1,5 @@
-import type { CapabilityToken, EventHook, Unsubscribe } from '@embedpdf/core';
+import { createHostToken, type EventHook, type Unsubscribe } from '@embedpdf/core';
+
 import { InteractionToken as PublicInteractionToken } from './contract';
 import type { Cursor, InteractionCapability, InteractionHandler, PointerSample } from './contract';
 
@@ -18,10 +19,10 @@ export interface InteractionHostCapability extends InteractionCapability {
   claimCursor(token: string, cursor: Cursor | null, priority?: number): void;
   /** The resolved cursor string. */
   getCursor(): Cursor;
+  /** The resolved cursor changed. */
   readonly onCursorChanged: EventHook<{ readonly cursor: Cursor }>;
 }
 
-export const InteractionToken =
-  PublicInteractionToken as CapabilityToken<InteractionHostCapability>;
+export const InteractionToken = createHostToken<InteractionHostCapability>(PublicInteractionToken);
 // The host entry is a superset of the public contract: everything public is reachable here too.
 export * from './contract';

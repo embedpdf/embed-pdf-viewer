@@ -1,21 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { PluginContext } from '@embedpdf/core';
+import { createTestContext } from '@embedpdf/core/testing';
 import type {
   DocumentActionsSnapshot,
+  DocumentHandle,
   PdfActionNode,
   PdfActionTree,
   SubmitFormPayload,
 } from '@embedpdf/engine-core/runtime';
 
 import { createActionsController } from '../src/controller';
-import type {
-  ActionContext,
-  ActionDiagnostic,
-  ActionsAction,
-  ActionsConfig,
-  ActionsState,
-} from '../src/host-contract';
+import type { ActionContext, ActionDiagnostic, ActionsConfig } from '../src/host-contract';
 
 const USER: ActionContext = {
   origin: 'user',
@@ -29,10 +24,10 @@ const tree = (root: PdfActionNode | null): PdfActionTree => ({
   warningFlags: 0,
   warnings: [],
 });
-const js = (script: string, next: PdfActionNode[] = []): PdfActionNode => ({
+const script = (source: string, next: PdfActionNode[] = []): PdfActionNode => ({
   type: 'javascript',
   subtype: 'JavaScript',
-  script,
+  script: source,
   next,
 });
 const named = (name: string): PdfActionNode => ({
@@ -72,10 +67,11 @@ const submitNode = (payload: SubmitFormPayload | undefined): PdfActionNode => ({
 const tick = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
 /**
- * A doc-events harness: a fake document whose catalog carries the five
- * Table-200 trees (each a one-script JS tree logging its own name), an
- * optional OpenAction (the D1 ordering probe), an optional failing first
- * read (the D11 eviction probe), and an optional `forms.submit` home.
+ * A test document whose catalog carries the five ISO 32000-2 Table 200 trees
+ * (each a one-script JavaScript tree logging its own name), an optional
+ * OpenAction (to probe the open ordering), an optional failing first read
+ * (to probe the eviction of a failed catalog read), and an optional
+ * `forms.submit` home.
  */
 function docHarness(options: {
   config?: ActionsConfig;
@@ -93,7 +89,8 @@ function docHarness(options: {
     openDestination: null,
     ...(options.trees ?? {}),
   };
-  const ctx = {
+  const ctx = createTestContext<void>({
+    id: 'actions',
     doc: {
       actions: {
         read: () => {
@@ -108,13 +105,11 @@ function docHarness(options: {
         list: async () => ({ fields: [] }),
         ...(options.formsSubmit ? { submit: options.formsSubmit } : {}),
       },
-    },
-    documentId: 'doc-1',
-    dispatch: vi.fn(),
-    tryGet: () => null,
-    cleanup: () => undefined,
-  } as unknown as PluginContext<ActionsState, ActionsAction>;
-  const capability = createActionsController(ctx, { openSequence: 'off', ...options.config });
+    } as unknown as Partial<DocumentHandle>,
+  });
+  const capability = ctx.connect(
+    createActionsController(ctx, { openSequence: 'off', ...options.config }),
+  );
   const log: string[] = [];
   capability.registerExecutor('javascript', (node) => {
     if (node.type === 'javascript') log.push(node.script);
@@ -125,15 +120,15 @@ function docHarness(options: {
   return { capability, log, diagnostics, readCallCount: () => readCalls };
 }
 
-describe('document lifecycle events (WC/WS/DS/WP/DP)', () => {
+describe('document lifecycle events (/WC, /WS, /DS, /WP, /DP)', () => {
   it('resolves each of the five catalog trees through dispatch', async () => {
     const { capability, log } = docHarness({
       trees: {
-        willSave: tree(js('ws')),
-        didSave: tree(js('ds')),
-        willPrint: tree(js('wp')),
-        didPrint: tree(js('dp')),
-        willClose: tree(js('wc')),
+        willSave: tree(script('ws')),
+        didSave: tree(script('ds')),
+        willPrint: tree(script('wp')),
+        didPrint: tree(script('dp')),
+        willClose: tree(script('wc')),
       },
     });
     for (const event of [
@@ -149,11 +144,11 @@ describe('document lifecycle events (WC/WS/DS/WP/DP)', () => {
     expect(log).toEqual(['ws', 'ds', 'wp', 'dp', 'wc']);
   });
 
-  it('D1: a first will-save under openSequence auto runs the OpenAction FIRST', async () => {
+  it('a first will-save under openSequence auto runs the OpenAction first', async () => {
     const { capability, log } = docHarness({
       config: { openSequence: 'auto' },
-      openAction: tree(js('open')),
-      trees: { willSave: tree(js('ws')) },
+      openAction: tree(script('open')),
+      trees: { willSave: tree(script('ws')) },
     });
     // No adapter, no user activity — the open latch is still armed.
     await capability.dispatch({ scope: 'document', event: 'will-save' });
@@ -161,12 +156,14 @@ describe('document lifecycle events (WC/WS/DS/WP/DP)', () => {
     // And the sequence counts as fired: a document-open trigger replays inert.
     const replay = await capability.dispatch({ scope: 'document', event: 'open' });
     expect(replay.status).toBe('inert');
-    expect(replay.diagnostics.some((d) => d.code === 'open-sequence-replayed')).toBe(true);
+    expect(
+      replay.diagnostics.some((diagnostic) => diagnostic.code === 'open-sequence-replayed'),
+    ).toBe(true);
   });
 
-  it('D2: two concurrent runDocumentVerb(save) calls fully serialize', async () => {
+  it('two concurrent runDocumentVerb(save) calls fully serialize', async () => {
     const { capability, log } = docHarness({
-      trees: { willSave: tree(js('ws')), didSave: tree(js('ds')) },
+      trees: { willSave: tree(script('ws')), didSave: tree(script('ds')) },
     });
     let releaseFirst!: () => void;
     const gate = new Promise<void>((resolve) => (releaseFirst = resolve));
@@ -189,16 +186,16 @@ describe('document lifecycle events (WC/WS/DS/WP/DP)', () => {
     expect(log).toEqual(['ws', 'op1', 'op1-done', 'ds', 'ws', 'op2', 'ds']);
   });
 
-  it('D3: the Print verb runs WP → adapter (exactly once) → DP; a nested Print is suppressed', async () => {
+  it('the Print verb runs /WP → adapter (exactly once) → /DP; a nested Print is suppressed', async () => {
     const { capability, log, diagnostics } = docHarness({
-      // The WP tree itself chains into a nested Named Print — the
-      // reentrancy probe. Policy admits lifecycle prints HERE so the probe
-      // reaches the LATCH (the default lifecycle row would block it a layer
-      // earlier — also fine, but this test pins the latch itself).
+      // The /WP tree itself chains into a nested Named Print: the reentrancy
+      // probe. Policy admits lifecycle prints here so the probe reaches the
+      // latch (the default lifecycle row would block it a layer earlier,
+      // which is also fine, but this test pins the latch itself).
       config: { policy: { print: { user: 'adapter', hover: 'block', lifecycle: 'adapter' } } },
       trees: {
-        willPrint: tree(js('wp', [named('Print')])),
-        didPrint: tree(js('dp')),
+        willPrint: tree(script('wp', [named('Print')])),
+        didPrint: tree(script('dp')),
       },
     });
     const print = vi.fn(() => log.push('print'));
@@ -206,13 +203,13 @@ describe('document lifecycle events (WC/WS/DS/WP/DP)', () => {
     const result = await capability.execute(tree(named('Print')), USER);
     expect(print).toHaveBeenCalledTimes(1);
     expect(log).toEqual(['wp', 'print', 'dp']);
-    expect(diagnostics.some((d) => d.code === 'reentrant-print')).toBe(true);
+    expect(diagnostics.some((diagnostic) => diagnostic.code === 'reentrant-print')).toBe(true);
     expect(result.nodes[0]?.status).toBe('executed');
   });
 
-  it('D3: an adapter throw skips DP (the latch still resets)', async () => {
+  it('an adapter throw skips /DP (the latch still resets)', async () => {
     const { capability, log } = docHarness({
-      trees: { willPrint: tree(js('wp')), didPrint: tree(js('dp')) },
+      trees: { willPrint: tree(script('wp')), didPrint: tree(script('dp')) },
     });
     capability.setUiAdapter({
       openUri: vi.fn(),
@@ -228,8 +225,8 @@ describe('document lifecycle events (WC/WS/DS/WP/DP)', () => {
     expect(log).toEqual(['wp', 'wp', 'print-2', 'dp']);
   });
 
-  it('D2: a before-event failure never cancels the operation', async () => {
-    const { capability, log } = docHarness({ trees: { willSave: tree(js('ws')) } });
+  it('a before-event failure never cancels the operation', async () => {
+    const { capability, log } = docHarness({ trees: { willSave: tree(script('ws')) } });
     capability.registerExecutor('javascript', () => ({ status: 'failed', error: 'ws broke' }));
     const value = await capability.runDocumentVerb('save', () => {
       log.push('op');
@@ -239,9 +236,9 @@ describe('document lifecycle events (WC/WS/DS/WP/DP)', () => {
     expect(log).toEqual(['op']);
   });
 
-  it('D2: an operation throw skips the after-event and rethrows', async () => {
+  it('an operation throw skips the after-event and rethrows', async () => {
     const { capability, log } = docHarness({
-      trees: { willSave: tree(js('ws')), didSave: tree(js('ds')) },
+      trees: { willSave: tree(script('ws')), didSave: tree(script('ds')) },
     });
     await expect(
       capability.runDocumentVerb('save', () => {
@@ -255,7 +252,7 @@ describe('document lifecycle events (WC/WS/DS/WP/DP)', () => {
   it('honors triggers.document: false — trees skipped, operation still runs', async () => {
     const { capability, log } = docHarness({
       config: { triggers: { document: false } },
-      trees: { willSave: tree(js('ws')), didSave: tree(js('ds')) },
+      trees: { willSave: tree(script('ws')), didSave: tree(script('ds')) },
     });
     const value = await capability.runDocumentVerb('save', () => {
       log.push('op');
@@ -265,24 +262,26 @@ describe('document lifecycle events (WC/WS/DS/WP/DP)', () => {
     expect(log).toEqual(['op']);
     const dispatched = await capability.dispatch({ scope: 'document', event: 'will-save' });
     expect(dispatched.status).toBe('inert');
-    expect(dispatched.diagnostics.some((d) => d.code === 'trigger-disabled')).toBe(true);
+    expect(
+      dispatched.diagnostics.some((diagnostic) => diagnostic.code === 'trigger-disabled'),
+    ).toBe(true);
   });
 
-  it('prepareClose runs the WC tree through the same door', async () => {
-    const { capability, log } = docHarness({ trees: { willClose: tree(js('wc')) } });
+  it('prepareClose runs the /WC tree through the same door', async () => {
+    const { capability, log } = docHarness({ trees: { willClose: tree(script('wc')) } });
     const result = await capability.prepareClose();
     expect(result.status).toBe('executed');
     expect(log).toEqual(['wc']);
   });
 
-  it('D11: a rejected catalog read is evicted — the next event retries', async () => {
+  it('a rejected catalog read is evicted: the next event retries', async () => {
     const { capability, log, diagnostics, readCallCount } = docHarness({
       readFailsFirst: true,
-      trees: { willSave: tree(js('ws')) },
+      trees: { willSave: tree(script('ws')) },
     });
     const first = await capability.dispatch({ scope: 'document', event: 'will-save' });
     expect(first.status).toBe('inert');
-    expect(diagnostics.some((d) => d.code === 'trigger-failed')).toBe(true);
+    expect(diagnostics.some((diagnostic) => diagnostic.code === 'trigger-failed')).toBe(true);
     const second = await capability.dispatch({ scope: 'document', event: 'will-save' });
     expect(second.status).toBe('executed');
     expect(log).toEqual(['ws']);
@@ -295,34 +294,41 @@ describe('the submit sink chain', () => {
     const noResolver = docHarness({});
     const result = await noResolver.capability.execute(tree(submitNode(submitPayload())), USER);
     expect(result.nodes[0]?.status).toBe('blocked');
-    expect(noResolver.diagnostics.some((d) => d.code === 'no-submit-resolver')).toBe(true);
+    expect(
+      noResolver.diagnostics.some((diagnostic) => diagnostic.code === 'no-submit-resolver'),
+    ).toBe(true);
 
     const noSink = docHarness({});
-    noSink.capability.registerSubmitResolver(async (intent, actionCtx) => ({
+    noSink.capability.registerSubmitResolver(async (intent, actionContext) => ({
       url: intent.url,
       method: intent.method,
       format: intent.format,
       flagsRaw: intent.flagsRaw,
       entries: [{ name: 'plain', value: 'visible' }],
-      origin: actionCtx.origin,
-      event: actionCtx.event,
+      origin: actionContext.origin,
+      event: actionContext.event,
     }));
     const blocked = await noSink.capability.execute(tree(submitNode(submitPayload())), USER);
     expect(blocked.nodes[0]?.status).toBe('blocked');
-    expect(noSink.diagnostics.some((d) => d.code === 'no-submit-sink')).toBe(true);
+    expect(noSink.diagnostics.some((diagnostic) => diagnostic.code === 'no-submit-sink')).toBe(
+      true,
+    );
   });
 
   it('the document home is sink 2: awaited, real result, real request shape', async () => {
-    const formsSubmit = vi.fn(async () => ({ submissionId: 's-1', receivedAt: 'now' }));
+    const formsSubmit = vi.fn(async (_request: unknown) => ({
+      submissionId: 's-1',
+      receivedAt: 'now',
+    }));
     const { capability } = docHarness({ formsSubmit });
-    capability.registerSubmitResolver(async (intent, actionCtx) => ({
+    capability.registerSubmitResolver(async (intent, actionContext) => ({
       url: intent.url,
       method: intent.method,
       format: intent.format,
       flagsRaw: intent.flagsRaw,
       entries: [{ name: 'plain', value: 'visible' }],
-      origin: actionCtx.origin,
-      event: actionCtx.event,
+      origin: actionContext.origin,
+      event: actionContext.event,
     }));
     const result = await capability.execute(tree(submitNode(submitPayload())), USER);
     expect(result.nodes[0]?.status).toBe('executed');
@@ -337,39 +343,39 @@ describe('the submit sink chain', () => {
   it('an installed handler BEATS the home (explicit beats ambient) and can delegate', async () => {
     const formsSubmit = vi.fn(async () => ({ submissionId: 's-2', receivedAt: 'now' }));
     const { capability } = docHarness({ formsSubmit });
-    capability.registerSubmitResolver(async (intent, actionCtx) => ({
+    capability.registerSubmitResolver(async (intent, actionContext) => ({
       url: intent.url,
       method: intent.method,
       format: intent.format,
       flagsRaw: intent.flagsRaw,
       entries: [],
-      origin: actionCtx.origin,
-      event: actionCtx.event,
+      origin: actionContext.origin,
+      event: actionContext.event,
     }));
     let delegate: (() => Promise<unknown>) | null = null;
-    const handler = vi.fn((_request, handlerCtx) => {
-      delegate = handlerCtx.submitToDocumentHome;
+    const handler = vi.fn((_request, chain) => {
+      delegate = chain.submitToDocumentHome;
     });
     capability.setSubmitHandler(handler);
     const result = await capability.execute(tree(submitNode(submitPayload())), USER);
     expect(result.nodes[0]?.status).toBe('executed');
     expect(handler).toHaveBeenCalledTimes(1);
     expect(formsSubmit).not.toHaveBeenCalled(); // the home never auto-fires
-    expect(delegate).not.toBeNull(); // ...but the handler CAN compose
+    expect(delegate).not.toBeNull(); // ...but the handler can compose
     await delegate!();
     expect(formsSubmit).toHaveBeenCalledTimes(1);
   });
 
   it('handler contract: sync throw fails the node; detached rejection is diagnostic-only', async () => {
     const thrower = docHarness({});
-    thrower.capability.registerSubmitResolver(async (intent, actionCtx) => ({
+    thrower.capability.registerSubmitResolver(async (intent, actionContext) => ({
       url: intent.url,
       method: intent.method,
       format: intent.format,
       flagsRaw: intent.flagsRaw,
       entries: [],
-      origin: actionCtx.origin,
-      event: actionCtx.event,
+      origin: actionContext.origin,
+      event: actionContext.event,
     }));
     thrower.capability.setSubmitHandler(() => {
       throw new Error('sync refuse');
@@ -378,14 +384,14 @@ describe('the submit sink chain', () => {
     expect(failed.nodes[0]?.status).toBe('failed');
 
     const detached = docHarness({});
-    detached.capability.registerSubmitResolver(async (intent, actionCtx) => ({
+    detached.capability.registerSubmitResolver(async (intent, actionContext) => ({
       url: intent.url,
       method: intent.method,
       format: intent.format,
       flagsRaw: intent.flagsRaw,
       entries: [],
-      origin: actionCtx.origin,
-      event: actionCtx.event,
+      origin: actionContext.origin,
+      event: actionContext.event,
     }));
     detached.capability.setSubmitHandler(() => Promise.reject(new Error('late network error')));
     const result = await detached.capability.execute(tree(submitNode(submitPayload())), USER);
@@ -395,7 +401,8 @@ describe('the submit sink chain', () => {
     await tick();
     expect(
       detached.diagnostics.some(
-        (d) => d.code === 'executor-failed' && d.message.includes('detached'),
+        (diagnostic) =>
+          diagnostic.code === 'executor-failed' && diagnostic.message.includes('detached'),
       ),
     ).toBe(true);
   });

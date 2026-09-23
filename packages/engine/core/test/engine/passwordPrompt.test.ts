@@ -3,7 +3,7 @@
  * in the function's docstring has a test here so future edits can't
  * silently change the contract local + cloud both rely on.
  *
- * If you change a mapping rule, this test MUST be updated explicitly
+ * If you change a mapping rule, this test must be updated explicitly
  * — and that's the point.
  */
 import { describe, expect, it } from 'vitest';

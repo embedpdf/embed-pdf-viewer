@@ -31,9 +31,9 @@ export interface TextDraft extends AnnotationDraftBase, ColorStyleDraftFields {
   /** `/Name` icon. Default `'note'` (the ISO 32000 default). */
   icon?: NoteIcon;
   /**
-   * Write `/State` + `/StateModel`, making this draft an ISO 32000
-   * §12.5.6.3 review-status reply (pair with `inReplyTo` → the annotation
-   * under review). `state` requires `stateModel` — the engine throws
+   * Write `/State` + `/StateModel`, making this draft an
+   * ISO 32000 §12.5.6.3 review-status reply (pair with `inReplyTo` → the
+   * annotation under review). `state` requires `stateModel` — the engine throws
    * `InvalidArg` otherwise. `stateModel` alone is valid: the model's
    * default state applies (`none` for review, `unmarked` for marked).
    */

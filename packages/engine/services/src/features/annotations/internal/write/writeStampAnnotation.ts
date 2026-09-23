@@ -211,16 +211,16 @@ interface StampBox {
 /**
  * Author a stamp's appearance from `source`, correct under rotation.
  *
- * The appearance MUST be built in the UNROTATED frame and rotated by an
+ * The appearance must be built in the unrotated frame and rotated by an
  * `/AP /Matrix` afterwards — the "FreeText pattern" the stamp draft documents.
  * If instead the image is fit into the rotated AABB `/Rect` (a portrait box for
  * a landscape image, say), the letterboxed bands get baked into the appearance,
  * and the closing native re-fit — which records `EPDFOrigContentRect` from that
  * padded box and then fits it into the unrotated box — shrinks the image by the
- * aspect ratio a SECOND time. The result is a small image adrift in white
+ * aspect ratio a second time. The result is a small image adrift in white
  * padding, and only when rotated (at 0° the two frames coincide, so it fills).
  *
- * So for a rotated stamp we: author the image into the UNROTATED box with no
+ * So for a rotated stamp we: author the image into the unrotated box with no
  * rotation metadata active (its recorded `EPDFOrigContentRect` is the
  * image-filled logical box), then write the rotation metadata, set the real
  * AABB `/Rect`, and re-fit once — which bakes the `/Matrix` and leaves the
@@ -284,8 +284,8 @@ function setStampContent(
     appendImageObject(fn, mem, annotPtr, ctx.docPtr, ctx.pagePtr, resource.bytes, meta, rect, fit);
   }
 
-  // Normalises the AP (BBox, EPDFOrigContentRect for future re-fits) and
-  // applies any /EMBD_Metadata rotation — same closing step as v2.
+  // Normalises the AP (BBox, EPDFOrigContentRect for later re-fits) and
+  // applies any /EMBD_Metadata rotation.
   refitAppearance(fn, annotPtr, fit);
 }
 
@@ -302,7 +302,7 @@ function refitAppearance(fn: PdfFunctions, annotPtr: Ptr, fit: StampFit): void {
  * PNG/JPEG → image object appended to the appearance.
  *
  * The AP's coordinate space aligns with page space (its BBox is the annot
- * `/Rect`, same as v2), so the image must be painted INSIDE `/Rect` or it
+ * `/Rect`), so the image must be painted inside `/Rect` or it
  * falls outside the form's clip and renders blank. The `fit` placement is
  * computed here from the sniffed intrinsic dimensions; the closing
  * `EPDFAnnot_UpdateAppearanceToRect` pass then normalises the BBox and
@@ -408,8 +408,8 @@ function setImageMatrix(
 }
 
 /**
- * Single-page PDF → deep-cloned Form XObject as AP/N (the v2 rubber-stamp
- * path). The source buffer must stay alive until the temp document closes.
+ * Single-page PDF → deep-cloned Form XObject as AP/N. The source buffer
+ * must stay alive until the temp document closes.
  */
 function setAppearanceFromPdfBytes(
   fn: PdfFunctions,

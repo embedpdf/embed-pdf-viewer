@@ -1,7 +1,7 @@
 /**
  * @embedpdf/plugin-shell/contract — the workbench's surface state, and
  * nothing else. A "surface" is anything the app shows or hides by name: a
- * sidebar panel, a modal, an overlay. The plugin stores WHICH surfaces are
+ * sidebar panel, a modal, an overlay. The plugin stores which surfaces are
  * open; the app owns their DOM entirely. Document-scoped: each document keeps
  * its own panels, so switching tabs restores them — and the state is plain
  * serializable data, so applications can snapshot and restore it.

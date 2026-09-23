@@ -27,9 +27,9 @@ export function useActions(): ActionsCapability {
   return useCapability(ActionsToken);
 }
 
-/** Subscribe to one actions event for the mounted lifetime: `useActionsEvent((c) => c.onExecuted, handler)`. */
+/** Subscribe to one actions event for the mounted lifetime: `useActionsEvent((actions) => actions.onExecuted, handler)`. */
 export function useActionsEvent<T>(
-  select: (cap: ActionsCapability) => EventHook<T>,
+  select: (actions: ActionsCapability) => EventHook<T>,
   handler: (event: T) => void,
 ): void {
   useCapabilityEvent(ActionsToken, select, handler);
@@ -40,11 +40,11 @@ export type ActionsUiHandlers = Partial<ActionUiAdapter>;
 
 /**
  * Install the UI adapter for the active document's action dispatcher. The
- * DEFAULT policy — the origin×phase visibility matrix, sanitizeExternalUri
+ * default policy — the origin×phase visibility matrix, sanitizeExternalUri
  * URI opens, browser print/alert fallbacks — is `@embedpdf/web`'s
- * `createDefaultActionsUiAdapter`, written ONCE for every binding; this
+ * `createDefaultActionsUiAdapter`, written once for every binding; this
  * hook is React glue only (late-bound handlers, stage navigation,
- * identity-safe install/uninstall). The doc.print AUTHORITY gate is
+ * identity-safe install/uninstall). The doc.print authority gate is
  * upstream (the actions plugin) and not overridable.
  */
 export function useActionsUiAdapter(handlers?: ActionsUiHandlers): void {

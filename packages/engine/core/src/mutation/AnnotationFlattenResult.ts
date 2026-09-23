@@ -22,7 +22,7 @@ export interface AnnotationFlattenItemResult {
 
 /**
  * Result of `page(pon).annotations.flatten()` — `pages.flatten` for a chosen
- * set. A content + annotation mutation of ONE page: `meta` carries that
+ * set. A content + annotation mutation of one page: `meta` carries that
  * page's new pins (null when nothing was applied), exactly like
  * `PageFlattenResult`.
  */

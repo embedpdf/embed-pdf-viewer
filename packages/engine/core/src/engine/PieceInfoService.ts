@@ -3,7 +3,7 @@ import { AbortablePromise } from '../promise/AbortablePromise';
 
 /**
  * Access to `/PieceInfo` private application data (ISO 32000 §14.5). The
- * SAME interface serves both levels — `DocumentHandle.pieceInfo?` reads and
+ * same interface serves both levels — `DocumentHandle.pieceInfo?` reads and
  * writes the catalog's `/PieceInfo`, `PageHandle.pieceInfo?` the page's —
  * mirroring the native API's doc/page symmetry.
  *

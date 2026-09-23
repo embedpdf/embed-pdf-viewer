@@ -1,8 +1,8 @@
 /**
- * Behavioral latch: flips when initial placement STARTS, while `state.placed`
- * is the render-commit latch that flips only after placement finishes. The
- * distinction keeps placement-time camera behavior unchanged while making
- * partial geometry unobservable to renderers.
+ * The behavioral placement latch: it flips when initial placement starts,
+ * while `StageState.placed` is the render-commit latch that flips only after
+ * placement finishes. Camera behavior keys on this one; renderers key on
+ * `placed`, so partial geometry is never observable.
  */
 export interface PlacementLatch {
   started: boolean;

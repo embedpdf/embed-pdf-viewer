@@ -78,17 +78,17 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     return AbortablePromise.run<AnnotationListPageSnapshot>(async (signal) => {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        const pon = this.pageRef.pageObjectNumber;
-        const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pon);
+        const pageObjectNumber = this.pageRef.pageObjectNumber;
+        const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pageObjectNumber);
         if (!page) {
           throw new EngineError(
             EngineErrorCode.NotFound,
-            `no page with object number ${pon} in document ${this.docId}`,
+            `no page with object number ${pageObjectNumber} in document ${this.docId}`,
           );
         }
         // Plane-scope rule: the list depends on the `annotations` plane. A
         // base's own annotations (weak-identity ones included) are simply
-        // VISIBLE through an inheriting layer, so every visitor reads ONE
+        // visible through an inheriting layer, so every visitor reads one
         // doc-level URL served from the base session.
         return planesInherited(manifest, ['annotations'])
           ? wirePaths.docPageAnnotations(this.docId, this.pageRef, page.cache.annotationVersion)
@@ -136,12 +136,12 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       const format: PageNetworkRenderFormat = options.format ?? 'webp';
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        const pon = this.pageRef.pageObjectNumber;
-        const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pon);
+        const pageObjectNumber = this.pageRef.pageObjectNumber;
+        const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pageObjectNumber);
         if (!page) {
           throw new EngineError(
             EngineErrorCode.NotFound,
-            `no page with object number ${pon} in document ${this.docId}`,
+            `no page with object number ${pageObjectNumber} in document ${this.docId}`,
           );
         }
         const wireToken = annotationAppearancesImageOptionsToWire(
@@ -205,7 +205,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     return AbortablePromise.run<AttachmentContent>(async (signal) => {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        // A FileAttachment annotation's bytes depend on BOTH planes —
+        // A FileAttachment annotation's bytes depend on both planes —
         // the annotation must exist in this view (`annotations`) and the
         // byte pin is `attachmentsVersion` (`attachments`).
         return planesInherited(manifest, ['annotations', 'attachments'])

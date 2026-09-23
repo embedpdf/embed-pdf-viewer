@@ -1,20 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { PluginContext } from '@embedpdf/core';
+import { createTestContext } from '@embedpdf/core/testing';
 import type { ScriptDiagnostic } from '@embedpdf/core-acrojs';
+import type { DocumentHandle } from '@embedpdf/engine-core/runtime';
 
 import { createActionsController } from '../src/controller';
-import type { ActionsAction, ActionsState } from '../src/host-contract';
 
 function harness() {
-  const ctx = {
-    doc: { forms: { list: async () => ({ fields: [] }) } },
-    documentId: 'doc-1',
-    dispatch: vi.fn(),
-    tryGet: () => null,
-    cleanup: () => {},
-  } as unknown as PluginContext<ActionsState, ActionsAction>;
-  return createActionsController(ctx);
+  const ctx = createTestContext<void>({
+    id: 'actions',
+    doc: { forms: { list: async () => ({ fields: [] }) } } as unknown as Partial<DocumentHandle>,
+  });
+  return ctx.connect(createActionsController(ctx));
 }
 
 describe('detached-realm script surfaces', () => {
@@ -104,7 +101,7 @@ describe('detached-realm script surfaces', () => {
     capability.setUiAdapter({
       openUri: vi.fn(),
       print: vi.fn(),
-      alert: (_message, opts) => seen.push(opts.phase),
+      alert: (_message, options) => seen.push(options.phase),
     });
     capability.surfaceScriptCommit(
       {

@@ -3,7 +3,7 @@
  * application code (toolbars, sidebars, app logic). Resolve it with the
  * token exported here or from the package root. Framework-only plumbing
  * (render projection, pointer gestures, behavior registration) lives on the
- * host lens in `./host-contract`; both are the SAME runtime object, two typed
+ * host lens in `./host-contract`; both are the same runtime object, two typed
  * lenses on one token, so app code simply can't see the host methods.
  */
 import type {
@@ -11,6 +11,7 @@ import type {
   ChangeOrigin,
   EventHook,
   OperationOptions,
+  PluginErrorInfo,
   ResourceStatus,
   Unsubscribe,
 } from '@embedpdf/core';
@@ -20,7 +21,7 @@ import type {
   AnnotationPropsPatch,
   Callout,
   CreationDraftAnchor,
-  Geom,
+  ContentGeometry,
   Id,
   PropKey,
   PropSpec,
@@ -28,7 +29,6 @@ import type {
   SnapSettings,
   Subtype,
   TextQuad,
-  Vec,
 } from '@embedpdf/core-annotation';
 import type { PageRotation, Point } from '@embedpdf/core-geometry';
 import type {
@@ -86,7 +86,7 @@ export { ARMED_STAMP_TOOL_ID } from './tools/definitions';
 
 /**
  * Selection-chrome settings: the outline, resize/vertex handles, and the rotate
- * knob. ONE unit story — every length is CSS px, screen-constant across zoom
+ * knob. One unit story — every length is CSS px, screen-constant across zoom
  * (the plugin converts to content units per event/page via the view scale).
  * Every color falls back to `accent`, so the common case is one line:
  * `annotationPlugin({ chrome: { accent: '#e91e63' } })`. Deep-partial merged
@@ -97,7 +97,7 @@ export interface ChromeSettings {
   /** The one color every chrome piece derives from unless overridden. */
   accent: string;
   outline: {
-    /** ONE style at rest AND while rotated — the box never flips style mid-gesture. */
+    /** One style at rest and while rotated — the box never flips style mid-gesture. */
     style: 'solid' | 'dashed';
     /** Stroke width, px. */
     width: number;
@@ -155,24 +155,6 @@ export interface ChromeSettingsPatch {
   guides?: Partial<ChromeSettings['guides']>;
 }
 
-/**
- * Whole-document annotation hydration. The plugin always hydrates ALL
- * pages through `doc.annotations.listRawAll()` (one bulk request on
- * cloud, one worker job locally) — a comments sidebar needs every page,
- * and per-page lazy loading could never truthfully claim completeness.
- * `loading` covers the initial ingest AND a desync re-ingest; `error`
- * means live events still apply but the whole-document view is
- * incomplete until a rehydrate succeeds.
- */
-export type AnnotationHydration =
-  | { status: 'loading' }
-  | { status: 'complete' }
-  | { status: 'error'; error: unknown }
-  // The scope lacks `doc.annotate.read`: hydration never runs (no doomed
-  // request), the comments panel hides, and `rehydrate` re-checks — the
-  // state clears if an /access refresh grants read later.
-  | { status: 'forbidden' };
-
 /** The armed tool's would-be placement under the cursor (content space). */
 export type ToolGhost = {
   page: PageRef;
@@ -182,7 +164,7 @@ export type ToolGhost = {
   rot: number;
 } & (
   | { kind: 'image' } // the armed stamp raster — framework blits it
-  | { kind: 'vector'; toolId: string; geom: Geom } // painted via pageItems/scene
+  | { kind: 'vector'; toolId: string; geometry: ContentGeometry } // painted via pageItems/scene
 );
 
 /** Registration options for {@link annotationPlugin} — the initial values of the
@@ -205,8 +187,8 @@ export interface AnnotationConfig {
   /** Selection-chrome styling + grab geometry (all lengths CSS px). */
   chrome?: ChromeSettingsPatch;
   /**
-   * Add or configure authoring tools at load. Entries MERGE over the built-ins by
-   * id (configure one — `{ id: 'ink', defaults: { strokeWidth: 6 } }`), ADD a new
+   * Add or configure authoring tools at load. Entries merge over the built-ins by
+   * id (configure one — `{ id: 'ink', defaults: { strokeWidth: 6 } }`), add a new
    * tool (a fresh id), or make a preset with `extends`
    * (`{ id: 'arrow', extends: 'line', defaults: { lineEndings: { end: 'open-arrow' } } }`).
    * See {@link AnnotationToolDef}. The runtime equivalent is
@@ -217,7 +199,7 @@ export interface AnnotationConfig {
 
 /**
  * One clickable link area on a page (content space): a standalone link
- * annotation, or one segment of a parent's ATTACHED link. See
+ * annotation, or one segment of a parent's attached link. See
  * {@link AnnotationHostCapability.linkItemsOn}.
  */
 export interface LinkNavItem {
@@ -227,8 +209,8 @@ export interface LinkNavItem {
   bounds: Rect;
   target: PdfLinkTarget;
   /**
-   * True for a link CHILD riding an editable annotation (an `/RT /Group`
-   * subordinate) — a PROPERTY of its parent while authoring, a nav behavior
+   * True for a link child riding an editable annotation (an `/RT /Group`
+   * subordinate) — a property of its parent while authoring, a nav behavior
    * only while reading. The nav layer stands its anchors down for attached
    * items whenever the active tool enables `annotation-edit`, so the parent
    * stays selectable/movable; standalone document links navigate regardless.
@@ -241,22 +223,22 @@ export interface LinkNavItem {
   ref?: AnnotationRef;
   /** Which `/AA` hover trees this link carries — the nav layer's pump flags
    *  (tree-less hover must cost zero dispatches). Links are behavior-inert
-   *  to the annotation plane's hover feed while navigable, so THEIR
+   *  to the annotation plane's hover feed while navigable, so their
    *  cursorEnter/cursorExit can only fire from the LinkLayer anchors. */
   hoverEvents?: { enter: boolean; exit: boolean };
 }
 
 /** A plugin (forms, links) marks some annotations as interactive: while engaged,
- *  they render their own DOM and are NOT geometry-editable. Suspend → editable. */
+ *  they render their own DOM and are not geometry-editable. Suspend → editable. */
 export interface Behavior {
   id: string;
-  matches(a: { subtype: Subtype; ref: AnnotationRef | null }): boolean;
+  matches(annotation: { subtype: Subtype; ref: AnnotationRef | null }): boolean;
   engaged(): boolean;
 }
 
 /**
  * The current selection's editable properties, ready to render: the ordered
- * {@link PropSpec}s EVERY selected kind declares (a mixed selection shows the
+ * {@link PropSpec}s every selected kind declares (a mixed selection shows the
  * shared subset, in the first kind's order), the first member's `values`, and
  * which keys differ across members (`mixed` — render an indeterminate control).
  * Empty `specs` = nothing selected / nothing editable.
@@ -278,9 +260,9 @@ export type SelectionFlags = { [K in keyof AnnotationFlags]: boolean | null };
 /**
  * A free-text annotation projected for the framework: the box (content space,
  * live gesture applied) + the plain text + an `editing` flag + a ready-to-spread
- * CSS style. The framework renders ONE editable element from this and nothing
+ * CSS style. The framework renders one editable element from this and nothing
  * more — all the mapping (fonts, colours, alignment) is done here, once. The
- * element paints the TEXT only: the box's fill and border are the vector
+ * element paints the text only: the box's fill and border are the vector
  * scene's (`pageItems`), the same for a plain box and a callout, so the live
  * view matches the baked appearance.
  */
@@ -293,13 +275,13 @@ export interface TextItem {
    *  body, which `css` carries). `contents` is their plain projection. */
   richText: { paragraphs: RichTextParagraph[] };
   editing: boolean;
-  /** Applied rotation (deg, CW). `box` is the UNROTATED text box; the framework
+  /** Applied rotation (deg, CW). `box` is the unrotated text box; the framework
    *  rotates the editable element about its centre by this. 0/undefined = none. */
   rot?: number;
   css: {
     fontFamily: string;
     /** Content units (the framework multiplies by the page scale). The line
-     *  height is NOT here: the editor binding states the engine's line model
+     *  height is not here: the editor binding states the engine's line model
      *  per face on the element itself (`@embedpdf/web`, `lineModelFor`). */
     fontSize: number;
     color: string;
@@ -317,21 +299,21 @@ export interface TextItem {
  * engine's collab-resolver mirrors — `allowsAnnotationCreate` for
  * reply/status, `allowsAnnotationMutation` against each target's
  * stamped owner for edit/delete) and PDF state (the two lock flags
- * gate DIFFERENT aspects, ISO 32000 Table 167: `lockedContents` blocks
+ * gate different aspects, ISO 32000 Table 167: `lockedContents` blocks
  * text edits, `locked` blocks deletion). A courtesy, not the guard — the
  * engine independently enforces every write.
  */
 export interface CommentPermissions {
-  /** A reply is an annotation CREATE. */
+  /** A reply is an annotation create. */
   canReply: boolean;
   /** Editing this comment's text (`contents`) — gated by `lockedContents`. */
   canEditText: boolean;
   /** Deleting this one annotation — gated by `locked`. */
   canDelete: boolean;
-  /** A status change is a NEW hidden annotation — create authority only,
+  /** A status change is a new hidden annotation — create authority only,
    *  never edit rights on someone else's comment. */
   canSetStatus: boolean;
-  /** `canDelete` over EVERY thread member (root, replies, grouped parts,
+  /** `canDelete` over every thread member (root, replies, grouped parts,
    *  state annotations) — the whole-thread preflight. */
   canDeleteThread: boolean;
 }
@@ -344,12 +326,12 @@ export interface ThreadDeleteResult {
 /**
  * The conversation plane's surface: a derived, memoized threads index over
  * the annotation substrate, plus the ISO-native verbs. Every verb compiles
- * down to plain annotation creates/patches/deletes — one optimistic
- * pipeline, no second write path — so remote SSE events, own edits, and
- * hydration all update `threads()` for free.
+ * down to plain annotation creates/patches/deletes — one write path — so
+ * remote events, this session's edits and reloads all update `threads()`
+ * for free.
  *
- * Threads carry `pageObjectNumber` (identity is PON, like everything
- * else); DISPLAY order is a behavior of `threads()` (sorted against the
+ * Threads carry `pageObjectNumber` (identity is page object number, like everything
+ * else); display order is a behavior of `threads()` (sorted against the
  * live layout at computation time), and display labels (`pageIndex`) are a
  * framework-hook enrichment — the layer that watches both stores.
  */
@@ -386,8 +368,8 @@ export interface CommentThreadChangedEvent {
  * The page-space record every read returns. Projected from the plugin's
  * model (which already lives in page space), so it is reference-stable per
  * annotation until that annotation changes. The PDF-space engine record is
- * `raw` (null for an optimistic entry that the engine has not confirmed yet)
- * and on the `…Raw` methods.
+ * `raw`: the engine's confirmed record, null for a new annotation the engine
+ * has not confirmed yet. The `…Raw` methods return the same records.
  */
 export interface Annotation {
   readonly ref: AnnotationRef;
@@ -406,7 +388,10 @@ export interface Annotation {
   readonly group: AnnotationRef | null;
   readonly inReplyTo: AnnotationRef | null;
   readonly authority: { readonly update: boolean; readonly delete: boolean };
+  /** The engine's confirmed record. While a change is pending it is the record before that change. */
   readonly raw: AnnotationDTO | null;
+  /** Present while a change the user made to it waits for the engine. */
+  readonly pending?: true;
 }
 
 /** Subtype-specific geometry in page space (one shape per model geometry). */
@@ -469,7 +454,7 @@ export type CreationDraft = CreationDraftAnchor;
 export interface AnnotationSelectionAnchor {
   page: PageRef;
   bounds: Rect;
-  knob?: Vec;
+  knob?: Point;
 }
 
 export interface AnnotationChangedEvent {
@@ -498,6 +483,17 @@ export interface AnnotationResyncedEvent {
   readonly pages: readonly PageRef[] | 'all';
 }
 
+/**
+ * The engine refused a change the user made (a revoked grant, a lock set
+ * elsewhere). The change is already gone from the view, which shows the
+ * engine's record again; this says why, so a UI can tell the user.
+ */
+export interface AnnotationWriteFailedEvent {
+  /** The existing annotations the refused write carried; empty for a refused create. */
+  readonly refs: readonly AnnotationRef[];
+  readonly error: PluginErrorInfo;
+}
+
 export interface AnnotationSelectionChangedEvent {
   readonly refs: readonly AnnotationRef[];
   readonly previousRefs: readonly AnnotationRef[];
@@ -521,14 +517,13 @@ export interface AnnotationFilter {
 }
 
 /**
- * The PUBLIC annotation API — the documented, stable surface for application code
+ * The public annotation API — the documented, stable surface for application code
  * (toolbars, sidebars, app logic). Resolve it with the token re-exported from the
  * package root (`@embedpdf/plugin-annotation`).
  *
  * Framework-only plumbing (render projection, pointer gestures, behavior
  * registration) lives on {@link AnnotationHostCapability}, reachable through
- * `@embedpdf/plugin-annotation/contract/host` (and the framework's `/internal`
- * entry). Both are the SAME runtime
+ * `@embedpdf/plugin-annotation/contract/host`. Both are the same runtime
  * object — two typed lenses on one token — so app code simply can't see the host
  * methods.
  */
@@ -679,8 +674,8 @@ export interface AnnotationCapability {
   listTools(): readonly AnnotationTool[];
   getTool(id: string): AnnotationTool | null;
   /** Add or replace a tool at runtime (the config equivalent is `tools`). */
-  registerTool(def: AnnotationToolInput): Unsubscribe;
-  /** A tool's resolved defaults (LOCAL drawing preferences — never collaborative). */
+  registerTool(definition: AnnotationToolInput): Unsubscribe;
+  /** A tool's resolved defaults (local drawing preferences — never collaborative). */
   getToolDefaults(toolId: string): AnnotationProps;
   setToolDefaults(toolId: string, patch: AnnotationPropsPatch): void;
   /** Property specs the tool's target kind declares — the "what can I edit here". */
@@ -699,7 +694,7 @@ export interface AnnotationCapability {
   canRead(): boolean;
   /** Would a create succeed now for this session's identity? */
   canCreate(): boolean;
-  /** Per record, from the TARGET's stamped owner (narrowed grants answer per annotation). */
+  /** Per record, from the target's stamped owner (narrowed grants answer per annotation). */
   canEdit(ref: AnnotationRef): boolean;
   canDelete(ref: AnnotationRef): boolean;
   /** Cancel the in-flight gesture or draft. */
@@ -715,6 +710,8 @@ export interface AnnotationCapability {
   readonly onSelectionChanged: EventHook<AnnotationSelectionChangedEvent>;
   readonly onDraftChanged: EventHook<AnnotationDraftChangedEvent>;
   readonly onEditingChanged: EventHook<AnnotationEditingChangedEvent>;
+  /** The engine refused a change the user made; the view already shows the engine's record again. */
+  readonly onWriteFailed: EventHook<AnnotationWriteFailedEvent>;
 }
 
 export type MarkupSubtype = 'highlight' | 'underline' | 'strikeout' | 'squiggly';
@@ -731,7 +728,7 @@ export interface StampToolInput {
   subject?: string;
   /**
    * The hover ghost's image. Either fixed bytes (PNG/JPEG) or — for vector
-   * sources, which are only ever right at ONE on-screen size — a
+   * sources, which are only ever right at one on-screen size — a
    * {@link StampPreviewProvider} the ghost asks for a render at the device
    * pixel width it is displayed at. Raster sources default to themselves;
    * omit and the tool simply shows no ghost.
@@ -748,6 +745,15 @@ export interface StampToolInput {
 }
 
 /** The armed stamp's paintable preview, for the render layer's ghost `<img>`. */
+/** What is armed for stamp placement: its placement size and identity. */
+export interface ArmedStampInfo {
+  /** Placement size in PDF points. */
+  readonly width: number;
+  readonly height: number;
+  readonly name?: string;
+  readonly subject?: string;
+}
+
 export interface ArmedStampPreview {
   bytes: Uint8Array;
   mimeType?: string;
@@ -770,7 +776,7 @@ export type StampPreviewProvider = (devicePixelWidth: number) => Promise<ArmedSt
 export interface StampPlacement {
   page: PageRef;
   /** Anchor in page points (content space): the placement is centred here. */
-  at: Vec;
+  at: Point;
   /** Placed width in PDF points; default the payload's intrinsic size. */
   targetWidth?: number;
   /** Content rotation, degrees clockwise. Default 0. */
@@ -793,12 +799,12 @@ export interface FilePromptRequest {
   accept?: string;
   page: PageRef;
   /** The content-space point the placement is centred on. */
-  point: Vec;
+  point: Point;
 }
 
 /**
- * The ONE environment port behind every click-then-pick tool — the stamp
- * `'prompt'` source and the file-attachment tool (the file is picked AFTER
+ * The one environment port behind every click-then-pick tool — the stamp
+ * `'prompt'` source and the file-attachment tool (the file is picked after
  * the spot): given a click, produce the file to place, `null` to cancel. The
  * plugin declares this contract but never implements it — "get bytes from the
  * environment" is a DOM concern (a file dialog), so the framework adapter
@@ -810,4 +816,6 @@ export interface FilePromptRequest {
  * its own name and mime — a provider returning raw bytes for an attachment
  * must supply `name` itself.
  */
-export type FilePickerProvider = (req: FilePromptRequest) => Promise<AttachmentFileSource | null>;
+export type FilePickerProvider = (
+  request: FilePromptRequest,
+) => Promise<AttachmentFileSource | null>;

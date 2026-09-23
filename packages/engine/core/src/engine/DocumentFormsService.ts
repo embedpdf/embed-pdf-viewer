@@ -82,14 +82,14 @@ export interface DocumentFormsService {
   applyEffects?(effects: FormEffect[]): AbortablePromise<FormEffectsResult>;
 
   /**
-   * Deliver a resolved form submission to the document's HOME. Present only
-   * where the document HAS a home that accepts submissions — the cloud
+   * Deliver a resolved form submission to the document's home. Present only
+   * where the document has a home that accepts submissions — the cloud
    * engine when the deployment advertises the capability; the local engine
    * truthfully lacks it (an in-process document has no home, and this
    * contract is never a callback trampoline). Gated by `doc.forms.submit`
    * (grant-minted; no PDF permission bit exists for submission), asserted
    * at the home's boundary where enforcement is real. The home stores the
-   * dataset with the declared intent as metadata and derives WHO submitted
+   * dataset with the declared intent as metadata and derives who submitted
    * from its own verified session — it never fetches the PDF's URL.
    */
   submit?(request: FormSubmissionRequest): AbortablePromise<FormSubmissionReceipt>;
@@ -132,7 +132,7 @@ export interface DocumentFormsService {
   updateField(ref: FormFieldRef, patch: FormFieldPatch): AbortablePromise<FormFieldUpdateResult>;
 
   /**
-   * Draw a PDF page into every widget of an UNSIGNED signature field — the
+   * Draw a PDF page into every widget of an unsigned signature field — the
    * visual "sign" of a viewer that has no signer. The field's value stays
    * empty and nothing is sealed; a signed field is refused. Gated by
    * `doc.forms.fill`. Emits `form.fieldUpdated`. Absent on engines that
@@ -154,7 +154,7 @@ export interface DocumentFormsService {
    * Adopt an existing, unattached widget annotation as a view of the
    * field. `onState` names the checked appearance state and is required
    * for radio groups (checkboxes default to "Yes"). Attaching into a
-   * legacy merged field splits it — the FIELD object number never
+   * legacy merged field splits it — the field object number never
    * changes; widget identity may. Emits `form.widgetAttached`.
    */
   attachWidget(

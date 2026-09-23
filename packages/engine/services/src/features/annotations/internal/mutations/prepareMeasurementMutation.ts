@@ -73,7 +73,7 @@ function validate(value: WireAnnotationDraft | WireAnnotationPatch): void {
   }
 }
 
-/** Infer a rigid transform only when ALL corresponding vertices agree. Vertex edits leave a manual center fixed. */
+/** Infer a rigid transform only when all corresponding vertices agree. Vertex edits leave a manual center fixed. */
 function moveCenter(
   before: readonly PdfPoint[],
   after: readonly PdfPoint[],

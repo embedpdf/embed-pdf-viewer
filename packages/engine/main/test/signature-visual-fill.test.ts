@@ -19,11 +19,11 @@ type Engine = Awaited<ReturnType<typeof createLocalEngine>>;
 /** Opaque pixels of one widget's rendered normal appearance — zero means an empty or broken /AP. */
 async function opaquePixels(
   doc: Awaited<ReturnType<Engine['open']>>,
-  pon: number,
+  pageObjectNumber: number,
   annotObjectNumber: number,
 ): Promise<number> {
   const { appearances } = await doc
-    .page(toPageRef(pon))
+    .page(toPageRef(pageObjectNumber))
     .annotations.renderAppearances({ scale: 2 });
   const ap = appearances.find(
     (a) => a.ref.kind === 'objectNumber' && a.ref.annotObjectNumber === annotObjectNumber,
@@ -80,7 +80,7 @@ describe('signature fields in the viewer phase', () => {
       expect(filled.meta.affectedPages.map((p) => p.page.pageObjectNumber)).toEqual([
         page.ref.pageObjectNumber,
       ]);
-      // The mark is actually DRAWN: the widget's appearance renders opaque pixels
+      // The mark is actually drawn: the widget's appearance renders opaque pixels
       // (the fork wraps the page into a child form; the outer stream must place it).
       expect(
         await opaquePixels(

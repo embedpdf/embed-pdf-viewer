@@ -2,7 +2,7 @@
  * Page-piece metadata (ISO 32000 §14.5): private, application-scoped data
  * under `/PieceInfo` on a page or on the document catalog. The engine
  * round-trips a constrained, wire-safe value vocabulary; anything else in
- * the file is PRESERVED untouched and surfaced as `{ type: 'unknown' }`.
+ * the file is preserved untouched and surfaced as `{ type: 'unknown' }`.
  *
  * Reads are lossless-tagged (a PDF name and a PDF string both arrive as
  * JS strings, so the tag is what keeps them distinguishable); writes take

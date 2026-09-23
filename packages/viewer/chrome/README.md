@@ -270,8 +270,8 @@ el.addEventListener('epdf:ready', () => {
 ```
 
 Rule of thumb: **buttons speak commands; code speaks capabilities.** The
-token re-export list in `index.ts` is the public-API act — internal lenses
-(`/internal` entries) are structurally absent from delivery bundles. Coarse
+token re-export list in `index.ts` is the public-API act — host lenses
+(`/contract/host` entries) are structurally absent from delivery bundles. Coarse
 DOM events (`epdf:ready`, `epdf:documentchange`) are sugar over `watch`.
 
 ### Theme — match your brand

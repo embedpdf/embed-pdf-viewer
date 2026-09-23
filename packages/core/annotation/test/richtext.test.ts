@@ -34,8 +34,8 @@ describe('rich text algebra', () => {
   });
 
   it('splits a run at a boundary and keeps its delta on both halves', () => {
-    const p = splitRunsAt(doc().paragraphs[0]!, 8);
-    expect(p.runs).toEqual([
+    const paragraph = splitRunsAt(doc().paragraphs[0]!, 8);
+    expect(paragraph.runs).toEqual([
       { text: 'Hello ' },
       { text: 'bo', style: { weight: 700 } },
       { text: 'ld', style: { weight: 700 } },
@@ -81,7 +81,7 @@ describe('rich text algebra', () => {
   });
 
   it('tests a range for a style', () => {
-    const bold = (d: { weight?: number }) => (d.weight ?? 400) >= 600;
+    const bold = (style: { weight?: number }) => (style.weight ?? 400) >= 600;
     expect(rangeHasStyle(doc(), { start: 6, end: 10 }, bold)).toBe(true);
     expect(rangeHasStyle(doc(), { start: 4, end: 10 }, bold)).toBe(false);
     expect(rangeHasStyle(doc(), { start: 8, end: 8 }, bold)).toBe(true);

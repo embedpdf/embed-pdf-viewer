@@ -1,9 +1,9 @@
 import type { Locale } from '@embedpdf/react/i18n';
 
 /**
- * English pack. Strings belong to the PRODUCT, not the plugins — the
- * `commands.*` namespace mirrors the v2 snippet packs so translations carry
- * over; `demo.*` is this example's own chrome.
+ * English pack. Strings belong to the product, not the plugins — the
+ * `commands.*` keys match the published snippet translation packs, so existing
+ * translations resolve; `demo.*` is this example's own chrome.
  */
 export const en: Locale = {
   code: 'en',
@@ -152,8 +152,8 @@ export const en: Locale = {
       unknown: 'The document could not be opened.',
       close: 'Close document',
     },
-    // Annotation type names — the comment sidebar's icon tooltips. Keys carry
-    // over from the v2 packs so existing translations still resolve.
+    // Annotation type names — the comment sidebar's icon tooltips. Keys match
+    // the published snippet packs, so existing translations resolve.
     annotation: {
       comment: 'Comment',
       highlight: 'Highlight',

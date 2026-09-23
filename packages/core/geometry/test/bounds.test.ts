@@ -7,8 +7,8 @@ describe('boundsOfRects', () => {
   });
 
   it('returns a single rect unchanged (by value)', () => {
-    const r = { x: 5, y: 10, width: 20, height: 30 };
-    expect(boundsOfRects([r])).toEqual(r);
+    const rect = { x: 5, y: 10, width: 20, height: 30 };
+    expect(boundsOfRects([rect])).toEqual(rect);
   });
 
   it('unions disjoint rects into their bounding box', () => {
@@ -41,14 +41,14 @@ describe('boundsOfRects', () => {
 
 describe('intersectRects', () => {
   it('returns the overlap, zero-sized when disjoint', () => {
-    const a = { x: 0, y: 0, width: 10, height: 10 };
-    expect(intersectRects(a, { x: 5, y: 5, width: 10, height: 10 })).toEqual({
+    const rect = { x: 0, y: 0, width: 10, height: 10 };
+    expect(intersectRects(rect, { x: 5, y: 5, width: 10, height: 10 })).toEqual({
       x: 5,
       y: 5,
       width: 5,
       height: 5,
     });
-    expect(intersectRects(a, { x: 20, y: 20, width: 5, height: 5 }).width).toBe(0);
-    expect(intersectRects(a, { x: -5, y: -5, width: 30, height: 30 })).toEqual(a);
+    expect(intersectRects(rect, { x: 20, y: 20, width: 5, height: 5 }).width).toBe(0);
+    expect(intersectRects(rect, { x: -5, y: -5, width: 30, height: 30 })).toEqual(rect);
   });
 });

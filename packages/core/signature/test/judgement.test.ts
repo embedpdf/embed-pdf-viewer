@@ -4,7 +4,7 @@
  * (Acrobat: "Form Fill-in, Signing and Commenting are allowed"; corpus
  * `signature-compat` v3/88-91), reported as permitted changes. A P=2
  * certification narrows that to form fill-in. And a verdict can be about the
- * bytes a save WOULD write (`working-copy`), which is what a viewer must show
+ * bytes a save would write (`working-copy`), which is what a viewer must show
  * before the file leaves it.
  */
 import { readFile } from 'node:fs/promises';
@@ -66,21 +66,21 @@ describe('what a validator concludes', () => {
       expect(doc.security.allows('doc.annotate.modify')).toBe(true);
 
       // The persisted bytes: the signature seals the last revision.
-      let [v] = await validateSignatures(doc, { trust });
-      expect(v.summary).toBe('valid');
-      expect(v.modifications).toEqual({ verdict: 'unchanged', basis: 'persisted' });
+      let [verdict] = await validateSignatures(doc, { trust });
+      expect(verdict.summary).toBe('valid');
+      expect(verdict.modifications).toEqual({ verdict: 'unchanged', basis: 'persisted' });
 
       // An unsaved ink stroke: the loaded bytes still say unchanged; the bytes
       // a save would write say "changed, permitted" — and the verdict says
       // which it judged.
       await inkOn(doc);
-      [v] = await validateSignatures(doc, { trust });
-      expect(v.summary).toBe('valid');
-      expect(v.modifications).toEqual({ verdict: 'unchanged', basis: 'persisted' });
-      [v] = await validateSignatures(doc, { trust, until: 'working-copy' });
-      expect(v.summary).toBe('valid');
-      expect(v.modifications.basis).toBe('working-copy');
-      expect(v.modifications.verdict).toBe('permitted');
+      [verdict] = await validateSignatures(doc, { trust });
+      expect(verdict.summary).toBe('valid');
+      expect(verdict.modifications).toEqual({ verdict: 'unchanged', basis: 'persisted' });
+      [verdict] = await validateSignatures(doc, { trust, until: 'working-copy' });
+      expect(verdict.summary).toBe('valid');
+      expect(verdict.modifications.basis).toBe('working-copy');
+      expect(verdict.modifications.verdict).toBe('permitted');
 
       // Saved and reopened: the file itself carries a permitted change, judged on its bytes.
       const saved = await doc.download();
@@ -93,9 +93,9 @@ describe('what a validator concludes', () => {
         expect(analysis.steps).toHaveLength(1);
         expect(analysis.steps[0]!.levelInForce).toBe('annotate');
         expect(analysis.verdict).toBe('permitted');
-        const [r] = await validateSignatures(reopened, { trust });
-        expect(r.summary).toBe('valid');
-        expect(r.modifications).toEqual({
+        const [reopenedVerdict] = await validateSignatures(reopened, { trust });
+        expect(reopenedVerdict.summary).toBe('valid');
+        expect(reopenedVerdict.modifications).toEqual({
           verdict: 'permitted',
           basis: 'persisted',
           laterRevisions: 1,
@@ -124,9 +124,9 @@ describe('what a validator concludes', () => {
       });
       expect(signed.protection).toMatchObject({ enforced: 'annotate', judged: 'annotate' });
       await inkOn(doc);
-      const [v] = await validateSignatures(doc, { trust, until: 'working-copy' });
-      expect(v.summary).toBe('valid');
-      expect(v.modifications).toMatchObject({ verdict: 'permitted', basis: 'working-copy' });
+      const [verdict] = await validateSignatures(doc, { trust, until: 'working-copy' });
+      expect(verdict.summary).toBe('valid');
+      expect(verdict.modifications).toMatchObject({ verdict: 'permitted', basis: 'working-copy' });
     } finally {
       await doc.close();
     }
@@ -150,15 +150,15 @@ describe('what a validator concludes', () => {
         color: { r: 0, g: 0, b: 0 },
         strokeWidth: 2,
       } as never);
-      let [v] = await validateSignatures(doc, { trust, until: 'working-copy' });
-      expect(v.summary).toBe('valid');
-      expect(v.modifications).toMatchObject({ verdict: 'permitted', basis: 'working-copy' });
+      let [verdict] = await validateSignatures(doc, { trust, until: 'working-copy' });
+      expect(verdict.summary).toBe('valid');
+      expect(verdict.modifications).toMatchObject({ verdict: 'permitted', basis: 'working-copy' });
 
       await doc.page(page.ref).annotations.delete(created.created.ref);
-      [v] = await validateSignatures(doc, { trust, until: 'working-copy' });
-      expect(v.summary).toBe('valid');
-      // Nothing to judge: the bytes a save would write ARE the loaded bytes.
-      expect(v.modifications).toEqual({ verdict: 'unchanged', basis: 'persisted' });
+      [verdict] = await validateSignatures(doc, { trust, until: 'working-copy' });
+      expect(verdict.summary).toBe('valid');
+      // Nothing to judge: the bytes a save would write are the loaded bytes.
+      expect(verdict.modifications).toEqual({ verdict: 'unchanged', basis: 'persisted' });
 
       const again = await doc.download();
       expect(Buffer.from(again).equals(Buffer.from(signedBytes))).toBe(true);
@@ -166,9 +166,9 @@ describe('what a validator concludes', () => {
       // A different annotation afterwards is still judged: the pass elides
       // what equals the loaded document, never a real change.
       await inkOn(doc);
-      [v] = await validateSignatures(doc, { trust, until: 'working-copy' });
-      expect(v.summary).toBe('valid');
-      expect(v.modifications).toMatchObject({ verdict: 'permitted', basis: 'working-copy' });
+      [verdict] = await validateSignatures(doc, { trust, until: 'working-copy' });
+      expect(verdict.summary).toBe('valid');
+      expect(verdict.modifications).toMatchObject({ verdict: 'permitted', basis: 'working-copy' });
       const changed = await doc.download();
       expect(changed.byteLength).toBeGreaterThan(signedBytes.byteLength);
     } finally {
@@ -179,7 +179,7 @@ describe('what a validator concludes', () => {
   test('a persisted annotation removed after a reopen leaves the signed bytes untouched', async () => {
     // The base page has no /Annots; the persisted layer's page has one. A
     // server reopens layers all the time (eviction, restart, another
-    // replica): removing the annotation there must restore the BASE shape.
+    // replica): removing the annotation there must restore the base shape.
     const twoPage = new Uint8Array(
       await readFile(resolve(here, '../../../engine/main/test/fixtures/two_page_sigfield.pdf')),
     );
@@ -187,7 +187,7 @@ describe('what a validator concludes', () => {
       { kind: 'bytes', id: 'reopen-a', bytes: twoPage },
       { scope: ['*'] },
     );
-    let signed: ArrayBuffer;
+    let signed: Uint8Array;
     let artifact: Uint8Array;
     let pageRef: PageRef;
     let ref: import('@embedpdf/engine-core/runtime').AnnotationRef;
@@ -220,9 +220,9 @@ describe('what a validator concludes', () => {
       await reopened.page(pageRef).annotations.delete(ref);
       const again = await reopened.download();
       expect(Buffer.from(again).equals(Buffer.from(signed))).toBe(true);
-      const [v] = await validateSignatures(reopened, { trust, until: 'working-copy' });
-      expect(v.summary).toBe('valid');
-      expect(v.modifications.verdict).toBe('unchanged');
+      const [verdict] = await validateSignatures(reopened, { trust, until: 'working-copy' });
+      expect(verdict.summary).toBe('valid');
+      expect(verdict.modifications.verdict).toBe('unchanged');
     } finally {
       await reopened.close();
     }
@@ -248,7 +248,7 @@ describe('what a validator concludes', () => {
       await sign(doc, { field: { kind: 'fqn', name: 'sig2' }, signer });
       const sealed = await doc.download();
       let verdicts = await validateSignatures(doc, { trust });
-      expect(verdicts.map((x) => x.summary)).toEqual(['valid', 'valid']);
+      expect(verdicts.map((verdict) => verdict.summary)).toEqual(['valid', 'valid']);
 
       const created = await doc.page(page.ref).annotations.create({
         subtype: 'square',
@@ -257,13 +257,19 @@ describe('what a validator concludes', () => {
         strokeWidth: 2,
       } as never);
       verdicts = await validateSignatures(doc, { trust, until: 'working-copy' });
-      expect(verdicts.map((x) => x.summary)).toEqual(['valid', 'valid']);
-      expect(verdicts.map((x) => x.modifications.verdict)).toEqual(['permitted', 'permitted']);
+      expect(verdicts.map((verdict) => verdict.summary)).toEqual(['valid', 'valid']);
+      expect(verdicts.map((verdict) => verdict.modifications.verdict)).toEqual([
+        'permitted',
+        'permitted',
+      ]);
 
       await doc.page(page.ref).annotations.delete(created.created.ref);
       verdicts = await validateSignatures(doc, { trust, until: 'working-copy' });
-      expect(verdicts.map((x) => x.summary)).toEqual(['valid', 'valid']);
-      expect(verdicts.map((x) => x.modifications.basis)).toEqual(['persisted', 'persisted']);
+      expect(verdicts.map((verdict) => verdict.summary)).toEqual(['valid', 'valid']);
+      expect(verdicts.map((verdict) => verdict.modifications.basis)).toEqual([
+        'persisted',
+        'persisted',
+      ]);
       const again = await doc.download();
       expect(Buffer.from(again).equals(Buffer.from(sealed))).toBe(true);
     } finally {

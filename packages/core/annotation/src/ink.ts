@@ -1,11 +1,14 @@
-import type { InkStraightenOptions, Vec } from './types';
+import type { InkStraightenOptions, Point } from './types';
 
 /**
  * Recognise a sufficiently straight freehand stroke and axis-snap it when it is
  * close to horizontal or vertical. Diagonal strokes remain untouched: this is
  * a highlighter aid, not a general line simplifier.
  */
-export function straightenInkStroke(points: readonly Vec[], options: InkStraightenOptions): Vec[] {
+export function straightenInkStroke(
+  points: readonly Point[],
+  options: InkStraightenOptions,
+): Point[] {
   if (points.length < 3) return [...points];
   const first = points[0];
   const last = points[points.length - 1];

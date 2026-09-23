@@ -24,7 +24,7 @@ export type PageRotation = PdfRotation;
  * viewer always needs an effective crop). `bleed`, `trim`, and `art` are
  * present only when the PDF actually declares them.
  *
- * Coordinates are NOT rotated and NOT origin-normalized; the display
+ * Coordinates are not rotated and not origin-normalized; the display
  * transform (origin shift, Y-flip, rotation) lives in the SDK, never here.
  */
 export interface PageBoxes {
@@ -37,11 +37,11 @@ export interface PageBoxes {
 
 /**
  * Static attributes for one page. This is the per-page element returned by
- * `pages.list()`. It carries NO annotation liveness (`revision`,
+ * `pages.list()`. It carries no annotation liveness (`revision`,
  * `weakAnnotationState`) — that lives on annotation reads and the cloud
  * manifest only.
  *
- * `size` is the UN-rotated crop dimensions (from
+ * `size` is the un-rotated crop dimensions (from
  * `EPDF_GetPageSizeByIndexNormalized`, which does not swap for rotation).
  * `rotation` is a separate field; the SDK swaps width/height for 90/270 to
  * derive the on-screen display size. Keeping the wire un-rotated keeps it

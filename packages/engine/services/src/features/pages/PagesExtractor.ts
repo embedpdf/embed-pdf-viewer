@@ -12,7 +12,7 @@ import { throwIfAborted } from '../../shared/abort';
 const FPDF_NO_INCREMENTAL = 1 << 1;
 
 /**
- * Export a subset of pages as a standalone PDF. A READ over the session:
+ * Export a subset of pages as a standalone PDF. A read over the session:
  * `FPDF_ImportPagesByIndex` copies pages into a scratch document, so the
  * source is untouched — no revision bumps, no registry refresh, no layer
  * artifact. Lives next to `PagesReader`/`PagesMutator` (one file per page
@@ -27,7 +27,7 @@ export class PagesExtractor {
   /**
    * Copy the given pages, in the supplied caller order, into a new
    * document and serialize it. Validation up front: non-empty, no
-   * duplicates, every PON resolvable (`NotFound` from the session on a
+   * duplicates, every page object number resolvable (`NotFound` from the session on a
    * bad one). The scratch document is always closed, success or throw.
    */
   extract(pages: PageRef[], signal: AbortSignal): { bytes: ArrayBuffer; size: number } {
@@ -37,20 +37,20 @@ export class PagesExtractor {
     }
     const pageObjectNumbers = this.session.resolvePageRefs(pages);
     const seen = new Set<PageObjectNumber>();
-    for (const pon of pageObjectNumbers) {
-      if (seen.has(pon)) {
+    for (const pageObjectNumber of pageObjectNumbers) {
+      if (seen.has(pageObjectNumber)) {
         throw new EngineError(
           EngineErrorCode.InvalidArg,
-          `pages.extract was given duplicate page object number ${pon}`,
+          `pages.extract was given duplicate page object number ${pageObjectNumber}`,
         );
       }
-      seen.add(pon);
+      seen.add(pageObjectNumber);
     }
 
-    // Resolve every pon to its CURRENT index via the session registry —
+    // Resolve every pon to its current index via the session registry —
     // NotFound on caller error, and caller order is preserved in the output.
     const indices = pageObjectNumbers.map(
-      (pon) => this.session.recordByObjectNumber(pon).pageIndex,
+      (pageObjectNumber) => this.session.recordByObjectNumber(pageObjectNumber).pageIndex,
     );
 
     const { fn, mem } = this.runtime;

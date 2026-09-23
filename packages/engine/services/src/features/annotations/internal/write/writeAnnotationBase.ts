@@ -10,7 +10,7 @@ import { formatPdfDate } from '../../../../shared/pdf-date';
 
 /**
  * Write the annotation-wide base fields shared by every Draft
- * (contents/subject/nm). The kind-specific writer calls this BEFORE its
+ * (contents/subject/nm). The kind-specific writer calls this before its
  * own field writes; order doesn't actually matter at the PDF level, but
  * keeping the base first makes the writers symmetric with the readers.
  *
@@ -72,7 +72,7 @@ export function applyAnnotationBasePatch(
 
 /**
  * Stamp /T (the standard PDF "author" display field) on an annotation.
- * Called by the mutator on CREATE — /T is bound to the caller's
+ * Called by the mutator on create — /T is bound to the caller's
  * `display_name` at creation. No-op when `displayName` is empty so
  * callers don't need to gate it.
  */
@@ -107,7 +107,7 @@ export function writeAnnotationNm(
  * it lives here alongside /T / /NM / /Contents rather than in any
  * vendor-namespaced extension.
  *
- * Called by the mutator on every annotation create AND every update;
+ * Called by the mutator on every annotation create and every update;
  * the existing base draft/patch writers leave /M alone because the
  * value is derived from the moment of the write, not from the
  * draft/patch payload. The base reader already extracts /M and

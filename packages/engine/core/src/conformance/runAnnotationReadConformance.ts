@@ -131,7 +131,7 @@ export function runAnnotationReadConformance(
       try {
         const snap = await doc.annotations.listRaw(toPageRef(opts.fixture.pageObjectNumber));
         for (const a of snap.annotations) {
-          // Ink carries the geometry styling (/C, /CA, /BS) but NOT /IC, plus
+          // Ink carries the geometry styling (/C, /CA, /BS) but not /IC, plus
           // its /InkList (a non-empty array of point paths).
           if (a.subtype === 'ink') {
             expect(a.color !== undefined && a.color !== null).toBe(true);

@@ -138,11 +138,11 @@ export class DocumentsRepo {
         if (existing) return { row: existing, created: false };
       }
       if (isUniqueViolation(err)) {
-        // The remaining unique surface is the PRIMARY KEY: the caller
+        // The remaining unique surface is the primary key: the caller
         // reused an explicit docId — a double submit, a retry without
         // an idempotencyKey, or a fresh key minted per attempt. That
         // is a client error with a clear remedy, never a raw driver
-        // 500. docId is identity of the RECORD, not of the operation:
+        // 500. docId is identity of the record, not of the operation:
         // resume is asked for with a stable idempotencyKey, so an
         // accidental id reuse must surface, not silently fold.
         const taken = await this.findById(input.id);
@@ -192,7 +192,7 @@ export class DocumentsRepo {
    * the typed `PdfBits` view used by the scope resolver.
    *
    * Used by route guards that need to evaluate `pdf.permissions`
-   * expansion before performing a capability check. Does NOT materialise
+   * expansion before performing a capability check. Does not materialise
    * the base file or open PDFium — it just reads the cached integer
    * column populated at ingestion by `DocumentSecurityProbe`.
    *
@@ -259,7 +259,7 @@ export class DocumentsRepo {
     if (opts.state) q = q.where('state', '=', opts.state);
     if (opts.before) {
       const { createdAt, id } = opts.before;
-      // Spelled as OR rather than a row-value comparison so both
+      // Spelled as or rather than a row-value comparison so both
       // dialects plan it against idx_documents_tenant_created_id.
       q = q.where((eb) =>
         eb.or([

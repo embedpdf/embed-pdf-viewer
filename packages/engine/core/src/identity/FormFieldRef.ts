@@ -68,7 +68,7 @@ export function decodeFieldRefKey(key: string): FormFieldRef | null {
 }
 
 /**
- * A widget annotation of a field, as the FIELD TREE sees it. The forms reader
+ * A widget annotation of a field, as the field tree sees it. The forms reader
  * learns widgets from the field's `/Kids`, not from a page's `/Annots`, so it
  * must be able to report widgets the annotation subsystem cannot reach.
  *
@@ -94,7 +94,7 @@ export interface FormWidget {
   page: PageRef | null;
 }
 
-/** The ONE place a widget record is built: computes `ref` from the raw facts. */
+/** The one place a widget record is built: computes `ref` from the raw facts. */
 export function formWidget(annotObjectNumber: number, page: PageRef | null): FormWidget {
   return {
     ref: annotObjectNumber > 0 && page ? { kind: 'objectNumber', page, annotObjectNumber } : null,

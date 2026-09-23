@@ -78,9 +78,9 @@ describe('redactConfig', () => {
     };
     const json = JSON.stringify(redactConfig(config));
 
-    // The placeholder MAY contain the names — that's the contract.
+    // The placeholder may contain the names — that's the contract.
     // But the original SecretRef object shape (`{ "provider": "..." }`)
-    // MUST NOT appear in the output.
+    // must not appear in the output.
     expect(json).not.toContain('"provider":"awsProd"');
     expect(json).not.toContain('"provider":"azureKv"');
     expect(json).not.toMatch(/"name":"top\/secret/);

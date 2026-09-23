@@ -47,9 +47,9 @@ describe('doc.render.policy (cloud)', () => {
     try {
       expect(doc.render).toBeDefined();
       const policy = await doc.render!.policy();
-      // The deployment default: a full-page WIDTH ladder
+      // The deployment default: a full-page width ladder
       // — the bounded quantity is output pixels, never zoom — plus the
-      // appearance SCALE lattice (appearances must track the page's
+      // appearance scale lattice (appearances must track the page's
       // effective render scale to composite crisply), with the tiles
       // block absent until the server advertises tile support, and
       // unenforced until the client stack snaps requests everywhere.
@@ -63,7 +63,7 @@ describe('doc.render.policy (cloud)', () => {
         enforced: false,
       });
 
-      // The ONE snap implementation conforms a scale-shaped request to
+      // The one snap implementation conforms a scale-shaped request to
       // the canonical width axis using the page's width: 2x on a 612pt
       // page needs 1224px -> ladder 1280.
       const snapped = snapFullPageViewport(policy, { kind: 'scale', scale: 2 }, { pageWidth: 612 });

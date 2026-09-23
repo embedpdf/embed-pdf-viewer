@@ -43,7 +43,7 @@ const CEILING_MAX_MATCHES = 1024;
  * trust boundary (worker locally, server process in the cloud):
  *
  *   extract — page text via the session corpus cache (version-keyed on
- *             `mutationSeq`, so results always reflect the CURRENT layer
+ *             `mutationSeq`, so results always reflect the current layer
  *             view — text a redaction removed is unfindable),
  *   match   — the pure engine-core matcher (identical code on every
  *             engine; parity by construction),
@@ -64,7 +64,7 @@ export class SearchReader {
     const query = request.query;
     const mode = request.mode ?? 'full';
 
-    // One validator covers everything: regex dialect AND flag combos
+    // One validator covers everything: regex dialect and flag combos
     // (regex + matchDiacritics / ignoreWhitespace are the rejected ones).
     // Literal queries are always valid.
     const valid = validateSearchQuery(query);
@@ -121,8 +121,8 @@ export class SearchReader {
     // split across slices, so the cursor only ever points between pages.
     while (scanned < order.length && pagesThisSlice < maxPages && matches.length < maxMatches) {
       throwIfAborted(signal);
-      const pon = order[scanned].pageObjectNumber;
-      const corpus = acquirePageCorpus(this.runtime, this.session, pon, signal);
+      const pageObjectNumber = order[scanned].pageObjectNumber;
+      const corpus = acquirePageCorpus(this.runtime, this.session, pageObjectNumber, signal);
 
       const text = corpus.snapshot.text;
       let ranges: SearchMatchRange[];
@@ -136,14 +136,17 @@ export class SearchReader {
       }
 
       if (ranges.length > 0) {
-        const geometry = new PageGeometryReader(this.runtime, this.session).read(pon, signal);
+        const geometry = new PageGeometryReader(this.runtime, this.session).read(
+          pageObjectNumber,
+          signal,
+        );
         // One canonical layout per page, shared by every match on it.
         const layout = buildPageTextLayout(geometry);
         for (const range of ranges) {
-          // Match ranges are TEXT-space (string offsets); the hit DTO and
-          // the geometry layout speak CHARACTER space. Convert exactly once,
+          // Match ranges are text-space (string offsets); the hit DTO and
+          // the geometry layout speak character space. Convert exactly once,
           // here — the biased range helper keeps zero-width characters
-          // adjacent to the match OUTSIDE it on both sides. Snippets stay in
+          // adjacent to the match outside it on both sides. Snippets stay in
           // text space (their offsets are internal to the snippet string).
           const chars = charRangeForTextOffsets(
             corpus.snapshot,
@@ -151,7 +154,7 @@ export class SearchReader {
             range.start + range.length,
           );
           matches.push({
-            page: toPageRef(pon),
+            page: toPageRef(pageObjectNumber),
             charStart: chars.start,
             charCount: chars.end - chars.start,
             segments: textSegmentsForRange(layout, chars.start, chars.end - chars.start),

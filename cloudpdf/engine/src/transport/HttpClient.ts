@@ -30,16 +30,16 @@ export interface HttpClientOptions {
   /** Replace the global fetch (e.g. in Node tests with undici). */
   fetch?: typeof globalThis.fetch;
   /**
-   * Document affinity key: `X-CloudPDF-Doc` is sent BY DEFAULT on
+   * Document affinity key: `X-CloudPDF-Doc` is sent by default on
    * origin-bound doc requests so consistent-hash load balancers can pin
    * a document's traffic to one warm replica. Routing hints are
-   * unconditional client behavior — whether they are USED is the
+   * unconditional client behavior — whether they are used is the
    * operator's choice at the load balancer, never the app's. Derived
    * from the request path (`/v1/docs/:docId/…` — the same extraction
    * the Helm chart's uri-mode fallback uses); never sent on
    * CDN-rewritten requests.
    *
-   * `false` is an ESCAPE HATCH, not a feature toggle: use it only
+   * `false` is an escape hatch, not a feature toggle: use it only
    * against a stale server whose CORS allowlist predates the header
    * (browser preflights would fail) or behind a proxy that rejects
    * unknown request headers.
@@ -152,13 +152,13 @@ export class HttpClient {
    * route everything to origin again — useful on session close or
    * when an adapter swap happens mid-session (rare).
    *
-   * The HttpClient stays dumb about WHEN to do this; the cloud
+   * The HttpClient stays dumb about when to do this; the cloud
    * document handle pushes the binding in after /access succeeds.
    *
    * Side effect: in the browser, signedCookies are written to
    * `document.cookie` once per setCdnAccess call so the CDN edge
-   * receives them on subsequent fetches. Node side ignores cookies
-   * for now (cookie jar wiring deferred until needed for tests).
+   * receives them on subsequent fetches. Outside the browser signed
+   * cookies are ignored: this client keeps no cookie jar.
    */
   setCdnAccess(binding: CdnBinding | null): void {
     this.cdnBinding = binding;
@@ -458,10 +458,10 @@ export class HttpClient {
       const doc = /^\/v1\/docs\/([^/]+)\//.exec(path);
       if (doc) headers.set('X-CloudPDF-Doc', decodeURIComponent(doc[1]!));
     }
-    // Code-keyed backpressure retry: ONLY our own 503s (`EngineBusy` =
+    // Code-keyed backpressure retry: Only our own 503s (`EngineBusy` =
     // shed before dispatch, `EngineRestarting` = the apply never landed)
-    // — both mean NOTHING HAPPENED, so retrying is method-agnostic-safe,
-    // mutations included. A foreign 503 keeps today's semantics.
+    // — both mean nothing happened, so retrying is method-agnostic-safe,
+    // mutations included. A foreign 503 is returned without a retry.
     for (let attempt = 0; ; attempt++) {
       const res = await this.execute(url, { ...init, headers });
       if (

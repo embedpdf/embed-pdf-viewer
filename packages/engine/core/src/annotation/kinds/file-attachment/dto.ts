@@ -4,7 +4,7 @@ import type { ColorStyleFields } from '../style.shared';
 import type { FileAttachmentIcon } from './draft';
 
 /**
- * FileAttachment annotation. The DTO carries the attached file's METADATA
+ * FileAttachment annotation. The DTO carries the attached file's metadata
  * only — bytes never ride a listing. Download them explicitly via
  * `PageAnnotationsService.downloadFile(ref)`.
  */

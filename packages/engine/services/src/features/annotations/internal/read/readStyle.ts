@@ -16,8 +16,8 @@ import {
 } from './annotationReadPrimitives';
 
 /**
- * Default `/C` colour when an annotation has none. Matches the v2 engine
- * (circle/square/polygon/polyline/line/ink all default red).
+ * Default `/C` colour when an annotation has none: circle, square,
+ * polygon, polyline, line and ink all default to red.
  */
 const DEFAULT_COLOR: Color = { r: 255, g: 0, b: 0 };
 

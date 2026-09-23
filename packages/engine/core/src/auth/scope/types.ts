@@ -3,7 +3,7 @@
  * not a wildcard, virtual, or collab scope) is rejected at parse time.
  *
  * Bit references in comments are documentation of how `pdf.permissions`
- * expands these capabilities. PDF bits are NEVER consulted unless
+ * expands these capabilities. PDF bits are never consulted unless
  * `pdf.permissions` is in scope.
  */
 export type DocCapability =
@@ -33,7 +33,7 @@ export type DocCapability =
   | 'doc.forms.read' // structured read of form field definitions/values (cloud-only; no PDF-bit gate — reading is unconditional)
   | 'doc.forms.fill' // set form field values (PDF bit 9, also implied by bit 6)
   | 'doc.forms.modify' // create/restructure/delete fields (PDF bit 6 + bit 4)
-  | 'doc.forms.submit' // deliver a form submission to the document's HOME (grant-minted ONLY — ISO defines no submit permission bit, so `pdf.permissions` never expands it; gates the engine `forms.submit` capability, NOT viewer-side handlers)
+  | 'doc.forms.submit' // deliver a form submission to the document's home (grant-minted only — ISO defines no submit permission bit, so `pdf.permissions` never expands it; gates the engine `forms.submit` capability, not viewer-side handlers)
 
   // Annotations
   | 'doc.annotate.read' // structured read of annotation lists (cloud-only; no PDF-bit gate — reading is unconditional)
@@ -49,7 +49,7 @@ export type DocCapability =
   | 'doc.redact'
 
   // Digital signatures
-  | 'doc.sign' // prepare/complete/abort an approval signature or document timestamp (PDF bit 6 or bit 9: filling in a signature field IS form fill)
+  | 'doc.sign' // prepare/complete/abort an approval signature or document timestamp (PDF bit 6 or bit 9: filling in a signature field is form fill)
   | 'doc.sign.certify'; // additionally make it the certification signature (/Perms /DocMDP) — grant-minted only, never expanded from PDF bits
 
 /**

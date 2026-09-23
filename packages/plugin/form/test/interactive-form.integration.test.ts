@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import type { DocumentMeta } from '@embedpdf/core';
 import { createQuickJsSandbox } from '@embedpdf/core-js-sandbox';
 import { createLocalEngine } from '@embedpdf/engine';
 import type {
@@ -85,12 +86,14 @@ describe('interactive form JavaScript acceptance', () => {
       { scope: ['*'] },
     );
     const pages = await doc.pages.list();
-    const document = () => ({
+    const document = (): DocumentMeta => ({
       id: doc.id,
+      instanceId: doc.id,
       name: 'interactive_pdf_forms_javascript_demo.pdf',
       pageCount: pages.pageCount,
       pages: pages.pages,
       revision: 0,
+      renderPolicy: { kind: 'continuous' },
     });
     const realm = standaloneRealm(doc, document, {
       now: () => Date.UTC(2026, 6, 15, 9, 30, 0),

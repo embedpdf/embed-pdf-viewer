@@ -1,5 +1,6 @@
 import { annotContentsEditable, annotTransformable } from '@embedpdf/core-annotation';
 import {
+  annotationKey,
   isDimension,
   isReadout,
   measurementReadout,
@@ -13,7 +14,6 @@ import {
 import type { RecalibrationReport } from '../host-contract';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import type { Crud } from './crud';
-import type { Hydration } from '../sync/hydration';
 
 /**
  * The measurement seam: the per-page viewports (scale regions) the
@@ -21,10 +21,9 @@ import type { Hydration } from '../sync/hydration';
  * page's dimensions to a new scale.
  */
 export function createMeasurement(
-  ctx: Pick<AnnotationContext, 'cleanup' | 'getState'>,
-  { store }: Pick<AnnotationServices, 'store'>,
+  ctx: Pick<AnnotationContext, 'cleanup'>,
+  { store, records }: Pick<AnnotationServices, 'store' | 'records'>,
   crud: Pick<Crud, 'updateRaw'>,
-  hydration: Pick<Hydration, 'rehydrate'>,
 ) {
   const pageViewports = new Map<
     number,
@@ -46,26 +45,33 @@ export function createMeasurement(
       pageViewports.set(page.pageObjectNumber, { viewports, fallback });
     },
     remeasurePage: async (page: PageRef, scale: PdfMeasure) => {
-      const pon = page.pageObjectNumber;
-      await hydration.rehydrate();
+      const pageObjectNumber = page.pageObjectNumber;
+      // Recalibration needs every dimension on the page: retry a failed load,
+      // and wait for any load or page reload still running.
+      if (records.getStatus() !== 'ready') {
+        await records.refresh().catch(() => {});
+      }
+      await records.settled();
       const report: RecalibrationReport = { page, scale, updated: [], skipped: [], failed: [] };
-      const state = ctx.getState().hydration;
-      if (state.status !== 'complete') {
-        report.error = serializeError(
-          state.status === 'error' ? state.error : new Error('Annotation hydration is incomplete'),
-        );
+      if (records.getStatus() !== 'ready') {
+        report.error = serializeError(new Error('the annotations of this document are not loaded'));
         return report;
       }
-      const candidates = Object.values(store.model().byId).filter(
-        (a) => a.page.pageObjectNumber === pon && a.data && isDimension(a.data),
-      );
-      for (const a of candidates) {
-        const dto = a.data!,
-          ref = dto.ref;
+      // The confirmed dimensions of the page, each with how this session sees
+      // it (one the user just deleted is not in the view, and is left alone).
+      const model = store.model();
+      const candidates = Object.values(records.get().byKey).flatMap(({ dto }) => {
+        const annotation = model.byId[annotationKey(dto.ref)];
+        return annotation && dto.page.pageObjectNumber === pageObjectNumber && isDimension(dto)
+          ? [{ dto, annotation }]
+          : [];
+      });
+      for (const { dto, annotation } of candidates) {
+        const ref = dto.ref;
         const reason =
-          a.authority?.update === false
+          annotation.authority?.update === false
             ? 'no-authority'
-            : !annotTransformable(a) || !annotContentsEditable(a)
+            : !annotTransformable(annotation) || !annotContentsEditable(annotation)
               ? 'locked'
               : 'measure' in dto && dto.measure && dto.measure.subtype !== 'RL'
                 ? 'foreign-measure'
@@ -87,7 +93,7 @@ export function createMeasurement(
     },
   };
 
-  return { viewportsOf: (pon: number) => pageViewports.get(pon), api };
+  return { viewportsOf: (pageObjectNumber: number) => pageViewports.get(pageObjectNumber), api };
 }
 
 export type Measurement = ReturnType<typeof createMeasurement>;

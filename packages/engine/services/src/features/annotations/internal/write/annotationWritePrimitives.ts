@@ -19,11 +19,10 @@ import { lineEndingToCode } from '../lineEnding';
 
 /**
  * Write-side twin of `annotationReadPrimitives.ts`. Every annotation
- * family (text-markup, shape, and upcoming polygon/polyline/line/free-text)
- * composes these low-level setters so the PDFium FFI surface lives in one
- * place. All colour/opacity/border writes go through the EmbedPDF
- * `EPDFAnnot_*` extensions — the same path v2 used and the read primitives
- * read back — so values survive native `EPDFAnnot_GenerateAppearance`.
+ * family composes these low-level setters so the PDFium ffi surface lives
+ * in one place. All colour/opacity/border writes go through the EmbedPDF
+ * `EPDFAnnot_*` extensions — the same path the read primitives read back —
+ * so values survive native `EPDFAnnot_GenerateAppearance`.
  */
 
 /**
@@ -133,10 +132,10 @@ export function writeAnnotString(
 }
 
 /**
- * Three-state string write: `null` REMOVES the dictionary entry.
+ * Three-state string write: `null` removes the dictionary entry.
  *
  * Clearing goes through `EPDFAnnot_RemoveKey` because
- * `FPDFAnnot_SetStringValue` with a NULL value writes an EMPTY string —
+ * `FPDFAnnot_SetStringValue` with a null value writes an empty string —
  * it never removes. True removal is what keeps the read side honest:
  * `readAnnotString` returns `null` iff the key is absent, so a cleared
  * field reads back as `null`, not `''`.

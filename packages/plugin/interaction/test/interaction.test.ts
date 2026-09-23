@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   createKernel,
-  isPluginError,
   toPageRef,
   type DocumentHandle,
   type Engine,
@@ -10,6 +9,8 @@ import {
 import { interactionPlugin } from '../src/interaction.plugin';
 import { InteractionToken } from '../src/host-contract';
 import type { InteractionHandler, PointerSample } from '../src/contract';
+import { feedbackPlugin } from '../src/feedback';
+import { FeedbackToken } from '../src/feedback.types';
 
 /** The hub through the real kernel: tools, routing, cursor arbitration, events. */
 
@@ -63,7 +64,7 @@ const handler = (
 ): InteractionHandler => ({
   id,
   priority,
-  enabledFor: (t) => t.enables.has(tag),
+  enabledFor: (tool) => tool.enables.has(tag),
   onDown: () => (log.push(`${id}:down`), capture),
   onMove: () => log.push(`${id}:move`),
   onUp: () => log.push(`${id}:up`),
@@ -75,7 +76,9 @@ describe('interaction hub', () => {
   it('defaults to the pointer tool, switches tools, and reports the change with a payload', async () => {
     const { kernel, hub } = await boot();
     const changes: string[] = [];
-    hub.onToolChanged((e) => changes.push(`${e.previousToolId}->${e.toolId}:${String(e.payload)}`));
+    hub.onToolChanged((event) =>
+      changes.push(`${event.previousToolId}->${event.toolId}:${String(event.payload)}`),
+    );
     expect(hub.getActiveToolId()).toBe('pointer');
     expect(hub.getDefaultToolId()).toBe('pointer');
     hub.activateTool('pan', { payload: 'x' });
@@ -85,6 +88,16 @@ describe('interaction hub', () => {
     expect(() => hub.activateTool('nope')).toThrow(expect.objectContaining({ code: 'not-found' }));
     hub.activateDefaultTool();
     expect(changes).toEqual(['pointer->pan:x', 'pan->pointer:undefined']);
+    await kernel.destroy();
+  });
+
+  it('announces every activation, including re-arming the armed tool with a new payload', async () => {
+    const { kernel, hub } = await boot();
+    const payloads: unknown[] = [];
+    hub.onToolChanged((event) => payloads.push(event.payload));
+    hub.activateTool('pan', { payload: 1 });
+    hub.activateTool('pan', { payload: 2 });
+    expect(payloads).toEqual([1, 2]);
     await kernel.destroy();
   });
 
@@ -101,15 +114,38 @@ describe('interaction hub', () => {
 
   it('registerTool rejects duplicates unless replaced, and a remover owns only its registration', async () => {
     const { kernel, hub } = await boot();
-    const a = { id: 'x', cursor: 'crosshair', enables: new Set(['draw']) };
-    const b = { id: 'x', cursor: 'copy', enables: new Set(['draw']) };
-    const offA = hub.registerTool(a);
-    expect(() => hub.registerTool(b)).toThrow(expect.objectContaining({ code: 'conflict' }));
-    hub.registerTool(b, { replace: true });
-    offA(); // must not remove b
-    expect(hub.getTool('x')).toBe(b);
+    const first = { id: 'x', cursor: 'crosshair', enables: new Set(['draw']) };
+    const second = { id: 'x', cursor: 'copy', enables: new Set(['draw']) };
+    const removeFirst = hub.registerTool(first);
+    expect(() => hub.registerTool(second)).toThrow(expect.objectContaining({ code: 'conflict' }));
+    hub.registerTool(second, { replace: true });
+    removeFirst(); // must not remove the replacement
+    expect(hub.getTool('x')).toBe(second);
     expect(hub.hasTool('x')).toBe(true);
-    expect(hub.listTools().map((t) => t.id)).toEqual(['pointer', 'pan', 'x']);
+    expect(hub.listTools().map((tool) => tool.id)).toEqual(['pointer', 'pan', 'x']);
+    await kernel.destroy();
+  });
+
+  it('wakes readers when a tool is registered and again when it is removed', async () => {
+    const { kernel, hub } = await boot();
+    const tools = hub.listTools();
+    expect(hub.listTools()).toBe(tools); // reference-stable while unchanged
+    const listener = vi.fn();
+    const unsubscribe = kernel.subscribe(listener);
+
+    const remove = hub.registerTool({ id: 'ink', cursor: 'crosshair', enables: new Set(['draw']) });
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(hub.listTools()).not.toBe(tools);
+    expect(hub.hasTool('ink')).toBe(true);
+
+    const withInk = hub.listTools();
+    remove();
+    expect(listener).toHaveBeenCalledTimes(2);
+    expect(hub.listTools()).not.toBe(withInk);
+    expect(hub.getTool('ink')).toBeNull();
+    remove(); // already removed: changes nothing and wakes no one
+    expect(listener).toHaveBeenCalledTimes(2);
+    unsubscribe();
     await kernel.destroy();
   });
 
@@ -120,9 +156,9 @@ describe('interaction hub', () => {
     hub.registerHandler(handler('high', 10, 'text-select', log));
     hub.registerHandler(handler('pan-only', 99, 'scroll', log));
     const events: string[] = [];
-    hub.onGestureStarted((e) => events.push(`start:${e.handlerId}`));
-    hub.onGestureEnded((e) => events.push(`end:${e.handlerId}`));
-    hub.onGestureCancelled((e) => events.push(`cancel:${e.handlerId}`));
+    hub.onGestureStarted((event) => events.push(`start:${event.handlerId}`));
+    hub.onGestureEnded((event) => events.push(`end:${event.handlerId}`));
+    hub.onGestureCancelled((event) => events.push(`cancel:${event.handlerId}`));
 
     hub.dispatchPointer(sample('move')); // hover, no owner
     hub.dispatchPointer(sample('down'));
@@ -158,7 +194,7 @@ describe('interaction hub', () => {
   it('cursor: claims outrank the tool, gaps use gapCursor, skins restyle keywords', async () => {
     const { kernel, hub } = await boot();
     const seen: string[] = [];
-    hub.onCursorChanged((e) => seen.push(e.cursor));
+    hub.onCursorChanged((event) => seen.push(event.cursor));
     hub.dispatchPointer(sample('move', true));
     expect(hub.getCursor()).toBe('default');
     hub.claimCursor('sel', 'text', 10);
@@ -195,13 +231,29 @@ describe('interaction hub', () => {
     await kernel.destroy();
   });
 
-  it('a tool payload is an error-free no-op for unknown ids only through activateTool', async () => {
+  it('rejects an unknown tool without changing the armed one or announcing', async () => {
     const { kernel, hub } = await boot();
-    try {
-      hub.activateTool('missing');
-    } catch (error) {
-      expect(isPluginError(error, 'not-found')).toBe(true);
-    }
+    const changes = vi.fn();
+    hub.onToolChanged(changes);
+    expect(() => hub.pushTool('missing')).toThrow(expect.objectContaining({ code: 'not-found' }));
+    expect(hub.getActiveToolId()).toBe('pointer');
+    expect(changes).not.toHaveBeenCalled();
     await kernel.destroy();
+  });
+});
+
+describe('feedback plugin', () => {
+  it('exposes the injected provider, or a no-op without one', async () => {
+    const provider = { selection: vi.fn(), impact: vi.fn(), notify: vi.fn() };
+    const kernel = createKernel({ engine: engine(), plugins: [feedbackPlugin({ provider })] });
+    await kernel.start();
+    kernel.capability(FeedbackToken).impact('light');
+    expect(provider.impact).toHaveBeenCalledWith('light');
+    await kernel.destroy();
+
+    const silent = createKernel({ engine: engine(), plugins: [feedbackPlugin()] });
+    await silent.start();
+    expect(() => silent.capability(FeedbackToken).notify('success')).not.toThrow();
+    await silent.destroy();
   });
 });

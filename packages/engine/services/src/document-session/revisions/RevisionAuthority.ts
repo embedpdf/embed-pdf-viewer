@@ -19,7 +19,7 @@ export interface RevisionAuthority {
   weakAnnotationState(pageObjectNumber: PageObjectNumber): WeakAnnotationState;
   recordWeakAnnotationState(pageObjectNumber: PageObjectNumber, state: WeakAnnotationState): void;
   /** Forget a page entirely (generation + weak state). Called when the page
-   *  is DELETED — its object number is retired, never recycled, so dropping
+   *  is deleted — its object number is retired, never recycled, so dropping
    *  is hygiene, not correctness. */
   drop(pageObjectNumber: PageObjectNumber): void;
   clear(): void;

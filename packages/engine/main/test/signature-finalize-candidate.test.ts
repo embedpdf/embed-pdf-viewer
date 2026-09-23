@@ -33,8 +33,11 @@ let basePath: string;
 let nextJob = 1;
 const pending = new Map<number, { resolve: (r: WorkerResultPayload) => void; reject: (e: unknown) => void }>();
 
+/** Omit a key from each member of a union (a plain `Omit` collapses the union). */
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
 function call<T extends WorkerResultPayload['tag']>(
-  req: Omit<Extract<WorkerRequest, { jobId: number }>, 'jobId'>,
+  req: DistributiveOmit<Extract<WorkerRequest, { jobId: number }>, 'jobId'>,
   tag: T,
 ): Promise<Extract<WorkerResultPayload, { tag: T }>> {
   const jobId = nextJob++;
@@ -112,7 +115,7 @@ describe('signatures.finalizeCandidate', () => {
     );
     expect(prepared.contentsSize).toBe(CONTENTS_SIZE);
 
-    // What a server keeps: the candidate's TAIL past the base's length.
+    // What a server keeps: the candidate's tail past the base's length.
     const candidatePath = join(dir, `${prepared.signingId}.candidate.pdf`);
     const base = await readFile(basePath);
     const candidate = await readFile(candidatePath);
@@ -147,7 +150,7 @@ describe('signatures.finalizeCandidate', () => {
     expect(finalized.signature.contentsSize).toBe(FAKE_CMS.byteLength);
     expect(finalized.protection.certification?.permission).toBe(2);
 
-    // The version IS the file: its own hash and length.
+    // The version is the file: its own hash and length.
     const sealed = await readFile(rebuilt);
     expect(finalized.version).toEqual({ sha256: sha256(sealed), byteLength: sealed.byteLength });
     // The prepare's digest is the digest of the finalized file's ranges:

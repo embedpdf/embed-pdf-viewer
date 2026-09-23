@@ -3,11 +3,11 @@
  *
  * A PDF has two distinct password moments:
  *   1. **Required** — the document is encrypted and we couldn't read
- *      anything anonymously. The dev MUST gather a password and call
+ *      anything anonymously. The dev must gather a password and call
  *      `unlock()` before any other operation succeeds.
  *   2. **Optional** — the document is open and readable, but more
  *      permissions become available with the owner password. The dev
- *      MAY surface an "unlock for full access" affordance.
+ *      may surface an "unlock for full access" affordance.
  *
  * Plus the trivial third state: **none** — nothing to do.
  *
@@ -33,7 +33,7 @@ export type PasswordPrompt =
  * Derive the high-level password prompt from the raw security state.
  *
  * The function is pure and total — every `DocumentSecurityState`
- * maps to exactly one `PasswordPrompt`. Use this as the SINGLE source
+ * maps to exactly one `PasswordPrompt`. Use this as the single source
  * of truth wherever the SDK exposes a "do you need a password?" flag:
  * both `LocalDocumentSecurityService` and `CloudDocumentSecurityService`
  * call it, so the contract can never drift.

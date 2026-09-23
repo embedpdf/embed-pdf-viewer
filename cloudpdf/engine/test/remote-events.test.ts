@@ -75,8 +75,8 @@ describe('remote events: two engines, one document (the collaboration loop)', ()
       await new Promise((r) => setTimeout(r, 300));
 
       const list = await docA.pages.list();
-      const pon = list.pages[0].ref.pageObjectNumber;
-      const rotated = await docA.pages.rotate([toPageRef(pon)], 90);
+      const pageObjectNumber = list.pages[0].ref.pageObjectNumber;
+      const rotated = await docA.pages.rotate([toPageRef(pageObjectNumber)], 90);
 
       // A: exactly one event, its own, local.
       await waitFor(() => eventsA.length >= 1, "A's local event");
@@ -92,7 +92,7 @@ describe('remote events: two engines, one document (the collaboration loop)', ()
       expect(typeof remote.origin.serverId).toBe('number');
       if (remote.type === 'pages.rotated') {
         expect(remote.rotation).toBe(90);
-        expect(remote.pages).toEqual([toPageRef(pon)]);
+        expect(remote.pages).toEqual([toPageRef(pageObjectNumber)]);
         expect(remote.layout).toEqual(rotated.layout);
         expect(remote.cache).toEqual(rotated.cache);
       }
@@ -106,7 +106,9 @@ describe('remote events: two engines, one document (the collaboration loop)', ()
       // And B's manifest absorbed the pins: a follow-up read on B sees the
       // rotation without a manual refresh.
       const listB = await docB.pages.list();
-      expect(listB.pages.find((p) => p.ref.pageObjectNumber === pon)?.rotation).toBe(90);
+      expect(listB.pages.find((p) => p.ref.pageObjectNumber === pageObjectNumber)?.rotation).toBe(
+        90,
+      );
     } finally {
       await docA.close();
       await docB.close();
@@ -133,9 +135,9 @@ describe('remote events: two engines, one document (the collaboration loop)', ()
       await new Promise((r) => setTimeout(r, 300));
 
       const list = await docB.pages.list();
-      const pon = list.pages[0].ref.pageObjectNumber;
+      const pageObjectNumber = list.pages[0].ref.pageObjectNumber;
       const created = await docB
-        .page(toPageRef(pon))
+        .page(toPageRef(pageObjectNumber))
         .annotations.create({ subtype: 'highlight', contents: 'from B', quadPoints: QUAD });
 
       await waitFor(() => eventsA.length >= 1, "A's remote annotation event");
@@ -144,7 +146,7 @@ describe('remote events: two engines, one document (the collaboration loop)', ()
       expect(remote.type).toBe('annotation.created');
       if (remote.type === 'annotation.created') {
         expect(remote.created).toEqual(created.created);
-        // The remote meta carries the SAME cloud-stable revision tokens A
+        // The remote meta carries the same cloud-stable revision tokens A
         // would get from its own reads — the finalize-in-txn work, visible.
         expect(remote.meta).toEqual(created.meta);
       }

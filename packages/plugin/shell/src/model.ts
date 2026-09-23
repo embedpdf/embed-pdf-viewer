@@ -1,7 +1,11 @@
-/** The shell slice: which surfaces are open (with their tag and props) and the menu stack. */
-import type { ShellSnapshot, SurfaceProps } from './contract';
+/**
+ * The shell's state: which surfaces are open (with their exclusivity tag and
+ * props) and the stack of open menus. Every function below is a pure
+ * transition; the controller applies them with `ctx.state.update`.
+ */
+import type { OpenSurfaceOptions, ShellSnapshot, SurfaceProps } from './contract';
 
-/** One surface's record (the id is the key). */
+/** One surface's record; the surface id is its key. */
 export interface SurfaceRecord {
   readonly open: boolean;
   readonly exclusive?: string;
@@ -14,92 +18,73 @@ export interface ShellState {
   readonly openMenus: readonly string[];
 }
 
-export type ShellAction =
-  | { type: 'SHELL/OPEN_SURFACE'; id: string; exclusive?: string; props?: SurfaceProps }
-  | { type: 'SHELL/CLOSE_SURFACE'; id: string }
-  | { type: 'SHELL/TOGGLE_SURFACE'; id: string; exclusive?: string; props?: SurfaceProps }
-  | { type: 'SHELL/SET_SURFACE_PROPS'; id: string; props: SurfaceProps }
-  | { type: 'SHELL/CLOSE_ALL_SURFACES' }
-  | { type: 'SHELL/OPEN_MENU'; id: string }
-  | { type: 'SHELL/CLOSE_MENU'; id: string }
-  | { type: 'SHELL/CLOSE_ALL_MENUS' }
-  | { type: 'SHELL/APPLY_SNAPSHOT'; snapshot: ShellSnapshot };
-
 export const initialShellState = (): ShellState => ({ surfaces: {}, openMenus: [] });
 
-/** Close every open surface sharing the exclusivity tag. */
+/** Close every open surface that shares the exclusivity tag, except `keepId`. */
 function closeExclusive(
-  surfaces: Readonly<Record<string, SurfaceRecord>>,
+  surfaces: ShellState['surfaces'],
   exclusive: string,
-  except: string,
+  keepId: string,
 ): Record<string, SurfaceRecord> {
   const next: Record<string, SurfaceRecord> = {};
-  for (const [id, s] of Object.entries(surfaces)) {
-    next[id] = s.open && s.exclusive === exclusive && id !== except ? { ...s, open: false } : s;
+  for (const [id, surface] of Object.entries(surfaces)) {
+    const closes = surface.open && surface.exclusive === exclusive && id !== keepId;
+    next[id] = closes ? { ...surface, open: false } : surface;
   }
   return next;
 }
 
-function openSurface(
-  state: ShellState,
-  id: string,
-  exclusive?: string,
-  props?: SurfaceProps,
-): ShellState {
-  const surfaces = exclusive
-    ? closeExclusive(state.surfaces, exclusive, id)
+export function openSurface(state: ShellState, id: string, options: OpenSurfaceOptions = {}): ShellState {
+  const surfaces = options.exclusive
+    ? closeExclusive(state.surfaces, options.exclusive, id)
     : { ...state.surfaces };
-  surfaces[id] = { open: true, exclusive, props };
+  surfaces[id] = { open: true, exclusive: options.exclusive, props: options.props };
   return { ...state, surfaces };
 }
 
-function closeSurface(state: ShellState, id: string): ShellState {
-  const existing = state.surfaces[id];
-  if (!existing?.open) return state;
-  return { ...state, surfaces: { ...state.surfaces, [id]: { ...existing, open: false } } };
+export function closeSurface(state: ShellState, id: string): ShellState {
+  const surface = state.surfaces[id];
+  if (!surface?.open) return state;
+  return { ...state, surfaces: { ...state.surfaces, [id]: { ...surface, open: false } } };
 }
 
-export function shellReducer(state: ShellState, action: ShellAction): ShellState {
-  switch (action.type) {
-    case 'SHELL/OPEN_SURFACE':
-      return openSurface(state, action.id, action.exclusive, action.props);
-    case 'SHELL/CLOSE_SURFACE':
-      return closeSurface(state, action.id);
-    case 'SHELL/TOGGLE_SURFACE':
-      return state.surfaces[action.id]?.open
-        ? closeSurface(state, action.id)
-        : openSurface(state, action.id, action.exclusive, action.props);
-    case 'SHELL/SET_SURFACE_PROPS': {
-      const existing = state.surfaces[action.id];
-      if (!existing) return state;
-      return {
-        ...state,
-        surfaces: { ...state.surfaces, [action.id]: { ...existing, props: action.props } },
-      };
-    }
-    case 'SHELL/CLOSE_ALL_SURFACES': {
-      if (!Object.values(state.surfaces).some((s) => s.open)) return state;
-      const surfaces: Record<string, SurfaceRecord> = {};
-      for (const [id, s] of Object.entries(state.surfaces))
-        surfaces[id] = s.open ? { ...s, open: false } : s;
-      return { ...state, surfaces };
-    }
-    case 'SHELL/OPEN_MENU':
-      return state.openMenus.includes(action.id)
-        ? state
-        : { ...state, openMenus: [...state.openMenus, action.id] };
-    case 'SHELL/CLOSE_MENU':
-      return state.openMenus.includes(action.id)
-        ? { ...state, openMenus: state.openMenus.filter((m) => m !== action.id) }
-        : state;
-    case 'SHELL/CLOSE_ALL_MENUS':
-      return state.openMenus.length === 0 ? state : { ...state, openMenus: [] };
-    case 'SHELL/APPLY_SNAPSHOT':
-      return {
-        surfaces: { ...action.snapshot.surfaces },
-        openMenus: [...action.snapshot.openMenus],
-      };
-    default:
-      return state;
+export function toggleSurface(state: ShellState, id: string, options?: OpenSurfaceOptions): ShellState {
+  return state.surfaces[id]?.open ? closeSurface(state, id) : openSurface(state, id, options);
+}
+
+export function setSurfaceProps(state: ShellState, id: string, props: SurfaceProps): ShellState {
+  const surface = state.surfaces[id];
+  if (!surface) return state;
+  return { ...state, surfaces: { ...state.surfaces, [id]: { ...surface, props } } };
+}
+
+export function closeAllSurfaces(state: ShellState): ShellState {
+  if (!Object.values(state.surfaces).some((surface) => surface.open)) return state;
+  const surfaces: Record<string, SurfaceRecord> = {};
+  for (const [id, surface] of Object.entries(state.surfaces)) {
+    surfaces[id] = surface.open ? { ...surface, open: false } : surface;
   }
+  return { ...state, surfaces };
+}
+
+export function openMenu(state: ShellState, id: string): ShellState {
+  if (state.openMenus.includes(id)) return state;
+  return { ...state, openMenus: [...state.openMenus, id] };
+}
+
+export function closeMenu(state: ShellState, id: string): ShellState {
+  if (!state.openMenus.includes(id)) return state;
+  return { ...state, openMenus: state.openMenus.filter((menu) => menu !== id) };
+}
+
+export function toggleMenu(state: ShellState, id: string): ShellState {
+  return state.openMenus.includes(id) ? closeMenu(state, id) : openMenu(state, id);
+}
+
+export function closeAllMenus(state: ShellState): ShellState {
+  return state.openMenus.length === 0 ? state : { ...state, openMenus: [] };
+}
+
+export function applySnapshot(_state: ShellState, snapshot: ShellSnapshot): ShellState {
+  return { surfaces: { ...snapshot.surfaces }, openMenus: [...snapshot.openMenus] };
 }

@@ -5,9 +5,8 @@
  * document's detached script realm, so neither the canonical library nor
  * its reusable per-page extraction becomes target/user/time specific.
  */
-import { toPluginError, toPluginErrorInfo } from '@embedpdf/core';
+import { DocumentsToken, toPluginError, toPluginErrorInfo } from '@embedpdf/core';
 import { javaScriptProgramFromActionTree } from '@embedpdf/core-acrojs';
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type { AnnotationRef, PageRef } from '@embedpdf/engine-core/runtime';
 import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/contract/host';
 import { AnnotationToken, type StampPlacement } from '@embedpdf/plugin-annotation/contract';
@@ -17,6 +16,7 @@ import { createFormScriptingController } from '@embedpdf/plugin-form/scripting';
 import type { StampAsset, StampAssetPreview, StampCapability, StampConfig } from '../contract';
 import type { StampContext, StampServices } from '../services';
 import { DEFAULT_PREVIEW_WIDTH } from '../services/asset-engine';
+import { notFound, stampError, verb } from '../services/errors';
 
 export function createPlacement(
   ctx: StampContext,
@@ -33,10 +33,24 @@ export function createPlacement(
   const { openAssetDocument, imageToPreview } = assetEngine;
   const { ghostProvider } = ghosts;
 
-  /** Which asset this plugin armed per document. The annotation plugin owns
-   *  the arm itself (a tool switch disarms it), so the answer is checked
-   *  against it and forgotten once it no longer holds one. */
+  /** Which asset this plugin armed per document, a resource read by
+   *  `getArmedAsset`. The annotation plugin owns the arm itself (a tool
+   *  switch disarms it), so a read checks the entry against it. */
   const armedByDocument = new Map<string, string>();
+
+  // The annotation plugin drops an arm on its own (a tool switch, a closed
+  // document). Forget those arms here too, so readers of `getArmedAsset`
+  // wake and `onArmChanged` announces the disarm.
+  const droppedArms = (): string =>
+    [...armedByDocument.keys()]
+      .filter((documentId) => !ctx.tryForDocument(AnnotationHostToken, documentId)?.hasArmedStamp())
+      .join('\n');
+  ctx.watch(droppedArms, (dropped) => {
+    if (!dropped) return;
+    for (const documentId of dropped.split('\n')) armedByDocument.delete(documentId);
+    ctx.notify();
+    for (const documentId of dropped.split('\n')) armChanged.emit({ documentId, assetId: null });
+  });
 
   /** The one payload both entry points hand the annotation plugin: artwork,
    *  a resolution-aware ghost, true size, and the identity a placement
@@ -58,34 +72,37 @@ export function createPlacement(
    * on an isolated copy so neither the canonical library nor its reusable
    * per-page extraction becomes target/user/time specific.
    *
-   * The realm comes from the TARGET document's actions plugin — a detached
-   * realm under that document's policy and environment (WP4: its own
-   * sandbox, none of the viewer realm's globals). No actions plugin, or
-   * scripting off, or `dynamic: false` → the template is armed as-is.
+   * The realm comes from the target document's actions plugin: a detached
+   * realm under that document's policy and environment, with its own
+   * sandbox and none of the viewer realm's globals. No actions plugin,
+   * scripting off, or `dynamic: false`: the template is armed as-is.
    */
   const materializeForPlacement = async (
     documentId: string,
     asset: StampAsset,
-    bin: { bytes: Uint8Array; preview: StampAssetPreview | null },
+    binary: { bytes: Uint8Array; preview: StampAssetPreview | null },
   ): Promise<{ bytes: Uint8Array; preview: StampAssetPreview | null }> => {
-    if (config.dynamic === false) return bin;
+    if (config.dynamic === false) return binary;
     const actions = ctx.tryForDocument(ActionsHostToken, documentId);
     const mintRealm = actions?.createDetachedScriptRealm;
-    if (!actions || !mintRealm) return bin;
+    if (!actions || !mintRealm) return binary;
 
-    const targetMeta = ctx.core().documents[documentId] ?? null;
-    if (!targetMeta) {
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `[stamp] target document '${documentId}' is not open`,
-      );
+    const documents = ctx.get(DocumentsToken);
+    const target = documents.get(documentId);
+    if (target?.status !== 'ready') {
+      throw stampError('not-found', `target document '${documentId}' is not open`);
     }
+    const targetDocument = {
+      name: target.name,
+      pageCount: target.pageCount,
+      pages: documents.listPages(documentId),
+    };
 
     // A page extraction intentionally does not retain catalog-owned AcroForm
     // and action structures. Canonical assets therefore evaluate from the
     // whole library PDF, then extract only their selected page after flatten.
     const canonicalBytes = libraryBinaries.get(asset.libraryId);
-    const sourceBytes = canonicalBytes ?? bin.bytes;
+    const sourceBytes = canonicalBytes ?? binary.bytes;
     const doc = await openAssetDocument(new Uint8Array(sourceBytes));
     // Cleanup protection starts the moment the temporary document exists:
     // realm/controller construction failures must not leak it.
@@ -100,11 +117,11 @@ export function createPlacement(
             : undefined
           : layout.pages.find(({ ref }) => ref.pageObjectNumber === asset.page.pageObjectNumber);
       if (!selectedPage) {
-        throw new EngineError(
-          EngineErrorCode.InvalidArg,
+        throw stampError(
+          'invalid-input',
           canonicalBytes
-            ? `[stamp] canonical page ${asset.page?.pageObjectNumber ?? 'unknown'} no longer exists`
-            : '[stamp] a loose dynamic stamp asset must contain exactly one page',
+            ? `canonical page ${asset.page?.pageObjectNumber ?? 'unknown'} no longer exists`
+            : 'a loose dynamic stamp asset must contain exactly one page',
         );
       }
       const snapshot = await doc.forms.list();
@@ -113,20 +130,20 @@ export function createPlacement(
           ({ page }) => page?.pageObjectNumber === selectedPage.ref.pageObjectNumber,
         ),
       );
-      if (!hasSelectedPageField) return bin;
+      if (!hasSelectedPageField) return binary;
       if (!doc.pages.flatten || !doc.pages.extract) {
-        throw new EngineError(
-          EngineErrorCode.NotImplemented,
-          '[stamp] dynamic PDF stamps need an asset engine with pages.flatten and pages.extract',
+        throw stampError(
+          'unsupported',
+          'dynamic PDF stamps need an asset engine with pages.flatten and pages.extract',
         );
       }
 
-      // Scripts observe the TARGET document's metadata (Acrobat's dynamic
+      // Scripts observe the target document's metadata (Acrobat's dynamic
       // stamp contract: `documentFileName` is the document being stamped)
       // and boot from the asset document's own name tree.
       realm = mintRealm.call(actions, {
         doc,
-        document: () => targetMeta,
+        document: () => targetDocument,
         bootSources: async () => {
           const tree = doc.actions ? await doc.actions.read() : null;
           return (
@@ -136,16 +153,16 @@ export function createPlacement(
       });
       scripting = createFormScriptingController({
         doc,
-        document: () => targetMeta,
+        document: () => targetDocument,
         transaction: realm.transaction.bind(realm),
         budget: realm.budget,
       });
       const result = await scripting.recalculate();
       actions.surfaceScriptCommit(result, { origin: 'user', realm: 'detached' });
       if (result.status === 'failed') {
-        throw new EngineError(
-          EngineErrorCode.Unknown,
-          `[stamp] dynamic stamp scripting failed: ${result.error?.message ?? 'native form effect failed'}`,
+        throw stampError(
+          'operation-failed',
+          `dynamic stamp scripting failed: ${result.error?.message ?? 'native form effect failed'}`,
         );
       }
 
@@ -155,9 +172,9 @@ export function createPlacement(
         ({ status }) => status === 'failed' || status === 'skipped',
       );
       if (failed) {
-        throw new EngineError(
-          EngineErrorCode.Unknown,
-          `[stamp] dynamic stamp flatten failed for page ${failed.page.pageObjectNumber}`,
+        throw stampError(
+          'operation-failed',
+          `dynamic stamp flatten failed for page ${failed.page.pageObjectNumber}`,
         );
       }
 
@@ -179,34 +196,33 @@ export function createPlacement(
   const armAsset = async (
     documentId: string,
     assetId: string,
-    opts?: { targetWidth?: number },
+    options?: { targetWidth?: number },
   ): Promise<void> => {
-    const asset = ctx.getState().assets[assetId];
-    const bin = assetBinaries.get(assetId);
-    if (!asset || !bin) {
-      throw new EngineError(EngineErrorCode.NotFound, `[stamp] unknown asset '${assetId}'`);
-    }
-    const placement = await materializeForPlacement(documentId, asset, bin);
+    const asset = ctx.state.get().assets[assetId];
+    const binary = assetBinaries.get(assetId);
+    if (!asset || !binary) throw notFound('asset', assetId);
+    const placement = await materializeForPlacement(documentId, asset, binary);
     // The placement itself remains one armStamp call. Dynamic evaluation,
     // when enabled and applicable, has already produced an ephemeral static
     // page and matching preview at this boundary.
     const annotation = ctx.forDocument(AnnotationToken, documentId);
     await annotation.armStamp({
-      ...stampPayload(asset, placement, placement !== bin),
-      targetWidth: opts?.targetWidth,
+      ...stampPayload(asset, placement, placement !== binary),
+      targetWidth: options?.targetWidth,
     });
     armedByDocument.set(documentId, assetId);
+    ctx.notify();
     armChanged.emit({ documentId, assetId });
   };
 
   const armedAsset = (documentId: string): StampAsset | null => {
     const assetId = armedByDocument.get(documentId);
     if (assetId === undefined) return null;
-    // Pure: a stale entry (the annotation plugin dropped the payload on a tool
-    // change) reads as nothing armed and is overwritten by the next arm.
+    // An arm the annotation plugin just dropped reads as nothing armed, even
+    // for a reader that runs before the watch above forgets it.
     const annotation = ctx.tryForDocument(AnnotationHostToken, documentId);
     if (!annotation?.hasArmedStamp()) return null;
-    return ctx.getState().assets[assetId] ?? null;
+    return ctx.state.get().assets[assetId] ?? null;
   };
 
   const placeAsset = async (
@@ -214,27 +230,28 @@ export function createPlacement(
     assetId: string,
     placement: StampPlacement,
   ): Promise<AnnotationRef> => {
-    const asset = ctx.getState().assets[assetId];
-    const bin = assetBinaries.get(assetId);
-    if (!asset || !bin) {
-      throw new EngineError(EngineErrorCode.NotFound, `[stamp] unknown asset '${assetId}'`);
-    }
-    const materialized = await materializeForPlacement(documentId, asset, bin);
+    const asset = ctx.state.get().assets[assetId];
+    const binary = assetBinaries.get(assetId);
+    if (!asset || !binary) throw notFound('asset', assetId);
+    const materialized = await materializeForPlacement(documentId, asset, binary);
     const annotation = ctx.forDocument(AnnotationToken, documentId);
     return annotation.placeStamp(
-      stampPayload(asset, materialized, materialized !== bin),
+      stampPayload(asset, materialized, materialized !== binary),
       placement,
     );
   };
 
   return {
     api: {
-      armAsset,
-      placeAsset,
+      armAsset: verb(armAsset),
+      placeAsset: verb(placeAsset),
       placeAssetOnPages: async (documentId, assetId, pages, placement) => {
         const targets =
           pages === 'all'
-            ? (ctx.core().documents[documentId]?.pages ?? []).map((p) => p.ref)
+            ? ctx
+                .get(DocumentsToken)
+                .listPages(documentId)
+                .map((page) => page.ref)
             : [...pages];
         const applied: AnnotationRef[] = [];
         const failed: { ref: PageRef; error: ReturnType<typeof toPluginErrorInfo> }[] = [];
@@ -248,10 +265,10 @@ export function createPlacement(
         return { applied, skipped: [], failed };
       },
       disarm: (documentId) => {
-        const was = armedByDocument.get(documentId) ?? null;
-        armedByDocument.delete(documentId);
+        const wasArmed = armedByDocument.delete(documentId);
+        if (wasArmed) ctx.notify();
         ctx.forDocument(AnnotationToken, documentId).disarmStamp();
-        if (was !== null) armChanged.emit({ documentId, assetId: null });
+        if (wasArmed) armChanged.emit({ documentId, assetId: null });
       },
       getArmedAsset: armedAsset,
     } satisfies Partial<StampCapability>,

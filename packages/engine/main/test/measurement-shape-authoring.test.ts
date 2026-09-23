@@ -2,16 +2,13 @@
  *  and layer replay. A label move must never rewrite the measured vertices. */
 import { readFile, writeFile } from 'node:fs/promises';
 import { describe, expect, test, vi } from 'vitest';
-import type { PluginContext } from '@embedpdf/core';
 import { measureFromKnownLength, toPageRef } from '@embedpdf/engine-core/runtime';
 import { annotationSelectionFrame, shapeMeasurementLayout } from '../../../core/annotation/src';
 import { rotatePoint } from '../../../core/annotation/src/geometry';
 import { createLocalEngine } from '../src/index';
-import { createAnnotationController } from '../../../plugin/annotation/src/controller';
-import { annotationReducer, initialAnnotationState } from '../../../plugin/annotation/src/model';
 import { fromDTO } from '../../../plugin/annotation/src/repository';
 import { annotationKey } from '@embedpdf/engine-core/runtime';
-import type { AnnotationAction, AnnotationState } from '../../../plugin/annotation/src/model';
+import { annotationShell } from './helpers/annotation-shell';
 
 describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (prefer) => {
   test.each(['area', 'perimeter'])(
@@ -34,26 +31,15 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
       try {
         const pages = (await doc.pages.list()).pages;
         const page = pages[0];
-        const pon = page.ref.pageObjectNumber;
+        const pageObjectNumber = page.ref.pageObjectNumber;
         const crop = page.boxes.crop;
-        let state = initialAnnotationState();
-        const ctx = {
-          doc,
-          engine,
-          document: () => ({ pages }),
-          getState: () => state,
-          dispatch: (action: AnnotationAction) => {
-            state = annotationReducer(state, action);
-          },
-          cleanup: (cb: () => void) => cleanups.push(cb),
-          tryGet: () => null,
-        } as unknown as PluginContext<AnnotationState, AnnotationAction>;
-        const annotation = createAnnotationController(ctx);
+        const { ctx, annotation } = await annotationShell(doc, pages);
+        cleanups.push(() => ctx.dispose());
         const scale = measureFromKnownLength(100, { value: 5, unit: 'm' });
-        await doc.page(toPageRef(pon)).measure!.setScale(scale);
+        await doc.page(toPageRef(pageObjectNumber)).measure!.setScale(scale);
         annotation.setPageViewports(
           page.ref,
-          await doc.page(toPageRef(pon)).measure!.viewports(),
+          await doc.page(toPageRef(pageObjectNumber)).measure!.viewports(),
           scale,
         );
         for (const preset of annotation.listResolvedTools()) {
@@ -84,14 +70,17 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
               .listPageItems(page.ref)
               .find((item) => item.id === annotationKey(created.ref))?.source,
           ).toBe('vector');
-          expect(annotation.getAppearanceEpoch(page.ref)).toBe('');
+          // The fixture's own annotations render baked; the edited shape never does.
+          const bakedEntries = annotation.getAppearanceEpoch(page.ref).split('|');
+          const createdKey = annotationKey(created.ref);
+          expect(bakedEntries.some((entry) => entry.startsWith(`${createdKey}@`))).toBe(false);
         };
         expect(created.contents).toBe(tool === 'area' ? '50 m²' : '25 m');
         expect(created.caption).toEqual({ enabled: true });
         const model = fromDTO(created, crop);
         if (!model.measure || model.measure.intent === 'LineDimension')
           throw new Error('Expected shape measure');
-        const label = shapeMeasurementLayout(model.geom, model.measure, model.style)!.caption!
+        const label = shapeMeasurementLayout(model.geometry, model.measure, model.style)!.caption!
           .center;
         const target = { x: 390, y: 275 };
         annotation.editPointer('down', page.ref, label, false);
@@ -160,9 +149,11 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         ]) {
           const reopened = await engine.open(source, { scope: ['*'] });
           try {
-            const reopenedPon = (await reopened.pages.list()).pages[0].ref.pageObjectNumber;
-            const list = (await reopened.page(toPageRef(reopenedPon)).annotations.list())
-              .annotations;
+            const reopenedPageObjectNumber = (await reopened.pages.list()).pages[0].ref
+              .pageObjectNumber;
+            const list = (
+              await reopened.page(toPageRef(reopenedPageObjectNumber)).annotations.list()
+            ).annotations;
             const restored = list.find((dto) => dto.nm === created.nm)!;
             expect(restored).toMatchObject({
               subtype: final.subtype,
@@ -178,7 +169,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
             );
             // Rendering requests exercise the generated /AP as well as dictionary persistence.
             const appearance = await reopened
-              .page(toPageRef(reopenedPon))
+              .page(toPageRef(reopenedPageObjectNumber))
               .annotations.renderAppearances({ scale: 1 });
             expect(appearance).toBeTruthy();
           } finally {

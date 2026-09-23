@@ -83,7 +83,7 @@ export function applyTextMarkupDraft(
  *   1. base author-metadata (contents/author; never /NM)
  *   2. color (only if present)
  *   3. opacity (only if present)
- *   4. quadPoints (only if present, AND non-empty — the schema accepts an
+ *   4. quadPoints (only if present, and non-empty — the schema accepts an
  *      empty array but PDFium would treat it as a deletion of the
  *      attachment-point list, which is never the user's intent. We
  *      explicitly reject the empty-array case).
@@ -163,7 +163,7 @@ export function appendQuadPoints(
  * Replace the existing quadPoints with the supplied list. PDFium has
  * `FPDFAnnot_SetAttachmentPoints` which writes at index, but no truncate
  * helper, so we overwrite as many existing slots as we can and append
- * the rest. PDFium will GROW the list via append, but it cannot SHRINK
+ * the rest. PDFium will grow the list via append, but it cannot shrink
  * it; for that reason `applyTextMarkupPatch` rejects an empty patch and
  * the conformance suite covers the "patch must not shrink quadPoints"
  * rule (`patch.quadPoints.length >= existingCount`).

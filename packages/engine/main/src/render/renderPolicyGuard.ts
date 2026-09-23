@@ -10,14 +10,14 @@ import {
  * Local mirror of the server's render-lattice enforcement.
  *
  * A `localEngine({ renderPolicy })` deployment opts the local engine into
- * the SAME policy discipline the cloud advertises over `/v1/access`:
+ * the same policy discipline the cloud advertises over `/v1/access`:
  *
- *   - BUDGET (always, lattice or not enforced): `maxRenderPixels` rides
+ *   - budget (always, lattice or not enforced): `maxRenderPixels` rides
  *     into every worker render as `maxOutputPixels`, so the rasterizer
- *     rejects BEFORE allocating — a page-sized stamp at scale 40 fails
+ *     rejects before allocating — a page-sized stamp at scale 40 fails
  *     fast instead of OOM-killing the tab. A caller-supplied budget can
  *     only tighten the deployment's, never loosen it (min wins).
- *   - ENFORCEMENT (`enforced: true` only): off-lattice requests are
+ *   - enforcement (`enforced: true` only): off-lattice requests are
  *     rejected with the same InvalidArg + `renderPolicy` details the
  *     enforcing server returns, so conformance bugs surface in dev
  *     against a local engine instead of in prod against the CDN plane.
@@ -26,7 +26,7 @@ import {
  *     stay exempt); appearance scales must sit on the appearance lattice
  *     when the policy declares one.
  *
- * The DEFAULT local policy remains `continuous` — every check here is the
+ * The default local policy remains `continuous` — every check here is the
  * identity unless the embedder configured a lattice.
  */
 
@@ -59,7 +59,7 @@ function foldBudget<T extends { maxOutputPixels?: number }>(
 }
 
 /**
- * Enforced-lattice check for a FULL-PAGE render. Throws the same
+ * Enforced-lattice check for a full-page render. Throws the same
  * InvalidArg-with-policy the enforcing server's 400 carries. Rect
  * targets pass untouched because they belong to the tile policy.
  */

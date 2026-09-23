@@ -6,7 +6,7 @@
  * one-level composer, `buildCommentThreads()` is the opinionated one a
  * comments sidebar wants:
  *
- *   - the WHOLE `/IRT` subtree of a root is walked (cycle-safe), and its
+ *   - the whole `/IRT` subtree of a root is walked (cycle-safe), and its
  *     non-state members flatten into one chronological reply list;
  *   - ISO 32000 §12.5.6.3 state annotations (review status) are extracted
  *     into `review` instead of appearing as replies;
@@ -18,9 +18,9 @@
  * Tolerant-reader rules (foreign files are messy; none of this throws):
  *   - empty-string `state` / `stateModel` count as absent — the engine
  *     DTO is faithful (`''` = present-but-empty), tolerance lives here;
- *   - a state annotation whose target cannot be resolved is DROPPED
+ *   - a state annotation whose target cannot be resolved is dropped
  *     (status metadata with no anchor has no meaning);
- *   - an orphaned non-state reply is PROMOTED to a thread root (matching
+ *   - an orphaned non-state reply is promoted to a thread root (matching
  *     `buildThreads`), as is the first input-order member of an `/IRT`
  *     cycle — the visited set breaks the loop, nothing is lost or hangs;
  *   - a `/State` with no `/StateModel` infers its model from the known
@@ -56,20 +56,20 @@ export interface ReviewStatus {
 
 /**
  * Review state of one thread. The two ISO state models are independent
- * axes: `byReviewer` / `lastChange` cover the review axis (the standard
+ * axes: `byReviewer` / `lastChange` cover review status (the standard
  * `Review` model plus custom models), while the personal-checkmark
  * `Marked` axis lives solely in `markedBy`.
  */
 export interface CommentThreadReview {
   /** Latest review-axis status per reviewer key (unattributed skipped). */
   byReviewer: Record<string, ReviewStatus>;
-  /** Latest review-axis change overall — a convenience, NOT a verdict. */
+  /** Latest review-axis change overall — a convenience, not a verdict. */
   lastChange: ReviewStatus | null;
   /** Reviewer keys whose latest Marked-model status is `'marked'`. */
   markedBy: string[];
   /**
    * Every state annotation in the thread's subtree (both axes, all
-   * reviewers, chronological) — thread MEMBERSHIP, not status history:
+   * reviewers, chronological) — thread membership, not status history:
    * deleting a whole thread must delete its state annotations too, and
    * the classified summaries above deliberately drop superseded refs.
    */
@@ -253,7 +253,7 @@ function computeReview(
 
 /**
  * Derive a `ReviewStatus` from one state annotation, or null when nothing
- * classifiable can be derived. ISO defaulting happens HERE, not in the
+ * classifiable can be derived. ISO defaulting happens here, not in the
  * engine reader: a known model with an absent state means `none` /
  * `unmarked`; an absent model infers from a known state; a custom model
  * with no state has no derivable status.

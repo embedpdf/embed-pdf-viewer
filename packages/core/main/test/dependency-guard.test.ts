@@ -5,19 +5,19 @@ import type { AnyPlugin, PluginContext } from '../src/types';
 import { bytesInput, immediateEngine } from './helpers';
 
 /**
- * G3: resolving a token a plugin did not declare is a lie in the dependency
+ * Resolving a token a plugin did not declare is a lie in the dependency
  * graph. In development it throws with the remedy; declaring it as optional
  * makes the same call legal.
  */
 
 const foo = createCapabilityToken<{ ok: true }>('foo');
-const fooPlugin: AnyPlugin = { id: 'foo', token: foo, capability: () => ({ ok: true }) };
+const fooPlugin: AnyPlugin = { id: 'foo', token: foo, create: () => ({ api: { ok: true } }) };
 
 function consumer(declare: boolean): AnyPlugin {
   return {
     id: 'consumer',
     optional: declare ? [foo] : [],
-    capability: (ctx: PluginContext<unknown>) => ({ probe: () => ctx.tryGet(foo) }),
+    create: (ctx: PluginContext<unknown>) => ({ api: { probe: () => ctx.tryGet(foo) } }),
     token: createCapabilityToken<{ probe(): unknown }>('consumer'),
   };
 }
@@ -43,15 +43,26 @@ describe('dependency guard', () => {
     await kernel.destroy();
   });
 
+  it('allows any token for a plugin that resolves on behalf of the host', async () => {
+    const plugin = { ...consumer(false), resolvesAnyCapability: true } as const;
+    const kernel = createKernel({ engine: immediateEngine(), plugins: [fooPlugin, plugin] });
+    await kernel.start();
+    const cap = kernel.capability<{ probe(): unknown }>(plugin.token!);
+    expect(cap.probe()).toEqual({ ok: true });
+    await kernel.destroy();
+  });
+
   it('always allows the documents token and the plugin’s own token', async () => {
     const self = createCapabilityToken<{ me(): unknown; docs(): unknown }>('self');
     const plugin: AnyPlugin = {
       id: 'self',
       scope: 'document',
       token: self,
-      capability: (ctx: PluginContext<unknown>) => ({
-        me: () => ctx.tryGet(self),
-        docs: () => ctx.get({ name: 'documents' } as never),
+      create: (ctx: PluginContext<unknown>) => ({
+        api: {
+          me: () => ctx.tryGet(self),
+          docs: () => ctx.get({ name: 'documents' } as never),
+        },
       }),
     };
     const kernel = createKernel({ engine: immediateEngine(), plugins: [plugin] });

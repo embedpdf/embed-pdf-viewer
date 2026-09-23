@@ -12,9 +12,9 @@ import { writeUtf16String } from '../../../../runtime/memory/strings';
  *                    a real, present-but-empty value, matching the reader's
  *                    `emptyAs = ''` decode)
  *
- * Returns the native success flag. Mirrors v2 `setMetaText` (engine.ts),
- * minus v2's "empty string removes" quirk — three-state patch semantics
- * keep `null` (clear) and `''` (set empty) distinct.
+ * Returns the native success flag. An empty string never removes the key:
+ * three-state patch semantics keep `null` (clear) and `''` (set empty)
+ * distinct.
  */
 export function writeMetaText(
   fn: PdfFunctions,

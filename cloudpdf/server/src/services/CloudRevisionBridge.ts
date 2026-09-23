@@ -88,11 +88,11 @@ export class CloudRevisionBridge {
     opts?: {
       /**
        * Additional `docSessionId`s to accept as equivalent to
-       * `pageState`'s own — in practice the doc's BASE revision scope. A
-       * weak/index ref minted by a SHARED base read carries the base scope
+       * `pageState`'s own — in practice the doc's base revision scope. A
+       * weak/index ref minted by a shared base read carries the base scope
        * (the response is one CDN object for every inheriting layer, so it
        * cannot carry per-layer scopes). Accepting it is sound because the
-       * GENERATION check still runs: layer pages snapshot the base rows and
+       * generation check still runs: layer pages snapshot the base rows and
        * generations only move forward on layer writes, so an equal
        * generation proves the two views are identical — the alias never
        * widens staleness acceptance.

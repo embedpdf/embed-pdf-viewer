@@ -1,8 +1,8 @@
 /**
- * The K/V/C/F seam. Scripting rides the actions plugin's per-document realm:
- * the transaction port's PRESENCE is the "JavaScript is on" signal (D8 — the
- * switch lives on `actionsPlugin({ javascript })`; form owns only the
- * keystroke / validate / calculate / format pipeline).
+ * The keystroke, validate, calculate and format script pipeline. Scripts run
+ * in the actions plugin's per-document realm: when that realm offers a
+ * transaction port, JavaScript is on (the switch is
+ * `actionsPlugin({ javascript })`). This plugin owns only the pipeline.
  */
 import type { ActionOrigin } from '@embedpdf/plugin-actions/contract';
 
@@ -24,8 +24,8 @@ export function createScriptingSeam(ctx: FormContext, config: FormConfig, siblin
         })
       : null;
   if (scripting) ctx.cleanup(() => scripting.dispose());
-  /** Every script surface (UI effects, diagnostics, errors) flows through
-   *  the actions plugin's ONE port — origin/phase attached (D9). */
+  /** Script results (UI effects, diagnostics, errors) are surfaced through the
+   *  actions plugin, with the origin that caused them. */
   const surfaceViaActions = (result: FormCommitResult, origin: ActionOrigin): void => {
     actionsHost?.surfaceScriptCommit(result, { origin, realm: 'document' });
   };

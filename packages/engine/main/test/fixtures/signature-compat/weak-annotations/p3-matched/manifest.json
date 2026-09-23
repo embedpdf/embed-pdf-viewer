@@ -1,0 +1,419 @@
+{
+  "certificate": "../keys/TEST-ONLY-signer.cer",
+  "cases": [
+    {
+      "id": "p3-direct-control",
+      "file": "p3-direct-control.pdf",
+      "profile": "p3",
+      "layout": "direct",
+      "action": "control",
+      "facts": {
+        "sha256": "fbc61cc9d7cd92e46ba81eedf2f7376b445c8897ea4873e6ed459342e37255dd",
+        "byteLength": 21648,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4024,
+              20410,
+              1238
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "certification": {
+        "permission": 3,
+        "transform": "/DocMDP",
+        "catalogSignatureObject": 22,
+        "fieldSignatureObject": 22
+      },
+      "cmsVerified": true,
+      "acrobat": "unobserved",
+      "signedPrefixPreserved": true,
+      "fieldsAndWidgetsByteIdentical": true,
+      "pageBodyByteIdentical": true,
+      "updatedObjectNumbers": [],
+      "comparison": "Inline Annots array in both layouts. Only annotation dictionaries differ in direct/indirect storage before certification. Same writer and page-only operation for rewrite; no NM added except in names variants."
+    },
+    {
+      "id": "p3-direct-rewrite",
+      "file": "p3-direct-rewrite.pdf",
+      "profile": "p3",
+      "layout": "direct",
+      "action": "rewrite",
+      "facts": {
+        "sha256": "81ab2475e3c70a4dcfe5f7dbe45a6a1a85e901c9fbd5a12b1353664f68a95db2",
+        "byteLength": 22481,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4024,
+              20410,
+              1238
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "certification": {
+        "permission": 3,
+        "transform": "/DocMDP",
+        "catalogSignatureObject": 22,
+        "fieldSignatureObject": 22
+      },
+      "cmsVerified": true,
+      "acrobat": "unobserved",
+      "signedPrefixPreserved": true,
+      "fieldsAndWidgetsByteIdentical": true,
+      "pageBodyByteIdentical": true,
+      "updatedObjectNumbers": [
+        6
+      ],
+      "comparison": "Inline Annots array in both layouts. Only annotation dictionaries differ in direct/indirect storage before certification. Same writer and page-only operation for rewrite; no NM added except in names variants."
+    },
+    {
+      "id": "p3-direct-delete",
+      "file": "p3-direct-delete.pdf",
+      "profile": "p3",
+      "layout": "direct",
+      "action": "delete",
+      "facts": {
+        "sha256": "bf1ba8137dac30d0ded59542f6211396d39af1c05eb7d2c4a76fcd9506785ce3",
+        "byteLength": 22359,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4024,
+              20410,
+              1238
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "certification": {
+        "permission": 3,
+        "transform": "/DocMDP",
+        "catalogSignatureObject": 22,
+        "fieldSignatureObject": 22
+      },
+      "cmsVerified": true,
+      "acrobat": "unobserved",
+      "signedPrefixPreserved": true,
+      "fieldsAndWidgetsByteIdentical": true,
+      "pageBodyByteIdentical": false,
+      "updatedObjectNumbers": [
+        6
+      ],
+      "comparison": "Inline Annots array in both layouts. Only annotation dictionaries differ in direct/indirect storage before certification. Same writer and page-only operation for rewrite; no NM added except in names variants."
+    },
+    {
+      "id": "p3-direct-delete-names",
+      "file": "p3-direct-delete-names.pdf",
+      "profile": "p3",
+      "layout": "direct",
+      "action": "delete-names",
+      "facts": {
+        "sha256": "15f0486b4793d5966ac49bc22a828be6e68e9161d89e783c5b67f4f76fffb051",
+        "byteLength": 22434,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4024,
+              20410,
+              1238
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "certification": {
+        "permission": 3,
+        "transform": "/DocMDP",
+        "catalogSignatureObject": 22,
+        "fieldSignatureObject": 22
+      },
+      "cmsVerified": true,
+      "acrobat": "unobserved",
+      "signedPrefixPreserved": true,
+      "fieldsAndWidgetsByteIdentical": true,
+      "pageBodyByteIdentical": false,
+      "updatedObjectNumbers": [
+        6
+      ],
+      "comparison": "Inline Annots array in both layouts. Only annotation dictionaries differ in direct/indirect storage before certification. Same writer and page-only operation for rewrite; no NM added except in names variants."
+    },
+    {
+      "id": "p3-direct-names",
+      "file": "p3-direct-names.pdf",
+      "profile": "p3",
+      "layout": "direct",
+      "action": "names",
+      "facts": {
+        "sha256": "f1b68664985d6e380bbcb306bc8ab09ebd9429c414c6f18a91cccb00c9029749",
+        "byteLength": 22581,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4024,
+              20410,
+              1238
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "certification": {
+        "permission": 3,
+        "transform": "/DocMDP",
+        "catalogSignatureObject": 22,
+        "fieldSignatureObject": 22
+      },
+      "cmsVerified": true,
+      "acrobat": "unobserved",
+      "signedPrefixPreserved": true,
+      "fieldsAndWidgetsByteIdentical": true,
+      "pageBodyByteIdentical": false,
+      "updatedObjectNumbers": [
+        6
+      ],
+      "comparison": "Inline Annots array in both layouts. Only annotation dictionaries differ in direct/indirect storage before certification. Same writer and page-only operation for rewrite; no NM added except in names variants."
+    },
+    {
+      "id": "p3-indirect-control",
+      "file": "p3-indirect-control.pdf",
+      "profile": "p3",
+      "layout": "indirect",
+      "action": "control",
+      "facts": {
+        "sha256": "56c17597c1a4c7f151dd81b49a1fc3837c1f351bec5a77c27e8e6ad2d42e901a",
+        "byteLength": 21820,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4116,
+              20502,
+              1318
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "certification": {
+        "permission": 3,
+        "transform": "/DocMDP",
+        "catalogSignatureObject": 26,
+        "fieldSignatureObject": 26
+      },
+      "cmsVerified": true,
+      "acrobat": "unobserved",
+      "signedPrefixPreserved": true,
+      "fieldsAndWidgetsByteIdentical": true,
+      "pageBodyByteIdentical": true,
+      "updatedObjectNumbers": [],
+      "comparison": "Inline Annots array in both layouts. Only annotation dictionaries differ in direct/indirect storage before certification. Same writer and page-only operation for rewrite; no NM added except in names variants."
+    },
+    {
+      "id": "p3-indirect-rewrite",
+      "file": "p3-indirect-rewrite.pdf",
+      "profile": "p3",
+      "layout": "indirect",
+      "action": "rewrite",
+      "facts": {
+        "sha256": "fceb6c42a06d12afb76330d8341a5f5cd9f2c50c9947e5818cc1766d622d6e5b",
+        "byteLength": 22193,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4116,
+              20502,
+              1318
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "certification": {
+        "permission": 3,
+        "transform": "/DocMDP",
+        "catalogSignatureObject": 26,
+        "fieldSignatureObject": 26
+      },
+      "cmsVerified": true,
+      "acrobat": "unobserved",
+      "signedPrefixPreserved": true,
+      "fieldsAndWidgetsByteIdentical": true,
+      "pageBodyByteIdentical": true,
+      "updatedObjectNumbers": [
+        6
+      ],
+      "comparison": "Inline Annots array in both layouts. Only annotation dictionaries differ in direct/indirect storage before certification. Same writer and page-only operation for rewrite; no NM added except in names variants."
+    },
+    {
+      "id": "p3-indirect-delete",
+      "file": "p3-indirect-delete.pdf",
+      "profile": "p3",
+      "layout": "indirect",
+      "action": "delete",
+      "facts": {
+        "sha256": "0ea428d2d6eed0f9a438a980417e348775bcbc99183bc41113b9d66041159c56",
+        "byteLength": 22186,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4116,
+              20502,
+              1318
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "certification": {
+        "permission": 3,
+        "transform": "/DocMDP",
+        "catalogSignatureObject": 26,
+        "fieldSignatureObject": 26
+      },
+      "cmsVerified": true,
+      "acrobat": "unobserved",
+      "signedPrefixPreserved": true,
+      "fieldsAndWidgetsByteIdentical": true,
+      "pageBodyByteIdentical": false,
+      "updatedObjectNumbers": [
+        6
+      ],
+      "comparison": "Inline Annots array in both layouts. Only annotation dictionaries differ in direct/indirect storage before certification. Same writer and page-only operation for rewrite; no NM added except in names variants."
+    },
+    {
+      "id": "p3-indirect-delete-names",
+      "file": "p3-indirect-delete-names.pdf",
+      "profile": "p3",
+      "layout": "indirect",
+      "action": "delete-names",
+      "facts": {
+        "sha256": "5e89d3420783b530d97f0184a962045d5843b966322fe86bf4be87d1347ab83b",
+        "byteLength": 22750,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4116,
+              20502,
+              1318
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "certification": {
+        "permission": 3,
+        "transform": "/DocMDP",
+        "catalogSignatureObject": 26,
+        "fieldSignatureObject": 26
+      },
+      "cmsVerified": true,
+      "acrobat": "unobserved",
+      "signedPrefixPreserved": true,
+      "fieldsAndWidgetsByteIdentical": true,
+      "pageBodyByteIdentical": false,
+      "updatedObjectNumbers": [
+        6,
+        22,
+        24,
+        25
+      ],
+      "comparison": "Inline Annots array in both layouts. Only annotation dictionaries differ in direct/indirect storage before certification. Same writer and page-only operation for rewrite; no NM added except in names variants."
+    },
+    {
+      "id": "p3-indirect-names",
+      "file": "p3-indirect-names.pdf",
+      "profile": "p3",
+      "layout": "indirect",
+      "action": "names",
+      "facts": {
+        "sha256": "3674242266ed671e965a36e2ddf79b561cabf0b23830dc26b4cc66fa6a1116f1",
+        "byteLength": 22724,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4116,
+              20502,
+              1318
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "certification": {
+        "permission": 3,
+        "transform": "/DocMDP",
+        "catalogSignatureObject": 26,
+        "fieldSignatureObject": 26
+      },
+      "cmsVerified": true,
+      "acrobat": "unobserved",
+      "signedPrefixPreserved": true,
+      "fieldsAndWidgetsByteIdentical": true,
+      "pageBodyByteIdentical": false,
+      "updatedObjectNumbers": [
+        22,
+        23,
+        24,
+        25
+      ],
+      "comparison": "Inline Annots array in both layouts. Only annotation dictionaries differ in direct/indirect storage before certification. Same writer and page-only operation for rewrite; no NM added except in names variants."
+    }
+  ],
+  "directBaselineReproduced": true,
+  "certificatePathBase": "Investigation directory (weak-annotations), not the manifest subdirectory."
+}

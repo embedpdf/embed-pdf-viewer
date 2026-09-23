@@ -283,8 +283,9 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
       );
       const doc = await open(bytes);
       try {
-        const pon = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
-        const annotations = (await doc.page(toPageRef(pon)).annotations.list()).annotations;
+        const pageObjectNumber = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
+        const annotations = (await doc.page(toPageRef(pageObjectNumber)).annotations.list())
+          .annotations;
         const dimensions = annotations.filter((a) =>
           ['line', 'polyline', 'polygon'].includes(a.subtype),
         );
@@ -298,7 +299,7 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
             expect(Number.parseFloat(readout.label)).toBe(Number.parseFloat(a.contents!));
           if (a.subtype === 'polygon' || a.subtype === 'polyline')
             expect(a.caption).toBeUndefined();
-          const updated = await doc.page(toPageRef(pon)).annotations.update(a.ref, {
+          const updated = await doc.page(toPageRef(pageObjectNumber)).annotations.update(a.ref, {
             subtype: a.subtype,
             color: { r: 0, g: 0, b: 255 },
           } as never);

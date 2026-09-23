@@ -1,5 +1,5 @@
 /**
- * C1: a layer session signs on a candidate opened over its OWN base (no
+ * C1: a layer session signs on a candidate opened over its own base (no
  * whole-file copy). With unsaved edits the candidate is fed the artifact a
  * save would write, so edits and signature share one revision; a plain
  * session keeps the freeze-the-loaded-bytes path and produces two.

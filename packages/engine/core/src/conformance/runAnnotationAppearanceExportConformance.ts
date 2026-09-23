@@ -16,7 +16,7 @@ const square = (left: number, bottom: number, size = 40): SquareDraft => ({
 
 /**
  * `page(pon).annotations.exportAppearance(refs)`: the chosen annotations'
- * appearances as ONE single-page PDF sized to their union /Rect. Locks:
+ * appearances as one single-page PDF sized to their union /Rect. Locks:
  *   1. bytes are a PDF; the source page is untouched (no mutation, no
  *      revision bump);
  *   2. re-opened (local engines), the page is exactly the union size and the
@@ -45,8 +45,8 @@ export function runAnnotationAppearanceExportConformance(
       const doc = await openFixture(engine, opts);
       let exported: DocumentHandle | null = null;
       try {
-        const pon = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
-        const page = doc.page(toPageRef(pon));
+        const pageObjectNumber = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
+        const page = doc.page(toPageRef(pageObjectNumber));
         if (!page.annotations.exportAppearance) return;
         const a = (await page.annotations.create(square(20, 20))).created.ref;
         const b = (await page.annotations.create(square(100, 60, 30))).created.ref;

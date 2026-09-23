@@ -1,0 +1,7 @@
+---
+'@embedpdf/core-annotation': minor
+---
+
+The annotation model uses full names. `Point` replaces the `Vec` alias, `ContentGeometry` replaces `Geom`, `ModelAnnotation` replaces `Annot`, and `Message` replaces `Msg`; an annotation's `geom` is `geometry`. Discriminants follow one rule: things that are use `kind` (geometry, hit targets, drafts) and things that happen use `type` (messages, effects). `ChromeGeom` is `ChromeGeometry` and `DEFAULT_CHROME_GEOM` is `DEFAULT_CHROME_GEOMETRY`; a paint's `cap` is `lineCap`; a draft's `cur` is `current`.
+
+`update(model, message)` returns `{ session, change, effects }` instead of `[model, effects]`: the next session, the records the message changed (`change.put`) or deleted (`change.drop`), and the engine work. The core no longer stores records, so the record messages (`loaded`, `hydrated`, `upsert`, `remove`, `bumpAp`, `created`, `createFailed`) are gone; `rekey` follows a new record to the id it was confirmed under, and `forget` drops session references to records that left the view. `Model` is `Session & AnnotationView`; `initialSession`, `sameSession` and `EMPTY_CHANGE` are exported. Records created by the core get `new:<n>` ids (was `tmp:<n>`). Typing emits a `text` effect, and the `patch` effect no longer carries `apChanged`: whether an appearance changed is the engine's answer. The `delete` effect names the record by `id` (was `ref`), and `delete` and `flags` effects are emitted for records the engine has not confirmed yet too; the plugin writes them once the record's create is confirmed.

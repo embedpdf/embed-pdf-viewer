@@ -2,8 +2,8 @@
 
 SelectionAnchor [InterfaceDeclaration]: export interface SelectionAnchor{ page: PageRef; bounds: Rect; }
 SelectionCapability [InterfaceDeclaration]: export interface SelectionCapability{ canSelect(): boolean; canCopy(): boolean; select(range: SelectionRangeInput): void; selectAll(): void; selectPage(page: PageRef): void; selectWordAt(page: PageRef, point: Point): boolean; selectLineAt(page: PageRef, point: Point): boolean; extendTo(page: PageRef, point: Point): void; clear(): void; hasSelection(): boolean; getSnapshot(): SelectionSnapshot; getRange(): TextRange | null; listSelectedPages(): readonly PageRef[]; listSegments(page: PageRef): readonly SelectionSegment[]; listRects(page: PageRef): readonly Rect[]; getAnchor(): SelectionAnchor | null; readText(options?: OperationOptions): Promise<string>; readTextInRange(range: TextRange, options?: OperationOptions): Promise<string>; readonly onChanged: EventHook<SelectionChangedEvent>; readonly onCommitted: EventHook<SelectionCommittedEvent>; readonly onCleared: EventHook<SelectionClearedEvent>; }
-SelectionChangedEvent [InterfaceDeclaration]: export interface SelectionChangedEvent{ readonly range: TextRange | null; readonly pages: readonly PageRef[]; readonly origin: ChangeOrigin; }
-SelectionClearedEvent [InterfaceDeclaration]: export interface SelectionClearedEvent{ readonly origin: ChangeOrigin; }
+SelectionChangedEvent [InterfaceDeclaration]: export interface SelectionChangedEvent{ readonly range: TextRange | null; readonly pages: readonly PageRef[]; }
+SelectionClearedEvent [TypeAliasDeclaration]: export type SelectionClearedEvent = Record<string, never>;
 SelectionCommittedEvent [InterfaceDeclaration]: export interface SelectionCommittedEvent{ readonly range: TextRange; }
 SelectionConfig [InterfaceDeclaration]: export interface SelectionConfig{ dragThreshold?: number; }
 SelectionEndpoint [InterfaceDeclaration]: export interface SelectionEndpoint{ page: PageRef; glyphQuad: TextQuad; advance: 1 | -1; rect: Rect; }

@@ -5,7 +5,7 @@ import type { AnnotationBorderStyle, Color } from '../primitives';
 
 /**
  * Composable styling layers shared by every annotation family, named after
- * the PDF entries they map onto so the v3 wire vocabulary matches ISO 32000:
+ * the PDF entries they map onto so the wire vocabulary matches ISO 32000:
  *
  *   ColorStyleFields    -> `/C` (color) + `/CA` (opacity)        — universal
  *   GeometryStyleFields -> + `/BS` (border style / width / dash) — geometric

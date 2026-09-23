@@ -60,8 +60,8 @@ try {
   const errs: string[] = [];
   diffBool(
     'invariants.ponSetPreserved',
-    localResult.invariants.ponSetPreserved,
-    cloudResult.invariants.ponSetPreserved,
+    localResult.invariants.pageObjectNumberSetPreserved,
+    cloudResult.invariants.pageObjectNumberSetPreserved,
     errs,
   );
   diffBool(

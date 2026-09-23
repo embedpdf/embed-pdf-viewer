@@ -1,11 +1,11 @@
-import { PluginError, pageRefsEqual } from '@embedpdf/core';
+import { PluginError, memo, pageRefsEqual } from '@embedpdf/core';
 import {
   geomVisualBounds,
   propsFor,
   readProp,
-  type Annot,
+  type ModelAnnotation,
   type AnnotationProps,
-  type Geom,
+  type ContentGeometry,
   type Id,
   type Model,
 } from '@embedpdf/core-annotation';
@@ -13,100 +13,126 @@ import {
   annotationKey,
   type AnnotationDTO,
   type AnnotationRef,
+  type PageRef,
 } from '@embedpdf/engine-core/runtime';
 
 import type { Annotation, AnnotationFilter, AnnotationGeometry } from '../contract';
-import type { AnnotationServices } from '../services';
+import type { AnnotationContext, AnnotationServices } from '../services';
 
 /**
  * The page-space read model: every annotation projected once per model
  * entry (the model already lives in page space), so reads are
- * reference-stable until the entry changes.
+ * reference-stable until the entry changes. `raw` is always the engine's
+ * confirmed record; everything else shows the user's change while it is
+ * pending.
  */
-export function createAnnotationReads({ store }: Pick<AnnotationServices, 'store'>) {
-  const projections = new WeakMap<Annot, Annotation>();
+export function createAnnotationReads(
+  ctx: Pick<AnnotationContext, 'state'>,
+  { store, records }: Pick<AnnotationServices, 'store' | 'records'>,
+) {
+  const projections = new WeakMap<ModelAnnotation, Annotation>();
+
+  /** The records with a change waiting for the engine. */
+  const pendingIds = memo(
+    () => [ctx.state.get().pending] as const,
+    (pending) => new Set(pending.map((change) => change.id)),
+  );
+
+  /** The engine's confirmed record for an id (null for a record not yet confirmed). */
+  const confirmedDtoOf = (id: Id): AnnotationDTO | null => records.get().byKey[id]?.dto ?? null;
 
   const refOfId = (id: Id): AnnotationRef | null => store.model().byId[id]?.ref ?? null;
 
-  const geometryOf = (g: Geom): AnnotationGeometry => {
-    switch (g.t) {
+  const geometryOf = (geometry: ContentGeometry): AnnotationGeometry => {
+    switch (geometry.kind) {
       case 'rect':
-        return { kind: 'rect', bounds: g.rect, rotation: g.rot ?? 0 };
+        return { kind: 'rect', bounds: geometry.rect, rotation: geometry.rot ?? 0 };
       case 'line':
-        return { kind: 'line', from: g.a, to: g.b };
+        return { kind: 'line', from: geometry.a, to: geometry.b };
       case 'poly':
-        return { kind: g.closed ? 'polygon' : 'polyline', vertices: g.points };
+        return { kind: geometry.closed ? 'polygon' : 'polyline', vertices: geometry.points };
       case 'ink':
-        return { kind: 'ink', strokes: g.strokes };
+        return { kind: 'ink', strokes: geometry.strokes };
       case 'quads':
-        return { kind: 'markup', quads: g.quads };
+        return { kind: 'markup', quads: geometry.quads };
       case 'caret':
-        return { kind: 'caret', bounds: g.rect };
+        return { kind: 'caret', bounds: geometry.rect };
       case 'text':
-        return { kind: 'text', bounds: g.rect, rotation: g.rot ?? 0, callout: g.callout ?? null };
+        return {
+          kind: 'text',
+          bounds: geometry.rect,
+          rotation: geometry.rot ?? 0,
+          callout: geometry.callout ?? null,
+        };
     }
   };
-  const propsOf = (a: Annot): Partial<AnnotationProps> => {
+  const propsOf = (annotation: ModelAnnotation): Partial<AnnotationProps> => {
     const out: Partial<AnnotationProps> = {};
-    for (const spec of propsFor(a.subtype)) {
-      const value = readProp(a, spec.key);
+    for (const spec of propsFor(annotation.subtype)) {
+      const value = readProp(annotation, spec.key);
       if (value !== undefined) (out as Record<string, unknown>)[spec.key] = value;
     }
     return out;
   };
-  const projectAnnot = (a: Annot): Annotation | null => {
-    if (!a.ref) return null;
-    const hit = projections.get(a);
+  const projectAnnot = (annotation: ModelAnnotation): Annotation | null => {
+    if (!annotation.ref) return null;
+    const hit = projections.get(annotation);
     if (hit) return hit;
-    const d = a.data;
+    const dto = annotation.data;
+    const pending = pendingIds().has(annotation.id);
     const projected: Annotation = {
-      ref: a.ref,
-      page: a.page,
-      subtype: a.subtype,
-      bounds: geomVisualBounds(a.geom, a.style.strokeWidth, a.style.border),
-      geometry: geometryOf(a.geom),
-      props: propsOf(a),
-      flags: a.flags,
-      contents: d?.contents ?? '',
-      author: d?.author ?? null,
-      createdAt: d?.created ?? null,
-      modifiedAt: d?.modified ?? null,
-      group: a.group ? refOfId(a.group) : null,
-      inReplyTo: d?.inReplyTo ?? null,
-      authority: a.authority ?? { update: true, delete: true },
-      raw: d ?? null,
+      ref: annotation.ref,
+      page: annotation.page,
+      subtype: annotation.subtype,
+      bounds: geomVisualBounds(
+        annotation.geometry,
+        annotation.style.strokeWidth,
+        annotation.style.border,
+      ),
+      geometry: geometryOf(annotation.geometry),
+      props: propsOf(annotation),
+      flags: annotation.flags,
+      contents: dto?.contents ?? '',
+      author: dto?.author ?? null,
+      createdAt: dto?.created ?? null,
+      modifiedAt: dto?.modified ?? null,
+      group: annotation.group ? refOfId(annotation.group) : null,
+      inReplyTo: dto?.inReplyTo ?? null,
+      authority: annotation.authority ?? { update: true, delete: true },
+      raw: confirmedDtoOf(annotation.id),
+      ...(pending ? { pending: true as const } : {}),
     };
-    projections.set(a, projected);
+    projections.set(annotation, projected);
     return projected;
   };
   const projectRef = (ref: AnnotationRef): Annotation | null => {
-    const a = store.model().byId[annotationKey(ref)];
-    return a ? projectAnnot(a) : null;
+    const annotation = store.model().byId[annotationKey(ref)];
+    return annotation ? projectAnnot(annotation) : null;
   };
 
-  const listAnnots = (filter?: AnnotationFilter): Annot[] => {
-    const m = store.model();
+  const listAnnots = (filter?: AnnotationFilter): ModelAnnotation[] => {
+    const model = store.model();
     const group = filter?.group ? annotationKey(filter.group) : undefined;
-    return m.order
-      .map((id) => m.byId[id])
-      .filter((a): a is Annot => a !== undefined)
+    return model.order
+      .map((id) => model.byId[id])
+      .filter((annotation): annotation is ModelAnnotation => annotation !== undefined)
       .filter(
-        (a) =>
-          (!filter?.page || pageRefsEqual(a.page, filter.page)) &&
-          (!filter?.subtype || a.subtype === filter.subtype) &&
-          (filter?.author === undefined || a.data?.author === filter.author) &&
-          (!group || a.group === group || a.id === group),
+        (annotation) =>
+          (!filter?.page || pageRefsEqual(annotation.page, filter.page)) &&
+          (!filter?.subtype || annotation.subtype === filter.subtype) &&
+          (filter?.author === undefined || annotation.data?.author === filter.author) &&
+          (!group || annotation.group === group || annotation.id === group),
       );
   };
   // Unfiltered and per-page lists are what layers subscribe to: memoized per model.
   let listMemo: { model: Model; v: readonly Annotation[] } | null = null;
   const pageListMemo = new Map<number, { model: Model; v: readonly Annotation[] }>();
-  const projectList = (annots: readonly Annot[]): Annotation[] =>
-    annots.map(projectAnnot).filter((a): a is Annotation => a !== null);
+  const projectList = (annots: readonly ModelAnnotation[]): Annotation[] =>
+    annots.map(projectAnnot).filter((annotation): annotation is Annotation => annotation !== null);
   const listAnnotations = (filter?: AnnotationFilter): readonly Annotation[] => {
-    const m = store.model();
+    const model = store.model();
     if (!filter) {
-      if (listMemo?.model !== m) listMemo = { model: m, v: projectList(listAnnots()) };
+      if (listMemo?.model !== model) listMemo = { model: model, v: projectList(listAnnots()) };
       return listMemo.v;
     }
     if (
@@ -115,38 +141,51 @@ export function createAnnotationReads({ store }: Pick<AnnotationServices, 'store
       filter.author === undefined &&
       !filter.group
     ) {
-      const pon = filter.page.pageObjectNumber;
-      const hit = pageListMemo.get(pon);
-      if (hit?.model === m) return hit.v;
-      const v = projectList(listAnnots(filter));
-      pageListMemo.set(pon, { model: m, v });
-      return v;
+      const pageObjectNumber = filter.page.pageObjectNumber;
+      const hit = pageListMemo.get(pageObjectNumber);
+      if (hit?.model === model) return hit.v;
+      const pageList = projectList(listAnnots(filter));
+      pageListMemo.set(pageObjectNumber, { model: model, v: pageList });
+      return pageList;
     }
     return projectList(listAnnots(filter));
   };
   let selectedMemo: { model: Model; v: readonly Annotation[] } | null = null;
   const listSelected = (): readonly Annotation[] => {
-    const m = store.model();
-    if (selectedMemo?.model !== m) {
+    const model = store.model();
+    if (selectedMemo?.model !== model) {
       selectedMemo = {
-        model: m,
-        v: projectList(m.selected.map((id) => m.byId[id]).filter((a): a is Annot => !!a)),
+        model: model,
+        v: projectList(
+          model.selected
+            .map((id) => model.byId[id])
+            .filter((annotation): annotation is ModelAnnotation => !!annotation),
+        ),
       };
     }
     return selectedMemo.v;
   };
 
-  const loadedOrThrow = (ref: AnnotationRef): Annot & { ref: AnnotationRef } => {
-    const a = store.model().byId[annotationKey(ref)];
-    if (!a || !a.ref) {
+  /** The page a ref lives on: where the record was read, else the ref's own page. */
+  const pageOf = (ref: AnnotationRef): PageRef =>
+    store.model().byId[annotationKey(ref)]?.page ?? ref.page;
+
+  const loadedOrThrow = (ref: AnnotationRef): ModelAnnotation & { ref: AnnotationRef } => {
+    const annotation = store.model().byId[annotationKey(ref)];
+    if (!annotation || !annotation.ref) {
       throw new PluginError('not-found', 'annotation', 'annotation is not loaded in this document');
     }
-    return a as Annot & { ref: AnnotationRef };
+    return annotation as ModelAnnotation & { ref: AnnotationRef };
   };
   /** Committed, data-backed annotations in the current selection. */
-  const selectedCommitted = (): Annot[] => {
-    const m = store.model();
-    return m.selected.map((id) => m.byId[id]).filter((a): a is Annot => !!a && !!a.ref && !!a.data);
+  const selectedCommitted = (): ModelAnnotation[] => {
+    const model = store.model();
+    return model.selected
+      .map((id) => model.byId[id])
+      .filter(
+        (annotation): annotation is ModelAnnotation =>
+          !!annotation && !!annotation.ref && !!annotation.data,
+      );
   };
 
   const api = {
@@ -154,18 +193,19 @@ export function createAnnotationReads({ store }: Pick<AnnotationServices, 'store
     list: listAnnotations,
     listRaw: (filter?: AnnotationFilter) =>
       listAnnots(filter)
-        .map((a) => a.data)
-        .filter((d): d is AnnotationDTO => d != null),
-    getRaw: (ref: AnnotationRef): AnnotationDTO | null =>
-      store.model().byId[annotationKey(ref)]?.data ?? null,
+        .map((annotation) => confirmedDtoOf(annotation.id))
+        .filter((dto): dto is AnnotationDTO => dto != null),
+    getRaw: (ref: AnnotationRef): AnnotationDTO | null => confirmedDtoOf(annotationKey(ref)),
     listSelected,
     getSelection: (): AnnotationRef[] => {
-      const m = store.model();
-      return m.selected.map((id) => m.byId[id]?.ref).filter((r): r is AnnotationRef => r != null);
+      const model = store.model();
+      return model.selected
+        .map((id) => model.byId[id]?.ref)
+        .filter((ref): ref is AnnotationRef => ref != null);
     },
   };
 
-  return { projectRef, listAnnots, loadedOrThrow, selectedCommitted, api };
+  return { projectRef, listAnnots, loadedOrThrow, selectedCommitted, pageOf, api };
 }
 
 export type AnnotationReads = ReturnType<typeof createAnnotationReads>;

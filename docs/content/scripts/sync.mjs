@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Mount the shared docs corpus into a site (DOCS-PLATFORM-ARCHITECTURE.md).
+ * Mount the shared docs corpus into a site (docs/conventions/docs-architecture.md).
  *
  *   node scripts/sync.mjs --target <site dir> --engine local|cloud [--frameworks react,...] [--check]
  *

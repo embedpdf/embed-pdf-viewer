@@ -1,7 +1,6 @@
 /**
- * Handle policy against a fake view — the rotation coverage the React-bound
- * version could never have: geometry at every quarter turn plus 45°, RTL edge
- * choice, and the drag session's re-root/gap/commit rules.
+ * Handle policy against a fake view: geometry at every quarter turn plus
+ * 45°, RTL edge choice, and the drag session's re-root/gap/commit rules.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { textQuadFromRect } from '@embedpdf/core-geometry';
@@ -10,80 +9,85 @@ import { toPageRef, type PageRef } from '@embedpdf/engine-core/runtime';
 import { HANDLE_HEAD, createSelectionHandleDrag, selectionHandleGeom } from '../src/handles';
 import type { SelectionHandleEndpoint, SelectionHandleView } from '../src/handles';
 
-const rotQuad = (q: TextQuad, deg: number, px: number, py: number): TextQuad => {
-  const r = (deg * Math.PI) / 180;
-  const c = Math.cos(r);
-  const s = Math.sin(r);
-  const m = (p: Point) => ({
-    x: px + (p.x - px) * c - (p.y - py) * s,
-    y: py + (p.x - px) * s + (p.y - py) * c,
+const rotateQuad = (
+  quad: TextQuad,
+  angleDeg: number,
+  pivotX: number,
+  pivotY: number,
+): TextQuad => {
+  const radians = (angleDeg * Math.PI) / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const rotate = (point: Point) => ({
+    x: pivotX + (point.x - pivotX) * cos - (point.y - pivotY) * sin,
+    y: pivotY + (point.x - pivotX) * sin + (point.y - pivotY) * cos,
   });
   return {
-    upperStart: m(q.upperStart),
-    upperEnd: m(q.upperEnd),
-    lowerStart: m(q.lowerStart),
-    lowerEnd: m(q.lowerEnd),
+    upperStart: rotate(quad.upperStart),
+    upperEnd: rotate(quad.upperEnd),
+    lowerStart: rotate(quad.lowerStart),
+    lowerEnd: rotate(quad.lowerEnd),
   };
 };
 
-/** Identity projection with a zoom factor — page space IS overlay space × zoom. */
+/** Identity projection with a zoom factor — page space is overlay space × zoom. */
 const view = (zoom = 1): SelectionHandleView => ({
-  toOverlay: (_page, pt) => ({ x: pt.x * zoom, y: pt.y * zoom }),
+  toOverlay: (_page, point) => ({ x: point.x * zoom, y: point.y * zoom }),
   pageAt: () => null,
   pointOnPage: () => null,
 });
 
 const CELL = textQuadFromRect({ x: 100, y: 200, width: 60, height: 16 });
-const ep = (glyphQuad: TextQuad, advance: 1 | -1 = 1): SelectionHandleEndpoint => ({
+const endpoint = (glyphQuad: TextQuad, advance: 1 | -1 = 1): SelectionHandleEndpoint => ({
   page: toPageRef(7),
   glyphQuad,
   advance,
 });
 
 describe('selectionHandleGeom', () => {
-  it('upright: bar IS the rect side, marked upright, head stacked beyond it', () => {
-    const start = selectionHandleGeom(view(), ep(CELL), 'start')!;
+  it('upright: bar is the rect side, marked upright, head stacked beyond it', () => {
+    const start = selectionHandleGeom(view(), endpoint(CELL), 'start')!;
     expect(start.bar.from).toEqual({ x: 100, y: 200 }); // ascent corner first
     expect(start.bar.to).toEqual({ x: 100, y: 216 });
     expect(start.length).toBeCloseTo(16, 9);
     expect(start.rotation).toBeCloseTo(0, 9);
     expect(start.upright).toBe(true);
     expect(start.head).toEqual({ x: 100, y: 200 - HANDLE_HEAD / 2 }); // above the ascent
-    const end = selectionHandleGeom(view(), ep(CELL), 'end')!;
+    const end = selectionHandleGeom(view(), endpoint(CELL), 'end')!;
     expect(end.bar.from).toEqual({ x: 160, y: 200 });
     expect(end.head).toEqual({ x: 160, y: 216 + HANDLE_HEAD / 2 }); // past the baseline
   });
 
-  it('bar length is the INK height at every rotation — never the AABB height', () => {
+  it('bar length is the ink height at every rotation — never the AABB height', () => {
     for (const deg of [30, 45, 90, 180, 270]) {
-      const g = selectionHandleGeom(view(), ep(rotQuad(CELL, deg, 100, 200)), 'start')!;
-      expect(g.length).toBeCloseTo(16, 6);
-      expect(g.upright).toBe(false);
+      const geometry = selectionHandleGeom(view(), endpoint(rotateQuad(CELL, deg, 100, 200)), 'start')!;
+      expect(geometry.length).toBeCloseTo(16, 6);
+      expect(geometry.upright).toBe(false);
       // the bar's screen angle tracks the text's tilt exactly
-      expect(((g.rotation % 360) + 360) % 360).toBeCloseTo(deg % 360, 6);
+      expect(((geometry.rotation % 360) + 360) % 360).toBeCloseTo(deg % 360, 6);
     }
   });
 
   it('zoom scales the projected geometry with no extra factor', () => {
-    const g = selectionHandleGeom(view(2.5), ep(rotQuad(CELL, 45, 100, 200)), 'start')!;
-    expect(g.length).toBeCloseTo(40, 6); // 16 × 2.5
+    const geometry = selectionHandleGeom(view(2.5), endpoint(rotateQuad(CELL, 45, 100, 200)), 'start')!;
+    expect(geometry.length).toBeCloseTo(40, 6); // 16 × 2.5
   });
 
-  it('RTL: the LEADING edge mirrors — start takes the end-side edge', () => {
-    const ltr = selectionHandleGeom(view(), ep(CELL, 1), 'start')!;
-    const rtl = selectionHandleGeom(view(), ep(CELL, -1), 'start')!;
+  it('RTL: the leading edge mirrors — start takes the end-side edge', () => {
+    const ltr = selectionHandleGeom(view(), endpoint(CELL, 1), 'start')!;
+    const rtl = selectionHandleGeom(view(), endpoint(CELL, -1), 'start')!;
     expect(ltr.bar.from.x).toBeCloseTo(100, 9);
     expect(rtl.bar.from.x).toBeCloseTo(160, 9); // the cell's end side
     // …and the same mirroring under rotation
-    const rtl45 = selectionHandleGeom(view(), ep(rotQuad(CELL, 45, 100, 200), -1), 'start')!;
+    const rtl45 = selectionHandleGeom(view(), endpoint(rotateQuad(CELL, 45, 100, 200), -1), 'start')!;
     expect(rtl45.length).toBeCloseTo(16, 6);
   });
 
   it('null when the page is not laid out or the cell is degenerate', () => {
     const dead: SelectionHandleView = { ...view(), toOverlay: () => null };
-    expect(selectionHandleGeom(dead, ep(CELL), 'start')).toBeNull();
+    expect(selectionHandleGeom(dead, endpoint(CELL), 'start')).toBeNull();
     const flat = textQuadFromRect({ x: 0, y: 0, width: 10, height: 0 });
-    expect(selectionHandleGeom(view(), ep(flat), 'start')).toBeNull();
+    expect(selectionHandleGeom(view(), endpoint(flat), 'start')).toBeNull();
   });
 });
 
@@ -94,76 +98,84 @@ describe('createSelectionHandleDrag', () => {
     endGesture: vi.fn(),
   });
 
-  it('re-roots ONCE at the opposite cell centre, then extends toward the pointer', () => {
-    const t = target();
-    const v: SelectionHandleView = {
+  it('re-roots once at the opposite cell centre, then extends toward the pointer', () => {
+    const selection = target();
+    const handleView: SelectionHandleView = {
       ...view(),
-      pageAt: (o) => ({ ref: toPageRef(9), point: { x: o.x, y: o.y } }),
+      pageAt: (overlay) => ({ ref: toPageRef(9), point: { x: overlay.x, y: overlay.y } }),
     };
-    const session = createSelectionHandleDrag(t, v, ep(CELL), toPageRef(7));
+    const session = createSelectionHandleDrag(selection, handleView, endpoint(CELL), toPageRef(7));
     session.move({ x: 300, y: 400 });
     session.move({ x: 310, y: 410 });
-    expect(t.beginGestureAt).toHaveBeenCalledTimes(1);
-    expect(t.beginGestureAt).toHaveBeenCalledWith(toPageRef(7), { x: 130, y: 208 }); // the cell centre
-    expect(t.extendTo).toHaveBeenNthCalledWith(1, toPageRef(9), { x: 300, y: 400 });
-    expect(t.extendTo).toHaveBeenNthCalledWith(2, toPageRef(9), { x: 310, y: 410 });
+    expect(selection.beginGestureAt).toHaveBeenCalledTimes(1);
+    // The cell centre.
+    expect(selection.beginGestureAt).toHaveBeenCalledWith(toPageRef(7), { x: 130, y: 208 });
+    expect(selection.extendTo).toHaveBeenNthCalledWith(1, toPageRef(9), { x: 300, y: 400 });
+    expect(selection.extendTo).toHaveBeenNthCalledWith(2, toPageRef(9), { x: 310, y: 410 });
     session.end();
-    expect(t.endGesture).toHaveBeenCalledTimes(1);
+    expect(selection.endGesture).toHaveBeenCalledTimes(1);
   });
 
-  it('the re-root anchor stays inside a ROTATED opposite glyph (cell centre, not AABB corner)', () => {
-    const t = target();
-    const v: SelectionHandleView = { ...view(), pageAt: (o) => ({ ref: toPageRef(9), point: o }) };
-    const session = createSelectionHandleDrag(t, v, ep(rotQuad(CELL, 45, 100, 200)), toPageRef(7));
+  it('the re-root anchor stays inside a rotated opposite glyph (cell centre, not AABB corner)', () => {
+    const selection = target();
+    const handleView: SelectionHandleView = {
+      ...view(),
+      pageAt: (overlay) => ({ ref: toPageRef(9), point: overlay }),
+    };
+    const rotated = endpoint(rotateQuad(CELL, 45, 100, 200));
+    const session = createSelectionHandleDrag(selection, handleView, rotated, toPageRef(7));
     session.move({ x: 0, y: 0 });
-    const [, anchor] = t.beginGestureAt.mock.calls[0]!;
+    const [, anchor] = selection.beginGestureAt.mock.calls[0]!;
     // the centre of the rotated cell = the upright centre rotated about the pivot
-    const r = Math.PI / 4;
-    const cx = 100 + (130 - 100) * Math.cos(r) - (208 - 200) * Math.sin(r);
-    const cy = 200 + (130 - 100) * Math.sin(r) + (208 - 200) * Math.cos(r);
-    expect(anchor.x).toBeCloseTo(cx, 9);
-    expect(anchor.y).toBeCloseTo(cy, 9);
+    const radians = Math.PI / 4;
+    const centerX = 100 + (130 - 100) * Math.cos(radians) - (208 - 200) * Math.sin(radians);
+    const centerY = 200 + (130 - 100) * Math.sin(radians) + (208 - 200) * Math.cos(radians);
+    expect(anchor.x).toBeCloseTo(centerX, 9);
+    expect(anchor.y).toBeCloseTo(centerY, 9);
   });
 
-  it('over a gap, projects onto the LAST page hit so the selection keeps tracking', () => {
-    const t = target();
-    const v: SelectionHandleView = {
-      toOverlay: (_p, pt) => pt,
+  it('over a gap, projects onto the last page hit so the selection keeps tracking', () => {
+    const selection = target();
+    const handleView: SelectionHandleView = {
+      toOverlay: (_page, point) => point,
       pageAt: vi
-        .fn<(o: Point) => { ref: PageRef; point: Point } | null>()
+        .fn<(overlay: Point) => { ref: PageRef; point: Point } | null>()
         .mockReturnValueOnce({ ref: toPageRef(9), point: { x: 1, y: 2 } })
         .mockReturnValue(null),
-      pointOnPage: (page, o) => ({ x: o.x + page.pageObjectNumber, y: o.y }),
+      pointOnPage: (page, overlay) => ({ x: overlay.x + page.pageObjectNumber, y: overlay.y }),
     };
-    const session = createSelectionHandleDrag(t, v, ep(CELL), toPageRef(7));
+    const session = createSelectionHandleDrag(selection, handleView, endpoint(CELL), toPageRef(7));
     session.move({ x: 10, y: 10 }); // hits page 9
     session.move({ x: 20, y: 20 }); // gap → projects onto page 9's plane
-    expect(t.extendTo).toHaveBeenLastCalledWith(toPageRef(9), { x: 29, y: 20 });
+    expect(selection.extendTo).toHaveBeenLastCalledWith(toPageRef(9), { x: 29, y: 20 });
   });
 
-  it('before any page hit, the gap fallback uses the DRAGGED endpoint page', () => {
-    const t = target();
-    const v: SelectionHandleView = {
-      toOverlay: (_p, pt) => pt,
+  it('before any page hit, the gap fallback uses the dragged endpoint page', () => {
+    const selection = target();
+    const handleView: SelectionHandleView = {
+      toOverlay: (_page, point) => point,
       pageAt: () => null,
-      pointOnPage: (page, o) => ({ x: o.x + page.pageObjectNumber, y: o.y }),
+      pointOnPage: (page, overlay) => ({ x: overlay.x + page.pageObjectNumber, y: overlay.y }),
     };
-    const session = createSelectionHandleDrag(t, v, ep(CELL), toPageRef(7));
+    const session = createSelectionHandleDrag(selection, handleView, endpoint(CELL), toPageRef(7));
     session.move({ x: 5, y: 5 });
-    expect(t.extendTo).toHaveBeenCalledWith(toPageRef(7), { x: 12, y: 5 });
+    expect(selection.extendTo).toHaveBeenCalledWith(toPageRef(7), { x: 12, y: 5 });
   });
 
   it('a refused re-root arms nothing; end() without arming settles nothing', () => {
-    const t = {
+    const selection = {
       beginGestureAt: vi.fn((_page: PageRef, _point: Point) => false),
       extendTo: vi.fn(),
       endGesture: vi.fn(),
     };
-    const v: SelectionHandleView = { ...view(), pageAt: (o) => ({ ref: toPageRef(9), point: o }) };
-    const session = createSelectionHandleDrag(t, v, ep(CELL), toPageRef(7));
+    const handleView: SelectionHandleView = {
+      ...view(),
+      pageAt: (overlay) => ({ ref: toPageRef(9), point: overlay }),
+    };
+    const session = createSelectionHandleDrag(selection, handleView, endpoint(CELL), toPageRef(7));
     session.move({ x: 10, y: 10 });
-    expect(t.extendTo).not.toHaveBeenCalled();
+    expect(selection.extendTo).not.toHaveBeenCalled();
     session.end();
-    expect(t.endGesture).not.toHaveBeenCalled(); // an untouched press commits nothing
+    expect(selection.endGesture).not.toHaveBeenCalled(); // an untouched press commits nothing
   });
 });

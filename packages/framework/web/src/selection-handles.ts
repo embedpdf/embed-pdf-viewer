@@ -5,12 +5,12 @@
  * `handles` module; this file never imports it, per the layering law:
  * structural interfaces only).
  *
- * The load-bearing subtlety this module owns: the pointer-DOWN shield must be
- * a NATIVE listener. The stage's gesture controller listens natively on the
+ * The load-bearing subtlety this module owns: the pointer-down shield must be
+ * a native listener. The stage's gesture controller listens natively on the
  * container, so a framework-synthetic stopPropagation (React runs its
- * handlers at the root, AFTER the container's native ones) would be too late
+ * handlers at the root, after the container's native ones) would be too late
  * — the stage would already be panning underneath the handle drag. Once the
- * down is captured here, movement tracks by CLIENT DELTAS from the handle's
+ * down is captured here, movement tracks by client deltas from the handle's
  * own base point: no DOM geometry reads, and the client↔overlay conversion
  * cancels out.
  */
@@ -30,7 +30,7 @@ export interface SelectionHandleSession {
 export interface AttachSelectionHandleOptions {
   /**
    * Called at pointer-down to arm a drag: return the drag session plus the
-   * handle's current BASE point in overlay space (the bar's midpoint — the
+   * handle's current base point in overlay space (the bar's midpoint — the
    * point the user grabbed). Return null to decline (endpoint vanished, page
    * not laid out) — the press then does nothing and nothing is captured.
    */
@@ -39,7 +39,7 @@ export interface AttachSelectionHandleOptions {
 
 /** Bind one handle element. Returns the detach fn. */
 export function attachSelectionHandle(
-  el: HTMLElement,
+  element: HTMLElement,
   options: AttachSelectionHandleOptions,
 ): () => void {
   let active: {
@@ -49,29 +49,29 @@ export function attachSelectionHandle(
     pointerId: number;
   } | null = null;
 
-  const onMove = (e: PointerEvent) => {
-    if (!active || e.pointerId !== active.pointerId) return;
+  const onMove = (event: PointerEvent) => {
+    if (!active || event.pointerId !== active.pointerId) return;
     active.session.move({
-      x: active.base.x + (e.clientX - active.baseClient.x),
-      y: active.base.y + (e.clientY - active.baseClient.y),
+      x: active.base.x + (event.clientX - active.baseClient.x),
+      y: active.base.y + (event.clientY - active.baseClient.y),
     });
   };
   // Release and system-cancel settle identically: the selection's own commit
   // semantics live in the session; there is no half-state to revert here.
-  const onUp = (e: PointerEvent) => {
-    if (!active || e.pointerId !== active.pointerId) return;
-    const s = active.session;
+  const onUp = (event: PointerEvent) => {
+    if (!active || event.pointerId !== active.pointerId) return;
+    const session = active.session;
     active = null;
-    s.end();
+    session.end();
   };
-  const onDown = (e: PointerEvent) => {
+  const onDown = (event: PointerEvent) => {
     if (active) return;
     const armed = options.arm();
     if (!armed) return;
-    e.preventDefault();
-    e.stopPropagation(); // native: fires BEFORE the stage controller's listener
+    event.preventDefault();
+    event.stopPropagation(); // native: fires before the stage controller's listener
     try {
-      el.setPointerCapture(e.pointerId);
+      element.setPointerCapture(event.pointerId);
     } catch {
       // best-effort, like the scrollbar: an already-released pointer
       // (pen/touch races, synthetic events in tests) throws — the drag must
@@ -80,20 +80,20 @@ export function attachSelectionHandle(
     active = {
       session: armed.session,
       base: armed.base,
-      baseClient: { x: e.clientX, y: e.clientY },
-      pointerId: e.pointerId,
+      baseClient: { x: event.clientX, y: event.clientY },
+      pointerId: event.pointerId,
     };
   };
 
-  el.addEventListener('pointerdown', onDown);
-  el.addEventListener('pointermove', onMove);
-  el.addEventListener('pointerup', onUp);
-  el.addEventListener('pointercancel', onUp);
+  element.addEventListener('pointerdown', onDown);
+  element.addEventListener('pointermove', onMove);
+  element.addEventListener('pointerup', onUp);
+  element.addEventListener('pointercancel', onUp);
   return () => {
-    el.removeEventListener('pointerdown', onDown);
-    el.removeEventListener('pointermove', onMove);
-    el.removeEventListener('pointerup', onUp);
-    el.removeEventListener('pointercancel', onUp);
+    element.removeEventListener('pointerdown', onDown);
+    element.removeEventListener('pointermove', onMove);
+    element.removeEventListener('pointerup', onUp);
+    element.removeEventListener('pointercancel', onUp);
     active = null;
   };
 }

@@ -191,7 +191,7 @@ describe('buildCommentThreads — review status', () => {
     const review = threads[0]!.review;
     expect(review.byReviewer['alice']?.state).toBe('rejected');
     expect(review.lastChange?.state).toBe('rejected');
-    // Membership keeps BOTH links of the chain — thread deletion needs the
+    // Membership keeps both links of the chain — thread deletion needs the
     // superseded state annotation too, even though the summary dropped it.
     expect(review.statusRefs.map(num)).toEqual([2, 3]);
   });

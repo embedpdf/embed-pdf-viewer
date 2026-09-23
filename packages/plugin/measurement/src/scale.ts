@@ -1,19 +1,14 @@
+/** Scale arithmetic: the default presets and scale, and unit and precision edits of a scale. */
 import {
   areaUnitLabel,
   measureFromRatio,
   METRES,
   squareMetres,
   squareOf,
-  viewportForPoint,
 } from '@embedpdf/engine-core/runtime';
-import type {
-  AreaUnit,
-  LengthUnit,
-  PageMeasurementViewport,
-  PdfMeasure,
-  PdfRect,
-} from '@embedpdf/engine-core/runtime';
-import type { MeasurementConfig, PageScale, ScalePreset } from './contract';
+import type { AreaUnit, LengthUnit, PdfMeasure } from '@embedpdf/engine-core/runtime';
+
+import type { MeasurementConfig, ScalePreset } from './contract';
 
 export const DEFAULT_PRESETS: ScalePreset[] = [
   ...[1, 10, 20, 50, 100, 200].map((real) => ({
@@ -32,39 +27,19 @@ export const defaultMeasure = (config: MeasurementConfig, userUnit = 1): PdfMeas
     ? config.defaultScale
     : measureFromRatio(1, 1, config.defaultScale === 'imperial' ? 'ft' : 'm', userUnit);
 
-export function selectPageScale(
-  viewports: PageMeasurementViewport[],
-  crop: PdfRect,
-  fallback: PdfMeasure,
-  persistent: boolean,
-): PageScale {
-  const selected =
-    viewports.find((v) => v.owned) ??
-    viewportForPoint(viewports, {
-      x: (crop.left + crop.right) / 2,
-      y: (crop.top + crop.bottom) / 2,
-    });
-  return {
-    measure: selected ? (selected.measure ?? null) : fallback,
-    source: selected ? (selected.owned ? 'owned' : 'foreign') : 'default',
-    ready: true,
-    persistent,
-  };
-}
-
 export function withUnit(
-  m: PdfMeasure,
+  measure: PdfMeasure,
   unit: LengthUnit,
   area: AreaUnit = squareOf(unit),
 ): PdfMeasure {
-  const basis = m.x[0]?.unit.trim() as LengthUnit;
+  const basis = measure.x[0]?.unit.trim() as LengthUnit;
   if (!(basis in METRES)) {
     throw new RangeError('This scale has an unknown base unit; calibrate it first');
   }
-  const previous = m.distance[m.distance.length - 1];
+  const previous = measure.distance[measure.distance.length - 1];
   const precision = previous?.fraction === 'fraction' ? 100 : (previous?.precision ?? 100);
   return {
-    ...m,
+    ...measure,
     distance: [{ unit, conversion: METRES[basis] / METRES[unit], precision, fraction: 'decimal' }],
     area: [
       {
@@ -77,15 +52,17 @@ export function withUnit(
   };
 }
 
-export function withPrecision(m: PdfMeasure, precision: number): PdfMeasure {
+export function withPrecision(measure: PdfMeasure, precision: number): PdfMeasure {
   if (!Number.isInteger(Math.log10(precision)) || precision < 1 || precision > 1e9) {
     throw new RangeError('Invalid decimal precision');
   }
   const update = (formats: PdfMeasure['distance']) =>
-    formats.map((f, i) =>
-      i === formats.length - 1 ? { ...f, precision, fraction: 'decimal' as const } : f,
+    formats.map((format, index) =>
+      index === formats.length - 1
+        ? { ...format, precision, fraction: 'decimal' as const }
+        : format,
     );
-  return { ...m, distance: update(m.distance), area: update(m.area) };
+  return { ...measure, distance: update(measure.distance), area: update(measure.area) };
 }
 
 /** Change the area display unit while preserving imported distance formatting. */

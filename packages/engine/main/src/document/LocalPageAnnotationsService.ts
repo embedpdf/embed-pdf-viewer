@@ -50,7 +50,7 @@ interface DocClosedView {
  * sees its own writes immediately.
  *
  * Every mutation publishes its result to the document's event stream
- * AFTER the worker confirms — ground truth, never optimistic.
+ * after the worker confirms — ground truth, never optimistic.
  */
 export class LocalPageAnnotationsService implements PageAnnotationsService {
   constructor(
@@ -548,7 +548,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
 
   /**
    * Resolve the collab subject (userId / groupId) of the target row
-   * an UPDATE or DELETE is about to act on. Mirrors the cloud's
+   * an update or DELETE is about to act on. Mirrors the cloud's
    * `LayerService.getAnnotationCollabTarget` — page-fetch + filter
    * over the existing listFullPage worker job. Returns `{}` when the
    * row can't be located; the collab resolver then denies

@@ -197,14 +197,14 @@ const utf8ByteLength = (s: string): number => new TextEncoder().encode(s).length
 
 /**
  * A server-side pull source for `documents.importFrom`. The discriminator
- * distinguishes AUTHORIZATION MODELS, not storage vendors:
+ * distinguishes authorization models, not storage vendors:
  *
- *   - `url`        — the CALLER supplies authority: a presigned
+ *   - `url`        — the caller supplies authority: a presigned
  *     S3/GCS/Azure/R2/MinIO GET, or any HTTPS endpoint the
  *     deployment's import policy allows. The URL is a capability:
  *     treat it as a secret. Servers never echo its query string back
  *     in errors, logs, or stored failure reasons.
- *   - `connection` — the OPERATOR pre-registered authority: the
+ *   - `connection` — the operator pre-registered authority: the
  *     request names a connection and a key; which provider backs it
  *     (S3, GCS, Azure Blob, filesystem, ...) is deployment
  *     configuration, never wire surface. `revision` is opaque here
@@ -272,7 +272,7 @@ export const AdminDocumentImportRequestSchema = z.object({
    * against the source's declared Content-Length before the transfer,
    * `sha256` against the server-observed digest after it. When absent
    * the server-observed values become authoritative.
-   * `dedupMode=reuse-existing` REQUIRES `sha256` — without a declared
+   * `dedupMode=reuse-existing` requires `sha256` — without a declared
    * hash the server cannot know what content to reuse.
    */
   expected: z
@@ -345,7 +345,7 @@ export const ADMIN_DOCUMENT_LIST_MAX_LIMIT = 200;
 
 /**
  * Query parameters for `documents.list`. `limit` arrives as a string on
- * the wire, hence the coercion; values outside [1, MAX] are a validation
+ * the wire, hence the coercion; values outside [1, max] are a validation
  * error, not a silent clamp. `cursor` is an opaque continuation token
  * from a previous page's `nextCursor` — clients must not parse it.
  */
@@ -422,7 +422,7 @@ export const AdminTokenRevokeRequestSchema = z.object({
   /** Optional human reason, written to the audit row. */
   reason: z.string().max(1024).optional(),
   /**
-   * The token's `exp` (unix seconds), used to GC the revocation row
+   * The token's `exp` (unix seconds); the revocation row is garbage-collected
    * once the token would have expired anyway. Defaults server-side to
    * now + 30 days.
    */
@@ -589,7 +589,7 @@ export type AdminTokenIssueResponse = z.infer<typeof AdminTokenIssueResponseSche
 //
 // The registry is the admin surface's contract: one entry per operation
 // carrying method, path template, required tenant scope, and the request/
-// response schemas. The server mounts its routes FROM these entries (so the
+// response schemas. The server mounts its routes from these entries (so the
 // registry is executed, not merely described), and the OpenAPI document is
 // generated from the same entries in CI. Migration status: `documents.list`
 // is registered; the remaining admin operations move in as they are touched.
@@ -608,7 +608,7 @@ export type AdminTokenIssueResponse = z.infer<typeof AdminTokenIssueResponseSche
 // A share grant is a standing, revocable authorization decision stored
 // with the documents: "anyone presenting this reference, from these
 // origins, gets exactly these capabilities on this document". The grant
-// id doubles as the public share token — it is a REFERENCE whose power
+// id doubles as the public share token — it is a reference whose power
 // is evaluated at exchange time, never a bearer credential, which is
 // what lets it live in public HTML while staying editable and
 // revocable. The only credential it ever produces is an ordinary
@@ -720,7 +720,7 @@ export const AdminTenantShareParamsSchema = z.object({
 export type AdminTenantShareParams = z.infer<typeof AdminTenantShareParamsSchema>;
 
 /**
- * The share token travels in the BODY, never the path — URLs land in
+ * The share token travels in the body, never the path — URLs land in
  * access logs and proxy logs, and the token is the whole credential.
  */
 export const ShareExchangeRequestSchema = z.object({
@@ -754,7 +754,7 @@ export const TenantUsageQuerySchema = z.object({
 export type TenantUsageQuery = z.infer<typeof TenantUsageQuerySchema>;
 
 /**
- * Per-tenant usage FACTS for one UTC month. Deliberately opinion-free:
+ * Per-tenant usage facts for one UTC month. Deliberately opinion-free:
  * no limits, no plans, no billing state — those belong to whoever
  * operates the deployment. `pdf.views` counts share exchanges plus
  * authorized `/v1/access` grants, deduplicated (a share session that

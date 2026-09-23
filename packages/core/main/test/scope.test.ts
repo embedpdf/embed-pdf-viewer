@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createScope, isCancelled, CancelledError } from '../src/scope';
 
-const tick = () => new Promise((r) => setTimeout(r, 0));
+const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe('scope', () => {
   it('disposes LIFO and awaits async teardowns in order', async () => {
@@ -26,12 +26,16 @@ describe('scope', () => {
     const report = vi.fn();
     const ran: string[] = [];
     const scope = createScope(report);
-    scope.defer(() => ran.push('a'));
+    scope.defer(() => {
+      ran.push('a');
+    });
     scope.defer(() => {
       throw new Error('sync boom');
     });
     scope.defer(() => Promise.reject(new Error('async boom')));
-    scope.defer(() => ran.push('b'));
+    scope.defer(() => {
+      ran.push('b');
+    });
 
     await scope.dispose();
     expect(ran).toEqual(['b', 'a']);
@@ -70,13 +74,15 @@ describe('scope', () => {
     const scope = createScope(() => {});
     scope.defer(
       () =>
-        new Promise<void>((r) => {
-          releaseSlow = r;
+        new Promise<void>((resolve) => {
+          releaseSlow = resolve;
         }),
     );
 
     const disposal = scope.dispose();
-    scope.defer(() => order.push('late'));
+    scope.defer(() => {
+      order.push('late');
+    });
     order.push('registered-late');
     releaseSlow();
     await disposal;

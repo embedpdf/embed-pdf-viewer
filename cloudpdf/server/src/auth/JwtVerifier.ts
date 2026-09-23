@@ -42,7 +42,7 @@ export interface BaseClaims extends IdentityClaims {
    */
   jti?: string;
   /**
-   * Optional per-token unlock secret used to bind encrypted PDF
+   * Optional per-token unlock secret that binds encrypted PDF
    * password sessions to this JWT. Kept as an extension claim so the
    * server can encrypt/decrypt password-session rows without treating
    * `jti` itself as secret material.
@@ -62,7 +62,7 @@ export interface BaseClaims extends IdentityClaims {
  * the token is implicitly tied to a tenant by `tenant_id` and
  * grants access to any document in that tenant matching its scope.
  *
- * MUST NOT carry `doc_id` / `layer_name` — those belong to the
+ * Must not carry `doc_id` / `layer_name` — those belong to the
  * `DocUserClaims` audience. Class is determined by the presence of
  * `doc_id` and the `?: never` discriminator makes the union
  * exhaustive at compile time.
@@ -98,7 +98,7 @@ export interface DocUserClaims extends BaseClaims {
   doc_id: string;
   /** Doc-level operations this token can perform on `doc_id`. */
   scope: ReadonlyArray<DocScope>;
-  /** Phase 5: pin a specific layer. Optional. */
+  /** Pins a specific layer. Optional. */
   layer_name?: string;
   /**
    * Origin lock: web origin patterns this token may be presented from,
@@ -396,7 +396,7 @@ export class JwksVerifier implements JwtVerifier {
     } catch (err) {
       // Key rotation: if the JWT references an unknown kid, retry via the
       // remote fetcher exactly once (jose's cooldown bounds actual network
-      // fetches). Do NOT clear the local cache here: a kid miss is exactly
+      // fetches). Do not clear the local cache here: a kid miss is exactly
       // what an unauthenticated attacker can produce at will, and evicting
       // known-good keys on every miss would turn each garbage token into a
       // cache-store round-trip for the next legitimate request. On a real
@@ -650,7 +650,7 @@ function coerceClaims(payload: JWTPayload): JwtClaims {
   }
   // Tenant token.
   // Tenant scopes live in a separate namespace (`TenantScope`) and are
-  // NOT validated by engine-core's scope vocabulary, which targets the
+  // not validated by engine-core's scope vocabulary, which targets the
   // doc-scoped capability/collab grammar.
   const tenantScope = (scope ?? []) as ReadonlyArray<TenantScope>;
   const out: TenantClaims = { ...base, scope: tenantScope };

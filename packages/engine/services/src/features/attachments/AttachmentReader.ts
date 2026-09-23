@@ -23,7 +23,7 @@ import { resolveAnnotPtr } from '../annotations/internal/identity/resolveAnnotat
  * Read-only access to embedded files, at both of their homes: the
  * document catalog's `/EmbeddedFiles` name tree (list / readFile by
  * index) and a FileAttachment annotation's `/FS` (readAnnotationFile by
- * ref). Pure READS over the session — no revision bumps, no layer
+ * ref). Pure reads over the session — no revision bumps, no layer
  * artifacts (the `PagesExtractor` shape).
  *
  * Byte delivery mirrors the request's `path?`: absent → a standalone

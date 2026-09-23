@@ -184,7 +184,7 @@ export const AnnotationRefSchema: z.ZodType<AnnotationRef> = z.discriminatedUnio
 /**
  * Shared object literal for every per-subtype DTO schema. Each kind's
  * `dto.schema.ts` extends this with its own `subtype` literal and
- * subtype-specific fields. Note that we do NOT include `subtype` here —
+ * subtype-specific fields. Note that we do not include `subtype` here —
  * each kind sets its own literal so `z.discriminatedUnion('subtype', ...)`
  * works at the catalog level.
  */

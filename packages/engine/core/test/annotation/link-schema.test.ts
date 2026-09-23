@@ -84,7 +84,7 @@ describe('link kind schemas', () => {
       subtype: 'link',
       rect: RECT,
       target: null,
-      // v2 parity: a link grouped to another annotation rides the base
+      // A link grouped to another annotation rides the base
       // relationship fields — nothing link-specific.
       inReplyTo: {
         kind: 'objectNumber',

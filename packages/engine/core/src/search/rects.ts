@@ -3,7 +3,7 @@ import type { PdfRect } from '../geometry/primitives';
 import { buildPageTextLayout, textSegmentsForRange, type PdfTextSegment } from '../text/layout';
 
 /**
- * Match-range → canonical visual-line segments. Thin wrappers over the ONE
+ * Match-range → canonical visual-line segments. Thin wrappers over the one
  * text layout (`src/text/layout.ts`) — search owns matching and cursors,
  * never segmentation, so a match highlights exactly like a selection of the
  * same characters. No frame or merge logic lives here.

@@ -151,7 +151,7 @@ export const decodeDownloadToken = (raw: string): DownloadToken => {
  * Encode a render token from a flat wire-shape input. The input is the
  * output of `flatten(...)` over an SDK `PageImageOptions`-shaped object plus
  * cache versions. Semantic invariants (viewport-kind XOR fields, per-family
- * pin grammar — annotatedness itself is PATH-expressed, never a token key —
+ * pin grammar — annotatedness itself is path-expressed, never a token key —
  * target rect coherence) live in the per-family render query schemas —
  * running them here would duplicate the spec.
  */
@@ -179,7 +179,7 @@ export const decodeAnnotationAppearancesRenderToken = (raw: string): TokenQuery 
   decodeToken(AnnotationAppearancesRenderTokenSchema, raw);
 
 /**
- * The decoded state of a versioned search URL — the WHOLE cache key.
+ * The decoded state of a versioned search URL — the whole cache key.
  * `epoch` is `searchContentEpoch(manifest)`; `skip` is the number of
  * scan-order pages already consumed (0 = first slice). The server mints
  * continuation tokens (same epoch, advanced skip); the client decodes
@@ -194,10 +194,10 @@ export interface SearchToken {
 }
 
 /**
- * The search RESULT representation this client speaks — part of the token
+ * The search result representation this client speaks — part of the token
  * (and therefore the versioned URL), so a response-shape change can never
  * serve a stale CDN body to a newer client: new tokens are new cache keys,
- * and old tokens fail decode on new servers. Deliberately ALWAYS encoded —
+ * and old tokens fail decode on new servers. Deliberately always encoded —
  * an exception to the omit-defaults rule, because its entire job is to
  * change the token bytes when the format changes.
  */
@@ -209,7 +209,7 @@ export const encodeSearchToken = (input: SearchToken): string => {
     epoch: input.epoch,
     format: SEARCH_RESULT_FORMAT,
     q: encodeTokenText(q.text),
-    // Canonical keys: every default is OMITTED, never encoded as false/0.
+    // Canonical keys: every default is omitted, never encoded as false/0.
     regex: q.regex ? true : undefined,
     matchCase: q.matchCase ? true : undefined,
     matchDiacritics: q.matchDiacritics ? true : undefined,

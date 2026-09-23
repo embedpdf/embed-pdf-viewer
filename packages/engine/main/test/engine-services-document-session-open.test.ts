@@ -4,7 +4,10 @@ import { ManifestPageSchema } from '@embedpdf/engine-core/wire';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 import { BaseDocumentRegistry } from '../../services/src/document-session/lifecycle/BaseDocumentRegistry';
 import { DocumentSession } from '../../services/src/document-session/DocumentSession';
-import { openLayerDocument } from '../../services/src/document-session/lifecycle/PdfDocumentOpener';
+import {
+  openLayerDocument,
+  type AcquiredBaseDocument,
+} from '../../services/src/document-session/lifecycle/PdfDocumentOpener';
 import { WorkerHost } from '../../services/src/worker-host/WorkerHost';
 
 const ptr = (value: number): Ptr => BigInt(value) as Ptr;
@@ -24,7 +27,7 @@ function createFakeRuntime(): PdfRuntimeModule & {
   let nextPtr = 1000;
   const memory = new Map<string, number | bigint>();
   const pagesByDoc = new Map<Ptr, number[]>();
-  const ponByPagePtr = new Map<Ptr, number>();
+  const pageObjectNumberByPagePtr = new Map<Ptr, number>();
   const calls = {
     closeDocuments: [] as Ptr[],
     loadMemDocuments: [] as Array<{ ptr: Ptr; size: number; password: string }>,
@@ -96,20 +99,20 @@ function createFakeRuntime(): PdfRuntimeModule & {
         pagesByDoc.get(docPtr)?.[pageIndex] ?? 0,
       FPDF_LoadPage: (docPtr: Ptr, pageIndex: number) => {
         calls.loadPages.push({ docPtr, pageIndex });
-        const pon = pagesByDoc.get(docPtr)?.[pageIndex];
-        if (!pon) return ptr(0);
+        const pageObjectNumber = pagesByDoc.get(docPtr)?.[pageIndex];
+        if (!pageObjectNumber) return ptr(0);
         const pagePtr = ptr(Number(docPtr) * 100 + pageIndex);
-        ponByPagePtr.set(pagePtr, pon);
+        pageObjectNumberByPagePtr.set(pagePtr, pageObjectNumber);
         return pagePtr;
       },
       EPDFDoc_LoadPageByObjectNumber: (docPtr: Ptr, pageObjectNumber: number) => {
         if (!pagesByDoc.get(docPtr)?.includes(pageObjectNumber)) return ptr(0);
         const pagePtr = ptr(Number(docPtr) * 1000 + pageObjectNumber);
-        ponByPagePtr.set(pagePtr, pageObjectNumber);
+        pageObjectNumberByPagePtr.set(pagePtr, pageObjectNumber);
         return pagePtr;
       },
       FPDF_ClosePage: () => undefined,
-      EPDFPage_GetObjectNumber: (pagePtr: Ptr) => ponByPagePtr.get(pagePtr) ?? 0,
+      EPDFPage_GetObjectNumber: (pagePtr: Ptr) => pageObjectNumberByPagePtr.get(pagePtr) ?? 0,
       // Security probe run on every open. The harness opens unencrypted
       // fixtures: report success with kind=0 (none); the caller pre-zeroes
       // the out-params so the defaults (no perms, revision 0) flow through.
@@ -241,8 +244,9 @@ describe('DocumentSession open ownership', () => {
 
   test('layer session closes document before artifact access and shared base', () => {
     const runtime = createFakeRuntime();
-    const base = {
+    const base: AcquiredBaseDocument = {
       key: 'base-a',
+      kind: 'memory',
       basePtr: ptr(201),
       release: () => {
         runtime.calls.order.push('base-handle');
@@ -265,7 +269,7 @@ describe('DocumentSession open ownership', () => {
   test('renderEncoded kinds fail fast with NotImplemented on hosts without an injected encoder', () => {
     // The `*.renderEncoded` wire kinds are cloud-server surface: the server
     // worker injects a sharp-backed encoder; browser/local hosts (this
-    // two-argument construction) must reject WITHOUT paying for a render.
+    // two-argument construction) must reject without paying for a render.
     const runtime = createFakeRuntime();
     const responses: WorkerResponse[] = [];
     const host = new WorkerHost(runtime, (pack) => responses.push(pack.payload));

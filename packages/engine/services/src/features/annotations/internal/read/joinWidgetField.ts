@@ -10,7 +10,7 @@ import { FAMILY_BY_CODE } from '../../../forms/internal/readFormSnapshot';
 
 /**
  * Resolve the owning field's object number for a widget annotation, or 0
- * when unattached. (The /Parent of a widget is a FIELD dictionary - not an
+ * when unattached. (The /Parent of a widget is a field dictionary - not an
  * annotation - so FPDFAnnot_GetLinkedAnnot cannot follow it; the reconciled
  * form model is the authoritative join.)
  */

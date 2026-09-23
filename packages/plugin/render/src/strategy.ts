@@ -6,7 +6,7 @@ import type { ResolvedRenderOptions } from './paint-plan';
 export type RenderFormat = NonNullable<PageImageOptions['format']>;
 
 /**
- * The render points a document actually uses — POLICY ∧ STRATEGY, resolved
+ * The render points a document actually uses — policy ∧ strategy, resolved
  * once per (policy, options) pair.
  *
  * Policy is an engine fact (what the deployment serves and caches); strategy
@@ -17,10 +17,10 @@ export type RenderFormat = NonNullable<PageImageOptions['format']>;
  * `format: 'bmp'` run unchanged against cloud with no branches in client
  * code.
  *
- *   - `widths: null`  → base renders the EXACT settled demand, capped at
+ *   - `widths: null`  → base renders the exact settled demand, capped at
  *     `maxWidth` (the local default — resting pixels are never resampled,
  *     which is the only way ~1px text stems stay crisp on dpr-1 screens).
- *   - `widths: [...]` → base snaps UP the rung list (an advertised lattice,
+ *   - `widths: [...]` → base snaps up the rung list (an advertised lattice,
  *     or the opt-in client ladder), capped by `maxWidth`.
  *   - `pyramid` mirrors the same split for tile levels.
  */
@@ -39,17 +39,18 @@ export interface ResolvedStrategy {
   readonly engageAt: number;
   /** Exact-mode tile-level safety clamp (device px per point). */
   readonly tileMaxScale: number;
-  /** Encode format for BOTH planes, policy-conformed. Undefined = engine default. */
+  /** Encode format for both planes, policy-conformed. Undefined = engine default. */
   readonly format?: RenderFormat;
   readonly quality?: number;
 }
 
-const ascending = (values: readonly number[]): number[] => [...values].sort((a, b) => a - b);
+const ascending = (values: readonly number[]): number[] =>
+  [...values].sort((left, right) => left - right);
 
 /** Rung list capped by the budget — always keeps at least the smallest rung. */
 const capWidths = (widths: readonly number[], maxWidth: number): readonly number[] => {
   const sorted = ascending(widths);
-  const kept = sorted.filter((w) => w <= maxWidth);
+  const kept = sorted.filter((width) => width <= maxWidth);
   return kept.length ? kept : sorted.slice(0, 1);
 };
 
@@ -59,8 +60,8 @@ export function resolveStrategy(
 ): ResolvedStrategy {
   const lattice = policy.kind === 'lattice';
 
-  // An advertised ladder is the deployment's intent — the DEFAULT budget
-  // never second-guesses it; an EXPLICIT maxWidth filters it (every rung is
+  // An advertised ladder is the deployment's intent — the default budget
+  // never second-guesses it; an explicit maxWidth filters it (every rung is
   // CDN-valid, so choosing lower ones is always safe — the mobile knob).
   const widths = lattice
     ? options.fullPage.maxWidthExplicit
@@ -113,13 +114,17 @@ export function resolveStrategy(
 }
 
 /**
- * The ONE base-sizing function — four callers: `renderPage`,
- * `renderSourceKey`, `conformViewport`, and tile engagement. Exact mode
+ * The one base-sizing function. Its callers: the controller's
+ * `conformViewport` (which `renderSource` and `getSourceKey` go through)
+ * and tile engagement in the tile manager. Exact mode
  * returns the (settled) demand itself up to the budget; ladder mode snaps
- * UP and caps at the top rung.
+ * up and caps at the top rung.
  */
 export function baseAskWidth(strategy: ResolvedStrategy, demandWidth: number): number {
   const wanted = Math.max(1, Math.round(demandWidth));
   if (strategy.widths === null) return Math.min(wanted, strategy.maxWidth);
-  return strategy.widths.find((w) => w >= wanted) ?? strategy.widths[strategy.widths.length - 1]!;
+  return (
+    strategy.widths.find((width) => width >= wanted) ??
+    strategy.widths[strategy.widths.length - 1]!
+  );
 }

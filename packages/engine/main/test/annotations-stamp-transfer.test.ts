@@ -32,7 +32,7 @@ const PAGE_OBJECT_NUMBER = 3;
  * InlineTransport ignores `pack.transfer` (no thread boundary), which is
  * exactly why the ordinary stamp tests never noticed buffers being detached.
  * This transport reproduces what BrowserWorkerTransport's postMessage does:
- * structured-clone the payload and DETACH every buffer on the transfer list.
+ * structured-clone the payload and detach every buffer on the transfer list.
  */
 class DetachingInlineTransport implements Transport {
   constructor(private readonly inner: InlineTransport) {}
@@ -132,7 +132,7 @@ describe('stamp annotations: resource buffers survive a detaching transport', ()
 
   test('the same Uint8Array can be placed twice, and updated with, without being detached', async () => {
     const page = handle.page(toPageRef(PAGE_OBJECT_NUMBER));
-    // A full-span view — the case the resolver used to hand over by reference.
+    // A full-span view — the case a no-copy shortcut would hand over by reference.
     const png = makePng(8, 4, [0, 128, 255, 255]);
     const original = Array.from(png);
     expect(png.byteOffset).toBe(0);

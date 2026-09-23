@@ -29,7 +29,7 @@ export interface PagesDemoResult {
   after: PageListSnapshot;
   /** Computed for the summary; true means the geometry invariants held. */
   invariants: {
-    ponSetPreserved: boolean;
+    pageObjectNumberSetPreserved: boolean;
     indicesDense: boolean;
   };
 }
@@ -49,8 +49,8 @@ export async function runPagesDemo(
     }
 
     // 1) Single-page move: send the LAST page to the FRONT.
-    const lastPon = before.pages[before.pages.length - 1].pageObjectNumber;
-    const movedSingle = await doc.pages.move([lastPon], 0);
+    const lastPageObjectNumber = before.pages[before.pages.length - 1].pageObjectNumber;
+    const movedSingle = await doc.pages.move([lastPageObjectNumber], 0);
 
     // 2) Multi-page contiguous-block move: send pages [0, 1] (post-
     //    single-move order) to the END. Mirrors `FPDF_MovePages`
@@ -98,13 +98,13 @@ function computeInvariants(
   before: PageListSnapshot,
   after: PageListSnapshot,
 ): PagesDemoResult['invariants'] {
-  const beforePons = new Set(before.pages.map((p) => p.pageObjectNumber));
-  const afterPons = new Set(after.pages.map((p) => p.pageObjectNumber));
-  let ponSetPreserved = beforePons.size === afterPons.size;
-  if (ponSetPreserved) {
-    for (const pon of beforePons) {
-      if (!afterPons.has(pon)) {
-        ponSetPreserved = false;
+  const beforePageObjectNumbers = new Set(before.pages.map((p) => p.pageObjectNumber));
+  const afterPageObjectNumbers = new Set(after.pages.map((p) => p.pageObjectNumber));
+  let pageObjectNumberSetPreserved = beforePageObjectNumbers.size === afterPageObjectNumbers.size;
+  if (pageObjectNumberSetPreserved) {
+    for (const pageObjectNumber of beforePageObjectNumbers) {
+      if (!afterPageObjectNumbers.has(pageObjectNumber)) {
+        pageObjectNumberSetPreserved = false;
         break;
       }
     }
@@ -116,7 +116,7 @@ function computeInvariants(
       break;
     }
   }
-  return { ponSetPreserved, indicesDense };
+  return { ponSetPreserved: pageObjectNumberSetPreserved, indicesDense };
 }
 
 export function summarizePages(result: PagesDemoResult) {
@@ -125,22 +125,22 @@ export function summarizePages(result: PagesDemoResult) {
     docId: result.docId,
     elapsedMs: result.elapsedMs,
     before: result.before.pages.map((p) => ({
-      pon: p.pageObjectNumber,
+      pageObjectNumber: p.pageObjectNumber,
       idx: p.index,
       w: p.size.width,
       h: p.size.height,
       rot: p.rotation,
     })),
     movedSingle: result.movedSingle.layout.pages.map((p) => ({
-      pon: p.pageObjectNumber,
+      pageObjectNumber: p.pageObjectNumber,
       idx: p.index,
     })),
     movedBatch: result.movedBatch.layout.pages.map((p) => ({
-      pon: p.pageObjectNumber,
+      pageObjectNumber: p.pageObjectNumber,
       idx: p.index,
     })),
     after: result.after.pages.map((p) => ({
-      pon: p.pageObjectNumber,
+      pageObjectNumber: p.pageObjectNumber,
       idx: p.index,
       w: p.size.width,
       h: p.size.height,

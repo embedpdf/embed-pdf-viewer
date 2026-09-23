@@ -8,9 +8,9 @@ import { toPageRef } from '../identity/PageRef';
 
 /**
  * Attachment conformance suite. Fixture requirement: a document whose
- * `/EmbeddedFiles` name tree contains AT LEAST ONE embedded file.
+ * `/EmbeddedFiles` name tree contains at least one embedded file.
  *
- * Both attachment surfaces are OPTIONAL on the contract (the
+ * Both attachment surfaces are optional on the contract (the
  * `downloadLayer?` pattern), probed independently and skipped cleanly:
  *   - `doc.attachments?` — document-level EmbeddedFiles (list/download)
  *   - `page.annotations.downloadFile?` — annotation-level file bytes
@@ -36,15 +36,16 @@ export function runAttachmentConformance(
     let engine: Engine;
     let docSupported = false;
     let annotSupported = false;
-    let firstPon: PageObjectNumber;
+    let firstPageObjectNumber: PageObjectNumber;
 
     beforeAll(async () => {
       engine = await opts.makeEngine();
       const probe = await openFixture(engine, opts);
       docSupported = probe.attachments !== undefined;
       const pages = await probe.pages.list();
-      firstPon = pages.pages[0].ref.pageObjectNumber;
-      annotSupported = probe.page(toPageRef(firstPon)).annotations.downloadFile !== undefined;
+      firstPageObjectNumber = pages.pages[0].ref.pageObjectNumber;
+      annotSupported =
+        probe.page(toPageRef(firstPageObjectNumber)).annotations.downloadFile !== undefined;
       await probe.close();
     });
 
@@ -165,7 +166,7 @@ export function runAttachmentConformance(
       if (!annotSupported) return;
       const doc = await openFixture(engine, opts);
       try {
-        const annotations = doc.page(toPageRef(firstPon)).annotations;
+        const annotations = doc.page(toPageRef(firstPageObjectNumber)).annotations;
         const data = new Uint8Array(2048);
         for (let i = 0; i < data.length; i++) data[i] = (i * 31 + 7) & 0xff;
 
@@ -208,7 +209,7 @@ export function runAttachmentConformance(
       if (!annotSupported) return;
       const doc = await openFixture(engine, opts);
       try {
-        const annotations = doc.page(toPageRef(firstPon)).annotations;
+        const annotations = doc.page(toPageRef(firstPageObjectNumber)).annotations;
         const { created } = await annotations.create({
           subtype: 'text',
           rect: { left: 100, bottom: 100, right: 120, top: 120 },

@@ -17,9 +17,9 @@ import type { EventHook } from '@embedpdf/core';
 import { useCapability, useCapabilityEvent, usePage, useSelector } from './runtime';
 
 export interface SearchLayerProps {
-  /** Highlight colour for hits — SOLID (default: highlighter yellow). */
+  /** Highlight colour for hits — solid (default: highlighter yellow). */
   color?: string;
-  /** Highlight colour for the ACTIVE hit — SOLID (default: orange). */
+  /** Highlight colour for the active hit — solid (default: orange). */
   activeColor?: string;
   /**
    * How the highlight composites with the page. `'multiply'` (default) is
@@ -40,15 +40,15 @@ export function SearchLayer({
 }: SearchLayerProps) {
   const page = usePage();
   // Per-page hit arrays are reference-stable in the plugin, so plain Object.is works.
-  const hits = useSelector(SearchToken, (c) => c.listHits({ page: page.ref }));
-  const active = useSelector(SearchToken, (c) => c.getActiveHit());
+  const hits = useSelector(SearchToken, (search) => search.listHits({ page: page.ref }));
+  const active = useSelector(SearchToken, (search) => search.getActiveHit());
 
   if (hits.length === 0) return null;
 
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
       {hits.map((hit: SearchHit) =>
-        hit.segments.map(({ quad: q }, i) => {
+        hit.segments.map(({ quad }, i) => {
           const fill = hit === active ? activeColor : color;
           // Only a clickable hit takes the pointer; a plain highlight stays inert.
           const clickable = onHitClick
@@ -58,12 +58,12 @@ export function SearchLayer({
           // Upright hits keep the classic rounded div (pixel-identical to the
           // pre-orientation layer); rotated hits draw their true oriented cell.
           const upright =
-            q.upperStart.y === q.upperEnd.y &&
-            q.lowerStart.y === q.lowerEnd.y &&
-            q.upperStart.x === q.lowerStart.x;
+            quad.upperStart.y === quad.upperEnd.y &&
+            quad.lowerStart.y === quad.lowerEnd.y &&
+            quad.upperStart.x === quad.lowerStart.x;
           if (upright) {
-            const tl = page.transform.toPixels(q.upperStart);
-            const br = page.transform.toPixels(q.lowerEnd);
+            const tl = page.transform.toPixels(quad.upperStart);
+            const br = page.transform.toPixels(quad.lowerEnd);
             return (
               <div
                 key={`${hit.charStart}:${i}`}
@@ -82,8 +82,8 @@ export function SearchLayer({
               />
             );
           }
-          const ring = [q.upperStart, q.upperEnd, q.lowerEnd, q.lowerStart].map((p) =>
-            page.transform.toPixels(p),
+          const ring = [quad.upperStart, quad.upperEnd, quad.lowerEnd, quad.lowerStart].map(
+            (point) => page.transform.toPixels(point),
           );
           return (
             <svg
@@ -98,7 +98,7 @@ export function SearchLayer({
               }}
             >
               <polygon
-                points={ring.map((p) => `${p.x},${p.y}`).join(' ')}
+                points={ring.map((point) => `${point.x},${point.y}`).join(' ')}
                 fill={fill}
                 onClick={onClick}
                 style={clickable ?? undefined}
@@ -116,9 +116,9 @@ export function useSearch() {
   return useCapability(SearchToken);
 }
 
-/** Subscribe to one search event for the mounted lifetime: `useSearchEvent((c) => c.onCompleted, handler)`. */
+/** Subscribe to one search event for the mounted lifetime: `useSearchEvent((search) => search.onCompleted, handler)`. */
 export function useSearchEvent<T>(
-  select: (cap: SearchCapability) => EventHook<T>,
+  select: (search: SearchCapability) => EventHook<T>,
   handler: (event: T) => void,
 ): void {
   useCapabilityEvent(SearchToken, select, handler);
@@ -126,11 +126,11 @@ export function useSearchEvent<T>(
 
 /** Reactive search read-model for chrome: the query, status, counts, progress. */
 export function useSearchState() {
-  const query = useSelector(SearchToken, (c) => c.getQuery());
-  const status = useSelector(SearchToken, (c) => c.getStatus());
-  const hitCount = useSelector(SearchToken, (c) => c.getHitCount());
-  const activeIndex = useSelector(SearchToken, (c) => c.getActiveHitIndex());
-  const progress = useSelector(SearchToken, (c) => c.getProgress());
-  const error = useSelector(SearchToken, (c) => c.getError());
+  const query = useSelector(SearchToken, (search) => search.getQuery());
+  const status = useSelector(SearchToken, (search) => search.getStatus());
+  const hitCount = useSelector(SearchToken, (search) => search.getHitCount());
+  const activeIndex = useSelector(SearchToken, (search) => search.getActiveHitIndex());
+  const progress = useSelector(SearchToken, (search) => search.getProgress());
+  const error = useSelector(SearchToken, (search) => search.getError());
   return { query, status, hitCount, activeIndex, progress, error };
 }

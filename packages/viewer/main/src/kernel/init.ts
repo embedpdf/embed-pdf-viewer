@@ -1,9 +1,9 @@
 /**
- * `init()` — the imperative mount, implemented ONCE and door-blind.
+ * `init()` — the imperative mount, implemented once and door-blind.
  *
  * Typed with the element's own (widest) config deliberately: a function that
  * accepts the wider config satisfies a narrower signature, so each door can
- * re-type this as ITS contract by plain assignment, no cast. The reverse does
+ * re-type this as its contract by plain assignment, no cast. The reverse does
  * not hold — parameter types are contravariant — which is why the shared
  * implementation lives at the widest type and the doors narrow from there.
  */

@@ -1,6 +1,6 @@
 /**
  * The shared integration preference across the Viewer and Headless docs —
- * the same fan-out model as embedpdf.com (DOCS-PLATFORM-ARCHITECTURE.md):
+ * the same fan-out model as embedpdf.com (docs/conventions/docs-architecture.md):
  * the URL remains the source of truth for the current page; the cookie only
  * chooses an integration when a visitor enters through a variant-less route.
  *

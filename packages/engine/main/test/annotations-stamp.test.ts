@@ -26,7 +26,7 @@ function makePng(
   width: number,
   height: number,
   rgba: [number, number, number, number],
-): Uint8Array {
+): Uint8Array<ArrayBuffer> {
   const crcTable = Array.from({ length: 256 }, (_, n) => {
     let c = n;
     for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
@@ -216,7 +216,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
         a.ref.annotObjectNumber === created.ref.annotObjectNumber,
     );
     expect(entry).toBeDefined();
-    // THE convention: the entry's rect is the UNROTATED logical box…
+    // The convention: the entry's rect is the unrotated logical box…
     expect(entry!.rect.left).toBeCloseTo(unrotated.left, 0);
     expect(entry!.rect.right).toBeCloseTo(unrotated.right, 0);
     expect(entry!.rect.top).toBeCloseTo(unrotated.top, 0);
@@ -236,11 +236,11 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
   });
 
   test('rotated CONTAIN stamp fills the box — no compound-shrink padding', async () => {
-    // Regression: the writer used to fit the image into the ROTATED AABB /Rect,
-    // then the native re-fit fit that (padded) box into the unrotated box — a
-    // SECOND aspect shrink, so the image landed at ~aspect² size in white
-    // padding. Only under rotation (at 0° the two frames coincide). 'fill' hid
-    // it; 'contain' (the default, and what the viewer uses) exposes it.
+    // Fitting the image into the rotated AABB /Rect and then natively
+    // re-fitting that padded box into the unrotated box shrinks the aspect
+    // twice, leaving the image at ~aspect² size in white padding. Only
+    // rotation shows it (at 0° the two frames coincide), and only 'contain'
+    // (the default, and what the viewer uses); 'fill' hides it.
     const page = handle.page(toPageRef(PAGE_OBJECT_NUMBER));
     const png = makePng(8, 4, [255, 0, 0, 255]); // 2:1 landscape
     const unrotated = { left: 300, bottom: 400, right: 400, top: 450 }; // 100×50, 2:1 — matches image
@@ -269,8 +269,8 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     expect(width).toBeGreaterThan(height);
     expect(entry!.rect.left).toBeCloseTo(unrotated.left, 0);
     expect(entry!.rect.right).toBeCloseTo(unrotated.right, 0);
-    // The image aspect matches the box, so contain-fit FILLS it: BOTH the middle
-    // row AND the middle column are red edge-to-edge. Under the old double-shrink
+    // The image aspect matches the box, so contain-fit fills it: Both the middle
+    // row and the middle column are red edge-to-edge. Under the old double-shrink
     // the image was ~1/4 size, so neither would be. Sampling both catches a
     // shrink on either axis.
     const data = new Uint8Array(entry!.raster.data);
@@ -288,7 +288,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
   test('stamp rotation is tri-state: rect-only re-position preserves, null clears', async () => {
     // Transform metadata follows the tri-state law: a patch touches what it
     // states and preserves what it omits. A plain re-position (rect only)
-    // KEEPS the rotation; dropping the tilt is stated explicitly with
+    // keeps the rotation; dropping the tilt is stated explicitly with
     // `rotation: null` (the viewer's total projection emits exactly that).
     const page = handle.page(toPageRef(PAGE_OBJECT_NUMBER));
     const png = makePng(4, 4, [0, 0, 255, 255]);

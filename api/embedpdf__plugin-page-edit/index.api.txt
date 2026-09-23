@@ -9,4 +9,4 @@ PagePlacement [TypeAliasDeclaration] (from packages/plugin/page-edit/src/contrac
 PageRotateResult [InterfaceDeclaration] (from packages/engine/core/src/mutation/PageRotateResult.ts): export interface PageRotateResult{ layout: PageListSnapshot; cache: PageStructureCache | null; }
 PageRotation [TypeAliasDeclaration] (from packages/engine/core/src/dto/PageLayout.ts): export type PageRotation = PdfRotation;
 PdfSize [InterfaceDeclaration] (from packages/engine/core/src/geometry/primitives.ts): export interface PdfSize{ width: number; height: number; }
-pageEditPlugin [VariableDeclaration] (from packages/plugin/page-edit/src/page-edit.plugin.ts): pageEditPlugin = () => definePlugin({ id: 'page-edit', scope: 'document', token: PageEditToken, create: (ctx) => ({ api: createPageEditController(ctx)} ), } )
+pageEditPlugin [VariableDeclaration] (from packages/plugin/page-edit/src/page-edit.plugin.ts): pageEditPlugin = () => definePlugin<void, PageEditCapability>({ id: 'page-edit', scope: 'document', token: PageEditToken, create: createPageEditController, } )

@@ -1,8 +1,8 @@
 /**
  * Document scoping — hierarchical DI is Angular's native React-context.
  *
- * `[epdfDocumentScope]` binds a subtree to a SPECIFIC document (panes,
- * comparison); `*epdfDocumentGate` renders a subtree only WHILE it has one.
+ * `[epdfDocumentScope]` binds a subtree to a specific document (panes,
+ * comparison); `*epdfDocumentGate` renders a subtree only while it has one.
  * The gate is a structural directive on purpose: a template genuinely defers
  * creation, which a conditional `<ng-content>` slot cannot (Angular
  * instantiates projected content eagerly). Document-scoped UI — the Stage,
@@ -34,17 +34,17 @@ export class EpdfDocumentScope implements EpdfDocumentScopeRef {
 /**
  * Render the host template only while this subtree has a document — the
  * structural way to say "this UI is defined over a document". Sibling of
- * `[epdfDocumentScope]`, which picks WHICH document; this one handles WHETHER.
+ * `[epdfDocumentScope]`, which picks which document; this one handles whether.
  *
  *   <section *epdfDocumentGate="; fallback: empty">…document UI…</section>
  *   <ng-template #empty>Drop a PDF to get started</ng-template>
  *
- * The subtree stays mounted across a CHANGE of document (active-tab switch) —
+ * The subtree stays mounted across a change of document (active-tab switch) —
  * only the has-a-document boolean creates/destroys it.
  */
 @Directive({ selector: '[epdfDocumentGate]', standalone: true })
 export class EpdfDocumentGate {
-  /** Shown while this subtree has NO document (empty workspace, docs still opening). */
+  /** Shown while this subtree has no document (empty workspace, docs still opening). */
   readonly fallback = input<TemplateRef<unknown> | null>(null, {
     alias: 'epdfDocumentGateFallback',
   });

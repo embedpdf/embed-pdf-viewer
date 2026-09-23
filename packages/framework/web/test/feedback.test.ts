@@ -9,7 +9,7 @@ describe('feedback providers', () => {
 
   it('vibrationFeedback maps the three families onto vibrate', () => {
     const calls: Array<number | number[]> = [];
-    vi.stubGlobal('navigator', { vibrate: (p: number | number[]) => calls.push(p) });
+    vi.stubGlobal('navigator', { vibrate: (pattern: number | number[]) => calls.push(pattern) });
     vibrationFeedback.selection();
     vibrationFeedback.impact('heavy');
     vibrationFeedback.notify('error');
@@ -26,10 +26,12 @@ describe('feedback providers', () => {
   it('wkFeedback posts families to the host bridge, falls back without one', () => {
     const posted: unknown[] = [];
     vi.stubGlobal('window', {
-      webkit: { messageHandlers: { haptics: { postMessage: (m: unknown) => posted.push(m) } } },
+      webkit: {
+        messageHandlers: { haptics: { postMessage: (message: unknown) => posted.push(message) } },
+      },
     });
     const vibrated: Array<number | number[]> = [];
-    vi.stubGlobal('navigator', { vibrate: (p: number | number[]) => vibrated.push(p) });
+    vi.stubGlobal('navigator', { vibrate: (pattern: number | number[]) => vibrated.push(pattern) });
     const fb = wkFeedback('haptics');
     fb.selection();
     fb.impact('medium');

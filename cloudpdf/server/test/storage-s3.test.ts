@@ -122,7 +122,7 @@ describe('S3ObjectStore', () => {
     });
     expect(presigned).not.toBeNull();
     expect(presigned!.method).toBe('PUT');
-    // S3 SDK v3 issues path-style or virtual-host URLs; either is fine
+    // The AWS SDK issues path-style or virtual-host URLs; either is fine
     // as long as the bucket + key + signing query params are present.
     expect(presigned!.url).toMatch(/amazonaws\.com\/.+tenant\/docs\/ab\/abx\/base\.pdf\?/);
     expect(presigned!.url).toContain('X-Amz-Signature');
@@ -237,8 +237,8 @@ describe('S3ObjectStore', () => {
 
     // A presigned browser PUT cannot carry signed x-amz-meta-* headers,
     // so HEAD reports no metadata and the fallback must hash the
-    // finished partial. Regression: this branch used to re-read the
-    // write-only descriptor and die with EBADF on every such upload.
+    // finished partial. It must not re-read the write-only descriptor,
+    // which fails with `EBADF` on every such upload.
     s3Mock.on(HeadObjectCommand).resolves({
       ContentLength: total,
       ETag: '"abc"',

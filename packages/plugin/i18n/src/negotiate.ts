@@ -1,7 +1,7 @@
 /**
- * Pure BCP-47 locale negotiation — strings in, string out. The plugin never
- * reads the platform; the EMBEDDER feeds it whatever request list its
- * environment offers:
+ * Pure locale negotiation over language tags (RFC 5646) — strings in, string
+ * out. The plugin never reads the platform; the embedder feeds it whatever
+ * request list its environment offers:
  *
  * ```ts
  * // browser shell:  negotiateLocale(['en', 'es', 'ar'], navigator.languages)
@@ -9,9 +9,9 @@
  * ```
  *
  * Matching, per requested code in preference order:
- *   1. exact match (case-insensitive):        'es-MX' → 'es-MX'
- *   2. request narrowed to its language:      'en-GB' → 'en'
- *   3. any available dialect of the language: 'zh'    → 'zh-Hans'
+ *   1. exact match (case-insensitive):        `es-MX` → `es-MX`
+ *   2. request narrowed to its language:      `en-GB` → `en`
+ *   3. any available dialect of the language: `zh`    → `zh-Hans`
  *
  * Returns the matched code exactly as it appears in `available`, or null.
  */
@@ -19,25 +19,25 @@ export function negotiateLocale(
   available: readonly string[],
   requested: readonly string[],
 ): string | null {
-  const byCanon = new Map<string, string>();
+  const byCanonical = new Map<string, string>();
   for (const code of available) {
-    const canon = code.toLowerCase();
-    if (!byCanon.has(canon)) byCanon.set(canon, code);
+    const canonical = code.toLowerCase();
+    if (!byCanonical.has(canonical)) byCanonical.set(canonical, code);
   }
   const languageOf = (code: string) => code.toLowerCase().split('-')[0];
 
-  for (const want of requested) {
-    const exact = byCanon.get(want.toLowerCase());
+  for (const wanted of requested) {
+    const exact = byCanonical.get(wanted.toLowerCase());
     if (exact !== undefined) return exact;
   }
-  for (const want of requested) {
-    const narrowed = byCanon.get(languageOf(want));
+  for (const wanted of requested) {
+    const narrowed = byCanonical.get(languageOf(wanted));
     if (narrowed !== undefined) return narrowed;
   }
-  for (const want of requested) {
-    const language = languageOf(want);
-    for (const [canon, original] of byCanon) {
-      if (languageOf(canon) === language) return original;
+  for (const wanted of requested) {
+    const language = languageOf(wanted);
+    for (const [canonical, original] of byCanonical) {
+      if (languageOf(canonical) === language) return original;
     }
   }
   return null;

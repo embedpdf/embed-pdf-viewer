@@ -5,7 +5,7 @@
  * Grammar: modifiers and one key joined by '+', e.g. 'Mod+K', 'Ctrl+=',
  * 'Shift+Alt+D', 'Meta+NumpadAdd'. 'Mod' is ⌘ on mac and Ctrl elsewhere.
  * Keys longer than one character (F1, Escape, NumpadAdd, ArrowLeft) match
- * `event.key` OR `event.code` case-insensitively, so numpad shortcuts work.
+ * `event.key` or `event.code` case-insensitively, so numpad shortcuts work.
  */
 
 export interface ParsedShortcut {
@@ -40,8 +40,8 @@ const MODIFIERS = new Set([
 ]);
 
 export function parseShortcut(shortcut: string): ParsedShortcut {
-  const tokens = shortcut.split('+').map((t) => t.trim());
-  // 'Ctrl+=' splits to ['Ctrl', '', ''] — an empty tail means the key IS '+'.
+  const tokens = shortcut.split('+').map((token) => token.trim());
+  // 'Ctrl+=' splits to ['Ctrl', '', ''] — an empty tail means the key is '+'.
   const keyToken = tokens[tokens.length - 1] === '' ? '+' : tokens[tokens.length - 1];
   const parsed = {
     key: keyToken.toLowerCase(),
@@ -52,14 +52,15 @@ export function parseShortcut(shortcut: string): ParsedShortcut {
     shift: false,
   };
   for (const token of tokens.slice(0, -1)) {
-    const t = token.toLowerCase();
-    if (t === '') continue; // artifact of a literal '+' key
-    if (!MODIFIERS.has(t))
+    const modifier = token.toLowerCase();
+    if (modifier === '') continue; // artifact of a literal '+' key
+    if (!MODIFIERS.has(modifier))
       throw new Error(`[ui-core] unknown modifier "${token}" in "${shortcut}"`);
-    if (t === 'mod') parsed.mod = true;
-    else if (t === 'ctrl' || t === 'control') parsed.ctrl = true;
-    else if (t === 'meta' || t === 'cmd' || t === 'command') parsed.meta = true;
-    else if (t === 'alt' || t === 'option') parsed.alt = true;
+    if (modifier === 'mod') parsed.mod = true;
+    else if (modifier === 'ctrl' || modifier === 'control') parsed.ctrl = true;
+    else if (modifier === 'meta' || modifier === 'cmd' || modifier === 'command')
+      parsed.meta = true;
+    else if (modifier === 'alt' || modifier === 'option') parsed.alt = true;
     else parsed.shift = true;
   }
   if (parsed.key === '') throw new Error(`[ui-core] empty key in shortcut "${shortcut}"`);
@@ -69,14 +70,14 @@ export function parseShortcut(shortcut: string): ParsedShortcut {
 export function matchShortcut(
   parsed: ParsedShortcut,
   stroke: KeyStroke,
-  opts: { isMac: boolean },
+  options: { isMac: boolean },
 ): boolean {
-  const wantCtrl = parsed.ctrl || (parsed.mod && !opts.isMac);
-  const wantMeta = parsed.meta || (parsed.mod && opts.isMac);
+  const wantCtrl = parsed.ctrl || (parsed.mod && !options.isMac);
+  const wantMeta = parsed.meta || (parsed.mod && options.isMac);
   if (stroke.ctrlKey !== wantCtrl) return false;
   if (stroke.metaKey !== wantMeta) return false;
   if (stroke.altKey !== parsed.alt) return false;
-  // Shift changes what `key` IS for printable characters ('=' vs '+'), so only
+  // Shift changes what `key` is for printable characters ('=' vs '+'), so only
   // enforce declared shift; an undeclared shift is rejected for non-printables.
   if (parsed.shift && !stroke.shiftKey) return false;
   if (!parsed.shift && stroke.shiftKey && parsed.key.length > 1) return false;
@@ -90,10 +91,10 @@ export function matchShortcut(
 }
 
 /** Display form for menu rows: '⌘K' on mac, 'Ctrl+K' elsewhere. */
-export function formatShortcut(shortcut: string, opts: { isMac: boolean }): string {
+export function formatShortcut(shortcut: string, options: { isMac: boolean }): string {
   const parsed = parseShortcut(shortcut);
   const key = parsed.key.length === 1 ? parsed.key.toUpperCase() : capitalize(parsed.key);
-  if (opts.isMac) {
+  if (options.isMac) {
     const mods = [
       parsed.ctrl ? '⌃' : '',
       parsed.alt ? '⌥' : '',
@@ -111,6 +112,6 @@ export function formatShortcut(shortcut: string, opts: { isMac: boolean }): stri
   return [...mods, key].join('+');
 }
 
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
+function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }

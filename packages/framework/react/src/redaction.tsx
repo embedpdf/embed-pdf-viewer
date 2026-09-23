@@ -28,15 +28,15 @@ export function useRedaction(): RedactionCapability & {
   applying: boolean;
   lastResult: RedactionApplyResult | null;
 } {
-  const cap = useCapability(RedactionToken);
-  const applying = useSelector(RedactionToken, (c) => c.isApplying());
-  const lastResult = useSelector(RedactionToken, (c) => c.getLastResult());
-  return useMemo(() => ({ ...cap, applying, lastResult }), [cap, applying, lastResult]);
+  const redaction = useCapability(RedactionToken);
+  const applying = useSelector(RedactionToken, (redaction) => redaction.isApplying());
+  const lastResult = useSelector(RedactionToken, (redaction) => redaction.getLastResult());
+  return useMemo(() => ({ ...redaction, applying, lastResult }), [redaction, applying, lastResult]);
 }
 
-/** Subscribe to one redaction event for the mounted lifetime: `useRedactionEvent((c) => c.onApplied, handler)`. */
+/** Subscribe to one redaction event for the mounted lifetime: `useRedactionEvent((redaction) => redaction.onApplied, handler)`. */
 export function useRedactionEvent<T>(
-  select: (cap: RedactionCapability) => EventHook<T>,
+  select: (redaction: RedactionCapability) => EventHook<T>,
   handler: (event: T) => void,
 ): void {
   useCapabilityEvent(RedactionToken, select, handler);
@@ -44,15 +44,15 @@ export function useRedactionEvent<T>(
 
 /** The pending marks (optionally of one page), reactive against the annotation plane. */
 export function usePendingRedactions(filter?: RedactionMarkFilter): readonly RedactionMark[] {
-  const pon = filter?.page?.pageObjectNumber;
-  const stable = useMemo(() => filter, [pon]);
-  return useSelector(RedactionToken, (c) => c.listPending(stable), pendingEqual);
+  const pageObjectNumber = filter?.page?.pageObjectNumber;
+  const stable = useMemo(() => filter, [pageObjectNumber]);
+  return useSelector(RedactionToken, (redaction) => redaction.listPending(stable), pendingEqual);
 }
 
-const pendingEqual = (a: readonly RedactionMark[], b: readonly RedactionMark[]): boolean =>
-  a.length === b.length &&
-  a.every(
+const pendingEqual = (left: readonly RedactionMark[], right: readonly RedactionMark[]): boolean =>
+  left.length === right.length &&
+  left.every(
     (item, i) =>
-      annotationKey(item.ref) === annotationKey(b[i]!.ref) &&
-      item.overlayText === b[i]!.overlayText,
+      annotationKey(item.ref) === annotationKey(right[i]!.ref) &&
+      item.overlayText === right[i]!.overlayText,
   );

@@ -75,25 +75,25 @@ try {
     console.log('parity (listRawAll): OK');
   }
 
-  const localPons = Object.keys(localResult.fullByPage);
-  const cloudPons = Object.keys(cloudResult.fullByPage);
-  if (localPons.join(',') !== cloudPons.join(',')) {
+  const localPageObjectNumbers = Object.keys(localResult.fullByPage);
+  const cloudPageObjectNumbers = Object.keys(cloudResult.fullByPage);
+  if (localPageObjectNumbers.join(',') !== cloudPageObjectNumbers.join(',')) {
     console.error(
-      `PARITY MISMATCH (page registry): local=${localPons.join(',')} vs cloud=${cloudPons.join(',')}`,
+      `PARITY MISMATCH (page registry): local=${localPageObjectNumbers.join(',')} vs cloud=${cloudPageObjectNumbers.join(',')}`,
     );
     process.exitCode = 1;
   } else {
-    for (const pon of localPons) {
+    for (const pageObjectNumber of localPageObjectNumbers) {
       const fullDiffs = diffAnnotationListSnapshotAll(
-        { pages: [localResult.fullByPage[Number(pon)]!] },
-        { pages: [cloudResult.fullByPage[Number(pon)]!] },
+        { pages: [localResult.fullByPage[Number(pageObjectNumber)]!] },
+        { pages: [cloudResult.fullByPage[Number(pageObjectNumber)]!] },
       );
       if (fullDiffs.length > 0) {
-        console.error(`PARITY MISMATCH (page ${pon} list) between local and cloud:`);
+        console.error(`PARITY MISMATCH (page ${pageObjectNumber} list) between local and cloud:`);
         for (const d of fullDiffs) console.error('  ' + d);
         process.exitCode = 1;
       } else {
-        console.log(`parity (page ${pon} list): OK`);
+        console.log(`parity (page ${pageObjectNumber} list): OK`);
       }
     }
   }

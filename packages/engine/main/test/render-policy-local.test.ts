@@ -26,7 +26,7 @@ const annotatedPath = resolve(
 
 /**
  * `localEngine({ renderPolicy })` — the deployment policy plane on the
- * LOCAL engine: advertisement via `render.policy()`,
+ * local engine: advertisement via `render.policy()`,
  * off-lattice rejection under `enforced: true` (server parity), and the
  * `maxRenderPixels` budget riding into every worker render.
  */
@@ -57,18 +57,18 @@ describe('local render policy (wasm runtime)', () => {
   });
 
   test('policy() advertises the configured lattice verbatim', async () => {
-    expect(await doc.render.policy()).toEqual(LATTICE);
+    expect(await doc.render!.policy()).toEqual(LATTICE);
   });
 
   test('default engine stays continuous', async () => {
     const plain = createLocalEngine({ runtime: { prefer: 'wasm' } });
     const plainDoc = await plain.open({ kind: 'bytes', id: 'plain-doc', bytes });
     try {
-      expect(await plainDoc.render.policy()).toEqual({ kind: 'continuous' });
+      expect(await plainDoc.render!.policy()).toEqual({ kind: 'continuous' });
       // …and renders anything, including the scale viewport the enforced
       // lattice rejects below.
       const raster = await plainDoc
-        .page(toPageRef(await firstPon(plainDoc)))
+        .page(toPageRef(await firstPageObjectNumber(plainDoc)))
         .render.raw({ viewport: { kind: 'scale', scale: 0.25 } });
       expect(raster.width).toBeGreaterThan(0);
     } finally {
@@ -78,7 +78,7 @@ describe('local render policy (wasm runtime)', () => {
   }, 120_000);
 
   test('enforced: off-lattice full-page renders reject with the policy attached', async () => {
-    const page = doc.page(toPageRef(await firstPon(doc)));
+    const page = doc.page(toPageRef(await firstPageObjectNumber(doc)));
 
     // Scale viewports are off the width lattice by construction — the
     // caller must convert through snapFullPageViewport(pageWidth).
@@ -104,7 +104,7 @@ describe('local render policy (wasm runtime)', () => {
   });
 
   test('enforced: rect targets are exempt (tile jurisdiction)', async () => {
-    const page = doc.page(toPageRef(await firstPon(doc)));
+    const page = doc.page(toPageRef(await firstPageObjectNumber(doc)));
     const raster = await page.render.raw({
       target: { kind: 'rect', rect: { left: 0, bottom: 0, right: 100, top: 100 } },
       viewport: { kind: 'scale', scale: 1 },
@@ -130,7 +130,7 @@ describe('local render policy (wasm runtime)', () => {
 
   test('the pixel budget rides into the worker and rejects before allocating', async () => {
     // A lattice whose budget is smaller than its own smallest ladder
-    // width can produce: width 320 of ANY page overflows 10,000 px, so
+    // width can produce: width 320 of any page overflows 10,000 px, so
     // the worker-side guard must fire (the lattice check passes).
     const tiny = createLocalEngine({
       runtime: { prefer: 'wasm' },
@@ -147,7 +147,7 @@ describe('local render policy (wasm runtime)', () => {
     try {
       await expect(
         tinyDoc
-          .page(toPageRef(await firstPon(tinyDoc)))
+          .page(toPageRef(await firstPageObjectNumber(tinyDoc)))
           .render.raw({ viewport: { kind: 'width', width: 320 } }),
       ).rejects.toSatisfy((err: unknown) => {
         expect(EngineError.is(err, EngineErrorCode.InvalidArg)).toBe(true);
@@ -161,7 +161,7 @@ describe('local render policy (wasm runtime)', () => {
   }, 120_000);
 });
 
-async function firstPon(doc: DocumentHandle): Promise<never> {
+async function firstPageObjectNumber(doc: DocumentHandle): Promise<never> {
   const pages = await doc.pages.list();
   return pages.pages[0]!.ref.pageObjectNumber as never;
 }

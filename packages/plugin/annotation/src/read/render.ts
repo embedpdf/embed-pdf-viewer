@@ -23,8 +23,8 @@ import { buildTextItems } from '../text-item';
  * areas, and the baked-appearance seam (epoch, bake scale, rasters).
  */
 export function createRenderReads(
-  ctx: Pick<AnnotationContext, 'getState' | 'document' | 'doc'>,
-  { store, geometry, tools }: Pick<AnnotationServices, 'store' | 'geometry' | 'tools'>,
+  ctx: Pick<AnnotationContext, 'state' | 'document' | 'doc'>,
+  { view: { pageModel }, geometry, tools }: Pick<AnnotationServices, 'view' | 'geometry' | 'tools'>,
 ) {
   const itemsCache = new Map<
     number,
@@ -37,37 +37,43 @@ export function createRenderReads(
     }
   >();
   const pageItemsOf = (page: PageRef, view?: ViewEnv): RenderItem[] => {
-    const pon = page.pageObjectNumber;
-    const m = store.model();
-    const g = ctx.getState().toolGhost;
-    const c = itemsCache.get(pon);
+    const pageObjectNumber = page.pageObjectNumber;
+    const model = pageModel(pageObjectNumber);
+    const ghost = ctx.state.get().toolGhost;
+    const cached = itemsCache.get(pageObjectNumber);
     if (
-      c &&
-      c.model === m &&
-      c.ghost === g &&
-      c.zoom === view?.zoom &&
-      c.rotation === view?.rotation
+      cached &&
+      cached.model === model &&
+      cached.ghost === ghost &&
+      cached.zoom === view?.zoom &&
+      cached.rotation === view?.rotation
     )
-      return c.v;
-    const v = corePageItems(m, page, view);
-    // The armed tool's VECTOR footprint ghost rides the same items pipeline as
+      return cached.v;
+    const items = corePageItems(model, page, view);
+    // The armed tool's vector footprint ghost rides the same items pipeline as
     // every draft preview (image ghosts blit through the framework instead).
-    if (g && g.page.pageObjectNumber === pon && g.kind === 'vector') {
-      const tool = tools.get(g.toolId);
-      const style = styleFromProps(defaultsFor(m, tool?.preset ?? g.toolId));
-      v.push({
+    if (ghost && ghost.page.pageObjectNumber === pageObjectNumber && ghost.kind === 'vector') {
+      const tool = tools.get(ghost.toolId);
+      const style = styleFromProps(defaultsFor(model, tool?.preset ?? ghost.toolId));
+      items.push({
         id: 'tool-ghost',
         ref: null,
         subtype: tool?.subtype ?? 'square',
-        geom: g.geom,
-        box: g.box,
+        geometry: ghost.geometry,
+        box: ghost.box,
         style,
         source: 'ghost',
         selected: false,
       });
     }
-    itemsCache.set(pon, { model: m, ghost: g, zoom: view?.zoom, rotation: view?.rotation, v });
-    return v;
+    itemsCache.set(pageObjectNumber, {
+      model: model,
+      ghost: ghost,
+      zoom: view?.zoom,
+      rotation: view?.rotation,
+      v: items,
+    });
+    return items;
   };
 
   const textsCache = new Map<
@@ -75,50 +81,68 @@ export function createRenderReads(
     { model: Model; zoom: number | undefined; rotation: number | undefined; v: TextItem[] }
   >();
   const textItemsOf = (page: PageRef, view?: ViewEnv): TextItem[] => {
-    const pon = page.pageObjectNumber;
-    const m = store.model();
-    const c = textsCache.get(pon);
-    if (c && c.model === m && c.zoom === view?.zoom && c.rotation === view?.rotation) return c.v;
-    const v = buildTextItems(m, page, view);
-    textsCache.set(pon, { model: m, zoom: view?.zoom, rotation: view?.rotation, v });
-    return v;
+    const pageObjectNumber = page.pageObjectNumber;
+    const model = pageModel(pageObjectNumber);
+    const cached = textsCache.get(pageObjectNumber);
+    if (
+      cached &&
+      cached.model === model &&
+      cached.zoom === view?.zoom &&
+      cached.rotation === view?.rotation
+    )
+      return cached.v;
+    const items = buildTextItems(model, page, view);
+    textsCache.set(pageObjectNumber, {
+      model: model,
+      zoom: view?.zoom,
+      rotation: view?.rotation,
+      v: items,
+    });
+    return items;
   };
 
   // The navigation plane's feed: clickable link areas per page — standalone
   // links + attached-link segments (rects derived by the reconciler's own
-  // rule). Memoized by model identity for selector use.
+  // rule). Memoized by the page's slice of the model for selector use.
   const linkItemsCache = new Map<number, { model: Model; v: LinkNavItem[] }>();
-  const linkItemsOf = (pon: number): LinkNavItem[] => {
-    const m = store.model();
-    const c = linkItemsCache.get(pon);
-    if (c && c.model === m) return c.v;
-    const v: LinkNavItem[] = [];
-    for (const id of m.order) {
-      const a = m.byId[id];
-      if (!a || a.page.pageObjectNumber !== pon || a.subtype !== 'link') continue;
-      if (!viewable(a.flags, false)) continue; // hidden links don't navigate
+  const linkItemsOf = (pageObjectNumber: number): LinkNavItem[] => {
+    const model = pageModel(pageObjectNumber);
+    const cached = linkItemsCache.get(pageObjectNumber);
+    if (cached && cached.model === model) return cached.v;
+    const items: LinkNavItem[] = [];
+    for (const id of model.order) {
+      const annotation = model.byId[id];
+      if (
+        !annotation ||
+        annotation.page.pageObjectNumber !== pageObjectNumber ||
+        annotation.subtype !== 'link'
+      )
+        continue;
+      if (!viewable(annotation.flags, false)) continue; // hidden links don't navigate
       // Standalone links carry their own model `link` (/A); attached children
-      // carry the target on their DTO. Rects are the CHILD's own committed
+      // carry the target on their DTO. Rects are the child's own committed
       // geometry — anchors render only in view contexts, where nothing is
       // mid-gesture, so no live parent-derivation is needed.
-      const target = a.link ?? (a.data?.subtype === 'link' ? (a.data.target ?? null) : null);
-      if (target == null || a.geom.t !== 'rect') continue;
-      const activate = a.data?.actions?.activate;
-      const ref = a.ref ?? a.data?.ref ?? undefined;
-      const hoverEnter = Boolean(a.data?.actions?.cursorEnter?.root);
-      const hoverExit = Boolean(a.data?.actions?.cursorExit?.root);
-      v.push({
+      const target =
+        annotation.link ??
+        (annotation.data?.subtype === 'link' ? (annotation.data.target ?? null) : null);
+      if (target == null || annotation.geometry.kind !== 'rect') continue;
+      const activate = annotation.data?.actions?.activate;
+      const ref = annotation.ref ?? annotation.data?.ref ?? undefined;
+      const hoverEnter = Boolean(annotation.data?.actions?.cursorEnter?.root);
+      const hoverExit = Boolean(annotation.data?.actions?.cursorExit?.root);
+      items.push({
         id,
-        bounds: a.geom.rect,
+        bounds: annotation.geometry.rect,
         target,
-        attached: a.group !== undefined,
+        attached: annotation.group !== undefined,
         ...(activate ? { activate } : {}),
         ...(ref ? { ref } : {}),
         ...(hoverEnter || hoverExit ? { hoverEvents: { enter: hoverEnter, exit: hoverExit } } : {}),
       });
     }
-    linkItemsCache.set(pon, { model: m, v });
-    return v;
+    linkItemsCache.set(pageObjectNumber, { model: model, v: items });
+    return items;
   };
 
   const api = {
@@ -126,29 +150,35 @@ export function createRenderReads(
     listTextItems: (page: PageRef, view?: ViewEnv) => textItemsOf(page, view),
     listLinkItems: (page: PageRef) => linkItemsOf(page.pageObjectNumber),
     getAppearanceEpoch: (page: PageRef) => {
-      const pon = page.pageObjectNumber;
-      // What a baked raster DEPENDS on, and nothing else: which annotations are
+      const pageObjectNumber = page.pageObjectNumber;
+      // What a baked raster depends on, and nothing else: which annotations are
       // baked on this page, and each one's /AP content version (`apVersion` —
-      // bumped when a size-changing patch RESOLVES, or a remote edit folds in).
+      // bumped when a size-changing patch resolves, or a remote edit folds in).
       // Position and rotation are deliberately absent: the blit translates
       // (`apBox`) and rotates (`apRot`) the same pixels, so a move or a spin
       // costs zero re-renders — and because the version bumps when the engine
-      // CONFIRMS the re-bake, the fetch can never read a stale /AP ("one
+      // confirms the re-bake, the fetch can never read a stale /AP ("one
       // behind"). Render scale is the shell effect's own dependency.
-      const m = store.model();
+      const model = pageModel(pageObjectNumber);
       const parts: string[] = [];
-      for (const id of m.order) {
-        const a = m.byId[id];
-        if (!a || a.page.pageObjectNumber !== pon || a.source !== 'baked' || !a.ref) continue;
+      for (const id of model.order) {
+        const annotation = model.byId[id];
+        if (
+          !annotation ||
+          annotation.page.pageObjectNumber !== pageObjectNumber ||
+          annotation.source !== 'baked' ||
+          !annotation.ref
+        )
+          continue;
         // Conversation-plane annotations never paint — a remote reply or
         // status change must not churn the page's raster cache key.
-        if (isSubstrateOnly(a)) continue;
-        parts.push(`${id}@${a.apVersion ?? 0}`);
+        if (isSubstrateOnly(annotation)) continue;
+        parts.push(`${id}@${annotation.apVersion ?? 0}`);
       }
       return parts.sort().join('|');
     },
     getBakeScale: (renderScale: number) =>
-      // The render policy is a document FACT off the kernel registry (like
+      // The render policy is a document fact off the kernel registry (like
       // `pages`), interpreted by the pure engine-core helper — one lifecycle,
       // one interpretation, no plugin dependency. Identity under continuous.
       snapAppearanceScale(ctx.document()?.renderPolicy ?? CONTINUOUS_RENDER_POLICY, renderScale),
@@ -161,7 +191,7 @@ export function createRenderReads(
         else signal.addEventListener('abort', () => task.abort(signal.reason), { once: true });
       }
       return task.then(
-        (r) => r.appearances,
+        (result) => result.appearances,
         () => [],
       );
     },

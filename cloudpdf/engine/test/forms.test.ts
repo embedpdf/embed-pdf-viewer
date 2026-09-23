@@ -35,7 +35,7 @@ let fx: DbSeededFixture | undefined;
 const TENANT_ID = 'cloud-forms-conformance-tenant';
 
 // The suite opens several independent documents, so the engine carries a
-// TENANT token (doc-scoped tokens bind to one docId). The import target is
+// tenant token (doc-scoped tokens bind to one docId). The import target is
 // a second copy of toggle_fields.pdf — id-opened docs are server state, so
 // the round-trip test can't mint one by re-opening bytes.
 const DOCS = {

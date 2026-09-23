@@ -52,8 +52,8 @@ describe('matchShortcut', () => {
   });
 
   it('matches printable keys regardless of shift-produced identity', () => {
-    // 'Ctrl+=' on a US layout with shift held produces key '+': the v2
-    // shortcut set lists 'Ctrl+=' and 'Ctrl+NumpadAdd' separately, so '='
+    // 'Ctrl+=' on a US layout with shift held produces key '+': a shortcut
+    // set may list 'Ctrl+=' and 'Ctrl+NumpadAdd' separately, so '='
     // must match only '='.
     const parsed = parseShortcut('Ctrl+=');
     expect(matchShortcut(parsed, stroke({ key: '=', ctrlKey: true }), { isMac: false })).toBe(true);

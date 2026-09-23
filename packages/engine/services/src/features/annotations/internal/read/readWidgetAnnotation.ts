@@ -57,7 +57,7 @@ export function readWidget(
       : {}),
     textAlign: textAlignmentFromCode(readTextAlignment(fn, annotPtr)),
     // Joined by the caller (joinWidgetFieldNumbers): the /Parent target is
-    // a FIELD dictionary, which annotation-plane primitives cannot follow.
+    // a field dictionary, which annotation-plane primitives cannot follow.
     fieldObjectNumber: 0,
     fieldFamily: 'unknown',
   };

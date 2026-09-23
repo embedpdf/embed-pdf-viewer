@@ -41,7 +41,7 @@ import {
 import type { PageContextValue } from './runtime';
 
 /**
- * Resolve a target through the plugin and PERFORM the `uri` outcome — the ONE
+ * Resolve a target through the plugin and perform the `uri` outcome — the one
  * place in the codebase that turns a link target into a browser tab. The
  * plugin owns resolution (goto → stage reveal, policy, analytics) and stays
  * DOM-free; opening is this framework layer's job. Every click path — the nav
@@ -59,7 +59,7 @@ export function openLinkTarget(
     if (href && typeof window !== 'undefined') window.open(href, '_blank', 'noopener,noreferrer');
   }
   // 'dispatched': the action engine took it — the actions UI adapter owns any
-  // URI open (the no-double-open rule); this opener must do NOTHING.
+  // URI open (the no-double-open rule); this opener must do nothing.
   return activation;
 }
 
@@ -86,21 +86,21 @@ export function LinkLayer({ renderLink }: LinkLayerProps = {}) {
   const page = usePage();
   const link = useCapability(LinkToken);
   // The link plane's /AA event feed: links are behavior-inert to the
-  // annotation plane's hover feed while navigable (their pixels are THESE
+  // annotation plane's hover feed while navigable (their pixels are these
   // anchors), so E/X/D/U/Fo/Bl can only fire from here. One shared pump per
   // layer — crossing layers still orders Exit before Enter because both
   // sides submit synchronously in DOM event order.
   const actions = useOptionalCapability(ActionsToken);
   const linkPump = useMemo(() => (actions ? createHoverPump(actions.dispatch) : null), [actions]);
-  const items = useSelector(LinkToken, (c) => c.listLinks(page.ref), shallowArray);
-  const engaged = useSelector(LinkHostToken, (c) => c.isNavigationEngaged());
-  // One owner per pixel: an ATTACHED link is a property of its parent — while
+  const items = useSelector(LinkToken, (link) => link.listLinks(page.ref), shallowArray);
+  const engaged = useSelector(LinkHostToken, (link) => link.isNavigationEngaged());
+  // One owner per pixel: an attached link is a property of its parent — while
   // the active tool can edit annotations, the parent owns those pixels and
   // the anchor stands down (select/move/resize work; no tooltip, no swallowed
   // pointer). Standalone document links navigate under any link-nav tool.
   const editEnabled = useOptionalSelector(
     InteractionToken,
-    (c) => c.getActiveTool()?.enables.has('annotation-edit') ?? false,
+    (interaction) => interaction.getActiveTool()?.enables.has('annotation-edit') ?? false,
     false,
   );
 
@@ -118,7 +118,7 @@ export function LinkLayer({ renderLink }: LinkLayerProps = {}) {
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
       {visible.map((item) => {
         const box = boxOf(item, page);
-        // Real href ONLY for a chain-free sanitized external URI; blocked
+        // Real href only for a chain-free sanitized external URI; blocked
         // schemes, internal targets, and chain-bearing trees (/Next after the
         // URI) activate through the plugin instead — a native navigation
         // would perform the first action and silently drop the rest.
@@ -152,23 +152,23 @@ export function LinkLayer({ renderLink }: LinkLayerProps = {}) {
             tabIndex={0}
             title={link.getLabel(item)}
             aria-label={link.getLabel(item)}
-            onClick={(e) => {
+            onClick={(event) => {
               // Modified clicks and middle-clicks on a real href keep their
               // native browser behaviour (new tab / copy link).
-              if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+              if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
               // A plain left-click on a real href: let the anchor be an
               // anchor — native navigation, target=_blank, status bar. Only
               // non-href targets (goto / named / blocked schemes) route
-              // through the plugin, whose uri outcome the opener PERFORMS
-              // (the old code preventDefault-ed AND dropped the outcome, so
+              // through the plugin, whose uri outcome the opener performs
+              // (the old code preventDefault-ed and dropped the outcome, so
               // clicking a URL link did nothing at all).
               if (href) return;
-              e.preventDefault();
+              event.preventDefault();
               openLinkTarget(link, item.target, context);
             }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
                 openLinkTarget(link, item.target, context);
               }
             }}
@@ -187,8 +187,8 @@ export function LinkLayer({ renderLink }: LinkLayerProps = {}) {
             onBlur={() => notify('blur')}
             // Keep the hub out of it: a down inside the anchor must not reach
             // the Stage's native listener (same isolation idiom as FreeText).
-            onPointerDown={(e) => {
-              e.stopPropagation();
+            onPointerDown={(event) => {
+              event.stopPropagation();
               notify('mouseDown');
             }}
             style={{
@@ -213,9 +213,9 @@ export function useLink() {
   return useCapability(LinkToken);
 }
 
-/** Subscribe to one link event for the mounted lifetime: `useLinkEvent((c) => c.onActivated, handler)`. */
+/** Subscribe to one link event for the mounted lifetime: `useLinkEvent((link) => link.onActivated, handler)`. */
 export function useLinkEvent<T>(
-  select: (cap: LinkCapability) => EventHook<T>,
+  select: (link: LinkCapability) => EventHook<T>,
   handler: (event: T) => void,
 ): void {
   useCapabilityEvent(LinkToken, select, handler);

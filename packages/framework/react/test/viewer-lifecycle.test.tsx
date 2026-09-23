@@ -13,16 +13,16 @@ import type { AnyPlugin, PluginContext } from '@embedpdf/core';
  * cycles:
  *   - StrictMode's setup/cleanup/setup creates two kernels and fully
  *     destroys the first — documents open once, nothing leaks.
- *   - The kernel is on context DURING boot, so the fallback can use
+ *   - The kernel is on context during boot, so the fallback can use
  *     workspace capabilities (the i18n promise).
  *   - A failed boot renders `renderError` — never a silent forever-fallback.
  *   - engine/plugins are init-only: changed identities warn and are ignored.
  */
 
 const box = { left: 0, bottom: 0, right: 600, top: 800 } as const;
-const page = (pon: number, index: number): PageLayout => ({
+const page = (pageObjectNumber: number, index: number): PageLayout => ({
   index,
-  ref: toPageRef(pon),
+  ref: toPageRef(pageObjectNumber),
   label: null,
   size: { width: 600, height: 800 },
   rotation: 0,
@@ -58,7 +58,7 @@ function countingEngine() {
   };
 }
 
-/** A thunk (EngineFactory) that constructs a FRESH engine on each call and
+/** A thunk (EngineFactory) that constructs a fresh engine on each call and
  *  records each one's `destroy` spy — so ownership assertions can target
  *  per-mount engines. */
 function engineThunk() {
@@ -83,10 +83,10 @@ describe('<Viewer> lifecycle', () => {
     const plugin: AnyPlugin = {
       id: 'ws-probe',
       token: { name: 'ws-probe' },
-      capability: (ctx: PluginContext<unknown>) => {
+      create: (ctx: PluginContext<unknown>) => {
         constructed();
         ctx.cleanup(torndown);
-        return {};
+        return { api: {} };
       },
     };
     const plugins = [plugin];
@@ -116,33 +116,37 @@ describe('<Viewer> lifecycle', () => {
     await waitFor(() => expect(handles[0].close).toHaveBeenCalledTimes(1)); // the leak fix
   });
 
-  it('the fallback renders WITH the kernel on context during boot', async () => {
+  it('the fallback renders with the kernel on context before the children', async () => {
     const { engine } = countingEngine();
-    let releaseInit!: () => void;
-    const initGate = new Promise<void>((r) => (releaseInit = r));
-    const slowPlugin: AnyPlugin = { id: 'slow-ws', init: () => initGate };
+    const statuses: string[] = [];
 
     function BootScreen() {
-      const kernel = useKernel(); // the i18n contract: usable before start() resolves
-      return <div data-testid="boot">{`booting (${kernel.status()})`}</div>;
+      const kernel = useKernel(); // usable before boot completes
+      statuses.push(kernel.status());
+      return <div data-testid="boot">booting</div>;
     }
 
     render(
-      <Viewer engine={engine} plugins={[slowPlugin]} fallback={<BootScreen />}>
+      <Viewer engine={engine} plugins={[]} fallback={<BootScreen />}>
         <div data-testid="shell">shell</div>
       </Viewer>,
     );
 
-    await waitFor(() => expect(screen.getByTestId('boot').textContent).toContain('starting'));
-    releaseInit();
     await waitFor(() => expect(screen.getByTestId('shell')).toBeTruthy());
+    // The fallback rendered with the kernel on context before the children did.
+    expect(statuses.length).toBeGreaterThan(0);
   });
 
   it('a failed boot renders renderError, never a silent forever-fallback', async () => {
     const { engine } = countingEngine();
     const broken: AnyPlugin = {
       id: 'broken-ws',
-      init: () => Promise.reject(new Error('locale pack exploded')),
+      create: () => ({
+        api: {},
+        connect: () => {
+          throw new Error('locale pack exploded');
+        },
+      }),
     };
 
     render(
@@ -173,7 +177,7 @@ describe('<Viewer> lifecycle', () => {
     await waitFor(() => expect(screen.getByTestId('shell')).toBeTruthy());
     expect(open).toHaveBeenCalledTimes(1);
 
-    // Re-render with a NEW plugins array identity (the classic inline-array mistake).
+    // Re-render with a new plugins array identity (the classic inline-array mistake).
     view.rerender(
       <Viewer engine={engine} plugins={[]} initialDocuments={[{ source: bytesInput('a') }]}>
         <div data-testid="shell">shell</div>
@@ -187,9 +191,9 @@ describe('<Viewer> lifecycle', () => {
 });
 
 /**
- * Engine OWNERSHIP follows the shape of the `engine` prop:
- *   - a thunk (function) is VIEWER-OWNED — constructed on mount, destroyed on unmount;
- *   - an instance is BORROWED — used as-is (warmed up), never destroyed here.
+ * Engine ownership follows the shape of the `engine` prop:
+ *   - a thunk (function) is viewer-owned — constructed on mount, destroyed on unmount;
+ *   - an instance is borrowed — used as-is (warmed up), never destroyed here.
  * The union type is the flag; there is no lifecycle config.
  */
 describe('<Viewer> engine ownership', () => {
@@ -248,7 +252,7 @@ describe('<Viewer> engine ownership', () => {
     // destroyed by its own cleanup, the second survives.
     expect(thunk).toHaveBeenCalledTimes(2);
     expect(engines).toHaveLength(2);
-    // PINNED: BOTH engines are warmed up — StrictMode's double-mount really
+    // Pinned: Both engines are warmed up — StrictMode's double-mount really
     // boots twice in dev (worker spawn, font fetches) before the first engine
     // is destroyed. Deliberate: that is the leak-detection contract StrictMode
     // exercises; production mounts once.

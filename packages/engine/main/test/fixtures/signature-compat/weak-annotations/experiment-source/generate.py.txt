@@ -1,0 +1,80 @@
+import sys
+sys.dont_write_bytecode = True
+from pathlib import Path
+CORPUS = Path('/Users/bobsingor/GitHub/cloudpdf-platform/oss/embedpdf/packages/engine/main/test/fixtures/signature-compat')
+sys.path.insert(0, str(CORPUS))
+from generate import A, D, N, S, g, signer_for, stream, describe_bytes, reader, raw_body
+from generate_v3 import fresh, seal, edit
+from generate_v2 import page_of
+from verify_v3 import normalized, changed_keys
+from asn1crypto import cms
+import json, subprocess, hashlib
+OUT = Path('/tmp/epdf-weak-nm-probes/pdfs')
+OUT.mkdir(exist_ok=True)
+assert not any(OUT.iterdir()), 'Refuse to overwrite probe bytes'
+signer = signer_for(CORPUS / 'keys')
+cases = []
+for profile in ['approval', 'p3', 'p2', 'fieldmdp', 'lockp2', 'locked-markup']:
+  for layout in ['inline', 'indirect-array']:
+    w = fresh(profile=profile)
+    page = page_of(w)
+    annots = page['/Annots']
+    for index in range(4):
+      appearance = stream(w, 'q 0 0 1 RG 1 w 1 1 58 38 re S Q', Type=N('/XObject'), Subtype=N('/Form'), BBox=A(0,0,60,40), Resources=D())
+      annots.append(D(Type=N('/Annot'), Subtype=N('/Square'), Rect=A(310+index*65, 420, 370+index*65,460), F=g.NumberObject(132 if profile == 'locked-markup' and index == 2 else 4), C=A(0,0,1), Contents=S(f'weak-{index}'), AP=D(N=appearance)))
+    if layout == 'indirect-array':
+      page[N('/Annots')] = w.add_object(annots)
+    if profile == 'lockp2':
+      from generate import field_ref
+      # The signer below preserves this signed /Lock /P declaration.
+      field_ref(w, 'SignatureOne').get_object()[N('/Lock')] = D(Type=N('/SigFieldLock'), Action=N('/All'), P=g.NumberObject(2))
+    base = seal(w, signer, certification=3 if profile=='p3' else 2 if profile=='p2' else None, lock=['ValueOne'] if profile=='fieldmdp' else None)
+    old = reader(base)
+    old_page = page_of(old)
+    old_weak = {str(a['/Contents']): a for a in old_page['/Annots'] if isinstance(a, g.DictionaryObject) and a.get('/Subtype') == '/Square'}
+    assert len(old_weak) == 4 and all('/NM' not in a for a in old_weak.values())
+    for action in ['control', 'delete', 'delete-names', 'names', 'reorder', 'reorder-names']:
+      def mutate(writer):
+        target_page = page_of(writer)
+        array = target_page['/Annots']
+        if action.startswith('delete'):
+          at = next(i for i,a in enumerate(array) if a.get_object().get('/Contents') == 'weak-1')
+          array.pop(at)
+        if action.startswith('reorder'):
+          at = next(i for i,a in enumerate(array) if a.get_object().get('/Contents') == 'weak-3')
+          item = array.pop(at)
+          first = next(i for i,a in enumerate(array) if a.get_object().get('/Contents') == 'weak-0')
+          array.insert(first,item)
+        if 'names' in action:
+          for a in array:
+            if isinstance(a, g.DictionaryObject) and a.get('/Subtype') == '/Square' and not int(a.get('/F',0)) & 128:
+              a[N('/NM')] = S('probe-' + str(a['/Contents']))
+        raw = target_page.raw_get('/Annots')
+        writer.mark_update(raw if isinstance(raw,g.IndirectObject) else writer.root['/Pages']['/Kids'].raw_get(0))
+      data = base if action == 'control' else edit(base, mutate)
+      new = reader(data)
+      assert data.startswith(base)
+      current = {str(a['/Contents']): a for a in page_of(new)['/Annots'] if isinstance(a,g.DictionaryObject) and a.get('/Subtype')=='/Square'}
+      assert len(current) == (3 if action.startswith('delete') else 4)
+      for name,a in current.items():
+        expected = {'/NM'} if 'names' in action and not int(a.get('/F',0)) & 128 else set()
+        assert changed_keys(old_weak[name], a) == expected, (profile,layout,action,name)
+      # No field/widget object or appearance bytes were rewritten.
+      for ref in old.root['/AcroForm']['/Fields']:
+        assert raw_body(base,ref.idnum) == raw_body(data,ref.idnum)
+      facts=describe_bytes(data)
+      assert all(s['digestMatches'] for s in facts['signatures'])
+      embedded = new.embedded_signatures[0]
+      info=cms.ContentInfo.load(embedded.sig_object['/Contents'].original_bytes)
+      ranges=embedded.sig_object['/ByteRange']
+      signed = b''.join(data[int(ranges[i]):int(ranges[i])+int(ranges[i+1])] for i in range(0,len(ranges),2))
+      sig_path=OUT/'check.cms'; content_path=OUT/'check.bin'
+      sig_path.write_bytes(info.dump());content_path.write_bytes(signed)
+      result=subprocess.run(['openssl','cms','-verify','-inform','DER','-in',str(sig_path),'-content',str(content_path),'-binary','-noverify','-out','/dev/null'],capture_output=True)
+      assert result.returncode==0, result.stderr
+      name=f'{profile}-{layout}-{action}'
+      (OUT/f'{name}.pdf').write_bytes(data)
+      cases.append(dict(id=name,profile=profile,layout=layout,action=action,file=f'{name}.pdf',facts=facts,acrobat='unobserved'))
+for temporary in ['check.cms','check.bin']:(OUT/temporary).unlink()
+(OUT/'manifest.json').write_text(json.dumps(dict(cases=cases,certificate=str(CORPUS/'keys/TEST-ONLY-signer.cer'),cmsVerified=len(cases)),indent=2)+'\n')
+print(f'Generated {len(cases)} signed probes; exact-change checks and OpenSSL CMS verification passed for all.')

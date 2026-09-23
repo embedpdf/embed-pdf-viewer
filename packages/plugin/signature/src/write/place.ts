@@ -14,30 +14,22 @@ import type {
   SignatureConfig,
   SignFieldInput,
 } from '../contract';
+import { hasSignedField, sameFieldRef, setTarget } from '../model';
+import type { SignatureReads } from '../read/signatures';
 import type { SignatureContext, SignatureServices } from '../services';
-import { sameRef } from '../services/store';
+import { verb } from '../services/errors';
 
-export function createTarget(
-  ctx: SignatureContext,
-  { events, store }: Pick<SignatureServices, 'events' | 'store'>,
-) {
-  const { targetChanged, inspectionRequested } = events;
-  const { state } = store;
-  const setTarget = (field: FormFieldRef | null): void => {
-    const current = state().target;
-    if (current === field || (current && field && sameRef(current, field))) return;
-    ctx.dispatch({ type: 'TARGET', field });
-    targetChanged.emit({ field });
-  };
+export function createTarget(ctx: SignatureContext, { events }: Pick<SignatureServices, 'events'>) {
+  const { inspectionRequested } = events;
   /** A field that was just signed or filled is no longer the target. */
   const clearIfTarget = (field: FormFieldRef): void => {
-    const current = state().target;
-    if (current && sameRef(current, field)) setTarget(null);
+    const current = ctx.state.get().target;
+    if (current && sameFieldRef(current, field)) ctx.state.update(setTarget, null);
   };
   return {
     clearIfTarget,
     api: {
-      setTarget,
+      setTarget: (field) => ctx.state.update(setTarget, field),
       requestInspection: (field) => inspectionRequested.emit({ field }),
     } satisfies Partial<SignatureCapability>,
   };
@@ -52,11 +44,12 @@ export function createPlacement(
     siblings,
   }: Pick<SignatureServices, 'events' | 'store' | 'authority' | 'siblings'>,
   config: SignatureConfig,
+  { snapshot }: Pick<SignatureReads, 'snapshot'>,
   { sign }: { sign(input: SignFieldInput): Promise<SignatureCompleteResult> },
   { fillField }: { fillField(field: FormFieldRef, mark: Mark): Promise<void> },
 ) {
   const { signRequested } = events;
-  const { state, documentId } = store;
+  const { documentId } = store;
   const { mode } = authority;
   const { stamp, annotation } = siblings;
 
@@ -65,7 +58,7 @@ export function createPlacement(
     target: { field: FormFieldRef } | StampPlacement,
   ): Promise<PlaceMarkResult> => {
     if (!('field' in target)) {
-      // Free placement: a stamp, as in Preview — one placement law, the stamp plugin's.
+      // Free placement: a stamp, as in Preview; one placement law, the stamp plugin's.
       if ('assetId' in mark) {
         const library = stamp();
         if (!library) {
@@ -82,7 +75,7 @@ export function createPlacement(
         // The first signature is the one that can certify: when the config
         // allows a certification, let the chrome offer the choice (its sign
         // dialog) instead of sealing a plain approval on the spot.
-        if (config.allowCertify && !state().snapshot?.signatures.some((s) => s.signed)) {
+        if (config.allowCertify && !hasSignedField(snapshot())) {
           signRequested.emit({ field: target.field, mark });
           return { kind: 'requested', field: target.field };
         }
@@ -100,5 +93,5 @@ export function createPlacement(
     }
   };
 
-  return { api: { placeMark } satisfies Partial<SignatureCapability> };
+  return { api: { placeMark: verb(placeMark) } satisfies Partial<SignatureCapability> };
 }

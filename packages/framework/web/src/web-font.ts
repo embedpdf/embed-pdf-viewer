@@ -2,13 +2,13 @@
  * Mount a registered font for the DOM: the engine lays text out with the
  * font's bytes, the browser needs the same face as a `@font-face` so the
  * live editor and the vector renderer show the glyphs the appearance stream
- * will bake. The family name is the font's KEY — the CSS family the
+ * will bake. The family name is the font's key — the CSS family the
  * annotation plugin emits for a registered font (`cssFontFamily`) — so
  * mounting under the key is what makes the two agree.
  *
  * Returns the unmount. Idempotent per (document, key): a second mount of a
  * key already in the document's font set is a no-op that still returns an
- * unmount of its own (the face leaves when the LAST holder unmounts).
+ * unmount of its own (the face leaves when the last holder unmounts).
  */
 export async function mountWebFont(
   key: string,

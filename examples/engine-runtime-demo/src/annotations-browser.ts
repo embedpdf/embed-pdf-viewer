@@ -22,8 +22,8 @@ try {
     elapsedMs: result.elapsedMs,
     summary: summarizeRawAll(result.rawAll),
     pageStateByPon: Object.fromEntries(
-      Object.entries(result.fullByPage).map(([pon, page]) => [
-        pon,
+      Object.entries(result.fullByPage).map(([pageObjectNumber, page]) => [
+        pageObjectNumber,
         {
           pageObjectNumber: page.pageState.pageObjectNumber,
           hasAnyWeakAnnotations:

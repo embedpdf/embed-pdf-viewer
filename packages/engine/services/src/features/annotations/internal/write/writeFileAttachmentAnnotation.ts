@@ -22,7 +22,7 @@ const DEFAULT_OPACITY = 1;
 /**
  * Validate a file-attachment draft before any native write: the wire
  * `file.resource` ref must have arrived with the mutation. No format
- * sniffing — unlike stamps, ANY bytes are a valid attachment.
+ * sniffing — unlike stamps, any bytes are a valid attachment.
  */
 export function preflightFileAttachmentDraft(
   draft: FileAttachmentWireDraft,

@@ -59,18 +59,30 @@ export function parseCmsInternal(cms: Uint8Array): ParsedCmsInternal {
   try {
     contentInfo = new pkijs.ContentInfo({ schema: asn1.result });
     if (contentInfo.contentType !== OID.signedData) {
-      throw new CmsError('unsupported', `CMS content type ${contentInfo.contentType} is not SignedData`);
+      throw new CmsError(
+        'unsupported',
+        `CMS content type ${contentInfo.contentType} is not SignedData`,
+      );
     }
     signedData = new pkijs.SignedData({ schema: contentInfo.content });
-  } catch (err) {
-    if (err instanceof CmsError) throw err;
-    throw new CmsError('malformed', `CMS does not parse as SignedData: ${(err as Error).message}`);
+  } catch (error) {
+    if (error instanceof CmsError) throw error;
+    throw new CmsError(
+      'malformed',
+      `CMS does not parse as SignedData: ${(error as Error).message}`,
+    );
   }
   if (signedData.encapContentInfo.eContent) {
-    throw new CmsError('unsupported', 'CMS carries encapsulated content; a PDF signature is detached');
+    throw new CmsError(
+      'unsupported',
+      'CMS carries encapsulated content; a PDF signature is detached',
+    );
   }
   if (signedData.signerInfos.length !== 1) {
-    throw new CmsError('unsupported', `CMS has ${signedData.signerInfos.length} signers; exactly one is expected`);
+    throw new CmsError(
+      'unsupported',
+      `CMS has ${signedData.signerInfos.length} signers; exactly one is expected`,
+    );
   }
   const signerInfo = signedData.signerInfos[0];
   const digestAlgorithm = DIGEST_BY_OID[signerInfo.digestAlgorithm.algorithmId];
@@ -79,7 +91,7 @@ export function parseCmsInternal(cms: Uint8Array): ParsedCmsInternal {
   }
 
   const certificates = (signedData.certificates ?? []).filter(
-    (c): c is pkijs.Certificate => c instanceof pkijs.Certificate,
+    (certificate): certificate is pkijs.Certificate => certificate instanceof pkijs.Certificate,
   );
   const signerCertificate = findSignerCertificate(signerInfo, certificates);
   if (!signerCertificate) {
@@ -88,9 +100,13 @@ export function parseCmsInternal(cms: Uint8Array): ParsedCmsInternal {
 
   const signedAttrs = signerInfo.signedAttrs?.attributes ?? [];
   if (signedAttrs.length === 0) {
-    throw new CmsError('unsupported', 'CMS has no signed attributes; a PDF signature needs message-digest');
+    throw new CmsError(
+      'unsupported',
+      'CMS has no signed attributes; a PDF signature needs message-digest',
+    );
   }
-  const attr = (type: string): pkijs.Attribute | undefined => signedAttrs.find((a) => a.type === type);
+  const attr = (type: string): pkijs.Attribute | undefined =>
+    signedAttrs.find((attribute) => attribute.type === type);
   const contentType = attr(OID.contentType);
   if (contentType && contentType.values[0]?.valueBlock?.toString?.() !== OID.data) {
     const oid = contentType.values[0] as asn1js.ObjectIdentifier | undefined;
@@ -115,18 +131,21 @@ export function parseCmsInternal(cms: Uint8Array): ParsedCmsInternal {
   const essAttr = attr(OID.signingCertificateV2);
   let essCertHash: Uint8Array | null = null;
   if (essAttr) {
-    // SigningCertificateV2 ::= SEQUENCE { certs SEQUENCE OF ESSCertIDv2, ... }
-    // ESSCertIDv2 ::= SEQUENCE { hashAlgorithm DEFAULT sha256, certHash OCTET STRING, ... }
+    // SigningCertificateV2 ::= sequence { certs sequence of ESSCertIDv2, ... }
+    // ESSCertIDv2 ::= sequence { hashAlgorithm default sha256, certHash octet string, ... }
     const seq = essAttr.values[0] as asn1js.Sequence | undefined;
     const certs = seq?.valueBlock?.value?.[0] as asn1js.Sequence | undefined;
     const first = certs?.valueBlock?.value?.[0] as asn1js.Sequence | undefined;
     const members = first?.valueBlock?.value ?? [];
-    // hashAlgorithm is OPTIONAL (DEFAULT sha256) and, when present, the
-    // first member: a SEQUENCE starting with an OID. issuerSerial is also a
-    // SEQUENCE but follows the certHash.
+    // hashAlgorithm is optional (default sha256) and, when present, the
+    // first member: a sequence starting with an OID. issuerSerial is also a
+    // sequence but follows the certHash.
     let cursor = 0;
     const head = members[0];
-    if (head instanceof asn1js.Sequence && head.valueBlock.value[0] instanceof asn1js.ObjectIdentifier) {
+    if (
+      head instanceof asn1js.Sequence &&
+      head.valueBlock.value[0] instanceof asn1js.ObjectIdentifier
+    ) {
       const algOid = head.valueBlock.value[0] as asn1js.ObjectIdentifier;
       if (algOid.valueBlock.toString() !== OID.sha256) {
         throw new CmsError('unsupported', 'signing-certificate-v2 uses a hash other than SHA-256');
@@ -141,12 +160,17 @@ export function parseCmsInternal(cms: Uint8Array): ParsedCmsInternal {
   }
 
   let timestampToken: Uint8Array | null = null;
-  const tokenAttr = signerInfo.unsignedAttrs?.attributes.find((a) => a.type === OID.timestampToken);
+  const tokenAttr = signerInfo.unsignedAttrs?.attributes.find(
+    (attribute) => attribute.type === OID.timestampToken,
+  );
   if (tokenAttr?.values[0]) {
     timestampToken = new Uint8Array((tokenAttr.values[0] as asn1js.Sequence).toBER(false));
   }
 
-  const ordered = [signerCertificate, ...certificates.filter((c) => c !== signerCertificate)];
+  const ordered = [
+    signerCertificate,
+    ...certificates.filter((certificate) => certificate !== signerCertificate),
+  ];
   return {
     parsed: {
       digestAlgorithm,
@@ -189,11 +213,11 @@ function findSignerCertificate(
     }
     return null;
   }
-  // SubjectKeyIdentifier: [0] IMPLICIT OCTET STRING.
+  // SubjectKeyIdentifier: [0] implicit octet string.
   const ski = (sid as asn1js.Primitive | undefined)?.valueBlock?.valueHexView;
   if (!ski) return null;
   for (const cert of certificates) {
-    const ext = cert.extensions?.find((e) => e.extnID === OID.subjectKeyIdentifier);
+    const ext = cert.extensions?.find((extension) => extension.extnID === OID.subjectKeyIdentifier);
     const value = ext ? asn1js.fromBER(ext.extnValue.valueBlock.valueHexView) : null;
     const inner = value && value.offset !== -1 ? (value.result as asn1js.OctetString) : null;
     if (inner && bytesEqual(new Uint8Array(inner.valueBlock.valueHexView), new Uint8Array(ski))) {

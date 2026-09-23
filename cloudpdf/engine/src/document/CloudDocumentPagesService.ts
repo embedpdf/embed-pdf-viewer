@@ -53,7 +53,7 @@ function copyToExactBuffer(view: Uint8Array): ArrayBuffer {
  *     multi-call client logic from having to account for index drift
  *     between requests.
  *   - Successful `move()` returns the new `layout` (order + geometry) plus
- *     cloud coherence pins. The server does NOT bump per-page revisions on a
+ *     cloud coherence pins. The server does not bump per-page revisions on a
  *     page move (page reorder is intentionally outside the weak-ref staleness
  *     model), only `docVersion` + `layoutVersion`.
  */
@@ -88,7 +88,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
         const manifest = await this.manifest.get(s);
         // Plane-scope rule: the layout leaf depends on the `layout` plane —
         // while inherited (no move/rotate/insert/delete ever ran), every
-        // visitor's page list is ONE doc-level URL served from the base
+        // visitor's page list is one doc-level URL served from the base
         // session; the SDK open sequence creates no layer session.
         return planesInherited(manifest, ['layout'])
           ? wirePaths.docLayout(this.docId, manifest.layoutVersion)
@@ -121,7 +121,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
       // A move only advances docVersion + layoutVersion (no per-page pin
       // changes), so the cached manifest can be patched in place — no refetch.
       if (result.cache) this.manifest.applyPageStructure(result.cache);
-      // Publish AFTER absorb: listeners reading the manifest in their
+      // Publish after absorb: listeners reading the manifest in their
       // callback must see post-mutation state.
       this.publisher.publishLocal({ type: 'pages.moved', pages, destIndex, ...result });
       return result;
@@ -147,7 +147,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
   }
 
   /**
-   * Named pages are LAYOUT: both verbs share the page-move patch exactly —
+   * Named pages are layout: both verbs share the page-move patch exactly —
    * docVersion + layoutVersion advance, no per-page pin changes, so the
    * cached manifest is patched in place and the fresh layout is published.
    */
@@ -210,7 +210,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
         signal,
       );
       // The structural advance plus dropping the deleted pages' manifest
-      // rows — a retired PON must not be buildable from the local cache.
+      // rows — a retired page object number must not be buildable from the local cache.
       if (result.cache) this.manifest.applyPageDelete(result.cache, pages);
       this.publisher.publishLocal({ type: 'pages.deleted', pages, ...result });
       return result;
@@ -236,8 +236,8 @@ export class CloudDocumentPagesService implements DocumentPagesService {
         (raw) => PageInsertResultSchema.parse(raw),
         signal,
       );
-      // Insert changes the page SET: the cached manifest has no rows for
-      // the fresh PONs, so the absorb drops it for a lazy refetch (the
+      // Insert changes the page set: the cached manifest has no rows for
+      // the fresh page object numbers, so the absorb drops it for a lazy refetch (the
       // result already carries the full new layout — nothing waits).
       if (result.cache) this.manifest.applyPageInsert(result.cache);
       this.publisher.publishLocal({ type: 'pages.inserted', destIndex, ...result });

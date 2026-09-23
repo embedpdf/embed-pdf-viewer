@@ -3,15 +3,20 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-import { createLocalEngine } from '@embedpdf/engine';
-import type { DocumentHandle, FormEffect, FormFieldRef } from '@embedpdf/engine-core/runtime';
+import { createLocalEngine, type DocumentHandle } from '@embedpdf/engine';
 import {
   javaScriptProgramFromActionTree,
   scriptFieldsFromSnapshot,
   type ScriptFieldInput,
   type ScriptInput,
+  type ScriptOutput,
 } from '@embedpdf/core-acrojs';
 import { createQuickJsSandbox } from '../src';
+
+// `@embedpdf/engine-core` is not a dependency of this package: name its
+// types through the declared ones.
+type FormEffect = ScriptOutput['formEffects'][number];
+type FormFieldRef = ScriptFieldInput['ref'];
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(here, 'fixtures', 'EmbedPDF_Dynamic_Approval_Stamp.pdf');

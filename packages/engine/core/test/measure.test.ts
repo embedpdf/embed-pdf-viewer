@@ -9,7 +9,7 @@ import {
   polygonArea,
   viewportForPoint,
 } from '../src/measure';
-import type { PdfMeasure } from '../src/dto/Measure';
+import type { PdfMeasure, PdfViewport } from '../src/dto/Measure';
 import { LinePatchSchema } from '../src/annotation/kinds/line/schema';
 import { PolygonPatchSchema } from '../src/annotation/kinds/polygon/schema';
 import { PdfMeasureSchema, PdfMeasureWriteSchema } from '../src/dto/Measure.schema';
@@ -138,9 +138,9 @@ describe('measurement arithmetic and formatting', () => {
     expect(isReadout(r) && r.value).toBeCloseTo(0.0012);
   });
   test('viewport selection is last-containing, foreign included', () => {
-    const a = {
+    const a: PdfViewport = {
       bbox: { left: -20, right: 100, bottom: -40, top: 100 },
-      measure: { subtype: 'GEO' as const },
+      measure: { subtype: 'GEO' },
     };
     expect(viewportForPoint([a, { ...a, name: 'last' }], { x: 0, y: 0 })?.name).toBe('last');
     expect(viewportForPoint([a], { x: -30, y: 0 })).toBeUndefined();

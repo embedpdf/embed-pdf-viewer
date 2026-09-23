@@ -10,7 +10,7 @@ import type { AbortablePromise } from '../promise/AbortablePromise';
  * Availability is the deliberate local-vs-cloud split:
  *   - `@embedpdf/engine` (local/WASM) implements it: the developer embedding
  *     the viewer decides what fonts ship to the client runtime.
- *   - `@cloudpdf/engine` (cloud) does NOT expose it (`Engine.fonts` is
+ *   - `@cloudpdf/engine` (cloud) does not expose it (`Engine.fonts` is
  *     undefined). Fallback fonts are a server policy decision, loaded once on
  *     the server runtime; clients cannot influence them.
  *

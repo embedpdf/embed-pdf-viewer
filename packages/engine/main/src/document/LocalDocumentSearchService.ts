@@ -20,7 +20,7 @@ interface DocClosedView {
 /**
  * Document-scoped search service. `'rects'` mode gates on
  * `doc.text.search`; `'full'` (snippets) additionally needs
- * `doc.text.copy` — a snippet IS extracted text, so the copy denial must
+ * `doc.text.copy` — a snippet is extracted text, so the copy denial must
  * hold here too (cloud parity: the server's search route enforces the
  * same pair). The worker fans out to `SearchReader`, which serves page
  * text from the session's version-keyed corpus cache.

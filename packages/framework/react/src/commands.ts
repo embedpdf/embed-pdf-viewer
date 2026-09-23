@@ -25,9 +25,9 @@ export function useCommands(): CommandsCapability {
   return useCapability(CommandsToken);
 }
 
-/** Subscribe to one commands event for the mounted lifetime: `useCommandsEvent((c) => c.onExecuted, handler)`. */
+/** Subscribe to one commands event for the mounted lifetime: `useCommandsEvent((commands) => commands.onExecuted, handler)`. */
 export function useCommandsEvent<T>(
-  select: (cap: CommandsCapability) => EventHook<T>,
+  select: (commands: CommandsCapability) => EventHook<T>,
   handler: (event: T) => void,
 ): void {
   useCapabilityEvent(CommandsToken, select, handler);
@@ -48,9 +48,9 @@ export const isMacPlatform = (): boolean =>
   typeof navigator !== 'undefined' && /Mac|iP(hone|ad|od)/.test(navigator.platform);
 
 const isEditableTarget = (target: EventTarget | null): boolean => {
-  const el = target as HTMLElement | null;
-  if (!el || !el.tagName) return false;
-  return el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable;
+  const element = target as HTMLElement | null;
+  if (!element || !element.tagName) return false;
+  return element.tagName === 'INPUT' || element.tagName === 'TEXTAREA' || element.isContentEditable;
 };
 
 /**

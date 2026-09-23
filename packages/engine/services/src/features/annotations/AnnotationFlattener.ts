@@ -27,7 +27,7 @@ const FPDF_NO_INCREMENTAL = 1 << 1;
  * The annotation-plane flatten verbs — `pages.flatten` for a chosen set:
  * in place (`flatten`) or into a new single-page document
  * (`exportAppearance`). Both resolve refs to native handles on the page,
- * hand the SET to the fork (one candidate plan, one placement writer — the
+ * hand the set to the fork (one candidate plan, one placement writer — the
  * same code whole-page flatten runs), and release every handle afterwards.
  */
 export class AnnotationFlattener {
@@ -73,7 +73,7 @@ export class AnnotationFlattener {
       }
 
       if (code === FLATTEN_FAIL) {
-        // Every ref resolved on THIS page (resolveAll), so a FAIL is the
+        // Every ref resolved on this page (resolveAll), so a fail is the
         // fork disagreeing with /Annots or a catalog write failing.
         const foreign = statuses.findIndex((status) => status === STATUS_NOT_ON_PAGE);
         throw new EngineError(

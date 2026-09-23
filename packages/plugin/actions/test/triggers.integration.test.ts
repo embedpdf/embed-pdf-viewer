@@ -8,7 +8,7 @@ import { createLocalEngine } from '@embedpdf/engine';
 import { toPageRef, type AnnotationRef } from '@embedpdf/engine-core/runtime';
 
 import { actionsPlugin } from '../src/actions.plugin';
-import { ActionsToken } from '../src/internal';
+import { ActionsToken } from '../src/host-contract';
 import type { ActionsHostCapability, ActionsConfig } from '../src/host-contract';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -16,11 +16,11 @@ const fixture = (name: string) =>
   resolve(here, '..', '..', '..', 'engine', 'main', 'test', 'fixtures', name);
 
 /** Kernel + real engine + recording seams over one fixture. */
-async function boot(file: string, opts?: { config?: ActionsConfig }) {
+async function boot(file: string, options?: { config?: ActionsConfig }) {
   const engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
   const kernel = createKernel({
     engine,
-    plugins: [actionsPlugin(opts?.config)],
+    plugins: [actionsPlugin(options?.config)],
   });
   const bytes = new Uint8Array(await readFile(fixture(file)));
   await kernel.documents.open({ kind: 'bytes', id: `trigger-${file}`, bytes });
@@ -28,8 +28,8 @@ async function boot(file: string, opts?: { config?: ActionsConfig }) {
 
   const seam: string[] = [];
   actions.registerAnnotCommitSink(async (entries) => {
-    for (const e of entries) {
-      seam.push(`${e.patch.flags?.hidden ? 'hide' : 'show'}:${e.annotObjectNumber}`);
+    for (const entry of entries) {
+      seam.push(`${entry.patch.flags?.hidden ? 'hide' : 'show'}:${entry.annotObjectNumber}`);
     }
     return {
       results: entries.map((entry) => ({
@@ -49,17 +49,17 @@ async function boot(file: string, opts?: { config?: ActionsConfig }) {
     return { status: 'executed' };
   });
 
-  const pon = 3; // both fixtures: first page is object 3
+  const firstPage = 3; // both fixtures: the first page is object 3
   const drain = () =>
     actions.dispatch({
       scope: 'annotation',
       event: 'cursorEnter',
-      ref: { kind: 'objectNumber', page: toPageRef(pon), annotObjectNumber: 999 },
-      page: toPageRef(pon),
+      ref: { kind: 'objectNumber', page: toPageRef(firstPage), annotObjectNumber: 999 },
+      page: toPageRef(firstPage),
     });
   const ref = (annotObjectNumber: number): AnnotationRef => ({
     kind: 'objectNumber',
-    page: toPageRef(pon),
+    page: toPageRef(firstPage),
     annotObjectNumber,
   });
 
@@ -68,7 +68,7 @@ async function boot(file: string, opts?: { config?: ActionsConfig }) {
     engine,
     actions,
     seam,
-    pon,
+    firstPage,
     ref,
     drain,
     async [Symbol.asyncDispose]() {
@@ -80,83 +80,99 @@ async function boot(file: string, opts?: { config?: ActionsConfig }) {
 
 describe('trigger integration (real engine)', () => {
   it('fans page open/close out in ISO order over real /AA trees', async () => {
-    await using t = await boot('action_triggers.pdf', {
+    await using booted = await boot('action_triggers.pdf', {
       config: { openSequence: 'off' },
     });
-    await t.actions.dispatch({ scope: 'page', event: 'open', page: toPageRef(t.pon) });
-    // Page /O (shows pageTip 7) BEFORE the /PO set (shows lifeTip 9).
-    expect(t.seam).toEqual(['show:7', 'show:9']);
-    t.seam.length = 0;
-    await t.actions.dispatch({ scope: 'page', event: 'close', page: toPageRef(t.pon) });
-    // /PC set (hides lifeTip 9) BEFORE page /C (hides pageTip 7).
-    expect(t.seam).toEqual(['hide:9', 'hide:7']);
+    await booted.actions.dispatch({
+      scope: 'page',
+      event: 'open',
+      page: toPageRef(booted.firstPage),
+    });
+    // Page /O (shows pageTip 7) before the /PO set (shows lifeTip 9).
+    expect(booted.seam).toEqual(['show:7', 'show:9']);
+    booted.seam.length = 0;
+    await booted.actions.dispatch({
+      scope: 'page',
+      event: 'close',
+      page: toPageRef(booted.firstPage),
+    });
+    // /PC set (hides lifeTip 9) before page /C (hides pageTip 7).
+    expect(booted.seam).toEqual(['hide:9', 'hide:7']);
   });
 
   it('fans visibility events out to the /PV /PI sets only', async () => {
-    await using t = await boot('action_triggers.pdf', {
+    await using booted = await boot('action_triggers.pdf', {
       config: { openSequence: 'off' },
     });
-    await t.actions.dispatch({ scope: 'page', event: 'visible', page: toPageRef(t.pon) });
-    await t.actions.dispatch({ scope: 'page', event: 'invisible', page: toPageRef(t.pon) });
-    expect(t.seam).toEqual(['show:12', 'hide:12']);
+    await booted.actions.dispatch({
+      scope: 'page',
+      event: 'visible',
+      page: toPageRef(booted.firstPage),
+    });
+    await booted.actions.dispatch({
+      scope: 'page',
+      event: 'invisible',
+      page: toPageRef(booted.firstPage),
+    });
+    expect(booted.seam).toEqual(['show:12', 'hide:12']);
   });
 
   it('runs the native tooltip: /E shows, /X hides — zero scripting anywhere', async () => {
-    await using t = await boot('action_triggers.pdf', {
+    await using booted = await boot('action_triggers.pdf', {
       config: { openSequence: 'off' },
     });
-    await t.actions.dispatch({
+    await booted.actions.dispatch({
       scope: 'annotation',
       event: 'cursorEnter',
-      ref: t.ref(5),
-      page: toPageRef(t.pon),
+      ref: booted.ref(5),
+      page: toPageRef(booted.firstPage),
     });
-    expect(t.seam).toEqual(['show:6']);
-    await t.actions.dispatch({
+    expect(booted.seam).toEqual(['show:6']);
+    await booted.actions.dispatch({
       scope: 'annotation',
       event: 'cursorExit',
-      ref: t.ref(5),
-      page: toPageRef(t.pon),
+      ref: booted.ref(5),
+      page: toPageRef(booted.firstPage),
     });
-    expect(t.seam).toEqual(['show:6', 'hide:6']);
+    expect(booted.seam).toEqual(['show:6', 'hide:6']);
   });
 
   it('delivers a LINK annotation /AA hover tree (the link-plane feed target)', async () => {
-    await using t = await boot('action_triggers.pdf', {
+    await using booted = await boot('action_triggers.pdf', {
       config: { openSequence: 'off' },
     });
-    const result = await t.actions.dispatch({
+    const result = await booted.actions.dispatch({
       scope: 'annotation',
       event: 'cursorEnter',
-      ref: t.ref(10),
-      page: toPageRef(t.pon),
-      source: { kind: 'link', annotation: t.ref(10), page: toPageRef(t.pon) },
+      ref: booted.ref(10),
+      page: toPageRef(booted.firstPage),
+      source: { kind: 'link', annotation: booted.ref(10), page: toPageRef(booted.firstPage) },
     });
     expect(result.status).toBe('executed');
-    expect(t.seam).toEqual(['show:11']);
+    expect(booted.seam).toEqual(['show:11']);
   });
 
   it('runs the open sequence on adapter install: openAction chain, in order, once', async () => {
-    await using t = await boot('action_open_chain.pdf');
-    expect(t.seam).toEqual([]);
-    t.actions.setUiAdapter({ openUri: () => {}, print: () => {} });
-    await t.drain();
-    await t.drain();
+    await using booted = await boot('action_open_chain.pdf');
+    expect(booted.seam).toEqual([]);
+    booted.actions.setUiAdapter({ openUri: () => {}, print: () => {} });
+    await booted.drain();
+    await booted.drain();
     // The deferred-navigation law holds inside the open sequence too: the
-    // /Next Hide applies INLINE during the walk, the Named navigation thunk
+    // /Next Hide applies inline during the walk, the Named navigation thunk
     // fires after — the view never moves before the session effect lands.
     // (No fallback page-open in auto.)
-    expect(t.seam).toEqual(['show:4', 'named:NextPage']);
-    const replay = await t.actions.dispatch({ scope: 'document', event: 'open' });
+    expect(booted.seam).toEqual(['show:4', 'named:NextPage']);
+    const replay = await booted.actions.dispatch({ scope: 'document', event: 'open' });
     expect(replay.diagnostics[0]).toMatchObject({ code: 'open-sequence-replayed' });
   });
 
   it('hands the destination-form /OpenAction to the goto executor as a lifecycle reveal', async () => {
-    await using t = await boot('open_action_dest.pdf');
-    t.actions.setUiAdapter({ openUri: () => {}, print: () => {} });
-    await t.drain();
-    await t.drain();
-    expect(t.seam).toEqual(['goto:xyz']);
+    await using booted = await boot('open_action_dest.pdf');
+    booted.actions.setUiAdapter({ openUri: () => {}, print: () => {} });
+    await booted.drain();
+    await booted.drain();
+    expect(booted.seam).toEqual(['goto:xyz']);
   });
 
   // The stage-report half of the coordinator (placement → page open, real

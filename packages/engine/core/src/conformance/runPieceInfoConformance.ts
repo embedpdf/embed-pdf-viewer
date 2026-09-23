@@ -7,7 +7,7 @@ const APP = 'EMBD_ConformanceTest';
 const SIBLING_APP = 'EMBD_ConformanceSibling';
 
 /**
- * `/PieceInfo` conformance (doc + page level). The service is OPTIONAL on
+ * `/PieceInfo` conformance (doc + page level). The service is optional on
  * the contract (`downloadLayer?` pattern) — the suite runs only where the
  * implementation provides it, so an engine that has not shipped it yet
  * skips cleanly.
@@ -15,7 +15,7 @@ const SIBLING_APP = 'EMBD_ConformanceSibling';
  * Invariants:
  *   1. The full value vocabulary round-trips at both levels: string,
  *      number, boolean, name, string-array — read back with the same tags.
- *   2. Writes PERSIST: download() → re-open → identical read (bytes-open
+ *   2. Writes persist: download() → re-open → identical read (bytes-open
  *      engines only, since cloud cannot re-open loose bytes).
  *   3. `null` deletes a key; sibling keys and sibling applications
  *      survive both key deletes and whole-entry clears.
@@ -81,7 +81,7 @@ export function runPieceInfoConformance(
           name: { type: 'string', value: 'Witness' },
           subject: { type: 'string', value: 'Getuige' },
         });
-        // The doc-level holder is a DIFFERENT dictionary: untouched.
+        // The doc-level holder is a different dictionary: untouched.
         expect(await doc.pieceInfo!.read(APP)).toBe(null);
       } finally {
         await doc.close();
@@ -94,10 +94,10 @@ export function runPieceInfoConformance(
       let reopened: DocumentHandle | null = null;
       try {
         const list = await doc.pages.list();
-        const pon = list.pages[0].ref.pageObjectNumber;
+        const pageObjectNumber = list.pages[0].ref.pageObjectNumber;
         await doc.pieceInfo!.update(APP, { name: 'Standard Stamps' });
         await doc
-          .page(toPageRef(pon))
+          .page(toPageRef(pageObjectNumber))
           .pieceInfo!.update(APP, { name: 'Witness', subject: 'Getuige' });
         const bytes = await doc.download();
 

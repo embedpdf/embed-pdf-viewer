@@ -50,20 +50,20 @@ export function createToolRegistry(
   };
 
   const toolProjections = new WeakMap<ResolvedTool, AnnotationTool>();
-  const projectTool = (t: ResolvedTool): AnnotationTool => {
-    let hit = toolProjections.get(t);
+  const projectTool = (tool: ResolvedTool): AnnotationTool => {
+    let hit = toolProjections.get(tool);
     if (!hit) {
       hit = {
-        id: t.id,
-        subtype: t.subtype,
-        preset: t.preset,
-        cursor: t.cursor,
-        enables: [...t.enables],
-        ...(t.defaults ? { defaults: t.defaults } : {}),
-        ...(t.flags ? { flags: t.flags } : {}),
-        upright: t.upright,
+        id: tool.id,
+        subtype: tool.subtype,
+        preset: tool.preset,
+        cursor: tool.cursor,
+        enables: [...tool.enables],
+        ...(tool.defaults ? { defaults: tool.defaults } : {}),
+        ...(tool.flags ? { flags: tool.flags } : {}),
+        upright: tool.upright,
       };
-      toolProjections.set(t, hit);
+      toolProjections.set(tool, hit);
     }
     return hit;
   };
@@ -71,14 +71,14 @@ export function createToolRegistry(
   const api = {
     listTools: () => values().map(projectTool),
     getTool: (id: string) => {
-      const t = registry.get(id);
-      return t ? projectTool(t) : null;
+      const tool = registry.get(id);
+      return tool ? projectTool(tool) : null;
     },
-    registerTool: (def: AnnotationToolInput) => {
+    registerTool: (definition: AnnotationToolInput) => {
       // Re-resolve against the same base pool so `extends` can reach built-ins /
       // config tools, then register just this one with the hub + seed its defaults.
-      const resolved = buildToolRegistry([...configTools, def]).get(def.id);
-      if (!resolved) throw new Error(`[annotation] could not resolve tool '${def.id}'`);
+      const resolved = buildToolRegistry([...configTools, definition]).get(definition.id);
+      if (!resolved) throw new Error(`[annotation] could not resolve tool '${definition.id}'`);
       registry.set(resolved.id, resolved);
       const un = ctx.tryGet(InteractionToken)?.registerTool(
         {
@@ -90,7 +90,7 @@ export function createToolRegistry(
         { replace: true },
       );
       if (resolved.defaults)
-        store.commit({ t: 'setDefaults', subtype: resolved.preset, patch: resolved.defaults });
+        store.commit({ type: 'setDefaults', subtype: resolved.preset, patch: resolved.defaults });
       return () => {
         registry.delete(resolved.id);
         un?.();
@@ -99,7 +99,7 @@ export function createToolRegistry(
     getToolDefaults: (toolId: string) =>
       defaultsFor(store.model(), registry.get(toolId)?.preset ?? toolId),
     setToolDefaults: (toolId: string, patch: AnnotationPropsPatch) => {
-      store.commit({ t: 'setDefaults', subtype: registry.get(toolId)?.preset ?? toolId, patch });
+      store.commit({ type: 'setDefaults', subtype: registry.get(toolId)?.preset ?? toolId, patch });
     },
     // A tool's editable-prop schema comes from its kind: a callout edits free-text
     // props, an arrow edits line props. The registry holds that mapping.

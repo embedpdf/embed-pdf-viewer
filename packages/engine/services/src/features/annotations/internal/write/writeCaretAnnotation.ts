@@ -35,7 +35,7 @@ export function applyCaretDraft(
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
   setAnnotRect(fn, mem, annotPtr, draft.rect);
-  // Box-family rotation pair — MUST land before the AP bake sees the caret.
+  // Box-family rotation pair — must land before the AP bake sees the caret.
   writeBoxTransformMetadata(fn, mem, annotPtr, {
     rotation: draft.rotation,
     unrotatedRect: draft.unrotatedRect,

@@ -105,7 +105,7 @@ export interface OpenInputToken {
 
 /**
  * Cloud-engine: open via a public share token (`shr_…`) from the
- * dashboard's embed snippet. A share token is a REFERENCE to a
+ * dashboard's embed snippet. A share token is a reference to a
  * stored grant on the server, not a credential — the engine
  * exchanges it for a short-lived doc-scoped session JWT and
  * silently re-exchanges near expiry, so revoking or editing the
@@ -120,7 +120,7 @@ export interface OpenInputShare {
   /** Public share token (`shr_…`) identifying the grant. */
   shareToken: string;
   /**
-   * Passphrase for a protected grant. This is the SHARE passphrase,
+   * Passphrase for a protected grant. This is the share passphrase,
    * checked by the exchange endpoint — not the PDF's encryption
    * password, which stays in `password` like every other kind.
    */
@@ -134,7 +134,7 @@ export type OpenInputLayerFileSource =
   | { kind: 'artifact-file'; path: string };
 
 /**
- * Local-engine layer open over a base FILE (Node runtimes only): the base
+ * Local-engine layer open over a base file (Node runtimes only): the base
  * is range-read from disk by PDFium and never loaded into JS, and a
  * signing candidate for such a session is written beside it rather than
  * held in memory. What a server does for every document; useful locally
@@ -178,7 +178,7 @@ export interface OpenOptions {
    * console warning. Set explicitly to test realistic permissions
    * locally before pointing the same SDK code at the cloud.
    *
-   * Cloud engines read scope from the JWT and IGNORE this option.
+   * Cloud engines read scope from the JWT and ignore this option.
    */
   scope?: ReadonlyArray<string>;
 
@@ -193,7 +193,7 @@ export interface OpenOptions {
    * mistake surfaces immediately instead of producing silent denies
    * at every mutation.
    *
-   * Cloud engines read identity from the JWT and IGNORE this option.
+   * Cloud engines read identity from the JWT and ignore this option.
    */
   identity?: IdentityClaims;
 }

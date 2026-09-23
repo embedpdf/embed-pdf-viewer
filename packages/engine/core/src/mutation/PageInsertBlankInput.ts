@@ -1,7 +1,7 @@
 import type { PdfSize } from '../geometry/primitives';
 
 /**
- * Upper bound on `count` for a single `pages.insertBlank()` call. A CONTRACT
+ * Upper bound on `count` for a single `pages.insertBlank()` call. A contract
  * cap, enforced identically by every engine (the cloud input schema carries
  * the same number), so a UI never discovers a lower server limit by surprise.
  * Larger batches are a loop at the call site.

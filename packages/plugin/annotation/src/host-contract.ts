@@ -1,9 +1,9 @@
 /**
- * @embedpdf/plugin-annotation/contract/host — the HOST lens: render
- * projections, hydration, pointer routing, ghosts, the markup bridge and the
+ * @embedpdf/plugin-annotation/contract/host — the host lens: render
+ * projections, sync, pointer routing, ghosts, the markup bridge and the
  * extension seams. Same runtime token as the public one, typed wider.
  */
-import type { CapabilityToken } from '@embedpdf/core';
+import { createHostToken } from '@embedpdf/core';
 import type { DocumentEvent, EventHook, Unsubscribe } from '@embedpdf/core';
 import type {
   ChromeNode,
@@ -13,7 +13,7 @@ import type {
   Subtype,
   TextEndAnchor,
   TextQuad,
-  Vec,
+  Point,
   ViewEnv,
 } from '@embedpdf/core-annotation';
 import type { PageRotation } from '@embedpdf/core-geometry';
@@ -32,7 +32,7 @@ import type { AnnotCommitEntry, AnnotCommitResult } from '@embedpdf/plugin-actio
 
 import type {
   AnnotationCapability,
-  AnnotationHydration,
+  ArmedStampInfo,
   ArmedStampPreview,
   Behavior,
   LinkNavItem,
@@ -43,7 +43,7 @@ import { AnnotationToken as PublicAnnotationToken } from './token';
 import type { ResolvedTool } from './tools/definitions';
 
 export * from './contract';
-export type { AnnotationAction, AnnotationState } from './model';
+export type { AnnotationState } from './model';
 export {
   ANNOTATION_DRAW_PRIORITY,
   ANNOTATION_EDIT_PRIORITY,
@@ -77,17 +77,16 @@ export interface CapturedAnnotationDraft {
  * Ghost render buckets: powers of two from 128 px up to `cap`. The same policy
  * the page renderer uses — one bitmap per size class, never per zoom step.
  */
-export function previewBucket(devicePixelWidth: number, cap = 4096): number {
+export function previewBucket(devicePixelWidth: number, maxWidth = 4096): number {
   const px = Math.max(128, Math.ceil(devicePixelWidth));
-  return Math.min(cap, 2 ** Math.ceil(Math.log2(px)));
+  return Math.min(maxWidth, 2 ** Math.ceil(Math.log2(px)));
 }
 
 /**
- * The HOST (framework) surface: everything the render layer, the interaction hub,
+ * The host (framework) surface: everything the render layer, the interaction hub,
  * and sibling plugins need, on top of the public {@link AnnotationCapability}.
- * Host-only — sibling plugins import the token from
- * `@embedpdf/plugin-annotation/contract/host`; framework implementation code may
- * use `/internal`. Never use either from application code.
+ * Host-only: sibling plugins and framework adapters import the token from
+ * `@embedpdf/plugin-annotation/contract/host`. Never use it from application code.
  */
 export interface AnnotationHostCapability extends AnnotationCapability {
   // ── measurement seam ──
@@ -120,17 +119,18 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   ): Promise<AnnotationAppearanceImage[]>;
   pdfToPageRect(page: PageRef, rect: PdfRect): Rect | null;
 
-  // ── hydration ──
-  getHydration(): AnnotationHydration;
-  ensureHydrated(): void;
-  reloadPage(page: PageRef): Promise<void>;
-  deliverRemoteEvent(event: DocumentEvent): void;
+  // ── sync ──
+  /**
+   * Resolves once the annotations mirror has applied every confirmed change
+   * it knows of, including page re-reads that events started.
+   */
+  whenSynced(): Promise<void>;
 
-  // ── text editing (the editor's draft path: optimistic, debounced engine write) ──
+  // ── text editing (the editor's draft path: shown at once, written after a pause) ──
   getEditingId(): Id | null;
   beginTextEditAt(
     page: PageRef,
-    point: Vec,
+    point: Point,
     scale?: number,
     rotation?: PageRotation,
     zoom?: number,
@@ -143,7 +143,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   // ── pointer routing ──
   getHitKind(
     page: PageRef,
-    point: Vec,
+    point: Point,
     scale?: number,
     rotation?: PageRotation,
     zoom?: number,
@@ -151,14 +151,14 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   ): 'handle' | 'rotate' | 'group-handle' | 'annot' | 'empty';
   claimsTouchAt(
     page: PageRef,
-    point: Vec,
+    point: Point,
     scale?: number,
     rotation?: PageRotation,
     zoom?: number,
   ): boolean;
   getCursorAt(
     page: PageRef,
-    point: Vec,
+    point: Point,
     scale?: number,
     rotation?: PageRotation,
     zoom?: number,
@@ -166,7 +166,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   hoverAt(
     at: {
       page: PageRef;
-      point: Vec;
+      point: Point;
       scale?: number;
       rotation?: PageRotation;
       zoom?: number;
@@ -175,7 +175,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   editPointer(
     phase: 'down' | 'move' | 'up',
     page: PageRef,
-    point: Vec,
+    point: Point,
     shift: boolean,
     scale?: number,
     rotation?: PageRotation,
@@ -185,7 +185,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   marqueePointer(
     phase: 'down' | 'move' | 'up',
     page: PageRef,
-    point: Vec,
+    point: Point,
     shift: boolean,
     scale?: number,
     rotation?: PageRotation,
@@ -195,14 +195,14 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     tool: string,
     phase: 'down' | 'move' | 'up',
     page: PageRef,
-    point: Vec,
+    point: Point,
     finish?: boolean,
     displayRotation?: PageRotation,
   ): void;
   finishInkDraft(): void;
-  placeAt(page: PageRef, point: Vec, displayRotation?: PageRotation): boolean;
-  placeArmedStamp(page: PageRef, point: Vec, displayRotation?: PageRotation): boolean;
-  requestStampAt(page: PageRef, point: Vec, displayRotation?: PageRotation): boolean;
+  placeAt(page: PageRef, point: Point, displayRotation?: PageRotation): boolean;
+  placeArmedStamp(page: PageRef, point: Point, displayRotation?: PageRotation): boolean;
+  requestStampAt(page: PageRef, point: Point, displayRotation?: PageRotation): boolean;
 
   // ── markup bridge (the selection plugin's commit path) ──
   createMarkup(subtype: Subtype, page: PageRef, quads: TextQuad[], preset?: string): void;
@@ -212,31 +212,30 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   clearMarkupPreview(): void;
 
   // ── ghosts and previews ──
-  hoverGhostAt(toolId: string, page: PageRef, point: Vec, displayRotation?: PageRotation): void;
+  hoverGhostAt(toolId: string, page: PageRef, point: Point, displayRotation?: PageRotation): void;
   clearGhost(): void;
   setPlacementPreview(toolId: string, page: PageRef, box: Rect): void;
   clearPlacementPreview(): void;
   getToolGhost(page: PageRef): ToolGhost | null;
-  getArmedStampPreview(devicePixelWidth?: number): Promise<ArmedStampPreview | null>;
-  getStampArmEpoch(): number;
+  /** The armed stamp: a new object on every arm, null when nothing is armed. */
+  getArmedStamp(): ArmedStampInfo | null;
+  /** Render the armed stamp's ghost preview for a device pixel width (cached per size bucket). */
+  renderArmedStampPreview(devicePixelWidth?: number): Promise<ArmedStampPreview | null>;
 
   // ── extension ──
   listResolvedTools(): ResolvedTool[];
   getResolvedTool(id: string): ResolvedTool | null;
   getToolSubtype(id: string): Subtype;
-  registerBehavior(b: Behavior): Unsubscribe;
-  getBehaviorFor(a: { subtype: Subtype; ref: AnnotationRef | null }): Behavior | null;
+  registerBehavior(behavior: Behavior): Unsubscribe;
+  getBehaviorFor(annotation: { subtype: Subtype; ref: AnnotationRef | null }): Behavior | null;
   pruneEngagedSelection(): void;
   commitScriptEffects(entries: AnnotCommitEntry[]): Promise<AnnotCommitResult>;
 }
 
 /**
- * The annotation capability token. Typed to the full {@link AnnotationHostCapability}
- * here (the package internals, `/contract/host`, and `/internal` use this view).
- * The package root re-exports the SAME token narrowed to
+ * The annotation capability token, typed to the full
+ * {@link AnnotationHostCapability} (the package internals and `/contract/host`
+ * use this view). The package root exports the same runtime token narrowed to
  * {@link AnnotationCapability}.
  */
-
-/** The host lens over the public token: the same runtime object, typed to the full host capability. */
-export const AnnotationToken =
-  PublicAnnotationToken as unknown as CapabilityToken<AnnotationHostCapability>;
+export const AnnotationToken = createHostToken<AnnotationHostCapability>(PublicAnnotationToken);

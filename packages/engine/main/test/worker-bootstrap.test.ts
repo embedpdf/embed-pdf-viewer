@@ -94,7 +94,6 @@ describe('engine worker boot — wasm source handling', () => {
     init({
       kind: 'init',
       wasmUrl: 'https://app.example/assets/embedpdf.wasm',
-      fallbackWasmUrl: 'https://cdn.example/embedpdf.wasm',
       wasmBinary: bytes,
     });
     await settled();

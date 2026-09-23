@@ -1,7 +1,7 @@
 /**
  * watchWorkerReady must settle for every way a worker can end its handshake —
- * including workers whose SCRIPT never runs (bad URL, CSP rejection, syntax
- * error), which fire `error` instead of any message and used to hang forever.
+ * including workers whose script never runs (bad URL, CSP rejection, syntax
+ * error), which fire `error` instead of any message and must not hang.
  */
 import { describe, expect, test } from 'vitest';
 

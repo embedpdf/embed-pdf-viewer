@@ -38,8 +38,8 @@ const STRING_FIELDS: ReadonlyArray<[keyof MetadataPatch, string]> = [
 
 /**
  * A custom key must be writable as a PDF Name and must not shadow a
- * reserved standard key. Mirrors v2 `isValidCustomKey` (helper.ts):
- * non-empty ASCII printable, <= 127 chars, no leading slash.
+ * reserved standard key: non-empty ASCII printable, <= 127 chars, no
+ * leading slash.
  */
 function isValidCustomKey(key: string): boolean {
   if (!key || key.length > 127) return false;

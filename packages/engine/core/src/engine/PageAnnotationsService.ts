@@ -81,11 +81,11 @@ export interface PageAnnotationsService {
   move(refs: AnnotationRef[], toIndex: number): AbortablePromise<AnnotationMoveResult>;
 
   /**
-   * Flatten the given annotations of THIS page into its content —
+   * Flatten the given annotations of this page into its content —
    * `pages.flatten` for a chosen set. Painted annotations are removed from
    * the page; ones that are ineligible (hidden for `usage`, Popups, no
    * usable appearance) stay and report `skipped`, so a caller can say
-   * "2 of 3 flattened". A content + annotation MUTATION of this page: its
+   * "2 of 3 flattened". A content + annotation mutation of this page: its
    * content and annotation pins advance, layout does not; a
    * `annotations.flattened` event is published when anything was applied.
    * Gated like `pages.flatten` (`doc.pages.modify` + `doc.annotate.modify`).
@@ -99,10 +99,10 @@ export interface PageAnnotationsService {
 
   /**
    * Flatten the normal appearances of the given annotations of this page
-   * into a NEW single-page PDF sized to their union `/Rect` — vector,
+   * into a new single-page PDF sized to their union `/Rect` — vector,
    * positions preserved, exactly as this page shows them. The same plan as
    * `flatten` aimed at a fresh page; the source document is untouched. A
-   * derived READ that egresses content, so it is gated by `doc.download`
+   * derived read that egresses content, so it is gated by `doc.download`
    * like `pages.extract`. All-or-nothing: `InvalidArg` when any ref is not
    * on this page, hidden, or has no appearance (a stamp silently missing a
    * part would be worse than an error). Optional — feature-detect.

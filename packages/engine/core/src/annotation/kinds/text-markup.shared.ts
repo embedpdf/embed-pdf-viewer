@@ -19,7 +19,7 @@ import {
  * ISO 32000 12.5.6.10: the universal {@link ColorStyleFields} (`/C` color +
  * `/CA` opacity) plus one or more `quadPoints` quads.
  *
- * This file ONLY carries fields that are unique to the text-markup
+ * This file only carries fields that are unique to the text-markup
  * family. Annotation-wide author-metadata (`contents`, `author`, `nm`)
  * lives on `AnnotationDraftBase` / `AnnotationPatchBase`. Each kind's
  * draft/patch type composes the two: family fields + base fields +

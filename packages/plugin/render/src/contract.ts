@@ -1,5 +1,5 @@
 /**
- * @embedpdf/plugin-render/contract — the PUBLIC render vocabulary.
+ * @embedpdf/plugin-render/contract — the public render vocabulary.
  *
  * Page rasters for developers: exact-size renders, thumbnails, batches, the
  * deployment's render policy, and invalidation (both directions: the
@@ -27,7 +27,7 @@ export type { FullPageOptions, PageViewDemand, TilesOptions } from './paint-plan
 export type RenderFormat = NonNullable<PageImageOptions['format']>;
 
 /**
- * `renderPlugin(config)` — the render STRATEGY: what the viewer chooses to
+ * `renderPlugin(config)` — the render strategy: what the viewer chooses to
  * spend, and which render points it uses when the engine permits anything.
  * The shape mirrors the deployment policy (`policy.fullPage` / `policy.tiles`),
  * and the one composition rule is: a strategy value applies as written under
@@ -40,7 +40,7 @@ export interface RenderConfig {
   /** Tile plane strategy; `false` disables the plane entirely. */
   tiles?: TilesOptions | false;
   /**
-   * Encode format for BOTH planes. Unset → engine default (png local, the
+   * Encode format for both planes. Unset → engine default (png local, the
    * deployment's format on cloud). `'bmp'` is the local fast path — no
    * compression, no encoder-worker round trip; under a lattice it conforms
    * to `policy.formats`.
@@ -94,9 +94,9 @@ export interface PageRender {
 /**
  * The two invalidation scopes — every pixel-changing fact is one of them:
  *
- *   'annotations' — only baked APPEARANCES changed (an annotation mutated, a
+ *   'annotations' — only baked appearances changed (an annotation mutated, a
  *                   form widget re-baked). Base renders keep their pixels.
- *   'content'     — the PAGE ITSELF changed (redaction applied, text edited).
+ *   'content'     — the page itself changed (redaction applied, text edited).
  *                   Invalidates everything: content strictly contains annotations.
  */
 export type InvalidateScope = 'content' | 'annotations';
@@ -115,10 +115,14 @@ export interface InvalidateOptions {
 export interface RenderInvalidatedEvent {
   readonly pages: readonly PageRef[];
   readonly scope: InvalidateScope;
-  readonly origin: ChangeOrigin;
+  /**
+   * Where the document mutation came from. Null when a caller requested the
+   * invalidation through {@link RenderCapability.invalidate}.
+   */
+  readonly origin: ChangeOrigin | null;
 }
 
-// ── the PUBLIC capability ───────────────────────────────────────────────────
+// ── the public capability ───────────────────────────────────────────────────
 
 export interface RenderCapability {
   /**
@@ -147,14 +151,14 @@ export interface RenderCapability {
   /**
    * The version of the raster the given options would produce. Key a
    * long-lived render on it: when it bumps, refetch. Base renders version on
-   * content facts; annotated renders on content AND annotation facts. Bumps
-   * only on CONFIRMED mutations — never optimistically.
+   * content facts; annotated renders on content and annotation facts. Bumps
+   * only on confirmed mutations — never optimistically.
    */
   getRenderEpoch(page: PageRef, includeAnnotations?: boolean): number;
   /**
    * Declare that page pixels changed — the open door for facts the built-in
    * event map doesn't know (a plugin's own mutation vocabulary, anything
-   * third-party). Call at CONFIRMATION, never for optimistic previews.
+   * third-party). Call at confirmation, never for optimistic previews.
    */
   invalidate(options?: InvalidateOptions): void;
   readonly onInvalidated: EventHook<RenderInvalidatedEvent>;

@@ -1,7 +1,7 @@
 import { definePlugin } from '@embedpdf/core';
 
+import { PageEditToken, type PageEditCapability } from './contract';
 import { createPageEditController } from './controller';
-import { PageEditToken } from './host-contract';
 
 /**
  * Document-scoped, stateless: turns the engine handle's page service into a
@@ -9,9 +9,9 @@ import { PageEditToken } from './host-contract';
  * controller so the framework adapters never re-derive it.
  */
 export const pageEditPlugin = () =>
-  definePlugin({
+  definePlugin<void, PageEditCapability>({
     id: 'page-edit',
     scope: 'document',
     token: PageEditToken,
-    create: (ctx) => ({ api: createPageEditController(ctx) }),
+    create: createPageEditController,
   });

@@ -27,7 +27,7 @@ export {
 export { normalizeFileAttachmentDraft, normalizeAttachmentFileSource } from './normalize';
 
 /**
- * WIRE-typed like `StampKind`: the draft schema validates the
+ * Wire-typed like `StampKind`: the draft schema validates the
  * post-normalization form (`file` as metadata + resource ref). The
  * authoring `FileAttachmentDraft` (inline bytes) is swapped into the
  * public `AnnotationDraft` union in `kinds/index.ts`. The patch carries

@@ -31,7 +31,7 @@ export interface ShareSessionRouteDeps {
 /**
  * `POST /v1/share-sessions` — the public bottom rung of the ladder.
  *
- * Trades a share token (a stored-grant REFERENCE) for an ordinary
+ * Trades a share token (a stored-grant reference) for an ordinary
  * short-lived doc JWT carrying the grant's capabilities and origin
  * lock. Unauthenticated by design: the grant row is the authorization,
  * evaluated here on every exchange, which is exactly what makes grants
@@ -47,7 +47,7 @@ export interface ShareSessionRouteDeps {
  *   - failures per IP (probe): token spray and passphrase guessing
  *     accrue count and lock the source out; legitimate outcomes never
  *     count, exactly like the auth hook's limiter.
- *   - attempts per token (volume): the share token IS the grant row
+ *   - attempts per token (volume): the share token is the grant row
  *     id, so its budget is consumed before the row is fetched — a
  *     blocked token performs no DB work, and one hot link cannot melt
  *     a replica.
@@ -58,7 +58,7 @@ export interface ShareSessionRouteDeps {
  * Unknown, revoked, disabled, and suspended-tenant tokens are all the
  * same 404: existence of a grant is itself information. Stale-but-
  * legitimate outcomes (disabled, expired, suspended) do not count as
- * probe FAILURES — an old embed on a real site keeps polling and must
+ * probe failures — an old embed on a real site keeps polling and must
  * not 429 its visitors' shared NAT. They do consume the token's own
  * attempt budget, which is what bounds the DB work a dead link can
  * demand while still blocking per token, never per NAT.
@@ -114,7 +114,7 @@ export async function registerShareSessionRoutes(
         });
       }
 
-      // Volume tier, per token — consumed BEFORE the row is fetched
+      // Volume tier, per token — consumed before the row is fetched
       // (the token is the grant id, and the schema already bounded its
       // shape). A blocked token never reaches the database. Attempts,
       // not successes: stale-grant outcomes and passphrase roundtrips

@@ -25,11 +25,11 @@ const fixturePath = resolve(
 );
 
 /**
- * The stage → actions FEED (this package's side of the trigger contract):
- * stage reports placement and page-set changes into the actions lifecycle
- * coordinator, which fans page open/close/visible out over the real /AA
- * trees. The dispatcher-only halves live in plugin-actions' own suite;
- * this one needs a real stage, so it lives with the feeder.
+ * The stage → actions feed (this package's side of the trigger contract):
+ * the stage reports placement and page-set changes to the actions lifecycle
+ * coordinator, which fans page open, close and visible out over the real /AA
+ * trees. The dispatcher-only halves live in plugin-actions' own suite; this
+ * one needs a real stage, so it lives with the feeder.
  */
 async function boot() {
   const engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
@@ -43,8 +43,8 @@ async function boot() {
 
   const seam: string[] = [];
   actions.registerAnnotCommitSink(async (entries) => {
-    for (const e of entries) {
-      seam.push(`${e.patch.flags?.hidden ? 'hide' : 'show'}:${e.annotObjectNumber}`);
+    for (const entry of entries) {
+      seam.push(`${entry.patch.flags?.hidden ? 'hide' : 'show'}:${entry.annotObjectNumber}`);
     }
     return {
       results: entries.map((entry) => ({
@@ -64,13 +64,17 @@ async function boot() {
     return { status: 'executed' };
   });
 
-  const pon = 3; // fixture: first page is object 3
+  const firstPageObjectNumber = 3; // the fixture's first page is object 3
   const drain = () =>
     actions.dispatch({
       scope: 'annotation',
       event: 'cursorEnter',
-      ref: { kind: 'objectNumber', page: toPageRef(pon), annotObjectNumber: 999 },
-      page: toPageRef(pon),
+      ref: {
+        kind: 'objectNumber',
+        page: toPageRef(firstPageObjectNumber),
+        annotObjectNumber: 999,
+      },
+      page: toPageRef(firstPageObjectNumber),
     });
 
   return {
@@ -87,26 +91,26 @@ async function boot() {
 
 describe('the stage → actions trigger feed (real engine)', () => {
   it('wires stage state reports through the coordinator: placement opens the actual page', async () => {
-    await using t = await boot();
-    const stage = t.kernel.capability(StageToken);
-    t.actions.setUiAdapter({ openUri: () => {}, print: () => {} });
-    await t.drain();
-    expect(t.seam).toEqual([]); // no stage report yet, no fallback in auto
+    await using booted = await boot();
+    const stage = booted.kernel.capability(StageToken);
+    booted.actions.setUiAdapter({ openUri: () => {}, print: () => {} });
+    await booted.drain();
+    expect(booted.seam).toEqual([]); // no stage report yet, no fallback in auto
     stage.setViewportSize({ width: 800, height: 600 }); // placement → report
-    await t.drain();
-    await t.drain();
+    await booted.drain();
+    await booted.drain();
     // Canonical coordinator order: the visible set (/PV shows 12) precedes
     // the open fan-out (page /O shows 7, then the /PO set shows 9).
-    expect(t.seam).toEqual(['show:12', 'show:7', 'show:9']);
-    t.seam.length = 0;
+    expect(booted.seam).toEqual(['show:12', 'show:7', 'show:9']);
+    booted.seam.length = 0;
     stage.goToPageIndex(1); // programmatic navigation to page 2 (no /AA there)
-    await t.drain();
-    await t.drain();
-    // Leaving page 3: close fires (/PC set then /C — ISO order). The /PI
-    // set is VIEWPORT truth, not cursor truth — at this zoom page 3 may
+    await booted.drain();
+    await booted.drain();
+    // Leaving page 3: close fires (the /PC set, then /C, in ISO order). The
+    // /PI set is viewport truth, not cursor truth: at this zoom page 3 may
     // still peek into the viewport, so only assert it never fired a bogus
     // show and the close pair is ordered.
-    expect(t.seam.slice(0, 2)).toEqual(['hide:9', 'hide:7']);
-    expect(t.seam).not.toContain('show:12');
+    expect(booted.seam.slice(0, 2)).toEqual(['hide:9', 'hide:7']);
+    expect(booted.seam).not.toContain('show:12');
   });
 });

@@ -31,12 +31,12 @@ export class CloudPageGeometryService implements PageGeometryService {
     return AbortablePromise.run<PageGeometrySnapshot>(async (signal) => {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        const pon = this.pageRef.pageObjectNumber;
-        const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pon);
+        const pageObjectNumber = this.pageRef.pageObjectNumber;
+        const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pageObjectNumber);
         if (!page) {
           throw new EngineError(
             EngineErrorCode.NotFound,
-            `no page with object number ${pon} in document ${this.docId}`,
+            `no page with object number ${pageObjectNumber} in document ${this.docId}`,
           );
         }
         // Plane-scope rule: geometry depends on the `content` plane (see

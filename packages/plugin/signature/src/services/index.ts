@@ -1,7 +1,7 @@
 /**
- * Plugin-private services every area is built on (NOT the kernel): the
- * event hooks, the slice reads and engine doors, authority, the sibling
- * planes and mark resolution.
+ * Plugin-private services every area is built on (not the kernel): the
+ * events, the busy bracket and engine doors, authority, the sibling plugins
+ * and mark resolution.
  */
 import type { SignatureConfig } from '../contract';
 import { createAuthority, type SignatureAuthority } from './authority';

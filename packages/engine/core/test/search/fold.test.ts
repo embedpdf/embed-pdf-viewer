@@ -49,7 +49,7 @@ describe('foldText', () => {
   });
 
   test('collapses whitespace born from decomposition', () => {
-    // U+00A8 DIAERESIS decomposes to space + combining mark.
+    // U+00A8 diaeresis decomposes to space + combining mark.
     const f = foldText('a ¨ b');
     expect(f.folded).toBe('a b');
   });
