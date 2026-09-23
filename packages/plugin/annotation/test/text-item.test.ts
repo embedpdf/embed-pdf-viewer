@@ -1,9 +1,9 @@
 import {
   initialModel,
-  update,
   type ModelAnnotation,
   type AnnotationFlags,
   type ContentGeometry,
+  type Model,
 } from '@embedpdf/core-annotation';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
@@ -18,6 +18,15 @@ import { buildTextItems } from '../src/text-item';
 
 const PON = 1;
 const PAGE = toPageRef(PON);
+
+/** These records, with `editing` in text edit (only live text becomes a text item). */
+const editingIn = (records: ModelAnnotation[], editing: string): Model => ({
+  ...initialModel,
+  byId: Object.fromEntries(records.map((record) => [record.id, record])),
+  order: records.map((record) => record.id),
+  selected: [editing],
+  editing,
+});
 const FLAGS: AnnotationFlags = {
   invisible: false,
   hidden: false,
@@ -69,16 +78,12 @@ describe('buildTextItems — text plate mirrors the AP generator', () => {
       { kind: 'text', rect: { x: 10, y: 10, width: 80, height: 30 } },
       3,
     );
-    let model = update(initialModel, { type: 'loaded', annots: [callout, plain] })[0];
     // textBoxes only emits live text — edit each in turn.
-    model = update(model, { type: 'beginTextEdit', id: 'C1' })[0];
-    const [calloutItem] = buildTextItems(model, PAGE);
+    const [calloutItem] = buildTextItems(editingIn([callout, plain], 'C1'), PAGE);
     expect(calloutItem!.id).toBe('C1');
     expect(calloutItem!.css.padding).toBe(12); // 2 × 6: Acrobat's plate rule
 
-    model = update(model, { type: 'endTextEdit' })[0];
-    model = update(model, { type: 'beginTextEdit', id: 'P1' })[0];
-    const [plainItem] = buildTextItems(model, PAGE);
+    const [plainItem] = buildTextItems(editingIn([callout, plain], 'P1'), PAGE);
     expect(plainItem!.id).toBe('P1');
     expect(plainItem!.css.padding).toBe(6); // 2 × 3
   });
@@ -122,9 +127,7 @@ describe('buildTextItems — the editor document', () => {
         ],
       },
     };
-    let model = update(initialModel, { type: 'loaded', annots: [annotation] })[0];
-    model = update(model, { type: 'beginTextEdit', id: 'A1' })[0];
-    const [item] = buildTextItems(model, PAGE);
+    const [item] = buildTextItems(editingIn([annotation], 'A1'), PAGE);
     expect(item!.css.align).toBe('center');
     expect(item!.richText.paragraphs).toEqual([
       { runs: [{ text: 'one' }] },

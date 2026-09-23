@@ -2,8 +2,8 @@ import { isPluginError, toPageRef } from '@embedpdf/core';
 import type { AnnotationDTO, AnnotationFlags } from '@embedpdf/engine-core/runtime';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { annotationKey } from '../src/repository';
 import { annotationHarness } from './harness';
+import { annotationKey } from '../src/repository';
 
 /**
  * The public page-space `create()` takes the same optimistic path the draw
@@ -68,7 +68,7 @@ describe('create() in page space', () => {
       props: { color: '#ff0000' },
     });
     // staged at once, before the engine answers
-    expect(harness.state().model.order.some((id) => id.startsWith('tmp:'))).toBe(true);
+    expect(harness.model().order.some((id) => id.startsWith('new:'))).toBe(true);
 
     const ref = await pending.then((ref) => (order.push('resolved'), ref));
     expect(annotationKey(ref)).toBe('obj:42');
@@ -81,7 +81,7 @@ describe('create() in page space', () => {
       flags: { print: true },
     });
     // reconciled: the optimistic id is gone, the durable record is in the model
-    expect(harness.state().model.order).toEqual(['obj:42']);
+    expect(harness.model().order).toEqual(['obj:42']);
   });
 
   it('produces the same draft as the draw tool for the same geometry (one commit path)', async () => {
@@ -136,7 +136,7 @@ describe('create() in page space', () => {
         to: { x: 50, y: 50 },
       }),
     ).rejects.toSatisfy((error) => isPluginError(error, 'operation-failed'));
-    expect(harness.state().model.order).toEqual([]); // the optimistic record was dropped
+    expect(harness.model().order).toEqual([]); // the optimistic record was dropped
   });
 
   it('builds every supported geometry kind', async () => {

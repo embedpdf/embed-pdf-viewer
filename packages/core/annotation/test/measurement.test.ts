@@ -1,5 +1,10 @@
-import { describe, expect, it } from 'vitest';
 import { measureFromKnownLength, toPageRef } from '@embedpdf/engine-core/runtime';
+import { describe, expect, it } from 'vitest';
+
+import { step } from './support';
+import { DRAWN_FLAGS } from '../src/flags';
+import { DEFAULT_CHROME_GEOMETRY } from '../src/geometry';
+import { hitTest } from '../src/hit';
 import {
   distanceCaptionAt,
   distanceLabel,
@@ -9,12 +14,9 @@ import {
   moveDistanceCaption,
   type DistanceAppearance,
 } from '../src/measurement';
-import { initialModel, initialStyle, update } from '../src/update';
-import { pageItems, chrome } from '../src/view';
-import { hitTest } from '../src/hit';
-import { DRAWN_FLAGS } from '../src/flags';
-import { DEFAULT_CHROME_GEOMETRY } from '../src/geometry';
 import type { ModelAnnotation, ContentGeometry, Model, Message } from '../src/types';
+import { initialModel, initialStyle } from '../src/update';
+import { pageItems, chrome } from '../src/view';
 const PAGE = toPageRef(1);
 const geom: ContentGeometry = {
   kind: 'line',
@@ -75,8 +77,8 @@ describe('distance gestures and captions', () => {
       kind: 'handle',
       handle: 'caption',
     });
-    state = update(state, pointer('down', at))[0];
-    state = update(state, pointer('move', { x: at.x + 20, y: at.y - 30 }))[0];
+    state = step(state, pointer('down', at))[0];
+    state = step(state, pointer('move', { x: at.x + 20, y: at.y - 30 }))[0];
     expect(pageItems(state, PAGE)[0].source).toBe('vector');
     expect((pageItems(state, PAGE)[0].measure as DistanceAppearance).caption.offset).toEqual({
       along: 20,
@@ -85,8 +87,8 @@ describe('distance gestures and captions', () => {
     const handles = chrome(state, PAGE).filter((node) => node.kind === 'handle');
     expect(handles).toHaveLength(4);
     expect(handles.some((node) => node.at.x === at.x + 20 && node.at.y === at.y - 30)).toBe(false);
-    expect(update(state, { type: 'cancel' })[0].byId.a).toBe(annotation);
-    const [committed, effects] = update(state, pointer('up', at));
+    expect(step(state, { type: 'cancel' })[0].byId.a).toBe(annotation);
+    const [committed, effects] = step(state, pointer('up', at));
     expect(committed.byId.a.geometry).toBe(geom);
     expect(effects).toEqual([{ type: 'patch', id: 'a', scope: { kind: 'caption' } }]);
   });
@@ -105,9 +107,9 @@ describe('distance gestures and captions', () => {
       capture: 'calibrate',
       in: { page: toPageRef(1), point: { x, y: 20 }, shift: false },
     });
-    model = update(model, message('down', 10))[0];
-    model = update(model, message('move', 150))[0];
-    const [next, effects] = update(model, {
+    model = step(model, message('down', 10))[0];
+    model = step(model, message('move', 150))[0];
+    const [next, effects] = step(model, {
       ...message('up', 150),
       capture: 'another-tool',
     } as Message);
@@ -131,25 +133,25 @@ describe('distance gestures and captions', () => {
       in: { page: toPageRef(1), point: { x, y }, shift: false },
     });
 
-    state = update(state, create('down', 40, 100))[0];
-    state = update(state, create('move', 240, 100))[0];
-    const [released, releaseEffects] = update(state, create('up', 240, 100));
+    state = step(state, create('down', 40, 100))[0];
+    state = step(state, create('move', 240, 100))[0];
+    const [released, releaseEffects] = step(state, create('up', 240, 100));
     expect(released.draft).toMatchObject({ kind: 'create-distance', step: 'offset' });
     expect(released.order).toEqual([]);
     expect(releaseEffects).toEqual([]);
 
-    state = update(released, create('move', 190, 160))[0];
+    state = step(released, create('move', 190, 160))[0];
     const preview = pageItems(state, PAGE)[0];
     expect(preview.geometry).toMatchObject({ a: { x: 40, y: 100 }, b: { x: 240, y: 100 } });
     expect((preview.measure as DistanceAppearance).leader?.length).toBe(-60);
     expect(distanceLabel(preview.geometry, preview.measure as DistanceAppearance)).toBe('4 m');
-    expect(update(state, { type: 'cancel' })[0].order).toEqual([]);
+    expect(step(state, { type: 'cancel' })[0].order).toEqual([]);
 
-    const [committed, effects] = update(state, create('down', 190, 160));
+    const [committed, effects] = step(state, create('down', 190, 160));
     expect(committed.order).toHaveLength(1);
     expect(committed.draft).toBeNull();
     expect(effects).toEqual([{ type: 'create', id: committed.order[0] }]);
-    expect(update(committed, create('up', 190, 160))[1]).toEqual([]);
+    expect(step(committed, create('up', 190, 160))[1]).toEqual([]);
   });
 
   it('keeps offset placement on its home page and discards a click without a length', () => {
@@ -160,12 +162,12 @@ describe('distance gestures and captions', () => {
       measure,
       in: { page: toPageRef(pageObjectNumber), point: { x, y: 100 }, shift: false },
     });
-    let state = update(initialModel, message('down', 40))[0];
-    expect(update(state, message('up', 40))[0].draft).toBeNull();
+    let state = step(initialModel, message('down', 40))[0];
+    expect(step(state, message('up', 40))[0].draft).toBeNull();
 
-    state = update(state, message('up', 240))[0];
-    expect(update(state, message('down', 180, 2))[0]).toBe(state);
-    expect(update(state, message('move', 180, 2))[0]).toBe(state);
+    state = step(state, message('up', 240))[0];
+    expect(step(state, message('down', 180, 2))[0]).toBe(state);
+    expect(step(state, message('move', 180, 2))[0]).toBe(state);
   });
 
   it.each(['leader-start', 'leader-end'])(
@@ -175,13 +177,13 @@ describe('distance gestures and captions', () => {
       const point = { x: handle === 'leader-start' ? 40 : 240, y: 88 };
       expect(hitTest(state, PAGE, point, DEFAULT_CHROME_GEOMETRY, 6)).toMatchObject({ handle });
 
-      state = update(state, pointer('down', point))[0];
-      state = update(state, pointer('move', { x: point.x + 35, y: 160 }))[0];
+      state = step(state, pointer('down', point))[0];
+      state = step(state, pointer('move', { x: point.x + 35, y: 160 }))[0];
       expect((pageItems(state, PAGE)[0].measure as DistanceAppearance).leader?.length).toBe(-60);
       expect(pageItems(state, PAGE)[0].geometry).toEqual(geom);
-      expect(update(state, { type: 'cancel' })[0].byId.a).toBe(annotation);
+      expect(step(state, { type: 'cancel' })[0].byId.a).toBe(annotation);
 
-      const [committed, effects] = update(state, pointer('up', point));
+      const [committed, effects] = step(state, pointer('up', point));
       expect((committed.byId.a.measure as DistanceAppearance).leader?.length).toBe(-60);
       expect(committed.byId.a.geometry).toBe(geom);
       expect(effects).toEqual([{ type: 'patch', id: 'a', scope: { kind: 'leader' } }]);
@@ -190,9 +192,9 @@ describe('distance gestures and captions', () => {
 
   it('drags the measured endpoint independently of leader and caption offsets', () => {
     let state = model();
-    state = update(state, pointer('down', { x: 40, y: 100 }))[0];
-    state = update(state, pointer('move', { x: 100, y: 100 }))[0];
-    const [committed] = update(state, pointer('up', { x: 100, y: 100 }));
+    state = step(state, pointer('down', { x: 40, y: 100 }))[0];
+    state = step(state, pointer('move', { x: 100, y: 100 }))[0];
+    const [committed] = step(state, pointer('up', { x: 100, y: 100 }));
     expect(committed.byId.a.geometry).toMatchObject({
       a: { x: 100, y: 100 },
       b: { x: 240, y: 100 },

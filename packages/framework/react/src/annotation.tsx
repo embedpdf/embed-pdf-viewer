@@ -11,9 +11,16 @@
 
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-annotation';
-import * as React from 'react';
-import { useEffect, useRef, useState } from 'react';
 import type { EventHook, ResourceStatus } from '@embedpdf/core';
+import {
+  scene,
+  MITER_LIMIT,
+  pdfToContentRect,
+  type AnnotationProps,
+  type Paint,
+  type Rect,
+  type RenderItem,
+} from '@embedpdf/core-annotation';
 import {
   AnnotationToken,
   annotationKey,
@@ -30,6 +37,10 @@ import {
   type TextItem,
 } from '@embedpdf/plugin-annotation';
 import {
+  AnnotationToken as AnnotationHostToken,
+  previewBucket,
+} from '@embedpdf/plugin-annotation/contract/host';
+import {
   attachRichTextEditor,
   pickFile,
   type RichTextEditorBinding,
@@ -38,19 +49,8 @@ import {
 // The render layer is framework code, so it resolves the full host lens
 // (pageItems/chrome/appearances/…). Same runtime token as the public one — only
 // the type differs. App code never imports this.
-import {
-  AnnotationToken as AnnotationHostToken,
-  previewBucket,
-} from '@embedpdf/plugin-annotation/contract/host';
-import {
-  scene,
-  MITER_LIMIT,
-  pdfToContentRect,
-  type AnnotationProps,
-  type Paint,
-  type Rect,
-  type RenderItem,
-} from '@embedpdf/core-annotation';
+import { useEffect, useRef, useState } from 'react';
+import * as React from 'react';
 
 export type {
   CreationDraftAnchor,
@@ -68,6 +68,8 @@ export type {
   TextStyle,
 } from '@embedpdf/core-annotation';
 export type { SelectionFlags, SelectionProps } from '@embedpdf/plugin-annotation';
+import { devWarn } from './dev';
+import { usePageLayerFact } from './dev-registry';
 import {
   shallowArray,
   useCapability,
@@ -78,8 +80,6 @@ import {
   usePage,
   useSelector,
 } from './runtime';
-import { devWarn } from './dev';
-import { usePageLayerFact } from './dev-registry';
 import type { PageContextValue, PageLayout } from './runtime';
 
 export {
@@ -612,9 +612,11 @@ function FreeText({ item, page }: { item: TextItem; page: PageContextValue }) {
     const element = ref.current;
     if (!element) return;
     const host: RichTextEditorHost = {
+      // Typing shows at once and reaches the engine in one write after a
+      // pause (or when the edit ends), not one write per keystroke.
       onInput: (doc) => {
         const it = latest.current.item;
-        if (it.ref) anno.setRichText(it.ref, doc);
+        if (it.ref) anno.draftRichText(it.ref, doc);
       },
       onSelectionChange: (range) => {
         const it = latest.current.item;

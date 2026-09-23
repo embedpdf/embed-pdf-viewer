@@ -15,8 +15,8 @@ import { toPageRef, type PageRef } from '@embedpdf/engine-core/runtime';
 import { ICON_PLACE_SIZE, isIconPlaceKind } from './placement';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import type { Stamps } from './stamps';
-import { pageSizeOf } from '../services/geometry';
 import { setToolGhost } from '../model';
+import { pageSizeOf } from '../services/geometry';
 
 /**
  * The armed tool's footprint ghost: where (and what) the next click would

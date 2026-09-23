@@ -1,8 +1,8 @@
 import type { SnapSettings } from '@embedpdf/core-annotation';
 
 import type { ChromeSettingsPatch } from '../contract';
-import type { AnnotationContext, AnnotationServices } from '../services';
 import { patchChrome } from '../model';
+import type { AnnotationContext, AnnotationServices } from '../services';
 
 /** The live-adjustable settings: snapping (a UI toggle) and the selection
  *  chrome (theming). Both are seeded by the registration config. */

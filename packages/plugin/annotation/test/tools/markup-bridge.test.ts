@@ -4,8 +4,8 @@ import type { InteractionHostCapability } from '@embedpdf/plugin-interaction/con
 import type { SelectionHostCapability } from '@embedpdf/plugin-selection/contract/host';
 import { describe, expect, it, vi } from 'vitest';
 
-import { wireMarkup } from '../../src/tools/markup-bridge';
 import type { AnnotationHostCapability } from '../../src/host-contract';
+import { wireMarkup } from '../../src/tools/markup-bridge';
 
 describe('selection authoring bridge', () => {
   it('previews and commits Replace Text from its declarative tool recipe', () => {

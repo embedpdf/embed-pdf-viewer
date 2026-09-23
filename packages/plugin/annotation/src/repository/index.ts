@@ -23,7 +23,6 @@ import {
   type PropKey,
 } from '@embedpdf/core-annotation';
 import { geomRotation } from '@embedpdf/core-annotation';
-import { generateUuid } from '@embedpdf/engine-core/runtime';
 import type {
   AnnotationDraft,
   AnnotationDTO,
@@ -98,16 +97,11 @@ const wireSubtypeOf = (annotation: ModelAnnotation): string =>
 /* ── DTO → content model ──────────────────────────────────────────────────── */
 
 /**
- * Engine DTO → content-space ModelAnnotation. `source` decides how it renders: `'baked'`
- * shows the engine's appearance raster (a page load, or a remote edit — trust
- * the authored AP); `'vector'` renders live from geom/style (we authored or
- * changed it). `apBox` is the raster's content-space box, used while baked.
+ * Engine DTO → content-space ModelAnnotation, rendering from the engine's
+ * appearance raster (`source: 'baked'`, placed by `apBox`). Whether this
+ * session renders it live instead is the view's choice (read/view.ts).
  */
-export function fromDTO(
-  dto: AnnotationDTO,
-  crop: PdfRect,
-  source: 'baked' | 'vector' = 'baked',
-): ModelAnnotation {
+export function fromDTO(dto: AnnotationDTO, crop: PdfRect): ModelAnnotation {
   const slice = projectionOf(dto.subtype).ingest(dto, crop);
   // Rotation-stripped appearances (mirrors the engine's exact condition — see
   // AnnotationAppearanceReader): only when the DTO carries both `rotation` and
@@ -131,7 +125,7 @@ export function fromDTO(
     // `/F` verbatim — every behavioral question (visible? selectable? frozen?)
     // is answered by the core's flag predicates, never derived here.
     flags: dto.flags,
-    source,
+    source: 'baked',
     // Carry the canonical DTO; geom/style below are derived projections of it.
     data: dto,
     // Relationship to a parent annotation. `irt` mirrors `/IRT`; `group` is the
@@ -227,8 +221,6 @@ export function toCreateDraft(annotation: ModelAnnotation, crop: PdfRect): Annot
   if (!base) return null;
   const extras = kind.draftExtras?.(annotation, crop);
   if (kind.draftExtras && extras === null) return null;
-  // Seed /NM on every create: a durable identity that survives save and
-  // reload, gives replies and status annotations a stable join key from
-  // birth, and lets the confirmed record be matched to its optimistic one.
-  return { ...base, ...extras, nm: generateUuid(), flags: annotation.flags } as AnnotationDraft;
+  // The /NM comes from `named()` at the write, like every create of this plugin.
+  return { ...base, ...extras, flags: annotation.flags } as AnnotationDraft;
 }

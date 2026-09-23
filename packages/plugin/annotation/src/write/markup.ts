@@ -5,20 +5,16 @@ import { SelectionToken as SelectionPublicToken } from '@embedpdf/plugin-selecti
 
 import type { MarkupSubtype } from '../contract';
 import type { AnnotationContext, AnnotationServices } from '../services';
+import { createdRefOf } from './outcomes';
 
 /**
  * Text markup, carets and replace-text pairs: the selection plugin's commit
- * path (optimistic creates over text quads) and the programmatic
+ * path (creates over text quads, shown at once) and the programmatic
  * `createFromSelection`.
  */
 export function createMarkupWrites(
   ctx: Pick<AnnotationContext, 'tryGet'>,
-  {
-    store,
-    authority,
-    writes,
-    tools,
-  }: Pick<AnnotationServices, 'store' | 'authority' | 'writes' | 'tools'>,
+  { store, authority, tools }: Pick<AnnotationServices, 'store' | 'authority' | 'tools'>,
 ) {
   const api = {
     createMarkup: (subtype: Subtype, page: PageRef, quads: TextQuad[], preset?: string) => {
@@ -65,12 +61,12 @@ export function createMarkupWrites(
       const pending: Promise<AnnotationRef>[] = [];
       if (subtype === 'insert-text') {
         if (snapshot.end) {
-          const effects = store.commit({
+          const commit = store.commit({
             type: 'createCaret',
             page: snapshot.end.page,
             anchor: { glyphQuad: snapshot.end.glyphQuad, advance: snapshot.end.advance },
           });
-          pending.push(writes.awaitCreate(writes.createEffectsOf(effects)[0]?.id));
+          pending.push(createdRefOf(commit));
         }
       } else {
         for (const entry of snapshot.pages) {
@@ -82,16 +78,16 @@ export function createMarkupWrites(
               snapshot.end && pageRefsEqual(snapshot.end.page, entry.page)
                 ? { glyphQuad: snapshot.end.glyphQuad, advance: snapshot.end.advance }
                 : { glyphQuad: last.quad, advance: last.advance };
-            const effects = store.commit({
+            const commit = store.commit({
               type: 'createReplaceText',
               page: entry.page,
               quads,
               anchor,
               preset,
             });
-            pending.push(writes.awaitCreate(writes.groupEffectsOf(effects)[0]?.primary));
+            pending.push(createdRefOf(commit));
           } else {
-            const effects = store.commit({
+            const commit = store.commit({
               type: 'createMarkup',
               subtype,
               page: entry.page,
@@ -99,7 +95,7 @@ export function createMarkupWrites(
               preset,
               flags: preset ? tools.get(preset)?.flags : undefined,
             });
-            pending.push(...writes.createEffectsOf(effects).map((fx) => writes.awaitCreate(fx.id)));
+            if (commit.effects.length) pending.push(createdRefOf(commit));
           }
         }
       }

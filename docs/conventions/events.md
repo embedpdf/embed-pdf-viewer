@@ -7,11 +7,11 @@ its change came from.
 
 ## Three kinds
 
-| Kind         | Meaning                                             | Fired from                                     | Origin                            | Examples                                                                                                                                        |
-| ------------ | --------------------------------------------------- | ---------------------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Fact         | Something changed in the document                   | Where the confirmed document event is applied  | `originOf(event)`                 | metadata `onUpdated`; form `onValueChanged`, `onFieldCreated`; annotation `onCreated`, `onDeleted`; signature `onSigned`; redaction `onApplied` |
-| State change | A session value changed                             | The plugin's one `ctx.state.onChange` listener | none: session state has no origin | shell `onSurfaceOpened`; stage `onZoomChanged`, `onPageChanged`; search `onActiveHitChanged`                                                    |
-| Occurrence   | An operation ran, was requested, finished or failed | Where the operation reaches that point         | a domain field when one is needed | search `onStarted`, `onCompleted`, `onFailed`; stage `onMotionEnded`; form `onValidationRejected`; commands `onExecuted`                        |
+| Kind         | Meaning                                             | Fired from                                     | Origin                            | Examples                                                                                                                                             |
+| ------------ | --------------------------------------------------- | ---------------------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fact         | Something changed in the document                   | Where the confirmed document event is applied  | `originOf(event)`                 | metadata `onUpdated`; form `onValueChanged`, `onFieldCreated`; annotation `onCreated`, `onDeleted`; signature `onSigned`; redaction `onApplied`      |
+| State change | A session value changed                             | The plugin's one `ctx.state.onChange` listener | none: session state has no origin | shell `onSurfaceOpened`; stage `onZoomChanged`, `onPageChanged`; search `onActiveHitChanged`                                                         |
+| Occurrence   | An operation ran, was requested, finished or failed | Where the operation reaches that point         | a domain field when one is needed | search `onStarted`, `onCompleted`, `onFailed`; stage `onMotionEnded`; form `onValidationRejected`; commands `onExecuted`; annotation `onWriteFailed` |
 
 ### Fact events
 

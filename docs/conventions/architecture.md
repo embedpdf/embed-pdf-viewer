@@ -56,7 +56,7 @@ in reverse order, and then fires `documents.onClosed`.
 | Kind     | What it is                                                                                  | Where it lives                                                              | How it changes                                                                             | Examples                                                                                      |
 | -------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
 | Mirror   | A local copy of data the engine owns                                                        | `ctx.mirror(spec)` or `ctx.pageMirror(spec)`: a store cell of its own       | Only by folding confirmed engine events (every origin) and by loads. Verbs never write it. | form fields, annotation records, metadata, signatures, links per page, text geometry per page |
-| Overlay  | A local change the engine has not confirmed yet                                             | Session state, keyed so its confirmation can find it                        | Added by a verb or gesture; dropped when the confirmation arrives or the write fails       | an annotation created optimistically, awaiting the engine's record with the same `/NM`        |
+| Overlay  | A local change the engine has not confirmed yet                                             | Session state, keyed by the record it changes                               | Added by a verb or gesture; dropped when the writes carrying it settle, success or failure | an annotation the user moved, shown at its new place until its engine write settles           |
 | Session  | State the client owns that is not in the PDF                                                | `ctx.state`                                                                 | Only through named pure transitions in `model.ts`                                          | camera, open surfaces, active tool, selection, search session, in-flight flags                |
 | Resource | Anything that is not plain data: handles, rasters, workers, registries of functions, caches | Closures in the controller, released through `ctx.cleanup` or `ctx.acquire` | However the owner likes; readers are woken with `ctx.notify()`                             | raster store, tile manager, command and tool registries, script sandboxes                     |
 
@@ -67,8 +67,12 @@ Rules:
 
 - A mirror always holds what the engine confirmed. Nothing optimistic enters
   it.
-- An overlay entry has a key that its confirmation carries (an annotation's
-  `/NM`, a field key), and a way to be dropped when the write fails.
+- An overlay entry is dropped when the writes carrying it settle, whether
+  they succeeded (the mirror already holds the confirmed result) or failed
+  (the change is wrong). Rollback is deletion: the reads show the mirror
+  again, never a copy taken before the write.
+- A new record has no key until the engine answers, so its entry carries one
+  its confirmation will carry too (an annotation's `/NM`).
 - State is plain data: no functions, class instances, handles, `Map`s or
   `Set`s in `ctx.state` or a mirror. Anything else is a resource.
 - No state exists only to wake the UI. A counter bumped so that selectors
@@ -149,8 +153,10 @@ kernel, engine or DOM: page geometry (`core-geometry`), the camera and scene
 toolbar solver (`core-ui`).
 
 - Inputs in, decision out: plain functions, or `update(model, message)`
-  returning `[model, effects]` as in `core-annotation`. No I/O, no clock, no
-  randomness.
+  returning the next session, the records it changed and the effects, as in
+  `core-annotation`. No I/O, no clock, no randomness.
+- A core never stores engine data. It reads the records it works on from its
+  input and returns what it changed; the plugin decides where that lives.
 - The plugin's controller performs the effects. A core does not call the
   engine.
 - Cores know nothing about mirrors, overlays or events. They receive the data

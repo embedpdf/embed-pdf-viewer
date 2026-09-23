@@ -1,5 +1,5 @@
-import { pageSpace } from '@embedpdf/core-geometry';
 import type { Rect, ViewEnv } from '@embedpdf/core-annotation';
+import { pageSpace } from '@embedpdf/core-geometry';
 import type { PdfRect } from '@embedpdf/engine-core/runtime';
 
 import type { AnnotationContext } from './context';

@@ -13,6 +13,7 @@ import type { CommentPermissions, CommentsApi, ThreadDeleteResult } from '../con
 import type { AnnotationContext, AnnotationServices } from '../services';
 import type { ThreadIndex } from './threads';
 import type { Crud } from '../write/crud';
+import { named } from '../write/named';
 
 // Screen-anchored like a sticky note; `print` for Acrobat parity.
 const REPLY_FLAGS = { print: true, noZoom: true, noRotate: true };
@@ -23,18 +24,12 @@ const STATUS_FLAGS = { hidden: true, noZoom: true, noRotate: true };
 
 /**
  * The conversation plane's verbs: every one compiles down to plain
- * annotation creates / patches / deletes (one optimistic pipeline, no second
- * write path), and each announces the thread it touched (its root, as it
+ * annotation creates / patches / deletes (one write path), and each announces the thread it touched (its root, as it
  * was before the change).
  */
 export function createComments(
   ctx: Pick<AnnotationContext, 'doc'>,
-  {
-    store,
-    records,
-    authority,
-    events,
-  }: Pick<AnnotationServices, 'store' | 'records' | 'authority' | 'events'>,
+  { store, authority, events }: Pick<AnnotationServices, 'store' | 'authority' | 'events'>,
   threads: ThreadIndex,
   crud: Pick<Crud, 'updateRaw'>,
 ) {
@@ -43,7 +38,7 @@ export function createComments(
     pageObjectNumber: number,
     draft: AnnotationDraft,
   ): Promise<AnnotationDTO> => {
-    const result = await ctx.doc.page(toPageRef(pageObjectNumber)).annotations.create(draft);
+    const result = await ctx.doc.page(toPageRef(pageObjectNumber)).annotations.create(named(draft));
     return result.created;
   };
 

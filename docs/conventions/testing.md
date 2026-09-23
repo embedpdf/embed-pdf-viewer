@@ -178,6 +178,16 @@ update: vi.fn(async (patch: { title?: string | null }) => {
   never data.
 - **No refetch.** Count the engine's reads: a mirror reads once when it loads,
   not again after a write (`packages/plugin/form/test/fields-mirror.test.ts`).
+
+## Overlay tests
+
+Test what the user sees while a write runs and after it settles, through the
+capability, with a fake engine that can refuse a write, hold it in flight, and
+deliver another session's event meanwhile. A refused change must show the
+mirror's record, including that other session's change; a late write must
+never replace newer work. `packages/plugin/annotation/test/intents.test.ts` is
+the reference.
+
 - **Events.** A write fires its fact event once, with the right origin; a load
   fires `onResynced` and no per-item events.
 

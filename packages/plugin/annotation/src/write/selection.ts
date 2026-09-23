@@ -19,8 +19,10 @@ import { richDocOf, runDeltaForProps, type TextFormat } from '../rich-text';
 import type { AnnotationServices } from '../services';
 import type { Crud } from './crud';
 import type { LinkWrites } from './links';
+import { batchResultOf, throwIfFailed } from './outcomes';
+import { rotationOf } from './page-patch';
 import type { TextEditing } from './text-editing';
-import { refsOfIn } from '../services/store';
+import { refsOfIn, type Commit } from '../services/store';
 
 /**
  * The selection: what is selected, and the verbs that restyle, flag, delete,
@@ -28,25 +30,30 @@ import { refsOfIn } from '../services/store';
  * `update → patch effect → toPatch` path a gesture takes.
  */
 export function createSelectionWrites(
-  {
-    store,
-    authority,
-    writes,
-    fonts,
-  }: Pick<AnnotationServices, 'store' | 'authority' | 'writes' | 'fonts'>,
+  { store, authority, fonts }: Pick<AnnotationServices, 'store' | 'authority' | 'fonts'>,
   annotations: Pick<AnnotationReads, 'loadedOrThrow' | 'selectedCommitted'>,
   selectionProps: Pick<SelectionPropsReads, 'activeTextRange' | 'selectionPropsOf'>,
-  text: Pick<TextEditing, 'scheduleTextCommit' | 'flushTextCommits'>,
+  text: Pick<TextEditing, 'flushAllText'>,
   links: Pick<LinkWrites, 'writeRelationship'>,
-  crud: Pick<Crud, 'setRotation' | 'rotationOf'>,
+  crud: Pick<Crud, 'setRotation'>,
 ) {
   const selectedRefs = () => refsOfIn(store.model(), store.model().selected);
 
-  // Restyle the selection: One flat props patch through the pure core (the
+  /** Commit a selection message; resolves with its outcome over the refs that were selected. */
+  const commitOverSelection = async (commit: () => Commit[]) => {
+    const refs = selectedRefs();
+    const outcomes = await Promise.all(commit().map((committed) => committed.written));
+    return batchResultOf(refs, {
+      created: {},
+      failed: outcomes.flatMap((outcome) => outcome.failed),
+    });
+  };
+
+  // Restyle the selection: one flat props patch through the pure core (the
   // same `update → patch effect → toPatch` path every gesture takes). Each
-  // member takes the keys its kind declares and ignores the rest; the model
-  // updates optimistically, the engine writes fire per member and re-sync.
-  const restyle = (patch: AnnotationPropsPatch): void => {
+  // member takes the keys its kind declares and ignores the rest; the change
+  // shows at once and one engine write runs per member.
+  const restyle = (patch: AnnotationPropsPatch): Commit[] => {
     const model = store.model();
     const range = selectionProps.activeTextRange(model);
     if (range) {
@@ -55,25 +62,25 @@ export function createSelectionWrites(
       // algebra); whatever is left restyles the annotation as usual.
       const annotation = model.byId[range.id]!;
       const { delta, rest } = runDeltaForProps(patch, fonts);
+      const commits: Commit[] = [];
       if (Object.keys(delta).length) {
         const next = applyStyleToRange(
           { paragraphs: richDocOf(annotation, fonts).paragraphs },
           range,
           delta,
         );
-        store.commit({ type: 'setRichText', id: range.id, doc: next });
-        if (annotation.ref) text.scheduleTextCommit(annotation.ref);
+        commits.push(store.commit({ type: 'setRichText', id: range.id, doc: next }));
       }
       if (Object.keys(rest).length) {
-        text.flushTextCommits(); // the props write must not overtake the text
-        store.commit({ type: 'setProps', patch: rest });
+        text.flushAllText(); // the props write must not overtake the text
+        commits.push(store.commit({ type: 'setProps', patch: rest }));
       }
-      return;
+      return commits;
     }
     // A body restyle of the annotation being typed in: land the text first
     // so the engine's body rewrite carries the latest paragraphs.
-    if (model.editing) text.flushTextCommits();
-    store.commit({ type: 'setProps', patch });
+    if (model.editing) text.flushAllText();
+    return [store.commit({ type: 'setProps', patch })];
   };
 
   const api = {
@@ -118,40 +125,29 @@ export function createSelectionWrites(
     clearSelection: () => {
       store.commit({ type: 'deselect' });
     },
-    updateSelection: (patch: AnnotationPropsPatch) => {
-      const refs = selectedRefs();
-      const { writes: pending } = writes.collect(() => restyle(patch));
-      return writes.settle(refs, pending);
-    },
-    updateSelectionFlags: (patch: Partial<AnnotationFlags>) => {
-      const refs = selectedRefs();
-      const { writes: pending } = writes.collect(() => store.commit({ type: 'setFlags', patch }));
-      return writes.settle(refs, pending);
-    },
-    deleteSelection: () => {
-      const refs = selectedRefs();
-      const { writes: pending } = writes.collect(() => store.commit({ type: 'delete' }));
-      return writes.settle(refs, pending);
-    },
+    updateSelection: (patch: AnnotationPropsPatch) => commitOverSelection(() => restyle(patch)),
+    updateSelectionFlags: (patch: Partial<AnnotationFlags>) =>
+      commitOverSelection(() => [store.commit({ type: 'setFlags', patch })]),
+    deleteSelection: () => commitOverSelection(() => [store.commit({ type: 'delete' })]),
     rotateSelectionBy: async (delta: 90 | -90) => {
       if (delta === 90) {
-        const { writes: pending } = writes.collect(() => store.commit({ type: 'rotate90' }));
-        await writes.awaitAll(pending);
+        throwIfFailed(await store.commit({ type: 'rotate90' }).written);
         return;
       }
-      for (const ref of selectedRefs())
-        await crud.setRotation(ref, crud.rotationOf(annotations.loadedOrThrow(ref)) - 90);
+      for (const ref of selectedRefs()) {
+        const annotation = annotations.loadedOrThrow(ref);
+        await crud.setRotation(ref, rotationOf(annotation.geometry) - 90);
+      }
     },
     resetSelectionRotation: async () => {
-      const { writes: pending } = writes.collect(() => store.commit({ type: 'resetRotation' }));
-      await writes.awaitAll(pending);
+      throwIfFailed(await store.commit({ type: 'resetRotation' }).written);
     },
     toggleTextFormat: async (format: TextFormat) => {
       const current = selectionProps.selectionPropsOf().values[format];
-      const { writes: pending } = writes.collect(() =>
-        restyle({ [format]: !current } as AnnotationPropsPatch),
+      const outcomes = await Promise.all(
+        restyle({ [format]: !current } as AnnotationPropsPatch).map((commit) => commit.written),
       );
-      await writes.awaitAll(pending);
+      outcomes.forEach(throwIfFailed);
     },
     // Grouping writes a relationship (`/IRT` + `/RT /Group`) onto every
     // subordinate; ungrouping clears it, so each member becomes top-level again.

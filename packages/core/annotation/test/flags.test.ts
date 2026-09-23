@@ -1,6 +1,9 @@
-import { describe, expect, it } from 'vitest';
 import { textQuadFromRect } from '@embedpdf/core-geometry';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
+import { describe, expect, it } from 'vitest';
+
+import { modelWith, step } from './support';
+import { anchoredGeom, anchorModeOf, anchorOf, unanchoredGeom, type ViewEnv } from '../src/anchor';
 import {
   DRAWN_FLAGS,
   NO_ANNOTATION_FLAGS,
@@ -12,12 +15,11 @@ import {
   viewable,
   type AnnotationFlags,
 } from '../src/flags';
-import { anchoredGeom, anchorModeOf, anchorOf, unanchoredGeom, type ViewEnv } from '../src/anchor';
-import { hitTest, isSelectable, paintOrder } from '../src/hit';
-import { pageItems, chrome, textBoxes } from '../src/view';
 import { geomBounds, geomRotation } from '../src/geometry';
-import { initialModel, update, DEFAULT_CHROME_GEOMETRY } from '../src/index';
+import { hitTest, isSelectable, paintOrder } from '../src/hit';
+import { initialModel, DEFAULT_CHROME_GEOMETRY } from '../src/index';
 import type { ModelAnnotation, ContentGeometry, Model, Message, Point } from '../src/types';
+import { pageItems, chrome, textBoxes } from '../src/view';
 
 const PON = 1;
 const PAGE = toPageRef(PON);
@@ -46,10 +48,9 @@ const square = (
   ...over,
 });
 
-const loaded = (annots: ModelAnnotation[]): Model =>
-  update(initialModel, { type: 'loaded', annots })[0];
+const loaded = (annots: ModelAnnotation[]): Model => modelWith(annots);
 const run = (model: Model, msgs: Message[]): Model =>
-  msgs.reduce((acc, message) => update(acc, message)[0], model);
+  msgs.reduce((acc, message) => step(acc, message)[0], model);
 
 describe('flag predicates (ISO 32000 Table 167)', () => {
   it('hidden beats everything on screen', () => {
@@ -185,15 +186,15 @@ describe('flag-driven behavior in the model', () => {
     expect(nodes.some((node) => node.kind === 'handle')).toBe(false);
     expect(nodes.some((node) => node.kind === 'rotate-knob')).toBe(false);
     // restyle is blocked, silently (no effect emitted)
-    const [afterProps, propsFx] = update(model, { type: 'setProps', patch: { color: '#00ff00' } });
+    const [afterProps, propsFx] = step(model, { type: 'setProps', patch: { color: '#00ff00' } });
     expect(afterProps.byId['l1'].style.color).toBe(model.byId['l1'].style.color);
     expect(propsFx).toEqual([]);
     // delete is blocked — the locked member survives, still selected
-    const [afterDelete, deleteFx] = update(model, { type: 'delete' });
+    const [afterDelete, deleteFx] = step(model, { type: 'delete' });
     expect(afterDelete.byId['l1']).toBeDefined();
     expect(deleteFx).toEqual([]);
     // …but setFlags is not gated by locked: unlocking must work
-    const [unlocked, unlockFx] = update(model, { type: 'setFlags', patch: { locked: false } });
+    const [unlocked, unlockFx] = step(model, { type: 'setFlags', patch: { locked: false } });
     expect(unlocked.byId['l1'].flags.locked).toBe(false);
     expect(unlockFx).toEqual([{ type: 'flags', id: 'l1' }]);
   });
@@ -201,7 +202,7 @@ describe('flag-driven behavior in the model', () => {
   it('setFlags merges onto the selection, skips no-ops, keeps the render source', () => {
     let model = loaded([square('s1', DRAWN_FLAGS, { source: 'baked' }), square('s2', DRAWN_FLAGS)]);
     model = { ...model, selected: ['s1', 's2'] };
-    const [next, fx] = update(model, { type: 'setFlags', patch: { print: true, hidden: true } });
+    const [next, fx] = step(model, { type: 'setFlags', patch: { print: true, hidden: true } });
     // print was already set on both — only `hidden` changes, but both change by it
     expect(fx).toEqual([
       { type: 'flags', id: 's1' },
@@ -210,18 +211,18 @@ describe('flag-driven behavior in the model', () => {
     expect(next.byId['s1'].flags.hidden).toBe(true);
     expect(next.byId['s1'].source).toBe('baked'); // flags never re-bake
     // a pure no-op patch emits nothing and keeps the model reference
-    const [same, none] = update(next, { type: 'setFlags', patch: { hidden: true } });
+    const [same, none] = step(next, { type: 'setFlags', patch: { hidden: true } });
     expect(none).toEqual([]);
     expect(same).toBe(next);
   });
 
-  it('setFlags on an uncommitted draft merges without emitting an effect', () => {
-    const tmp = square('tmp:1', DRAWN_FLAGS, { ref: null });
-    let model = loaded([tmp]);
-    model = { ...model, selected: ['tmp:1'] };
-    const [next, fx] = update(model, { type: 'setFlags', patch: { locked: true } });
-    expect(next.byId['tmp:1'].flags.locked).toBe(true);
-    expect(fx).toEqual([]); // its create draft will carry the flags instead
+  it('setFlags on a record not yet confirmed still asks for the write (it follows the create)', () => {
+    const created = square('new:1', DRAWN_FLAGS, { ref: null });
+    let model = loaded([created]);
+    model = { ...model, selected: ['new:1'] };
+    const [next, fx] = step(model, { type: 'setFlags', patch: { locked: true } });
+    expect(next.byId['new:1'].flags.locked).toBe(true);
+    expect(fx).toEqual([{ type: 'flags', id: 'new:1' }]);
   });
 
   it('lockedContents blocks beginTextEdit', () => {
@@ -230,7 +231,7 @@ describe('flag-driven behavior in the model', () => {
       geometry: { kind: 'text', rect: { x: 10, y: 10, width: 100, height: 40 } },
     });
     const model = loaded([ft]);
-    const [after] = update(model, { type: 'beginTextEdit', id: 'ft1' });
+    const [after] = step(model, { type: 'beginTextEdit', id: 'ft1' });
     expect(after.editing).toBeNull();
   });
 });
@@ -462,7 +463,7 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
       .map((node) => (node as { at: Point }).at.x);
     expect(Math.max(...handleXs)).toBeLessThanOrEqual(100 + 80 / 2 + 2);
     // rotate90 turns the authored tilt (displayed directly at any page rotation)
-    const [after, fx] = update(model, { type: 'rotate90' });
+    const [after, fx] = step(model, { type: 'rotate90' });
     const geometry = after.byId['an'].geometry;
     expect(geometry.kind === 'rect' && geometry.rot).toBe(90);
     expect(fx).toHaveLength(1);

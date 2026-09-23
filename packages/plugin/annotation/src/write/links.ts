@@ -7,6 +7,7 @@ import {
 } from '@embedpdf/core-annotation';
 import {
   annotationKey,
+  type AnnotationDraft,
   type AnnotationDTO,
   type AnnotationPatch,
   type AnnotationRef,
@@ -15,6 +16,7 @@ import {
 
 import { linkChildRects, writableTarget } from '../repository';
 import type { AnnotationContext, AnnotationServices } from '../services';
+import { named } from './named';
 
 /**
  * Attached links (a Link child riding an editable annotation) and group
@@ -23,7 +25,7 @@ import type { AnnotationContext, AnnotationServices } from '../services';
  */
 export function createLinkWrites(
   ctx: Pick<AnnotationContext, 'doc'>,
-  { store, geometry, records }: Pick<AnnotationServices, 'store' | 'geometry' | 'records'>,
+  { store, geometry }: Pick<AnnotationServices, 'store' | 'geometry'>,
 ) {
   /**
    * Per-parent serialization of attached-link reconciles: rapid edits chain
@@ -37,10 +39,10 @@ export function createLinkWrites(
    * The one place attached link children are created, retargeted, re-rected,
    * or deleted. Declarative: desired state = `desired` target + the parent's
    * committed geometry (`linkChildRects`); current state is read straight
-   * from the substrate (`linkChildrenOf`) — no join-key ledger. Results land
-   * as ordinary substrate upserts/removes, so the `linkOf` lens converges
-   * immediately locally and via events everywhere else. Idempotent — foreign
-   * inconsistencies heal on the next local edit.
+   * from the substrate (`linkChildrenOf`) — no join-key ledger. Each write's
+   * confirmed record reaches the records mirror before the write resolves, so
+   * the `linkOf` lens converges as the run goes, here and in every other
+   * session. Idempotent — foreign inconsistencies heal on the next local edit.
    */
   const reconcileChildren = async (id: Id, desired: PdfLinkTarget | null): Promise<void> => {
     const doc = ctx.doc;
@@ -60,27 +62,26 @@ export function createLinkWrites(
       for (let i = 0; i < paired; i++) {
         const ref = current[i].ref;
         if (!ref) continue;
-        const result = await page.annotations.update(ref, {
+        await page.annotations.update(ref, {
           subtype: 'link',
           rect: rects[i],
           ...(target ? { target } : {}),
         });
-        store.commit({ type: 'upsert', annots: [records.ingest(result.updated, crop, 'baked')] });
       }
       for (let i = current.length; i < rects.length; i++) {
-        const result = await page.annotations.create({
-          subtype: 'link',
-          rect: rects[i],
-          target,
-          inReplyTo: annotation.ref,
-          replyType: 'group',
-        });
-        store.commit({ type: 'upsert', annots: [records.ingest(result.created, crop, 'baked')] });
+        await page.annotations.create(
+          named({
+            subtype: 'link',
+            rect: rects[i],
+            target,
+            inReplyTo: annotation.ref,
+            replyType: 'group',
+          } as AnnotationDraft),
+        );
       }
       for (let i = rects.length; i < current.length; i++) {
         const child = current[i];
         if (child.ref) await page.annotations.delete(child.ref);
-        store.commit({ type: 'remove', ids: [child.id] });
       }
     } catch (error) {
       console.error('[annotation] attached-link sync failed:', error);
@@ -127,10 +128,11 @@ export function createLinkWrites(
       .annotations.update(record.ref, relationshipPatch(record.data.subtype, relationship));
   };
 
-  store.onEffect('syncLink', (fx) => {
-    if (!ctx.doc) return;
-    void scheduleSync(fx.id, { target: fx.target });
-  });
+  // A restyle that set or cleared a link: the verb that made it waits for the children.
+  store.onEffect('syncLink', (effect) => ({
+    ids: [],
+    perform: () => scheduleSync(effect.id, { target: effect.target }),
+  }));
 
   const api = {
     links: {

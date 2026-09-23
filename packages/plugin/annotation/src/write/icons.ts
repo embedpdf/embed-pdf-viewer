@@ -11,8 +11,10 @@ import {
 
 import { ICON_PLACE_SIZE, iconPlacementDraft, isIconPlaceKind } from './placement';
 import type { FilePickerProvider } from '../contract';
+import type { AnnotationReads } from '../read/annotations';
 import { boxGeomFields } from '../repository';
 import type { AnnotationContext, AnnotationServices } from '../services';
+import { named } from './named';
 import type { Stamps } from './stamps';
 import { pageSizeOf } from '../services/geometry';
 import type { ResolvedTool } from '../tools/definitions';
@@ -27,14 +29,11 @@ export function createIcons(
   {
     store,
     geometry,
-    records,
     authority,
     tools,
     filePicker,
-  }: Pick<
-    AnnotationServices,
-    'store' | 'geometry' | 'records' | 'authority' | 'tools' | 'filePicker'
-  >,
+  }: Pick<AnnotationServices, 'store' | 'geometry' | 'authority' | 'tools' | 'filePicker'>,
+  annotations: Pick<AnnotationReads, 'pageOf'>,
   stamps: Pick<Stamps, 'placeArmedStamp' | 'requestStampAt'>,
 ) {
   /** Create an icon annotation and select it (the anchor for its menu and comment popup). */
@@ -45,7 +44,7 @@ export function createIcons(
   ): Promise<AnnotationRef> =>
     doc
       .page(toPageRef(pageObjectNumber))
-      .annotations.create(draft)
+      .annotations.create(named(draft))
       .then((result) => {
         store.commit({ type: 'select', ids: [annotationKey(result.created.ref)] });
         return result.created.ref;
@@ -131,13 +130,11 @@ export function createIcons(
     readAttachment: async (ref: AnnotationRef) => {
       const doc = ctx.doc;
       if (!doc) throw new Error('[annotation] no document bound');
-      const pageObjectNumber = records.pageOf(ref);
-      if (pageObjectNumber == null) throw new Error('[annotation] cannot resolve page for ref');
-      const annotations = doc.page(toPageRef(pageObjectNumber)).annotations;
-      if (!annotations.downloadFile) {
+      const page = doc.page(annotations.pageOf(ref)).annotations;
+      if (!page.downloadFile) {
         throw new Error('[annotation] this engine does not support attachment download');
       }
-      return annotations.downloadFile(ref);
+      return page.downloadFile(ref);
     },
     setFilePickerProvider: (provider: FilePickerProvider | null) => filePicker.set(provider),
   };

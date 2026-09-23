@@ -16,9 +16,9 @@ interface ThreadsIndex {
 
 /**
  * The comments lens's index: a derived, memoized threads index over the
- * substrate. Because every path — optimistic writes, engine confirms, remote
- * events, hydration — lands in the model, the sidebar updates with zero
- * extra wiring. The memo keys on the model's annotation content (byId/order
+ * substrate. Because every path — this session's changes, engine
+ * confirmations, remote events, reloads — lands in the model, the sidebar
+ * updates with zero extra wiring. The memo keys on the model's annotation content (byId/order
  * — hover and drafts don't invalidate) plus the layout (display order is
  * computed fresh against the live pages) and the session identity.
  */
@@ -44,8 +44,8 @@ export function createThreadIndex(
 
   const computeIndex = (): ThreadsIndex => {
     const model = store.model();
-    // Committed truth only: optimistic tmp drafts have no DTO yet and join
-    // the index when their create confirms.
+    // Records with engine data only: a new annotation has none until its
+    // create is confirmed, and joins the index then.
     const dtos: AnnotationDTO[] = [];
     for (const id of model.order) {
       const data = model.byId[id]?.data;

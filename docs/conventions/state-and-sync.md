@@ -183,7 +183,9 @@ export function foldFormEvent(
    idempotent, so engines without a cursor replay everything.
 4. **Degrade on failure.** A failed load keeps the previous value, applies the
    queued events to it, and reports `forbidden` (a `permission-denied`
-   rejection) or `error` through `getStatus()`. The mirror stays live.
+   rejection) or `error` through `getStatus()`. The mirror stays live. A
+   failed page reload does the same: the value is stale for those pages, and
+   says so, until a full load succeeds.
 5. **Resync.** `stream.desynced` and `document.versioned` start a full reload.
    `fold` never sees them.
 6. **Throwing folds.** A `fold` that throws is reported and starts a full
@@ -211,7 +213,7 @@ case 'pages.flattened': {
   const pages = event.results
     .filter((result) => result.status === 'applied')
     .map((result) => result.page);
-  return pages.length ? reload({ pages }) : index;
+  return pages.length ? reload({ pages }) : records;
 }
 ```
 
@@ -229,12 +231,12 @@ interface MirrorChange<V> {
 
 ### Status and control
 
-| Member        | Behavior                                                                                                                                                  |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `get()`       | The current value.                                                                                                                                        |
-| `getStatus()` | `idle` until the first load starts, `loading` while it runs, then `ready`. Stays `ready` while a reload runs. `forbidden` or `error` after a failed load. |
-| `refresh()`   | Reload everything. Joins a running load; rejects when the load fails.                                                                                     |
-| `settled()`   | Resolves once no load or page reload runs, including reloads started while it waits. Never rejects.                                                       |
+| Member        | Behavior                                                                                                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `get()`       | The current value.                                                                                                                                                       |
+| `getStatus()` | `idle` until the first load starts, `loading` while it runs, then `ready`. Stays `ready` while a reload runs. `forbidden` or `error` after a failed load or page reload. |
+| `refresh()`   | Reload everything. Joins a running load; rejects when the load fails.                                                                                                    |
+| `settled()`   | Resolves once no load or page reload runs, including reloads started while it waits. Never rejects.                                                                      |
 
 A capability usually passes these through: `getStatus: metadata.getStatus`,
 `refresh: () => metadata.refresh()`.
@@ -297,26 +299,34 @@ const pages = ctx.pageMirror<readonly Link[]>({
 
 An overlay entry is a local change the engine has not confirmed yet. It lives
 in session state, next to (never inside) the mirror, and reads combine the
-two. Every overlay entry needs:
+two. The rules:
 
-- **a key its confirmation carries**, chosen by the client before the engine
-  call, so the confirmation finds the entry whatever its origin or timing;
-- **a drop on confirmation**, done where the confirmed event is applied: the
-  mirror's `changed` callback;
-- **a drop on failure**, done by the write path when the engine call rejects.
+- **One entry per write, holding what that write carries.** A record's new
+  flags, its new geometry, its typed text: each is its own entry, so settling
+  one write never touches other outstanding work on the same record.
+- **Keyed by the record, following it.** When a record gets another key (a new
+  record confirmed under the engine's key, a weak record the engine named),
+  its entries move with it. A new record has no key until the engine answers,
+  so its create carries one the confirmation carries too, chosen before the
+  engine call; a write to a record that does not exist in the engine yet waits
+  for its create.
+- **Refused: dropped at once.** The change is wrong; the reads show the
+  mirror, including anything another session changed meanwhile. Rollback is
+  deletion; nothing is restored from a copy.
+- **Accepted: dropped once the mirror holds it**, and only after every older
+  entry of the same record settled, so the view never falls back to an older
+  version of what the user did. The engine publishes before it resolves, so an
+  exactly folded event is in the mirror already; an event that asked for a
+  page read is in once that read succeeded. While the mirror is stale (a read
+  failed), accepted entries stay: the engine accepted them.
 
-The annotation plugin is the reference. An optimistic create mints a UUID and
-sends it as the draft's `/NM` (`nm`). The temporary entry is remembered under
-that name. When `annotation.created` arrives with a record whose `nm` matches,
-the records mirror's `changed` callback renames the temporary entry to the
-confirmed record's key in the same step, so selection and text editing follow
-it. When the create rejects, the write path removes the temporary entry.
-Because the engine publishes before resolving, the confirmation is applied
-before the create's promise settles. The promise continuation only resolves
-callers waiting for the confirmed ref, and matches by ref instead when an
-engine did not echo the `/NM`.
+The annotation plugin is the reference
+(`packages/plugin/annotation/README.md`): `services/intents.ts` stages a
+message's changes and settles them, `model.ts` holds the transitions
+(`stage`, `writeSettled`, `followRecord`), and `services/new-records.ts`
+matches new records to their confirmation by `/NM`.
 
-A write that shows no optimistic value needs no overlay. An in-flight flag in
+A write that shows no value before it is confirmed needs no overlay. An in-flight flag in
 session state is enough: the form plugin marks a field in `writing` for the
 duration of its write (`beginWrite` / `endWrite` in
 `packages/plugin/form/src/model.ts`), and a reload never touches that flag.
@@ -360,8 +370,9 @@ the actions plugin clears its per-page trigger cache.
 1. A mirror changes only by `fold` and by loads. Verbs never write it.
 2. `fold` is pure and ignores origin. Origin may shape presentation, never
    data, and only outside the fold: the annotation plugin renders another
-   session's change from the engine's baked appearance, and keeps its own
-   render source for a change this session made.
+   session's change from the engine's baked appearance, and records this
+   session edited or created from their description (a session preference,
+   `vector` in its state).
 3. `fold` applies the data the event carries. It asks for a reload only when
    the event does not carry enough (`form.repaired`, or `redaction.applied`
    for annotations).

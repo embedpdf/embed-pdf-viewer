@@ -80,14 +80,13 @@ async function loaded(dto: AnnotationDTO) {
   vi.useRealTimers();
   await harness.load([dto]);
   vi.useFakeTimers();
-  expect(harness.state().model.order.length).toBe(1);
-  const id = harness.state().model.order[0]!;
+  expect(harness.model().order.length).toBe(1);
+  const id = harness.model().order[0]!;
   harness.update.mockResolvedValue({ updated: dto, appearance: { changed: false } });
   return {
     ...harness,
     id,
-    data: () =>
-      harness.state().model.byId[id]!.data as Extract<AnnotationDTO, { subtype: 'free-text' }>,
+    data: () => harness.model().byId[id]!.data as Extract<AnnotationDTO, { subtype: 'free-text' }>,
   };
 }
 
@@ -150,7 +149,7 @@ describe('the editor document', () => {
       richText: { paragraphs: [{ runs: [{ text: 'bye' }] }] },
     });
     expect(harness.state().textSelection).toBeNull();
-    expect(harness.state().model.editing).toBeNull();
+    expect(harness.model().editing).toBeNull();
     vi.advanceTimersByTime(300);
     expect(harness.update).toHaveBeenCalledTimes(1); // the debounce was cancelled, not doubled
   });
@@ -167,7 +166,7 @@ describe('the property surface while editing', () => {
         runs: [{ text: 'hello', style: { weight: 700, color: '#FF0000' } }, { text: ' world' }],
       },
     ]);
-    expect(harness.state().model.byId[harness.id]!.text!.bold).toBeUndefined(); // the body is untouched
+    expect(harness.model().byId[harness.id]!.text!.bold).toBeUndefined(); // the body is untouched
     const props = harness.capability.getSelectionProps();
     expect(props.values).toMatchObject({ bold: true, fontColor: '#ff0000', italic: false });
     expect(props.mixed).toEqual([]);
@@ -199,7 +198,7 @@ describe('the property surface while editing', () => {
     // A bare caret: the body takes the toggle, written as a rich body patch.
     harness.capability.setTextSelection(REF, { start: 2, end: 2 });
     harness.capability.toggleTextFormat('bold');
-    expect(harness.state().model.byId[harness.id]!.text!.bold).toBe(true);
+    expect(harness.model().byId[harness.id]!.text!.bold).toBe(true);
     expect(harness.capability.getSelectionProps().values.bold).toBe(true);
     expect(harness.capability.listTextItems(PAGE)[0]!.css.fontWeight).toBe(700);
     const bodyWrite = harness.update.mock.calls.find((call) => call[1].richText?.body);
@@ -219,7 +218,7 @@ describe('the property surface while editing', () => {
     harness.capability.draftRichText(REF, { paragraphs: [{ runs: [{ text: 'typed' }] }] });
     harness.capability.setTextSelection(REF, { start: 0, end: 5 });
     harness.capability.updateSelection({ opacity: 0.5, underline: true });
-    expect(harness.state().model.byId[harness.id]!.style.opacity).toBe(0.5);
+    expect(harness.model().byId[harness.id]!.style.opacity).toBe(0.5);
     // order: the (flushed) text write, then the opacity write
     expect(harness.update.mock.calls.map((call) => Object.keys(call[1]).sort().join(','))).toEqual([
       'richText,subtype',

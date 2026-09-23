@@ -6,9 +6,9 @@
  */
 import { createEventHook, type DocumentEvent } from '@embedpdf/core';
 import { createTestContext } from '@embedpdf/core/testing';
-import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import type { AnnotationDTO, AnnotationRef, PageRef } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
+import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { vi } from 'vitest';
 
 import { createAnnotationController } from '../src/controller';
@@ -19,6 +19,15 @@ export const PAGE2 = toPageRef(2);
 
 const localOrigin = { kind: 'local', sessionId: 'me', sub: null, ts: 0, serverId: null };
 
+/** The mutation meta a write's event carries; a weak (index-addressed) write invalidates positions. */
+const metaOf = (weakRefsInvalidated = false) => ({
+  affectedPages: [],
+  cacheDelta: null,
+  changed: [],
+  weakRefsInvalidated,
+  shouldRefetch: weakRefsInvalidated ? { reason: 'weakRefsInvalidated' } : null,
+});
+
 /** The bulk snapshot `listRawAll` resolves with, grouped by page. */
 export const snapshotOf = (records: readonly AnnotationDTO[], auditHead?: number) => {
   const pages = new Map<number, { page: PageRef; annotations: AnnotationDTO[] }>();
@@ -28,7 +37,10 @@ export const snapshotOf = (records: readonly AnnotationDTO[], auditHead?: number
     pages.set(record.page.pageObjectNumber, entry);
   }
   return {
-    pages: [...pages.values()].map(({ page, annotations }) => ({ pageState: { page }, annotations })),
+    pages: [...pages.values()].map(({ page, annotations }) => ({
+      pageState: { page },
+      annotations,
+    })),
     ...(auditHead !== undefined ? { auditHead } : {}),
   };
 };
@@ -67,18 +79,23 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
     state: initialAnnotationState(),
     capabilities: [[InteractionToken, interaction]],
     pages: [
-      options.crop ? { ref: PAGE, crop: options.crop } : { ref: PAGE, size: { width: 600, height: 800 } },
+      options.crop
+        ? { ref: PAGE, crop: options.crop }
+        : { ref: PAGE, size: { width: 600, height: 800 } },
       { ref: PAGE2, size: { width: 600, height: 800 } },
     ],
     doc: {
       page: (page: PageRef) => ({
         annotations: {
           create: async (draft: unknown) => {
+            // Every create this plugin sends to the viewed document carries an /NM.
+            if (!(draft as { nm?: string }).nm) throw new Error('a create without an /NM');
             const result = await create(draft);
             ctx.emitDocumentEvent({
               type: 'annotation.created',
               page: result.created.page ?? page,
               origin: localOrigin,
+              meta: metaOf(),
               ...result,
             } as unknown as DocumentEvent);
             return result;
@@ -91,6 +108,7 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
                 page: result.updated.page,
                 origin: localOrigin,
                 appearance: { changed: false },
+                meta: metaOf(),
                 ...result,
               } as unknown as DocumentEvent);
             }
@@ -98,14 +116,20 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
           },
           delete: async (ref: AnnotationRef) => {
             const result = await remove(ref);
-            if (ref.kind === 'objectNumber') {
-              ctx.emitDocumentEvent({
-                type: 'annotation.deleted',
-                page: ref.page,
-                origin: localOrigin,
-                deleted: { kind: 'objectNumber', value: ref.annotObjectNumber },
-              } as unknown as DocumentEvent);
-            }
+            // A weak delete reports no stable id and says the page's positions moved.
+            const weak = ref.kind === 'index';
+            ctx.emitDocumentEvent({
+              type: 'annotation.deleted',
+              page: ref.page,
+              origin: localOrigin,
+              deleted:
+                ref.kind === 'objectNumber'
+                  ? { kind: 'objectNumber', value: ref.annotObjectNumber }
+                  : ref.kind === 'nm'
+                    ? { kind: 'nm', value: ref.nm }
+                    : null,
+              meta: metaOf(weak),
+            } as unknown as DocumentEvent);
             return result;
           },
           list,
@@ -149,6 +173,8 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
     allowsAnnotationCreate,
     allowsAnnotationMutation,
     state: () => ctx.state.get(),
+    /** The composed model: confirmed records, pending changes and the session. */
+    model: () => instance.model(),
     startSync,
     connectAll,
     /** Deliver a document event (another session's change, a form write, …). */

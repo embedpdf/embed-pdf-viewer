@@ -1,13 +1,15 @@
-import { describe, expect, it } from 'vitest';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
+import { describe, expect, it } from 'vitest';
+
+import { step } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
 import { DEFAULT_CHROME_GEOMETRY, pointInQuad, rotatePoint, unionRect } from '../src/geometry';
 import { hitTest, groupUnionBounds } from '../src/hit';
 import { distanceLayout, type DistanceAppearance } from '../src/measurement';
 import { annotationSelectionFrame } from '../src/selection';
-import { initialModel, initialStyle, update, annotsInBox } from '../src/update';
-import { chrome, pageItems } from '../src/view';
 import type { ModelAnnotation, Model, Quad, Point } from '../src/types';
+import { initialModel, initialStyle, annotsInBox } from '../src/update';
+import { chrome, pageItems } from '../src/view';
 
 const PAGE = toPageRef(1);
 const appearance: DistanceAppearance = {
@@ -68,7 +70,7 @@ function outlineCorners(model: Model): Quad {
 }
 
 function pointer(model: Model, phase: 'down' | 'move' | 'up', point: Point): Model {
-  return update(model, {
+  return step(model, {
     type: 'editPointer',
     phase,
     in: { page: toPageRef(1), point, shift: false },
@@ -135,20 +137,20 @@ describe('measurement selection frame and rotation', () => {
       expect(committed.byId.distance.geometry).toEqual(item.geometry);
     }
     expect(pointer(armed, 'move', knob.at).draft).toMatchObject({ pivot: center });
-    expect(update(armed, { type: 'cancel' })[0].byId.distance).toBe(annotation);
+    expect(step(armed, { type: 'cancel' })[0].byId.distance).toBe(annotation);
   });
 
   it('uses the same center for quarter turns and reset, without moving the annotation', () => {
     const initial = selected();
     const center = annotationSelectionFrame(initial.byId.distance).center;
-    const once = update(initial, { type: 'rotate90' })[0];
+    const once = step(initial, { type: 'rotate90' })[0];
     expectPoint(annotationSelectionFrame(once.byId.distance).center, center);
-    const reset = update(once, { type: 'resetRotation' })[0];
+    const reset = step(once, { type: 'resetRotation' })[0];
     expect(reset.byId.distance.geometry).toMatchObject(initial.byId.distance.geometry);
 
     let state = initial;
     for (let turn = 0; turn < 4; turn++) {
-      state = update(state, { type: 'rotate90' })[0];
+      state = step(state, { type: 'rotate90' })[0];
       expectPoint(annotationSelectionFrame(state.byId.distance).center, center);
     }
     const geometry = state.byId.distance.geometry;
@@ -158,7 +160,7 @@ describe('measurement selection frame and rotation', () => {
   });
 
   it('keeps its frame after a native appearance with conservative bounds arrives', () => {
-    const state = update(selected(), { type: 'rotate90' })[0];
+    const state = step(selected(), { type: 'rotate90' })[0];
     const annotation = state.byId.distance;
     const baked: ModelAnnotation = {
       ...annotation,
@@ -186,7 +188,7 @@ describe('measurement selection frame and rotation', () => {
     const bounds = groupUnionBounds(state, toPageRef(1))!;
     const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
     const before = annotationSelectionFrame(state.byId.distance).center;
-    const rotated = update(state, { type: 'rotate90' })[0];
+    const rotated = step(state, { type: 'rotate90' })[0];
     expectPoint(
       annotationSelectionFrame(rotated.byId.distance).center,
       rotatePoint(before, center, 90),

@@ -21,6 +21,7 @@ import { previewBucket } from '../host-contract';
 import { setToolGhost } from '../model';
 import { boxGeomFields } from '../repository';
 import type { AnnotationContext, AnnotationServices } from '../services';
+import { named } from './named';
 import { pageSizeOf } from '../services/geometry';
 import { ARMED_STAMP_TOOL_ID } from '../tools/definitions';
 
@@ -83,10 +84,9 @@ export function createStamps(
   {
     store,
     geometry,
-    records,
     tools,
     filePicker,
-  }: Pick<AnnotationServices, 'store' | 'geometry' | 'records' | 'tools' | 'filePicker'>,
+  }: Pick<AnnotationServices, 'store' | 'geometry' | 'tools' | 'filePicker'>,
 ) {
   let armed: ArmedStamp | null = null;
   /** The public face of the armed payload: a new object on every arm, null when disarmed. */
@@ -165,14 +165,16 @@ export function createStamps(
     const box: Rect = fitStampBox(point, desired, pageSizeOf(crop), rotCW);
     return doc
       .page(toPageRef(pageObjectNumber))
-      .annotations.create({
-        subtype: 'stamp',
-        ...boxGeomFields(box, rotCW, crop),
-        source,
-        fit: 'contain',
-        ...(identity.name !== undefined ? { name: identity.name } : {}),
-        ...(identity.subject !== undefined ? { subject: identity.subject } : {}),
-      })
+      .annotations.create(
+        named({
+          subtype: 'stamp',
+          ...boxGeomFields(box, rotCW, crop),
+          source,
+          fit: 'contain',
+          ...(identity.name !== undefined ? { name: identity.name } : {}),
+          ...(identity.subject !== undefined ? { subject: identity.subject } : {}),
+        }),
+      )
       .then((result) => {
         // The fold has added the confirmed stamp; every placement selects
         // its result (the anchor for menus and editing).

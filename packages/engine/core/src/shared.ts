@@ -323,7 +323,7 @@ export type {
 } from './annotation/AnnotationListSnapshot';
 
 export { classifyRelation, buildThreads } from './annotation/relationships';
-export { annotationKey, refFromStableId } from './identity/annotationKey';
+export { annotationKey, positionKey, refFromStableId } from './identity/annotationKey';
 export type { AnnotationRelationKind, AnnotationThread } from './annotation/relationships';
 
 export { buildCommentThreads, isStateAnnotation } from './annotation/comments';

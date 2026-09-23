@@ -28,8 +28,17 @@ export function annotationKey(ref: AnnotationRef): string {
     case 'nm':
       return `nm:${ref.page.pageObjectNumber}:${ref.nm}`;
     case 'index':
-      return `idx:${ref.page.pageObjectNumber}:${ref.index}`;
+      return positionKey(ref.page, ref.index);
   }
+}
+
+/**
+ * The key of the annotation at this position of a page's `/Annots` array, as
+ * a weak ref addresses it. A record carries its position (`dto.index`), so a
+ * reader can find the key a weak record had before the engine named it.
+ */
+export function positionKey(page: PageRef, index: number): string {
+  return `idx:${page.pageObjectNumber}:${index}`;
 }
 
 /**

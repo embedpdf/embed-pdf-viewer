@@ -1,5 +1,6 @@
 import { annotContentsEditable, annotTransformable } from '@embedpdf/core-annotation';
 import {
+  annotationKey,
   isDimension,
   isReadout,
   measurementReadout,
@@ -12,9 +13,6 @@ import {
 
 import type { RecalibrationReport } from '../host-contract';
 import type { AnnotationContext, AnnotationServices } from '../services';
-import type { Mirror } from '@embedpdf/core';
-
-import type { RecordIndex } from '../sync/records';
 import type { Crud } from './crud';
 
 /**
@@ -24,9 +22,8 @@ import type { Crud } from './crud';
  */
 export function createMeasurement(
   ctx: Pick<AnnotationContext, 'cleanup'>,
-  { store }: Pick<AnnotationServices, 'store'>,
+  { store, records }: Pick<AnnotationServices, 'store' | 'records'>,
   crud: Pick<Crud, 'updateRaw'>,
-  confirmedRecords: Mirror<RecordIndex>,
 ) {
   const pageViewports = new Map<
     number,
@@ -51,24 +48,26 @@ export function createMeasurement(
       const pageObjectNumber = page.pageObjectNumber;
       // Recalibration needs every dimension on the page: retry a failed load,
       // and wait for any load or page reload still running.
-      if (confirmedRecords.getStatus() !== 'ready') {
-        await confirmedRecords.refresh().catch(() => {});
+      if (records.getStatus() !== 'ready') {
+        await records.refresh().catch(() => {});
       }
-      await confirmedRecords.settled();
+      await records.settled();
       const report: RecalibrationReport = { page, scale, updated: [], skipped: [], failed: [] };
-      if (confirmedRecords.getStatus() !== 'ready') {
+      if (records.getStatus() !== 'ready') {
         report.error = serializeError(new Error('the annotations of this document are not loaded'));
         return report;
       }
-      const candidates = Object.values(store.model().byId).filter(
-        (annotation) =>
-          annotation.page.pageObjectNumber === pageObjectNumber &&
-          annotation.data &&
-          isDimension(annotation.data),
-      );
-      for (const annotation of candidates) {
-        const dto = annotation.data!,
-          ref = dto.ref;
+      // The confirmed dimensions of the page, each with how this session sees
+      // it (one the user just deleted is not in the view, and is left alone).
+      const model = store.model();
+      const candidates = Object.values(records.get().byKey).flatMap(({ dto }) => {
+        const annotation = model.byId[annotationKey(dto.ref)];
+        return annotation && dto.page.pageObjectNumber === pageObjectNumber && isDimension(dto)
+          ? [{ dto, annotation }]
+          : [];
+      });
+      for (const { dto, annotation } of candidates) {
+        const ref = dto.ref;
         const reason =
           annotation.authority?.update === false
             ? 'no-authority'

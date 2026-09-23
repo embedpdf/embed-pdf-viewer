@@ -1,13 +1,17 @@
+import type { Mirror } from '@embedpdf/core';
+
 import type { AnnotationConfig } from '../contract';
-import type { FontLookup } from '../rich-text';
 import { createAuthority, type Authority } from './authority';
+import { createView, type View } from '../read/view';
+import type { FontLookup } from '../rich-text';
 import type { AnnotationContext } from './context';
 import { createAnnotationEvents, type AnnotationEvents } from './events';
 import { createFilePickerPort, type FilePickerPort } from './file-picker';
 import { createCropLookup, type CropLookup } from './geometry';
-import { createRecords, type Records } from './records';
+import { createIntents } from './intents';
+import { createNewRecords, type NewRecords } from './new-records';
 import { createStore, type AnnotationStore } from './store';
-import { createWriteSink, type WriteSink } from './write-sink';
+import { createRecordsMirror, type AnnotationRecords } from '../sync/records';
 import { createBehaviors, type Behaviors } from '../tools/behaviors';
 import { createToolRegistry, type ToolRegistry } from '../tools/registry';
 
@@ -21,11 +25,15 @@ export type { AnnotationContext } from './context';
  */
 export interface AnnotationServices {
   readonly events: AnnotationEvents;
+  /** The confirmed layer: every record the engine confirmed. */
+  readonly records: Mirror<AnnotationRecords>;
+  /** Confirmed records with the pending changes on top, composed with the session. */
+  readonly view: View;
+  /** The one door user actions go through. */
   readonly store: AnnotationStore;
+  readonly newRecords: NewRecords;
   readonly geometry: CropLookup;
   readonly authority: Authority;
-  readonly records: Records;
-  readonly writes: WriteSink;
   readonly filePicker: FilePickerPort;
   /** The registered fonts, for face ↔ key mapping (the local engine's list;
    *  the cloud engine registers none). */
@@ -39,15 +47,20 @@ export function createServices(
   config: AnnotationConfig,
 ): AnnotationServices {
   const events = createAnnotationEvents(ctx);
-  const store = createStore(ctx, events);
   const geometry = createCropLookup(ctx);
+  const records = createRecordsMirror(ctx, events);
+  const view = createView(ctx, records, geometry);
+  const refOf = (id: string) => view.model().byId[id]?.ref ?? null;
+  const intents = createIntents(ctx, records, events, refOf);
+  const store = createStore(ctx, view, intents, events);
   return {
     events,
+    records,
+    view,
     store,
+    newRecords: createNewRecords(ctx, store, records),
     geometry,
     authority: createAuthority(ctx, store),
-    records: createRecords(ctx, store, geometry),
-    writes: createWriteSink(),
     filePicker: createFilePickerPort(ctx),
     fonts: () => ctx.engine?.fonts?.list() ?? [],
     tools: createToolRegistry(ctx, config, store),

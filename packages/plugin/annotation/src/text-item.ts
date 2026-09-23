@@ -23,8 +23,8 @@ import { cssFontFamilyForFont, richDocOf, stripBodyDefaults } from './rich-text'
 export function buildTextItems(model: Model, page: PageRef, view?: ViewEnv): TextItem[] {
   return textBoxes(model, page, view).map((tb) => {
     const annotation = model.byId[tb.id];
-    // `text`/`style` are the optimistic content projections (a props edit lands
-    // here before the engine round-trips), so the editor restyles instantly.
+    // `text`/`style` show the user's pending change (a props edit lands here
+    // before the engine confirms it), so the editor restyles instantly.
     const style = annotation?.text ?? initialTextStyle;
     // Match the engine's text plate inset. Browser font metrics and line
     // heights belong to the shared editor binding.

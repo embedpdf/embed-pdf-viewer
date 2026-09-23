@@ -16,7 +16,9 @@
  *      (`origin.serverId <= cursor`). Replaying confirmed records in arrival
  *      order is idempotent, so engines without a cursor replay everything.
  *   4. A failed load keeps the previous value, applies the queued events to
- *      it, and reports `error` (or `forbidden`) through `getStatus()`.
+ *      it, and reports `error` (or `forbidden`) through `getStatus()`. So
+ *      does a failed page reload: the value is stale for those pages until
+ *      a full load succeeds.
  *   5. `stream.desynced` and `document.versioned` reload; `fold` never sees
  *      them. A `fold` that throws is reported and also reloads.
  *   6. A reload requested while one runs schedules exactly one more after it.
@@ -175,7 +177,10 @@ export function createMirror<V>(spec: MirrorSpec<V>, env: MirrorEnvironment): Mi
       cell.write({ ...cell.read(), value: next });
       announce({ cause: 'load', event: null, pages, previous, next });
     } catch (error) {
-      if (!isPluginError(error, 'instance-closed')) env.report(error);
+      if (isPluginError(error, 'instance-closed') || !cell.live) return;
+      // The value is stale for these pages: say so until a full load succeeds.
+      cell.write({ ...cell.read(), status: statusOfFailure(error) });
+      env.report(error);
     }
   };
 

@@ -1,8 +1,9 @@
 /**
  * @embedpdf/plugin-annotation — the annotation plugin.
  *
- * The pure @embedpdf/core-annotation wired to the engine repository (optimistic
- * create/patch/delete) and the interaction hub (ambient editing + draw tools).
+ * The pure @embedpdf/core-annotation wired to the engine (a records mirror,
+ * and changes shown at once until their writes settle) and the interaction
+ * hub (ambient editing + draw tools). How it fits together: README.md.
  * Behaviors (forms, links) plug in via registerBehavior. Zero framework code.
  */
 export { annotationPlugin } from './annotation.plugin';

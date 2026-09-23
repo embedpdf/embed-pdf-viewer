@@ -14,8 +14,8 @@ import type {
 } from '@embedpdf/plugin-interaction/contract/host';
 import { describe, expect, it, vi } from 'vitest';
 
-import { createDrawHandler, createEditHandler, createGhostHandler } from '../../src/tools/handlers';
 import type { AnnotationHostCapability } from '../../src/host-contract';
+import { createDrawHandler, createEditHandler, createGhostHandler } from '../../src/tools/handlers';
 
 const PAGE_1 = toPageRef(1);
 const PAGE_2 = toPageRef(2);

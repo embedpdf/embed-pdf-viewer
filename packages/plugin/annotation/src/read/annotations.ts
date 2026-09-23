@@ -1,4 +1,4 @@
-import { PluginError, pageRefsEqual } from '@embedpdf/core';
+import { PluginError, memo, pageRefsEqual } from '@embedpdf/core';
 import {
   geomVisualBounds,
   propsFor,
@@ -13,18 +13,33 @@ import {
   annotationKey,
   type AnnotationDTO,
   type AnnotationRef,
+  type PageRef,
 } from '@embedpdf/engine-core/runtime';
 
 import type { Annotation, AnnotationFilter, AnnotationGeometry } from '../contract';
-import type { AnnotationServices } from '../services';
+import type { AnnotationContext, AnnotationServices } from '../services';
 
 /**
  * The page-space read model: every annotation projected once per model
  * entry (the model already lives in page space), so reads are
- * reference-stable until the entry changes.
+ * reference-stable until the entry changes. `raw` is always the engine's
+ * confirmed record; everything else shows the user's change while it is
+ * pending.
  */
-export function createAnnotationReads({ store }: Pick<AnnotationServices, 'store'>) {
+export function createAnnotationReads(
+  ctx: Pick<AnnotationContext, 'state'>,
+  { store, records }: Pick<AnnotationServices, 'store' | 'records'>,
+) {
   const projections = new WeakMap<ModelAnnotation, Annotation>();
+
+  /** The records with a change waiting for the engine. */
+  const pendingIds = memo(
+    () => [ctx.state.get().pending] as const,
+    (pending) => new Set(pending.map((change) => change.id)),
+  );
+
+  /** The engine's confirmed record for an id (null for a record not yet confirmed). */
+  const confirmedDtoOf = (id: Id): AnnotationDTO | null => records.get().byKey[id]?.dto ?? null;
 
   const refOfId = (id: Id): AnnotationRef | null => store.model().byId[id]?.ref ?? null;
 
@@ -64,6 +79,7 @@ export function createAnnotationReads({ store }: Pick<AnnotationServices, 'store
     const hit = projections.get(annotation);
     if (hit) return hit;
     const dto = annotation.data;
+    const pending = pendingIds().has(annotation.id);
     const projected: Annotation = {
       ref: annotation.ref,
       page: annotation.page,
@@ -83,7 +99,8 @@ export function createAnnotationReads({ store }: Pick<AnnotationServices, 'store
       group: annotation.group ? refOfId(annotation.group) : null,
       inReplyTo: dto?.inReplyTo ?? null,
       authority: annotation.authority ?? { update: true, delete: true },
-      raw: dto ?? null,
+      raw: confirmedDtoOf(annotation.id),
+      ...(pending ? { pending: true as const } : {}),
     };
     projections.set(annotation, projected);
     return projected;
@@ -149,6 +166,10 @@ export function createAnnotationReads({ store }: Pick<AnnotationServices, 'store
     return selectedMemo.v;
   };
 
+  /** The page a ref lives on: where the record was read, else the ref's own page. */
+  const pageOf = (ref: AnnotationRef): PageRef =>
+    store.model().byId[annotationKey(ref)]?.page ?? ref.page;
+
   const loadedOrThrow = (ref: AnnotationRef): ModelAnnotation & { ref: AnnotationRef } => {
     const annotation = store.model().byId[annotationKey(ref)];
     if (!annotation || !annotation.ref) {
@@ -172,10 +193,9 @@ export function createAnnotationReads({ store }: Pick<AnnotationServices, 'store
     list: listAnnotations,
     listRaw: (filter?: AnnotationFilter) =>
       listAnnots(filter)
-        .map((annotation) => annotation.data)
+        .map((annotation) => confirmedDtoOf(annotation.id))
         .filter((dto): dto is AnnotationDTO => dto != null),
-    getRaw: (ref: AnnotationRef): AnnotationDTO | null =>
-      store.model().byId[annotationKey(ref)]?.data ?? null,
+    getRaw: (ref: AnnotationRef): AnnotationDTO | null => confirmedDtoOf(annotationKey(ref)),
     listSelected,
     getSelection: (): AnnotationRef[] => {
       const model = store.model();
@@ -185,7 +205,7 @@ export function createAnnotationReads({ store }: Pick<AnnotationServices, 'store
     },
   };
 
-  return { projectRef, listAnnots, loadedOrThrow, selectedCommitted, api };
+  return { projectRef, listAnnots, loadedOrThrow, selectedCommitted, pageOf, api };
 }
 
 export type AnnotationReads = ReturnType<typeof createAnnotationReads>;

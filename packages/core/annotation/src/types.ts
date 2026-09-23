@@ -1,5 +1,4 @@
-import type { DistanceAppearance, MeasurementAppearance } from './measurement';
-import type { ShapeMeasurementAppearance } from './measurement-shape';
+import type { PageRotation, Point, Rect as GeometryRect, TextQuad } from '@embedpdf/core-geometry';
 import type {
   RichTextDocumentInput,
   AnnotationDTO,
@@ -14,7 +13,9 @@ import type {
   PdfLinkTarget,
   StrikeoutIntent,
 } from '@embedpdf/engine-core/runtime';
-import type { PageRotation, Point, Rect as GeometryRect, TextQuad } from '@embedpdf/core-geometry';
+
+import type { DistanceAppearance, MeasurementAppearance } from './measurement';
+import type { ShapeMeasurementAppearance } from './measurement-shape';
 
 export type { TextQuad } from '@embedpdf/core-geometry';
 
@@ -250,6 +251,13 @@ export interface ModelAnnotation {
    * interpretation of the spec, and `anchorModeOf` owns `noZoom`/`noRotate`.
    */
   flags: AnnotationFlags;
+  /**
+   * How the record renders: `baked` blits the engine's appearance raster,
+   * `vector` draws it live from its geometry and style. The core sets
+   * `vector` when an edit makes the raster stale (a resize, a restyle,
+   * typing); a move keeps the raster. The plugin decides it for confirmed
+   * records: this session's edits stay live, another session's are baked.
+   */
   source: 'baked' | 'vector';
   /**
    * Content-space box of the engine appearance raster (the AP `/Rect`), set when
@@ -272,30 +280,27 @@ export interface ModelAnnotation {
    * Revision of the engine-baked `/AP` content (absent ≡ 0). The raster a baked
    * annotation shows depends on exactly this and the render scale — never on
    * position (`apBox` translates the blit) or rotation (`apRot` transforms it) —
-   * so the shell re-fetches appearances precisely when it changes. Bumped by the
-   * `upsert` that confirms an engine re-bake with new content: a geometry patch
-   * that changed the authoring frame's size resolving (`Effect.apChanged`), or a
-   * remote edit folding in. A move or rotate leaves it untouched: the old raster
-   * is still pixel-exact, so those cost zero re-renders.
+   * so the shell re-fetches appearances precisely when it changes. Owned by the
+   * plugin's confirmed records, which advance it when the engine reports a
+   * re-baked appearance; the core only reads it.
    */
   apVersion?: number;
   /**
-   * This session's authority over this record, projected from the security
-   * service's collab mirrors at ingest (see permissions.md) — model-owned
-   * derived state like `apVersion`, never DTO-derived. Fused into
+   * This session's authority over this record (see permissions.md), set by the
+   * plugin from the security service; the core only reads it. Fused into
    * `annotTransformable`/`annotDeletable`, so a record the session may not
    * edit renders and behaves exactly like a `locked` one (bare outline, no
-   * handles, no drag). Absent = unstamped (a local draft, a wildcard local
-   * engine, tests) and treated as allowed — the client gate is a courtesy
-   * that keeps the UI truthful; the engine independently enforces.
+   * handles, no drag). Absent = unstamped (a record created in this session,
+   * a wildcard local engine, tests) and treated as allowed — the client gate
+   * is a courtesy that keeps the UI truthful; the engine independently enforces.
    */
   authority?: { update: boolean; delete: boolean };
   /**
    * The canonical engine DTO this annotation was derived from (PDF-space, sRGB)
    * — the single source of truth for its data. `geom` and `style` are
    * content-space render projections of it, recomputed (never edited directly)
-   * whenever `data` changes, so the two can't drift. Absent only for a vector
-   * draft that hasn't been committed to the engine yet (no DTO exists).
+   * whenever `data` changes, so the two can't drift. Absent only for a record
+   * this session created that the engine has not confirmed yet (no DTO exists).
    */
   data?: AnnotationDTO;
   /** Normalized PDF `/IT` for intent-bearing annotations authored before a DTO exists. */
@@ -526,18 +531,22 @@ export interface CreationDraftAnchor {
   canFinish: boolean;
 }
 
-export interface Model {
-  byId: Record<Id, ModelAnnotation>;
-  order: Id[];
+/**
+ * What the core owns: everything about the user's session that is not a
+ * record. `update` returns the next session; the plugin stores it.
+ */
+export interface Session {
   selected: Id[];
   /** The annotation under the pointer (topmost hit), or null. View-model
    *  state like `selected` — drives hover affordances (a redaction mark's
    *  applied-look preview) purely from the scene. Updated on change only
    *  (enter/leave cadence, never per-move). */
   hovered: Id | null;
+  /** The gesture in progress (a move, a resize, a shape being drawn), or null. */
   draft: Draft | null;
   /** Transient ghost of an in-progress markup selection (null when idle). */
   preview: MarkupPreview | null;
+  /** How many records this session has created; the next one is `new:<seq + 1>`. */
   seq: number;
   /** The base style new annotations inherit (per-tool `defaults` layer on top). */
   style: Style;
@@ -553,6 +562,37 @@ export interface Model {
   editing: Id | null;
   /** Snapping behaviour (alignment guides + rotation). */
   snap: SnapSettings;
+}
+
+/**
+ * The records a gesture works on, read-only: what the engine confirmed with
+ * the user's unconfirmed changes on top. The plugin builds it; the core never
+ * stores a record.
+ */
+export interface AnnotationView {
+  byId: Record<Id, ModelAnnotation>;
+  /** Paint order: the document's order, then records created in this session. */
+  order: Id[];
+}
+
+/** What every transition and read takes: the session composed with the records it works on. */
+export type Model = Session & AnnotationView;
+
+/**
+ * What one message changed in the records. `put` holds new or changed records
+ * as the user produced them; `drop` holds the ids the user deleted. The plugin
+ * shows them until the engine writes that carry them settle.
+ */
+export interface ChangeSet {
+  readonly put: readonly ModelAnnotation[];
+  readonly drop: readonly Id[];
+}
+
+/** The result of one message: the next session, the records it changed, and the engine work to do. */
+export interface UpdateResult {
+  readonly session: Session;
+  readonly change: ChangeSet;
+  readonly effects: readonly Effect[];
 }
 
 /**
@@ -668,9 +708,9 @@ export type Message =
   | { type: 'finishCreationDraft' }
   /**
    * Programmatic creation from page-space geometry — the data API's `create`.
-   * Mints the same optimistic `tmp:` annotation a draw tool commits, from the
-   * preset's defaults with `props` layered on top, and emits the same `create`
-   * effect: One commit path for pointer and API. `preset` defaults to `subtype`.
+   * Adds the same `new:` record a draw tool commits, from the preset's
+   * defaults with `props` layered on top, and emits the same `create` effect:
+   * one commit path for pointer and API. `preset` defaults to `subtype`.
    */
   | {
       type: 'createAnnot';
@@ -723,10 +763,6 @@ export type Message =
   | { type: 'deselect'; ids?: Id[] }
   /** Pointer entered/left an annotation (topmost hit id, or null). Pure state. */
   | { type: 'hover'; id: Id | null }
-  /** Force/clear session visibility for specific annotations (the actions
-   *  plane's Hide sink). Hiding also clears transient engagement (selection,
-   *  editing, hover) for the hidden ids. Unknown ids no-op. Zero effects. */
-  /** Drop overrides for truly deleted annotations (never for reloads). */
   // Programmatic selection (the data-API `select(ref)` — e.g. auto-selecting
   // a freshly placed form widget). Unknown/unselectable ids are dropped;
   // selecting a group member takes the whole group, like a click would.
@@ -754,41 +790,17 @@ export type Message =
   | { type: 'resetRotation' }
   | { type: 'delete' }
   | { type: 'cancel' }
-  | { type: 'loaded'; annots: ModelAnnotation[] }
-  /**
-   * Whole-document hydration ingest (and desync re-ingest): the snapshot is
-   * the committed truth. Incoming annots overwrite by id (gesture-locked ids
-   * excepted, as in `upsert`); committed model entries absent from the
-   * snapshot are reaped — they were deleted while we could not watch.
-   * Uncommitted `tmp:` drafts and gesture-locked ids are never reaped, and
-   * an in-progress draft survives (unlike `remove`). `bumpAp` marks a
-   * desync re-ingest: rasters may have changed invisibly during the gap,
-   * so every replaced annotation re-fetches once.
-   */
-  | { type: 'hydrated'; annots: ModelAnnotation[]; bumpAp?: boolean }
-  | { type: 'created'; tempId: Id; id: Id; ref: AnnotationRef }
-  | { type: 'createFailed'; tempId: Id }
-  // store maintenance for the data API + collaboration: add-or-replace an
-  // annotation by id (own create/update re-synced from the engine DTO, or a
-  // remote edit arriving over the event stream), and remove by id (own delete
-  // by ref, or a remote delete). Pure store ops — they emit no effects.
-  // add-or-replace by id. `bumpAp` marks these upserts as confirming an engine
-  // /AP re-bake with new content (a size-changing patch resolving, a remote
-  // edit): each replaced annotation's `apVersion` increments, telling the shell
-  // to re-fetch its raster. Plain re-syncs (a move's round-trip) leave it alone.
-  | { type: 'upsert'; annots: ModelAnnotation[]; bumpAp?: boolean }
-  // A sibling plane re-baked these annotations' /AP without touching the
-  // annotation model (a form value write regenerating widget appearances):
-  // bump `apVersion` so the shell re-fetches the raster. Unknown ids no-op.
-  | { type: 'bumpAp'; ids: Id[] }
-  | { type: 'remove'; ids: Id[] }
+  /** A record this session created was confirmed under a new id: selection, hover and editing follow it. */
+  | { type: 'rekey'; from: Id; to: Id }
+  /** These records left the view (deleted elsewhere, a refused create): drop every reference to them. */
+  | { type: 'forget'; ids: Id[] }
   // free-text editing: enter/leave the focused `contentEditable`, and apply the
-  // browser's plain-text result optimistically (the plugin debounces the engine
-  // write). `setText` flips the annotation to `vector` so the live text shows.
+  // browser's plain-text result. `setText` flips the annotation to `vector` so
+  // the live text shows; its `text` effect is written after a pause in typing.
   | { type: 'beginTextEdit'; id: Id }
   | { type: 'setText'; id: Id; text: string }
   // The editor's rich result (runs of deltas over the body), applied
-  // optimistically like `setText`; `contents` follows as the projection.
+  // like `setText`; `contents` follows as the projection.
   | { type: 'setRichText'; id: Id; doc: RichTextDocumentInput }
   | { type: 'endTextEdit' };
 
@@ -796,30 +808,26 @@ export type Effect =
   | { type: 'captured'; tool: string; page: PageRef; geometry: ContentGeometry }
   | { type: 'create'; id: Id }
   | { type: 'createGroup'; primary: Id; members: Id[] }
-  /** `apChanged` is set (to `true`) only when this patch invalidated a baked
-   *  raster — the annotation stayed `baked` (an opaque-body kind) and the edit
-   *  resized its `/AP` frame, so the engine's re-bake produces new content (in
-   *  practice: a stamp resize). The shell's resolve handler then turns it into
-   *  an `upsert` with `bumpAp`. Absent for everything else — moves/rotations
-   *  (the blit repositions the same pixels) and any kind that flipped to
-   *  `vector` (it renders live; the raster stops mattering) — so those keep the
-   *  bare `{ fx, id }` shape and trigger no appearance re-fetch. */
-  | { type: 'patch'; id: Id; scope: PatchScope; apChanged?: true }
-  /** A `/F`-only engine write for one committed annotation: the shell emits a
-   *  flags-only patch (the model already holds the merged flags) and re-syncs
-   *  preserving the render source — flags never re-bake an appearance. */
+  /** Write the part of one record that `scope` names. Whether the engine's
+   *  re-baked appearance differs is the engine's answer, not the core's guess. */
+  | { type: 'patch'; id: Id; scope: PatchScope }
+  /** Write the edited text of one free-text record. The plugin waits for a
+   *  pause in typing and writes the latest text once. */
+  | { type: 'text'; id: Id }
+  /** A `/F`-only engine write for one record: the plugin sends the record's
+   *  merged flags. Flags never change an appearance, so nothing re-renders. */
   | { type: 'flags'; id: Id }
   /** The parent's `link` prop changed on a non-link kind: reconcile its
-   *  attached link children (create / retarget / delete) against the desired
-   *  state derived from `link` + the parent's geometry. Declarative — the
-   *  shell's reconciler is the only code that spells out child operations.
-   *  (Geometry commits don't emit this; the shell re-runs the reconciler on
-   *  any `patch` of an annotation that has `linkRefs`.) */
-  // Reconcile the parent's attached link children toward `target` (null =
-  // remove them). The intent rides the effect — parents store no link value;
-  // the committed children are the truth (`linkOf` reads them back).
+   *  attached link children (create / retarget / delete) toward `target`
+   *  (null = remove them). Declarative — the plugin's reconciler is the only
+   *  code that spells out child operations; parents store no link value, the
+   *  committed children are the truth (`linkOf` reads them back). Geometry
+   *  commits don't emit this; the plugin re-runs the reconciler after any
+   *  `patch` of an annotation with attached children. */
   | { type: 'syncLink'; id: Id; target: PdfLinkTarget | null }
-  | { type: 'delete'; ref: AnnotationRef };
+  /** Delete one record from the document. A record the engine has not
+   *  confirmed yet is deleted once its create is. */
+  | { type: 'delete'; id: Id };
 
 /** Per-annotation render data — its content geometry + style + live state. */
 export interface RenderItem {

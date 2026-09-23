@@ -1,61 +1,138 @@
 /**
- * The document's annotations, mirrored from the engine, and how they reach
- * the model.
+ * The confirmed layer: every annotation record the engine confirmed, held in
+ * a mirror. It is loaded whole once, kept current by folding confirmed events
+ * from every origin, and re-reads a page only when an event describes it too
+ * coarsely (a redaction, an inserted page, a new form field).
  *
- * The `records` mirror holds every confirmed annotation record, keyed by
- * annotation key. It is loaded whole (one bulk read), kept current by folding
- * confirmed events from every origin, and re-reads only the pages an event
- * describes too coarsely (a redaction, an inserted page, a new form field).
- *
- * The model is the view: confirmed records plus the user's optimistic
- * changes plus session state. Every change of the mirror is absorbed into it
- * here. Origin decides only how a record renders, never what it contains:
- * another session's change renders from the engine's baked appearance, while
- * a change this session made keeps its current render source, so a record
- * the user just restyled keeps rendering live instead of waiting for a
- * raster. This is also the one place the created, updated, deleted and
- * resynced events fire.
+ * Nothing unconfirmed ever enters it: the user's changes wait in the plugin
+ * state's `pending` entries (model.ts) and the view lays them on top
+ * (read/view.ts). What happens when a change is confirmed (new records find
+ * their keys, record events fire) is in sync/confirmed.ts.
  */
 import {
-  originOf,
   refFromStableId,
   reload,
   type DocumentEvent,
   type Mirror,
-  type MirrorChange,
   type PageRef,
 } from '@embedpdf/core';
-import { capsFor, isSubstrateOnly, type ModelAnnotation } from '@embedpdf/core-annotation';
-import { annotationKey, type FormWidget } from '@embedpdf/engine-core/runtime';
+import {
+  annotationKey,
+  positionKey,
+  type AnnotationDTO,
+  type FormWidget,
+} from '@embedpdf/engine-core/runtime';
 
-import type { AnnotationContext, AnnotationServices } from '../services';
-import type { Announcer } from '../services/announce';
-import type { EngineRecord, RenderSource } from '../services/records';
+import type { AnnotationContext } from '../services/context';
+import type { AnnotationEvents } from '../services/events';
 
-/** Confirmed annotation records by annotation key. */
-export type RecordIndex = Readonly<Record<string, EngineRecord>>;
+/** One confirmed annotation. */
+export interface AnnotationRecord {
+  readonly dto: AnnotationDTO;
+  /**
+   * Revision of the engine-baked appearance. It advances when the engine
+   * reports new raster content (a re-bake, a repainted widget, a reload), and
+   * only then: the page's rasters are fetched again exactly when it changes.
+   */
+  readonly apVersion: number;
+}
 
-const keyOf = (record: EngineRecord): string => annotationKey(record.ref);
+/** Every confirmed annotation of the document, by annotation key. */
+export interface AnnotationRecords {
+  readonly byKey: Readonly<Record<string, AnnotationRecord>>;
+  /** Document order: pages as loaded with each page's `/Annots` order, then records confirmed later. */
+  readonly order: readonly string[];
+}
 
-const withRecords = (index: RecordIndex, records: readonly EngineRecord[]): RecordIndex => {
-  if (records.length === 0) return index;
-  const next: Record<string, EngineRecord> = { ...index };
-  for (const record of records) next[keyOf(record)] = record;
-  return next;
-};
+export const NO_RECORDS: AnnotationRecords = { byKey: {}, order: [] };
 
-const withoutKeys = (index: RecordIndex, keys: readonly string[]): RecordIndex => {
-  const present = keys.filter((key) => key in index);
-  if (present.length === 0) return index;
-  const next: Record<string, EngineRecord> = { ...index };
-  for (const key of present) delete next[key];
-  return next;
-};
+/* ── pure updates of the records ─────────────────────────────────────────── */
 
-const keysOnPages = (index: RecordIndex, pages: readonly PageRef[]): string[] => {
+/**
+ * Add or replace these records, advancing their appearance version when
+ * `bump` is set. A weak record the engine just named (a direct-object
+ * annotation that got an /NM when it was written) keeps its place under its
+ * new key: its position (`dto.index`) is the key it had.
+ */
+function put(
+  records: AnnotationRecords,
+  dtos: readonly AnnotationDTO[],
+  bump: boolean,
+): AnnotationRecords {
+  if (!dtos.length) return records;
+  const byKey = { ...records.byKey };
+  const added: string[] = [];
+  const renamed = new Map<string, string>();
+  for (const dto of dtos) {
+    const key = annotationKey(dto.ref);
+    const position = positionKey(dto.page, dto.index);
+    const named = key !== position && !(key in byKey) && position in byKey;
+    const previous = named ? byKey[position] : byKey[key];
+    if (named) {
+      delete byKey[position];
+      renamed.set(position, key);
+    } else if (!previous) {
+      added.push(key);
+    }
+    byKey[key] = { dto, apVersion: (previous?.apVersion ?? 0) + (bump ? 1 : 0) };
+  }
+  const order = renamed.size ? records.order.map((key) => renamed.get(key) ?? key) : records.order;
+  return { byKey, order: added.length ? [...order, ...added] : order };
+}
+
+function drop(records: AnnotationRecords, keys: readonly string[]): AnnotationRecords {
+  const present = keys.filter((key) => key in records.byKey);
+  if (!present.length) return records;
+  const gone = new Set(present);
+  const byKey = { ...records.byKey };
+  for (const key of present) delete byKey[key];
+  return { byKey, order: records.order.filter((key) => !gone.has(key)) };
+}
+
+/** The engine repainted these records without changing them (a form value, a signature). */
+function bumpAppearance(records: AnnotationRecords, keys: readonly string[]): AnnotationRecords {
+  const present = keys.filter((key) => key in records.byKey);
+  if (!present.length) return records;
+  const byKey = { ...records.byKey };
+  for (const key of present) byKey[key] = { ...byKey[key]!, apVersion: byKey[key]!.apVersion + 1 };
+  return { ...records, byKey };
+}
+
+const keysOnPages = (records: AnnotationRecords, pages: readonly PageRef[]): string[] => {
   const wanted = new Set(pages.map((page) => page.pageObjectNumber));
-  return Object.keys(index).filter((key) => wanted.has(index[key]!.page.pageObjectNumber));
+  return records.order.filter((key) => wanted.has(records.byKey[key]!.dto.page.pageObjectNumber));
 };
+
+/**
+ * A fresh read of the whole document. Every record's appearance version moves
+ * past the one it had, so a reload after a desync re-fetches every raster
+ * (the appearances may have changed while the event stream was not trusted).
+ */
+function fromSnapshot(
+  current: AnnotationRecords,
+  dtos: readonly AnnotationDTO[],
+): AnnotationRecords {
+  const byKey: Record<string, AnnotationRecord> = {};
+  const order: string[] = [];
+  for (const dto of dtos) {
+    const key = annotationKey(dto.ref);
+    const previous = current.byKey[key];
+    if (!(key in byKey)) order.push(key);
+    byKey[key] = { dto, apVersion: previous ? previous.apVersion + 1 : 0 };
+  }
+  return { byKey, order };
+}
+
+/** Some pages were read again: their records are replaced, and their rasters re-fetched. */
+function withPages(
+  records: AnnotationRecords,
+  pages: readonly PageRef[],
+  dtos: readonly AnnotationDTO[],
+): AnnotationRecords {
+  const read = new Set(dtos.map((dto) => annotationKey(dto.ref)));
+  const stale = keysOnPages(records, pages).filter((key) => !read.has(key));
+  return put(drop(records, stale), dtos, true);
+}
 
 const pagesOfWidgets = (widgets: readonly FormWidget[]): PageRef[] =>
   widgets.flatMap((widget) => (widget.page ? [widget.page] : []));
@@ -63,246 +140,162 @@ const pagesOfWidgets = (widgets: readonly FormWidget[]): PageRef[] =>
 const widgetKeys = (widgets: readonly FormWidget[]): string[] =>
   widgets.flatMap((widget) => (widget.ref ? [annotationKey(widget.ref)] : []));
 
+type AnnotationEvent = Extract<
+  DocumentEvent,
+  { type: 'annotation.created' | 'annotation.updated' | 'annotation.deleted' | 'annotation.moved' }
+>;
+
+const recordsOf = (event: AnnotationEvent): readonly AnnotationDTO[] => {
+  switch (event.type) {
+    case 'annotation.created':
+      return [event.created];
+    case 'annotation.updated':
+      return [event.updated];
+    case 'annotation.moved':
+      return event.moved;
+    case 'annotation.deleted':
+      return [];
+  }
+};
+
+/** Does this page hold a record addressed by its position? */
+const hasWeakRecords = (records: AnnotationRecords, page: PageRef): boolean =>
+  records.order.some((key) => {
+    const { ref } = records.byKey[key]!.dto;
+    return ref.kind === 'index' && ref.page.pageObjectNumber === page.pageObjectNumber;
+  });
+
+/**
+ * Weak annotations (direct objects without /NM) are addressed by position, so
+ * two kinds of annotation event need the page read again instead of applied:
+ * one the engine says moved positions (`shouldRefetch`: a weak delete, a
+ * move), and one that names a record this event does not carry and the
+ * records do not hold (a reply whose weak parent the engine just named).
+ * Pages without weak annotations never take this path.
+ */
+function positionsReload(
+  records: AnnotationRecords,
+  event: AnnotationEvent,
+): ReturnType<typeof reload> | null {
+  if (event.meta.shouldRefetch) return reload({ pages: [event.page] });
+  const carried = new Set(recordsOf(event).map((dto) => annotationKey(dto.ref)));
+  const unknown = event.meta.changed.some((id) => {
+    const key = annotationKey(refFromStableId(event.page, id));
+    return !carried.has(key) && !(key in records.byKey);
+  });
+  return unknown && hasWeakRecords(records, event.page) ? reload({ pages: [event.page] }) : null;
+}
+
 /**
  * Apply one confirmed document event to the records. Pure, and the same for
  * every origin. Events that change widgets through the form plane re-read
  * the widgets' pages: the form result carries fields, not annotation records.
  */
 export function foldRecords(
-  index: RecordIndex,
+  records: AnnotationRecords,
   event: DocumentEvent,
-): RecordIndex | ReturnType<typeof reload> {
+): AnnotationRecords | ReturnType<typeof reload> {
   switch (event.type) {
+    // A new record comes with a freshly baked appearance; the engine says
+    // whether an update changed one; a z-order move changes none.
     case 'annotation.created':
-      return withRecords(index, [event.created]);
+      return positionsReload(records, event) ?? put(records, [event.created], true);
     case 'annotation.updated':
-      return withRecords(index, [event.updated]);
+      return (
+        positionsReload(records, event) ?? put(records, [event.updated], event.appearance.changed)
+      );
     case 'annotation.moved':
-      return withRecords(index, event.moved);
+      return positionsReload(records, event) ?? put(records, event.moved, false);
     case 'annotation.deleted':
-      return event.deleted
-        ? withoutKeys(index, [annotationKey(refFromStableId(event.page, event.deleted))])
-        : index;
+      return (
+        positionsReload(records, event) ??
+        (event.deleted
+          ? drop(records, [annotationKey(refFromStableId(event.page, event.deleted))])
+          : records)
+      );
     case 'pages.deleted':
-      return withoutKeys(index, keysOnPages(index, event.pages));
+      return drop(records, keysOnPages(records, event.pages));
     case 'pages.inserted':
-      return event.insertedPages.length ? reload({ pages: event.insertedPages }) : index;
+      return event.insertedPages.length ? reload({ pages: event.insertedPages }) : records;
     // These paint annotations into the page content and remove them.
     case 'redaction.applied':
     case 'pages.flattened': {
       const pages = event.results
         .filter((result) => result.status === 'applied')
         .map((result) => result.page);
-      return pages.length ? reload({ pages }) : index;
+      return pages.length ? reload({ pages }) : records;
     }
     case 'annotations.flattened':
       return event.results.some((result) => result.status === 'applied')
         ? reload({ pages: [event.page] })
-        : index;
+        : records;
     // A repair links stray widgets into fields and re-bakes appearances, and
     // its result names none of them.
     case 'form.repaired':
-      return event.widgetsLinked > 0 || event.appearancesBaked > 0 ? reload() : index;
+      return event.widgetsLinked > 0 || event.appearancesBaked > 0 ? reload() : records;
     case 'form.fieldCreated':
     case 'form.widgetAttached':
     case 'form.widgetDetached': {
       const pages = pagesOfWidgets(event.field.widgets);
-      return pages.length ? reload({ pages }) : index;
+      return pages.length ? reload({ pages }) : records;
     }
     case 'form.fieldDeleted':
-      return withoutKeys(index, widgetKeys(event.removedWidgets));
+      return drop(records, widgetKeys(event.removedWidgets));
     case 'form.effectsApplied': {
       // A script can change a widget's display flags.
       const pages = pagesOfWidgets(event.changedWidgets);
-      return pages.length ? reload({ pages }) : index;
+      return pages.length ? reload({ pages }) : records;
     }
+    // The form plane and signatures repaint widgets without changing their records.
+    case 'form.valueChanged':
+      return bumpAppearance(records, widgetKeys(event.changedWidgets));
+    case 'form.fieldUpdated':
+      return bumpAppearance(records, widgetKeys(event.field.widgets));
+    case 'form.imported':
+      return event.widgetsChanged > 0
+        ? bumpAppearance(
+            records,
+            widgetKeys(event.snapshot.fields.flatMap((field) => field.widgets)),
+          )
+        : records;
+    case 'signature.completed':
+      return event.signature.widget
+        ? bumpAppearance(records, widgetKeys([event.signature.widget]))
+        : records;
     default:
-      return index;
+      return records;
   }
 }
 
+/* ── the mirror ──────────────────────────────────────────────────────────── */
+
+/**
+ * The records mirror. Every change it applies is published on the internal
+ * `recordsChanged` event, where sync/confirmed.ts reacts to it.
+ */
 export function createRecordsMirror(
-  ctx: Pick<AnnotationContext, 'mirror'>,
-  {
-    store,
-    geometry,
-    records,
-    writes,
-    authority,
-    events,
-  }: Pick<AnnotationServices, 'store' | 'geometry' | 'records' | 'writes' | 'authority' | 'events'>,
-  announce: Announcer,
-): Mirror<RecordIndex> {
-  let loadedOnce = false;
-
-  const ingest = (record: EngineRecord, source?: RenderSource): ModelAnnotation | null => {
-    const crop = geometry.cropOf(record.page.pageObjectNumber);
-    return crop ? records.ingest(record, crop, source) : null;
-  };
-
-  /** How a confirmed record renders; see the module comment. */
-  const sourceFor = (
-    event: DocumentEvent | null,
-    record: EngineRecord,
-    currentId: string,
-  ): RenderSource => {
-    if (!event || !('origin' in event) || event.origin.kind === 'remote') return 'baked';
-    const current = store.model().byId[currentId];
-    if (current) return current.source === 'vector' ? 'vector' : 'baked';
-    return capsFor(record.subtype).opaqueBody ? 'baked' : 'vector';
-  };
-
-  /** Upsert confirmed records; `bumpAp` re-fetches baked rasters whose appearance changed. */
-  const upsert = (
-    event: DocumentEvent | null,
-    changed: readonly EngineRecord[],
-    bumpAp: boolean,
-  ): void => {
-    const bumped: ModelAnnotation[] = [];
-    const kept: ModelAnnotation[] = [];
-    for (const record of changed) {
-      const annotation = ingest(record, sourceFor(event, record, keyOf(record)));
-      if (!annotation) continue;
-      // Conversation annotations (replies, review states) and attached link
-      // children never paint, so they never cost a raster fetch.
-      (bumpAp && !isSubstrateOnly(annotation) ? bumped : kept).push(annotation);
-    }
-    if (bumped.length) store.commit({ type: 'upsert', annots: bumped, bumpAp: true });
-    if (kept.length) store.commit({ type: 'upsert', annots: kept });
-  };
-
-  const diff = (previous: RecordIndex, next: RecordIndex) => ({
-    removed: Object.keys(previous).filter((key) => !(key in next)),
-    changed: Object.keys(next)
-      .filter((key) => next[key] !== previous[key])
-      .map((key) => next[key]!),
-  });
-
-  /** A whole-document load: the snapshot is the confirmed truth. */
-  const absorbLoad = (next: RecordIndex): void => {
-    const annots = Object.values(next)
-      .map((record) => ingest(record))
-      .filter((annotation): annotation is ModelAnnotation => annotation !== null);
-    // A reload after the first load re-fetches every baked raster: the
-    // appearances may have changed while the event stream could not be trusted.
-    store.commit({ type: 'hydrated', annots, bumpAp: loadedOnce });
-    loadedOnce = true;
-    events.resynced.emit({ pages: 'all' });
-  };
-
-  /** Some pages were re-read: replace their records, re-fetching their rasters. */
-  const absorbPages = (
-    pages: readonly PageRef[],
-    previous: RecordIndex,
-    next: RecordIndex,
-  ): void => {
-    const { removed } = diff(previous, next);
-    if (removed.length) store.commit({ type: 'remove', ids: removed });
-    upsert(
-      null,
-      keysOnPages(next, pages).map((key) => next[key]!),
-      true,
-    );
-    events.resynced.emit({ pages });
-  };
-
-  /**
-   * While a record is being text-edited, or a text write for it is in
-   * flight, the text on screen is newer than this session's own echo of an
-   * earlier write: the edit shadows the confirmed record until it ends.
-   */
-  const shadowedByTyping = (
-    event: Extract<DocumentEvent, { type: 'annotation.updated' }>,
-  ): boolean => {
-    if (event.origin.kind !== 'local') return false;
-    const key = keyOf(event.updated);
-    return store.model().editing === key || writes.hasTextWrite(key);
-  };
-
-  const absorbEvent = (event: DocumentEvent, previous: RecordIndex, next: RecordIndex): void => {
-    const { removed, changed } = diff(previous, next);
-    if (event.type === 'annotation.updated' && shadowedByTyping(event)) {
-      announce.updated(event.updated, originOf(event));
-      return;
-    }
-    if (event.type === 'annotation.created') {
-      // This session's optimistic create, matched by the /NM it sent: rename
-      // the temporary record first, so selection and editing follow it.
-      const created = event.created;
-      const tempId = created.nm ? writes.claimCreate(created.nm) : undefined;
-      if (tempId !== undefined && store.model().byId[tempId]) {
-        store.commit({ type: 'created', tempId, id: keyOf(created), ref: created.ref });
-      }
-    }
-    // The engine reports whether an update changed the appearance: a
-    // preserved move costs no re-fetch, a regenerated appearance re-fetches
-    // once. A create brings a freshly baked appearance; a z-order move none.
-    const bumpAp =
-      event.type === 'annotation.updated'
-        ? event.appearance.changed
-        : event.type !== 'annotation.moved';
-    upsert(event, changed, bumpAp);
-    if (removed.length) store.commit({ type: 'remove', ids: removed });
-
-    if (!('origin' in event)) return;
-    const origin = originOf(event);
-    if (event.type === 'annotation.created') announce.created(event.created, origin);
-    else if (event.type === 'annotation.updated') announce.updated(event.updated, origin);
-    else if (event.type === 'annotation.deleted' && event.deleted) {
-      const ref = refFromStableId(event.page, event.deleted);
-      announce.deleted(ref, event.page, origin);
-    }
-  };
-
-  return ctx.mirror<RecordIndex>({
+  ctx: Pick<AnnotationContext, 'mirror' | 'doc'>,
+  events: Pick<AnnotationEvents, 'recordsChanged'>,
+): Mirror<AnnotationRecords> {
+  const records: Mirror<AnnotationRecords> = ctx.mirror<AnnotationRecords>({
     name: 'records',
-    initial: () => ({}),
+    initial: () => NO_RECORDS,
     // Without `doc.annotate.read` the bulk read would be refused: skip it
     // and report `forbidden`; a later refresh checks again.
-    readable: () => authority.canRead(),
+    readable: () => ctx.doc?.security.allows('doc.annotate.read') ?? true,
     load: async (doc) => {
       const snapshot = await doc.annotations.listRawAll();
-      const all = snapshot.pages.flatMap((page) => page.annotations);
-      return { value: withRecords({}, all), cursor: snapshot.auditHead ?? null };
+      const dtos = snapshot.pages.flatMap((page) => page.annotations);
+      return { value: fromSnapshot(records.get(), dtos), cursor: snapshot.auditHead ?? null };
     },
     fold: foldRecords,
     loadPages: async (doc, pages) => {
       const read = await Promise.all(
         pages.map(async (page) => (await doc.page(page).annotations.list()).annotations),
       );
-      return (index) => withRecords(withoutKeys(index, keysOnPages(index, pages)), read.flat());
+      return (current) => withPages(current, pages, read.flat());
     },
-    changed: (change: MirrorChange<RecordIndex>) => {
-      if (change.cause === 'load') {
-        if (change.pages === 'all') absorbLoad(change.next);
-        else if (change.pages) absorbPages(change.pages, change.previous, change.next);
-        return;
-      }
-      if (change.event) absorbEvent(change.event, change.previous, change.next);
-    },
+    changed: (change) => events.recordsChanged.emit(change),
   });
-}
-
-/**
- * Widget appearances repainted by the form plane (a value write, an import,
- * a script batch, a signature's visual fill or seal) change pixels without
- * changing any annotation record: bump the widgets' appearance versions so
- * their rasters re-fetch.
- */
-export function widgetsRepaintedBy(event: DocumentEvent): string[] {
-  switch (event.type) {
-    case 'form.valueChanged':
-    case 'form.effectsApplied':
-      return widgetKeys(event.changedWidgets);
-    case 'form.fieldUpdated':
-      return widgetKeys(event.field.widgets);
-    case 'form.imported':
-      return event.widgetsChanged > 0
-        ? widgetKeys(event.snapshot.fields.flatMap((field) => field.widgets))
-        : [];
-    case 'signature.completed':
-      return event.signature.widget ? widgetKeys([event.signature.widget]) : [];
-    default:
-      return [];
-  }
+  return records;
 }

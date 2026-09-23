@@ -267,6 +267,39 @@ describe('ctx.mirror', () => {
     expect(changes.at(-1)?.pages).toEqual([{ kind: 'objectNumber', pageObjectNumber: 3 }]);
   });
 
+  it('reports a failed page reload as error until a full load succeeds', async () => {
+    const first = deferred<{ value: Records }>();
+    const second = deferred<{ value: Records }>();
+    const loadPages = vi.fn(async () => {
+      throw new Error('offline');
+    });
+    const { ctx, mirror } = setup({
+      loads: [first, second],
+      fold: (value, event) =>
+        (event as { type: string }).type === 'redaction.applied'
+          ? reload({ pages: [{ kind: 'objectNumber', pageObjectNumber: 3 }] })
+          : value,
+      loadPages,
+    });
+    ctx.connect({ api: null });
+    first.resolve({ value: { a: 'A' } });
+    await settle();
+    ctx.emitDocumentEvent({
+      type: 'redaction.applied',
+      origin: origin(null),
+    } as unknown as DocumentEvent);
+    await mirror.settled();
+    // The page could not be read: the value is stale and says so.
+    expect(mirror.get()).toEqual({ a: 'A' });
+    expect(mirror.getStatus()).toBe('error');
+
+    const refreshed = mirror.refresh();
+    second.resolve({ value: { a: 'A2' } });
+    await refreshed;
+    expect(mirror.getStatus()).toBe('ready');
+    expect(mirror.get()).toEqual({ a: 'A2' });
+  });
+
   it('settles once every load and page reload, including ones started meanwhile, finished', async () => {
     const first = deferred<{ value: Records }>();
     const second = deferred<{ value: Records }>();

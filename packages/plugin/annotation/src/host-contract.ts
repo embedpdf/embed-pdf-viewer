@@ -126,7 +126,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
    */
   whenSynced(): Promise<void>;
 
-  // ── text editing (the editor's draft path: optimistic, debounced engine write) ──
+  // ── text editing (the editor's draft path: shown at once, written after a pause) ──
   getEditingId(): Id | null;
   beginTextEditAt(
     page: PageRef,

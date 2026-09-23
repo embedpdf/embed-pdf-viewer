@@ -24,7 +24,7 @@ import { buildTextItems } from '../text-item';
  */
 export function createRenderReads(
   ctx: Pick<AnnotationContext, 'state' | 'document' | 'doc'>,
-  { store, geometry, tools }: Pick<AnnotationServices, 'store' | 'geometry' | 'tools'>,
+  { view: { pageModel }, geometry, tools }: Pick<AnnotationServices, 'view' | 'geometry' | 'tools'>,
 ) {
   const itemsCache = new Map<
     number,
@@ -38,7 +38,7 @@ export function createRenderReads(
   >();
   const pageItemsOf = (page: PageRef, view?: ViewEnv): RenderItem[] => {
     const pageObjectNumber = page.pageObjectNumber;
-    const model = store.model();
+    const model = pageModel(pageObjectNumber);
     const ghost = ctx.state.get().toolGhost;
     const cached = itemsCache.get(pageObjectNumber);
     if (
@@ -82,7 +82,7 @@ export function createRenderReads(
   >();
   const textItemsOf = (page: PageRef, view?: ViewEnv): TextItem[] => {
     const pageObjectNumber = page.pageObjectNumber;
-    const model = store.model();
+    const model = pageModel(pageObjectNumber);
     const cached = textsCache.get(pageObjectNumber);
     if (
       cached &&
@@ -103,10 +103,10 @@ export function createRenderReads(
 
   // The navigation plane's feed: clickable link areas per page — standalone
   // links + attached-link segments (rects derived by the reconciler's own
-  // rule). Memoized by model identity for selector use.
+  // rule). Memoized by the page's slice of the model for selector use.
   const linkItemsCache = new Map<number, { model: Model; v: LinkNavItem[] }>();
   const linkItemsOf = (pageObjectNumber: number): LinkNavItem[] => {
-    const model = store.model();
+    const model = pageModel(pageObjectNumber);
     const cached = linkItemsCache.get(pageObjectNumber);
     if (cached && cached.model === model) return cached.v;
     const items: LinkNavItem[] = [];
@@ -159,7 +159,7 @@ export function createRenderReads(
       // costs zero re-renders — and because the version bumps when the engine
       // confirms the re-bake, the fetch can never read a stale /AP ("one
       // behind"). Render scale is the shell effect's own dependency.
-      const model = store.model();
+      const model = pageModel(pageObjectNumber);
       const parts: string[] = [];
       for (const id of model.order) {
         const annotation = model.byId[id];

@@ -135,7 +135,7 @@ describe('repository — Ink Highlight intent and blend', () => {
   });
 
   it('round-trips intent and blend through the content model, draft, and patch', () => {
-    const annotation = fromDTO(dto(), CROP, 'vector');
+    const annotation = fromDTO(dto(), CROP);
     expect(annotation.intent).toBe('ink-highlight');
     expect(annotation.style.blendMode).toBe('multiply');
     expect(toCreateDraft(annotation, CROP)).toMatchObject({

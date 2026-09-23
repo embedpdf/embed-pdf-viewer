@@ -11,6 +11,7 @@ import type {
   ChangeOrigin,
   EventHook,
   OperationOptions,
+  PluginErrorInfo,
   ResourceStatus,
   Unsubscribe,
 } from '@embedpdf/core';
@@ -325,9 +326,9 @@ export interface ThreadDeleteResult {
 /**
  * The conversation plane's surface: a derived, memoized threads index over
  * the annotation substrate, plus the ISO-native verbs. Every verb compiles
- * down to plain annotation creates/patches/deletes — one optimistic
- * pipeline, no second write path — so remote SSE events, own edits, and
- * hydration all update `threads()` for free.
+ * down to plain annotation creates/patches/deletes — one write path — so
+ * remote events, this session's edits and reloads all update `threads()`
+ * for free.
  *
  * Threads carry `pageObjectNumber` (identity is page object number, like everything
  * else); display order is a behavior of `threads()` (sorted against the
@@ -367,8 +368,8 @@ export interface CommentThreadChangedEvent {
  * The page-space record every read returns. Projected from the plugin's
  * model (which already lives in page space), so it is reference-stable per
  * annotation until that annotation changes. The PDF-space engine record is
- * `raw` (null for an optimistic entry that the engine has not confirmed yet)
- * and on the `…Raw` methods.
+ * `raw`: the engine's confirmed record, null for a new annotation the engine
+ * has not confirmed yet. The `…Raw` methods return the same records.
  */
 export interface Annotation {
   readonly ref: AnnotationRef;
@@ -387,7 +388,10 @@ export interface Annotation {
   readonly group: AnnotationRef | null;
   readonly inReplyTo: AnnotationRef | null;
   readonly authority: { readonly update: boolean; readonly delete: boolean };
+  /** The engine's confirmed record. While a change is pending it is the record before that change. */
   readonly raw: AnnotationDTO | null;
+  /** Present while a change the user made to it waits for the engine. */
+  readonly pending?: true;
 }
 
 /** Subtype-specific geometry in page space (one shape per model geometry). */
@@ -477,6 +481,17 @@ export interface AnnotationDeletedEvent {
 /** Records were replaced after a stream gap or a page reload — not a fabricated history. */
 export interface AnnotationResyncedEvent {
   readonly pages: readonly PageRef[] | 'all';
+}
+
+/**
+ * The engine refused a change the user made (a revoked grant, a lock set
+ * elsewhere). The change is already gone from the view, which shows the
+ * engine's record again; this says why, so a UI can tell the user.
+ */
+export interface AnnotationWriteFailedEvent {
+  /** The existing annotations the refused write carried; empty for a refused create. */
+  readonly refs: readonly AnnotationRef[];
+  readonly error: PluginErrorInfo;
 }
 
 export interface AnnotationSelectionChangedEvent {
@@ -695,6 +710,8 @@ export interface AnnotationCapability {
   readonly onSelectionChanged: EventHook<AnnotationSelectionChangedEvent>;
   readonly onDraftChanged: EventHook<AnnotationDraftChangedEvent>;
   readonly onEditingChanged: EventHook<AnnotationEditingChangedEvent>;
+  /** The engine refused a change the user made; the view already shows the engine's record again. */
+  readonly onWriteFailed: EventHook<AnnotationWriteFailedEvent>;
 }
 
 export type MarkupSubtype = 'highlight' | 'underline' | 'strikeout' | 'squiggly';

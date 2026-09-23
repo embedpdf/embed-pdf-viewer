@@ -115,12 +115,12 @@ describe('Replace Text grouped persistence', () => {
       replyType: 'group',
       flags: { print: true },
     });
-    const [caretId, strikeoutId] = harness.state().model.order;
-    expect(harness.state().model.byId[strikeoutId]).toMatchObject({
+    const [caretId, strikeoutId] = harness.model().order;
+    expect(harness.model().byId[strikeoutId]).toMatchObject({
       irt: caretId,
       group: caretId,
     });
-    expect(harness.state().model.selected).toEqual([caretId, strikeoutId]);
+    expect(harness.model().selected).toEqual([caretId, strikeoutId]);
   });
 
   it('deletes the Caret and removes both optimistic parts when StrikeOut creation fails', async () => {
@@ -138,7 +138,7 @@ describe('Replace Text grouped persistence', () => {
       'replace-text',
     );
     await vi.waitFor(() => expect(harness.remove).toHaveBeenCalledWith(ref(10)));
-    await vi.waitFor(() => expect(harness.state().model.order).toHaveLength(0));
+    await vi.waitFor(() => expect(harness.model().order).toHaveLength(0));
   });
 });
 
@@ -159,20 +159,20 @@ describe('annotation flags', () => {
   /** Load these records as the document's annotations. */
   const loadPage = async (harness: ReturnType<typeof createHarness>, dtos: AnnotationDTO[]) => {
     await harness.load(dtos);
-    expect(harness.state().model.order.length).toBe(dtos.length);
+    expect(harness.model().order.length).toBe(dtos.length);
   };
 
   it('updateSelectionFlags writes a flags-only engine patch and keeps the render source', async () => {
     const harness = createHarness();
     await loadPage(harness, [squareDTO(20)]);
-    const id = harness.state().model.order[0];
+    const id = harness.model().order[0];
     harness.capability.select(ref(20));
     harness.update.mockResolvedValueOnce({ updated: squareDTO(20, { locked: true }) });
 
     harness.capability.updateSelectionFlags({ locked: true });
     // optimistic: the model flips immediately, source untouched (still baked)
-    expect(harness.state().model.byId[id].flags.locked).toBe(true);
-    expect(harness.state().model.byId[id].source).toBe('baked');
+    expect(harness.model().byId[id].flags.locked).toBe(true);
+    expect(harness.model().byId[id].source).toBe('baked');
 
     await vi.waitFor(() => expect(harness.update).toHaveBeenCalledTimes(1));
     const [wref, patch] = harness.update.mock.calls[0]!;
@@ -183,7 +183,7 @@ describe('annotation flags', () => {
       flags: { ...NO_FLAGS, locked: true },
     });
     // the re-sync preserves 'baked'
-    await vi.waitFor(() => expect(harness.state().model.byId[id].source).toBe('baked'));
+    await vi.waitFor(() => expect(harness.model().byId[id].source).toBe('baked'));
   });
 
   it('getSelectionFlags reports uniform values and null for mixed', async () => {
@@ -201,11 +201,11 @@ describe('annotation flags', () => {
   it('unlocking works on a locked annotation (setFlags bypasses the locked gate)', async () => {
     const harness = createHarness();
     await loadPage(harness, [squareDTO(23, { locked: true })]);
-    const id = harness.state().model.order[0];
+    const id = harness.model().order[0];
     harness.capability.select(ref(23));
     harness.update.mockResolvedValueOnce({ updated: squareDTO(23) });
     harness.capability.updateSelectionFlags({ locked: false });
-    expect(harness.state().model.byId[id].flags.locked).toBe(false);
+    expect(harness.model().byId[id].flags.locked).toBe(false);
     await vi.waitFor(() => expect(harness.update).toHaveBeenCalledTimes(1));
   });
 
@@ -234,7 +234,7 @@ describe('claimsTouchAt (touch consent)', () => {
       'replace-text',
     );
     await vi.waitFor(() => expect(harness.create).toHaveBeenCalledTimes(2));
-    expect(harness.state().model.selected.length).toBe(2);
+    expect(harness.model().selected.length).toBe(2);
     // the strikeout's body is under the point (the hit-test finds it)…
     expect(harness.capability.getHitKind(PAGE, { x: 50, y: 27 })).toBe('annot');
     // …but the claim must refuse: the selection cannot move, so a drag here
@@ -262,6 +262,15 @@ const hydrationSquare = (objectNumber: number): AnnotationDTO =>
     replyType: null,
   }) as AnnotationDTO;
 
+/** The mutation meta every annotation event carries (a remote event replays the writer's result). */
+const META = {
+  affectedPages: [],
+  cacheDelta: null,
+  changed: [],
+  weakRefsInvalidated: false,
+  shouldRefetch: null,
+};
+
 const remoteOrigin = (serverId: number) => ({
   kind: 'remote' as const,
   sessionId: 'cloud:other',
@@ -276,6 +285,7 @@ const createdEvent = (dto: AnnotationDTO, serverId: number): DocumentEvent =>
     page: PAGE,
     origin: remoteOrigin(serverId),
     created: dto,
+    meta: META,
   }) as unknown as DocumentEvent;
 
 const updatedEvent = (dto: AnnotationDTO, serverId: number, changed: boolean): DocumentEvent =>
@@ -285,6 +295,7 @@ const updatedEvent = (dto: AnnotationDTO, serverId: number, changed: boolean): D
     origin: remoteOrigin(serverId),
     updated: dto,
     appearance: { changed },
+    meta: META,
   }) as unknown as DocumentEvent;
 
 const deletedEvent = (annotObjectNumber: number, serverId: number): DocumentEvent =>
@@ -293,6 +304,7 @@ const deletedEvent = (annotObjectNumber: number, serverId: number): DocumentEven
     page: PAGE,
     origin: remoteOrigin(serverId),
     deleted: { kind: 'objectNumber', value: annotObjectNumber },
+    meta: META,
   }) as unknown as DocumentEvent;
 
 const snapshot = (dtos: AnnotationDTO[], auditHead?: number) => ({
@@ -310,7 +322,7 @@ describe('the records mirror', () => {
     await harness.capability.whenSynced();
     expect(harness.capability.getStatus()).toBe('ready');
     expect(harness.listRawAll).toHaveBeenCalledTimes(1);
-    expect(harness.state().model.order).toHaveLength(2);
+    expect(harness.model().order).toHaveLength(2);
   });
 
   it('queues events during the load and replays them past the audit cursor', async () => {
@@ -329,9 +341,9 @@ describe('the records mirror', () => {
     resolveSnap(snapshot([hydrationSquare(30), hydrationSquare(31)], 44));
     await harness.capability.whenSynced();
 
-    expect(harness.state().model.byId['obj:30']).toBeUndefined();
-    expect(harness.state().model.order).toEqual(['obj:31']);
-    expect(harness.state().model.byId['obj:31']!.apVersion ?? 0).toBe(0);
+    expect(harness.model().byId['obj:30']).toBeUndefined();
+    expect(harness.model().order).toEqual(['obj:31']);
+    expect(harness.model().byId['obj:31']!.apVersion ?? 0).toBe(0);
   });
 
   it('applies events live when the load fails', async () => {
@@ -347,16 +359,16 @@ describe('the records mirror', () => {
     await harness.capability.whenSynced();
     expect(harness.capability.getStatus()).toBe('error');
     // The queued event applied to the previous (empty) view.
-    expect(harness.state().model.byId['obj:50']).toBeDefined();
+    expect(harness.model().byId['obj:50']).toBeDefined();
 
     harness.emit(deletedEvent(50, 46));
-    expect(harness.state().model.byId['obj:50']).toBeUndefined();
+    expect(harness.model().byId['obj:50']).toBeUndefined();
   });
 
   it('a reload reaps confirmed records missing from the snapshot and keeps optimistic ones', async () => {
     const harness = createHarness();
     await harness.load([hydrationSquare(40), hydrationSquare(41)], 40);
-    expect(harness.state().model.order).toHaveLength(2);
+    expect(harness.model().order).toHaveLength(2);
 
     // An optimistic create whose engine write never resolves: its temporary
     // records (caret and strikeout) must survive a reload.
@@ -368,19 +380,19 @@ describe('the records mirror', () => {
       { glyphQuad: textQuadFromRect(rect), advance: 1 },
       'replace-text',
     );
-    const tmpIds = harness.state().model.order.filter((id) => id.startsWith('tmp:'));
-    expect(tmpIds.length).toBeGreaterThan(0);
+    const newIds = harness.model().order.filter((id) => id.startsWith('new:'));
+    expect(newIds.length).toBeGreaterThan(0);
 
     // obj:41 was deleted while the stream could not be trusted.
     harness.listRawAll.mockResolvedValueOnce(snapshot([hydrationSquare(40)], 60));
     harness.emit({ type: 'stream.desynced', reason: 'backlog-overflow', ts: 0 } as DocumentEvent);
     await harness.capability.whenSynced();
 
-    expect(harness.state().model.byId['obj:41']).toBeUndefined();
-    expect(harness.state().model.byId['obj:40']).toBeDefined();
+    expect(harness.model().byId['obj:41']).toBeUndefined();
+    expect(harness.model().byId['obj:40']).toBeDefined();
     // A reload re-fetches rasters once: changes during the gap were invisible.
-    expect(harness.state().model.byId['obj:40']!.apVersion).toBe(1);
-    for (const id of tmpIds) expect(harness.state().model.byId[id]).toBeDefined();
+    expect(harness.model().byId['obj:40']!.apVersion).toBe(1);
+    for (const id of newIds) expect(harness.model().byId[id]).toBeDefined();
   });
 
   it("matches this session's create to its optimistic record by /NM, whatever arrives first", async () => {
@@ -396,8 +408,8 @@ describe('the records mirror', () => {
       select: true,
     });
     expect(created).toEqual(ref(60));
-    expect(harness.state().model.order).toEqual(['obj:60']);
-    expect(harness.state().model.selected).toEqual(['obj:60']);
+    expect(harness.model().order).toEqual(['obj:60']);
+    expect(harness.model().selected).toEqual(['obj:60']);
   });
 
   it('announces its own changes with the engine session as origin', async () => {
@@ -440,6 +452,7 @@ describe('links lens — substrate children, no ledger', () => {
       type: 'annotation.deleted',
       page: PAGE,
       deleted: { kind: 'objectNumber', value: 21 },
+      meta: META,
       origin: { kind: 'remote', sub: 'alice' },
       ts: Date.now(),
     } as unknown as DocumentEvent);
@@ -533,7 +546,7 @@ describe('conversation plane at the capability boundary', () => {
     harness.emit(createdEvent(statusDto, 45));
 
     // In the model (the conversation plane will read it)…
-    expect(harness.state().model.byId['obj:81']).toBeDefined();
+    expect(harness.model().byId['obj:81']).toBeDefined();
     // …but invisible to the page: not painted, and the raster cache key of
     // the page is untouched despite the created-event's bake-fetch default.
     expect(harness.capability.listPageItems(PAGE).map((i) => i.id)).toEqual(['obj:80']);
@@ -626,7 +639,7 @@ describe('the comments lens', () => {
       }),
     );
     expect(created).toEqual(ref(40));
-    expect(harness.state().model.byId['obj:40']).toBeDefined();
+    expect(harness.model().byId['obj:40']).toBeDefined();
   });
 
   it('setStatus chains: first to the root, the next to my previous status', async () => {
@@ -809,7 +822,7 @@ describe('the twin law — authority fused into presentation and gestures', () =
     harness.capability.createPointer('square', 'down', PAGE, { x: 10, y: 10 });
     harness.capability.createPointer('square', 'move', PAGE, { x: 80, y: 60 });
     harness.capability.createPointer('square', 'up', PAGE, { x: 80, y: 60 }, true);
-    expect(harness.state().model.order).toHaveLength(0);
+    expect(harness.model().order).toHaveLength(0);
     expect(harness.create).not.toHaveBeenCalled();
     expect(harness.capability.canCreate()).toBe(false);
   });
@@ -829,7 +842,7 @@ describe('the twin law — authority fused into presentation and gestures', () =
     await expect(harness.capability.createFromSelection('highlight')).rejects.toMatchObject({
       code: 'permission-denied',
     });
-    expect(harness.state().model.order).toHaveLength(0);
+    expect(harness.model().order).toHaveLength(0);
     expect(harness.create).not.toHaveBeenCalled();
   });
 
@@ -847,14 +860,14 @@ describe('the twin law — authority fused into presentation and gestures', () =
     vi.spyOn(console, 'error').mockImplementation(() => {});
     await harness.load([stamped(20, 'me')]);
     harness.capability.select(ref(20));
-    const id = harness.state().model.order[0]!;
-    const before = harness.state().model.byId[id]!.style.color;
+    const id = harness.model().order[0]!;
+    const before = harness.model().byId[id]!.style.color;
     harness.update.mockRejectedValueOnce(new Error('Forbidden'));
     harness.capability.updateSelection({ color: '#00ff00' });
     // optimistic first…
-    expect(harness.state().model.byId[id]!.style.color).toBe('#00ff00');
+    expect(harness.model().byId[id]!.style.color).toBe('#00ff00');
     // …then the refusal restores the pre-patch annotation.
-    await vi.waitFor(() => expect(harness.state().model.byId[id]!.style.color).toBe(before));
+    await vi.waitFor(() => expect(harness.model().byId[id]!.style.color).toBe(before));
   });
 });
 
@@ -907,15 +920,15 @@ describe('remote delivery — echo-driven appearance invalidation', () => {
     const harness = createHarness();
     await seed(harness, hydrationSquare(70));
     harness.emit(updatedEvent(hydrationSquare(70), 45, false));
-    expect(harness.state().model.byId['obj:70']!.apVersion ?? 0).toBe(0);
-    expect(harness.state().model.byId['obj:70']!.source).toBe('baked');
+    expect(harness.model().byId['obj:70']!.apVersion ?? 0).toBe(0);
+    expect(harness.model().byId['obj:70']!.source).toBe('baked');
   });
 
   it('a REGENERATED remote update advances apVersion exactly once', async () => {
     const harness = createHarness();
     await seed(harness, hydrationSquare(70));
     harness.emit(updatedEvent(hydrationSquare(70), 45, true));
-    expect(harness.state().model.byId['obj:70']!.apVersion).toBe(1);
+    expect(harness.model().byId['obj:70']!.apVersion).toBe(1);
   });
 
   it('a remote z-order move never re-fetches appearances', async () => {
@@ -926,8 +939,9 @@ describe('remote delivery — echo-driven appearance invalidation', () => {
       page: PAGE,
       origin: remoteOrigin(45),
       moved: [hydrationSquare(70)],
+      meta: META,
     } as unknown as DocumentEvent);
-    expect(harness.state().model.byId['obj:70']!.apVersion ?? 0).toBe(0);
+    expect(harness.model().byId['obj:70']!.apVersion ?? 0).toBe(0);
   });
 });
 
@@ -961,18 +975,19 @@ describe.each([
     replyType: null,
   } as AnnotationDTO;
 
-  it('switches an imported annotation to vector after a programmatic update', async () => {
+  it('a programmatic update keeps the raster and fetches the one the engine re-baked', async () => {
     const harness = createHarness();
     await harness.load([dto]);
     expect(harness.capability.listPageItems(PAGE)[0].source).toBe('baked');
+    const epoch = harness.capability.getAppearanceEpoch(PAGE);
 
     const updated = { ...dto, strokeWidth: 2 };
     harness.update.mockResolvedValueOnce({ updated, appearance: { changed: true } });
     await harness.capability.updateRaw(dto.ref, { subtype, strokeWidth: 2 });
 
     expect(harness.capability.getRaw(dto.ref)).toEqual(updated);
-    expect(harness.capability.listPageItems(PAGE)[0].source).toBe('vector');
-    expect(harness.capability.getAppearanceEpoch(PAGE)).toBe('');
+    expect(harness.capability.listPageItems(PAGE)[0].source).toBe('baked');
+    expect(harness.capability.getAppearanceEpoch(PAGE)).not.toBe(epoch);
   });
 
   it('preserves vector rendering through consecutive local edits and engine responses', async () => {
@@ -1054,7 +1069,7 @@ describe('distance authoring and recalibration', () => {
     const harness = createHarness();
     const { measureFromRatio } = await import('@embedpdf/engine-core/runtime');
     harness.capability.createPointer('distance', 'down', PAGE, { x: 20, y: 20 });
-    expect(harness.state().model.draft).toBeNull();
+    expect(harness.model().draft).toBeNull();
     harness.capability.setPageViewports(
       PAGE,
       [
@@ -1064,7 +1079,7 @@ describe('distance authoring and recalibration', () => {
       measureFromRatio(1, 1, 'm'),
     );
     harness.capability.createPointer('distance', 'down', PAGE, { x: 20, y: 20 });
-    expect(harness.state().model.draft).toBeNull();
+    expect(harness.model().draft).toBeNull();
   });
   it('captures calibration with modify authority even without create authority', () => {
     const harness = createHarness(),
@@ -1083,7 +1098,7 @@ describe('distance authoring and recalibration', () => {
     expect(harness.create).not.toHaveBeenCalled();
     harness.allows.mockReturnValue(false);
     harness.capability.createPointer('calibrate', 'down', PAGE, { x: 20, y: 20 });
-    expect(harness.state().model.draft).toBeNull();
+    expect(harness.model().draft).toBeNull();
   });
   it('reports locked, foreign, unauthorized and failed annotations independently', async () => {
     const harness = createHarness();
@@ -1179,17 +1194,17 @@ describe.each(['area', 'perimeter'])('%s scale resolution', (tool) => {
     const harness = createHarness();
     const { measureFromRatio } = await import('@embedpdf/engine-core/runtime');
     harness.capability.createPointer(tool, 'down', PAGE, { x: 20, y: 20 });
-    expect(harness.state().model.draft).toBeNull();
+    expect(harness.model().draft).toBeNull();
     harness.capability.setPageViewports(
       PAGE,
       [{ owned: false, bbox: CROP, measure: { subtype: 'GEO' } }],
       measureFromRatio(1, 1, 'm'),
     );
     harness.capability.createPointer(tool, 'down', PAGE, { x: 20, y: 20 });
-    expect(harness.state().model.draft).toBeNull();
+    expect(harness.model().draft).toBeNull();
     harness.capability.setPageViewports(PAGE, [], measureFromRatio(1, 1, 'm'));
     harness.allowsAnnotationCreate.mockReturnValue(false);
     harness.capability.createPointer(tool, 'down', PAGE, { x: 20, y: 20 });
-    expect(harness.state().model.draft).toBeNull();
+    expect(harness.model().draft).toBeNull();
   });
 });

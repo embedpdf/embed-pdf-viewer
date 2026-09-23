@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest';
 import { textQuadFromRect } from '@embedpdf/core-geometry';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
-import { initialModel, update } from '../src/update';
+import { describe, expect, it } from 'vitest';
+
+import { step } from './support';
+import { DRAWN_FLAGS } from '../src/flags';
 import { layoutRedactLabel, scene } from '../src/scene';
 import type { ModelAnnotation, Model, RenderItem, TextStyle } from '../src/types';
-import { DRAWN_FLAGS } from '../src/flags';
+import { initialModel } from '../src/update';
 
 const REGION = { x: 10, y: 10, width: 200, height: 60 };
 
@@ -51,24 +53,24 @@ describe('hover model state', () => {
   };
 
   it('sets and clears hovered, no effects', () => {
-    const [hoveredModel, fx1] = update(base, { type: 'hover', id: 'obj:1' });
+    const [hoveredModel, fx1] = step(base, { type: 'hover', id: 'obj:1' });
     expect(hoveredModel.hovered).toBe('obj:1');
     expect(fx1).toEqual([]);
-    const [cleared, fx2] = update(hoveredModel, { type: 'hover', id: null });
+    const [cleared, fx2] = step(hoveredModel, { type: 'hover', id: null });
     expect(cleared.hovered).toBe(null);
     expect(fx2).toEqual([]);
   });
 
   it('is a no-op (same model identity) when unchanged', () => {
-    const [hoveredModel] = update(base, { type: 'hover', id: 'obj:1' });
-    const [again] = update(hoveredModel, { type: 'hover', id: 'obj:1' });
+    const [hoveredModel] = step(base, { type: 'hover', id: 'obj:1' });
+    const [again] = step(hoveredModel, { type: 'hover', id: 'obj:1' });
     expect(again).toBe(hoveredModel);
   });
 
-  it('clears hovered when the hovered annotation is removed', () => {
-    const [hoveredModel] = update(base, { type: 'hover', id: 'obj:1' });
-    const [afterRemove] = update(hoveredModel, { type: 'remove', ids: ['obj:1'] });
-    expect(afterRemove.hovered).toBe(null);
+  it('clears hovered when the hovered annotation leaves the view', () => {
+    const [hoveredModel] = step(base, { type: 'hover', id: 'obj:1' });
+    const [afterForget] = step(hoveredModel, { type: 'forget', ids: ['obj:1'] });
+    expect(afterForget.hovered).toBe(null);
   });
 });
 
