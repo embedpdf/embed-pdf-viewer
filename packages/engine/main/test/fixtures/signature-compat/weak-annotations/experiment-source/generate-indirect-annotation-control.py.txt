@@ -1,0 +1,56 @@
+import sys,json,subprocess,tempfile,csv,io,hashlib
+from pathlib import Path
+sys.dont_write_bytecode=True
+CORPUS=Path('/Users/bobsingor/GitHub/cloudpdf-platform/oss/embedpdf/packages/engine/main/test/fixtures/signature-compat')
+sys.path.insert(0,str(CORPUS))
+from generate import A,D,N,S,g,signer_for,stream,reader,raw_body,describe_bytes
+from generate_v3 import fresh,seal,append_revision
+from generate_v2 import page_of
+from asn1crypto import cms
+root=Path('/tmp/epdf-weak-nm-probes');signer=signer_for(CORPUS/'keys')
+def build(indirect):
+ w=fresh(profile='approval');annots=page_of(w)['/Annots']
+ for index in range(4):
+  appearance=stream(w,'q 0 0 1 RG 1 w 1 1 58 38 re S Q',Type=N('/XObject'),Subtype=N('/Form'),BBox=A(0,0,60,40),Resources=D())
+  annots.append(D(Type=N('/Annot'),Subtype=N('/Square'),Rect=A(310+index*65,420,370+index*65,460),F=g.NumberObject(4),C=A(0,0,1),Contents=S(f'weak-{index}'),AP=D(N=appearance)))
+ if indirect:
+  for i in range(4,len(annots)):annots[i]=w.add_object(annots[i])
+ return seal(w,signer)
+def serialized(obj):
+ out=io.BytesIO();obj.write_to_stream(out);return out.getvalue()
+direct=build(False);frozen=(root/'pdfs/approval-inline-control.pdf').read_bytes()
+assert direct==frozen,'Direct generation must exactly reproduce original signed baseline for matched comparison'
+base=build(True);old=reader(direct);r=reader(base);a=page_of(old)['/Annots'];b=page_of(r)['/Annots']
+assert len(a)==len(b)==8
+assert not isinstance(page_of(r).raw_get('/Annots'),g.IndirectObject),'Array itself stays inline'
+for i in range(4):assert a.raw_get(i).idnum==b.raw_get(i).idnum
+for i in range(4,8):
+ assert isinstance(a.raw_get(i),g.DictionaryObject) and isinstance(b.raw_get(i),g.IndirectObject)
+ left=a[i];right=b[i].get_object()
+ assert '/NM' not in left and '/NM' not in right
+ assert serialized(left)==serialized(right),'Annotation dictionaries must be exactly equal'
+ assert left['/AP']['/N'].data==right['/AP']['/N'].data
+for key in page_of(old):
+ if key!='/Annots':assert serialized(page_of(old).raw_get(key))==serialized(page_of(r).raw_get(key))
+page=r.root['/Pages']['/Kids'].raw_get(0);rewrite=append_revision(base,{page.idnum:raw_body(base,page.idnum)})
+assert rewrite.startswith(base)
+assert raw_body(base,page.idnum)==raw_body(rewrite,page.idnum)
+for ref in r.root['/AcroForm']['/Fields']:assert raw_body(base,ref.idnum)==raw_body(rewrite,ref.idnum)
+cases=[]
+for action,data in [('control',base),('rewrite-reference-writer',rewrite)]:
+ case_id='approval-indirect-annotations-'+action;path=root/'supplemental'/f'{case_id}.pdf';assert not path.exists()
+ facts=describe_bytes(data);assert all(s['digestMatches'] for s in facts['signatures'])
+ sig=reader(data).embedded_signatures[0].sig_object;rs=sig['/ByteRange'];signed=b''.join(data[int(rs[i]):int(rs[i])+int(rs[i+1])] for i in range(0,len(rs),2))
+ with tempfile.TemporaryDirectory(prefix='epdf-indirect-cms-') as tmp:
+  t=Path(tmp);(t/'sig.der').write_bytes(cms.ContentInfo.load(sig['/Contents'].original_bytes).dump());(t/'signed.bin').write_bytes(signed)
+  result=subprocess.run(['openssl','cms','-verify','-inform','DER','-in',str(t/'sig.der'),'-content',str(t/'signed.bin'),'-binary','-noverify','-out','/dev/null'],capture_output=True)
+  assert result.returncode==0,result.stderr
+ path.write_bytes(data)
+ cases.append(dict(id=case_id,file=path.name,profile='approval',layout='inline-array-indirect-annotations',action=action,facts=facts,cmsVerified=True,acrobat='unobserved',comparison='Direct generation exactly reproduced frozen approval-inline-control bytes. Only intentional change before signing is moving the four identical markup dictionaries into indirect objects; appearance object numbers and bytes unchanged. Annots array stays inline; no NM added. Signature object numbers/bytes and offsets necessarily differ between separately signed baselines.',pageBodyByteIdentical=action!='control',originalDirectControlSha256=hashlib.sha256(direct).hexdigest()))
+p=root/'supplemental/manifest.json';m=json.loads(p.read_text());m['cases'].extend(cases);p.write_text(json.dumps(m,indent=2)+'\n')
+p=root/'acrobat-checklist.csv'
+with p.open(newline='') as f:reader_csv=csv.DictReader(f);fields=reader_csv.fieldnames;rows=list(reader_csv)
+for c in cases:rows.append(dict(id=c['id'],file='supplemental/'+c['file'],sha256=c['facts']['sha256'],profile=c['profile'],layout=c['layout'],action=c['action']))
+with p.open('w',newline='') as f:w=csv.DictWriter(f,fieldnames=fields);w.writeheader();w.writerows(rows)
+for c in cases:print(json.dumps({'file':c['file'],'sha256':c['facts']['sha256'],'cmsVerified':True}))
+print('Matched direct baseline reproduced byte for byte; annotation and appearance equality verified.')

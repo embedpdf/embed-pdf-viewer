@@ -1,0 +1,1951 @@
+{
+  "cases": [
+    {
+      "id": "approval-inline-control",
+      "profile": "approval",
+      "layout": "inline",
+      "action": "control",
+      "file": "approval-inline-control.pdf",
+      "facts": {
+        "sha256": "6ca67fa9b008d4d0e3fb142b57122b871367c163f805ac07f1a611f9a839d940",
+        "byteLength": 21495,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4002,
+              20388,
+              1107
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "approval-inline-delete",
+      "profile": "approval",
+      "layout": "inline",
+      "action": "delete",
+      "file": "approval-inline-delete.pdf",
+      "facts": {
+        "sha256": "cba60f1427b3b6c59941915a15e910f80fceca386a5f715253a59a8b7e916fab",
+        "byteLength": 22246,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4002,
+              20388,
+              1107
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "approval-inline-delete-names",
+      "profile": "approval",
+      "layout": "inline",
+      "action": "delete-names",
+      "file": "approval-inline-delete-names.pdf",
+      "facts": {
+        "sha256": "04c5f6e0664797f7a1404e2b8015e65d02e7eb3bedb102e5846b21475b07c797",
+        "byteLength": 22321,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4002,
+              20388,
+              1107
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "approval-inline-names",
+      "profile": "approval",
+      "layout": "inline",
+      "action": "names",
+      "file": "approval-inline-names.pdf",
+      "facts": {
+        "sha256": "50356d25c243f01a06b3941928c40c247d767a15eb8881576ba333b8b517cb77",
+        "byteLength": 22468,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4002,
+              20388,
+              1107
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "approval-inline-reorder",
+      "profile": "approval",
+      "layout": "inline",
+      "action": "reorder",
+      "file": "approval-inline-reorder.pdf",
+      "facts": {
+        "sha256": "dd9eaf3291e8b898d60a6ca0e1f91c5fdd1baa747f42df2d291e25dcae0efe6e",
+        "byteLength": 22368,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4002,
+              20388,
+              1107
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "approval-inline-reorder-names",
+      "profile": "approval",
+      "layout": "inline",
+      "action": "reorder-names",
+      "file": "approval-inline-reorder-names.pdf",
+      "facts": {
+        "sha256": "b2bbbde3bed3cf7ae4fb9c4b148cd7cb9011afbc0f1158c1b5d81e329db81b8c",
+        "byteLength": 22468,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4002,
+              20388,
+              1107
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "approval-indirect-array-control",
+      "profile": "approval",
+      "layout": "indirect-array",
+      "action": "control",
+      "file": "approval-indirect-array-control.pdf",
+      "facts": {
+        "sha256": "7578011b3766235fea418b19e8febd5859e9740aed1ab1b7a79e13c6e4494804",
+        "byteLength": 21538,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4025,
+              20411,
+              1127
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "approval-indirect-array-delete",
+      "profile": "approval",
+      "layout": "indirect-array",
+      "action": "delete",
+      "file": "approval-indirect-array-delete.pdf",
+      "facts": {
+        "sha256": "196b775dd5f9c1943eb7b480c915bd69726a5010d79bb983668b9238699d2b39",
+        "byteLength": 22168,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4025,
+              20411,
+              1127
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "approval-indirect-array-delete-names",
+      "profile": "approval",
+      "layout": "indirect-array",
+      "action": "delete-names",
+      "file": "approval-indirect-array-delete-names.pdf",
+      "facts": {
+        "sha256": "f8df1b2c5f3757c315f939300c8a227d986e1e10d2d481142457526dadb08596",
+        "byteLength": 22243,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4025,
+              20411,
+              1127
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "approval-indirect-array-names",
+      "profile": "approval",
+      "layout": "indirect-array",
+      "action": "names",
+      "file": "approval-indirect-array-names.pdf",
+      "facts": {
+        "sha256": "a7df233bd8a6ee048057cd54437d47dcdaa31cdf99e8e598c5a9161b5281268d",
+        "byteLength": 22390,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4025,
+              20411,
+              1127
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "approval-indirect-array-reorder",
+      "profile": "approval",
+      "layout": "indirect-array",
+      "action": "reorder",
+      "file": "approval-indirect-array-reorder.pdf",
+      "facts": {
+        "sha256": "5d5b829597dae024a1287f40db1e4b33e69e38319c222611e43f8c76e1642921",
+        "byteLength": 22290,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4025,
+              20411,
+              1127
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "approval-indirect-array-reorder-names",
+      "profile": "approval",
+      "layout": "indirect-array",
+      "action": "reorder-names",
+      "file": "approval-indirect-array-reorder-names.pdf",
+      "facts": {
+        "sha256": "3caab5b9c4630b59381a319110355e6806651cc3cb793536d257895b8f0a2126",
+        "byteLength": 22390,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4025,
+              20411,
+              1127
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "p3-inline-control",
+      "profile": "p3",
+      "layout": "inline",
+      "action": "control",
+      "file": "p3-inline-control.pdf",
+      "facts": {
+        "sha256": "fbc61cc9d7cd92e46ba81eedf2f7376b445c8897ea4873e6ed459342e37255dd",
+        "byteLength": 21648,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4024,
+              20410,
+              1238
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "p3-inline-delete",
+      "profile": "p3",
+      "layout": "inline",
+      "action": "delete",
+      "file": "p3-inline-delete.pdf",
+      "facts": {
+        "sha256": "b8f7b9318382ceee86bf2af4a55df89413f501573e0cbf3a18858ac53d46d2ab",
+        "byteLength": 22399,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4024,
+              20410,
+              1238
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "p3-inline-delete-names",
+      "profile": "p3",
+      "layout": "inline",
+      "action": "delete-names",
+      "file": "p3-inline-delete-names.pdf",
+      "facts": {
+        "sha256": "70156ece31ab032b891d46a55c21f0e9c3fcf2d5bab1377c2e8e20e83f4d0b29",
+        "byteLength": 22474,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4024,
+              20410,
+              1238
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "p3-inline-names",
+      "profile": "p3",
+      "layout": "inline",
+      "action": "names",
+      "file": "p3-inline-names.pdf",
+      "facts": {
+        "sha256": "00410e34164df1b099a6179919e77f5e6a47f14f69081cf9509628f0c3d3c655",
+        "byteLength": 22621,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4024,
+              20410,
+              1238
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "p3-inline-reorder",
+      "profile": "p3",
+      "layout": "inline",
+      "action": "reorder",
+      "file": "p3-inline-reorder.pdf",
+      "facts": {
+        "sha256": "de7515a9097662cff5cf75c7c9946421afdd7847b74819fd12852219541acc6c",
+        "byteLength": 22521,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4024,
+              20410,
+              1238
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "p3-inline-reorder-names",
+      "profile": "p3",
+      "layout": "inline",
+      "action": "reorder-names",
+      "file": "p3-inline-reorder-names.pdf",
+      "facts": {
+        "sha256": "2fe7ffec880f9e8ae9af626611b3b04cfd2bb62f875b1a106fa78cf0786d8ab9",
+        "byteLength": 22621,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4024,
+              20410,
+              1238
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "p3-indirect-array-control",
+      "profile": "p3",
+      "layout": "indirect-array",
+      "action": "control",
+      "file": "p3-indirect-array-control.pdf",
+      "facts": {
+        "sha256": "82a603e47ffe0b3753b4871fc2761cb46f940da994300316bf5b87fb66521715",
+        "byteLength": 21691,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4047,
+              20433,
+              1258
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "p3-indirect-array-delete",
+      "profile": "p3",
+      "layout": "indirect-array",
+      "action": "delete",
+      "file": "p3-indirect-array-delete.pdf",
+      "facts": {
+        "sha256": "67192f80560ade1aa321b13e2e41c2af1fe482a453f5d5000b0213a45ebc4314",
+        "byteLength": 22321,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4047,
+              20433,
+              1258
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "p3-indirect-array-delete-names",
+      "profile": "p3",
+      "layout": "indirect-array",
+      "action": "delete-names",
+      "file": "p3-indirect-array-delete-names.pdf",
+      "facts": {
+        "sha256": "7b96ad062fea769130d07d8b297ca08aab221b84ede22f4d6324e97dec2e1ec9",
+        "byteLength": 22396,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4047,
+              20433,
+              1258
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "p3-indirect-array-names",
+      "profile": "p3",
+      "layout": "indirect-array",
+      "action": "names",
+      "file": "p3-indirect-array-names.pdf",
+      "facts": {
+        "sha256": "cce7f8dbe9e2ea3c7bf13d93e3b2067a68f1f060d27eba8408e4521bee1651b9",
+        "byteLength": 22543,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4047,
+              20433,
+              1258
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "p3-indirect-array-reorder",
+      "profile": "p3",
+      "layout": "indirect-array",
+      "action": "reorder",
+      "file": "p3-indirect-array-reorder.pdf",
+      "facts": {
+        "sha256": "9a1b8d5d709a624aebe291af3f0dfe0bb3ba3736c85bc02ebd32c4e173b617ae",
+        "byteLength": 22443,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4047,
+              20433,
+              1258
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "p3-indirect-array-reorder-names",
+      "profile": "p3",
+      "layout": "indirect-array",
+      "action": "reorder-names",
+      "file": "p3-indirect-array-reorder-names.pdf",
+      "facts": {
+        "sha256": "cd7d4584713e8aacca13e89fb5301101e03e0788ca9a6a2b206294beb38ce219",
+        "byteLength": 22543,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4047,
+              20433,
+              1258
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "p2-inline-control",
+      "profile": "p2",
+      "layout": "inline",
+      "action": "control",
+      "file": "p2-inline-control.pdf",
+      "facts": {
+        "sha256": "08bbe682ea23c2c3b8232e0ba420dbe7ce508d2ea30bbc5f1777be60c19a753f",
+        "byteLength": 21648,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4024,
+              20410,
+              1238
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "p2-inline-delete",
+      "profile": "p2",
+      "layout": "inline",
+      "action": "delete",
+      "file": "p2-inline-delete.pdf",
+      "facts": {
+        "sha256": "06180daf385bb2ef2573cf0f9e198b832f0cbf2d02379136c89a79a7b576bc27",
+        "byteLength": 22399,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4024,
+              20410,
+              1238
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "p2-inline-delete-names",
+      "profile": "p2",
+      "layout": "inline",
+      "action": "delete-names",
+      "file": "p2-inline-delete-names.pdf",
+      "facts": {
+        "sha256": "a3dcb286fea7420304bb7c81fedeb9472be6f995b07bfeb31217eb3861d22176",
+        "byteLength": 22474,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4024,
+              20410,
+              1238
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "p2-inline-names",
+      "profile": "p2",
+      "layout": "inline",
+      "action": "names",
+      "file": "p2-inline-names.pdf",
+      "facts": {
+        "sha256": "e1723ae7af7fa63ecf1469a54f8e57b18a81b55461114e6681812274a0f1ec60",
+        "byteLength": 22621,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4024,
+              20410,
+              1238
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "p2-inline-reorder",
+      "profile": "p2",
+      "layout": "inline",
+      "action": "reorder",
+      "file": "p2-inline-reorder.pdf",
+      "facts": {
+        "sha256": "14b55850d87857f3b70af7b1404a41b0d676dc334f7cdd89cf9f00be8e06ab4e",
+        "byteLength": 22521,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4024,
+              20410,
+              1238
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "p2-inline-reorder-names",
+      "profile": "p2",
+      "layout": "inline",
+      "action": "reorder-names",
+      "file": "p2-inline-reorder-names.pdf",
+      "facts": {
+        "sha256": "066a7165bbbe66feab702d9cb711e486782ad0f9150bc101c290f2dd1c429ab6",
+        "byteLength": 22621,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4024,
+              20410,
+              1238
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "p2-indirect-array-control",
+      "profile": "p2",
+      "layout": "indirect-array",
+      "action": "control",
+      "file": "p2-indirect-array-control.pdf",
+      "facts": {
+        "sha256": "5f1e9422be018bdb23a4ed559fdc4a53ba6605812e7e69a601a96454c55dc471",
+        "byteLength": 21691,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4047,
+              20433,
+              1258
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "p2-indirect-array-delete",
+      "profile": "p2",
+      "layout": "indirect-array",
+      "action": "delete",
+      "file": "p2-indirect-array-delete.pdf",
+      "facts": {
+        "sha256": "f99db29e4c857a817328069a751d37d8a6cbd66b933cb06fde920f58c63dc004",
+        "byteLength": 22321,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4047,
+              20433,
+              1258
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "p2-indirect-array-delete-names",
+      "profile": "p2",
+      "layout": "indirect-array",
+      "action": "delete-names",
+      "file": "p2-indirect-array-delete-names.pdf",
+      "facts": {
+        "sha256": "010fe2e88bb5599d67274552bed0e6c5d0cb13e51f332ad32d31e7e0ae986ea3",
+        "byteLength": 22396,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4047,
+              20433,
+              1258
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "p2-indirect-array-names",
+      "profile": "p2",
+      "layout": "indirect-array",
+      "action": "names",
+      "file": "p2-indirect-array-names.pdf",
+      "facts": {
+        "sha256": "225f52985c5ba3f8a9f8f406dab013f7f8071d0762a155817ee12e569532c230",
+        "byteLength": 22543,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4047,
+              20433,
+              1258
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "p2-indirect-array-reorder",
+      "profile": "p2",
+      "layout": "indirect-array",
+      "action": "reorder",
+      "file": "p2-indirect-array-reorder.pdf",
+      "facts": {
+        "sha256": "c6001a1f7a68cdd627361822369efd24a755b04a100a66dda3ab0975e2770a3e",
+        "byteLength": 22443,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4047,
+              20433,
+              1258
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "p2-indirect-array-reorder-names",
+      "profile": "p2",
+      "layout": "indirect-array",
+      "action": "reorder-names",
+      "file": "p2-indirect-array-reorder-names.pdf",
+      "facts": {
+        "sha256": "849f6aee2c26963ae4d6a422fda5e0d76a4d0a6f677000aaa0fe9c65ee55115b",
+        "byteLength": 22543,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4047,
+              20433,
+              1258
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "fieldmdp-inline-control",
+      "profile": "fieldmdp",
+      "layout": "inline",
+      "action": "control",
+      "file": "fieldmdp-inline-control.pdf",
+      "facts": {
+        "sha256": "c99d9458bd62cc985b2e055c274503a67237c88f415543794b96a4d47a7d5a09",
+        "byteLength": 21735,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4074,
+              20460,
+              1275
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "fieldmdp-inline-delete",
+      "profile": "fieldmdp",
+      "layout": "inline",
+      "action": "delete",
+      "file": "fieldmdp-inline-delete.pdf",
+      "facts": {
+        "sha256": "6840dfc576b1557dab25888d17f89b1f37dbe0ca0023b6693135355c56e8d518",
+        "byteLength": 22486,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4074,
+              20460,
+              1275
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "fieldmdp-inline-delete-names",
+      "profile": "fieldmdp",
+      "layout": "inline",
+      "action": "delete-names",
+      "file": "fieldmdp-inline-delete-names.pdf",
+      "facts": {
+        "sha256": "956ea29536635053e9b8fbd5068e814db4602731ed1d1d10f4b67dea04fd37d4",
+        "byteLength": 22561,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4074,
+              20460,
+              1275
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "fieldmdp-inline-names",
+      "profile": "fieldmdp",
+      "layout": "inline",
+      "action": "names",
+      "file": "fieldmdp-inline-names.pdf",
+      "facts": {
+        "sha256": "f0403caecdb7047cc2dec0729c84cd9382842d797057ab803d7d400494dc2fd2",
+        "byteLength": 22708,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4074,
+              20460,
+              1275
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "fieldmdp-inline-reorder",
+      "profile": "fieldmdp",
+      "layout": "inline",
+      "action": "reorder",
+      "file": "fieldmdp-inline-reorder.pdf",
+      "facts": {
+        "sha256": "66de07bd664bba99f098d7ab980984beda9fcb67c10756792b38a5cec9cc91ae",
+        "byteLength": 22608,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4074,
+              20460,
+              1275
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "fieldmdp-inline-reorder-names",
+      "profile": "fieldmdp",
+      "layout": "inline",
+      "action": "reorder-names",
+      "file": "fieldmdp-inline-reorder-names.pdf",
+      "facts": {
+        "sha256": "99319e33e93f3d8698e9f94d2fd2dba5b1613365ca7a963bd4e30f1252473d27",
+        "byteLength": 22708,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4074,
+              20460,
+              1275
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "fieldmdp-indirect-array-control",
+      "profile": "fieldmdp",
+      "layout": "indirect-array",
+      "action": "control",
+      "file": "fieldmdp-indirect-array-control.pdf",
+      "facts": {
+        "sha256": "d6bcafa1807762565c576ad4cec01d59399a87c6682cf8014c8d5d27f6f6af99",
+        "byteLength": 21778,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4097,
+              20483,
+              1295
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "fieldmdp-indirect-array-delete",
+      "profile": "fieldmdp",
+      "layout": "indirect-array",
+      "action": "delete",
+      "file": "fieldmdp-indirect-array-delete.pdf",
+      "facts": {
+        "sha256": "0702c9946e792ace7c27ea61858270b9fba3701e156ba438f4a47ac62d7f6544",
+        "byteLength": 22408,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4097,
+              20483,
+              1295
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "fieldmdp-indirect-array-delete-names",
+      "profile": "fieldmdp",
+      "layout": "indirect-array",
+      "action": "delete-names",
+      "file": "fieldmdp-indirect-array-delete-names.pdf",
+      "facts": {
+        "sha256": "3f97bb72dd1a7bc66794d3f745b8596a48381847d7efd453aad0c875a1ca7ab2",
+        "byteLength": 22483,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4097,
+              20483,
+              1295
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "fieldmdp-indirect-array-names",
+      "profile": "fieldmdp",
+      "layout": "indirect-array",
+      "action": "names",
+      "file": "fieldmdp-indirect-array-names.pdf",
+      "facts": {
+        "sha256": "5d13a8f39aec40d7b51d2dd1329b7f96d9aa168debb155b1b20fce80e6e36ad5",
+        "byteLength": 22630,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4097,
+              20483,
+              1295
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "fieldmdp-indirect-array-reorder",
+      "profile": "fieldmdp",
+      "layout": "indirect-array",
+      "action": "reorder",
+      "file": "fieldmdp-indirect-array-reorder.pdf",
+      "facts": {
+        "sha256": "e4acef4cf3fc0de52943f9c6903648c23327811ee64b6be435afafb06ec56c1a",
+        "byteLength": 22530,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4097,
+              20483,
+              1295
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "fieldmdp-indirect-array-reorder-names",
+      "profile": "fieldmdp",
+      "layout": "indirect-array",
+      "action": "reorder-names",
+      "file": "fieldmdp-indirect-array-reorder-names.pdf",
+      "facts": {
+        "sha256": "694012f3cc60fc14a326afeb26fb71b4ad5a6dcbdcedee5acd11a9205526cf6b",
+        "byteLength": 22630,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4097,
+              20483,
+              1295
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "lockp2-inline-control",
+      "profile": "lockp2",
+      "layout": "inline",
+      "action": "control",
+      "file": "lockp2-inline-control.pdf",
+      "facts": {
+        "sha256": "7d772fae7622294184de9e14c848aadfc8a4f9165fed9e89f1443a9089092804",
+        "byteLength": 21543,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4050,
+              20436,
+              1107
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "lockp2-inline-delete",
+      "profile": "lockp2",
+      "layout": "inline",
+      "action": "delete",
+      "file": "lockp2-inline-delete.pdf",
+      "facts": {
+        "sha256": "3952f861b2c6a1654e4f83b233fcdce2e8561e4e0ab040153254b3eb5dac7378",
+        "byteLength": 22294,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4050,
+              20436,
+              1107
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "lockp2-inline-delete-names",
+      "profile": "lockp2",
+      "layout": "inline",
+      "action": "delete-names",
+      "file": "lockp2-inline-delete-names.pdf",
+      "facts": {
+        "sha256": "c9b567a410888a1d8a5d257a7342575eadcb514047b0d6ab1ec169d81ff89738",
+        "byteLength": 22369,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4050,
+              20436,
+              1107
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "lockp2-inline-names",
+      "profile": "lockp2",
+      "layout": "inline",
+      "action": "names",
+      "file": "lockp2-inline-names.pdf",
+      "facts": {
+        "sha256": "5c80d5573dd0eb7f0776fb17a987e49831039b79ab20289551ec016a89a000a3",
+        "byteLength": 22516,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4050,
+              20436,
+              1107
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "lockp2-inline-reorder",
+      "profile": "lockp2",
+      "layout": "inline",
+      "action": "reorder",
+      "file": "lockp2-inline-reorder.pdf",
+      "facts": {
+        "sha256": "eb413032bf1364596ac7f04f87c8359dfec6b6e9f4f10519f6763e7de38d9d79",
+        "byteLength": 22416,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4050,
+              20436,
+              1107
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "lockp2-inline-reorder-names",
+      "profile": "lockp2",
+      "layout": "inline",
+      "action": "reorder-names",
+      "file": "lockp2-inline-reorder-names.pdf",
+      "facts": {
+        "sha256": "b911e3bdcd9185493cad0cb6893b169b0ddb68338b924bfa9d18afb493e5deb4",
+        "byteLength": 22516,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4050,
+              20436,
+              1107
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "lockp2-indirect-array-control",
+      "profile": "lockp2",
+      "layout": "indirect-array",
+      "action": "control",
+      "file": "lockp2-indirect-array-control.pdf",
+      "facts": {
+        "sha256": "777cbcd7682dabcc8fd97cf06275d80dfe7ae0ec8aa20760d51ad664980bbba7",
+        "byteLength": 21586,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4073,
+              20459,
+              1127
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "lockp2-indirect-array-delete",
+      "profile": "lockp2",
+      "layout": "indirect-array",
+      "action": "delete",
+      "file": "lockp2-indirect-array-delete.pdf",
+      "facts": {
+        "sha256": "966ae95d41859a68432ff299f676fab52fc9c33b323d31c6800f2dbec9765c62",
+        "byteLength": 22216,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4073,
+              20459,
+              1127
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "lockp2-indirect-array-delete-names",
+      "profile": "lockp2",
+      "layout": "indirect-array",
+      "action": "delete-names",
+      "file": "lockp2-indirect-array-delete-names.pdf",
+      "facts": {
+        "sha256": "6f72c11a651f058f32eb7cb7ae85d2e983cb7c89e8247b7e7767abb1c45cd75e",
+        "byteLength": 22291,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4073,
+              20459,
+              1127
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "lockp2-indirect-array-names",
+      "profile": "lockp2",
+      "layout": "indirect-array",
+      "action": "names",
+      "file": "lockp2-indirect-array-names.pdf",
+      "facts": {
+        "sha256": "9e8824ba5f497a34060e8bb62105e8327f47e99952d7f13218c0815e67e6052f",
+        "byteLength": 22438,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4073,
+              20459,
+              1127
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "lockp2-indirect-array-reorder",
+      "profile": "lockp2",
+      "layout": "indirect-array",
+      "action": "reorder",
+      "file": "lockp2-indirect-array-reorder.pdf",
+      "facts": {
+        "sha256": "4e73e24ffcaca53994e7b285483d375e9adb446f60e0c868765289aa097cb4b3",
+        "byteLength": 22338,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4073,
+              20459,
+              1127
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "lockp2-indirect-array-reorder-names",
+      "profile": "lockp2",
+      "layout": "indirect-array",
+      "action": "reorder-names",
+      "file": "lockp2-indirect-array-reorder-names.pdf",
+      "facts": {
+        "sha256": "bc2890a0bf209caad23590d77da50f661891459dbab0521657fe5ce08bd04686",
+        "byteLength": 22438,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4073,
+              20459,
+              1127
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "locked-markup-inline-control",
+      "profile": "locked-markup",
+      "layout": "inline",
+      "action": "control",
+      "file": "locked-markup-inline-control.pdf",
+      "facts": {
+        "sha256": "20fe34f3eb83f10c30692a59a199a8e8481c23f479f711cc268b4662634f2c34",
+        "byteLength": 21502,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4009,
+              20395,
+              1107
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "locked-markup-inline-delete",
+      "profile": "locked-markup",
+      "layout": "inline",
+      "action": "delete",
+      "file": "locked-markup-inline-delete.pdf",
+      "facts": {
+        "sha256": "7734624578c5d175620d80eef0db937f6bf0612a4ff84c6d6f5970ec6baf8a82",
+        "byteLength": 22255,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4009,
+              20395,
+              1107
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "locked-markup-inline-delete-names",
+      "profile": "locked-markup",
+      "layout": "inline",
+      "action": "delete-names",
+      "file": "locked-markup-inline-delete-names.pdf",
+      "facts": {
+        "sha256": "4bdaf4b8a5b0b74eea821c8ebfd3e146c29f8de8583eca9b737d482a6033d794",
+        "byteLength": 22305,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4009,
+              20395,
+              1107
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "locked-markup-inline-names",
+      "profile": "locked-markup",
+      "layout": "inline",
+      "action": "names",
+      "file": "locked-markup-inline-names.pdf",
+      "facts": {
+        "sha256": "f8ba3c73eaf5d2a4076a476485681b3ebb02995de3313aa32050a10a2e0056b6",
+        "byteLength": 22452,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4009,
+              20395,
+              1107
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "locked-markup-inline-reorder",
+      "profile": "locked-markup",
+      "layout": "inline",
+      "action": "reorder",
+      "file": "locked-markup-inline-reorder.pdf",
+      "facts": {
+        "sha256": "86209531da1c0e768b69a5c7080bc531e775e088a1de7a51b60edd30d7fa021f",
+        "byteLength": 22377,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4009,
+              20395,
+              1107
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "locked-markup-inline-reorder-names",
+      "profile": "locked-markup",
+      "layout": "inline",
+      "action": "reorder-names",
+      "file": "locked-markup-inline-reorder-names.pdf",
+      "facts": {
+        "sha256": "ba480e3b308ab9894d69f79680dd83454b6e7dbda77339d42d6ea80727ef762e",
+        "byteLength": 22452,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4009,
+              20395,
+              1107
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "locked-markup-indirect-array-control",
+      "profile": "locked-markup",
+      "layout": "indirect-array",
+      "action": "control",
+      "file": "locked-markup-indirect-array-control.pdf",
+      "facts": {
+        "sha256": "7a95e0751de8d8fdab18dfc887dc62693d54233ea69abfb91c2ae85326e4f782",
+        "byteLength": 21545,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4032,
+              20418,
+              1127
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "locked-markup-indirect-array-delete",
+      "profile": "locked-markup",
+      "layout": "indirect-array",
+      "action": "delete",
+      "file": "locked-markup-indirect-array-delete.pdf",
+      "facts": {
+        "sha256": "3cabf1125a1ced003db46e5c033b404dc045acd8ea2b960e1f381e31c6c77fcf",
+        "byteLength": 22177,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4032,
+              20418,
+              1127
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "locked-markup-indirect-array-delete-names",
+      "profile": "locked-markup",
+      "layout": "indirect-array",
+      "action": "delete-names",
+      "file": "locked-markup-indirect-array-delete-names.pdf",
+      "facts": {
+        "sha256": "dfb84b6d5a5b2749a308ea728f748716f83512037921f155c6f9538fe498e808",
+        "byteLength": 22227,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4032,
+              20418,
+              1127
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "locked-markup-indirect-array-names",
+      "profile": "locked-markup",
+      "layout": "indirect-array",
+      "action": "names",
+      "file": "locked-markup-indirect-array-names.pdf",
+      "facts": {
+        "sha256": "a114ef91140575b1d6f7931c44c97090fb4bedf229c4a9d22f7b527f733efe3b",
+        "byteLength": 22374,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4032,
+              20418,
+              1127
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "locked-markup-indirect-array-reorder",
+      "profile": "locked-markup",
+      "layout": "indirect-array",
+      "action": "reorder",
+      "file": "locked-markup-indirect-array-reorder.pdf",
+      "facts": {
+        "sha256": "89d2c496417e169ba1e5b0de245205ab2938fa63906ed2b3732ca48c175c3f4e",
+        "byteLength": 22299,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4032,
+              20418,
+              1127
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "locked-markup-indirect-array-reorder-names",
+      "profile": "locked-markup",
+      "layout": "indirect-array",
+      "action": "reorder-names",
+      "file": "locked-markup-indirect-array-reorder-names.pdf",
+      "facts": {
+        "sha256": "d691c8a32c8a63d91d569ab66657cd749807a8c7312be19a0df00388469d7908",
+        "byteLength": 22374,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4032,
+              20418,
+              1127
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": "unobserved"
+    }
+  ],
+  "certificate": "../keys/TEST-ONLY-signer.cer",
+  "cmsVerified": 72,
+  "certificatePathBase": "Investigation directory (weak-annotations), not the manifest subdirectory."
+}

@@ -1,0 +1,105 @@
+import sys, json, subprocess, tempfile, csv, io, hashlib
+from pathlib import Path
+sys.dont_write_bytecode = True
+CORPUS = Path('/Users/bobsingor/GitHub/cloudpdf-platform/oss/embedpdf/packages/engine/main/test/fixtures/signature-compat')
+sys.path.insert(0, str(CORPUS))
+from generate import A, D, N, S, g, signer_for, stream, reader, raw_body, describe_bytes
+from generate_v3 import fresh, seal, append_revision
+from generate_v2 import page_of
+from asn1crypto import cms
+root = Path('/tmp/epdf-weak-nm-probes')
+out = root / 'p3-matched'
+assert not out.exists(), 'Refuse to replace an existing experiment'
+signer = signer_for(CORPUS / 'keys')
+def serialize(obj):
+    b = io.BytesIO(); obj.write_to_stream(b); return b.getvalue()
+def build(indirect):
+    w = fresh(profile='p3'); annotations = page_of(w)['/Annots']
+    for index in range(4):
+        appearance = stream(w, 'q 0 0 1 RG 1 w 1 1 58 38 re S Q', Type=N('/XObject'), Subtype=N('/Form'), BBox=A(0,0,60,40), Resources=D())
+        annotations.append(D(Type=N('/Annot'), Subtype=N('/Square'), Rect=A(310+index*65,420,370+index*65,460), F=g.NumberObject(4), C=A(0,0,1), Contents=S(f'weak-{index}'), AP=D(N=appearance)))
+    if indirect:
+        for index in range(4,8): annotations[index] = w.add_object(annotations[index])
+    return seal(w, signer, certification=3)
+def cert_facts(data):
+    r = reader(data); sig = r.embedded_signatures[0]
+    transforms = sig.sig_object['/Reference']
+    assert len(transforms) == 1
+    transform = transforms[0]
+    assert str(transform['/TransformMethod']) == '/DocMDP'
+    assert int(transform['/TransformParams']['/P']) == 3
+    field_signature = sig.sig_field.raw_get('/V')
+    catalog_signature = r.root['/Perms'].raw_get('/DocMDP')
+    assert (field_signature.idnum,field_signature.generation) == (catalog_signature.idnum,catalog_signature.generation)
+    assert '/Lock' not in sig.sig_field
+    return dict(permission=3,transform='/DocMDP',catalogSignatureObject=catalog_signature.idnum,fieldSignatureObject=field_signature.idnum)
+def verify_cms(data):
+    sig = reader(data).embedded_signatures[0].sig_object; br = sig['/ByteRange']
+    signed = b''.join(data[int(br[i]):int(br[i])+int(br[i+1])] for i in range(0,len(br),2))
+    with tempfile.TemporaryDirectory(prefix='epdf-p3-cms-') as temp:
+        t = Path(temp); (t/'signature.der').write_bytes(cms.ContentInfo.load(sig['/Contents'].original_bytes).dump()); (t/'signed.bin').write_bytes(signed)
+        result = subprocess.run(['openssl','cms','-verify','-inform','DER','-in',str(t/'signature.der'),'-content',str(t/'signed.bin'),'-binary','-noverify','-out','/dev/null'],capture_output=True)
+        assert result.returncode == 0, result.stderr
+bases = {'direct':build(False),'indirect':build(True)}
+assert bases['direct'] == (root/'pdfs/p3-inline-control.pdf').read_bytes(), 'Must reproduce existing P3 direct baseline exactly'
+direct_reader = reader(bases['direct']); indirect_reader = reader(bases['indirect'])
+for layout,r in [('direct',direct_reader),('indirect',indirect_reader)]:
+    assert isinstance(page_of(r).raw_get('/Annots'),g.ArrayObject), 'Array stays inline in both layouts'
+    arr = page_of(r)['/Annots']
+    assert len(arr) == 8
+    for index in range(4,8):
+        assert isinstance(arr.raw_get(index),g.IndirectObject) == (layout=='indirect')
+        assert '/NM' not in arr[index]
+for index in range(4,8):
+    a=page_of(direct_reader)['/Annots'][index]; b=page_of(indirect_reader)['/Annots'][index]
+    assert serialize(a)==serialize(b)
+    assert a['/AP']['/N'].data == b['/AP']['/N'].data
+for key in page_of(direct_reader):
+    if key != '/Annots': assert serialize(page_of(direct_reader).raw_get(key)) == serialize(page_of(indirect_reader).raw_get(key))
+outputs = []
+for layout,base in bases.items():
+    for action in ['control','rewrite','delete','delete-names','names']:
+        r = reader(base); page = page_of(r); page_ref = r.root['/Pages']['/Kids'].raw_get(0); arr = page['/Annots']; objects = {}
+        if action == 'rewrite': objects[page_ref.idnum] = raw_body(base,page_ref.idnum)
+        elif action != 'control':
+            if action.startswith('delete'):
+                target = next(i for i,a in enumerate(arr) if a.get_object().get('/Contents')=='weak-1')
+                arr.pop(target)
+            if 'names' in action:
+                for a in arr:
+                    annotation=a.get_object()
+                    if annotation.get('/Subtype')=='/Square':
+                        annotation[N('/NM')]=S('probe-'+str(annotation['/Contents']))
+                        if isinstance(a,g.IndirectObject): objects[a.idnum]=serialize(annotation)
+            if action.startswith('delete') or layout=='direct': objects[page_ref.idnum]=serialize(page)
+        data = base if action=='control' else append_revision(base,objects)
+        assert data.startswith(base)
+        previous=reader(base); current=reader(data)
+        cert=cert_facts(data); facts=describe_bytes(data)
+        assert all(s['digestMatches'] for s in facts['signatures']); verify_cms(data)
+        old_annotations={str(a.get_object()['/Contents']):a.get_object() for a in page_of(previous)['/Annots'] if a.get_object().get('/Subtype')=='/Square'}
+        new_annotations={str(a.get_object()['/Contents']):a.get_object() for a in page_of(current)['/Annots'] if a.get_object().get('/Subtype')=='/Square'}
+        assert list(new_annotations)==(['weak-0','weak-2','weak-3'] if action.startswith('delete') else ['weak-0','weak-1','weak-2','weak-3'])
+        for name,annotation in new_annotations.items():
+            expected_keys=set(old_annotations[name]) | ({N('/NM')} if 'names' in action else set())
+            assert set(annotation)==expected_keys
+            for key in old_annotations[name]: assert serialize(annotation.raw_get(key))==serialize(old_annotations[name].raw_get(key))
+            if 'names' in action: assert str(annotation['/NM'])=='probe-'+name
+            assert annotation['/AP']['/N'].data==old_annotations[name]['/AP']['/N'].data
+        for field in previous.root['/AcroForm']['/Fields']: assert raw_body(base,field.idnum)==raw_body(data,field.idnum)
+        sig_num=cert['catalogSignatureObject']; assert raw_body(base,sig_num)==raw_body(data,sig_num)
+        if action=='rewrite': assert raw_body(base,page_ref.idnum)==raw_body(data,page_ref.idnum)
+        case_id=f'p3-{layout}-{action}'
+        case=dict(id=case_id,file=case_id+'.pdf',profile='p3',layout=layout,action=action,facts=facts,certification=cert,cmsVerified=True,acrobat='unobserved',signedPrefixPreserved=True,fieldsAndWidgetsByteIdentical=True,pageBodyByteIdentical=action in ['control','rewrite'],updatedObjectNumbers=sorted(objects),comparison='Inline Annots array in both layouts. Only annotation dictionaries differ in direct/indirect storage before certification. Same writer and page-only operation for rewrite; no NM added except in names variants.')
+        outputs.append((case,data))
+out.mkdir()
+for case,data in outputs: (out/case['file']).write_bytes(data)
+(out/'manifest.json').write_text(json.dumps(dict(certificate=str(CORPUS/'keys/TEST-ONLY-signer.cer'),cases=[c for c,_ in outputs],directBaselineReproduced=True),indent=2)+'\n')
+p=root/'acrobat-checklist.csv'
+with p.open(newline='') as f: rr=csv.DictReader(f); fields=rr.fieldnames; rows=list(rr)
+existing_ids={row['id'] for row in rows}
+for c,_ in outputs:
+    assert c['id'] not in existing_ids
+    rows.append(dict(id=c['id'],file='p3-matched/'+c['file'],sha256=c['facts']['sha256'],profile='p3',layout=c['layout'],action=c['action']))
+with p.open('w',newline='') as f: ww=csv.DictWriter(f,fieldnames=fields); ww.writeheader(); ww.writerows(rows)
+print(json.dumps({'generated':len(outputs),'explicitDocMdpP':3,'catalogReferenceVerified':True,'cmsVerified':len(outputs),'directBaselineExactlyReproduced':True,'outputDirectory':str(out)}))

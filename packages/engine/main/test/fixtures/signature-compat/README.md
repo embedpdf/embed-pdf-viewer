@@ -19,6 +19,16 @@ observed in the same Acrobat environment on 2026-09-14. Use `acrobat-results-tem
 or its CSV companion to record a new run. See [FINDINGS-V3.md](FINDINGS-V3.md)
 for the new observations and their limits.
 
+## Weak annotation follow-up (2026-09-23)
+
+The separate [weak annotation investigation](weak-annotations/README.md) preserves
+88 PDF files, 12 hash-linked Acrobat screenshots, raw observations, engine
+reports and reproduction tools. It tests direct annotation dictionaries, lazy
+`/NM` naming, identical rewrites and explicit DocMDP P=3. The direct P3 baseline
+was already invalid before editing; the report keeps this separate from failures
+caused by subsequent mutations. These diagnostics are not promoted policy
+expectations and do not change the 91-case v1/v2/v3 corpus above.
+
 ## Start here in Acrobat
 
 1. Open `v1/01-approval-control.pdf` and `v1/22-aes128-control.pdf`. Neither has
