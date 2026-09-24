@@ -31,7 +31,10 @@
 <div
   bind:this={zoomGesture.elementRef}
   {...restProps}
-  style:display="inline-block"
+  style:display="block"
+  style:width="fit-content"
+  style:margin-left="auto"
+  style:margin-right="auto"
   style:overflow="visible"
   style:box-sizing="border-box"
   class={propsClass}
