@@ -104,6 +104,7 @@ import type { PageRotateInput } from '../mutation/PageRotateInput';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
 import type { PageStructureCache } from '../mutation/PageStructureCache';
 import type { RefetchReason } from '../mutation/RefetchReason';
+import type { AnnotationExportSelection } from '../transfer/exportSelection';
 import { fromBase64, toBase64 } from '../resource/base64';
 import type { PageState } from '../revision/PageState';
 import type { WeakAnnotationState } from '../revision/WeakAnnotationState';
@@ -1061,6 +1062,15 @@ export const AnnotationAppearanceExportInputSchema: z.ZodType<AnnotationAppearan
   z.object({
     refs: z.array(AnnotationRefSchema).min(1),
   });
+
+/** `doc.annotations.export` selection — see `AnnotationExportSelection`. */
+export const AnnotationExportSelectionSchema: z.ZodType<AnnotationExportSelection> = z
+  .object({
+    refs: z.array(AnnotationRefSchema).optional(),
+    pages: z.array(PageRefSchema).optional(),
+    include: z.enum(['references', 'threads']).optional(),
+  })
+  .strict();
 
 export const PageFlattenInputSchema: z.ZodType<PageFlattenInput> = z.object({
   pages: z.array(PageRefSchema),

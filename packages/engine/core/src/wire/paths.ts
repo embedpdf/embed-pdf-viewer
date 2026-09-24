@@ -1,7 +1,7 @@
 import { encodePageKey, type PageRef } from '../identity/PageRef';
 import type { ModificationLevel } from '../signature/types';
 import { SIGNATURE_POLICY_VERSION } from '../signature/protection';
-import type { AnalysisToken } from './tokens';
+import type { AnalysisToken, AnnotationsExportToken } from './tokens';
 /**
  * Single source of truth for cloud HTTP paths. Both @cloudpdf/engine and
  * @cloudpdf/server import these so they cannot drift.
@@ -54,6 +54,7 @@ import {
   encodeAnnotationAppearancesRenderToken,
   encodeAnnotationToken,
   encodeAnnotationsAllToken,
+  encodeAnnotationsExportToken,
   encodeAttachmentsToken,
   encodeContentToken,
   encodeDocToken,
@@ -384,6 +385,15 @@ export const wirePaths = {
     annotationVersion: number,
   ) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items@${encodeAnnotationToken(annotationVersion)}`,
+
+  /** Immutable base annotation export: a bundle as multipart, needing
+   *  `doc.annotate.read` and `doc.download`. */
+  docAnnotationsExport: (docId: string, token: AnnotationsExportToken) =>
+    `/v1/docs/${encodeURIComponent(docId)}/annotations/export@${encodeAnnotationsExportToken(token)}`,
+
+  /** Immutable layer annotation export (twin of `docAnnotationsExport`). */
+  layerAnnotationsExport: (docId: string, layerName: string, token: AnnotationsExportToken) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/export@${encodeAnnotationsExportToken(token)}`,
 
   /** Immutable layer whole-document annotation listing (bulk hydration). */
   layerAnnotationsAll: (docId: string, layerName: string, annotationsVersion: number) =>

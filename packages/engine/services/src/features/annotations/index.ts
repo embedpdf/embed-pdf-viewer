@@ -3,5 +3,6 @@ export { AnnotationAppearanceReader } from './AnnotationAppearanceReader';
 export { RawAnnotationReader } from './RawAnnotationReader';
 export { AnnotationMutator } from './AnnotationMutator';
 export { AnnotationFlattener } from './AnnotationFlattener';
+export { AnnotationExporter } from './AnnotationExporter';
 export { computeMutationImpact } from './internal/mutations/computeMutationImpact';
 export type { MutationKind, ImpactInputs } from './internal/mutations/computeMutationImpact';

@@ -75,6 +75,8 @@ const RESOURCE_PLANES: Partial<Record<DocResourceId, readonly LayerScopePlane[]>
   'page-render-annotated': ['content', 'annotations'],
   'page-annotations': ['annotations'],
   'annotations-all': ['annotations'],
+  // Positions and boxes of the bundle's pages come from the layout.
+  'annotations-export': ['annotations', 'layout'],
   layout: ['layout'],
   metadata: ['metadata'],
   actions: ['actions'],

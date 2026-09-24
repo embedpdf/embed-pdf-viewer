@@ -81,6 +81,7 @@ export {
   AnnotationFlattenInputSchema,
   AnnotationFlattenResultSchema,
   AnnotationAppearanceExportInputSchema,
+  AnnotationExportSelectionSchema,
   NamedPageEntrySchema,
   PageNameInputSchema,
   PageNameResultSchema,
@@ -200,6 +201,7 @@ export {
   decodeAnnotationAppearancesRenderToken,
   decodeAnnotationToken,
   decodeAnnotationsAllToken,
+  decodeAnnotationsExportToken,
   decodeActionsToken,
   decodeAttachmentsToken,
   decodeContentToken,
@@ -211,6 +213,7 @@ export {
   encodeAnnotationAppearancesRenderToken,
   encodeAnnotationToken,
   encodeAnnotationsAllToken,
+  encodeAnnotationsExportToken,
   encodeActionsToken,
   encodeAttachmentsToken,
   encodeContentToken,
@@ -360,6 +363,7 @@ export type {
   DocumentVersions,
 } from './wire/schemas';
 export { encodeAnalysisToken, decodeAnalysisToken, type AnalysisToken } from './wire/tokens';
+export type { AnnotationsExportToken } from './wire/tokens';
 export { analysisQueryString, type AnalysisQueryInput } from './wire/paths';
 
 export * from './dto/Measure.schema';

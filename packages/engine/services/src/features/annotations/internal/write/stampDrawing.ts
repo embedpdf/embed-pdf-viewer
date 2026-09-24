@@ -7,12 +7,11 @@ import {
 } from '@embedpdf/engine-runtime';
 
 import type { DrawingIndex } from '../../../../document-session/DrawingIndex';
-import { withScratch, withScratchN } from '../../../../runtime/memory/scratch';
+import { withScratch } from '../../../../runtime/memory/scratch';
 import { F32_BYTES } from '../../../../runtime/memory/structs';
+import { sha256Hex } from '../digest';
 
 const FPDF_NO_INCREMENTAL = 1 << 1;
-/** `EPDF_DIGEST_SHA256` from `public/epdf_digest.h`. */
-const EPDF_DIGEST_SHA256 = 1;
 /** Room for an `unsigned long` out-parameter: 8 bytes on 64-bit native. */
 const ULONG_SLOT = 8;
 
@@ -44,7 +43,7 @@ export function drawingFor(
   const dataPtr = mem.alloc(bytes.byteLength);
   try {
     mem.writeBytes(dataPtr, new Uint8Array(bytes));
-    const source = digest(fn, mem, dataPtr, bytes.byteLength);
+    const source = sha256Hex(fn, mem, dataPtr, bytes.byteLength);
     const noted = index.bySource.get(source);
     if (noted !== undefined) return noted;
 
@@ -124,24 +123,10 @@ function savedDigest(fn: PdfFunctions, mem: PdfRuntimeMemory, docPtr: Ptr): stri
       throw new EngineError(EngineErrorCode.Unknown, 'failed to save a stamp drawing');
     }
     try {
-      return digest(fn, mem, pdfPtr, size);
+      return sha256Hex(fn, mem, pdfPtr, size);
     } finally {
       fn.EPDF_FreeBuffer(pdfPtr);
     }
-  });
-}
-
-/** SHA-256 (hex) of `size` bytes at `dataPtr`. */
-function digest(fn: PdfFunctions, mem: PdfRuntimeMemory, dataPtr: Ptr, size: number): string {
-  return withScratchN(mem, [32, ULONG_SLOT], ([outPtr, lenPtr]) => {
-    mem.poke(lenPtr, 'i32', 32, 0);
-    mem.poke(lenPtr, 'i32', 0, 4);
-    if (!fn.EPDF_DigestBuffer(dataPtr, size, EPDF_DIGEST_SHA256, outPtr, lenPtr)) {
-      throw new EngineError(EngineErrorCode.Unknown, 'EPDF_DigestBuffer returned false');
-    }
-    let hex = '';
-    for (const byte of mem.readBytes(outPtr, 32)) hex += byte.toString(16).padStart(2, '0');
-    return hex;
   });
 }
 

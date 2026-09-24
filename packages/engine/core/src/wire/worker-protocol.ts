@@ -35,6 +35,9 @@ import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
 import type { PageRef } from '../identity/PageRef';
+import type { WireAnnotationBundle } from '../transfer/AnnotationBundle';
+import type { AnnotationBundleLimits } from '../transfer/bundleLimits';
+import type { AnnotationExportSelection } from '../transfer/exportSelection';
 import type {
   AnnotationCreateResult,
   AnnotationDeleteResult,
@@ -396,6 +399,17 @@ export interface AnnotationsExportAppearanceWorkerRequest {
   layerName?: string;
   page: PageRef;
   refs: AnnotationRef[];
+}
+
+/** Annotations and their resources as one bundle (`doc.annotations.export`). A read. */
+export interface AnnotationsExportWorkerRequest {
+  kind: 'annotations.export';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  selection: AnnotationExportSelection;
+  /** The limits the bundle must stay within; the defaults otherwise. */
+  limits?: AnnotationBundleLimits;
 }
 
 /** An annotation's `appearance` resource: its drawing, as a one-page PDF (bytes). A read. */
@@ -1149,6 +1163,7 @@ export type WorkerRequest =
   | AttachmentsDeleteWorkerRequest
   | AnnotationsReadFileWorkerRequest
   | AnnotationsReadAppearanceWorkerRequest
+  | AnnotationsExportWorkerRequest
   | MeasureViewportsWorkerRequest
   | MeasureSetScaleWorkerRequest
   | PieceInfoReadWorkerRequest
@@ -1258,6 +1273,7 @@ export type WorkerResultPayload =
     }
   | { tag: 'annotations.exportAppearance'; bytes: ArrayBuffer; size: number }
   | { tag: 'annotations.readAppearance'; bytes: ArrayBuffer; size: number }
+  | { tag: 'annotations.export'; bundle: WireAnnotationBundle }
   | {
       tag: 'annotations.move';
       result: AnnotationMoveResult;

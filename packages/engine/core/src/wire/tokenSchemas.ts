@@ -26,6 +26,16 @@ export const AnnotationsAllTokenSchema = {
   fields: ['annotationsVersion'],
 } as const satisfies TokenSchema;
 
+/**
+ * `doc.annotations.export` leaf: the annotation and layout pins (the bundle
+ * carries each page's position and box, which only the layout pin covers)
+ * and the selection, canonical so one selection is one URL.
+ */
+export const AnnotationsExportTokenSchema = {
+  fields: ['annotationsVersion', 'include', 'layoutVersion', 'selection'],
+  maxLength: 4096,
+} as const satisfies TokenSchema;
+
 export const ActionsTokenSchema = {
   fields: ['actionsVersion'],
 } as const satisfies TokenSchema;

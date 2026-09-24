@@ -23,6 +23,7 @@ export type {
   AttributionSession,
 } from './conformance/runAnnotationAttributionConformance';
 export { runAnnotationResourceConformance } from './conformance/runAnnotationResourceConformance';
+export { runAnnotationExportConformance } from './conformance/runAnnotationExportConformance';
 export type {
   AnnotationResourceConformanceOptions,
   AnnotationResourceFixture,

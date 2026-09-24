@@ -2,6 +2,10 @@ import {
   AbortablePromise,
   EngineError,
   EngineErrorCode,
+  assertAnnotationBundle,
+  type AnnotationBundle,
+  type AnnotationBundleLimits,
+  type AnnotationExportSelection,
   type AnnotationListPageSnapshot,
   type AnnotationListSnapshotAllPages,
   type DocumentAnnotationsService,
@@ -9,6 +13,7 @@ import {
   type ManifestPage,
   type PageObjectNumber,
   type PageRef,
+  type ResourceId,
   type WeakAnnotationEditSession,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -26,6 +31,17 @@ import type { HttpClient } from '../transport/HttpClient';
 /** Bulk-read restarts after a mid-flight mutation staled the pinned
  *  version (404 on the immutable leaf → refresh the manifest → retry). */
 const MAX_COHERENCE_RESTARTS = 2;
+
+/** The server holds the bundle limits; the client only checks what arrived. */
+const NO_LIMITS: AnnotationBundleLimits = {
+  bundleBytes: Infinity,
+  manifestBytes: Infinity,
+  items: Infinity,
+  pages: Infinity,
+  resources: Infinity,
+  resourceBytes: Infinity,
+  imagePixels: Infinity,
+};
 
 export class CloudDocumentAnnotationsService implements DocumentAnnotationsService {
   constructor(
@@ -85,6 +101,84 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
       signal,
     );
     return { ...body, auditHead: body.auditHead ?? manifest.auditHead };
+  }
+
+  /**
+   * One versioned, CDN-cacheable read at the manifest's annotation and
+   * layout pins, with the stale-pin retry (404 → refresh the manifest →
+   * once). The response is the bundle without its bytes and one part per
+   * resource; every part is checked against its id before it is returned.
+   */
+  export(selection: AnnotationExportSelection = {}): AbortablePromise<AnnotationBundle> {
+    if (this.isClosed()) {
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
+      );
+    }
+    if (selection.refs?.some((ref) => ref.kind === 'index')) {
+      return AbortablePromise.rejectReason(
+        new EngineError(
+          EngineErrorCode.InvalidArg,
+          'export names annotations by object number or name, not by position',
+        ),
+      );
+    }
+    return AbortablePromise.run<AnnotationBundle>(async (signal) => {
+      const form = await this.http.getFormDataWithRefresh(
+        async (s) => this.exportPathAt(await this.manifest.get(s), selection),
+        async (s) => {
+          await this.manifest.refresh(s);
+        },
+        signal,
+      );
+      const manifest = form.get('manifest');
+      if (typeof manifest !== 'string') {
+        throw new EngineError(EngineErrorCode.WireFormat, 'annotation export has no manifest part');
+      }
+      const resources: Record<ResourceId, Uint8Array> = {};
+      const parts: Array<[string, FormDataEntryValue]> = [];
+      form.forEach((value, name) => parts.push([name, value]));
+      for (const [name, value] of parts) {
+        if (!name.startsWith('resource:')) continue;
+        if (typeof value === 'string') {
+          throw new EngineError(
+            EngineErrorCode.WireFormat,
+            `annotation export part ${name} is text`,
+          );
+        }
+        resources[name.slice('resource:'.length) as ResourceId] = new Uint8Array(
+          await value.arrayBuffer(),
+        );
+      }
+      const bundle = {
+        ...(JSON.parse(manifest) as Omit<AnnotationBundle, 'resources'>),
+        resources,
+      };
+      await assertAnnotationBundle(bundle, NO_LIMITS);
+      return bundle;
+    });
+  }
+
+  /** The export leaf at the manifest's pins: the base leaf while the layer
+   *  inherits both planes the bundle depends on. */
+  private exportPathAt(manifest: DocumentManifest, selection: AnnotationExportSelection): string {
+    const token = {
+      annotationsVersion: manifest.annotationsVersion,
+      layoutVersion: manifest.layoutVersion,
+      selection,
+    };
+    try {
+      return planesInherited(manifest, ['annotations', 'layout'])
+        ? wirePaths.docAnnotationsExport(this.docId, token)
+        : wirePaths.layerAnnotationsExport(this.docId, this.layerName, token);
+    } catch (error) {
+      // The selection travels in the URL, which has room for a few hundred refs.
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        'the selection is too large for one export: select pages, or fewer annotations at a time',
+        { cause: error },
+      );
+    }
   }
 
   listRaw(page: PageRef): AbortablePromise<AnnotationListPageSnapshot> {

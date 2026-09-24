@@ -224,10 +224,17 @@ export type {
   AnnotationBundleItem,
   AnnotationBundlePage,
   ResourceId,
+  WireAnnotationBundle,
 } from './transfer/AnnotationBundle';
+export type { AnnotationExportSelection } from './transfer/exportSelection';
+export { closeExportSelection, pageRefsIn } from './transfer/exportSelection';
 export { assertAnnotationBundle, resourceIdOf } from './transfer/AnnotationBundle';
 export type { AnnotationBundleLimits } from './transfer/bundleLimits';
-export { DEFAULT_ANNOTATION_BUNDLE_LIMITS, manifestBytesOf } from './transfer/bundleLimits';
+export {
+  assertWithinLimit,
+  DEFAULT_ANNOTATION_BUNDLE_LIMITS,
+  manifestBytesOf,
+} from './transfer/bundleLimits';
 export type { AnnotationTransferOptions } from './transfer/AnnotationTransfer';
 export { AnnotationTransfer } from './transfer/AnnotationTransfer';
 

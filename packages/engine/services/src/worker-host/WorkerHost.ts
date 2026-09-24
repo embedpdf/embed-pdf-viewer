@@ -4,6 +4,7 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 import { MeasureReader, MeasureMutator } from '../features/measure';
 import {
+  DEFAULT_ANNOTATION_BUNDLE_LIMITS,
   EMPTY_TRANSFER,
   EngineError,
   EngineErrorCode,
@@ -76,6 +77,7 @@ import {
   type AttachmentsDeleteWorkerRequest,
   type AnnotationsReadFileWorkerRequest,
   type AnnotationsReadAppearanceWorkerRequest,
+  type AnnotationsExportWorkerRequest,
   type PagesFlattenWorkerRequest,
   type RedactionApplyWorkerRequest,
   type PieceInfoApplicationsWorkerRequest,
@@ -115,6 +117,7 @@ import { DocumentActionsReader } from '../features/actions';
 import {
   AnnotationReader,
   AnnotationAppearanceReader,
+  AnnotationExporter,
   AnnotationFlattener,
   AnnotationMutator,
   RawAnnotationReader,
@@ -403,6 +406,9 @@ export class WorkerHost {
           break;
         case 'annotations.readAppearance':
           resultPack = this.handleAnnotationsReadAppearance(msg, ctrl.signal);
+          break;
+        case 'annotations.export':
+          resultPack = this.handleAnnotationsExport(msg, ctrl.signal);
           break;
         case 'pages.removeName':
           resultPack = this.handlePagesRemoveName(msg, ctrl.signal);
@@ -915,6 +921,19 @@ export class WorkerHost {
       { tag: 'annotations.exportAppearance', bytes: exported.bytes, size: exported.size },
       [exported.bytes],
     );
+  }
+
+  private handleAnnotationsExport(
+    req: AnnotationsExportWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const bundle = new AnnotationExporter(this.runtime, session, this.fonts).export(
+      req.selection,
+      req.limits ?? DEFAULT_ANNOTATION_BUNDLE_LIMITS,
+      signal,
+    );
+    return wirePack({ tag: 'annotations.export', bundle }, Object.values(bundle.resources));
   }
 
   private handleAnnotationsReadAppearance(

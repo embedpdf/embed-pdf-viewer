@@ -181,6 +181,7 @@ export type {
   AttachmentsDeleteWorkerRequest,
   AnnotationsReadFileWorkerRequest,
   AnnotationsReadAppearanceWorkerRequest,
+  AnnotationsExportWorkerRequest,
   AttachmentFileWorkerPayload,
   LayerArtifactWorkerPayload,
   LayerArtifactFileWorkerPayload,

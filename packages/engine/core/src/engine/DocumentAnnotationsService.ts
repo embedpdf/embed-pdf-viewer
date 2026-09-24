@@ -4,6 +4,8 @@ import type {
 } from '../annotation/AnnotationListSnapshot';
 import type { PageRef } from '../identity/PageRef';
 import { AbortablePromise } from '../promise/AbortablePromise';
+import type { AnnotationBundle } from '../transfer/AnnotationBundle';
+import type { AnnotationExportSelection } from '../transfer/exportSelection';
 
 export interface WeakAnnotationEditSession {
   readonly id: string;
@@ -37,4 +39,15 @@ export interface DocumentAnnotationsService {
   listRawAll(): AbortablePromise<AnnotationListSnapshotAllPages>;
   listRaw(page: PageRef): AbortablePromise<AnnotationListPageSnapshot>;
   beginWeakEdit(pages: readonly PageRef[]): AbortablePromise<WeakAnnotationEditSession>;
+  /**
+   * Take annotations out of the document, with the bytes beside them, as one
+   * bundle: every annotation, or the selection with what it points at and,
+   * by default, its threads (see {@link AnnotationExportSelection}). One
+   * drawing is one resource however many stamps place it. Refused with
+   * `PayloadTooLarge`, naming the limit, when the bundle would pass one of
+   * the import limits, and with `NotFound` for a selected page or
+   * annotation the document doesn't have. Needs `doc.annotate.read` and
+   * `doc.download`.
+   */
+  export(selection?: AnnotationExportSelection): AbortablePromise<AnnotationBundle>;
 }

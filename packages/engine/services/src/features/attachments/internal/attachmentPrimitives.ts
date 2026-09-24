@@ -228,7 +228,7 @@ function extractStatusError(status: number): EngineError {
       return new EngineError(EngineErrorCode.MalformedPdf, 'embedded file stream failed to decode');
     case 3: // kSizeLimitExceeded
       return new EngineError(
-        EngineErrorCode.InvalidArg,
+        EngineErrorCode.PayloadTooLarge,
         'embedded file exceeds the configured decoded-size limit',
       );
     case 4: // kWriteFailed

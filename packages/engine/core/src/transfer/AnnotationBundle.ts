@@ -48,6 +48,11 @@ export interface AnnotationBundleItem {
   readonly resources: Readonly<Partial<Record<AnnotationResourceRole, ResourceId>>>;
 }
 
+/** A bundle as a worker returns it: each resource an `ArrayBuffer` on the transfer list. */
+export interface WireAnnotationBundle extends Omit<AnnotationBundle, 'resources'> {
+  readonly resources: Readonly<Record<ResourceId, ArrayBuffer>>;
+}
+
 export const ANNOTATION_BUNDLE_FORMAT = 'embedpdf/annotations';
 export const ANNOTATION_BUNDLE_VERSION = 1;
 

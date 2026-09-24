@@ -338,6 +338,47 @@ All-or-nothing: any ref that is not on the page, hidden, or without an
 appearance rejects the call with `InvalidArg`. A derived read that egresses
 content, so it is gated by `doc.download` like `pages.extract`.
 
+## Exporting annotations
+
+`doc.annotations.export` takes annotations out of a document with the bytes beside them, a stamp's
+drawing or an attached file, as one **bundle**, in one call:
+
+```ts
+const bundle = await doc.annotations.export(); // every annotation
+const some = await doc.annotations.export({ refs: [comment.ref] }); // one comment and its thread
+const pages = await doc.annotations.export({ pages: [pageRef] }); // everything on a page
+```
+
+A bundle is a flat list. Each item is an annotation exactly as a read returns it, and names its
+resources by id. Each resource is in the bundle once, however many items use it, under the SHA-256
+of its bytes: a hundred stamps of one image carry the image once.
+
+A selection brings what it needs, so nothing arrives broken:
+
+- a reply brings the comment it answers, up to the first comment of the thread;
+- an annotation brings its popup, and a popup brings its annotation;
+- by default a comment also brings every reply below it (`include: 'threads'`). Pass
+  `include: 'references'` to leave the replies out.
+
+The bundle also lists every page its items are on or point at, with the page's position and crop
+box, so the annotations can be placed on the matching pages of another document.
+
+To store or send a bundle as one file, `AnnotationTransfer` writes it as JSON with its resources in
+base64, and reads it back, checking every resource against its id:
+
+```ts
+import { AnnotationTransfer } from '@embedpdf/engine-core';
+
+const text = AnnotationTransfer.stringify(bundle);
+const again = await AnnotationTransfer.parse(text); // refuses anything tampered with
+```
+
+Export reads the annotations and the bytes beside them, so it needs `doc.annotate.read` and
+`doc.download`. A bundle has limits, 50 MB and 10 000 annotations by default; an export that would
+pass one is refused with `PayloadTooLarge`, naming the limit, so you can export fewer pages at a
+time. The same document exports to the same bundle on the local and the cloud engine; on the cloud,
+an export is cached until the document's annotations or pages change.
+
 ## Edit sessions (cloud)
 
 On the cloud, structural edits addressed by **index** (a delete or move that shifts the

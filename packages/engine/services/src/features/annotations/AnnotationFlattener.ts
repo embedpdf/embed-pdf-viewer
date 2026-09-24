@@ -16,9 +16,9 @@ import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { AnnotationReader } from './AnnotationReader';
 import { resolveAnnotPtr } from './internal/identity/resolveAnnotationPointer';
+import { saveDocumentToBuffer } from './internal/saveDocumentToBuffer';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { withScratch } from '../../runtime/memory/scratch';
-import { U64_BYTES, pokeU64 } from '../../runtime/memory/u64';
 import { throwIfAborted } from '../../shared/abort';
 
 // `FLATTEN_*` / `EPDF_FLATTEN_STATUS_*` from public/fpdf_flatten.h.
@@ -28,7 +28,6 @@ const FLATTEN_NOTHING_TO_DO = 2;
 const STATUS_APPLIED = 0;
 const STATUS_SKIPPED = 1;
 const STATUS_NOT_ON_PAGE = 2;
-const FPDF_NO_INCREMENTAL = 1 << 1;
 
 /**
  * The annotation-plane flatten verbs — `pages.flatten` for a chosen set:
@@ -147,7 +146,12 @@ export class AnnotationFlattener {
           'annotations.exportAppearance: every ref must be a visible annotation of this page with a normal appearance',
         );
       }
-      return this.saveExported(exportedPtr, 'exported appearances');
+      return saveDocumentToBuffer(
+        this.runtime.fn,
+        this.runtime.mem,
+        exportedPtr,
+        'exported appearances',
+      );
     } finally {
       if (exportedPtr) fn.FPDF_CloseDocument(exportedPtr);
       pool.release(pageObjectNumber);
@@ -190,33 +194,10 @@ export class AnnotationFlattener {
           'the annotation has no normal appearance to read',
         );
       }
-      return this.saveExported(exportedPtr, 'the appearance');
+      return saveDocumentToBuffer(this.runtime.fn, this.runtime.mem, exportedPtr, 'the appearance');
     } finally {
       if (exportedPtr) fn.FPDF_CloseDocument(exportedPtr);
       pool.release(pageObjectNumber);
-    }
-  }
-
-  /** Save an exported single-page document to bytes the caller owns. */
-  private saveExported(exportedPtr: Ptr, what: string): { bytes: ArrayBuffer; size: number } {
-    const { fn, mem } = this.runtime;
-    let pdfPtr: Ptr | null = null;
-    try {
-      return withScratch(mem, U64_BYTES, (sizePtr) => {
-        // `unsigned long*`: 8 bytes on native, 4 on wasm32 — zero the whole slot.
-        pokeU64(mem, sizePtr, 0);
-        pdfPtr = fn.EPDF_SaveDocumentToOwnedBuffer(exportedPtr, FPDF_NO_INCREMENTAL, sizePtr);
-        const size = Number(mem.peek(sizePtr, 'i32'));
-        if (!pdfPtr || size <= 0) {
-          throw new EngineError(EngineErrorCode.DocOpenFailed, `failed to save ${what}`);
-        }
-        const bytes = mem.readBytes(pdfPtr, size);
-        const buffer = new ArrayBuffer(bytes.byteLength);
-        new Uint8Array(buffer).set(bytes);
-        return { bytes: buffer, size };
-      });
-    } finally {
-      if (pdfPtr) fn.EPDF_FreeBuffer(pdfPtr);
     }
   }
 

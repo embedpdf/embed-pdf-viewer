@@ -3,6 +3,8 @@ import {
   EngineError,
   EngineErrorCode,
   wirePack,
+  type AnnotationBundle,
+  type AnnotationExportSelection,
   type AnnotationListPageSnapshot,
   type AnnotationListSnapshotAllPages,
   type DocumentAnnotationsService,
@@ -31,6 +33,44 @@ export class LocalDocumentAnnotationsService implements DocumentAnnotationsServi
     private readonly view: DocClosedView,
     private readonly guard: ScopeGuard,
   ) {}
+
+  export(selection: AnnotationExportSelection = {}): AbortablePromise<AnnotationBundle> {
+    if (this.view.isClosed()) {
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
+      );
+    }
+    // The annotations and the bytes beside them: `readResource`'s gate too.
+    try {
+      this.guard.assertCapability('doc.annotate.read');
+      this.guard.assertCapability('doc.download');
+    } catch (err) {
+      return AbortablePromise.rejectReason(err);
+    }
+    const docId = this.docId;
+    const submission = this.queue.enqueue<WorkerResultPayload>(
+      {
+        buildPack: (jobId: JobId) =>
+          wirePack({ kind: 'annotations.export', jobId, docId, selection: { ...selection } }),
+      },
+      { priority: Priority.MEDIUM },
+    );
+    return AbortablePromise.run<AnnotationBundle>(async (signal) => {
+      const onAbort = () => submission.abort(signal.reason);
+      if (signal.aborted) onAbort();
+      else signal.addEventListener('abort', onAbort, { once: true });
+      const payload = await submission;
+      if (payload.tag !== 'annotations.export') {
+        throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
+      }
+      // The worker transferred each resource's buffer: the bundle owns it now.
+      const { bundle } = payload;
+      const resources: AnnotationBundle['resources'] = Object.fromEntries(
+        Object.entries(bundle.resources).map(([id, bytes]) => [id, new Uint8Array(bytes)]),
+      );
+      return { ...bundle, resources };
+    });
+  }
 
   listRawAll(): AbortablePromise<AnnotationListSnapshotAllPages> {
     if (this.view.isClosed()) {

@@ -7,6 +7,7 @@ import {
   AnnotationAppearancesRenderTokenSchema,
   AnnotationTokenSchema,
   AnnotationsAllTokenSchema,
+  AnnotationsExportTokenSchema,
   ActionsTokenSchema,
   AttachmentsTokenSchema,
   ContentTokenSchema,
@@ -18,6 +19,8 @@ import {
   SearchTokenSchema,
 } from './tokenSchemas';
 import type { PdfSaveMode } from '../dto/PdfSaveMode';
+import { toPageRef } from '../identity/PageRef';
+import type { AnnotationExportSelection } from '../transfer/exportSelection';
 import type { ModificationLevel } from '../signature/types';
 import type { SearchQuery, SearchSliceBudget } from '../search/types';
 
@@ -123,6 +126,92 @@ export const decodeAnnotationsAllToken = (raw: string): number =>
     decodeToken(AnnotationsAllTokenSchema, raw).annotationsVersion,
     'annotationsVersion',
   );
+
+/** What a `doc.annotations.export` leaf is: two pins and a selection. */
+export interface AnnotationsExportToken {
+  annotationsVersion: number;
+  layoutVersion: number;
+  selection: AnnotationExportSelection;
+}
+
+// A selection as the token holds it: page object numbers, and refs as
+// [page, object number] or [page, name]. Weak index refs have no durable
+// address, so a versioned read can't carry them.
+interface TokenSelection {
+  p?: number[];
+  r?: Array<[number, number | string]>;
+}
+
+export const encodeAnnotationsExportToken = (token: AnnotationsExportToken): string => {
+  const { selection } = token;
+  const wire: TokenSelection = {};
+  if (selection.pages) {
+    wire.p = [...new Set(selection.pages.map((page) => page.pageObjectNumber))].sort(
+      (left, right) => left - right,
+    );
+  }
+  if (selection.refs) {
+    const refs = new Map<string, [number, number | string]>();
+    for (const ref of selection.refs) {
+      if (ref.kind === 'index') {
+        throw new Error('an export names annotations by object number or name, not by position');
+      }
+      const entry: [number, number | string] = [
+        ref.page.pageObjectNumber,
+        ref.kind === 'objectNumber' ? ref.annotObjectNumber : ref.nm,
+      ];
+      refs.set(JSON.stringify(entry), entry);
+    }
+    wire.r = [...refs.keys()].sort().map((key) => refs.get(key)!);
+  }
+  return encodeToken(AnnotationsExportTokenSchema, {
+    annotationsVersion: token.annotationsVersion,
+    layoutVersion: token.layoutVersion,
+    include: selection.include === 'references' ? 'references' : undefined,
+    selection: wire.p || wire.r ? encodeTokenText(JSON.stringify(wire)) : undefined,
+  });
+};
+
+export const decodeAnnotationsExportToken = (raw: string): AnnotationsExportToken => {
+  const query = decodeToken(AnnotationsExportTokenSchema, raw);
+  const selection: {
+    -readonly [K in keyof AnnotationExportSelection]: AnnotationExportSelection[K];
+  } = {};
+  if (query.include !== undefined) {
+    if (query.include !== 'references') throw new Error(`unknown include "${query.include}"`);
+    selection.include = 'references';
+  }
+  if (query.selection !== undefined) {
+    const wire = JSON.parse(decodeTokenText(query.selection)) as TokenSelection;
+    const isNumber = (value: unknown): value is number =>
+      Number.isInteger(value) && (value as number) > 0;
+    if (typeof wire !== 'object' || wire === null) throw new Error('malformed export selection');
+    if (wire.p !== undefined) {
+      if (!Array.isArray(wire.p) || !wire.p.every(isNumber)) {
+        throw new Error('malformed export pages');
+      }
+      selection.pages = wire.p.map((pageObjectNumber) => toPageRef(pageObjectNumber));
+    }
+    if (wire.r !== undefined) {
+      if (!Array.isArray(wire.r)) throw new Error('malformed export refs');
+      selection.refs = wire.r.map((entry) => {
+        if (!Array.isArray(entry) || entry.length !== 2 || !isNumber(entry[0])) {
+          throw new Error('malformed export ref');
+        }
+        const page = toPageRef(entry[0]);
+        const [, id] = entry;
+        if (isNumber(id)) return { kind: 'objectNumber', page, annotObjectNumber: id } as const;
+        if (typeof id === 'string' && id.length > 0) return { kind: 'nm', page, nm: id } as const;
+        throw new Error('malformed export ref');
+      });
+    }
+  }
+  return {
+    annotationsVersion: decodePositiveInteger(query.annotationsVersion, 'annotationsVersion'),
+    layoutVersion: decodePositiveInteger(query.layoutVersion, 'layoutVersion'),
+    selection,
+  };
+};
 
 export const encodeActionsToken = (actionsVersion: number): string =>
   encodeToken(ActionsTokenSchema, { actionsVersion });

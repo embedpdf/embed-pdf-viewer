@@ -48,6 +48,9 @@ export type DocResourceId =
   // own family: the path is not under the per-page `annotations/pages/`
   // prefix, so it needs its own catalogue entry for edge grants.
   | 'annotations-all'
+  // Annotation export: data and resource bytes, so it egresses content and
+  // needs `doc.download` beside the annotation read.
+  | 'annotations-export'
   | 'layout'
   | 'metadata'
   | 'actions'
@@ -88,6 +91,7 @@ export type DocResourceId =
   | 'layer-search-full'
   | 'annotations-read'
   | 'layer-annotations-all'
+  | 'layer-annotations-export'
   // Attachments, split by permission tier under distinct prefixes (the
   // search-rects/search-full rule): the metadata listing rides the base
   // read capability, while decoded file bytes egress content and gate on
@@ -252,6 +256,16 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     pathPrefix: '/v1/docs/{docId}/annotations/items@',
     resolvePathPrefix: (docId) => `/v1/docs/${docId}/annotations/items@`,
     requirement: { kind: 'single', capability: 'doc.annotate.read' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'annotations-export': {
+    id: 'annotations-export',
+    pathPattern: '/v1/docs/{docId}/annotations/export@*',
+    resolvePathPattern: (docId) => `/v1/docs/${docId}/annotations/export@*`,
+    pathPrefix: '/v1/docs/{docId}/annotations/export@',
+    resolvePathPrefix: (docId) => `/v1/docs/${docId}/annotations/export@`,
+    requirement: { kind: 'all', capabilities: ['doc.annotate.read', 'doc.download'] },
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
@@ -479,6 +493,18 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     resolvePathPrefix: (docId, layerName = 'default') =>
       `/v1/docs/${docId}/layers/${layerName}/annotations/pages/`,
     requirement: { kind: 'single', capability: 'doc.annotate.read' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'layer-annotations-export': {
+    id: 'layer-annotations-export',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/annotations/export@*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/annotations/export@*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/annotations/export@',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/annotations/export@`,
+    requirement: { kind: 'all', capabilities: ['doc.annotate.read', 'doc.download'] },
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },

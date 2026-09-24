@@ -1,5 +1,4 @@
 import { Buffer } from 'node:buffer';
-import { randomBytes } from 'node:crypto';
 
 import {
   EngineError,
@@ -38,6 +37,8 @@ import {
   decodeAnnotationAppearancesRenderToken,
   decodeAnnotationToken,
   decodeAnnotationsAllToken,
+  decodeAnnotationsExportToken,
+  type AnnotationsExportToken,
   PageNetworkRenderFormatSchema,
   WeakAnnotationSessionPagesRequestSchema,
   type ManifestPage,
@@ -55,6 +56,7 @@ import {
   toPageState,
   type SchemaLike,
 } from './_helpers';
+import { buildMultipart, type MultipartPart } from './_multipart';
 import { readMutationEnvelope, type MutationEnvelope } from './_mutationEnvelope';
 import { requireSharedDocRead } from './_planeGuard';
 import { assertRefMatchesPage, refFromKey } from './annotation-route-helpers';
@@ -264,6 +266,61 @@ export async function registerAnnotationRoutes(
       ),
     });
   });
+
+  // ── Annotation export: a bundle as multipart at an annotation and a layout
+  //    pin (the bundle carries its pages' positions and boxes). It egresses
+  //    content, so it needs `doc.download` beside the annotation read.
+  //    Immutable per token, so the CDN can cache it; the doc-level twin
+  //    serves layers that inherit both planes. ─
+
+  app.get(
+    '/v1/docs/:docId/annotations/export@:token',
+    { config: { compress: false } },
+    async (req, reply) => {
+      const { docId, token } = req.params as { docId: string; token: string };
+      const ctx = await requireSharedDocRead(req, documentService, docId, 'annotations-export', [
+        'annotations',
+        'layout',
+      ]);
+      return exportAnnotations({
+        documentService,
+        reply,
+        signal: abortSignalFromRequest(req),
+        scope: { kind: 'base', ctx, docId },
+        token: parseTokenOrInvalidArg(
+          decodeAnnotationsExportToken,
+          token,
+          'annotation export token',
+        ),
+      });
+    },
+  );
+
+  app.get(
+    '/v1/docs/:docId/layers/:layerName/annotations/export@:token',
+    { config: { compress: false } },
+    async (req, reply) => {
+      const { docId, layerName, token } = req.params as {
+        docId: string;
+        layerName: string;
+        token: string;
+      };
+      const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const ctx = requireLayerResource(req, docId, layerName, 'layer-annotations-export', pdfBits);
+      return exportAnnotations({
+        documentService,
+        reply,
+        signal: abortSignalFromRequest(req),
+        scope: { kind: 'layer', ctx, docId, layerName },
+        token: parseTokenOrInvalidArg(
+          decodeAnnotationsExportToken,
+          token,
+          'annotation export token',
+        ),
+      });
+    },
+  );
 
   app.get('/v1/docs/:docId/layers/:layerName/annotations/items', async (req, reply) => {
     const { docId, layerName } = req.params as {
@@ -1146,59 +1203,6 @@ async function renderAnnotationAppearances(input: {
   return input.reply.send(body);
 }
 
-interface MultipartPart {
-  name: string;
-  filename: string;
-  contentType: string;
-  body: Buffer;
-}
-
-/**
- * Assemble a `multipart/form-data` body by hand. The first part is the JSON
- * manifest (`name="manifest"`); the rest are the encoded appearance images.
- * Fetch's `Response.formData()` parses this on the client — text parts (no
- * filename) come back as strings, image parts (with filename) as `Blob`s.
- */
-function buildMultipart(
-  manifest: AnnotationAppearanceManifest,
-  parts: MultipartPart[],
-): { contentType: string; body: Buffer } {
-  const boundary = `cloudpdf-${randomBytes(16).toString('hex')}`;
-  const CRLF = '\r\n';
-  const chunks: Buffer[] = [];
-
-  const manifestJson = Buffer.from(JSON.stringify(manifest), 'utf8');
-  chunks.push(
-    Buffer.from(
-      `--${boundary}${CRLF}` +
-        `Content-Disposition: form-data; name="manifest"${CRLF}` +
-        `Content-Type: application/json${CRLF}${CRLF}`,
-      'utf8',
-    ),
-  );
-  chunks.push(manifestJson);
-  chunks.push(Buffer.from(CRLF, 'utf8'));
-
-  for (const part of parts) {
-    chunks.push(
-      Buffer.from(
-        `--${boundary}${CRLF}` +
-          `Content-Disposition: form-data; name="${part.name}"; filename="${part.filename}"${CRLF}` +
-          `Content-Type: ${part.contentType}${CRLF}${CRLF}`,
-        'utf8',
-      ),
-    );
-    chunks.push(part.body);
-    chunks.push(Buffer.from(CRLF, 'utf8'));
-  }
-
-  chunks.push(Buffer.from(`--${boundary}--${CRLF}`, 'utf8'));
-  return {
-    contentType: `multipart/form-data; boundary=${boundary}`,
-    body: Buffer.concat(chunks),
-  };
-}
-
 function rejectQueryParamsOnTokenUrl(query: unknown): void {
   if (query && typeof query === 'object' && Object.keys(query).length > 0) {
     throw new EngineError(
@@ -1305,6 +1309,74 @@ async function readAnnotations(input: {
  * manifest's `auditHead`, so replaying events with `serverId > auditHead`
  * over this body is exact.
  */
+/**
+ * One export job at the token's pins, checked before and after the job so an
+ * immutable body never belongs to another version: a stale pin is a 404 the
+ * client answers by refreshing its manifest. The response is the bundle
+ * without its bytes as `manifest`, then one part per resource, named by id.
+ */
+async function exportAnnotations(input: {
+  documentService: DocumentService;
+  reply: FastifyReply;
+  signal: AbortSignal;
+  scope: ReadScope;
+  token: AnnotationsExportToken;
+}) {
+  const { scope, token } = input;
+  const layerName = scope.kind === 'layer' ? scope.layerName : undefined;
+  const assertCurrent = async () => {
+    const manifest =
+      layerName !== undefined
+        ? await input.documentService.getLayerManifest(scope.ctx, scope.docId, layerName)
+        : await input.documentService.getManifest(scope.ctx, scope.docId);
+    const annotationsVersion = manifest.annotationsVersion ?? 1;
+    const layoutVersion = manifest.layoutVersion ?? 1;
+    if (token.annotationsVersion !== annotationsVersion || token.layoutVersion !== layoutVersion) {
+      setNoStore(input.reply);
+      throw new EngineError(
+        EngineErrorCode.NotFound,
+        `annotation export at annotationsVersion ${token.annotationsVersion}, layoutVersion ${token.layoutVersion} no longer current (current: ${annotationsVersion}, ${layoutVersion})`,
+      );
+    }
+  };
+
+  await assertCurrent();
+  const build = (jobId: WorkerJobId) =>
+    wirePack({
+      kind: 'annotations.export' as const,
+      jobId,
+      docId: scope.docId,
+      ...(layerName !== undefined ? { layerName } : {}),
+      selection: token.selection,
+    });
+  const result = await input.documentService.readOnPool(
+    scope.ctx,
+    scope.docId,
+    layerName,
+    build,
+    input.signal,
+  );
+  if (result.tag !== 'annotations.export') {
+    throw new EngineError(
+      EngineErrorCode.WireFormat,
+      `unexpected annotations.export payload: ${result.tag}`,
+    );
+  }
+  await assertCurrent();
+
+  const { resources, ...manifest } = result.bundle;
+  const parts: MultipartPart[] = Object.entries(resources).map(([id, bytes]) => ({
+    name: `resource:${id}`,
+    filename: id,
+    contentType: 'application/octet-stream',
+    body: Buffer.from(bytes),
+  }));
+  setImmutableCache(input.reply);
+  const { contentType, body } = buildMultipart(manifest, parts);
+  input.reply.type(contentType);
+  return input.reply.send(body);
+}
+
 async function readAnnotationsAll(input: {
   documentService: DocumentService;
   revisionBridge: CloudRevisionBridge;
