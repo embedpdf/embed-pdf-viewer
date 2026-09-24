@@ -51,7 +51,8 @@ export interface AnnotationResourceConformanceOptions {
  * returns what `create(data, resources)` needs to make the same annotation
  * again. A stamp's appearance is its drawing without the fit, rotation and
  * opacity its data describes; a stamp another tool made is drawn as shown,
- * without a layer that only repeats its /CA. The opacity is painted once:
+ * in its own box, without a layer that only repeats its /CA. Stamps with
+ * the same artwork place one drawing. The opacity is painted once:
  * in a copy, after a resize, and after a change.
  */
 export function runAnnotationResourceConformance(
@@ -73,11 +74,11 @@ export function runAnnotationResourceConformance(
 
     const onPage = async (
       fixture: AnnotationResourceFixture,
-      run: (page: PageHandle) => Promise<void>,
+      run: (page: PageHandle, doc: DocumentHandle) => Promise<void>,
     ): Promise<void> => {
       const doc = await opts.open(engine, fixture);
       try {
-        await run(doc.page(await firstPage(doc)));
+        await run(doc.page(await firstPage(doc)), doc);
       } finally {
         await doc.close();
       }
@@ -303,7 +304,7 @@ export function runAnnotationResourceConformance(
         expect(stamp.opacity).toBe(1);
         const shown = await rasterOf(page, stamp.ref);
         expectPaintedOnce(shown, 0.35);
-        // Drawn as the page shows it, in /Rect, the 35% included.
+        // The drawing in its own box, which is /Rect's size here, the 35% included.
         const appearance = await page.annotations.readResource(stamp.ref, 'appearance');
         expect(pageSize(appearance)).toEqual([300, 120]);
         const data = JSON.parse(JSON.stringify(stamp)) as AnnotationDraft;
@@ -438,6 +439,71 @@ export function runAnnotationResourceConformance(
       });
     });
 
+    test('stamps with the same artwork place one drawing', async () => {
+      await onPage('authoring', async (page, doc) => {
+        for (let i = 0; i < 10; i++) {
+          const left = 20 + 50 * i;
+          await page.annotations.create(
+            { subtype: 'stamp', rect: { left, bottom: 20, right: left + 40, top: 40 } },
+            { appearance: BANDS_PNG },
+          );
+          await page.annotations.create(
+            { subtype: 'stamp', rect: { left, bottom: 60, right: left + 40, top: 80 } },
+            { appearance: BANDS_PDF },
+          );
+        }
+        const saved = await rewrite(doc);
+        expect(images(saved)).toBe(1);
+        expect(occurrences(saved, BANDS_PDF_CONTENT)).toBe(1);
+      });
+    });
+
+    test('an image and the drawing exported from it are one drawing', async () => {
+      await onPage('authoring', async (page, doc) => {
+        const stamp = (
+          await page.annotations.create(
+            { subtype: 'stamp', rect: { left: 20, bottom: 20, right: 120, top: 120 } },
+            { appearance: BANDS_PNG },
+          )
+        ).created;
+        const appearance = await page.annotations.readResource(stamp.ref, 'appearance');
+        await page.annotations.create(
+          { subtype: 'stamp', rect: { left: 200, bottom: 20, right: 260, top: 40 } },
+          { appearance },
+        );
+        expect(images(await rewrite(doc))).toBe(1);
+      });
+    });
+
+    test('new artwork for one stamp leaves a stamp sharing the old alone', async () => {
+      await onPage('authoring', async (page, doc) => {
+        const place = async (left: number) =>
+          (
+            await page.annotations.create(
+              {
+                subtype: 'stamp',
+                rect: { left, bottom: 20, right: left + 100, top: 120 },
+                opacity: 0.5,
+              },
+              { appearance: BANDS_PNG },
+            )
+          ).created;
+        const changed = await place(20);
+        const kept = await place(200);
+        const before = await page.annotations.readResource(kept.ref, 'appearance');
+        const shown = await rasterOf(page, kept.ref);
+
+        await page.annotations.update(changed.ref, {}, { appearance: BANDS_PDF });
+        expect(sameBytes(await page.annotations.readResource(kept.ref, 'appearance'), before)).toBe(
+          true,
+        );
+        expectSameDrawing(await rasterOf(page, kept.ref), shown);
+        const saved = await rewrite(doc);
+        expect(images(saved)).toBe(1);
+        expect(occurrences(saved, BANDS_PDF_CONTENT)).toBe(1);
+      });
+    });
+
     test('a role the kind does not take is refused', async () => {
       await onPage('authoring', async (page) => {
         const rect: PdfRect = { left: 300, bottom: 300, right: 360, top: 340 };
@@ -471,9 +537,11 @@ function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
   return a.length === b.length && a.every((byte, i) => byte === b[i]);
 }
 
+const BANDS_PDF_CONTENT = '1 0 0 rg 0 0 120 100 re f 0 0 1 rg 120 0 80 100 re f';
+
 /** A one-page PDF, 200 × 100: a red band and a blue band, so a wrong fit or crop shows. */
 const BANDS_PDF = (() => {
-  const content = '1 0 0 rg 0 0 120 100 re f 0 0 1 rg 120 0 80 100 re f';
+  const content = BANDS_PDF_CONTENT;
   const objects = [
     '<< /Type /Catalog /Pages 2 0 R >>',
     '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
@@ -510,6 +578,51 @@ function dataOf(dto: AnnotationDTO): Record<string, unknown> {
     ...data
   } = dto;
   return data;
+}
+
+/** A full rewrite of `doc`, only what the document still uses: its streams. */
+async function rewrite(doc: DocumentHandle): Promise<SavedStream[]> {
+  return savedStreams(await doc.download({ mode: 'rewrite' }));
+}
+
+interface SavedStream {
+  dict: string;
+  /** The content, inflated when the stream is Flate-compressed. */
+  content: string;
+}
+
+async function savedStreams(saved: Uint8Array): Promise<SavedStream[]> {
+  const latin1 = new TextDecoder('latin1');
+  const text = latin1.decode(saved);
+  const streams: SavedStream[] = [];
+  for (const object of text.matchAll(/\d+ 0 obj([\s\S]*?)endobj/g)) {
+    const body = object[1]!;
+    const keyword = /stream\r?\n/.exec(body);
+    const length = /\/Length (\d+)/.exec(body);
+    if (!keyword || !length) continue;
+    const dict = body.slice(0, keyword.index);
+    const start = object.index! + object[0].indexOf(body) + keyword.index + keyword[0].length;
+    const data = saved.subarray(start, start + Number(length[1]));
+    const content = dict.includes('/FlateDecode')
+      ? new Uint8Array(
+          await new Response(
+            new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate')),
+          ).arrayBuffer(),
+        )
+      : data;
+    streams.push({ dict, content: latin1.decode(content) });
+  }
+  return streams;
+}
+
+/** How many images a saved file holds. */
+function images(streams: SavedStream[]): number {
+  return streams.filter((stream) => /\/Subtype\s*\/Image\b/.test(stream.dict)).length;
+}
+
+/** How many streams of a saved file have exactly `content`. */
+function occurrences(streams: SavedStream[], content: string): number {
+  return streams.filter((stream) => stream.content === content).length;
 }
 
 /** The width and height of a one-page PDF's page. */

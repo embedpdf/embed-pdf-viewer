@@ -19,6 +19,7 @@ import {
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
+import { DrawingIndex } from './DrawingIndex';
 import {
   openFatMemoryDocument,
   type DocumentSource,
@@ -116,6 +117,8 @@ export class DocumentSession {
   pendingSigning: PendingSigning | null = null;
   /** The last completed signing, so a replayed `complete` answers `already-completed`. */
   lastCompletion: SigningCompletion | null = null;
+  /** The stamp drawings of the open document, by content; dropped with it. */
+  private drawings: DrawingIndex | null = null;
 
   constructor(
     private readonly runtime: PdfRuntimeModule,
@@ -164,6 +167,7 @@ export class DocumentSession {
     this.revisions = new LocalRevisionAuthority(this._sessionId);
     this.pages = new PagePtrPool(this.runtime, handle.docPtr);
     this.parkedBytes = null;
+    this.drawings = null;
     this.loadedSeq = this.mutationSeqCounter;
   }
 
@@ -225,6 +229,7 @@ export class DocumentSession {
     this.mutationSeqCounter++;
     this.loadedSeq = this.mutationSeqCounter;
     this.pendingSigning = null;
+    this.drawings = null;
     if (firstError) throw firstError;
   }
 
@@ -435,6 +440,15 @@ export class DocumentSession {
     return this.pages;
   }
 
+  /** The open document's stamp drawings, by content (see {@link DrawingIndex}). */
+  drawingIndex(): DrawingIndex {
+    if (!this.docPtr) {
+      throw new EngineError(EngineErrorCode.DocNotOpen, 'document is not open');
+    }
+    this.drawings ??= new DrawingIndex();
+    return this.drawings;
+  }
+
   requireDocPtr(): Ptr {
     if (!this.docPtr) {
       throw new EngineError(EngineErrorCode.DocNotOpen, 'document is not open');
@@ -487,6 +501,7 @@ export class DocumentSession {
       this.parkedBytes = null;
       this.pendingSigning = null;
       this.lastCompletion = null;
+      this.drawings = null;
       this.revisions?.clear();
       this.revisions = null;
       this.recordsByIndex.clear();

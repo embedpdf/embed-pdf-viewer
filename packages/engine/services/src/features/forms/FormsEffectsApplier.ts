@@ -18,6 +18,7 @@ import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { withScratchN } from '../../runtime/memory/scratch';
+import { U64_BYTES, pokeU64 } from '../../runtime/memory/u64';
 import { throwIfAborted } from '../../shared/abort';
 import { acquireFormModel } from './internal/formModelCache';
 import { readFieldAt } from './internal/readFormSnapshot';
@@ -309,8 +310,9 @@ export class FormsEffectsApplier {
     call: (buf: Ptr, cap: number, countPtr: Ptr) => boolean,
   ): NativeEffectResult {
     const { mem } = this.runtime;
-    return withScratchN(mem, [CHANGED_WIDGETS_CAPACITY * 4, 4], ([buf, countPtr]) => {
-      mem.poke(countPtr, 'i32', 0);
+    return withScratchN(mem, [CHANGED_WIDGETS_CAPACITY * 4, U64_BYTES], ([buf, countPtr]) => {
+      // `unsigned long*`: 8 bytes on native, 4 on wasm32 — zero the whole slot.
+      pokeU64(mem, countPtr, 0);
       const ok = call(buf, CHANGED_WIDGETS_CAPACITY, countPtr);
       const count = Math.min(
         Math.max(0, Number(mem.peek(countPtr, 'i32'))),

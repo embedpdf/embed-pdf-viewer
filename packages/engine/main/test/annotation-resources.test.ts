@@ -109,42 +109,42 @@ describe('drawing bytes across runtimes', () => {
   });
 });
 
+/** 128 × 128 of noise: a PNG a file can't hide. */
+const noisePng = () => {
+  let seed = 11;
+  const next = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) >> 16) & 0xff;
+  const width = 128;
+  const rows: number[] = [];
+  for (let y = 0; y < width; y++) {
+    rows.push(0);
+    for (let x = 0; x < width * 3; x++) rows.push(next());
+  }
+  const chunk = (type: string, data: Buffer) => {
+    const body = Buffer.concat([Buffer.from(type, 'latin1'), data]);
+    const out = Buffer.alloc(12 + data.length);
+    out.writeUInt32BE(data.length, 0);
+    body.copy(out, 4);
+    out.writeUInt32BE(crc32(body) >>> 0, 8 + data.length);
+    return out;
+  };
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(width, 4);
+  header[8] = 8;
+  header[9] = 2;
+  return new Uint8Array(
+    Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      chunk('IHDR', header),
+      chunk('IDAT', deflateSync(Buffer.from(rows))),
+      chunk('IEND', Buffer.alloc(0)),
+    ]),
+  );
+};
+
 // A stamp given a new drawing keeps nothing of the old one: a full rewrite
 // is the size of the document with the new drawing only.
 describe('replacing a stamp drawing', () => {
-  /** 128 × 128 of noise: a PNG a file can't hide. */
-  const noisePng = () => {
-    let seed = 11;
-    const next = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) >> 16) & 0xff;
-    const width = 128;
-    const rows: number[] = [];
-    for (let y = 0; y < width; y++) {
-      rows.push(0);
-      for (let x = 0; x < width * 3; x++) rows.push(next());
-    }
-    const chunk = (type: string, data: Buffer) => {
-      const body = Buffer.concat([Buffer.from(type, 'latin1'), data]);
-      const out = Buffer.alloc(12 + data.length);
-      out.writeUInt32BE(data.length, 0);
-      body.copy(out, 4);
-      out.writeUInt32BE(crc32(body) >>> 0, 8 + data.length);
-      return out;
-    };
-    const header = Buffer.alloc(13);
-    header.writeUInt32BE(width, 0);
-    header.writeUInt32BE(width, 4);
-    header[8] = 8;
-    header[9] = 2;
-    return new Uint8Array(
-      Buffer.concat([
-        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-        chunk('IHDR', header),
-        chunk('IDAT', deflateSync(Buffer.from(rows))),
-        chunk('IEND', Buffer.alloc(0)),
-      ]),
-    );
-  };
-
   test('a full rewrite after a new drawing has none of the old', async () => {
     const engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
     try {
@@ -177,6 +177,37 @@ describe('replacing a stamp drawing', () => {
       // Back to the size with the small drawing: the image is gone.
       expect(Math.abs(replaced - withSmall) < 1024).toBe(true);
       await doc.close();
+    } finally {
+      await engine.destroy();
+    }
+  });
+});
+
+// The drawings a document holds are found again after a reopen: placing the
+// same artwork adds a wrapper, not another copy.
+describe('stamp drawings across a reopen', () => {
+  test('artwork a reopened document already has is placed again', async () => {
+    const engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
+    try {
+      const image = noisePng();
+      const place = async (bytes: Uint8Array, left: number) => {
+        const doc = await engine.open(
+          { kind: 'bytes', id: `reopen-${++opened}`, bytes },
+          { scope: ['*'] },
+        );
+        const { pages } = await doc.pages.list();
+        const page = doc.page(toPageRef(pages[0]!.ref.pageObjectNumber));
+        await page.annotations.create(
+          { subtype: 'stamp', rect: { left, bottom: 20, right: left + 100, top: 120 } },
+          { appearance: image },
+        );
+        const saved = await doc.download({ mode: 'rewrite' });
+        await doc.close();
+        return saved;
+      };
+      const once = await place(new Uint8Array(await readFile(fixtures.authoring)), 20);
+      const twice = await place(once, 200);
+      expect(twice.length - once.length < image.length / 4).toBe(true);
     } finally {
       await engine.destroy();
     }

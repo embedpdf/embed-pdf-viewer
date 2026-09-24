@@ -2,26 +2,21 @@ import {
   EngineError,
   EngineErrorCode,
   sniffBinaryMetadata,
-  type BinaryMetadata,
   type PdfRect,
   type StampDraft,
   type StampFit,
   type StampPatch,
   type WireAnnotationResources,
 } from '@embedpdf/engine-core/runtime';
-import {
-  NULL_PTR,
-  type PdfFunctions,
-  type PdfRuntimeMemory,
-  type Ptr,
-} from '@embedpdf/engine-runtime';
+import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import type { AnnotationWriteContext } from './annotationWriteContext';
 import { opacityToAlpha, setAnnotOpacity, setAnnotRect } from './annotationWritePrimitives';
+import { drawingFor } from './stampDrawing';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 import { writeBoxTransformMetadata } from './writeAnnotationTransformMetadata';
 import { EMBD_METADATA_SCHEMA_VERSION, writeEmbedMetadataString } from './writeEmbedMetadata';
-import { F32_BYTES } from '../../../../runtime/memory/structs';
+import type { DrawingIndex } from '../../../../document-session/DrawingIndex';
 import { readAnnotRect } from '../read/annotationReadPrimitives';
 import { KEY_APPEARANCE_FIT, readStampFit } from '../read/readStampAnnotation';
 
@@ -57,9 +52,11 @@ export function preflightStampPatch(patch: StampPatch, ctx?: AnnotationWriteCont
  * Apply a stamp draft. Order mirrors the other writers (base → subtype
  * fields), then the appearance pipeline via {@link authorStampAppearance}:
  *   1. take the `appearance` resource that came with the write
- *   2. sniff the bytes (PNG/JPEG → image object, PDF → cloned form XObject)
- *   3. `EPDFAnnot_UpdateAppearanceToRect` fits the appearance into the box
- *      honouring its `fit` and any `/EMBD_Metadata` rotation.
+ *   2. find or make its drawing ({@link drawingFor}): a stamp with the same
+ *      artwork already in the document shares it
+ *   3. `EPDFAnnot_SetStampDrawing` gives the stamp a wrapper of its own that
+ *      fits the drawing into the box, honouring its `fit` and any
+ *      `/EMBD_Metadata` rotation.
  * The mutator's `EPDFAnnot_GenerateAppearance` pass afterwards is a no-op
  * for stamps (CPDF_GenerateAP has no stamp arm), so the appearance built
  * here is what ships.
@@ -81,7 +78,8 @@ export function applyStampDraft(
   // A create records the fit it used. Data that records none (`null`, as a
   // stamp another tool made reads) is fit as such a stamp is shown: `fill`.
   const fit = draft.fit === null ? 'fill' : (draft.fit ?? 'contain');
-  authorStampAppearance(fn, mem, annotPtr, requireStampAppearance(ctx), fit, {
+  const appearance = requireStampAppearance(ctx);
+  authorStampAppearance(fn, mem, annotPtr, appearance, requireDrawingTarget(ctx), fit, {
     rect: draft.rect,
     // The appearance author wants values-or-absent; a tri-state `null`
     // (no rotation) authors the same as an omitted field.
@@ -119,7 +117,7 @@ export function applyStampPatch(
     // in the unrotated frame (see authorStampAppearance) so a rotated stamp
     // never double-fits into its padded AABB.
     const rect = patch.rect ?? readAnnotRect(fn, mem, annotPtr);
-    authorStampAppearance(fn, mem, annotPtr, appearance, fit, {
+    authorStampAppearance(fn, mem, annotPtr, appearance, requireDrawingTarget(ctx), fit, {
       rect,
       unrotatedRect: patch.unrotatedRect ?? undefined,
       rotation: patch.rotation ?? undefined,
@@ -221,12 +219,23 @@ function requireStampContent(
       'the appearance resource must be PNG, JPEG or one-page PDF bytes',
     );
   }
-  if (ctx?.docPtr === undefined || ctx.pagePtr === undefined) {
+  requireDrawingTarget(ctx);
+}
+
+/** Where a stamp's drawing is found or added: the document and its drawings. */
+interface DrawingTarget {
+  docPtr: Ptr;
+  drawings: DrawingIndex;
+}
+
+function requireDrawingTarget(ctx: AnnotationWriteContext | undefined): DrawingTarget {
+  if (ctx?.docPtr === undefined || ctx.pagePtr === undefined || !ctx.drawings) {
     throw new EngineError(
       EngineErrorCode.Unknown,
-      'stamp writer requires docPtr/pagePtr on the write context',
+      'stamp writer requires docPtr/pagePtr/drawings on the write context',
     );
   }
+  return { docPtr: ctx.docPtr, drawings: ctx.drawings };
 }
 
 /** The box transform a stamp draft/patch carries (the box-kind rotation split). */
@@ -263,13 +272,14 @@ function authorStampAppearance(
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
   appearance: StampAppearance,
+  target: DrawingTarget,
   fit: StampFit,
   box: StampBox,
 ): void {
   const rotated = !!box.rotation && box.unrotatedRect !== undefined;
   if (!rotated) {
     setAnnotRect(fn, mem, annotPtr, box.rect);
-    setStampContent(fn, mem, annotPtr, appearance, fit);
+    setStampContent(fn, mem, annotPtr, appearance, target, fit);
     return;
   }
   const unrotated = box.unrotatedRect!;
@@ -277,7 +287,7 @@ function authorStampAppearance(
   //    internal re-fit records an image-shaped EPDFOrigContentRect, not the AABB.
   writeBoxTransformMetadata(fn, mem, annotPtr, {});
   setAnnotRect(fn, mem, annotPtr, unrotated);
-  setStampContent(fn, mem, annotPtr, appearance, fit);
+  setStampContent(fn, mem, annotPtr, appearance, target, fit);
   // 2. Apply the transform: metadata bakes the /Matrix, /Rect becomes the AABB,
   //    and one re-fit reconciles BBox + Matrix from the now-recorded content.
   writeBoxTransformMetadata(fn, mem, annotPtr, {
@@ -293,24 +303,20 @@ function setStampContent(
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
   bytes: ArrayBuffer,
+  target: DrawingTarget,
   fit: StampFit,
 ): void {
   const meta = sniffBinaryMetadata(bytes);
   if (!meta) {
     throw new EngineError(EngineErrorCode.Unknown, 'stamp content preflight invariant broken');
   }
-
-  // Both paths give the stamp a new appearance, so the old one is replaced
-  // whole, and nothing of it stays reachable in the saved file.
-  if (meta.mimeType === 'application/pdf') {
-    setAppearanceFromPdfBytes(fn, mem, annotPtr, bytes);
-  } else {
-    setAppearanceFromImageBytes(fn, mem, annotPtr, bytes, meta);
+  // A new wrapper places the drawing: the old appearance is replaced whole,
+  // nothing of it stays reachable in the saved file, and a drawing other
+  // stamps place is never changed.
+  const drawing = drawingFor(fn, mem, target.docPtr, target.drawings, bytes, meta);
+  if (!fn.EPDFAnnot_SetStampDrawing(annotPtr, drawing, STAMP_FIT_TO_CODE[fit])) {
+    throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetStampDrawing returned false');
   }
-
-  // Normalises the AP (BBox, EPDFOrigContentRect for later re-fits) and
-  // applies any /EMBD_Metadata rotation.
-  refitAppearance(fn, annotPtr, fit);
 }
 
 function setStampOpacity(fn: PdfFunctions, annotPtr: Ptr, fit: StampFit, opacity: number): void {
@@ -325,139 +331,5 @@ function refitAppearance(fn: PdfFunctions, annotPtr: Ptr, fit: StampFit): void {
       EngineErrorCode.Unknown,
       'EPDFAnnot_UpdateAppearanceToRect returned false',
     );
-  }
-}
-
-/** Acrobat's page size limit: a drawing larger than this is scaled down to fit. */
-const MAX_DRAWING_SIZE = 14_400;
-
-/**
- * PNG or JPEG → the image at its own size, as a one-page drawing: a pixel is
- * a point, scaled down to fit {@link MAX_DRAWING_SIZE}. The drawing doesn't
- * depend on the stamp's box or fit, which the wrapper applies: a later `fit`
- * shows the whole image, and the same image is always the same drawing.
- */
-function setAppearanceFromImageBytes(
-  fn: PdfFunctions,
-  mem: PdfRuntimeMemory,
-  annotPtr: Ptr,
-  bytes: ArrayBuffer,
-  meta: Extract<BinaryMetadata, { width: number }>,
-): void {
-  const scale = Math.min(1, MAX_DRAWING_SIZE / Math.max(meta.width, meta.height));
-  const width = meta.width * scale;
-  const height = meta.height * scale;
-  const docPtr = fn.FPDF_CreateNewDocument();
-  if (!docPtr) {
-    throw new EngineError(EngineErrorCode.Unknown, 'FPDF_CreateNewDocument returned NULL');
-  }
-  try {
-    const pagePtr = fn.FPDFPage_New(docPtr, 0, width, height);
-    if (!pagePtr) {
-      throw new EngineError(EngineErrorCode.Unknown, 'FPDFPage_New returned NULL');
-    }
-    try {
-      const imageObjPtr = fn.FPDFPageObj_NewImageObj(docPtr);
-      if (!imageObjPtr) {
-        throw new EngineError(EngineErrorCode.Unknown, 'FPDFPageObj_NewImageObj returned NULL');
-      }
-      let inserted = false;
-      try {
-        const dataPtr = mem.alloc(bytes.byteLength);
-        try {
-          mem.writeBytes(dataPtr, new Uint8Array(bytes));
-          const ok =
-            meta.mimeType === 'image/png'
-              ? fn.EPDFImageObj_SetPng(NULL_PTR, 0, imageObjPtr, dataPtr, bytes.byteLength)
-              : fn.EPDFImageObj_SetJpeg(NULL_PTR, 0, imageObjPtr, dataPtr, bytes.byteLength);
-          if (!ok) {
-            throw new EngineError(
-              EngineErrorCode.InvalidArg,
-              `${meta.mimeType === 'image/png' ? 'EPDFImageObj_SetPng' : 'EPDFImageObj_SetJpeg'} rejected the image data`,
-            );
-          }
-        } finally {
-          mem.free(dataPtr);
-        }
-        setImageMatrix(fn, mem, imageObjPtr, width, height);
-        fn.FPDFPage_InsertObject(pagePtr, imageObjPtr);
-        inserted = true;
-      } finally {
-        // The page owns the object once inserted; on failure we own it.
-        if (!inserted) fn.FPDFPageObj_Destroy(imageObjPtr);
-      }
-      if (!fn.FPDFPage_GenerateContent(pagePtr)) {
-        throw new EngineError(EngineErrorCode.Unknown, 'FPDFPage_GenerateContent returned false');
-      }
-      if (!fn.EPDFAnnot_SetAppearanceFromPage(annotPtr, docPtr, 0)) {
-        throw new EngineError(
-          EngineErrorCode.Unknown,
-          'EPDFAnnot_SetAppearanceFromPage returned false',
-        );
-      }
-    } finally {
-      fn.FPDF_ClosePage(pagePtr);
-    }
-  } finally {
-    fn.FPDF_CloseDocument(docPtr);
-  }
-}
-
-/** FS_MATRIX { a, b, c, d, e, f } — six f32s. */
-function setImageMatrix(
-  fn: PdfFunctions,
-  mem: PdfRuntimeMemory,
-  imageObjPtr: Ptr,
-  width: number,
-  height: number,
-): void {
-  const buf = mem.alloc(6 * F32_BYTES);
-  try {
-    mem.poke(buf, 'f32', width, 0);
-    mem.poke(buf, 'f32', 0, 4);
-    mem.poke(buf, 'f32', 0, 8);
-    mem.poke(buf, 'f32', height, 12);
-    mem.poke(buf, 'f32', 0, 16);
-    mem.poke(buf, 'f32', 0, 20);
-    if (!fn.FPDFPageObj_SetMatrix(imageObjPtr, buf)) {
-      throw new EngineError(EngineErrorCode.Unknown, 'FPDFPageObj_SetMatrix returned false');
-    }
-  } finally {
-    mem.free(buf);
-  }
-}
-
-/**
- * Single-page PDF → deep-cloned Form XObject as AP/N. The source buffer
- * must stay alive until the temp document closes.
- */
-function setAppearanceFromPdfBytes(
-  fn: PdfFunctions,
-  mem: PdfRuntimeMemory,
-  annotPtr: Ptr,
-  bytes: ArrayBuffer,
-): void {
-  const dataPtr = mem.alloc(bytes.byteLength);
-  try {
-    mem.writeBytes(dataPtr, new Uint8Array(bytes));
-    const tempDocPtr = fn.FPDF_LoadMemDocument(dataPtr, bytes.byteLength, '');
-    if (!tempDocPtr) {
-      throw new EngineError(
-        EngineErrorCode.MalformedPdf,
-        "the stamp's appearance PDF could not be opened",
-      );
-    }
-    try {
-      if (!fn.EPDFAnnot_SetAppearanceFromPage(annotPtr, tempDocPtr, 0)) {
-        throw new EngineError(
-          EngineErrorCode.Unknown,
-          'EPDFAnnot_SetAppearanceFromPage returned false',
-        );
-      }
-    } finally {
-      fn.FPDF_CloseDocument(tempDocPtr);
-    }
-  } finally {
-    mem.free(dataPtr);
   }
 }

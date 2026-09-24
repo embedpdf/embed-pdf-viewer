@@ -125,6 +125,7 @@ export class AnnotationMutator {
         : {}),
       docPtr: this.session.requireDocPtr(),
       pagePtr,
+      drawings: this.session.drawingIndex(),
       ...(resources ? { resources } : {}),
     };
   }

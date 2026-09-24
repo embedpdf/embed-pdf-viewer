@@ -18,6 +18,7 @@ import { AnnotationReader } from './AnnotationReader';
 import { resolveAnnotPtr } from './internal/identity/resolveAnnotationPointer';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { withScratch } from '../../runtime/memory/scratch';
+import { U64_BYTES, pokeU64 } from '../../runtime/memory/u64';
 import { throwIfAborted } from '../../shared/abort';
 
 // `FLATTEN_*` / `EPDF_FLATTEN_STATUS_*` from public/fpdf_flatten.h.
@@ -201,8 +202,9 @@ export class AnnotationFlattener {
     const { fn, mem } = this.runtime;
     let pdfPtr: Ptr | null = null;
     try {
-      return withScratch(mem, 4, (sizePtr) => {
-        mem.poke(sizePtr, 'i32', 0);
+      return withScratch(mem, U64_BYTES, (sizePtr) => {
+        // `unsigned long*`: 8 bytes on native, 4 on wasm32 — zero the whole slot.
+        pokeU64(mem, sizePtr, 0);
         pdfPtr = fn.EPDF_SaveDocumentToOwnedBuffer(exportedPtr, FPDF_NO_INCREMENTAL, sizePtr);
         const size = Number(mem.peek(sizePtr, 'i32'));
         if (!pdfPtr || size <= 0) {

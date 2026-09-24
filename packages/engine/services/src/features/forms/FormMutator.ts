@@ -25,6 +25,7 @@ import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import { withScratch, withScratchN } from '../../runtime/memory/scratch';
+import { U64_BYTES, pokeU64 } from '../../runtime/memory/u64';
 import { createUnattachedWidget } from './internal/authorWidget';
 import { flagMasks } from './internal/fieldFlagBits';
 import { acquireFormModel } from './internal/formModelCache';
@@ -438,8 +439,9 @@ export class FormMutator {
       this.session.requireDocPtr(),
     );
 
-    const ok = withScratchN(mem, [256 * 4, 4], ([buf, countPtr]) => {
-      mem.poke(countPtr, 'i32', 0);
+    const ok = withScratchN(mem, [256 * 4, U64_BYTES], ([buf, countPtr]) => {
+      // `unsigned long*`: 8 bytes on native, 4 on wasm32 — zero the whole slot.
+      pokeU64(mem, countPtr, 0);
       return fn.EPDFForm_DeleteField(
         this.session.requireDocPtr(),
         resolved.fieldObjectNumber,
@@ -687,8 +689,9 @@ export class FormMutator {
     call: (buf: Ptr, cap: number, countPtr: Ptr) => boolean,
   ): number[] | null {
     const { mem } = this.runtime;
-    return withScratchN(mem, [CHANGED_WIDGETS_CAPACITY * 4, 4], ([buf, countPtr]) => {
-      mem.poke(countPtr, 'i32', 0);
+    return withScratchN(mem, [CHANGED_WIDGETS_CAPACITY * 4, U64_BYTES], ([buf, countPtr]) => {
+      // `unsigned long*`: 8 bytes on native, 4 on wasm32 — zero the whole slot.
+      pokeU64(mem, countPtr, 0);
       if (!call(buf, CHANGED_WIDGETS_CAPACITY, countPtr)) {
         return null;
       }

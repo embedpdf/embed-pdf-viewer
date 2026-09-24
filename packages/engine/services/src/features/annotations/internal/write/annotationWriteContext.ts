@@ -1,6 +1,8 @@
 import type { FontIdentityInfo, WireAnnotationResources } from '@embedpdf/engine-core/runtime';
 import type { Ptr } from '@embedpdf/engine-runtime';
 
+import type { DrawingIndex } from '../../../../document-session/DrawingIndex';
+
 /**
  * Optional capabilities threaded into per-subtype annotation writers.
  *
@@ -31,4 +33,6 @@ export interface AnnotationWriteContext {
   pagePtr?: Ptr;
   /** The bytes that came with this write, by role. */
   resources?: WireAnnotationResources;
+  /** The document's stamp drawings, by content: where a stamp's drawing is found or added. */
+  drawings?: DrawingIndex;
 }

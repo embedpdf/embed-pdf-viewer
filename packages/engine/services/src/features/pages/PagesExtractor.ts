@@ -7,6 +7,7 @@ import {
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
+import { U64_BYTES, pokeU64 } from '../../runtime/memory/u64';
 import { throwIfAborted } from '../../shared/abort';
 
 const FPDF_NO_INCREMENTAL = 1 << 1;
@@ -61,7 +62,7 @@ export class PagesExtractor {
       throw new EngineError(EngineErrorCode.Unknown, 'FPDF_CreateNewDocument failed');
     }
     const idxPtr = mem.alloc(4 * indices.length);
-    const sizePtr = mem.alloc(4);
+    const sizePtr = mem.alloc(U64_BYTES);
     let pdfPtr: Ptr | null = null;
     try {
       for (let i = 0; i < indices.length; i++) {
@@ -74,7 +75,8 @@ export class PagesExtractor {
         );
       }
 
-      mem.poke(sizePtr, 'i32', 0);
+      // `unsigned long*`: 8 bytes on native, 4 on wasm32 — zero the whole slot.
+      pokeU64(mem, sizePtr, 0);
       pdfPtr = fn.EPDF_SaveDocumentToOwnedBuffer(destPtr, FPDF_NO_INCREMENTAL, sizePtr);
       const size = Number(mem.peek(sizePtr, 'i32'));
       if (!pdfPtr || size <= 0) {

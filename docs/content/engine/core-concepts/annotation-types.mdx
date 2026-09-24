@@ -432,6 +432,11 @@ The bytes are written into the stamp's appearance stream, so the document stays 
 self-contained — it renders in any PDF viewer and survives download and re-open with no
 side-car storage. The call is identical on the local and cloud engines.
 
+Stamps with the same artwork share one drawing in the file, each with its own box, fit,
+rotation and opacity around it. Placing a stamp a hundred times stores its image once, and
+so does placing it again after the document is reopened. Changing one of those stamps never
+changes the others.
+
 Changing the geometry later (an `update` with a new `rect`, or a resize in the viewer)
 re-fits the existing drawing — the image is never re-uploaded or re-encoded. A new `fit`
 re-fits it too. A new `appearance` resource replaces the drawing:
@@ -462,9 +467,11 @@ const drawing = await page.annotations.readResource(stamp.ref, 'appearance');
 await otherPage.annotations.create(stamp, { appearance: drawing });
 ```
 
-A stamp made by another tool is returned as it is shown, in the size of its `rect`. A stamp
-made from a PNG or JPEG is returned as the image at its own size, a pixel to a point, whatever
-box it was placed in, so a later `fit` always has the whole image to work with.
+A stamp made by another tool is returned as its drawing at its own size, as its appearance
+defines it. Its data reads `fit: null`, so a copy stretches the drawing to its `rect`, the way
+every PDF viewer shows it, and looks the same. The same artwork at two sizes is one drawing. A
+stamp made from a PNG or JPEG is returned as the image at its own size, a pixel to a point,
+whatever box it was placed in, so a later `fit` always has the whole image to work with.
 
 The same drawing is always the same bytes, whichever engine exports it, and a drawing
 exported again after a copy is the same bytes as before. You can store drawings by their hash

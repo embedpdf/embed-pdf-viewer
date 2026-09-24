@@ -4,6 +4,7 @@ import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runti
 
 import { withScratchN } from '../../runtime/memory/scratch';
 import { F32_BYTES, I32_BYTES, readF32, readI32 } from '../../runtime/memory/structs';
+import { U64_BYTES } from '../../runtime/memory/u64';
 import { DEST_VIEW } from './destinationViewCodes';
 
 const MAX_VIEW_PARAMS = 4; // /FitR carries the most: left, bottom, right, top
@@ -32,7 +33,8 @@ export function readDestination(
 
   const view = withScratchN(
     mem,
-    [I32_BYTES, MAX_VIEW_PARAMS * F32_BYTES],
+    // `unsigned long* pNumParams`: 8 bytes on native, 4 on wasm32.
+    [U64_BYTES, MAX_VIEW_PARAMS * F32_BYTES],
     ([countPtr, paramsPtr]) => {
       const code = fn.FPDFDest_GetView(destPtr, countPtr, paramsPtr);
       const count = Math.min(readI32(mem, countPtr), MAX_VIEW_PARAMS);
