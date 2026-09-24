@@ -19,7 +19,7 @@ import { AbortablePromise } from '../promise/AbortablePromise';
  * validate (see the ref's doc comment). `list()` returns metadata only;
  * bytes leave the engine exclusively through {@link download}. The
  * annotation-level counterpart is
- * `PageAnnotationsService.downloadFile(ref)`.
+ * `PageAnnotationsService.readResource(ref, 'file')`.
  *
  * `create`/`delete` are optional (the `downloadLayer?` pattern) while
  * transports ship — feature-detect with `attachments.create !== undefined`.

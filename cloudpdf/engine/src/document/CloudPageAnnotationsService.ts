@@ -6,6 +6,7 @@ import {
   encodeStableIdKey,
   hasAnnotationResources,
   resolveAnnotationResources,
+  type AnnotationResourceRole,
   type AnnotationResources,
   type WireAnnotationResources,
   type AnnotationAppearanceImage,
@@ -23,7 +24,6 @@ import {
   type AnnotationMoveResult,
   type PageFlattenUsage,
   type AnnotationUpdateResult,
-  type AttachmentContent,
   type DocumentEventInit,
   type MutationMeta,
   type PageAnnotationsService,
@@ -47,7 +47,6 @@ import type { SessionEventPublisher } from '@embedpdf/engine-services';
 import { buildAnnotationMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import { planesInherited } from './planes';
-import { parseAttachmentContent } from './parseAttachmentContent';
 import type { HttpClient } from '../transport/HttpClient';
 
 /**
@@ -172,15 +171,15 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
   }
 
   /**
-   * Decode and return the file embedded in a FileAttachment annotation.
-   * A read over the immutable `attachment-files` leaf, pinned by the
-   * manifest's `attachmentsVersion` (annotation-level files re-key on the
-   * same pin as document-level ones), with the same stale-404 refresh
-   * retry as {@link list}. Weak `index` refs cannot be spliced into a GET
-   * URL (no body to carry the revision), so bytes reads require a stable
-   * id — the same `:annotKey` routing update()/delete() use.
+   * One of the annotation's resources. `file` is a read over the immutable
+   * `attachment-files` leaf, pinned by the manifest's `attachmentsVersion`
+   * (annotation-level files re-key on the same pin as document-level ones),
+   * with the same stale-404 refresh retry as {@link list}. `appearance` is a
+   * derived read (no-store), like {@link exportAppearance}. Weak `index` refs
+   * cannot be spliced into a GET URL (no body to carry the revision), so both
+   * require a stable id — the same `:annotKey` routing update()/delete() use.
    */
-  downloadFile(ref: AnnotationRef): AbortablePromise<AttachmentContent> {
+  readResource(ref: AnnotationRef, role: AnnotationResourceRole): AbortablePromise<Uint8Array> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
@@ -198,12 +197,25 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       return AbortablePromise.rejectReason(
         new EngineError(
           EngineErrorCode.InvalidArg,
-          'downloadFile requires a stable ref (objectNumber or nm); index refs cannot address the content-addressed file leaf',
+          'readResource requires a stable ref (objectNumber or nm); index refs cannot address a resource URL',
         ),
       );
     }
     const annotKey = encodeStableIdKey(refToStableId(ref));
-    return AbortablePromise.run<AttachmentContent>(async (signal) => {
+    if (role === 'appearance') {
+      return AbortablePromise.run<Uint8Array>(async (signal) =>
+        this.http.getBytes(
+          wirePaths.layerAnnotationAppearanceResource(
+            this.docId,
+            this.layerName,
+            this.pageRef,
+            annotKey,
+          ),
+          signal,
+        ),
+      );
+    }
+    return AbortablePromise.run<Uint8Array>(async (signal) => {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
         // A FileAttachment annotation's bytes depend on both planes —
@@ -231,7 +243,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         },
         signal,
       );
-      return parseAttachmentContent(file);
+      return file.bytes;
     });
   }
 

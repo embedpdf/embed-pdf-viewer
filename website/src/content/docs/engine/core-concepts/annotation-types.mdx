@@ -416,17 +416,19 @@ await page.annotations.create(
 );
 ```
 
-| Field  | What it is                                                          | Required | Default     |
-| :----- | :------------------------------------------------------------------ | :------- | :---------- |
-| `rect` | Bounding box                                                        | yes      | —           |
-| `fit`  | How the drawing fills `rect` (see below)                            | no       | `'contain'` |
-| `name` | Standard stamp label (`'Approved'`, `'Draft'`, `'Confidential'`, …) | no       | none        |
+| Field     | What it is                                                          | Required | Default     |
+| :-------- | :------------------------------------------------------------------ | :------- | :---------- |
+| `rect`    | Bounding box                                                        | yes      | —           |
+| `fit`     | How the drawing fills `rect` (see below)                            | no       | `'contain'` |
+| `name`    | Standard stamp label (`'Approved'`, `'Draft'`, `'Confidential'`, …) | no       | none        |
+| `opacity` | Transparency `0`–`1`, applied once over the whole drawing           | no       | `1`         |
 
 `fit` uses the CSS `object-fit` vocabulary: `'contain'` preserves the aspect ratio and
 keeps the drawing fully visible, `'cover'` preserves the aspect ratio and fills the box
 (may crop), `'fill'` stretches to the box. The stamp records it, so reads return it and a
 later resize fills the new box the same way. A stamp made by another tool records none and
-reads `fit: null`; it is re-fit with `'contain'`.
+reads `fit: null`; it is re-fit with `'fill'`, the way every PDF viewer places an
+appearance in its box.
 
 The bytes are written into the stamp's appearance stream, so the document stays fully
 self-contained — it renders in any PDF viewer and survives download and re-open with no
@@ -443,6 +445,27 @@ await page.annotations.update(ref, {}, { appearance: otherImage });
 
 A stamp created without an `appearance`, or with bytes that aren't PNG, JPEG or PDF, is
 refused with `InvalidArg` before any work happens.
+
+`opacity` is the stamp's `/CA`. A new value replaces the old one, and it applies to the
+drawing as a whole, so overlapping parts of the artwork don't show through each other.
+Opacity goes both ways with Acrobat: a stamp from Acrobat keeps the opacity it was saved
+with through a resize or a copy, and a new value replaces Acrobat's; a stamp made here
+can have its opacity changed in Acrobat, and Acrobat's value replaces ours. Neither
+stacks on top of the other.
+
+### Copying a stamp
+
+A read never contains the drawing. `readResource(ref, 'appearance')` returns it as a
+one-page PDF, before the `fit`, rotation and `opacity` the data describes. The read and
+that PDF together make the same stamp again, in this document or another:
+
+```ts
+const drawing = await page.annotations.readResource(stamp.ref, 'appearance');
+await otherPage.annotations.create(stamp, { appearance: drawing });
+```
+
+A stamp made by another tool is returned as it is shown, on a page the size of its `rect`.
+Reading a resource sends document content out, so it needs the `doc.download` scope.
 
 ## File attachment
 
@@ -463,9 +486,9 @@ await page.annotations.create(
 
 A read returns the same `file`, plus `size` and `checksum` taken from the bytes, and
 `createdAt` and `modifiedAt` from the embedded file's parameters; the bytes themselves come
-from `downloadFile(ref)`. In an update, `file` replaces the
-name, MIME type and description together (leave one out and it is removed), and a `file`
-resource replaces the bytes:
+from `readResource(ref, 'file')`. In an update, `file` replaces the name, MIME type and
+description together (leave one out and it is removed), and a `file` resource replaces the
+bytes:
 
 ```ts
 const { file } = attachment;

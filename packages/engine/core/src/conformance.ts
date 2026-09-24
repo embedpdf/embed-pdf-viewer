@@ -22,6 +22,11 @@ export type {
   AnnotationAttributionConformanceOptions,
   AttributionSession,
 } from './conformance/runAnnotationAttributionConformance';
+export { runAnnotationResourceConformance } from './conformance/runAnnotationResourceConformance';
+export type {
+  AnnotationResourceConformanceOptions,
+  AnnotationResourceFixture,
+} from './conformance/runAnnotationResourceConformance';
 export { runDateConformance } from './conformance/runDateConformance';
 export type { DateConformanceOptions } from './conformance/runDateConformance';
 export { runAnnotationDeclarationConformance } from './conformance/runAnnotationDeclarationConformance';

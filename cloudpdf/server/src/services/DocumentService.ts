@@ -1493,6 +1493,39 @@ export class DocumentService {
     return new Uint8Array(result.bytes);
   }
 
+  /**
+   * An annotation's `appearance` resource: its drawing as a one-page PDF,
+   * before the fit, rotation and opacity its data describes. A read like
+   * {@link exportAnnotationAppearance}.
+   */
+  async readAnnotationAppearance(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+    pageObjectNumber: number,
+    ref: AnnotationRef,
+    signal?: AbortSignal,
+  ): Promise<Uint8Array> {
+    await this.ensureLayerOnPool(ctx, docId, layerName);
+    const build = (jobId: WorkerJobId) =>
+      wirePack({
+        kind: 'annotations.readAppearance' as const,
+        jobId,
+        docId,
+        layerName,
+        page: toPageRef(pageObjectNumber),
+        ref,
+      });
+    const result = await this.pool.run(docId, build, signal);
+    if (result.tag !== 'annotations.readAppearance') {
+      throw new EngineError(
+        EngineErrorCode.WireFormat,
+        `unexpected annotations.readAppearance payload: ${result.tag}`,
+      );
+    }
+    return new Uint8Array(result.bytes);
+  }
+
   async saveLayerDownloadToTemp(
     ctx: OpenContext,
     docId: string,

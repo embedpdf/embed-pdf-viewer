@@ -421,6 +421,16 @@ export const wirePaths = {
   layerAnnotationByKey: (docId: string, layerName: string, page: PageRef, key: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items/${encodeURIComponent(key)}`,
 
+  /** GET: an annotation's `appearance` resource, its drawing as a one-page
+   *  PDF — a derived read (application/pdf, no-store), gated like pages/extract. */
+  layerAnnotationAppearanceResource: (
+    docId: string,
+    layerName: string,
+    page: PageRef,
+    key: string,
+  ) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items/${encodeURIComponent(key)}/resources/appearance`,
+
   layerPageAnnotationsMove: (docId: string, layerName: string, page: PageRef) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items/move`,
   /** POST: flatten a chosen set of the page's annotations into its content
@@ -642,6 +652,8 @@ export const wireTemplates = {
     '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/flatten',
   layerAnnotationItemsAppearance:
     '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/appearance',
+  layerAnnotationItemAppearanceResource:
+    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotKey/resources/appearance',
   layerForm: '/v1/docs/:docId/layers/:layerName/form',
   layerFormFieldValue: '/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/value',
   layerFormFieldReset: '/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/reset',

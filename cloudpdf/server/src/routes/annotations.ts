@@ -6,7 +6,6 @@ import {
   EngineErrorCode,
   ANNOTATION_RESOURCE_ROLE_NAMES,
   checkSetGroup,
-  sniffBinaryMetadata,
   wirePack,
   type AnnotationActor,
   type AnnotationAppearanceImageOptions,
@@ -43,7 +42,7 @@ import {
   WeakAnnotationSessionPagesRequestSchema,
   type ManifestPage,
 } from '@embedpdf/engine-core/wire';
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 
 import {
   abortSignalFromRequest,
@@ -588,6 +587,36 @@ export async function registerAnnotationRoutes(
         layerName,
         pageObjectNumber,
         body.refs,
+        abortSignalFromRequest(req),
+      );
+      setNoStore(reply);
+      reply.type('application/pdf');
+      return reply.send(Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength));
+    },
+  );
+
+  // An annotation's `appearance` resource: its drawing, as a one-page PDF. A
+  // read that egresses content, gated by `doc.download` like the export above.
+  // Durable keys only: a weak index ref needs a revision-validated body.
+  app.get(
+    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotKey/resources/appearance',
+    async (req, reply) => {
+      const { docId, layerName, pageKey, annotKey } = req.params as {
+        docId: string;
+        layerName: string;
+        pageKey: string;
+        annotKey: string;
+      };
+      const pageObjectNumber = resolvePageKeyParam(pageKey);
+      const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const ctx = requireLayerCapability(req, docId, layerName, 'doc.download', pdfBits);
+      const bytes = await documentService.readAnnotationAppearance(
+        ctx,
+        docId,
+        layerName,
+        pageObjectNumber,
+        refFromKey(annotKey, pageObjectNumber),
         abortSignalFromRequest(req),
       );
       setNoStore(reply);

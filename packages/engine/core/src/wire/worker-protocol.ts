@@ -398,6 +398,16 @@ export interface AnnotationsExportAppearanceWorkerRequest {
   refs: AnnotationRef[];
 }
 
+/** An annotation's `appearance` resource: its drawing, as a one-page PDF (bytes). A read. */
+export interface AnnotationsReadAppearanceWorkerRequest {
+  kind: 'annotations.readAppearance';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  page: PageRef;
+  ref: AnnotationRef;
+}
+
 /**
  * Batch annotation reorder. Refs are resolved on the worker before the
  * move so the impact computation has a single before-state and one
@@ -1138,6 +1148,7 @@ export type WorkerRequest =
   | AttachmentsCreateWorkerRequest
   | AttachmentsDeleteWorkerRequest
   | AnnotationsReadFileWorkerRequest
+  | AnnotationsReadAppearanceWorkerRequest
   | MeasureViewportsWorkerRequest
   | MeasureSetScaleWorkerRequest
   | PieceInfoReadWorkerRequest
@@ -1246,6 +1257,7 @@ export type WorkerResultPayload =
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | { tag: 'annotations.exportAppearance'; bytes: ArrayBuffer; size: number }
+  | { tag: 'annotations.readAppearance'; bytes: ArrayBuffer; size: number }
   | {
       tag: 'annotations.move';
       result: AnnotationMoveResult;

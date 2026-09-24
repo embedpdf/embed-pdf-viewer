@@ -35,7 +35,7 @@ export interface DocumentHandle {
    * Document-level attachments (the catalog's `/EmbeddedFiles` name tree).
    * Optional while transports ship (the `downloadLayer?` pattern) —
    * feature-detect with `doc.attachments !== undefined`. Files attached to
-   * annotations are downloaded via `page(pon).annotations.downloadFile`.
+   * annotations are read via `page(ref).annotations.readResource(ref, 'file')`.
    */
   readonly attachments?: DocumentAttachmentsService;
   /** The document's interactive form (AcroForm): fields, values, interchange. */

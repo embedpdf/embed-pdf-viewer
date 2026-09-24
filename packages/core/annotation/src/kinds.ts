@@ -530,8 +530,9 @@ export const KINDS: Record<string, AnnotationKind> = {
   },
   // Stamp: a rect-variant kind whose visual is always the engine-baked /AP
   // (image or vector appearance authored at create time) — never a vector
-  // re-render, so it declares no editable style props. Geometry edits
-  // (move/resize/rotate) re-fit the appearance natively on the engine side.
+  // re-render. Its one style prop is opacity (/CA), which the engine paints
+  // over the whole drawing. Geometry edits (move/resize/rotate) and a new
+  // opacity re-bake the appearance natively on the engine side.
   stamp: {
     subtype: 'stamp',
     variant: 'rect',
@@ -546,7 +547,7 @@ export const KINDS: Record<string, AnnotationKind> = {
       commentable: true,
       opaqueBody: true,
     }),
-    props: [LINKABLE],
+    props: [OPACITY, LINKABLE],
   },
   // Link: an invisible hit rectangle that navigates somewhere. Paints nothing
   // of its own (scene() skips it; any /AP a PDF baked shows via the page

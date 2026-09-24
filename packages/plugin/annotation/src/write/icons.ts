@@ -6,6 +6,7 @@ import {
   type AnnotationDraft,
   type AnnotationRef,
   type AnnotationResources,
+  type AttachmentContent,
   type AttachmentFileSource,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
@@ -34,7 +35,7 @@ export function createIcons(
     tools,
     filePicker,
   }: Pick<AnnotationServices, 'store' | 'geometry' | 'authority' | 'tools' | 'filePicker'>,
-  annotations: Pick<AnnotationReads, 'pageOf'>,
+  annotations: Pick<AnnotationReads, 'pageOf' | 'api'>,
   stamps: Pick<Stamps, 'placeArmedStamp' | 'requestStampAt'>,
 ) {
   /** Create an icon annotation and select it (the anchor for its menu and comment popup). */
@@ -128,14 +129,17 @@ export function createIcons(
         throw toPluginError('annotation', error);
       });
     },
-    readAttachment: async (ref: AnnotationRef) => {
+    readAttachment: async (ref: AnnotationRef): Promise<AttachmentContent> => {
       const doc = ctx.doc;
       if (!doc) throw new Error('[annotation] no document bound');
-      const page = doc.page(annotations.pageOf(ref)).annotations;
-      if (!page.downloadFile) {
-        throw new Error('[annotation] this engine does not support attachment download');
+      // The name and MIME type are the annotation's data; the bytes are its `file` resource.
+      const dto = annotations.api.getRaw(ref);
+      const file = dto?.subtype === 'file-attachment' ? dto.file : null;
+      if (!file) {
+        throw new PluginError('not-found', 'annotation', 'the annotation has no attached file');
       }
-      return page.downloadFile(ref);
+      const bytes = await doc.page(annotations.pageOf(ref)).annotations.readResource(ref, 'file');
+      return { bytes, name: file.name, ...(file.mimeType ? { mimeType: file.mimeType } : {}) };
     },
     setFilePickerProvider: (provider: FilePickerProvider | null) => filePicker.set(provider),
   };

@@ -240,6 +240,17 @@ export function styleFromDTO(dto: AnnotationDTO): Style {
       border: { kind: 'solid' },
     };
   }
+  if (dto.subtype === 'stamp') {
+    // The drawing is the appearance; /CA is the only style it has.
+    return {
+      color: '#444444',
+      interiorColor: null,
+      strokeWidth: 1,
+      opacity: dto.opacity,
+      blendMode: dto.blendMode,
+      border: { kind: 'solid' },
+    };
+  }
   if (dto.subtype === 'text' || dto.subtype === 'file-attachment') {
     // Icon kinds: /C is the icon fill, /CA its opacity — no stroke/fill split.
     const iconDto = dto as Extract<AnnotationDTO, { color: Color; opacity: number }>;

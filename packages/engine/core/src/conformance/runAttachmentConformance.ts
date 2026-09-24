@@ -13,7 +13,7 @@ import { toPageRef } from '../identity/PageRef';
  * Both attachment surfaces are optional on the contract (the
  * `downloadLayer?` pattern), probed independently and skipped cleanly:
  *   - `doc.attachments?` — document-level EmbeddedFiles (list/download)
- *   - `page.annotations.downloadFile?` — annotation-level file bytes
+ *   - `page.annotations.readResource(ref, 'file')` — annotation-level file bytes
  *
  * Invariants:
  *   1. `list()` reflects the name tree: positional indices, non-empty
@@ -23,7 +23,7 @@ import { toPageRef } from '../identity/PageRef';
  *   3. Unknown indices reject with an `EngineError`.
  *   4. A created file-attachment annotation round-trips its file:
  *      metadata inline on the DTO (never bytes), bytes byte-identical
- *      through `downloadFile(ref)`.
+ *      as its `file` resource.
  *   5. A created text (sticky-note) annotation round-trips icon + color.
  */
 export function runAttachmentConformance(
@@ -45,7 +45,7 @@ export function runAttachmentConformance(
       const pages = await probe.pages.list();
       firstPageObjectNumber = pages.pages[0].ref.pageObjectNumber;
       annotSupported =
-        probe.page(toPageRef(firstPageObjectNumber)).annotations.downloadFile !== undefined;
+        probe.page(toPageRef(firstPageObjectNumber)).annotations.readResource !== undefined;
       await probe.close();
     });
 
@@ -162,7 +162,7 @@ export function runAttachmentConformance(
       }
     });
 
-    test('a created file-attachment annotation round-trips its file through downloadFile()', async () => {
+    test('a created file-attachment annotation round-trips its file as its file resource', async () => {
       if (!annotSupported) return;
       const doc = await openFixture(engine, opts);
       try {
@@ -197,12 +197,11 @@ export function runAttachmentConformance(
         expect(file.description).toBe('attachment conformance payload');
         expect(file.size).toBe(data.length);
 
-        // Bytes come back byte-identical through the explicit download.
-        const content = await annotations.downloadFile!(dto.ref);
-        expect(content.name).toBe('conformance.bin');
-        expect(content.bytes.length).toBe(data.length);
-        expect(Array.from(content.bytes.slice(0, 16))).toEqual(Array.from(data.slice(0, 16)));
-        expect(content.bytes.every((byte, i) => byte === data[i])).toBe(true);
+        // Bytes come back byte-identical as the `file` resource.
+        const bytes = await annotations.readResource(dto.ref, 'file');
+        expect(bytes.length).toBe(data.length);
+        expect(Array.from(bytes.slice(0, 16))).toEqual(Array.from(data.slice(0, 16)));
+        expect(bytes.every((byte, i) => byte === data[i])).toBe(true);
       } finally {
         await doc.close();
       }

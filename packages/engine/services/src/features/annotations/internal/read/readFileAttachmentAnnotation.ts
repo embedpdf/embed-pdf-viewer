@@ -20,7 +20,7 @@ const DEFAULT_FILE_ATTACHMENT_ICON: FileAttachmentIcon = 'push-pin';
 /**
  * FileAttachment DTO: base + icon presentation + the attached file's
  * metadata (bytes are downloaded explicitly via
- * `PageAnnotationsService.downloadFile`). A malformed annotation without
+ * `PageAnnotationsService.readResource(ref, 'file')`). A malformed annotation without
  * a readable `/FS` filespec still reads, with `file: null`; the download
  * call reports the precise error.
  */

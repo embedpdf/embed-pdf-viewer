@@ -287,11 +287,8 @@ export function runAnnotationDeclarationConformance(
           mimeType: 'text/plain',
           size: bytes.byteLength,
         });
-        if (page.annotations.downloadFile) {
-          const content = await page.annotations.downloadFile(created.ref);
-          expect(new TextDecoder().decode(content.bytes)).toBe('replaced bytes');
-          expect(content.name).toBe('renamed.txt');
-        }
+        const read = await page.annotations.readResource(created.ref, 'file');
+        expect(new TextDecoder().decode(read)).toBe('replaced bytes');
       });
     });
   });

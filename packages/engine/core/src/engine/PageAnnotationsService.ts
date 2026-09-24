@@ -1,13 +1,12 @@
 import type { AnnotationListPageSnapshot } from '../annotation/AnnotationListSnapshot';
 import type { AnnotationDraft, AnnotationPatch } from '../annotation/kinds';
-import type { AnnotationResources } from '../annotation/resources';
+import type { AnnotationResourceRole, AnnotationResources } from '../annotation/resources';
 import type {
   AnnotationAppearanceImageOptions,
   AnnotationAppearanceImagesResult,
   AnnotationAppearanceRenderOptions,
   AnnotationAppearancesResult,
 } from '../dto/AnnotationRender';
-import type { AttachmentContent } from '../dto/Attachment';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { AnnotationFlattenResult } from '../mutation/AnnotationFlattenResult';
 import type { PageFlattenUsage } from '../mutation/PageFlattenResult';
@@ -55,15 +54,19 @@ export interface PageAnnotationsService {
     options?: AnnotationAppearanceImageOptions,
   ): AbortablePromise<AnnotationAppearanceImagesResult>;
   /**
-   * Decode and return the file embedded in a FileAttachment annotation
-   * (its `/FS` filespec). A read — listings carry the file's metadata
-   * (`FileAttachmentAnnotationDTO.file`); this is the explicit bytes-out
-   * call. Optional while the cloud endpoint ships (the `extract?`
-   * pattern); feature-detect with `annotations.downloadFile !== undefined`.
-   * Throws `EngineError(InvalidArg)` when the annotation is not a
-   * file-attachment or has no embedded file stream.
+   * One of an annotation's resources: the bytes `create(data, resources)`
+   * takes to make the same annotation again. A read never contains them.
+   *
+   * - `appearance` (stamps): the drawing, as a one-page PDF, before the fit,
+   *   rotation and opacity the data describes. A stamp another tool made is
+   *   drawn as the page shows it, on a page the size of its `/Rect`.
+   * - `file` (file attachments): the attached file's exact bytes; its name,
+   *   MIME type and description are the data's `file`.
+   *
+   * Egresses content, so it needs `doc.download`. A role the annotation's
+   * kind doesn't take is refused with `InvalidArg`.
    */
-  downloadFile?(ref: AnnotationRef): AbortablePromise<AttachmentContent>;
+  readResource(ref: AnnotationRef, role: AnnotationResourceRole): AbortablePromise<Uint8Array>;
   /**
    * Create an annotation on this page from its data. Bytes travel beside the
    * data, by role: a stamp needs its `appearance`, a file attachment its

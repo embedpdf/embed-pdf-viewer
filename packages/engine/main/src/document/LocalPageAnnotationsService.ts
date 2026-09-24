@@ -17,6 +17,7 @@ import {
   type AnnotationListPageSnapshot,
   type AnnotationPatch,
   type AnnotationRef,
+  type AnnotationResourceRole,
   type AnnotationResources,
   type WireAnnotationResources,
   type AnnotationCreateResult,
@@ -25,7 +26,6 @@ import {
   type AnnotationMoveResult,
   type PageFlattenUsage,
   type AnnotationUpdateResult,
-  type AttachmentContent,
   type CollabTarget,
   type PageAnnotationsService,
   type PageObjectNumber,
@@ -105,15 +105,15 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     });
   }
 
-  downloadFile(ref: AnnotationRef): AbortablePromise<AttachmentContent> {
+  readResource(ref: AnnotationRef, role: AnnotationResourceRole): AbortablePromise<Uint8Array> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
       );
     }
-    // Attachment bytes egress content (a partial download), so like
-    // `pages.extract` this gates on `doc.download` — seeing the annotation
-    // (`doc.annotate.read`) does not imply extracting its file.
+    // A resource egresses content (a partial download), so like
+    // `pages.extract` this gates on `doc.download`: seeing the annotation
+    // (`doc.annotate.read`) does not imply extracting its bytes.
     try {
       this.guard.assertCapability('doc.download');
     } catch (err) {
@@ -121,39 +121,27 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     }
     const docId = this.docId;
     const page = this.ref;
+    const kind = role === 'file' ? 'annotations.readFile' : 'annotations.readAppearance';
     const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'annotations.readFile',
-            jobId,
-            docId,
-            page,
-            ref,
-          }),
-      },
+      { buildPack: (jobId: JobId) => wirePack({ kind, jobId, docId, page, ref }) },
       { priority: Priority.MEDIUM },
     );
-    return AbortablePromise.run<AttachmentContent>(async (signal) => {
+    return AbortablePromise.run<Uint8Array>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
       const payload = await submission;
+      if (payload.tag === 'annotations.readAppearance') return new Uint8Array(payload.bytes);
       if (payload.tag !== 'annotations.readFile') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      const { content } = payload;
-      if (content.bytes === undefined) {
+      if (payload.content.bytes === undefined) {
         throw new EngineError(
           EngineErrorCode.WireFormat,
           'annotations.readFile returned no bytes (path mode is server-only)',
         );
       }
-      return {
-        bytes: new Uint8Array(content.bytes),
-        name: content.name,
-        ...(content.mimeType !== undefined ? { mimeType: content.mimeType } : {}),
-      };
+      return new Uint8Array(payload.content.bytes);
     });
   }
 

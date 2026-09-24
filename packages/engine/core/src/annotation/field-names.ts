@@ -602,6 +602,7 @@ export const ANNOTATION_FIELD_NAMES: Readonly<Record<AnnotationSubtype, readonly
     'unrotatedRect',
     'name',
     'fit',
+    'opacity',
   ],
   'file-attachment': [
     'ref',

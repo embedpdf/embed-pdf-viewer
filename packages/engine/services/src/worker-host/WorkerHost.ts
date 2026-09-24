@@ -75,6 +75,7 @@ import {
   type AttachmentsCreateWorkerRequest,
   type AttachmentsDeleteWorkerRequest,
   type AnnotationsReadFileWorkerRequest,
+  type AnnotationsReadAppearanceWorkerRequest,
   type PagesFlattenWorkerRequest,
   type RedactionApplyWorkerRequest,
   type PieceInfoApplicationsWorkerRequest,
@@ -399,6 +400,9 @@ export class WorkerHost {
           break;
         case 'annotations.exportAppearance':
           resultPack = this.handleAnnotationsExportAppearance(msg, ctrl.signal);
+          break;
+        case 'annotations.readAppearance':
+          resultPack = this.handleAnnotationsReadAppearance(msg, ctrl.signal);
           break;
         case 'pages.removeName':
           resultPack = this.handlePagesRemoveName(msg, ctrl.signal);
@@ -910,6 +914,23 @@ export class WorkerHost {
     return wirePack(
       { tag: 'annotations.exportAppearance', bytes: exported.bytes, size: exported.size },
       [exported.bytes],
+    );
+  }
+
+  private handleAnnotationsReadAppearance(
+    req: AnnotationsReadAppearanceWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
+    const drawing = new AnnotationFlattener(this.runtime, session).readAppearance(
+      pageObjectNumber,
+      req.ref,
+      signal,
+    );
+    return wirePack(
+      { tag: 'annotations.readAppearance', bytes: drawing.bytes, size: drawing.size },
+      [drawing.bytes],
     );
   }
 

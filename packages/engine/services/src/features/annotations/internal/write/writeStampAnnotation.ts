@@ -12,7 +12,7 @@ import {
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import type { AnnotationWriteContext } from './annotationWriteContext';
-import { setAnnotRect } from './annotationWritePrimitives';
+import { opacityToAlpha, setAnnotOpacity, setAnnotRect } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 import { writeBoxTransformMetadata } from './writeAnnotationTransformMetadata';
 import { EMBD_METADATA_SCHEMA_VERSION, writeEmbedMetadataString } from './writeEmbedMetadata';
@@ -70,8 +70,12 @@ export function applyStampDraft(
   if (draft.name != null) {
     setStampName(fn, annotPtr, draft.name);
   }
-  // A create records the fit it used, unless the data says the stamp records none.
-  const fit = draft.fit ?? 'contain';
+  // Before the drawing is placed: the wrapper paints /CA, and a layer in the
+  // drawing that only repeats it is left out.
+  if (draft.opacity !== undefined) setAnnotOpacity(fn, annotPtr, draft.opacity);
+  // A create records the fit it used. Data that records none (`null`, as a
+  // stamp another tool made reads) is fit as such a stamp is shown: `fill`.
+  const fit = draft.fit === null ? 'fill' : (draft.fit ?? 'contain');
   authorStampAppearance(
     fn,
     mem,
@@ -105,14 +109,15 @@ export function applyStampPatch(
   } else if (patch.name !== undefined) {
     setStampName(fn, annotPtr, patch.name);
   }
-  // The fit the drawing is (re-)fit with: the patch's, else the recorded one.
-  const fit =
-    patch.fit !== undefined
-      ? (patch.fit ?? 'contain')
-      : (readStampFit(fn, mem, annotPtr) ?? 'contain');
+  // The fit the drawing is (re-)fit with: the patch's, else the recorded one,
+  // else `fill`, the way a PDF places any appearance in its /Rect.
+  const recordedFit = readStampFit(fn, mem, annotPtr) ?? 'fill';
+  const fit = patch.fit !== undefined ? (patch.fit ?? 'fill') : recordedFit;
   if (patch.fit !== undefined) writeStampFit(fn, mem, annotPtr, patch.fit);
   const appearance = ctx?.resources?.appearance;
   if (appearance !== undefined) {
+    // New bytes replace the drawing, so they only need the new value.
+    if (patch.opacity !== undefined) setAnnotOpacity(fn, annotPtr, patch.opacity);
     // Content replacement: rebuild the appearance from the new bytes, authored
     // in the unrotated frame (see authorStampAppearance) so a rotated stamp
     // never double-fits into its padded AABB.
@@ -144,7 +149,12 @@ export function applyStampPatch(
     rotation: patch.rotation,
     unrotatedRect: patch.unrotatedRect,
   });
-  if (
+  if (patch.opacity !== undefined) {
+    // The appearance still paints the old /CA; the native side reads it with
+    // that value, so its opacity layer is replaced, not kept as drawing. It
+    // re-fits into the new /Rect too.
+    setStampOpacity(fn, annotPtr, fit, patch.opacity);
+  } else if (
     patch.rect !== undefined ||
     patch.fit !== undefined ||
     patch.rotation !== undefined ||
@@ -318,6 +328,12 @@ function setStampContent(
   // Normalises the AP (BBox, EPDFOrigContentRect for later re-fits) and
   // applies any /EMBD_Metadata rotation.
   refitAppearance(fn, annotPtr, fit);
+}
+
+function setStampOpacity(fn: PdfFunctions, annotPtr: Ptr, fit: StampFit, opacity: number): void {
+  if (!fn.EPDFAnnot_SetStampOpacity(annotPtr, STAMP_FIT_TO_CODE[fit], opacityToAlpha(opacity))) {
+    throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetStampOpacity returned false');
+  }
 }
 
 function refitAppearance(fn: PdfFunctions, annotPtr: Ptr, fit: StampFit): void {

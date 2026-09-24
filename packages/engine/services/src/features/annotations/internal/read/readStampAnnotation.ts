@@ -1,7 +1,7 @@
 import type { AnnotationBase, StampAnnotationDTO, StampFit } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
-import { readAnnotName } from './annotationReadPrimitives';
+import { readAnnotName, readAnnotOpacity } from './annotationReadPrimitives';
 import {
   readAnnotationRotation,
   readAnnotationUnrotatedRect,
@@ -25,7 +25,7 @@ export function readStampFit(
 
 /**
  * Stamp DTO: base + `/Name` (standard or custom identifier, verbatim) +
- * transform metadata + the recorded fit. The visual content
+ * transform metadata + the recorded fit + `/CA`. The visual content
  * stays in the `/AP` stream — rendered via `renderAppearanceImages()`,
  * never surfaced as DTO data.
  */
@@ -42,6 +42,7 @@ export function readStamp(
     subtype: 'stamp',
     name: readAnnotName(fn, mem, annotPtr),
     fit: readStampFit(fn, mem, annotPtr),
+    opacity: readAnnotOpacity(fn, mem, annotPtr) ?? 1,
     rotation: rotation ?? null,
     unrotatedRect: unrotatedRect ?? null,
   };

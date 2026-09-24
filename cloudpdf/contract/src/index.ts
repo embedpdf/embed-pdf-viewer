@@ -1816,6 +1816,24 @@ export const docOperations = {
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
   },
+  'doc.annotations.readAppearance': {
+    operationId: 'doc.annotations.readAppearance',
+    title: 'Read an annotation appearance',
+    summary:
+      "A stamp's drawing as a one-page PDF, before the fit, rotation and opacity its data describes: with the data, the bytes to create the same stamp again. A read; the source is untouched.",
+    method: 'GET',
+    path: wireTemplates.layerAnnotationItemAppearanceResource,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.download'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocAnnotationParamsSchema,
+    responses: {
+      200: { contentType: 'application/pdf' },
+      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+  },
   'doc.forms.get': {
     operationId: 'doc.forms.get',
     title: 'Get form snapshot',

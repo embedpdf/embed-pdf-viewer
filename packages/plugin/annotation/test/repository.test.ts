@@ -735,6 +735,35 @@ describe('repository — toScopedPatch (sparse emission)', () => {
     expect(patch).not.toHaveProperty('color');
   });
 
+  it('props opacity on a stamp reads and lowers /CA alone (the engine re-bakes it)', () => {
+    const {
+      color: _color,
+      interiorColor: _interiorColor,
+      strokeWidth: _strokeWidth,
+      borderStyle: _borderStyle,
+      ...base
+    } = squareDTO(65) as Extract<AnnotationDTO, { subtype: 'square' }>;
+    const stamp = fromDTO(
+      {
+        ...base,
+        subtype: 'stamp',
+        name: null,
+        fit: 'contain',
+        opacity: 0.3,
+        rotation: null,
+        unrotatedRect: null,
+      } as AnnotationDTO,
+      CROP,
+    );
+    expect(stamp.style.opacity).toBe(0.3);
+    const patch = toScopedPatch(
+      { ...stamp, style: { ...stamp.style, opacity: 0.6 } },
+      { kind: 'props', keys: ['opacity'] },
+      CROP,
+    ) as unknown as Record<string, unknown>;
+    expect(patch).toEqual({ subtype: 'stamp', opacity: 0.6 });
+  });
+
   it('an unlowerable key degrades to the FULL projection, never a dropped write', () => {
     const annotation = fromDTO(squareDTO(64), CROP);
     const sparse = toScopedPatch(

@@ -61,7 +61,8 @@ const { created } = await page.annotations.create({
 The first argument is data only. The kinds that carry bytes take them in a second
 argument, by what the bytes are for: a stamp's drawing as `appearance`, an attached file as
 `file`. `update(ref, patch, resources)` takes them the same way, to replace them. A read
-never contains bytes.
+never contains bytes; `readResource(ref, role)` returns them, so a read and its resources
+make the same annotation again.
 
 ## Measurements
 

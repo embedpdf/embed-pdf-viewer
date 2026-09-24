@@ -21,7 +21,7 @@ import { pdfDateToIso } from '../../../shared/pdf-date';
  * filespec pointer — no close call exists or is needed). Used by both
  * homes an embedded file can have: the document-level `/EmbeddedFiles`
  * name tree (`AttachmentReader`) and a FileAttachment annotation's `/FS`
- * (the annotation reader + `downloadFile`).
+ * (the annotation reader + `readResource(ref, 'file')`).
  */
 
 /** Read the name-tree key at |index| — the durable EmbeddedFileRef address. */
