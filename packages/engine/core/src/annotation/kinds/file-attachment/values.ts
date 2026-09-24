@@ -9,18 +9,3 @@ export const FileAttachmentIconSchema: z.ZodType<FileAttachmentIcon> = z.enum([
   'graph',
   'tag',
 ]);
-
-/** The attached file after normalization: its metadata and a resource ref for its bytes. */
-export interface WireAttachmentFile {
-  resource: string;
-  name: string;
-  mimeType?: string;
-  description?: string;
-}
-
-export const WireAttachmentFileSchema: z.ZodType<WireAttachmentFile> = z.object({
-  resource: z.string().min(1),
-  name: z.string().min(1),
-  mimeType: z.string().optional(),
-  description: z.string().optional(),
-});

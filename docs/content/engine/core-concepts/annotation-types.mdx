@@ -393,10 +393,10 @@ await page.annotations.create({
 
 ## Stamp
 
-A `stamp` places an image — or a vector appearance — inside `rect`. You pass the bytes
-inline as `source`; there is no separate upload or attachment step. The format is
-detected from the bytes themselves (never from a declared mime type), and each format
-takes the best path into the PDF:
+A `stamp` places an image — or a vector appearance — inside `rect`. The data describes the
+stamp; its drawing travels beside it, as the `appearance` resource in the second argument.
+There is no separate upload step. The format is detected from the bytes themselves (never
+from a declared mime type), and each format takes the best path into the PDF:
 
 - **PNG** — decoded natively, transparency preserved.
 - **JPEG** — embedded as-is (no re-encoding).
@@ -404,39 +404,71 @@ takes the best path into the PDF:
 
 ```ts
 // From a file input, a fetch, or raw bytes — Blob and Uint8Array both work.
-await page.annotations.create({
-  subtype: 'stamp',
-  rect: { left: 72, bottom: 640, right: 222, top: 715 },
-  source: file, // PNG, JPEG, or single-page PDF bytes
-  fit: 'contain',
-});
+await page.annotations.create(
+  {
+    subtype: 'stamp',
+    rect: { left: 72, bottom: 640, right: 222, top: 715 },
+    fit: 'contain',
+  },
+  { appearance: file }, // PNG, JPEG, or single-page PDF bytes
+);
 ```
 
-| Field    | What it is                                                               | Required | Default     |
-| :------- | :----------------------------------------------------------------------- | :------- | :---------- |
-| `rect`   | Bounding box                                                             | yes      | —           |
-| `source` | The content bytes: `Blob`, `Uint8Array`, or `{ data, mimeType?, name? }` | yes      | —           |
-| `fit`    | How the content maps into `rect` (see below)                             | no       | `'contain'` |
-| `name`   | Standard stamp label (`'Approved'`, `'Draft'`, `'Confidential'`, …)      | no       | none        |
+| Field  | What it is                                                          | Required | Default     |
+| :----- | :------------------------------------------------------------------ | :------- | :---------- |
+| `rect` | Bounding box                                                        | yes      | —           |
+| `fit`  | How the drawing fills `rect` (see below)                            | no       | `'contain'` |
+| `name` | Standard stamp label (`'Approved'`, `'Draft'`, `'Confidential'`, …) | no       | none        |
 
 `fit` uses the CSS `object-fit` vocabulary: `'contain'` preserves the aspect ratio and
-keeps the content fully visible, `'cover'` preserves the aspect ratio and fills the box
-(may crop), `'fill'` stretches to the box.
+keeps the drawing fully visible, `'cover'` preserves the aspect ratio and fills the box
+(may crop), `'fill'` stretches to the box. The stamp records it, so reads return it and a
+later resize fills the new box the same way. A stamp made by another tool records none and
+reads `fit: null`; it is re-fit with `'contain'`.
 
 The bytes are written into the stamp's appearance stream, so the document stays fully
 self-contained — it renders in any PDF viewer and survives download and re-open with no
 side-car storage. The call is identical on the local and cloud engines.
 
 Changing the geometry later (an `update` with a new `rect`, or a resize in the viewer)
-re-fits the existing appearance — the image is never re-uploaded or re-encoded. Sending
-a new `source` in an `update` replaces the content:
+re-fits the existing drawing — the image is never re-uploaded or re-encoded. A new `fit`
+re-fits it too. A new `appearance` resource replaces the drawing:
 
 ```ts
-await page.annotations.update(ref, { subtype: 'stamp', source: otherImage });
+await page.annotations.update(ref, { fit: 'cover' });
+await page.annotations.update(ref, {}, { appearance: otherImage });
 ```
 
-Unsupported bytes (anything that isn't PNG, JPEG, or PDF) reject with `InvalidArg`
-before any work happens.
+A stamp created without an `appearance`, or with bytes that aren't PNG, JPEG or PDF, is
+refused with `InvalidArg` before any work happens.
+
+## File attachment
+
+A `file-attachment` shows an icon on the page and carries a file. The data holds the file's
+name, MIME type and description; the file's bytes travel beside it, as the `file` resource.
+
+```ts
+await page.annotations.create(
+  {
+    subtype: 'file-attachment',
+    rect: { left: 40, bottom: 40, right: 60, top: 60 },
+    icon: 'paperclip',
+    file: { name: 'drawing.pdf', mimeType: 'application/pdf', description: 'Rev B' },
+  },
+  { file: pdfBytes },
+);
+```
+
+A read returns the same `file`, plus `size`, `checksum` and `creationDate` taken from the
+bytes; the bytes themselves come from `downloadFile(ref)`. In an update, `file` replaces the
+name, MIME type and description together (leave one out and it is removed), and a `file`
+resource replaces the bytes:
+
+```ts
+const { file } = attachment;
+await page.annotations.update(ref, { file: { ...file, name: 'drawing-rev-c.pdf' } });
+await page.annotations.update(ref, {}, { file: newBytes });
+```
 
 ## Cloudy borders
 

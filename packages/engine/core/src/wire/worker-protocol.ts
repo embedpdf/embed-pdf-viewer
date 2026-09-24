@@ -5,18 +5,15 @@ import type {
   AnnotationListPageSnapshot,
   AnnotationListSnapshotAllPages,
 } from '../annotation/AnnotationListSnapshot';
-import type {
-  WireAnnotationDraft,
-  WireAnnotationPatch,
-  WireAttachmentFile,
-} from '../annotation/kinds';
+import type { AnnotationDraft, AnnotationPatch } from '../annotation/kinds';
+import type { WireAnnotationResources } from '../annotation/resources';
 import type { AnnotationActor } from '../auth/scope';
 import type {
   AnnotationAppearanceMode,
   AnnotationAppearanceRenderOptions,
   AnnotationAppearancesResult,
 } from '../dto/AnnotationRender';
-import type { EmbeddedFileItem, EmbeddedFileRef } from '../dto/Attachment';
+import type { EmbeddedFileItem, EmbeddedFileRef, WireAttachmentFile } from '../dto/Attachment';
 import type { DocumentMetadata } from '../dto/DocumentMetadata';
 import type { MetadataPatch } from '../dto/MetadataPatch';
 import type { PageGeometrySnapshot } from '../dto/PageGeometrySnapshot';
@@ -332,14 +329,12 @@ export interface AnnotationsCreateWorkerRequest {
   docId: string;
   layerName?: string;
   page: PageRef;
-  /** Wire form — binary fields hold `{ resource }` refs into {@link resources}. */
-  draft: WireAnnotationDraft;
+  draft: AnnotationDraft;
   /**
-   * Binary payloads referenced by the draft, keyed by resource key. The
-   * producer puts each `bytes` buffer on the wirePack transfer list
-   * (zero-copy, same convention as `PageRaster`).
+   * The bytes beside the draft, by role. The producer puts each buffer on
+   * the wirePack transfer list (zero-copy, same convention as `PageRaster`).
    */
-  resources?: WireResourceMap;
+  resources?: WireAnnotationResources;
   artifactPath?: string;
   /**
    * Identity to stamp on the newly created annotation:
@@ -358,10 +353,9 @@ export interface AnnotationsUpdateWorkerRequest {
   docId: string;
   layerName?: string;
   ref: AnnotationRef;
-  /** Wire form — see {@link AnnotationsCreateWorkerRequest.draft}. */
-  patch: WireAnnotationPatch;
-  /** Binary payloads referenced by the patch — see the create request. */
-  resources?: WireResourceMap;
+  patch: AnnotationPatch;
+  /** The bytes beside the patch, by role — see the create request. */
+  resources?: WireAnnotationResources;
   artifactPath?: string;
   /**
    * Identity of the editor. Drives /EMBD_Metadata/UpdatedBy refresh on

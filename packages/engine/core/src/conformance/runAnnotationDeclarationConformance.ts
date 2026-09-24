@@ -1,6 +1,7 @@
 import { annotationReadDriftOf } from './annotationReadDrift';
 import type { ConformanceTestRunner } from './runMetadataConformance';
 import type { AnnotationDraft } from '../annotation/kinds';
+import type { AnnotationResources } from '../annotation/resources';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { PageHandle } from '../engine/PageHandle';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
@@ -71,8 +72,8 @@ export function runAnnotationDeclarationConformance(
         const first = (await doc.annotations.listRawAll()).pages[0];
         expect(first !== undefined).toBe(true);
         const page = first!.pageState.page;
-        for (const draft of creatableDrafts()) {
-          const { created } = await doc.page(page).annotations.create(draft);
+        for (const { data, resources } of creatables()) {
+          const { created } = await doc.page(page).annotations.create(data, resources);
           reads.push(created);
         }
         reads.push(...(await doc.annotations.listRaw(page)).annotations);
@@ -96,15 +97,15 @@ export function runAnnotationDeclarationConformance(
 
     test('shared fields follow the write rules on every kind', async () => {
       await onAuthoringPage(async (page) => {
-        for (const draft of creatableDrafts()) {
-          const { created } = await page.annotations.create(draft);
+        for (const { data, resources } of creatables()) {
+          const { created } = await page.annotations.create(data, resources);
           const read = async () =>
             (await page.annotations.list()).annotations.find(
               (annotation) => annotationKey(annotation.ref) === annotationKey(created.ref),
             ) as unknown as Record<string, unknown>;
           const text: [string, string, string][] = [['subject', 'Pricing', 'Terms']];
           // A free text box and a redaction paint their contents, so clearing them is not tested here.
-          if (draft.subtype !== 'free-text' && draft.subtype !== 'redact') {
+          if (data.subtype !== 'free-text' && data.subtype !== 'redact') {
             text.push(['contents', 'First note', 'Second note']);
           }
           for (const [field, first, second] of text) {
@@ -129,8 +130,8 @@ export function runAnnotationDeclarationConformance(
 
     test('a read sent back as an update changes nothing', async () => {
       await onAuthoringPage(async (page) => {
-        for (const draft of creatableDrafts()) {
-          const { created } = await page.annotations.create(draft);
+        for (const { data, resources } of creatables()) {
+          const { created } = await page.annotations.create(data, resources);
           const result = await page.annotations.update(created.ref, created as never);
           expect(result.appearance.changed).toBe(false);
           const { modified: _before, ...expected } = created;
@@ -142,7 +143,7 @@ export function runAnnotationDeclarationConformance(
 
     test('an update takes its subtype from the annotation it targets', async () => {
       await onAuthoringPage(async (page) => {
-        const { created } = await page.annotations.create(creatableDrafts()[0]!);
+        const { created } = await page.annotations.create(creatables()[0]!.data);
         const result = await page.annotations.update(created.ref, { contents: 'No subtype' });
         expect(result.updated.contents).toBe('No subtype');
         await expect(
@@ -153,7 +154,7 @@ export function runAnnotationDeclarationConformance(
 
     test('a field the kind does not declare is refused, and so is a new name', async () => {
       await onAuthoringPage(async (page) => {
-        const square = creatableDrafts().find((draft) => draft.subtype === 'square')!;
+        const square = creatables().find(({ data }) => data.subtype === 'square')!.data;
         await expect(
           page.annotations.create({ ...square, colour: { r: 0, g: 0, b: 0 } } as never),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
@@ -186,6 +187,112 @@ export function runAnnotationDeclarationConformance(
         expect((await find(note.ref)).popup).toBe(null);
       });
     });
+
+    test('a resource belongs to the kinds that take it', async () => {
+      await onAuthoringPage(async (page) => {
+        const rect: PdfRect = { left: 300, bottom: 300, right: 360, top: 340 };
+        const refused = { code: EngineErrorCode.InvalidArg };
+        await expect(page.annotations.create({ subtype: 'stamp', rect })).rejects.toMatchObject(
+          refused,
+        );
+        await expect(
+          page.annotations.create({ subtype: 'file-attachment', rect, file: { name: 'a.txt' } }),
+        ).rejects.toMatchObject(refused);
+        await expect(
+          page.annotations.create({ subtype: 'square', rect }, { appearance: PNG_1X1 }),
+        ).rejects.toMatchObject(refused);
+        await expect(
+          page.annotations.create(
+            { subtype: 'stamp', rect },
+            { appearance: new TextEncoder().encode('not an image') },
+          ),
+        ).rejects.toMatchObject(refused);
+        const { created } = await page.annotations.create(
+          { subtype: 'stamp', rect },
+          { appearance: PNG_1X1 },
+        );
+        await expect(
+          page.annotations.update(created.ref, {}, { file: new Uint8Array([1]) }),
+        ).rejects.toMatchObject(refused);
+      });
+    });
+
+    test("a new appearance replaces a stamp's drawing and keeps its data", async () => {
+      await onAuthoringPage(async (page) => {
+        const rect: PdfRect = { left: 300, bottom: 400, right: 360, top: 440 };
+        const { created } = await page.annotations.create(
+          { subtype: 'stamp', rect, name: 'Approved' },
+          { appearance: PNG_1X1 },
+        );
+        const result = await page.annotations.update(created.ref, {}, { appearance: PNG_1X1 });
+        expect(result.appearance.changed).toBe(true);
+        const { modified: _before, ...expected } = created;
+        const { modified: _after, ...updated } = result.updated;
+        expect(updated).toEqual(expected);
+      });
+    });
+
+    test("a stamp's fit is recorded, and a new box is filled the same way", async () => {
+      await onAuthoringPage(async (page) => {
+        const rect: PdfRect = { left: 300, bottom: 460, right: 360, top: 500 };
+        const fitOf = (dto: { subtype: string }) => (dto as { fit?: unknown }).fit;
+        const plain = await page.annotations.create(
+          { subtype: 'stamp', rect },
+          { appearance: PNG_1X1 },
+        );
+        expect(fitOf(plain.created)).toBe('contain');
+        const { created } = await page.annotations.create(
+          { subtype: 'stamp', rect, fit: 'cover' },
+          { appearance: PNG_1X1 },
+        );
+        expect(fitOf(created)).toBe('cover');
+        const moved = await page.annotations.update(created.ref, {
+          rect: { ...rect, right: rect.right + 40 },
+        });
+        expect(fitOf(moved.updated)).toBe('cover');
+        const refit = await page.annotations.update(created.ref, { fit: 'fill' });
+        expect(fitOf(refit.updated)).toBe('fill');
+        expect(refit.appearance.changed).toBe(true);
+        const forgotten = await page.annotations.update(created.ref, { fit: null });
+        expect(fitOf(forgotten.updated)).toBe(null);
+      });
+    });
+
+    test('an attached file is renamed by its data and replaced by its resource', async () => {
+      await onAuthoringPage(async (page) => {
+        const attachment = creatables().find(({ data }) => data.subtype === 'file-attachment')!;
+        const { created } = await page.annotations.create(attachment.data, attachment.resources);
+        const fileOf = (dto: { subtype: string }) =>
+          (dto as { file?: { name: string; size?: number; checksum?: string } | null }).file;
+        const original = fileOf(created)!;
+
+        // The value replaces all of the metadata: leaving the description out removes it.
+        const renamed = await page.annotations.update(created.ref, {
+          file: { ...original, name: 'renamed.txt', description: null },
+        });
+        expect(renamed.appearance.changed).toBe(false);
+        expect(fileOf(renamed.updated)).toEqual({
+          name: 'renamed.txt',
+          mimeType: 'text/plain',
+          size: original.size,
+          checksum: original.checksum,
+          creationDate: (original as { creationDate?: string }).creationDate,
+        });
+
+        const bytes = new TextEncoder().encode('replaced bytes');
+        const replaced = await page.annotations.update(created.ref, {}, { file: bytes });
+        expect(fileOf(replaced.updated)).toMatchObject({
+          name: 'renamed.txt',
+          mimeType: 'text/plain',
+          size: bytes.byteLength,
+        });
+        if (page.annotations.downloadFile) {
+          const content = await page.annotations.downloadFile(created.ref);
+          expect(new TextDecoder().decode(content.bytes)).toBe('replaced bytes');
+          expect(content.name).toBe('renamed.txt');
+        }
+      });
+    });
   });
 }
 
@@ -208,8 +315,14 @@ const PNG_1X1 = Uint8Array.from(
   (character) => character.charCodeAt(0),
 );
 
-/** One draft for every kind the engine can create, inside a box near the page origin. */
-function creatableDrafts(): AnnotationDraft[] {
+/** A create's two arguments. */
+interface Creatable {
+  data: AnnotationDraft;
+  resources?: AnnotationResources;
+}
+
+/** One create for every kind the engine can create, inside a box near the page origin. */
+function creatables(): Creatable[] {
   const rect: PdfRect = { left: 40, bottom: 40, right: 140, top: 100 };
   const quad = {
     p1: { x: 40, y: 100 },
@@ -222,7 +335,7 @@ function creatableDrafts(): AnnotationDraft[] {
     { x: 130, y: 50 },
     { x: 90, y: 90 },
   ];
-  return [
+  const drafts: AnnotationDraft[] = [
     { subtype: 'highlight', quadPoints: [quad] },
     { subtype: 'underline', quadPoints: [quad] },
     { subtype: 'squiggly', quadPoints: [quad] },
@@ -252,17 +365,19 @@ function creatableDrafts(): AnnotationDraft[] {
     },
     { subtype: 'caret', rect },
     { subtype: 'text', rect },
-    { subtype: 'stamp', rect, source: PNG_1X1 },
-    {
-      subtype: 'file-attachment',
-      rect,
-      file: {
-        data: new TextEncoder().encode('attached'),
-        name: 'note.txt',
-        mimeType: 'text/plain',
-      },
-    },
     { subtype: 'link', rect, target: { kind: 'uri', uri: 'https://example.com' } },
     { subtype: 'redact', rect, quadPoints: [quad] },
+  ];
+  return [
+    ...drafts.map((data) => ({ data })),
+    { data: { subtype: 'stamp', rect }, resources: { appearance: PNG_1X1 } },
+    {
+      data: {
+        subtype: 'file-attachment',
+        rect,
+        file: { name: 'note.txt', mimeType: 'text/plain', description: 'A note' },
+      },
+      resources: { file: new TextEncoder().encode('attached') },
+    },
   ];
 }

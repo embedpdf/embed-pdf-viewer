@@ -758,7 +758,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     }
   });
 
-  test('multipart stamp create: body part + resource part → parsed, persisted, version bumped', async () => {
+  test('multipart stamp create: the data as `body`, its drawing as `resource:appearance` → persisted, version bumped', async () => {
     const tenantId = 'tenant-layer-multipart';
     const docId = 'doclayermut010';
     const layerName = 'alice';
@@ -770,11 +770,10 @@ describe('Phase 5 layer mutation pipeline', () => {
       JSON.stringify({
         subtype: 'stamp',
         rect: { left: 100, bottom: 500, right: 260, top: 580 },
-        source: { resource: 'r0' },
         fit: 'contain',
       }),
     );
-    form.append('resource:r0', new Blob([tinyPng()], { type: 'image/png' }), 'stamp.png');
+    form.append('resource:appearance', new Blob([tinyPng()], { type: 'image/png' }), 'stamp.png');
 
     const res = await fetch(
       `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items`,
@@ -811,11 +810,10 @@ describe('Phase 5 layer mutation pipeline', () => {
       JSON.stringify({
         subtype: 'stamp',
         rect: { left: 0, bottom: 0, right: 10, top: 10 },
-        source: { resource: 'r0' },
       }),
     );
     form.append(
-      'resource:r0',
+      'resource:appearance',
       new Blob([new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8])], { type: 'image/png' }),
       'not-a-png.png',
     );
@@ -839,6 +837,33 @@ describe('Phase 5 layer mutation pipeline', () => {
     expect(layer?.doc_version ?? 1).toBe(1); // nothing advanced
   });
 
+  test('multipart create: a resource part named by no role → 400, nothing committed', async () => {
+    const tenantId = 'tenant-layer-multipart';
+    const docId = 'doclayermut013';
+    const layerName = 'alice';
+    await seedDocument(fx, tenantId, docId, { pageCount: 1 });
+
+    const form = new FormData();
+    form.append(
+      'body',
+      JSON.stringify({ subtype: 'stamp', rect: { left: 0, bottom: 0, right: 10, top: 10 } }),
+    );
+    form.append('resource:r0', new Blob([tinyPng()], { type: 'image/png' }), 'stamp.png');
+
+    const res = await fetch(
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${docToken(tenantId, docId, layerName)}` },
+        body: form,
+      },
+    );
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: { message: string } }).error.message).toMatch(
+      /resource:r0/,
+    );
+  });
+
   test('multipart create without a body part → 400', async () => {
     const tenantId = 'tenant-layer-multipart';
     const docId = 'doclayermut012';
@@ -846,7 +871,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     await seedDocument(fx, tenantId, docId, { pageCount: 1 });
 
     const form = new FormData();
-    form.append('resource:r0', new Blob([tinyPng()], { type: 'image/png' }), 'stamp.png');
+    form.append('resource:appearance', new Blob([tinyPng()], { type: 'image/png' }), 'stamp.png');
 
     const res = await fetch(
       `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items`,

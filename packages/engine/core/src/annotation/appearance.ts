@@ -1,5 +1,5 @@
 import type { PdfRect } from '../geometry/primitives';
-import type { AnnotationDTO, WireAnnotationPatch } from './kinds';
+import type { AnnotationDTO, AnnotationPatch } from './kinds';
 
 /**
  * Appearance-impact classification: the shared, pure decision for whether an
@@ -89,6 +89,8 @@ const INERT_KEYS: ReadonlySet<string> = new Set([
   'updatedBy',
   'importedBy',
   'actions',
+  // A file attachment's icon is drawn from `/Name` and `/C`, never from its file.
+  'file',
 ]);
 
 /**
@@ -261,7 +263,7 @@ function isRigidTranslation(
  */
 export function appearanceImpactOf(
   current: AnnotationDTO,
-  patch: WireAnnotationPatch,
+  patch: AnnotationPatch,
 ): AppearanceImpact {
   if (patch.subtype !== undefined && patch.subtype !== current.subtype) return 'regenerate';
 

@@ -1,13 +1,7 @@
-import type { FileAttachmentDraft, FileAttachmentWireDraft } from './index';
-import type { WireAttachmentFile } from './values';
-import type { AttachmentFileSource } from '../../../dto/Attachment';
-import { EngineError } from '../../../errors/EngineError';
-import { EngineErrorCode } from '../../../errors/EngineErrorCode';
-import {
-  resolveBinarySource,
-  type WireResource,
-  type WireResourceMap,
-} from '../../../resource/BinarySource';
+import type { AttachmentFileSource, WireAttachmentFile } from './Attachment';
+import { EngineError } from '../errors/EngineError';
+import { EngineErrorCode } from '../errors/EngineErrorCode';
+import { resolveBinarySource, type WireResource } from '../resource/BinarySource';
 
 /**
  * Resolve an attachment `file` into its wire halves: metadata into the
@@ -15,10 +9,7 @@ import {
  * format allowlist — attaching arbitrary files is the point — so the
  * declared mime type wins (attachment formats cannot be reliably sniffed;
  * the writer falls back to `application/octet-stream` when absent).
- *
- * Shared by the file-attachment annotation draft (below) and the
- * document-level `attachments.create` mutation — one vocabulary, one
- * normalizer for both homes a file can enter a PDF through.
+ * Used by the document-level `attachments.create`.
  */
 export async function normalizeAttachmentFileSource(
   file: AttachmentFileSource,
@@ -42,14 +33,4 @@ export async function normalizeAttachmentFileSource(
     },
     resource: { bytes: resolved.bytes, ...(mimeType !== undefined ? { mimeType } : {}), name },
   };
-}
-
-export async function normalizeFileAttachmentDraft(
-  draft: FileAttachmentDraft,
-  allocateKey: () => string,
-): Promise<{ wire: FileAttachmentWireDraft; resources: WireResourceMap }> {
-  const { file, ...rest } = draft;
-  const key = allocateKey();
-  const { wireFile, resource } = await normalizeAttachmentFileSource(file, key);
-  return { wire: { ...rest, file: wireFile }, resources: { [key]: resource } };
 }

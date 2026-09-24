@@ -5,11 +5,12 @@ import {
   toPageRef,
   type AnnotationDraft,
   type AnnotationRef,
+  type AnnotationResources,
   type AttachmentFileSource,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
 
-import { ICON_PLACE_SIZE, iconPlacementDraft, isIconPlaceKind } from './placement';
+import { ICON_PLACE_SIZE, iconPlacement, isIconPlaceKind } from './placement';
 import type { FilePickerProvider } from '../contract';
 import type { AnnotationReads } from '../read/annotations';
 import { boxGeomFields } from '../repository';
@@ -40,11 +41,11 @@ export function createIcons(
   const createIcon = (
     doc: NonNullable<AnnotationContext['doc']>,
     pageObjectNumber: number,
-    draft: AnnotationDraft,
+    { data, resources }: { data: AnnotationDraft; resources?: AnnotationResources },
   ): Promise<AnnotationRef> =>
     doc
       .page(toPageRef(pageObjectNumber))
-      .annotations.create(named(draft))
+      .annotations.create(named(data), resources)
       .then((result) => {
         store.commit({ type: 'select', ids: [annotationKey(result.created.ref)] });
         return result.created.ref;
@@ -64,14 +65,14 @@ export function createIcons(
     const crop = geometry.cropOf(pageObjectNumber);
     if (!doc || !crop || !isIconPlaceKind(tool.subtype)) return false;
     const box: Rect = fitStampBox(point, ICON_PLACE_SIZE, pageSizeOf(crop), rotCW);
-    const draft = iconPlacementDraft(
+    const placement = iconPlacement(
       tool.subtype,
       boxGeomFields(box, rotCW, crop),
       defaultsFor(store.model(), tool.preset),
       tool.flags,
       file,
     );
-    void createIcon(doc, pageObjectNumber, draft).catch((error) =>
+    void createIcon(doc, pageObjectNumber, placement).catch((error) =>
       console.error('[annotation] icon placement failed:', error),
     );
     return true;
@@ -116,14 +117,14 @@ export function createIcons(
         throw new PluginError('unsupported', 'annotation', 'no attachment tool is registered');
       }
       const box: Rect = fitStampBox(at, ICON_PLACE_SIZE, pageSizeOf(crop), 0);
-      const draft = iconPlacementDraft(
+      const placement = iconPlacement(
         tool.subtype,
         boxGeomFields(box, 0, crop),
         defaultsFor(store.model(), tool.preset),
         tool.flags,
         file,
       );
-      return createIcon(doc, pageObjectNumber, draft).catch((error) => {
+      return createIcon(doc, pageObjectNumber, placement).catch((error) => {
         throw toPluginError('annotation', error);
       });
     },

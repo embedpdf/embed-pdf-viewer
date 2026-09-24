@@ -1,13 +1,10 @@
 /**
- * Inline binary payloads for annotation drafts/patches.
- *
- * Public rule (see also `annotation/normalize.ts`): binary data is a call
- * argument, never engine state. Callers put bytes directly on the draft
- * field that names their role (stamp `source`, future file-attachment
- * `file`); normalization replaces each such field with a `ResourceRef`
- * and moves the bytes into a `WireResourceMap` that travels out-of-band
- * (worker: transferable buffers; cloud: multipart parts). After the call,
- * the only durable home for the bytes is the PDF itself.
+ * Binary payloads of a call: a document attachment's file, a signature's
+ * appearance, the pages to insert. Bytes are a call argument, never engine
+ * state. On the way out they become a `WireResourceMap` that travels beside
+ * the JSON (worker: transferable buffers; cloud: multipart parts). After the
+ * call, the only durable home for the bytes is the PDF itself. Annotations
+ * take theirs by role, as `AnnotationResources` (`annotation/resources.ts`).
  */
 
 /**
@@ -42,11 +39,6 @@ export interface WireResource {
 
 /** Keyed resources accompanying one mutation. Keys are allocator-generated (`r0`, `r1`, …). */
 export type WireResourceMap = Record<string, WireResource>;
-
-/** What replaces a `BinarySource` field in the wire form of a draft/patch. */
-export interface ResourceRef {
-  resource: string;
-}
 
 function isBlob(value: unknown): value is Blob {
   return typeof Blob !== 'undefined' && value instanceof Blob;

@@ -1,11 +1,12 @@
 /**
- * One vocabulary for "a file living inside a PDF" — shared by the
+ * One vocabulary for "a file living inside a PDF", shared by the
  * file-attachment annotation kind and the document-level EmbeddedFiles
- * service, on both the write and read sides:
+ * service:
  *
- *   write  -> {@link AttachmentFileSource}: the shared metadata fields plus
- *             inline `data` bytes (the [[BinarySource]] rule — bytes are a
- *             call argument, never engine state).
+ *   write  -> the document service takes {@link AttachmentFileSource}: the
+ *             metadata fields plus the bytes. A file attachment annotation
+ *             takes the metadata as its `file` data and the bytes as its
+ *             `file` resource.
  *   read   -> {@link AttachmentFileInfo}: the same metadata fields plus
  *             engine-derived facts (size, checksum, creationDate) and never
  *             the bytes — listings stay cheap; bytes leave the engine only
@@ -37,6 +38,14 @@ export interface AttachmentFileBase {
 export interface AttachmentFileSource {
   data: Uint8Array | Blob;
   name?: string;
+  mimeType?: string;
+  description?: string;
+}
+
+/** An {@link AttachmentFileSource} ready to ship: its metadata, and the key of its bytes. */
+export interface WireAttachmentFile {
+  resource: string;
+  name: string;
   mimeType?: string;
   description?: string;
 }

@@ -45,6 +45,10 @@ interface ArmedStamp {
   subject?: string;
 }
 
+/** The bytes of a stamp source; its declared type and name don't matter, the engine sniffs. */
+const bytesOf = (source: BinarySource): Uint8Array | Blob =>
+  source instanceof Uint8Array || !('data' in source) ? source : source.data;
+
 /** Fixed bytes as a provider: the same image at every size. */
 const fixedPreview = (bytes: Uint8Array, mimeType?: string): StampPreviewProvider => {
   const preview: ArmedStampPreview = { bytes, ...(mimeType ? { mimeType } : {}) };
@@ -169,11 +173,11 @@ export function createStamps(
         named({
           subtype: 'stamp',
           ...boxGeomFields(box, rotCW, crop),
-          source,
           fit: 'contain',
           ...(identity.name !== undefined ? { name: identity.name } : {}),
           ...(identity.subject !== undefined ? { subject: identity.subject } : {}),
         }),
+        { appearance: bytesOf(source) },
       )
       .then((result) => {
         // The fold has added the confirmed stamp; every placement selects

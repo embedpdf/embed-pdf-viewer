@@ -16815,6 +16815,11 @@
                     "name": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "fit": {
+                      "type": "string",
+                      "enum": ["contain", "cover", "fill"],
+                      "nullable": true
                     }
                   },
                   "required": [
@@ -16851,7 +16856,8 @@
                     "actions",
                     "rotation",
                     "unrotatedRect",
-                    "name"
+                    "name",
+                    "fit"
                   ],
                   "additionalProperties": false
                 },
@@ -21873,6 +21879,11 @@
                           "name": {
                             "type": "string",
                             "nullable": true
+                          },
+                          "fit": {
+                            "type": "string",
+                            "enum": ["contain", "cover", "fill"],
+                            "nullable": true
                           }
                         },
                         "required": [
@@ -21909,7 +21920,8 @@
                           "actions",
                           "rotation",
                           "unrotatedRect",
-                          "name"
+                          "name",
+                          "fit"
                         ],
                         "additionalProperties": false
                       },

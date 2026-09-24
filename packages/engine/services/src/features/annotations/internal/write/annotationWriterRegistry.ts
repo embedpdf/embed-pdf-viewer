@@ -1,8 +1,8 @@
 import {
   EngineError,
   EngineErrorCode,
-  type WireAnnotationDraft,
-  type WireAnnotationPatch,
+  type AnnotationDraft,
+  type AnnotationPatch,
 } from '@embedpdf/engine-core/runtime';
 import type {
   CaretDraft,
@@ -23,11 +23,11 @@ import type {
   PolylinePatch,
   RedactDraft,
   RedactPatch,
-  StampWireDraft,
-  StampWirePatch,
+  StampDraft,
+  StampPatch,
   TextDraft,
   TextPatch,
-  FileAttachmentWireDraft,
+  FileAttachmentDraft,
   FileAttachmentPatch,
   PopupDraft,
   PopupPatch,
@@ -84,19 +84,19 @@ import {
 import { applyWidgetDraft, applyWidgetPatch, isWidgetSubtype } from './writeWidgetAnnotation';
 
 /** Validate subtype inputs before AnnotationMutator performs any native write. */
-export function preflightDraft(draft: WireAnnotationDraft, ctx?: AnnotationWriteContext): void {
+export function preflightDraft(draft: AnnotationDraft, ctx?: AnnotationWriteContext): void {
   if (isStampSubtype(draft.subtype)) {
-    preflightStampDraft(draft as StampWireDraft, ctx);
+    preflightStampDraft(draft as StampDraft, ctx);
   }
   if (isFileAttachmentSubtype(draft.subtype)) {
-    preflightFileAttachmentDraft(draft as FileAttachmentWireDraft, ctx);
+    preflightFileAttachmentDraft(draft as FileAttachmentDraft, ctx);
   }
 }
 
 /** Validate subtype inputs before AnnotationMutator performs any native write. */
-export function preflightPatch(patch: WireAnnotationPatch, ctx?: AnnotationWriteContext): void {
+export function preflightPatch(patch: AnnotationPatch, ctx?: AnnotationWriteContext): void {
   if (isStampSubtype(subtypeOf(patch))) {
-    preflightStampPatch(patch as StampWirePatch, ctx);
+    preflightStampPatch(patch as StampPatch, ctx);
   }
 }
 
@@ -113,7 +113,7 @@ export function applyDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: WireAnnotationDraft,
+  draft: AnnotationDraft,
   ctx?: AnnotationWriteContext,
 ): void {
   if (isTextMarkupSubtype(draft.subtype)) {
@@ -157,11 +157,11 @@ export function applyDraft(
     return;
   }
   if (isStampSubtype(draft.subtype)) {
-    applyStampDraft(fn, mem, annotPtr, draft as StampWireDraft, ctx);
+    applyStampDraft(fn, mem, annotPtr, draft as StampDraft, ctx);
     return;
   }
   if (isFileAttachmentSubtype(draft.subtype)) {
-    applyFileAttachmentDraft(fn, mem, annotPtr, draft as FileAttachmentWireDraft, ctx);
+    applyFileAttachmentDraft(fn, mem, annotPtr, draft as FileAttachmentDraft, ctx);
     return;
   }
   if (isWidgetSubtype(draft.subtype)) {
@@ -191,7 +191,7 @@ export function applyPatch(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  patch: WireAnnotationPatch,
+  patch: AnnotationPatch,
   ctx?: AnnotationWriteContext,
 ): void {
   const subtype = subtypeOf(patch);
@@ -236,11 +236,11 @@ export function applyPatch(
     return;
   }
   if (isStampSubtype(subtype)) {
-    applyStampPatch(fn, mem, annotPtr, patch as StampWirePatch, ctx);
+    applyStampPatch(fn, mem, annotPtr, patch as StampPatch, ctx);
     return;
   }
   if (isFileAttachmentSubtype(subtype)) {
-    applyFileAttachmentPatch(fn, mem, annotPtr, patch as FileAttachmentPatch);
+    applyFileAttachmentPatch(fn, mem, annotPtr, patch as FileAttachmentPatch, ctx);
     return;
   }
   if (isWidgetSubtype(subtype)) {
@@ -265,7 +265,7 @@ export function applyPatch(
  * The subtype a patch is written as. The mutator fills it in from the target
  * before any write, since a caller may leave it out.
  */
-function subtypeOf(patch: WireAnnotationPatch): string {
+function subtypeOf(patch: AnnotationPatch): string {
   if (patch.subtype === undefined) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,

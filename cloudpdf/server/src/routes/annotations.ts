@@ -4,6 +4,7 @@ import { randomBytes } from 'node:crypto';
 import {
   EngineError,
   EngineErrorCode,
+  ANNOTATION_RESOURCE_ROLE_NAMES,
   checkSetGroup,
   sniffBinaryMetadata,
   wirePack,
@@ -11,9 +12,10 @@ import {
   type AnnotationAppearanceImageOptions,
   type AnnotationAppearanceManifest,
   type AnnotationAppearanceManifestEntry,
-  type WireAnnotationDraft,
-  type WireAnnotationPatch,
-  type WireResourceMap,
+  type AnnotationDraft,
+  type AnnotationPatch,
+  type AnnotationResourceRole,
+  type WireAnnotationResources,
   type AnnotationRef,
   type CollabTarget,
   type PageNetworkRenderFormat,
@@ -54,7 +56,7 @@ import {
   toPageState,
   type SchemaLike,
 } from './_helpers';
-import { readMutationEnvelope } from './_mutationEnvelope';
+import { readMutationEnvelope, type MutationEnvelope } from './_mutationEnvelope';
 import { requireSharedDocRead } from './_planeGuard';
 import { assertRefMatchesPage, refFromKey } from './annotation-route-helpers';
 import {
@@ -445,12 +447,13 @@ export async function registerAnnotationRoutes(
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
       const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const { body, resources } = await readMutationEnvelope(req, annotationBinaryPolicy);
-      const draft = parseOrInvalidArg<WireAnnotationDraft>(
-        AnnotationDraftSchema as unknown as SchemaLike<WireAnnotationDraft>,
-        body,
+      const envelope = await readMutationEnvelope(req, annotationBinaryPolicy);
+      const draft = parseOrInvalidArg<AnnotationDraft>(
+        AnnotationDraftSchema as unknown as SchemaLike<AnnotationDraft>,
+        envelope.body,
         'request body',
       );
+      const resources = annotationResourcesOf(envelope);
       // Creation is a collab check against the caller's own identity
       // (no impersonation), in the group the annotation is created in:
       // the draft's, when it names one the caller may set, else the
@@ -605,9 +608,9 @@ export async function registerAnnotationRoutes(
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
       const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const envelope = await readMutationEnvelope(req);
+      const envelope = await readMutationEnvelope(req, annotationBinaryPolicy);
       const body = envelope.body as Record<string, unknown> | null | undefined;
-      const resources = envelope.resources;
+      const resources = annotationResourcesOf(envelope);
       const signal = abortSignalFromRequest(req);
 
       if (annotKey === 'index') {
@@ -640,7 +643,7 @@ export async function registerAnnotationRoutes(
           return layerService.deleteAnnotation(ctx, { docId, layerName, ref }, signal);
         }
 
-        const patch = parseOrInvalidArg<WireAnnotationPatch>(
+        const patch = parseOrInvalidArg<AnnotationPatch>(
           patchSchemaFor(target.subtype),
           body?.patch,
           'body.patch',
@@ -664,7 +667,7 @@ export async function registerAnnotationRoutes(
         signal,
       );
       const ctx = requireLayerCollabAction(req, docId, layerName, 'update', target, pdfBits);
-      const patch = parseOrInvalidArg<WireAnnotationPatch>(
+      const patch = parseOrInvalidArg<AnnotationPatch>(
         patchSchemaFor(target.subtype),
         body?.patch,
         'body.patch',
@@ -766,7 +769,7 @@ function requireWeakAnnotationSessions(
  */
 function createGroupOf(
   jwt: RequestJwtContext,
-  draft: WireAnnotationDraft,
+  draft: AnnotationDraft,
   pdfBits: PdfBits,
 ): string | undefined {
   const groupId = (draft as { groupId?: string | null }).groupId ?? jwt.identity.groupId;
@@ -795,17 +798,33 @@ function targetForSelfCreate(jwt: RequestJwtContext, groupId: string | undefined
 }
 
 /**
- * The per-kind binary policy the envelope doc long promised: a
- * file-attachment draft's `file` bytes are exempt from the PNG/JPEG/PDF
- * allowlist — attaching arbitrary formats is the point of the kind.
- * Every other resource (stamp `source`) stays strict. Patches carry no
- * binary fields, so update routes keep the strict default.
+ * How an annotation's resource parts are checked: an `appearance` must be
+ * PNG, JPEG or PDF, and a `file` may be any bytes (attaching any format is
+ * the point). The parts are named by role: `resource:appearance`,
+ * `resource:file`.
  */
-function annotationBinaryPolicy(body: unknown, key: string): 'image-or-pdf' | 'any' {
-  const draft = body as { subtype?: unknown; file?: { resource?: unknown } } | null;
-  return draft?.subtype === 'file-attachment' && draft.file?.resource === key
-    ? 'any'
-    : 'image-or-pdf';
+function annotationBinaryPolicy(_body: unknown, key: string): 'image-or-pdf' | 'any' {
+  return key === 'file' ? 'any' : 'image-or-pdf';
+}
+
+/**
+ * The resources of an annotation write, by role, from its multipart parts.
+ * Whether the kind takes them is the engine's check.
+ */
+function annotationResourcesOf(envelope: MutationEnvelope): WireAnnotationResources | undefined {
+  if (!envelope.resources) return undefined;
+  const resources: WireAnnotationResources = {};
+  for (const [role, { bytes }] of Object.entries(envelope.resources)) {
+    if ((ANNOTATION_RESOURCE_ROLE_NAMES as readonly string[]).includes(role)) {
+      resources[role as AnnotationResourceRole] = bytes;
+    } else {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `unknown annotation resource part 'resource:${role}'; expected 'resource:appearance' or 'resource:file'`,
+      );
+    }
+  }
+  return resources;
 }
 
 /**
@@ -853,7 +872,7 @@ function actorFromJwt(
 function buildUpdateActor(
   jwt: RequestJwtContext,
   currentTarget: CollabTarget,
-  patch: WireAnnotationPatch,
+  patch: AnnotationPatch,
   pdfBits: PdfBits,
 ): AnnotationActor | undefined {
   const patchedGroupId = (patch as { groupId?: string | null }).groupId;
@@ -1383,8 +1402,8 @@ async function resolvePageForRead(input: {
  * found, so a field that kind doesn't declare is refused here, otherwise
  * against every kind. The engine refuses a subtype that doesn't match.
  */
-function patchSchemaFor(subtype: AnnotationSubtype | undefined): SchemaLike<WireAnnotationPatch> {
+function patchSchemaFor(subtype: AnnotationSubtype | undefined): SchemaLike<AnnotationPatch> {
   return (subtype === undefined || subtype === 'unsupported'
     ? AnnotationPatchSchema
-    : annotationPatchSchemaOf(subtype)) as unknown as SchemaLike<WireAnnotationPatch>;
+    : annotationPatchSchemaOf(subtype)) as unknown as SchemaLike<AnnotationPatch>;
 }

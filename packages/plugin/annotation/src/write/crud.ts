@@ -85,7 +85,8 @@ export function createCrud(
     }
     let engine: Record<string, unknown> = {};
     if (modified !== annotation) engine = { ...engine, ...(toPatch(modified, crop) ?? {}) };
-    if (patch.flags) engine = { ...engine, flags: { ...annotation.flags, ...patch.flags } };
+    // Each flag is its own engine field: only the ones the patch names are written.
+    if (patch.flags) engine = { ...engine, ...patch.flags };
     if (patch.contents !== undefined) engine = { ...engine, contents: patch.contents };
     if (Object.keys(engine).length) {
       await updateRaw(annotation.ref, {

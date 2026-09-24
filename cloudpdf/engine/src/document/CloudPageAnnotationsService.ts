@@ -4,9 +4,10 @@ import {
   EngineErrorCode,
   createPageImageHandle,
   encodeStableIdKey,
-  normalizeAnnotationDraft,
-  normalizeAnnotationPatch,
-  type WireResourceMap,
+  hasAnnotationResources,
+  resolveAnnotationResources,
+  type AnnotationResources,
+  type WireAnnotationResources,
   type AnnotationAppearanceImage,
   type AnnotationAppearanceImageOptions,
   type AnnotationAppearanceImagesResult,
@@ -43,7 +44,7 @@ import {
 } from '@embedpdf/engine-core/wire';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
-import { buildMutationForm, hasResources } from './buildMutationForm';
+import { buildAnnotationMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import { planesInherited } from './planes';
 import { parseAttachmentContent } from './parseAttachmentContent';
@@ -234,29 +235,38 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     });
   }
 
-  create(draft: AnnotationDraft): AbortablePromise<AnnotationCreateResult> {
+  create(
+    draft: AnnotationDraft,
+    resources?: AnnotationResources,
+  ): AbortablePromise<AnnotationCreateResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
     return AbortablePromise.run<AnnotationCreateResult>(async (signal) => {
-      // Split inline BinarySource fields (stamp images, …) into the wire
-      // draft + binary resources. Without resources the request is the
-      // plain JSON POST it has always been; with resources it becomes
-      // multipart: a `body` JSON part + one `resource:{key}` part each —
-      // the mirror image of the appearance-render response.
-      const { wire, resources } = await normalizeAnnotationDraft(draft);
+      // Without resources the request is the plain JSON POST of the data;
+      // with them it is multipart (see `buildAnnotationMutationForm`).
+      const wireResources = await resolveAnnotationResources(resources);
       const path = wirePaths.layerPageAnnotationsCreate(this.docId, this.layerName, this.pageRef);
       const parse = (raw: unknown) => AnnotationCreateResultSchema.parse(raw);
-      const result = hasResources(resources)
-        ? await this.http.postMultipartJson(path, buildMutationForm(wire, resources), parse, signal)
-        : await this.http.postJson(path, wire, parse, signal);
+      const result = hasAnnotationResources(wireResources)
+        ? await this.http.postMultipartJson(
+            path,
+            buildAnnotationMutationForm(draft, wireResources),
+            parse,
+            signal,
+          )
+        : await this.http.postJson(path, draft, parse, signal);
       return this.absorbMutation(result, 'annotation.created');
     });
   }
 
-  update(ref: AnnotationRef, patch: AnnotationPatch): AbortablePromise<AnnotationUpdateResult> {
+  update(
+    ref: AnnotationRef,
+    patch: AnnotationPatch,
+    resources?: AnnotationResources,
+  ): AbortablePromise<AnnotationUpdateResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
@@ -281,8 +291,8 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         'index',
       );
       return AbortablePromise.run<AnnotationUpdateResult>(async (signal) => {
-        const { wire, resources } = await normalizeAnnotationPatch(patch);
-        const result = await this.patchMutation(path, { ref, patch: wire }, resources, signal);
+        const wireResources = await resolveAnnotationResources(resources);
+        const result = await this.patchMutation(path, { ref, patch }, wireResources, signal);
         return this.absorbMutation(result, 'annotation.updated');
       });
     }
@@ -294,22 +304,27 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       stableKey,
     );
     return AbortablePromise.run<AnnotationUpdateResult>(async (signal) => {
-      const { wire, resources } = await normalizeAnnotationPatch(patch);
-      const result = await this.patchMutation(path, { patch: wire }, resources, signal);
+      const wireResources = await resolveAnnotationResources(resources);
+      const result = await this.patchMutation(path, { patch }, wireResources, signal);
       return this.absorbMutation(result, 'annotation.updated');
     });
   }
 
-  /** PATCH as plain JSON, or as multipart when the patch carried binaries. */
+  /** PATCH as plain JSON, or as multipart when resources came with the patch. */
   private patchMutation(
     path: string,
     body: unknown,
-    resources: WireResourceMap,
+    resources: WireAnnotationResources,
     signal: AbortSignal,
   ): Promise<AnnotationUpdateResult> {
     const parse = (raw: unknown) => AnnotationUpdateResultSchema.parse(raw);
-    if (hasResources(resources)) {
-      return this.http.patchMultipartJson(path, buildMutationForm(body, resources), parse, signal);
+    if (hasAnnotationResources(resources)) {
+      return this.http.patchMultipartJson(
+        path,
+        buildAnnotationMutationForm(body, resources),
+        parse,
+        signal,
+      );
     }
     return this.http.patchJson(path, body, parse, signal);
   }

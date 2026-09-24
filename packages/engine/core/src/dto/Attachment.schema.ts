@@ -1,13 +1,24 @@
 import { z } from 'zod';
 
-import type { AttachmentFileInfo, EmbeddedFileItem, EmbeddedFileRef } from './Attachment';
+import type {
+  AttachmentFileInfo,
+  EmbeddedFileItem,
+  EmbeddedFileRef,
+  WireAttachmentFile,
+} from './Attachment';
 
 /**
- * Wire schemas for the attachment read vocabulary (see `Attachment.ts`).
- * The write-side `AttachmentFileSource` carries inline bytes and never
- * appears on the wire — its post-normalization form is the kind-owned
- * `WireAttachmentFile` (see `annotation/kinds/file-attachment/schema.ts`).
+ * Wire schemas for the attachment vocabulary (see `Attachment.ts`). The
+ * write-side `AttachmentFileSource` carries bytes and never appears on the
+ * wire; `WireAttachmentFile` is its form there.
  */
+
+export const WireAttachmentFileSchema: z.ZodType<WireAttachmentFile> = z.object({
+  resource: z.string().min(1),
+  name: z.string().min(1),
+  mimeType: z.string().optional(),
+  description: z.string().optional(),
+});
 
 export const AttachmentFileInfoSchema: z.ZodType<AttachmentFileInfo> = z.object({
   name: z.string(),

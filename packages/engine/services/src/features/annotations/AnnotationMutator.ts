@@ -1,8 +1,8 @@
 import { isDimension } from '@embedpdf/engine-core/runtime';
 import {
   ANNOTATION_FIELD_NAMES,
-  STAMP_SOURCE_FIELD_NAMES,
   annotationKey,
+  assertAnnotationResources,
   appearanceImpactOf,
   EngineError,
   EngineErrorCode,
@@ -13,11 +13,11 @@ import {
   type AnnotationCreateResult,
   type AnnotationDeleteResult,
   type AnnotationDTO,
-  type WireAnnotationDraft,
+  type AnnotationDraft,
   type AnnotationListMutationMeta,
   type AnnotationMoveResult,
-  type WireAnnotationPatch,
-  type WireResourceMap,
+  type AnnotationPatch,
+  type WireAnnotationResources,
   type AnnotationRef,
   type AnnotationReplyType,
   type AnnotationSubtype,
@@ -114,7 +114,7 @@ export class AnnotationMutator {
 
   /** Build the per-write context handed to subtype writers: font resolver
    *  (FreeText `/DA`), doc/page pointers and binary resources (stamp). */
-  private writeContext(pagePtr: Ptr, resources?: WireResourceMap): AnnotationWriteContext {
+  private writeContext(pagePtr: Ptr, resources?: WireAnnotationResources): AnnotationWriteContext {
     const fonts = this.fonts;
     return {
       ...(fonts
@@ -131,10 +131,10 @@ export class AnnotationMutator {
 
   create(
     pageObjectNumber: PageObjectNumber,
-    draft: WireAnnotationDraft,
+    draft: AnnotationDraft,
     signal: AbortSignal,
     actor?: AnnotationActor,
-    resources?: WireResourceMap,
+    resources?: WireAnnotationResources,
   ): AnnotationCreateResult {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
@@ -146,6 +146,7 @@ export class AnnotationMutator {
       this.ensureKnownWeakStateFromPage(pageObjectNumber, pagePtr);
       const writeCtx = this.writeContext(pagePtr, resources);
       assertDeclaredFields(draft.subtype, draft);
+      assertAnnotationResources(draft.subtype, resources, 'create');
       preflightDraft(draft, writeCtx);
       assertRichTextAgreement(draft);
       draft = prepareMeasurementDraft(draft);
@@ -267,10 +268,10 @@ export class AnnotationMutator {
 
   update(
     ref: AnnotationRef,
-    patch: WireAnnotationPatch,
+    patch: AnnotationPatch,
     signal: AbortSignal,
     actor?: AnnotationActor,
-    resources?: WireResourceMap,
+    resources?: WireAnnotationResources,
   ): AnnotationUpdateResult {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
@@ -312,6 +313,7 @@ export class AnnotationMutator {
       );
 
       patch = patchForTarget(currentDto, patch);
+      assertAnnotationResources(currentDto.subtype, resources, 'update');
       preflightPatch(patch, writeCtx);
       assertRichTextAgreement(patch);
       patch = prepareMeasurementPatch(fn, annotPtr, currentDto, patch);
@@ -387,7 +389,8 @@ export class AnnotationMutator {
       // (otherwise the annotation renders as nothing). The verdict is
       // echoed on the result: clients drive raster invalidation off
       // `appearance.changed` instead of guessing from the patch they sent.
-      const impact = appearanceImpactOf(currentDto, patch);
+      // New appearance bytes are a new drawing, whatever the patch says.
+      const impact = resources?.appearance ? 'regenerate' : appearanceImpactOf(currentDto, patch);
       let appearance: AppearanceOutcome;
       if (
         impact === 'inert' ||
@@ -855,7 +858,7 @@ export class AnnotationMutator {
  * a caller may leave out. A different subtype, a changed name, or any change to
  * an annotation of a type the engine doesn't model is refused.
  */
-function patchForTarget(current: AnnotationDTO, patch: WireAnnotationPatch): WireAnnotationPatch {
+function patchForTarget(current: AnnotationDTO, patch: AnnotationPatch): AnnotationPatch {
   if (patch.subtype !== undefined && patch.subtype !== current.subtype) {
     throw new EngineError(EngineErrorCode.InvalidArg, 'Annotation subtype cannot change');
   }
@@ -872,44 +875,13 @@ function patchForTarget(current: AnnotationDTO, patch: WireAnnotationPatch): Wir
     );
   }
   assertDeclaredFields(current.subtype, patch);
-  if (current.subtype === 'file-attachment' && 'file' in patch && patch.file !== undefined) {
-    if (!sameFileMetadata(patch.file, current.file)) {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        "a file attachment's file can't change after create",
-      );
-    }
-    const { file: _file, ...rest } = patch;
-    return { ...rest, subtype: current.subtype } as WireAnnotationPatch;
-  }
-  return { ...patch, subtype: current.subtype } as WireAnnotationPatch;
-}
-
-interface FileMetadata {
-  name: string;
-  mimeType?: string | null;
-  description?: string | null;
-}
-
-/** Whether a patch's `file` repeats the attached file's name, MIME type and description. */
-function sameFileMetadata(next: FileMetadata | null, current: FileMetadata | null): boolean {
-  if (next === null || current === null) return next === current;
-  return (
-    next.name === current.name &&
-    (next.mimeType ?? null) === (current.mimeType ?? null) &&
-    (next.description ?? null) === (current.description ?? null)
-  );
+  return { ...patch, subtype: current.subtype } as AnnotationPatch;
 }
 
 /** A write names only fields its kind declares: a misspelled or foreign field is refused, never ignored. */
 function assertDeclaredFields(subtype: AnnotationSubtype, write: object): void {
   const known = ANNOTATION_FIELD_NAMES[subtype];
-  const unknown = Object.keys(write).filter(
-    (name) =>
-      name !== 'subtype' &&
-      !known.includes(name) &&
-      !(subtype === 'stamp' && STAMP_SOURCE_FIELD_NAMES.includes(name)),
-  );
+  const unknown = Object.keys(write).filter((name) => name !== 'subtype' && !known.includes(name));
   if (unknown.length > 0) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,

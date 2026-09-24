@@ -4,11 +4,10 @@ import {
   sniffBinaryMetadata,
   type BinaryMetadata,
   type PdfRect,
-  type ResourceRef,
+  type StampDraft,
   type StampFit,
-  type StampWireDraft,
-  type StampWirePatch,
-  type WireResource,
+  type StampPatch,
+  type WireAnnotationResources,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -16,8 +15,10 @@ import type { AnnotationWriteContext } from './annotationWriteContext';
 import { setAnnotRect } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 import { writeBoxTransformMetadata } from './writeAnnotationTransformMetadata';
+import { EMBD_METADATA_SCHEMA_VERSION, writeEmbedMetadataString } from './writeEmbedMetadata';
 import { F32_BYTES } from '../../../../runtime/memory/structs';
 import { readAnnotRect } from '../read/annotationReadPrimitives';
+import { KEY_APPEARANCE_FIT, readStampFit } from '../read/readStampAnnotation';
 
 /** `EPDF_STAMP_FIT` codes from `public/fpdf_annot.h` (CSS `object-fit` naming on the wire). */
 const STAMP_FIT_TO_CODE: Record<StampFit, number> = {
@@ -26,30 +27,34 @@ const STAMP_FIT_TO_CODE: Record<StampFit, number> = {
   fill: 2, // EPDF_STAMP_FIT_STRETCH
 };
 
+/** The stamp's drawing: the `appearance` resource that came with the write. */
+type StampAppearance = NonNullable<WireAnnotationResources['appearance']>;
+
 /**
  * Validate every caller-controlled stamp input before the mutation owner
  * performs its first native write. AnnotationMutator invokes these before
  * creating an annotation or strengthening a weak annotation id.
  */
-export function preflightStampDraft(draft: StampWireDraft, ctx?: AnnotationWriteContext): void {
+export function preflightStampDraft(draft: StampDraft, ctx?: AnnotationWriteContext): void {
   if (draft.name != null) requireStampName(draft.name);
-  requireStampFit(draft.fit ?? 'contain');
-  requireStampContent(draft.source, ctx);
+  if (draft.fit != null) requireStampFit(draft.fit);
+  requireStampContent(ctx?.resources?.appearance, ctx);
 }
 
-export function preflightStampPatch(patch: StampWirePatch, ctx?: AnnotationWriteContext): void {
+export function preflightStampPatch(patch: StampPatch, ctx?: AnnotationWriteContext): void {
   if (patch.name !== undefined && patch.name !== null) requireStampName(patch.name);
-  requireStampFit(patch.fit ?? 'contain');
-  if (patch.source !== undefined) requireStampContent(patch.source, ctx);
+  if (patch.fit != null) requireStampFit(patch.fit);
+  const appearance = ctx?.resources?.appearance;
+  if (appearance !== undefined) requireStampContent(appearance, ctx);
 }
 
 /**
  * Apply a stamp draft. Order mirrors the other writers (base → subtype
  * fields), then the appearance pipeline via {@link authorStampAppearance}:
- *   1. resolve the `{ resource }` ref against the mutation's binary payloads
+ *   1. take the `appearance` resource that came with the write
  *   2. sniff the bytes (PNG/JPEG → image object, PDF → cloned form XObject)
  *   3. `EPDFAnnot_UpdateAppearanceToRect` fits the appearance into the box
- *      honouring `fit` and any `/EMBD_Metadata` rotation.
+ *      honouring its `fit` and any `/EMBD_Metadata` rotation.
  * The mutator's `EPDFAnnot_GenerateAppearance` pass afterwards is a no-op
  * for stamps (CPDF_GenerateAP has no stamp arm), so the appearance built
  * here is what ships.
@@ -58,19 +63,21 @@ export function applyStampDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: StampWireDraft,
+  draft: StampDraft,
   ctx?: AnnotationWriteContext,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
   if (draft.name != null) {
     setStampName(fn, annotPtr, draft.name);
   }
+  // A create records the fit it used, unless the data says the stamp records none.
+  const fit = draft.fit ?? 'contain';
   authorStampAppearance(
     fn,
     mem,
     annotPtr,
-    draft.source,
-    draft.fit ?? 'contain',
+    requireStampAppearance(ctx),
+    fit,
     {
       rect: draft.rect,
       // The appearance author wants values-or-absent; a tri-state `null`
@@ -80,13 +87,14 @@ export function applyStampDraft(
     },
     ctx,
   );
+  if (draft.fit !== null) writeStampFit(fn, mem, annotPtr, fit);
 }
 
 export function applyStampPatch(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  patch: StampWirePatch,
+  patch: StampPatch,
   ctx?: AnnotationWriteContext,
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);
@@ -97,7 +105,14 @@ export function applyStampPatch(
   } else if (patch.name !== undefined) {
     setStampName(fn, annotPtr, patch.name);
   }
-  if (patch.source !== undefined) {
+  // The fit the drawing is (re-)fit with: the patch's, else the recorded one.
+  const fit =
+    patch.fit !== undefined
+      ? (patch.fit ?? 'contain')
+      : (readStampFit(fn, mem, annotPtr) ?? 'contain');
+  if (patch.fit !== undefined) writeStampFit(fn, mem, annotPtr, patch.fit);
+  const appearance = ctx?.resources?.appearance;
+  if (appearance !== undefined) {
     // Content replacement: rebuild the appearance from the new bytes, authored
     // in the unrotated frame (see authorStampAppearance) so a rotated stamp
     // never double-fits into its padded AABB.
@@ -106,8 +121,8 @@ export function applyStampPatch(
       fn,
       mem,
       annotPtr,
-      patch.source,
-      patch.fit ?? 'contain',
+      appearance,
+      fit,
       {
         rect,
         unrotatedRect: patch.unrotatedRect ?? undefined,
@@ -117,7 +132,7 @@ export function applyStampPatch(
     );
     return;
   }
-  // No new bytes: geometry / rotation / fit only.
+  // No new bytes: geometry / rotation only.
   if (patch.rect !== undefined) {
     setAnnotRect(fn, mem, annotPtr, patch.rect);
   }
@@ -136,12 +151,29 @@ export function applyStampPatch(
     patch.unrotatedRect !== undefined
   ) {
     // Geometry-only patch: re-fit the existing appearance into the new /Rect.
-    refitAppearance(fn, annotPtr, patch.fit ?? 'contain');
+    refitAppearance(fn, annotPtr, fit);
   }
 }
 
 export function isStampSubtype(subtype: string): subtype is 'stamp' {
   return subtype === 'stamp';
+}
+
+/** Record how the drawing fills the box; `null` removes the record. */
+function writeStampFit(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+  fit: StampFit | null,
+): void {
+  if (fit === null) {
+    fn.EPDFAnnot_ClearEmbedMetadataKey(annotPtr, KEY_APPEARANCE_FIT);
+    return;
+  }
+  if (!fn.EPDFAnnot_HasEmbedMetadata(annotPtr)) {
+    fn.EPDFAnnot_SetEmbedMetadataNumber(annotPtr, 'SchemaVersion', EMBD_METADATA_SCHEMA_VERSION);
+  }
+  writeEmbedMetadataString(fn, mem, annotPtr, KEY_APPEARANCE_FIT, fit);
 }
 
 /** Any non-empty name: standard ('Approved') or custom ('#LBGiYhk8V…') —
@@ -168,26 +200,26 @@ function requireStampFit(fit: StampFit): void {
   }
 }
 
-function requireStampResource(
-  ref: ResourceRef,
-  ctx: AnnotationWriteContext | undefined,
-): WireResource {
-  const resource = ctx?.resources?.[ref.resource];
-  if (!resource) {
+function requireStampAppearance(ctx: AnnotationWriteContext | undefined): StampAppearance {
+  const appearance = ctx?.resources?.appearance;
+  if (!appearance) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
-      `stamp source references resource '${ref.resource}' but no such binary payload accompanied the mutation`,
+      "creating a stamp annotation needs its 'appearance' resource",
     );
   }
-  return resource;
+  return appearance;
 }
 
-function requireStampContent(ref: ResourceRef, ctx: AnnotationWriteContext | undefined): void {
-  const resource = requireStampResource(ref, ctx);
-  if (!(resource.bytes instanceof ArrayBuffer) || !sniffBinaryMetadata(resource.bytes)) {
+function requireStampContent(
+  appearance: StampAppearance | undefined,
+  ctx: AnnotationWriteContext | undefined,
+): void {
+  if (!appearance) requireStampAppearance(ctx);
+  if (!(appearance instanceof ArrayBuffer) || !sniffBinaryMetadata(appearance)) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
-      'stamp source must be PNG, JPEG, or single-page PDF bytes',
+      'the appearance resource must be PNG, JPEG or one-page PDF bytes',
     );
   }
   if (ctx?.docPtr === undefined || ctx.pagePtr === undefined) {
@@ -209,7 +241,7 @@ interface StampBox {
 }
 
 /**
- * Author a stamp's appearance from `source`, correct under rotation.
+ * Author a stamp's appearance from its `appearance` resource, correct under rotation.
  *
  * The appearance must be built in the unrotated frame and rotated by an
  * `/AP /Matrix` afterwards — the "FreeText pattern" the stamp draft documents.
@@ -231,7 +263,7 @@ function authorStampAppearance(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  source: ResourceRef,
+  appearance: StampAppearance,
   fit: StampFit,
   box: StampBox,
   ctx: AnnotationWriteContext | undefined,
@@ -239,7 +271,7 @@ function authorStampAppearance(
   const rotated = !!box.rotation && box.unrotatedRect !== undefined;
   if (!rotated) {
     setAnnotRect(fn, mem, annotPtr, box.rect);
-    setStampContent(fn, mem, annotPtr, source, fit, box.rect, ctx);
+    setStampContent(fn, mem, annotPtr, appearance, fit, box.rect, ctx);
     return;
   }
   const unrotated = box.unrotatedRect!;
@@ -247,7 +279,7 @@ function authorStampAppearance(
   //    internal re-fit records an image-shaped EPDFOrigContentRect, not the AABB.
   writeBoxTransformMetadata(fn, mem, annotPtr, {});
   setAnnotRect(fn, mem, annotPtr, unrotated);
-  setStampContent(fn, mem, annotPtr, source, fit, unrotated, ctx);
+  setStampContent(fn, mem, annotPtr, appearance, fit, unrotated, ctx);
   // 2. Apply the transform: metadata bakes the /Matrix, /Rect becomes the AABB,
   //    and one re-fit reconciles BBox + Matrix from the now-recorded content.
   writeBoxTransformMetadata(fn, mem, annotPtr, {
@@ -262,14 +294,13 @@ function setStampContent(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  ref: ResourceRef,
+  bytes: ArrayBuffer,
   fit: StampFit,
   rect: PdfRect,
   ctx: AnnotationWriteContext | undefined,
 ): void {
-  const resource = ctx?.resources?.[ref.resource];
-  const meta = resource ? sniffBinaryMetadata(resource.bytes) : null;
-  if (!resource || !meta || ctx?.docPtr === undefined || ctx.pagePtr === undefined) {
+  const meta = sniffBinaryMetadata(bytes);
+  if (!meta || ctx?.docPtr === undefined || ctx.pagePtr === undefined) {
     throw new EngineError(EngineErrorCode.Unknown, 'stamp content preflight invariant broken');
   }
 
@@ -279,9 +310,9 @@ function setStampContent(
   }
 
   if (meta.mimeType === 'application/pdf') {
-    setAppearanceFromPdfBytes(fn, mem, annotPtr, resource.bytes);
+    setAppearanceFromPdfBytes(fn, mem, annotPtr, bytes);
   } else {
-    appendImageObject(fn, mem, annotPtr, ctx.docPtr, ctx.pagePtr, resource.bytes, meta, rect, fit);
+    appendImageObject(fn, mem, annotPtr, ctx.docPtr, ctx.pagePtr, bytes, meta, rect, fit);
   }
 
   // Normalises the AP (BBox, EPDFOrigContentRect for later re-fits) and
@@ -422,7 +453,10 @@ function setAppearanceFromPdfBytes(
     mem.writeBytes(dataPtr, new Uint8Array(bytes));
     const tempDocPtr = fn.FPDF_LoadMemDocument(dataPtr, bytes.byteLength, '');
     if (!tempDocPtr) {
-      throw new EngineError(EngineErrorCode.MalformedPdf, 'stamp source PDF could not be opened');
+      throw new EngineError(
+        EngineErrorCode.MalformedPdf,
+        "the stamp's appearance PDF could not be opened",
+      );
     }
     try {
       if (!fn.EPDFAnnot_SetAppearanceFromPage(annotPtr, tempDocPtr, 0)) {

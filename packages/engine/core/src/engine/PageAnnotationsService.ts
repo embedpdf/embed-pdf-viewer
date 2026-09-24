@@ -1,5 +1,6 @@
 import type { AnnotationListPageSnapshot } from '../annotation/AnnotationListSnapshot';
 import type { AnnotationDraft, AnnotationPatch } from '../annotation/kinds';
+import type { AnnotationResources } from '../annotation/resources';
 import type {
   AnnotationAppearanceImageOptions,
   AnnotationAppearanceImagesResult,
@@ -63,8 +64,24 @@ export interface PageAnnotationsService {
    * file-attachment or has no embedded file stream.
    */
   downloadFile?(ref: AnnotationRef): AbortablePromise<AttachmentContent>;
-  create(draft: AnnotationDraft): AbortablePromise<AnnotationCreateResult>;
-  update(ref: AnnotationRef, patch: AnnotationPatch): AbortablePromise<AnnotationUpdateResult>;
+  /**
+   * Create an annotation on this page from its data. Bytes travel beside the
+   * data, by role: a stamp needs its `appearance`, a file attachment its
+   * `file`. A resource the kind doesn't take is refused.
+   */
+  create(
+    data: AnnotationDraft,
+    resources?: AnnotationResources,
+  ): AbortablePromise<AnnotationCreateResult>;
+  /**
+   * Change the fields `patch` names; the others stay. A resource replaces
+   * what it is for: a stamp's drawing, an attached file's bytes.
+   */
+  update(
+    ref: AnnotationRef,
+    patch: AnnotationPatch,
+    resources?: AnnotationResources,
+  ): AbortablePromise<AnnotationUpdateResult>;
   delete(ref: AnnotationRef): AbortablePromise<AnnotationDeleteResult>;
   /**
    * Batch move (contiguous-block; `refs.length === 1` is the

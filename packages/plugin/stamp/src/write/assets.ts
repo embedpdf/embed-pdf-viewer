@@ -120,12 +120,14 @@ export function createAssetWrites(
           }
           const blank = await doc.pages.insertBlank({ size: rasterSize! });
           page = blank.insertedPages[0];
-          await doc.page(page).annotations.create({
-            subtype: 'stamp',
-            rect: { left: 0, bottom: 0, right: rasterSize!.width, top: rasterSize!.height },
-            source: new Uint8Array(resolved.bytes),
-            fit: 'fill',
-          });
+          await doc.page(page).annotations.create(
+            {
+              subtype: 'stamp',
+              rect: { left: 0, bottom: 0, right: rasterSize!.width, top: rasterSize!.height },
+              fit: 'fill',
+            },
+            { appearance: new Uint8Array(resolved.bytes) },
+          );
           const flattened = await doc.pages.flatten([page], 'display');
           if (flattened.results.some(({ status }) => status !== 'applied')) {
             throw stampError('operation-failed', 'flattening the raster into its page failed');

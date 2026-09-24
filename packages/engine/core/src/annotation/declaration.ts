@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import type { AnnotationResourceRole } from './resources';
+
 /**
  * One declaration per annotation kind. Each field says who writes it, what it
  * reads as, what a write accepts, and whether it can be absent. The read,
@@ -161,10 +163,8 @@ export type UpdateShape<Fields extends KindFields> = {
 
 // ── kinds ──
 
-/** A role in which bytes travel beside the data: `create(data, resources)`. */
-export type ResourceRole = 'appearance' | 'file';
-
-export type KindResources = { readonly [Role in ResourceRole]?: 'required' | 'optional' };
+/** The resources a kind takes, by role (`annotation/resources.ts`). */
+export type KindResources = { readonly [Role in AnnotationResourceRole]?: 'required' | 'optional' };
 
 export type KindRead<Subtype extends string, Fields extends KindFields> = Simplify<
   { subtype: Subtype } & ReadShape<Fields>

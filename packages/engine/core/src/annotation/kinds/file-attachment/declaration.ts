@@ -5,7 +5,10 @@ import { defineKind, field } from '../../declaration';
 import { annotationBaseFields, colorStyleFields } from '../shared-fields';
 import { FileAttachmentIconSchema } from './values';
 
-/** The file's metadata; its bytes travel as the `file` resource. */
+/**
+ * The file's metadata; its bytes travel as the `file` resource. What a read
+ * adds (size, checksum, creation date) comes from the bytes and is ignored.
+ */
 const AttachmentFileWriteSchema = z.object({
   name: z.string().min(1),
   mimeType: z.string().nullable().optional(),

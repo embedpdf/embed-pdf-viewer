@@ -15,10 +15,11 @@ import {
   type AnnotationActor,
   type AnnotationCreateResult,
   type AnnotationDeleteResult,
-  type WireAnnotationDraft,
+  type AnnotationDraft,
   type AnnotationFlattenResult,
   type AnnotationMoveResult,
-  type WireAnnotationPatch,
+  type AnnotationPatch,
+  type WireAnnotationResources,
   type WireResourceMap,
   type AnnotationRef,
   type AnnotationUpdateResult,
@@ -355,7 +356,7 @@ export class LayerService {
       docId: string;
       layerName: string;
       pageObjectNumber: PageObjectNumber;
-      draft: WireAnnotationDraft;
+      draft: AnnotationDraft;
       /**
        * Optional actor override. When supplied, replaces the actor
        * built from `ctx.jwt.identity`. Routes pass this so that the
@@ -363,8 +364,8 @@ export class LayerService {
        * the capability check. The service trusts what arrives here.
        */
       actor?: AnnotationActor;
-      /** Binary payloads referenced by the draft (multipart `resource:{key}` parts). */
-      resources?: WireResourceMap;
+      /** The bytes beside the draft, by role (multipart `resource:{role}` parts). */
+      resources?: WireAnnotationResources;
     },
     signal?: AbortSignal,
   ): Promise<AnnotationCreateResult> {
@@ -405,9 +406,9 @@ export class LayerService {
       docId: string;
       layerName: string;
       ref: AnnotationRef;
-      patch: WireAnnotationPatch;
-      /** Binary payloads referenced by the patch (multipart `resource:{key}` parts). */
-      resources?: WireResourceMap;
+      patch: AnnotationPatch;
+      /** The bytes beside the patch, by role (multipart `resource:{role}` parts). */
+      resources?: WireAnnotationResources;
       /**
        * Optional actor override. For UPDATE this is typically built
        * from the caller's JWT identity (for /UpdatedBy) plus any

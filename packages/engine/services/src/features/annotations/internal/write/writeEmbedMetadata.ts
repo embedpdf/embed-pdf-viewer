@@ -62,12 +62,12 @@ export function applyEmbedMetadataOnCreate(
   fn.EPDFAnnot_SetEmbedMetadataNumber(annotPtr, KEY_SCHEMA_VERSION, EMBD_METADATA_SCHEMA_VERSION);
 
   if (actor.userId) {
-    setMetadataString(fn, mem, annotPtr, KEY_USER_ID, actor.userId);
-    setMetadataString(fn, mem, annotPtr, KEY_CREATED_BY, actor.userId);
-    setMetadataString(fn, mem, annotPtr, KEY_UPDATED_BY, actor.userId);
+    writeEmbedMetadataString(fn, mem, annotPtr, KEY_USER_ID, actor.userId);
+    writeEmbedMetadataString(fn, mem, annotPtr, KEY_CREATED_BY, actor.userId);
+    writeEmbedMetadataString(fn, mem, annotPtr, KEY_UPDATED_BY, actor.userId);
   }
   if (actor.groupId) {
-    setMetadataString(fn, mem, annotPtr, KEY_GROUP_ID, actor.groupId);
+    writeEmbedMetadataString(fn, mem, annotPtr, KEY_GROUP_ID, actor.groupId);
   }
 }
 
@@ -99,14 +99,15 @@ export function applyEmbedMetadataOnUpdate(
     fn.EPDFAnnot_SetEmbedMetadataNumber(annotPtr, KEY_SCHEMA_VERSION, EMBD_METADATA_SCHEMA_VERSION);
   }
   if (actor.userId) {
-    setMetadataString(fn, mem, annotPtr, KEY_UPDATED_BY, actor.userId);
+    writeEmbedMetadataString(fn, mem, annotPtr, KEY_UPDATED_BY, actor.userId);
   }
   if (actor.groupId) {
-    setMetadataString(fn, mem, annotPtr, KEY_GROUP_ID, actor.groupId);
+    writeEmbedMetadataString(fn, mem, annotPtr, KEY_GROUP_ID, actor.groupId);
   }
 }
 
-function setMetadataString(
+/** Set a string under `/EMBD_Metadata`. */
+export function writeEmbedMetadataString(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,

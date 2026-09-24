@@ -228,6 +228,14 @@ describe('annotation flags', () => {
     await vi.waitFor(() => expect(harness.update).toHaveBeenCalledTimes(1));
   });
 
+  it('update writes each flag it names as its own engine field', async () => {
+    const harness = createHarness();
+    await loadPage(harness, [squareDTO(25)]);
+    harness.update.mockResolvedValueOnce({ updated: squareDTO(25, { hidden: true }) });
+    await harness.capability.update(ref(25), { flags: { hidden: true } });
+    expect(harness.update.mock.calls[0]![1]).toEqual({ subtype: 'square', hidden: true });
+  });
+
   it('the data-API create defaults /F to print when the caller omits flags', async () => {
     const harness = createHarness();
     harness.create.mockResolvedValueOnce({ created: squareDTO(24) });

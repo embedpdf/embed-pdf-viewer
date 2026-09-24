@@ -51,9 +51,9 @@ export const stamp: KindProjection = {
       ),
     };
   },
-  // Geometry only — the visual is the engine-baked /AP, re-fit natively when
-  // /Rect changes. Content replacement carries bytes and goes through
-  // `capability.update` with an inline `source`, never through this path.
+  // Geometry only — the visual is the engine-baked /AP, re-fit natively (with
+  // the stamp's recorded fit) when /Rect changes. A new drawing is bytes: it
+  // goes to the engine as the `appearance` resource, never through this path.
   geometry: (annotation, crop) => boxEmit(annotation, crop),
   createable: false,
 };

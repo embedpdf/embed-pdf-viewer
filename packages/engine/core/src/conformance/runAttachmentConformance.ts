@@ -170,19 +170,21 @@ export function runAttachmentConformance(
         const data = new Uint8Array(2048);
         for (let i = 0; i < data.length; i++) data[i] = (i * 31 + 7) & 0xff;
 
-        const { created } = await annotations.create({
-          subtype: 'file-attachment',
-          rect: { left: 40, bottom: 40, right: 60, top: 60 },
-          file: {
-            data,
-            name: 'conformance.bin',
-            mimeType: 'application/octet-stream',
-            description: 'attachment conformance payload',
+        const { created } = await annotations.create(
+          {
+            subtype: 'file-attachment',
+            rect: { left: 40, bottom: 40, right: 60, top: 60 },
+            file: {
+              name: 'conformance.bin',
+              mimeType: 'application/octet-stream',
+              description: 'attachment conformance payload',
+            },
+            icon: 'paperclip',
+            color: { r: 220, g: 38, b: 38 },
+            contents: 'conformance attachment',
           },
-          icon: 'paperclip',
-          color: { r: 220, g: 38, b: 38 },
-          contents: 'conformance attachment',
-        });
+          { file: data },
+        );
 
         // Metadata rides the DTO; bytes never do.
         const dto = created as FileAttachmentAnnotationDTO;

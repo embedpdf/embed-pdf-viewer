@@ -177,7 +177,7 @@ export type {
   BlendMode,
 } from './annotation/primitives';
 export { NO_ANNOTATION_FLAGS } from './annotation/primitives';
-export { ANNOTATION_FIELD_NAMES, STAMP_SOURCE_FIELD_NAMES } from './annotation/field-names';
+export { ANNOTATION_FIELD_NAMES, ANNOTATION_RESOURCE_ROLES } from './annotation/field-names';
 
 export type { AnnotationBase } from './annotation/base';
 export type { AnnotationDraftBase } from './annotation/draft-base';
@@ -191,21 +191,29 @@ export {
 } from './annotation/subtype';
 export type { AnnotationSubtype } from './annotation/subtype';
 
-// Inline binary payloads (stamp images, future embedded files) — zod-free.
+// Binary payloads — zod-free.
 export type {
   BinarySource,
   BinaryPayload,
   WireResource,
   WireResourceMap,
-  ResourceRef,
 } from './resource/BinarySource';
 export { resolveBinarySource } from './resource/BinarySource';
 export type { BinaryMetadata, BinaryMimeType } from './resource/binaryMetadata';
 export { sniffBinaryMetadata } from './resource/binaryMetadata';
-export { normalizeAnnotationDraft, normalizeAnnotationPatch } from './annotation/normalize';
-// Deep import keeps `shared` zod-free (the kind barrel pulls schemas).
-export { normalizeAttachmentFileSource } from './annotation/kinds/file-attachment/normalize';
-export type { NormalizedDraft, NormalizedPatch } from './annotation/normalize';
+export type {
+  AnnotationResources,
+  AnnotationResourceRole,
+  ResourceBytes,
+  WireAnnotationResources,
+} from './annotation/resources';
+export {
+  ANNOTATION_RESOURCE_ROLE_NAMES,
+  assertAnnotationResources,
+  hasAnnotationResources,
+  resolveAnnotationResources,
+} from './annotation/resources';
+export { normalizeAttachmentFileSource } from './dto/normalizeAttachmentFileSource';
 
 // Attachment vocabulary — one set of file metadata fields shared by the
 // file-attachment kind and the document-level EmbeddedFiles service.
@@ -216,6 +224,7 @@ export type {
   EmbeddedFileItem,
   EmbeddedFileRef,
   AttachmentContent,
+  WireAttachmentFile,
 } from './dto/Attachment';
 export type {
   AttachmentCreateResult,
@@ -235,8 +244,6 @@ export type {
   AnnotationDTO,
   AnnotationDraft,
   AnnotationPatch,
-  WireAnnotationDraft,
-  WireAnnotationPatch,
   HighlightAnnotationDTO,
   HighlightDraft,
   HighlightPatch,
@@ -286,15 +293,11 @@ export type {
   StampAnnotationDTO,
   StampDraft,
   StampPatch,
-  StampWireDraft,
-  StampWirePatch,
   StampFit,
   FileAttachmentAnnotationDTO,
   FileAttachmentDraft,
-  FileAttachmentWireDraft,
   FileAttachmentPatch,
   FileAttachmentIcon,
-  WireAttachmentFile,
   ShapeAnnotationFields,
   ShapeDraftFields,
   ShapePatchFields,

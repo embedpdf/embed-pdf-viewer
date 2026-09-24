@@ -2,6 +2,7 @@ import type { AnnotationProps, Subtype } from '@embedpdf/core-annotation';
 import type {
   AnnotationDraft,
   AnnotationFlags,
+  AnnotationResources,
   AttachmentFileSource,
   FileAttachmentIcon,
   NoteIcon,
@@ -31,19 +32,20 @@ export const isIconPlaceKind = (subtype: Subtype): subtype is IconPlaceKind =>
   subtype === 'text' || subtype === 'file-attachment';
 
 /**
- * Build the engine create draft for a placed icon annotation. `geom` is the
+ * Build the engine create for a placed icon annotation: its data, and for a
+ * file attachment the file's bytes as the `file` resource. `geom` is the
  * repository's `boxGeomFields` emit (the `/Rect` + upright rotation pair);
  * `defaults` is the tool's resolved flat props bag (`defaultsFor`) — the
  * colour seam is crossed here via the repository's `cssToColor`, and the
  * icon falls back to the kind's own default when the bag carries none.
  */
-export function iconPlacementDraft(
+export function iconPlacement(
   subtype: IconPlaceKind,
   geometry: { rect: PdfRect; rotation?: number | null; unrotatedRect?: PdfRect | null },
   defaults: AnnotationProps,
   flags: Partial<AnnotationFlags> | undefined,
   file: AttachmentFileSource | null,
-): AnnotationDraft {
+): { data: AnnotationDraft; resources?: AnnotationResources } {
   const shared = {
     ...geometry,
     color: cssToColor(defaults.color),
@@ -54,15 +56,37 @@ export function iconPlacementDraft(
     ...flags,
   };
   if (subtype === 'text') {
-    return { subtype: 'text', icon: (defaults.icon as NoteIcon) ?? 'comment', ...shared };
+    return { data: { subtype: 'text', icon: (defaults.icon as NoteIcon) ?? 'comment', ...shared } };
   }
   if (!file) {
     throw new Error('[annotation] a file-attachment placement requires a file payload');
   }
   return {
-    subtype: 'file-attachment',
-    icon: (defaults.icon as FileAttachmentIcon) ?? 'paperclip',
-    file,
-    ...shared,
+    data: {
+      subtype: 'file-attachment',
+      icon: (defaults.icon as FileAttachmentIcon) ?? 'paperclip',
+      file: attachmentMetadataOf(file),
+      ...shared,
+    },
+    resources: { file: file.data },
+  };
+}
+
+/** A picked file's name, MIME type and description: from the source, else from a browser `File`. */
+function attachmentMetadataOf(file: AttachmentFileSource): {
+  name: string;
+  mimeType?: string;
+  description?: string;
+} {
+  const blob = typeof Blob !== 'undefined' && file.data instanceof Blob ? file.data : null;
+  const name = file.name ?? (blob as File | null)?.name;
+  if (!name) {
+    throw new Error('[annotation] an attached file needs a name: pass { data, name } or a File');
+  }
+  const mimeType = file.mimeType ?? (blob?.type || undefined);
+  return {
+    name,
+    ...(mimeType !== undefined ? { mimeType } : {}),
+    ...(file.description !== undefined ? { description: file.description } : {}),
   };
 }

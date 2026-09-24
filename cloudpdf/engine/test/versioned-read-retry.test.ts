@@ -918,35 +918,32 @@ describe('CloudPageAnnotationsService — binary payload wire shape', () => {
     return Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0));
   })();
 
-  test('a stamp create ships as multipart: `body` JSON part + `resource:{key}` file part', async () => {
+  test('a stamp create ships as multipart: the data as `body`, its drawing as `resource:appearance`', async () => {
     const fx = freshStub();
     const doc = new CloudDocumentHandle(fx.http, DOC_ID);
     try {
-      await doc.page(toPageRef(PAGE_OBJECT_NUMBER)).annotations.create({
-        subtype: 'stamp',
-        rect: { left: 10, bottom: 10, right: 110, top: 60 },
-        source: TINY_PNG,
-        fit: 'contain',
-      });
+      await doc
+        .page(toPageRef(PAGE_OBJECT_NUMBER))
+        .annotations.create(
+          { subtype: 'stamp', rect: { left: 10, bottom: 10, right: 110, top: 60 }, fit: 'cover' },
+          { appearance: TINY_PNG },
+        );
 
       const post = fx.calls.find((c) => c.method === 'POST' && c.path.endsWith('/items'));
       expect(post).toBeDefined();
       expect(post!.body).toBeInstanceOf(FormData);
       const form = post!.body as FormData;
 
-      const wire = JSON.parse(String(form.get('body')));
-      expect(wire).toMatchObject({
+      // The body is the data exactly: no bytes and no resource keys inside it.
+      expect(JSON.parse(String(form.get('body')))).toEqual({
         subtype: 'stamp',
-        fit: 'contain',
-        source: { resource: 'r0' },
+        rect: { left: 10, bottom: 10, right: 110, top: 60 },
+        fit: 'cover',
       });
-      expect(wire.source.resource).toBe('r0'); // never inline bytes on the wire
-
-      const part = form.get('resource:r0');
+      const part = form.get('resource:appearance');
       expect(part).toBeInstanceOf(Blob);
-      expect((part as Blob).type).toBe('image/png'); // sniffed, not declared
-      const bytes = new Uint8Array(await (part as Blob).arrayBuffer());
-      expect(bytes).toEqual(TINY_PNG);
+      expect(new Uint8Array(await (part as Blob).arrayBuffer())).toEqual(TINY_PNG);
+      expect([...form.keys()].sort()).toEqual(['body', 'resource:appearance']);
     } finally {
       await doc.close();
     }

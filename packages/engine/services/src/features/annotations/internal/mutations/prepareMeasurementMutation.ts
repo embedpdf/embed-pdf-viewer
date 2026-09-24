@@ -7,17 +7,14 @@ import {
   isReadout,
   measurementReadout,
   type AnnotationDTO,
-  type WireAnnotationDraft,
-  type WireAnnotationPatch,
+  type AnnotationDraft,
+  type AnnotationPatch,
   type PdfPoint,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, Ptr } from '@embedpdf/engine-runtime';
 
 type DimensionKind = 'line' | 'polygon' | 'polyline';
-type DimensionWrite = Extract<
-  WireAnnotationDraft | WireAnnotationPatch,
-  { subtype?: DimensionKind }
->;
+type DimensionWrite = Extract<AnnotationDraft | AnnotationPatch, { subtype?: DimensionKind }>;
 
 const inputs = ['linePoints', 'vertices', 'measure', 'intent', 'contents'] as const;
 
@@ -120,7 +117,7 @@ const touchesCaption = (value: object): boolean =>
  * and complete its caption fields, since the native caption setters write the
  * whole caption at once.
  */
-export function prepareMeasurementDraft(draft: WireAnnotationDraft): WireAnnotationDraft {
+export function prepareMeasurementDraft(draft: AnnotationDraft): AnnotationDraft {
   if (!isDimensionKind(draft.subtype)) return draft;
   const dimension = draft as DimensionWrite;
   validate(draft.subtype, dimension);
@@ -147,7 +144,7 @@ export function prepareMeasurementDraft(draft: WireAnnotationDraft): WireAnnotat
       };
     }
   }
-  return deriveMeasurementLabel(prepared as never) as WireAnnotationDraft;
+  return deriveMeasurementLabel(prepared as never) as AnnotationDraft;
 }
 
 /**
@@ -161,8 +158,8 @@ export function prepareMeasurementPatch(
   fn: PdfFunctions,
   annot: Ptr,
   current: AnnotationDTO,
-  patch: WireAnnotationPatch,
-): WireAnnotationPatch {
+  patch: AnnotationPatch,
+): AnnotationPatch {
   if (patch.subtype !== undefined && patch.subtype !== current.subtype)
     throw new EngineError(EngineErrorCode.InvalidArg, 'Annotation subtype cannot change');
   if (!isDimensionKind(current.subtype)) return patch;
@@ -232,5 +229,5 @@ export function prepareMeasurementPatch(
     if (isReadout(readout)) next = { ...next, contents: readout.label };
   }
   validate(subtype, next);
-  return next as WireAnnotationPatch;
+  return next as AnnotationPatch;
 }

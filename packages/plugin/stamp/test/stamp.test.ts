@@ -434,6 +434,7 @@ describe('stamp plugin: assets', () => {
     expect(insertBlank).toHaveBeenCalledWith({ size: { width: 100, height: 50 } });
     expect(createAnnotation).toHaveBeenCalledWith(
       expect.objectContaining({ subtype: 'stamp', fit: 'fill' }),
+      { appearance: expect.any(Uint8Array) },
     );
     expect(flatten).toHaveBeenCalledWith([toPageRef(100)], 'display');
     expect(names.get('Logo=Company logo')).toBe(100);

@@ -42,11 +42,11 @@ export function readEmbedMetadata(
   if (!fn.EPDFAnnot_HasEmbedMetadata(annotPtr)) return null;
 
   const schemaVersion = readMetaNumber(fn, mem, annotPtr, 'SchemaVersion');
-  const userId = readMetaString(fn, mem, annotPtr, 'UserID');
-  const groupId = readMetaString(fn, mem, annotPtr, 'GroupID');
-  const createdBy = readMetaString(fn, mem, annotPtr, 'CreatedBy');
-  const updatedBy = readMetaString(fn, mem, annotPtr, 'UpdatedBy');
-  const importedBy = readMetaString(fn, mem, annotPtr, 'ImportedBy');
+  const userId = readEmbedMetadataString(fn, mem, annotPtr, 'UserID');
+  const groupId = readEmbedMetadataString(fn, mem, annotPtr, 'GroupID');
+  const createdBy = readEmbedMetadataString(fn, mem, annotPtr, 'CreatedBy');
+  const updatedBy = readEmbedMetadataString(fn, mem, annotPtr, 'UpdatedBy');
+  const importedBy = readEmbedMetadataString(fn, mem, annotPtr, 'ImportedBy');
 
   const out: EmbedMetadata = {};
   if (schemaVersion !== undefined) out.schemaVersion = schemaVersion;
@@ -58,7 +58,8 @@ export function readEmbedMetadata(
   return out;
 }
 
-function readMetaString(
+/** A string under `/EMBD_Metadata`, `undefined` when it is absent or empty. */
+export function readEmbedMetadataString(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,

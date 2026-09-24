@@ -4,8 +4,8 @@ import {
   EngineError,
   EngineErrorCode,
   createPageImageHandle,
-  normalizeAnnotationDraft,
-  normalizeAnnotationPatch,
+  hasAnnotationResources,
+  resolveAnnotationResources,
   wirePack,
   type EngineRenderPolicy,
   type AnnotationAppearanceImage,
@@ -17,6 +17,8 @@ import {
   type AnnotationListPageSnapshot,
   type AnnotationPatch,
   type AnnotationRef,
+  type AnnotationResources,
+  type WireAnnotationResources,
   type AnnotationCreateResult,
   type AnnotationDeleteResult,
   type AnnotationFlattenResult,
@@ -246,7 +248,10 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     });
   }
 
-  create(draft: AnnotationDraft): AbortablePromise<AnnotationCreateResult> {
+  create(
+    draft: AnnotationDraft,
+    resources?: AnnotationResources,
+  ): AbortablePromise<AnnotationCreateResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -272,14 +277,10 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     const docId = this.docId;
     const ref = this.ref;
     return AbortablePromise.run<AnnotationCreateResult>(async (signal) => {
-      // Split inline BinarySource fields (stamp images, …) into the wire
-      // draft + resource buffers. Async because Blob bytes resolve async.
-      // Each resource is a private copy made by resolveBinarySource (one
-      // copy per call, at the argument boundary); that copy rides the
-      // wirePack transfer list and is detached by the worker transport,
-      // while the caller's Uint8Array stays intact and reusable.
-      const { wire, resources } = await normalizeAnnotationDraft(draft);
-      const resourceBuffers = Object.values(resources).map((r) => r.bytes);
+      // Each resource becomes a private copy (async: Blob bytes resolve
+      // async). The copy rides the wirePack transfer list and is detached by
+      // the worker transport, while the caller's bytes stay intact.
+      const wireResources = await resolveAnnotationResources(resources);
       const submission = this.queue.enqueue<WorkerResultPayload>(
         {
           buildPack: (jobId: JobId) =>
@@ -289,11 +290,11 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
                 jobId,
                 docId,
                 page: ref,
-                draft: wire,
-                ...(resourceBuffers.length > 0 ? { resources } : {}),
+                draft,
+                ...(hasAnnotationResources(wireResources) ? { resources: wireResources } : {}),
                 ...(actor ? { actor } : {}),
               },
-              resourceBuffers,
+              transferOf(wireResources),
             ),
         },
         { priority: Priority.HIGH },
@@ -314,7 +315,11 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     });
   }
 
-  update(ref: AnnotationRef, patch: AnnotationPatch): AbortablePromise<AnnotationUpdateResult> {
+  update(
+    ref: AnnotationRef,
+    patch: AnnotationPatch,
+    resources?: AnnotationResources,
+  ): AbortablePromise<AnnotationUpdateResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -344,10 +349,8 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
       const actor = this.guard.actorForUpdate(target.groupId, patchGroupId ?? undefined);
 
       const docId = this.docId;
-      // Same binary split as create(): wire patch + owned resource copies
-      // that the transport may detach without touching the caller's bytes.
-      const { wire, resources } = await normalizeAnnotationPatch(patch);
-      const resourceBuffers = Object.values(resources).map((r) => r.bytes);
+      // Owned copies, as in create().
+      const wireResources = await resolveAnnotationResources(resources);
       const submission = this.queue.enqueue<WorkerResultPayload>(
         {
           buildPack: (jobId: JobId) =>
@@ -357,11 +360,11 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
                 jobId,
                 docId,
                 ref,
-                patch: wire,
-                ...(resourceBuffers.length > 0 ? { resources } : {}),
+                patch,
+                ...(hasAnnotationResources(wireResources) ? { resources: wireResources } : {}),
                 ...(actor ? { actor } : {}),
               },
-              resourceBuffers,
+              transferOf(wireResources),
             ),
         },
         { priority: Priority.HIGH },
@@ -611,4 +614,9 @@ function copyToExactArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   const body = new ArrayBuffer(bytes.byteLength);
   new Uint8Array(body).set(bytes);
   return body;
+}
+
+/** The buffers a write's resources hand to the worker. */
+function transferOf(resources: WireAnnotationResources): ArrayBuffer[] {
+  return Object.values(resources).filter((bytes): bytes is ArrayBuffer => bytes !== undefined);
 }

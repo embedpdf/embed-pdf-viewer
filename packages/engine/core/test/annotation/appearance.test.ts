@@ -1,14 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import { appearanceImpactOf, semanticEqual } from '../../src/shared';
-import type { AnnotationDTO, WireAnnotationPatch } from '../../src/shared';
+import type { AnnotationDTO, AnnotationPatch } from '../../src/shared';
 
 /* Minimal DTO/patch fixtures: the classifier only reads the fields it
  * compares, so tests cast focused literals rather than materialise the full
  * AnnotationBase envelope. */
 const dto = (v: Record<string, unknown>): AnnotationDTO => v as unknown as AnnotationDTO;
-const patch = (v: Record<string, unknown>): WireAnnotationPatch =>
-  v as unknown as WireAnnotationPatch;
+const patch = (v: Record<string, unknown>): AnnotationPatch => v as unknown as AnnotationPatch;
 
 const rect = (left: number, bottom: number, right: number, top: number) => ({
   left,

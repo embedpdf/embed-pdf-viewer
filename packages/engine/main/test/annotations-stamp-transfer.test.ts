@@ -138,27 +138,31 @@ describe('stamp annotations: resource buffers survive a detaching transport', ()
     expect(png.byteOffset).toBe(0);
     expect(png.byteLength).toBe(png.buffer.byteLength);
 
-    const first = await page.annotations.create({
-      subtype: 'stamp',
-      rect: { left: 100, bottom: 500, right: 260, top: 580 },
-      source: png,
-      name: 'Approved',
-    });
+    const first = await page.annotations.create(
+      {
+        subtype: 'stamp',
+        rect: { left: 100, bottom: 500, right: 260, top: 580 },
+        name: 'Approved',
+      },
+      { appearance: png },
+    );
     expect(png.byteLength).toBe(original.length);
     expect(Array.from(png)).toEqual(original);
 
     // Second placement from the very same bytes (a stamp library re-arming).
-    const second = await page.annotations.create({
-      subtype: 'stamp',
-      rect: { left: 100, bottom: 300, right: 260, top: 380 },
-      source: png,
-      name: 'Approved',
-    });
+    const second = await page.annotations.create(
+      {
+        subtype: 'stamp',
+        rect: { left: 100, bottom: 300, right: 260, top: 380 },
+        name: 'Approved',
+      },
+      { appearance: png },
+    );
     expect((second.created as StampAnnotationDTO).name).toBe('Approved');
     expect(png.byteLength).toBe(original.length);
 
     // Source update through the same path.
-    await page.annotations.update(first.created.ref, { subtype: 'stamp', source: png });
+    await page.annotations.update(first.created.ref, { subtype: 'stamp' }, { appearance: png });
     expect(png.byteLength).toBe(original.length);
     expect(Array.from(png)).toEqual(original);
 

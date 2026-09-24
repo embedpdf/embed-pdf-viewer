@@ -3,7 +3,6 @@ import { z } from 'zod';
 import type { AnnotationKindModule } from '../registry';
 import { CaretKind } from './caret';
 import { CircleKind } from './circle';
-import type { FileAttachmentDraft, FileAttachmentWireDraft } from './file-attachment';
 import { FileAttachmentKind } from './file-attachment';
 import { FreeTextKind } from './free-text';
 import { HighlightKind } from './highlight';
@@ -16,7 +15,6 @@ import { PopupKind } from './popup';
 import { RedactKind } from './redact';
 import { SquareKind } from './square';
 import { SquigglyKind } from './squiggly';
-import type { StampDraft, StampPatch, StampWireDraft, StampWirePatch } from './stamp';
 import { StampKind } from './stamp';
 import { StrikeoutKind } from './strikeout';
 import { TextKind } from './text';
@@ -118,25 +116,12 @@ type PatchFromKind<K> =
 export type AnnotationDTO = DTOFromKind<AnnotationKind>;
 
 /**
- * Wire drafts/patches: pure JSON, what the worker protocol and HTTP
- * surface carry and what the Zod schemas below validate. Kind modules are
- * wire-typed, so these derive straight from the registry.
+ * What `create()` and `update()` take, and what the worker protocol and the
+ * HTTP surface carry: pure JSON. Bytes travel beside them, as resources
+ * (`annotation/resources.ts`).
  */
-export type WireAnnotationDraft = Exclude<DraftFromKind<AnnotationKind>, never>;
-export type WireAnnotationPatch = Exclude<PatchFromKind<AnnotationKind>, never>;
-
-/**
- * Authoring drafts/patches: what callers pass to `create()`/`update()`.
- * Identical to the wire forms except for binary-carrying kinds, whose
- * inline-`BinarySource` authoring types are swapped in here. Engines
- * bridge the two via `annotation/normalize.ts` — see that module for the
- * uniform binary rule.
- */
-export type AnnotationDraft =
-  | Exclude<WireAnnotationDraft, StampWireDraft | FileAttachmentWireDraft>
-  | StampDraft
-  | FileAttachmentDraft;
-export type AnnotationPatch = Exclude<WireAnnotationPatch, StampWirePatch> | StampPatch;
+export type AnnotationDraft = DraftFromKind<AnnotationKind>;
+export type AnnotationPatch = PatchFromKind<AnnotationKind>;
 
 /**
  * Runtime zod schema for the discriminated union. The cast unwinds the
@@ -170,52 +155,46 @@ export const AnnotationDTOSchema: z.ZodType<AnnotationDTO> = z.discriminatedUnio
   ...z.ZodDiscriminatedUnionOption<'subtype'>[],
 ]) as unknown as z.ZodType<AnnotationDTO>;
 
-/**
- * Validates the wire draft form (post-normalization) — binary-carrying
- * kinds appear here with `{ resource }` refs, never inline bytes.
- */
-export const AnnotationDraftSchema: z.ZodType<WireAnnotationDraft> = z.discriminatedUnion(
-  'subtype',
-  [
-    HighlightKind.draftSchema,
-    UnderlineKind.draftSchema,
-    SquigglyKind.draftSchema,
-    StrikeoutKind.draftSchema,
-    CircleKind.draftSchema,
-    SquareKind.draftSchema,
-    PolygonKind.draftSchema,
-    PolylineKind.draftSchema,
-    LineKind.draftSchema,
-    LinkKind.draftSchema,
-    InkKind.draftSchema,
-    FreeTextKind.draftSchema,
-    CaretKind.draftSchema,
-    TextKind.draftSchema,
-    StampKind.draftSchema,
-    FileAttachmentKind.draftSchema,
-    WidgetKind.draftSchema,
-    RedactKind.draftSchema,
-    PopupKind.draftSchema,
-  ] as unknown as [
-    z.ZodDiscriminatedUnionOption<'subtype'>,
-    ...z.ZodDiscriminatedUnionOption<'subtype'>[],
-  ],
-) as unknown as z.ZodType<WireAnnotationDraft>;
+/** Validates a create's data against its kind. */
+export const AnnotationDraftSchema: z.ZodType<AnnotationDraft> = z.discriminatedUnion('subtype', [
+  HighlightKind.draftSchema,
+  UnderlineKind.draftSchema,
+  SquigglyKind.draftSchema,
+  StrikeoutKind.draftSchema,
+  CircleKind.draftSchema,
+  SquareKind.draftSchema,
+  PolygonKind.draftSchema,
+  PolylineKind.draftSchema,
+  LineKind.draftSchema,
+  LinkKind.draftSchema,
+  InkKind.draftSchema,
+  FreeTextKind.draftSchema,
+  CaretKind.draftSchema,
+  TextKind.draftSchema,
+  StampKind.draftSchema,
+  FileAttachmentKind.draftSchema,
+  WidgetKind.draftSchema,
+  RedactKind.draftSchema,
+  PopupKind.draftSchema,
+] as unknown as [
+  z.ZodDiscriminatedUnionOption<'subtype'>,
+  ...z.ZodDiscriminatedUnionOption<'subtype'>[],
+]) as unknown as z.ZodType<AnnotationDraft>;
 
 /**
- * Validates the wire patch form (post-normalization) against every kind. A
+ * Validates a patch against every kind. A
  * patch may leave out its `subtype`, so this only checks that the patch fits
  * some kind; {@link annotationPatchSchemaOf} checks it against its target.
  */
-export const AnnotationPatchSchema: z.ZodType<WireAnnotationPatch> = z.union(
+export const AnnotationPatchSchema: z.ZodType<AnnotationPatch> = z.union(
   ANNOTATION_KINDS.filter((kind) => kind.subtype !== 'unsupported').map(
     (kind) => kind.patchSchema,
   ) as unknown as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]],
-) as unknown as z.ZodType<WireAnnotationPatch>;
+) as unknown as z.ZodType<AnnotationPatch>;
 
-/** The wire patch schema of one kind: how an update of an annotation of that kind is checked. */
+/** The patch schema of one kind: how an update of an annotation of that kind is checked. */
 export function annotationPatchSchemaOf(
   subtype: AnnotationSubtypeOfKind,
-): z.ZodType<WireAnnotationPatch> {
-  return KIND_BY_SUBTYPE[subtype].patchSchema as unknown as z.ZodType<WireAnnotationPatch>;
+): z.ZodType<AnnotationPatch> {
+  return KIND_BY_SUBTYPE[subtype].patchSchema as unknown as z.ZodType<AnnotationPatch>;
 }

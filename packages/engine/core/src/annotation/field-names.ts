@@ -1,3 +1,4 @@
+import type { KindResources } from './declaration';
 import type { AnnotationSubtype } from './subtype';
 
 /**
@@ -600,6 +601,7 @@ export const ANNOTATION_FIELD_NAMES: Readonly<Record<AnnotationSubtype, readonly
     'rotation',
     'unrotatedRect',
     'name',
+    'fit',
   ],
   'file-attachment': [
     'ref',
@@ -790,5 +792,14 @@ export const ANNOTATION_FIELD_NAMES: Readonly<Record<AnnotationSubtype, readonly
   ],
 };
 
-/** Fields a stamp draft or patch carries beside its declared data: its image and its fit. */
-export const STAMP_SOURCE_FIELD_NAMES: readonly string[] = ['source', 'fit'];
+/**
+ * The resources each kind takes (`create(data, resources)`), without zod,
+ * kept equal to the declarations by the same test. A kind missing here takes
+ * none.
+ */
+export const ANNOTATION_RESOURCE_ROLES: Readonly<
+  Partial<Record<AnnotationSubtype, KindResources>>
+> = {
+  stamp: { appearance: 'required' },
+  'file-attachment': { file: 'required' },
+};
