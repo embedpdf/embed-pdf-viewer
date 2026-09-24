@@ -135,7 +135,7 @@ export function runSignatureConformance(
           expect(sig.revisionIndex).toBe(i + 1);
           expect(snapshot.revisions[i + 1].signatureIndex).toBe(i);
           expect(sig.subFilter).toBe('ETSI.CAdES.detached');
-          expect(typeof sig.signer.claimedTime).toBe('string');
+          expect(typeof sig.signer.signedAt).toBe('string');
           expect(sig.docMdp).toBeNull();
           expect(sig.catalogCertification).toBe(false);
           expect(sig.contentsSize > 0).toBe(true);
@@ -459,7 +459,10 @@ function runAnalysisTests(
       const byRevision = await partial.signatures!.analyze({ since: { revisionIndex: 0 } });
       expect(byRevision.later.revisionCount).toBe(2);
       expect(byRevision.steps).toHaveLength(0);
-      const inFull = await partial.signatures!.analyze({ since: { revisionIndex: 0 }, detail: 'full' });
+      const inFull = await partial.signatures!.analyze({
+        since: { revisionIndex: 0 },
+        detail: 'full',
+      });
       expect(inFull.steps).toHaveLength(2);
       expect(inFull.current.verdict).toBe(byRevision.current.verdict);
     } finally {

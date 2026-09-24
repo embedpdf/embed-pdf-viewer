@@ -3,6 +3,8 @@ import { PageRefSchema } from '../identity/PageRef.schema';
 import type { PageRef } from '../identity/PageRef';
 import { z } from 'zod';
 
+import { DateInputSchema, IsoDateTimeSchema } from '../dto/IsoDateTime.schema';
+
 import type {
   AnnotationListPageSnapshot,
   AnnotationListSnapshotAllPages,
@@ -135,8 +137,8 @@ export const DocumentMetadataSchema: z.ZodType<DocumentMetadata> = z.object({
   keywords: z.string().nullable(),
   producer: z.string().nullable(),
   creator: z.string().nullable(),
-  created: z.string().datetime().nullable(),
-  modified: z.string().datetime().nullable(),
+  createdAt: IsoDateTimeSchema.nullable(),
+  modifiedAt: IsoDateTimeSchema.nullable(),
   trapped: z.enum(['true', 'false', 'unknown']),
   custom: z.record(z.string(), z.string()),
 });
@@ -154,8 +156,8 @@ export const MetadataPatchSchema: z.ZodType<MetadataPatch> = z
     keywords: z.string().nullable().optional(),
     producer: z.string().nullable().optional(),
     creator: z.string().nullable().optional(),
-    created: z.string().datetime().nullable().optional(),
-    modified: z.string().datetime().nullable().optional(),
+    createdAt: DateInputSchema.nullable().optional(),
+    modifiedAt: DateInputSchema.nullable().optional(),
     trapped: z.enum(['true', 'false', 'unknown']).optional(),
     custom: z.record(z.string(), z.string().nullable()).optional(),
   })
@@ -1425,7 +1427,7 @@ export const SignatureDTOSchema: z.ZodType<SignatureDTO> = z.object({
     reason: z.string().nullable(),
     location: z.string().nullable(),
     contactInfo: z.string().nullable(),
-    claimedTime: z.string().nullable(),
+    signedAt: IsoDateTimeSchema.nullable(),
   }),
   docMdp: DocMdpPermissionSchema.nullable(),
   catalogCertification: z.boolean(),
@@ -1561,7 +1563,7 @@ export const SignaturePrepareBodySchema = z.object({
   attribution: SignatureAttributionSchema.optional(),
   /** @deprecated the pre-rename spelling of `attribution`; servers read either. */
   signer: SignatureAttributionSchema.optional(),
-  signingTime: z.string().optional(),
+  signedAt: IsoDateTimeSchema.optional(),
   certify: z.object({ permission: DocMdpPermissionSchema }).optional(),
   lock: FieldLockSpecSchema.optional(),
   appearance: z

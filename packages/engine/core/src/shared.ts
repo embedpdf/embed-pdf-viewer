@@ -199,6 +199,8 @@ export type {
   WireResourceMap,
 } from './resource/BinarySource';
 export { resolveBinarySource } from './resource/BinarySource';
+export type { DateInput, IsoDateTime } from './dto/IsoDateTime';
+export { compareIsoDateTime } from './dto/IsoDateTime';
 export type { BinaryMetadata, BinaryMimeType } from './resource/binaryMetadata';
 export { sniffBinaryMetadata } from './resource/binaryMetadata';
 export type {

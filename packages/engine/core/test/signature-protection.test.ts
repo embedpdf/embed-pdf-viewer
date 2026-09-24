@@ -21,7 +21,7 @@ const sig = (over: Partial<SignatureDTO>): SignatureDTO => ({
   contentsSize: 8,
   coverage: 'whole-revision',
   revisionIndex: 1,
-  signer: { name: null, reason: null, location: null, contactInfo: null, claimedTime: null },
+  signer: { name: null, reason: null, location: null, contactInfo: null, signedAt: null },
   docMdp: null,
   catalogCertification: false,
   fieldMdp: null,

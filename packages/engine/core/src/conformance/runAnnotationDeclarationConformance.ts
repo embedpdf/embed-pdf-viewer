@@ -134,8 +134,8 @@ export function runAnnotationDeclarationConformance(
           const { created } = await page.annotations.create(data, resources);
           const result = await page.annotations.update(created.ref, created as never);
           expect(result.appearance.changed).toBe(false);
-          const { modified: _before, ...expected } = created;
-          const { modified: _after, ...updated } = result.updated;
+          const { modifiedAt: _before, ...expected } = created;
+          const { modifiedAt: _after, ...updated } = result.updated;
           expect(updated).toEqual(expected);
         }
       });
@@ -226,8 +226,8 @@ export function runAnnotationDeclarationConformance(
         );
         const result = await page.annotations.update(created.ref, {}, { appearance: PNG_1X1 });
         expect(result.appearance.changed).toBe(true);
-        const { modified: _before, ...expected } = created;
-        const { modified: _after, ...updated } = result.updated;
+        const { modifiedAt: _before, ...expected } = created;
+        const { modifiedAt: _after, ...updated } = result.updated;
         expect(updated).toEqual(expected);
       });
     });
@@ -276,7 +276,8 @@ export function runAnnotationDeclarationConformance(
           mimeType: 'text/plain',
           size: original.size,
           checksum: original.checksum,
-          creationDate: (original as { creationDate?: string }).creationDate,
+          createdAt: (original as { createdAt?: string }).createdAt,
+          modifiedAt: (original as { modifiedAt?: string }).modifiedAt,
         });
 
         const bytes = new TextEncoder().encode('replaced bytes');

@@ -229,7 +229,7 @@ function ThreadCard({
                 {view.root.author ?? t('demo.commentsAnonymous')}
               </span>
               <span className="text-fg-muted ml-auto shrink-0 text-xs">
-                {dateLabel(view.root.modified ?? view.root.created)}
+                {dateLabel(view.root.modifiedAt ?? view.root.createdAt)}
               </span>
             </div>
             {latest && (
@@ -327,7 +327,9 @@ function Reply({ dto }: { dto: AnnotationDTO }) {
         <span className="text-fg-secondary text-xs font-medium">
           {dto.author ?? t('demo.commentsAnonymous')}
         </span>
-        <span className="text-fg-muted text-[11px]">{dateLabel(dto.modified ?? dto.created)}</span>
+        <span className="text-fg-muted text-[11px]">
+          {dateLabel(dto.modifiedAt ?? dto.createdAt)}
+        </span>
       </div>
       <CommentBody annotationRef={dto.ref} text={dto.contents ?? ''} deletable />
     </div>

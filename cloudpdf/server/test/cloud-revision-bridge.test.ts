@@ -127,7 +127,7 @@ function annotation(ref: AnnotationRef): AnnotationDTO {
     rect: { left: 0, top: 0, right: 1, bottom: 1 },
     contents: null,
     author: null,
-    created: null,
-    modified: null,
+    createdAt: null,
+    modifiedAt: null,
   };
 }

@@ -50,9 +50,9 @@ const FORGED = {
   author: 'Mallory',
   userId: 'mallory',
   createdBy: 'mallory',
-  updatedBy: 'mallory',
-  created: '2001-01-01T00:00:00.000Z',
-  modified: '2001-01-01T00:00:00.000Z',
+  modifiedBy: 'mallory',
+  createdAt: '2001-01-01T00:00:00.000Z',
+  modifiedAt: '2001-01-01T00:00:00.000Z',
   importedBy: 'mallory',
 };
 
@@ -64,7 +64,7 @@ const SQUARE: AnnotationDraft = {
 /**
  * Attribution on both engines with the same identities:
  * `create` stamps it from the session and ignores what the data says,
- * `update` stamps only `modified` and `updatedBy`, and a `groupId` other than
+ * `update` stamps only `modifiedAt` and `modifiedBy`, and a `groupId` other than
  * the session's own passes the set-group check or is refused. The session's
  * whole identity reaches `doc.security.identity`; only the name and the ids
  * reach the annotation.
@@ -128,12 +128,12 @@ export function runAnnotationAttributionConformance(
           author: 'Alice Author',
           userId: 'alice',
           createdBy: 'alice',
-          updatedBy: 'alice',
+          modifiedBy: 'alice',
           groupId: 'legal',
           importedBy: null,
         });
-        expect(read.created).toBe(read.modified);
-        expectNow(read.created, before, after);
+        expect(read.createdAt).toBe(read.modifiedAt);
+        expectNow(read.createdAt, before, after);
         // The rest of the identity stays with the session.
         const text = JSON.stringify(read);
         for (const kept of [
@@ -147,7 +147,7 @@ export function runAnnotationAttributionConformance(
       });
     });
 
-    test("update stamps modified and updatedBy, and keeps the creator's attribution", async () => {
+    test("update stamps modifiedAt and modifiedBy, and keeps the creator's attribution", async () => {
       const alice = await opts.openAs(engine, { scope: SCOPE, identity: ALICE });
       let original: AnnotationDTO;
       try {
@@ -171,18 +171,18 @@ export function runAnnotationAttributionConformance(
           author: 'Alice Author',
           userId: 'alice',
           createdBy: 'alice',
-          updatedBy: 'bob',
+          modifiedBy: 'bob',
           groupId: 'legal',
           importedBy: null,
         });
-        expect(read.created).toBe(original.created);
-        expect(Date.parse(read.modified!) >= Date.parse(original.modified!)).toBe(true);
+        expect(read.createdAt).toBe(original.createdAt);
+        expect(Date.parse(read.modifiedAt!) >= Date.parse(original.modifiedAt!)).toBe(true);
       } finally {
         await bob.close();
       }
     });
 
-    test("update of another tool's annotation stamps only modified and updatedBy", async () => {
+    test("update of another tool's annotation stamps only modifiedAt and modifiedBy", async () => {
       await asSession({ scope: SCOPE, identity: BOB }, async (page) => {
         const foreign = (await page.annotations.list()).annotations.find(
           (annotation) =>
@@ -199,12 +199,12 @@ export function runAnnotationAttributionConformance(
           author: foreign!.author,
           userId: null,
           createdBy: null,
-          updatedBy: 'bob',
+          modifiedBy: 'bob',
           groupId: foreign!.groupId,
           importedBy: null,
         });
-        expect(read.created).toBe(foreign!.created);
-        expectNow(read.modified, before, after);
+        expect(read.createdAt).toBe(foreign!.createdAt);
+        expectNow(read.modifiedAt, before, after);
       });
     });
 
@@ -297,7 +297,7 @@ function attributionOf(read: AnnotationDTO) {
     author: read.author,
     userId: read.userId,
     createdBy: read.createdBy,
-    updatedBy: read.updatedBy,
+    modifiedBy: read.modifiedBy,
     groupId: read.groupId,
     importedBy: read.importedBy,
   };

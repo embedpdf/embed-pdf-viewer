@@ -132,7 +132,7 @@ describe('appearanceImpactOf — value diffing (inert)', () => {
       index: 7,
       identityQuality: 'durable',
       author: 'Someone else',
-      modified: '2026-01-01T00:00:00Z',
+      modifiedAt: '2026-01-01T00:00:00Z',
       userId: 'u_other',
       importedBy: null,
       popup: null,

@@ -1,3 +1,5 @@
+import type { IsoDateTime } from './IsoDateTime';
+
 /**
  * One vocabulary for "a file living inside a PDF", shared by the
  * file-attachment annotation kind and the document-level EmbeddedFiles
@@ -8,7 +10,7 @@
  *             takes the metadata as its `file` data and the bytes as its
  *             `file` resource.
  *   read   -> {@link AttachmentFileInfo}: the same metadata fields plus
- *             engine-derived facts (size, checksum, creationDate) and never
+ *             engine-derived facts (size, checksum, dates) and never
  *             the bytes — listings stay cheap; bytes leave the engine only
  *             through an explicit download call.
  *
@@ -56,8 +58,10 @@ export interface AttachmentFileInfo extends AttachmentFileBase {
   size?: number;
   /** `/Params /CheckSum` — MD5 of the decoded bytes, lowercase hex. */
   checksum?: string;
-  /** `/Params /CreationDate` — PDF date string. */
-  creationDate?: string;
+  /** `/Params /CreationDate`. */
+  createdAt?: IsoDateTime;
+  /** `/Params /ModDate`. */
+  modifiedAt?: IsoDateTime;
 }
 
 /**

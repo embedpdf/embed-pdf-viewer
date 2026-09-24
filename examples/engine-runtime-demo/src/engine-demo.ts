@@ -42,8 +42,8 @@ export function diffMetadata(a: DocumentMetadata, b: DocumentMetadata): string[]
     'keywords',
     'producer',
     'creator',
-    'created',
-    'modified',
+    'createdAt',
+    'modifiedAt',
     'trapped',
   ];
   const diffs: string[] = [];

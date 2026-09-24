@@ -459,8 +459,9 @@ await page.annotations.create(
 );
 ```
 
-A read returns the same `file`, plus `size`, `checksum` and `creationDate` taken from the
-bytes; the bytes themselves come from `downloadFile(ref)`. In an update, `file` replaces the
+A read returns the same `file`, plus `size` and `checksum` taken from the bytes, and
+`createdAt` and `modifiedAt` from the embedded file's parameters; the bytes themselves come
+from `downloadFile(ref)`. In an update, `file` replaces the
 name, MIME type and description together (leave one out and it is removed), and a `file`
 resource replaces the bytes:
 

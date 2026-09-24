@@ -29,7 +29,7 @@
  * Ordering: threads appear in the input order of their roots; the
  * composer never sorts by page (display order is a layout concern —
  * callers join `pages.list()`). Replies sort chronologically by
- * `created ?? modified`, entries without a date last, page z-order
+ * `createdAt ?? modifiedAt`, entries without a date last, page z-order
  * (`index`) as the final deterministic tiebreak.
  */
 
@@ -39,6 +39,7 @@ import { classifyRelation } from './relationships';
 import { annotationKey } from '../identity/annotationKey';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { PageRef } from '../identity/PageRef';
+import { compareIsoDateTime, type IsoDateTime } from '../dto/IsoDateTime';
 
 /** One reviewer's status, derived from an ISO §12.5.6.3 state annotation. */
 export interface ReviewStatus {
@@ -48,8 +49,8 @@ export interface ReviewStatus {
   stateModel: string;
   /** Reviewer key: `/EMBD_Metadata` userId, else `/T`, else null. */
   by: string | null;
-  /** `/M` ?? `/CreationDate` of the state annotation (ISO 8601). */
-  at: string | null;
+  /** `/M` ?? `/CreationDate` of the state annotation. */
+  at: IsoDateTime | null;
   /** The state annotation itself — for auditing or deletion. */
   ref: AnnotationRef;
 }
@@ -202,11 +203,12 @@ export function buildCommentThreads(
   return threads;
 }
 
-/** `created ?? modified` ascending; undated last; z-order tiebreak. */
+/** `createdAt ?? modifiedAt` ascending; undated last; z-order tiebreak. */
 function chronological(a: AnnotationDTO, b: AnnotationDTO): number {
-  const at = a.created ?? a.modified;
-  const bt = b.created ?? b.modified;
-  if (at !== null && bt !== null && at !== bt) return at < bt ? -1 : 1;
+  const at = a.createdAt ?? a.modifiedAt;
+  const bt = b.createdAt ?? b.modifiedAt;
+  const order = at !== null && bt !== null ? compareIsoDateTime(at, bt) : 0;
+  if (order !== 0) return order;
   if (at !== null && bt === null) return -1;
   if (at === null && bt !== null) return 1;
   return a.index - b.index;
@@ -281,7 +283,7 @@ function toReviewStatus(a: AnnotationDTO): ReviewStatus | null {
     state,
     stateModel,
     by: a.userId ?? (nonEmpty(a.author) ? a.author : null),
-    at: a.modified ?? a.created ?? null,
+    at: a.modifiedAt ?? a.createdAt ?? null,
     ref: a.ref,
   };
 }
@@ -291,7 +293,7 @@ function toReviewStatus(a: AnnotationDTO): ReviewStatus | null {
  *  equal or missing dates the later entry wins via `>=` / `true`. */
 function isNewer(a: ReviewStatus, b: ReviewStatus | null | undefined): boolean {
   if (!b) return true;
-  if (a.at !== null && b.at !== null) return a.at >= b.at;
+  if (a.at !== null && b.at !== null) return compareIsoDateTime(a.at, b.at) >= 0;
   if (a.at !== null) return true;
   if (b.at !== null) return false;
   return true; // both undated: input order — later entry wins

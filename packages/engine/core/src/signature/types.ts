@@ -1,3 +1,4 @@
+import type { DateInput, IsoDateTime } from '../dto/IsoDateTime';
 import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
 import type { MutationMeta } from '../mutation/MutationMeta';
 
@@ -84,8 +85,8 @@ export interface SignatureSigner {
   reason: string | null;
   location: string | null;
   contactInfo: string | null;
-  /** `/M` as written (PDF date string). */
-  claimedTime: string | null;
+  /** `/M`: when the signer says they signed. */
+  signedAt: IsoDateTime | null;
 }
 
 /** The field's `/SV` seed value: what a signature on this field must satisfy. */
@@ -224,8 +225,8 @@ export interface SignaturePrepareInput {
   contentsSize?: number;
   /** What the signature dictionary says about the signer: `/Name`, `/Reason`, `/Location`, `/ContactInfo`. */
   attribution?: { name?: string; reason?: string; location?: string; contactInfo?: string };
-  /** PDF date string for `/M`; default: now. */
-  signingTime?: string;
+  /** `/M`; default: now. */
+  signedAt?: DateInput;
   /** Make this the certification signature (`/Root /Perms /DocMDP`). Only ever the first signature. */
   certify?: { permission: DocMdpPermission };
   /** FieldMDP for this signature plus a mirroring `/Lock` on the field. */

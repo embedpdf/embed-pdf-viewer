@@ -77,12 +77,12 @@ export function applyMetadataPatch(
     if (!writeMetaText(fn, mem, docPtr, key, value)) fail(key);
   }
 
-  if (patch.created !== undefined) {
-    const value = patch.created === null ? null : formatPdfDate(new Date(patch.created));
+  if (patch.createdAt !== undefined) {
+    const value = patch.createdAt === null ? null : formatPdfDate(patch.createdAt);
     if (!writeMetaText(fn, mem, docPtr, 'CreationDate', value)) fail('CreationDate');
   }
-  if (patch.modified !== undefined) {
-    const value = patch.modified === null ? null : formatPdfDate(new Date(patch.modified));
+  if (patch.modifiedAt !== undefined) {
+    const value = patch.modifiedAt === null ? null : formatPdfDate(patch.modifiedAt);
     if (!writeMetaText(fn, mem, docPtr, 'ModDate', value)) fail('ModDate');
   }
 

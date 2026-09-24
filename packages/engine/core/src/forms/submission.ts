@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import type { IsoDateTime } from '../dto/IsoDateTime';
+import { IsoDateTimeSchema } from '../dto/IsoDateTime.schema';
 
 /**
  * One resolved entry of a form submission. The viewer resolved it with the
@@ -39,16 +41,16 @@ export interface FormSubmissionRequest {
   };
   /** How the submission was triggered — the viewer-derived origin axis. */
   origin: 'user' | 'hover' | 'lifecycle';
-  /** Client wall-clock, milliseconds since epoch. Informational — the home
-   *  stamps its own authoritative `receivedAt`. */
-  clientTimeMs: number;
+  /** The client's clock when it sent the submission. Informational — the
+   *  home stamps its own authoritative `receivedAt`. */
+  sentAt: IsoDateTime;
 }
 
 /** The home's acknowledgment: the stored submission's durable identity. */
 export interface FormSubmissionReceipt {
   submissionId: string;
-  /** ISO 8601, the home's clock. */
-  receivedAt: string;
+  /** The home's clock. */
+  receivedAt: IsoDateTime;
 }
 
 export const FormSubmissionEntrySchema: z.ZodType<FormSubmissionEntry> = z.object({
@@ -66,10 +68,10 @@ export const FormSubmissionRequestSchema: z.ZodType<FormSubmissionRequest> = z.o
     charSet: z.string().optional(),
   }),
   origin: z.enum(['user', 'hover', 'lifecycle']),
-  clientTimeMs: z.number().finite(),
+  sentAt: IsoDateTimeSchema,
 }) as unknown as z.ZodType<FormSubmissionRequest>;
 
 export const FormSubmissionReceiptSchema: z.ZodType<FormSubmissionReceipt> = z.object({
   submissionId: z.string().min(1),
-  receivedAt: z.string().min(1),
+  receivedAt: IsoDateTimeSchema,
 });

@@ -20,7 +20,8 @@ export interface EmbedMetadata {
   userId?: string;
   groupId?: string;
   createdBy?: string;
-  updatedBy?: string;
+  /** `/UpdatedBy`. */
+  modifiedBy?: string;
   importedBy?: string;
 }
 
@@ -45,7 +46,7 @@ export function readEmbedMetadata(
   const userId = readEmbedMetadataString(fn, mem, annotPtr, 'UserID');
   const groupId = readEmbedMetadataString(fn, mem, annotPtr, 'GroupID');
   const createdBy = readEmbedMetadataString(fn, mem, annotPtr, 'CreatedBy');
-  const updatedBy = readEmbedMetadataString(fn, mem, annotPtr, 'UpdatedBy');
+  const modifiedBy = readEmbedMetadataString(fn, mem, annotPtr, 'UpdatedBy');
   const importedBy = readEmbedMetadataString(fn, mem, annotPtr, 'ImportedBy');
 
   const out: EmbedMetadata = {};
@@ -53,7 +54,7 @@ export function readEmbedMetadata(
   if (userId !== undefined) out.userId = userId;
   if (groupId !== undefined) out.groupId = groupId;
   if (createdBy !== undefined) out.createdBy = createdBy;
-  if (updatedBy !== undefined) out.updatedBy = updatedBy;
+  if (modifiedBy !== undefined) out.modifiedBy = modifiedBy;
   if (importedBy !== undefined) out.importedBy = importedBy;
   return out;
 }

@@ -18,6 +18,7 @@ import {
 } from '../base.schema';
 import { field } from '../declaration';
 import type { FreeTextFont } from '../primitives';
+import { DateInputSchema, IsoDateTimeSchema } from '../../dto/IsoDateTime.schema';
 
 /** `/IRT` and `/RT`: the annotation this one replies to, and how it relates to it. */
 export const AnnotationReplySchema = z.object({
@@ -65,11 +66,14 @@ export const annotationBaseFields = {
   /** `/EMBD_Metadata/GroupID`: the group that owns the annotation. */
   groupId: field.data(z.string().min(1)).nullable().optional(),
   author: field.attribution(z.string()).nullable(),
-  created: field.attribution(z.string().datetime()).nullable(),
-  modified: field.attribution(z.string().datetime()).nullable(),
+  /** `/CreationDate`. */
+  createdAt: field.attribution(IsoDateTimeSchema).writes(DateInputSchema).nullable(),
+  /** `/M`. */
+  modifiedAt: field.attribution(IsoDateTimeSchema).writes(DateInputSchema).nullable(),
   userId: field.attribution(z.string()).nullable(),
   createdBy: field.attribution(z.string()).nullable(),
-  updatedBy: field.attribution(z.string()).nullable(),
+  /** `/EMBD_Metadata/UpdatedBy`. */
+  modifiedBy: field.attribution(z.string()).nullable(),
   /** The session that restored this annotation's attribution in an import. */
   importedBy: field.engine(z.string()).nullable(),
   /** `/A` and `/AA`. */

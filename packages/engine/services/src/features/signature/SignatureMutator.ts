@@ -29,6 +29,7 @@ import {
   type OpenedPdfDocument,
 } from '../../document-session/lifecycle/PdfDocumentOpener';
 import { withScratch } from '../../runtime/memory/scratch';
+import { formatPdfDate } from '../../shared/pdf-date';
 import { generateUuid } from '../../shared/uuid';
 import { disposeFormModel } from '../forms/internal/formModelCache';
 import { withWideStringArray } from '../forms/internal/wideStringArray';
@@ -182,8 +183,7 @@ export class SignatureMutator {
 
       // `signer` is the pre-rename wire spelling: older clients still send it.
       const attribution =
-        input.attribution ??
-        (input as { signer?: SignaturePrepareInput['attribution'] }).signer;
+        input.attribution ?? (input as { signer?: SignaturePrepareInput['attribution'] }).signer;
       const valueObjNum = this.callPrepare(candidate.docPtr, field.fieldObjectNumber, {
         subfilter: SUBFILTER_CODE[subFilter],
         digest: DIGEST_CODE[algorithm],
@@ -192,7 +192,7 @@ export class SignatureMutator {
         reason: attribution?.reason ?? null,
         location: attribution?.location ?? null,
         contactInfo: attribution?.contactInfo ?? null,
-        signingTime: input.signingTime ?? null,
+        signingTime: input.signedAt !== undefined ? formatPdfDate(input.signedAt) : null,
         docmdpPermission: input.certify?.permission ?? 0,
         fieldmdpAction: input.lock ? FIELD_ACTION_CODE[input.lock.action] : 0,
         fieldmdpFields: input.lock?.action === 'all' ? [] : (input.lock?.fields ?? []),
@@ -205,7 +205,8 @@ export class SignatureMutator {
         );
       }
       if (input.appearance && field.widget) {
-        bakeWidgetAppearance(this.runtime, 
+        bakeWidgetAppearance(
+          this.runtime,
           candidate.docPtr,
           field.widget,
           input.appearance.pdf,
@@ -473,7 +474,8 @@ export class SignatureMutator {
     // layer-sized goes through scratch files beside the base (the signing
     // root the file candidate store owns); the wasm client keeps buffers —
     // its bytes are in memory anyway.
-    const scratch = saver.canWriteScratchFiles() && source.base?.kind === 'file' ? source.base.path : null;
+    const scratch =
+      saver.canWriteScratchFiles() && source.base?.kind === 'file' ? source.base.path : null;
     if (this.session.kind === 'layer' && source.base && !this.loadedDeltaHoldsSignedBytes()) {
       const base = this.baseDocuments.retainByKey(source.base.key);
       if (base) {

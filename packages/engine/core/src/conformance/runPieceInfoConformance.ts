@@ -20,7 +20,7 @@ const SIBLING_APP = 'EMBD_ConformanceSibling';
  *   3. `null` deletes a key; sibling keys and sibling applications
  *      survive both key deletes and whole-entry clears.
  *   4. An absent application reads as `null`; `applications()` enumerates
- *      what is present; every write refreshes `lastModified`.
+ *      what is present; every write refreshes `modifiedAt`.
  */
 export function runPieceInfoConformance(
   runner: ConformanceTestRunner,
@@ -63,7 +63,7 @@ export function runPieceInfoConformance(
           kind: { type: 'name', value: 'StampLibrary' },
           tags: { type: 'string-array', value: ['legal', 'finance'] },
         });
-        expect(typeof snap!.lastModified).toBe('string');
+        expect(typeof snap!.modifiedAt).toBe('string');
       } finally {
         await doc.close();
       }

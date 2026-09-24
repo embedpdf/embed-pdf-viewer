@@ -58,8 +58,8 @@ export function readAnnotationBase(
     contents,
     subject,
     author,
-    created: createdRaw ? pdfDateToIso(createdRaw) : null,
-    modified: modifiedRaw ? pdfDateToIso(modifiedRaw) : null,
+    createdAt: createdRaw ? pdfDateToIso(createdRaw) : null,
+    modifiedAt: modifiedRaw ? pdfDateToIso(modifiedRaw) : null,
     blendMode,
     reply: relationship.inReplyTo
       ? { to: relationship.inReplyTo, type: relationship.replyType ?? 'reply' }
@@ -68,7 +68,7 @@ export function readAnnotationBase(
     groupId: embd?.groupId ?? null,
     userId: embd?.userId ?? null,
     createdBy: embd?.createdBy ?? null,
-    updatedBy: embd?.updatedBy ?? null,
+    modifiedBy: embd?.modifiedBy ?? null,
     importedBy: embd?.importedBy ?? null,
     actions: actions ?? null,
   };

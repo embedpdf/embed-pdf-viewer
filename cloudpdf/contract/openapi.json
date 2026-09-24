@@ -9714,14 +9714,17 @@
             "type": "string",
             "nullable": true
           },
-          "created": {
+          "createdAt": {
             "type": "string",
             "format": "date-time",
             "nullable": true
           },
-          "modified": {
-            "type": "string",
-            "format": "date-time",
+          "modifiedAt": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DocMetadataGet200Response/properties/createdAt"
+              }
+            ],
             "nullable": true
           },
           "trapped": {
@@ -9742,8 +9745,8 @@
           "keywords",
           "producer",
           "creator",
-          "created",
-          "modified",
+          "createdAt",
+          "modifiedAt",
           "trapped",
           "custom"
         ],
@@ -10058,12 +10061,13 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "claimedTime": {
+                    "signedAt": {
                       "type": "string",
+                      "format": "date-time",
                       "nullable": true
                     }
                   },
-                  "required": ["name", "reason", "location", "contactInfo", "claimedTime"],
+                  "required": ["name", "reason", "location", "contactInfo", "signedAt"],
                   "additionalProperties": false
                 },
                 "docMdp": {
@@ -11099,12 +11103,13 @@
                     "type": "string",
                     "nullable": true
                   },
-                  "claimedTime": {
+                  "signedAt": {
                     "type": "string",
+                    "format": "date-time",
                     "nullable": true
                   }
                 },
-                "required": ["name", "reason", "location", "contactInfo", "claimedTime"],
+                "required": ["name", "reason", "location", "contactInfo", "signedAt"],
                 "additionalProperties": false
               },
               "docMdp": {
@@ -12027,12 +12032,13 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "claimedTime": {
+                    "signedAt": {
                       "type": "string",
+                      "format": "date-time",
                       "nullable": true
                     }
                   },
-                  "required": ["name", "reason", "location", "contactInfo", "claimedTime"],
+                  "required": ["name", "reason", "location", "contactInfo", "signedAt"],
                   "additionalProperties": false
                 },
                 "docMdp": {
@@ -13176,14 +13182,17 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "created": {
+                    "createdAt": {
                       "type": "string",
                       "format": "date-time",
                       "nullable": true
                     },
-                    "modified": {
-                      "type": "string",
-                      "format": "date-time",
+                    "modifiedAt": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
+                        }
+                      ],
                       "nullable": true
                     },
                     "userId": {
@@ -13194,7 +13203,7 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "updatedBy": {
+                    "modifiedBy": {
                       "type": "string",
                       "nullable": true
                     },
@@ -13295,11 +13304,11 @@
                     "popup",
                     "groupId",
                     "author",
-                    "created",
-                    "modified",
+                    "createdAt",
+                    "modifiedAt",
                     "userId",
                     "createdBy",
-                    "updatedBy",
+                    "modifiedBy",
                     "importedBy",
                     "actions",
                     "color",
@@ -13403,18 +13412,18 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "created": {
+                    "createdAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/created"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
                     },
-                    "modified": {
+                    "modifiedAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/modified"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
@@ -13427,7 +13436,7 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "updatedBy": {
+                    "modifiedBy": {
                       "type": "string",
                       "nullable": true
                     },
@@ -13478,11 +13487,11 @@
                     "popup",
                     "groupId",
                     "author",
-                    "created",
-                    "modified",
+                    "createdAt",
+                    "modifiedAt",
                     "userId",
                     "createdBy",
-                    "updatedBy",
+                    "modifiedBy",
                     "importedBy",
                     "actions",
                     "color",
@@ -13586,18 +13595,18 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "created": {
+                    "createdAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/created"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
                     },
-                    "modified": {
+                    "modifiedAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/modified"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
@@ -13610,7 +13619,7 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "updatedBy": {
+                    "modifiedBy": {
                       "type": "string",
                       "nullable": true
                     },
@@ -13661,11 +13670,11 @@
                     "popup",
                     "groupId",
                     "author",
-                    "created",
-                    "modified",
+                    "createdAt",
+                    "modifiedAt",
                     "userId",
                     "createdBy",
-                    "updatedBy",
+                    "modifiedBy",
                     "importedBy",
                     "actions",
                     "color",
@@ -13769,18 +13778,18 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "created": {
+                    "createdAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/created"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
                     },
-                    "modified": {
+                    "modifiedAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/modified"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
@@ -13793,7 +13802,7 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "updatedBy": {
+                    "modifiedBy": {
                       "type": "string",
                       "nullable": true
                     },
@@ -13849,11 +13858,11 @@
                     "popup",
                     "groupId",
                     "author",
-                    "created",
-                    "modified",
+                    "createdAt",
+                    "modifiedAt",
                     "userId",
                     "createdBy",
-                    "updatedBy",
+                    "modifiedBy",
                     "importedBy",
                     "actions",
                     "color",
@@ -13958,18 +13967,18 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "created": {
+                    "createdAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/created"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
                     },
-                    "modified": {
+                    "modifiedAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/modified"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
@@ -13982,7 +13991,7 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "updatedBy": {
+                    "modifiedBy": {
                       "type": "string",
                       "nullable": true
                     },
@@ -14096,11 +14105,11 @@
                     "popup",
                     "groupId",
                     "author",
-                    "created",
-                    "modified",
+                    "createdAt",
+                    "modifiedAt",
                     "userId",
                     "createdBy",
-                    "updatedBy",
+                    "modifiedBy",
                     "importedBy",
                     "actions",
                     "color",
@@ -14211,18 +14220,18 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "created": {
+                    "createdAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/created"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
                     },
-                    "modified": {
+                    "modifiedAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/modified"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
@@ -14235,7 +14244,7 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "updatedBy": {
+                    "modifiedBy": {
                       "type": "string",
                       "nullable": true
                     },
@@ -14333,11 +14342,11 @@
                     "popup",
                     "groupId",
                     "author",
-                    "created",
-                    "modified",
+                    "createdAt",
+                    "modifiedAt",
                     "userId",
                     "createdBy",
-                    "updatedBy",
+                    "modifiedBy",
                     "importedBy",
                     "actions",
                     "color",
@@ -14448,18 +14457,18 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "created": {
+                    "createdAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/created"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
                     },
-                    "modified": {
+                    "modifiedAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/modified"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
@@ -14472,7 +14481,7 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "updatedBy": {
+                    "modifiedBy": {
                       "type": "string",
                       "nullable": true
                     },
@@ -14704,11 +14713,11 @@
                     "popup",
                     "groupId",
                     "author",
-                    "created",
-                    "modified",
+                    "createdAt",
+                    "modifiedAt",
                     "userId",
                     "createdBy",
-                    "updatedBy",
+                    "modifiedBy",
                     "importedBy",
                     "actions",
                     "color",
@@ -14822,18 +14831,18 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "created": {
+                    "createdAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/created"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
                     },
-                    "modified": {
+                    "modifiedAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/modified"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
@@ -14846,7 +14855,7 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "updatedBy": {
+                    "modifiedBy": {
                       "type": "string",
                       "nullable": true
                     },
@@ -14973,11 +14982,11 @@
                     "popup",
                     "groupId",
                     "author",
-                    "created",
-                    "modified",
+                    "createdAt",
+                    "modifiedAt",
                     "userId",
                     "createdBy",
-                    "updatedBy",
+                    "modifiedBy",
                     "importedBy",
                     "actions",
                     "color",
@@ -15091,18 +15100,18 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "created": {
+                    "createdAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/created"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
                     },
-                    "modified": {
+                    "modifiedAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/modified"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
@@ -15115,7 +15124,7 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "updatedBy": {
+                    "modifiedBy": {
                       "type": "string",
                       "nullable": true
                     },
@@ -15256,11 +15265,11 @@
                     "popup",
                     "groupId",
                     "author",
-                    "created",
-                    "modified",
+                    "createdAt",
+                    "modifiedAt",
                     "userId",
                     "createdBy",
-                    "updatedBy",
+                    "modifiedBy",
                     "importedBy",
                     "actions",
                     "color",
@@ -15376,18 +15385,18 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "created": {
+                    "createdAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/created"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
                     },
-                    "modified": {
+                    "modifiedAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/modified"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
@@ -15400,7 +15409,7 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "updatedBy": {
+                    "modifiedBy": {
                       "type": "string",
                       "nullable": true
                     },
@@ -15539,11 +15548,11 @@
                     "popup",
                     "groupId",
                     "author",
-                    "created",
-                    "modified",
+                    "createdAt",
+                    "modifiedAt",
                     "userId",
                     "createdBy",
-                    "updatedBy",
+                    "modifiedBy",
                     "importedBy",
                     "actions",
                     "target"
@@ -15645,18 +15654,18 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "created": {
+                    "createdAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/created"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
                     },
-                    "modified": {
+                    "modifiedAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/modified"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
@@ -15669,7 +15678,7 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "updatedBy": {
+                    "modifiedBy": {
                       "type": "string",
                       "nullable": true
                     },
@@ -15749,11 +15758,11 @@
                     "popup",
                     "groupId",
                     "author",
-                    "created",
-                    "modified",
+                    "createdAt",
+                    "modifiedAt",
                     "userId",
                     "createdBy",
-                    "updatedBy",
+                    "modifiedBy",
                     "importedBy",
                     "actions",
                     "color",
@@ -15862,18 +15871,18 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "created": {
+                    "createdAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/created"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
                     },
-                    "modified": {
+                    "modifiedAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/modified"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
@@ -15886,7 +15895,7 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "updatedBy": {
+                    "modifiedBy": {
                       "type": "string",
                       "nullable": true
                     },
@@ -16226,11 +16235,11 @@
                     "popup",
                     "groupId",
                     "author",
-                    "created",
-                    "modified",
+                    "createdAt",
+                    "modifiedAt",
                     "userId",
                     "createdBy",
-                    "updatedBy",
+                    "modifiedBy",
                     "importedBy",
                     "actions",
                     "rotation",
@@ -16348,18 +16357,18 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "created": {
+                    "createdAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/created"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
                     },
-                    "modified": {
+                    "modifiedAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/modified"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
@@ -16372,7 +16381,7 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "updatedBy": {
+                    "modifiedBy": {
                       "type": "string",
                       "nullable": true
                     },
@@ -16445,11 +16454,11 @@
                     "popup",
                     "groupId",
                     "author",
-                    "created",
-                    "modified",
+                    "createdAt",
+                    "modifiedAt",
                     "userId",
                     "createdBy",
-                    "updatedBy",
+                    "modifiedBy",
                     "importedBy",
                     "actions",
                     "color",
@@ -16556,18 +16565,18 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "created": {
+                    "createdAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/created"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
                     },
-                    "modified": {
+                    "modifiedAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/modified"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
@@ -16580,7 +16589,7 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "updatedBy": {
+                    "modifiedBy": {
                       "type": "string",
                       "nullable": true
                     },
@@ -16650,11 +16659,11 @@
                     "popup",
                     "groupId",
                     "author",
-                    "created",
-                    "modified",
+                    "createdAt",
+                    "modifiedAt",
                     "userId",
                     "createdBy",
-                    "updatedBy",
+                    "modifiedBy",
                     "importedBy",
                     "actions",
                     "color",
@@ -16760,18 +16769,18 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "created": {
+                    "createdAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/created"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
                     },
-                    "modified": {
+                    "modifiedAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/modified"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
@@ -16784,7 +16793,7 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "updatedBy": {
+                    "modifiedBy": {
                       "type": "string",
                       "nullable": true
                     },
@@ -16847,11 +16856,11 @@
                     "popup",
                     "groupId",
                     "author",
-                    "created",
-                    "modified",
+                    "createdAt",
+                    "modifiedAt",
                     "userId",
                     "createdBy",
-                    "updatedBy",
+                    "modifiedBy",
                     "importedBy",
                     "actions",
                     "rotation",
@@ -16956,18 +16965,18 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "created": {
+                    "createdAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/created"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
                     },
-                    "modified": {
+                    "modifiedAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/modified"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
@@ -16980,7 +16989,7 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "updatedBy": {
+                    "modifiedBy": {
                       "type": "string",
                       "nullable": true
                     },
@@ -17025,8 +17034,11 @@
                         "checksum": {
                           "type": "string"
                         },
-                        "creationDate": {
-                          "type": "string"
+                        "createdAt": {
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
+                        },
+                        "modifiedAt": {
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       },
                       "required": ["name"],
@@ -17059,11 +17071,11 @@
                     "popup",
                     "groupId",
                     "author",
-                    "created",
-                    "modified",
+                    "createdAt",
+                    "modifiedAt",
                     "userId",
                     "createdBy",
-                    "updatedBy",
+                    "modifiedBy",
                     "importedBy",
                     "actions",
                     "color",
@@ -17168,18 +17180,18 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "created": {
+                    "createdAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/created"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
                     },
-                    "modified": {
+                    "modifiedAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/modified"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
@@ -17192,7 +17204,7 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "updatedBy": {
+                    "modifiedBy": {
                       "type": "string",
                       "nullable": true
                     },
@@ -17310,11 +17322,11 @@
                     "popup",
                     "groupId",
                     "author",
-                    "created",
-                    "modified",
+                    "createdAt",
+                    "modifiedAt",
                     "userId",
                     "createdBy",
-                    "updatedBy",
+                    "modifiedBy",
                     "importedBy",
                     "actions",
                     "color",
@@ -17425,18 +17437,18 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "created": {
+                    "createdAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/created"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
                     },
-                    "modified": {
+                    "modifiedAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/modified"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
@@ -17449,7 +17461,7 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "updatedBy": {
+                    "modifiedBy": {
                       "type": "string",
                       "nullable": true
                     },
@@ -17531,11 +17543,11 @@
                     "popup",
                     "groupId",
                     "author",
-                    "created",
-                    "modified",
+                    "createdAt",
+                    "modifiedAt",
                     "userId",
                     "createdBy",
-                    "updatedBy",
+                    "modifiedBy",
                     "importedBy",
                     "actions",
                     "color",
@@ -17646,18 +17658,18 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "created": {
+                    "createdAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/created"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
                     },
-                    "modified": {
+                    "modifiedAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/modified"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
@@ -17670,7 +17682,7 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "updatedBy": {
+                    "modifiedBy": {
                       "type": "string",
                       "nullable": true
                     },
@@ -17720,11 +17732,11 @@
                     "popup",
                     "groupId",
                     "author",
-                    "created",
-                    "modified",
+                    "createdAt",
+                    "modifiedAt",
                     "userId",
                     "createdBy",
-                    "updatedBy",
+                    "modifiedBy",
                     "importedBy",
                     "actions",
                     "parent"
@@ -17826,18 +17838,18 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "created": {
+                    "createdAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/created"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
                     },
-                    "modified": {
+                    "modifiedAt": {
                       "allOf": [
                         {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/modified"
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/createdAt"
                         }
                       ],
                       "nullable": true
@@ -17850,7 +17862,7 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "updatedBy": {
+                    "modifiedBy": {
                       "type": "string",
                       "nullable": true
                     },
@@ -17899,11 +17911,11 @@
                     "popup",
                     "groupId",
                     "author",
-                    "created",
-                    "modified",
+                    "createdAt",
+                    "modifiedAt",
                     "userId",
                     "createdBy",
-                    "updatedBy",
+                    "modifiedBy",
                     "importedBy",
                     "actions",
                     "rawSubtypeCode",
@@ -18240,14 +18252,17 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "created": {
+                          "createdAt": {
                             "type": "string",
                             "format": "date-time",
                             "nullable": true
                           },
-                          "modified": {
-                            "type": "string",
-                            "format": "date-time",
+                          "modifiedAt": {
+                            "allOf": [
+                              {
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
+                              }
+                            ],
                             "nullable": true
                           },
                           "userId": {
@@ -18258,7 +18273,7 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "updatedBy": {
+                          "modifiedBy": {
                             "type": "string",
                             "nullable": true
                           },
@@ -18359,11 +18374,11 @@
                           "popup",
                           "groupId",
                           "author",
-                          "created",
-                          "modified",
+                          "createdAt",
+                          "modifiedAt",
                           "userId",
                           "createdBy",
-                          "updatedBy",
+                          "modifiedBy",
                           "importedBy",
                           "actions",
                           "color",
@@ -18467,18 +18482,18 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "created": {
+                          "createdAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/created"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
                           },
-                          "modified": {
+                          "modifiedAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/modified"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
@@ -18491,7 +18506,7 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "updatedBy": {
+                          "modifiedBy": {
                             "type": "string",
                             "nullable": true
                           },
@@ -18542,11 +18557,11 @@
                           "popup",
                           "groupId",
                           "author",
-                          "created",
-                          "modified",
+                          "createdAt",
+                          "modifiedAt",
                           "userId",
                           "createdBy",
-                          "updatedBy",
+                          "modifiedBy",
                           "importedBy",
                           "actions",
                           "color",
@@ -18650,18 +18665,18 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "created": {
+                          "createdAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/created"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
                           },
-                          "modified": {
+                          "modifiedAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/modified"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
@@ -18674,7 +18689,7 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "updatedBy": {
+                          "modifiedBy": {
                             "type": "string",
                             "nullable": true
                           },
@@ -18725,11 +18740,11 @@
                           "popup",
                           "groupId",
                           "author",
-                          "created",
-                          "modified",
+                          "createdAt",
+                          "modifiedAt",
                           "userId",
                           "createdBy",
-                          "updatedBy",
+                          "modifiedBy",
                           "importedBy",
                           "actions",
                           "color",
@@ -18833,18 +18848,18 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "created": {
+                          "createdAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/created"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
                           },
-                          "modified": {
+                          "modifiedAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/modified"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
@@ -18857,7 +18872,7 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "updatedBy": {
+                          "modifiedBy": {
                             "type": "string",
                             "nullable": true
                           },
@@ -18913,11 +18928,11 @@
                           "popup",
                           "groupId",
                           "author",
-                          "created",
-                          "modified",
+                          "createdAt",
+                          "modifiedAt",
                           "userId",
                           "createdBy",
-                          "updatedBy",
+                          "modifiedBy",
                           "importedBy",
                           "actions",
                           "color",
@@ -19022,18 +19037,18 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "created": {
+                          "createdAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/created"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
                           },
-                          "modified": {
+                          "modifiedAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/modified"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
@@ -19046,7 +19061,7 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "updatedBy": {
+                          "modifiedBy": {
                             "type": "string",
                             "nullable": true
                           },
@@ -19160,11 +19175,11 @@
                           "popup",
                           "groupId",
                           "author",
-                          "created",
-                          "modified",
+                          "createdAt",
+                          "modifiedAt",
                           "userId",
                           "createdBy",
-                          "updatedBy",
+                          "modifiedBy",
                           "importedBy",
                           "actions",
                           "color",
@@ -19275,18 +19290,18 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "created": {
+                          "createdAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/created"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
                           },
-                          "modified": {
+                          "modifiedAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/modified"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
@@ -19299,7 +19314,7 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "updatedBy": {
+                          "modifiedBy": {
                             "type": "string",
                             "nullable": true
                           },
@@ -19397,11 +19412,11 @@
                           "popup",
                           "groupId",
                           "author",
-                          "created",
-                          "modified",
+                          "createdAt",
+                          "modifiedAt",
                           "userId",
                           "createdBy",
-                          "updatedBy",
+                          "modifiedBy",
                           "importedBy",
                           "actions",
                           "color",
@@ -19512,18 +19527,18 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "created": {
+                          "createdAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/created"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
                           },
-                          "modified": {
+                          "modifiedAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/modified"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
@@ -19536,7 +19551,7 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "updatedBy": {
+                          "modifiedBy": {
                             "type": "string",
                             "nullable": true
                           },
@@ -19768,11 +19783,11 @@
                           "popup",
                           "groupId",
                           "author",
-                          "created",
-                          "modified",
+                          "createdAt",
+                          "modifiedAt",
                           "userId",
                           "createdBy",
-                          "updatedBy",
+                          "modifiedBy",
                           "importedBy",
                           "actions",
                           "color",
@@ -19886,18 +19901,18 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "created": {
+                          "createdAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/created"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
                           },
-                          "modified": {
+                          "modifiedAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/modified"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
@@ -19910,7 +19925,7 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "updatedBy": {
+                          "modifiedBy": {
                             "type": "string",
                             "nullable": true
                           },
@@ -20037,11 +20052,11 @@
                           "popup",
                           "groupId",
                           "author",
-                          "created",
-                          "modified",
+                          "createdAt",
+                          "modifiedAt",
                           "userId",
                           "createdBy",
-                          "updatedBy",
+                          "modifiedBy",
                           "importedBy",
                           "actions",
                           "color",
@@ -20155,18 +20170,18 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "created": {
+                          "createdAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/created"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
                           },
-                          "modified": {
+                          "modifiedAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/modified"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
@@ -20179,7 +20194,7 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "updatedBy": {
+                          "modifiedBy": {
                             "type": "string",
                             "nullable": true
                           },
@@ -20320,11 +20335,11 @@
                           "popup",
                           "groupId",
                           "author",
-                          "created",
-                          "modified",
+                          "createdAt",
+                          "modifiedAt",
                           "userId",
                           "createdBy",
-                          "updatedBy",
+                          "modifiedBy",
                           "importedBy",
                           "actions",
                           "color",
@@ -20440,18 +20455,18 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "created": {
+                          "createdAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/created"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
                           },
-                          "modified": {
+                          "modifiedAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/modified"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
@@ -20464,7 +20479,7 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "updatedBy": {
+                          "modifiedBy": {
                             "type": "string",
                             "nullable": true
                           },
@@ -20603,11 +20618,11 @@
                           "popup",
                           "groupId",
                           "author",
-                          "created",
-                          "modified",
+                          "createdAt",
+                          "modifiedAt",
                           "userId",
                           "createdBy",
-                          "updatedBy",
+                          "modifiedBy",
                           "importedBy",
                           "actions",
                           "target"
@@ -20709,18 +20724,18 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "created": {
+                          "createdAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/created"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
                           },
-                          "modified": {
+                          "modifiedAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/modified"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
@@ -20733,7 +20748,7 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "updatedBy": {
+                          "modifiedBy": {
                             "type": "string",
                             "nullable": true
                           },
@@ -20813,11 +20828,11 @@
                           "popup",
                           "groupId",
                           "author",
-                          "created",
-                          "modified",
+                          "createdAt",
+                          "modifiedAt",
                           "userId",
                           "createdBy",
-                          "updatedBy",
+                          "modifiedBy",
                           "importedBy",
                           "actions",
                           "color",
@@ -20926,18 +20941,18 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "created": {
+                          "createdAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/created"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
                           },
-                          "modified": {
+                          "modifiedAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/modified"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
@@ -20950,7 +20965,7 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "updatedBy": {
+                          "modifiedBy": {
                             "type": "string",
                             "nullable": true
                           },
@@ -21290,11 +21305,11 @@
                           "popup",
                           "groupId",
                           "author",
-                          "created",
-                          "modified",
+                          "createdAt",
+                          "modifiedAt",
                           "userId",
                           "createdBy",
-                          "updatedBy",
+                          "modifiedBy",
                           "importedBy",
                           "actions",
                           "rotation",
@@ -21412,18 +21427,18 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "created": {
+                          "createdAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/created"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
                           },
-                          "modified": {
+                          "modifiedAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/modified"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
@@ -21436,7 +21451,7 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "updatedBy": {
+                          "modifiedBy": {
                             "type": "string",
                             "nullable": true
                           },
@@ -21509,11 +21524,11 @@
                           "popup",
                           "groupId",
                           "author",
-                          "created",
-                          "modified",
+                          "createdAt",
+                          "modifiedAt",
                           "userId",
                           "createdBy",
-                          "updatedBy",
+                          "modifiedBy",
                           "importedBy",
                           "actions",
                           "color",
@@ -21620,18 +21635,18 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "created": {
+                          "createdAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/created"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
                           },
-                          "modified": {
+                          "modifiedAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/modified"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
@@ -21644,7 +21659,7 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "updatedBy": {
+                          "modifiedBy": {
                             "type": "string",
                             "nullable": true
                           },
@@ -21714,11 +21729,11 @@
                           "popup",
                           "groupId",
                           "author",
-                          "created",
-                          "modified",
+                          "createdAt",
+                          "modifiedAt",
                           "userId",
                           "createdBy",
-                          "updatedBy",
+                          "modifiedBy",
                           "importedBy",
                           "actions",
                           "color",
@@ -21824,18 +21839,18 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "created": {
+                          "createdAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/created"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
                           },
-                          "modified": {
+                          "modifiedAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/modified"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
@@ -21848,7 +21863,7 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "updatedBy": {
+                          "modifiedBy": {
                             "type": "string",
                             "nullable": true
                           },
@@ -21911,11 +21926,11 @@
                           "popup",
                           "groupId",
                           "author",
-                          "created",
-                          "modified",
+                          "createdAt",
+                          "modifiedAt",
                           "userId",
                           "createdBy",
-                          "updatedBy",
+                          "modifiedBy",
                           "importedBy",
                           "actions",
                           "rotation",
@@ -22020,18 +22035,18 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "created": {
+                          "createdAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/created"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
                           },
-                          "modified": {
+                          "modifiedAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/modified"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
@@ -22044,7 +22059,7 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "updatedBy": {
+                          "modifiedBy": {
                             "type": "string",
                             "nullable": true
                           },
@@ -22089,8 +22104,11 @@
                               "checksum": {
                                 "type": "string"
                               },
-                              "creationDate": {
-                                "type": "string"
+                              "createdAt": {
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
+                              },
+                              "modifiedAt": {
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             },
                             "required": ["name"],
@@ -22123,11 +22141,11 @@
                           "popup",
                           "groupId",
                           "author",
-                          "created",
-                          "modified",
+                          "createdAt",
+                          "modifiedAt",
                           "userId",
                           "createdBy",
-                          "updatedBy",
+                          "modifiedBy",
                           "importedBy",
                           "actions",
                           "color",
@@ -22232,18 +22250,18 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "created": {
+                          "createdAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/created"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
                           },
-                          "modified": {
+                          "modifiedAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/modified"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
@@ -22256,7 +22274,7 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "updatedBy": {
+                          "modifiedBy": {
                             "type": "string",
                             "nullable": true
                           },
@@ -22374,11 +22392,11 @@
                           "popup",
                           "groupId",
                           "author",
-                          "created",
-                          "modified",
+                          "createdAt",
+                          "modifiedAt",
                           "userId",
                           "createdBy",
-                          "updatedBy",
+                          "modifiedBy",
                           "importedBy",
                           "actions",
                           "color",
@@ -22489,18 +22507,18 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "created": {
+                          "createdAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/created"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
                           },
-                          "modified": {
+                          "modifiedAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/modified"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
@@ -22513,7 +22531,7 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "updatedBy": {
+                          "modifiedBy": {
                             "type": "string",
                             "nullable": true
                           },
@@ -22595,11 +22613,11 @@
                           "popup",
                           "groupId",
                           "author",
-                          "created",
-                          "modified",
+                          "createdAt",
+                          "modifiedAt",
                           "userId",
                           "createdBy",
-                          "updatedBy",
+                          "modifiedBy",
                           "importedBy",
                           "actions",
                           "color",
@@ -22710,18 +22728,18 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "created": {
+                          "createdAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/created"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
                           },
-                          "modified": {
+                          "modifiedAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/modified"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
@@ -22734,7 +22752,7 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "updatedBy": {
+                          "modifiedBy": {
                             "type": "string",
                             "nullable": true
                           },
@@ -22784,11 +22802,11 @@
                           "popup",
                           "groupId",
                           "author",
-                          "created",
-                          "modified",
+                          "createdAt",
+                          "modifiedAt",
                           "userId",
                           "createdBy",
-                          "updatedBy",
+                          "modifiedBy",
                           "importedBy",
                           "actions",
                           "parent"
@@ -22890,18 +22908,18 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "created": {
+                          "createdAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/created"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
                           },
-                          "modified": {
+                          "modifiedAt": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/modified"
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/createdAt"
                               }
                             ],
                             "nullable": true
@@ -22914,7 +22932,7 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "updatedBy": {
+                          "modifiedBy": {
                             "type": "string",
                             "nullable": true
                           },
@@ -22963,11 +22981,11 @@
                           "popup",
                           "groupId",
                           "author",
-                          "created",
-                          "modified",
+                          "createdAt",
+                          "modifiedAt",
                           "userId",
                           "createdBy",
-                          "updatedBy",
+                          "modifiedBy",
                           "importedBy",
                           "actions",
                           "rawSubtypeCode",

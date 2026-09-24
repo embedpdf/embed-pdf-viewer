@@ -63,7 +63,10 @@ export function createSubmit(
     const forms = ctx.doc.forms;
     const homeSubmit =
       typeof forms.submit === 'function'
-        ? () => Promise.resolve(forms.submit!(toFormSubmissionRequest(request, nowMs())))
+        ? () =>
+            Promise.resolve(
+              forms.submit!(toFormSubmissionRequest(request, new Date(nowMs()).toISOString())),
+            )
         : null;
     if (ports.submitHandler) {
       try {

@@ -238,8 +238,8 @@ export function runAnnotationReadConformance(
         rect: { left: 0, top: 0, right: 0, bottom: 0 },
         contents: null,
         author: null,
-        created: null,
-        modified: null,
+        createdAt: null,
+        modifiedAt: null,
       };
       const result = AnnotationDTOSchema.safeParse(bogus);
       expect(result.success).toBe(false);

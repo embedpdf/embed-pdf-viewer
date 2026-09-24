@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { IsoDateTimeSchema } from './IsoDateTime.schema';
+
 import type {
   AttachmentFileInfo,
   EmbeddedFileItem,
@@ -26,7 +28,8 @@ export const AttachmentFileInfoSchema: z.ZodType<AttachmentFileInfo> = z.object(
   description: z.string().optional(),
   size: z.number().int().nonnegative().optional(),
   checksum: z.string().optional(),
-  creationDate: z.string().optional(),
+  createdAt: IsoDateTimeSchema.optional(),
+  modifiedAt: IsoDateTimeSchema.optional(),
 });
 
 export const EmbeddedFileRefSchema: z.ZodType<EmbeddedFileRef> = z.object({
@@ -41,6 +44,7 @@ export const EmbeddedFileItemSchema: z.ZodType<EmbeddedFileItem> = z.object({
   description: z.string().optional(),
   size: z.number().int().nonnegative().optional(),
   checksum: z.string().optional(),
-  creationDate: z.string().optional(),
+  createdAt: IsoDateTimeSchema.optional(),
+  modifiedAt: IsoDateTimeSchema.optional(),
   index: z.number().int().nonnegative(),
 });

@@ -1,6 +1,7 @@
 import type {
   AttachmentFileInfo,
   EmbeddedFileRef,
+  IsoDateTime,
   WireResource,
 } from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
@@ -13,6 +14,7 @@ import type {
 } from '@embedpdf/engine-runtime';
 
 import { readUtf16String, writeUtf16String } from '../../../runtime/memory/strings';
+import { pdfDateToIso } from '../../../shared/pdf-date';
 
 /**
  * Shared primitives over an `FPDF_ATTACHMENT` handle (an unretained
@@ -112,7 +114,8 @@ export function readAttachmentFileInfo(
   const description = readUtf16String(mem, (buf, cap) =>
     fn.EPDFAttachment_GetDescription(attachmentPtr, buf, cap),
   );
-  const creationDate = readAttachmentString(fn, mem, attachmentPtr, 'CreationDate');
+  const createdAt = readAttachmentDate(fn, mem, attachmentPtr, 'CreationDate');
+  const modifiedAt = readAttachmentDate(fn, mem, attachmentPtr, 'ModDate');
   const checksum = normalizeChecksum(readAttachmentString(fn, mem, attachmentPtr, 'CheckSum'));
   const size = readAttachmentSize(fn, mem, attachmentPtr);
 
@@ -122,7 +125,8 @@ export function readAttachmentFileInfo(
     ...(description ? { description } : {}),
     ...(size !== null ? { size } : {}),
     ...(checksum ? { checksum } : {}),
-    ...(creationDate ? { creationDate } : {}),
+    ...(createdAt ? { createdAt } : {}),
+    ...(modifiedAt ? { modifiedAt } : {}),
   };
 }
 
@@ -249,6 +253,17 @@ function readAttachmentString(
     (buf, cap) => fn.FPDFAttachment_GetStringValue(attachmentPtr, key, buf, cap),
     null,
   );
+}
+
+/** A `/Params` date as `IsoDateTime`; absent when missing or not a date. */
+function readAttachmentDate(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  attachmentPtr: Ptr,
+  key: 'CreationDate' | 'ModDate',
+): IsoDateTime | null {
+  const raw = readAttachmentString(fn, mem, attachmentPtr, key);
+  return raw ? pdfDateToIso(raw) : null;
 }
 
 function readAttachmentSize(

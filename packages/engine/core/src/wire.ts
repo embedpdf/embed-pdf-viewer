@@ -338,6 +338,7 @@ export {
   UnsupportedDraftSchema,
   UnsupportedPatchSchema,
 } from './annotation/kinds';
+export { DateInputSchema, IsoDateTimeSchema } from './dto/IsoDateTime.schema';
 export {
   AttachmentFileInfoSchema,
   WireAttachmentFileSchema,

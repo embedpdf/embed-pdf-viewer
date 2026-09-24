@@ -36,18 +36,10 @@ const verdictKey = (verdict: SignatureVerdict | null): string =>
           : 'demo.verdictIndeterminate';
 
 /** A PDF date string (`D:YYYYMMDDHHmmSSZ` or with a zone offset) as a locale date; the raw text when it is not one. */
-const pdfDate = (raw: string): string => {
-  const match = /^D:(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?(Z|[+-]\d{2}'?\d{2}'?)?/.exec(
-    raw,
-  );
-  if (!match) return raw;
-  const [, year, month = '01', day = '01', hour = '00', minute = '00', second = '00', zone] = match;
-  const offset =
-    !zone || zone === 'Z'
-      ? 'Z'
-      : `${zone[0]}${zone.slice(1, 3)}:${zone.slice(3).replace(/'/g, '') || '00'}`;
-  const date = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}${offset}`);
-  return Number.isNaN(date.getTime()) ? raw : date.toLocaleString();
+/** A moment in the reader's locale; the text itself if it isn't one. */
+const dateTime = (iso: string): string => {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? iso : date.toLocaleString();
 };
 
 const tone = (summary: SignatureVerdict['summary'] | null): string =>
@@ -119,9 +111,7 @@ export function SignatureInspector() {
         {row(t('demo.inspectSigner'), dto.signer.name ?? '—')}
         {dto.signer.reason ? row(t('demo.inspectReason'), dto.signer.reason) : null}
         {dto.signer.location ? row(t('demo.inspectLocation'), dto.signer.location) : null}
-        {dto.signer.claimedTime
-          ? row(t('demo.inspectTime'), pdfDate(dto.signer.claimedTime))
-          : null}
+        {dto.signer.signedAt ? row(t('demo.inspectTime'), dateTime(dto.signer.signedAt)) : null}
       </div>
       <div className="border-border-subtle mt-2 flex flex-col gap-1 border-t pt-2">
         {row(

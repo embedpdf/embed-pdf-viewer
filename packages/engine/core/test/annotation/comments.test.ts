@@ -23,8 +23,8 @@ const annot = (n: number, over: Record<string, unknown> = {}): AnnotationDTO =>
     nm: null,
     contents: `annot ${n}`,
     author: null,
-    created: null,
-    modified: null,
+    createdAt: null,
+    modifiedAt: null,
     reply: null,
     ...over,
   }) as unknown as AnnotationDTO;
@@ -49,7 +49,7 @@ const state = (
     state: fields.state ?? null,
     stateModel: fields.stateModel ?? null,
     userId: fields.by,
-    modified: fields.at ?? null,
+    modifiedAt: fields.at ?? null,
   });
 
 const num = (r: AnnotationRef): number => (r.kind === 'objectNumber' ? r.annotObjectNumber : -1);
@@ -69,8 +69,8 @@ describe('buildCommentThreads — threading', () => {
   it('composes a simple thread with chronological replies', () => {
     const threads = buildCommentThreads([
       annot(1),
-      reply(2, 1, { created: '2026-08-28T10:05:00Z' }),
-      reply(3, 1, { created: '2026-08-28T10:01:00Z' }),
+      reply(2, 1, { createdAt: '2026-08-28T10:05:00Z' }),
+      reply(3, 1, { createdAt: '2026-08-28T10:01:00Z' }),
     ]);
     expect(threads).toHaveLength(1);
     expect(num(threads[0]!.root.ref)).toBe(1);
@@ -80,9 +80,9 @@ describe('buildCommentThreads — threading', () => {
   it('flattens reply-to-reply chains into one chronological list', () => {
     const threads = buildCommentThreads([
       annot(1),
-      reply(2, 1, { created: '2026-08-28T10:01:00Z' }),
-      reply(3, 2, { created: '2026-08-28T10:02:00Z' }), // replies to the reply
-      reply(4, 3, { created: '2026-08-28T10:03:00Z' }),
+      reply(2, 1, { createdAt: '2026-08-28T10:01:00Z' }),
+      reply(3, 2, { createdAt: '2026-08-28T10:02:00Z' }), // replies to the reply
+      reply(4, 3, { createdAt: '2026-08-28T10:03:00Z' }),
     ]);
     expect(threads).toHaveLength(1);
     expect(threads[0]!.replies.map((r) => num(r.ref))).toEqual([2, 3, 4]);
@@ -93,7 +93,7 @@ describe('buildCommentThreads — threading', () => {
       annot(1),
       reply(2, 1), // undated, earlier z-order
       reply(3, 1), // undated, later z-order
-      reply(4, 1, { created: '2026-08-28T10:00:00Z' }),
+      reply(4, 1, { createdAt: '2026-08-28T10:00:00Z' }),
     ]);
     expect(threads[0]!.replies.map((r) => num(r.ref))).toEqual([4, 2, 3]);
   });
@@ -288,7 +288,7 @@ describe('buildCommentThreads — review status', () => {
         state: 'rejected',
         stateModel: 'review',
         author: 'Alice (T)',
-        modified: '2026-08-28T09:00:00Z',
+        modifiedAt: '2026-08-28T09:00:00Z',
       }),
     ]);
     const review = threads[0]!.review;

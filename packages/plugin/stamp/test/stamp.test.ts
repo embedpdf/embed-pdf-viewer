@@ -191,7 +191,7 @@ function makeAssetEngine(
   const pieceInfo = (entries: MetadataSeed) => ({
     read: vi.fn(
       async (): Promise<PieceInfoSnapshot | null> =>
-        Object.keys(entries).length === 0 ? null : { entries: { ...entries }, lastModified: null },
+        Object.keys(entries).length === 0 ? null : { entries: { ...entries }, modifiedAt: null },
     ),
     update: vi.fn(async (_application: string, patch: PieceInfoPatch) => {
       for (const [key, value] of Object.entries(patch)) {

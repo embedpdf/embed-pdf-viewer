@@ -313,7 +313,7 @@ describe('records mirror through the controller', () => {
       groupId: null,
       userId: null,
       createdBy: null,
-      updatedBy: null,
+      modifiedBy: null,
       importedBy: null,
       actions: null,
     } as unknown as AnnotationDTO;

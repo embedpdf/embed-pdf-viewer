@@ -1,5 +1,6 @@
 import type { Id, Model } from '@embedpdf/core-annotation';
 import {
+  compareIsoDateTime,
   annotationKey,
   buildCommentThreads,
   type AnnotationDTO,
@@ -63,9 +64,12 @@ export function createThreadIndex(
       if (pa !== pb) return pa - pb;
       if (left.root.rect.top !== right.root.rect.top)
         return right.root.rect.top - left.root.rect.top;
-      const ca = left.root.created ?? '';
-      const callback = right.root.created ?? '';
-      return ca < callback ? -1 : ca > callback ? 1 : 0;
+      const leftCreated = left.root.createdAt;
+      const rightCreated = right.root.createdAt;
+      if (leftCreated === null || rightCreated === null) {
+        return leftCreated === rightCreated ? 0 : leftCreated === null ? -1 : 1;
+      }
+      return compareIsoDateTime(leftCreated, rightCreated);
     });
 
     const byMember = new Map<Id, CommentThread>();

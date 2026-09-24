@@ -90,7 +90,7 @@ export class PieceInfoAccessor {
     );
     return {
       entries,
-      lastModified: lastModifiedPdf ? pdfDateToIso(lastModifiedPdf) : null,
+      modifiedAt: lastModifiedPdf ? pdfDateToIso(lastModifiedPdf) : null,
     };
   }
 

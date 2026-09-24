@@ -53,7 +53,7 @@ for (const sig of snapshot.signatures) {
   sig.signed; // has a /V
   sig.coverage; // 'whole-revision' | 'partial' | 'malformed' | null
   sig.revisionIndex; // which revision it seals (whole-revision only)
-  sig.signer; // { name, reason, location, contactInfo, claimedTime } — claims, unverified
+  sig.signer; // { name, reason, location, contactInfo, signedAt } — claims, unverified
   sig.docMdp; // 1 | 2 | 3 when it certifies
   sig.catalogCertification; // /Root /Perms /DocMDP names it
   sig.fieldMdp;
