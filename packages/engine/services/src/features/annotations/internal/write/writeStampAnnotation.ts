@@ -300,11 +300,8 @@ function setStampContent(
     throw new EngineError(EngineErrorCode.Unknown, 'stamp content preflight invariant broken');
   }
 
-  // Replace, not merge: drop any existing appearance objects (no-op on create).
-  for (let i = fn.FPDFAnnot_GetObjectCount(annotPtr) - 1; i >= 0; i--) {
-    fn.FPDFAnnot_RemoveObject(annotPtr, i);
-  }
-
+  // Both paths give the stamp a new appearance, so the old one is replaced
+  // whole, and nothing of it stays reachable in the saved file.
   if (meta.mimeType === 'application/pdf') {
     setAppearanceFromPdfBytes(fn, mem, annotPtr, bytes);
   } else {

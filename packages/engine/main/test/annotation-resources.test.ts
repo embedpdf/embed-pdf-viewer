@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { crc32, deflateSync } from 'node:zlib';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -45,7 +46,8 @@ runAnnotationResourceConformance(runner, {
 
 // The same drawing is the same bytes on both runtimes, so a bundle made by the
 // local engine and one made by the cloud engine name their resources alike.
-describe('drawing bytes across runtimes', () => {
+/** A one-page vector drawing, 100 × 50. */
+const drawing = (() => {
   const content = '1 0 0 rg 0 0 60 50 re f 0 0 1 rg 60 0 40 50 re f';
   const objects = [
     '<< /Type /Catalog /Pages 2 0 R >>',
@@ -61,8 +63,10 @@ describe('drawing bytes across runtimes', () => {
   });
   const start = text.length;
   text += `xref\n0 5\n0000000000 65535 f \n${offsets.map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n${start}\n%%EOF\n`;
-  const drawing = new TextEncoder().encode(text);
+  return new TextEncoder().encode(text);
+})();
 
+describe('drawing bytes across runtimes', () => {
   /** The drawings of a vector stamp made here and of the two Acrobat stamps. */
   const drawingsOn = async (prefer: 'wasm' | 'native') => {
     const engine = await createLocalEngine({ runtime: { prefer } });
@@ -102,5 +106,79 @@ describe('drawing bytes across runtimes', () => {
     wasm.forEach((bytes, i) => {
       expect(Buffer.from(bytes).equals(Buffer.from(native[i]!))).toBe(true);
     });
+  });
+});
+
+// A stamp given a new drawing keeps nothing of the old one: a full rewrite
+// is the size of the document with the new drawing only.
+describe('replacing a stamp drawing', () => {
+  /** 128 × 128 of noise: a PNG a file can't hide. */
+  const noisePng = () => {
+    let seed = 11;
+    const next = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) >> 16) & 0xff;
+    const width = 128;
+    const rows: number[] = [];
+    for (let y = 0; y < width; y++) {
+      rows.push(0);
+      for (let x = 0; x < width * 3; x++) rows.push(next());
+    }
+    const chunk = (type: string, data: Buffer) => {
+      const body = Buffer.concat([Buffer.from(type, 'latin1'), data]);
+      const out = Buffer.alloc(12 + data.length);
+      out.writeUInt32BE(data.length, 0);
+      body.copy(out, 4);
+      out.writeUInt32BE(crc32(body) >>> 0, 8 + data.length);
+      return out;
+    };
+    const header = Buffer.alloc(13);
+    header.writeUInt32BE(width, 0);
+    header.writeUInt32BE(width, 4);
+    header[8] = 8;
+    header[9] = 2;
+    return new Uint8Array(
+      Buffer.concat([
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        chunk('IHDR', header),
+        chunk('IDAT', deflateSync(Buffer.from(rows))),
+        chunk('IEND', Buffer.alloc(0)),
+      ]),
+    );
+  };
+
+  test('a full rewrite after a new drawing has none of the old', async () => {
+    const engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
+    try {
+      const doc = await engine.open(
+        {
+          kind: 'bytes',
+          id: `replace-${++opened}`,
+          bytes: new Uint8Array(await readFile(fixtures.authoring)),
+        },
+        { scope: ['*'] },
+      );
+      const { pages } = await doc.pages.list();
+      const page = doc.page(toPageRef(pages[0]!.ref.pageObjectNumber));
+      const rect = { left: 20, bottom: 20, right: 120, top: 120 };
+      const small = (
+        await page.annotations.create({ subtype: 'stamp', rect }, { appearance: drawing })
+      ).created;
+      const withSmall = (await doc.download({ mode: 'rewrite' })).length;
+      await page.annotations.delete(small.ref);
+
+      const image = noisePng();
+      const stamp = (
+        await page.annotations.create({ subtype: 'stamp', rect }, { appearance: image })
+      ).created;
+      const withImage = (await doc.download({ mode: 'rewrite' })).length;
+      expect(withImage - withSmall > image.length / 2).toBe(true);
+
+      await page.annotations.update(stamp.ref, {}, { appearance: drawing });
+      const replaced = (await doc.download({ mode: 'rewrite' })).length;
+      // Back to the size with the small drawing: the image is gone.
+      expect(Math.abs(replaced - withSmall) < 1024).toBe(true);
+      await doc.close();
+    } finally {
+      await engine.destroy();
+    }
   });
 });
