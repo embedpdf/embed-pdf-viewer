@@ -56,3 +56,25 @@ ENV PATH="$HOME/.cargo/bin:${PATH}"
 WORKDIR /workspace
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
+
+# Native linux-x64 PDFium tests (scripts/test-pdfium-docker.sh). Chromium's
+# Linux build dependencies are installed here, in a layer keyed on the install
+# script, so a test run doesn't spend minutes in apt: test-target.sh skips the
+# install when its install-build-deps.py matches EMBEDPDF_BUILD_DEPS_INSTALLED_FROM.
+# The apt lists stay in the image because `--quick-check` reads them to pick
+# the same packages.
+FROM base AS linux-test
+
+COPY runtime-src/build/install-build-deps.py /opt/chromium-build/install-build-deps.py
+
+RUN /opt/chromium-build/install-build-deps.py --no-prompt && \
+    apt-get clean
+
+# The first pass installs systemd-sysv, and its /sbin/init makes the script add
+# 32-bit compat packages it skipped before; the second pass installs those. The
+# quick check must pass here, or every test run falls back to the full install.
+RUN /opt/chromium-build/install-build-deps.py --no-prompt && \
+    /opt/chromium-build/install-build-deps.py --quick-check && \
+    apt-get clean
+
+ENV EMBEDPDF_BUILD_DEPS_INSTALLED_FROM=/opt/chromium-build/install-build-deps.py
