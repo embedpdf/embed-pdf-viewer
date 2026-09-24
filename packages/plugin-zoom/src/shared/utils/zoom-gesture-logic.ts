@@ -82,15 +82,6 @@ export function setupZoomGestures({
 
   const clamp = (val: number, min: number, max: number) => Math.min(Math.max(val, min), max);
 
-  // --- Margin calculation ---
-  const updateMargin = () => {
-    const availableWidth = container.clientWidth - 2 * viewportGap;
-    const elementWidth = element.offsetWidth;
-
-    const newMargin = elementWidth < availableWidth ? (availableWidth - elementWidth) / 2 : 0;
-    element.style.marginLeft = `${newMargin}px`;
-  };
-
   const calculateTransform = (scale: number) => {
     const finalWidth = initialElementWidth * scale;
     const finalHeight = initialElementHeight * scale;
@@ -240,17 +231,6 @@ export function setupZoomGestures({
     }, 150);
   };
 
-  // Subscribe to zoom changes to update margin
-  const unsubZoom = zoomScope.onStateChange(() => updateMargin());
-
-  // Use ResizeObserver to update margin when element or container size changes
-  const resizeObserver = new ResizeObserver(() => updateMargin());
-  resizeObserver.observe(element);
-  resizeObserver.observe(container);
-
-  // Initial margin calculation
-  updateMargin();
-
   // Attach events to the viewport container for better UX
   // (gestures work anywhere in viewport, not just on the PDF)
   if (enablePinch) {
@@ -276,9 +256,6 @@ export function setupZoomGestures({
     if (wheelZoomTimeout) {
       clearTimeout(wheelZoomTimeout);
     }
-    unsubZoom();
-    resizeObserver.disconnect();
     resetTransform();
-    element.style.marginLeft = '';
   };
 }
