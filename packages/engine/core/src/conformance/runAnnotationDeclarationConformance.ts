@@ -188,6 +188,23 @@ export function runAnnotationDeclarationConformance(
       });
     });
 
+    test("a popup's open state is read and written", async () => {
+      await onAuthoringPage(async (page) => {
+        const rect: PdfRect = { left: 200, bottom: 260, right: 260, top: 300 };
+        const note = (await page.annotations.create({ subtype: 'text', rect })).created;
+        // A PDF that says nothing about /Open shows the window closed.
+        const closed = (await page.annotations.create({ subtype: 'popup', rect, parent: note.ref }))
+          .created;
+        expect(closed.subtype === 'popup' && closed.open).toBe(false);
+        const opened = await page.annotations.update(closed.ref, { open: true });
+        expect(opened.updated.subtype === 'popup' && opened.updated.open).toBe(true);
+        const created = (
+          await page.annotations.create({ subtype: 'popup', rect, parent: note.ref, open: true })
+        ).created;
+        expect(created.subtype === 'popup' && created.open).toBe(true);
+      });
+    });
+
     test('a resource belongs to the kinds that take it', async () => {
       await onAuthoringPage(async (page) => {
         const rect: PdfRect = { left: 300, bottom: 300, right: 360, top: 340 };

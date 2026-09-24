@@ -756,6 +756,7 @@ export const ANNOTATION_FIELD_NAMES: Readonly<Record<AnnotationSubtype, readonly
     'importedBy',
     'actions',
     'parent',
+    'open',
   ],
   unsupported: [
     'ref',

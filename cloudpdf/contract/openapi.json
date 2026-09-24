@@ -17822,6 +17822,9 @@
                         }
                       ],
                       "nullable": true
+                    },
+                    "open": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -17856,7 +17859,8 @@
                     "modifiedBy",
                     "importedBy",
                     "actions",
-                    "parent"
+                    "parent",
+                    "open"
                   ],
                   "additionalProperties": false
                 },
@@ -22898,6 +22902,9 @@
                               }
                             ],
                             "nullable": true
+                          },
+                          "open": {
+                            "type": "boolean"
                           }
                         },
                         "required": [
@@ -22932,7 +22939,8 @@
                           "modifiedBy",
                           "importedBy",
                           "actions",
-                          "parent"
+                          "parent",
+                          "open"
                         ],
                         "additionalProperties": false
                       },

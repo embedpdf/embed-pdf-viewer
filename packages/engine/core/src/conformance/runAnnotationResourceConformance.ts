@@ -312,6 +312,132 @@ export function runAnnotationResourceConformance(
       });
     });
 
+    /** Export, make a copy from the export, export the copy: `rounds` times. */
+    const exportCycles = async (page: PageHandle, stamp: AnnotationDTO, rounds: number) => {
+      const drawings = [await page.annotations.readResource(stamp.ref, 'appearance')];
+      const data = JSON.parse(JSON.stringify(stamp)) as AnnotationDraft;
+      for (let round = 0; round < rounds; round++) {
+        const appearance = drawings[drawings.length - 1]!;
+        const copy = (await page.annotations.create(data, { appearance })).created;
+        drawings.push(await page.annotations.readResource(copy.ref, 'appearance'));
+      }
+      return drawings;
+    };
+
+    test('a drawing exported again after an import is the same bytes', async () => {
+      await onPage('authoring', async (page) => {
+        const vector = (
+          await page.annotations.create(
+            {
+              subtype: 'stamp',
+              rect: { left: 20, bottom: 20, right: 220, top: 120 },
+              fit: 'contain',
+            },
+            { appearance: BANDS_PDF },
+          )
+        ).created;
+        const image = (
+          await page.annotations.create(
+            {
+              subtype: 'stamp',
+              rect: { left: 20, bottom: 140, right: 120, top: 240 },
+              fit: 'cover',
+            },
+            { appearance: BANDS_PNG },
+          )
+        ).created;
+        for (const stamp of [vector, image]) {
+          const [first, ...again] = await exportCycles(page, stamp, 3);
+          for (const drawing of again) expect(sameBytes(drawing, first!)).toBe(true);
+        }
+      });
+      await onPage('acrobat-stamps', async (page) => {
+        for (const stamp of await acrobatStamps(page)) {
+          const [first, ...again] = await exportCycles(page, stamp, 2);
+          for (const drawing of again) expect(sameBytes(drawing, first!)).toBe(true);
+        }
+      });
+    });
+
+    test('an image is the same drawing in any box', async () => {
+      await onPage('authoring', async (page) => {
+        const square = (
+          await page.annotations.create(
+            {
+              subtype: 'stamp',
+              rect: { left: 20, bottom: 20, right: 120, top: 120 },
+              fit: 'contain',
+            },
+            { appearance: BANDS_PNG },
+          )
+        ).created;
+        const wide = (
+          await page.annotations.create(
+            {
+              subtype: 'stamp',
+              rect: { left: 20, bottom: 140, right: 320, top: 240 },
+              fit: 'cover',
+            },
+            { appearance: BANDS_PNG },
+          )
+        ).created;
+        const a = await page.annotations.readResource(square.ref, 'appearance');
+        const b = await page.annotations.readResource(wide.ref, 'appearance');
+        expect(sameBytes(a, b)).toBe(true);
+        // The image at its own size: a pixel is a point.
+        expect(pageSize(a)).toEqual([30, 10]);
+      });
+    });
+
+    test('a cover stamp set to contain shows the whole image', async () => {
+      await onPage('authoring', async (page) => {
+        const stamp = (
+          await page.annotations.create(
+            {
+              subtype: 'stamp',
+              rect: { left: 20, bottom: 20, right: 120, top: 120 },
+              fit: 'cover',
+            },
+            { appearance: BANDS_PNG },
+          )
+        ).created;
+        const { updated } = await page.annotations.update(stamp.ref, { fit: 'contain' });
+        const raster = await rasterOf(page, updated.ref);
+        const y = Math.floor(raster.height / 2);
+        const colour = (fx: number) => {
+          const i = (y * raster.width + Math.floor(raster.width * fx)) * 4;
+          return [raster.rgba[i], raster.rgba[i + 1], raster.rgba[i + 2]];
+        };
+        // Red, green and blue bands, letterboxed: not only the green the cover showed.
+        expect(colour(0.15)).toEqual([255, 0, 0]);
+        expect(colour(0.5)).toEqual([0, 255, 0]);
+        expect(colour(0.85)).toEqual([0, 0, 255]);
+      });
+    });
+
+    test('an exported drawing is the drawing and nothing else', async () => {
+      await onPage('authoring', async (page) => {
+        const stamp = (
+          await page.annotations.create(
+            {
+              subtype: 'stamp',
+              rect: { left: 20, bottom: 20, right: 220, top: 120 },
+              opacity: 0.5,
+            },
+            { appearance: BANDS_PDF },
+          )
+        ).created;
+        const text = new TextDecoder('latin1').decode(
+          await page.annotations.readResource(stamp.ref, 'appearance'),
+        );
+        // No /Info with a creation date, nothing of how our wrapper placed it.
+        expect(text.includes('/Info')).toBe(false);
+        expect(text.includes('CreationDate')).toBe(false);
+        expect(text.includes('EPDFOrigContentRect')).toBe(false);
+        expect(text.includes('EPDFWRAP')).toBe(false);
+      });
+    });
+
     test('a role the kind does not take is refused', async () => {
       await onPage('authoring', async (page) => {
         const rect: PdfRect = { left: 300, bottom: 300, right: 360, top: 340 };
@@ -332,6 +458,18 @@ export function runAnnotationResourceConformance(
 }
 
 const PDF_MAGIC = [0x25, 0x50, 0x44, 0x46]; // %PDF
+
+/** A 30 × 10 PNG: red, green and blue bands, so a crop or a wrong fit shows. */
+const BANDS_PNG = Uint8Array.from(
+  atob(
+    'iVBORw0KGgoAAAANSUhEUgAAAB4AAAAKCAIAAAAsFXl4AAAAGklEQVR42mP4z8CABzFQIj1q9KjRo0aTIg0AQXcq5OunV0AAAAAASUVORK5CYII=',
+  ),
+  (c) => c.charCodeAt(0),
+);
+
+function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
+  return a.length === b.length && a.every((byte, i) => byte === b[i]);
+}
 
 /** A one-page PDF, 200 × 100: a red band and a blue band, so a wrong fit or crop shows. */
 const BANDS_PDF = (() => {

@@ -9,7 +9,12 @@ import {
   type StampPatch,
   type WireAnnotationResources,
 } from '@embedpdf/engine-core/runtime';
-import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
+import {
+  NULL_PTR,
+  type PdfFunctions,
+  type PdfRuntimeMemory,
+  type Ptr,
+} from '@embedpdf/engine-runtime';
 
 import type { AnnotationWriteContext } from './annotationWriteContext';
 import { opacityToAlpha, setAnnotOpacity, setAnnotRect } from './annotationWritePrimitives';
@@ -76,21 +81,13 @@ export function applyStampDraft(
   // A create records the fit it used. Data that records none (`null`, as a
   // stamp another tool made reads) is fit as such a stamp is shown: `fill`.
   const fit = draft.fit === null ? 'fill' : (draft.fit ?? 'contain');
-  authorStampAppearance(
-    fn,
-    mem,
-    annotPtr,
-    requireStampAppearance(ctx),
-    fit,
-    {
-      rect: draft.rect,
-      // The appearance author wants values-or-absent; a tri-state `null`
-      // (no rotation) authors the same as an omitted field.
-      unrotatedRect: draft.unrotatedRect ?? undefined,
-      rotation: draft.rotation ?? undefined,
-    },
-    ctx,
-  );
+  authorStampAppearance(fn, mem, annotPtr, requireStampAppearance(ctx), fit, {
+    rect: draft.rect,
+    // The appearance author wants values-or-absent; a tri-state `null`
+    // (no rotation) authors the same as an omitted field.
+    unrotatedRect: draft.unrotatedRect ?? undefined,
+    rotation: draft.rotation ?? undefined,
+  });
   if (draft.fit !== null) writeStampFit(fn, mem, annotPtr, fit);
 }
 
@@ -122,19 +119,11 @@ export function applyStampPatch(
     // in the unrotated frame (see authorStampAppearance) so a rotated stamp
     // never double-fits into its padded AABB.
     const rect = patch.rect ?? readAnnotRect(fn, mem, annotPtr);
-    authorStampAppearance(
-      fn,
-      mem,
-      annotPtr,
-      appearance,
-      fit,
-      {
-        rect,
-        unrotatedRect: patch.unrotatedRect ?? undefined,
-        rotation: patch.rotation ?? undefined,
-      },
-      ctx,
-    );
+    authorStampAppearance(fn, mem, annotPtr, appearance, fit, {
+      rect,
+      unrotatedRect: patch.unrotatedRect ?? undefined,
+      rotation: patch.rotation ?? undefined,
+    });
     return;
   }
   // No new bytes: geometry / rotation only.
@@ -276,12 +265,11 @@ function authorStampAppearance(
   appearance: StampAppearance,
   fit: StampFit,
   box: StampBox,
-  ctx: AnnotationWriteContext | undefined,
 ): void {
   const rotated = !!box.rotation && box.unrotatedRect !== undefined;
   if (!rotated) {
     setAnnotRect(fn, mem, annotPtr, box.rect);
-    setStampContent(fn, mem, annotPtr, appearance, fit, box.rect, ctx);
+    setStampContent(fn, mem, annotPtr, appearance, fit);
     return;
   }
   const unrotated = box.unrotatedRect!;
@@ -289,7 +277,7 @@ function authorStampAppearance(
   //    internal re-fit records an image-shaped EPDFOrigContentRect, not the AABB.
   writeBoxTransformMetadata(fn, mem, annotPtr, {});
   setAnnotRect(fn, mem, annotPtr, unrotated);
-  setStampContent(fn, mem, annotPtr, appearance, fit, unrotated, ctx);
+  setStampContent(fn, mem, annotPtr, appearance, fit);
   // 2. Apply the transform: metadata bakes the /Matrix, /Rect becomes the AABB,
   //    and one re-fit reconciles BBox + Matrix from the now-recorded content.
   writeBoxTransformMetadata(fn, mem, annotPtr, {
@@ -306,11 +294,9 @@ function setStampContent(
   annotPtr: Ptr,
   bytes: ArrayBuffer,
   fit: StampFit,
-  rect: PdfRect,
-  ctx: AnnotationWriteContext | undefined,
 ): void {
   const meta = sniffBinaryMetadata(bytes);
-  if (!meta || ctx?.docPtr === undefined || ctx.pagePtr === undefined) {
+  if (!meta) {
     throw new EngineError(EngineErrorCode.Unknown, 'stamp content preflight invariant broken');
   }
 
@@ -322,7 +308,7 @@ function setStampContent(
   if (meta.mimeType === 'application/pdf') {
     setAppearanceFromPdfBytes(fn, mem, annotPtr, bytes);
   } else {
-    appendImageObject(fn, mem, annotPtr, ctx.docPtr, ctx.pagePtr, bytes, meta, rect, fit);
+    setAppearanceFromImageBytes(fn, mem, annotPtr, bytes, meta);
   }
 
   // Normalises the AP (BBox, EPDFOrigContentRect for later re-fits) and
@@ -345,89 +331,79 @@ function refitAppearance(fn: PdfFunctions, annotPtr: Ptr, fit: StampFit): void {
   }
 }
 
+/** Acrobat's page size limit: a drawing larger than this is scaled down to fit. */
+const MAX_DRAWING_SIZE = 14_400;
+
 /**
- * PNG/JPEG → image object appended to the appearance.
- *
- * The AP's coordinate space aligns with page space (its BBox is the annot
- * `/Rect`), so the image must be painted inside `/Rect` or it
- * falls outside the form's clip and renders blank. The `fit` placement is
- * computed here from the sniffed intrinsic dimensions; the closing
- * `EPDFAnnot_UpdateAppearanceToRect` pass then normalises the BBox and
- * records `EPDFOrigContentRect` so later geometry-only patches can re-fit
- * natively.
+ * PNG or JPEG → the image at its own size, as a one-page drawing: a pixel is
+ * a point, scaled down to fit {@link MAX_DRAWING_SIZE}. The drawing doesn't
+ * depend on the stamp's box or fit, which the wrapper applies: a later `fit`
+ * shows the whole image, and the same image is always the same drawing.
  */
-function appendImageObject(
+function setAppearanceFromImageBytes(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  docPtr: Ptr,
-  pagePtr: Ptr,
   bytes: ArrayBuffer,
   meta: Extract<BinaryMetadata, { width: number }>,
-  rect: PdfRect,
-  fit: StampFit,
 ): void {
-  const imageObjPtr = fn.FPDFPageObj_NewImageObj(docPtr);
-  if (!imageObjPtr) {
-    throw new EngineError(EngineErrorCode.Unknown, 'FPDFPageObj_NewImageObj returned NULL');
+  const scale = Math.min(1, MAX_DRAWING_SIZE / Math.max(meta.width, meta.height));
+  const width = meta.width * scale;
+  const height = meta.height * scale;
+  const docPtr = fn.FPDF_CreateNewDocument();
+  if (!docPtr) {
+    throw new EngineError(EngineErrorCode.Unknown, 'FPDF_CreateNewDocument returned NULL');
   }
-
-  let appended = false;
   try {
-    const dataPtr = mem.alloc(bytes.byteLength);
+    const pagePtr = fn.FPDFPage_New(docPtr, 0, width, height);
+    if (!pagePtr) {
+      throw new EngineError(EngineErrorCode.Unknown, 'FPDFPage_New returned NULL');
+    }
     try {
-      mem.writeBytes(dataPtr, new Uint8Array(bytes));
-      const ok =
-        meta.mimeType === 'image/png'
-          ? fn.EPDFImageObj_SetPng(pagePtr, 0, imageObjPtr, dataPtr, bytes.byteLength)
-          : fn.EPDFImageObj_SetJpeg(pagePtr, 0, imageObjPtr, dataPtr, bytes.byteLength);
-      if (!ok) {
+      const imageObjPtr = fn.FPDFPageObj_NewImageObj(docPtr);
+      if (!imageObjPtr) {
+        throw new EngineError(EngineErrorCode.Unknown, 'FPDFPageObj_NewImageObj returned NULL');
+      }
+      let inserted = false;
+      try {
+        const dataPtr = mem.alloc(bytes.byteLength);
+        try {
+          mem.writeBytes(dataPtr, new Uint8Array(bytes));
+          const ok =
+            meta.mimeType === 'image/png'
+              ? fn.EPDFImageObj_SetPng(NULL_PTR, 0, imageObjPtr, dataPtr, bytes.byteLength)
+              : fn.EPDFImageObj_SetJpeg(NULL_PTR, 0, imageObjPtr, dataPtr, bytes.byteLength);
+          if (!ok) {
+            throw new EngineError(
+              EngineErrorCode.InvalidArg,
+              `${meta.mimeType === 'image/png' ? 'EPDFImageObj_SetPng' : 'EPDFImageObj_SetJpeg'} rejected the image data`,
+            );
+          }
+        } finally {
+          mem.free(dataPtr);
+        }
+        setImageMatrix(fn, mem, imageObjPtr, width, height);
+        fn.FPDFPage_InsertObject(pagePtr, imageObjPtr);
+        inserted = true;
+      } finally {
+        // The page owns the object once inserted; on failure we own it.
+        if (!inserted) fn.FPDFPageObj_Destroy(imageObjPtr);
+      }
+      if (!fn.FPDFPage_GenerateContent(pagePtr)) {
+        throw new EngineError(EngineErrorCode.Unknown, 'FPDFPage_GenerateContent returned false');
+      }
+      if (!fn.EPDFAnnot_SetAppearanceFromPage(annotPtr, docPtr, 0)) {
         throw new EngineError(
-          EngineErrorCode.InvalidArg,
-          `${meta.mimeType === 'image/png' ? 'EPDFImageObj_SetPng' : 'EPDFImageObj_SetJpeg'} rejected the image data`,
+          EngineErrorCode.Unknown,
+          'EPDFAnnot_SetAppearanceFromPage returned false',
         );
       }
     } finally {
-      mem.free(dataPtr);
+      fn.FPDF_ClosePage(pagePtr);
     }
-
-    const placement = fitIntoRect(meta.width, meta.height, rect, fit);
-    setImageMatrix(fn, mem, imageObjPtr, placement.width, placement.height);
-    fn.FPDFPageObj_Transform(imageObjPtr, 1, 0, 0, 1, placement.left, placement.bottom);
-
-    if (!fn.FPDFAnnot_AppendObject(annotPtr, imageObjPtr)) {
-      throw new EngineError(EngineErrorCode.Unknown, 'FPDFAnnot_AppendObject returned false');
-    }
-    appended = true;
   } finally {
-    // The annotation owns the object once appended; on failure we own it.
-    if (!appended) {
-      fn.FPDFPageObj_Destroy(imageObjPtr);
-    }
+    fn.FPDF_CloseDocument(docPtr);
   }
-}
-
-/** Fit-policy placement of `w×h` content inside `rect` (centered for the aspect-preserving fits). */
-function fitIntoRect(
-  w: number,
-  h: number,
-  rect: PdfRect,
-  fit: StampFit,
-): { left: number; bottom: number; width: number; height: number } {
-  const boxW = Math.max(0, rect.right - rect.left);
-  const boxH = Math.max(0, rect.top - rect.bottom);
-  if (fit === 'fill' || w <= 0 || h <= 0) {
-    return { left: rect.left, bottom: rect.bottom, width: boxW, height: boxH };
-  }
-  const scale = fit === 'contain' ? Math.min(boxW / w, boxH / h) : Math.max(boxW / w, boxH / h);
-  const width = w * scale;
-  const height = h * scale;
-  return {
-    left: rect.left + (boxW - width) / 2,
-    bottom: rect.bottom + (boxH - height) / 2,
-    width,
-    height,
-  };
 }
 
 /** FS_MATRIX { a, b, c, d, e, f } — six f32s. */

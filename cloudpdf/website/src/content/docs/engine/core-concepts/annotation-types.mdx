@@ -464,8 +464,14 @@ const drawing = await page.annotations.readResource(stamp.ref, 'appearance');
 await otherPage.annotations.create(stamp, { appearance: drawing });
 ```
 
-A stamp made by another tool is returned as it is shown, on a page the size of its `rect`.
-Reading a resource sends document content out, so it needs the `doc.download` scope.
+A stamp made by another tool is returned as it is shown, in the size of its `rect`. A stamp
+made from a PNG or JPEG is returned as the image at its own size, a pixel to a point, whatever
+box it was placed in, so a later `fit` always has the whole image to work with.
+
+The same drawing is always the same bytes, whichever engine exports it, and a drawing
+exported again after a copy is the same bytes as before. You can store drawings by their hash
+and keep one copy for every stamp that uses it. Reading a resource sends document content out,
+so it needs the `doc.download` scope.
 
 ## File attachment
 

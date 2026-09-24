@@ -92,6 +92,19 @@ export function readAnnotColor(
   });
 }
 
+/** A boolean entry of the annotation's dictionary; `null` when absent or not a boolean. */
+export function readAnnotBoolean(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+  key: string,
+): boolean | null {
+  return withScratch(mem, I32_BYTES, (buf) => {
+    if (!fn.EPDFAnnot_GetBooleanValue(annotPtr, key, buf)) return null;
+    return readI32(mem, buf) !== 0;
+  });
+}
+
 /**
  * Read annotation opacity via the EmbedPDF `EPDFAnnot_GetOpacity`
  * extension. Returns a 0..1 value (the native alpha is 0..255). Returns

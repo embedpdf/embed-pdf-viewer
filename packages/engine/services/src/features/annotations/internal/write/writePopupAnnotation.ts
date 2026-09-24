@@ -1,4 +1,9 @@
-import type { PopupDraft, PopupPatch } from '@embedpdf/engine-core/runtime';
+import {
+  EngineError,
+  EngineErrorCode,
+  type PopupDraft,
+  type PopupPatch,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { setAnnotRect } from './annotationWritePrimitives';
@@ -17,6 +22,7 @@ export function applyPopupDraft(
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
   setAnnotRect(fn, mem, annotPtr, draft.rect);
+  if (draft.open !== undefined) setPopupOpen(fn, annotPtr, draft.open);
 }
 
 export function applyPopupPatch(
@@ -27,6 +33,13 @@ export function applyPopupPatch(
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);
   if (patch.rect !== undefined) setAnnotRect(fn, mem, annotPtr, patch.rect);
+  if (patch.open !== undefined) setPopupOpen(fn, annotPtr, patch.open);
+}
+
+function setPopupOpen(fn: PdfFunctions, annotPtr: Ptr, open: boolean): void {
+  if (!fn.EPDFAnnot_SetBooleanValue(annotPtr, 'Open', open)) {
+    throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetBooleanValue returned false');
+  }
 }
 
 export function isPopupSubtype(subtype: string): subtype is 'popup' {
