@@ -38,7 +38,7 @@ import {
   type FormSnapshot,
   type FormWidgetLinkResult,
   type FormWidget,
-  type IdentityClaims,
+  type Identity,
   type MetadataPatch,
   type MetadataUpdateResult,
   type MutationMeta,
@@ -72,6 +72,7 @@ import {
   type SignaturePrepared,
   type SignatureSubFilter,
   formWidget,
+  type AnnotationSubtype,
 } from '@embedpdf/engine-core/runtime';
 import {
   SignaturePreparedWireSchema,
@@ -481,7 +482,7 @@ export class LayerService {
     pageObjectNumber: PageObjectNumber,
     ref: AnnotationRef,
     signal?: AbortSignal,
-  ): Promise<{ userId?: string; groupId?: string }> {
+  ): Promise<{ userId?: string; groupId?: string; subtype?: AnnotationSubtype }> {
     // The worker job below assumes the layer is already attached to the
     // pool's session for `docId`. Most read paths already do this via
     // `documentService.ensureLayerOnPool`; collab gating runs before any
@@ -522,8 +523,9 @@ export class LayerService {
     });
     if (!match) return {};
     return {
-      ...(match.userId !== undefined ? { userId: match.userId } : {}),
-      ...(match.groupId !== undefined ? { groupId: match.groupId } : {}),
+      ...(match.userId != null ? { userId: match.userId } : {}),
+      ...(match.groupId != null ? { groupId: match.groupId } : {}),
+      subtype: match.subtype,
     };
   }
 
@@ -4496,18 +4498,18 @@ function requireKnownWeakAnnotationBoolean(page: PageState): boolean {
  * Returns `undefined` when:
  *   - no JWT identity is attached to the context (tenant tokens, dev
  *     fixtures without identity claims), or
- *   - the identity has neither `user_id` nor `group_id` nor
- *     `display_name` (nothing meaningful to stamp)
+ *   - the identity has neither `userId` nor `groupId` nor
+ *     `displayName` (nothing meaningful to stamp)
  *
  * The worker treats an absent actor as "stamp /M only, skip EMBD_Metadata".
  */
 function actorFromContext(ctx: LayerWriteContext): AnnotationActor | undefined {
-  const id: IdentityClaims | undefined = ctx.jwt?.identity;
+  const id: Identity | undefined = ctx.jwt?.identity;
   if (!id) return undefined;
   const actor: AnnotationActor = {};
-  if (id.user_id) actor.userId = id.user_id;
-  if (id.group_id) actor.groupId = id.group_id;
-  if (id.display_name) actor.displayName = id.display_name;
+  if (id.userId) actor.userId = id.userId;
+  if (id.groupId) actor.groupId = id.groupId;
+  if (id.displayName) actor.displayName = id.displayName;
   // No fields set → nothing for the worker to stamp; signal absence.
   if (!actor.userId && !actor.groupId && !actor.displayName) return undefined;
   return actor;

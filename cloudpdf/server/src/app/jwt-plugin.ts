@@ -7,6 +7,7 @@ import {
   type CollabAction,
   type CollabTarget,
   type DocCapability,
+  type Identity,
   type PdfBits,
 } from '@embedpdf/engine-core/runtime';
 import { checkResourceAccess, type DocResourceId } from '@embedpdf/engine-core/wire';
@@ -22,7 +23,6 @@ import {
   isDocUserClaims,
   isTenantClaims,
   type DocScope,
-  type IdentityClaims,
   type JwtClaims,
   type JwtVerifier,
   type JwtVerifierConfig,
@@ -319,7 +319,7 @@ export interface RequestJwtContext {
   exp: number | null;
   unlockKey: string | null;
   scope: ReadonlyArray<string>;
-  identity: IdentityClaims;
+  identity: Identity;
   /**
    * Per-request document password (decoded `X-Document-Password`),
    * present only on API-token requests — backends supply the password
@@ -703,12 +703,12 @@ function jwtContext(claims: JwtClaims): RequestJwtContext {
     exp: typeof claims.exp === 'number' ? claims.exp : null,
     unlockKey: readUnlockKey(claims),
     scope: claims.scope,
-    identity: {
-      ...(claims.user_id ? { user_id: claims.user_id } : {}),
-      ...(claims.group_id ? { group_id: claims.group_id } : {}),
-      ...(claims.display_name ? { display_name: claims.display_name } : {}),
-      ...(claims.groups ? { groups: [...claims.groups] } : {}),
-    },
+    identity: claims.identity
+      ? {
+          ...claims.identity,
+          ...(claims.identity.groups ? { groups: [...claims.identity.groups] } : {}),
+        }
+      : {},
   };
 }
 

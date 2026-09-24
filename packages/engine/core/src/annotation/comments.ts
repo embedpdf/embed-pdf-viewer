@@ -141,8 +141,8 @@ export function buildCommentThreads(
   // Children adjacency over resolvable /IRT edges.
   const children = new Map<string, AnnotationDTO[]>();
   for (const a of eligible) {
-    if (!a.inReplyTo) continue;
-    const parent = byKey.get(annotationKey(a.inReplyTo));
+    if (!a.reply) continue;
+    const parent = byKey.get(annotationKey(a.reply.to));
     if (!parent) continue; // orphan — handled in the promotion pass
     const parentKey = annotationKey(parent.ref);
     const list = children.get(parentKey);
@@ -186,7 +186,7 @@ export function buildCommentThreads(
 
   // Pass 1: real roots, in input order.
   for (const a of eligible) {
-    if (!a.inReplyTo && !isStateAnnotation(a)) walk(a);
+    if (!a.reply && !isStateAnnotation(a)) walk(a);
   }
 
   // Pass 2: promotion. Anything not reached from a root — an orphan whose

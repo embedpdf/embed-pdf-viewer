@@ -76,7 +76,8 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
           expect(bakedEntries.some((entry) => entry.startsWith(`${createdKey}@`))).toBe(false);
         };
         expect(created.contents).toBe(tool === 'area' ? '50 m²' : '25 m');
-        expect(created.caption).toEqual({ enabled: true });
+        expect(created.captionEnabled).toBe(true);
+        expect(created.captionCenter).toBe(null);
         const model = fromDTO(created, crop);
         if (!model.measure || model.measure.intent === 'LineDimension')
           throw new Error('Expected shape measure');
@@ -87,7 +88,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         annotation.editPointer('move', page.ref, target, false);
         annotation.editPointer('up', page.ref, target, false);
         await vi.waitFor(() =>
-          expect(current().caption?.center).toEqual({
+          expect(current().captionCenter).toEqual({
             x: crop.left + target.x,
             y: crop.top - target.y,
           }),
@@ -100,7 +101,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         annotation.editPointer('move', page.ref, { x: 80, y: 290 }, false);
         annotation.editPointer('up', page.ref, { x: 80, y: 290 }, false);
         await vi.waitFor(() => expect(current().vertices[0].x).toBeCloseTo(crop.left + 80, 3));
-        expect(current().caption?.center).toEqual({
+        expect(current().captionCenter).toEqual({
           x: crop.left + target.x,
           y: crop.top - target.y,
         });
@@ -112,8 +113,8 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         await annotation.rotateSelectionBy(90);
         await vi.waitFor(() => {
           expect(current().rotation).toBe(270);
-          expect(current().caption?.center?.x).toBeCloseTo(crop.left + rotatedCaption.x, 3);
-          expect(current().caption?.center?.y).toBeCloseTo(crop.top - rotatedCaption.y, 3);
+          expect(current().captionCenter?.x).toBeCloseTo(crop.left + rotatedCaption.x, 3);
+          expect(current().captionCenter?.y).toBeCloseTo(crop.top - rotatedCaption.y, 3);
           const after = annotationSelectionFrame(fromDTO(current(), crop));
           expect(after.center.x).toBeCloseTo(frame.center.x, 3);
           expect(after.center.y).toBeCloseTo(frame.center.y, 3);
@@ -122,9 +123,9 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         const displacedRect = current().rect;
         await annotation.updateRaw(created.ref, {
           subtype: created.subtype,
-          caption: { center: null },
+          captionCenter: null,
         });
-        expect(current().caption?.center).toBeUndefined();
+        expect(current().captionCenter).toBe(null);
         expect(current().rect.top - current().rect.bottom).toBeLessThan(
           displacedRect.top - displacedRect.bottom,
         );
@@ -160,7 +161,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
               intent: final.intent,
               vertices: final.vertices,
               contents: final.contents,
-              caption: { enabled: true },
+              captionEnabled: true,
               rotation: 270,
             });
             const restoredModel = fromDTO(restored, crop);

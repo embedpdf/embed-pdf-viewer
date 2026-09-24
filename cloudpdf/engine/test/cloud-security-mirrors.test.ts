@@ -75,7 +75,7 @@ describe('security collab mirrors (cloud SDK, token-fallback path)', () => {
   it('narrowing: annotations:update:self shadows modify for update only', () => {
     const doc = openWith({
       scope: ['doc.annotate.modify', 'annotations:update:self'],
-      user_id: 'me',
+      identity: { userId: 'me' },
     });
     expect(doc.security.allowsAnnotationMutation('update', { userId: 'me' })).toBe(true);
     expect(doc.security.allowsAnnotationMutation('update', { userId: 'alice' })).toBe(false);
@@ -88,9 +88,7 @@ describe('security collab mirrors (cloud SDK, token-fallback path)', () => {
   it('group grant: create from own identity, targets need the stamp + membership', () => {
     const doc = openWith({
       scope: ['annotations:*:group=legal'],
-      user_id: 'me',
-      group_id: 'legal',
-      groups: ['legal'],
+      identity: { userId: 'me', groupId: 'legal', groups: ['legal'] },
     });
     expect(doc.security.allowsAnnotationCreate()).toBe(true);
     expect(doc.security.allowsAnnotationMutation('update', { groupId: 'legal' })).toBe(true);
@@ -101,7 +99,10 @@ describe('security collab mirrors (cloud SDK, token-fallback path)', () => {
   });
 
   it("assigning the caller's own default group needs no grant", () => {
-    const doc = openWith({ scope: ['doc.annotate.modify'], user_id: 'me', group_id: 'legal' });
+    const doc = openWith({
+      scope: ['doc.annotate.modify'],
+      identity: { userId: 'me', groupId: 'legal' },
+    });
     expect(doc.security.allowsAnnotationGroupAssignment('legal')).toBe(true);
     expect(doc.security.allowsAnnotationGroupAssignment('other')).toBe(false);
   });

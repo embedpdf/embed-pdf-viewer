@@ -10,8 +10,7 @@ import {
   viewportForPoint,
 } from '../src/measure';
 import type { PdfMeasure, PdfViewport } from '../src/dto/Measure';
-import { LinePatchSchema } from '../src/annotation/kinds/line/schema';
-import { PolygonPatchSchema } from '../src/annotation/kinds/polygon/schema';
+import { LinePatchSchema, PolygonPatchSchema } from '../src/annotation/kinds';
 import { PdfMeasureSchema, PdfMeasureWriteSchema } from '../src/dto/Measure.schema';
 
 describe('measurement arithmetic and formatting', () => {
@@ -147,15 +146,17 @@ describe('measurement arithmetic and formatting', () => {
   });
   test('wire schemas distinguish line vectors, shape points, and caption resets', () => {
     expect(
-      LinePatchSchema.safeParse({ subtype: 'line', caption: { offset: { x: 1, y: 2 } } }).success,
+      LinePatchSchema.safeParse({ subtype: 'line', captionOffset: { x: 1, y: 2 } }).success,
     ).toBe(false);
-    expect(PolygonPatchSchema.parse({ subtype: 'polygon', caption: { center: null } })).toEqual({
+    expect(PolygonPatchSchema.parse({ subtype: 'polygon', captionCenter: null })).toEqual({
       subtype: 'polygon',
-      caption: { center: null },
+      captionCenter: null,
     });
+  });
+  test('an update may send back the marker of a scale the engine cannot model', () => {
     expect(
       LinePatchSchema.safeParse({ subtype: 'line', measure: { subtype: 'GEO' } }).success,
-    ).toBe(false);
+    ).toBe(true);
   });
   test('malformed imported factors remain readable, but cannot be authored', () => {
     const imported = {

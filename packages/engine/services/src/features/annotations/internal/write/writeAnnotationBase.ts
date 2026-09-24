@@ -7,6 +7,7 @@ import {
   writeAnnotStringOrClear,
 } from './annotationWritePrimitives';
 import { formatPdfDate } from '../../../../shared/pdf-date';
+import { flagFieldsOf } from '../annotationFlagBits';
 
 /**
  * Write the annotation-wide base fields shared by every Draft
@@ -33,12 +34,11 @@ export function applyAnnotationBaseDraft(
   if (draft.subject !== undefined) {
     writeAnnotStringOrClear(fn, mem, annotPtr, 'Subj', draft.subject);
   }
-  if (draft.nm !== undefined && draft.nm.length > 0) {
+  if (draft.nm) {
     writeAnnotString(fn, mem, annotPtr, 'NM', draft.nm);
   }
-  if (draft.flags !== undefined) {
-    setAnnotFlags(fn, annotPtr, draft.flags);
-  }
+  const flags = flagFieldsOf(draft);
+  if (flags) setAnnotFlags(fn, annotPtr, flags);
 }
 
 /**
@@ -65,15 +65,14 @@ export function applyAnnotationBasePatch(
   if (patch.subject !== undefined) {
     writeAnnotStringOrClear(fn, mem, annotPtr, 'Subj', patch.subject);
   }
-  if (patch.flags !== undefined) {
-    setAnnotFlags(fn, annotPtr, patch.flags);
-  }
+  const flags = flagFieldsOf(patch);
+  if (flags) setAnnotFlags(fn, annotPtr, flags);
 }
 
 /**
  * Stamp /T (the standard PDF "author" display field) on an annotation.
  * Called by the mutator on create — /T is bound to the caller's
- * `display_name` at creation. No-op when `displayName` is empty so
+ * `displayName` at creation. No-op when `displayName` is empty so
  * callers don't need to gate it.
  */
 export function writeAnnotationAuthor(
@@ -99,6 +98,19 @@ export function writeAnnotationNm(
 ): void {
   if (nm.length === 0) return;
   writeAnnotString(fn, mem, annotPtr, 'NM', nm);
+}
+
+/**
+ * Stamp `/CreationDate` on a new annotation. The mutator calls it once, on
+ * create, with the same moment it stamps as `/M`.
+ */
+export function writeAnnotationCreated(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+  now: Date = new Date(),
+): void {
+  writeAnnotString(fn, mem, annotPtr, 'CreationDate', formatPdfDate(now));
 }
 
 /**

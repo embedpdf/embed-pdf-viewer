@@ -1,9 +1,9 @@
 import { EngineError, EngineErrorCode, type PdfRect } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
+import { EMBD_METADATA_SCHEMA_VERSION } from './writeEmbedMetadata';
 import { RECTF_BYTES } from '../../../../runtime/memory/structs';
 import { readAnnotationUnrotatedRect } from '../read/readAnnotationTransformMetadata';
-import { EMBD_METADATA_SCHEMA_VERSION } from './writeEmbedMetadata';
 
 /**
  * Write the EmbedPDF transform keys under /EMBD_Metadata. This is the seam

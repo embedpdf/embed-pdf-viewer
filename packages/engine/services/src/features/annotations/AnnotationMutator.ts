@@ -1,9 +1,8 @@
 import { isDimension } from '@embedpdf/engine-core/runtime';
 import {
-  prepareMeasurementDraft,
-  prepareMeasurementPatch,
-} from './internal/mutations/prepareMeasurementMutation';
-import {
+  ANNOTATION_FIELD_NAMES,
+  STAMP_SOURCE_FIELD_NAMES,
+  annotationKey,
   appearanceImpactOf,
   EngineError,
   EngineErrorCode,
@@ -20,6 +19,8 @@ import {
   type WireAnnotationPatch,
   type WireResourceMap,
   type AnnotationRef,
+  type AnnotationReplyType,
+  type AnnotationSubtype,
   type AnnotationStableId,
   type AnnotationUpdateResult,
   type PageObjectNumber,
@@ -28,13 +29,16 @@ import {
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { blendModeFromCode, blendModeToCode } from './internal/blendMode';
+import {
+  prepareMeasurementDraft,
+  prepareMeasurementPatch,
+} from './internal/mutations/prepareMeasurementMutation';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import type { FontRegistrar } from '../fonts';
 import { captureOrStampStableId } from './internal/identity/captureOrStampStableId';
 import { resolveAnnotPtr } from './internal/identity/resolveAnnotationPointer';
 import { computeMutationImpact } from './internal/mutations/computeMutationImpact';
-import { assertRichTextAgreement } from './internal/richTextWire';
 import { readContextFor } from './internal/read/annotationReadContext';
 import { readAnnotString } from './internal/read/annotationReadPrimitives';
 import {
@@ -42,6 +46,7 @@ import {
   resolveWidgetFieldObjectNumber,
 } from './internal/read/joinWidgetField';
 import { readAnnotationFromPtr } from './internal/read/readAnnotationFromPtr';
+import { assertRichTextAgreement } from './internal/richTextWire';
 import type { AnnotationWriteContext } from './internal/write/annotationWriteContext';
 import {
   applyDraft,
@@ -51,9 +56,13 @@ import {
 } from './internal/write/annotationWriterRegistry';
 import {
   writeAnnotationAuthor,
+  writeAnnotationCreated,
   writeAnnotationModified,
 } from './internal/write/writeAnnotationBase';
-import { writeAnnotationRelationship } from './internal/write/writeAnnotationRelationship';
+import {
+  writeAnnotationRelationship,
+  writePopupParent,
+} from './internal/write/writeAnnotationRelationship';
 import {
   applyEmbedMetadataOnCreate,
   applyEmbedMetadataOnUpdate,
@@ -136,6 +145,7 @@ export class AnnotationMutator {
     try {
       this.ensureKnownWeakStateFromPage(pageObjectNumber, pagePtr);
       const writeCtx = this.writeContext(pagePtr, resources);
+      assertDeclaredFields(draft.subtype, draft);
       preflightDraft(draft, writeCtx);
       assertRichTextAgreement(draft);
       draft = prepareMeasurementDraft(draft);
@@ -167,25 +177,39 @@ export class AnnotationMutator {
         // promote a weak/direct parent to an indirect object (non-structural,
         // no index shift); the strengthened parent id is folded into
         // `meta.changed` below so the client can reconcile its cached ref.
-        if (draft.inReplyTo !== undefined || draft.replyType !== undefined) {
+        if (draft.reply != null) {
           linkedParentId = writeAnnotationRelationship(
             this.runtime,
             this.session,
             pagePtr,
             annotPtr,
             pageObjectNumber,
-            { inReplyTo: draft.inReplyTo, replyType: draft.replyType },
+            { inReplyTo: draft.reply.to, replyType: draft.reply.type },
+          );
+        }
+        if (draft.subtype === 'popup' && draft.parent != null) {
+          linkedParentId = writePopupParent(
+            this.runtime,
+            this.session,
+            pagePtr,
+            annotPtr,
+            pageObjectNumber,
+            draft.parent,
+            null,
           );
         }
         // Stamp identity + modification metadata after the per-subtype
         // writer so a buggy subtype writer can't clobber them:
         //   /T             ← actor.displayName  (when present)
+        //   /CreationDate  ← now                 (always)
         //   /M             ← now                 (always)
         //   /EMBD_Metadata ← actor.userId/groupId (when present)
         if (actor?.displayName) {
           writeAnnotationAuthor(fn, mem, annotPtr, actor.displayName);
         }
-        writeAnnotationModified(fn, mem, annotPtr);
+        const now = new Date();
+        writeAnnotationCreated(fn, mem, annotPtr, now);
+        writeAnnotationModified(fn, mem, annotPtr, now);
         applyEmbedMetadataOnCreate(fn, mem, annotPtr, actor);
         // Bake the /AP appearance stream now that every visual field is
         // written, so the new annotation ships with a standard-compliant
@@ -258,8 +282,6 @@ export class AnnotationMutator {
       throwIfAborted(signal);
 
       const writeCtx = this.writeContext(pagePtr, resources);
-      preflightPatch(patch, writeCtx);
-      assertRichTextAgreement(patch);
 
       this.ensureKnownWeakStateFromPage(ref.page.pageObjectNumber, pagePtr);
       const pageStateBefore = this.session.pageState(ref.page.pageObjectNumber);
@@ -289,6 +311,9 @@ export class AnnotationMutator {
         readContextFor(this.session, this.fonts),
       );
 
+      patch = patchForTarget(currentDto, patch);
+      preflightPatch(patch, writeCtx);
+      assertRichTextAgreement(patch);
       patch = prepareMeasurementPatch(fn, annotPtr, currentDto, patch);
 
       // Apply boundary: validation and cancellation are complete before the
@@ -316,14 +341,32 @@ export class AnnotationMutator {
       // link may promote a weak parent to indirect (non-structural); the
       // strengthened parent id is folded into `meta.changed` below.
       let linkedParentId: AnnotationStableId | null = null;
-      if (patch.inReplyTo !== undefined || patch.replyType !== undefined) {
+      if (patch.reply !== undefined && !sameReply(patch.reply, currentDto.reply)) {
         linkedParentId = writeAnnotationRelationship(
           this.runtime,
           this.session,
           pagePtr,
           annotPtr,
           ref.page.pageObjectNumber,
-          { inReplyTo: patch.inReplyTo, replyType: patch.replyType },
+          patch.reply === null
+            ? { inReplyTo: null }
+            : { inReplyTo: patch.reply.to, replyType: patch.reply.type ?? 'reply' },
+        );
+      }
+      if (
+        patch.subtype === 'popup' &&
+        currentDto.subtype === 'popup' &&
+        patch.parent !== undefined &&
+        !sameRef(patch.parent, currentDto.parent)
+      ) {
+        linkedParentId = writePopupParent(
+          this.runtime,
+          this.session,
+          pagePtr,
+          annotPtr,
+          ref.page.pageObjectNumber,
+          patch.parent,
+          currentDto.parent,
         );
       }
       // Refresh standard /M (modified date) on every update — independent
@@ -805,4 +848,84 @@ export class AnnotationMutator {
     }
     return false;
   }
+}
+
+/**
+ * The patch as the target's kind: its subtype filled in from the target, which
+ * a caller may leave out. A different subtype, a changed name, or any change to
+ * an annotation of a type the engine doesn't model is refused.
+ */
+function patchForTarget(current: AnnotationDTO, patch: WireAnnotationPatch): WireAnnotationPatch {
+  if (patch.subtype !== undefined && patch.subtype !== current.subtype) {
+    throw new EngineError(EngineErrorCode.InvalidArg, 'Annotation subtype cannot change');
+  }
+  if (current.subtype === 'unsupported') {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      "an annotation of a type the engine doesn't model can't be updated",
+    );
+  }
+  if (patch.nm !== undefined && patch.nm !== current.nm) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      "an annotation's nm can't change after create",
+    );
+  }
+  assertDeclaredFields(current.subtype, patch);
+  if (current.subtype === 'file-attachment' && 'file' in patch && patch.file !== undefined) {
+    if (!sameFileMetadata(patch.file, current.file)) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        "a file attachment's file can't change after create",
+      );
+    }
+    const { file: _file, ...rest } = patch;
+    return { ...rest, subtype: current.subtype } as WireAnnotationPatch;
+  }
+  return { ...patch, subtype: current.subtype } as WireAnnotationPatch;
+}
+
+interface FileMetadata {
+  name: string;
+  mimeType?: string | null;
+  description?: string | null;
+}
+
+/** Whether a patch's `file` repeats the attached file's name, MIME type and description. */
+function sameFileMetadata(next: FileMetadata | null, current: FileMetadata | null): boolean {
+  if (next === null || current === null) return next === current;
+  return (
+    next.name === current.name &&
+    (next.mimeType ?? null) === (current.mimeType ?? null) &&
+    (next.description ?? null) === (current.description ?? null)
+  );
+}
+
+/** A write names only fields its kind declares: a misspelled or foreign field is refused, never ignored. */
+function assertDeclaredFields(subtype: AnnotationSubtype, write: object): void {
+  const known = ANNOTATION_FIELD_NAMES[subtype];
+  const unknown = Object.keys(write).filter(
+    (name) =>
+      name !== 'subtype' &&
+      !known.includes(name) &&
+      !(subtype === 'stamp' && STAMP_SOURCE_FIELD_NAMES.includes(name)),
+  );
+  if (unknown.length > 0) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      `${subtype} has no field ${unknown.map((name) => `'${name}'`).join(', ')}`,
+    );
+  }
+}
+
+const sameRef = (left: AnnotationRef | null, right: AnnotationRef | null): boolean =>
+  left === null || right === null ? left === right : annotationKey(left) === annotationKey(right);
+
+/** Whether a patch's `reply` names the link the annotation already has. */
+function sameReply(
+  next: { to: AnnotationRef; type?: AnnotationReplyType } | null,
+  current: { to: AnnotationRef; type: AnnotationReplyType } | null,
+): boolean {
+  if (next === null || current === null) return next === current;
+  return sameRef(next.to, current.to) && (next.type ?? 'reply') === current.type;
 }

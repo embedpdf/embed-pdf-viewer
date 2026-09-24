@@ -25,8 +25,7 @@ const annot = (n: number, over: Record<string, unknown> = {}): AnnotationDTO =>
     author: null,
     created: null,
     modified: null,
-    inReplyTo: null,
-    replyType: null,
+    reply: null,
     ...over,
   }) as unknown as AnnotationDTO;
 
@@ -35,8 +34,7 @@ const reply = (n: number, parent: number, over: Record<string, unknown> = {}): A
     subtype: 'text',
     state: null,
     stateModel: null,
-    inReplyTo: ref(parent),
-    replyType: 'reply',
+    reply: { to: ref(parent), type: 'reply' },
     ...over,
   });
 
@@ -47,8 +45,7 @@ const state = (
 ): AnnotationDTO =>
   annot(n, {
     subtype: 'text',
-    inReplyTo: parent === null ? null : ref(parent),
-    replyType: parent === null ? null : 'reply',
+    reply: parent === null ? null : { to: ref(parent), type: 'reply' },
     state: fields.state ?? null,
     stateModel: fields.stateModel ?? null,
     userId: fields.by,
@@ -104,7 +101,7 @@ describe('buildCommentThreads — threading', () => {
   it('folds /RT /Group subordinates into groupedParts, never replies', () => {
     const threads = buildCommentThreads([
       annot(1, { subtype: 'strikeout' }),
-      annot(2, { subtype: 'caret', inReplyTo: ref(1), replyType: 'group' }),
+      annot(2, { subtype: 'caret', reply: { to: ref(1), type: 'group' } }),
       reply(3, 1),
     ]);
     expect(threads).toHaveLength(1);
@@ -130,8 +127,8 @@ describe('buildCommentThreads — threading', () => {
 
   it('survives an /IRT cycle: first member promotes, back-edge dies', () => {
     const threads = buildCommentThreads([
-      annot(1, { inReplyTo: ref(2), replyType: 'reply' }),
-      annot(2, { inReplyTo: ref(1), replyType: 'reply' }),
+      annot(1, { reply: { to: ref(2), type: 'reply' } }),
+      annot(2, { reply: { to: ref(1), type: 'reply' } }),
     ]);
     expect(threads).toHaveLength(1);
     expect(num(threads[0]!.root.ref)).toBe(1);
@@ -142,10 +139,9 @@ describe('buildCommentThreads — threading', () => {
     const threads = buildCommentThreads([
       annot(1, { nm: 'root-nm' }),
       reply(2, 0, {
-        inReplyTo: {
-          kind: 'nm',
-          page: { kind: 'objectNumber', pageObjectNumber: 1 },
-          nm: 'root-nm',
+        reply: {
+          to: { kind: 'nm', page: { kind: 'objectNumber', pageObjectNumber: 1 }, nm: 'root-nm' },
+          type: 'reply',
         },
       }),
     ]);
@@ -288,8 +284,7 @@ describe('buildCommentThreads — review status', () => {
       state(2, 1, { state: 'accepted', stateModel: 'review', at: '2026-08-28T10:00:00Z' }),
       annot(3, {
         subtype: 'text',
-        inReplyTo: ref(1),
-        replyType: 'reply',
+        reply: { to: ref(1), type: 'reply' },
         state: 'rejected',
         stateModel: 'review',
         author: 'Alice (T)',
@@ -325,8 +320,7 @@ describe('buildCommentThreads — review status', () => {
       annot(1),
       annot(2, {
         subtype: 'text',
-        inReplyTo: ref(1),
-        replyType: 'reply',
+        reply: { to: ref(1), type: 'reply' },
         state: '',
         stateModel: '',
         contents: 'just a reply',

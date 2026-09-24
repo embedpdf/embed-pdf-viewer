@@ -6,6 +6,7 @@
  */
 import {
   contentToPdfRect,
+  FLAG_KEYS,
   normalizeDeg,
   pdfToContentRect,
   rotatedAabb,
@@ -17,6 +18,7 @@ import {
 } from '@embedpdf/core-annotation';
 import type {
   AnnotationDTO,
+  AnnotationFlags,
   AnnotationRef,
   Color,
   PdfLinkTarget,
@@ -77,7 +79,12 @@ export const fromPdfRotation = (rotPdf: number): number => normalizeDeg(-rotPdf)
 
 /** Advisory `rot` for a vertex geom, from a DTO's (PDF-convention) `rotation`.
  *  Absent → no `rot` key (kept off the geom so unrotated shapes stay clean). */
-export const rotFromDTO = (rotation?: number): { rot?: number } =>
+/** The `/F` flags of a read, as the model's one flag set. */
+export function flagsOf(dto: AnnotationFlags): AnnotationFlags {
+  return Object.fromEntries(FLAG_KEYS.map((key) => [key, dto[key]])) as unknown as AnnotationFlags;
+}
+
+export const rotFromDTO = (rotation?: number | null): { rot?: number } =>
   rotation ? { rot: fromPdfRotation(rotation) } : {};
 
 /**
@@ -133,7 +140,7 @@ export const insetPdfRectByRD = (rect: PdfRect, rd?: PdfRectDifferences | null):
  *  cloudy effect wins over the underlying border style (which stays solid). */
 export function borderFromDTO(dto: {
   borderStyle?: string;
-  dashArray?: number[];
+  dashArray?: number[] | null;
   cloudyIntensity?: number | null;
 }): Border {
   if ((dto.cloudyIntensity ?? 0) > 0) return { kind: 'cloudy', intensity: dto.cloudyIntensity! };

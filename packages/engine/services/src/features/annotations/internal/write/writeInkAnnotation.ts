@@ -1,10 +1,10 @@
 import type { InkDraft, InkPatch } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
-import { setAnnotRect, setInkList, setIntent } from './annotationWritePrimitives';
+import { setAnnotRect, setInkList, setIntent, setIntentOrClear } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
-import { applyGeometryStyleDraft, applyGeometryStylePatch } from './writeStyle';
 import { writeVertexTransformMetadata } from './writeAnnotationTransformMetadata';
+import { applyGeometryStyleDraft, applyGeometryStylePatch } from './writeStyle';
 import { inkIntentToName } from '../inkIntent';
 
 /**
@@ -23,7 +23,7 @@ export function applyInkDraft(
   draft: InkDraft,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
-  if (draft.intent !== undefined) setIntent(fn, annotPtr, inkIntentToName(draft.intent));
+  if (draft.intent != null) setIntent(fn, annotPtr, inkIntentToName(draft.intent));
   setAnnotRect(fn, mem, annotPtr, draft.rect);
   applyGeometryStyleDraft(fn, mem, annotPtr, draft);
   setInkList(fn, mem, annotPtr, draft.inkList);
@@ -38,7 +38,9 @@ export function applyInkPatch(
   patch: InkPatch,
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);
-  if (patch.intent !== undefined) setIntent(fn, annotPtr, inkIntentToName(patch.intent));
+  if (patch.intent !== undefined) {
+    setIntentOrClear(fn, annotPtr, patch.intent === null ? null : inkIntentToName(patch.intent));
+  }
   if (patch.rect !== undefined) {
     setAnnotRect(fn, mem, annotPtr, patch.rect);
   }

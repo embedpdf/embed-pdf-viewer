@@ -14,8 +14,8 @@ import {
   setRectangleDifferences,
 } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
-import { applyFilledStyleDraft, applyFilledStylePatch } from './writeStyle';
 import { writeBoxTransformMetadata } from './writeAnnotationTransformMetadata';
+import { applyFilledStyleDraft, applyFilledStylePatch } from './writeStyle';
 
 export type ShapeDraft = CircleDraft | SquareDraft;
 export type ShapePatch = CirclePatch | SquarePatch;

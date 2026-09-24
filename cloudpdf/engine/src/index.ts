@@ -89,6 +89,6 @@ export type {
   DocumentUnlockInput,
   DocumentUnlockResult,
   DocumentAccessInfo,
-  DocumentIdentity,
+  Identity,
   PdfSaveMode,
 } from '@embedpdf/engine-core/runtime';

@@ -88,19 +88,19 @@ export function seedFrom(documentId: string, sequence: number): number {
   return hash >>> 0;
 }
 
-/** Engine JWT/session identity composed under embedder overrides — the
- *  standard `ScriptHostOptions.identity` builder. */
+/** The session's identity, as Acrobat JavaScript's `identity` object, under
+ *  embedder overrides — the standard `ScriptHostOptions.identity` builder. */
 export function resolveScriptIdentity(
   doc: DocumentHandle,
   overrides?: Partial<ScriptIdentity> | (() => Partial<ScriptIdentity>),
 ): ScriptIdentity {
-  const claims = doc.security.identity;
+  const identity = doc.security.identity;
   const supplied = typeof overrides === 'function' ? overrides() : (overrides ?? {});
   return {
-    name: supplied.name ?? claims?.display_name ?? claims?.user_id ?? '',
-    loginName: supplied.loginName ?? claims?.user_id ?? '',
-    corporation: supplied.corporation ?? claims?.group_id ?? '',
-    email: supplied.email ?? '',
+    name: supplied.name ?? identity?.displayName ?? identity?.userId ?? '',
+    loginName: supplied.loginName ?? identity?.userId ?? '',
+    corporation: supplied.corporation ?? identity?.organization ?? '',
+    email: supplied.email ?? identity?.email ?? '',
   };
 }
 

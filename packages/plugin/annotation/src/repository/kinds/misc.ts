@@ -42,7 +42,13 @@ export const stamp: KindProjection = {
   ingest: (dto, crop) => {
     const stampDto = dto as Extract<AnnotationDTO, { subtype: 'stamp' }>;
     return {
-      geometry: boxGeomFromDTO(stampDto, stampDto.rotation, stampDto.unrotatedRect, crop, false),
+      geometry: boxGeomFromDTO(
+        stampDto,
+        stampDto.rotation ?? undefined,
+        stampDto.unrotatedRect ?? undefined,
+        crop,
+        false,
+      ),
     };
   },
   // Geometry only — the visual is the engine-baked /AP, re-fit natively when

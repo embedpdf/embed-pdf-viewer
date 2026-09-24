@@ -45,6 +45,7 @@ describe('caps — capability builders return the expected literal strings', () 
   it('annotate read/modify split + metadata + redact', () => {
     expect(caps.doc.annotate.read()).toBe('doc.annotate.read');
     expect(caps.doc.annotate.modify()).toBe('doc.annotate.modify');
+    expect(caps.doc.annotate.import()).toBe('doc.annotate.import');
     expect(caps.doc.metadata.modify()).toBe('doc.metadata.modify');
     expect(caps.doc.redact()).toBe('doc.redact');
   });
@@ -68,6 +69,7 @@ describe('caps — capability builders return the expected literal strings', () 
       caps.doc.forms.modify(),
       caps.doc.annotate.read(),
       caps.doc.annotate.modify(),
+      caps.doc.annotate.import(),
       caps.doc.metadata.modify(),
       caps.doc.redact(),
     ];

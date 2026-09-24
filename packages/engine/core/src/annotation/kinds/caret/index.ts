@@ -1,14 +1,17 @@
-import type { CaretDraft } from './draft';
-import type { CaretAnnotationDTO } from './dto';
-import type { CaretPatch } from './patch';
-import { CaretDTOSchema, CaretDraftSchema, CaretPatchSchema } from './schema';
+import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
+import { CaretDeclaration } from './declaration';
 
-export type { CaretAnnotationDTO } from './dto';
-export type { CaretDraft } from './draft';
-export type { CaretPatch } from './patch';
-export { CaretDTOSchema, CaretDraftSchema, CaretPatchSchema } from './schema';
+export { CaretDeclaration } from './declaration';
+
+export type CaretAnnotationDTO = ReadOf<typeof CaretDeclaration>;
+export type CaretDraft = CreateOf<typeof CaretDeclaration>;
+export type CaretPatch = UpdateOf<typeof CaretDeclaration>;
+
+export const CaretDTOSchema = CaretDeclaration.readSchema;
+export const CaretDraftSchema = CaretDeclaration.createSchema;
+export const CaretPatchSchema = CaretDeclaration.updateSchema;
 
 export const CaretKind: AnnotationKindModule<'caret', CaretAnnotationDTO, CaretDraft, CaretPatch> =
   {

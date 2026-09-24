@@ -189,10 +189,11 @@ export function runAttachmentConformance(
         expect(dto.subtype).toBe('file-attachment');
         expect(dto.icon).toBe('paperclip');
         expect(dto.color).toEqual({ r: 220, g: 38, b: 38 });
-        expect(dto.file.name).toBe('conformance.bin');
-        expect(dto.file.mimeType).toBe('application/octet-stream');
-        expect(dto.file.description).toBe('attachment conformance payload');
-        expect(dto.file.size).toBe(data.length);
+        const file = dto.file!;
+        expect(file.name).toBe('conformance.bin');
+        expect(file.mimeType).toBe('application/octet-stream');
+        expect(file.description).toBe('attachment conformance payload');
+        expect(file.size).toBe(data.length);
 
         // Bytes come back byte-identical through the explicit download.
         const content = await annotations.downloadFile!(dto.ref);

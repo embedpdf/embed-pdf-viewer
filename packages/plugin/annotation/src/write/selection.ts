@@ -162,10 +162,11 @@ export function createSelectionWrites(
         (left, right) => model.order.indexOf(left.id) - model.order.indexOf(right.id),
       );
       const [primary, ...rest] = ordered;
-      if (!primary.ref) return;
+      const primaryRef = primary.ref;
+      if (!primaryRef) return;
       await Promise.all(
         rest.map((annotation) =>
-          links.writeRelationship(annotation, { inReplyTo: primary.ref, replyType: 'group' }),
+          links.writeRelationship(annotation, { to: primaryRef, type: 'group' }),
         ),
       );
     },
@@ -177,9 +178,7 @@ export function createSelectionWrites(
           (annotation): annotation is ModelAnnotation =>
             !!annotation && !!annotation.ref && !!annotation.data && !!annotation.group,
         );
-      await Promise.all(
-        subs.map((annotation) => links.writeRelationship(annotation, { inReplyTo: null })),
-      );
+      await Promise.all(subs.map((annotation) => links.writeRelationship(annotation, null)));
     },
     canGroup: (): boolean => {
       const model = store.model();

@@ -57,7 +57,8 @@ const squareOf = (state: EngineState): AnnotationDTO =>
     index: 20,
     identityQuality: 'durable',
     nm: null,
-    flags: { ...FLAGS, print: state.print },
+    ...FLAGS,
+    print: state.print,
     contents: null,
     subject: null,
     author: null,
@@ -70,8 +71,14 @@ const squareOf = (state: EngineState): AnnotationDTO =>
     interiorColor: null,
     opacity: 1,
     strokeWidth: 2,
-    inReplyTo: null,
-    replyType: null,
+    reply: null,
+    popup: null,
+    groupId: null,
+    userId: null,
+    createdBy: null,
+    updatedBy: null,
+    importedBy: null,
+    actions: null,
   }) as unknown as AnnotationDTO;
 
 /** A small seeded generator (mulberry32), so a failure replays exactly. */
@@ -89,7 +96,7 @@ function random(seed: number) {
 
 /** One write the fake engine holds until the test answers it. */
 interface HeldWrite {
-  patch: { color?: { r: number; g: number; b: number }; flags?: AnnotationFlags };
+  patch: { color?: { r: number; g: number; b: number }; print?: boolean };
   resolve(result: unknown): void;
   reject(error: unknown): void;
 }
@@ -182,7 +189,7 @@ async function play(seed: number, steps: number) {
       const [write] = held.splice(index, 1);
       if (rng.next() < 0.75) {
         if (write!.patch.color) engine.color = hex(write!.patch.color);
-        if (write!.patch.flags) engine.print = write!.patch.flags.print;
+        if (write!.patch.print !== undefined) engine.print = write!.patch.print;
         change.state = 'accepted';
         write!.resolve({ updated: squareOf(engine) });
       } else {
@@ -219,7 +226,7 @@ async function play(seed: number, steps: number) {
     const change = inFlight.splice(index, 1)[0]!;
     const [write] = held.splice(index, 1);
     if (write!.patch.color) engine.color = hex(write!.patch.color);
-    if (write!.patch.flags) engine.print = write!.patch.flags.print;
+    if (write!.patch.print !== undefined) engine.print = write!.patch.print;
     change.state = 'accepted';
     write!.resolve({ updated: squareOf(engine) });
     await flush();

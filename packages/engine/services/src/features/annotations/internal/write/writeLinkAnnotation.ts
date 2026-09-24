@@ -9,12 +9,12 @@ import {
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 import { NULL_PTR } from '@embedpdf/engine-runtime';
 
+import type { AnnotationWriteContext } from './annotationWriteContext';
+import { setAnnotRect } from './annotationWritePrimitives';
+import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 import { withScratch } from '../../../../runtime/memory/scratch';
 import { F32_BYTES } from '../../../../runtime/memory/structs';
 import { VIEW_CODE_BY_KIND } from '../../../destinations/destinationViewCodes';
-import { setAnnotRect } from './annotationWritePrimitives';
-import type { AnnotationWriteContext } from './annotationWriteContext';
-import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 
 /**
  * Link writer: rect + the `/A` action. Only `goto`/`uri` targets are

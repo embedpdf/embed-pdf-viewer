@@ -37,7 +37,13 @@ export function cloudyExtras(annotation: ModelAnnotation): Wire {
 const ingest = (dto: AnnotationDTO, crop: PdfRect, ellipse: boolean) => {
   const shapeDto = dto as ShapeDTO;
   return {
-    geometry: boxGeomFromDTO(shapeDto, shapeDto.rotation, shapeDto.unrotatedRect, crop, ellipse),
+    geometry: boxGeomFromDTO(
+      shapeDto,
+      shapeDto.rotation ?? undefined,
+      shapeDto.unrotatedRect ?? undefined,
+      crop,
+      ellipse,
+    ),
   };
 };
 

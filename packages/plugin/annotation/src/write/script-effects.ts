@@ -42,7 +42,8 @@ const engineScriptPatch = (
     };
   }
   if (patch.contents !== undefined) out.contents = patch.contents;
-  if (patch.flags) out.flags = patch.flags;
+  // Each `/F` flag is its own engine field.
+  if (patch.flags) Object.assign(out, patch.flags);
   // Assembled key by key: the script VM already limited the keys to the ones
   // this kind accepts, and the engine validates the patch against the subtype.
   return out as unknown as AnnotationPatch;

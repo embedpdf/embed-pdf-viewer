@@ -143,7 +143,7 @@ export function runActionsConformance(
         expect(scriptOf(form.fields[0].actions?.format?.root)).toMatch(/AFDate_FormatEx/);
         const page = (await doc.pages.list()).pages[0];
         const widget = (await doc.page(page.ref).annotations.list()).annotations[0];
-        expect(widget.actions).toBe(undefined);
+        expect(widget.actions).toBe(null);
       } finally {
         await doc.close();
       }

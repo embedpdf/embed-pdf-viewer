@@ -41,7 +41,7 @@ const base = (annotObjectNumber: number) => ({
   index: annotObjectNumber,
   identityQuality: 'durable' as const,
   nm: null,
-  flags: NO_FLAGS,
+  ...NO_FLAGS,
   contents: null,
   subject: null,
   author: null,
@@ -59,8 +59,14 @@ const caretDTO = (): AnnotationDTO =>
     color: { r: 239, g: 68, b: 68 },
     opacity: 1,
     rectDifferences: { left: 0.5, top: 0.5, right: 0.5, bottom: 0.5 },
-    inReplyTo: null,
-    replyType: null,
+    reply: null,
+    popup: null,
+    groupId: null,
+    userId: null,
+    createdBy: null,
+    updatedBy: null,
+    importedBy: null,
+    actions: null,
   }) as AnnotationDTO;
 
 const strikeoutDTO = (): AnnotationDTO => {
@@ -78,8 +84,14 @@ const strikeoutDTO = (): AnnotationDTO => {
     color: { r: 239, g: 68, b: 68 },
     opacity: 1,
     quadPoints: [quad],
-    inReplyTo: ref(10),
-    replyType: 'group',
+    reply: { to: ref(10), type: 'group' },
+    popup: null,
+    groupId: null,
+    userId: null,
+    createdBy: null,
+    updatedBy: null,
+    importedBy: null,
+    actions: null,
   };
 };
 
@@ -106,14 +118,13 @@ describe('Replace Text grouped persistence', () => {
     expect(harness.create.mock.calls[0]![0]).toMatchObject({
       subtype: 'caret',
       intent: 'replace',
-      flags: { print: true },
+      print: true,
     });
     expect(harness.create.mock.calls[1]![0]).toMatchObject({
       subtype: 'strikeout',
       intent: 'strikeout-text-edit',
-      inReplyTo: ref(10),
-      replyType: 'group',
-      flags: { print: true },
+      reply: { to: ref(10), type: 'group' },
+      print: true,
     });
     const [caretId, strikeoutId] = harness.model().order;
     expect(harness.model().byId[strikeoutId]).toMatchObject({
@@ -146,14 +157,21 @@ describe('annotation flags', () => {
   const squareDTO = (objectNumber: number, flags: Partial<AnnotationFlags> = {}): AnnotationDTO =>
     ({
       ...base(objectNumber),
-      flags: { ...NO_FLAGS, ...flags },
+      ...NO_FLAGS,
+      ...flags,
       subtype: 'square',
       rect: { left: 100, bottom: 700, right: 180, top: 760 },
       color: { r: 0, g: 0, b: 0 },
       opacity: 1,
       strokeWidth: 2,
-      inReplyTo: null,
-      replyType: null,
+      reply: null,
+      popup: null,
+      groupId: null,
+      userId: null,
+      createdBy: null,
+      updatedBy: null,
+      importedBy: null,
+      actions: null,
     }) as AnnotationDTO;
 
   /** Load these records as the document's annotations. */
@@ -180,7 +198,8 @@ describe('annotation flags', () => {
     // a flags-only patch: no geometry/style keys ride along, so nothing re-bakes
     expect(patch).toEqual({
       subtype: 'square',
-      flags: { ...NO_FLAGS, locked: true },
+      ...NO_FLAGS,
+      locked: true,
     });
     // the re-sync preserves 'baked'
     await vi.waitFor(() => expect(harness.model().byId[id].source).toBe('baked'));
@@ -216,7 +235,7 @@ describe('annotation flags', () => {
       subtype: 'square',
       rect: { left: 0, bottom: 0, right: 10, top: 10 },
     } as Parameters<typeof harness.capability.createRaw>[1]);
-    expect(harness.create.mock.calls[0]![0]).toMatchObject({ flags: { print: true } });
+    expect(harness.create.mock.calls[0]![0]).toMatchObject({ print: true });
   });
 });
 
@@ -258,8 +277,14 @@ const hydrationSquare = (objectNumber: number): AnnotationDTO =>
     color: { r: 0, g: 0, b: 0 },
     opacity: 1,
     strokeWidth: 2,
-    inReplyTo: null,
-    replyType: null,
+    reply: null,
+    popup: null,
+    groupId: null,
+    userId: null,
+    createdBy: null,
+    updatedBy: null,
+    importedBy: null,
+    actions: null,
   }) as AnnotationDTO;
 
 /** The mutation meta every annotation event carries (a remote event replays the writer's result). */
@@ -438,8 +463,14 @@ describe('links lens — substrate children, no ledger', () => {
       ...hydrationSquare(objectNumber),
       subtype: 'link',
       target: TARGET,
-      inReplyTo: ref(parent),
-      replyType: 'group',
+      reply: { to: ref(parent), type: 'group' },
+      popup: null,
+      groupId: null,
+      userId: null,
+      createdBy: null,
+      updatedBy: null,
+      importedBy: null,
+      actions: null,
     }) as unknown as AnnotationDTO;
 
   it('links.of derives from the committed child; a remote child delete clears it (no sweep)', async () => {
@@ -482,8 +513,7 @@ describe('links lens — substrate children, no ledger', () => {
       expect.objectContaining({
         subtype: 'link',
         target: TARGET,
-        inReplyTo: ref(20),
-        replyType: 'group',
+        reply: { to: ref(20), type: 'group' },
       }),
     );
     // …and the lens reads the new value the moment the promise settles.
@@ -506,8 +536,14 @@ describe('link nav items — attached vs standalone', () => {
         ...hydrationSquare(21),
         subtype: 'link',
         target: { kind: 'uri', uri: 'https://example.com' },
-        inReplyTo: ref(20),
-        replyType: 'group',
+        reply: { to: ref(20), type: 'group' },
+        popup: null,
+        groupId: null,
+        userId: null,
+        createdBy: null,
+        updatedBy: null,
+        importedBy: null,
+        actions: null,
       } as unknown as AnnotationDTO,
       // A standalone document link (no group): navigates under any link-nav
       // tool — never stands down.
@@ -540,8 +576,14 @@ describe('conversation plane at the capability boundary', () => {
       icon: 'note',
       state: 'accepted',
       stateModel: 'review',
-      inReplyTo: ref(80),
-      replyType: 'reply',
+      reply: { to: ref(80), type: 'reply' },
+      popup: null,
+      groupId: null,
+      userId: null,
+      createdBy: null,
+      updatedBy: null,
+      importedBy: null,
+      actions: null,
     } as unknown as AnnotationDTO;
     harness.emit(createdEvent(statusDto, 45));
 
@@ -566,8 +608,14 @@ describe('the comments lens', () => {
       icon: 'note',
       state: null,
       stateModel: null,
-      inReplyTo: null,
-      replyType: null,
+      reply: null,
+      popup: null,
+      groupId: null,
+      userId: null,
+      createdBy: null,
+      updatedBy: null,
+      importedBy: null,
+      actions: null,
       ...over,
     }) as unknown as AnnotationDTO;
   const rootAt = (objectNumber: number, top: number): AnnotationDTO =>
@@ -588,10 +636,15 @@ describe('the comments lens', () => {
     await harness.load([
       rootAt(25, 500),
       rootAt(20, 760),
-      textDto(21, { inReplyTo: ref(20), replyType: 'reply', contents: 'a reply' }),
+      textDto(21, { reply: { to: ref(20), type: 'reply' }, contents: 'a reply' }),
       textDto(22, {
-        inReplyTo: ref(20),
-        replyType: 'reply',
+        reply: { to: ref(20), type: 'reply' },
+        popup: null,
+        groupId: null,
+        createdBy: null,
+        updatedBy: null,
+        importedBy: null,
+        actions: null,
         state: 'accepted',
         stateModel: 'review',
         userId: 'alice',
@@ -626,7 +679,7 @@ describe('the comments lens', () => {
     const harness = createHarness();
     await seed(harness);
     harness.create.mockResolvedValueOnce({
-      created: textDto(40, { inReplyTo: ref(20), replyType: 'reply', contents: 'agreed' }),
+      created: textDto(40, { reply: { to: ref(20), type: 'reply' }, contents: 'agreed' }),
     });
     const created = await harness.capability.comments.reply(ref(21), 'agreed'); // via the reply
     expect(harness.create).toHaveBeenCalledWith(
@@ -634,8 +687,10 @@ describe('the comments lens', () => {
         subtype: 'text',
         contents: 'agreed',
         icon: 'comment',
-        inReplyTo: ref(20), // the root, not the reply
-        flags: { print: true, noZoom: true, noRotate: true },
+        reply: { to: ref(20) }, // the root, not the reply
+        print: true,
+        noZoom: true,
+        noRotate: true,
       }),
     );
     expect(created).toEqual(ref(40));
@@ -647,8 +702,13 @@ describe('the comments lens', () => {
     await seed(harness);
     harness.create.mockResolvedValueOnce({
       created: textDto(41, {
-        inReplyTo: ref(20),
-        replyType: 'reply',
+        reply: { to: ref(20), type: 'reply' },
+        popup: null,
+        groupId: null,
+        createdBy: null,
+        updatedBy: null,
+        importedBy: null,
+        actions: null,
         state: 'accepted',
         stateModel: 'review',
         userId: 'me',
@@ -660,16 +720,23 @@ describe('the comments lens', () => {
       expect.objectContaining({
         state: 'accepted',
         stateModel: 'review',
-        inReplyTo: ref(20),
-        flags: { hidden: true, noZoom: true, noRotate: true },
+        reply: { to: ref(20) },
+        hidden: true,
+        noZoom: true,
+        noRotate: true,
       }),
     );
     expect(harness.capability.comments.getThread(ref(20))!.review.mine?.state).toBe('accepted');
 
     harness.create.mockResolvedValueOnce({
       created: textDto(42, {
-        inReplyTo: ref(41),
-        replyType: 'reply',
+        reply: { to: ref(41), type: 'reply' },
+        popup: null,
+        groupId: null,
+        createdBy: null,
+        updatedBy: null,
+        importedBy: null,
+        actions: null,
         state: 'rejected',
         stateModel: 'review',
         userId: 'me',
@@ -678,7 +745,7 @@ describe('the comments lens', () => {
     });
     await harness.capability.comments.setStatus(ref(20), 'rejected');
     expect(harness.create).toHaveBeenLastCalledWith(
-      expect.objectContaining({ state: 'rejected', inReplyTo: ref(41) }), // the ISO chain
+      expect.objectContaining({ state: 'rejected', reply: { to: ref(41) } }), // the ISO chain
     );
     expect(harness.capability.comments.getThread(ref(20))!.review.mine?.state).toBe('rejected');
   });
@@ -709,8 +776,9 @@ describe('the comments lens', () => {
     await harness.load([
       rootAt(20, 760),
       {
-        ...textDto(21, { inReplyTo: ref(20), replyType: 'reply' }),
-        flags: { ...NO_FLAGS, locked: true },
+        ...textDto(21, { reply: { to: ref(20), type: 'reply' } }),
+        ...NO_FLAGS,
+        locked: true,
       } as unknown as AnnotationDTO,
     ]);
     const result = await harness.capability.comments.deleteThread(ref(20));
@@ -724,9 +792,10 @@ describe('the comments lens', () => {
     await harness.load([
       {
         ...rootAt(20, 760),
-        flags: { ...NO_FLAGS, lockedContents: true },
+        ...NO_FLAGS,
+        lockedContents: true,
       } as unknown as AnnotationDTO,
-      textDto(21, { inReplyTo: ref(20), replyType: 'reply' }),
+      textDto(21, { reply: { to: ref(20), type: 'reply' } }),
     ]);
     const perms = harness.capability.comments.getPermissions(ref(20));
     expect(perms.canEditText).toBe(false); // lockedContents gates text
@@ -739,8 +808,9 @@ describe('the comments lens', () => {
     await harness.load([
       rootAt(20, 760),
       {
-        ...textDto(21, { inReplyTo: ref(20), replyType: 'reply' }),
-        flags: { ...NO_FLAGS, locked: true },
+        ...textDto(21, { reply: { to: ref(20), type: 'reply' } }),
+        ...NO_FLAGS,
+        locked: true,
       } as unknown as AnnotationDTO,
     ]);
     const perms2 = harness.capability.comments.getPermissions(ref(20));
@@ -757,10 +827,15 @@ describe('the comments lens', () => {
     );
     await harness.load([
       { ...rootAt(20, 760), userId: 'me' } as unknown as AnnotationDTO,
-      textDto(21, { inReplyTo: ref(20), replyType: 'reply', userId: 'me' }),
+      textDto(21, { reply: { to: ref(20), type: 'reply' }, userId: 'me' }),
       textDto(22, {
-        inReplyTo: ref(20),
-        replyType: 'reply',
+        reply: { to: ref(20), type: 'reply' },
+        popup: null,
+        groupId: null,
+        createdBy: null,
+        updatedBy: null,
+        importedBy: null,
+        actions: null,
         state: 'accepted',
         stateModel: 'review',
         userId: 'alice',
@@ -967,13 +1042,19 @@ describe.each([
     interiorColor: null,
     borderStyle: 'solid',
     opacity: 1,
-    caption: { enabled: true },
+    captionEnabled: true,
     leader: { length: -20 },
     lineEndings: { start: 'none', end: 'none' },
     contents: '200 pt',
-    inReplyTo: null,
-    replyType: null,
-  } as AnnotationDTO;
+    reply: null,
+    popup: null,
+    groupId: null,
+    userId: null,
+    createdBy: null,
+    updatedBy: null,
+    importedBy: null,
+    actions: null,
+  } as unknown as AnnotationDTO;
 
   it('a programmatic update keeps the raster and fetches the one the engine re-baked', async () => {
     const harness = createHarness();
@@ -1039,7 +1120,7 @@ describe('distance authoring and recalibration', () => {
       rect: CROP,
       linePoints: { start: { x: 20, y: 780 }, end: { x: 220, y: 780 } },
       measure: region,
-      caption: { enabled: true },
+      captionEnabled: true,
     } as AnnotationDTO;
     harness.create.mockResolvedValue({ created: dto });
     harness.capability.createPointer('distance', 'down', PAGE, { x: 20, y: 20 });
@@ -1053,7 +1134,8 @@ describe('distance authoring and recalibration', () => {
         intent: 'LineDimension',
         measure: region,
         contents: '20 ft',
-        caption: { enabled: true, position: 'inline' },
+        captionEnabled: true,
+        captionPosition: 'inline',
         leader: { length: 12, extension: 5, offset: 0 },
       }),
     );
@@ -1116,11 +1198,12 @@ describe('distance authoring and recalibration', () => {
           rect: CROP,
           intent: 'LineDimension',
           measure: objectNumber === 82 ? { subtype: 'GEO' } : scale,
-          caption: { enabled: true },
+          captionEnabled: true,
           linePoints: { start: { x: 0, y: 0 }, end: { x: 100, y: 0 } },
-          flags: { ...NO_FLAGS, locked: objectNumber === 81 },
+          ...NO_FLAGS,
+          locked: objectNumber === 81,
           userId: objectNumber === 83 ? 'other' : 'me',
-        }) as AnnotationDTO,
+        }) as unknown as AnnotationDTO,
     );
     harness.listRawAll.mockResolvedValue(snapshot(dtos));
     harness.allowsAnnotationMutation.mockImplementation(
@@ -1166,7 +1249,7 @@ describe.each(['area', 'perimeter'])('%s scale resolution', (tool) => {
         ],
         intent: tool === 'area' ? 'PolygonDimension' : 'PolyLineDimension',
         measure: region,
-        caption: { enabled: true },
+        captionEnabled: true,
         color: { r: 239, g: 68, b: 68 },
         strokeWidth: 1,
         opacity: 1,
@@ -1181,7 +1264,7 @@ describe.each(['area', 'perimeter'])('%s scale resolution', (tool) => {
       expect.objectContaining({
         subtype,
         measure: region,
-        caption: { enabled: true },
+        captionEnabled: true,
         contents: tool === 'area' ? '100 m²' : '30 m',
       }),
     );

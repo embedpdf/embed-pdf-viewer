@@ -1,84 +1,9 @@
-import { z } from 'zod';
+import type { CreateShape, ReadShape, UpdateShape } from '../declaration';
+import type { annotationBaseFields, vertexFields } from './shared-fields';
 
-import {
-  FilledStyleDTOShape,
-  FilledStyleDraftShape,
-  FilledStylePatchShape,
-  type FilledStyleDraftFields,
-  type FilledStyleFields,
-  type FilledStylePatchFields,
-} from './style.shared';
-import type { PdfPoint, PdfRect } from '../../geometry/primitives';
-import { PdfPointSchema } from '../../geometry/schemas';
-import { PdfRectSchema } from '../../geometry/schemas';
-import type { AnnotationBase } from '../base';
-import { AnnotationBaseShape } from '../base.schema';
+type BaseName = keyof typeof annotationBaseFields;
 
-/**
- * Vertex-family-specific fields. The two vertex subtypes (polygon/polyline)
- * carry their geometry as a `/Vertices` point list (ISO 32000 §12.5.6.9)
- * plus the common stroke/fill styling ({@link FilledStyleFields}). Polygon
- * layers a cloudy border (`/BE`) on top; polyline layers line endings
- * (`/LE`); each kind file adds those. (Polygon does not use `/RD` — its
- * geometry is fully described by `/Vertices` + `/Rect`, so `/RD` is for the
- * shape family only.)
- *
- * Like shapes, the engine takes an explicit `/Rect` on the Draft (the
- * annotation plugin owns the bounding-box + rotation math, so the engine stays a
- * faithful persistence layer); the DTO inherits `rect` from
- * `AnnotationBase`.
- */
-export interface VertexAnnotationFields extends FilledStyleFields {
-  /** `/Vertices` — the ordered point list (PDF user space, y-up). */
-  vertices: PdfPoint[];
-  /**
-   * `/EMBD_Metadata/Rotation` — advisory rotation (degrees, PDF convention). The
-   * vertices are already rotated (they are the portable visual); this scalar
-   * just records the applied angle so EmbedPDF can show an oriented selection
-   * box and offer reset. It carries no `unrotatedRect`, so it is inert for AP
-   * (PDFium ignores a lone `Rotation`).
-   */
-  rotation?: number;
-}
-
-export interface VertexDraftFields extends FilledStyleDraftFields {
-  /** `/Vertices` geometry — required (vertex annotations are not derived). */
-  vertices: PdfPoint[];
-  /** `/Rect` bounding box — required (computed by the caller/plugin). */
-  rect: PdfRect;
-  /** Advisory rotation (deg). See {@link VertexAnnotationFields.rotation}. */
-  rotation?: number | null;
-}
-
-export interface VertexPatchFields extends FilledStylePatchFields {
-  vertices?: PdfPoint[];
-  rect?: PdfRect;
-  /** Tri-state: omitted preserves, `null`/`0` clears the advisory scalar. */
-  rotation?: number | null;
-}
-
-export const VertexDTOShape = {
-  ...AnnotationBaseShape,
-  ...FilledStyleDTOShape,
-  vertices: z.array(PdfPointSchema),
-  rotation: z.number().optional(),
-} as const;
-
-export const VertexDraftShape = {
-  ...FilledStyleDraftShape,
-  vertices: z.array(PdfPointSchema),
-  rect: PdfRectSchema,
-  rotation: z.number().nullable().optional(),
-} as const;
-
-export const VertexPatchShape = {
-  ...FilledStylePatchShape,
-  vertices: z.array(PdfPointSchema).optional(),
-  rect: PdfRectSchema.optional(),
-  rotation: z.number().nullable().optional(),
-} as const;
-
-/** Glue type used by each vertex kind file to construct its concrete DTO. */
-export type VertexDTO<S extends string> = AnnotationBase & {
-  subtype: S;
-} & VertexAnnotationFields;
+/** The fields a polygon or polyline adds to the base. */
+export type VertexAnnotationFields = Omit<ReadShape<typeof vertexFields>, BaseName>;
+export type VertexDraftFields = Omit<CreateShape<typeof vertexFields>, Exclude<BaseName, 'rect'>>;
+export type VertexPatchFields = Omit<UpdateShape<typeof vertexFields>, Exclude<BaseName, 'rect'>>;

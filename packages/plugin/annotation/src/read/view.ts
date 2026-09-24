@@ -36,8 +36,8 @@ export const authorityOf = (
   const security = ctx.doc?.security;
   if (!security) return undefined;
   const target = {
-    ...(dto.userId !== undefined ? { userId: dto.userId } : {}),
-    ...(dto.groupId !== undefined ? { groupId: dto.groupId } : {}),
+    ...(dto.userId != null ? { userId: dto.userId } : {}),
+    ...(dto.groupId != null ? { groupId: dto.groupId } : {}),
   };
   return {
     update: security.allowsAnnotationMutation('update', target),

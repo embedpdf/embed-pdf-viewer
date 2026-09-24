@@ -2,8 +2,8 @@ import type { AnnotationListPageSnapshot, PageObjectNumber } from '@embedpdf/eng
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
-import type { FontRegistrar } from '../fonts/FontRegistrar';
 import { throwIfAborted } from '../../shared/abort';
+import type { FontRegistrar } from '../fonts/FontRegistrar';
 import { collectPageAnnotations } from './internal/read/collectPageAnnotations';
 
 /**

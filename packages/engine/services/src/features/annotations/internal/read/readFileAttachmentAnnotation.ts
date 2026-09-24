@@ -21,8 +21,8 @@ const DEFAULT_FILE_ATTACHMENT_ICON: FileAttachmentIcon = 'push-pin';
  * FileAttachment DTO: base + icon presentation + the attached file's
  * metadata (bytes are downloaded explicitly via
  * `PageAnnotationsService.downloadFile`). A malformed annotation without
- * a readable `/FS` filespec still reads — `file.name` is `''` and the
- * download call reports the precise error.
+ * a readable `/FS` filespec still reads, with `file: null`; the download
+ * call reports the precise error.
  */
 export function readFileAttachment(
   fn: PdfFunctions,
@@ -37,9 +37,9 @@ export function readFileAttachment(
     FILE_NAME_TO_ICON[readAnnotName(fn, mem, annotPtr) ?? ''] ?? DEFAULT_FILE_ATTACHMENT_ICON;
 
   const attachmentPtr = fn.FPDFAnnot_GetFileAttachment(annotPtr);
-  const file: AttachmentFileInfo = attachmentPtr
+  const file: AttachmentFileInfo | null = attachmentPtr
     ? readAttachmentFileInfo(fn, mem, attachmentPtr)
-    : { name: '' };
+    : null;
 
   return {
     ...base,

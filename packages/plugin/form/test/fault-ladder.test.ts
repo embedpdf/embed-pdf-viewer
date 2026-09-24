@@ -136,7 +136,7 @@ function harness(snapshot: FormSnapshot, sandbox: ScriptSandbox = new NodeSandbo
     id: 'form-doc',
     forms: { list: async () => snapshot, applyEffects },
     actions: { read: async () => ({ nameTreeScripts: [], openAction: null }) },
-    security: { identity: { user_id: 'alex', display_name: 'Alex Morgan', group_id: 'EmbedPDF' } },
+    security: { identity: { userId: 'alex', displayName: 'Alex Morgan', organization: 'EmbedPDF' } },
   } as unknown as DocumentHandle;
   const realm = standaloneRealm(doc, documentMeta, {
     now: () => Date.UTC(2026, 6, 15, 9, 30, 0),

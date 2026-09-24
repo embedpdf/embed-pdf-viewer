@@ -1,4 +1,3 @@
-import { writeMeasurementFields } from './writeMeasurementFields';
 import type {
   PolygonDraft,
   PolygonPatch,
@@ -15,8 +14,9 @@ import {
   setVertices,
 } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
-import { applyFilledStyleDraft, applyFilledStylePatch } from './writeStyle';
 import { writeVertexTransformMetadata } from './writeAnnotationTransformMetadata';
+import { writeMeasurementFields } from './writeMeasurementFields';
+import { applyFilledStyleDraft, applyFilledStylePatch } from './writeStyle';
 
 export type VertexDraft = PolygonDraft | PolylineDraft;
 export type VertexPatch = PolygonPatch | PolylinePatch;

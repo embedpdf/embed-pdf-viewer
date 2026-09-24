@@ -19,6 +19,7 @@ import {
   setAnnotOpacity,
   setAnnotRect,
   setIntent,
+  setIntentOrClear,
 } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 import { strikeoutIntentToName } from '../textEditIntent';
@@ -73,7 +74,7 @@ export function applyTextMarkupDraft(
     draft.subtype === 'highlight' ? DEFAULT_HIGHLIGHT_COLOR : DEFAULT_TEXT_MARKUP_COLOR;
   setAnnotColor(fn, annotPtr, draft.color ?? fallback);
   setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULT_OPACITY);
-  if (draft.subtype === 'strikeout' && draft.intent !== undefined) {
+  if (draft.subtype === 'strikeout' && draft.intent != null) {
     setIntent(fn, annotPtr, strikeoutIntentToName(draft.intent));
   }
 }
@@ -106,7 +107,11 @@ export function applyTextMarkupPatch(
     setAnnotOpacity(fn, annotPtr, patch.opacity);
   }
   if (patch.subtype === 'strikeout' && patch.intent !== undefined) {
-    setIntent(fn, annotPtr, strikeoutIntentToName(patch.intent));
+    setIntentOrClear(
+      fn,
+      annotPtr,
+      patch.intent === null ? null : strikeoutIntentToName(patch.intent),
+    );
   }
   if (patch.quadPoints !== undefined) {
     if (patch.quadPoints.length === 0) {

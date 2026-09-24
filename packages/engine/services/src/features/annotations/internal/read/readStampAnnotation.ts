@@ -25,7 +25,7 @@ export function readStamp(
     ...base,
     subtype: 'stamp',
     name: readAnnotName(fn, mem, annotPtr),
-    ...(rotation != null ? { rotation } : {}),
-    ...(unrotatedRect != null ? { unrotatedRect } : {}),
+    rotation: rotation ?? null,
+    unrotatedRect: unrotatedRect ?? null,
   };
 }

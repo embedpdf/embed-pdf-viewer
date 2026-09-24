@@ -7,6 +7,7 @@
  */
 import { PluginError, pageRefsEqual, type BatchResult } from '@embedpdf/core';
 import {
+  FLAG_KEYS,
   applyProps,
   type ContentGeometry,
   type ModelAnnotation,
@@ -150,10 +151,11 @@ export function createCrud(
 
   const createRaw = async (page: PageRef, draft: AnnotationDraft): Promise<AnnotationRef> => {
     // Default `/F` to `print`, as Acrobat does: without it the annotation
-    // disappears when printed. An explicit `flags` is kept as given.
-    const withFlags = (
-      draft.flags ? draft : { ...draft, flags: { print: true } }
-    ) as AnnotationDraft;
+    // disappears when printed. A draft that sets any flag is kept as given.
+    const setsFlags = FLAG_KEYS.some(
+      (key) => (draft as Partial<Record<string, unknown>>)[key] !== undefined,
+    );
+    const withFlags = (setsFlags ? draft : { ...draft, print: true }) as AnnotationDraft;
     const result = await ctx.doc.page(page).annotations.create(named(withFlags));
     return result.created.ref;
   };

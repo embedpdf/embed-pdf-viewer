@@ -7,8 +7,8 @@ import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
-import type { FontRegistrar } from '../fonts/FontRegistrar';
 import { throwIfAborted } from '../../shared/abort';
+import type { FontRegistrar } from '../fonts/FontRegistrar';
 import { collectPageAnnotations } from './internal/read/collectPageAnnotations';
 
 /**

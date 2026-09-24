@@ -1,26 +1,50 @@
-import type { StampDraft, StampWireDraft } from './draft';
-import type { StampAnnotationDTO } from './dto';
-import type { StampPatch, StampWirePatch } from './patch';
-import { StampDTOSchema, StampWireDraftSchema, StampWirePatchSchema } from './schema';
+import { z } from 'zod';
+
+import type { BinarySource, ResourceRef } from '../../../resource/BinarySource';
+import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
+import { StampDeclaration } from './declaration';
+import { ResourceRefSchema, StampFitSchema, type StampFit } from './values';
 
-export type { StampAnnotationDTO } from './dto';
-export type { StampDraft, StampWireDraft, StampFit } from './draft';
-export type { StampPatch, StampWirePatch } from './patch';
-export {
-  StampDTOSchema,
-  StampWireDraftSchema,
-  StampWirePatchSchema,
-  ResourceRefSchema,
-} from './schema';
-export { normalizeStampDraft, normalizeStampPatch } from './normalize';
+export { StampDeclaration } from './declaration';
+export { ResourceRefSchema, StampFitSchema } from './values';
+export type { StampFit } from './values';
+
+export type StampAnnotationDTO = ReadOf<typeof StampDeclaration>;
+
+/** The stamp's image travels in the draft as `source`, scaled into the box by `fit`. */
+interface StampSource<Source> {
+  source: Source;
+  /** Default `'contain'`. */
+  fit?: StampFit;
+}
+
+export type StampDraft = CreateOf<typeof StampDeclaration> & StampSource<BinarySource>;
+export type StampWireDraft = CreateOf<typeof StampDeclaration> & StampSource<ResourceRef>;
+export type StampPatch = UpdateOf<typeof StampDeclaration> & Partial<StampSource<BinarySource>>;
+export type StampWirePatch = UpdateOf<typeof StampDeclaration> & Partial<StampSource<ResourceRef>>;
+
+export const StampDTOSchema = StampDeclaration.readSchema;
+export const StampWireDraftSchema = z
+  .object({
+    ...StampDeclaration.shapes.create,
+    source: ResourceRefSchema,
+    fit: StampFitSchema.optional(),
+  })
+  .strict() as unknown as z.ZodType<StampWireDraft>;
+export const StampWirePatchSchema = z
+  .object({
+    ...StampDeclaration.shapes.update,
+    source: ResourceRefSchema.optional(),
+    fit: StampFitSchema.optional(),
+  })
+  .strict() as unknown as z.ZodType<StampWirePatch>;
 
 /**
- * The kind module is wire-typed (schemas validate the post-normalization
- * form). The authoring types with inline bytes (`StampDraft`, `StampPatch`)
- * are swapped into the public `AnnotationDraft`/`AnnotationPatch` unions in
- * `kinds/index.ts`; `annotation/normalize.ts` bridges the two.
+ * Wire-typed: the draft and patch schemas validate the form after
+ * normalization, with `source` as a resource ref. The authoring types carry
+ * the bytes and are swapped into the public unions in `kinds/index.ts`.
  */
 export const StampKind: AnnotationKindModule<
   'stamp',

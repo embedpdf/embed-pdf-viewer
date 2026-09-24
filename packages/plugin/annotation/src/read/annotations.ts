@@ -97,7 +97,7 @@ export function createAnnotationReads(
       createdAt: dto?.created ?? null,
       modifiedAt: dto?.modified ?? null,
       group: annotation.group ? refOfId(annotation.group) : null,
-      inReplyTo: dto?.inReplyTo ?? null,
+      inReplyTo: dto?.reply?.to ?? null,
       authority: annotation.authority ?? { update: true, delete: true },
       raw: confirmedDtoOf(annotation.id),
       ...(pending ? { pending: true as const } : {}),

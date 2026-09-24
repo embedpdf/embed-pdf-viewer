@@ -82,8 +82,7 @@ export function createLinkWrites(
             subtype: 'link',
             rect: rects[i],
             target,
-            inReplyTo: annotation.ref,
-            replyType: 'group',
+            reply: { to: annotation.ref, type: 'group' },
           } as AnnotationDraft),
         );
       }
@@ -126,18 +125,18 @@ export function createLinkWrites(
    *  style are left untouched, so grouping never re-bakes an appearance. */
   const relationshipPatch = (
     subtype: AnnotationDTO['subtype'],
-    rel: { inReplyTo: AnnotationRef | null; replyType?: 'group' },
-  ): AnnotationPatch => ({ subtype, ...rel }) as AnnotationPatch;
+    reply: { to: AnnotationRef; type?: 'group' } | null,
+  ): AnnotationPatch => ({ subtype, reply }) as AnnotationPatch;
 
   /** Write a relationship change to one committed annotation; the fold applies the result. */
   const writeRelationship = async (
     record: ModelAnnotation,
-    relationship: { inReplyTo: AnnotationRef | null; replyType?: 'group' },
+    reply: { to: AnnotationRef; type?: 'group' } | null,
   ): Promise<void> => {
     if (!record.ref || !record.data) return;
     await ctx.doc
       .page(record.page)
-      .annotations.update(record.ref, relationshipPatch(record.data.subtype, relationship));
+      .annotations.update(record.ref, relationshipPatch(record.data.subtype, reply));
   };
 
   // A restyle that set or cleared a link: the verb that made it waits for the

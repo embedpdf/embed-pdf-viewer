@@ -21,6 +21,7 @@ export interface EmbedMetadata {
   groupId?: string;
   createdBy?: string;
   updatedBy?: string;
+  importedBy?: string;
 }
 
 /**
@@ -45,6 +46,7 @@ export function readEmbedMetadata(
   const groupId = readMetaString(fn, mem, annotPtr, 'GroupID');
   const createdBy = readMetaString(fn, mem, annotPtr, 'CreatedBy');
   const updatedBy = readMetaString(fn, mem, annotPtr, 'UpdatedBy');
+  const importedBy = readMetaString(fn, mem, annotPtr, 'ImportedBy');
 
   const out: EmbedMetadata = {};
   if (schemaVersion !== undefined) out.schemaVersion = schemaVersion;
@@ -52,6 +54,7 @@ export function readEmbedMetadata(
   if (groupId !== undefined) out.groupId = groupId;
   if (createdBy !== undefined) out.createdBy = createdBy;
   if (updatedBy !== undefined) out.updatedBy = updatedBy;
+  if (importedBy !== undefined) out.importedBy = importedBy;
   return out;
 }
 
@@ -66,8 +69,9 @@ function readMetaString(
   //           terminator, so an empty string returns 2)
   //   pass 2: alloc buf, fill it, decode
   const len = fn.EPDFAnnot_GetEmbedMetadataString(annotPtr, key, NULL_PTR, 0);
-  if (len <= 0) return undefined;
-  if (len === 2) return '';
+  // Every key read here is an id, and an empty id is no id. The native runtime
+  // also reports a missing key as empty whenever the dictionary exists.
+  if (len <= 2) return undefined;
 
   const buf = mem.alloc(len);
   try {

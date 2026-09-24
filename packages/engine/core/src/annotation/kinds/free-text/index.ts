@@ -1,20 +1,18 @@
-import type { FreeTextDraft } from './draft';
-import type { FreeTextAnnotationDTO } from './dto';
-import type { FreeTextPatch } from './patch';
-import { FreeTextDTOSchema, FreeTextDraftSchema, FreeTextPatchSchema } from './schema';
+import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
+import { FreeTextDeclaration } from './declaration';
 
-export type { FreeTextAnnotationDTO } from './dto';
-export type { FreeTextDraft } from './draft';
-export type { FreeTextPatch } from './patch';
-export {
-  FreeTextDTOSchema,
-  FreeTextDraftSchema,
-  FreeTextPatchSchema,
-  RichTextDocumentInputSchema,
-  RichTextDocumentSchema,
-} from './schema';
+export { FreeTextDeclaration } from './declaration';
+export { RichTextDocumentInputSchema, RichTextDocumentSchema } from './values';
+
+export type FreeTextAnnotationDTO = ReadOf<typeof FreeTextDeclaration>;
+export type FreeTextDraft = CreateOf<typeof FreeTextDeclaration>;
+export type FreeTextPatch = UpdateOf<typeof FreeTextDeclaration>;
+
+export const FreeTextDTOSchema = FreeTextDeclaration.readSchema;
+export const FreeTextDraftSchema = FreeTextDeclaration.createSchema;
+export const FreeTextPatchSchema = FreeTextDeclaration.updateSchema;
 
 export const FreeTextKind: AnnotationKindModule<
   'free-text',

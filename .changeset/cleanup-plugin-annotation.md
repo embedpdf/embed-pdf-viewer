@@ -15,5 +15,9 @@ Annotations stay in sync through one path for every origin: a records mirror loa
 - A page's render items are rebuilt only when something on that page changes.
 - Typing never shows an older engine echo over newer text.
 - Direct-object annotations without `/NM` (addressed by position) keep one record when the engine names them on an edit, and leave no ghost when deleted.
+- An annotation that gets another key (a new one confirmed, a direct-object one the engine names) takes everything with it: typing still waiting for its write, the text range, a link sync in progress, and its pending changes. A write always goes to the annotation now at a position, never to one the engine named away from it.
+- A new annotation stays on screen when the engine answers its create while a page read is running, and can be edited at once. A link set on it before the engine answered is written once it has. Deleted elsewhere before its create answered, it stays deleted.
+- A refused text write drops every keystroke it carried, and `onWriteFailed` fires once for it, naming the annotation by its current ref.
+- An annotation with a pending restyle keeps rendering live when another session updates it.
 - Every annotation the plugin creates carries an `/NM`.
 - A programmatic update keeps rendering from the engine's appearance and fetches it again when the engine re-bakes it.

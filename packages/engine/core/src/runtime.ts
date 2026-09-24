@@ -36,7 +36,6 @@ export type {
   DocumentAccessInfo,
   DocumentAccessReason,
   DocumentEncryptionState,
-  DocumentIdentity,
   DocumentOpenMode,
   DocumentSecurityService,
   DocumentSecurityState,

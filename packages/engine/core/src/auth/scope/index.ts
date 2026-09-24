@@ -13,7 +13,7 @@ export type {
   CollabEntity,
   CollabFilter,
   DocCapability,
-  IdentityClaims,
+  Identity,
   ParsedCapability,
   ParsedCollab,
   ParsedScope,

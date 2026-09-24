@@ -22,8 +22,8 @@ export function createAuthority(
   const mutationTarget = (ref: AnnotationRef): { userId?: string; groupId?: string } => {
     const dto = store.model().byId[annotationKey(ref)]?.data;
     return {
-      ...(dto?.userId !== undefined ? { userId: dto.userId } : {}),
-      ...(dto?.groupId !== undefined ? { groupId: dto.groupId } : {}),
+      ...(dto?.userId != null ? { userId: dto.userId } : {}),
+      ...(dto?.groupId != null ? { groupId: dto.groupId } : {}),
     };
   };
   const allowsMutation = (action: 'update' | 'delete', ref: AnnotationRef): boolean =>

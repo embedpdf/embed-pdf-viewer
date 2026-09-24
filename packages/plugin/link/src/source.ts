@@ -17,7 +17,7 @@ export function linksOf(
   const links: Link[] = [];
   for (const dto of annotations) {
     if (dto.subtype !== 'link' || dto.target == null) continue;
-    if (dto.flags.hidden || dto.flags.noView) continue;
+    if (dto.hidden || dto.noView) continue;
     links.push({
       id:
         dto.ref.kind === 'objectNumber'
@@ -35,7 +35,7 @@ export function linksOf(
           }
         : {}),
       ref: dto.ref,
-      attached: dto.replyType === 'group' && dto.inReplyTo != null,
+      attached: dto.reply?.type === 'group',
     });
   }
   return links;

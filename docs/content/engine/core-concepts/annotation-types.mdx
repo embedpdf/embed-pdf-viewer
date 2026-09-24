@@ -20,7 +20,7 @@ Every annotation also accepts these optional base fields, so they're left out of
 per-type tables below:
 
 - `contents` — a text note/comment.
-- `flags` — PDF flags, e.g. `{ print: true }` (see [Annotations](/docs/engine/core-concepts/annotations#flags)).
+- `print`, `hidden`, `locked` and the other PDF flags — each its own field, e.g. `print: true` (see [Annotations](/docs/engine/core-concepts/annotations#flags)).
 - `nm` — a stable name you want to assign.
 
 Anything you omit falls back to its default (a 1pt solid red stroke, full opacity, no

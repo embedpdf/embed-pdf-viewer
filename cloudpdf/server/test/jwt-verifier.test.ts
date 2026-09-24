@@ -105,37 +105,58 @@ describe('Hs256Verifier', () => {
     expect((claims as unknown as { unlock_key?: string }).unlock_key).toBeUndefined();
   });
 
-  test('parses identity claims into the verified claim object', async () => {
+  test('parses the identity claim into the verified claim object', async () => {
     const v = new Hs256Verifier({ secret });
     const tok = signDevToken(secret, {
       sub: 'alice',
       tenant_id: TENANT,
       extras: {
-        user_id: '44',
-        group_id: '4',
-        groups: ['4', 'engineering'],
-        display_name: 'Alice Example',
+        identity: {
+          userId: '44',
+          groupId: '4',
+          groups: ['4', 'engineering'],
+          displayName: 'Alice Example',
+          organization: 'Example Inc.',
+          title: '',
+          unknownKey: 'dropped',
+        },
       },
     });
 
     const claims = await v.verify(tok);
-    expect(claims).toMatchObject({
-      user_id: '44',
-      group_id: '4',
+    expect(claims.identity).toEqual({
+      userId: '44',
+      groupId: '4',
       groups: ['4', 'engineering'],
-      display_name: 'Alice Example',
+      displayName: 'Alice Example',
+      organization: 'Example Inc.',
     });
   });
 
-  test('rejects malformed identity arrays', async () => {
+  test('ignores the old flat identity claims', async () => {
     const v = new Hs256Verifier({ secret });
     const tok = signDevToken(secret, {
       sub: 'alice',
       tenant_id: TENANT,
-      extras: { groups: ['4', 42] },
+      extras: { user_id: '44', display_name: 'Alice Example' },
     });
 
-    await expect(v.verify(tok)).rejects.toThrow(/groups\[1\] must be a string/);
+    const claims = await v.verify(tok);
+    expect(claims.identity).toBeUndefined();
+  });
+
+  test('rejects a malformed identity claim', async () => {
+    const v = new Hs256Verifier({ secret });
+    const sign = (identity: unknown) =>
+      signDevToken(secret, { sub: 'alice', tenant_id: TENANT, extras: { identity } });
+
+    await expect(v.verify(sign('alice'))).rejects.toThrow(/identity must be an object/);
+    await expect(v.verify(sign({ userId: 44 }))).rejects.toThrow(
+      /identity\.userId must be a string/,
+    );
+    await expect(v.verify(sign({ groups: ['4', 42] }))).rejects.toThrow(
+      /identity\.groups\[1\] must be a string/,
+    );
   });
 });
 

@@ -620,10 +620,13 @@ describe('Phase 6 access route — POST /v1/access', () => {
           layer: 'default',
           scope: ['doc.open', 'doc.render', 'doc.download'],
           extras: {
-            user_id: '44',
-            group_id: '4',
-            groups: ['4', 'engineering'],
-            display_name: 'Alice Example',
+            identity: {
+              userId: '44',
+              groupId: '4',
+              groups: ['4', 'engineering'],
+              displayName: 'Alice Example',
+              email: 'alice@example.com',
+            },
           },
         })}`,
         'Content-Type': 'application/json',
@@ -635,7 +638,7 @@ describe('Phase 6 access route — POST /v1/access', () => {
       security: { encryption: { state: string }; permissions: { known: boolean } };
       cdn: { adapter: string; cache: { immutableVersionedReads: boolean } };
       scope: string[];
-      identity: { user_id?: string; group_id?: string; groups?: string[]; display_name?: string };
+      identity: Record<string, unknown>;
     };
     expect(body.security.encryption.state).toBe('none');
     expect(body.security.permissions.known).toBe(true);
@@ -645,10 +648,11 @@ describe('Phase 6 access route — POST /v1/access', () => {
     });
     expect(body.scope).toEqual(['doc.open', 'doc.render', 'doc.download']);
     expect(body.identity).toEqual({
-      user_id: '44',
-      group_id: '4',
+      userId: '44',
+      groupId: '4',
       groups: ['4', 'engineering'],
-      display_name: 'Alice Example',
+      displayName: 'Alice Example',
+      email: 'alice@example.com',
     });
   });
 

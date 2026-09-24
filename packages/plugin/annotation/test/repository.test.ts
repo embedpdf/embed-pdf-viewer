@@ -46,7 +46,7 @@ const NO_FLAGS: AnnotationFlags = {
 /** A minimal committed square DTO, with optional relationship fields. */
 function squareDTO(
   annotObjectNumber: number,
-  rel?: { inReplyTo: AnnotationRef | null; replyType: 'reply' | 'group' | null },
+  reply: { to: AnnotationRef; type: 'reply' | 'group' } | null = null,
 ): AnnotationDTO {
   const ref: AnnotationRef = { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber };
   return {
@@ -55,15 +55,21 @@ function squareDTO(
     index: 0,
     identityQuality: 'durable',
     nm: null,
-    flags: NO_FLAGS,
+    ...NO_FLAGS,
     rect: { left: 100, bottom: 100, right: 200, top: 200 },
     contents: null,
     author: null,
     created: null,
     modified: null,
     blendMode: 'normal',
-    inReplyTo: rel?.inReplyTo ?? null,
-    replyType: rel?.replyType ?? null,
+    reply,
+    popup: null,
+    groupId: null,
+    userId: null,
+    createdBy: null,
+    updatedBy: null,
+    importedBy: null,
+    actions: null,
     subtype: 'square',
     color: { r: 0, g: 0, b: 0 },
     interiorColor: null,
@@ -86,7 +92,7 @@ describe('repository.fromDTO — group/relationship mapping', () => {
       page: toPageRef(1),
       annotObjectNumber: 10,
     };
-    const sub = fromDTO(squareDTO(11, { inReplyTo: primary, replyType: 'group' }), CROP);
+    const sub = fromDTO(squareDTO(11, { to: primary, type: 'group' }), CROP);
     expect(sub.irt).toBe(annotationKey(primary));
     expect(sub.group).toBe(annotationKey(primary)); // visual group → acts as a unit
   });
@@ -97,7 +103,7 @@ describe('repository.fromDTO — group/relationship mapping', () => {
       page: toPageRef(1),
       annotObjectNumber: 10,
     };
-    const reply = fromDTO(squareDTO(12, { inReplyTo: parent, replyType: 'reply' }), CROP);
+    const reply = fromDTO(squareDTO(12, { to: parent, type: 'reply' }), CROP);
     expect(reply.irt).toBe(annotationKey(parent));
     expect(reply.group).toBeUndefined();
   });
@@ -110,7 +116,7 @@ describe('repository — Ink Highlight intent and blend', () => {
     index: 0,
     identityQuality: 'durable',
     nm: null,
-    flags: NO_FLAGS,
+    ...NO_FLAGS,
     rect: { left: 10, bottom: 740, right: 120, top: 760 },
     contents: null,
     subject: null,
@@ -118,8 +124,16 @@ describe('repository — Ink Highlight intent and blend', () => {
     created: null,
     modified: null,
     blendMode: 'multiply',
-    inReplyTo: null,
-    replyType: null,
+    rotation: null,
+    dashArray: null,
+    reply: null,
+    popup: null,
+    groupId: null,
+    userId: null,
+    createdBy: null,
+    updatedBy: null,
+    importedBy: null,
+    actions: null,
     subtype: 'ink',
     intent: 'ink-highlight',
     color: { r: 255, g: 205, b: 69 },
@@ -193,13 +207,13 @@ describe('repository — Replace Text authoring', () => {
     expect(toCreateDraft(caret, CROP)).toMatchObject({
       subtype: 'caret',
       intent: 'replace',
-      flags: { print: true },
+      print: true,
       rectDifferences: { left: 0.5, top: 0.5, right: 0.5, bottom: 0.5 },
     });
     expect(toCreateDraft(strikeout, CROP)).toMatchObject({
       subtype: 'strikeout',
       intent: 'strikeout-text-edit',
-      flags: { print: true },
+      print: true,
     });
   });
 
@@ -259,15 +273,21 @@ function calloutDTO(annotObjectNumber = 20): AnnotationDTO {
     index: 0,
     identityQuality: 'durable',
     nm: null,
-    flags: NO_FLAGS,
+    ...NO_FLAGS,
     rect: OVERALL_PDF,
     contents: 'see here',
     author: null,
     created: null,
     modified: null,
     blendMode: 'normal',
-    inReplyTo: null,
-    replyType: null,
+    reply: null,
+    popup: null,
+    groupId: null,
+    userId: null,
+    createdBy: null,
+    updatedBy: null,
+    importedBy: null,
+    actions: null,
     subtype: 'free-text',
     intent: 'free-text-callout',
     fontFamily: 'helvetica',
@@ -296,8 +316,8 @@ function plainFreeTextDTO(annotObjectNumber = 21): AnnotationDTO {
     intent: 'free-text',
     rect: BOX_PDF,
     rectDifferences: null,
-    calloutLine: undefined,
-    lineEnding: undefined,
+    calloutLine: null,
+    lineEnding: null,
   } as AnnotationDTO;
 }
 
@@ -326,15 +346,21 @@ function rotatedPolylineDTO(rotationPdf: number, annotObjectNumber = 31): Annota
     index: 0,
     identityQuality: 'durable',
     nm: null,
-    flags: NO_FLAGS,
+    ...NO_FLAGS,
     rect: { left: 100, bottom: 100, right: 300, top: 300 },
     contents: null,
     author: null,
     created: null,
     modified: null,
     blendMode: 'normal',
-    inReplyTo: null,
-    replyType: null,
+    reply: null,
+    popup: null,
+    groupId: null,
+    userId: null,
+    createdBy: null,
+    updatedBy: null,
+    importedBy: null,
+    actions: null,
     subtype: 'polyline',
     color: { r: 0, g: 0, b: 0 },
     interiorColor: null,
@@ -364,7 +390,7 @@ describe('repository — rotation round-trip', () => {
   it('box: toPatch emits rect(AABB) + unrotatedRect + rotation (CW→PDF back)', () => {
     const patch = toPatch(fromDTO(rotatedSquareDTO(90), CROP), CROP) as Extract<
       AnnotationPatch,
-      { subtype: 'square' }
+      { subtype?: 'square' }
     > & { rotation?: number; unrotatedRect?: PdfRect };
     if (!patch) throw new Error('expected a patch');
     expect(patch.rotation).toBe(90); // round-trips back to the PDF angle
@@ -378,7 +404,7 @@ describe('repository — rotation round-trip', () => {
   it('box: an unrotated DTO states the transform clears explicitly (total projection)', () => {
     const patch = toPatch(fromDTO(squareDTO(32), CROP), CROP) as Extract<
       AnnotationPatch,
-      { subtype: 'square' }
+      { subtype?: 'square' }
     > & { rotation?: number | null; unrotatedRect?: PdfRect | null };
     if (!patch) throw new Error('expected a patch');
     // Tri-state writes preserve omitted fields, so rotation 0 must be stated
@@ -394,7 +420,10 @@ describe('repository — rotation round-trip', () => {
     // the points are the visual — first vertex maps straight through the y-flip
     expect(annotation.geometry.points[0]).toEqual({ x: 120, y: 680 });
 
-    const patch = toPatch(annotation, CROP) as Extract<AnnotationPatch, { subtype: 'polyline' }> & {
+    const patch = toPatch(annotation, CROP) as Extract<
+      AnnotationPatch,
+      { subtype?: 'polyline' }
+    > & {
       rotation?: number;
       unrotatedRect?: PdfRect;
     };
@@ -407,7 +436,10 @@ describe('repository — rotation round-trip', () => {
   it('vertex: an unrotated polyline states the advisory clear explicitly', () => {
     const annotation = fromDTO(rotatedPolylineDTO(0, 33), CROP);
     expect(annotation.geometry.kind === 'poly' && annotation.geometry.rot).toBeFalsy();
-    const patch = toPatch(annotation, CROP) as Extract<AnnotationPatch, { subtype: 'polyline' }> & {
+    const patch = toPatch(annotation, CROP) as Extract<
+      AnnotationPatch,
+      { subtype?: 'polyline' }
+    > & {
       rotation?: number | null;
     };
     expect(patch?.rotation).toBe(null);
@@ -473,7 +505,7 @@ describe('repository — free-text callout mapping', () => {
   it('toPatch: a callout sends the overall /Rect + /CL + /RD + /LE together', () => {
     const patch = toPatch(fromDTO(calloutDTO(), CROP), CROP) as Extract<
       AnnotationPatch,
-      { subtype: 'free-text' }
+      { subtype?: 'free-text' }
     > | null;
     if (!patch) throw new Error('expected a patch');
     expect(patch.calloutLine).toHaveLength(3);
@@ -507,7 +539,7 @@ describe('repository — free-text style + font round-trip', () => {
         textAlign: 'center' as const,
       },
     };
-    const patch = toPatch(edited, CROP) as Extract<AnnotationPatch, { subtype: 'free-text' }>;
+    const patch = toPatch(edited, CROP) as Extract<AnnotationPatch, { subtype?: 'free-text' }>;
     expect(patch.color).toEqual({ r: 0, g: 0, b: 255 });
     expect(patch.interiorColor).toEqual({ r: 255, g: 255, b: 0 });
     expect(patch.opacity).toBe(0.5);
@@ -522,7 +554,7 @@ describe('repository — free-text style + font round-trip', () => {
   it('toPatch carries style + font for a callout too, alongside the leader fields', () => {
     const annotation = fromDTO(calloutDTO(), CROP);
     const edited = { ...annotation, text: { ...annotation.text!, fontFamily: 'courier' } };
-    const patch = toPatch(edited, CROP) as Extract<AnnotationPatch, { subtype: 'free-text' }>;
+    const patch = toPatch(edited, CROP) as Extract<AnnotationPatch, { subtype?: 'free-text' }>;
     expect(patch.calloutLine).toHaveLength(3); // geometry still round-trips
     expect(patch.fontFamily).toBe('courier');
     expect(patch.strokeWidth).toBe(1);
@@ -555,15 +587,21 @@ function polygonDTO(cloudyIntensity: number | undefined, annotObjectNumber = 40)
     index: 0,
     identityQuality: 'durable',
     nm: null,
-    flags: NO_FLAGS,
+    ...NO_FLAGS,
     rect: { left: 100, bottom: 100, right: 300, top: 300 },
     contents: null,
     author: null,
     created: null,
     modified: null,
     blendMode: 'normal',
-    inReplyTo: null,
-    replyType: null,
+    reply: null,
+    popup: null,
+    groupId: null,
+    userId: null,
+    createdBy: null,
+    updatedBy: null,
+    importedBy: null,
+    actions: null,
     subtype: 'polygon',
     color: { r: 0, g: 0, b: 0 },
     interiorColor: null,
@@ -587,7 +625,7 @@ describe('repository — polygon cloudy border', () => {
 
   it('toPatch carries cloudyIntensity and grows /Rect by the outward cloud extent', () => {
     const annotation = fromDTO(polygonDTO(2), CROP);
-    const patch = toPatch(annotation, CROP) as Extract<AnnotationPatch, { subtype: 'polygon' }>;
+    const patch = toPatch(annotation, CROP) as Extract<AnnotationPatch, { subtype?: 'polygon' }>;
     expect(patch.cloudyIntensity).toBe(2);
     // vertex hull is x:[120,280]; the /Rect must reach beyond it by the cloud
     // radius (4·intensity + 0.5·stroke) + stroke/2 = 8 + 1 + 1 = 10
@@ -603,7 +641,7 @@ describe('repository — polygon cloudy border', () => {
       ...annotation,
       style: { ...annotation.style, border: { kind: 'solid' as const } },
     };
-    const patch = toPatch(solid, CROP) as Extract<AnnotationPatch, { subtype: 'polygon' }>;
+    const patch = toPatch(solid, CROP) as Extract<AnnotationPatch, { subtype?: 'polygon' }>;
     expect(patch.cloudyIntensity).toBe(null); // tri-state remove of /BE
     // and the /Rect shrinks back to the stroke-only bounds
     expect(patch.rect!.left).toBeGreaterThanOrEqual(118);
@@ -615,7 +653,7 @@ describe('repository — polygon cloudy border', () => {
       ...annotation,
       style: { ...annotation.style, border: { kind: 'cloudy' as const, intensity: 2 } },
     };
-    const patch = toPatch(cloudyStyled, CROP) as Extract<AnnotationPatch, { subtype: 'polyline' }>;
+    const patch = toPatch(cloudyStyled, CROP) as Extract<AnnotationPatch, { subtype?: 'polyline' }>;
     expect(patch).not.toHaveProperty('cloudyIntensity');
   });
 });
@@ -724,7 +762,7 @@ describe('repository — /Rect derives from line endings (the clipped-arrowhead 
       index: 0,
       identityQuality: 'durable',
       nm: null,
-      flags: NO_FLAGS,
+      ...NO_FLAGS,
       rect: { left: 100, bottom: 100, right: 300, top: 200 },
       contents: null,
       subject: null,
@@ -732,8 +770,14 @@ describe('repository — /Rect derives from line endings (the clipped-arrowhead 
       created: null,
       modified: null,
       blendMode: 'normal',
-      inReplyTo: null,
-      replyType: null,
+      reply: null,
+      popup: null,
+      groupId: null,
+      userId: null,
+      createdBy: null,
+      updatedBy: null,
+      importedBy: null,
+      actions: null,
       subtype: 'line',
       color: { r: 0, g: 0, b: 0 },
       interiorColor: null,
@@ -808,7 +852,7 @@ describe('repository — shape cloudy border tri-state', () => {
   it('toPatch on a cloudy square carries /BE + a derived /RD inset', () => {
     const patch = toPatch(fromDTO(cloudySquare(), CROP), CROP) as Extract<
       AnnotationPatch,
-      { subtype: 'square' }
+      { subtype?: 'square' }
     >;
     expect(patch.cloudyIntensity).toBe(2);
     expect(patch.rectDifferences).toBeDefined();
@@ -821,7 +865,7 @@ describe('repository — shape cloudy border tri-state', () => {
       ...annotation,
       style: { ...annotation.style, border: { kind: 'solid' as const } },
     };
-    const patch = toPatch(solid, CROP) as Extract<AnnotationPatch, { subtype: 'square' }>;
+    const patch = toPatch(solid, CROP) as Extract<AnnotationPatch, { subtype?: 'square' }>;
     // Tri-state removes: /BE and /RD are stated as null, never omitted — an
     // omitted rectDifferences preserves the stale inset (a phantom padding in
     // Adobe viewers).
@@ -834,13 +878,10 @@ describe('repository — attached links (fold + desired state + link kind mappin
   const linkDTO = (
     annotObjectNumber: number,
     target: import('@embedpdf/engine-core/runtime').PdfLinkTarget | null,
-    rel?: { inReplyTo: AnnotationRef; replyType: 'group' | 'reply' },
+    reply?: { to: AnnotationRef; type: 'group' | 'reply' },
   ): AnnotationDTO =>
     ({
-      ...squareDTO(
-        annotObjectNumber,
-        rel ? { inReplyTo: rel.inReplyTo, replyType: rel.replyType } : undefined,
-      ),
+      ...squareDTO(annotObjectNumber, reply ?? null),
       subtype: 'link',
       target,
     }) as unknown as AnnotationDTO;
@@ -867,7 +908,7 @@ describe('repository — attached links (fold + desired state + link kind mappin
 
   it('a grouped link child is SUBSTRATE: classified attached, read via linkOf', () => {
     const parent = fromDTO(squareDTO(10), CROP);
-    const child = fromDTO(linkDTO(11, URI, { inReplyTo: parentRef, replyType: 'group' }), CROP);
+    const child = fromDTO(linkDTO(11, URI, { to: parentRef, type: 'group' }), CROP);
     // Nothing folds — both are first-class model annotations…
     expect(isAttachedLink(parent)).toBe(false);
     expect(isAttachedLink(child)).toBe(true);
@@ -880,8 +921,8 @@ describe('repository — attached links (fold + desired state + link kind mappin
   it('an orphan grouped link derives nothing for strangers and keeps its own target', () => {
     const orphan = fromDTO(
       linkDTO(12, URI, {
-        inReplyTo: { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber: 99 },
-        replyType: 'group',
+        to: { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber: 99 },
+        type: 'group',
       }),
       CROP,
     );
@@ -892,8 +933,8 @@ describe('repository — attached links (fold + desired state + link kind mappin
 
   it('multi-segment: several children, ONE derived value (first child wins)', () => {
     const parent = fromDTO(squareDTO(10), CROP);
-    const c1 = fromDTO(linkDTO(11, URI, { inReplyTo: parentRef, replyType: 'group' }), CROP);
-    const c2 = fromDTO(linkDTO(12, URI, { inReplyTo: parentRef, replyType: 'group' }), CROP);
+    const c1 = fromDTO(linkDTO(11, URI, { to: parentRef, type: 'group' }), CROP);
+    const c2 = fromDTO(linkDTO(12, URI, { to: parentRef, type: 'group' }), CROP);
     const model = modelWith([parent, c1, c2]);
     expect(linkChildrenOf(model, parent.id)).toHaveLength(2);
     expect(linkOf(model, parent.id)).toEqual(URI);

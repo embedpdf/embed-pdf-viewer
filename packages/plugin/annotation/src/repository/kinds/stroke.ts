@@ -99,7 +99,11 @@ export const line: KindProjection = {
             measure: {
               intent: lineDto.intent,
               measure: lineDto.measure ?? null,
-              caption: lineDto.caption ?? { enabled: false },
+              caption: {
+                enabled: lineDto.captionEnabled,
+                position: lineDto.captionPosition,
+                ...(lineDto.captionOffset ? { offset: lineDto.captionOffset } : {}),
+              },
               leader: lineDto.leader ?? undefined,
               crop,
               text: lineDto.contents ?? '',
@@ -136,7 +140,7 @@ export const line: KindProjection = {
       ? {
           intent: annotation.measure.intent,
           measure: annotation.measure.measure?.subtype === 'RL' ? annotation.measure.measure : null,
-          caption: annotation.measure.caption,
+          ...captionFieldsOf(annotation.measure),
           leader: annotation.measure.leader,
           subject: 'Distance',
         }
@@ -152,7 +156,10 @@ const polyProjection = (closed: boolean): KindProjection => ({
             measure: {
               intent: polyDto.intent,
               measure: polyDto.measure ?? null,
-              caption: polyDto.caption ?? { enabled: false },
+              caption: {
+                enabled: polyDto.captionEnabled ?? false,
+                ...(polyDto.captionCenter ? { center: polyDto.captionCenter } : {}),
+              },
               crop,
               text: polyDto.contents ?? '',
             },
@@ -174,7 +181,7 @@ const polyProjection = (closed: boolean): KindProjection => ({
       ...(annotation.measure && annotation.measure.intent !== 'LineDimension'
         ? {
             contents: shapeMeasurementLabel(geometry, annotation.measure),
-            caption: annotation.measure.caption,
+            ...captionFieldsOf(annotation.measure),
           }
         : {}),
       vertices: geometry.points.map((point) => contentToPdfPoint(point, crop)),
@@ -188,7 +195,7 @@ const polyProjection = (closed: boolean): KindProjection => ({
       ? {
           intent: annotation.measure.intent,
           measure: annotation.measure.measure?.subtype === 'RL' ? annotation.measure.measure : null,
-          caption: annotation.measure.caption,
+          ...captionFieldsOf(annotation.measure),
           subject: closed ? 'Area' : 'Perimeter',
         }
       : {},
@@ -227,3 +234,22 @@ export const ink: KindProjection = {
   draftExtras: (annotation) =>
     annotation.intent === 'ink-highlight' ? { intent: annotation.intent } : {},
 };
+
+/**
+ * The model keeps a measurement's caption as one value; the engine takes its
+ * parts as separate fields. A line's caption has a position and an offset, a
+ * shape's a center.
+ */
+export function captionFieldsOf(measure: {
+  intent: string;
+  caption: { enabled: boolean; position?: 'inline' | 'top'; offset?: unknown; center?: unknown };
+}): Record<string, unknown> {
+  const { caption } = measure;
+  return measure.intent === 'LineDimension'
+    ? {
+        captionEnabled: caption.enabled,
+        captionPosition: caption.position ?? 'inline',
+        captionOffset: caption.offset ?? null,
+      }
+    : { captionEnabled: caption.enabled, captionCenter: caption.center ?? null };
+}

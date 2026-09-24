@@ -1,7 +1,7 @@
 import type { Ptr } from '@embedpdf/engine-runtime';
 
-import type { FontRegistrar } from '../../../fonts/FontRegistrar';
 import type { DocumentSession } from '../../../../document-session/DocumentSession';
+import type { FontRegistrar } from '../../../fonts/FontRegistrar';
 
 /**
  * Document-scoped capabilities threaded into per-subtype annotation

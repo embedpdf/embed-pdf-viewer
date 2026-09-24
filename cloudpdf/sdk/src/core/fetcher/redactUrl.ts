@@ -36,7 +36,7 @@ export function redactUrl(url: string): string {
         fragmentStart === -1 ? url.length : fragmentStart,
     );
 
-    // Find the last @ before the delimiter (handles multiple @ in credentials)
+    // Find the LAST @ before the delimiter (handles multiple @ in credentials)
     let atIndex = -1;
     for (let i = afterProtocol; i < firstDelimiter; i++) {
         if (url[i] === "@") {
@@ -58,7 +58,7 @@ export function redactUrl(url: string): string {
 
     if (queryString.length === 0) return url;
 
-    // Fast path: Quick check if any sensitive keywords present
+    // FAST PATH: Quick check if any sensitive keywords present
     // Using indexOf is faster than regex for simple substring matching
     const lower = queryString.toLowerCase();
     const hasSensitive =
@@ -74,7 +74,7 @@ export function redactUrl(url: string): string {
         return url;
     }
 
-    // Slow path: Parse and redact
+    // SLOW PATH: Parse and redact
     const redactedParams: string[] = [];
     const params = queryString.split("&");
 

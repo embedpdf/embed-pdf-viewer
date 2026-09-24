@@ -7,8 +7,7 @@ import {
   type WireResourceMap,
 } from '../../../resource/BinarySource';
 import { sniffBinaryMetadata } from '../../../resource/binaryMetadata';
-import type { StampDraft, StampWireDraft } from './draft';
-import type { StampPatch, StampWirePatch } from './patch';
+import type { StampDraft, StampPatch, StampWireDraft, StampWirePatch } from './index';
 
 /**
  * Resolve + validate a stamp `source`. Sniffing happens here — before any

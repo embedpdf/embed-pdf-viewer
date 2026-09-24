@@ -1,14 +1,19 @@
-import type { TextDraft } from './draft';
-import type { TextAnnotationDTO } from './dto';
-import type { TextPatch } from './patch';
-import { TextDTOSchema, TextDraftSchema, TextPatchSchema } from './schema';
+import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
+import { TextDeclaration } from './declaration';
 
-export type { TextAnnotationDTO } from './dto';
-export type { TextDraft, NoteIcon } from './draft';
-export type { TextPatch } from './patch';
-export { TextDTOSchema, TextDraftSchema, TextPatchSchema, NoteIconSchema } from './schema';
+export { TextDeclaration } from './declaration';
+export type { NoteIcon } from './values';
+export { NoteIconSchema } from './values';
+
+export type TextAnnotationDTO = ReadOf<typeof TextDeclaration>;
+export type TextDraft = CreateOf<typeof TextDeclaration>;
+export type TextPatch = UpdateOf<typeof TextDeclaration>;
+
+export const TextDTOSchema = TextDeclaration.readSchema;
+export const TextDraftSchema = TextDeclaration.createSchema;
+export const TextPatchSchema = TextDeclaration.updateSchema;
 
 export const TextKind: AnnotationKindModule<'text', TextAnnotationDTO, TextDraft, TextPatch> = {
   subtype: 'text',

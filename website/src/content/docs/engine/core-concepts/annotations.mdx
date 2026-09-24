@@ -91,19 +91,24 @@ runtime.
 
 ### Captions and placement
 
-Set `caption.enabled` to paint the saved label into the annotation's appearance.
-Imported polygons and polylines keep their existing appearance behavior until
-explicitly enabled.
+Set `captionEnabled: true` to paint the saved label into the annotation's
+appearance. Showing a label and placing it are separate fields, so each can
+change without the other.
 
-- A line caption uses `position: 'inline' | 'top'` and an optional
-  `offset: { along, perpendicular }`. These are displacements in PDF units along
-  the directed line and its positive 90-degree normal.
-- A polygon or polyline caption uses an optional `center: { x, y }`. This is an
-  absolute point in PDF user space: y increases upward and the original page
-  origin is retained. The point `(0, 0)` is a valid manual placement.
-- Caption patches merge with saved placement. Hiding a caption retains its
-  position; `offset: null` or `center: null` restores automatic placement, and
-  `caption: null` clears the caption settings.
+- A line reads `captionEnabled`, `captionPosition: 'inline' | 'top'` and
+  `captionOffset: { along, perpendicular } | null`. The offset is a
+  displacement in PDF units along the directed line and its positive 90-degree
+  normal; `null` is the normal position.
+- A polygon or polyline reads `captionEnabled` and
+  `captionCenter: { x, y } | null`. The center is an absolute point in PDF user
+  space: y increases upward and the original page origin is retained. The point
+  `(0, 0)` is a valid manual placement; `null` places the label automatically.
+  An imported shape without a caption reads `captionEnabled: null` and keeps its
+  existing appearance until you enable one.
+- Hiding a label with `captionEnabled: false` keeps its placement.
+  `captionOffset: null` or `captionCenter: null` restores automatic placement.
+  On a polygon or polyline, `captionEnabled: null` removes the caption and its
+  placement.
 - A manual shape center follows a verified translation or rotation of all
   vertices. Editing individual vertices leaves it fixed. An explicit center in
   the patch takes precedence. The editor also carries the center during group
@@ -219,8 +224,9 @@ stroke at full opacity.
 
 ## Flags
 
-Every annotation has the standard PDF flags. Set only the ones you care about — the rest
-keep their current value:
+Every annotation reads the standard PDF flags as its own `boolean` fields. Set
+only the ones you care about: on create the rest are off, and on update the rest
+keep their current value.
 
 ```ts
 // On create: print, but don't show on screen.
@@ -228,11 +234,12 @@ await page.annotations.create({
   subtype: 'square',
   rect: { left: 100, bottom: 600, right: 200, top: 680 },
   color: { r: 0, g: 0, b: 0 },
-  flags: { print: true, noView: true },
+  print: true,
+  noView: true,
 });
 
 // Later: lock from editing without touching any other flag.
-await page.annotations.update(note.ref, { subtype: note.subtype, flags: { readOnly: true } });
+await page.annotations.update(note.ref, { readOnly: true });
 ```
 
 Available flags: `invisible`, `hidden`, `print`, `noZoom`, `noRotate`, `noView`,

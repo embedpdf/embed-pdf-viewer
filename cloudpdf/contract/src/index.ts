@@ -12,6 +12,7 @@ import {
   DocumentMetadataSchema,
   EngineErrorPayloadSchema,
   FormSnapshotSchema,
+  IdentitySchema,
   MutationMetaSchema,
   PageTextSnapshotSchema,
   ChangeAnalysisSchema,
@@ -532,10 +533,12 @@ export const AdminTokenIssueDocRequestSchema = z.object({
    * vocabulary — an unknown string rejects the whole request.
    */
   scope: z.array(z.string().min(1).max(128)).min(1).max(64),
-  userId: z.string().max(256).optional(),
-  displayName: z.string().max(256).optional(),
-  groupId: z.string().max(256).optional(),
-  groups: z.array(z.string().max(256)).max(64).optional(),
+  /**
+   * Who the token acts for: the same `Identity` the local engine takes at
+   * open time. `displayName` becomes the author of the annotations the token
+   * creates, `userId` and `groupId` their owner and group.
+   */
+  identity: IdentitySchema.optional(),
   /**
    * Origin lock: web origins (scheme + host, optional port; one leading
    * `*.` wildcard label allowed) the minted token may be presented

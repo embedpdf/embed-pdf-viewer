@@ -44,6 +44,7 @@ export const caps = {
     annotate: {
       read: () => 'doc.annotate.read' as const,
       modify: () => 'doc.annotate.modify' as const,
+      import: () => 'doc.annotate.import' as const,
     },
     metadata: {
       modify: () => 'doc.metadata.modify' as const,

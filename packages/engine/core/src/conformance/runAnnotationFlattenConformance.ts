@@ -56,7 +56,7 @@ export function runAnnotationFlattenConformance(
         const b = (await page.annotations.create(square(80, 20))).created.ref;
         const c = (await page.annotations.create(square(140, 20))).created.ref;
         // Hide `c` — ineligible for display flatten, so it must be skipped.
-        await page.annotations.update(c, { subtype: 'square', flags: { hidden: true } });
+        await page.annotations.update(c, { subtype: 'square', hidden: true });
         const before = await page.annotations.list();
 
         const events: DocumentEvent[] = [];

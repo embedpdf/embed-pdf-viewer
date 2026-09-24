@@ -15,7 +15,7 @@ encrypted documents.
 interface DocumentSecurityService {
   readonly current: DocumentSecurityState;
   readonly effectiveScope: ReadonlyArray<string>;
-  readonly identity: IdentityClaims | null;
+  readonly identity: Identity | null;
   readonly passwordPrompt: PasswordPrompt;
   unlock(input: { password: string; mode?: 'any' | 'owner' }): AbortablePromise<DocumentUnlockResult>;
 }
@@ -34,8 +34,26 @@ const canAnnotate = doc.security.effectiveScope.includes('doc.annotate.write');
 if (!canCopy) hideCopyButton();
 ```
 
-`identity` is the resolved caller identity (or `null` when anonymous): `user_id`,
-`group_id`, `groups`, `display_name`.
+`identity` is who the session acts for, or `null` when anonymous. It is one
+object on both engines: the local engine takes it as the `identity` open option,
+the cloud engine from the document token's `identity` claim.
+
+```ts
+interface Identity {
+  userId?: string;             // owner of the annotations this session creates
+  displayName?: string;        // their author (/T)
+  email?: string;
+  title?: string;
+  organization?: string;
+  organizationalUnit?: string;
+  groupId?: string;            // the group new annotations are created in
+  groups?: string[];           // groups the caller belongs to, for :group= scopes
+}
+```
+
+Only `displayName`, `userId` and `groupId` are written into annotations. The
+other fields are there for scripts (`identity.corporation`, `identity.email`)
+and your own UI.
 
 ## Inspecting protection state
 

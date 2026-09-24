@@ -240,14 +240,19 @@ describe('openapi document', () => {
       allOf: [{ $ref: '#/components/schemas/PdfActionNode' }],
       nullable: true,
     });
+    // An annotation read carries `actions: null` when it has none.
+    const nullableAnnotationActions = {
+      allOf: [{ $ref: '#/components/schemas/PdfAnnotationActions' }],
+      nullable: true,
+    };
     expect(
       schemas.DocAnnotationsList200Response.properties.annotations.items.anyOf[0].properties
         .actions,
-    ).toEqual({ $ref: '#/components/schemas/PdfAnnotationActions' });
+    ).toEqual(nullableAnnotationActions);
     expect(
       schemas.DocAnnotationsListAll200Response.properties.pages.items.properties.annotations.items
         .anyOf[0].properties.actions,
-    ).toEqual({ $ref: '#/components/schemas/PdfAnnotationActions' });
+    ).toEqual(nullableAnnotationActions);
     expect(
       schemas.DocFormsGet200Response.properties.fields.items.anyOf[0].properties.actions,
     ).toEqual({ $ref: '#/components/schemas/PdfFieldActions' });

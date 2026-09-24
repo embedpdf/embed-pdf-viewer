@@ -85,8 +85,7 @@ export function registerEffectRunners(
                 ? creates[0]!
                 : ({
                     ...creates[index]!,
-                    inReplyTo: written[0]!.ref,
-                    replyType: 'group',
+                    reply: { to: written[0]!.ref, type: 'group' },
                   } as AnnotationDraft);
             const { created } = await page.annotations.create(draft);
             identity.confirm(id, created.ref);
@@ -130,7 +129,7 @@ export function registerEffectRunners(
     if (!record) return;
     const patch = {
       subtype: record.data?.subtype ?? record.subtype,
-      flags: record.flags,
+      ...record.flags,
     } as AnnotationPatch;
     return {
       ids: [effect.id],

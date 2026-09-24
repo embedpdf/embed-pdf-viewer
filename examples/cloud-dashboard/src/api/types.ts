@@ -1,3 +1,5 @@
+import type { Identity } from '@embedpdf/engine-core';
+
 /**
  * The demo API surface — what the dashboard's own helper server (`/api/*`)
  * speaks. Deliberately separate from the CloudPDF wire types: everything under
@@ -37,17 +39,10 @@ export interface Share {
   role: string;
   layerName: string;
   scope: string[];
-  identity: ShareIdentity;
+  identity: Identity;
   token: string;
   createdAt: number;
   expiresAt: number;
-}
-
-export interface ShareIdentity {
-  user_id?: string;
-  group_id?: string;
-  groups?: string[];
-  display_name?: string;
 }
 
 export interface CreateShareInput {
@@ -56,7 +51,7 @@ export interface CreateShareInput {
   role: string;
   layerName: string;
   scope: string[];
-  identity: ShareIdentity;
+  identity: Identity;
   ttlSeconds: number;
   /** Reuse the live share created under this key instead of minting again. */
   idempotencyKey?: string;

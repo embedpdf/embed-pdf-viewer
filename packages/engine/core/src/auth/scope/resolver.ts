@@ -3,7 +3,7 @@ import type {
   CollabAction,
   CollabFilter,
   DocCapability,
-  IdentityClaims,
+  Identity,
   ParsedScope,
   PdfBits,
 } from './types';
@@ -71,7 +71,7 @@ export function checkAnyCapability(
  *   4. otherwise → deny.
  *
  * For create: `target` should be built by the caller from JWT identity
- * (`{ userId: caller.user_id, groupId: caller.group_id }`). `:self` and
+ * (`{ userId: caller.userId, groupId: caller.groupId }`). `:self` and
  * `:all` then trivially pass; `:group=X` is the meaningful filter (only
  * matches when the caller's default group is X).
  *
@@ -81,7 +81,7 @@ export function checkCollab(
   action: CollabAction,
   target: CollabTarget,
   rawScope: ReadonlyArray<string>,
-  identity: IdentityClaims,
+  identity: Identity,
   pdfBits: PdfBits,
 ): boolean {
   const parsed = rawScope.map(parseScope);
@@ -173,7 +173,7 @@ export function expandRawScope(
  * identity. Pure function — no side effects, no implicit rules.
  *
  *   all              → always matches
- *   self             → matches if identity.user_id === target.userId
+ *   self             → matches if identity.userId === target.userId
  *   createdBy=<X>    → matches if target.userId === X
  *   group=<X>        → matches if target.groupId === X
  *                      and identity.groups includes X
@@ -232,16 +232,12 @@ export function checkSetGroup(
   return false;
 }
 
-export function filterMatches(
-  filter: CollabFilter,
-  target: CollabTarget,
-  id: IdentityClaims,
-): boolean {
+export function filterMatches(filter: CollabFilter, target: CollabTarget, id: Identity): boolean {
   switch (filter.kind) {
     case 'all':
       return true;
     case 'self':
-      return !!id.user_id && target.userId === id.user_id;
+      return !!id.userId && target.userId === id.userId;
     case 'createdBy':
       return target.userId === filter.userId;
     case 'group':

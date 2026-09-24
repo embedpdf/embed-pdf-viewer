@@ -43,7 +43,7 @@ export class PermissionDenied extends Error {
  */
 export class MissingIdentity extends Error {
   constructor(scope: string) {
-    super(`scope "${scope}" requires identity claims (user_id and/or groups)`);
+    super(`scope "${scope}" requires an identity (userId and/or groups)`);
     this.name = 'MissingIdentity';
   }
 }

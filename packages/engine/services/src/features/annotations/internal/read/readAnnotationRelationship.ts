@@ -51,6 +51,27 @@ export function readAnnotationRelationship(
   }
 }
 
+/**
+ * Read the annotation that `key` (`/IRT`, `/Popup`, `/Parent`) refers to, as a
+ * ref on the same page, or `null` when the key is absent or its target can't
+ * be addressed.
+ */
+export function readLinkedAnnotationRef(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+  key: string,
+  pageObjectNumber: PageObjectNumber,
+): AnnotationRef | null {
+  const linkedPtr = fn.FPDFAnnot_GetLinkedAnnot(annotPtr, key);
+  if (!linkedPtr) return null;
+  try {
+    return readParentRef(fn, mem, linkedPtr, pageObjectNumber);
+  } finally {
+    fn.FPDFPage_CloseAnnot(linkedPtr);
+  }
+}
+
 function readParentRef(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,

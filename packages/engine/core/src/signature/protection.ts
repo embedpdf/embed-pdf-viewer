@@ -145,7 +145,10 @@ export function protectedCapabilities(protection: DocumentProtection | null): Se
   out.add('doc.redact');
   out.add('doc.attachments.modify');
   out.add('doc.forms.modify');
-  if (!levelAllows(protection.enforced, 'annotate')) out.add('doc.annotate.modify');
+  if (!levelAllows(protection.enforced, 'annotate')) {
+    out.add('doc.annotate.modify');
+    out.add('doc.annotate.import');
+  }
   if (!levelAllows(protection.enforced, 'fill')) out.add('doc.forms.fill');
   return out;
 }

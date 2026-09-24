@@ -37,7 +37,7 @@ export function readCaret(
     color,
     opacity,
     rectDifferences: rd,
-    ...(rotation != null ? { rotation } : {}),
-    ...(unrotatedRect ? { unrotatedRect } : {}),
+    rotation: rotation ?? null,
+    unrotatedRect: unrotatedRect ?? null,
   };
 }

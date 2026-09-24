@@ -37,7 +37,7 @@ const freeTextDTO = (
     index: 30,
     identityQuality: 'durable',
     nm: null,
-    flags: NO_FLAGS,
+    ...NO_FLAGS,
     contents,
     subject: null,
     author: null,

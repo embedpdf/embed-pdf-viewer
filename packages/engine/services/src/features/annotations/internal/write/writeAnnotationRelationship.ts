@@ -101,3 +101,59 @@ export function writeAnnotationRelationship(
   }
   return null;
 }
+
+/**
+ * Link a popup to the annotation it shows, in both directions: the popup's
+ * `/Parent` and the parent's `/Popup` (ISO 32000-2 §12.5.6.14). `null`
+ * unlinks it. A previous parent loses its `/Popup` when it pointed at this
+ * popup. Returns the parent's stable id, which linking may strengthen.
+ */
+export function writePopupParent(
+  runtime: PdfRuntimeModule,
+  session: DocumentSession,
+  pagePtr: Ptr,
+  popupPtr: Ptr,
+  pageObjectNumber: PageObjectNumber,
+  parent: AnnotationRef | null,
+  previousParent: AnnotationRef | null,
+): AnnotationStableId | null {
+  const { fn } = runtime;
+  if (previousParent) {
+    const previousPtr = resolveAnnotPtr(runtime, session, pagePtr, previousParent);
+    try {
+      const linkedPtr = fn.FPDFAnnot_GetLinkedAnnot(previousPtr, 'Popup');
+      if (linkedPtr) {
+        const pointsHere =
+          fn.EPDFAnnot_GetObjectNumber(linkedPtr) === fn.EPDFAnnot_GetObjectNumber(popupPtr);
+        fn.FPDFPage_CloseAnnot(linkedPtr);
+        if (pointsHere) fn.EPDFAnnot_SetLinkedAnnot(previousPtr, 'Popup', NULL_PTR);
+      }
+    } finally {
+      fn.FPDFPage_CloseAnnot(previousPtr);
+    }
+  }
+
+  if (parent === null) {
+    fn.EPDFAnnot_SetLinkedAnnot(popupPtr, 'Parent', NULL_PTR);
+    return null;
+  }
+  if (parent.page.pageObjectNumber !== pageObjectNumber) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      `a popup's parent must be on the same page (parent page ${parent.page.pageObjectNumber}, popup page ${pageObjectNumber})`,
+    );
+  }
+  const parentPtr = resolveAnnotPtr(runtime, session, pagePtr, parent);
+  try {
+    const parentStableId = captureOrStampStableId(runtime, parentPtr);
+    if (
+      !fn.EPDFAnnot_SetLinkedAnnot(popupPtr, 'Parent', parentPtr) ||
+      !fn.EPDFAnnot_SetLinkedAnnot(parentPtr, 'Popup', popupPtr)
+    ) {
+      throw new EngineError(EngineErrorCode.Unknown, 'failed to link a popup to its parent');
+    }
+    return parentStableId;
+  } finally {
+    fn.FPDFPage_CloseAnnot(parentPtr);
+  }
+}

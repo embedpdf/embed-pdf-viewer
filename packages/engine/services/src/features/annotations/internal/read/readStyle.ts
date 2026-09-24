@@ -25,7 +25,8 @@ const DEFAULT_COLOR: Color = { r: 255, g: 0, b: 0 };
 export interface BorderFields {
   strokeWidth: number;
   borderStyle: AnnotationBorderStyle;
-  dashArray?: number[];
+  /** `null` for a solid border. */
+  dashArray: number[] | null;
 }
 
 /**
@@ -44,7 +45,7 @@ export function readBorderFields(
   return {
     strokeWidth: width,
     borderStyle: borderStyleFromCode(styleCode),
-    ...(dashArray.length > 0 ? { dashArray } : {}),
+    dashArray: dashArray.length > 0 ? dashArray : null,
   };
 }
 

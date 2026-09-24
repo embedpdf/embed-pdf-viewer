@@ -38,6 +38,7 @@ export type DocCapability =
   // Annotations
   | 'doc.annotate.read' // structured read of annotation lists (cloud-only; no PDF-bit gate — reading is unconditional)
   | 'doc.annotate.modify' // broad write default for create/update/delete (PDF bit 6); narrowed per-action by collab scopes when present
+  | 'doc.annotate.import' // restore annotations with their original authors and dates (grant-minted only — `pdf.permissions` never expands it; a restored userId or groupId grants that owner access)
 
   // Metadata (Info-dict writes, PDF bit 4)
   | 'doc.metadata.modify' // rewrite document metadata / Info dict (PDF bit 4)
@@ -122,23 +123,31 @@ export interface PdfBits {
 }
 
 /**
- * Identity claims associated with a JWT (cloud) or supplied at engine
- * open time (local). Used by collab filter resolution and by annotation
- * authoring (populating /T and /EMBD_Metadata fields).
+ * Who a session acts for: supplied at open time to the local engine, and
+ * carried in the `identity` claim of a document token for the cloud engine.
+ * It drives collab filters and fills in the attribution of what the session
+ * writes. Only `displayName`, `userId` and `groupId` are written into
+ * annotations; the rest is for the viewer (stamp templates, signature
+ * appearances), so personal data doesn't travel in every shared PDF.
  */
-export interface IdentityClaims {
-  user_id?: string;
-  group_id?: string;
-  groups?: ReadonlyArray<string>;
-  display_name?: string;
+export interface Identity {
+  /** The person's stable id in your system: `/EMBD_Metadata/UserID`, `CreatedBy` and `UpdatedBy`. */
+  readonly userId?: string;
+  /** The name shown as the author: `/T`. */
+  readonly displayName?: string;
+  readonly email?: string;
+  readonly title?: string;
+  readonly organization?: string;
+  readonly organizationalUnit?: string;
+  /** The group new annotations belong to: `/EMBD_Metadata/GroupID`. */
+  readonly groupId?: string;
+  /** The groups the person is in, for `:group=` collab filters. */
+  readonly groups?: ReadonlyArray<string>;
 }
 
 /**
- * Subset of identity claims that flows into worker requests so the
+ * The part of an {@link Identity} that flows into worker requests, so the
  * annotation pipeline can stamp /T, /M, and /EMBD_Metadata on writes.
- *
- * Field names follow PDF/EMBD conventions (UserID, GroupID) rather than
- * the JWT-style snake_case used by IdentityClaims.
  */
 export interface AnnotationActor {
   userId?: string;

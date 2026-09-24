@@ -42,10 +42,10 @@ import {
 } from './kinds/misc';
 import { caret, highlight, redact, squiggly, strikeout, underline } from './kinds/quads';
 import { circle, square } from './kinds/shape';
-import { ink, line, polygon, polyline } from './kinds/stroke';
+import { captionFieldsOf, ink, line, polygon, polyline } from './kinds/stroke';
 import { boxEmit, type KindProjection, type Wire } from './projection';
 import { GENERIC_PROPS } from './props';
-import { pdfToContentRect, annotationKey, styleFromDTO } from './seam';
+import { pdfToContentRect, annotationKey, flagsOf, styleFromDTO } from './seam';
 
 export {
   boxGeomFields,
@@ -81,6 +81,8 @@ const KINDS = {
   stamp,
   link,
   widget,
+  // A popup is its parent's window; the plugin draws nothing for it itself.
+  popup: unsupported,
   unsupported,
 } satisfies Record<AnnotationDTO['subtype'], KindProjection>;
 
@@ -124,15 +126,15 @@ export function fromDTO(dto: AnnotationDTO, crop: PdfRect): ModelAnnotation {
     subtype: dto.subtype === 'widget' ? widgetKindOf(dto.fieldFamily) : dto.subtype,
     // `/F` verbatim — every behavioral question (visible? selectable? frozen?)
     // is answered by the core's flag predicates, never derived here.
-    flags: dto.flags,
+    flags: flagsOf(dto),
     source: 'baked',
     // Carry the canonical DTO; geom/style below are derived projections of it.
     data: dto,
     // Relationship to a parent annotation. `irt` mirrors `/IRT`; `group` is the
     // primary's key for `/RT /Group` subordinates only (a visual group acts as
     // a unit). `/RT /R` (comment replies) keep `irt` but are not a visual group.
-    ...(dto.inReplyTo ? { irt: annotationKey(dto.inReplyTo) } : {}),
-    ...(dto.replyType === 'group' && dto.inReplyTo ? { group: annotationKey(dto.inReplyTo) } : {}),
+    ...(dto.reply ? { irt: annotationKey(dto.reply.to) } : {}),
+    ...(dto.reply?.type === 'group' ? { group: annotationKey(dto.reply.to) } : {}),
     style: styleFromDTO(dto),
     ...slice,
     apBox: pdfToContentRect(strippedRect ?? dto.rect, crop),
@@ -189,7 +191,7 @@ export function toScopedPatch(
     return annotation.measure
       ? ({
           subtype: wireSubtypeOf(annotation),
-          caption: annotation.measure.caption,
+          ...captionFieldsOf(annotation.measure),
         } as AnnotationPatch)
       : null;
   }
@@ -222,5 +224,5 @@ export function toCreateDraft(annotation: ModelAnnotation, crop: PdfRect): Annot
   const extras = kind.draftExtras?.(annotation, crop);
   if (kind.draftExtras && extras === null) return null;
   // The /NM comes from `named()` at the write, like every create of this plugin.
-  return { ...base, ...extras, flags: annotation.flags } as AnnotationDraft;
+  return { ...base, ...extras, ...annotation.flags } as unknown as AnnotationDraft;
 }

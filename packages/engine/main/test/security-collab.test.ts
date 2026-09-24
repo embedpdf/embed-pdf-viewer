@@ -64,7 +64,7 @@ describe('security collab mirrors (engine-local, wasm runtime)', () => {
   test('coarse doc.annotate.modify: any target mutable, set-group NOT implied', async () => {
     const doc = await open({
       scope: ['doc.annotate.modify'],
-      identity: { user_id: 'me' },
+      identity: { userId: 'me' },
     });
     expect(doc.security.allowsAnnotationCreate()).toBe(true);
     expect(doc.security.allowsAnnotationMutation('update', { userId: 'alice' })).toBe(true);
@@ -76,7 +76,7 @@ describe('security collab mirrors (engine-local, wasm runtime)', () => {
   test('narrowing: annotations:update:self SHADOWS modify for update only', async () => {
     const doc = await open({
       scope: ['doc.annotate.modify', 'annotations:update:self'],
-      identity: { user_id: 'me' },
+      identity: { userId: 'me' },
     });
     expect(doc.security.allowsAnnotationMutation('update', { userId: 'me' })).toBe(true);
     // The applicable narrowed grant shadows the coarse fallback…
@@ -89,7 +89,7 @@ describe('security collab mirrors (engine-local, wasm runtime)', () => {
   test('group grant: create derives from own identity, targets need the group stamp', async () => {
     const doc = await open({
       scope: ['annotations:*:group=legal'],
-      identity: { user_id: 'me', group_id: 'legal', groups: ['legal'] },
+      identity: { userId: 'me', groupId: 'legal', groups: ['legal'] },
     });
     // Self-target carries the caller's default group → matches the filter.
     expect(doc.security.allowsAnnotationCreate()).toBe(true);
@@ -104,7 +104,7 @@ describe('security collab mirrors (engine-local, wasm runtime)', () => {
   test('assigning the caller\'s own default group needs no grant', async () => {
     const doc = await open({
       scope: ['doc.annotate.modify'],
-      identity: { user_id: 'me', group_id: 'legal' },
+      identity: { userId: 'me', groupId: 'legal' },
     });
     expect(doc.security.allowsAnnotationGroupAssignment('legal')).toBe(true);
     expect(doc.security.allowsAnnotationGroupAssignment('other')).toBe(false);

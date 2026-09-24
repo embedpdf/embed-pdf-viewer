@@ -1,3 +1,4 @@
+import type { Identity } from '../auth/scope/types';
 import { PageRefSchema } from '../identity/PageRef.schema';
 import type { PageRef } from '../identity/PageRef';
 import { z } from 'zod';
@@ -112,6 +113,20 @@ import type {
 } from '../search/types';
 import type { PdfTextSegment } from '../text/layout';
 export type { CacheDelta, MutationMeta } from '../mutation/MutationMeta';
+
+/** Who a session acts for; see `Identity` in `auth/scope/types.ts`. */
+export const IdentitySchema: z.ZodType<Identity> = z
+  .object({
+    userId: z.string().min(1).max(256).optional(),
+    displayName: z.string().min(1).max(256).optional(),
+    email: z.string().min(1).max(256).optional(),
+    title: z.string().min(1).max(256).optional(),
+    organization: z.string().min(1).max(256).optional(),
+    organizationalUnit: z.string().min(1).max(256).optional(),
+    groupId: z.string().min(1).max(256).optional(),
+    groups: z.array(z.string().min(1).max(256)).max(64).optional(),
+  })
+  .strict();
 
 export const DocumentMetadataSchema: z.ZodType<DocumentMetadata> = z.object({
   title: z.string().nullable(),
@@ -312,12 +327,7 @@ export const AccessResponseSchema = z.object({
    * detection.
    */
   effectiveScope: z.array(z.string()),
-  identity: z.object({
-    user_id: z.string().optional(),
-    group_id: z.string().optional(),
-    groups: z.array(z.string()).optional(),
-    display_name: z.string().optional(),
-  }),
+  identity: IdentitySchema,
   originPasswordPolicy: z.object({
     mode: z.enum(['not-needed', 'client-retry', 'server-session']),
   }),

@@ -39,7 +39,7 @@ const square = (objectNumber: number, extra: Record<string, unknown> = {}): Anno
     index: objectNumber,
     identityQuality: 'durable',
     nm: null,
-    flags: NO_FLAGS,
+    ...NO_FLAGS,
     contents: null,
     subject: null,
     author: null,
@@ -52,8 +52,14 @@ const square = (objectNumber: number, extra: Record<string, unknown> = {}): Anno
     interiorColor: null,
     opacity: 1,
     strokeWidth: 2,
-    inReplyTo: null,
-    replyType: null,
+    reply: null,
+    popup: null,
+    groupId: null,
+    userId: null,
+    createdBy: null,
+    updatedBy: null,
+    importedBy: null,
+    actions: null,
     ...extra,
   }) as unknown as AnnotationDTO;
 
@@ -621,7 +627,8 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
         ref: NAMED,
         index: 3,
         nm: 'named-text',
-        flags: { ...NO_FLAGS, print: false },
+        ...NO_FLAGS,
+        print: false,
       }),
     });
     await harness.capability.updateSelectionFlags({ print: false });
@@ -762,16 +769,28 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
       created: square(61, {
         subtype: 'link',
         target: FIRST,
-        inReplyTo: PARENT,
-        replyType: 'group',
+        reply: { to: PARENT, type: 'group' },
+        popup: null,
+        groupId: null,
+        userId: null,
+        createdBy: null,
+        updatedBy: null,
+        importedBy: null,
+        actions: null,
       }),
     });
     harness.update.mockResolvedValueOnce({
       updated: square(61, {
         subtype: 'link',
         target: SECOND,
-        inReplyTo: PARENT,
-        replyType: 'group',
+        reply: { to: PARENT, type: 'group' },
+        popup: null,
+        groupId: null,
+        userId: null,
+        createdBy: null,
+        updatedBy: null,
+        importedBy: null,
+        actions: null,
       }),
     });
     await first;
@@ -833,8 +852,14 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
       created: square(61, {
         subtype: 'link',
         target: TARGET,
-        inReplyTo: ref(60),
-        replyType: 'group',
+        reply: { to: ref(60), type: 'group' },
+        popup: null,
+        groupId: null,
+        userId: null,
+        createdBy: null,
+        updatedBy: null,
+        importedBy: null,
+        actions: null,
       }),
     });
 
@@ -848,8 +873,7 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     expect(harness.create.mock.calls[1]![0]).toMatchObject({
       subtype: 'link',
       target: TARGET,
-      inReplyTo: ref(60),
-      replyType: 'group',
+      reply: { to: ref(60), type: 'group' },
     });
     expect(harness.capability.links.get(ref(60))).toEqual(TARGET);
   });
@@ -875,7 +899,7 @@ describe('one engine write carrying several changes', () => {
     expect(harness.capability.get(ref(30))!.contents).toBe('Hello');
     expect(failures).toHaveBeenCalledTimes(1);
 
-    flags.resolve({ updated: freeText('Hello', { flags: { ...NO_FLAGS, print: false } }) });
+    flags.resolve({ updated: freeText('Hello', { ...NO_FLAGS, print: false }) });
     await settingFlags;
     expect(harness.capability.get(ref(30))!.contents).toBe('Hello');
   });
@@ -893,7 +917,8 @@ describe('one engine write carrying several changes', () => {
         ref: NAMED,
         index: 3,
         nm: 'named-text',
-        flags: { ...NO_FLAGS, print: false },
+        ...NO_FLAGS,
+        print: false,
       }),
     });
     await harness.capability.updateSelectionFlags({ print: false });

@@ -224,7 +224,7 @@ export function runAnnotationMutationConformance(
       }
     });
 
-    test('create + update honor annotation flags (set on create, merge on patch)', async () => {
+    test('create and update write each annotation flag as its own field', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
@@ -236,27 +236,21 @@ export function runAnnotationMutationConformance(
           color: { r: 10, g: 20, b: 30 },
           opacity: 1,
           quadPoints: quad,
-          flags: { print: true },
+          print: true,
         };
         const created = await page.annotations.create(draft);
-        expect(created.created.flags.print).toBe(true);
-        expect(created.created.flags.hidden).toBe(false);
+        expect(created.created.print).toBe(true);
+        expect(created.created.hidden).toBe(false);
 
-        // Patch a different flag: it must merge, leaving `print` intact.
-        const hidden = await page.annotations.update(created.created.ref, {
-          subtype: 'highlight',
-          flags: { hidden: true },
-        });
-        expect(hidden.updated.flags.hidden).toBe(true);
-        expect(hidden.updated.flags.print).toBe(true);
+        // Setting another flag leaves `print` as it is.
+        const hidden = await page.annotations.update(created.created.ref, { hidden: true });
+        expect(hidden.updated.hidden).toBe(true);
+        expect(hidden.updated.print).toBe(true);
 
         // Clearing one flag leaves the rest untouched.
-        const cleared = await page.annotations.update(created.created.ref, {
-          subtype: 'highlight',
-          flags: { print: false },
-        });
-        expect(cleared.updated.flags.print).toBe(false);
-        expect(cleared.updated.flags.hidden).toBe(true);
+        const cleared = await page.annotations.update(created.created.ref, { print: false });
+        expect(cleared.updated.print).toBe(false);
+        expect(cleared.updated.hidden).toBe(true);
       } finally {
         await doc.close();
       }
@@ -450,7 +444,7 @@ export function runAnnotationMutationConformance(
         // Metadata-only patches never touch /AP.
         const flagged = await page.annotations.update(created.created.ref, {
           subtype: 'square',
-          flags: { print: true },
+          print: true,
         });
         expect(flagged.appearance).toEqual({ action: 'preserved', changed: false });
 
@@ -582,8 +576,8 @@ export function runAnnotationMutationConformance(
           unrotatedRect: null,
         });
         if (flattened.updated.subtype === 'square') {
-          expect(flattened.updated.rotation).toBe(undefined);
-          expect(flattened.updated.unrotatedRect).toBe(undefined);
+          expect(flattened.updated.rotation).toBe(null);
+          expect(flattened.updated.unrotatedRect).toBe(null);
         }
       } finally {
         await doc.close();
@@ -723,7 +717,7 @@ export function runAnnotationMutationConformance(
           expect(freeText.created.color).toMatchObject({ r: 20, g: 40, b: 60 });
           expect(freeText.created.interiorColor).toMatchObject({ r: 250, g: 250, b: 210 });
           // No override sent => text follows `color`, so fontColor is omitted.
-          expect(freeText.created.fontColor === undefined).toBe(true);
+          expect(freeText.created.fontColor).toBe(null);
         }
 
         // Callout: intent + /CL leader + /LE ending, explicit fontColor
@@ -2009,10 +2003,10 @@ export function runAnnotationMutationConformance(
 
     // ─────────────────────────────────────────────────────────────────
     //  /IRT + /RT relationships (reply vs group). Locked rules:
-    //  - A draft `inReplyTo` writes /IRT; /RT defaults to 'reply' when
-    //    `replyType` is omitted (ISO 32000 §12.5.6.2 default).
-    //  - The DTO surfaces `inReplyTo` (parent ref) + `replyType`; a
-    //    top-level annotation reports both as null.
+    //  - A draft `reply` writes /IRT; /RT defaults to 'reply' when
+    //    `reply.type` is left out (ISO 32000 §12.5.6.2 default).
+    //  - The DTO surfaces `reply` ({ to, type }); a top-level annotation
+    //    reports `reply: null`.
     //  - Linking reports the (possibly strengthened) parent id in
     //    `meta.changed` and is non-structural (no rev bump / refetch).
     //  - A cross-page parent is rejected with InvalidArg.
@@ -2028,27 +2022,26 @@ export function runAnnotationMutationConformance(
           quadPoints: quad,
         } satisfies HighlightDraft);
         // A freshly created top-level annotation has no relationship.
-        expect(parent.created.inReplyTo).toBe(null);
-        expect(parent.created.replyType).toBe(null);
+        expect(parent.created.reply).toBe(null);
 
         const reply = await page.annotations.create({
           subtype: 'highlight',
           contents: 'a reply',
           quadPoints: quad,
-          inReplyTo: parent.created.ref,
+          reply: { to: parent.created.ref },
         } satisfies HighlightDraft);
         expect(AnnotationCreateResultSchema.safeParse(reply).success).toBe(true);
         // /RT absent in the draft normalizes to 'reply'.
-        expect(reply.created.replyType).toBe('reply');
-        expect(reply.created.inReplyTo === null).toBe(false);
+        expect(reply.created.reply?.type).toBe('reply');
+        expect(reply.created.reply?.to !== undefined).toBe(true);
         if (
-          reply.created.inReplyTo?.kind === 'objectNumber' &&
+          reply.created.reply?.to.kind === 'objectNumber' &&
           parent.created.ref.kind === 'objectNumber'
         ) {
-          expect(reply.created.inReplyTo.annotObjectNumber).toBe(
+          expect(reply.created.reply!.to.annotObjectNumber).toBe(
             parent.created.ref.annotObjectNumber,
           );
-          expect(reply.created.inReplyTo.page.pageObjectNumber).toBe(fix.pageObjectNumber);
+          expect(reply.created.reply!.to.page.pageObjectNumber).toBe(fix.pageObjectNumber);
         }
         // The parent (already durable) is reported alongside the new reply.
         expect(reply.meta.changed.length).toBe(2);
@@ -2064,8 +2057,8 @@ export function runAnnotationMutationConformance(
             reply.created.ref.kind === 'objectNumber' &&
             a.ref.annotObjectNumber === reply.created.ref.annotObjectNumber,
         );
-        expect(readReply?.replyType).toBe('reply');
-        expect(readReply?.inReplyTo == null).toBe(false);
+        expect(readReply?.reply?.type).toBe('reply');
+        expect(readReply?.reply?.to !== undefined).toBe(true);
       } finally {
         await doc.close();
       }
@@ -2087,12 +2080,11 @@ export function runAnnotationMutationConformance(
           rect: shapeRect,
           color: { r: 0, g: 0, b: 0 },
           opacity: 1,
-          inReplyTo: primary.created.ref,
-          replyType: 'group',
+          reply: { to: primary.created.ref, type: 'group' },
         } satisfies CaretDraft);
         expect(AnnotationCreateResultSchema.safeParse(caret).success).toBe(true);
-        expect(caret.created.replyType).toBe('group');
-        expect(caret.created.inReplyTo === null).toBe(false);
+        expect(caret.created.reply?.type).toBe('group');
+        expect(caret.created.reply?.to !== undefined).toBe(true);
 
         const after = await page.annotations.list();
         const readCaret = after.annotations.find(
@@ -2101,7 +2093,7 @@ export function runAnnotationMutationConformance(
             caret.created.ref.kind === 'objectNumber' &&
             a.ref.annotObjectNumber === caret.created.ref.annotObjectNumber,
         );
-        expect(readCaret?.replyType).toBe('group');
+        expect(readCaret?.reply?.type).toBe('group');
       } finally {
         await doc.close();
       }
@@ -2306,17 +2298,16 @@ export function runAnnotationMutationConformance(
           subtype: 'link',
           rect: shapeRect,
           target: { kind: 'uri', uri: 'https://www.embedpdf.com/docs' },
-          inReplyTo: parent.created.ref,
-          replyType: 'group',
+          reply: { to: parent.created.ref, type: 'group' },
         } satisfies LinkDraft);
         expect(AnnotationCreateResultSchema.safeParse(link).success).toBe(true);
-        expect(link.created.replyType).toBe('group');
-        expect(link.created.inReplyTo === null).toBe(false);
+        expect(link.created.reply?.type).toBe('group');
+        expect(link.created.reply?.to !== undefined).toBe(true);
         if (
-          link.created.inReplyTo?.kind === 'objectNumber' &&
+          link.created.reply?.to.kind === 'objectNumber' &&
           parent.created.ref.kind === 'objectNumber'
         ) {
-          expect(link.created.inReplyTo.annotObjectNumber).toBe(
+          expect(link.created.reply!.to.annotObjectNumber).toBe(
             parent.created.ref.annotObjectNumber,
           );
         }
@@ -2330,7 +2321,7 @@ export function runAnnotationMutationConformance(
             a.ref.annotObjectNumber === link.created.ref.annotObjectNumber,
         );
         expect(readLink?.subtype).toBe('link');
-        expect(readLink?.replyType).toBe('group');
+        expect(readLink?.reply?.type).toBe('group');
         if (readLink?.subtype === 'link') {
           expect(readLink.target).toEqual({ kind: 'uri', uri: 'https://www.embedpdf.com/docs' });
         }
@@ -2358,8 +2349,7 @@ export function runAnnotationMutationConformance(
           quadPoints: quad,
           color: { r: 228, g: 66, b: 52 },
           opacity: 1,
-          inReplyTo: caret.created.ref,
-          replyType: 'group',
+          reply: { to: caret.created.ref, type: 'group' },
         } satisfies StrikeoutDraft);
 
         expect(caret.created.subtype).toBe('caret');
@@ -2368,8 +2358,8 @@ export function runAnnotationMutationConformance(
         if (strikeout.created.subtype === 'strikeout') {
           expect(strikeout.created.intent).toBe('strikeout-text-edit');
         }
-        expect(strikeout.created.replyType).toBe('group');
-        expect(strikeout.created.inReplyTo).toEqual(caret.created.ref);
+        expect(strikeout.created.reply?.type).toBe('group');
+        expect(strikeout.created.reply?.to).toEqual(caret.created.ref);
 
         const after = await page.annotations.list();
         const readCaret = after.annotations.find(
@@ -2388,14 +2378,14 @@ export function runAnnotationMutationConformance(
         expect(readStrikeout?.subtype === 'strikeout' && readStrikeout.intent).toBe(
           'strikeout-text-edit',
         );
-        expect(readStrikeout?.replyType).toBe('group');
-        expect(readStrikeout?.inReplyTo).toEqual(caret.created.ref);
+        expect(readStrikeout?.reply?.type).toBe('group');
+        expect(readStrikeout?.reply?.to).toEqual(caret.created.ref);
       } finally {
         await doc.close();
       }
     });
 
-    test('patch inReplyTo: null clears /IRT and /RT (back to top-level)', async () => {
+    test('patch reply: null clears /IRT and /RT (back to top-level)', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
@@ -2408,17 +2398,16 @@ export function runAnnotationMutationConformance(
           subtype: 'highlight',
           contents: 'clearable reply',
           quadPoints: quad,
-          inReplyTo: parent.created.ref,
+          reply: { to: parent.created.ref },
         } satisfies HighlightDraft);
-        expect(reply.created.replyType).toBe('reply');
+        expect(reply.created.reply?.type).toBe('reply');
 
         const cleared = await page.annotations.update(reply.created.ref, {
           subtype: 'highlight',
-          inReplyTo: null,
+          reply: null,
         });
         expect(AnnotationUpdateResultSchema.safeParse(cleared).success).toBe(true);
-        expect(cleared.updated.inReplyTo).toBe(null);
-        expect(cleared.updated.replyType).toBe(null);
+        expect(cleared.updated.reply).toBe(null);
       } finally {
         await doc.close();
       }
@@ -2449,7 +2438,7 @@ export function runAnnotationMutationConformance(
             subtype: 'highlight',
             contents: 'bad cross-page reply',
             quadPoints: quad,
-            inReplyTo: crossPageRef,
+            reply: { to: crossPageRef },
           } satisfies HighlightDraft);
         } catch (err) {
           caught = err;
@@ -2491,7 +2480,7 @@ export function runAnnotationMutationConformance(
         const status = await page.annotations.create({
           subtype: 'text',
           rect: shapeRect,
-          inReplyTo: target.created.ref,
+          reply: { to: target.created.ref },
           state: 'accepted',
           stateModel: 'review',
         } satisfies TextDraft);
@@ -2501,7 +2490,7 @@ export function runAnnotationMutationConformance(
         expect(status.created.state).toBe('accepted');
         expect(status.created.stateModel).toBe('review');
         // A state annotation is a reply like any other.
-        expect(status.created.replyType).toBe('reply');
+        expect(status.created.reply?.type).toBe('reply');
 
         // The entries survive a fresh read.
         const after = await page.annotations.list();

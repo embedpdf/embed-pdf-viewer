@@ -869,9 +869,9 @@ describe('stamp plugin: placement', () => {
       {
         scope: ['*'],
         identity: {
-          user_id: 'alex',
-          group_id: 'EmbedPDF',
-          display_name: 'Alex Morgan',
+          userId: 'alex',
+          organization: 'EmbedPDF',
+          displayName: 'Alex Morgan',
         },
       },
     );

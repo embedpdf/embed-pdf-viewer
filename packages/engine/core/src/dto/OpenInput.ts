@@ -1,4 +1,4 @@
-import type { IdentityClaims } from '../auth/scope';
+import type { Identity } from '../auth/scope';
 
 /**
  * Per-call token source. Either a literal JWT or a factory that
@@ -183,10 +183,10 @@ export interface OpenOptions {
   scope?: ReadonlyArray<string>;
 
   /**
-   * Engine-local only. The identity claims to evaluate collab filters
-   * against (`:self`, `:group=X`) and to stamp onto annotation
-   * `/EMBD_Metadata` on create. Mirrors the JWT identity claims used
-   * cloud-side.
+   * Engine-local only. Who the session acts for: collab filters
+   * (`:self`, `:group=X`) are evaluated against it, and annotations it
+   * writes are attributed to it. The cloud engine takes the same object
+   * from the document token's `identity` claim.
    *
    * Required when `scope` contains collab scopes (`annotations:*:self`
    * etc.) — opening without it throws `MissingIdentity` so the config
@@ -195,5 +195,5 @@ export interface OpenOptions {
    *
    * Cloud engines read identity from the JWT and ignore this option.
    */
-  identity?: IdentityClaims;
+  identity?: Identity;
 }

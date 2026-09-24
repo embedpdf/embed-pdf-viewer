@@ -6,8 +6,8 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
-import { readDestination } from '../../../destinations/readDestination';
 import type { AnnotationReadContext } from './annotationReadContext';
+import { readDestination } from '../../../destinations/readDestination';
 
 /**
  * Link reader: rect/flags/relationship ride the base (a link grouped to an

@@ -235,8 +235,8 @@ describe('annotation rotation (local engine) — save + reopen', () => {
     );
     expect(square).toBeDefined();
     if (square && square.subtype === 'square') {
-      expect(square.rotation).toBeUndefined();
-      expect(square.unrotatedRect).toBeUndefined();
+      expect(square.rotation).toBe(null);
+      expect(square.unrotatedRect).toBe(null);
     }
     await doc.close();
   });

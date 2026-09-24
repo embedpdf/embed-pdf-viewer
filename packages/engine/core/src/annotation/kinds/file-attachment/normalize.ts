@@ -1,4 +1,5 @@
-import type { FileAttachmentDraft, FileAttachmentWireDraft, WireAttachmentFile } from './draft';
+import type { FileAttachmentDraft, FileAttachmentWireDraft } from './index';
+import type { WireAttachmentFile } from './values';
 import type { AttachmentFileSource } from '../../../dto/Attachment';
 import { EngineError } from '../../../errors/EngineError';
 import { EngineErrorCode } from '../../../errors/EngineErrorCode';

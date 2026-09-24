@@ -12,6 +12,7 @@ import { LineKind } from './line';
 import { LinkKind } from './link';
 import { PolygonKind } from './polygon';
 import { PolylineKind } from './polyline';
+import { PopupKind } from './popup';
 import { RedactKind } from './redact';
 import { SquareKind } from './square';
 import { SquigglyKind } from './squiggly';
@@ -41,18 +42,23 @@ export * from './stamp';
 export * from './file-attachment';
 export * from './widget';
 export * from './redact';
+export * from './popup';
 export * from './unsupported';
 export * from './text-markup.shared';
 export * from './shape.shared';
 export * from './style.shared';
 export * from './vertex.shared';
+export * from './widget.shared';
+export { ANNOTATION_DECLARATIONS, declarationOf } from './declarations';
+export type { AnnotationDeclaration, AnnotationRead } from './declarations';
+export type { CreateOf, ReadOf, UpdateOf } from '../declaration';
 
 /**
  * The closed-world catalog of currently-implemented annotation kinds.
  *
- * Adding a new subtype is one folder under `kinds/<name>/` exporting the
- * five files (dto, draft, patch, schema, index) and one entry in this
- * tuple. The discriminated unions and zod discriminator below regenerate
+ * Adding a new subtype is one folder under `kinds/<name>/` with its
+ * `declaration.ts` and `index.ts`, and one entry in this tuple and in
+ * `declarations.ts`. The discriminated unions and zod discriminator below regenerate
  * automatically; no other file in the package needs to change.
  *
  * Every subtype the engine has not yet wired up rides on
@@ -80,6 +86,7 @@ export const ANNOTATION_KINDS = [
   FileAttachmentKind,
   WidgetKind,
   RedactKind,
+  PopupKind,
   UnsupportedKind,
 ] as const;
 
@@ -156,6 +163,7 @@ export const AnnotationDTOSchema: z.ZodType<AnnotationDTO> = z.discriminatedUnio
   FileAttachmentKind.dtoSchema,
   WidgetKind.dtoSchema,
   RedactKind.dtoSchema,
+  PopupKind.dtoSchema,
   UnsupportedKind.dtoSchema,
 ] as unknown as [
   z.ZodDiscriminatedUnionOption<'subtype'>,
@@ -187,36 +195,27 @@ export const AnnotationDraftSchema: z.ZodType<WireAnnotationDraft> = z.discrimin
     FileAttachmentKind.draftSchema,
     WidgetKind.draftSchema,
     RedactKind.draftSchema,
+    PopupKind.draftSchema,
   ] as unknown as [
     z.ZodDiscriminatedUnionOption<'subtype'>,
     ...z.ZodDiscriminatedUnionOption<'subtype'>[],
   ],
 ) as unknown as z.ZodType<WireAnnotationDraft>;
 
-/** Validates the wire patch form (post-normalization). */
-export const AnnotationPatchSchema: z.ZodType<WireAnnotationPatch> = z.discriminatedUnion(
-  'subtype',
-  [
-    HighlightKind.patchSchema,
-    UnderlineKind.patchSchema,
-    SquigglyKind.patchSchema,
-    StrikeoutKind.patchSchema,
-    CircleKind.patchSchema,
-    SquareKind.patchSchema,
-    PolygonKind.patchSchema,
-    PolylineKind.patchSchema,
-    LineKind.patchSchema,
-    LinkKind.patchSchema,
-    InkKind.patchSchema,
-    FreeTextKind.patchSchema,
-    CaretKind.patchSchema,
-    TextKind.patchSchema,
-    StampKind.patchSchema,
-    FileAttachmentKind.patchSchema,
-    WidgetKind.patchSchema,
-    RedactKind.patchSchema,
-  ] as unknown as [
-    z.ZodDiscriminatedUnionOption<'subtype'>,
-    ...z.ZodDiscriminatedUnionOption<'subtype'>[],
-  ],
+/**
+ * Validates the wire patch form (post-normalization) against every kind. A
+ * patch may leave out its `subtype`, so this only checks that the patch fits
+ * some kind; {@link annotationPatchSchemaOf} checks it against its target.
+ */
+export const AnnotationPatchSchema: z.ZodType<WireAnnotationPatch> = z.union(
+  ANNOTATION_KINDS.filter((kind) => kind.subtype !== 'unsupported').map(
+    (kind) => kind.patchSchema,
+  ) as unknown as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]],
 ) as unknown as z.ZodType<WireAnnotationPatch>;
+
+/** The wire patch schema of one kind: how an update of an annotation of that kind is checked. */
+export function annotationPatchSchemaOf(
+  subtype: AnnotationSubtypeOfKind,
+): z.ZodType<WireAnnotationPatch> {
+  return KIND_BY_SUBTYPE[subtype].patchSchema as unknown as z.ZodType<WireAnnotationPatch>;
+}

@@ -45,7 +45,8 @@ export function runMeasurementConformance(
             rect,
             measure: scale,
             linePoints: { start: vertices[0], end: vertices[1] },
-            caption: { enabled: true, offset: { along: 10, perpendicular: 20 } },
+            captionEnabled: true,
+            captionOffset: { along: 10, perpendicular: 20 },
           })
         ).created;
         const inert = await page.annotations.update(created.ref, {
@@ -62,22 +63,22 @@ export function runMeasurementConformance(
         expect(changed.appearance.changed).toBe(true);
         const hidden = await page.annotations.update(created.ref, {
           subtype: 'line',
-          caption: { enabled: false },
+          captionEnabled: false,
         });
         expect(hidden.updated).toMatchObject({
           contents: '6 m',
-          caption: { enabled: false, offset: { along: 10, perpendicular: 20 } },
+          captionEnabled: false,
+          captionOffset: { along: 10, perpendicular: 20 },
         });
         expect(hidden.appearance.changed).toBe(true);
         const reset = await page.annotations.update(created.ref, {
           subtype: 'line',
-          caption: { enabled: true, offset: null },
+          captionEnabled: true,
+          captionOffset: null,
           measure: null,
         });
         expect(reset.updated.contents).toBe('6 m');
-        expect(
-          reset.updated.subtype === 'line' && reset.updated.caption?.offset === undefined,
-        ).toBe(true);
+        expect(reset.updated.subtype === 'line' && reset.updated.captionOffset === null).toBe(true);
         expect(measurementReadout(reset.updated)).toEqual({ unavailable: 'no-measure' });
       } finally {
         await doc.close();
@@ -97,7 +98,8 @@ export function runMeasurementConformance(
             measure: measureFromKnownLength(1, { value: 1.00000001, unit: 'm' }),
             contents: 'wrong',
             linePoints: { start: vertices[0], end: { x: 3.4450000001, y: 0 } },
-            caption: { enabled: true, offset: { along: 10, perpendicular: 20 } },
+            captionEnabled: true,
+            captionOffset: { along: 10, perpendicular: 20 },
           },
           {
             subtype: 'polyline',
@@ -106,7 +108,8 @@ export function runMeasurementConformance(
             measure: scale,
             contents: 'wrong',
             vertices,
-            caption: { enabled: true, center: { x: 0, y: 0 } },
+            captionEnabled: true,
+            captionCenter: { x: 0, y: 0 },
           },
           {
             subtype: 'polygon',
@@ -115,7 +118,8 @@ export function runMeasurementConformance(
             measure: scale,
             contents: 'wrong',
             vertices,
-            caption: { enabled: true, center: { x: 50, y: 30 } },
+            captionEnabled: true,
+            captionCenter: { x: 50, y: 30 },
           },
         ];
         const saved = [];
@@ -137,7 +141,7 @@ export function runMeasurementConformance(
           expect(a.contents).toBe(before.contents);
           if (a.subtype !== 'line' && a.subtype !== 'polygon' && a.subtype !== 'polyline')
             throw new Error('Missing dimension');
-          expect(a.caption).toEqual('caption' in before ? before.caption : undefined);
+          expect(captionOf(a)).toEqual(captionOf(before));
           const result = await page.annotations.update(a.ref, {
             subtype: a.subtype,
             color: { r: 0, g: 0, b: 255 },
@@ -198,4 +202,13 @@ export function runMeasurementConformance(
       }
     });
   });
+}
+
+const CAPTION_FIELDS = ['captionEnabled', 'captionPosition', 'captionOffset', 'captionCenter'];
+
+/** The caption fields a dimension annotation reads, for comparing two reads. */
+function captionOf(annotation: object): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(annotation).filter(([name]) => CAPTION_FIELDS.includes(name)),
+  );
 }

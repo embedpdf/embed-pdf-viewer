@@ -29,9 +29,9 @@ import {
   setTextAlignment,
 } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
+import { writeBoxTransformMetadata } from './writeAnnotationTransformMetadata';
 import { applyDefaultAppearance } from './writeDefaultAppearance';
 import { applyBorderDraft, applyBorderPatch, DEFAULT_OPACITY } from './writeStyle';
-import { writeBoxTransformMetadata } from './writeAnnotationTransformMetadata';
 
 /**
  * Default `/DA` colour for free text: black (border + default text). Unlike
@@ -110,7 +110,7 @@ export function applyFreeTextDraft(
 
   const daColor = draft.color ?? DEFAULT_FREETEXT_COLOR;
   applyDefaultAppearance(fn, annotPtr, draft.fontFamily, draft.fontSize, daColor, ctx);
-  if (draft.fontColor !== undefined) {
+  if (draft.fontColor != null) {
     setAnnotColor(fn, annotPtr, draft.fontColor, FPDFANNOT_COLORTYPE.TextColor);
   }
 
@@ -121,10 +121,10 @@ export function applyFreeTextDraft(
     setRectangleDifferences(fn, annotPtr, draft.rectDifferences);
   }
 
-  if (draft.calloutLine !== undefined) {
+  if (draft.calloutLine != null) {
     setCalloutLine(fn, mem, annotPtr, draft.calloutLine);
   }
-  if (draft.lineEnding !== undefined) {
+  if (draft.lineEnding != null) {
     setLineEndings(fn, annotPtr, { start: 'none', end: draft.lineEnding });
   }
   // A plain text box rotates like square/circle (box model). A callout's
@@ -213,7 +213,9 @@ export function applyFreeTextPatch(
       ctx,
     );
   }
-  if (patch.fontColor !== undefined) {
+  if (patch.fontColor === null) {
+    clearAnnotColor(fn, annotPtr, FPDFANNOT_COLORTYPE.TextColor);
+  } else if (patch.fontColor !== undefined) {
     setAnnotColor(fn, annotPtr, patch.fontColor, FPDFANNOT_COLORTYPE.TextColor);
   }
   {
@@ -250,7 +252,7 @@ export function applyFreeTextPatch(
         if (face.italic !== undefined) body.italic = face.italic;
       }
       if (patch.fontSize !== undefined) body.size = patch.fontSize;
-      if (patch.fontColor !== undefined) body.color = hexColor(patch.fontColor);
+      if (patch.fontColor != null) body.color = hexColor(patch.fontColor);
       if (patch.textAlign !== undefined) body.align = patch.textAlign;
       writeRichText(fn, annotPtr, { body, paragraphs: current.paragraphs }, ctx);
     }
@@ -269,10 +271,14 @@ export function applyFreeTextPatch(
     setRectangleDifferences(fn, annotPtr, patch.rectDifferences);
   }
 
-  if (patch.calloutLine !== undefined) {
+  if (patch.calloutLine === null) {
+    fn.EPDFAnnot_RemoveKey(annotPtr, 'CL');
+  } else if (patch.calloutLine !== undefined) {
     setCalloutLine(fn, mem, annotPtr, patch.calloutLine);
   }
-  if (patch.lineEnding !== undefined) {
+  if (patch.lineEnding === null) {
+    fn.EPDFAnnot_RemoveKey(annotPtr, 'LE');
+  } else if (patch.lineEnding !== undefined) {
     setLineEndings(fn, annotPtr, { start: 'none', end: patch.lineEnding });
   }
 }

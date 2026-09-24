@@ -50,7 +50,8 @@ export function iconPlacementDraft(
     opacity: defaults.opacity,
     // A fresh placement carries print (Acrobat parity) plus the tool's seed
     // (the note/attachment tools pass noZoom + noRotate).
-    flags: { print: true, ...flags },
+    print: true,
+    ...flags,
   };
   if (subtype === 'text') {
     return { subtype: 'text', icon: (defaults.icon as NoteIcon) ?? 'comment', ...shared };

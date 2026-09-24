@@ -1,14 +1,17 @@
-import type { SquigglyDraft } from './draft';
-import type { SquigglyAnnotationDTO } from './dto';
-import type { SquigglyPatch } from './patch';
-import { SquigglyDTOSchema, SquigglyDraftSchema, SquigglyPatchSchema } from './schema';
+import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
+import { SquigglyDeclaration } from './declaration';
 
-export type { SquigglyAnnotationDTO } from './dto';
-export type { SquigglyDraft } from './draft';
-export type { SquigglyPatch } from './patch';
-export { SquigglyDTOSchema, SquigglyDraftSchema, SquigglyPatchSchema } from './schema';
+export { SquigglyDeclaration } from './declaration';
+
+export type SquigglyAnnotationDTO = ReadOf<typeof SquigglyDeclaration>;
+export type SquigglyDraft = CreateOf<typeof SquigglyDeclaration>;
+export type SquigglyPatch = UpdateOf<typeof SquigglyDeclaration>;
+
+export const SquigglyDTOSchema = SquigglyDeclaration.readSchema;
+export const SquigglyDraftSchema = SquigglyDeclaration.createSchema;
+export const SquigglyPatchSchema = SquigglyDeclaration.updateSchema;
 
 export const SquigglyKind: AnnotationKindModule<
   'squiggly',

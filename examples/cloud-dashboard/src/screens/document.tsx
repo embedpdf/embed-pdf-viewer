@@ -54,7 +54,7 @@ export function DocumentScreen({
     void (async () => {
       try {
         const owner = roleById('owner')!;
-        const identity = { user_id: 'owner', display_name: 'You' };
+        const identity = { userId: 'owner', displayName: 'You' };
         const share = await api.shares.create(tenantId, {
           docId,
           name: 'You',

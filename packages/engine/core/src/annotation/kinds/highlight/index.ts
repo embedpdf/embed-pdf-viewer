@@ -1,14 +1,17 @@
-import type { HighlightDraft } from './draft';
-import type { HighlightAnnotationDTO } from './dto';
-import type { HighlightPatch } from './patch';
-import { HighlightDTOSchema, HighlightDraftSchema, HighlightPatchSchema } from './schema';
+import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
+import { HighlightDeclaration } from './declaration';
 
-export type { HighlightAnnotationDTO } from './dto';
-export type { HighlightDraft } from './draft';
-export type { HighlightPatch } from './patch';
-export { HighlightDTOSchema, HighlightDraftSchema, HighlightPatchSchema } from './schema';
+export { HighlightDeclaration } from './declaration';
+
+export type HighlightAnnotationDTO = ReadOf<typeof HighlightDeclaration>;
+export type HighlightDraft = CreateOf<typeof HighlightDeclaration>;
+export type HighlightPatch = UpdateOf<typeof HighlightDeclaration>;
+
+export const HighlightDTOSchema = HighlightDeclaration.readSchema;
+export const HighlightDraftSchema = HighlightDeclaration.createSchema;
+export const HighlightPatchSchema = HighlightDeclaration.updateSchema;
 
 export const HighlightKind: AnnotationKindModule<
   'highlight',

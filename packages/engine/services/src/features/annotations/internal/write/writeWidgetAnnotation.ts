@@ -1,5 +1,4 @@
 import type {
-  AnnotationSubtype,
   WidgetDraft,
   WidgetPatch,
   WidgetStyleDraftFields,
@@ -14,7 +13,7 @@ import { setAnnotRect } from './annotationWritePrimitives';
 const MK_BORDER_COLOR = 0; // EPDF_MK_COLOR_BC
 const MK_BACKGROUND_COLOR = 1; // EPDF_MK_COLOR_BG
 
-export function isWidgetSubtype(subtype: AnnotationSubtype): subtype is 'widget' {
+export function isWidgetSubtype(subtype: string): subtype is 'widget' {
   return subtype === 'widget';
 }
 

@@ -256,13 +256,18 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     // `annotations:create:filter` collab scope (target is the handle's
     // own identity). Under the narrowing model, presence of `modify`
     // also satisfies create when no create-collab is given.
+    // A group other than the caller's own takes the same authority as
+    // reassigning one (cloud parity).
+    const groupId = (draft as { groupId?: string | null }).groupId ?? undefined;
     try {
-      const target = this.guard.targetForSelfCreate();
-      this.guard.assertCollab('create', target);
+      if (groupId !== undefined && groupId !== this.guard.identity().groupId) {
+        this.guard.assertSetGroup(groupId);
+      }
+      this.guard.assertCollab('create', this.guard.targetForSelfCreate(groupId));
     } catch (err) {
       return AbortablePromise.rejectReason(err);
     }
-    const actor = this.guard.actorForCreate();
+    const actor = this.guard.actorForCreate(groupId);
 
     const docId = this.docId;
     const ref = this.ref;
@@ -326,12 +331,17 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
 
       // Group reassignment runs `:set-group` against the caller's
       // default group before building the actor (cloud PATCH parity).
-      const patchGroupId = (patch as { groupId?: string }).groupId;
+      const patchGroupId = (patch as { groupId?: string | null }).groupId;
+      // `null` sent back for an annotation without a group changes nothing;
+      // an existing group can only be reassigned, never removed.
+      if (patchGroupId === null && target.groupId !== undefined) {
+        throw new EngineError(EngineErrorCode.InvalidArg, "an annotation's group can't be removed");
+      }
       const isReassigning = typeof patchGroupId === 'string' && patchGroupId !== target.groupId;
       if (isReassigning) {
         this.guard.assertSetGroup(patchGroupId);
       }
-      const actor = this.guard.actorForUpdate(target.groupId, patchGroupId);
+      const actor = this.guard.actorForUpdate(target.groupId, patchGroupId ?? undefined);
 
       const docId = this.docId;
       // Same binary split as create(): wire patch + owned resource copies
@@ -591,8 +601,8 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     });
     if (!match) return {};
     return {
-      ...(match.userId !== undefined ? { userId: match.userId } : {}),
-      ...(match.groupId !== undefined ? { groupId: match.groupId } : {}),
+      ...(match.userId != null ? { userId: match.userId } : {}),
+      ...(match.groupId != null ? { groupId: match.groupId } : {}),
     };
   }
 }

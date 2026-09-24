@@ -86,7 +86,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       annotation.editPointer('up', page.ref, { x: 165, y: 39 }, false);
       await vi.waitFor(() =>
         expect(annotation.getRaw(created.ref)).toMatchObject({
-          caption: { offset: { along: 15, perpendicular: 25 } },
+          captionOffset: { along: 15, perpendicular: 25 },
         }),
       );
       expectVector();
@@ -97,7 +97,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       expect(report.error).toBeUndefined();
       expect(annotation.getRaw(created.ref)).toMatchObject({
         contents: '16 ft',
-        caption: { offset: { along: 15, perpendicular: 25 } },
+        captionOffset: { along: 15, perpendicular: 25 },
       });
       expectVector();
 
@@ -161,7 +161,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
         expect(layeredAnnotations.find((a) => a.nm === created.nm)).toMatchObject({
           contents: '16 ft',
           leader: { length: 36 },
-          caption: { offset: { along: 15, perpendicular: 25 } },
+          captionOffset: { along: 15, perpendicular: 25 },
         });
         expect(
           (await layered.page(toPageRef(pageObjectNumber)).measure!.viewports()).some(
@@ -184,7 +184,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
           intent: 'LineDimension',
           contents: '16 ft',
           leader: { length: 36 },
-          caption: { offset: { along: 15, perpendicular: 25 } },
+          captionOffset: { along: 15, perpendicular: 25 },
         });
         const restoredFrame = annotationSelectionFrame(fromDTO(restored, page.boxes.crop));
         expect(restoredFrame.center.x).toBeCloseTo(frame.center.x, 3);

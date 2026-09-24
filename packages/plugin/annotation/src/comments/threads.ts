@@ -26,7 +26,7 @@ export function createThreadIndex(
   ctx: Pick<AnnotationContext, 'doc' | 'document'>,
   { store }: Pick<AnnotationServices, 'store'>,
 ) {
-  const currentUserId = (): string | undefined => ctx.doc?.security.identity?.user_id;
+  const currentUserId = (): string | undefined => ctx.doc?.security.identity?.userId;
 
   let memo:
     | (ThreadsIndex & {

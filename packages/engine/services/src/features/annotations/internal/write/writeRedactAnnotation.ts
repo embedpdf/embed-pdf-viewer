@@ -90,7 +90,7 @@ export function applyRedactDraft(
     setAnnotColor(fn, annotPtr, fill, FPDFANNOT_COLORTYPE.InteriorColor);
   }
 
-  if (draft.overlayText !== undefined && draft.overlayText.length > 0) {
+  if (draft.overlayText != null && draft.overlayText.length > 0) {
     setOverlayText(fn, mem, annotPtr, draft.overlayText);
   }
   if (draft.repeat) {

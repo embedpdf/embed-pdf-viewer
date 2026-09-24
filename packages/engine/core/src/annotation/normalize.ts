@@ -4,6 +4,7 @@ import type {
   WireAnnotationDraft,
   WireAnnotationPatch,
 } from './kinds';
+import type { StampPatch } from './kinds/stamp';
 import type { WireResourceMap } from '../resource/BinarySource';
 // Deep imports (not the kind barrels): keeps this module — and the zod-free
 // `shared` entrypoint that re-exports it — free of the kinds' Zod schemas.
@@ -51,10 +52,9 @@ export async function normalizeAnnotationDraft(draft: AnnotationDraft): Promise<
 }
 
 export async function normalizeAnnotationPatch(patch: AnnotationPatch): Promise<NormalizedPatch> {
-  switch (patch.subtype) {
-    case 'stamp':
-      return normalizeStampPatch(patch, createResourceKeyAllocator());
-    default:
-      return { wire: patch, resources: {} };
+  // A patch may leave out its subtype, so a stamp's new image is recognized by its `source`.
+  if ('source' in patch && patch.source !== undefined) {
+    return normalizeStampPatch(patch as StampPatch, createResourceKeyAllocator());
   }
+  return { wire: patch as WireAnnotationPatch, resources: {} };
 }

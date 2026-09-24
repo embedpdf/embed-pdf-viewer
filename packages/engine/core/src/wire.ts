@@ -108,6 +108,7 @@ export {
   SearchSnippetSchema,
   SearchMatchSchema,
   SearchSliceSchema,
+  IdentitySchema,
 } from './wire/schemas';
 export {
   PdfActionTypeSchema,
@@ -253,8 +254,6 @@ export {
   AnnotationStableIdSchema,
   AnnotationRefSchema,
   RevisionTokenSchema,
-  AnnotationFlagsSchema,
-  AnnotationFlagsPartialSchema,
   ColorSchema,
   PointSchema,
   RectSchema,
@@ -269,9 +268,6 @@ export {
   StrikeoutIntentSchema,
   InkIntentSchema,
   BlendModeSchema,
-  AnnotationBaseShape,
-  AnnotationDraftBaseShape,
-  AnnotationPatchBaseShape,
 } from './annotation/base.schema';
 
 export {
@@ -280,6 +276,10 @@ export {
   AnnotationDTOSchema,
   AnnotationDraftSchema,
   AnnotationPatchSchema,
+  annotationPatchSchemaOf,
+  PopupDTOSchema,
+  PopupDraftSchema,
+  PopupPatchSchema,
   HighlightDTOSchema,
   HighlightDraftSchema,
   HighlightPatchSchema,

@@ -64,8 +64,8 @@ export function createComments(
         rect: thread.root.rect,
         icon: 'comment',
         contents: text,
-        inReplyTo: thread.root.ref,
-        flags: { ...REPLY_FLAGS },
+        reply: { to: thread.root.ref },
+        ...REPLY_FLAGS,
       } as AnnotationDraft);
       announce(root, 'reply');
       return created.ref;
@@ -93,10 +93,10 @@ export function createComments(
       await createConversationAnnot(thread.page.pageObjectNumber, {
         subtype: 'text',
         rect: thread.root.rect,
-        inReplyTo: previous?.ref ?? thread.root.ref,
+        reply: { to: previous?.ref ?? thread.root.ref },
         state,
         stateModel: 'review',
-        flags: { ...STATUS_FLAGS },
+        ...STATUS_FLAGS,
       } as AnnotationDraft);
       announce(root, 'status');
     },
@@ -107,10 +107,10 @@ export function createComments(
       await createConversationAnnot(thread.page.pageObjectNumber, {
         subtype: 'text',
         rect: thread.root.rect,
-        inReplyTo: thread.root.ref,
+        reply: { to: thread.root.ref },
         state: marked ? 'marked' : 'unmarked',
         stateModel: 'marked',
-        flags: { ...STATUS_FLAGS },
+        ...STATUS_FLAGS,
       } as AnnotationDraft);
       announce(root, 'marked');
     },

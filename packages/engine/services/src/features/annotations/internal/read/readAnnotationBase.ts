@@ -9,17 +9,18 @@ import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runti
 
 import { readAnnotFlags, readAnnotRect, readAnnotString } from './annotationReadPrimitives';
 import { readAnnotationIdentity } from './readAnnotationIdentity';
-import { readAnnotationRelationship } from './readAnnotationRelationship';
+import { readAnnotationRelationship, readLinkedAnnotationRef } from './readAnnotationRelationship';
 import { readEmbedMetadata } from './readEmbedMetadata';
-import { blendModeFromCode } from '../blendMode';
 import { pdfDateToIso } from '../../../../shared/pdf-date';
 import { ActionReadBudgetTracker, readActionModel } from '../../../actions/ActionModelReader';
+import { blendModeFromCode } from '../blendMode';
 
 /**
- * Reads the wire shell every annotation DTO carries: identity, flags,
- * rect, contents, author, dates. No subtype-specific fields. The
- * per-subtype reader builds its DTO by extending this with its own
- * fields and `subtype: '...'` discriminator.
+ * Reads the fields every annotation DTO carries: identity, flags, rect,
+ * contents, relationships, attribution and actions, each present and `null`
+ * when absent. No subtype-specific fields. The per-subtype reader builds its
+ * DTO by extending this with its own fields and `subtype: '...'`
+ * discriminator.
  */
 export function readAnnotationBase(
   fn: PdfFunctions,
@@ -40,11 +41,10 @@ export function readAnnotationBase(
   const createdRaw = readAnnotString(fn, mem, annotPtr, 'CreationDate');
   const modifiedRaw = readAnnotString(fn, mem, annotPtr, 'M');
   const blendMode = blendModeFromCode(fn.EPDFAnnot_GetBlendMode(annotPtr));
-  // EmbedPDF /EMBD_Metadata is optional; absent for legacy or anonymous
-  // annotations. We spread the present fields into the DTO so the wire
-  // never carries explicit `undefined` keys.
+  // /EMBD_Metadata is absent for anonymous annotations and those written by other tools.
   const embd = readEmbedMetadata(fn, mem, annotPtr);
   const relationship = readAnnotationRelationship(fn, mem, annotPtr, pageObjectNumber);
+  const popup = readLinkedAnnotationRef(fn, mem, annotPtr, 'Popup', pageObjectNumber);
   const actions = readAnnotationActions(fn, mem, docPtr, annotPtr, actionBudget);
 
   return {
@@ -53,7 +53,7 @@ export function readAnnotationBase(
     index,
     identityQuality: identity.identityQuality,
     nm: identity.nm,
-    flags,
+    ...flags,
     rect,
     contents,
     subject,
@@ -61,13 +61,16 @@ export function readAnnotationBase(
     created: createdRaw ? pdfDateToIso(createdRaw) : null,
     modified: modifiedRaw ? pdfDateToIso(modifiedRaw) : null,
     blendMode,
-    inReplyTo: relationship.inReplyTo,
-    replyType: relationship.replyType,
-    ...(embd?.userId !== undefined ? { userId: embd.userId } : {}),
-    ...(embd?.groupId !== undefined ? { groupId: embd.groupId } : {}),
-    ...(embd?.createdBy !== undefined ? { createdBy: embd.createdBy } : {}),
-    ...(embd?.updatedBy !== undefined ? { updatedBy: embd.updatedBy } : {}),
-    ...(actions ? { actions } : {}),
+    reply: relationship.inReplyTo
+      ? { to: relationship.inReplyTo, type: relationship.replyType ?? 'reply' }
+      : null,
+    popup,
+    groupId: embd?.groupId ?? null,
+    userId: embd?.userId ?? null,
+    createdBy: embd?.createdBy ?? null,
+    updatedBy: embd?.updatedBy ?? null,
+    importedBy: embd?.importedBy ?? null,
+    actions: actions ?? null,
   };
 }
 

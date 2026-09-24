@@ -5,7 +5,7 @@ import {
   passwordPromptFromState,
   securityStateFromProbe,
   wirePack,
-  type DocumentIdentity,
+  type Identity,
   type DocumentSecurityService,
   type DocumentSecurityState,
   type DocumentSecurityProbeInfo,
@@ -86,7 +86,7 @@ export class LocalDocumentSecurityService implements DocumentSecurityService {
   }
 
   /** Identity claims supplied at `engine.open()`, or null when none. */
-  get identity(): DocumentIdentity | null {
+  get identity(): Identity | null {
     if (!this.guard) return null;
     const id = this.guard.identity();
     return id && Object.keys(id).length > 0 ? id : null;

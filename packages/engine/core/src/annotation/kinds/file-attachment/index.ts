@@ -1,38 +1,39 @@
-import type { FileAttachmentWireDraft } from './draft';
-import type { FileAttachmentAnnotationDTO } from './dto';
-import type { FileAttachmentPatch } from './patch';
-import {
-  FileAttachmentDTOSchema,
-  FileAttachmentPatchSchema,
-  FileAttachmentWireDraftSchema,
-} from './schema';
+import { z } from 'zod';
+
+import type { AttachmentFileSource } from '../../../dto/Attachment';
+import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
+import { FileAttachmentDeclaration } from './declaration';
+import { WireAttachmentFileSchema, type WireAttachmentFile } from './values';
 
-export type { FileAttachmentAnnotationDTO } from './dto';
-export type {
-  FileAttachmentDraft,
-  FileAttachmentWireDraft,
-  FileAttachmentIcon,
-  WireAttachmentFile,
-} from './draft';
-export type { FileAttachmentPatch } from './patch';
-export {
-  FileAttachmentDTOSchema,
-  FileAttachmentWireDraftSchema,
-  FileAttachmentPatchSchema,
-  FileAttachmentIconSchema,
-  WireAttachmentFileSchema,
-} from './schema';
-export { normalizeFileAttachmentDraft, normalizeAttachmentFileSource } from './normalize';
+export { FileAttachmentDeclaration } from './declaration';
+export { FileAttachmentIconSchema, WireAttachmentFileSchema } from './values';
+export type { FileAttachmentIcon, WireAttachmentFile } from './values';
+
+export type FileAttachmentAnnotationDTO = ReadOf<typeof FileAttachmentDeclaration>;
+
+/** The draft carries the file's bytes with its metadata. */
+export type FileAttachmentDraft = Omit<CreateOf<typeof FileAttachmentDeclaration>, 'file'> & {
+  file: AttachmentFileSource;
+};
+export type FileAttachmentWireDraft = Omit<CreateOf<typeof FileAttachmentDeclaration>, 'file'> & {
+  file: WireAttachmentFile;
+};
+/** `file` in an update may only repeat the current metadata: the attached file can't change after create. */
+export type FileAttachmentPatch = UpdateOf<typeof FileAttachmentDeclaration>;
+
+const { file: _createFile, ...createShape } = FileAttachmentDeclaration.shapes.create;
+
+export const FileAttachmentDTOSchema = FileAttachmentDeclaration.readSchema;
+export const FileAttachmentWireDraftSchema = z
+  .object({ ...createShape, file: WireAttachmentFileSchema })
+  .strict() as unknown as z.ZodType<FileAttachmentWireDraft>;
+export const FileAttachmentPatchSchema = FileAttachmentDeclaration.updateSchema;
 
 /**
- * Wire-typed like `StampKind`: the draft schema validates the
- * post-normalization form (`file` as metadata + resource ref). The
- * authoring `FileAttachmentDraft` (inline bytes) is swapped into the
- * public `AnnotationDraft` union in `kinds/index.ts`. The patch carries
- * no binary (`file` is create-only), so its authoring and wire forms are
- * the same type.
+ * Wire-typed like `StampKind`: the draft schema validates the form after
+ * normalization, with `file` as metadata and a resource ref.
  */
 export const FileAttachmentKind: AnnotationKindModule<
   'file-attachment',
@@ -46,3 +47,5 @@ export const FileAttachmentKind: AnnotationKindModule<
   draftSchema: FileAttachmentWireDraftSchema,
   patchSchema: FileAttachmentPatchSchema,
 };
+
+export { normalizeFileAttachmentDraft, normalizeAttachmentFileSource } from './normalize';

@@ -9,10 +9,10 @@ import { readContextFor } from './annotationReadContext';
 import { pickReader } from './annotationReaderRegistry';
 import { joinWidgetFieldNumbers } from './joinWidgetField';
 import { readAnnotationBase } from './readAnnotationBase';
-import type { FontRegistrar } from '../../../fonts/FontRegistrar';
 import type { DocumentSession } from '../../../../document-session/DocumentSession';
 import { throwIfAborted } from '../../../../shared/abort';
 import { ActionReadBudgetTracker } from '../../../actions/ActionModelReader';
+import type { FontRegistrar } from '../../../fonts/FontRegistrar';
 
 /**
  * Shared per-page annotation read loop, used by both read paths. The raw

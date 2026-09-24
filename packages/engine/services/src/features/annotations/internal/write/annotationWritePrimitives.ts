@@ -10,7 +10,12 @@ import {
   type PdfRect,
   type PdfRectDifferences,
 } from '@embedpdf/engine-core/runtime';
-import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
+import {
+  NULL_PTR,
+  type PdfFunctions,
+  type PdfRuntimeMemory,
+  type Ptr,
+} from '@embedpdf/engine-runtime';
 
 import { F32_BYTES, POINTF_BYTES, RECTF_BYTES } from '../../../../runtime/memory/structs';
 import { flagsToBits } from '../annotationFlagBits';
@@ -194,6 +199,13 @@ export function setBorderDashPattern(
     }
   } finally {
     mem.free(buf);
+  }
+}
+
+/** Remove the `/BS` dash array, so the border is solid. */
+export function clearBorderDashPattern(fn: PdfFunctions, annotPtr: Ptr): void {
+  if (!fn.EPDFAnnot_SetBorderDashPattern(annotPtr, NULL_PTR, 0)) {
+    throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetBorderDashPattern returned false');
   }
 }
 
@@ -422,6 +434,12 @@ export function setIntent(fn: PdfFunctions, annotPtr: Ptr, name: string): void {
   if (!fn.EPDFAnnot_SetIntent(annotPtr, name)) {
     throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetIntent returned false');
   }
+}
+
+/** Write `/IT`, or remove it for `null`. */
+export function setIntentOrClear(fn: PdfFunctions, annotPtr: Ptr, name: string | null): void {
+  if (name === null) fn.EPDFAnnot_RemoveKey(annotPtr, 'IT');
+  else setIntent(fn, annotPtr, name);
 }
 
 /**

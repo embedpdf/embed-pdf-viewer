@@ -25,8 +25,7 @@ function objRef(objNum: number): AnnotationRef {
 function annot(
   objNum: number,
   rel: {
-    inReplyTo?: AnnotationRef | null;
-    replyType?: AnnotationReplyType | null;
+    reply?: { to: AnnotationRef; type: AnnotationReplyType } | null;
     nm?: string;
   } = {},
 ): AnnotationDTO {
@@ -36,14 +35,13 @@ function annot(
     index: 0,
     identityQuality: 'durable',
     nm: rel.nm ?? null,
-    flags: NO_ANNOTATION_FLAGS,
+    ...NO_ANNOTATION_FLAGS,
     rect: { left: 0, top: 10, right: 10, bottom: 0 },
     contents: null,
     author: null,
     created: null,
     modified: null,
-    inReplyTo: rel.inReplyTo ?? null,
-    replyType: rel.replyType ?? null,
+    reply: rel.reply ?? null,
     subtype: 'highlight',
     color: { r: 0, g: 0, b: 0 },
     opacity: 1,
@@ -57,15 +55,11 @@ describe('classifyRelation', () => {
   });
 
   it('returns reply for /IRT with replyType reply', () => {
-    expect(classifyRelation(annot(2, { inReplyTo: objRef(1), replyType: 'reply' }))).toBe('reply');
-  });
-
-  it('returns reply for /IRT with no replyType (ISO default)', () => {
-    expect(classifyRelation(annot(2, { inReplyTo: objRef(1), replyType: null }))).toBe('reply');
+    expect(classifyRelation(annot(2, { reply: { to: objRef(1), type: 'reply' } }))).toBe('reply');
   });
 
   it('returns grouped-subordinate for /IRT with replyType group', () => {
-    expect(classifyRelation(annot(2, { inReplyTo: objRef(1), replyType: 'group' }))).toBe(
+    expect(classifyRelation(annot(2, { reply: { to: objRef(1), type: 'group' } }))).toBe(
       'grouped-subordinate',
     );
   });
@@ -106,7 +100,7 @@ describe('annotationKey', () => {
 describe('buildThreads', () => {
   it('attaches a reply under its primary', () => {
     const primary = annot(1);
-    const reply = annot(2, { inReplyTo: objRef(1), replyType: 'reply' });
+    const reply = annot(2, { reply: { to: objRef(1), type: 'reply' } });
     const threads = buildThreads([primary, reply]);
 
     expect(threads).toHaveLength(1);
@@ -117,7 +111,7 @@ describe('buildThreads', () => {
 
   it('treats a missing /RT child as a reply (default)', () => {
     const primary = annot(1);
-    const reply = annot(2, { inReplyTo: objRef(1), replyType: null });
+    const reply = annot(2, { reply: { to: objRef(1), type: 'reply' } });
     const threads = buildThreads([primary, reply]);
 
     expect(threads[0]!.replies).toEqual([reply]);
@@ -125,7 +119,7 @@ describe('buildThreads', () => {
 
   it('folds a group subordinate into groupedParts, not replies', () => {
     const primary = annot(1);
-    const caret = annot(2, { inReplyTo: objRef(1), replyType: 'group' });
+    const caret = annot(2, { reply: { to: objRef(1), type: 'group' } });
     const threads = buildThreads([primary, caret]);
 
     expect(threads).toHaveLength(1);
@@ -135,8 +129,8 @@ describe('buildThreads', () => {
 
   it('supports a primary with both a group part and a reply', () => {
     const primary = annot(1);
-    const caret = annot(2, { inReplyTo: objRef(1), replyType: 'group' });
-    const reply = annot(3, { inReplyTo: objRef(1), replyType: 'reply' });
+    const caret = annot(2, { reply: { to: objRef(1), type: 'group' } });
+    const reply = annot(3, { reply: { to: objRef(1), type: 'reply' } });
     const threads = buildThreads([primary, caret, reply]);
 
     expect(threads).toHaveLength(1);
@@ -147,12 +141,14 @@ describe('buildThreads', () => {
   it('matches a child that points at the parent by /NM', () => {
     const primary = annot(1, { nm: 'parent-nm' });
     const reply = annot(2, {
-      inReplyTo: {
-        kind: 'nm',
-        page: { kind: 'objectNumber', pageObjectNumber: PAGE },
-        nm: 'parent-nm',
+      reply: {
+        to: {
+          kind: 'nm',
+          page: { kind: 'objectNumber', pageObjectNumber: PAGE },
+          nm: 'parent-nm',
+        },
+        type: 'reply',
       },
-      replyType: 'reply',
     });
     const threads = buildThreads([primary, reply]);
 
@@ -161,7 +157,7 @@ describe('buildThreads', () => {
   });
 
   it('surfaces an orphan (parent not in the set) as its own primary', () => {
-    const orphan = annot(2, { inReplyTo: objRef(99), replyType: 'reply' });
+    const orphan = annot(2, { reply: { to: objRef(99), type: 'reply' } });
     const threads = buildThreads([orphan]);
 
     expect(threads).toHaveLength(1);
@@ -172,7 +168,7 @@ describe('buildThreads', () => {
   it('preserves primary order from the input', () => {
     const p1 = annot(1);
     const p2 = annot(2);
-    const r1 = annot(3, { inReplyTo: objRef(1), replyType: 'reply' });
+    const r1 = annot(3, { reply: { to: objRef(1), type: 'reply' } });
     const threads = buildThreads([p1, p2, r1]);
 
     expect(threads.map((t) => t.primary)).toEqual([p1, p2]);

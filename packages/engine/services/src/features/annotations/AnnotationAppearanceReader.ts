@@ -11,6 +11,7 @@ import type {
 import { normalizePdfRect } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
+import { freeTextIntentFromName } from './internal/freeTextIntent';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import { FPDF_REVERSE_BYTE_ORDER, rasterize } from '../render/deviceRaster';
@@ -20,7 +21,6 @@ import {
   readAnnotationRotation,
   readAnnotationUnrotatedRect,
 } from './internal/read/readAnnotationTransformMetadata';
-import { freeTextIntentFromName } from './internal/freeTextIntent';
 
 /** `FPDF_ANNOT_WIDGET` — form-field annotation subtype code. */
 const ANNOT_SUBTYPE_WIDGET = 20;

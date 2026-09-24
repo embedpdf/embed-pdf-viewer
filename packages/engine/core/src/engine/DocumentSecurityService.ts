@@ -1,3 +1,4 @@
+import type { Identity } from '../auth/scope/types';
 import type { CollabTarget, DocCapability, PdfBits } from '../auth/scope';
 import type { AbortablePromise } from '../promise/AbortablePromise';
 
@@ -131,12 +132,7 @@ export interface DocumentAccessInfo {
    * Sorted alphabetically for stable display.
    */
   readonly effectiveScope: string[];
-  readonly identity: {
-    readonly user_id?: string;
-    readonly group_id?: string;
-    readonly groups?: string[];
-    readonly display_name?: string;
-  };
+  readonly identity: Identity;
   readonly originPasswordPolicy: {
     readonly mode: 'not-needed' | 'client-retry' | 'server-session';
   };
@@ -172,18 +168,6 @@ export interface DocumentUnlockResult {
   readonly security: DocumentSecurityState;
   readonly access?: DocumentAccessInfo;
 }
-
-/**
- * Identity of the caller for the current session. Cloud derives this
- * from the JWT claims (and refreshes from /access when called); local
- * derives it from the identity supplied to `engine.open()`. Null when
- * no identity is known (anonymous session).
- *
- * Re-exported alias of `IdentityClaims` from `auth/scope/types.ts` —
- * the alias gives a security-flavored name to the same shape so the
- * dev-facing API reads naturally.
- */
-export type { IdentityClaims as DocumentIdentity } from '../auth/scope/types';
 
 export interface DocumentSecurityService {
   /**
@@ -250,9 +234,10 @@ export interface DocumentSecurityService {
   allowsAnnotationGroupAssignment(groupId: string): boolean;
 
   /**
-   * Identity of the current caller, or null when anonymous.
+   * Who the session acts for: from the document token's `identity` claim on
+   * the cloud, from `engine.open()` locally. Null when anonymous.
    */
-  readonly identity: import('../auth/scope/types').IdentityClaims | null;
+  readonly identity: Identity | null;
 
   /**
    * "Should I prompt the user for a password?" — the single source

@@ -33,7 +33,7 @@ const squareDTO = (annotObjectNumber: number): AnnotationDTO =>
     index: annotObjectNumber,
     identityQuality: 'durable',
     nm: null,
-    flags: NO_FLAGS,
+    ...NO_FLAGS,
     contents: null,
     subject: null,
     author: null,
@@ -78,7 +78,7 @@ describe('create() in page space', () => {
       subtype: 'square',
       rect: { left: 40, bottom: 270, right: 60, top: 280 },
       color: { r: 255, g: 0, b: 0 },
-      flags: { print: true },
+      print: true,
     });
     // reconciled: the optimistic id is gone, the durable record is in the model
     expect(harness.model().order).toEqual(['obj:42']);

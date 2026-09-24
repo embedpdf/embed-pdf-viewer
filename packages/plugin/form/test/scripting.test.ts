@@ -136,7 +136,7 @@ function harness(snapshot: FormSnapshot, nameTreeScript?: string) {
     forms: { list: async () => snapshot, applyEffects },
     actions: { read: readActions },
     security: {
-      identity: { user_id: 'alex', display_name: 'Alex Morgan', group_id: 'EmbedPDF' },
+      identity: { userId: 'alex', displayName: 'Alex Morgan', organization: 'EmbedPDF' },
     },
   } as unknown as DocumentHandle;
   const sandbox = new NodeSandbox();

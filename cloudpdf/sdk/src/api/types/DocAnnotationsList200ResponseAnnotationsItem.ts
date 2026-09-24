@@ -21,6 +21,7 @@ export type DocAnnotationsList200ResponseAnnotationsItem =
     | CloudPDF.DocAnnotationsList200ResponseAnnotationsItem.FileAttachment
     | CloudPDF.DocAnnotationsList200ResponseAnnotationsItem.Widget
     | CloudPDF.DocAnnotationsList200ResponseAnnotationsItem.Redact
+    | CloudPDF.DocAnnotationsList200ResponseAnnotationsItem.Popup
     | CloudPDF.DocAnnotationsList200ResponseAnnotationsItem.Unsupported;
 
 export namespace DocAnnotationsList200ResponseAnnotationsItem {
@@ -31,21 +32,31 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         index: number;
         identityQuality: DocAnnotationsList200ResponseAnnotationsItemHighlight.IdentityQuality;
         nm: string | null;
-        flags: DocAnnotationsList200ResponseAnnotationsItemHighlight.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemHighlight.Rect;
         contents: string | null;
         subject: string | null;
+        blendMode: DocAnnotationsList200ResponseAnnotationsItemHighlight.BlendMode;
+        invisible: boolean;
+        hidden: boolean;
+        print: boolean;
+        noZoom: boolean;
+        noRotate: boolean;
+        noView: boolean;
+        readOnly: boolean;
+        locked: boolean;
+        toggleNoView: boolean;
+        lockedContents: boolean;
+        reply: DocAnnotationsList200ResponseAnnotationsItemHighlight.Reply | null;
+        popup: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemHighlightPopup | null;
+        groupId: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
-        blendMode: DocAnnotationsList200ResponseAnnotationsItemHighlight.BlendMode;
-        inReplyTo: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemHighlightInReplyTo | null;
-        replyType: DocAnnotationsList200ResponseAnnotationsItemHighlight.ReplyType | null;
-        userId?: string | undefined;
-        groupId?: string | undefined;
-        createdBy?: string | undefined;
-        updatedBy?: string | undefined;
-        actions?: CloudPDF.PdfAnnotationActions | undefined;
+        userId: string | null;
+        createdBy: string | null;
+        updatedBy: string | null;
+        importedBy: string | null;
+        actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsList200ResponseAnnotationsItemHighlight.Color;
         opacity: number;
         quadPoints: DocAnnotationsList200ResponseAnnotationsItemHighlight.QuadPoints.Item[];
@@ -69,19 +80,6 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Weak: "weak",
         } as const;
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
-
-        export interface Flags {
-            invisible: boolean;
-            hidden: boolean;
-            print: boolean;
-            noZoom: boolean;
-            noRotate: boolean;
-            noView: boolean;
-            readOnly: boolean;
-            locked: boolean;
-            toggleNoView: boolean;
-            lockedContents: boolean;
-        }
 
         export interface Rect {
             left: number;
@@ -109,11 +107,19 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Luminosity: "luminosity",
         } as const;
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
-        export const ReplyType = {
-            Reply: "reply",
-            Group: "group",
-        } as const;
-        export type ReplyType = (typeof ReplyType)[keyof typeof ReplyType];
+
+        export interface Reply {
+            to: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemHighlightReplyTo;
+            type: Reply.Type;
+        }
+
+        export namespace Reply {
+            export const Type = {
+                Reply: "reply",
+                Group: "group",
+            } as const;
+            export type Type = (typeof Type)[keyof typeof Type];
+        }
 
         export interface Color {
             r: number;
@@ -162,21 +168,31 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         index: number;
         identityQuality: DocAnnotationsList200ResponseAnnotationsItemUnderline.IdentityQuality;
         nm: string | null;
-        flags: DocAnnotationsList200ResponseAnnotationsItemUnderline.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemUnderline.Rect;
         contents: string | null;
         subject: string | null;
+        blendMode: DocAnnotationsList200ResponseAnnotationsItemUnderline.BlendMode;
+        invisible: boolean;
+        hidden: boolean;
+        print: boolean;
+        noZoom: boolean;
+        noRotate: boolean;
+        noView: boolean;
+        readOnly: boolean;
+        locked: boolean;
+        toggleNoView: boolean;
+        lockedContents: boolean;
+        reply: DocAnnotationsList200ResponseAnnotationsItemUnderline.Reply | null;
+        popup: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemUnderlinePopup | null;
+        groupId: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
-        blendMode: DocAnnotationsList200ResponseAnnotationsItemUnderline.BlendMode;
-        inReplyTo: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemUnderlineInReplyTo | null;
-        replyType: DocAnnotationsList200ResponseAnnotationsItemUnderline.ReplyType | null;
-        userId?: string | undefined;
-        groupId?: string | undefined;
-        createdBy?: string | undefined;
-        updatedBy?: string | undefined;
-        actions?: CloudPDF.PdfAnnotationActions | undefined;
+        userId: string | null;
+        createdBy: string | null;
+        updatedBy: string | null;
+        importedBy: string | null;
+        actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsList200ResponseAnnotationsItemUnderline.Color;
         opacity: number;
         quadPoints: DocAnnotationsList200ResponseAnnotationsItemUnderline.QuadPoints.Item[];
@@ -200,19 +216,6 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Weak: "weak",
         } as const;
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
-
-        export interface Flags {
-            invisible: boolean;
-            hidden: boolean;
-            print: boolean;
-            noZoom: boolean;
-            noRotate: boolean;
-            noView: boolean;
-            readOnly: boolean;
-            locked: boolean;
-            toggleNoView: boolean;
-            lockedContents: boolean;
-        }
 
         export interface Rect {
             left: number;
@@ -240,11 +243,19 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Luminosity: "luminosity",
         } as const;
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
-        export const ReplyType = {
-            Reply: "reply",
-            Group: "group",
-        } as const;
-        export type ReplyType = (typeof ReplyType)[keyof typeof ReplyType];
+
+        export interface Reply {
+            to: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemUnderlineReplyTo;
+            type: Reply.Type;
+        }
+
+        export namespace Reply {
+            export const Type = {
+                Reply: "reply",
+                Group: "group",
+            } as const;
+            export type Type = (typeof Type)[keyof typeof Type];
+        }
 
         export interface Color {
             r: number;
@@ -293,21 +304,31 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         index: number;
         identityQuality: DocAnnotationsList200ResponseAnnotationsItemSquiggly.IdentityQuality;
         nm: string | null;
-        flags: DocAnnotationsList200ResponseAnnotationsItemSquiggly.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemSquiggly.Rect;
         contents: string | null;
         subject: string | null;
+        blendMode: DocAnnotationsList200ResponseAnnotationsItemSquiggly.BlendMode;
+        invisible: boolean;
+        hidden: boolean;
+        print: boolean;
+        noZoom: boolean;
+        noRotate: boolean;
+        noView: boolean;
+        readOnly: boolean;
+        locked: boolean;
+        toggleNoView: boolean;
+        lockedContents: boolean;
+        reply: DocAnnotationsList200ResponseAnnotationsItemSquiggly.Reply | null;
+        popup: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemSquigglyPopup | null;
+        groupId: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
-        blendMode: DocAnnotationsList200ResponseAnnotationsItemSquiggly.BlendMode;
-        inReplyTo: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemSquigglyInReplyTo | null;
-        replyType: DocAnnotationsList200ResponseAnnotationsItemSquiggly.ReplyType | null;
-        userId?: string | undefined;
-        groupId?: string | undefined;
-        createdBy?: string | undefined;
-        updatedBy?: string | undefined;
-        actions?: CloudPDF.PdfAnnotationActions | undefined;
+        userId: string | null;
+        createdBy: string | null;
+        updatedBy: string | null;
+        importedBy: string | null;
+        actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsList200ResponseAnnotationsItemSquiggly.Color;
         opacity: number;
         quadPoints: DocAnnotationsList200ResponseAnnotationsItemSquiggly.QuadPoints.Item[];
@@ -331,19 +352,6 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Weak: "weak",
         } as const;
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
-
-        export interface Flags {
-            invisible: boolean;
-            hidden: boolean;
-            print: boolean;
-            noZoom: boolean;
-            noRotate: boolean;
-            noView: boolean;
-            readOnly: boolean;
-            locked: boolean;
-            toggleNoView: boolean;
-            lockedContents: boolean;
-        }
 
         export interface Rect {
             left: number;
@@ -371,11 +379,19 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Luminosity: "luminosity",
         } as const;
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
-        export const ReplyType = {
-            Reply: "reply",
-            Group: "group",
-        } as const;
-        export type ReplyType = (typeof ReplyType)[keyof typeof ReplyType];
+
+        export interface Reply {
+            to: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemSquigglyReplyTo;
+            type: Reply.Type;
+        }
+
+        export namespace Reply {
+            export const Type = {
+                Reply: "reply",
+                Group: "group",
+            } as const;
+            export type Type = (typeof Type)[keyof typeof Type];
+        }
 
         export interface Color {
             r: number;
@@ -424,21 +440,31 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         index: number;
         identityQuality: DocAnnotationsList200ResponseAnnotationsItemStrikeout.IdentityQuality;
         nm: string | null;
-        flags: DocAnnotationsList200ResponseAnnotationsItemStrikeout.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemStrikeout.Rect;
         contents: string | null;
         subject: string | null;
+        blendMode: DocAnnotationsList200ResponseAnnotationsItemStrikeout.BlendMode;
+        invisible: boolean;
+        hidden: boolean;
+        print: boolean;
+        noZoom: boolean;
+        noRotate: boolean;
+        noView: boolean;
+        readOnly: boolean;
+        locked: boolean;
+        toggleNoView: boolean;
+        lockedContents: boolean;
+        reply: DocAnnotationsList200ResponseAnnotationsItemStrikeout.Reply | null;
+        popup: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemStrikeoutPopup | null;
+        groupId: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
-        blendMode: DocAnnotationsList200ResponseAnnotationsItemStrikeout.BlendMode;
-        inReplyTo: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemStrikeoutInReplyTo | null;
-        replyType: DocAnnotationsList200ResponseAnnotationsItemStrikeout.ReplyType | null;
-        userId?: string | undefined;
-        groupId?: string | undefined;
-        createdBy?: string | undefined;
-        updatedBy?: string | undefined;
-        actions?: CloudPDF.PdfAnnotationActions | undefined;
+        userId: string | null;
+        createdBy: string | null;
+        updatedBy: string | null;
+        importedBy: string | null;
+        actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsList200ResponseAnnotationsItemStrikeout.Color;
         opacity: number;
         quadPoints: DocAnnotationsList200ResponseAnnotationsItemStrikeout.QuadPoints.Item[];
@@ -463,19 +489,6 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Weak: "weak",
         } as const;
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
-
-        export interface Flags {
-            invisible: boolean;
-            hidden: boolean;
-            print: boolean;
-            noZoom: boolean;
-            noRotate: boolean;
-            noView: boolean;
-            readOnly: boolean;
-            locked: boolean;
-            toggleNoView: boolean;
-            lockedContents: boolean;
-        }
 
         export interface Rect {
             left: number;
@@ -503,11 +516,19 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Luminosity: "luminosity",
         } as const;
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
-        export const ReplyType = {
-            Reply: "reply",
-            Group: "group",
-        } as const;
-        export type ReplyType = (typeof ReplyType)[keyof typeof ReplyType];
+
+        export interface Reply {
+            to: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemStrikeoutReplyTo;
+            type: Reply.Type;
+        }
+
+        export namespace Reply {
+            export const Type = {
+                Reply: "reply",
+                Group: "group",
+            } as const;
+            export type Type = (typeof Type)[keyof typeof Type];
+        }
 
         export interface Color {
             r: number;
@@ -561,31 +582,41 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         index: number;
         identityQuality: DocAnnotationsList200ResponseAnnotationsItemCircle.IdentityQuality;
         nm: string | null;
-        flags: DocAnnotationsList200ResponseAnnotationsItemCircle.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemCircle.Rect;
         contents: string | null;
         subject: string | null;
+        blendMode: DocAnnotationsList200ResponseAnnotationsItemCircle.BlendMode;
+        invisible: boolean;
+        hidden: boolean;
+        print: boolean;
+        noZoom: boolean;
+        noRotate: boolean;
+        noView: boolean;
+        readOnly: boolean;
+        locked: boolean;
+        toggleNoView: boolean;
+        lockedContents: boolean;
+        reply: DocAnnotationsList200ResponseAnnotationsItemCircle.Reply | null;
+        popup: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemCirclePopup | null;
+        groupId: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
-        blendMode: DocAnnotationsList200ResponseAnnotationsItemCircle.BlendMode;
-        inReplyTo: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemCircleInReplyTo | null;
-        replyType: DocAnnotationsList200ResponseAnnotationsItemCircle.ReplyType | null;
-        userId?: string | undefined;
-        groupId?: string | undefined;
-        createdBy?: string | undefined;
-        updatedBy?: string | undefined;
-        actions?: CloudPDF.PdfAnnotationActions | undefined;
+        userId: string | null;
+        createdBy: string | null;
+        updatedBy: string | null;
+        importedBy: string | null;
+        actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsList200ResponseAnnotationsItemCircle.Color;
         opacity: number;
         strokeWidth: number;
         borderStyle: DocAnnotationsList200ResponseAnnotationsItemCircle.BorderStyle;
-        dashArray?: number[] | undefined;
+        dashArray: number[] | null;
         interiorColor: DocAnnotationsList200ResponseAnnotationsItemCircle.InteriorColor | null;
+        rotation: number | null;
+        unrotatedRect: DocAnnotationsList200ResponseAnnotationsItemCircle.UnrotatedRect | null;
         cloudyIntensity: number | null;
         rectDifferences: DocAnnotationsList200ResponseAnnotationsItemCircle.RectDifferences | null;
-        rotation?: number | undefined;
-        unrotatedRect?: DocAnnotationsList200ResponseAnnotationsItemCircle.UnrotatedRect | undefined;
     }
 
     export namespace DocAnnotationsList200ResponseAnnotationsItemCircle {
@@ -607,19 +638,6 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         } as const;
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
-        export interface Flags {
-            invisible: boolean;
-            hidden: boolean;
-            print: boolean;
-            noZoom: boolean;
-            noRotate: boolean;
-            noView: boolean;
-            readOnly: boolean;
-            locked: boolean;
-            toggleNoView: boolean;
-            lockedContents: boolean;
-        }
-
         export interface Rect {
             left: number;
             bottom: number;
@@ -646,11 +664,19 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Luminosity: "luminosity",
         } as const;
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
-        export const ReplyType = {
-            Reply: "reply",
-            Group: "group",
-        } as const;
-        export type ReplyType = (typeof ReplyType)[keyof typeof ReplyType];
+
+        export interface Reply {
+            to: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemCircleReplyTo;
+            type: Reply.Type;
+        }
+
+        export namespace Reply {
+            export const Type = {
+                Reply: "reply",
+                Group: "group",
+            } as const;
+            export type Type = (typeof Type)[keyof typeof Type];
+        }
 
         export interface Color {
             r: number;
@@ -672,18 +698,18 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             b: number;
         }
 
-        export interface RectDifferences {
-            left: number;
-            top: number;
-            right: number;
-            bottom: number;
-        }
-
         export interface UnrotatedRect {
             left: number;
             bottom: number;
             right: number;
             top: number;
+        }
+
+        export interface RectDifferences {
+            left: number;
+            top: number;
+            right: number;
+            bottom: number;
         }
     }
 
@@ -694,31 +720,41 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         index: number;
         identityQuality: DocAnnotationsList200ResponseAnnotationsItemSquare.IdentityQuality;
         nm: string | null;
-        flags: DocAnnotationsList200ResponseAnnotationsItemSquare.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemSquare.Rect;
         contents: string | null;
         subject: string | null;
+        blendMode: DocAnnotationsList200ResponseAnnotationsItemSquare.BlendMode;
+        invisible: boolean;
+        hidden: boolean;
+        print: boolean;
+        noZoom: boolean;
+        noRotate: boolean;
+        noView: boolean;
+        readOnly: boolean;
+        locked: boolean;
+        toggleNoView: boolean;
+        lockedContents: boolean;
+        reply: DocAnnotationsList200ResponseAnnotationsItemSquare.Reply | null;
+        popup: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemSquarePopup | null;
+        groupId: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
-        blendMode: DocAnnotationsList200ResponseAnnotationsItemSquare.BlendMode;
-        inReplyTo: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemSquareInReplyTo | null;
-        replyType: DocAnnotationsList200ResponseAnnotationsItemSquare.ReplyType | null;
-        userId?: string | undefined;
-        groupId?: string | undefined;
-        createdBy?: string | undefined;
-        updatedBy?: string | undefined;
-        actions?: CloudPDF.PdfAnnotationActions | undefined;
+        userId: string | null;
+        createdBy: string | null;
+        updatedBy: string | null;
+        importedBy: string | null;
+        actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsList200ResponseAnnotationsItemSquare.Color;
         opacity: number;
         strokeWidth: number;
         borderStyle: DocAnnotationsList200ResponseAnnotationsItemSquare.BorderStyle;
-        dashArray?: number[] | undefined;
+        dashArray: number[] | null;
         interiorColor: DocAnnotationsList200ResponseAnnotationsItemSquare.InteriorColor | null;
+        rotation: number | null;
+        unrotatedRect: DocAnnotationsList200ResponseAnnotationsItemSquare.UnrotatedRect | null;
         cloudyIntensity: number | null;
         rectDifferences: DocAnnotationsList200ResponseAnnotationsItemSquare.RectDifferences | null;
-        rotation?: number | undefined;
-        unrotatedRect?: DocAnnotationsList200ResponseAnnotationsItemSquare.UnrotatedRect | undefined;
     }
 
     export namespace DocAnnotationsList200ResponseAnnotationsItemSquare {
@@ -740,19 +776,6 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         } as const;
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
-        export interface Flags {
-            invisible: boolean;
-            hidden: boolean;
-            print: boolean;
-            noZoom: boolean;
-            noRotate: boolean;
-            noView: boolean;
-            readOnly: boolean;
-            locked: boolean;
-            toggleNoView: boolean;
-            lockedContents: boolean;
-        }
-
         export interface Rect {
             left: number;
             bottom: number;
@@ -779,11 +802,19 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Luminosity: "luminosity",
         } as const;
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
-        export const ReplyType = {
-            Reply: "reply",
-            Group: "group",
-        } as const;
-        export type ReplyType = (typeof ReplyType)[keyof typeof ReplyType];
+
+        export interface Reply {
+            to: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemSquareReplyTo;
+            type: Reply.Type;
+        }
+
+        export namespace Reply {
+            export const Type = {
+                Reply: "reply",
+                Group: "group",
+            } as const;
+            export type Type = (typeof Type)[keyof typeof Type];
+        }
 
         export interface Color {
             r: number;
@@ -803,13 +834,6 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             r: number;
             g: number;
             b: number;
-        }
-
-        export interface RectDifferences {
-            left: number;
-            top: number;
-            right: number;
-            bottom: number;
         }
 
         export interface UnrotatedRect {
@@ -818,210 +842,210 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             right: number;
             top: number;
         }
+
+        export interface RectDifferences {
+            left: number;
+            top: number;
+            right: number;
+            bottom: number;
+        }
     }
 
     export interface Polygon {
         subtype: "polygon";
-        intent?: DocAnnotationsList200ResponseAnnotationsItemPolygon.Intent | undefined;
-        measure?: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemPolygonMeasure | undefined;
-        caption?: DocAnnotationsList200ResponseAnnotationsItemPolygon.Caption | undefined;
         ref: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemPolygonRef;
         page: DocAnnotationsList200ResponseAnnotationsItemPolygon.Page;
         index: number;
         identityQuality: DocAnnotationsList200ResponseAnnotationsItemPolygon.IdentityQuality;
         nm: string | null;
-        flags: DocAnnotationsList200ResponseAnnotationsItemPolygon.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemPolygon.Rect;
         contents: string | null;
         subject: string | null;
+        blendMode: DocAnnotationsList200ResponseAnnotationsItemPolygon.BlendMode;
+        invisible: boolean;
+        hidden: boolean;
+        print: boolean;
+        noZoom: boolean;
+        noRotate: boolean;
+        noView: boolean;
+        readOnly: boolean;
+        locked: boolean;
+        toggleNoView: boolean;
+        lockedContents: boolean;
+        reply: DocAnnotationsList200ResponseAnnotationsItemPolygon.Reply | null;
+        popup: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemPolygonPopup | null;
+        groupId: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
-        blendMode: DocAnnotationsList200ResponseAnnotationsItemPolygon.BlendMode;
-        inReplyTo: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemPolygonInReplyTo | null;
-        replyType: DocAnnotationsList200ResponseAnnotationsItemPolygon.ReplyType | null;
-        userId?: string | undefined;
-        groupId?: string | undefined;
-        createdBy?: string | undefined;
-        updatedBy?: string | undefined;
-        actions?: CloudPDF.PdfAnnotationActions | undefined;
+        userId: string | null;
+        createdBy: string | null;
+        updatedBy: string | null;
+        importedBy: string | null;
+        actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsList200ResponseAnnotationsItemPolygon.Color;
         opacity: number;
         strokeWidth: number;
         borderStyle: DocAnnotationsList200ResponseAnnotationsItemPolygon.BorderStyle;
-        dashArray?: number[] | undefined;
+        dashArray: number[] | null;
         interiorColor: DocAnnotationsList200ResponseAnnotationsItemPolygon.InteriorColor | null;
         vertices: DocAnnotationsList200ResponseAnnotationsItemPolygon.Vertices.Item[];
-        rotation?: number | undefined;
+        rotation: number | null;
+        captionEnabled: boolean | null;
+        captionCenter: DocAnnotationsList200ResponseAnnotationsItemPolygon.CaptionCenter | null;
+        intent: DocAnnotationsList200ResponseAnnotationsItemPolygon.Intent | null;
+        measure: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemPolygonMeasure | null;
         cloudyIntensity: number | null;
     }
 
     export namespace DocAnnotationsList200ResponseAnnotationsItemPolygon {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+
+        export const IdentityQuality = {
+            Durable: "durable",
+            Weak: "weak",
+        } as const;
+        export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
+
+        export interface Rect {
+            left: number;
+            bottom: number;
+            right: number;
+            top: number;
+        }
+
+        export const BlendMode = {
+            Normal: "normal",
+            Multiply: "multiply",
+            Screen: "screen",
+            Overlay: "overlay",
+            Darken: "darken",
+            Lighten: "lighten",
+            ColorDodge: "color-dodge",
+            ColorBurn: "color-burn",
+            HardLight: "hard-light",
+            SoftLight: "soft-light",
+            Difference: "difference",
+            Exclusion: "exclusion",
+            Hue: "hue",
+            Saturation: "saturation",
+            Color: "color",
+            Luminosity: "luminosity",
+        } as const;
+        export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
+
+        export interface Reply {
+            to: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemPolygonReplyTo;
+            type: Reply.Type;
+        }
+
+        export namespace Reply {
+            export const Type = {
+                Reply: "reply",
+                Group: "group",
+            } as const;
+            export type Type = (typeof Type)[keyof typeof Type];
+        }
+
+        export interface Color {
+            r: number;
+            g: number;
+            b: number;
+        }
+
+        export const BorderStyle = {
+            Solid: "solid",
+            Dashed: "dashed",
+            Beveled: "beveled",
+            Inset: "inset",
+        } as const;
+        export type BorderStyle = (typeof BorderStyle)[keyof typeof BorderStyle];
+
+        export interface InteriorColor {
+            r: number;
+            g: number;
+            b: number;
+        }
+
+        export type Vertices = Vertices.Item[];
+
+        export namespace Vertices {
+            export interface Item {
+                x: number;
+                y: number;
+            }
+        }
+
+        export interface CaptionCenter {
+            x: number;
+            y: number;
+        }
+
         export const Intent = {
             PolygonCloud: "PolygonCloud",
             PolygonDimension: "PolygonDimension",
         } as const;
         export type Intent = (typeof Intent)[keyof typeof Intent];
-
-        export interface Caption {
-            enabled: boolean;
-            center?: Caption.Center | undefined;
-        }
-
-        export namespace Caption {
-            export interface Center {
-                x: number;
-                y: number;
-            }
-        }
-
-        export interface Page {
-            kind: Page.Kind;
-            pageObjectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-
-        export const IdentityQuality = {
-            Durable: "durable",
-            Weak: "weak",
-        } as const;
-        export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
-
-        export interface Flags {
-            invisible: boolean;
-            hidden: boolean;
-            print: boolean;
-            noZoom: boolean;
-            noRotate: boolean;
-            noView: boolean;
-            readOnly: boolean;
-            locked: boolean;
-            toggleNoView: boolean;
-            lockedContents: boolean;
-        }
-
-        export interface Rect {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
-        }
-
-        export const BlendMode = {
-            Normal: "normal",
-            Multiply: "multiply",
-            Screen: "screen",
-            Overlay: "overlay",
-            Darken: "darken",
-            Lighten: "lighten",
-            ColorDodge: "color-dodge",
-            ColorBurn: "color-burn",
-            HardLight: "hard-light",
-            SoftLight: "soft-light",
-            Difference: "difference",
-            Exclusion: "exclusion",
-            Hue: "hue",
-            Saturation: "saturation",
-            Color: "color",
-            Luminosity: "luminosity",
-        } as const;
-        export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
-        export const ReplyType = {
-            Reply: "reply",
-            Group: "group",
-        } as const;
-        export type ReplyType = (typeof ReplyType)[keyof typeof ReplyType];
-
-        export interface Color {
-            r: number;
-            g: number;
-            b: number;
-        }
-
-        export const BorderStyle = {
-            Solid: "solid",
-            Dashed: "dashed",
-            Beveled: "beveled",
-            Inset: "inset",
-        } as const;
-        export type BorderStyle = (typeof BorderStyle)[keyof typeof BorderStyle];
-
-        export interface InteriorColor {
-            r: number;
-            g: number;
-            b: number;
-        }
-
-        export type Vertices = Vertices.Item[];
-
-        export namespace Vertices {
-            export interface Item {
-                x: number;
-                y: number;
-            }
-        }
     }
 
     export interface Polyline {
         subtype: "polyline";
-        intent?: DocAnnotationsList200ResponseAnnotationsItemPolyline.Intent | undefined;
-        measure?: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemPolylineMeasure | undefined;
-        caption?: DocAnnotationsList200ResponseAnnotationsItemPolyline.Caption | undefined;
         ref: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemPolylineRef;
         page: DocAnnotationsList200ResponseAnnotationsItemPolyline.Page;
         index: number;
         identityQuality: DocAnnotationsList200ResponseAnnotationsItemPolyline.IdentityQuality;
         nm: string | null;
-        flags: DocAnnotationsList200ResponseAnnotationsItemPolyline.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemPolyline.Rect;
         contents: string | null;
         subject: string | null;
+        blendMode: DocAnnotationsList200ResponseAnnotationsItemPolyline.BlendMode;
+        invisible: boolean;
+        hidden: boolean;
+        print: boolean;
+        noZoom: boolean;
+        noRotate: boolean;
+        noView: boolean;
+        readOnly: boolean;
+        locked: boolean;
+        toggleNoView: boolean;
+        lockedContents: boolean;
+        reply: DocAnnotationsList200ResponseAnnotationsItemPolyline.Reply | null;
+        popup: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemPolylinePopup | null;
+        groupId: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
-        blendMode: DocAnnotationsList200ResponseAnnotationsItemPolyline.BlendMode;
-        inReplyTo: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemPolylineInReplyTo | null;
-        replyType: DocAnnotationsList200ResponseAnnotationsItemPolyline.ReplyType | null;
-        userId?: string | undefined;
-        groupId?: string | undefined;
-        createdBy?: string | undefined;
-        updatedBy?: string | undefined;
-        actions?: CloudPDF.PdfAnnotationActions | undefined;
+        userId: string | null;
+        createdBy: string | null;
+        updatedBy: string | null;
+        importedBy: string | null;
+        actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsList200ResponseAnnotationsItemPolyline.Color;
         opacity: number;
         strokeWidth: number;
         borderStyle: DocAnnotationsList200ResponseAnnotationsItemPolyline.BorderStyle;
-        dashArray?: number[] | undefined;
+        dashArray: number[] | null;
         interiorColor: DocAnnotationsList200ResponseAnnotationsItemPolyline.InteriorColor | null;
         vertices: DocAnnotationsList200ResponseAnnotationsItemPolyline.Vertices.Item[];
-        rotation?: number | undefined;
+        rotation: number | null;
+        captionEnabled: boolean | null;
+        captionCenter: DocAnnotationsList200ResponseAnnotationsItemPolyline.CaptionCenter | null;
+        intent: DocAnnotationsList200ResponseAnnotationsItemPolyline.Intent | null;
+        measure: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemPolylineMeasure | null;
         lineEndings: DocAnnotationsList200ResponseAnnotationsItemPolyline.LineEndings;
     }
 
     export namespace DocAnnotationsList200ResponseAnnotationsItemPolyline {
-        export const Intent = {
-            PolyLineDimension: "PolyLineDimension",
-        } as const;
-        export type Intent = (typeof Intent)[keyof typeof Intent];
-
-        export interface Caption {
-            enabled: boolean;
-            center?: Caption.Center | undefined;
-        }
-
-        export namespace Caption {
-            export interface Center {
-                x: number;
-                y: number;
-            }
-        }
-
         export interface Page {
             kind: Page.Kind;
             pageObjectNumber: number;
@@ -1039,19 +1063,6 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Weak: "weak",
         } as const;
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
-
-        export interface Flags {
-            invisible: boolean;
-            hidden: boolean;
-            print: boolean;
-            noZoom: boolean;
-            noRotate: boolean;
-            noView: boolean;
-            readOnly: boolean;
-            locked: boolean;
-            toggleNoView: boolean;
-            lockedContents: boolean;
-        }
 
         export interface Rect {
             left: number;
@@ -1079,11 +1090,19 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Luminosity: "luminosity",
         } as const;
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
-        export const ReplyType = {
-            Reply: "reply",
-            Group: "group",
-        } as const;
-        export type ReplyType = (typeof ReplyType)[keyof typeof ReplyType];
+
+        export interface Reply {
+            to: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemPolylineReplyTo;
+            type: Reply.Type;
+        }
+
+        export namespace Reply {
+            export const Type = {
+                Reply: "reply",
+                Group: "group",
+            } as const;
+            export type Type = (typeof Type)[keyof typeof Type];
+        }
 
         export interface Color {
             r: number;
@@ -1113,6 +1132,16 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
                 y: number;
             }
         }
+
+        export interface CaptionCenter {
+            x: number;
+            y: number;
+        }
+
+        export const Intent = {
+            PolyLineDimension: "PolyLineDimension",
+        } as const;
+        export type Intent = (typeof Intent)[keyof typeof Intent];
 
         export interface LineEndings {
             start: LineEndings.Start;
@@ -1151,73 +1180,54 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
 
     export interface Line {
         subtype: "line";
-        intent?: DocAnnotationsList200ResponseAnnotationsItemLine.Intent | undefined;
-        measure?: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemLineMeasure | undefined;
-        caption?: DocAnnotationsList200ResponseAnnotationsItemLine.Caption | undefined;
-        leader?: DocAnnotationsList200ResponseAnnotationsItemLine.Leader | undefined;
         ref: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemLineRef;
         page: DocAnnotationsList200ResponseAnnotationsItemLine.Page;
         index: number;
         identityQuality: DocAnnotationsList200ResponseAnnotationsItemLine.IdentityQuality;
         nm: string | null;
-        flags: DocAnnotationsList200ResponseAnnotationsItemLine.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemLine.Rect;
         contents: string | null;
         subject: string | null;
+        blendMode: DocAnnotationsList200ResponseAnnotationsItemLine.BlendMode;
+        invisible: boolean;
+        hidden: boolean;
+        print: boolean;
+        noZoom: boolean;
+        noRotate: boolean;
+        noView: boolean;
+        readOnly: boolean;
+        locked: boolean;
+        toggleNoView: boolean;
+        lockedContents: boolean;
+        reply: DocAnnotationsList200ResponseAnnotationsItemLine.Reply | null;
+        popup: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemLinePopup | null;
+        groupId: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
-        blendMode: DocAnnotationsList200ResponseAnnotationsItemLine.BlendMode;
-        inReplyTo: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemLineInReplyTo | null;
-        replyType: DocAnnotationsList200ResponseAnnotationsItemLine.ReplyType | null;
-        userId?: string | undefined;
-        groupId?: string | undefined;
-        createdBy?: string | undefined;
-        updatedBy?: string | undefined;
-        actions?: CloudPDF.PdfAnnotationActions | undefined;
+        userId: string | null;
+        createdBy: string | null;
+        updatedBy: string | null;
+        importedBy: string | null;
+        actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsList200ResponseAnnotationsItemLine.Color;
         opacity: number;
         strokeWidth: number;
         borderStyle: DocAnnotationsList200ResponseAnnotationsItemLine.BorderStyle;
-        dashArray?: number[] | undefined;
+        dashArray: number[] | null;
         interiorColor: DocAnnotationsList200ResponseAnnotationsItemLine.InteriorColor | null;
         linePoints: DocAnnotationsList200ResponseAnnotationsItemLine.LinePoints;
         lineEndings: DocAnnotationsList200ResponseAnnotationsItemLine.LineEndings;
-        rotation?: number | undefined;
+        rotation: number | null;
+        intent: DocAnnotationsList200ResponseAnnotationsItemLine.Intent | null;
+        measure: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemLineMeasure | null;
+        captionEnabled: boolean;
+        captionPosition: DocAnnotationsList200ResponseAnnotationsItemLine.CaptionPosition;
+        captionOffset: DocAnnotationsList200ResponseAnnotationsItemLine.CaptionOffset | null;
+        leader: DocAnnotationsList200ResponseAnnotationsItemLine.Leader | null;
     }
 
     export namespace DocAnnotationsList200ResponseAnnotationsItemLine {
-        export const Intent = {
-            LineArrow: "LineArrow",
-            LineDimension: "LineDimension",
-        } as const;
-        export type Intent = (typeof Intent)[keyof typeof Intent];
-
-        export interface Caption {
-            enabled: boolean;
-            position?: Caption.Position | undefined;
-            offset?: Caption.Offset | undefined;
-        }
-
-        export namespace Caption {
-            export const Position = {
-                Inline: "inline",
-                Top: "top",
-            } as const;
-            export type Position = (typeof Position)[keyof typeof Position];
-
-            export interface Offset {
-                along: number;
-                perpendicular: number;
-            }
-        }
-
-        export interface Leader {
-            length: number;
-            extension?: number | undefined;
-            offset?: number | undefined;
-        }
-
         export interface Page {
             kind: Page.Kind;
             pageObjectNumber: number;
@@ -1235,19 +1245,6 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Weak: "weak",
         } as const;
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
-
-        export interface Flags {
-            invisible: boolean;
-            hidden: boolean;
-            print: boolean;
-            noZoom: boolean;
-            noRotate: boolean;
-            noView: boolean;
-            readOnly: boolean;
-            locked: boolean;
-            toggleNoView: boolean;
-            lockedContents: boolean;
-        }
 
         export interface Rect {
             left: number;
@@ -1275,11 +1272,19 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Luminosity: "luminosity",
         } as const;
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
-        export const ReplyType = {
-            Reply: "reply",
-            Group: "group",
-        } as const;
-        export type ReplyType = (typeof ReplyType)[keyof typeof ReplyType];
+
+        export interface Reply {
+            to: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemLineReplyTo;
+            type: Reply.Type;
+        }
+
+        export namespace Reply {
+            export const Type = {
+                Reply: "reply",
+                Group: "group",
+            } as const;
+            export type Type = (typeof Type)[keyof typeof Type];
+        }
 
         export interface Color {
             r: number;
@@ -1351,6 +1356,28 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             } as const;
             export type End = (typeof End)[keyof typeof End];
         }
+
+        export const Intent = {
+            LineArrow: "LineArrow",
+            LineDimension: "LineDimension",
+        } as const;
+        export type Intent = (typeof Intent)[keyof typeof Intent];
+        export const CaptionPosition = {
+            Inline: "inline",
+            Top: "top",
+        } as const;
+        export type CaptionPosition = (typeof CaptionPosition)[keyof typeof CaptionPosition];
+
+        export interface CaptionOffset {
+            along: number;
+            perpendicular: number;
+        }
+
+        export interface Leader {
+            length: number;
+            extension?: number | undefined;
+            offset?: number | undefined;
+        }
     }
 
     export interface Link {
@@ -1360,21 +1387,31 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         index: number;
         identityQuality: DocAnnotationsList200ResponseAnnotationsItemLink.IdentityQuality;
         nm: string | null;
-        flags: DocAnnotationsList200ResponseAnnotationsItemLink.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemLink.Rect;
         contents: string | null;
         subject: string | null;
+        blendMode: DocAnnotationsList200ResponseAnnotationsItemLink.BlendMode;
+        invisible: boolean;
+        hidden: boolean;
+        print: boolean;
+        noZoom: boolean;
+        noRotate: boolean;
+        noView: boolean;
+        readOnly: boolean;
+        locked: boolean;
+        toggleNoView: boolean;
+        lockedContents: boolean;
+        reply: DocAnnotationsList200ResponseAnnotationsItemLink.Reply | null;
+        popup: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemLinkPopup | null;
+        groupId: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
-        blendMode: DocAnnotationsList200ResponseAnnotationsItemLink.BlendMode;
-        inReplyTo: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemLinkInReplyTo | null;
-        replyType: DocAnnotationsList200ResponseAnnotationsItemLink.ReplyType | null;
-        userId?: string | undefined;
-        groupId?: string | undefined;
-        createdBy?: string | undefined;
-        updatedBy?: string | undefined;
-        actions?: CloudPDF.PdfAnnotationActions | undefined;
+        userId: string | null;
+        createdBy: string | null;
+        updatedBy: string | null;
+        importedBy: string | null;
+        actions: CloudPDF.PdfAnnotationActions | null;
         target: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemLinkTarget | null;
     }
 
@@ -1397,19 +1434,6 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         } as const;
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
-        export interface Flags {
-            invisible: boolean;
-            hidden: boolean;
-            print: boolean;
-            noZoom: boolean;
-            noRotate: boolean;
-            noView: boolean;
-            readOnly: boolean;
-            locked: boolean;
-            toggleNoView: boolean;
-            lockedContents: boolean;
-        }
-
         export interface Rect {
             left: number;
             bottom: number;
@@ -1436,11 +1460,19 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Luminosity: "luminosity",
         } as const;
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
-        export const ReplyType = {
-            Reply: "reply",
-            Group: "group",
-        } as const;
-        export type ReplyType = (typeof ReplyType)[keyof typeof ReplyType];
+
+        export interface Reply {
+            to: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemLinkReplyTo;
+            type: Reply.Type;
+        }
+
+        export namespace Reply {
+            export const Type = {
+                Reply: "reply",
+                Group: "group",
+            } as const;
+            export type Type = (typeof Type)[keyof typeof Type];
+        }
     }
 
     export interface Ink {
@@ -1450,29 +1482,39 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         index: number;
         identityQuality: DocAnnotationsList200ResponseAnnotationsItemInk.IdentityQuality;
         nm: string | null;
-        flags: DocAnnotationsList200ResponseAnnotationsItemInk.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemInk.Rect;
         contents: string | null;
         subject: string | null;
+        blendMode: DocAnnotationsList200ResponseAnnotationsItemInk.BlendMode;
+        invisible: boolean;
+        hidden: boolean;
+        print: boolean;
+        noZoom: boolean;
+        noRotate: boolean;
+        noView: boolean;
+        readOnly: boolean;
+        locked: boolean;
+        toggleNoView: boolean;
+        lockedContents: boolean;
+        reply: DocAnnotationsList200ResponseAnnotationsItemInk.Reply | null;
+        popup: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemInkPopup | null;
+        groupId: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
-        blendMode: DocAnnotationsList200ResponseAnnotationsItemInk.BlendMode;
-        inReplyTo: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemInkInReplyTo | null;
-        replyType: DocAnnotationsList200ResponseAnnotationsItemInk.ReplyType | null;
-        userId?: string | undefined;
-        groupId?: string | undefined;
-        createdBy?: string | undefined;
-        updatedBy?: string | undefined;
-        actions?: CloudPDF.PdfAnnotationActions | undefined;
+        userId: string | null;
+        createdBy: string | null;
+        updatedBy: string | null;
+        importedBy: string | null;
+        actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsList200ResponseAnnotationsItemInk.Color;
         opacity: number;
         strokeWidth: number;
         borderStyle: DocAnnotationsList200ResponseAnnotationsItemInk.BorderStyle;
-        dashArray?: number[] | undefined;
-        intent: DocAnnotationsList200ResponseAnnotationsItemInk.Intent | null;
+        dashArray: number[] | null;
         inkList: DocAnnotationsList200ResponseAnnotationsItemInk.InkList.Item[][];
-        rotation?: number | undefined;
+        intent: DocAnnotationsList200ResponseAnnotationsItemInk.Intent | null;
+        rotation: number | null;
     }
 
     export namespace DocAnnotationsList200ResponseAnnotationsItemInk {
@@ -1494,19 +1536,6 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         } as const;
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
-        export interface Flags {
-            invisible: boolean;
-            hidden: boolean;
-            print: boolean;
-            noZoom: boolean;
-            noRotate: boolean;
-            noView: boolean;
-            readOnly: boolean;
-            locked: boolean;
-            toggleNoView: boolean;
-            lockedContents: boolean;
-        }
-
         export interface Rect {
             left: number;
             bottom: number;
@@ -1533,11 +1562,19 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Luminosity: "luminosity",
         } as const;
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
-        export const ReplyType = {
-            Reply: "reply",
-            Group: "group",
-        } as const;
-        export type ReplyType = (typeof ReplyType)[keyof typeof ReplyType];
+
+        export interface Reply {
+            to: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemInkReplyTo;
+            type: Reply.Type;
+        }
+
+        export namespace Reply {
+            export const Type = {
+                Reply: "reply",
+                Group: "group",
+            } as const;
+            export type Type = (typeof Type)[keyof typeof Type];
+        }
 
         export interface Color {
             r: number;
@@ -1552,10 +1589,6 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Inset: "inset",
         } as const;
         export type BorderStyle = (typeof BorderStyle)[keyof typeof BorderStyle];
-        export const Intent = {
-            InkHighlight: "ink-highlight",
-        } as const;
-        export type Intent = (typeof Intent)[keyof typeof Intent];
         export type InkList = InkList.Item[];
 
         export namespace InkList {
@@ -1564,6 +1597,11 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
                 y: number;
             }
         }
+
+        export const Intent = {
+            InkHighlight: "ink-highlight",
+        } as const;
+        export type Intent = (typeof Intent)[keyof typeof Intent];
     }
 
     export interface FreeText {
@@ -1573,38 +1611,48 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         index: number;
         identityQuality: DocAnnotationsList200ResponseAnnotationsItemFreeText.IdentityQuality;
         nm: string | null;
-        flags: DocAnnotationsList200ResponseAnnotationsItemFreeText.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemFreeText.Rect;
         contents: string | null;
         subject: string | null;
+        blendMode: DocAnnotationsList200ResponseAnnotationsItemFreeText.BlendMode;
+        invisible: boolean;
+        hidden: boolean;
+        print: boolean;
+        noZoom: boolean;
+        noRotate: boolean;
+        noView: boolean;
+        readOnly: boolean;
+        locked: boolean;
+        toggleNoView: boolean;
+        lockedContents: boolean;
+        reply: DocAnnotationsList200ResponseAnnotationsItemFreeText.Reply | null;
+        popup: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemFreeTextPopup | null;
+        groupId: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
-        blendMode: DocAnnotationsList200ResponseAnnotationsItemFreeText.BlendMode;
-        inReplyTo: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemFreeTextInReplyTo | null;
-        replyType: DocAnnotationsList200ResponseAnnotationsItemFreeText.ReplyType | null;
-        userId?: string | undefined;
-        groupId?: string | undefined;
-        createdBy?: string | undefined;
-        updatedBy?: string | undefined;
-        actions?: CloudPDF.PdfAnnotationActions | undefined;
+        userId: string | null;
+        createdBy: string | null;
+        updatedBy: string | null;
+        importedBy: string | null;
+        actions: CloudPDF.PdfAnnotationActions | null;
+        rotation: number | null;
+        unrotatedRect: DocAnnotationsList200ResponseAnnotationsItemFreeText.UnrotatedRect | null;
         intent: DocAnnotationsList200ResponseAnnotationsItemFreeText.Intent;
         fontFamily: string;
         fontSize: number;
         textAlign: DocAnnotationsList200ResponseAnnotationsItemFreeText.TextAlign;
         richText: DocAnnotationsList200ResponseAnnotationsItemFreeText.RichText;
         color: DocAnnotationsList200ResponseAnnotationsItemFreeText.Color;
-        fontColor?: DocAnnotationsList200ResponseAnnotationsItemFreeText.FontColor | undefined;
+        fontColor: DocAnnotationsList200ResponseAnnotationsItemFreeText.FontColor | null;
         interiorColor: DocAnnotationsList200ResponseAnnotationsItemFreeText.InteriorColor | null;
         opacity: number;
         strokeWidth: number;
         borderStyle: DocAnnotationsList200ResponseAnnotationsItemFreeText.BorderStyle;
-        dashArray?: number[] | undefined;
+        dashArray: number[] | null;
         rectDifferences: DocAnnotationsList200ResponseAnnotationsItemFreeText.RectDifferences | null;
-        calloutLine?: unknown[] | undefined;
-        lineEnding?: DocAnnotationsList200ResponseAnnotationsItemFreeText.LineEnding | undefined;
-        rotation?: number | undefined;
-        unrotatedRect?: DocAnnotationsList200ResponseAnnotationsItemFreeText.UnrotatedRect | undefined;
+        calloutLine: unknown[] | null;
+        lineEnding: DocAnnotationsList200ResponseAnnotationsItemFreeText.LineEnding | null;
     }
 
     export namespace DocAnnotationsList200ResponseAnnotationsItemFreeText {
@@ -1626,19 +1674,6 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         } as const;
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
-        export interface Flags {
-            invisible: boolean;
-            hidden: boolean;
-            print: boolean;
-            noZoom: boolean;
-            noRotate: boolean;
-            noView: boolean;
-            readOnly: boolean;
-            locked: boolean;
-            toggleNoView: boolean;
-            lockedContents: boolean;
-        }
-
         export interface Rect {
             left: number;
             bottom: number;
@@ -1665,11 +1700,27 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Luminosity: "luminosity",
         } as const;
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
-        export const ReplyType = {
-            Reply: "reply",
-            Group: "group",
-        } as const;
-        export type ReplyType = (typeof ReplyType)[keyof typeof ReplyType];
+
+        export interface Reply {
+            to: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemFreeTextReplyTo;
+            type: Reply.Type;
+        }
+
+        export namespace Reply {
+            export const Type = {
+                Reply: "reply",
+                Group: "group",
+            } as const;
+            export type Type = (typeof Type)[keyof typeof Type];
+        }
+
+        export interface UnrotatedRect {
+            left: number;
+            bottom: number;
+            right: number;
+            top: number;
+        }
+
         export const Intent = {
             FreeText: "free-text",
             FreeTextCallout: "free-text-callout",
@@ -1872,13 +1923,6 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Slash: "slash",
         } as const;
         export type LineEnding = (typeof LineEnding)[keyof typeof LineEnding];
-
-        export interface UnrotatedRect {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
-        }
     }
 
     export interface Caret {
@@ -1888,27 +1932,37 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         index: number;
         identityQuality: DocAnnotationsList200ResponseAnnotationsItemCaret.IdentityQuality;
         nm: string | null;
-        flags: DocAnnotationsList200ResponseAnnotationsItemCaret.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemCaret.Rect;
         contents: string | null;
         subject: string | null;
+        blendMode: DocAnnotationsList200ResponseAnnotationsItemCaret.BlendMode;
+        invisible: boolean;
+        hidden: boolean;
+        print: boolean;
+        noZoom: boolean;
+        noRotate: boolean;
+        noView: boolean;
+        readOnly: boolean;
+        locked: boolean;
+        toggleNoView: boolean;
+        lockedContents: boolean;
+        reply: DocAnnotationsList200ResponseAnnotationsItemCaret.Reply | null;
+        popup: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemCaretPopup | null;
+        groupId: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
-        blendMode: DocAnnotationsList200ResponseAnnotationsItemCaret.BlendMode;
-        inReplyTo: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemCaretInReplyTo | null;
-        replyType: DocAnnotationsList200ResponseAnnotationsItemCaret.ReplyType | null;
-        userId?: string | undefined;
-        groupId?: string | undefined;
-        createdBy?: string | undefined;
-        updatedBy?: string | undefined;
-        actions?: CloudPDF.PdfAnnotationActions | undefined;
+        userId: string | null;
+        createdBy: string | null;
+        updatedBy: string | null;
+        importedBy: string | null;
+        actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsList200ResponseAnnotationsItemCaret.Color;
         opacity: number;
+        rotation: number | null;
+        unrotatedRect: DocAnnotationsList200ResponseAnnotationsItemCaret.UnrotatedRect | null;
         intent: DocAnnotationsList200ResponseAnnotationsItemCaret.Intent | null;
         rectDifferences: DocAnnotationsList200ResponseAnnotationsItemCaret.RectDifferences | null;
-        rotation?: number | undefined;
-        unrotatedRect?: DocAnnotationsList200ResponseAnnotationsItemCaret.UnrotatedRect | undefined;
     }
 
     export namespace DocAnnotationsList200ResponseAnnotationsItemCaret {
@@ -1929,19 +1983,6 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Weak: "weak",
         } as const;
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
-
-        export interface Flags {
-            invisible: boolean;
-            hidden: boolean;
-            print: boolean;
-            noZoom: boolean;
-            noRotate: boolean;
-            noView: boolean;
-            readOnly: boolean;
-            locked: boolean;
-            toggleNoView: boolean;
-            lockedContents: boolean;
-        }
 
         export interface Rect {
             left: number;
@@ -1969,16 +2010,31 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Luminosity: "luminosity",
         } as const;
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
-        export const ReplyType = {
-            Reply: "reply",
-            Group: "group",
-        } as const;
-        export type ReplyType = (typeof ReplyType)[keyof typeof ReplyType];
+
+        export interface Reply {
+            to: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemCaretReplyTo;
+            type: Reply.Type;
+        }
+
+        export namespace Reply {
+            export const Type = {
+                Reply: "reply",
+                Group: "group",
+            } as const;
+            export type Type = (typeof Type)[keyof typeof Type];
+        }
 
         export interface Color {
             r: number;
             g: number;
             b: number;
+        }
+
+        export interface UnrotatedRect {
+            left: number;
+            bottom: number;
+            right: number;
+            top: number;
         }
 
         export const Intent = {
@@ -1992,13 +2048,6 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             right: number;
             bottom: number;
         }
-
-        export interface UnrotatedRect {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
-        }
     }
 
     export interface Text {
@@ -2008,21 +2057,31 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         index: number;
         identityQuality: DocAnnotationsList200ResponseAnnotationsItemText.IdentityQuality;
         nm: string | null;
-        flags: DocAnnotationsList200ResponseAnnotationsItemText.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemText.Rect;
         contents: string | null;
         subject: string | null;
+        blendMode: DocAnnotationsList200ResponseAnnotationsItemText.BlendMode;
+        invisible: boolean;
+        hidden: boolean;
+        print: boolean;
+        noZoom: boolean;
+        noRotate: boolean;
+        noView: boolean;
+        readOnly: boolean;
+        locked: boolean;
+        toggleNoView: boolean;
+        lockedContents: boolean;
+        reply: DocAnnotationsList200ResponseAnnotationsItemText.Reply | null;
+        popup: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemTextPopup | null;
+        groupId: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
-        blendMode: DocAnnotationsList200ResponseAnnotationsItemText.BlendMode;
-        inReplyTo: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemTextInReplyTo | null;
-        replyType: DocAnnotationsList200ResponseAnnotationsItemText.ReplyType | null;
-        userId?: string | undefined;
-        groupId?: string | undefined;
-        createdBy?: string | undefined;
-        updatedBy?: string | undefined;
-        actions?: CloudPDF.PdfAnnotationActions | undefined;
+        userId: string | null;
+        createdBy: string | null;
+        updatedBy: string | null;
+        importedBy: string | null;
+        actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsList200ResponseAnnotationsItemText.Color;
         opacity: number;
         icon: DocAnnotationsList200ResponseAnnotationsItemText.Icon;
@@ -2049,19 +2108,6 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         } as const;
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
-        export interface Flags {
-            invisible: boolean;
-            hidden: boolean;
-            print: boolean;
-            noZoom: boolean;
-            noRotate: boolean;
-            noView: boolean;
-            readOnly: boolean;
-            locked: boolean;
-            toggleNoView: boolean;
-            lockedContents: boolean;
-        }
-
         export interface Rect {
             left: number;
             bottom: number;
@@ -2088,11 +2134,19 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Luminosity: "luminosity",
         } as const;
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
-        export const ReplyType = {
-            Reply: "reply",
-            Group: "group",
-        } as const;
-        export type ReplyType = (typeof ReplyType)[keyof typeof ReplyType];
+
+        export interface Reply {
+            to: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemTextReplyTo;
+            type: Reply.Type;
+        }
+
+        export namespace Reply {
+            export const Type = {
+                Reply: "reply",
+                Group: "group",
+            } as const;
+            export type Type = (typeof Type)[keyof typeof Type];
+        }
 
         export interface Color {
             r: number;
@@ -2119,24 +2173,34 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         index: number;
         identityQuality: DocAnnotationsList200ResponseAnnotationsItemStamp.IdentityQuality;
         nm: string | null;
-        flags: DocAnnotationsList200ResponseAnnotationsItemStamp.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemStamp.Rect;
         contents: string | null;
         subject: string | null;
+        blendMode: DocAnnotationsList200ResponseAnnotationsItemStamp.BlendMode;
+        invisible: boolean;
+        hidden: boolean;
+        print: boolean;
+        noZoom: boolean;
+        noRotate: boolean;
+        noView: boolean;
+        readOnly: boolean;
+        locked: boolean;
+        toggleNoView: boolean;
+        lockedContents: boolean;
+        reply: DocAnnotationsList200ResponseAnnotationsItemStamp.Reply | null;
+        popup: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemStampPopup | null;
+        groupId: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
-        blendMode: DocAnnotationsList200ResponseAnnotationsItemStamp.BlendMode;
-        inReplyTo: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemStampInReplyTo | null;
-        replyType: DocAnnotationsList200ResponseAnnotationsItemStamp.ReplyType | null;
-        userId?: string | undefined;
-        groupId?: string | undefined;
-        createdBy?: string | undefined;
-        updatedBy?: string | undefined;
-        actions?: CloudPDF.PdfAnnotationActions | undefined;
+        userId: string | null;
+        createdBy: string | null;
+        updatedBy: string | null;
+        importedBy: string | null;
+        actions: CloudPDF.PdfAnnotationActions | null;
+        rotation: number | null;
+        unrotatedRect: DocAnnotationsList200ResponseAnnotationsItemStamp.UnrotatedRect | null;
         name: string | null;
-        rotation?: number | undefined;
-        unrotatedRect?: DocAnnotationsList200ResponseAnnotationsItemStamp.UnrotatedRect | undefined;
     }
 
     export namespace DocAnnotationsList200ResponseAnnotationsItemStamp {
@@ -2158,19 +2222,6 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         } as const;
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
-        export interface Flags {
-            invisible: boolean;
-            hidden: boolean;
-            print: boolean;
-            noZoom: boolean;
-            noRotate: boolean;
-            noView: boolean;
-            readOnly: boolean;
-            locked: boolean;
-            toggleNoView: boolean;
-            lockedContents: boolean;
-        }
-
         export interface Rect {
             left: number;
             bottom: number;
@@ -2197,11 +2248,19 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Luminosity: "luminosity",
         } as const;
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
-        export const ReplyType = {
-            Reply: "reply",
-            Group: "group",
-        } as const;
-        export type ReplyType = (typeof ReplyType)[keyof typeof ReplyType];
+
+        export interface Reply {
+            to: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemStampReplyTo;
+            type: Reply.Type;
+        }
+
+        export namespace Reply {
+            export const Type = {
+                Reply: "reply",
+                Group: "group",
+            } as const;
+            export type Type = (typeof Type)[keyof typeof Type];
+        }
 
         export interface UnrotatedRect {
             left: number;
@@ -2218,25 +2277,35 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         index: number;
         identityQuality: DocAnnotationsList200ResponseAnnotationsItemFileAttachment.IdentityQuality;
         nm: string | null;
-        flags: DocAnnotationsList200ResponseAnnotationsItemFileAttachment.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemFileAttachment.Rect;
         contents: string | null;
         subject: string | null;
+        blendMode: DocAnnotationsList200ResponseAnnotationsItemFileAttachment.BlendMode;
+        invisible: boolean;
+        hidden: boolean;
+        print: boolean;
+        noZoom: boolean;
+        noRotate: boolean;
+        noView: boolean;
+        readOnly: boolean;
+        locked: boolean;
+        toggleNoView: boolean;
+        lockedContents: boolean;
+        reply: DocAnnotationsList200ResponseAnnotationsItemFileAttachment.Reply | null;
+        popup: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemFileAttachmentPopup | null;
+        groupId: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
-        blendMode: DocAnnotationsList200ResponseAnnotationsItemFileAttachment.BlendMode;
-        inReplyTo: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemFileAttachmentInReplyTo | null;
-        replyType: DocAnnotationsList200ResponseAnnotationsItemFileAttachment.ReplyType | null;
-        userId?: string | undefined;
-        groupId?: string | undefined;
-        createdBy?: string | undefined;
-        updatedBy?: string | undefined;
-        actions?: CloudPDF.PdfAnnotationActions | undefined;
+        userId: string | null;
+        createdBy: string | null;
+        updatedBy: string | null;
+        importedBy: string | null;
+        actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsList200ResponseAnnotationsItemFileAttachment.Color;
         opacity: number;
         icon: DocAnnotationsList200ResponseAnnotationsItemFileAttachment.Icon;
-        file: DocAnnotationsList200ResponseAnnotationsItemFileAttachment.File_;
+        file: DocAnnotationsList200ResponseAnnotationsItemFileAttachment.File_ | null;
     }
 
     export namespace DocAnnotationsList200ResponseAnnotationsItemFileAttachment {
@@ -2258,19 +2327,6 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         } as const;
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
-        export interface Flags {
-            invisible: boolean;
-            hidden: boolean;
-            print: boolean;
-            noZoom: boolean;
-            noRotate: boolean;
-            noView: boolean;
-            readOnly: boolean;
-            locked: boolean;
-            toggleNoView: boolean;
-            lockedContents: boolean;
-        }
-
         export interface Rect {
             left: number;
             bottom: number;
@@ -2297,11 +2353,19 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Luminosity: "luminosity",
         } as const;
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
-        export const ReplyType = {
-            Reply: "reply",
-            Group: "group",
-        } as const;
-        export type ReplyType = (typeof ReplyType)[keyof typeof ReplyType];
+
+        export interface Reply {
+            to: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemFileAttachmentReplyTo;
+            type: Reply.Type;
+        }
+
+        export namespace Reply {
+            export const Type = {
+                Reply: "reply",
+                Group: "group",
+            } as const;
+            export type Type = (typeof Type)[keyof typeof Type];
+        }
 
         export interface Color {
             r: number;
@@ -2334,28 +2398,38 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         index: number;
         identityQuality: DocAnnotationsList200ResponseAnnotationsItemWidget.IdentityQuality;
         nm: string | null;
-        flags: DocAnnotationsList200ResponseAnnotationsItemWidget.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemWidget.Rect;
         contents: string | null;
         subject: string | null;
+        blendMode: DocAnnotationsList200ResponseAnnotationsItemWidget.BlendMode;
+        invisible: boolean;
+        hidden: boolean;
+        print: boolean;
+        noZoom: boolean;
+        noRotate: boolean;
+        noView: boolean;
+        readOnly: boolean;
+        locked: boolean;
+        toggleNoView: boolean;
+        lockedContents: boolean;
+        reply: DocAnnotationsList200ResponseAnnotationsItemWidget.Reply | null;
+        popup: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemWidgetPopup | null;
+        groupId: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
-        blendMode: DocAnnotationsList200ResponseAnnotationsItemWidget.BlendMode;
-        inReplyTo: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemWidgetInReplyTo | null;
-        replyType: DocAnnotationsList200ResponseAnnotationsItemWidget.ReplyType | null;
-        userId?: string | undefined;
-        groupId?: string | undefined;
-        createdBy?: string | undefined;
-        updatedBy?: string | undefined;
-        actions?: CloudPDF.PdfAnnotationActions | undefined;
+        userId: string | null;
+        createdBy: string | null;
+        updatedBy: string | null;
+        importedBy: string | null;
+        actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsList200ResponseAnnotationsItemWidget.Color | null;
         interiorColor: DocAnnotationsList200ResponseAnnotationsItemWidget.InteriorColor | null;
         strokeWidth: number;
         borderStyle: DocAnnotationsList200ResponseAnnotationsItemWidget.BorderStyle;
-        fontFamily?: DocAnnotationsList200ResponseAnnotationsItemWidget.FontFamily | undefined;
-        fontSize?: number | undefined;
-        fontColor?: DocAnnotationsList200ResponseAnnotationsItemWidget.FontColor | undefined;
+        fontFamily: DocAnnotationsList200ResponseAnnotationsItemWidget.FontFamily | null;
+        fontSize: number | null;
+        fontColor: DocAnnotationsList200ResponseAnnotationsItemWidget.FontColor | null;
         textAlign: DocAnnotationsList200ResponseAnnotationsItemWidget.TextAlign;
         fieldObjectNumber: number;
         fieldFamily: DocAnnotationsList200ResponseAnnotationsItemWidget.FieldFamily;
@@ -2379,19 +2453,6 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Weak: "weak",
         } as const;
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
-
-        export interface Flags {
-            invisible: boolean;
-            hidden: boolean;
-            print: boolean;
-            noZoom: boolean;
-            noRotate: boolean;
-            noView: boolean;
-            readOnly: boolean;
-            locked: boolean;
-            toggleNoView: boolean;
-            lockedContents: boolean;
-        }
 
         export interface Rect {
             left: number;
@@ -2419,11 +2480,19 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Luminosity: "luminosity",
         } as const;
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
-        export const ReplyType = {
-            Reply: "reply",
-            Group: "group",
-        } as const;
-        export type ReplyType = (typeof ReplyType)[keyof typeof ReplyType];
+
+        export interface Reply {
+            to: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemWidgetReplyTo;
+            type: Reply.Type;
+        }
+
+        export namespace Reply {
+            export const Type = {
+                Reply: "reply",
+                Group: "group",
+            } as const;
+            export type Type = (typeof Type)[keyof typeof Type];
+        }
 
         export interface Color {
             r: number;
@@ -2494,28 +2563,38 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         index: number;
         identityQuality: DocAnnotationsList200ResponseAnnotationsItemRedact.IdentityQuality;
         nm: string | null;
-        flags: DocAnnotationsList200ResponseAnnotationsItemRedact.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemRedact.Rect;
         contents: string | null;
         subject: string | null;
+        blendMode: DocAnnotationsList200ResponseAnnotationsItemRedact.BlendMode;
+        invisible: boolean;
+        hidden: boolean;
+        print: boolean;
+        noZoom: boolean;
+        noRotate: boolean;
+        noView: boolean;
+        readOnly: boolean;
+        locked: boolean;
+        toggleNoView: boolean;
+        lockedContents: boolean;
+        reply: DocAnnotationsList200ResponseAnnotationsItemRedact.Reply | null;
+        popup: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemRedactPopup | null;
+        groupId: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
-        blendMode: DocAnnotationsList200ResponseAnnotationsItemRedact.BlendMode;
-        inReplyTo: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemRedactInReplyTo | null;
-        replyType: DocAnnotationsList200ResponseAnnotationsItemRedact.ReplyType | null;
-        userId?: string | undefined;
-        groupId?: string | undefined;
-        createdBy?: string | undefined;
-        updatedBy?: string | undefined;
-        actions?: CloudPDF.PdfAnnotationActions | undefined;
-        quadPoints: DocAnnotationsList200ResponseAnnotationsItemRedact.QuadPoints.Item[];
+        userId: string | null;
+        createdBy: string | null;
+        updatedBy: string | null;
+        importedBy: string | null;
+        actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsList200ResponseAnnotationsItemRedact.Color;
         opacity: number;
+        quadPoints: DocAnnotationsList200ResponseAnnotationsItemRedact.QuadPoints.Item[];
         interiorColor: DocAnnotationsList200ResponseAnnotationsItemRedact.InteriorColor | null;
         overlayText: string | null;
         repeat: boolean;
-        fontFamily: DocAnnotationsList200ResponseAnnotationsItemRedact.FontFamily;
+        fontFamily: DocAnnotationsList200ResponseAnnotationsItemRedact.FontFamily | null;
         fontSize: number;
         fontColor: DocAnnotationsList200ResponseAnnotationsItemRedact.FontColor;
         textAlign: DocAnnotationsList200ResponseAnnotationsItemRedact.TextAlign;
@@ -2539,19 +2618,6 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Weak: "weak",
         } as const;
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
-
-        export interface Flags {
-            invisible: boolean;
-            hidden: boolean;
-            print: boolean;
-            noZoom: boolean;
-            noRotate: boolean;
-            noView: boolean;
-            readOnly: boolean;
-            locked: boolean;
-            toggleNoView: boolean;
-            lockedContents: boolean;
-        }
 
         export interface Rect {
             left: number;
@@ -2579,11 +2645,26 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Luminosity: "luminosity",
         } as const;
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
-        export const ReplyType = {
-            Reply: "reply",
-            Group: "group",
-        } as const;
-        export type ReplyType = (typeof ReplyType)[keyof typeof ReplyType];
+
+        export interface Reply {
+            to: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemRedactReplyTo;
+            type: Reply.Type;
+        }
+
+        export namespace Reply {
+            export const Type = {
+                Reply: "reply",
+                Group: "group",
+            } as const;
+            export type Type = (typeof Type)[keyof typeof Type];
+        }
+
+        export interface Color {
+            r: number;
+            g: number;
+            b: number;
+        }
+
         export type QuadPoints = QuadPoints.Item[];
 
         export namespace QuadPoints {
@@ -2615,12 +2696,6 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
                     y: number;
                 }
             }
-        }
-
-        export interface Color {
-            r: number;
-            g: number;
-            b: number;
         }
 
         export interface InteriorColor {
@@ -2661,33 +2736,42 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         export type TextAlign = (typeof TextAlign)[keyof typeof TextAlign];
     }
 
-    export interface Unsupported {
-        subtype: "unsupported";
-        ref: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemUnsupportedRef;
-        page: DocAnnotationsList200ResponseAnnotationsItemUnsupported.Page;
+    export interface Popup {
+        subtype: "popup";
+        ref: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemPopupRef;
+        page: DocAnnotationsList200ResponseAnnotationsItemPopup.Page;
         index: number;
-        identityQuality: DocAnnotationsList200ResponseAnnotationsItemUnsupported.IdentityQuality;
+        identityQuality: DocAnnotationsList200ResponseAnnotationsItemPopup.IdentityQuality;
         nm: string | null;
-        flags: DocAnnotationsList200ResponseAnnotationsItemUnsupported.Flags;
-        rect: DocAnnotationsList200ResponseAnnotationsItemUnsupported.Rect;
+        rect: DocAnnotationsList200ResponseAnnotationsItemPopup.Rect;
         contents: string | null;
         subject: string | null;
+        blendMode: DocAnnotationsList200ResponseAnnotationsItemPopup.BlendMode;
+        invisible: boolean;
+        hidden: boolean;
+        print: boolean;
+        noZoom: boolean;
+        noRotate: boolean;
+        noView: boolean;
+        readOnly: boolean;
+        locked: boolean;
+        toggleNoView: boolean;
+        lockedContents: boolean;
+        reply: DocAnnotationsList200ResponseAnnotationsItemPopup.Reply | null;
+        popup: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemPopupPopup | null;
+        groupId: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
-        blendMode: DocAnnotationsList200ResponseAnnotationsItemUnsupported.BlendMode;
-        inReplyTo: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemUnsupportedInReplyTo | null;
-        replyType: DocAnnotationsList200ResponseAnnotationsItemUnsupported.ReplyType | null;
-        userId?: string | undefined;
-        groupId?: string | undefined;
-        createdBy?: string | undefined;
-        updatedBy?: string | undefined;
-        actions?: CloudPDF.PdfAnnotationActions | undefined;
-        rawSubtypeCode: number;
-        rawSubtypeName: string | null;
+        userId: string | null;
+        createdBy: string | null;
+        updatedBy: string | null;
+        importedBy: string | null;
+        actions: CloudPDF.PdfAnnotationActions | null;
+        parent: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemPopupParent | null;
     }
 
-    export namespace DocAnnotationsList200ResponseAnnotationsItemUnsupported {
+    export namespace DocAnnotationsList200ResponseAnnotationsItemPopup {
         export interface Page {
             kind: Page.Kind;
             pageObjectNumber: number;
@@ -2705,19 +2789,6 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Weak: "weak",
         } as const;
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
-
-        export interface Flags {
-            invisible: boolean;
-            hidden: boolean;
-            print: boolean;
-            noZoom: boolean;
-            noRotate: boolean;
-            noView: boolean;
-            readOnly: boolean;
-            locked: boolean;
-            toggleNoView: boolean;
-            lockedContents: boolean;
-        }
 
         export interface Rect {
             left: number;
@@ -2745,10 +2816,114 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             Luminosity: "luminosity",
         } as const;
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
-        export const ReplyType = {
-            Reply: "reply",
-            Group: "group",
+
+        export interface Reply {
+            to: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemPopupReplyTo;
+            type: Reply.Type;
+        }
+
+        export namespace Reply {
+            export const Type = {
+                Reply: "reply",
+                Group: "group",
+            } as const;
+            export type Type = (typeof Type)[keyof typeof Type];
+        }
+    }
+
+    export interface Unsupported {
+        subtype: "unsupported";
+        ref: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemUnsupportedRef;
+        page: DocAnnotationsList200ResponseAnnotationsItemUnsupported.Page;
+        index: number;
+        identityQuality: DocAnnotationsList200ResponseAnnotationsItemUnsupported.IdentityQuality;
+        nm: string | null;
+        rect: DocAnnotationsList200ResponseAnnotationsItemUnsupported.Rect;
+        contents: string | null;
+        subject: string | null;
+        blendMode: DocAnnotationsList200ResponseAnnotationsItemUnsupported.BlendMode;
+        invisible: boolean;
+        hidden: boolean;
+        print: boolean;
+        noZoom: boolean;
+        noRotate: boolean;
+        noView: boolean;
+        readOnly: boolean;
+        locked: boolean;
+        toggleNoView: boolean;
+        lockedContents: boolean;
+        reply: DocAnnotationsList200ResponseAnnotationsItemUnsupported.Reply | null;
+        popup: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemUnsupportedPopup | null;
+        groupId: string | null;
+        author: string | null;
+        created: string | null;
+        modified: string | null;
+        userId: string | null;
+        createdBy: string | null;
+        updatedBy: string | null;
+        importedBy: string | null;
+        actions: CloudPDF.PdfAnnotationActions | null;
+        rawSubtypeCode: number;
+        rawSubtypeName: string | null;
+    }
+
+    export namespace DocAnnotationsList200ResponseAnnotationsItemUnsupported {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+
+        export const IdentityQuality = {
+            Durable: "durable",
+            Weak: "weak",
         } as const;
-        export type ReplyType = (typeof ReplyType)[keyof typeof ReplyType];
+        export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
+
+        export interface Rect {
+            left: number;
+            bottom: number;
+            right: number;
+            top: number;
+        }
+
+        export const BlendMode = {
+            Normal: "normal",
+            Multiply: "multiply",
+            Screen: "screen",
+            Overlay: "overlay",
+            Darken: "darken",
+            Lighten: "lighten",
+            ColorDodge: "color-dodge",
+            ColorBurn: "color-burn",
+            HardLight: "hard-light",
+            SoftLight: "soft-light",
+            Difference: "difference",
+            Exclusion: "exclusion",
+            Hue: "hue",
+            Saturation: "saturation",
+            Color: "color",
+            Luminosity: "luminosity",
+        } as const;
+        export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
+
+        export interface Reply {
+            to: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemUnsupportedReplyTo;
+            type: Reply.Type;
+        }
+
+        export namespace Reply {
+            export const Type = {
+                Reply: "reply",
+                Group: "group",
+            } as const;
+            export type Type = (typeof Type)[keyof typeof Type];
+        }
     }
 }

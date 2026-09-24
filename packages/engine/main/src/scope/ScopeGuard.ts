@@ -52,7 +52,7 @@ export class ScopeGuard {
     this.protection = this.ctx.signedDocumentPolicy === 'protect' ? protection : null;
   }
 
-  /** Identity claims (user_id, group_id, groups, display_name). */
+  /** Who the handle acts for, as supplied to `open()`. */
   identity(): HandleScopeContext['identity'] {
     return this.ctx.identity;
   }
@@ -134,7 +134,7 @@ export class ScopeGuard {
 
   /** Non-throwing destination-group check — see `assertSetGroup`. */
   canSetGroup(newGroupId: string): boolean {
-    return checkSetGroup(newGroupId, this.ctx.identity.group_id, this.ctx.scope, this.ctx.pdfBits);
+    return checkSetGroup(newGroupId, this.ctx.identity.groupId, this.ctx.scope, this.ctx.pdfBits);
   }
 
   assertCollab(action: CollabAction, target: CollabTarget): void {
@@ -171,31 +171,36 @@ export class ScopeGuard {
    *   groupId     → /EMBD_Metadata/GroupID
    *   displayName → /T (the standard PDF "author" display field)
    *
+   * `groupId` is the group the caller chose for the annotation, checked
+   * with {@link assertSetGroup} beforehand; it defaults to the identity's.
+   *
    * Returns `undefined` when the handle has no identity fields at all
    * (anonymous local handle) — the worker still writes /M but skips
    * both /T and /EMBD_Metadata.
    */
-  actorForCreate(): AnnotationActor | undefined {
+  actorForCreate(
+    groupId: string | undefined = this.ctx.identity.groupId,
+  ): AnnotationActor | undefined {
     const id = this.ctx.identity;
     const actor: AnnotationActor = {
-      ...(id.user_id !== undefined ? { userId: id.user_id } : {}),
-      ...(id.group_id !== undefined ? { groupId: id.group_id } : {}),
-      ...(id.display_name !== undefined ? { displayName: id.display_name } : {}),
+      ...(id.userId !== undefined ? { userId: id.userId } : {}),
+      ...(groupId !== undefined ? { groupId } : {}),
+      ...(id.displayName !== undefined ? { displayName: id.displayName } : {}),
     };
     return actor.userId || actor.groupId || actor.displayName ? actor : undefined;
   }
 
   /**
-   * Build the CollabTarget for create — the handle's own identity.
-   * Fed to `assertCollab('create', target)` so `:self`/`:all` trivially
-   * pass and `:group=X` is meaningful (matches when the handle's
-   * default group is X).
+   * Build the CollabTarget for create — the handle's own identity, in
+   * the group the annotation is created in (the identity's unless the
+   * caller chose one). Fed to `assertCollab('create', target)` so
+   * `:self`/`:all` trivially pass and `:group=X` is meaningful.
    */
-  targetForSelfCreate(): CollabTarget {
+  targetForSelfCreate(groupId: string | undefined = this.ctx.identity.groupId): CollabTarget {
     const id = this.ctx.identity;
     return {
-      ...(id.user_id !== undefined ? { userId: id.user_id } : {}),
-      ...(id.group_id !== undefined ? { groupId: id.group_id } : {}),
+      ...(id.userId !== undefined ? { userId: id.userId } : {}),
+      ...(groupId !== undefined ? { groupId } : {}),
     };
   }
 
@@ -203,7 +208,7 @@ export class ScopeGuard {
    * Build the actor for an annotation update.
    *   - userId      → caller's identity (UpdatedBy stamp)
    *   - groupId     → only when the patch reassigns it (differs from current)
-   *   - displayName → caller's display_name (for the modification trail;
+   *   - displayName → caller's displayName (for the modification trail;
    *                   the worker does not touch /T on update)
    *
    * No set-group check here — call `assertSetGroup` separately first,
@@ -216,8 +221,8 @@ export class ScopeGuard {
     const id = this.ctx.identity;
     const isReassigning = patchGroupId !== undefined && patchGroupId !== currentGroupId;
     const actor: AnnotationActor = {
-      ...(id.user_id !== undefined ? { userId: id.user_id } : {}),
-      ...(id.display_name !== undefined ? { displayName: id.display_name } : {}),
+      ...(id.userId !== undefined ? { userId: id.userId } : {}),
+      ...(id.displayName !== undefined ? { displayName: id.displayName } : {}),
       ...(isReassigning ? { groupId: patchGroupId } : {}),
     };
     return actor.userId || actor.groupId || actor.displayName ? actor : undefined;

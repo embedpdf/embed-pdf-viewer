@@ -138,7 +138,7 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
       annotations: { listRawAll },
       security: {
         allows,
-        identity: { user_id: 'me' },
+        identity: { userId: 'me' },
         allowsAnnotationCreate,
         allowsAnnotationMutation,
         allowsAnnotationGroupAssignment: () => true,

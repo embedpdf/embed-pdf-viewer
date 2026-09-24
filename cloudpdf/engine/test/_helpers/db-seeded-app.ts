@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { Identity } from '@embedpdf/engine-core';
 import type { Kysely } from 'kysely';
 import {
   createSqliteDb,
@@ -124,6 +125,7 @@ export function docScopedToken(
   docId: string,
   scope: ReadonlyArray<string> = ['*'],
   layerName?: string,
+  identity?: Identity,
 ): string {
   return signDevToken(fx.secret, {
     sub: layerName ? `cloud-test-${layerName}` : 'cloud-test',
@@ -131,6 +133,7 @@ export function docScopedToken(
     doc_id: docId,
     scope,
     ...(layerName ? { layer_name: layerName } : {}),
+    ...(identity ? { extras: { identity } } : {}),
   });
 }
 

@@ -85,13 +85,15 @@ describe('link kind schemas', () => {
       rect: RECT,
       target: null,
       // A link grouped to another annotation rides the base
-      // relationship fields — nothing link-specific.
-      inReplyTo: {
-        kind: 'objectNumber',
-        page: { kind: 'objectNumber', pageObjectNumber: 4 },
-        annotObjectNumber: 77,
+      // relationship field — nothing link-specific.
+      reply: {
+        to: {
+          kind: 'objectNumber',
+          page: { kind: 'objectNumber', pageObjectNumber: 4 },
+          annotObjectNumber: 77,
+        },
+        type: 'group',
       },
-      replyType: 'group',
     };
     const parsed = LinkDraftSchema.safeParse(draft);
     expect(parsed.success).toBe(true);

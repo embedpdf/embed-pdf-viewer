@@ -1,11 +1,11 @@
-import { readAnnotationMeasure, readLineCaption, readLineLeader } from './readMeasurementFields';
-import { readIntent } from './annotationReadPrimitives';
 import type { AnnotationBase, LineAnnotationDTO } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
+import { readIntent } from './annotationReadPrimitives';
 import { readLine as readLinePoints, readLineEndings } from './annotationReadPrimitives';
-import { readFilledStyleExtras } from './readStyle';
 import { readAnnotationRotation } from './readAnnotationTransformMetadata';
+import { readAnnotationMeasure, readLineCaption, readLineLeader } from './readMeasurementFields';
+import { readFilledStyleExtras } from './readStyle';
 
 /** Fallback `/L` when the annotation has no line geometry. */
 const ZERO_LINE = { start: { x: 0, y: 0 }, end: { x: 0, y: 0 } };
@@ -23,13 +23,16 @@ export function readLine(
   return {
     ...base,
     ...readAnnotationMeasure(fn, mem, annotPtr),
-    ...(intent === 'LineDimension' || intent === 'LineArrow' ? { intent } : {}),
-    ...(caption ? { caption } : {}),
-    ...(leader ? { leader } : {}),
+    intent: intent === 'LineDimension' || intent === 'LineArrow' ? intent : null,
+    // `/Cap` and `/CP` read their ISO defaults when absent.
+    captionEnabled: caption?.enabled ?? false,
+    captionPosition: caption?.position ?? 'inline',
+    captionOffset: caption?.offset ?? null,
+    leader: leader ?? null,
     subtype: 'line',
     ...readFilledStyleExtras(fn, mem, annotPtr),
     linePoints: readLinePoints(fn, mem, annotPtr) ?? ZERO_LINE,
     lineEndings: readLineEndings(fn, mem, annotPtr),
-    ...(rotation != null ? { rotation } : {}),
+    rotation: rotation ?? null,
   };
 }

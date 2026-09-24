@@ -1,14 +1,17 @@
-import type { InkDraft } from './draft';
-import type { InkAnnotationDTO } from './dto';
-import type { InkPatch } from './patch';
-import { InkDTOSchema, InkDraftSchema, InkPatchSchema } from './schema';
+import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
+import { InkDeclaration } from './declaration';
 
-export type { InkAnnotationDTO } from './dto';
-export type { InkDraft } from './draft';
-export type { InkPatch } from './patch';
-export { InkDTOSchema, InkDraftSchema, InkPatchSchema } from './schema';
+export { InkDeclaration } from './declaration';
+
+export type InkAnnotationDTO = ReadOf<typeof InkDeclaration>;
+export type InkDraft = CreateOf<typeof InkDeclaration>;
+export type InkPatch = UpdateOf<typeof InkDeclaration>;
+
+export const InkDTOSchema = InkDeclaration.readSchema;
+export const InkDraftSchema = InkDeclaration.createSchema;
+export const InkPatchSchema = InkDeclaration.updateSchema;
 
 export const InkKind: AnnotationKindModule<'ink', InkAnnotationDTO, InkDraft, InkPatch> = {
   subtype: 'ink',

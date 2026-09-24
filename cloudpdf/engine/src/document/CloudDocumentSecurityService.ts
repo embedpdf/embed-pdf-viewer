@@ -12,11 +12,11 @@ import {
   type CollabTarget,
   type DocCapability,
   type DocumentAccessInfo,
-  type DocumentIdentity,
   type DocumentSecurityService,
   type DocumentSecurityState,
   type DocumentUnlockInput,
   type DocumentUnlockResult,
+  type Identity,
   type PasswordPrompt,
 } from '@embedpdf/engine-core/runtime';
 import { AccessResponseSchema, wirePaths, type DocumentHead } from '@embedpdf/engine-core/wire';
@@ -35,7 +35,7 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
    * yet supplied, etc.).
    */
   private readonly tokenScope: ReadonlyArray<string>;
-  private readonly tokenIdentity: DocumentIdentity | null;
+  private readonly tokenIdentity: Identity | null;
 
   constructor(
     private readonly http: HttpClient,
@@ -104,7 +104,7 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
   }
 
   allowsAnnotationGroupAssignment(groupId: string): boolean {
-    return checkSetGroup(groupId, this.identity?.group_id, this.rawScope(), this.pdfBits());
+    return checkSetGroup(groupId, this.identity?.groupId, this.rawScope(), this.pdfBits());
   }
 
   /** Raw scope for the collab resolver: server-canonical post-/access, else the JWT claim. */
@@ -124,7 +124,7 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
    * version is just refreshed to reflect any server-side identity
    * augmentation (rare; reserved for future tenant hooks).
    */
-  get identity(): DocumentIdentity | null {
+  get identity(): Identity | null {
     return this.access?.identity ?? this.tokenIdentity;
   }
 
@@ -246,21 +246,40 @@ function safeDecodeClaims(token: string): Record<string, unknown> | null {
  * `:self` trivially passes and `:group=X` matches the caller's
  * default group.
  */
-function selfTarget(id: DocumentIdentity): CollabTarget {
+function selfTarget(id: Identity): CollabTarget {
   return {
-    ...(id.user_id !== undefined ? { userId: id.user_id } : {}),
-    ...(id.group_id !== undefined ? { groupId: id.group_id } : {}),
+    ...(id.userId !== undefined ? { userId: id.userId } : {}),
+    ...(id.groupId !== undefined ? { groupId: id.groupId } : {}),
   };
 }
 
-function identityFromClaims(claims: Record<string, unknown>): DocumentIdentity | null {
-  const out: DocumentIdentity = {};
-  if (typeof claims['user_id'] === 'string') out.user_id = claims['user_id'];
-  if (typeof claims['group_id'] === 'string') out.group_id = claims['group_id'];
-  if (typeof claims['display_name'] === 'string') out.display_name = claims['display_name'];
-  if (Array.isArray(claims['groups'])) {
-    const groups = (claims['groups'] as unknown[]).filter(
-      (g): g is string => typeof g === 'string',
+const IDENTITY_STRING_FIELDS = [
+  'userId',
+  'displayName',
+  'email',
+  'title',
+  'organization',
+  'organizationalUnit',
+  'groupId',
+] as const;
+
+/**
+ * The token's `identity` claim, read the way the server reads it: string
+ * fields and a `groups` array, empty values absent. The server rejects a
+ * malformed claim; unverified here, anything else is skipped.
+ */
+function identityFromClaims(claims: Record<string, unknown>): Identity | null {
+  const claim = claims['identity'];
+  if (!claim || typeof claim !== 'object' || Array.isArray(claim)) return null;
+  const record = claim as Record<string, unknown>;
+  const out: { -readonly [K in keyof Identity]: Identity[K] } = {};
+  for (const key of IDENTITY_STRING_FIELDS) {
+    const value = record[key];
+    if (typeof value === 'string' && value.length > 0) out[key] = value;
+  }
+  if (Array.isArray(record['groups'])) {
+    const groups = (record['groups'] as unknown[]).filter(
+      (g): g is string => typeof g === 'string' && g.length > 0,
     );
     if (groups.length > 0) out.groups = groups;
   }

@@ -1,6 +1,4 @@
-import { caps, collab } from '@embedpdf/engine-core';
-
-import type { ShareIdentity } from '../api/types';
+import { caps, collab, type Identity } from '@embedpdf/engine-core';
 
 /**
  * Roles are the product-facing name for a set of scopes.
@@ -28,9 +26,9 @@ export interface Role {
    * "group editor" is only meaningful once you know WHICH group — so this is
    * a function of the identity, not a constant.
    */
-  scopes: (identity: ShareIdentity) => string[];
+  scopes: (identity: Identity) => string[];
   /** Identity fields without which this role can't be materialized. */
-  requires?: Array<keyof ShareIdentity>;
+  requires?: Array<keyof Identity>;
 }
 
 /**
@@ -63,7 +61,7 @@ export const ROLES: Role[] = [
     id: 'reviewer',
     label: 'Reviewer',
     description: 'Comment on the document, but only edit their OWN comments.',
-    requires: ['user_id'],
+    requires: ['userId'],
     scopes: () => [
       ...READ,
       ...TEXT,
@@ -77,9 +75,9 @@ export const ROLES: Role[] = [
     id: 'group-editor',
     label: 'Group editor',
     description: 'Comment, and edit anything from their group.',
-    requires: ['group_id'],
+    requires: ['groupId'],
     scopes: (identity) => {
-      const group = identity.group_id ?? '';
+      const group = identity.groupId ?? '';
       return [
         ...READ,
         ...TEXT,
@@ -143,8 +141,8 @@ export function roleLabel(id: string): string {
  */
 export function materializeScopes(
   role: Role,
-  identity: ShareIdentity,
-): { scopes: string[]; missing?: keyof ShareIdentity } {
+  identity: Identity,
+): { scopes: string[]; missing?: keyof Identity } {
   const missing = role.requires?.find((field) => !identity[field]);
   if (missing) return { scopes: [], missing };
   return { scopes: role.scopes(identity) };

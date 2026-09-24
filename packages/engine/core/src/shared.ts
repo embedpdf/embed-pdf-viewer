@@ -177,6 +177,7 @@ export type {
   BlendMode,
 } from './annotation/primitives';
 export { NO_ANNOTATION_FLAGS } from './annotation/primitives';
+export { ANNOTATION_FIELD_NAMES, STAMP_SOURCE_FIELD_NAMES } from './annotation/field-names';
 
 export type { AnnotationBase } from './annotation/base';
 export type { AnnotationDraftBase } from './annotation/draft-base';
@@ -315,6 +316,14 @@ export type {
   WidgetAnnotationDTO,
   WidgetDraft,
   WidgetPatch,
+  PopupAnnotationDTO,
+  PopupDraft,
+  PopupPatch,
+  AnnotationDeclaration,
+  AnnotationRead,
+  CreateOf,
+  ReadOf,
+  UpdateOf,
 } from './annotation/kinds';
 
 export type {
@@ -600,7 +609,7 @@ export type {
   CollabEntity,
   CollabFilter,
   DocCapability,
-  IdentityClaims,
+  Identity,
   ParsedCapability,
   ParsedCollab,
   ParsedScope,

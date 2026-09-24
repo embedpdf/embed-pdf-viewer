@@ -23,11 +23,13 @@ import {
   type AnnotationAppearanceExportInput,
   type AnnotationFlattenInput,
   toPageRef,
+  type AnnotationSubtype,
 } from '@embedpdf/engine-core/runtime';
 import {
   AnnotationAppearancesQuerySchema,
   AnnotationDraftSchema,
   AnnotationPatchSchema,
+  annotationPatchSchemaOf,
   AnnotationAppearanceExportInputSchema,
   AnnotationFlattenInputSchema,
   AnnotationRefSchema,
@@ -443,20 +445,23 @@ export async function registerAnnotationRoutes(
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
       const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      // Creation is a collab check against the caller's own identity
-      // (no impersonation). `:self`/`:all` trivially pass; `:group=X`
-      // constrains creators to those whose default group is X. Under
-      // the narrowing model, `doc.annotate.modify` covers create when
-      // no create-collab filter is present.
-      const target = targetForSelfCreate(accessCtx.jwt);
-      const ctx = requireLayerCollabAction(req, docId, layerName, 'create', target, pdfBits);
       const { body, resources } = await readMutationEnvelope(req, annotationBinaryPolicy);
       const draft = parseOrInvalidArg<WireAnnotationDraft>(
         AnnotationDraftSchema as unknown as SchemaLike<WireAnnotationDraft>,
         body,
         'request body',
       );
-      const actor = actorFromJwt(ctx.jwt);
+      // Creation is a collab check against the caller's own identity
+      // (no impersonation), in the group the annotation is created in:
+      // the draft's, when it names one the caller may set, else the
+      // caller's default. `:self`/`:all` trivially pass; `:group=X`
+      // constrains that group to X. Under the narrowing model,
+      // `doc.annotate.modify` covers create when no create-collab filter
+      // is present.
+      const groupId = createGroupOf(accessCtx.jwt, draft, pdfBits);
+      const target = targetForSelfCreate(accessCtx.jwt, groupId);
+      const ctx = requireLayerCollabAction(req, docId, layerName, 'create', target, pdfBits);
+      const actor = actorFromJwt(ctx.jwt, groupId);
 
       setNoStore(reply);
       return layerService.createAnnotation(
@@ -636,7 +641,7 @@ export async function registerAnnotationRoutes(
         }
 
         const patch = parseOrInvalidArg<WireAnnotationPatch>(
-          AnnotationPatchSchema as unknown as SchemaLike<WireAnnotationPatch>,
+          patchSchemaFor(target.subtype),
           body?.patch,
           'body.patch',
         );
@@ -660,7 +665,7 @@ export async function registerAnnotationRoutes(
       );
       const ctx = requireLayerCollabAction(req, docId, layerName, 'update', target, pdfBits);
       const patch = parseOrInvalidArg<WireAnnotationPatch>(
-        AnnotationPatchSchema as unknown as SchemaLike<WireAnnotationPatch>,
+        patchSchemaFor(target.subtype),
         body?.patch,
         'body.patch',
       );
@@ -740,7 +745,8 @@ function requireWeakAnnotationSessions(
 // ----------------------------------------------------------------------
 // Annotation identity helpers
 //
-// Three small pure helpers, one per mutation shape:
+// Small pure helpers for the identity a mutation carries:
+//   - createGroupOf:       the group a create lands in (set-group checked)
 //   - targetForSelfCreate: build the CollabTarget for create checks
 //                          from JWT identity (no impersonation).
 //   - actorFromJwt:        build the worker actor for create from JWT
@@ -753,31 +759,40 @@ function requireWeakAnnotationSessions(
 // ----------------------------------------------------------------------
 
 /**
- * Build the CollabTarget for a create check. Targets the caller's own
- * identity — no impersonation, no draft-side override. `:self`/`:all`
- * pass trivially; `:group=X` is the meaningful filter (matches only
- * when the caller's default group is X).
+ * The group a new annotation is created in: the draft's `groupId` when it
+ * names one, else the caller's default group. A group other than the
+ * caller's own needs `annotations:set-group` authority for it, as a
+ * reassignment on update does.
  */
-function targetForSelfCreate(jwt: RequestJwtContext): CollabTarget {
-  const id = jwt.identity;
-  return {
-    ...(id.user_id !== undefined ? { userId: id.user_id } : {}),
-    ...(id.group_id !== undefined ? { groupId: id.group_id } : {}),
-  };
+function createGroupOf(
+  jwt: RequestJwtContext,
+  draft: WireAnnotationDraft,
+  pdfBits: PdfBits,
+): string | undefined {
+  const groupId = (draft as { groupId?: string | null }).groupId ?? jwt.identity.groupId;
+  if (groupId !== undefined && groupId !== jwt.identity.groupId) {
+    if (!checkSetGroup(groupId, jwt.identity.groupId, jwt.scope, pdfBits)) {
+      throw new EngineError(
+        EngineErrorCode.Forbidden,
+        `annotations:set-group denied for group=${groupId}`,
+      );
+    }
+  }
+  return groupId;
 }
 
 /**
- * Build the CREATE actor from the caller's JWT identity. The worker
- * writes:
- *
- *   /T                                         ← actor.displayName
- *   /EMBD_Metadata/UserID,CreatedBy,UpdatedBy  ← actor.userId
- *   /EMBD_Metadata/GroupID                     ← actor.groupId
- *
- * Returns `undefined` when the JWT carries no identity at all
- * (anonymous tenant tokens) — the worker still stamps /M but skips /T
- * and /EMBD_Metadata.
+ * Build the CollabTarget for a create check. Targets the caller's own
+ * identity — no impersonation — in the group the annotation is created
+ * in. `:self`/`:all` pass trivially; `:group=X` is the meaningful filter.
  */
+function targetForSelfCreate(jwt: RequestJwtContext, groupId: string | undefined): CollabTarget {
+  const { userId } = jwt.identity;
+  return {
+    ...(userId !== undefined ? { userId } : {}),
+    ...(groupId !== undefined ? { groupId } : {}),
+  };
+}
 
 /**
  * The per-kind binary policy the envelope doc long promised: a
@@ -793,12 +808,27 @@ function annotationBinaryPolicy(body: unknown, key: string): 'image-or-pdf' | 'a
     : 'image-or-pdf';
 }
 
-function actorFromJwt(jwt: RequestJwtContext): AnnotationActor | undefined {
-  const id = jwt.identity;
+/**
+ * Build the CREATE actor from the caller's JWT identity. The worker
+ * writes:
+ *
+ *   /T                                         ← actor.displayName
+ *   /EMBD_Metadata/UserID,CreatedBy,UpdatedBy  ← actor.userId
+ *   /EMBD_Metadata/GroupID                     ← actor.groupId
+ *
+ * Returns `undefined` when the JWT carries no identity at all
+ * (anonymous tenant tokens) — the worker still stamps /M but skips /T
+ * and /EMBD_Metadata.
+ */
+function actorFromJwt(
+  jwt: RequestJwtContext,
+  groupId: string | undefined,
+): AnnotationActor | undefined {
+  const { userId, displayName } = jwt.identity;
   const actor: AnnotationActor = {
-    ...(id.user_id !== undefined ? { userId: id.user_id } : {}),
-    ...(id.group_id !== undefined ? { groupId: id.group_id } : {}),
-    ...(id.display_name !== undefined ? { displayName: id.display_name } : {}),
+    ...(userId !== undefined ? { userId } : {}),
+    ...(groupId !== undefined ? { groupId } : {}),
+    ...(displayName !== undefined ? { displayName } : {}),
   };
   return actor.userId || actor.groupId || actor.displayName ? actor : undefined;
 }
@@ -806,9 +836,9 @@ function actorFromJwt(jwt: RequestJwtContext): AnnotationActor | undefined {
 /**
  * Build the worker-side actor for UPDATE.
  *
- *   - `userId`      = caller's JWT user_id → stamped as
+ *   - `userId`      = the caller's `identity.userId` → stamped as
  *                     /EMBD_Metadata/UpdatedBy (modification trail).
- *   - `displayName` = caller's display_name → carried for the
+ *   - `displayName` = the caller's `identity.displayName` → carried for the
  *                     modification trail. The worker does not touch /T
  *                     on update; /T is bound at creation.
  *   - `groupId`     = `patch.groupId` only when it reassigns the row
@@ -826,12 +856,17 @@ function buildUpdateActor(
   patch: WireAnnotationPatch,
   pdfBits: PdfBits,
 ): AnnotationActor | undefined {
-  const patchedGroupId = (patch as { groupId?: string }).groupId;
+  const patchedGroupId = (patch as { groupId?: string | null }).groupId;
+  // `null` sent back for an annotation without a group changes nothing;
+  // an existing group can only be reassigned, never removed.
+  if (patchedGroupId === null && currentTarget.groupId !== undefined) {
+    throw new EngineError(EngineErrorCode.InvalidArg, "an annotation's group can't be removed");
+  }
   const isReassigningGroup =
     typeof patchedGroupId === 'string' && patchedGroupId !== currentTarget.groupId;
 
   if (isReassigningGroup) {
-    if (!checkSetGroup(patchedGroupId, jwt.identity.group_id, jwt.scope, pdfBits)) {
+    if (!checkSetGroup(patchedGroupId, jwt.identity.groupId, jwt.scope, pdfBits)) {
       throw new EngineError(
         EngineErrorCode.Forbidden,
         `annotations:set-group denied for group=${patchedGroupId}`,
@@ -840,8 +875,8 @@ function buildUpdateActor(
   }
 
   const actor: AnnotationActor = {
-    ...(jwt.identity.user_id !== undefined ? { userId: jwt.identity.user_id } : {}),
-    ...(jwt.identity.display_name !== undefined ? { displayName: jwt.identity.display_name } : {}),
+    ...(jwt.identity.userId !== undefined ? { userId: jwt.identity.userId } : {}),
+    ...(jwt.identity.displayName !== undefined ? { displayName: jwt.identity.displayName } : {}),
     ...(isReassigningGroup ? { groupId: patchedGroupId } : {}),
   };
   return actor.userId || actor.groupId || actor.displayName ? actor : undefined;
@@ -1341,4 +1376,15 @@ async function resolvePageForRead(input: {
       ? `no page with object number ${input.pageObjectNumber} in layer ${input.scope.layerName} for document ${input.scope.docId}`
       : `no page with object number ${input.pageObjectNumber} in document ${input.scope.docId}`,
   );
+}
+
+/**
+ * How a patch is checked: against its target's kind when the target was
+ * found, so a field that kind doesn't declare is refused here, otherwise
+ * against every kind. The engine refuses a subtype that doesn't match.
+ */
+function patchSchemaFor(subtype: AnnotationSubtype | undefined): SchemaLike<WireAnnotationPatch> {
+  return (subtype === undefined || subtype === 'unsupported'
+    ? AnnotationPatchSchema
+    : annotationPatchSchemaOf(subtype)) as unknown as SchemaLike<WireAnnotationPatch>;
 }

@@ -69,7 +69,7 @@ export function MeasurementSection() {
             (candidate.subtype === 'polygon' || candidate.subtype === 'polyline') &&
             candidate.raw &&
             (candidate.raw.subtype === 'polygon' || candidate.raw.subtype === 'polyline') &&
-            candidate.raw.caption?.center &&
+            candidate.raw.captionCenter &&
             annotation.canEdit(candidate.ref) &&
             !candidate.flags.lockedContents,
         ),
@@ -261,7 +261,7 @@ export function MeasurementSection() {
                     if (raw && (raw.subtype === 'polygon' || raw.subtype === 'polyline')) {
                       await anno.updateRaw(annotation.ref, {
                         subtype: raw.subtype,
-                        caption: { center: null },
+                        captionCenter: null,
                       });
                     }
                   }

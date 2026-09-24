@@ -51,20 +51,44 @@ export interface AppearanceOutcome {
 const EPSILON = 1e-3;
 
 /**
- * Keys that never affect `/AP` on any kind: the discriminator, behavioral
- * flags, reply relationships, grouping, and the conversation-plane
+ * Keys that never affect `/AP` on any kind: the discriminator, the `/F`
+ * flags, the name, relationships and grouping, the conversation-plane
  * entries (`/Subj` subject line, `/State` + `/StateModel` review status —
- * dictionary-only per ISO 32000 §12.5.6.3, never painted).
+ * dictionary-only per ISO 32000 §12.5.6.3, never painted), and the fields a
+ * write accepts but never applies (addresses, attribution, `/A` and `/AA`).
  */
 const INERT_KEYS: ReadonlySet<string> = new Set([
   'subtype',
-  'flags',
-  'inReplyTo',
-  'replyType',
+  'invisible',
+  'hidden',
+  'print',
+  'noZoom',
+  'noRotate',
+  'noView',
+  'readOnly',
+  'locked',
+  'toggleNoView',
+  'lockedContents',
+  'nm',
+  'reply',
+  'popup',
+  'parent',
   'groupId',
   'subject',
   'state',
   'stateModel',
+  'ref',
+  'page',
+  'index',
+  'identityQuality',
+  'author',
+  'created',
+  'modified',
+  'userId',
+  'createdBy',
+  'updatedBy',
+  'importedBy',
+  'actions',
 ]);
 
 /**
@@ -239,16 +263,15 @@ export function appearanceImpactOf(
   current: AnnotationDTO,
   patch: WireAnnotationPatch,
 ): AppearanceImpact {
-  if (patch.subtype !== current.subtype) return 'regenerate';
+  if (patch.subtype !== undefined && patch.subtype !== current.subtype) return 'regenerate';
 
   const cur = current as unknown as Record<string, unknown>;
   const pat = patch as unknown as Record<string, unknown>;
-  const subtype = patch.subtype;
-  const caption = pat.caption === undefined ? cur.caption : pat.caption;
+  const subtype = current.subtype;
+  const captionEnabled = pat.captionEnabled === undefined ? cur.captionEnabled : pat.captionEnabled;
   const contentsPainted =
     CONTENTS_PAINTED.has(subtype) ||
-    (['line', 'polygon', 'polyline'].includes(subtype) &&
-      !!(caption as { enabled?: boolean } | null | undefined)?.enabled);
+    (['line', 'polygon', 'polyline'].includes(subtype) && captionEnabled === true);
 
   const touched: string[] = [];
   for (const [key, value] of Object.entries(pat)) {
@@ -263,10 +286,8 @@ export function appearanceImpactOf(
   // A manual shape caption is page-space geometry and must ride with a rigid
   // move. Automatic centers follow the vertices without an explicit patch.
   const geometryKeys =
-    baseGeometryKeys &&
-    (subtype === 'polygon' || subtype === 'polyline') &&
-    (cur.caption as { center?: unknown } | undefined)?.center
-      ? [...baseGeometryKeys, 'caption']
+    baseGeometryKeys && (subtype === 'polygon' || subtype === 'polyline') && cur.captionCenter
+      ? [...baseGeometryKeys, 'captionCenter']
       : baseGeometryKeys;
   if (!geometryKeys) return 'regenerate';
   if (!touched.every((k) => geometryKeys.includes(k))) return 'regenerate';

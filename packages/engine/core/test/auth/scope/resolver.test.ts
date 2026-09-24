@@ -10,7 +10,7 @@ import {
   PDF_BITS,
   decodePdfBits,
   type CollabFilter,
-  type IdentityClaims,
+  type Identity,
   type PdfBits,
 } from '../../../src/auth/scope';
 
@@ -30,9 +30,9 @@ const ALL_BITS: PdfBits = decodePdfBits(
     PDF_BITS.PRINT_HIGH,
 );
 
-const ALICE: IdentityClaims = { user_id: 'alice', group_id: '4', groups: ['4', 'engineering'] };
-const BOB: IdentityClaims = { user_id: 'bob', group_id: '5', groups: ['5'] };
-const ANON: IdentityClaims = {};
+const ALICE: Identity = { userId: 'alice', groupId: '4', groups: ['4', 'engineering'] };
+const BOB: Identity = { userId: 'bob', groupId: '5', groups: ['5'] };
+const ANON: Identity = {};
 
 // ============================================================================
 // checkCapability — wildcard
@@ -151,6 +151,20 @@ describe('pdf.permissions expansion — bit-derived', () => {
   it('does NOT grant cloud-only capabilities (download, etc.) regardless of bits', () => {
     expect(checkCapability('doc.download', ['pdf.permissions'], ALL_BITS)).toBe(false);
     expect(checkCapability('doc.download.flattened', ['pdf.permissions'], ALL_BITS)).toBe(false);
+  });
+
+  it('never grants doc.annotate.import: only a minted grant carries it', () => {
+    expect(checkCapability('doc.annotate.import', ['pdf.permissions'], ALL_BITS)).toBe(false);
+    expect(checkCapability('doc.annotate.import', ['doc.annotate.modify'], ALL_BITS)).toBe(false);
+    expect(
+      checkCapability(
+        'doc.annotate.import',
+        ['annotations:*:all', 'annotations:set-group:all'],
+        ALL_BITS,
+      ),
+    ).toBe(false);
+    expect(checkCapability('doc.annotate.import', ['doc.annotate.import'], NO_BITS)).toBe(true);
+    expect(checkCapability('doc.annotate.import', ['*'], NO_BITS)).toBe(true);
   });
 
   it('pdf.permissions never consults bits when not in scope', () => {
@@ -313,9 +327,9 @@ describe('checkCollab — narrowing model', () => {
   });
 
   it('CREATE: filter evaluated against caller-built target', () => {
-    // POST handler builds target = { userId: jwt.user_id, groupId: jwt.group_id }
+    // POST handler builds target = { userId: identity.userId, groupId: identity.groupId }
     const selfTarget = { userId: 'alice', groupId: '4' };
-    // :self always passes (target.userId === caller.user_id)
+    // :self always passes (target.userId === caller.userId)
     expect(checkCollab('create', selfTarget, ['annotations:create:self'], ALICE, NO_BITS)).toBe(
       true,
     );
@@ -332,7 +346,7 @@ describe('checkCollab — narrowing model', () => {
         'create',
         { userId: 'alice', groupId: '99' },
         ['annotations:create:group=4'],
-        { ...ALICE, group_id: '99', groups: ['99'] },
+        { ...ALICE, groupId: '99', groups: ['99'] },
         NO_BITS,
       ),
     ).toBe(false);
@@ -358,17 +372,17 @@ describe('checkCollab — action matching', () => {
 });
 
 describe('checkCollab — filter: self', () => {
-  it('matches when target userId equals identity user_id', () => {
+  it('matches when target userId equals identity userId', () => {
     const target = { userId: 'alice', groupId: '4' };
     expect(checkCollab('update', target, ['annotations:update:self'], ALICE, NO_BITS)).toBe(true);
   });
 
-  it('denies when target userId differs from identity user_id', () => {
+  it('denies when target userId differs from identity userId', () => {
     const target = { userId: 'bob', groupId: '5' };
     expect(checkCollab('update', target, ['annotations:update:self'], ALICE, NO_BITS)).toBe(false);
   });
 
-  it('denies when identity has no user_id', () => {
+  it('denies when identity has no userId', () => {
     const target = { userId: 'alice' };
     expect(checkCollab('update', target, ['annotations:update:self'], ANON, NO_BITS)).toBe(false);
   });
@@ -463,7 +477,7 @@ describe('filterMatches', () => {
     name: string;
     filter: CollabFilter;
     target: { userId?: string; groupId?: string };
-    id: IdentityClaims;
+    id: Identity;
     expected: boolean;
   }> = [
     { name: 'all matches anything', filter: { kind: 'all' }, target: {}, id: ANON, expected: true },

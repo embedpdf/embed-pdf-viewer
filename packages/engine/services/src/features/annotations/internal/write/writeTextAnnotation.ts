@@ -31,7 +31,7 @@ export function applyTextDraft(
   annotPtr: Ptr,
   draft: TextDraft,
 ): void {
-  if (draft.state !== undefined && draft.stateModel === undefined) {
+  if (draft.state != null && draft.stateModel == null) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
       'text draft: state requires stateModel (ISO 32000 §12.5.6.3)',
@@ -42,10 +42,10 @@ export function applyTextDraft(
   setAnnotColor(fn, annotPtr, draft.color ?? DEFAULT_NOTE_COLOR);
   setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULT_OPACITY);
   setNoteIcon(fn, annotPtr, draft.icon ?? 'note');
-  if (draft.stateModel !== undefined) {
+  if (draft.stateModel != null) {
     writeAnnotString(fn, mem, annotPtr, 'StateModel', stateModelToPdf(draft.stateModel));
   }
-  if (draft.state !== undefined) {
+  if (draft.state != null) {
     writeAnnotString(fn, mem, annotPtr, 'State', stateToPdf(draft.state));
   }
 }

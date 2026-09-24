@@ -1,11 +1,11 @@
-import { writeMeasurementFields } from './writeMeasurementFields';
 import type { LineDraft, LinePatch } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { setAnnotRect, setLine, setLineEndings } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
-import { applyFilledStyleDraft, applyFilledStylePatch } from './writeStyle';
 import { writeVertexTransformMetadata } from './writeAnnotationTransformMetadata';
+import { writeMeasurementFields } from './writeMeasurementFields';
+import { applyFilledStyleDraft, applyFilledStylePatch } from './writeStyle';
 
 /** Default line endings when a line draft omits them. */
 const DEFAULT_LINE_ENDINGS = { start: 'none', end: 'none' } as const;

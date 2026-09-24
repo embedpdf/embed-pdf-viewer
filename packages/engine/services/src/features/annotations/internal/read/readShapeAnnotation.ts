@@ -7,11 +7,11 @@ import type {
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { readBorderEffect, readRectangleDifferences } from './annotationReadPrimitives';
-import { readFilledStyleExtras } from './readStyle';
 import {
   readAnnotationRotation,
   readAnnotationUnrotatedRect,
 } from './readAnnotationTransformMetadata';
+import { readFilledStyleExtras } from './readStyle';
 
 /**
  * Shared reader for the two shape subtypes. Materialises the common
@@ -34,8 +34,8 @@ export function readShapeExtras(
     ...readFilledStyleExtras(fn, mem, annotPtr),
     cloudyIntensity,
     rectDifferences,
-    ...(rotation != null ? { rotation } : {}),
-    ...(unrotatedRect ? { unrotatedRect } : {}),
+    rotation: rotation ?? null,
+    unrotatedRect: unrotatedRect ?? null,
   };
 }
 

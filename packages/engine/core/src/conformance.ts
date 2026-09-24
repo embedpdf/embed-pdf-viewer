@@ -17,6 +17,17 @@ export type {
   AnnotationConformanceOptions,
 } from './conformance/runAnnotationReadConformance';
 export { runAnnotationMutationConformance } from './conformance/runAnnotationMutationConformance';
+export { runAnnotationAttributionConformance } from './conformance/runAnnotationAttributionConformance';
+export type {
+  AnnotationAttributionConformanceOptions,
+  AttributionSession,
+} from './conformance/runAnnotationAttributionConformance';
+export { runAnnotationDeclarationConformance } from './conformance/runAnnotationDeclarationConformance';
+export type {
+  AnnotationDeclarationConformanceOptions,
+  AnnotationDeclarationFixture,
+} from './conformance/runAnnotationDeclarationConformance';
+export { annotationReadDriftOf } from './conformance/annotationReadDrift';
 export { runFormConformance } from './conformance/runFormConformance';
 export type {
   FormConformanceFixtures,

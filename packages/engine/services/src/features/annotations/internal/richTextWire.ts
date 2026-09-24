@@ -13,8 +13,8 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
-import { readUtf8String } from '../../../runtime/memory/strings';
 import { isStandardFont } from './standardFont';
+import { readUtf8String } from '../../../runtime/memory/strings';
 
 /**
  * The rich text wire: the engine's `EPDFAnnot_GetRichTextJSON` /
@@ -204,7 +204,7 @@ export function readEngineRichText(
  * DTO echo fails loud here instead of quietly restoring old text.
  */
 export function assertRichTextAgreement(input: {
-  subtype: string;
+  subtype?: string;
   contents?: string | null;
   richText?: RichTextDocumentInput;
 }): void {

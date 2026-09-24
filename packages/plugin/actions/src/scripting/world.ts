@@ -64,12 +64,12 @@ export function createScriptWorld(ctx: PluginContext<void>) {
           width: styled.strokeWidth ?? 1,
           borderStyle: styled.borderStyle === 'dashed' ? ('D' as const) : ('S' as const),
           dash: styled.dashArray ?? [],
-          hidden: annotation.flags.hidden,
-          print: annotation.flags.print,
-          readOnly: annotation.flags.readOnly,
-          locked: annotation.flags.locked,
-          noView: annotation.flags.noView,
-          toggleNoView: annotation.flags.toggleNoView,
+          hidden: annotation.hidden,
+          print: annotation.print,
+          readOnly: annotation.readOnly,
+          locked: annotation.locked,
+          noView: annotation.noView,
+          toggleNoView: annotation.toggleNoView,
           opaqueBody: annotation.subtype === 'stamp',
         };
       });

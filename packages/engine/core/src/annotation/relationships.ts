@@ -3,8 +3,8 @@
  * reply/group threads. No PDFium, no browser, no zod — safe to import from
  * the cloud SDK, the local engine, and any UI plugin.
  *
- * The engine surfaces `/IRT` + `/RT` as flat edges on every DTO
- * ({@link AnnotationBase.inReplyTo} / {@link AnnotationBase.replyType}); it
+ * The engine surfaces `/IRT` + `/RT` as a flat edge on every DTO
+ * ({@link AnnotationBase.reply}); it
  * deliberately does not nest replies/group members, because each of those
  * is itself a first-class annotation in the page list. This module turns
  * those edges into the shape a comments sidebar wants.
@@ -34,11 +34,9 @@ export type AnnotationRelationKind = 'top-level' | 'reply' | 'grouped-subordinat
  * a grouped subordinate; anything else with an `/IRT` is a reply (the
  * engine has already normalized a missing `/RT` to `'reply'`).
  */
-export function classifyRelation(
-  a: Pick<AnnotationBase, 'inReplyTo' | 'replyType'>,
-): AnnotationRelationKind {
-  if (!a.inReplyTo) return 'top-level';
-  return a.replyType === 'group' ? 'grouped-subordinate' : 'reply';
+export function classifyRelation(a: Pick<AnnotationBase, 'reply'>): AnnotationRelationKind {
+  if (!a.reply) return 'top-level';
+  return a.reply.type === 'group' ? 'grouped-subordinate' : 'reply';
 }
 
 /**
@@ -108,14 +106,14 @@ export function buildThreads(annotations: readonly AnnotationDTO[]): AnnotationT
 
   // Pass 1: every top-level annotation seeds a thread, preserving order.
   for (const a of annotations) {
-    if (!a.inReplyTo) primaryThread(a);
+    if (!a.reply) primaryThread(a);
   }
 
   // Pass 2: attach children to their primary; orphans become primaries.
   for (const a of annotations) {
-    if (!a.inReplyTo) continue;
-    const parent = byKey.get(annotationKey(a.inReplyTo));
-    if (!parent || parent.inReplyTo) {
+    if (!a.reply) continue;
+    const parent = byKey.get(annotationKey(a.reply.to));
+    if (!parent || parent.reply) {
       // Parent missing from the set, or itself a child (one-level-deep
       // limitation): surface the annotation as its own primary so it is
       // never silently dropped.
@@ -123,7 +121,7 @@ export function buildThreads(annotations: readonly AnnotationDTO[]): AnnotationT
       continue;
     }
     const thread = primaryThread(parent);
-    if (a.replyType === 'group') thread.groupedParts.push(a);
+    if (a.reply.type === 'group') thread.groupedParts.push(a);
     else thread.replies.push(a);
   }
 

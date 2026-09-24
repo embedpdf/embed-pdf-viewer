@@ -618,13 +618,13 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
         sub: 'end-user-9',
         docId: doc.document.id,
         scope: ['doc.open', 'doc.render'],
-        displayName: 'Jane',
+        identity: { displayName: 'Jane', organization: 'Acme' },
         expiresIn: 900,
       });
       const claims = decodeJwtPayload(issued.token);
       expect(claims['doc_id']).toBe(doc.document.id);
       expect(claims['scope']).toEqual(['doc.open', 'doc.render']);
-      expect(claims['display_name']).toBe('Jane');
+      expect(claims['identity']).toEqual({ displayName: 'Jane', organization: 'Acme' });
       expect(claims['tenant_id']).toBe('mint-doc-t');
 
       // A doc-scoped token is rejected on the tenant surface — proof it

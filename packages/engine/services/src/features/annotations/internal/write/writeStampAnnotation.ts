@@ -12,12 +12,12 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
-import { F32_BYTES } from '../../../../runtime/memory/structs';
-import { readAnnotRect } from '../read/annotationReadPrimitives';
 import type { AnnotationWriteContext } from './annotationWriteContext';
 import { setAnnotRect } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 import { writeBoxTransformMetadata } from './writeAnnotationTransformMetadata';
+import { F32_BYTES } from '../../../../runtime/memory/structs';
+import { readAnnotRect } from '../read/annotationReadPrimitives';
 
 /** `EPDF_STAMP_FIT` codes from `public/fpdf_annot.h` (CSS `object-fit` naming on the wire). */
 const STAMP_FIT_TO_CODE: Record<StampFit, number> = {
@@ -32,7 +32,7 @@ const STAMP_FIT_TO_CODE: Record<StampFit, number> = {
  * creating an annotation or strengthening a weak annotation id.
  */
 export function preflightStampDraft(draft: StampWireDraft, ctx?: AnnotationWriteContext): void {
-  if (draft.name !== undefined) requireStampName(draft.name);
+  if (draft.name != null) requireStampName(draft.name);
   requireStampFit(draft.fit ?? 'contain');
   requireStampContent(draft.source, ctx);
 }
@@ -62,7 +62,7 @@ export function applyStampDraft(
   ctx?: AnnotationWriteContext,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
-  if (draft.name !== undefined) {
+  if (draft.name != null) {
     setStampName(fn, annotPtr, draft.name);
   }
   authorStampAppearance(
