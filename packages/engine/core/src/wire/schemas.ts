@@ -104,6 +104,7 @@ import type { PageRotateInput } from '../mutation/PageRotateInput';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
 import type { PageStructureCache } from '../mutation/PageStructureCache';
 import type { RefetchReason } from '../mutation/RefetchReason';
+import { fromBase64, toBase64 } from '../resource/base64';
 import type { PageState } from '../revision/PageState';
 import type { WeakAnnotationState } from '../revision/WeakAnnotationState';
 import type {
@@ -1295,46 +1296,7 @@ export type WeakAnnotationSessionPagesRequest = z.infer<
 // the HTTP bodies and the server's durable `prepared_json` share.
 // ---------------------------------------------------------------------------
 
-const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-
-/** Standard base64 (padded). Dependency-free: no Buffer, runs in browsers too. */
-export function toBase64(bytes: Uint8Array): string {
-  let out = '';
-  for (let i = 0; i < bytes.length; i += 3) {
-    const b0 = bytes[i];
-    const b1 = bytes[i + 1];
-    const b2 = bytes[i + 2];
-    out += BASE64_ALPHABET[b0 >> 2];
-    out += BASE64_ALPHABET[((b0 & 0x03) << 4) | ((b1 ?? 0) >> 4)];
-    out += b1 === undefined ? '=' : BASE64_ALPHABET[((b1 & 0x0f) << 2) | ((b2 ?? 0) >> 6)];
-    out += b2 === undefined ? '=' : BASE64_ALPHABET[b2 & 0x3f];
-  }
-  return out;
-}
-
-export function fromBase64(encoded: string): Uint8Array {
-  // Scan backward to avoid regex backtracking on long runs of interior padding.
-  let end = encoded.length;
-  while (end > 0 && encoded[end - 1] === '=') {
-    end -= 1;
-  }
-  const clean = encoded.slice(0, end);
-  if (clean.length % 4 === 1 || /[^A-Za-z0-9+/]/.test(clean)) {
-    throw new Error('malformed base64');
-  }
-  const bytes: number[] = [];
-  let buffer = 0;
-  let bits = 0;
-  for (const ch of clean) {
-    buffer = (buffer << 6) | BASE64_ALPHABET.indexOf(ch);
-    bits += 6;
-    if (bits >= 8) {
-      bits -= 8;
-      bytes.push((buffer >> bits) & 0xff);
-    }
-  }
-  return Uint8Array.from(bytes);
-}
+export { fromBase64, toBase64 };
 
 const Base64Schema = z.string().regex(/^[A-Za-z0-9+/]*={0,2}$/, 'base64');
 

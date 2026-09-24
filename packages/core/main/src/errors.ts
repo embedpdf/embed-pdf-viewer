@@ -57,6 +57,7 @@ export function isPluginError(value: unknown, code?: PluginErrorCode): value is 
 const ENGINE_CODE_MAP: Readonly<Record<string, PluginErrorCode>> = {
   InvalidArg: 'invalid-input',
   MalformedPdf: 'invalid-input',
+  PayloadTooLarge: 'invalid-input',
   WireFormat: 'invalid-input',
   DocNotOpen: 'not-ready',
   DocPasswordRequired: 'permission-denied',

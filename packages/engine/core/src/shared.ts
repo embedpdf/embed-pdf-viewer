@@ -217,6 +217,20 @@ export {
 } from './annotation/resources';
 export { normalizeAttachmentFileSource } from './dto/normalizeAttachmentFileSource';
 
+// Annotation bundles: annotations and their resources, to move between
+// documents in one call, and the JSON file that holds one.
+export type {
+  AnnotationBundle,
+  AnnotationBundleItem,
+  AnnotationBundlePage,
+  ResourceId,
+} from './transfer/AnnotationBundle';
+export { assertAnnotationBundle, resourceIdOf } from './transfer/AnnotationBundle';
+export type { AnnotationBundleLimits } from './transfer/bundleLimits';
+export { DEFAULT_ANNOTATION_BUNDLE_LIMITS, manifestBytesOf } from './transfer/bundleLimits';
+export type { AnnotationTransferOptions } from './transfer/AnnotationTransfer';
+export { AnnotationTransfer } from './transfer/AnnotationTransfer';
+
 // Attachment vocabulary — one set of file metadata fields shared by the
 // file-attachment kind and the document-level EmbeddedFiles service.
 export type {

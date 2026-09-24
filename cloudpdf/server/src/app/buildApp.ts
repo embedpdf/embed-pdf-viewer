@@ -1629,6 +1629,8 @@ function mapToHttp(code: string): number {
       return 404;
     case EngineErrorCode.SigningExpired:
       return 410;
+    case EngineErrorCode.PayloadTooLarge:
+      return 413;
     case EngineErrorCode.DocOpenFailed:
     case EngineErrorCode.DocPasswordRequired:
     case EngineErrorCode.DocPasswordIncorrect:

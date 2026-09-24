@@ -105,6 +105,12 @@ export const EngineErrorCode = {
    * edited but not signed from.
    */
   StaleBase: 'StaleBase',
+  /**
+   * A payload passed one of its limits: an annotation bundle's bytes,
+   * counts or image pixels. Nothing was read past the limit and nothing was
+   * written. `details` has the `limit`, its `max` and the `value` found.
+   */
+  PayloadTooLarge: 'PayloadTooLarge',
 } as const;
 
 export type EngineErrorCode = (typeof EngineErrorCode)[keyof typeof EngineErrorCode];

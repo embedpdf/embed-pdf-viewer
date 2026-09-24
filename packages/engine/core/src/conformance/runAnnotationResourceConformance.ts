@@ -606,7 +606,9 @@ async function savedStreams(saved: Uint8Array): Promise<SavedStream[]> {
     const content = dict.includes('/FlateDecode')
       ? new Uint8Array(
           await new Response(
-            new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate')),
+            new Blob([new Uint8Array(data)])
+              .stream()
+              .pipeThrough(new DecompressionStream('deflate')),
           ).arrayBuffer(),
         )
       : data;
