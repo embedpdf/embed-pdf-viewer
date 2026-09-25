@@ -93,7 +93,9 @@ describe('area and perimeter authoring', () => {
     const ghost = pageItems(model, PAGE)[0];
     expect(ghost.measure?.measure).toEqual(measure.measure);
     expect(
-      scene(ghost).some((node) => node.kind === 'text' && node.text === (closed ? '4 m²' : '6 m')),
+      scene(ghost).some(
+        (node) => node.kind === 'text' && node.text === (closed ? '4.00 m²' : '6.00 m'),
+      ),
     ).toBe(true);
     expect(creationDraftAnchor(model)?.canFinish).toBe(true);
     const [committed, effects] = step(model, { type: 'finishCreationDraft' });
@@ -106,15 +108,15 @@ describe('area and perimeter authoring', () => {
 
   it('keeps open perimeter lengths and computes area with its closed perimeter', () => {
     expect(shapeMeasurementReadout(geometry, appearance)).toMatchObject({
-      label: '8 m²',
-      perimeter: '12 m',
+      label: '8.00 m²',
+      perimeter: '12.00 m',
     });
     expect(
       shapeMeasurementReadout(
         { ...geometry, closed: false },
         { ...appearance, intent: 'PolyLineDimension' },
       ),
-    ).toMatchObject({ label: '10 m' });
+    ).toMatchObject({ label: '10.00 m' });
   });
 
   it('places concave area labels inside and perimeter labels at half the path length', () => {

@@ -56,8 +56,14 @@ describe('measurement arithmetic and formatting', () => {
       ]),
     ).toBe('$1,234.50');
     expect(formatMeasurement(-1234.5, [{ unit: 'm', conversion: 1, thousands: '$' }])).toBe(
-      '-1$234.5 m',
+      '-1$234.50 m',
     );
+  });
+  test('decimals show every digit /RD asks for, with or without /FD, as Acrobat does', () => {
+    const metric = { unit: 'm ', conversion: 1, precision: 100 };
+    expect(formatMeasurement(1.5, [metric])).toBe('1.50 m ');
+    expect(formatMeasurement(2, [metric])).toBe('2.00 m ');
+    expect(formatMeasurement(2, [{ ...metric, precision: 1 }])).toBe('2 m ');
   });
   test('round and truncate modes', () => {
     expect(formatMeasurement(1.8, [{ unit: 'm', conversion: 1, fraction: 'round' }])).toBe('2 m');
@@ -107,7 +113,7 @@ describe('measurement arithmetic and formatting', () => {
     expect(measurementReadout(d)).toEqual({ unavailable: 'no-scale' });
     expect(measurementReadout({ ...d, measure: { ...m, cyx: 1 } })).toMatchObject({
       value: 5,
-      label: '5 m',
+      label: '5.00 m',
     });
     expect(measurementReadout({ ...d, measure: { ...m, x: [{ unit: 'm' }] } })).toEqual({
       unavailable: 'no-scale',
@@ -234,7 +240,7 @@ describe('area boundary validity', () => {
       [...points].reverse(),
       points.map(([x, y]) => [x + 10000, y - 20000]),
     ]) {
-      expect(read(ring)).toMatchObject({ label: '100 m²', perimeter: '40 m' });
+      expect(read(ring)).toMatchObject({ label: '100.00 m²', perimeter: '40.00 m' });
     }
   });
 });

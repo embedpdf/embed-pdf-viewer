@@ -904,6 +904,7 @@ export const AnnotationImportResultSchema: z.ZodType<AnnotationImportResult> = z
       field: z.string().optional(),
       reason: z.enum([
         'unsupported-kind',
+        'form-field',
         'geospatial',
         'unknown-measure',
         'unsupported-action',

@@ -25,6 +25,8 @@ export type {
 export { runAnnotationResourceConformance } from './conformance/runAnnotationResourceConformance';
 export { runAnnotationExportConformance } from './conformance/runAnnotationExportConformance';
 export { runAnnotationImportConformance } from './conformance/runAnnotationImportConformance';
+export { runAnnotationTransferConformance } from './conformance/runAnnotationTransferConformance';
+export type { AnnotationTransferConformanceOptions } from './conformance/runAnnotationTransferConformance';
 export { creatables, type Creatable } from './conformance/creatables';
 export type {
   AnnotationResourceConformanceOptions,

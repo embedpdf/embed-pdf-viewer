@@ -417,8 +417,10 @@ imported annotations. What an import can't carry it leaves out, reports in `drop
 the rest:
 
 - an annotation of a kind the engine doesn't model (`unsupported-kind`);
-- a field the engine can only read, such as a geospatial measure (`geospatial`) or a link's
-  JavaScript action (`unsupported-action`): the annotation is imported without it;
+- a form field's widget (`form-field`): it travels with its field, through `doc.forms`;
+- a field the engine can only read, such as a geospatial measure (`geospatial`), a link's
+  JavaScript action, or actions a kind has no field for (`unsupported-action`): the annotation is
+  imported without it;
 - an annotation whose `nm` is already used on its page (`name-conflict`), so importing the same
   bundle twice doesn't duplicate named annotations;
 - an annotation whose comment or popup parent was left out (`parent-dropped`) or isn't in the

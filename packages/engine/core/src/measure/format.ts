@@ -30,10 +30,11 @@ function last(value: number, nf: PdfNumberFormat): string {
     const divisor = nf.fixed ? 1 : gcd(numerator, denominator);
     return `${whole ? `${group(String(whole), sep)} ` : ''}${numerator / divisor}/${denominator / divisor}`;
   }
+  // Every digit /RD asks for, /FD or not, as Acrobat shows it ("1.50 m"):
+  // ISO 32000-2 would let a reader drop the trailing zeros without /FD.
   const digits = Math.log10(nf.precision ?? 100);
   const [integer, decimal = ''] = value.toFixed(digits).split('.');
-  const kept = nf.fixed ? decimal : decimal.replace(/0+$/, '');
-  return group(integer, sep) + (kept ? (nf.decimal || '.') + kept : '');
+  return group(integer, sep) + (decimal ? (nf.decimal || '.') + decimal : '');
 }
 
 /** ISO 32000-2 §12.9.2 cascade. PDF float conversions are normalized before use.
@@ -49,8 +50,10 @@ export function formatMeasurement(value: number, formats: readonly PdfNumberForm
     if (!Number.isFinite(remainder)) throw new RangeError('Measurement overflow');
     const whole = Math.floor(remainder);
     const fraction = remainder - whole;
-    const terminal = index === formats.length - 1 || fraction === 0;
-    const number = terminal ? last(remainder, nf) : group(String(whole), nf.thousands ?? ',');
+    const final = index === formats.length - 1;
+    const terminal = final || fraction === 0;
+    // A cascade that stops early on a whole unit shows it whole ("2 ft").
+    const number = final ? last(remainder, nf) : group(String(whole), nf.thousands ?? ',');
     // Omit only the implicit outer padding, never trim the unit or explicit separators.
     const prefix = nf.labelPosition === 'prefix';
     const ps = nf.prefixSpacing ?? (prefix && index === 0 ? '' : ' ');

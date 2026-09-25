@@ -61,11 +61,11 @@ describe('distance gestures and captions', () => {
     expect(distanceLabel(geometry, { ...measure, crop })).toBe('0.32 m');
   });
   it('derives live labels and preserves foreign stored contents', () => {
-    expect(distanceLabel(geom, measure)).toBe('4 m');
+    expect(distanceLabel(geom, measure)).toBe('4.00 m');
     expect(distanceLabel(geom, { ...measure, measure: { subtype: 'GEO' } })).toBe('stored');
     expect(
       distanceScene(geom, measure, initialStyle).some(
-        (node) => node.kind === 'text' && node.text === '4 m',
+        (node) => node.kind === 'text' && node.text === '4.00 m',
       ),
     ).toBe(true);
   });
@@ -144,7 +144,7 @@ describe('distance gestures and captions', () => {
     const preview = pageItems(state, PAGE)[0];
     expect(preview.geometry).toMatchObject({ a: { x: 40, y: 100 }, b: { x: 240, y: 100 } });
     expect((preview.measure as DistanceAppearance).leader?.length).toBe(-60);
-    expect(distanceLabel(preview.geometry, preview.measure as DistanceAppearance)).toBe('4 m');
+    expect(distanceLabel(preview.geometry, preview.measure as DistanceAppearance)).toBe('4.00 m');
     expect(step(state, { type: 'cancel' })[0].order).toEqual([]);
 
     const [committed, effects] = step(state, create('down', 190, 160));
@@ -200,7 +200,7 @@ describe('distance gestures and captions', () => {
       b: { x: 240, y: 100 },
     });
     expect(committed.byId.a.measure).toBe(measure);
-    expect(distanceLabel(committed.byId.a.geometry, measure)).toBe('2.8 m');
+    expect(distanceLabel(committed.byId.a.geometry, measure)).toBe('2.80 m');
   });
 
   it('encloses leaders, displaced captions, connectors and handles in the selection', () => {

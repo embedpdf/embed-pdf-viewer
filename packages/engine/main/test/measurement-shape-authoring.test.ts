@@ -75,7 +75,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
           const createdKey = annotationKey(created.ref);
           expect(bakedEntries.some((entry) => entry.startsWith(`${createdKey}@`))).toBe(false);
         };
-        expect(created.contents).toBe(tool === 'area' ? '50 m²' : '25 m');
+        expect(created.contents).toBe(tool === 'area' ? '50.00 m²' : '25.00 m');
         expect(created.captionEnabled).toBe(true);
         expect(created.captionCenter).toBe(null);
         const model = fromDTO(created, crop);

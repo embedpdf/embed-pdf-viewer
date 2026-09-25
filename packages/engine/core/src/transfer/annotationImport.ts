@@ -6,6 +6,7 @@ import {
   type AnnotationDTO,
 } from '../annotation/kinds';
 import type { AnnotationReplyType } from '../annotation/primitives';
+import type { PdfActionTree } from '../dto/PdfAction';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import { annotationKey, annotationKeysOf } from '../identity/annotationKey';
@@ -57,11 +58,17 @@ export interface AnnotationImportManifest {
 export type AnnotationDropReason =
   /** A kind the engine doesn't model (`subtype: 'unsupported'`). */
   | 'unsupported-kind'
+  /** A form field's widget: it travels with its field, through the forms API. */
+  | 'form-field'
   /** A geospatial measure, which the engine reads only as a marker. */
   | 'geospatial'
   /** A measure of a kind the engine doesn't know, read only as a marker. */
   | 'unknown-measure'
-  /** A link's action of a kind a write can't make (JavaScript, launch, named, remote go-to). */
+  /**
+   * An action a write can't make: a link's target of a kind a write can't
+   * make (JavaScript, launch, named, remote go-to), or actions (`/A`, `/AA`)
+   * that no field of the kind writes.
+   */
   | 'unsupported-action'
   /** Its `nm` is used on the target page already, or by an earlier item. */
   | 'name-conflict'
@@ -156,8 +163,8 @@ export interface AnnotationImportPlan {
  *
  * What is left out (convention §2.11, §2.13), in this order:
  *
- * 1. an item of an unsupported kind; a field marker leaves out only that
- *    field;
+ * 1. an item of an unsupported kind, and a form field's widget; a field
+ *    marker leaves out only that field;
  * 2. an item whose `reply.to` or `parent` is no item of the bundle on the
  *    same target page (`parent-missing`);
  * 3. an item whose name is used on its target page, or by an earlier item
@@ -199,6 +206,10 @@ export function planAnnotationImport(input: {
   items.forEach((data, index) => {
     if (data.subtype === 'unsupported') {
       drops.set(index, 'unsupported-kind');
+      return;
+    }
+    if (data.subtype === 'widget' && data.fieldObjectNumber > 0) {
+      drops.set(index, 'form-field');
       return;
     }
     const markers = fieldMarkersOf(data);
@@ -335,10 +346,25 @@ function fieldMarkersOf(
   const measure = (data as { measure?: { subtype?: unknown } | null }).measure;
   if (measure?.subtype === 'GEO') markers.push({ field: 'measure', reason: 'geospatial' });
   if (measure?.subtype === 'unknown') markers.push({ field: 'measure', reason: 'unknown-measure' });
-  if (data.subtype === 'link' && data.target && !WRITABLE_LINK_TARGETS.has(data.target.kind)) {
-    markers.push({ field: 'target', reason: 'unsupported-action' });
-  }
+  const target = data.subtype === 'link' ? data.target : null;
+  const carriedTarget = !!target && WRITABLE_LINK_TARGETS.has(target.kind);
+  if (target && !carriedTarget) markers.push({ field: 'target', reason: 'unsupported-action' });
+  // `actions` reads `/A` and `/AA`, and no write takes it. A copy has only
+  // the `/A` a link's target writes: one go-to or URI action, without a
+  // chain or an `/IsMap`. A target a write can't make is reported above.
+  const { actions } = data;
+  const lost = Object.entries(actions ?? {}).some(([trigger, tree]) =>
+    data.subtype !== 'link' || trigger !== 'activate' ? true : carriedTarget && !writtenAsIs(tree),
+  );
+  if (lost) markers.push({ field: 'actions', reason: 'unsupported-action' });
   return markers;
+}
+
+/** Whether a link's `/A` is what writing its target writes again. */
+function writtenAsIs(tree: PdfActionTree | undefined): boolean {
+  const root = tree?.root;
+  if (!tree || tree.incomplete || !root || root.next.length > 0) return false;
+  return !(root.type === 'uri' && root.isMap);
 }
 
 /** The link targets a write can make; the others read as markers. */

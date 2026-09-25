@@ -1,3 +1,4 @@
+import { appearanceRaster, maxAlpha, maxDifference, type Raster } from './appearanceRasters';
 import type { ConformanceTestRunner } from './runMetadataConformance';
 import { BANDS_PDF, BANDS_PDF_CONTENT, BANDS_PNG, sameBytes } from './stampFixtures';
 import type { AnnotationDraft, AnnotationDTO } from '../annotation/kinds';
@@ -6,7 +7,6 @@ import type { Engine } from '../engine/Engine';
 import type { PageHandle } from '../engine/PageHandle';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { PdfRect } from '../geometry/primitives';
-import { annotationKey } from '../identity/annotationKey';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import { toPageRef, type PageRef } from '../identity/PageRef';
 
@@ -605,125 +605,6 @@ function pageSize(pdf: Uint8Array): [number, number] | null {
   const text = new TextDecoder('latin1').decode(pdf);
   const box = /\/MediaBox\s*\[\s*([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s*\]/.exec(text);
   return box ? [Number(box[3]) - Number(box[1]), Number(box[4]) - Number(box[2])] : null;
-}
-
-interface Raster {
-  width: number;
-  height: number;
-  /** RGBA, 4 bytes a pixel, no row padding. */
-  rgba: Uint8Array;
-}
-
-async function appearanceRaster(
-  page: PageHandle,
-  ref: AnnotationRef,
-  raw: boolean,
-): Promise<Raster> {
-  const key = annotationKey(ref);
-  if (raw) {
-    const { appearances } = await page.annotations.renderAppearances({ scale: 1 });
-    const found = appearances.find((a) => annotationKey(a.ref) === key && a.mode === 'normal');
-    if (!found) throw new Error(`no appearance rendered for ${key}`);
-    const { raster } = found;
-    const bytes = new Uint8Array(raster.data);
-    const rgba = new Uint8Array(raster.width * raster.height * 4);
-    for (let y = 0; y < raster.height; y++) {
-      rgba.set(
-        bytes.subarray(y * raster.stride, y * raster.stride + raster.width * 4),
-        y * raster.width * 4,
-      );
-    }
-    return { width: raster.width, height: raster.height, rgba };
-  }
-  const { appearances } = await page.annotations.renderAppearanceImages({
-    format: 'png',
-    scale: 1,
-  });
-  const found = appearances.find((a) => annotationKey(a.ref) === key && a.mode === 'normal');
-  if (!found || found.image.source.kind !== 'bytes') {
-    throw new Error(`no appearance image rendered for ${key}`);
-  }
-  return decodePng(found.image.source.bytes);
-}
-
-function maxAlpha(raster: Raster): number {
-  let max = 0;
-  for (let i = 3; i < raster.rgba.length; i += 4) max = Math.max(max, raster.rgba[i]!);
-  return max;
-}
-
-function maxDifference(a: Raster, b: Raster): number {
-  let max = 0;
-  for (let i = 0; i < a.rgba.length; i++) max = Math.max(max, Math.abs(a.rgba[i]! - b.rgba[i]!));
-  return max;
-}
-
-/** An 8-bit, non-interlaced RGB or RGBA PNG as RGBA. Enough for the engines' own encoders. */
-async function decodePng(png: Uint8Array): Promise<Raster> {
-  const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
-  let offset = 8;
-  let width = 0;
-  let height = 0;
-  let channels = 4;
-  const data: Uint8Array[] = [];
-  while (offset < png.length) {
-    const length = view.getUint32(offset);
-    const type = String.fromCharCode(...png.subarray(offset + 4, offset + 8));
-    const body = png.subarray(offset + 8, offset + 8 + length);
-    if (type === 'IHDR') {
-      width = view.getUint32(offset + 8);
-      height = view.getUint32(offset + 12);
-      if (body[8] !== 8 || body[12] !== 0) throw new Error('only 8-bit non-interlaced PNGs');
-      channels = body[9] === 6 ? 4 : body[9] === 2 ? 3 : 0;
-      if (!channels) throw new Error(`unsupported PNG color type ${body[9]}`);
-    } else if (type === 'IDAT') {
-      data.push(body);
-    }
-    offset += 12 + length;
-  }
-  const compressed = new Blob(data as BlobPart[]);
-  const inflated = new Uint8Array(
-    await new Response(
-      compressed.stream().pipeThrough(new DecompressionStream('deflate')),
-    ).arrayBuffer(),
-  );
-  const stride = width * channels;
-  const pixels = new Uint8Array(height * stride);
-  for (let y = 0; y < height; y++) {
-    const filter = inflated[y * (stride + 1)]!;
-    const line = inflated.subarray(y * (stride + 1) + 1, (y + 1) * (stride + 1));
-    for (let x = 0; x < stride; x++) {
-      const left = x >= channels ? pixels[y * stride + x - channels]! : 0;
-      const up = y > 0 ? pixels[(y - 1) * stride + x]! : 0;
-      const upLeft = y > 0 && x >= channels ? pixels[(y - 1) * stride + x - channels]! : 0;
-      const predictor =
-        filter === 1
-          ? left
-          : filter === 2
-            ? up
-            : filter === 3
-              ? (left + up) >> 1
-              : filter === 4
-                ? paeth(left, up, upLeft)
-                : 0;
-      pixels[y * stride + x] = (line[x]! + predictor) & 0xff;
-    }
-  }
-  if (channels === 4) return { width, height, rgba: pixels };
-  const rgba = new Uint8Array(width * height * 4);
-  for (let i = 0, j = 0; i < pixels.length; i += 3, j += 4) {
-    rgba.set(pixels.subarray(i, i + 3), j);
-    rgba[j + 3] = 255;
-  }
-  return { width, height, rgba };
-}
-
-function paeth(a: number, b: number, c: number): number {
-  const p = a + b - c;
-  const pa = Math.abs(p - a);
-  const pb = Math.abs(p - b);
-  const pc = Math.abs(p - c);
-  return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
 }
 
 async function firstPage(doc: DocumentHandle): Promise<PageRef> {

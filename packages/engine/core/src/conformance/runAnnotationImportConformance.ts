@@ -242,7 +242,7 @@ export function runAnnotationImportConformance(
 /**
  * A bundle as two engines or two documents can agree on it: each ref as the
  * source had it (`result.refMap` maps the target's back), and without the
- * attribution an import stamps.
+ * attribution an import stamps, the attached file's dates included.
  */
 function comparable(bundle: AnnotationBundle, result?: AnnotationImportResult) {
   const back = new Map(
@@ -261,6 +261,11 @@ function comparable(bundle: AnnotationBundle, result?: AnnotationImportResult) {
       ...rest
     } = data as AnnotationDTO & Record<string, unknown>;
     const fields = rest as Record<string, unknown>;
+    // An attached file is dated when it is written, as the stamp dates the annotation.
+    if (data.subtype === 'file-attachment' && data.file) {
+      const { createdAt: _fileCreatedAt, modifiedAt: _fileModifiedAt, ...file } = data.file;
+      fields.file = file;
+    }
     return {
       data: {
         ...fields,

@@ -64,7 +64,7 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
       const page = doc.page(toPageRef(3)),
         created = (await page.annotations.create(line())).created;
       expect(created).toMatchObject({
-        contents: '3 m',
+        contents: '3.00 m',
         intent: 'LineDimension',
         captionEnabled: true,
         leader: { length: 12 },
@@ -73,13 +73,13 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
         subtype: 'line',
         contents: '999 m',
       });
-      expect(wrong.updated.contents).toBe('3 m');
+      expect(wrong.updated.contents).toBe('3.00 m');
       expect(wrong.appearance).toEqual({ action: 'preserved', changed: false });
       const moved = await page.annotations.update(created.ref, {
         subtype: 'line',
         linePoints: { start: { x: 100, y: 100 }, end: { x: 300, y: 100 } },
       });
-      expect(moved.updated.contents).toBe('6 m');
+      expect(moved.updated.contents).toBe('6.00 m');
       expect(moved.appearance.changed).toBe(true);
       await page.annotations.update(created.ref, {
         subtype: 'line',
@@ -94,7 +94,7 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
         captionEnabled: false,
         captionPosition: 'top',
         captionOffset: { along: 12, perpendicular: 25 },
-        contents: '6 m',
+        contents: '6.00 m',
       });
       const reset = await page.annotations.update(created.ref, {
         subtype: 'line',
@@ -126,7 +126,7 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
         captionCenter: { x: 0, y: 0 },
       };
       const a = (await page.annotations.create(draft)).created;
-      expect(a.contents).toBe('9 m²');
+      expect(a.contents).toBe('9.00 m²');
       const moved = await page.annotations.update(a.ref, {
         subtype: 'polygon',
         rect: {
@@ -139,7 +139,7 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
       });
       expect(moved.updated).toMatchObject({
         captionCenter: { x: 20, y: 30 },
-        contents: '9 m²',
+        contents: '9.00 m²',
       });
       expect(moved.appearance.action).toBe('preserved');
       const edit = await page.annotations.update(a.ref, {
@@ -210,7 +210,7 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
         { scope: ['*'] },
       );
       const annotations = (await doc.page(toPageRef(3)).annotations.list()).annotations;
-      expect(annotations.map((a) => a.contents)).toEqual(['3 m', '6 m', '4.5 m²']);
+      expect(annotations.map((a) => a.contents)).toEqual(['3.00 m', '6.00 m', '4.50 m²']);
       expect(annotations[1]).toMatchObject({ captionCenter: { x: 0, y: 0 } });
       const viewports = await doc.page(toPageRef(3)).measure!.viewports();
       expect(viewports).toHaveLength(2);
@@ -271,12 +271,12 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
         code: EngineErrorCode.InvalidArg,
       });
       expect(await page.measure!.viewports()).toEqual([]);
-      expect((await page.annotations.list()).annotations[0].contents).toBe('3 m');
+      expect((await page.annotations.list()).annotations[0].contents).toBe('3.00 m');
       const unavailable = await page.annotations.update(a.ref, {
         subtype: 'line',
         measure: { ...scale, y: [{ unit: 'm', conversion: 2 }] },
       });
-      expect(unavailable.updated.contents).toBe('3 m');
+      expect(unavailable.updated.contents).toBe('3.00 m');
       expect(measurementReadout(unavailable.updated)).toEqual({ unavailable: 'no-scale' });
     } finally {
       await doc.close();
@@ -352,9 +352,9 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
         measure: scale,
       });
       expect(replaced.updated.subtype === 'line' && replaced.updated.measure?.subtype).toBe('RL');
-      expect(replaced.updated.contents).toBe('3 m');
+      expect(replaced.updated.contents).toBe('3.00 m');
       const after = (await page.annotations.list()).annotations;
-      expect(after[0].contents).toBe('3 m');
+      expect(after[0].contents).toBe('3.00 m');
       expect(after[1]).toEqual(before[1]);
       await page.annotations.update(before[3].ref, {
         subtype: 'line',
@@ -392,7 +392,7 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
         captionEnabled: false,
       });
       expect(result.updated).toMatchObject({
-        contents: '4.5 m²',
+        contents: '4.50 m²',
         captionEnabled: false,
         captionCenter: { x: 180, y: 90 },
       });

@@ -272,6 +272,69 @@ describe('planAnnotationImport', () => {
     expect(dropped).toEqual([{ ref: script.ref, field: 'target', reason: 'unsupported-action' }]);
   });
 
+  test("leaves out a form field's widget, which travels with its field", () => {
+    const field = annotation(first, 10, 0, {
+      subtype: 'widget',
+      fieldObjectNumber: 44,
+      fieldFamily: 'text',
+    });
+    const inert = annotation(first, 11, 1, {
+      subtype: 'widget',
+      fieldObjectNumber: 0,
+      fieldFamily: 'unknown',
+    });
+    const { creates, dropped } = plan(bundleOf(field, inert));
+    expect(creates.map((create) => create.item)).toEqual([1]);
+    expect(dropped).toEqual([{ ref: field.ref, reason: 'form-field' }]);
+  });
+
+  test('reports the actions a copy leaves out, and not the one a link target carries', () => {
+    const goto = {
+      incomplete: false,
+      warningFlags: 0,
+      warnings: [],
+      root: { type: 'goto', subtype: 'GoTo', next: [], destination: { kind: 'fit', page: first } },
+    };
+    const target = { kind: 'goto', destination: { kind: 'fit', page: first } };
+    const link = annotation(first, 10, 0, { subtype: 'link', target, actions: { activate: goto } });
+    const hovering = annotation(first, 11, 1, {
+      subtype: 'link',
+      target,
+      actions: { activate: goto, cursorEnter: goto },
+    });
+    const chained = annotation(first, 12, 2, {
+      subtype: 'link',
+      target,
+      actions: { activate: { ...goto, root: { ...goto.root, next: [goto.root] } } },
+    });
+    const square = annotation(first, 13, 3, { actions: { activate: goto } });
+    const map = annotation(first, 14, 4, {
+      subtype: 'link',
+      target: { kind: 'uri', uri: 'https://example.com/map' },
+      actions: {
+        activate: {
+          ...goto,
+          root: {
+            type: 'uri',
+            subtype: 'URI',
+            next: [],
+            uri: 'https://example.com/map',
+            isMap: true,
+          },
+        },
+      },
+    });
+    const { creates, dropped } = plan(bundleOf(link, hovering, chained, square, map));
+    expect(creates).toHaveLength(5);
+    expect(dropped).toEqual(
+      [hovering, chained, square, map].map(({ ref }) => ({
+        ref,
+        field: 'actions',
+        reason: 'unsupported-action',
+      })),
+    );
+  });
+
   test('refuses an item whose data is not valid for its kind, naming it', () => {
     const broken = annotation(first, 10, 0, { rect: { left: 'no' } });
     expect(() => plan(bundleOf(annotation(first, 9, 0), broken))).toThrow(

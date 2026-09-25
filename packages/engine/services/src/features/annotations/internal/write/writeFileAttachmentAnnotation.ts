@@ -72,6 +72,8 @@ export function applyFileAttachmentDraft(
     metadataForPayload(draft.file),
     { bytes: requireFileBytes(ctx) },
   );
+  // A file the data gives no MIME type has none, as on update: none is made up.
+  if (draft.file.mimeType == null) setMimeType(fn, attachmentPtr, null);
 }
 
 /**

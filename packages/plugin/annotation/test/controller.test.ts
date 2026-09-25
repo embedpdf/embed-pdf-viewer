@@ -1141,7 +1141,7 @@ describe('distance authoring and recalibration', () => {
       expect.objectContaining({
         intent: 'LineDimension',
         measure: region,
-        contents: '20 ft',
+        contents: '20.00 ft',
         captionEnabled: true,
         captionPosition: 'inline',
         leader: { length: 12, extension: 5, offset: 0 },
@@ -1273,7 +1273,7 @@ describe.each(['area', 'perimeter'])('%s scale resolution', (tool) => {
         subtype,
         measure: region,
         captionEnabled: true,
-        contents: tool === 'area' ? '100 m²' : '30 m',
+        contents: tool === 'area' ? '100.00 m²' : '30.00 m',
       }),
     );
     await vi.waitFor(() => expect(harness.capability.getRaw(ref(75))).toBeTruthy());

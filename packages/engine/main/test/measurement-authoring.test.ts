@@ -61,7 +61,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       expect(created).toMatchObject({
         subtype: 'line',
         intent: 'LineDimension',
-        contents: '10 m',
+        contents: '10.00 m',
         linePoints: {
           start: { x: page.boxes.crop.left + 50, y: page.boxes.crop.top - 100 },
           end: { x: page.boxes.crop.left + 250, y: page.boxes.crop.top - 100 },
@@ -74,7 +74,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       annotation.editPointer('up', page.ref, { x: 250, y: 64 }, false);
       await vi.waitFor(() =>
         expect(annotation.getRaw(created.ref)).toMatchObject({
-          contents: '10 m',
+          contents: '10.00 m',
           linePoints: created.subtype === 'line' ? created.linePoints : undefined,
           leader: { length: 36 },
         }),
@@ -96,7 +96,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       expect(report.failed).toEqual([]);
       expect(report.error).toBeUndefined();
       expect(annotation.getRaw(created.ref)).toMatchObject({
-        contents: '16 ft',
+        contents: '16.00 ft',
         captionOffset: { along: 15, perpendicular: 25 },
       });
       expectVector();
@@ -159,7 +159,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
           await layered.page(toPageRef(pageObjectNumber)).annotations.list()
         ).annotations;
         expect(layeredAnnotations.find((a) => a.nm === created.nm)).toMatchObject({
-          contents: '16 ft',
+          contents: '16.00 ft',
           leader: { length: 36 },
           captionOffset: { along: 15, perpendicular: 25 },
         });
@@ -182,7 +182,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
         const restored = list.annotations.find((a) => a.nm === created.nm)!;
         expect(restored).toMatchObject({
           intent: 'LineDimension',
-          contents: '16 ft',
+          contents: '16.00 ft',
           leader: { length: 36 },
           captionOffset: { along: 15, perpendicular: 25 },
         });

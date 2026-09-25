@@ -53,20 +53,20 @@ export function runMeasurementConformance(
           subtype: 'line',
           contents: '999 m',
         });
-        expect(inert.updated.contents).toBe('3 m');
+        expect(inert.updated.contents).toBe('3.00 m');
         expect(inert.appearance).toEqual({ action: 'preserved', changed: false });
         const changed = await page.annotations.update(created.ref, {
           subtype: 'line',
           linePoints: { start: vertices[0], end: { x: 200, y: 0 } },
         });
-        expect(changed.updated.contents).toBe('6 m');
+        expect(changed.updated.contents).toBe('6.00 m');
         expect(changed.appearance.changed).toBe(true);
         const hidden = await page.annotations.update(created.ref, {
           subtype: 'line',
           captionEnabled: false,
         });
         expect(hidden.updated).toMatchObject({
-          contents: '6 m',
+          contents: '6.00 m',
           captionEnabled: false,
           captionOffset: { along: 10, perpendicular: 20 },
         });
@@ -77,7 +77,7 @@ export function runMeasurementConformance(
           captionOffset: null,
           measure: null,
         });
-        expect(reset.updated.contents).toBe('6 m');
+        expect(reset.updated.contents).toBe('6.00 m');
         expect(reset.updated.subtype === 'line' && reset.updated.captionOffset === null).toBe(true);
         expect(measurementReadout(reset.updated)).toEqual({ unavailable: 'no-measure' });
       } finally {
