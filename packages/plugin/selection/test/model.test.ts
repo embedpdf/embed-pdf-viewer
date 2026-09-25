@@ -78,7 +78,7 @@ describe('selection model', () => {
     ).toEqual([page]);
     expect(
       contentChangedPagesOf(
-        documentEvent({ type: 'annotations.flattened', page, results: [{ status: 'skipped' }] }),
+        documentEvent({ type: 'annotations.flattened', page, results: [{ status: 'unchanged' }] }),
       ),
     ).toBeNull();
   });

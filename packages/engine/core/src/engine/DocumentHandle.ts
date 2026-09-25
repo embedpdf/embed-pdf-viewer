@@ -33,7 +33,7 @@ export interface DocumentHandle {
   /**
    * Document-level attachments (the catalog's `/EmbeddedFiles` name tree).
    * Files attached to annotations are read via
-   * `page(ref).annotations.readResource(ref, 'file')`.
+   * `page(ref).annotations.downloadResource(ref, 'file')`.
    */
   readonly attachments: DocumentAttachmentsService;
   /** The document's interactive form (AcroForm): fields, values, interchange. */
@@ -56,7 +56,7 @@ export interface DocumentHandle {
   /** Document text search: budgeted, cursor-resumable slices. */
   readonly search: DocumentSearchService;
   /**
-   * Render policy surface (`doc.render.policy()`): the engine's render
+   * Render policy surface (`doc.render.getPolicy()`): the engine's render
    * lattice, or `continuous` on engines that render any viewport exactly
    * (the local engine). Pixels stay on `page(ref).render` — this carries
    * policy only. Conformance is explicit via `snapFullPageViewport`; no

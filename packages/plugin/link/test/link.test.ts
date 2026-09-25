@@ -212,7 +212,7 @@ describe('link plugin', () => {
     harness.emit({
       type: 'annotation.moved',
       page: toPageRef(1),
-      moved: [PAGE_ONE_LINKS[0], PAGE_ONE_LINKS[1], linkDto(20, 2, crop, null)],
+      annotations: [PAGE_ONE_LINKS[0], PAGE_ONE_LINKS[1], linkDto(20, 2, crop, null)],
       origin: ORIGIN,
     });
     await settle();

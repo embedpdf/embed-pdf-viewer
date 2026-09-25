@@ -543,7 +543,7 @@ export function createKernel(config: {
     // `continuous` — a policy hiccup must never block a document open.
     let renderPolicy: EngineRenderPolicy = CONTINUOUS_RENDER_POLICY;
     try {
-      renderPolicy = (await session.handle!.render?.policy()) ?? CONTINUOUS_RENDER_POLICY;
+      renderPolicy = (await session.handle!.render?.getPolicy()) ?? CONTINUOUS_RENDER_POLICY;
     } catch {
       /* unreachable policy = continuous */
     }

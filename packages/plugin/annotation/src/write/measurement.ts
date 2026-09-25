@@ -73,7 +73,7 @@ export function createMeasurement(
             ? 'no-authority'
             : !annotTransformable(annotation) || !annotContentsEditable(annotation)
               ? 'locked'
-              : 'measure' in dto && dto.measure && dto.measure.subtype !== 'RL'
+              : 'measure' in dto && dto.measure && dto.measure.subtype !== 'rectilinear'
                 ? 'foreign-measure'
                 : !isReadout(measurementReadout({ ...dto, measure: scale }))
                   ? 'unavailable'

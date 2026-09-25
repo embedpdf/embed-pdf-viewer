@@ -197,7 +197,11 @@ describe('derived renders', () => {
 
     // Default fixture (enforce=false): an off-lattice scale still computes.
     const lax = await fetch(
-      appearancesUrl(fx.baseUrl, docId, 'annotationVersion=1,format=webp,scale=3'),
+      appearancesUrl(
+        fx.baseUrl,
+        docId,
+        'annotationVersion=1,format=webp,viewport.kind=scale,viewport.scale=3',
+      ),
       { headers },
     );
     expect(lax.status).toBe(200);
@@ -211,7 +215,11 @@ describe('derived renders', () => {
 
       // Versioned off-lattice scale → 400, policy attached.
       const rejected = await fetch(
-        appearancesUrl(strict.baseUrl, strictDoc, 'annotationVersion=1,format=webp,scale=3'),
+        appearancesUrl(
+          strict.baseUrl,
+          strictDoc,
+          'annotationVersion=1,format=webp,viewport.kind=scale,viewport.scale=3',
+        ),
         { headers: strictHeaders },
       );
       expect(rejected.status).toBe(400);
@@ -222,14 +230,29 @@ describe('derived renders', () => {
 
       // Versioned on-lattice scale → 200.
       const accepted = await fetch(
-        appearancesUrl(strict.baseUrl, strictDoc, 'annotationVersion=1,format=webp,scale=2'),
+        appearancesUrl(
+          strict.baseUrl,
+          strictDoc,
+          'annotationVersion=1,format=webp,viewport.kind=scale,viewport.scale=2',
+        ),
         { headers: strictHeaders },
       );
       expect(accepted.status).toBe(200);
 
+      // A width viewport's scale depends on the page, so it is never on the lattice.
+      const byWidth = await fetch(
+        appearancesUrl(
+          strict.baseUrl,
+          strictDoc,
+          'annotationVersion=1,format=webp,viewport.kind=width,viewport.width=1224',
+        ),
+        { headers: strictHeaders },
+      );
+      expect(byWidth.status).toBe(400);
+
       // The unversioned alias is the escape hatch: never enforced (no-store).
       const unversioned = await fetch(
-        `${strict.baseUrl}/v1/docs/${strictDoc}/layers/default/annotations/pages/obj:1/appearances?scale=3`,
+        `${strict.baseUrl}/v1/docs/${strictDoc}/layers/default/annotations/pages/obj:1/appearances?viewport.kind=scale&viewport.scale=3`,
         { headers: strictHeaders },
       );
       expect(unversioned.status).toBe(200);
@@ -251,7 +274,7 @@ describe('derived renders', () => {
       const headers = { Authorization: `Bearer ${docToken(tenantId, docId)}` };
 
       const blown = await fetch(
-        `${tiny.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/obj:1/appearances@annotationVersion=1,format=webp,scale=4`,
+        `${tiny.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/obj:1/appearances@annotationVersion=1,format=webp,viewport.kind=scale,viewport.scale=4`,
         { headers },
       );
       expect(blown.status).toBe(400);
@@ -259,7 +282,7 @@ describe('derived renders', () => {
       expect(body.error.message).toContain('budget');
 
       const fits = await fetch(
-        `${tiny.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/obj:1/appearances@annotationVersion=1,format=webp,scale=1`,
+        `${tiny.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/obj:1/appearances@annotationVersion=1,format=webp,viewport.kind=scale,viewport.scale=1`,
         { headers },
       );
       expect(fits.status).toBe(200);

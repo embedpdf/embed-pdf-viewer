@@ -41,31 +41,31 @@ export function runMeasurementConformance(
         const created = (
           await page.annotations.create({
             subtype: 'line',
-            intent: 'LineDimension',
+            intent: 'line-dimension',
             rect,
             measure: scale,
             linePoints: { start: vertices[0], end: vertices[1] },
             captionEnabled: true,
             captionOffset: { along: 10, perpendicular: 20 },
           })
-        ).created;
+        ).annotation;
         const inert = await page.annotations.update(created.ref, {
           subtype: 'line',
           contents: '999 m',
         });
-        expect(inert.updated.contents).toBe('3.00 m');
+        expect(inert.annotation.contents).toBe('3.00 m');
         expect(inert.appearance).toEqual({ action: 'preserved', changed: false });
         const changed = await page.annotations.update(created.ref, {
           subtype: 'line',
           linePoints: { start: vertices[0], end: { x: 200, y: 0 } },
         });
-        expect(changed.updated.contents).toBe('6.00 m');
+        expect(changed.annotation.contents).toBe('6.00 m');
         expect(changed.appearance.changed).toBe(true);
         const hidden = await page.annotations.update(created.ref, {
           subtype: 'line',
           captionEnabled: false,
         });
-        expect(hidden.updated).toMatchObject({
+        expect(hidden.annotation).toMatchObject({
           contents: '6.00 m',
           captionEnabled: false,
           captionOffset: { along: 10, perpendicular: 20 },
@@ -77,9 +77,11 @@ export function runMeasurementConformance(
           captionOffset: null,
           measure: null,
         });
-        expect(reset.updated.contents).toBe('6.00 m');
-        expect(reset.updated.subtype === 'line' && reset.updated.captionOffset === null).toBe(true);
-        expect(measurementReadout(reset.updated)).toEqual({ unavailable: 'no-measure' });
+        expect(reset.annotation.contents).toBe('6.00 m');
+        expect(reset.annotation.subtype === 'line' && reset.annotation.captionOffset === null).toBe(
+          true,
+        );
+        expect(measurementReadout(reset.annotation)).toEqual({ unavailable: 'no-measure' });
       } finally {
         await doc.close();
       }
@@ -93,7 +95,7 @@ export function runMeasurementConformance(
           {
             subtype: 'line',
             rect,
-            intent: 'LineDimension',
+            intent: 'line-dimension',
             // Both coordinates and /C cross float32 rounding boundaries.
             measure: measureFromKnownLength(1, { value: 1.00000001, unit: 'm' }),
             contents: 'wrong',
@@ -104,7 +106,7 @@ export function runMeasurementConformance(
           {
             subtype: 'polyline',
             rect,
-            intent: 'PolyLineDimension',
+            intent: 'polyline-dimension',
             measure: scale,
             contents: 'wrong',
             vertices,
@@ -114,7 +116,7 @@ export function runMeasurementConformance(
           {
             subtype: 'polygon',
             rect,
-            intent: 'PolygonDimension',
+            intent: 'polygon-dimension',
             measure: scale,
             contents: 'wrong',
             vertices,
@@ -125,7 +127,8 @@ export function runMeasurementConformance(
         const saved = [];
         for (const draft of drafts) {
           const preview = measurementReadout(draft);
-          const a = (await doc.page(toPageRef(pageObjectNumber)).annotations.create(draft)).created;
+          const a = (await doc.page(toPageRef(pageObjectNumber)).annotations.create(draft))
+            .annotation;
           expect(a.contents).toBe('label' in preview ? preview.label : undefined);
           saved.push(a);
         }
@@ -146,7 +149,7 @@ export function runMeasurementConformance(
             subtype: a.subtype,
             color: { r: 0, g: 0, b: 255 },
           });
-          expect(result.updated.contents).toBe(before.contents);
+          expect(result.annotation.contents).toBe(before.contents);
         }
       } finally {
         await doc.close();
@@ -159,16 +162,16 @@ export function runMeasurementConformance(
         const pageObjectNumber = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
         const page = doc.page(toPageRef(pageObjectNumber));
         if (!page.measure) throw new Error('Measurement service is required');
-        const foreign = (await page.measure.viewports()).filter((v) => !v.owned);
+        const foreign = (await page.measure.listViewports()).filter((v) => !v.owned);
         const annotations = (await page.annotations.list()).annotations;
         const events: DocumentEvent[] = [];
         const off = doc.events.subscribe((event) => events.push(event));
         try {
           await page.measure.setScale(scale);
-          expect((await page.measure.viewports()).filter((v) => v.owned)).toHaveLength(1);
+          expect((await page.measure.listViewports()).filter((v) => v.owned)).toHaveLength(1);
           expect((await page.annotations.list()).annotations).toEqual(annotations);
           await page.measure.setScale(null);
-          expect(await page.measure.viewports()).toEqual(foreign);
+          expect(await page.measure.listViewports()).toEqual(foreign);
           const changes = events.filter((e) => e.type === 'page.viewportsChanged');
           expect(changes).toHaveLength(2);
           for (const event of changes)
@@ -189,14 +192,14 @@ export function runMeasurementConformance(
       try {
         const page = doc.page((await doc.pages.list()).pages[0].ref);
         await page.measure!.setScale(scale);
-        const before = await page.measure!.viewports();
+        const before = await page.measure!.listViewports();
         await expect(
           page.measure!.setScale({ ...scale, x: [{ unit: 'm', conversion: 0 }] }),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
         const pending = page.measure!.setScale(null);
         pending.abort('conformance');
         await expect(pending).rejects.toBeInstanceOf(AbortError);
-        expect(await page.measure!.viewports()).toEqual(before);
+        expect(await page.measure!.listViewports()).toEqual(before);
       } finally {
         await doc.close();
       }

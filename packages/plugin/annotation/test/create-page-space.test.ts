@@ -55,7 +55,7 @@ afterEach(() => vi.restoreAllMocks());
 describe('create() in page space', () => {
   it('stages optimistically, writes a PDF-space draft with the crop offset applied, and resolves after onCreated', async () => {
     const harness = createHarness();
-    harness.create.mockResolvedValueOnce({ created: squareDTO(42) });
+    harness.create.mockResolvedValueOnce({ annotation: squareDTO(42) });
     const order: string[] = [];
     harness.capability.onCreated((event) =>
       order.push(`created:${annotationKey(event.ref)}:${event.origin.locality}`),
@@ -86,7 +86,7 @@ describe('create() in page space', () => {
 
   it('produces the same draft as the draw tool for the same geometry (one commit path)', async () => {
     const api = createHarness();
-    api.create.mockResolvedValueOnce({ created: squareDTO(1) });
+    api.create.mockResolvedValueOnce({ annotation: squareDTO(1) });
     await api.capability.create({
       subtype: 'square',
       page: PAGE,
@@ -94,7 +94,7 @@ describe('create() in page space', () => {
     });
 
     const pointer = createHarness();
-    pointer.create.mockResolvedValueOnce({ created: squareDTO(2) });
+    pointer.create.mockResolvedValueOnce({ annotation: squareDTO(2) });
     pointer.capability.createPointer('square', 'down', PAGE, { x: 30, y: 40 });
     pointer.capability.createPointer('square', 'move', PAGE, { x: 130, y: 100 });
     pointer.capability.createPointer('square', 'up', PAGE, { x: 130, y: 100 }, true);
@@ -141,7 +141,7 @@ describe('create() in page space', () => {
 
   it('builds every supported geometry kind', async () => {
     const harness = createHarness();
-    harness.create.mockResolvedValue({ created: squareDTO(7) });
+    harness.create.mockResolvedValue({ annotation: squareDTO(7) });
     const inputs = [
       { subtype: 'circle', page: PAGE, bounds: { x: 0, y: 0, width: 10, height: 10 } },
       {
@@ -194,7 +194,7 @@ describe('create() in page space', () => {
 
   it('onUpdated and onDeleted fire once per confirmed change, local and remote', async () => {
     const harness = createHarness();
-    harness.create.mockResolvedValueOnce({ created: squareDTO(5) });
+    harness.create.mockResolvedValueOnce({ annotation: squareDTO(5) });
     const ref = await harness.capability.create({
       subtype: 'square',
       page: PAGE,
@@ -206,7 +206,10 @@ describe('create() in page space', () => {
       log.push(`deleted:${annotationKey(event.ref)}:${event.origin.locality}`),
     );
 
-    harness.update.mockResolvedValueOnce({ updated: squareDTO(5), appearance: { changed: false } });
+    harness.update.mockResolvedValueOnce({
+      annotation: squareDTO(5),
+      appearance: { changed: false },
+    });
     await harness.capability.updateRaw(ref, { subtype: 'square', opacity: 0.5 });
     await harness.capability.delete(ref);
     expect(log).toEqual(['updated:local', 'deleted:obj:5:local']);

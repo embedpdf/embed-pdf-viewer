@@ -24,7 +24,7 @@ export function editUp(model: Model): [Model, Effect[]] {
   const draft = model.draft!;
   if (draft.kind === 'leader') {
     const annotation = model.byId[draft.id];
-    if (annotation?.measure?.intent !== 'LineDimension' || draft.delta === 0) {
+    if (annotation?.measure?.intent !== 'line-dimension' || draft.delta === 0) {
       return [{ ...model, draft: null }, []];
     }
 
@@ -81,7 +81,7 @@ export function editUp(model: Model): [Model, Effect[]] {
     // commit maps it back to stored space — the identity when un-flagged.
     const before = model.byId[draft.id];
     const stored = unanchoredGeom(draft.current, anchorModeOf(before), draft.view);
-    if (before.measure?.intent === 'PolygonDimension') {
+    if (before.measure?.intent === 'polygon-dimension') {
       const readout = shapeMeasurementReadout(stored, before.measure);
       if ('unavailable' in readout && readout.unavailable === 'invalid-geometry') {
         return [{ ...model, draft: null }, []];

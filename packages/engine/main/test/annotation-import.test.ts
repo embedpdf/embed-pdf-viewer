@@ -75,7 +75,7 @@ async function everyKind(): Promise<AnnotationBundle> {
     const page = doc.page(pageRef);
     for (const { data, resources } of creatables()) await page.annotations.create(data, resources);
     const rect = { left: 300, bottom: 300, right: 320, top: 320 };
-    const { created: note } = await page.annotations.create({ subtype: 'text', rect });
+    const { annotation: note } = await page.annotations.create({ subtype: 'text', rect });
     await page.annotations.create({ subtype: 'popup', rect, parent: note.ref });
     await page.annotations.create({ subtype: 'text', rect, reply: { to: note.ref } });
     await page.annotations.create({
@@ -242,7 +242,7 @@ describe.each(['wasm', 'native'] as const)(
         const applied = await importing();
         expect(applied.kind).toBe('resolve');
         if (applied.kind !== 'resolve' || applied.result.tag !== 'annotations.import') return;
-        expect(applied.result.result.created).toHaveLength(count);
+        expect(applied.result.result.annotations).toHaveLength(count);
         expect(applied.result.result.dropped).toEqual([]);
         expect((await draw()).equals(drawn)).toBe(false);
       }
@@ -269,7 +269,9 @@ describe('an import into an open document', () => {
       const before = await page.render.raw();
       expect((await page.annotations.list()).annotations).toEqual([]);
 
-      const { created } = await doc.annotations.import(bundle, { attribution: 'stamp' });
+      const { annotations: created } = await doc.annotations.import(bundle, {
+        attribution: 'stamp',
+      });
 
       // The loaded page lists them and draws them...
       expect((await page.annotations.list()).annotations).toEqual(created);
@@ -311,7 +313,7 @@ describe.each(['wasm', 'native'] as const)('one create (%s runtime)', (prefer) =
     if (created.kind !== 'resolve' || created.result.tag !== 'annotations.create') {
       throw new Error(`the note: ${JSON.stringify(created)}`);
     }
-    const note: AnnotationRef = created.result.result.created.ref;
+    const note: AnnotationRef = created.result.result.annotation.ref;
     return { fault, worker, page, rect, create, note };
   }
 
@@ -369,13 +371,10 @@ describe.each(['wasm', 'native'] as const)('one create (%s runtime)', (prefer) =
       new Uint8Array(await readFile(fixtures.weak)),
       'weak-reply',
     );
-    const { snapshot } = await worker.result(
-      { kind: 'annotations.listRawAll' },
-      'annotations.listRawAll',
-    );
-    const weak = snapshot.pages
-      .flatMap((page) => page.annotations)
-      .find((dto) => dto.ref.kind === 'index' && dto.subtype !== 'popup')!.ref;
+    const { list } = await worker.result({ kind: 'annotations.list' }, 'annotations.list');
+    const weak = list.annotations.find(
+      (dto) => dto.ref.kind === 'index' && dto.subtype !== 'popup',
+    )!.ref;
     expect(weak).toBeDefined();
     const baseline = {
       rewrite: await worker.save('rewrite'),
@@ -399,8 +398,8 @@ describe.each(['wasm', 'native'] as const)('one create (%s runtime)', (prefer) =
     expect(response.kind).toBe('reject');
     expect(await worker.save('rewrite')).toBe(baseline.rewrite);
     expect(await worker.save('incremental')).toBe(baseline.incremental);
-    const after = await worker.result({ kind: 'annotations.listRawAll' }, 'annotations.listRawAll');
-    expect(after.snapshot).toEqual(snapshot);
+    const after = await worker.result({ kind: 'annotations.list' }, 'annotations.list');
+    expect(after.list).toEqual(list);
 
     // And a reply that holds names it.
     const held = await reply();

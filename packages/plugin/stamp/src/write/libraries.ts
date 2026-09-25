@@ -152,11 +152,10 @@ export function createLibraryWrites(
       );
 
       // Library identity: /Title (Acrobat), then format version 1 PieceInfo, then the caller's fallback.
-      const catalogEntries =
-        (await doc.pieceInfo!.read(STAMP_LIBRARY_PIECEINFO_APP))?.entries ?? {};
+      const catalogEntries = (await doc.pieceInfo!.get(STAMP_LIBRARY_PIECEINFO_APP))?.entries ?? {};
       const takenLibraryIds = new Set(Object.keys(ctx.state.get().libraries));
       const libraryId = allocateId(entryString(catalogEntries, 'Id'), 'stamp-lib', takenLibraryIds);
-      const docMeta = await doc.metadata.read();
+      const docMeta = await doc.metadata.get();
       const libraryName =
         (docMeta.title && docMeta.title.length > 0 ? docMeta.title : undefined) ??
         entryString(catalogEntries, 'Name') ??
@@ -217,7 +216,7 @@ export function createLibraryWrites(
         // (`Name`, `Subject`) name the stamps of a library without a registry.
         descriptors = [];
         for (const page of layout.pages) {
-          const version1Entries = (await doc.page(page.ref).pieceInfo?.read(STAMP_PIECEINFO_APP))
+          const version1Entries = (await doc.page(page.ref).pieceInfo?.get(STAMP_PIECEINFO_APP))
             ?.entries;
           const name =
             (version1Entries && entryString(version1Entries, 'Name')) ?? `Stamp${page.index + 1}`;
@@ -250,7 +249,7 @@ export function createLibraryWrites(
         if (!handle.pieceInfo) {
           throw stampError('unsupported', 'canonical PDF libraries need page pieceInfo support');
         }
-        const entries = (await handle.pieceInfo.read(STAMP_PIECEINFO_APP))?.entries ?? {};
+        const entries = (await handle.pieceInfo.get(STAMP_PIECEINFO_APP))?.entries ?? {};
         const kind = options?.kind ?? kindFromPdfName(entryName(entries, 'Kind')) ?? 'stamp';
         const subject = entryString(entries, 'SubjectOverride');
         const categories = entryStringArray(entries, 'Categories');

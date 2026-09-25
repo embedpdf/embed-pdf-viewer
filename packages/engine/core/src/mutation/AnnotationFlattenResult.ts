@@ -11,13 +11,13 @@ export interface AnnotationFlattenInput {
 
 /**
  * Per-ref outcome. `applied`: painted into the page content and removed.
- * `skipped`: left in place — hidden for the usage, a Popup, or without a
+ * `unchanged`: left in place — hidden for the usage, a Popup, or without a
  * usable normal appearance. A ref that is not on the page rejects the whole
  * call with `InvalidArg` before anything is mutated, so it never appears here.
  */
 export interface AnnotationFlattenItemResult {
   ref: AnnotationRef;
-  status: 'applied' | 'skipped';
+  status: 'applied' | 'unchanged';
 }
 
 /**

@@ -455,7 +455,7 @@ export class LayerService {
           );
         }
         // Everything was left out: nothing was written, nothing to commit.
-        if (payload.result.created.length === 0) return payload.result;
+        if (payload.result.annotations.length === 0) return payload.result;
         try {
           return await this.persistAnnotationImport(ctx, input.docId, input.layerName, layer, {
             result: payload.result,
@@ -558,7 +558,7 @@ export class LayerService {
    * deny with 403 without ever issuing a write.
    *
    * V1 implementation: page-fetch + filter. Uses the raw
-   * `annotations.listRawPage` worker job (docPtr dictionary walk — no
+   * `annotations.list` worker job (docPtr dictionary walk — no
    * FPDF_LoadPage; wire-identical DTOs, and this runs on every
    * PATCH/DELETE, so it is the mutation hot path) and finds the row
    * matching the ref. Returns an empty `{}` if the annotation can't be
@@ -586,20 +586,20 @@ export class LayerService {
 
     const build = (jobId: WorkerJobId) =>
       wirePack({
-        kind: 'annotations.listRawPage' as const,
+        kind: 'annotations.list' as const,
         jobId,
         docId,
         layerName,
-        page: toPageRef(pageObjectNumber),
+        pages: [toPageRef(pageObjectNumber)],
       });
     const payload = await this.requirePool().run(docId, build, signal);
-    if (payload.tag !== 'annotations.listRawPage') {
+    if (payload.tag !== 'annotations.list') {
       throw new EngineError(
         EngineErrorCode.WireFormat,
-        `unexpected annotations.listRawPage payload while resolving collab target: ${payload.tag}`,
+        `unexpected annotations.list payload while resolving collab target: ${payload.tag}`,
       );
     }
-    const annotations = payload.snapshot.annotations;
+    const annotations = payload.list.annotations;
     const match = annotations.find((a) => {
       // Refs match in three shapes; objectNumber and nm are durable
       // identities and the safest. Index is positional and resolved
@@ -2468,20 +2468,21 @@ export class LayerService {
     // way to learn the worker's revision state for this page.
     const build = (jobId: WorkerJobId) =>
       wirePack({
-        kind: 'annotations.listRawPage' as const,
+        kind: 'annotations.list' as const,
         jobId,
         docId,
         layerName,
-        page: toPageRef(pageObjectNumber),
+        pages: [toPageRef(pageObjectNumber)],
       });
     const payload = await this.requirePool().run(docId, build, signal);
-    if (payload.tag !== 'annotations.listRawPage') {
+    const pageState = payload.tag === 'annotations.list' ? payload.list.pages[0] : undefined;
+    if (!pageState) {
       throw new EngineError(
         EngineErrorCode.WireFormat,
-        `unexpected annotations.listRawPage payload while rewriting index ref: ${payload.tag}`,
+        `unexpected annotations.list payload while rewriting index ref: ${payload.tag}`,
       );
     }
-    return payload.snapshot.pageState;
+    return pageState;
   }
 
   private async requireLayerPage(

@@ -22,7 +22,9 @@ export async function appearanceRasters(
 ): Promise<Map<string, Raster>> {
   const rasters = new Map<string, Raster>();
   if (raw) {
-    const { appearances } = await page.annotations.renderAppearances({ scale: 1 });
+    const { appearances } = await page.annotations.renderAppearancesRaw({
+      viewport: { kind: 'scale', scale: 1 },
+    });
     for (const { ref, mode, raster } of appearances) {
       if (mode !== 'normal') continue;
       const bytes = new Uint8Array(raster.data);
@@ -37,9 +39,9 @@ export async function appearanceRasters(
     }
     return rasters;
   }
-  const { appearances } = await page.annotations.renderAppearanceImages({
+  const { appearances } = await page.annotations.renderAppearances({
     format: 'png',
-    scale: 1,
+    viewport: { kind: 'scale', scale: 1 },
   });
   for (const { ref, mode, image } of appearances) {
     if (mode !== 'normal' || image.source.kind !== 'bytes') continue;
@@ -55,7 +57,9 @@ export async function appearanceRaster(
 ): Promise<Raster> {
   const key = annotationKey(ref);
   if (raw) {
-    const { appearances } = await page.annotations.renderAppearances({ scale: 1 });
+    const { appearances } = await page.annotations.renderAppearancesRaw({
+      viewport: { kind: 'scale', scale: 1 },
+    });
     const found = appearances.find((a) => annotationKey(a.ref) === key && a.mode === 'normal');
     if (!found) throw new Error(`no appearance rendered for ${key}`);
     const { raster } = found;
@@ -69,9 +73,9 @@ export async function appearanceRaster(
     }
     return { width: raster.width, height: raster.height, rgba };
   }
-  const { appearances } = await page.annotations.renderAppearanceImages({
+  const { appearances } = await page.annotations.renderAppearances({
     format: 'png',
-    scale: 1,
+    viewport: { kind: 'scale', scale: 1 },
   });
   const found = appearances.find((a) => annotationKey(a.ref) === key && a.mode === 'normal');
   if (!found || found.image.source.kind !== 'bytes') {

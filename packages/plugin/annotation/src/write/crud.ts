@@ -158,7 +158,7 @@ export function createCrud(
     );
     const withFlags = (setsFlags ? draft : { ...draft, print: true }) as AnnotationDraft;
     const result = await ctx.doc.page(page).annotations.create(named(withFlags));
-    return result.created.ref;
+    return result.annotation.ref;
   };
 
   const remove = async (ref: AnnotationRef): Promise<void> => {

@@ -48,8 +48,8 @@ export function createIcons(
       .page(toPageRef(pageObjectNumber))
       .annotations.create(named(data), resources)
       .then((result) => {
-        store.commit({ type: 'select', ids: [annotationKey(result.created.ref)] });
-        return result.created.ref;
+        store.commit({ type: 'select', ids: [annotationKey(result.annotation.ref)] });
+        return result.annotation.ref;
       });
 
   /** Place a fixed-size icon annotation (note / file attachment) centred on a
@@ -138,7 +138,9 @@ export function createIcons(
       if (!file) {
         throw new PluginError('not-found', 'annotation', 'the annotation has no attached file');
       }
-      const bytes = await doc.page(annotations.pageOf(ref)).annotations.readResource(ref, 'file');
+      const bytes = await doc
+        .page(annotations.pageOf(ref))
+        .annotations.downloadResource(ref, 'file');
       return { bytes, name: file.name, ...(file.mimeType ? { mimeType: file.mimeType } : {}) };
     },
     setFilePickerProvider: (provider: FilePickerProvider | null) => filePicker.set(provider),

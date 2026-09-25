@@ -24,7 +24,7 @@ export class LocalPageMeasureService implements PageMeasureService {
     private readonly guard: ScopeGuard,
     private readonly publisher: SessionEventPublisher,
   ) {}
-  viewports(): AbortablePromise<PageMeasurementViewport[]> {
+  listViewports(): AbortablePromise<PageMeasurementViewport[]> {
     return AbortablePromise.run(async (signal) => {
       this.check('doc.open');
       const submission = this.queue.enqueue<WorkerResultPayload>(

@@ -36,7 +36,7 @@ export class LocalPageTextService implements PageTextService {
     private readonly guard: ScopeGuard,
   ) {}
 
-  read(): AbortablePromise<PageTextSnapshot> {
+  get(): AbortablePromise<PageTextSnapshot> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),

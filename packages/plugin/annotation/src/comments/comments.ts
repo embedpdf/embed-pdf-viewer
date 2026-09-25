@@ -39,7 +39,7 @@ export function createComments(
     draft: AnnotationDraft,
   ): Promise<AnnotationDTO> => {
     const result = await ctx.doc.page(toPageRef(pageObjectNumber)).annotations.create(named(draft));
-    return result.created;
+    return result.annotation;
   };
 
   const deleteOne = async (ref: AnnotationRef): Promise<void> => {

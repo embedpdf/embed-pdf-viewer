@@ -28,7 +28,7 @@ export type MeasurementAppearance = DistanceAppearance | ShapeMeasurementAppeara
  * axes. The crop keeps numeric rounding in the original PDF coordinate frame.
  */
 export interface DistanceAppearance {
-  intent: 'LineDimension';
+  intent: 'line-dimension';
   measure: PdfMeasurement | null;
   caption: LineDimensionCaption;
   leader?: LineLeader;

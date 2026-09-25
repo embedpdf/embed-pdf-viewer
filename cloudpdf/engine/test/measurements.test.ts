@@ -82,7 +82,7 @@ test('calibration persists an artifact and audit payload without bumping page ca
     ).toEqual(pages);
     // Discard the live worker session: the next read must load the saved artifact.
     fx.bundle.documentService!.invalidateLayerSession(id, 'default');
-    expect((await page.measure!.viewports()).find((v) => v.owned)).toMatchObject({
+    expect((await page.measure!.listViewports()).find((v) => v.owned)).toMatchObject({
       measure: { x: [{ conversion: Math.fround(0.06) }] },
     });
     const row = await fx.db
@@ -122,11 +122,11 @@ test('read-only access can inspect calibration but cannot change it', async () =
     doc = await engine.open({ kind: 'id', id });
   try {
     const page = doc.page((await doc.pages.list()).pages[0].ref);
-    const before = await page.measure!.viewports();
+    const before = await page.measure!.listViewports();
     await expect(page.measure!.setScale(null)).rejects.toMatchObject({
       code: EngineErrorCode.Forbidden,
     });
-    expect(await page.measure!.viewports()).toEqual(before);
+    expect(await page.measure!.listViewports()).toEqual(before);
   } finally {
     await doc.close();
     await engine.destroy();

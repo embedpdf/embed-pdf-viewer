@@ -93,10 +93,10 @@ async function validateOne(
     integrity = snapshot.chainValid ? 'invalid' : 'indeterminate';
   } else {
     try {
-      const contents = await doc.signatures!.contents(signature.field);
+      const contents = await doc.signatures!.getContents(signature.field);
       internal = parseCmsInternal(contents);
       cms = internal.parsed;
-      const digest = await doc.signatures!.digest(signature.field, cms.digestAlgorithm);
+      const digest = await doc.signatures!.getDigest(signature.field, cms.digestAlgorithm);
       const digestMatches = bytesEqual(digest, cms.messageDigest);
       integrity = signature.coverage === 'whole-revision' && digestMatches ? 'valid' : 'invalid';
     } catch (error) {

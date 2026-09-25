@@ -51,8 +51,8 @@ export function runPageFlattenConformance(
           true,
         );
         expect(
-          annotationsAfter.pageState.revision.generation >
-            annotationsBefore.pageState.revision.generation,
+          annotationsAfter.pages[0].revision.generation >
+            annotationsBefore.pages[0].revision.generation,
         ).toBe(true);
 
         const noOp = await doc.pages.flatten([toPageRef(pageObjectNumber)], 'display');

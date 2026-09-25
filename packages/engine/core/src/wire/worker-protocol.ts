@@ -1,10 +1,7 @@
 import type { PageScaleResult } from '../mutation/PageScaleResult';
 import type { PdfMeasure, PageMeasurementViewport } from '../dto/Measure';
 import type { FontIdentityInfo } from '../dto/FontSpec';
-import type {
-  AnnotationListPageSnapshot,
-  AnnotationListSnapshotAllPages,
-} from '../annotation/AnnotationListSnapshot';
+import type { AnnotationList } from '../annotation/AnnotationList';
 import type { AnnotationDraft, AnnotationPatch } from '../annotation/kinds';
 import type { WireAnnotationResources } from '../annotation/resources';
 import type { AnnotationActor } from '../auth/scope';
@@ -289,27 +286,17 @@ export interface ActionsReadWorkerRequest {
   layerName?: string;
 }
 
-export interface AnnotationsListRawAllWorkerRequest {
-  kind: 'annotations.listRawAll';
+/**
+ * The annotations of the given pages, or of every page: a raw read off the
+ * document (no page is loaded), one snapshot per page.
+ */
+export interface AnnotationsListWorkerRequest {
+  kind: 'annotations.list';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-}
-
-export interface AnnotationsListRawPageWorkerRequest {
-  kind: 'annotations.listRawPage';
-  jobId: WorkerJobId;
-  docId: string;
-  layerName?: string;
-  page: PageRef;
-}
-
-export interface AnnotationsListFullPageWorkerRequest {
-  kind: 'annotations.listFullPage';
-  jobId: WorkerJobId;
-  docId: string;
-  layerName?: string;
-  page: PageRef;
+  /** In the order to list them; every page when omitted. */
+  pages?: PageRef[];
 }
 
 /**
@@ -600,9 +587,8 @@ export interface PagesListWorkerRequest {
 
 /**
  * Per-page plain-text extraction. Acquires a pagePtr and runs PDFium's
- * `FPDFText_LoadPage` → `FPDFText_GetText` chain. Identical to
- * `annotations.listFullPage` in shape; both are slow-path per-page
- * reads keyed by indirect object number.
+ * `FPDFText_LoadPage` → `FPDFText_GetText` chain: a slow-path per-page
+ * read keyed by indirect object number.
  */
 export interface PagesTextWorkerRequest {
   kind: 'pages.text';
@@ -1145,9 +1131,7 @@ export type WorkerRequest =
   | MetadataReadWorkerRequest
   | MetadataUpdateWorkerRequest
   | ActionsReadWorkerRequest
-  | AnnotationsListRawAllWorkerRequest
-  | AnnotationsListRawPageWorkerRequest
-  | AnnotationsListFullPageWorkerRequest
+  | AnnotationsListWorkerRequest
   | AnnotationsRenderAppearancesWorkerRequest
   | AnnotationsRenderAppearancesEncodedWorkerRequest
   | AnnotationsCreateWorkerRequest
@@ -1268,9 +1252,7 @@ export type WorkerResultPayload =
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
-  | { tag: 'annotations.listRawAll'; snapshot: AnnotationListSnapshotAllPages }
-  | { tag: 'annotations.listRawPage'; snapshot: AnnotationListPageSnapshot }
-  | { tag: 'annotations.listFullPage'; snapshot: AnnotationListPageSnapshot }
+  | { tag: 'annotations.list'; list: AnnotationList }
   | { tag: 'annotations.renderAppearances'; result: AnnotationAppearancesResult }
   | { tag: 'annotations.renderAppearancesEncoded'; result: AnnotationAppearancesEncodedResultWire }
   | {

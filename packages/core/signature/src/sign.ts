@@ -73,7 +73,7 @@ export async function sign(
       expectedVersion: prepared.expectedVersion,
     });
   } catch (error) {
-    await doc.signatures.abort(prepared.signingId).catch(() => undefined);
+    await doc.signatures.cancel(prepared.signingId).catch(() => undefined);
     throw error;
   }
 }

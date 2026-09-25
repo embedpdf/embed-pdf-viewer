@@ -116,7 +116,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
         borderStyle: 'solid',
         opacity: 1,
       });
-      expect(created.created.subtype).toBe('square');
+      expect(created.annotation.subtype).toBe('square');
       bytes = await doc.download({ mode: 'rewrite' });
       await doc.close();
     }
@@ -166,9 +166,9 @@ describe('annotation rotation (local engine) — save + reopen', () => {
         borderStyle: 'solid',
         opacity: 1,
       });
-      ref = created.created.ref;
+      ref = created.annotation.ref;
 
-      const updated = await page.annotations.update(created.created.ref, {
+      const updated = await page.annotations.update(created.annotation.ref, {
         subtype: 'circle',
         rect: rotatedAabb(movedBox, rotation),
         unrotatedRect: movedBox,
@@ -186,7 +186,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
       baseBytes: annotationsPdf,
       layer: { kind: 'artifact', bytes: artifact },
     });
-    const rendered = await doc.page(toPageRef(PAGE)).annotations.renderAppearances();
+    const rendered = await doc.page(toPageRef(PAGE)).annotations.renderAppearancesRaw();
     const appearance = rendered.appearances.find(
       (candidate) => JSON.stringify(candidate.ref) === JSON.stringify(ref),
     );
@@ -218,7 +218,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
       });
       // Reset: state the clear explicitly (tri-state — omission would
       // preserve the rotation; `null` removes the EMBD keys).
-      await doc.page(toPageRef(PAGE)).annotations.update(created.created.ref, {
+      await doc.page(toPageRef(PAGE)).annotations.update(created.annotation.ref, {
         subtype: 'square',
         rect: SQUARE_RECT,
         rotation: null,
@@ -325,7 +325,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
     // rotation is baked into the vertices (advisory /Rotation only), so the
     // entry's rect is the annotation's own /Rect — never remapped to an
     // unrotated box — and the raster contains the drawn strokes.
-    const rendered = await doc.page(toPageRef(PAGE)).annotations.renderAppearances();
+    const rendered = await doc.page(toPageRef(PAGE)).annotations.renderAppearancesRaw();
     for (const dto of [polyline!, line!, ink!]) {
       const ap = rendered.appearances.find(
         (a) =>
@@ -366,7 +366,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
         color: { r: 30, g: 64, b: 175 },
         opacity: 1,
       });
-      expect(created.created.subtype).toBe('caret');
+      expect(created.annotation.subtype).toBe('caret');
       bytes = await doc.download({ mode: 'rewrite' });
       await doc.close();
     }
@@ -390,7 +390,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
       // /Rect. (Before caret joined BOX_FAMILY_SUBTYPES this returned the
       // rotated AABB and the consumer's re-applied `rotation` doubled the
       // tilt on reload.)
-      const rendered = await doc.page(toPageRef(PAGE)).annotations.renderAppearances();
+      const rendered = await doc.page(toPageRef(PAGE)).annotations.renderAppearancesRaw();
       const ap = rendered.appearances.find(
         (a) =>
           a.ref.kind === 'objectNumber' &&

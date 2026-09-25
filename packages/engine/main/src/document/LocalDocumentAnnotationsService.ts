@@ -9,8 +9,8 @@ import {
   type AnnotationExportSelection,
   type AnnotationImportOptions,
   type AnnotationImportResult,
-  type AnnotationListPageSnapshot,
-  type AnnotationListSnapshotAllPages,
+  type AnnotationList,
+  type AnnotationListOptions,
   type DocumentAnnotationsService,
   type WeakAnnotationEditSession,
   type PageRef,
@@ -28,8 +28,8 @@ interface DocClosedView {
 
 /**
  * Document-scoped annotation reads, dispatched through the same
- * WorkerQueue every other local read uses. The worker host fans out to
- * `RawAnnotationReader.listAll` / `RawAnnotationReader.listOne`.
+ * WorkerQueue every other local read uses. The worker host reads them with
+ * `RawAnnotationReader.list`.
  */
 export class LocalDocumentAnnotationsService implements DocumentAnnotationsService {
   constructor(
@@ -46,7 +46,7 @@ export class LocalDocumentAnnotationsService implements DocumentAnnotationsServi
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
       );
     }
-    // The annotations and the bytes beside them: `readResource`'s gate too.
+    // The annotations and the bytes beside them: `downloadResource`'s gate too.
     try {
       this.guard.assertCapability('doc.annotate.read');
       this.guard.assertCapability('doc.download');
@@ -164,7 +164,7 @@ export class LocalDocumentAnnotationsService implements DocumentAnnotationsServi
     }
   }
 
-  listRawAll(): AbortablePromise<AnnotationListSnapshotAllPages> {
+  list(options: AnnotationListOptions = {}): AbortablePromise<AnnotationList> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -178,61 +178,27 @@ export class LocalDocumentAnnotationsService implements DocumentAnnotationsServi
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) => wirePack({ kind: 'annotations.listRawAll', jobId, docId }),
-      },
-      { priority: Priority.MEDIUM },
-    );
-    return AbortablePromise.run<AnnotationListSnapshotAllPages>(async (signal) => {
-      const onAbort = () => submission.abort(signal.reason);
-      if (signal.aborted) onAbort();
-      else signal.addEventListener('abort', onAbort, { once: true });
-      const payload = await submission;
-      if (payload.tag !== 'annotations.listRawAll') {
-        throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
-      }
-      return payload.snapshot;
-    });
-  }
-
-  listRaw(page: PageRef): AbortablePromise<AnnotationListPageSnapshot> {
-    if (this.view.isClosed()) {
-      return AbortablePromise.rejectReason(
-        new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
-      );
-    }
-    try {
-      this.guard.assertCapability('doc.annotate.read');
-    } catch (err) {
-      return AbortablePromise.rejectReason(err);
-    }
-    const docId = this.docId;
+    const pages = options.pages === undefined ? undefined : [...options.pages];
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'annotations.listRawPage',
-            jobId,
-            docId,
-            page,
-          }),
+          wirePack({ kind: 'annotations.list', jobId, docId, ...(pages ? { pages } : {}) }),
       },
       { priority: Priority.MEDIUM },
     );
-    return AbortablePromise.run<AnnotationListPageSnapshot>(async (signal) => {
+    return AbortablePromise.run<AnnotationList>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
       const payload = await submission;
-      if (payload.tag !== 'annotations.listRawPage') {
+      if (payload.tag !== 'annotations.list') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      return payload.snapshot;
+      return payload.list;
     });
   }
 
-  beginWeakEdit(pages: readonly PageRef[]): AbortablePromise<WeakAnnotationEditSession> {
+  beginEdit(pages: readonly PageRef[]): AbortablePromise<WeakAnnotationEditSession> {
     const session = new LocalWeakAnnotationEditSession(pages);
     return AbortablePromise.resolveValue(session);
   }
@@ -265,7 +231,7 @@ class LocalWeakAnnotationEditSession implements WeakAnnotationEditSession {
     return AbortablePromise.resolveValue(undefined);
   }
 
-  release(): AbortablePromise<void> {
+  close(): AbortablePromise<void> {
     this._pages = [];
     return AbortablePromise.resolveValue(undefined);
   }

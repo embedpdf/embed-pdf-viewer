@@ -70,14 +70,14 @@ export function createPointer(
   if (input.pageBox) input = { ...input, point: clampPointToBox(input.point, input.pageBox) };
   if (
     model.draft?.kind === 'create-distance' ||
-    (measure?.intent === 'LineDimension' && !capture)
+    (measure?.intent === 'line-dimension' && !capture)
   ) {
     return distancePointer(
       model,
       phase,
       input,
       preset,
-      measure?.intent === 'LineDimension' ? measure : undefined,
+      measure?.intent === 'line-dimension' ? measure : undefined,
       flags,
     );
   }
@@ -115,7 +115,7 @@ export function createPointer(
             points: [input.point],
             current: input.point,
             closed: subtype === 'polygon',
-            ...(measure && measure.intent !== 'LineDimension' ? { measure } : {}),
+            ...(measure && measure.intent !== 'line-dimension' ? { measure } : {}),
             ...(flags ? { flags } : {}),
           },
         },

@@ -1,9 +1,5 @@
-import type {
-  AnnotationListPageSnapshot,
-  AnnotationListSnapshotAllPages,
-  PageObjectNumber,
-} from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import type { AnnotationList, PageObjectNumber } from '@embedpdf/engine-core/runtime';
+import { concatAnnotationLists, EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
@@ -29,19 +25,22 @@ export class RawAnnotationReader {
     private readonly fonts?: FontRegistrar,
   ) {}
 
-  listAll(signal: AbortSignal): AnnotationListSnapshotAllPages {
+  /** The given pages in their order, or every page in document order. */
+  list(pages: readonly PageObjectNumber[] | undefined, signal: AbortSignal): AnnotationList {
     throwIfAborted(signal);
-    this.session.ensureFullPageRegistry();
-    const records = this.session.allRecords();
-    const pages: AnnotationListPageSnapshot[] = [];
-    for (const record of records) {
-      throwIfAborted(signal);
-      pages.push(this.listOne(record.pageObjectNumber, signal));
+    if (pages === undefined) {
+      this.session.ensureFullPageRegistry();
+      pages = this.session.allRecords().map((record) => record.pageObjectNumber);
     }
-    return { pages };
+    const lists: AnnotationList[] = [];
+    for (const pageObjectNumber of pages) {
+      throwIfAborted(signal);
+      lists.push(this.listOne(pageObjectNumber, signal));
+    }
+    return concatAnnotationLists(lists);
   }
 
-  listOne(pageObjectNumber: PageObjectNumber, signal: AbortSignal): AnnotationListPageSnapshot {
+  listOne(pageObjectNumber: PageObjectNumber, signal: AbortSignal): AnnotationList {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();

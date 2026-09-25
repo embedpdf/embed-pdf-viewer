@@ -124,7 +124,7 @@ The metadata plugin is a complete mirror plugin in one file
 const metadata = ctx.mirror<DocumentMetadata | null>({
   name: 'metadata',
   initial: () => null,
-  load: async (doc) => ({ value: await doc.metadata.read() }),
+  load: async (doc) => ({ value: await doc.metadata.get() }),
   fold: (value, event) =>
     event.type === 'metadata.updated' ? event.metadata : value,
   changed: ({ cause, event, previous, next }) => {

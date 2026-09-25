@@ -1,6 +1,7 @@
 import { Buffer } from 'node:buffer';
 
 import {
+  appearanceLatticeScale,
   EngineError,
   EngineErrorCode,
   wirePack,
@@ -208,10 +209,10 @@ export class DerivedRenderService {
   /**
    * Classify an appearance-batch render against the appearance scale
    * lattice. Same conservative construction as `classify`: any option
-   * outside the canonical set — off-lattice scale, rotation, quality,
-   * non-normal modes, png — is off-lattice. `scale` defaults to 1 (the
-   * DTO's documented default), so an unspecified scale is canonical when
-   * the lattice contains 1. Durable appearance batches are a fast-follow;
+   * outside the canonical set — a `width` viewport, an off-lattice scale,
+   * rotation, quality, non-normal modes, png — is off-lattice. The scale
+   * defaults to 1 (the DTO's documented default), so an unspecified
+   * viewport is canonical when the lattice contains 1. Durable appearance batches are a fast-follow;
    * until then this feeds enforcement only.
    */
   classifyAppearance(input: {
@@ -219,9 +220,10 @@ export class DerivedRenderService {
     format: PageNetworkRenderFormat;
   }): { onLattice: boolean } {
     const o = input.imageOptions;
-    const scale = o.scale ?? 1;
+    const scale = o.viewport === undefined ? 1 : appearanceLatticeScale(o.viewport);
     const normalOnly = o.modes === undefined || (o.modes.length === 1 && o.modes[0] === 'normal');
     const onLattice =
+      scale !== undefined &&
       this.appearanceScales.includes(scale) &&
       input.format === 'webp' &&
       (o.rotation === undefined || o.rotation === 0) &&

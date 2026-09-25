@@ -46,7 +46,7 @@ describe('doc.render.policy (cloud)', () => {
     const doc = await engine.open({ kind: 'id', id: DOC_ID });
     try {
       expect(doc.render).toBeDefined();
-      const policy = await doc.render!.policy();
+      const policy = await doc.render!.getPolicy();
       // The deployment default: a full-page width ladder
       // — the bounded quantity is output pixels, never zoom — plus the
       // appearance scale lattice (appearances must track the page's
@@ -74,7 +74,7 @@ describe('doc.render.policy (cloud)', () => {
 
       // Policy reads are cached-access reads after the first call — no
       // extra handshake shape; calling again is cheap and identical.
-      expect(await doc.render!.policy()).toEqual(policy);
+      expect(await doc.render!.getPolicy()).toEqual(policy);
     } finally {
       await doc.close();
     }

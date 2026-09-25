@@ -84,11 +84,11 @@ describe('pixelChangeOf — the built-in event → pixels map', () => {
       changeOf({
         type: 'annotations.flattened',
         page,
-        results: [{ status: 'skipped' }, { status: 'applied' }],
+        results: [{ status: 'unchanged' }, { status: 'applied' }],
       }),
     ).toEqual({ pages: [22], scope: 'content' });
     expect(
-      changeOf({ type: 'annotations.flattened', page, results: [{ status: 'skipped' }] }),
+      changeOf({ type: 'annotations.flattened', page, results: [{ status: 'unchanged' }] }),
     ).toBeNull();
   });
 

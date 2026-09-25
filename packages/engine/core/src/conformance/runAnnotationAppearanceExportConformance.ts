@@ -48,8 +48,8 @@ export function runAnnotationAppearanceExportConformance(
         const pageObjectNumber = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
         const page = doc.page(toPageRef(pageObjectNumber));
         if (!page.annotations.exportAppearance) return;
-        const a = (await page.annotations.create(square(20, 20))).created.ref;
-        const b = (await page.annotations.create(square(100, 60, 30))).created.ref;
+        const a = (await page.annotations.create(square(20, 20))).annotation.ref;
+        const b = (await page.annotations.create(square(100, 60, 30))).annotation.ref;
         const before = await page.annotations.list();
 
         const bytes = await page.annotations.exportAppearance([a, b]);
@@ -58,7 +58,7 @@ export function runAnnotationAppearanceExportConformance(
 
         const after = await page.annotations.list();
         expect(after.annotations.length).toBe(before.annotations.length);
-        expect(after.pageState.revision.generation).toBe(before.pageState.revision.generation);
+        expect(after.pages[0].revision.generation).toBe(before.pages[0].revision.generation);
 
         if (opts.openKind !== 'bytes') return;
         exported = await engine.open({ kind: 'bytes', id: `${opts.fixture.id}-appearance`, bytes });
@@ -86,8 +86,8 @@ export function runAnnotationAppearanceExportConformance(
         });
         if (layout.pages.length < 2) return;
         const page1 = doc.page(layout.pages[1].ref);
-        const own = (await page0.annotations.create(square(20, 100))).created.ref;
-        const foreign = (await page1.annotations.create(square(20, 100))).created.ref;
+        const own = (await page0.annotations.create(square(20, 100))).annotation.ref;
+        const foreign = (await page1.annotations.create(square(20, 100))).annotation.ref;
         await expect(page0.annotations.exportAppearance([own, foreign])).rejects.toMatchObject({
           code: EngineErrorCode.InvalidArg,
         });

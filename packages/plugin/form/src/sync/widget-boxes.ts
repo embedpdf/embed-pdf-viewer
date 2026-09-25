@@ -27,9 +27,9 @@ function affectedPages(event: DocumentEvent): readonly PageRef[] | 'all' | null 
     case 'form.repaired':
       return 'all';
     case 'annotation.created':
-      return event.created.subtype === 'widget' ? [event.page] : null;
+      return event.annotation.subtype === 'widget' ? [event.page] : null;
     case 'annotation.updated':
-      return event.updated.subtype === 'widget' ? [event.page] : null;
+      return event.annotation.subtype === 'widget' ? [event.page] : null;
     case 'annotation.deleted':
       return [event.page];
     default:

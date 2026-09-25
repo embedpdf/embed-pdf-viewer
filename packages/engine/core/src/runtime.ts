@@ -46,6 +46,7 @@ export type {
 } from './engine/DocumentSecurityService';
 export {
   CONTINUOUS_RENDER_POLICY,
+  appearanceLatticeScale,
   snapAppearanceScale,
   snapFullPageViewport,
   snapTileScale,
@@ -99,9 +100,7 @@ export type {
   MetadataReadWorkerRequest,
   MetadataUpdateWorkerRequest,
   ActionsReadWorkerRequest,
-  AnnotationsListRawAllWorkerRequest,
-  AnnotationsListRawPageWorkerRequest,
-  AnnotationsListFullPageWorkerRequest,
+  AnnotationsListWorkerRequest,
   AnnotationsRenderAppearancesWorkerRequest,
   AnnotationsRenderAppearancesEncodedWorkerRequest,
   AnnotationAppearancesEncodedResultWire,

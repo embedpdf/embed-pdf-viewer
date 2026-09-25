@@ -249,7 +249,7 @@ describe('planAnnotationImport', () => {
   });
 
   test('imports an item without a field it can only read as a marker', () => {
-    const geo = annotation(first, 10, 0, { subtype: 'line', measure: { subtype: 'GEO' } });
+    const geo = annotation(first, 10, 0, { subtype: 'line', measure: { subtype: 'geospatial' } });
     const unknown = annotation(first, 11, 1, { subtype: 'line', measure: { subtype: 'unknown' } });
     const { creates, dropped } = plan(
       bundleOf(

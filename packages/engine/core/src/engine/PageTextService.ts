@@ -10,5 +10,5 @@ import type { AbortablePromise } from '../promise/AbortablePromise';
  * the text changes only with the page's content.
  */
 export interface PageTextService {
-  read(): AbortablePromise<PageTextSnapshot>;
+  get(): AbortablePromise<PageTextSnapshot>;
 }

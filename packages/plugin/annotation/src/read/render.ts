@@ -185,7 +185,9 @@ export function createRenderReads(
     renderAppearances: (page: PageRef, scale: number, signal?: AbortSignal) => {
       const doc = ctx.doc;
       if (!doc) return Promise.resolve([]);
-      const task = doc.page(page).annotations.renderAppearanceImages({ scale });
+      const task = doc
+        .page(page)
+        .annotations.renderAppearances({ viewport: { kind: 'scale', scale } });
       if (signal) {
         if (signal.aborted) task.abort(signal.reason);
         else signal.addEventListener('abort', () => task.abort(signal.reason), { once: true });

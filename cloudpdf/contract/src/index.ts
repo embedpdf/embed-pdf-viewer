@@ -5,8 +5,11 @@ import {
 } from '@embedpdf/engine-core/wire';
 import type { DocCapability } from '@embedpdf/engine-core/runtime';
 import {
-  AnnotationListPageSnapshotSchema,
-  AnnotationListSnapshotAllPagesSchema,
+  AnnotationCreateResultSchema,
+  AnnotationDeleteResultSchema,
+  AnnotationFlattenResultSchema,
+  AnnotationListSchema,
+  AnnotationUpdateResultSchema,
   DocumentHeadSchema,
   DocumentManifestSchema,
   DocumentMetadataSchema,
@@ -1700,7 +1703,7 @@ export const docOperations = {
     requestHeaders: [documentPasswordHeader],
     params: DocPageParamsSchema,
     responses: {
-      200: { contentType: 'application/json', schema: AnnotationListPageSnapshotSchema },
+      200: { contentType: 'application/json', schema: AnnotationListSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
   },
@@ -1718,7 +1721,7 @@ export const docOperations = {
     notes:
       'Returns one entry per page plus the audit-log cursor for reconciling subsequent document events. Page order is unspecified; join by `pageState.pageObjectNumber` when display order matters.',
     responses: {
-      200: { contentType: 'application/json', schema: AnnotationListSnapshotAllPagesSchema },
+      200: { contentType: 'application/json', schema: AnnotationListSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       409: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
@@ -1739,7 +1742,7 @@ export const docOperations = {
       'Doc JWTs may instead carry collab scopes (annotations:create:self, …) that refine ' +
       'per-annotation authorship rules; the API token is exempt from both.',
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: AnnotationCreateResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
@@ -1757,7 +1760,7 @@ export const docOperations = {
     params: DocAnnotationParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: AnnotationUpdateResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
@@ -1774,7 +1777,7 @@ export const docOperations = {
     requestHeaders: [documentPasswordHeader],
     params: DocAnnotationParamsSchema,
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: AnnotationDeleteResultSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
   },
@@ -1782,7 +1785,7 @@ export const docOperations = {
     operationId: 'doc.annotations.flatten',
     title: 'Flatten annotations',
     summary:
-      "Flatten a chosen set of one page's annotations into its content — pages.flatten for a selection. Painted annotations are removed; ineligible ones report skipped.",
+      "Flatten a chosen set of one page's annotations into its content — pages.flatten for a selection. Painted annotations are removed; ineligible ones report unchanged.",
     method: 'POST',
     path: wireTemplates.layerAnnotationItemsFlatten,
     credentials: docCredentials,
@@ -1792,7 +1795,7 @@ export const docOperations = {
     params: DocPageParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: AnnotationFlattenResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },

@@ -84,7 +84,7 @@ describe('measurement arithmetic and formatting', () => {
     const m = measureFromKnownLength(1, { value: 1.00000001, unit: 'm' });
     const d = {
       subtype: 'line',
-      intent: 'LineDimension',
+      intent: 'line-dimension',
       measure: m,
       linePoints: { start: { x: 0, y: 0 }, end: { x: 3.4450000001, y: 0 } },
     };
@@ -98,7 +98,7 @@ describe('measurement arithmetic and formatting', () => {
   });
   test('anisotropic scale requires CYX; missing conversion is unavailable', () => {
     const m: PdfMeasure = {
-      subtype: 'RL',
+      subtype: 'rectilinear',
       x: [{ unit: 'm', conversion: 1 }],
       y: [{ unit: 'm', conversion: 2 }],
       distance: [{ unit: 'm', conversion: 1 }],
@@ -106,7 +106,7 @@ describe('measurement arithmetic and formatting', () => {
     };
     const d = {
       subtype: 'line',
-      intent: 'LineDimension',
+      intent: 'line-dimension',
       measure: m,
       linePoints: { start: { x: 0, y: 0 }, end: { x: 3, y: 2 } },
     };
@@ -136,7 +136,7 @@ describe('measurement arithmetic and formatting', () => {
     );
     const r = measurementReadout({
       subtype: 'polygon',
-      intent: 'PolygonDimension',
+      intent: 'polygon-dimension',
       measure,
       vertices: points,
     });
@@ -145,7 +145,7 @@ describe('measurement arithmetic and formatting', () => {
   test('viewport selection is last-containing, foreign included', () => {
     const a: PdfViewport = {
       bbox: { left: -20, right: 100, bottom: -40, top: 100 },
-      measure: { subtype: 'GEO' },
+      measure: { subtype: 'geospatial' },
     };
     expect(viewportForPoint([a, { ...a, name: 'last' }], { x: 0, y: 0 })?.name).toBe('last');
     expect(viewportForPoint([a], { x: -30, y: 0 })).toBeUndefined();
@@ -161,12 +161,12 @@ describe('measurement arithmetic and formatting', () => {
   });
   test('an update may send back the marker of a scale the engine cannot model', () => {
     expect(
-      LinePatchSchema.safeParse({ subtype: 'line', measure: { subtype: 'GEO' } }).success,
+      LinePatchSchema.safeParse({ subtype: 'line', measure: { subtype: 'geospatial' } }).success,
     ).toBe(true);
   });
   test('malformed imported factors remain readable, but cannot be authored', () => {
     const imported = {
-      subtype: 'RL',
+      subtype: 'rectilinear',
       x: [{ unit: 'm', conversion: 0 }],
       distance: [{ unit: 'm' }],
       area: [],
@@ -186,7 +186,7 @@ describe('area boundary validity', () => {
   const read = (points: number[][]) =>
     measurementReadout({
       subtype: 'polygon',
-      intent: 'PolygonDimension',
+      intent: 'polygon-dimension',
       measure,
       vertices: points.map(([x, y]) => ({ x, y })),
     });

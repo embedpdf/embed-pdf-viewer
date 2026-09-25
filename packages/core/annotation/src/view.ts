@@ -79,7 +79,7 @@ function effMeasure(model: Model, id: Id) {
     return moveMeasurementCaption(annotation.geometry, measure, draft.delta, annotation.style);
   }
 
-  if (draft.kind === 'leader' && draft.id === id && measure.intent === 'LineDimension') {
+  if (draft.kind === 'leader' && draft.id === id && measure.intent === 'line-dimension') {
     return {
       ...measure,
       leader: {
@@ -617,7 +617,7 @@ export function chrome(
     const rot = geomRotation(geometry);
     const measure = effMeasure(model, annotation.id);
     const distance =
-      measure?.intent === 'LineDimension' && distanceLayout(geometry, measure, style.strokeWidth);
+      measure?.intent === 'line-dimension' && distanceLayout(geometry, measure, style.strokeWidth);
     const frame = effectiveSelectionFrame(model, annotation.id, geometry, view);
     if (frame.angle !== 0) {
       nodes.push({ kind: 'obb', corners: frame.corners, angle: frame.angle });

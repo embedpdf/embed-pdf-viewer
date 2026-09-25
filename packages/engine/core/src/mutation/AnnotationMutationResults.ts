@@ -10,7 +10,7 @@ import type { AnnotationStableId } from '../identity/AnnotationStableId';
  * object) and reads it back via `EPDFPage_GetAnnotByObjectNumber`.
  */
 export interface AnnotationCreateResult {
-  created: AnnotationDTO;
+  annotation: AnnotationDTO;
   meta: AnnotationListMutationMeta;
 }
 
@@ -18,12 +18,12 @@ export interface AnnotationUpdateResult {
   /**
    * The updated annotation, fully materialised after the patch.
    *
-   * Note: `updated.ref` may be **stronger** than the input ref. If the
+   * Note: `annotation.ref` may be **stronger** than the input ref. If the
    * caller updated by `kind: 'index'` against a weak annotation (no /NM,
    * no indirect object number), the engine stamps a fresh
    * engine-generated UUID v4 as /NM during the update. The returned ref
    * will then be `kind: 'nm'`. This is non-structural (no revision bump,
-   * no `shouldRefetch`); use `meta.changed[0]` (or `updated.ref`) to
+   * no `shouldRefetch`); use `meta.changed[0]` (or `annotation.ref`) to
    * update cache keys.
    *
    * /NM is monotonic per annotation:
@@ -38,7 +38,7 @@ export interface AnnotationUpdateResult {
    * intentionally no `patch.nm` — a stable id that callers can rename
    * mid-session is not stable.
    */
-  updated: AnnotationDTO;
+  annotation: AnnotationDTO;
   /**
    * The engine's appearance verdict for this update (see
    * {@link AppearanceOutcome}). Clients drive raster invalidation off
@@ -50,15 +50,19 @@ export interface AnnotationUpdateResult {
   meta: AnnotationListMutationMeta;
 }
 
+/** A delete: nothing exists after it, so only `meta`. */
 export interface AnnotationDeleteResult {
-  /**
-   * Stable id of the annotation that was deleted. `null` for a weak
-   * annotation (no objectNumber, no /NM): the engine refuses to fabricate
-   * a stable id at delete time, so callers that targeted by index
-   * receive `null` and must fall back to refetching the page list.
-   */
-  deleted: AnnotationStableId | null;
   meta: AnnotationListMutationMeta;
+}
+
+/**
+ * What a delete removed, as its `annotation.deleted` event names it for
+ * listeners that didn't make the call: the stable id in `meta.changed`, or
+ * `null` for a weak annotation (no objectNumber, no /NM), for which the
+ * engine refuses to fabricate one — those listeners refetch the page list.
+ */
+export function deletedAnnotationOf(result: AnnotationDeleteResult): AnnotationStableId | null {
+  return result.meta.changed[0] ?? null;
 }
 
 /**
@@ -67,9 +71,9 @@ export interface AnnotationDeleteResult {
  *
  * Note on identity: any weak ref in the batch is opportunistically
  * upgraded to `kind: 'nm'` with an engine-stamped UUID v4 before the
- * move happens, mirroring `update()`. So `moved[i].ref` may be stronger
- * than the corresponding input ref. Each `moved[i].index` reflects the
- * post-move index, which is exactly `toIndex + i`.
+ * move happens, mirroring `update()`. So `annotations[i].ref` may be
+ * stronger than the corresponding input ref. Each `annotations[i].index`
+ * reflects the post-move index, which is exactly `toIndex + i`.
  *
  * Move is structural for the per-page index space — bumps the page
  * revision once per batch, and `meta.shouldRefetch` is set iff the prior
@@ -78,10 +82,10 @@ export interface AnnotationDeleteResult {
 export interface AnnotationMoveResult {
   /**
    * The moved annotations in their **new order**. `length === refs.length`.
-   * `moved[i]` is the post-move DTO of `refs[i]`, and lives at index
+   * `annotations[i]` is the post-move DTO of `refs[i]`, and lives at index
    * `toIndex + i` in the page's /Annots array.
    */
-  moved: AnnotationDTO[];
+  annotations: AnnotationDTO[];
   /**
    * One structural envelope per batch. One revision bump, one impact
    * computation, regardless of `refs.length`. `meta.changed` lists the

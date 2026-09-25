@@ -69,7 +69,7 @@ function harness(config?: ActionsConfig) {
           ],
         }),
       },
-      actions: { read: async () => ({ nameTreeScripts: [], openAction, willSave }) },
+      actions: { get: async () => ({ nameTreeScripts: [], openAction, willSave }) },
     } as unknown as Partial<DocumentHandle>,
   });
   // The page's own /AA tree, as the kernel's page registry carries it.

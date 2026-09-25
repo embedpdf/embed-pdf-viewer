@@ -165,7 +165,7 @@ export class CloudDocumentHandle implements DocumentHandle {
     // A pre-lattice server (no renderPolicy field) enforces nothing:
     // `continuous` is the honest answer.
     this.render = {
-      policy: () =>
+      getPolicy: () =>
         AbortablePromise.run(async () => {
           const cached =
             security.currentAccess ?? (await security.establishAccess()).access ?? null;
@@ -423,7 +423,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       ...this.manifestCache,
       docVersion: delta?.docVersion ?? this.manifestCache.docVersion,
       // Bulk annotations pin: absorbed when the mutation bumped it, so the
-      // next `listRawAll` addresses the fresh bulk leaf without a
+      // next `annotations.list()` addresses the fresh bulk leaf without a
       // 404-refresh round trip.
       ...(delta?.annotationsVersion !== undefined
         ? { annotationsVersion: delta.annotationsVersion }
@@ -665,7 +665,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       initialCursor: this.hub.lastServerId() ?? this.manifestCache?.auditHead ?? null,
       onRow: (row) => {
         // Advance the cached manifest's audit cursor — own echoes and
-        // unknown kinds included — so a later `listRawAll` never stamps a
+        // unknown kinds included — so a later `annotations.list()` never stamps a
         // cursor older than the pins the absorbed cache hands it.
         if (this.manifestCache && row.id > this.manifestCache.auditHead) {
           this.manifestCache = { ...this.manifestCache, auditHead: row.id };

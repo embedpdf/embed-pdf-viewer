@@ -2,6 +2,7 @@ import {
   AbortablePromise,
   EngineError,
   EngineErrorCode,
+  deletedAnnotationOf,
   createPageImageHandle,
   encodeStableIdKey,
   hasAnnotationResources,
@@ -15,7 +16,7 @@ import {
   type AnnotationAppearanceRenderOptions,
   type AnnotationAppearancesResult,
   type AnnotationDraft,
-  type AnnotationListPageSnapshot,
+  type AnnotationList,
   type AnnotationPatch,
   type AnnotationRef,
   type AnnotationCreateResult,
@@ -34,7 +35,7 @@ import {
 import {
   AnnotationCreateResultSchema,
   AnnotationDeleteResultSchema,
-  AnnotationListPageSnapshotSchema,
+  AnnotationListSchema,
   AnnotationAppearanceManifestSchema,
   AnnotationFlattenResultSchema,
   AnnotationMoveResultSchema,
@@ -69,13 +70,13 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     private readonly publisher: SessionEventPublisher,
   ) {}
 
-  list(): AbortablePromise<AnnotationListPageSnapshot> {
+  list(): AbortablePromise<AnnotationList> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
-    return AbortablePromise.run<AnnotationListPageSnapshot>(async (signal) => {
+    return AbortablePromise.run<AnnotationList>(async (signal) => {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
         const pageObjectNumber = this.pageRef.pageObjectNumber;
@@ -101,7 +102,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       };
       return this.http.getJsonWithRefresh(
         buildPath,
-        (raw) => AnnotationListPageSnapshotSchema.parse(raw),
+        (raw) => AnnotationListSchema.parse(raw),
         async (s) => {
           await this.manifest.refresh(s);
         },
@@ -110,18 +111,18 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     });
   }
 
-  renderAppearances(
+  renderAppearancesRaw(
     _options?: AnnotationAppearanceRenderOptions,
   ): AbortablePromise<AnnotationAppearancesResult> {
     return AbortablePromise.rejectReason(
       new EngineError(
         EngineErrorCode.NotImplemented,
-        'annotations.renderAppearances() raw rasters are not available in the cloud engine; use renderAppearanceImages()',
+        'annotations.renderAppearancesRaw() raw rasters are not available in the cloud engine; use renderAppearances()',
       ),
     );
   }
 
-  renderAppearanceImages(
+  renderAppearances(
     options: AnnotationAppearanceImageOptions = {},
   ): AbortablePromise<AnnotationAppearanceImagesResult> {
     if (this.isClosed()) {
@@ -179,7 +180,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
    * cannot be spliced into a GET URL (no body to carry the revision), so both
    * require a stable id — the same `:annotKey` routing update()/delete() use.
    */
-  readResource(ref: AnnotationRef, role: AnnotationResourceRole): AbortablePromise<Uint8Array> {
+  downloadResource(ref: AnnotationRef, role: AnnotationResourceRole): AbortablePromise<Uint8Array> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
@@ -197,7 +198,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       return AbortablePromise.rejectReason(
         new EngineError(
           EngineErrorCode.InvalidArg,
-          'readResource requires a stable ref (objectNumber or nm); index refs cannot address a resource URL',
+          'downloadResource requires a stable ref (objectNumber or nm); index refs cannot address a resource URL',
         ),
       );
     }
@@ -372,7 +373,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
           (raw) => AnnotationDeleteResultSchema.parse(raw),
           signal,
         );
-        return this.absorbMutation(result, 'annotation.deleted');
+        return this.absorbDelete(result);
       });
     }
     const stableKey = encodeStableIdKey(refToStableId(ref));
@@ -388,7 +389,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         (raw) => AnnotationDeleteResultSchema.parse(raw),
         signal,
       );
-      return this.absorbMutation(result, 'annotation.deleted');
+      return this.absorbDelete(result);
     });
   }
 
@@ -491,9 +492,21 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
    * `type` with the matching result by construction; the cast localizes that
    * pairing here instead of widening every site.
    */
+  /** A delete's event names what went, for listeners that didn't delete it. */
+  private absorbDelete(result: AnnotationDeleteResult): AnnotationDeleteResult {
+    this.manifest.apply(result.meta, ['annotations']);
+    this.publisher.publishLocal({
+      type: 'annotation.deleted',
+      page: this.pageRef,
+      deleted: deletedAnnotationOf(result),
+      ...result,
+    });
+    return result;
+  }
+
   private absorbMutation<T extends { meta: MutationMeta }>(
     result: T,
-    type: 'annotation.created' | 'annotation.updated' | 'annotation.deleted' | 'annotation.moved',
+    type: 'annotation.created' | 'annotation.updated' | 'annotation.moved',
   ): T {
     this.manifest.apply(result.meta, ['annotations']);
     this.publisher.publishLocal({

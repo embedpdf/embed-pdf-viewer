@@ -82,7 +82,7 @@ async function loaded(dto: AnnotationDTO) {
   vi.useFakeTimers();
   expect(harness.model().order.length).toBe(1);
   const id = harness.model().order[0]!;
-  harness.update.mockResolvedValue({ updated: dto, appearance: { changed: false } });
+  harness.update.mockResolvedValue({ annotation: dto, appearance: { changed: false } });
   return {
     ...harness,
     id,
@@ -121,7 +121,7 @@ describe('the editor document', () => {
   it('never re-ingests the commit echo (it may be behind the keyboard)', async () => {
     const harness = await loaded(freeTextDTO('hello'));
     harness.update.mockResolvedValue({
-      updated: freeTextDTO('stale'),
+      annotation: freeTextDTO('stale'),
       appearance: { changed: true },
     });
     harness.capability.beginTextEdit(REF);

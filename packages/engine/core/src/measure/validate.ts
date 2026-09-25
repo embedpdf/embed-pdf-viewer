@@ -3,7 +3,8 @@ import { validNumberFormat } from './format';
 
 /** Shared preflight for HTTP, workers and calibration helpers. Does not write. */
 export function assertWritableMeasure(value: PdfMeasure): void {
-  if (value.subtype !== 'RL') throw new RangeError('Only rectilinear measures can be authored');
+  if (value.subtype !== 'rectilinear')
+    throw new RangeError('Only rectilinear measures can be authored');
   if (value.ratio !== undefined && (typeof value.ratio !== 'string' || value.ratio.includes('\0')))
     throw new RangeError('Invalid scale ratio');
   for (const key of ['x', 'y', 'distance', 'area', 'angle', 'slope'] as const) {

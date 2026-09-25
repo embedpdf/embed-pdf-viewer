@@ -84,7 +84,7 @@ export class LocalDocumentHandle implements DocumentHandle {
   ) {
     const view = { isClosed: () => this.closed };
     this.renderPolicy = renderPolicy;
-    this.render = { policy: () => AbortablePromise.resolveValue(this.renderPolicy) };
+    this.render = { getPolicy: () => AbortablePromise.resolveValue(this.renderPolicy) };
     const hub = new EventHub();
     this.events = hub;
     // A single instance, so every event is `kind: 'local'` — the same

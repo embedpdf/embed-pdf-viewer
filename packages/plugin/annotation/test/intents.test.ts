@@ -108,7 +108,7 @@ const remoteUpdate = (dto: AnnotationDTO): DocumentEvent =>
     type: 'annotation.updated',
     page: PAGE,
     origin: { kind: 'remote', sessionId: 'cloud:bob', sub: 'bob', ts: 0, serverId: 50 },
-    updated: dto,
+    annotation: dto,
     appearance: { changed: false },
     meta: {
       affectedPages: [],
@@ -186,7 +186,7 @@ describe('a refused write shows the truth', () => {
       if (target.kind === 'objectNumber' && target.annotObjectNumber === 21) {
         throw new Error('Forbidden');
       }
-      return { updated: square(20, { color: { r: 0, g: 255, b: 0 } }) };
+      return { annotation: square(20, { color: { r: 0, g: 255, b: 0 } }) };
     });
     harness.capability.select([ref(20), ref(21)]);
 
@@ -223,7 +223,7 @@ describe('what the capability says about a write', () => {
     const restyle = harness.capability.updateSelection({ color: '#00ff00' });
     expect(harness.capability.get(ref(20))!.pending).toBe(true);
     expect(harness.capability.get(ref(20))!.raw).toEqual(square(20));
-    write.resolve({ updated: square(20, { color: { r: 0, g: 255, b: 0 } }) });
+    write.resolve({ annotation: square(20, { color: { r: 0, g: 255, b: 0 } }) });
     await restyle;
 
     expect(harness.capability.get(ref(20))!.pending).toBeUndefined();
@@ -264,7 +264,7 @@ describe('typing', () => {
     await vi.advanceTimersByTimeAsync(300); // the debounced write of 'Hello w' starts
     expect(harness.update).toHaveBeenCalledTimes(1);
     harness.capability.draftContents(ref(30), 'Hello world');
-    firstWrite.resolve({ updated: freeText('Hello w') });
+    firstWrite.resolve({ annotation: freeText('Hello w') });
     await vi.advanceTimersByTimeAsync(0);
 
     expect(harness.capability.get(ref(30))!.contents).toBe('Hello world');
@@ -278,7 +278,7 @@ describe('weak annotations (direct objects without /NM)', () => {
     await harness.load([weakSquare()]);
     const named = { kind: 'nm', page: PAGE, nm: 'u-1' } as const;
     harness.update.mockResolvedValueOnce({
-      updated: square(0, { ref: named, index: 3, nm: 'u-1', color: { r: 0, g: 255, b: 0 } }),
+      annotation: square(0, { ref: named, index: 3, nm: 'u-1', color: { r: 0, g: 255, b: 0 } }),
       appearance: { changed: true },
     });
     harness.capability.select(WEAK_REF);
@@ -312,12 +312,14 @@ describe('several changes to one record', () => {
     const locked = { ...NO_FLAGS, locked: true };
 
     harness.capability.draftContents(ref(30), 'Hello world'); // written after a pause
-    harness.update.mockResolvedValueOnce({ updated: freeText('Hello', { flags: locked }) });
+    harness.update.mockResolvedValueOnce({ annotation: freeText('Hello', { flags: locked }) });
     await harness.capability.updateSelectionFlags({ locked: true });
     expect(harness.capability.get(ref(30))!.contents).toBe('Hello world');
     expect(harness.capability.get(ref(30))!.flags.locked).toBe(true);
 
-    harness.update.mockResolvedValueOnce({ updated: freeText('Hello world', { flags: locked }) });
+    harness.update.mockResolvedValueOnce({
+      annotation: freeText('Hello world', { flags: locked }),
+    });
     await vi.advanceTimersByTimeAsync(300);
     expect(harness.update.mock.calls[1]![1]).toMatchObject({
       subtype: 'free-text',
@@ -333,7 +335,7 @@ describe('several changes to one record', () => {
     const moved = { left: 200, bottom: 600, right: 400, top: 640 };
 
     harness.capability.draftContents(ref(30), 'Hello world');
-    harness.update.mockResolvedValueOnce({ updated: freeText('Hello', { rect: moved }) });
+    harness.update.mockResolvedValueOnce({ annotation: freeText('Hello', { rect: moved }) });
     await harness.capability.updateRaw(ref(30), { subtype: 'free-text', rect: moved } as never);
 
     const annotation = harness.capability.get(ref(30))!;
@@ -349,13 +351,13 @@ describe('several changes to one record', () => {
     const older = deferred<unknown>();
     harness.update
       .mockReturnValueOnce(older.promise)
-      .mockResolvedValueOnce({ updated: square(20, { color: { r: 0, g: 0, b: 255 } }) });
+      .mockResolvedValueOnce({ annotation: square(20, { color: { r: 0, g: 0, b: 255 } }) });
 
     const red = harness.capability.updateSelection({ color: '#ff0000' });
     await harness.capability.updateSelection({ color: '#0000ff' });
     expect(harness.capability.get(ref(20))!.props.color).toBe('#0000ff');
 
-    older.resolve({ updated: square(20, { color: { r: 0, g: 0, b: 255 } }) });
+    older.resolve({ annotation: square(20, { color: { r: 0, g: 0, b: 255 } }) });
     await red;
     expect(harness.capability.get(ref(20))!.props.color).toBe('#0000ff');
   });
@@ -367,7 +369,7 @@ describe('several changes to one record', () => {
     const older = deferred<unknown>();
     harness.update
       .mockReturnValueOnce(older.promise)
-      .mockResolvedValueOnce({ updated: square(20, { color: { r: 0, g: 0, b: 255 } }) });
+      .mockResolvedValueOnce({ annotation: square(20, { color: { r: 0, g: 0, b: 255 } }) });
 
     const red = harness.capability.updateSelection({ color: '#ff0000' });
     await harness.capability.updateSelection({ color: '#0000ff' });
@@ -385,13 +387,13 @@ describe('several changes to one record', () => {
     const newest = deferred<unknown>();
     harness.update
       .mockReturnValueOnce(slow.promise)
-      .mockResolvedValueOnce({ updated: square(20, { color: { r: 0, g: 0, b: 255 } }) })
+      .mockResolvedValueOnce({ annotation: square(20, { color: { r: 0, g: 0, b: 255 } }) })
       .mockReturnValueOnce(newest.promise);
 
     const red = harness.capability.updateSelection({ color: '#ff0000' });
     await harness.capability.updateSelection({ color: '#0000ff' });
     void harness.capability.updateSelection({ color: '#00ff00' });
-    slow.resolve({ updated: square(20, { color: { r: 255, g: 0, b: 0 } }) });
+    slow.resolve({ annotation: square(20, { color: { r: 255, g: 0, b: 0 } }) });
     await red;
 
     expect(harness.capability.get(ref(20))!.props.color).toBe('#00ff00');
@@ -412,7 +414,7 @@ describe('a new record before the engine confirms it', () => {
     });
     const confirm = () =>
       create.resolve({
-        created: { ...square(60), nm: (harness.create.mock.calls[0]![0] as { nm: string }).nm },
+        annotation: { ...square(60), nm: (harness.create.mock.calls[0]![0] as { nm: string }).nm },
       });
     return { harness, create, created, confirm };
   };
@@ -420,7 +422,7 @@ describe('a new record before the engine confirms it', () => {
   it('an edit stays on screen, is written after the create, and the selection follows', async () => {
     const { harness, created, confirm } = await createHeld();
     harness.update.mockResolvedValueOnce({
-      updated: square(60, { color: { r: 0, g: 255, b: 0 } }),
+      annotation: square(60, { color: { r: 0, g: 255, b: 0 } }),
     });
 
     const restyle = harness.capability.updateSelection({ color: '#00ff00' });
@@ -479,7 +481,7 @@ describe('a weak record the engine names', () => {
     const green = harness.capability.updateSelection({ color: '#00ff00' });
     const wide = harness.capability.updateSelection({ strokeWidth: 5 });
     first.resolve({
-      updated: square(0, { ref: named, index: 3, nm: 'u-1', color: { r: 0, g: 255, b: 0 } }),
+      annotation: square(0, { ref: named, index: 3, nm: 'u-1', color: { r: 0, g: 255, b: 0 } }),
     });
     await green;
 
@@ -488,7 +490,7 @@ describe('a weak record the engine names', () => {
     expect(harness.capability.getSelection()).toEqual([named]);
 
     second.resolve({
-      updated: square(0, {
+      annotation: square(0, {
         ref: named,
         index: 3,
         nm: 'u-1',
@@ -574,13 +576,18 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     const hidden = { ...NO_FLAGS, print: false };
 
     harness.update.mockResolvedValueOnce({
-      updated: freeText('Hello', { ref: NAMED, index: 3, nm: 'named-text', flags: hidden }),
+      annotation: freeText('Hello', { ref: NAMED, index: 3, nm: 'named-text', flags: hidden }),
     });
     await harness.capability.updateSelectionFlags({ print: false });
     expect(harness.capability.get(NAMED)!.contents).toBe('Hello world');
 
     harness.update.mockResolvedValueOnce({
-      updated: freeText('Hello world', { ref: NAMED, index: 3, nm: 'named-text', flags: hidden }),
+      annotation: freeText('Hello world', {
+        ref: NAMED,
+        index: 3,
+        nm: 'named-text',
+        flags: hidden,
+      }),
     });
     await vi.advanceTimersByTimeAsync(300);
     expect(harness.update).toHaveBeenCalledTimes(2);
@@ -596,14 +603,19 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     harness.capability.draftContents(WEAK_REF, 'Hello world');
     const hidden = { ...NO_FLAGS, print: false };
     harness.update.mockResolvedValueOnce({
-      updated: freeText('Hello', { ref: NAMED, index: 3, nm: 'named-text', flags: hidden }),
+      annotation: freeText('Hello', { ref: NAMED, index: 3, nm: 'named-text', flags: hidden }),
     });
     await harness.capability.updateSelectionFlags({ print: false });
 
     await vi.advanceTimersByTimeAsync(100);
     harness.capability.draftContents(NAMED, 'Hello world!');
     harness.update.mockResolvedValueOnce({
-      updated: freeText('Hello world!', { ref: NAMED, index: 3, nm: 'named-text', flags: hidden }),
+      annotation: freeText('Hello world!', {
+        ref: NAMED,
+        index: 3,
+        nm: 'named-text',
+        flags: hidden,
+      }),
     });
     await vi.advanceTimersByTimeAsync(300);
 
@@ -623,7 +635,7 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     harness.capability.setTextSelection(WEAK_REF, { start: 1, end: 3 });
 
     harness.update.mockResolvedValueOnce({
-      updated: freeText('Hello', {
+      annotation: freeText('Hello', {
         ref: NAMED,
         index: 3,
         nm: 'named-text',
@@ -641,10 +653,10 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     const harness = annotationHarness();
     await harness.load([]);
     const load = deferred<unknown>();
-    harness.listRawAll.mockReturnValueOnce(load.promise);
+    harness.listAll.mockReturnValueOnce(load.promise);
     const refreshed = harness.capability.refresh();
     harness.create.mockImplementationOnce(async (draft: { nm: string }) => ({
-      created: { ...square(60), nm: draft.nm },
+      annotation: { ...square(60), nm: draft.nm },
     }));
 
     const created = harness.capability.create({
@@ -677,7 +689,7 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     const A_NAMED = { kind: 'nm', page: PAGE, nm: 'annotation-a' } as const;
     harness.capability.select(WEAK_REF);
     harness.update.mockResolvedValueOnce({
-      updated: square(0, {
+      annotation: square(0, {
         ref: A_NAMED,
         index: 3,
         nm: 'annotation-a',
@@ -697,7 +709,7 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     ]);
     harness.capability.select(B_MOVED);
     harness.update.mockResolvedValueOnce({
-      updated: square(0, { ref: B_MOVED, index: 3, color: { r: 0, g: 255, b: 0 } }),
+      annotation: square(0, { ref: B_MOVED, index: 3, color: { r: 0, g: 255, b: 0 } }),
     });
     await harness.capability.updateSelection({ color: '#00ff00' });
 
@@ -729,7 +741,7 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
       type: 'annotation.created',
       page: PAGE,
       origin: { kind: 'local', sessionId: 'me', sub: null, ts: 0, serverId: null },
-      created: dto,
+      annotation: dto,
       meta,
     } as unknown as DocumentEvent);
     expect(harness.capability.get(ref(60))).not.toBeNull();
@@ -744,7 +756,7 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     expect(harness.capability.get(ref(60))).toBeNull();
     expect(harness.model().order).toEqual([]);
     // The fake engine publishes its create again when it answers; stop looking here.
-    answer.resolve({ created: dto });
+    answer.resolve({ annotation: dto });
     await created;
   });
 
@@ -766,7 +778,7 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     expect(harness.create).toHaveBeenCalledTimes(1);
 
     child.resolve({
-      created: square(61, {
+      annotation: square(61, {
         subtype: 'link',
         target: FIRST,
         reply: { to: PARENT, type: 'group' },
@@ -780,7 +792,7 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
       }),
     });
     harness.update.mockResolvedValueOnce({
-      updated: square(61, {
+      annotation: square(61, {
         subtype: 'link',
         target: SECOND,
         reply: { to: PARENT, type: 'group' },
@@ -809,10 +821,10 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     const harness = annotationHarness();
     await harness.load([]);
     const load = deferred<unknown>();
-    harness.listRawAll.mockReturnValueOnce(load.promise);
+    harness.listAll.mockReturnValueOnce(load.promise);
     const refreshed = harness.capability.refresh();
     harness.create.mockImplementationOnce(async (draft: { nm: string }) => ({
-      created: { ...square(60), nm: draft.nm },
+      annotation: { ...square(60), nm: draft.nm },
     }));
     const created = harness.capability.create({
       subtype: 'square',
@@ -823,7 +835,7 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     harness.update.mockResolvedValueOnce({
-      updated: square(60, { color: { r: 255, g: 0, b: 0 } }),
+      annotation: square(60, { color: { r: 255, g: 0, b: 0 } }),
     });
     const restyled = harness.capability.updateSelection({ color: '#ff0000' });
     expect(harness.update).toHaveBeenCalledWith(ref(60), expect.anything());
@@ -849,7 +861,7 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     });
     const linked = harness.capability.updateSelection({ link: TARGET });
     harness.create.mockResolvedValueOnce({
-      created: square(61, {
+      annotation: square(61, {
         subtype: 'link',
         target: TARGET,
         reply: { to: ref(60), type: 'group' },
@@ -864,7 +876,7 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     });
 
     create.resolve({
-      created: { ...square(60), nm: (harness.create.mock.calls[0]![0] as { nm: string }).nm },
+      annotation: { ...square(60), nm: (harness.create.mock.calls[0]![0] as { nm: string }).nm },
     });
     await created;
     await linked;
@@ -899,7 +911,7 @@ describe('one engine write carrying several changes', () => {
     expect(harness.capability.get(ref(30))!.contents).toBe('Hello');
     expect(failures).toHaveBeenCalledTimes(1);
 
-    flags.resolve({ updated: freeText('Hello', { ...NO_FLAGS, print: false }) });
+    flags.resolve({ annotation: freeText('Hello', { ...NO_FLAGS, print: false }) });
     await settingFlags;
     expect(harness.capability.get(ref(30))!.contents).toBe('Hello');
   });
@@ -913,7 +925,7 @@ describe('one engine write carrying several changes', () => {
     harness.capability.select(WEAK_REF);
     harness.capability.draftContents(WEAK_REF, 'Hello world');
     harness.update.mockResolvedValueOnce({
-      updated: freeText('Hello', {
+      annotation: freeText('Hello', {
         ref: NAMED,
         index: 3,
         nm: 'named-text',
@@ -937,7 +949,7 @@ describe('how a record with a pending change renders', () => {
     await harness.load([square(20)]);
     harness.capability.select(ref(20));
     harness.update.mockResolvedValueOnce({
-      updated: square(20, { color: { r: 255, g: 0, b: 0 } }),
+      annotation: square(20, { color: { r: 255, g: 0, b: 0 } }),
     });
     await harness.capability.updateSelection({ color: '#ff0000' });
     const pending = deferred<unknown>();
@@ -950,7 +962,7 @@ describe('how a record with a pending change renders', () => {
     expect(harness.capability.get(ref(20))!.props.color).toBe('#00ff00');
     expect(item().source).toBe('vector');
 
-    pending.resolve({ updated: square(20, { color: { r: 0, g: 255, b: 0 }, author: 'Bob' }) });
+    pending.resolve({ annotation: square(20, { color: { r: 0, g: 255, b: 0 }, author: 'Bob' }) });
     await restyle;
     // Settled: another session touched it, so the engine's raster is the truth again.
     expect(item().source).toBe('baked');

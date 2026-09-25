@@ -61,7 +61,7 @@ function makeHandle(id: string, options: FakeHandleOptions = {}) {
     },
     security: options.security,
     render: {
-      policy: async () => {
+      getPolicy: async () => {
         await options.policyGate;
         return { kind: 'continuous' };
       },

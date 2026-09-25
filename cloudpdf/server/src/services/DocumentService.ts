@@ -1822,15 +1822,15 @@ export class DocumentService {
 
   private async loadDurableBasePageStates(ctx: OpenContext, docId: string): Promise<PageState[]> {
     const annotationsBuild = (jobId: WorkerJobId) =>
-      wirePack({ kind: 'annotations.listRawAll' as const, jobId, docId });
+      wirePack({ kind: 'annotations.list' as const, jobId, docId });
     const annotationsResult = await this.readOnPool(ctx, docId, undefined, annotationsBuild);
-    if (annotationsResult.tag !== 'annotations.listRawAll') {
+    if (annotationsResult.tag !== 'annotations.list') {
       throw new EngineError(
         EngineErrorCode.WireFormat,
         `unexpected manifest annotation payload: ${annotationsResult.tag}`,
       );
     }
-    return annotationsResult.snapshot.pages.map((page) => page.pageState);
+    return annotationsResult.list.pages;
   }
 
   private async openLayerOnPool(

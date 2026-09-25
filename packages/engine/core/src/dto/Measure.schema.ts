@@ -21,7 +21,7 @@ export const PdfNumberFormatSchema = z.object({
   labelPosition: z.enum(['suffix', 'prefix']).optional(),
 });
 export const PdfMeasureSchema = z.object({
-  subtype: z.literal('RL'),
+  subtype: z.literal('rectilinear'),
   ratio: z.string().optional(),
   x: z.array(PdfNumberFormatSchema),
   y: z.array(PdfNumberFormatSchema).optional(),
@@ -45,7 +45,7 @@ export const PdfMeasureWriteSchema = PdfMeasureSchema.extend({
   slope: z.array(writableFormat).optional(),
   cyx: positive.optional(),
 });
-const geoMeasure = z.object({ subtype: z.literal('GEO') });
+const geoMeasure = z.object({ subtype: z.literal('geospatial') });
 const unknownMeasure = z.object({ subtype: z.literal('unknown') });
 export const PdfForeignMeasureSchema = z.union([geoMeasure, unknownMeasure]);
 export const PageScaleInputSchema = z.object({ measure: PdfMeasureWriteSchema.nullable() });
@@ -60,9 +60,9 @@ export const PageMeasurementViewportSchema = z.object({
   measure: PdfMeasurementSchema.optional(),
   owned: z.boolean(),
 });
-export const LineIntentSchema = z.enum(['LineArrow', 'LineDimension']);
-export const PolygonIntentSchema = z.enum(['PolygonCloud', 'PolygonDimension']);
-export const PolylineIntentSchema = z.literal('PolyLineDimension');
+export const LineIntentSchema = z.enum(['line-arrow', 'line-dimension']);
+export const PolygonIntentSchema = z.enum(['polygon-cloud', 'polygon-dimension']);
+export const PolylineIntentSchema = z.literal('polyline-dimension');
 const offset = z.object({ along: float, perpendicular: float }).strict();
 export const LineDimensionCaptionSchema = z
   .object({

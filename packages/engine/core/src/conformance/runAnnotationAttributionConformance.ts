@@ -123,7 +123,7 @@ export function runAnnotationAttributionConformance(
     test('create stamps attribution from the session and ignores the data', async () => {
       await asSession({ scope: SCOPE, identity: ALICE }, async (page) => {
         const before = Date.now();
-        const { created } = await page.annotations.create({
+        const { annotation: created } = await page.annotations.create({
           ...SQUARE,
           ...FORGED,
         } as AnnotationDraft);
@@ -157,7 +157,7 @@ export function runAnnotationAttributionConformance(
       let original: AnnotationDTO;
       try {
         const page = await firstPage(alice);
-        ({ created: original } = await page.annotations.create({
+        ({ annotation: original } = await page.annotations.create({
           ...SQUARE,
           nm: 'attribution-conformance-update',
         } as AnnotationDraft));
@@ -219,7 +219,7 @@ export function runAnnotationAttributionConformance(
           ...SQUARE,
           groupId: 'legal',
         } as AnnotationDraft);
-        expect(own.created.groupId).toBe('legal');
+        expect(own.annotation.groupId).toBe('legal');
         await expectRefused(
           () => page.annotations.create({ ...SQUARE, groupId: 'finance' } as AnnotationDraft),
           'set-group',
@@ -230,7 +230,7 @@ export function runAnnotationAttributionConformance(
         identity: ALICE,
       };
       await asSession(granted, async (page) => {
-        const { created } = await page.annotations.create({
+        const { annotation: created } = await page.annotations.create({
           ...SQUARE,
           groupId: 'finance',
         } as AnnotationDraft);
@@ -243,7 +243,7 @@ export function runAnnotationAttributionConformance(
 
     test('update reassigns a group only with authority for it', async () => {
       await asSession({ scope: SCOPE, identity: ALICE }, async (page) => {
-        const { created } = await page.annotations.create(SQUARE);
+        const { annotation: created } = await page.annotations.create(SQUARE);
         await expectRefused(
           () => page.annotations.update(created.ref, { groupId: 'finance' }),
           'set-group',
@@ -255,7 +255,7 @@ export function runAnnotationAttributionConformance(
         identity: ALICE,
       };
       await asSession(granted, async (page) => {
-        const { created } = await page.annotations.create(SQUARE);
+        const { annotation: created } = await page.annotations.create(SQUARE);
         await page.annotations.update(created.ref, { groupId: 'finance' });
         expect((await readBack(page, created.ref)).groupId).toBe('finance');
       });
@@ -267,8 +267,8 @@ export function runAnnotationAttributionConformance(
       const alice = await opts.openAs(engine, { scope: READ, identity: ALICE });
       const page = await firstPage(alice);
       const rect = { left: 300, bottom: 300, right: 330, top: 330 };
-      const { created: square } = await page.annotations.create(SQUARE);
-      const { created: note } = await page.annotations.create({ subtype: 'text', rect });
+      const { annotation: square } = await page.annotations.create(SQUARE);
+      const { annotation: note } = await page.annotations.create({ subtype: 'text', rect });
       await page.annotations.create({ subtype: 'text', rect, reply: { to: note.ref } });
       await page.annotations.create(
         { subtype: 'file-attachment', rect, file: { name: 'minutes.txt' } },
@@ -297,8 +297,8 @@ export function runAnnotationAttributionConformance(
         );
         // 'restore' is the default.
         const result = await importer.annotations.import(bundle);
-        expect(result.created).toHaveLength(bundle.items.length);
-        result.created.forEach((created, index) => {
+        expect(result.annotations).toHaveLength(bundle.items.length);
+        result.annotations.forEach((created, index) => {
           const source = bundle.items[index]!.data;
           expect(attributionOf(created)).toEqual({
             ...attributionOf(source),
@@ -313,7 +313,7 @@ export function runAnnotationAttributionConformance(
           }
         });
         const edited =
-          result.created[
+          result.annotations[
             bundle.items.findIndex(
               (item) => annotationKey(item.data.ref) === annotationKey(square.ref),
             )
@@ -326,11 +326,11 @@ export function runAnnotationAttributionConformance(
 
     test('a restoring import needs doc.annotate.import; one that stamps does not', async () => {
       await asSession({ scope: READ, identity: ALICE }, async (page, doc) => {
-        const { created } = await page.annotations.create(SQUARE);
+        const { annotation: created } = await page.annotations.create(SQUARE);
         const bundle = await doc.annotations.export({ refs: [created.ref] });
         await expectRefused(() => doc.annotations.import(bundle), 'doc.annotate.import');
         const stamped = await doc.annotations.import(bundle, { attribution: 'stamp' });
-        expect(attributionOf(stamped.created[0]!)).toMatchObject({
+        expect(attributionOf(stamped.annotations[0]!)).toMatchObject({
           userId: 'alice',
           importedBy: null,
         });
@@ -352,9 +352,9 @@ export function runAnnotationAttributionConformance(
 }
 
 async function firstPage(doc: DocumentHandle): Promise<PageHandle> {
-  const first = (await doc.annotations.listRawAll()).pages[0];
+  const first = (await doc.annotations.list()).pages[0];
   if (!first) throw new Error('the authoring document has no pages');
-  return doc.page(first.pageState.page);
+  return doc.page(first.page);
 }
 
 async function readBack(page: PageHandle, ref: AnnotationRef): Promise<AnnotationDTO> {

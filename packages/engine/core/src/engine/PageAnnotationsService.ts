@@ -1,4 +1,4 @@
-import type { AnnotationListPageSnapshot } from '../annotation/AnnotationListSnapshot';
+import type { AnnotationList } from '../annotation/AnnotationList';
 import type { AnnotationDraft, AnnotationPatch } from '../annotation/kinds';
 import type { AnnotationResourceRole, AnnotationResources } from '../annotation/resources';
 import type {
@@ -25,7 +25,8 @@ import { AbortablePromise } from '../promise/AbortablePromise';
  * write of one page goes through this service.
  */
 export interface PageAnnotationsService {
-  list(): AbortablePromise<AnnotationListPageSnapshot>;
+  /** This page's annotations, in display order: `doc.annotations.list()` for one page. */
+  list(): AbortablePromise<AnnotationList>;
   /**
    * Batch-render every annotation appearance (`/AP`) stream on the page into
    * its own raw RGBA raster, sized to the annotation's `/Rect`. Read-only and
@@ -33,18 +34,18 @@ export interface PageAnnotationsService {
    * its rendered appearance (the Adobe boundary).
    *
    * Cloud engines do not expose the raw rasters (the HTTP surface ships
-   * encoded images); use {@link renderAppearanceImages} there instead.
+   * encoded images); use {@link renderAppearances} there instead.
    */
-  renderAppearances(
+  renderAppearancesRaw(
     options?: AnnotationAppearanceRenderOptions,
   ): AbortablePromise<AnnotationAppearancesResult>;
   /**
-   * Encoded counterpart of {@link renderAppearances}: each raster is run
+   * Encoded counterpart of {@link renderAppearancesRaw}: each raster is run
    * through the engine's image encoder (local) or fetched as a
    * `multipart/form-data` body (cloud) and returned as a lazily-resolved
    * `PageImageHandle`. This is the cross-engine portable surface.
    */
-  renderAppearanceImages(
+  renderAppearances(
     options?: AnnotationAppearanceImageOptions,
   ): AbortablePromise<AnnotationAppearanceImagesResult>;
   /**
@@ -60,7 +61,7 @@ export interface PageAnnotationsService {
    * Egresses content, so it needs `doc.download`. A role the annotation's
    * kind doesn't take is refused with `InvalidArg`.
    */
-  readResource(ref: AnnotationRef, role: AnnotationResourceRole): AbortablePromise<Uint8Array>;
+  downloadResource(ref: AnnotationRef, role: AnnotationResourceRole): AbortablePromise<Uint8Array>;
   /**
    * Create an annotation on this page from its data. Bytes travel beside the
    * data, by role: a stamp needs its `appearance`, a file attachment its
@@ -98,7 +99,7 @@ export interface PageAnnotationsService {
    * Flatten the given annotations of this page into its content —
    * `pages.flatten` for a chosen set. Painted annotations are removed from
    * the page; ones that are ineligible (hidden for `usage`, Popups, no
-   * usable appearance) stay and report `skipped`, so a caller can say
+   * usable appearance) stay and report `unchanged`, so a caller can say
    * "2 of 3 flattened". A content + annotation mutation of this page: its
    * content and annotation pins advance, layout does not; a
    * `annotations.flattened` event is published when anything was applied.

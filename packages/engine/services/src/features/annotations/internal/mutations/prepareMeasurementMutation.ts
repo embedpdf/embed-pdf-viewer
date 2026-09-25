@@ -23,7 +23,7 @@ const isDimensionKind = (subtype: string | undefined): subtype is DimensionKind 
 
 function validate(subtype: DimensionKind, v: DimensionWrite): void {
   try {
-    if (v.measure != null && v.measure.subtype === 'RL') assertWritableMeasure(v.measure);
+    if (v.measure != null && v.measure.subtype === 'rectilinear') assertWritableMeasure(v.measure);
     if (
       subtype === 'line' &&
       'leader' in v &&
@@ -33,10 +33,10 @@ function validate(subtype: DimensionKind, v: DimensionWrite): void {
       throw new RangeError('Invalid line leader');
     const intents =
       subtype === 'line'
-        ? ['LineDimension', 'LineArrow']
+        ? ['line-dimension', 'line-arrow']
         : subtype === 'polygon'
-          ? ['PolygonDimension', 'PolygonCloud']
-          : ['PolyLineDimension'];
+          ? ['polygon-dimension', 'polygon-cloud']
+          : ['polyline-dimension'];
     if (v.intent != null && !intents.includes(v.intent))
       throw new RangeError('Invalid measurement intent');
     if (v.captionEnabled != null && typeof v.captionEnabled !== 'boolean')
@@ -121,10 +121,10 @@ export function prepareMeasurementDraft(draft: AnnotationDraft): AnnotationDraft
   if (!isDimensionKind(draft.subtype)) return draft;
   const dimension = draft as DimensionWrite;
   validate(draft.subtype, dimension);
-  if (dimension.measure != null && dimension.measure.subtype !== 'RL') {
+  if (dimension.measure != null && dimension.measure.subtype !== 'rectilinear') {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
-      `A ${dimension.measure.subtype === 'GEO' ? 'geospatial' : 'foreign'} measure can't be written; leave measure out`,
+      `A ${dimension.measure.subtype === 'geospatial' ? 'geospatial' : 'foreign'} measure can't be written; leave measure out`,
     );
   }
   let prepared = draft;
@@ -169,11 +169,11 @@ export function prepareMeasurementPatch(
   let next = { ...patch, subtype } as DimensionWrite & { subtype: DimensionKind };
   validate(subtype, next);
 
-  if (next.measure != null && next.measure.subtype !== 'RL') {
+  if (next.measure != null && next.measure.subtype !== 'rectilinear') {
     if (current.measure?.subtype !== next.measure.subtype) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
-        `A ${next.measure.subtype === 'GEO' ? 'geospatial' : 'foreign'} measure can't be written; leave measure out`,
+        `A ${next.measure.subtype === 'geospatial' ? 'geospatial' : 'foreign'} measure can't be written; leave measure out`,
       );
     }
     // The marker a read returned, sent back: the measure stays as it is.

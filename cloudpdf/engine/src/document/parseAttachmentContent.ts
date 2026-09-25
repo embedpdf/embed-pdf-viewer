@@ -16,7 +16,7 @@ const FILE_NAME_HEADER = 'X-EmbedPDF-File-Name';
  * is the decoded bytes; the metadata rides as headers — `Content-Type`
  * for the declared mime type, `X-EmbedPDF-File-Name` for the file name.
  * Used by the document-level `attachments.download()`; the annotation-level
- * `annotations.readResource(ref, 'file')` reads the same response's bytes.
+ * `annotations.downloadResource(ref, 'file')` reads the same response's bytes.
  */
 export function parseAttachmentContent(file: HttpFileResponse): AttachmentContent {
   const encodedName = file.headers.get(FILE_NAME_HEADER);

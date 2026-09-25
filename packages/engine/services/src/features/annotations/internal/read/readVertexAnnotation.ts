@@ -9,6 +9,7 @@ import type {
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { readIntent } from './annotationReadPrimitives';
+import { polygonIntentFromName, polylineIntentFromName } from '../measurementIntent';
 import { readBorderEffect, readLineEndings, readVertices } from './annotationReadPrimitives';
 import { readAnnotationRotation } from './readAnnotationTransformMetadata';
 import { readAnnotationMeasure, readShapeCaption } from './readMeasurementFields';
@@ -45,7 +46,7 @@ export function readPolygon(
     ...base,
     ...readAnnotationMeasure(fn, mem, annotPtr),
     ...shapeCaptionFieldsOf(caption),
-    intent: intent === 'PolygonDimension' || intent === 'PolygonCloud' ? intent : null,
+    intent: polygonIntentFromName(intent),
     subtype: 'polygon',
     ...readVertexExtras(fn, mem, annotPtr),
     // Absent /BE reads as explicit `null` (never omission), so a read DTO
@@ -66,7 +67,7 @@ export function readPolyline(
     ...base,
     ...readAnnotationMeasure(fn, mem, annotPtr),
     ...shapeCaptionFieldsOf(caption),
-    intent: intent === 'PolyLineDimension' ? intent : null,
+    intent: polylineIntentFromName(intent),
     subtype: 'polyline',
     ...readVertexExtras(fn, mem, annotPtr),
     lineEndings: readLineEndings(fn, mem, annotPtr),

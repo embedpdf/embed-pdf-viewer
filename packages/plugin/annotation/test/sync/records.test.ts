@@ -55,7 +55,7 @@ describe('foldRecords', () => {
     const one = recordOn(11, 1);
     let records = applied(
       NO_RECORDS,
-      event({ type: 'annotation.created', page: one.page, created: one }),
+      event({ type: 'annotation.created', page: one.page, annotation: one }),
     );
     expect(records.order).toEqual(['obj:1']);
     records = applied(
@@ -115,7 +115,7 @@ describe('foldRecords', () => {
     expect(
       foldRecords(
         records,
-        event({ type: 'annotations.flattened', page, results: [{ status: 'skipped' }] }),
+        event({ type: 'annotations.flattened', page, results: [{ status: 'unchanged' }] }),
       ),
     ).toBe(records);
   });
@@ -155,7 +155,7 @@ describe('appearance versions', () => {
   it('a created record starts with a freshly baked appearance', () => {
     const records = applied(
       NO_RECORDS,
-      event({ type: 'annotation.created', page: square.page, created: square }),
+      event({ type: 'annotation.created', page: square.page, annotation: square }),
     );
     expect(versionOf(records)).toBe(1);
   });
@@ -166,7 +166,7 @@ describe('appearance versions', () => {
       event({
         type: 'annotation.updated',
         page: square.page,
-        updated: square,
+        annotation: square,
         appearance: { changed },
       });
     expect(versionOf(applied(records, updated(false)))).toBe(0);
@@ -176,7 +176,7 @@ describe('appearance versions', () => {
   it('a z-order move never changes an appearance', () => {
     const records = applied(
       recordsOf(square),
-      event({ type: 'annotation.moved', page: square.page, moved: [square] }),
+      event({ type: 'annotation.moved', page: square.page, annotations: [square] }),
     );
     expect(versionOf(records)).toBe(0);
   });
@@ -226,7 +226,7 @@ describe('weak annotations (addressed by position)', () => {
       event({
         type: 'annotation.updated',
         page,
-        updated: named(weak, 'u-1'),
+        annotation: named(weak, 'u-1'),
         appearance: { changed: true },
       }),
     );
@@ -242,7 +242,7 @@ describe('weak annotations (addressed by position)', () => {
       event({
         type: 'annotation.updated',
         page,
-        updated: recordOn(11, 7),
+        annotation: recordOn(11, 7),
         appearance: { changed: false },
         meta: { changed: [{ kind: 'objectNumber', value: 7 }], shouldRefetch: null },
       }),
@@ -267,7 +267,7 @@ describe('weak annotations (addressed by position)', () => {
     const created = event({
       type: 'annotation.created',
       page,
-      created: reply,
+      annotation: reply,
       meta: {
         changed: [
           { kind: 'objectNumber', value: 9 },
@@ -286,7 +286,7 @@ describe('weak annotations (addressed by position)', () => {
       event({
         type: 'annotation.created',
         page,
-        created: recordOn(11, 9),
+        annotation: recordOn(11, 9),
         meta: { changed: [{ kind: 'nm', value: 'elsewhere' }], shouldRefetch: null },
       }),
     );
@@ -317,8 +317,9 @@ describe('records mirror through the controller', () => {
       importedBy: null,
       actions: null,
     } as unknown as AnnotationDTO;
-    harness.listRawAll.mockResolvedValueOnce({
-      pages: [{ pageState: { page: toPageRef(1) }, annotations: [widget] }],
+    harness.listAll.mockResolvedValueOnce({
+      annotations: [widget],
+      pages: [{ page: toPageRef(1) }],
     });
     harness.connectAll();
     await harness.capability.whenSynced();

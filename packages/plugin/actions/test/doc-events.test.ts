@@ -93,7 +93,7 @@ function docHarness(options: {
     id: 'actions',
     doc: {
       actions: {
-        read: () => {
+        get: () => {
           readCalls += 1;
           if (options.readFailsFirst && readCalls === 1) {
             return Promise.reject(new Error('transient read failure'));

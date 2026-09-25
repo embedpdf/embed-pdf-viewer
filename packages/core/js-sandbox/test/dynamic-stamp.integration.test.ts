@@ -72,7 +72,7 @@ describe('dynamic stamp real-PDF vertical slice', () => {
       );
       const [snapshot, actions] = await Promise.all([
         document.forms.list(),
-        document.actions!.read(),
+        document.actions!.get(),
       ]);
       const fields = scriptFieldsFromSnapshot(snapshot);
       const baseInput: Omit<ScriptInput, 'fields' | 'event'> = {

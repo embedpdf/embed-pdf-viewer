@@ -134,7 +134,7 @@ describe('plane-scoped view sharing (cloud SDK, real runtime)', () => {
           },
         ],
       });
-      expect(created.created).toBeTruthy();
+      expect(created.annotation).toBeTruthy();
 
       // Same handle, no reopen — the monotone flip did its job:
       // content-plane reads still resolve doc-level (the first cut's

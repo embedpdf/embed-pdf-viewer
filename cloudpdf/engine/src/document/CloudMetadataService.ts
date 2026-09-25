@@ -37,7 +37,7 @@ export class CloudMetadataService implements MetadataService {
    * manifest and retries once. `metadataVersion` bumps only on metadata
    * writes, so this leaf stays cached across page and annotation edits.
    */
-  read(): AbortablePromise<DocumentMetadata> {
+  get(): AbortablePromise<DocumentMetadata> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),

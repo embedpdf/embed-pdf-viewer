@@ -39,12 +39,12 @@ export function createJudging(
       analyzeChanges: verb(async (input: AnalyzeInput) => requireSignatures().analyze(input)),
       readRevision: verb(async (target: SignatureFieldAddress | { revisionIndex: number }) => {
         const service = requireSignatures();
-        if ('revisionIndex' in target) return service.revisionBytes(target.revisionIndex);
+        if ('revisionIndex' in target) return service.downloadRevision(target.revisionIndex);
         const signature = getSignature(target);
         if (!signature?.signed || signature.revisionIndex === null) {
           throw new PluginError('not-found', 'signature', 'no signed revision at that address');
         }
-        return service.revisionBytes(signature.revisionIndex);
+        return service.downloadRevision(signature.revisionIndex);
       }),
     } satisfies Partial<SignatureCapability>,
   };

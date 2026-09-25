@@ -148,11 +148,11 @@ type AnnotationEvent = Extract<
 const recordsOf = (event: AnnotationEvent): readonly AnnotationDTO[] => {
   switch (event.type) {
     case 'annotation.created':
-      return [event.created];
+      return [event.annotation];
     case 'annotation.updated':
-      return [event.updated];
+      return [event.annotation];
     case 'annotation.moved':
-      return event.moved;
+      return event.annotations;
     case 'annotation.deleted':
       return [];
   }
@@ -199,13 +199,14 @@ export function foldRecords(
     // A new record comes with a freshly baked appearance; the engine says
     // whether an update changed one; a z-order move changes none.
     case 'annotation.created':
-      return positionsReload(records, event) ?? put(records, [event.created], true);
+      return positionsReload(records, event) ?? put(records, [event.annotation], true);
     case 'annotation.updated':
       return (
-        positionsReload(records, event) ?? put(records, [event.updated], event.appearance.changed)
+        positionsReload(records, event) ??
+        put(records, [event.annotation], event.appearance.changed)
       );
     case 'annotation.moved':
-      return positionsReload(records, event) ?? put(records, event.moved, false);
+      return positionsReload(records, event) ?? put(records, event.annotations, false);
     case 'annotation.deleted':
       return (
         positionsReload(records, event) ??
@@ -284,16 +285,16 @@ export function createRecordsMirror(
     // and report `forbidden`; a later refresh checks again.
     readable: () => ctx.doc?.security.allows('doc.annotate.read') ?? true,
     load: async (doc) => {
-      const snapshot = await doc.annotations.listRawAll();
-      const dtos = snapshot.pages.flatMap((page) => page.annotations);
-      return { value: fromSnapshot(records.get(), dtos), cursor: snapshot.auditHead ?? null };
+      const list = await doc.annotations.list();
+      return {
+        value: fromSnapshot(records.get(), list.annotations),
+        cursor: list.auditHead ?? null,
+      };
     },
     fold: foldRecords,
     loadPages: async (doc, pages) => {
-      const read = await Promise.all(
-        pages.map(async (page) => (await doc.page(page).annotations.list()).annotations),
-      );
-      return (current) => withPages(current, pages, read.flat());
+      const { annotations } = await doc.annotations.list({ pages });
+      return (current) => withPages(current, pages, annotations);
     },
     changed: (change) => events.recordsChanged.emit(change),
   });

@@ -160,7 +160,7 @@ describe('kernel: document events → page registry', () => {
     events.emit({
       type: 'annotation.created',
       page: toPageRef(1),
-      created: {} as never,
+      annotation: {} as never,
       meta: {} as never,
       origin: { kind: 'local', sessionId: 's', sub: null, ts: 1, serverId: null },
     } as DocumentEvent);

@@ -26,7 +26,7 @@ export function readStampFit(
 /**
  * Stamp DTO: base + `/Name` (standard or custom identifier, verbatim) +
  * transform metadata + the recorded fit + `/CA`. The visual content
- * stays in the `/AP` stream — rendered via `renderAppearanceImages()`,
+ * stays in the `/AP` stream — rendered via `renderAppearances()`,
  * never surfaced as DTO data.
  */
 export function readStamp(

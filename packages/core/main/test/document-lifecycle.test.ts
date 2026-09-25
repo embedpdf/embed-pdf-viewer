@@ -327,7 +327,7 @@ describe('render policy is a document FACT (Pattern A, like the page registry)',
     const opened = kernel.documents.open(bytesInput('a'));
     resolve('a', {
       ...(makeHandle('a') as object),
-      render: { policy: () => Promise.resolve(LATTICE) },
+      render: { getPolicy: () => Promise.resolve(LATTICE) },
     } as unknown as DocumentHandle);
     await opened;
     expect(kernel.getState().core.documents['a']!.renderPolicy).toEqual(LATTICE);
@@ -345,7 +345,7 @@ describe('render policy is a document FACT (Pattern A, like the page registry)',
     const openedB = kernel.documents.open(bytesInput('b'), { activate: false });
     resolve('b', {
       ...(makeHandle('b') as object),
-      render: { policy: () => Promise.reject(new Error('offline')) },
+      render: { getPolicy: () => Promise.reject(new Error('offline')) },
     } as unknown as DocumentHandle);
     await openedB;
     expect(kernel.getState().core.documents['b']!.renderPolicy).toEqual({ kind: 'continuous' });

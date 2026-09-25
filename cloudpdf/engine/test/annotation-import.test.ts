@@ -111,11 +111,11 @@ describe('annotation import on the cloud engine', () => {
       const first = await target.annotations.import(bundle, options);
       const again = await target.annotations.import(bundle, options);
       expect(again).toEqual(first);
-      expect((await target.annotations.listRaw(pageRef)).annotations).toHaveLength(2);
+      expect((await target.annotations.list({ pages: [pageRef] })).annotations).toHaveLength(2);
 
       // Another key is another import.
       await target.annotations.import(bundle, { ...options, opId: 'replay-2' });
-      expect((await target.annotations.listRaw(pageRef)).annotations).toHaveLength(4);
+      expect((await target.annotations.list({ pages: [pageRef] })).annotations).toHaveLength(4);
     } finally {
       await source.close();
       await target.close();
@@ -172,7 +172,7 @@ describe('annotation import on the cloud engine', () => {
         if (event.type !== 'annotation.created') return;
         expect(event.origin.kind).toBe('remote');
         expect(event.origin.tx).toEqual({ id: 'remote-import', index, count: 3 });
-        expect(event.created).toEqual(result.created[index]);
+        expect(event.annotation).toEqual(result.annotations[index]);
       });
       // A published its own, once, with the same transaction.
       expect(eventsA.map((event) => event.origin.tx)).toEqual(
@@ -182,7 +182,7 @@ describe('annotation import on the cloud engine', () => {
       expect(eventsA).toHaveLength(3);
 
       // B's manifest absorbed the pins: its next read sees the import.
-      expect((await docB.annotations.listRaw(pageRef)).annotations).toHaveLength(3);
+      expect((await docB.annotations.list({ pages: [pageRef] })).annotations).toHaveLength(3);
     } finally {
       await docA.close();
       await docB.close();
@@ -232,7 +232,7 @@ describe('the server holds the bundle limits while the request streams in', () =
         rect: { left: 20, bottom: 20, right: 60, top: 50 },
       });
       const square = (await doc.annotations.export()).items[0]!;
-      const { annotations: before } = await doc.annotations.listRaw(pageRef);
+      const { annotations: before } = await doc.annotations.list({ pages: [pageRef] });
       // The export's page entry, and a file attachment naming each resource.
       const base = await doc.annotations.export();
       const attachment = (resource: ResourceId) => ({
@@ -265,7 +265,7 @@ describe('the server holds the bundle limits while the request streams in', () =
       await refused(await withFiles(100, 100, 100), 'resources');
       await refused(await withFiles(2900, 2900), 'bundleBytes');
 
-      expect((await doc.annotations.listRaw(pageRef)).annotations).toEqual(before);
+      expect((await doc.annotations.list({ pages: [pageRef] })).annotations).toEqual(before);
     } finally {
       await doc.close();
       await engine.destroy();

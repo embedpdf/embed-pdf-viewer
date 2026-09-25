@@ -69,7 +69,7 @@ export function runDocumentEventsConformance(
           quadPoints: QUAD,
         };
         const created = await page.annotations.create(draft);
-        const updated = await page.annotations.update(created.created.ref, {
+        const updated = await page.annotations.update(created.annotation.ref, {
           subtype: 'highlight',
           contents: 'updated',
         });
@@ -90,11 +90,11 @@ export function runDocumentEventsConformance(
         const [evCreated, evUpdated, evRotated, evDeleted, evMeta] = events;
         if (evCreated.type === 'annotation.created') {
           expect(evCreated.page).toEqual(toPageRef(pageObjectNumber));
-          expect(evCreated.created).toEqual(created.created);
+          expect(evCreated.annotation).toEqual(created.annotation);
           expect(evCreated.meta).toEqual(created.meta);
         }
         if (evUpdated.type === 'annotation.updated') {
-          expect(evUpdated.updated).toEqual(updated.updated);
+          expect(evUpdated.annotation).toEqual(updated.annotation);
         }
         if (evRotated.type === 'pages.rotated') {
           expect(evRotated.pages).toEqual([toPageRef(pageObjectNumber)]);

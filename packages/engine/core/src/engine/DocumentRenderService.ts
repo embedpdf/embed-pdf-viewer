@@ -63,7 +63,7 @@ export const CONTINUOUS_RENDER_POLICY: EngineRenderPolicy = { kind: 'continuous'
  * carries policy, not pixels.
  */
 export interface DocumentRenderService {
-  policy(): AbortablePromise<EngineRenderPolicy>;
+  getPolicy(): AbortablePromise<EngineRenderPolicy>;
 }
 
 /**
@@ -128,6 +128,19 @@ export function snapAppearanceScale(policy: EngineRenderPolicy, scale: number): 
   }
   const scales = [...policy.appearances.scales].sort((a, b) => a - b);
   return scales.find((s) => s >= scale) ?? scales[scales.length - 1]!;
+}
+
+/**
+ * The scale an appearance render's viewport puts on the appearance lattice:
+ * a `scale` viewport's scale (1 when omitted), and `undefined` for a
+ * `width` viewport, whose scale depends on the page's size and so is never
+ * on the lattice.
+ */
+export function appearanceLatticeScale(
+  viewport: PageRenderViewport | undefined,
+): number | undefined {
+  if (viewport === undefined) return 1;
+  return viewport.kind === 'scale' ? (viewport.scale ?? 1) : undefined;
 }
 
 /**

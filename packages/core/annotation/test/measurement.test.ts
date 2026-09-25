@@ -25,7 +25,7 @@ const geom: ContentGeometry = {
   ends: { start: 'closed-arrow', end: 'closed-arrow' },
 };
 const measure: DistanceAppearance = {
-  intent: 'LineDimension',
+  intent: 'line-dimension',
   measure: measureFromKnownLength(100, { value: 2, unit: 'm' }),
   crop: { left: -20, bottom: -40, top: 760, right: 580 },
   caption: { enabled: true, position: 'inline' },
@@ -62,7 +62,7 @@ describe('distance gestures and captions', () => {
   });
   it('derives live labels and preserves foreign stored contents', () => {
     expect(distanceLabel(geom, measure)).toBe('4.00 m');
-    expect(distanceLabel(geom, { ...measure, measure: { subtype: 'GEO' } })).toBe('stored');
+    expect(distanceLabel(geom, { ...measure, measure: { subtype: 'geospatial' } })).toBe('stored');
     expect(
       distanceScene(geom, measure, initialStyle).some(
         (node) => node.kind === 'text' && node.text === '4.00 m',

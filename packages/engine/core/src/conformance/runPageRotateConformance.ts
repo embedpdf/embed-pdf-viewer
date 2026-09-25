@@ -137,8 +137,8 @@ export function runPageRotateConformance(
         const targetIndex = afterCreate.annotations.findIndex(
           (a) =>
             a.ref.kind === 'objectNumber' &&
-            created.created.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === created.created.ref.annotObjectNumber,
+            created.annotation.ref.kind === 'objectNumber' &&
+            a.ref.annotObjectNumber === created.annotation.ref.annotObjectNumber,
         );
         expect(targetIndex >= 0).toBe(true);
 
@@ -146,7 +146,7 @@ export function runPageRotateConformance(
           kind: 'index',
           page: toPageRef(hostPageObjectNumber),
           index: targetIndex,
-          revision: afterCreate.pageState.revision,
+          revision: afterCreate.pages[0].revision,
         };
 
         // Rotate the host page itself — the strongest version of the
@@ -155,7 +155,7 @@ export function runPageRotateConformance(
 
         const patch: AnnotationPatch = { subtype: 'highlight', contents: 'still alive' };
         const update = await hostPage.annotations.update(indexRef, patch);
-        expect(update.updated.contents).toBe('still alive');
+        expect(update.annotation.contents).toBe('still alive');
       } finally {
         await doc.close();
       }

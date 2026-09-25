@@ -114,8 +114,8 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
       { appearance: png },
     );
 
-    expect(result.created.subtype).toBe('stamp');
-    const created = result.created as StampAnnotationDTO;
+    expect(result.annotation.subtype).toBe('stamp');
+    const created = result.annotation as StampAnnotationDTO;
     expect(created.name).toBe('Approved');
     expect(created.rect.left).toBeCloseTo(rect.left, 0);
     expect(created.rect.top).toBeCloseTo(rect.top, 0);
@@ -124,7 +124,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     const stamps = snapshot.annotations.filter((a) => a.subtype === 'stamp');
     expect(stamps.length).toBeGreaterThan(0);
 
-    const rendered = await page.annotations.renderAppearances();
+    const rendered = await page.annotations.renderAppearancesRaw();
     const appearance = rendered.appearances.find(
       (a) =>
         a.ref.kind === 'objectNumber' &&
@@ -157,7 +157,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
       },
       { appearance: new Blob([png], { type: 'image/png' }) },
     );
-    expect(result.created.subtype).toBe('stamp');
+    expect(result.annotation.subtype).toBe('stamp');
   });
 
   test('stamp survives save → reopen (bytes live in the PDF, not in engine state)', async () => {
@@ -173,7 +173,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
 
       const rendered = await reopened
         .page(toPageRef(PAGE_OBJECT_NUMBER))
-        .annotations.renderAppearances();
+        .annotations.renderAppearancesRaw();
       expect(rendered.appearances.length).toBeGreaterThan(0);
     } finally {
       await reopened.close();
@@ -183,7 +183,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
   test('update: geometry-only patch re-fits the existing appearance', async () => {
     const page = handle.page(toPageRef(PAGE_OBJECT_NUMBER));
     const png = makePng(4, 4, [0, 128, 0, 255]);
-    const { created } = await page.annotations.create(
+    const { annotation: created } = await page.annotations.create(
       {
         subtype: 'stamp',
         rect: { left: 10, bottom: 10, right: 50, top: 50 },
@@ -194,8 +194,8 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
       subtype: 'stamp',
       rect: { left: 10, bottom: 10, right: 90, top: 50 },
     });
-    expect(updated.updated.subtype).toBe('stamp');
-    expect(updated.updated.rect.right).toBeCloseTo(90, 0);
+    expect(updated.annotation.subtype).toBe('stamp');
+    expect(updated.annotation.rect.right).toBeCloseTo(90, 0);
   });
 
   test('rotated stamp: appearance renders UNROTATED — rect is the logical box, content is flat', async () => {
@@ -204,7 +204,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     const unrotated = { left: 300, bottom: 300, right: 400, top: 350 }; // 100×50 landscape
     // 90° CW about the centre (350, 325) → the /Rect AABB is 50×100 portrait.
     const rect = { left: 325, bottom: 275, right: 375, top: 375 };
-    const { created } = await page.annotations.create(
+    const { annotation: created } = await page.annotations.create(
       {
         subtype: 'stamp',
         rect,
@@ -216,7 +216,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     );
     expect((created as StampAnnotationDTO).rotation).toBe(90);
 
-    const rendered = await page.annotations.renderAppearances();
+    const rendered = await page.annotations.renderAppearancesRaw();
     const entry = rendered.appearances.find(
       (a) =>
         a.ref.kind === 'objectNumber' &&
@@ -254,7 +254,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     const unrotated = { left: 300, bottom: 400, right: 400, top: 450 }; // 100×50, 2:1 — matches image
     // 90° CW about the centre (350, 425) → AABB 50×100 portrait.
     const rect = { left: 325, bottom: 375, right: 375, top: 475 };
-    const { created } = await page.annotations.create(
+    const { annotation: created } = await page.annotations.create(
       {
         subtype: 'stamp',
         rect,
@@ -266,7 +266,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     );
     expect((created as StampAnnotationDTO).rotation).toBe(90);
 
-    const rendered = await page.annotations.renderAppearances();
+    const rendered = await page.annotations.renderAppearancesRaw();
     const entry = rendered.appearances.find(
       (a) =>
         a.ref.kind === 'objectNumber' &&
@@ -304,7 +304,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     const png = makePng(4, 4, [0, 0, 255, 255]);
     const unrotated = { left: 200, bottom: 200, right: 250, top: 250 };
     const rect = { left: 200, bottom: 200, right: 250, top: 250 }; // square: AABB == box
-    const { created } = await page.annotations.create(
+    const { annotation: created } = await page.annotations.create(
       {
         subtype: 'stamp',
         rect,
@@ -321,7 +321,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
       subtype: 'stamp',
       rect: { left: 205, bottom: 205, right: 255, top: 255 },
     });
-    expect((moved.updated as StampAnnotationDTO).rotation).toBe(90);
+    expect((moved.annotation as StampAnnotationDTO).rotation).toBe(90);
 
     // …and dropping the tilt is an explicit tri-state clear.
     const flat = { left: 210, bottom: 210, right: 270, top: 260 };
@@ -331,7 +331,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
       rotation: null,
       unrotatedRect: null,
     });
-    expect((updated.updated as StampAnnotationDTO).rotation ?? 0).toBe(0);
+    expect((updated.annotation as StampAnnotationDTO).rotation ?? 0).toBe(0);
 
     // Re-read from the annot dict (not just the patch echo) to prove it persists.
     const list = await page.annotations.list();
@@ -380,7 +380,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     expect(afterRejectedCreate.annotations).toHaveLength(beforeCreate.annotations.length);
 
     const customName = '#LBGiYhk8V_oAfmqAPENiwD';
-    const { created } = await page.annotations.create(
+    const { annotation: created } = await page.annotations.create(
       {
         subtype: 'stamp',
         rect: { left: 20, bottom: 100, right: 80, top: 130 },

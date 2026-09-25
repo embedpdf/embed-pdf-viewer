@@ -196,7 +196,7 @@ export function toScopedPatch(
       : null;
   }
   if (scope.kind === 'leader') {
-    return annotation.measure?.intent === 'LineDimension'
+    return annotation.measure?.intent === 'line-dimension'
       ? { subtype: 'line', leader: annotation.measure.leader }
       : null;
   }

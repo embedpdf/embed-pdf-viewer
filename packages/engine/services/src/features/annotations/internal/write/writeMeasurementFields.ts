@@ -14,6 +14,7 @@ import {
   withMeasurePoint,
   writeMeasure,
 } from '../../../measure/internal/measureCodec';
+import { measurementIntentToName } from '../measurementIntent';
 
 /** `EPDFMeasure_GetSubtype` of a rectilinear measure. */
 const MEASURE_SUBTYPE_RL = 1;
@@ -31,7 +32,7 @@ export function writeMeasurementFields(
 ): void {
   if (value.intent !== undefined) {
     if (value.intent === null) fn.EPDFAnnot_RemoveKey(annot, 'IT');
-    else requireMeasureWrite(fn.EPDFAnnot_SetIntent(annot, value.intent));
+    else requireMeasureWrite(fn.EPDFAnnot_SetIntent(annot, measurementIntentToName(value.intent)));
   }
   if (value.measure !== undefined) {
     if (value.measure === null) requireMeasureWrite(fn.EPDFAnnot_RemoveMeasure(annot));

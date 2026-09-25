@@ -52,7 +52,7 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
     return this.await(submission, 'signatures.list', (payload) => payload.snapshot);
   }
 
-  contents(field: FormFieldRef): AbortablePromise<Uint8Array> {
+  getContents(field: FormFieldRef): AbortablePromise<Uint8Array> {
     const rejected = this.gate('doc.forms.read');
     if (rejected) return rejected;
     const docId = this.docId;
@@ -63,10 +63,14 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
       },
       { priority: Priority.MEDIUM },
     );
-    return this.await(submission, 'signatures.contents', (payload) => new Uint8Array(payload.bytes));
+    return this.await(
+      submission,
+      'signatures.contents',
+      (payload) => new Uint8Array(payload.bytes),
+    );
   }
 
-  digest(field: FormFieldRef, algorithm: DigestAlgorithm): AbortablePromise<Uint8Array> {
+  getDigest(field: FormFieldRef, algorithm: DigestAlgorithm): AbortablePromise<Uint8Array> {
     const rejected = this.gate('doc.forms.read');
     if (rejected) return rejected;
     const docId = this.docId;
@@ -80,7 +84,7 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
     return this.await(submission, 'signatures.digest', (payload) => new Uint8Array(payload.digest));
   }
 
-  revisionBytes(revisionIndex: number): AbortablePromise<Uint8Array> {
+  downloadRevision(revisionIndex: number): AbortablePromise<Uint8Array> {
     const rejected = this.gate('doc.download');
     if (rejected) return rejected;
     if (!Number.isInteger(revisionIndex) || revisionIndex < 0) {
@@ -96,7 +100,11 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
       },
       { priority: Priority.MEDIUM },
     );
-    return this.await(submission, 'signatures.revisionBytes', (payload) => new Uint8Array(payload.bytes));
+    return this.await(
+      submission,
+      'signatures.revisionBytes',
+      (payload) => new Uint8Array(payload.bytes),
+    );
   }
 
   analyze(input: AnalyzeInput): AbortablePromise<ChangeAnalysis> {
@@ -104,18 +112,23 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
     if (rejected) return rejected;
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>(
-      { buildPack: (jobId: JobId) => wirePack({ kind: 'signatures.analyze', jobId, docId, input }) },
+      {
+        buildPack: (jobId: JobId) => wirePack({ kind: 'signatures.analyze', jobId, docId, input }),
+      },
       { priority: Priority.MEDIUM },
     );
     return this.await(submission, 'signatures.analyze', (payload) => payload.analysis);
   }
 
   prepare(input: SignaturePrepareInput): AbortablePromise<SignaturePrepared> {
-    const rejected = this.gate('doc.sign') ?? (input.certify ? this.gate('doc.sign.certify') : null);
+    const rejected =
+      this.gate('doc.sign') ?? (input.certify ? this.gate('doc.sign.certify') : null);
     if (rejected) return rejected;
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>(
-      { buildPack: (jobId: JobId) => wirePack({ kind: 'signatures.prepare', jobId, docId, input }) },
+      {
+        buildPack: (jobId: JobId) => wirePack({ kind: 'signatures.prepare', jobId, docId, input }),
+      },
       { priority: Priority.HIGH },
     );
     return this.await(submission, 'signatures.prepare', (payload) => {
@@ -133,7 +146,9 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
     if (rejected) return rejected;
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>(
-      { buildPack: (jobId: JobId) => wirePack({ kind: 'signatures.complete', jobId, docId, input }) },
+      {
+        buildPack: (jobId: JobId) => wirePack({ kind: 'signatures.complete', jobId, docId, input }),
+      },
       { priority: Priority.HIGH },
     );
     return this.await(submission, 'signatures.complete', (payload) => {
@@ -153,12 +168,15 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
     });
   }
 
-  abort(signingId: string): AbortablePromise<SignatureAbortResult> {
+  cancel(signingId: string): AbortablePromise<SignatureAbortResult> {
     const rejected = this.gate('doc.sign');
     if (rejected) return rejected;
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>(
-      { buildPack: (jobId: JobId) => wirePack({ kind: 'signatures.abort', jobId, docId, signingId }) },
+      {
+        buildPack: (jobId: JobId) =>
+          wirePack({ kind: 'signatures.abort', jobId, docId, signingId }),
+      },
       { priority: Priority.HIGH },
     );
     return this.await(submission, 'signatures.abort', (payload) => {

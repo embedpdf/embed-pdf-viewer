@@ -39,7 +39,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         await doc.page(toPageRef(pageObjectNumber)).measure!.setScale(scale);
         annotation.setPageViewports(
           page.ref,
-          await doc.page(toPageRef(pageObjectNumber)).measure!.viewports(),
+          await doc.page(toPageRef(pageObjectNumber)).measure!.listViewports(),
           scale,
         );
         for (const preset of annotation.listResolvedTools()) {
@@ -79,7 +79,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         expect(created.captionEnabled).toBe(true);
         expect(created.captionCenter).toBe(null);
         const model = fromDTO(created, crop);
-        if (!model.measure || model.measure.intent === 'LineDimension')
+        if (!model.measure || model.measure.intent === 'line-dimension')
           throw new Error('Expected shape measure');
         const label = shapeMeasurementLayout(model.geometry, model.measure, model.style)!.caption!
           .center;
@@ -171,7 +171,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
             // Rendering requests exercise the generated /AP as well as dictionary persistence.
             const appearance = await reopened
               .page(toPageRef(reopenedPageObjectNumber))
-              .annotations.renderAppearances({ scale: 1 });
+              .annotations.renderAppearancesRaw({ viewport: { kind: 'scale', scale: 1 } });
             expect(appearance).toBeTruthy();
           } finally {
             await reopened.close();

@@ -96,22 +96,22 @@ export function runAnnotationTransferConformance(
       const pages = (await doc.pages.list()).pages.map((entry) =>
         toPageRef(entry.ref.pageObjectNumber),
       );
-      const session = await doc.annotations.beginWeakEdit(pages);
+      const session = await doc.annotations.beginEdit(pages);
       try {
         for (const pageRef of pages) {
           for (;;) {
-            const { annotations } = await doc.annotations.listRaw(pageRef);
+            const { annotations } = await doc.annotations.list({ pages: [pageRef] });
             const last = [...annotations]
               .reverse()
               .find((annotation) => !isFieldWidget(annotation));
             if (!last) break;
             await doc.page(pageRef).annotations.delete(last.ref);
           }
-          const { annotations } = await doc.annotations.listRaw(pageRef);
+          const { annotations } = await doc.annotations.list({ pages: [pageRef] });
           for (const annotation of annotations) kept.add(annotationKey(annotation.ref));
         }
       } finally {
-        await session.release();
+        await session.close();
       }
       return { doc, kept };
     };
@@ -227,7 +227,7 @@ export function runAnnotationTransferConformance(
             for (const { data } of taken.items) {
               if (data.nm) expect(conflicts.has(annotationKey(data.ref))).toBe(true);
             }
-            expect(second.created.every((created) => created.nm === null)).toBe(true);
+            expect(second.annotations.every((created) => created.nm === null)).toBe(true);
             const third = without(await copy.annotations.export(), kept);
             expect(Object.keys(third.resources).sort()).toEqual(
               Object.keys(again.resources).sort(),
@@ -405,7 +405,7 @@ async function fill(doc: DocumentHandle): Promise<void> {
   const create = async (
     draft: Parameters<PageHandle['annotations']['create']>[0],
     resources?: Parameters<PageHandle['annotations']['create']>[1],
-  ) => (await page.annotations.create(draft, resources)).created as AnnotationDTO;
+  ) => (await page.annotations.create(draft, resources)).annotation as AnnotationDTO;
   for (const { data, resources } of creatables()) await create(data, resources);
   const box = (left: number): PdfRect => ({ left, bottom: 300, right: left + 40, top: 330 });
   await create({ subtype: 'stamp', rect: box(20), nm: 'approved' }, { appearance: BANDS_PDF });

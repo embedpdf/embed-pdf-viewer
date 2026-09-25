@@ -86,7 +86,7 @@ export async function fill(doc: Doc, count: number): Promise<void> {
     const bottom = 40 + Math.floor(slot / 10) * 60;
     const rect = { left, bottom, right: left + 50, top: bottom + 40 };
     if (i % 25 === 0) {
-      const { created } = await page.annotations.create({
+      const { annotation: created } = await page.annotations.create({
         subtype: 'text',
         rect,
         contents: `Note ${i}`,

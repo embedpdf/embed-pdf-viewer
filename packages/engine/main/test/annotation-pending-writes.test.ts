@@ -28,11 +28,8 @@ async function openFixture(id: string) {
 }
 
 async function engineKeys(doc: DocumentHandle): Promise<string[]> {
-  const snapshot = await doc.annotations.listRawAll();
-  return snapshot.pages
-    .flatMap((page) => page.annotations)
-    .map((dto) => annotationKey(dto.ref))
-    .sort();
+  const { annotations } = await doc.annotations.list();
+  return annotations.map((dto) => annotationKey(dto.ref)).sort();
 }
 
 describe('changes faster than the engine answers (local engine)', () => {

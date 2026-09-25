@@ -31,16 +31,16 @@ export interface DocumentSignaturesService {
   list(): AbortablePromise<SignatureSnapshot>;
 
   /** The DER `/Contents` of a signed field (exactly `contentsSize` bytes, padding stripped). `NotFound` for an unsigned field. */
-  contents(field: FormFieldRef): AbortablePromise<Uint8Array>;
+  getContents(field: FormFieldRef): AbortablePromise<Uint8Array>;
 
   /**
    * Hash the signed field's `/ByteRange` with `algorithm`, straight from
    * the loaded bytes. What a CMS verifier compares its message digest to.
    */
-  digest(field: FormFieldRef, algorithm: DigestAlgorithm): AbortablePromise<Uint8Array>;
+  getDigest(field: FormFieldRef, algorithm: DigestAlgorithm): AbortablePromise<Uint8Array>;
 
   /** The exact bytes of revision `revisionIndex` (`[0, end)`): what a signature over it signed. */
-  revisionBytes(revisionIndex: number): AbortablePromise<Uint8Array>;
+  downloadRevision(revisionIndex: number): AbortablePromise<Uint8Array>;
 
   /**
    * What changed after a signature (or after any revision), judged
@@ -72,5 +72,5 @@ export interface DocumentSignaturesService {
   complete(input: SignatureCompleteInput): AbortablePromise<SignatureCompleteResult>;
 
   /** Discard a pending candidate. */
-  abort(signingId: string): AbortablePromise<SignatureAbortResult>;
+  cancel(signingId: string): AbortablePromise<SignatureAbortResult>;
 }

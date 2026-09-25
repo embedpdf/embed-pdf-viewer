@@ -3,25 +3,25 @@
 import type * as CloudPDF from "../index.js";
 
 export type DocPagesViewports200ResponseItemMeasure =
-    | CloudPDF.DocPagesViewports200ResponseItemMeasure.Rl
-    | CloudPDF.DocPagesViewports200ResponseItemMeasure.Geo
+    | CloudPDF.DocPagesViewports200ResponseItemMeasure.Rectilinear
+    | CloudPDF.DocPagesViewports200ResponseItemMeasure.Geospatial
     | CloudPDF.DocPagesViewports200ResponseItemMeasure.Unknown;
 
 export namespace DocPagesViewports200ResponseItemMeasure {
-    export interface Rl {
-        subtype: "RL";
+    export interface Rectilinear {
+        subtype: "rectilinear";
         ratio?: string | undefined;
-        x: DocPagesViewports200ResponseItemMeasureRl.X.Item[];
-        y?: DocPagesViewports200ResponseItemMeasureRl.Y.Item[] | undefined;
-        distance: DocPagesViewports200ResponseItemMeasureRl.Distance.Item[];
-        area: DocPagesViewports200ResponseItemMeasureRl.Area.Item[];
-        angle?: DocPagesViewports200ResponseItemMeasureRl.Angle.Item[] | undefined;
-        slope?: DocPagesViewports200ResponseItemMeasureRl.Slope.Item[] | undefined;
-        origin?: DocPagesViewports200ResponseItemMeasureRl.Origin | undefined;
+        x: DocPagesViewports200ResponseItemMeasureRectilinear.X.Item[];
+        y?: DocPagesViewports200ResponseItemMeasureRectilinear.Y.Item[] | undefined;
+        distance: DocPagesViewports200ResponseItemMeasureRectilinear.Distance.Item[];
+        area: DocPagesViewports200ResponseItemMeasureRectilinear.Area.Item[];
+        angle?: DocPagesViewports200ResponseItemMeasureRectilinear.Angle.Item[] | undefined;
+        slope?: DocPagesViewports200ResponseItemMeasureRectilinear.Slope.Item[] | undefined;
+        origin?: DocPagesViewports200ResponseItemMeasureRectilinear.Origin | undefined;
         cyx?: number | undefined;
     }
 
-    export namespace DocPagesViewports200ResponseItemMeasureRl {
+    export namespace DocPagesViewports200ResponseItemMeasureRectilinear {
         export type X = X.Item[];
 
         export namespace X {
@@ -220,8 +220,8 @@ export namespace DocPagesViewports200ResponseItemMeasure {
         }
     }
 
-    export interface Geo {
-        subtype: "GEO";
+    export interface Geospatial {
+        subtype: "geospatial";
     }
 
     export interface Unknown {

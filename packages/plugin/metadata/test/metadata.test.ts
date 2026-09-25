@@ -70,7 +70,7 @@ function fakeDocument(options: { allowEdit?: boolean; readRejects?: unknown } = 
     pages: { list: () => Promise.resolve({ pageCount: 1, pages: [page] }) },
     security: { allows: () => options.allowEdit ?? true },
     metadata: {
-      read: () => {
+      get: () => {
         if (options.readRejects) return Promise.reject(options.readRejects);
         const pendingRead = deferred<DocumentMetadata>();
         reads.push(pendingRead);

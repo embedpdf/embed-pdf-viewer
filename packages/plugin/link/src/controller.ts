@@ -1,9 +1,4 @@
-import {
-  PluginError,
-  type PluginContext,
-  type DocumentEvent,
-  type PageRef,
-} from '@embedpdf/core';
+import { PluginError, type PluginContext, type DocumentEvent, type PageRef } from '@embedpdf/core';
 import type { Point } from '@embedpdf/core-geometry';
 import type { PdfLinkTarget } from '@embedpdf/engine-core/runtime';
 import { ActionsToken } from '@embedpdf/plugin-actions/contract';
@@ -41,14 +36,14 @@ const contains = (
 function pagesChangedBy(event: DocumentEvent): readonly PageRef[] | null {
   switch (event.type) {
     case 'annotation.created':
-      return [event.created.page];
+      return [event.annotation.page];
     case 'annotation.updated':
-      return [event.updated.page];
+      return [event.annotation.page];
     case 'annotation.deleted':
       return [event.page];
     case 'annotation.moved': {
       const pages = new Map<number, PageRef>();
-      for (const dto of event.moved) pages.set(dto.page.pageObjectNumber, dto.page);
+      for (const dto of event.annotations) pages.set(dto.page.pageObjectNumber, dto.page);
       return [...pages.values()];
     }
     // These can remove annotations, links included, from the pages they applied to.

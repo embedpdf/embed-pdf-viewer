@@ -114,20 +114,20 @@ try {
   );
   diffStr(
     'updated.identityQuality',
-    localResult.updated?.updated.identityQuality ?? '<skipped>',
-    cloudResult.updated?.updated.identityQuality ?? '<skipped>',
+    localResult.updated?.annotation.identityQuality ?? '<skipped>',
+    cloudResult.updated?.annotation.identityQuality ?? '<skipped>',
     errs,
   );
   diffStr(
     'updated.ref.kind',
-    localResult.updated?.updated.ref.kind ?? '<skipped>',
-    cloudResult.updated?.updated.ref.kind ?? '<skipped>',
+    localResult.updated?.annotation.ref.kind ?? '<skipped>',
+    cloudResult.updated?.annotation.ref.kind ?? '<skipped>',
     errs,
   );
   diffNum(
     'moveBatch.moved.length',
-    localResult.movedBatch.moved.length,
-    cloudResult.movedBatch.moved.length,
+    localResult.movedBatch.annotations.length,
+    cloudResult.movedBatch.annotations.length,
     errs,
   );
 

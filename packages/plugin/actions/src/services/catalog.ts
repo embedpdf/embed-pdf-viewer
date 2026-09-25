@@ -22,7 +22,7 @@ export function createCatalog(ctx: PluginContext<void>) {
     if (!snapshotRead) {
       const service = ctx.doc.actions;
       const read: Promise<DocumentActionsSnapshot | null> = service
-        ? Promise.resolve(service.read())
+        ? Promise.resolve(service.get())
         : Promise.resolve(null);
       const memoized: Promise<DocumentActionsSnapshot | null> = read.catch((error: unknown) => {
         if (snapshotRead === memoized) snapshotRead = null;

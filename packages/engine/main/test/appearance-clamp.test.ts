@@ -50,7 +50,7 @@ describe('appearance pixel clamp (wasm engine, real document)', () => {
     // node has no canvas encoder, and pixels are what the clamp bounds.
     const result = await doc
       .page(toPageRef(pageObjectNumber))
-      .annotations.renderAppearances({ scale: 50 });
+      .annotations.renderAppearancesRaw({ viewport: { kind: 'scale', scale: 50 } });
     expect(result.appearances.length).toBeGreaterThan(0);
     for (const ap of result.appearances) {
       expect(ap.raster.width).toBeGreaterThan(0);

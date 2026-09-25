@@ -13,7 +13,7 @@ import { chrome, pageItems } from '../src/view';
 
 const PAGE = toPageRef(1);
 const appearance: DistanceAppearance = {
-  intent: 'LineDimension',
+  intent: 'line-dimension',
   measure: null,
   text: '6.90 m',
   crop: { left: -20, bottom: -40, right: 580, top: 760 },

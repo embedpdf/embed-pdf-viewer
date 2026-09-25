@@ -96,10 +96,7 @@ export type {
   SearchConformanceFixture,
   SearchConformanceOptions,
 } from './conformance/runSearchConformance';
-export {
-  diffAnnotationListSnapshot,
-  diffAnnotationListSnapshotAll,
-} from './conformance/diffAnnotationListSnapshot';
+export { diffAnnotationList } from './conformance/diffAnnotationList';
 export { runSignatureConformance } from './conformance/runSignatureConformance';
 export type {
   SignatureConformanceFixtures,

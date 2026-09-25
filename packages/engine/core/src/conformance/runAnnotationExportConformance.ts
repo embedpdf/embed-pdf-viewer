@@ -19,7 +19,7 @@ import { AnnotationTransfer } from '../transfer/AnnotationTransfer';
 /**
  * `doc.annotations.export` on both engines: the annotations as a raw read
  * returns them, each resource once under its hash, the same bytes
- * `readResource` returns, and a selection with what it points at and, by
+ * `downloadResource` returns, and a selection with what it points at and, by
  * default, its threads.
  */
 export function runAnnotationExportConformance(
@@ -78,7 +78,7 @@ export function runAnnotationExportConformance(
 
         const bundle = await doc.annotations.export();
         await assertAnnotationBundle(bundle);
-        const read = await doc.annotations.listRaw(pageRef);
+        const read = await doc.annotations.list({ pages: [pageRef] });
         expect(bundle.items.map((item) => item.data)).toEqual(read.annotations);
 
         const { pages } = await doc.pages.list();
@@ -88,14 +88,16 @@ export function runAnnotationExportConformance(
           bundle.items.find((item) => annotationKey(item.data.ref) === annotationKey(ref))!
             .resources[role]!;
         // One drawing, one resource, however many stamps place it.
-        expect(idOf(first.created.ref, 'appearance')).toBe(idOf(second.created.ref, 'appearance'));
+        expect(idOf(first.annotation.ref, 'appearance')).toBe(
+          idOf(second.annotation.ref, 'appearance'),
+        );
         expect(Object.keys(bundle.resources)).toHaveLength(3);
         for (const [ref, role] of [
-          [first.created.ref, 'appearance'],
-          [image.created.ref, 'appearance'],
-          [file.created.ref, 'file'],
+          [first.annotation.ref, 'appearance'],
+          [image.annotation.ref, 'appearance'],
+          [file.annotation.ref, 'file'],
         ] as const) {
-          const bytes = await page.annotations.readResource(ref, role);
+          const bytes = await page.annotations.downloadResource(ref, role);
           expect(sameBytes(bundle.resources[idOf(ref, role)]!, bytes)).toBe(true);
         }
 
@@ -105,14 +107,14 @@ export function runAnnotationExportConformance(
       });
     });
 
-    test('exports a stamp another tool made as readResource returns it', async () => {
+    test('exports a stamp another tool made as downloadResource returns it', async () => {
       await onPage('acrobat-stamps', async (page, doc) => {
         const bundle = await doc.annotations.export();
         await assertAnnotationBundle(bundle);
         const stamps = bundle.items.filter((item) => item.data.subtype === 'stamp');
         expect(stamps).toHaveLength(2);
         for (const stamp of stamps) {
-          const bytes = await page.annotations.readResource(stamp.data.ref, 'appearance');
+          const bytes = await page.annotations.downloadResource(stamp.data.ref, 'appearance');
           expect(sameBytes(bundle.resources[stamp.resources.appearance!]!, bytes)).toBe(true);
         }
       });
@@ -143,7 +145,7 @@ export function runAnnotationExportConformance(
       await onPage('authoring', async (page, doc) => {
         const rect: PdfRect = { left: 300, bottom: 300, right: 320, top: 320 };
         const create = async (draft: Parameters<PageHandle['annotations']['create']>[0]) =>
-          (await page.annotations.create(draft)).created as AnnotationDTO;
+          (await page.annotations.create(draft)).annotation as AnnotationDTO;
         const note = await create({ subtype: 'text', rect, contents: 'Check this' });
         const popup = await create({ subtype: 'popup', rect, parent: note.ref });
         const reply = await create({ subtype: 'text', rect, reply: { to: note.ref } });

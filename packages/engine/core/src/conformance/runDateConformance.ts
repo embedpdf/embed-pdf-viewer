@@ -83,7 +83,7 @@ export function runDateConformance(
         const page = doc.page(toPageRef(3));
         const read = (await annotationsOf(doc))('dates-offset');
         const before = Date.now();
-        const { updated } = await page.annotations.update(
+        const { annotation: updated } = await page.annotations.update(
           read.ref,
           JSON.parse(JSON.stringify(read)),
         );
@@ -96,25 +96,25 @@ export function runDateConformance(
 
     test('document metadata keeps offsets, and a write takes the string or a Date', async () => {
       await withDocument(async (doc) => {
-        const read = await doc.metadata.read();
+        const read = await doc.metadata.get();
         expect(read.createdAt).toBe('2017-07-12T21:44:38-07:00');
         expect(read.modifiedAt).toBe('2019-02-03T04:05:06+09:00');
 
         await doc.metadata.update({ createdAt: '2020-01-02T03:04:05+05:30' });
-        expect((await doc.metadata.read()).createdAt).toBe('2020-01-02T03:04:05+05:30');
+        expect((await doc.metadata.get()).createdAt).toBe('2020-01-02T03:04:05+05:30');
 
         // A `Date` is an instant: written in UTC, whole seconds.
         await doc.metadata.update({ modifiedAt: new Date('2021-06-07T10:09:10.500+02:00') });
-        expect((await doc.metadata.read()).modifiedAt).toBe('2021-06-07T08:09:10Z');
+        expect((await doc.metadata.get()).modifiedAt).toBe('2021-06-07T08:09:10Z');
 
         // A read sent back through JSON writes the same dates.
-        const current = await doc.metadata.read();
+        const current = await doc.metadata.get();
         const { createdAt, modifiedAt } = JSON.parse(JSON.stringify(current)) as typeof current;
         await doc.metadata.update({ createdAt, modifiedAt });
-        expect(await doc.metadata.read()).toMatchObject({ createdAt, modifiedAt });
+        expect(await doc.metadata.get()).toMatchObject({ createdAt, modifiedAt });
 
         await doc.metadata.update({ createdAt: null });
-        expect((await doc.metadata.read()).createdAt).toBe(null);
+        expect((await doc.metadata.get()).createdAt).toBe(null);
       });
     });
 

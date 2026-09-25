@@ -48,7 +48,7 @@ export interface AnnotationResourceConformanceOptions {
 }
 
 /**
- * Resources beside an annotation's data, on both engines: `readResource`
+ * Resources beside an annotation's data, on both engines: `downloadResource`
  * returns what `create(data, resources)` needs to make the same annotation
  * again. A stamp's appearance is its drawing without the fit, rotation and
  * opacity its data describes; a stamp another tool made is drawn as shown,
@@ -96,7 +96,7 @@ export function runAnnotationResourceConformance(
     test("a stamp's appearance and its data make the same stamp", async () => {
       await onPage('authoring', async (page) => {
         const rect: PdfRect = { left: 100, bottom: 100, right: 260, top: 180 };
-        const { created } = await page.annotations.create(
+        const { annotation: created } = await page.annotations.create(
           {
             subtype: 'stamp',
             rect: { left: 80, bottom: 60, right: 280, top: 220 },
@@ -108,11 +108,11 @@ export function runAnnotationResourceConformance(
           },
           { appearance: BANDS_PDF },
         );
-        const appearance = await page.annotations.readResource(created.ref, 'appearance');
+        const appearance = await page.annotations.downloadResource(created.ref, 'appearance');
         expect([...appearance.subarray(0, 4)]).toEqual(PDF_MAGIC);
 
         const data = copyOnItsPage(created);
-        const copy = (await page.annotations.create(data, { appearance })).created;
+        const copy = (await page.annotations.create(data, { appearance })).annotation;
         expect(dataOf(copy)).toEqual(dataOf(created));
         expectSameDrawing(await rasterOf(page, copy.ref), await rasterOf(page, created.ref));
       });
@@ -135,9 +135,9 @@ export function runAnnotationResourceConformance(
         for (const stamp of await acrobatStamps(page)) {
           // Acrobat's 30%, in the 1/255 steps opacity is stored in.
           expect(stamp.opacity! > 0.25 && stamp.opacity! < 0.35).toBe(true);
-          const appearance = await page.annotations.readResource(stamp.ref, 'appearance');
+          const appearance = await page.annotations.downloadResource(stamp.ref, 'appearance');
           const data = copyOnItsPage(stamp);
-          const copy = (await page.annotations.create(data, { appearance })).created;
+          const copy = (await page.annotations.create(data, { appearance })).annotation;
           // The popup is another annotation; a copy is made without one.
           expect(dataOf(copy)).toEqual({ ...dataOf(stamp), popup: null, nm: null });
           const drawn = await rasterOf(page, copy.ref);
@@ -151,7 +151,7 @@ export function runAnnotationResourceConformance(
       await onPage('acrobat-stamps', async (page) => {
         for (const stamp of await acrobatStamps(page)) {
           const { left, bottom, right, top } = stamp.rect;
-          const { updated } = await page.annotations.update(stamp.ref, {
+          const { annotation: updated } = await page.annotations.update(stamp.ref, {
             rect: {
               left,
               bottom,
@@ -168,7 +168,7 @@ export function runAnnotationResourceConformance(
       await onPage('acrobat-stamps', async (page) => {
         for (const stamp of await acrobatStamps(page)) {
           for (const opacity of [1, 0.5]) {
-            const { updated } = await page.annotations.update(stamp.ref, { opacity });
+            const { annotation: updated } = await page.annotations.update(stamp.ref, { opacity });
             expect(updated.subtype === 'stamp' && updated.opacity).toBe(
               opacity === 1 ? 1 : 128 / 255,
             );
@@ -192,13 +192,13 @@ export function runAnnotationResourceConformance(
             },
             { appearance: BANDS_PDF },
           )
-        ).created;
+        ).annotation;
         const flat = (
           await page.annotations.create(
             { ...common, rect: unrotatedRect },
             { appearance: BANDS_PDF },
           )
-        ).created;
+        ).annotation;
         expectSameDrawing(await rasterOf(page, turned.ref), await rasterOf(page, flat.ref));
       });
     });
@@ -224,7 +224,7 @@ export function runAnnotationResourceConformance(
         for (const stamp of [turned, opaque]) {
           expectPaintedOnce(await rasterOf(page, stamp.ref), stamp.opacity!);
           // Our drawing in its own box, not the appearance Acrobat put around it.
-          const drawing = await page.annotations.readResource(stamp.ref, 'appearance');
+          const drawing = await page.annotations.downloadResource(stamp.ref, 'appearance');
           expect(pageSize(drawing)).toEqual([200, 100]);
         }
       });
@@ -233,18 +233,18 @@ export function runAnnotationResourceConformance(
     test('a resize of a turned stamp Acrobat wrapped turns it once', async () => {
       await onPage('acrobat-rewrapped', async (page) => {
         const turned = await rewrappedStamp(page, 'a');
-        const drawing = await page.annotations.readResource(turned.ref, 'appearance');
+        const drawing = await page.annotations.downloadResource(turned.ref, 'appearance');
         const box = turned.unrotatedRect!;
-        const { updated } = await page.annotations.update(turned.ref, {
+        const { annotation: updated } = await page.annotations.update(turned.ref, {
           unrotatedRect: { ...box, right: box.right + 60 },
           rotation: 30,
         });
-        expect(pageSize(await page.annotations.readResource(updated.ref, 'appearance'))).toEqual([
-          200, 100,
-        ]);
+        expect(
+          pageSize(await page.annotations.downloadResource(updated.ref, 'appearance')),
+        ).toEqual([200, 100]);
         // The same data and drawing made afresh: one turn, one fit, one opacity.
         const data = copyOnItsPage(updated);
-        const twin = (await page.annotations.create(data, { appearance: drawing })).created;
+        const twin = (await page.annotations.create(data, { appearance: drawing })).annotation;
         expectSameDrawing(await rasterOf(page, updated.ref), await rasterOf(page, twin.ref));
         expectPaintedOnce(await rasterOf(page, updated.ref), turned.opacity!);
       });
@@ -255,7 +255,7 @@ export function runAnnotationResourceConformance(
         for (const name of ['a', 'b'] as const) {
           const stamp = await rewrappedStamp(page, name);
           for (const opacity of [1, 0.5, 0.3]) {
-            const { updated } = await page.annotations.update(stamp.ref, { opacity });
+            const { annotation: updated } = await page.annotations.update(stamp.ref, { opacity });
             expectPaintedOnce(await rasterOf(page, updated.ref), opacity);
           }
         }
@@ -275,17 +275,17 @@ export function runAnnotationResourceConformance(
             Math.abs(stamp.opacity - (fixture === 'acrobat-roundtrip-60' ? 0.6 : 1)) < 0.01,
           ).toBe(true);
           // Unturned as its twin made afresh from its data and drawing.
-          const drawing = await page.annotations.readResource(stamp.ref, 'appearance');
+          const drawing = await page.annotations.downloadResource(stamp.ref, 'appearance');
           const twin = (
             await page.annotations.create(copyOnItsPage(stamp), {
               appearance: drawing,
             })
-          ).created;
+          ).annotation;
           expectSameDrawing(await rasterOf(page, stamp.ref), await rasterOf(page, twin.ref));
 
           // And after a resize here.
           const box = stamp.unrotatedRect!;
-          const { updated } = await page.annotations.update(stamp.ref, {
+          const { annotation: updated } = await page.annotations.update(stamp.ref, {
             unrotatedRect: { ...box, right: box.right + 40 },
             rotation: stamp.rotation,
           });
@@ -293,7 +293,7 @@ export function runAnnotationResourceConformance(
             await page.annotations.create(copyOnItsPage(updated), {
               appearance: drawing,
             })
-          ).created;
+          ).annotation;
           expectSameDrawing(await rasterOf(page, updated.ref), await rasterOf(page, resized.ref));
         });
       });
@@ -306,22 +306,22 @@ export function runAnnotationResourceConformance(
         const shown = await rasterOf(page, stamp.ref);
         expectPaintedOnce(shown, 0.35);
         // The drawing in its own box, which is /Rect's size here, the 35% included.
-        const appearance = await page.annotations.readResource(stamp.ref, 'appearance');
+        const appearance = await page.annotations.downloadResource(stamp.ref, 'appearance');
         expect(pageSize(appearance)).toEqual([300, 120]);
         const data = copyOnItsPage(stamp);
-        const copy = (await page.annotations.create(data, { appearance })).created;
+        const copy = (await page.annotations.create(data, { appearance })).annotation;
         expectSameDrawing(await rasterOf(page, copy.ref), shown);
       });
     });
 
     /** Export, make a copy from the export, export the copy: `rounds` times. */
     const exportCycles = async (page: PageHandle, stamp: AnnotationDTO, rounds: number) => {
-      const drawings = [await page.annotations.readResource(stamp.ref, 'appearance')];
+      const drawings = [await page.annotations.downloadResource(stamp.ref, 'appearance')];
       const data = copyOnItsPage(stamp);
       for (let round = 0; round < rounds; round++) {
         const appearance = drawings[drawings.length - 1]!;
-        const copy = (await page.annotations.create(data, { appearance })).created;
-        drawings.push(await page.annotations.readResource(copy.ref, 'appearance'));
+        const copy = (await page.annotations.create(data, { appearance })).annotation;
+        drawings.push(await page.annotations.downloadResource(copy.ref, 'appearance'));
       }
       return drawings;
     };
@@ -337,7 +337,7 @@ export function runAnnotationResourceConformance(
             },
             { appearance: BANDS_PDF },
           )
-        ).created;
+        ).annotation;
         const image = (
           await page.annotations.create(
             {
@@ -347,7 +347,7 @@ export function runAnnotationResourceConformance(
             },
             { appearance: BANDS_PNG },
           )
-        ).created;
+        ).annotation;
         for (const stamp of [vector, image]) {
           const [first, ...again] = await exportCycles(page, stamp, 3);
           for (const drawing of again) expect(sameBytes(drawing, first!)).toBe(true);
@@ -372,7 +372,7 @@ export function runAnnotationResourceConformance(
             },
             { appearance: BANDS_PNG },
           )
-        ).created;
+        ).annotation;
         const wide = (
           await page.annotations.create(
             {
@@ -382,9 +382,9 @@ export function runAnnotationResourceConformance(
             },
             { appearance: BANDS_PNG },
           )
-        ).created;
-        const a = await page.annotations.readResource(square.ref, 'appearance');
-        const b = await page.annotations.readResource(wide.ref, 'appearance');
+        ).annotation;
+        const a = await page.annotations.downloadResource(square.ref, 'appearance');
+        const b = await page.annotations.downloadResource(wide.ref, 'appearance');
         expect(sameBytes(a, b)).toBe(true);
         // The image at its own size: a pixel is a point.
         expect(pageSize(a)).toEqual([30, 10]);
@@ -402,8 +402,10 @@ export function runAnnotationResourceConformance(
             },
             { appearance: BANDS_PNG },
           )
-        ).created;
-        const { updated } = await page.annotations.update(stamp.ref, { fit: 'contain' });
+        ).annotation;
+        const { annotation: updated } = await page.annotations.update(stamp.ref, {
+          fit: 'contain',
+        });
         const raster = await rasterOf(page, updated.ref);
         const y = Math.floor(raster.height / 2);
         const colour = (fx: number) => {
@@ -428,9 +430,9 @@ export function runAnnotationResourceConformance(
             },
             { appearance: BANDS_PDF },
           )
-        ).created;
+        ).annotation;
         const text = new TextDecoder('latin1').decode(
-          await page.annotations.readResource(stamp.ref, 'appearance'),
+          await page.annotations.downloadResource(stamp.ref, 'appearance'),
         );
         // No /Info with a creation date, nothing of how our wrapper placed it.
         expect(text.includes('/Info')).toBe(false);
@@ -466,8 +468,8 @@ export function runAnnotationResourceConformance(
             { subtype: 'stamp', rect: { left: 20, bottom: 20, right: 120, top: 120 } },
             { appearance: BANDS_PNG },
           )
-        ).created;
-        const appearance = await page.annotations.readResource(stamp.ref, 'appearance');
+        ).annotation;
+        const appearance = await page.annotations.downloadResource(stamp.ref, 'appearance');
         await page.annotations.create(
           { subtype: 'stamp', rect: { left: 200, bottom: 20, right: 260, top: 40 } },
           { appearance },
@@ -488,16 +490,16 @@ export function runAnnotationResourceConformance(
               },
               { appearance: BANDS_PNG },
             )
-          ).created;
+          ).annotation;
         const changed = await place(20);
         const kept = await place(200);
-        const before = await page.annotations.readResource(kept.ref, 'appearance');
+        const before = await page.annotations.downloadResource(kept.ref, 'appearance');
         const shown = await rasterOf(page, kept.ref);
 
         await page.annotations.update(changed.ref, {}, { appearance: BANDS_PDF });
-        expect(sameBytes(await page.annotations.readResource(kept.ref, 'appearance'), before)).toBe(
-          true,
-        );
+        expect(
+          sameBytes(await page.annotations.downloadResource(kept.ref, 'appearance'), before),
+        ).toBe(true);
         expectSameDrawing(await rasterOf(page, kept.ref), shown);
         const saved = await rewrite(doc);
         expect(images(saved)).toBe(1);
@@ -509,14 +511,14 @@ export function runAnnotationResourceConformance(
       await onPage('authoring', async (page) => {
         const rect: PdfRect = { left: 300, bottom: 300, right: 360, top: 340 };
         const refused = { code: EngineErrorCode.InvalidArg };
-        const square = (await page.annotations.create({ subtype: 'square', rect })).created;
-        await expect(page.annotations.readResource(square.ref, 'appearance')).rejects.toMatchObject(
-          refused,
-        );
+        const square = (await page.annotations.create({ subtype: 'square', rect })).annotation;
+        await expect(
+          page.annotations.downloadResource(square.ref, 'appearance'),
+        ).rejects.toMatchObject(refused);
         const stamp = (
           await page.annotations.create({ subtype: 'stamp', rect }, { appearance: BANDS_PDF })
-        ).created;
-        await expect(page.annotations.readResource(stamp.ref, 'file')).rejects.toMatchObject(
+        ).annotation;
+        await expect(page.annotations.downloadResource(stamp.ref, 'file')).rejects.toMatchObject(
           refused,
         );
       });

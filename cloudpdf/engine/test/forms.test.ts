@@ -118,7 +118,7 @@ test('dynamic-stamp scripts feed the cloud effects sink and persist in its layer
   const sandbox = await createQuickJsSandbox();
 
   try {
-    const [snapshot, actions] = await Promise.all([doc.forms.list(), doc.actions!.read()]);
+    const [snapshot, actions] = await Promise.all([doc.forms.list(), doc.actions!.get()]);
     const fields = scriptFieldsFromSnapshot(snapshot);
     const baseInput: Omit<ScriptInput, 'fields' | 'event'> = {
       document: {

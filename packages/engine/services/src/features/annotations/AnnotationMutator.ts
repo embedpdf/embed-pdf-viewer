@@ -150,7 +150,7 @@ export class AnnotationMutator {
       ],
       signal,
     );
-    return { created: created[0]!, meta };
+    return { annotation: created[0]!, meta };
   }
 
   update(
@@ -336,7 +336,7 @@ export class AnnotationMutator {
         pageStateAfter,
         changed: linkedParentId ? [stableId, linkedParentId] : [stableId],
       });
-      return { updated: dto, appearance, meta };
+      return { annotation: dto, appearance, meta };
     } finally {
       if (annotPtr !== null) fn.FPDFPage_CloseAnnot(annotPtr);
       pool.release(ref.page.pageObjectNumber);
@@ -470,7 +470,7 @@ export class AnnotationMutator {
         pageStateAfter,
         changed: deleted ? [deleted] : [],
       });
-      return { deleted, meta };
+      return { meta };
     } finally {
       if (bumpRequested) this.session.bumpRevision(ref.page.pageObjectNumber);
       pool.release(ref.page.pageObjectNumber);
@@ -664,7 +664,7 @@ export class AnnotationMutator {
         pageStateAfter,
         changed: stableIds,
       });
-      return { moved, meta };
+      return { annotations: moved, meta };
     } finally {
       if (bumpRequested) this.session.bumpRevision(pageObjectNumber);
       pool.release(pageObjectNumber);

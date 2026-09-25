@@ -22,7 +22,7 @@ import { chrome, creationDraftAnchor, pageItems } from '../src/view';
 const PAGE = toPageRef(1);
 const crop = { left: -20, bottom: -40, right: 580, top: 760 };
 const appearance: ShapeMeasurementAppearance = {
-  intent: 'PolygonDimension',
+  intent: 'polygon-dimension',
   measure: measureFromKnownLength(100, { value: 2, unit: 'm' }),
   caption: { enabled: true },
   crop,
@@ -77,7 +77,7 @@ describe('area and perimeter authoring', () => {
   it.each([true, false])('creates a closed=%s measurement with a frozen scale', (closed) => {
     const measure: ShapeMeasurementAppearance = {
       ...appearance,
-      intent: closed ? 'PolygonDimension' : 'PolyLineDimension',
+      intent: closed ? 'polygon-dimension' : 'polyline-dimension',
     };
     const create = (point: Point, nextMeasure = measure): Message => ({
       type: 'createPointer',
@@ -114,7 +114,7 @@ describe('area and perimeter authoring', () => {
     expect(
       shapeMeasurementReadout(
         { ...geometry, closed: false },
-        { ...appearance, intent: 'PolyLineDimension' },
+        { ...appearance, intent: 'polyline-dimension' },
       ),
     ).toMatchObject({ label: '10.00 m' });
   });
@@ -173,7 +173,7 @@ describe('area and perimeter authoring', () => {
         const at = rotatePoint(knob.at, frame.center, angle);
         const moving = pointer(armed, 'move', at);
         const item = pageItems(moving, PAGE)[0];
-        if (item.measure?.intent === 'LineDimension' || !item.measure)
+        if (item.measure?.intent === 'line-dimension' || !item.measure)
           throw new Error('Missing shape');
         const layout = shapeMeasurementLayout(item.geometry, item.measure, item.style)!;
         expectPoint(layout.caption!.center, rotatePoint(caption.center, frame.center, angle));

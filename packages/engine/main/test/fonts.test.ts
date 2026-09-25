@@ -108,7 +108,7 @@ describe('engine.fonts (local engine)', () => {
       contents: 'Hello',
       rect: RECT,
     });
-    expect(created.created.subtype).toBe('free-text');
+    expect(created.annotation.subtype).toBe('free-text');
 
     const saved = await doc.download();
     const text = latin1(saved);
@@ -152,7 +152,7 @@ describe('engine.fonts (local engine)', () => {
       contents: 'Hello',
       rect: RECT,
     });
-    expect(created.created.subtype).toBe('free-text');
+    expect(created.annotation.subtype).toBe('free-text');
     const saved = await doc.download();
     // A standard font is never embedded; the doc stays tiny.
     expect(saved.byteLength).toBeLessThan(roboto.byteLength / 2);

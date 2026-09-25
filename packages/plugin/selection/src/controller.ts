@@ -252,7 +252,13 @@ export function createSelectionController(
     const pages = pagesWithSegments.length ? pagesWithSegments : EMPTY_PAGES;
     if (!current.selection) {
       return {
-        snapshot: { pages: snapshotPages, start: null, end: null, direction: 'forward', range: null },
+        snapshot: {
+          pages: snapshotPages,
+          start: null,
+          end: null,
+          direction: 'forward',
+          range: null,
+        },
         pages,
         anchor: null,
       };
@@ -423,7 +429,7 @@ export function createSelectionController(
     const key = page.pageObjectNumber;
     const cached = textSnapshots.get(key);
     if (cached) return cached;
-    const pending = Promise.resolve(ctx.doc.page(page).text.read());
+    const pending = Promise.resolve(ctx.doc.page(page).text.get());
     textSnapshots.set(key, pending);
     pending.catch(() => {
       if (textSnapshots.get(key) === pending) textSnapshots.delete(key);

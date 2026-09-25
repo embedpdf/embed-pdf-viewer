@@ -27,7 +27,7 @@ function fakeHandle() {
     id: 'd',
     security: { allows: (cap: string) => cap === 'doc.read' },
     metadata: {
-      read: () => read.promise,
+      get: () => read.promise,
       update: () => Promise.reject(new PermissionDenied('doc.metadata.modify')),
       fail: () => Promise.reject(new EngineError('NotFound', 'gone')),
       sync: () => {
@@ -49,7 +49,7 @@ describe('guardHandle', () => {
     const controller = new AbortController();
     const doc = guardHandle(handle, { signal: controller.signal, instanceId: 'd#1' }, 'test');
     expect(doc.security.allows('doc.read' as never)).toBe(true); // sync passthrough
-    const pending = doc.metadata.read();
+    const pending = doc.metadata.get();
     read.resolve('meta');
     await expect(pending).resolves.toBe('meta');
     // nested objects are wrapped lazily and cached
@@ -62,7 +62,7 @@ describe('guardHandle', () => {
     const { handle, read } = fakeHandle();
     const controller = new AbortController();
     const doc = guardHandle(handle, { signal: controller.signal, instanceId: 'd#1' }, 'test');
-    const pending = doc.metadata.read();
+    const pending = doc.metadata.get();
     controller.abort('closed');
     await expect(pending).rejects.toSatisfy((error) => isPluginError(error, 'instance-closed'));
     read.resolve('late'); // must not surface anywhere
@@ -84,7 +84,7 @@ describe('guardHandle', () => {
     const controller = new AbortController();
     controller.abort('closed');
     const doc = guardHandle(handle, { signal: controller.signal, instanceId: 'd#1' }, 'test');
-    await expect(doc.metadata.read()).rejects.toSatisfy((error) =>
+    await expect(doc.metadata.get()).rejects.toSatisfy((error) =>
       isPluginError(error, 'instance-closed'),
     );
   });

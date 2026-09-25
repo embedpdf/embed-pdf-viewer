@@ -30,7 +30,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       await doc.page(toPageRef(pageObjectNumber)).measure!.setScale(scale);
       annotation.setPageViewports(
         page.ref,
-        await doc.page(toPageRef(pageObjectNumber)).measure!.viewports(),
+        await doc.page(toPageRef(pageObjectNumber)).measure!.listViewports(),
         scale,
       );
       for (const tool of annotation.listResolvedTools()) {
@@ -60,7 +60,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       expectVector();
       expect(created).toMatchObject({
         subtype: 'line',
-        intent: 'LineDimension',
+        intent: 'line-dimension',
         contents: '10.00 m',
         linePoints: {
           start: { x: page.boxes.crop.left + 50, y: page.boxes.crop.top - 100 },
@@ -164,7 +164,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
           captionOffset: { along: 15, perpendicular: 25 },
         });
         expect(
-          (await layered.page(toPageRef(pageObjectNumber)).measure!.viewports()).some(
+          (await layered.page(toPageRef(pageObjectNumber)).measure!.listViewports()).some(
             (v) => v.owned,
           ),
         ).toBe(true);
@@ -181,7 +181,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
         const list = await reopened.page(toPageRef(reopenedPageObjectNumber)).annotations.list();
         const restored = list.annotations.find((a) => a.nm === created.nm)!;
         expect(restored).toMatchObject({
-          intent: 'LineDimension',
+          intent: 'line-dimension',
           contents: '16.00 ft',
           leader: { length: 36 },
           captionOffset: { along: 15, perpendicular: 25 },
@@ -191,8 +191,8 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
         expect(restoredFrame.center.y).toBeCloseTo(frame.center.y, 3);
         expect(restoredFrame.angle).toBe(90);
         expect(
-          (await reopened.page(toPageRef(reopenedPageObjectNumber)).measure!.viewports()).some(
-            (v) => v.owned && v.measure?.subtype === 'RL',
+          (await reopened.page(toPageRef(reopenedPageObjectNumber)).measure!.listViewports()).some(
+            (v) => v.owned && v.measure?.subtype === 'rectilinear',
           ),
         ).toBe(true);
       } finally {

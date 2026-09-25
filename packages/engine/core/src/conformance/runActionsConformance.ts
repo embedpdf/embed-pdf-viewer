@@ -56,7 +56,7 @@ export function runActionsConformance(
       const doc = await open(engine, opts, opts.fixtures.document);
       try {
         expect(Boolean(doc.actions)).toBe(true);
-        const snapshot = await doc.actions!.read();
+        const snapshot = await doc.actions!.get();
         expect(DocumentActionsSnapshotSchema.safeParse(snapshot).success).toBe(true);
         expect(snapshot.openAction).toBeNull();
         expect(snapshot.willSave?.root?.type).toBe('javascript');
@@ -317,7 +317,7 @@ export function runActionsConformance(
       const doc = await open(engine, opts, opts.fixtures.openDestination);
       try {
         expect(Boolean(doc.actions)).toBe(true);
-        const snapshot = await doc.actions!.read();
+        const snapshot = await doc.actions!.get();
         expect(DocumentActionsSnapshotSchema.safeParse(snapshot).success).toBe(true);
         expect(snapshot.openAction).toBeNull();
         const pageObjectNumber = (await doc.pages.list()).pages[0].ref.pageObjectNumber;

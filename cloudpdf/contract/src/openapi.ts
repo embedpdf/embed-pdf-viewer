@@ -9,7 +9,11 @@
  * committed artifact, never this module.
  */
 
-import { EngineErrorPayloadSchema, PdfActionWireComponents } from '@embedpdf/engine-core/wire';
+import {
+  AnnotationWireComponents,
+  EngineErrorPayloadSchema,
+  PdfActionWireComponents,
+} from '@embedpdf/engine-core/wire';
 import { z } from 'zod';
 import { ignoreOverride, zodToJsonSchema } from 'zod-to-json-schema';
 
@@ -44,7 +48,7 @@ const SECURITY_SCHEME: Record<AdminCredential, string> = {
 const ADMIN_ERROR_REF = '#/components/schemas/AdminErrorPayload';
 const ENGINE_ERROR_REF = '#/components/schemas/EngineErrorPayload';
 
-const SHARED_COMPONENT_SCHEMAS = PdfActionWireComponents;
+const SHARED_COMPONENT_SCHEMAS = { ...PdfActionWireComponents, ...AnnotationWireComponents };
 
 const SHARED_COMPONENT_BY_DEFINITION = new Map<z.ZodTypeDef, string>(
   Object.entries(SHARED_COMPONENT_SCHEMAS).map(([name, schema]) => [schema._def, name]),

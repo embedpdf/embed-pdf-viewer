@@ -123,7 +123,7 @@ export function annotationRenderOptionsFromImageOptions(
   options: AnnotationAppearanceImageOptions,
 ): AnnotationAppearanceRenderOptions {
   return {
-    ...(options.scale !== undefined ? { scale: options.scale } : {}),
+    ...(options.viewport ? { viewport: options.viewport } : {}),
     ...(options.rotation !== undefined ? { rotation: options.rotation } : {}),
     ...(options.modes ? { modes: options.modes } : {}),
   };

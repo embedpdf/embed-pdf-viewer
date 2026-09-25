@@ -86,8 +86,12 @@ Every annotation in the document, or the ones on one page:
 
 ```ts
 const { annotations } = await doc.annotations.list(); // every page
+const { annotations } = await doc.annotations.list({ pages: [pageA, pageB] }); // some pages
 const { annotations } = await doc.page(pageRef).annotations.list(); // one page
 ```
+
+A list is cheap even for a whole document: the engine reads the annotations without loading the
+pages. Each annotation names its `page`, and the list's `pages` has one entry per page it read.
 
 Each annotation has a `subtype` (its kind), a `rect` (where it is on its page) and a `ref` (its
 address). Keep the `ref`: it's how you change or delete the annotation later.

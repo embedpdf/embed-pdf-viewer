@@ -115,7 +115,7 @@ describe("PagesClient", () => {
                 bbox: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
                 name: "name",
                 measure: {
-                    subtype: "RL",
+                    subtype: "rectilinear",
                     ratio: "ratio",
                     x: [{ unit: "unit" }],
                     y: [{ unit: "unit" }],

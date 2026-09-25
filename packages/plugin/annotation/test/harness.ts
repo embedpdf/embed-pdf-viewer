@@ -28,19 +28,13 @@ const metaOf = (weakRefsInvalidated = false) => ({
   shouldRefetch: weakRefsInvalidated ? { reason: 'weakRefsInvalidated' } : null,
 });
 
-/** The bulk snapshot `listRawAll` resolves with, grouped by page. */
+/** The whole-document list `listAll` resolves with: the records and their pages. */
 export const snapshotOf = (records: readonly AnnotationDTO[], auditHead?: number) => {
-  const pages = new Map<number, { page: PageRef; annotations: AnnotationDTO[] }>();
-  for (const record of records) {
-    const entry = pages.get(record.page.pageObjectNumber) ?? { page: record.page, annotations: [] };
-    entry.annotations.push(record);
-    pages.set(record.page.pageObjectNumber, entry);
-  }
+  const pages = new Map<number, PageRef>();
+  for (const record of records) pages.set(record.page.pageObjectNumber, record.page);
   return {
-    pages: [...pages.values()].map(({ page, annotations }) => ({
-      pageState: { page },
-      annotations,
-    })),
+    annotations: [...records],
+    pages: [...pages.values()].map((page) => ({ page })),
     ...(auditHead !== undefined ? { auditHead } : {}),
   };
 };
@@ -54,8 +48,10 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
   const create = vi.fn();
   const update = vi.fn();
   const remove = vi.fn(async (_ref: AnnotationRef) => ({}));
+  /** One page's list. */
   const list = vi.fn();
-  const listRawAll = vi.fn();
+  /** The whole document's list. */
+  const listAll = vi.fn();
   // Allow-all authority by default; permission tests narrow these mocks.
   const allows = vi.fn((_capability: string) => true);
   const allowsAnnotationCreate = vi.fn(() => true);
@@ -93,7 +89,7 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
             const result = await create(draft);
             ctx.emitDocumentEvent({
               type: 'annotation.created',
-              page: result.created.page ?? page,
+              page: result.annotation.page ?? page,
               origin: localOrigin,
               meta: metaOf(),
               ...result,
@@ -102,10 +98,10 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
           },
           update: async (ref: AnnotationRef, patch: unknown) => {
             const result = await update(ref, patch);
-            if (result?.updated) {
+            if (result?.annotation) {
               ctx.emitDocumentEvent({
                 type: 'annotation.updated',
-                page: result.updated.page,
+                page: result.annotation.page,
                 origin: localOrigin,
                 appearance: { changed: false },
                 meta: metaOf(),
@@ -135,7 +131,17 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
           list,
         },
       }),
-      annotations: { listRawAll },
+      annotations: {
+        // Some pages read through each page's list, so a test queues page reads once.
+        list: async (options?: { pages?: readonly PageRef[] }) => {
+          if (!options?.pages) return listAll();
+          const lists = await Promise.all(options.pages.map(() => list()));
+          return {
+            annotations: lists.flatMap((read) => read.annotations),
+            pages: lists.flatMap((read) => read.pages ?? []),
+          };
+        },
+      },
       security: {
         allows,
         identity: { userId: 'me' },
@@ -168,7 +174,7 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
     update,
     remove,
     list,
-    listRawAll,
+    listAll,
     allows,
     allowsAnnotationCreate,
     allowsAnnotationMutation,
@@ -181,7 +187,7 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
     emit: (event: DocumentEvent) => ctx.emitDocumentEvent(event),
     /** Load these confirmed records as the document's annotations. */
     load: async (records: readonly AnnotationDTO[], auditHead?: number) => {
-      listRawAll.mockResolvedValueOnce(snapshotOf(records, auditHead));
+      listAll.mockResolvedValueOnce(snapshotOf(records, auditHead));
       if (started) await api.refresh();
       else startSync();
       await api.whenSynced();

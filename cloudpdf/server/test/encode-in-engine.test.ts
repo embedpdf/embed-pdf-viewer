@@ -199,7 +199,8 @@ describe('encode-in-engine', () => {
 
     // Appearances: same stub appearance, worker-encoded vs API-encoded —
     // manifests and image parts must match byte for byte.
-    const appearancesPath = '/layers/main/annotations/pages/obj:1/appearances?scale=1';
+    const appearancesPath =
+      '/layers/main/annotations/pages/obj:1/appearances?viewport.kind=scale&viewport.scale=1';
     const am = await get(inEngine, 't1', 'docenc002', appearancesPath);
     const bm = await get(legacy, 't1', 'docenc002', appearancesPath);
     expect(am.status).toBe(200);

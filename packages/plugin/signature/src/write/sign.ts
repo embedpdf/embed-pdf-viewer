@@ -111,7 +111,7 @@ export function createSigning(
   const abortPending = async (): Promise<void> => {
     const pending = reads.getPending();
     if (!pending) return;
-    const { status } = await requireSignatures().abort(pending.signingId);
+    const { status } = await requireSignatures().cancel(pending.signingId);
     prepared.delete(pending.signingId);
     // An abort or a completion clears the signing through its event; an
     // unknown signing has none.

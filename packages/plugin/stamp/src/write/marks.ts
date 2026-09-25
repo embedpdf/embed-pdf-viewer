@@ -105,7 +105,7 @@ export function createMarks({ assetEngine }: Pick<StampServices, 'assetEngine'>)
               fontColor: color,
               strokeWidth: 0,
             });
-      return new Uint8Array(await page.annotations.exportAppearance([created.created.ref]));
+      return new Uint8Array(await page.annotations.exportAppearance([created.annotation.ref]));
     } finally {
       await doc.close();
     }

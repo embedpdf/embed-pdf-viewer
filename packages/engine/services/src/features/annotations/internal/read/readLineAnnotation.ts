@@ -2,6 +2,7 @@ import type { AnnotationBase, LineAnnotationDTO } from '@embedpdf/engine-core/ru
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { readIntent } from './annotationReadPrimitives';
+import { lineIntentFromName } from '../measurementIntent';
 import { readLine as readLinePoints, readLineEndings } from './annotationReadPrimitives';
 import { readAnnotationRotation } from './readAnnotationTransformMetadata';
 import { readAnnotationMeasure, readLineCaption, readLineLeader } from './readMeasurementFields';
@@ -23,7 +24,7 @@ export function readLine(
   return {
     ...base,
     ...readAnnotationMeasure(fn, mem, annotPtr),
-    intent: intent === 'LineDimension' || intent === 'LineArrow' ? intent : null,
+    intent: lineIntentFromName(intent),
     // `/Cap` and `/CP` read their ISO defaults when absent.
     captionEnabled: caption?.enabled ?? false,
     captionPosition: caption?.position ?? 'inline',

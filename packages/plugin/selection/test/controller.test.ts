@@ -107,7 +107,7 @@ async function boot(fixtures: PageFixture[], allow = ALL) {
     security: { allows: (scope: string) => allow.has(scope) },
     page: (ref: { pageObjectNumber: number }) => ({
       geometry: { read: () => geometryReads(ref.pageObjectNumber) },
-      text: { read: () => textReads(ref.pageObjectNumber) },
+      text: { get: () => textReads(ref.pageObjectNumber) },
     }),
     close: () => Promise.resolve(),
   } as unknown as DocumentHandle;
@@ -485,7 +485,12 @@ describe('selection — invalidation', () => {
     fixture.selection.selectAll();
     await settle();
     await expect(fixture.selection.readText()).resolves.toBe('Hello!');
-    fixture.emit({ type: 'pages.flattened', origin, pages: [toPageRef(101)], results: [applied(101)] });
+    fixture.emit({
+      type: 'pages.flattened',
+      origin,
+      pages: [toPageRef(101)],
+      results: [applied(101)],
+    });
     expect(fixture.selection.hasSelection()).toBe(false);
     await settle();
     expect(fixture.geometryReads).toHaveBeenCalledTimes(2);
@@ -503,7 +508,11 @@ describe('selection — invalidation', () => {
     expect(fixture.selection.isLoaded(toPageRef(101))).toBe(true);
     expect(fixture.selection.isOverText(toPageRef(101), { x: 46, y: 5 })).toBe(true); // glyph 4
     // The redaction leaves two glyphs on the page.
-    fixture.replacePage({ ...pageA, geometry: simpleGeometry(2), text: { text: 'He', charCount: 2 } });
+    fixture.replacePage({
+      ...pageA,
+      geometry: simpleGeometry(2),
+      text: { text: 'He', charCount: 2 },
+    });
     fixture.emit({ type: 'redaction.applied', origin, results: [applied(101)] });
     await settle();
     expect(fixture.selection.isLoaded(toPageRef(101))).toBe(true);

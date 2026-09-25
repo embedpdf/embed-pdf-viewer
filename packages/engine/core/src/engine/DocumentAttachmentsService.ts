@@ -19,7 +19,7 @@ import { AbortablePromise } from '../promise/AbortablePromise';
  * validate (see the ref's doc comment). `list()` returns metadata only;
  * bytes leave the engine exclusively through {@link download}. The
  * annotation-level counterpart is
- * `PageAnnotationsService.readResource(ref, 'file')`.
+ * `PageAnnotationsService.downloadResource(ref, 'file')`.
  */
 export interface DocumentAttachmentsService {
   /** Snapshot of the `/EmbeddedFiles` name tree, in tree (key-sorted) order. */

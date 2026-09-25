@@ -26,7 +26,7 @@ const annotatedPath = resolve(
 
 /**
  * `localEngine({ renderPolicy })` — the deployment policy plane on the
- * local engine: advertisement via `render.policy()`,
+ * local engine: advertisement via `render.getPolicy()`,
  * off-lattice rejection under `enforced: true` (server parity), and the
  * `maxRenderPixels` budget riding into every worker render.
  */
@@ -57,14 +57,14 @@ describe('local render policy (wasm runtime)', () => {
   });
 
   test('policy() advertises the configured lattice verbatim', async () => {
-    expect(await doc.render!.policy()).toEqual(LATTICE);
+    expect(await doc.render!.getPolicy()).toEqual(LATTICE);
   });
 
   test('default engine stays continuous', async () => {
     const plain = createLocalEngine({ runtime: { prefer: 'wasm' } });
     const plainDoc = await plain.open({ kind: 'bytes', id: 'plain-doc', bytes });
     try {
-      expect(await plainDoc.render!.policy()).toEqual({ kind: 'continuous' });
+      expect(await plainDoc.render!.getPolicy()).toEqual({ kind: 'continuous' });
       // …and renders anything, including the scale viewport the enforced
       // lattice rejects below.
       const raster = await plainDoc
@@ -116,15 +116,17 @@ describe('local render policy (wasm runtime)', () => {
     // Page 2 of ebook-annotated.pdf carries annotations with /AP streams.
     const page = doc.page(toPageRef(2));
 
-    await expect(page.annotations.renderAppearances({ scale: 1.5 })).rejects.toSatisfy(
-      (err: unknown) => {
-        expect(EngineError.is(err, EngineErrorCode.InvalidArg)).toBe(true);
-        expect((err as EngineError).message).toContain('snapAppearanceScale');
-        return true;
-      },
-    );
+    await expect(
+      page.annotations.renderAppearancesRaw({ viewport: { kind: 'scale', scale: 1.5 } }),
+    ).rejects.toSatisfy((err: unknown) => {
+      expect(EngineError.is(err, EngineErrorCode.InvalidArg)).toBe(true);
+      expect((err as EngineError).message).toContain('snapAppearanceScale');
+      return true;
+    });
 
-    const result = await page.annotations.renderAppearances({ scale: 2 });
+    const result = await page.annotations.renderAppearancesRaw({
+      viewport: { kind: 'scale', scale: 2 },
+    });
     expect(result.appearances.length).toBeGreaterThan(0);
   });
 

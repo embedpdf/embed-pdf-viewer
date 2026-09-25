@@ -50,9 +50,11 @@ function buildDocument(): Uint8Array {
       `<< /Type /XObject /Subtype /Image /Width 1 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8 /Length ${data.length} >>\nstream\n${data}\nendstream`;
   }
   fieldNums.forEach((n, i) => {
-    objects[n] = `<< /Type /Annot /Subtype /Widget /FT /Tx /T (f${i}) /V (v${i}) /Rect [20 ${20 + (i % 30) * 20} 180 ${35 + (i % 30) * 20}] /P ${pageNums[i % PAGES]} 0 R >>`;
+    objects[n] =
+      `<< /Type /Annot /Subtype /Widget /FT /Tx /T (f${i}) /V (v${i}) /Rect [20 ${20 + (i % 30) * 20} 180 ${35 + (i % 30) * 20}] /P ${pageNums[i % PAGES]} 0 R >>`;
   });
-  objects[sigNum] = '<< /Type /Annot /Subtype /Widget /FT /Sig /T (sig) /Rect [300 10 500 60] /P 100 0 R >>';
+  objects[sigNum] =
+    '<< /Type /Annot /Subtype /Widget /FT /Sig /T (sig) /Rect [300 10 500 60] /P 100 0 R >>';
   return pdf(objects);
 }
 
@@ -66,13 +68,23 @@ describe.skipIf(!ENABLED)('signature analysis cost on a large multi-revision doc
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
     plainEngine = await createLocalEngine({ runtime: { prefer: 'wasm' }, sessionKind: 'plain' });
     const base = await timed(`build ${MB} MB, ${FIELDS} fields`, rows, async () => buildDocument());
-    const doc = await engine.open({ kind: 'bytes', id: 'bench-base', bytes: base }, { scope: ['*'] });
+    const doc = await engine.open(
+      { kind: 'bytes', id: 'bench-base', bytes: base },
+      { scope: ['*'] },
+    );
     try {
       const prepared = await timed('prepare (certify P=2)', rows, () =>
-        doc.signatures!.prepare({ field: { kind: 'fqn', name: 'sig' }, certify: { permission: 2 } }),
+        doc.signatures!.prepare({
+          field: { kind: 'fqn', name: 'sig' },
+          certify: { permission: 2 },
+        }),
       );
       await timed('complete', rows, () =>
-        doc.signatures!.complete({ signingId: prepared.signingId, expectedVersion: prepared.expectedVersion, cms: FAKE_CMS }),
+        doc.signatures!.complete({
+          signingId: prepared.signingId,
+          expectedVersion: prepared.expectedVersion,
+          cms: FAKE_CMS,
+        }),
       );
       signed = new Uint8Array(await doc.download());
     } finally {
@@ -82,7 +94,8 @@ describe.skipIf(!ENABLED)('signature analysis cost on a large multi-revision doc
     for (let r = 0; r < REVS; r++) {
       const i = r % FIELDS;
       signed = append(signed, {
-        [1000 + i]: `<< /Type /Annot /Subtype /Widget /FT /Tx /T (f${i}) /V (rev${r}) /Rect [20 ${20 + (i % 30) * 20} 180 ${35 + (i % 30) * 20}] /P ${100 + (i % PAGES)} 0 R >>`,
+        [1000 + i]:
+          `<< /Type /Annot /Subtype /Widget /FT /Tx /T (f${i}) /V (rev${r}) /Rect [20 ${20 + (i % 30) * 20} 180 ${35 + (i % 30) * 20}] /P ${100 + (i % PAGES)} 0 R >>`,
       });
     }
     rows.push(`bytes ${(signed.byteLength / 1048576).toFixed(1)} MB, revisions ${REVS + 2}`);
@@ -95,22 +108,35 @@ describe.skipIf(!ENABLED)('signature analysis cost on a large multi-revision doc
   });
 
   async function measure(label: string, eng: Engine): Promise<void> {
-    const doc: Doc = await timed(`${label} open`, rows, () => eng.open({ kind: 'bytes', id: `bench-${label}`, bytes: signed }, { scope: ['*'] }));
+    const doc: Doc = await timed(`${label} open`, rows, () =>
+      eng.open({ kind: 'bytes', id: `bench-${label}`, bytes: signed }, { scope: ['*'] }),
+    );
     try {
       const snapshot = await timed(`${label} list() first`, rows, () => doc.signatures!.list());
       await timed(`${label} list() again`, rows, () => doc.signatures!.list());
       await timed(`${label} version()`, rows, () => doc.version!());
       await timed(`${label} version() again`, rows, () => doc.version!());
-      const all = await timed(`${label} analyze all ${REVS} steps`, rows, () => doc.signatures!.analyze({ since: { signatureIndex: 0 } }));
+      const all = await timed(`${label} analyze all ${REVS} steps`, rows, () =>
+        doc.signatures!.analyze({ since: { signatureIndex: 0 } }),
+      );
       expect(all.verdict).toBe('permitted');
       const last = snapshot.revisions.length - 1;
-      await timed(`${label} analyze last step`, rows, () => doc.signatures!.analyze({ since: { revisionIndex: last - 1 }, until: { revisionIndex: last } }));
+      await timed(`${label} analyze last step`, rows, () =>
+        doc.signatures!.analyze({
+          since: { revisionIndex: last - 1 },
+          until: { revisionIndex: last },
+        }),
+      );
       await timed(`${label} download (no edits, verbatim)`, rows, () => doc.download());
       await doc.forms.setValue({ kind: 'fqn', name: 'f3' }, { type: 'text', value: 'unsaved' });
-      const working = await timed(`${label} analyze working-copy (1 unsaved edit)`, rows, () => doc.signatures!.analyze({ since: { signatureIndex: 0 }, until: 'working-copy' }));
+      const working = await timed(`${label} analyze working-copy (1 unsaved edit)`, rows, () =>
+        doc.signatures!.analyze({ since: { signatureIndex: 0 }, until: 'working-copy' }),
+      );
       expect(working.verdict).toBe('permitted');
-      const prepared = await timed(`${label} prepare (2nd sig, unsaved edit)`, rows, () => doc.signatures!.prepare({ field: { kind: 'fqn', name: 'sig' } }).catch(() => null));
-      if (prepared) await doc.signatures!.abort(prepared.signingId);
+      const prepared = await timed(`${label} prepare (2nd sig, unsaved edit)`, rows, () =>
+        doc.signatures!.prepare({ field: { kind: 'fqn', name: 'sig' } }).catch(() => null),
+      );
+      if (prepared) await doc.signatures!.cancel(prepared.signingId);
     } finally {
       await doc.close();
     }

@@ -182,8 +182,8 @@ export function createStamps(
       .then((result) => {
         // The fold has added the confirmed stamp; every placement selects
         // its result (the anchor for menus and editing).
-        store.commit({ type: 'select', ids: [annotationKey(result.created.ref)] });
-        return result.created.ref;
+        store.commit({ type: 'select', ids: [annotationKey(result.annotation.ref)] });
+        return result.annotation.ref;
       });
   };
 

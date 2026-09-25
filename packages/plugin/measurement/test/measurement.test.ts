@@ -58,7 +58,7 @@ function harness(
   let engineViewports: PageMeasurementViewport[] = options.viewports ?? [];
   let failing = options.failReads ?? false;
   const service = {
-    viewports: vi.fn(async () => {
+    listViewports: vi.fn(async () => {
       if (failing) throw new Error('viewport read failed');
       return engineViewports;
     }),
@@ -212,7 +212,7 @@ describe('page viewports from the engine', () => {
     });
     expect(measurement.getPageScale(PAGE).ready).toBe(false);
     await settle();
-    expect(service.viewports).toHaveBeenCalledOnce();
+    expect(service.listViewports).toHaveBeenCalledOnce();
     expect(measurement.getPageScale(PAGE)).toMatchObject({
       source: 'owned',
       ready: true,
@@ -222,19 +222,19 @@ describe('page viewports from the engine', () => {
     expect(annotation.setPageViewports).toHaveBeenCalledWith(
       PAGE,
       [owned(ONE_TO_HUNDRED)],
-      expect.objectContaining({ subtype: 'RL' }),
+      expect.objectContaining({ subtype: 'rectilinear' }),
     );
   });
 
   it('reads the viewports exactly once for its own scale change, and returns with the new scale', async () => {
     const { measurement, annotation, service } = harness({ engine: true });
     await settle();
-    expect(service.viewports).toHaveBeenCalledTimes(1);
+    expect(service.listViewports).toHaveBeenCalledTimes(1);
 
     await measurement.setScale(PAGE, ONE_TO_HUNDRED);
 
     expect(service.setScale).toHaveBeenCalledWith(ONE_TO_HUNDRED);
-    expect(service.viewports).toHaveBeenCalledTimes(2);
+    expect(service.listViewports).toHaveBeenCalledTimes(2);
     expect(measurement.getPageScale(PAGE)).toMatchObject({ source: 'owned', ready: true });
     expect(annotation.setPageViewports).toHaveBeenLastCalledWith(
       PAGE,
@@ -242,7 +242,7 @@ describe('page viewports from the engine', () => {
       expect.anything(),
     );
     await settle();
-    expect(service.viewports).toHaveBeenCalledTimes(2);
+    expect(service.listViewports).toHaveBeenCalledTimes(2);
   });
 
   it('follows a scale change made in another session', async () => {
@@ -292,7 +292,7 @@ describe('page viewports from the engine', () => {
   it('loads pages inserted after connect', async () => {
     const { ctx, measurement, service } = harness({ engine: true });
     await settle();
-    expect(service.viewports).toHaveBeenCalledTimes(1);
+    expect(service.listViewports).toHaveBeenCalledTimes(1);
 
     // Grow the test document's page registry, then wake the registry readers.
     const inserted = toPageRef(2);
@@ -302,7 +302,7 @@ describe('page viewports from the engine', () => {
     ctx.notify();
     await settle();
 
-    expect(service.viewports).toHaveBeenCalledTimes(2);
+    expect(service.listViewports).toHaveBeenCalledTimes(2);
     expect(measurement.getPageScale(inserted).ready).toBe(true);
   });
 });

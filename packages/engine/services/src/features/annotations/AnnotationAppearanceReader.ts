@@ -5,10 +5,11 @@ import type {
   AnnotationAppearancesResult,
   PageObjectNumber,
   PageRaster,
+  PageRenderViewport,
   PdfRect,
   PdfRotation,
 } from '@embedpdf/engine-core/runtime';
-import { normalizePdfRect } from '@embedpdf/engine-core/runtime';
+import { EngineError, EngineErrorCode, normalizePdfRect } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { freeTextIntentFromName } from './internal/freeTextIntent';
@@ -69,8 +70,8 @@ const APPEARANCE_MODES: ReadonlyArray<{
  * one bitmap per requested mode, in PDF user space and against the
  * `PdfRuntimeModule` (`fn` + `mem`).
  *
- * Each appearance bitmap is sized to its annotation's `/Rect` scaled by
- * `options.scale`. The shared raster helper handles PDFium's display matrix
+ * Each appearance bitmap is sized to its annotation's `/Rect` at the scale
+ * the page has at `options.viewport`. The shared raster helper handles PDFium's display matrix
  * convention, so this reader stays in normalized PDF page coordinates.
  */
 export class AnnotationAppearanceReader {
@@ -89,7 +90,6 @@ export class AnnotationAppearanceReader {
     const pool = this.session.pagePool();
     const pagePtr = pool.acquire(pageObjectNumber);
 
-    const scale = normalizeScale(options.scale);
     const rotation = (options.rotation ?? 0) as PdfRotation;
     const modes = resolveModes(options.modes);
     const revision = this.session.pageState(pageObjectNumber).revision;
@@ -101,6 +101,7 @@ export class AnnotationAppearanceReader {
         width: fn.FPDF_GetPageWidthF(pagePtr),
         height: fn.FPDF_GetPageHeightF(pagePtr),
       };
+      const scale = viewportScale(options.viewport, page, rotation);
       const count = fn.FPDFPage_GetAnnotCount(pagePtr);
       for (let i = 0; i < count; i++) {
         throwIfAborted(signal);
@@ -250,6 +251,24 @@ function resolveModes(
   }
   const wanted = new Set(requested);
   return APPEARANCE_MODES.filter((m) => wanted.has(m.name));
+}
+
+/**
+ * The scale the page has at `viewport`, as a full-page render would use it:
+ * a `scale` viewport's own, or a `width` viewport's width over the width of
+ * the page as `rotation` turns it.
+ */
+function viewportScale(
+  viewport: PageRenderViewport | undefined,
+  page: { width: number; height: number },
+  rotation: PdfRotation,
+): number {
+  if (viewport === undefined || viewport.kind === 'scale') return normalizeScale(viewport?.scale);
+  const pageWidth = rotation === 90 || rotation === 270 ? page.height : page.width;
+  if (!Number.isFinite(viewport.width) || viewport.width <= 0 || !(pageWidth > 0)) {
+    throw new EngineError(EngineErrorCode.InvalidArg, 'render viewport width must be positive');
+  }
+  return viewport.width / pageWidth;
 }
 
 function normalizeScale(scale: number | undefined): number {

@@ -94,7 +94,7 @@ export const line: KindProjection = {
   ingest: (dto, crop) => {
     const lineDto = dto as Extract<AnnotationDTO, { subtype: 'line' }>;
     return {
-      ...(lineDto.intent === 'LineDimension'
+      ...(lineDto.intent === 'line-dimension'
         ? {
             measure: {
               intent: lineDto.intent,
@@ -123,7 +123,7 @@ export const line: KindProjection = {
     const geometry = annotation.geometry;
     if (geometry.kind !== 'line') return null;
     return {
-      ...(annotation.measure?.intent === 'LineDimension'
+      ...(annotation.measure?.intent === 'line-dimension'
         ? { contents: distanceLabel(geometry, annotation.measure) }
         : {}),
       linePoints: {
@@ -136,10 +136,13 @@ export const line: KindProjection = {
   },
   prop: strokeProps,
   draftExtras: (annotation) =>
-    annotation.measure?.intent === 'LineDimension'
+    annotation.measure?.intent === 'line-dimension'
       ? {
           intent: annotation.measure.intent,
-          measure: annotation.measure.measure?.subtype === 'RL' ? annotation.measure.measure : null,
+          measure:
+            annotation.measure.measure?.subtype === 'rectilinear'
+              ? annotation.measure.measure
+              : null,
           ...captionFieldsOf(annotation.measure),
           leader: annotation.measure.leader,
           subject: 'Distance',
@@ -151,7 +154,7 @@ const polyProjection = (closed: boolean): KindProjection => ({
   ingest: (dto, crop) => {
     const polyDto = dto as Extract<AnnotationDTO, { subtype: 'polygon' | 'polyline' }>;
     return {
-      ...(polyDto.intent === 'PolygonDimension' || polyDto.intent === 'PolyLineDimension'
+      ...(polyDto.intent === 'polygon-dimension' || polyDto.intent === 'polyline-dimension'
         ? {
             measure: {
               intent: polyDto.intent,
@@ -178,7 +181,7 @@ const polyProjection = (closed: boolean): KindProjection => ({
     const geometry = annotation.geometry;
     if (geometry.kind !== 'poly') return null;
     return {
-      ...(annotation.measure && annotation.measure.intent !== 'LineDimension'
+      ...(annotation.measure && annotation.measure.intent !== 'line-dimension'
         ? {
             contents: shapeMeasurementLabel(geometry, annotation.measure),
             ...captionFieldsOf(annotation.measure),
@@ -191,10 +194,13 @@ const polyProjection = (closed: boolean): KindProjection => ({
   },
   prop: strokeProps,
   draftExtras: (annotation) =>
-    annotation.measure && annotation.measure.intent !== 'LineDimension'
+    annotation.measure && annotation.measure.intent !== 'line-dimension'
       ? {
           intent: annotation.measure.intent,
-          measure: annotation.measure.measure?.subtype === 'RL' ? annotation.measure.measure : null,
+          measure:
+            annotation.measure.measure?.subtype === 'rectilinear'
+              ? annotation.measure.measure
+              : null,
           ...captionFieldsOf(annotation.measure),
           subject: closed ? 'Area' : 'Perimeter',
         }
@@ -245,7 +251,7 @@ export function captionFieldsOf(measure: {
   caption: { enabled: boolean; position?: 'inline' | 'top'; offset?: unknown; center?: unknown };
 }): Record<string, unknown> {
   const { caption } = measure;
-  return measure.intent === 'LineDimension'
+  return measure.intent === 'line-dimension'
     ? {
         captionEnabled: caption.enabled,
         captionPosition: caption.position ?? 'inline',

@@ -2,10 +2,11 @@ import type {
   AnnotationCreateResult,
   AnnotationDeleteResult,
   AnnotationDTO,
-  AnnotationListPageSnapshot,
+  AnnotationList,
   AnnotationMoveResult,
   AnnotationRef,
   AnnotationUpdateResult,
+  PageRef,
   PageState,
 } from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
@@ -29,16 +30,27 @@ export type AnnotationMutationResult =
  * durable cloud token should be sent into worker mutators.
  */
 export class CloudRevisionBridge {
-  decorateAnnotationSnapshot(
-    pageState: PageState,
-    snapshot: AnnotationListPageSnapshot,
-  ): AnnotationListPageSnapshot {
+  /**
+   * A worker's list in cloud revision terms: each listed page takes the
+   * state `stateOf` gives it, and that page's annotations are decorated with
+   * it. A page `stateOf` doesn't know keeps what the worker said.
+   */
+  decorateAnnotationList(
+    list: AnnotationList,
+    stateOf: (page: PageRef) => PageState | undefined,
+  ): AnnotationList {
+    const states = new Map<number, PageState>();
+    for (const { page } of list.pages) {
+      const state = stateOf(page);
+      if (state) states.set(page.pageObjectNumber, state);
+    }
     return {
-      ...snapshot,
-      pageState,
-      annotations: snapshot.annotations.map((annotation) =>
-        this.decorateAnnotationRef(pageState, annotation),
-      ),
+      ...list,
+      pages: list.pages.map((state) => states.get(state.page.pageObjectNumber) ?? state),
+      annotations: list.annotations.map((annotation) => {
+        const state = states.get(annotation.page.pageObjectNumber);
+        return state ? this.decorateAnnotationRef(state, annotation) : annotation;
+      }),
     };
   }
 
@@ -61,22 +73,19 @@ export class CloudRevisionBridge {
       },
     };
 
-    if ('created' in base) {
+    // A create or an update carries the one annotation, a move all it moved.
+    if ('annotation' in base) {
       return {
         ...base,
-        created: this.decorateAnnotationRef(pageState, base.created),
+        annotation: this.decorateAnnotationRef(pageState, base.annotation),
       } as T;
     }
-    if ('updated' in base) {
+    if ('annotations' in base) {
       return {
         ...base,
-        updated: this.decorateAnnotationRef(pageState, base.updated),
-      } as T;
-    }
-    if ('moved' in base) {
-      return {
-        ...base,
-        moved: base.moved.map((annotation) => this.decorateAnnotationRef(pageState, annotation)),
+        annotations: base.annotations.map((annotation) =>
+          this.decorateAnnotationRef(pageState, annotation),
+        ),
       } as T;
     }
     return base as T;

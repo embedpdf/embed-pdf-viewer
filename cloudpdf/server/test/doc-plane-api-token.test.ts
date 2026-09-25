@@ -199,9 +199,11 @@ describe('API token on the doc plane', () => {
     expect(annotations.status, await annotations.clone().text()).toBe(200);
     expect(annotations.headers.get('cache-control')).toContain('no-store');
     const annotationBody = (await annotations.json()) as {
+      annotations?: unknown[];
       pages?: unknown[];
       auditHead?: number;
     };
+    expect(Array.isArray(annotationBody.annotations)).toBe(true);
     expect(annotationBody.pages).toHaveLength(3);
     expect(annotationBody.auditHead).toEqual(expect.any(Number));
   });

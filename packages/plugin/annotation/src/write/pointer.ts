@@ -136,7 +136,7 @@ export function createPointer(
               intent: resolvedTool.intent as MeasurementAppearance['intent'],
               measure: viewport ? (viewport.measure ?? null) : cache.fallback,
               caption: resolvedTool.measurement?.caption ?? { enabled: true },
-              ...(resolvedTool.intent === 'LineDimension'
+              ...(resolvedTool.intent === 'line-dimension'
                 ? { leader: resolvedTool.measurement?.leader }
                 : {}),
               crop,

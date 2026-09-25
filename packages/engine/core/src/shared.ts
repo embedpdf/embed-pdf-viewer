@@ -371,10 +371,8 @@ export type {
   UpdateOf,
 } from './annotation/kinds';
 
-export type {
-  AnnotationListPageSnapshot,
-  AnnotationListSnapshotAllPages,
-} from './annotation/AnnotationListSnapshot';
+export { concatAnnotationLists } from './annotation/AnnotationList';
+export type { AnnotationList, AnnotationListOptions } from './annotation/AnnotationList';
 
 export { classifyRelation, buildThreads } from './annotation/relationships';
 export {
@@ -412,6 +410,7 @@ export type {
   AnnotationDeleteResult,
   AnnotationMoveResult,
 } from './mutation/AnnotationMutationResults';
+export { deletedAnnotationOf } from './mutation/AnnotationMutationResults';
 export type {
   AppearanceAction,
   AppearanceImpact,

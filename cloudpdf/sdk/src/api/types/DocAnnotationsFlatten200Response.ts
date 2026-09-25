@@ -3,62 +3,53 @@
 import type * as CloudPDF from "../index.js";
 
 export interface DocAnnotationsFlatten200Response {
-    meta: DocAnnotationsFlatten200Response.Meta;
-    /** Accepts any additional properties */
-    [key: string]: any;
+    page: DocAnnotationsFlatten200Response.Page;
+    usage: DocAnnotationsFlatten200Response.Usage;
+    results: DocAnnotationsFlatten200Response.Results.Item[];
+    meta: DocAnnotationsFlatten200Response.Meta | null;
 }
 
 export namespace DocAnnotationsFlatten200Response {
+    export interface Page {
+        kind: Page.Kind;
+        pageObjectNumber: number;
+    }
+
+    export namespace Page {
+        export const Kind = {
+            ObjectNumber: "objectNumber",
+        } as const;
+        export type Kind = (typeof Kind)[keyof typeof Kind];
+    }
+
+    export const Usage = {
+        Display: "display",
+        Print: "print",
+    } as const;
+    export type Usage = (typeof Usage)[keyof typeof Usage];
+    export type Results = Results.Item[];
+
+    export namespace Results {
+        export interface Item {
+            ref: CloudPDF.DocAnnotationsFlatten200ResponseResultsItemRef;
+            status: Item.Status;
+        }
+
+        export namespace Item {
+            export const Status = {
+                Applied: "applied",
+                Unchanged: "unchanged",
+            } as const;
+            export type Status = (typeof Status)[keyof typeof Status];
+        }
+    }
+
     export interface Meta {
-        affectedPages: Meta.AffectedPages.Item[];
+        affectedPages: CloudPDF.PageState[];
         cacheDelta: Meta.CacheDelta | null;
     }
 
     export namespace Meta {
-        export type AffectedPages = AffectedPages.Item[];
-
-        export namespace AffectedPages {
-            export interface Item {
-                page: Item.Page;
-                revision: Item.Revision;
-                weakAnnotationState: CloudPDF.DocAnnotationsFlatten200ResponseMetaAffectedPagesItemWeakAnnotationState;
-            }
-
-            export namespace Item {
-                export interface Page {
-                    kind: Page.Kind;
-                    pageObjectNumber: number;
-                }
-
-                export namespace Page {
-                    export const Kind = {
-                        ObjectNumber: "objectNumber",
-                    } as const;
-                    export type Kind = (typeof Kind)[keyof typeof Kind];
-                }
-
-                export interface Revision {
-                    docSessionId: string;
-                    page: Revision.Page;
-                    generation: number;
-                }
-
-                export namespace Revision {
-                    export interface Page {
-                        kind: Page.Kind;
-                        pageObjectNumber: number;
-                    }
-
-                    export namespace Page {
-                        export const Kind = {
-                            ObjectNumber: "objectNumber",
-                        } as const;
-                        export type Kind = (typeof Kind)[keyof typeof Kind];
-                    }
-                }
-            }
-        }
-
         export interface CacheDelta {
             previousDocVersion: number;
             docVersion: number;

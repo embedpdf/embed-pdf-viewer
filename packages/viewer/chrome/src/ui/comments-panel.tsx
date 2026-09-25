@@ -23,7 +23,7 @@ import { commentIconAccent, commentTypeConfig } from './comment-config';
  * the ISO 32000 §12.5.6.3 review status per thread.
  *
  * There is no per-page loading dance: the plugin hydrates the whole document
- * at open (`listRawAll`), so the list is complete the moment `hydration()`
+ * at open (`annotations.list()`), so the list is complete the moment `hydration()`
  * says so, whether or not a page was ever scrolled to.
  *
  * Selection is two-way: clicking a card selects the annotation and

@@ -404,10 +404,10 @@ export function runFormConformance(
           strokeWidth: 1,
           fontSize: 10,
         });
-        if (created.created.subtype !== 'widget') throw new Error('expected widget DTO');
-        expect(created.created.fieldObjectNumber).toBe(0); // inert
-        expect(created.created.interiorColor).toEqual({ r: 246, g: 248, b: 250 });
-        const widgetRef = created.created.ref;
+        if (created.annotation.subtype !== 'widget') throw new Error('expected widget DTO');
+        expect(created.annotation.fieldObjectNumber).toBe(0); // inert
+        expect(created.annotation.interiorColor).toEqual({ r: 246, g: 248, b: 250 });
+        const widgetRef = created.annotation.ref;
         if (widgetRef.kind !== 'objectNumber') throw new Error('expected durable ref');
 
         // 2. Adopted by a field -> the DTO joins to the field plane.
@@ -427,8 +427,8 @@ export function runFormConformance(
           subtype: 'widget',
           interiorColor: { r: 255, g: 247, b: 219 },
         });
-        if (patched.updated.subtype !== 'widget') throw new Error('expected widget DTO');
-        expect(patched.updated.interiorColor).toEqual({ r: 255, g: 247, b: 219 });
+        if (patched.annotation.subtype !== 'widget') throw new Error('expected widget DTO');
+        expect(patched.annotation.interiorColor).toEqual({ r: 255, g: 247, b: 219 });
 
         // 4. Deleting an attached widget is refused - the field-tree owns it.
         await expect(page.annotations.delete(widgetRef)).rejects.toMatchObject({

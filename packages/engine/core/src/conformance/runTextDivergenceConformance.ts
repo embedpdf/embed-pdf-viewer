@@ -70,7 +70,7 @@ export function runTextDivergenceConformance(
     test('snapshot is schema-valid with the exact text, charCount, and charMap', async () => {
       const doc = await openFixture(engine, opts);
       try {
-        const snap = await doc.page(toPageRef(fixture.pageObjectNumber)).text.read();
+        const snap = await doc.page(toPageRef(fixture.pageObjectNumber)).text.get();
         // Schema-parse enforces every charMap invariant (the {0,2} step
         // rule, tail === text.length, identity ⇔ absent).
         expect(PageTextSnapshotSchema.safeParse(snap).success).toBe(true);
@@ -92,7 +92,7 @@ export function runTextDivergenceConformance(
     test('char-space slicing round-trips through the map', async () => {
       const doc = await openFixture(engine, opts);
       try {
-        const snap = await doc.page(toPageRef(fixture.pageObjectNumber)).text.read();
+        const snap = await doc.page(toPageRef(fixture.pageObjectNumber)).text.get();
         expect(sliceTextByChars(snap, 0, snap.charCount)).toBe(snap.text);
         for (const s of fixture.slices ?? []) {
           expect(sliceTextByChars(snap, s.from, s.to)).toBe(s.text);
@@ -118,7 +118,7 @@ export function runTextDivergenceConformance(
           expect(hit!.segments.length > 0).toBe(true);
           // The composition law: slicing the snapshot by the hit's range
           // reproduces the matched text (zero-width chars excluded).
-          const snap = await doc.page(toPageRef(fixture.pageObjectNumber)).text.read();
+          const snap = await doc.page(toPageRef(fixture.pageObjectNumber)).text.get();
           expect(sliceTextByChars(snap, hit!.charStart, hit!.charStart + hit!.charCount)).toBe(
             probe.matchedText,
           );
@@ -139,7 +139,10 @@ async function openFixture(engine: Engine, opts: TextDivergenceConformanceOption
 }
 
 /** One divergence case, minus the per-suite bytes/id wiring. */
-export type TextDivergenceCase = Omit<TextDivergenceConformanceFixture, 'id' | 'bytes' | 'expected'> & {
+export type TextDivergenceCase = Omit<
+  TextDivergenceConformanceFixture,
+  'id' | 'bytes' | 'expected'
+> & {
   /** Fixture file name under the fork's `testing/resources/`. */
   resource: string;
 };

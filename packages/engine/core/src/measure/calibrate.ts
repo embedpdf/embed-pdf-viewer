@@ -60,7 +60,7 @@ function build(
   )
     throw new RangeError('Invalid fraction denominator');
   const measure: PdfMeasure = {
-    subtype: 'RL',
+    subtype: 'rectilinear',
     ratio,
     x: [{ unit, conversion: Math.fround(perPoint), ...common }],
     distance,

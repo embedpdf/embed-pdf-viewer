@@ -25,7 +25,7 @@ export interface PieceInfoService {
    * entry for it. Unknown value types arrive as `{ type: 'unknown' }` and
    * survive sibling writes untouched.
    */
-  read(application: string): AbortablePromise<PieceInfoSnapshot | null>;
+  get(application: string): AbortablePromise<PieceInfoSnapshot | null>;
   /**
    * Merge-write entries into the application's `/Private` dictionary:
    * strings/numbers/booleans/string-arrays write as the corresponding PDF
@@ -35,7 +35,7 @@ export interface PieceInfoService {
    */
   update(application: string, patch: PieceInfoPatch): AbortablePromise<void>;
   /** Application names present under this holder's `/PieceInfo`. */
-  applications(): AbortablePromise<string[]>;
+  list(): AbortablePromise<string[]>;
   /** Remove the application's entire entry (sibling applications survive). */
-  clear(application: string): AbortablePromise<void>;
+  delete(application: string): AbortablePromise<void>;
 }

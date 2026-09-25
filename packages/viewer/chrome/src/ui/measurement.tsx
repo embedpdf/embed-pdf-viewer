@@ -40,7 +40,7 @@ export function MeasurementScaleButton() {
       <Icon name="updateScale" size={20} className="shrink-0" />
       <span>
         {t('measurement.scale')}:{' '}
-        {scale?.measure?.subtype === 'RL'
+        {scale?.measure?.subtype === 'rectilinear'
           ? (scale.measure.ratio ?? t('measurement.custom'))
           : t('measurement.unavailable')}
       </span>
@@ -91,7 +91,7 @@ export function MeasurementSection() {
   const [recalculate, setRecalculate] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const disabled = !page || measurement.busy || !canCalibrate || !scale?.ready;
-  const rectilinear = scale?.measure?.subtype === 'RL' ? scale.measure : null;
+  const rectilinear = scale?.measure?.subtype === 'rectilinear' ? scale.measure : null;
   const target = allPages ? 'all' : page!;
   const options = { recalculate };
   const run = async (work: () => Promise<unknown>) => {

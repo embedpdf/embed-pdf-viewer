@@ -191,7 +191,7 @@ async function play(seed: number, steps: number) {
         if (write!.patch.color) engine.color = hex(write!.patch.color);
         if (write!.patch.print !== undefined) engine.print = write!.patch.print;
         change.state = 'accepted';
-        write!.resolve({ updated: squareOf(engine) });
+        write!.resolve({ annotation: squareOf(engine) });
       } else {
         change.state = 'refused';
         write!.reject(new Error('refused'));
@@ -206,7 +206,7 @@ async function play(seed: number, steps: number) {
         type: 'annotation.updated',
         page: PAGE,
         origin: { kind: 'remote', sessionId: 'cloud:bob', sub: 'bob', ts: 0, serverId: step + 100 },
-        updated: squareOf(engine),
+        annotation: squareOf(engine),
         appearance: { changed: false },
         meta: {
           affectedPages: [],
@@ -228,7 +228,7 @@ async function play(seed: number, steps: number) {
     if (write!.patch.color) engine.color = hex(write!.patch.color);
     if (write!.patch.print !== undefined) engine.print = write!.patch.print;
     change.state = 'accepted';
-    write!.resolve({ updated: squareOf(engine) });
+    write!.resolve({ annotation: squareOf(engine) });
     await flush();
     check(`seed ${seed} drain`);
   }

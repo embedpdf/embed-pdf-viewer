@@ -278,7 +278,7 @@ export class DocumentSession {
 
   /**
    * Lazily enumerate every page and cache (pageObjectNumber, pageIndex).
-   * Necessary before `listRawAll()` and any pon -> pageIndex resolution.
+   * Necessary before a whole-document list and any pon -> pageIndex resolution.
    */
   ensureFullPageRegistry(): void {
     if (this.fullyEnumerated) return;

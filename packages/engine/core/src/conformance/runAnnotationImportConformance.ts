@@ -62,7 +62,7 @@ export function runAnnotationImportConformance(
       page: PageHandle,
       draft: Parameters<PageHandle['annotations']['create']>[0],
       resources?: Parameters<PageHandle['annotations']['create']>[1],
-    ) => (await page.annotations.create(draft, resources)).created as AnnotationDTO;
+    ) => (await page.annotations.create(draft, resources)).annotation as AnnotationDTO;
 
     test('imports every kind a create makes, as the export has it', async () => {
       await twoCopies('authoring', async (source, target, pageRef) => {
@@ -86,7 +86,7 @@ export function runAnnotationImportConformance(
         const bundle = await source.annotations.export();
         const result = await target.annotations.import(bundle, { attribution: 'stamp' });
         expect(result.dropped).toEqual([]);
-        expect(result.created).toHaveLength(bundle.items.length);
+        expect(result.annotations).toHaveLength(bundle.items.length);
         expect(result.refMap.map((pair) => annotationKey(pair.from))).toEqual(
           bundle.items.map((item) => annotationKey(item.data.ref)),
         );
@@ -97,7 +97,7 @@ export function runAnnotationImportConformance(
         const again = await target.annotations.export();
         expect(comparable(again, result)).toEqual(comparable(bundle));
         expect(Object.keys(again.resources).sort()).toEqual(Object.keys(bundle.resources).sort());
-        expect(result.created).toEqual(again.items.map((item) => item.data));
+        expect(result.annotations).toEqual(again.items.map((item) => item.data));
       });
     });
 
@@ -118,7 +118,7 @@ export function runAnnotationImportConformance(
         expect(created).toHaveLength(2);
         created.forEach((event, index) => {
           if (event.type !== 'annotation.created') return;
-          expect(event.created).toEqual(result.created[index]);
+          expect(event.annotation).toEqual(result.annotations[index]);
           expect(event.page).toEqual(pageRef);
           expect(event.origin.tx).toEqual({ id: 'import-1', index, count: 2 });
         });
@@ -147,7 +147,7 @@ export function runAnnotationImportConformance(
         expect(first.refMap.map((pair) => annotationKey(pair.from))).toEqual(
           [free, unnamed].map((annotation) => annotationKey(annotation.ref)),
         );
-        expect(first.created.map((annotation) => annotation.nm)).toEqual(['free', null]);
+        expect(first.annotations.map((annotation) => annotation.nm)).toEqual(['free', null]);
 
         // A name is recognized again; an unnamed annotation can't be.
         const second = await target.annotations.import(bundle, { attribution: 'stamp' });
@@ -156,7 +156,7 @@ export function runAnnotationImportConformance(
           'parent-dropped',
           'name-conflict',
         ]);
-        expect(second.created.map((annotation) => annotation.subtype)).toEqual(['circle']);
+        expect(second.annotations.map((annotation) => annotation.subtype)).toEqual(['circle']);
       });
     });
 
@@ -168,7 +168,7 @@ export function runAnnotationImportConformance(
         const { pages } = await target.pages.list();
         const blank = toPageRef(pages[0]!.ref.pageObjectNumber);
 
-        const pageOf = (result: AnnotationImportResult) => result.created[0]!.ref.page;
+        const pageOf = (result: AnnotationImportResult) => result.annotations[0]!.ref.page;
         const same = await target.annotations.import(bundle, { attribution: 'stamp' });
         expect(pageOf(same)).toEqual(pageRef);
         const byPosition = await target.annotations.import(bundle, {
@@ -181,7 +181,7 @@ export function runAnnotationImportConformance(
           pages: [{ from: pageRef, to: blank }],
         });
         expect(pageOf(listed)).toEqual(blank);
-        expect((await target.annotations.listRaw(blank)).annotations).toHaveLength(2);
+        expect((await target.annotations.list({ pages: [blank] })).annotations).toHaveLength(2);
       });
     });
 
@@ -232,7 +232,7 @@ export function runAnnotationImportConformance(
           details: { limit: 'imagePixels' },
         });
 
-        expect((await target.annotations.listRaw(pageRef)).annotations).toEqual([]);
+        expect((await target.annotations.list({ pages: [pageRef] })).annotations).toEqual([]);
         expect(events).toEqual([]);
       });
     });

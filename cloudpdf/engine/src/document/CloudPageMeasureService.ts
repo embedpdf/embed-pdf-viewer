@@ -26,7 +26,7 @@ export class CloudPageMeasureService implements PageMeasureService {
     private readonly manifest: ManifestAccessor,
     private readonly publisher: SessionEventPublisher,
   ) {}
-  viewports(): AbortablePromise<PageMeasurementViewport[]> {
+  listViewports(): AbortablePromise<PageMeasurementViewport[]> {
     return AbortablePromise.run(async (signal) => {
       this.check();
       // Viewports have no independent cache pin. Always read the current layer.

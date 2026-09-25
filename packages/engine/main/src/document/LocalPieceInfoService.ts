@@ -39,7 +39,7 @@ export class LocalPieceInfoService implements PieceInfoService {
     private readonly page?: PageRef,
   ) {}
 
-  read(application: string): AbortablePromise<PieceInfoSnapshot | null> {
+  get(application: string): AbortablePromise<PieceInfoSnapshot | null> {
     const rejected = this.gate('doc.open');
     if (rejected) return rejected as AbortablePromise<PieceInfoSnapshot | null>;
     const { docId, page } = this;
@@ -85,7 +85,7 @@ export class LocalPieceInfoService implements PieceInfoService {
     });
   }
 
-  applications(): AbortablePromise<string[]> {
+  list(): AbortablePromise<string[]> {
     const rejected = this.gate('doc.open');
     if (rejected) return rejected as AbortablePromise<string[]>;
     const { docId, page } = this;
@@ -105,7 +105,7 @@ export class LocalPieceInfoService implements PieceInfoService {
     });
   }
 
-  clear(application: string): AbortablePromise<void> {
+  delete(application: string): AbortablePromise<void> {
     const rejected = this.gate('doc.metadata.modify');
     if (rejected) return rejected as AbortablePromise<void>;
     const { docId, page } = this;

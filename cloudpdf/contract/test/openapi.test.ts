@@ -245,14 +245,19 @@ describe('openapi document', () => {
       allOf: [{ $ref: '#/components/schemas/PdfAnnotationActions' }],
       nullable: true,
     };
-    expect(
-      schemas.DocAnnotationsList200Response.properties.annotations.items.anyOf[0].properties
-        .actions,
-    ).toEqual(nullableAnnotationActions);
-    expect(
-      schemas.DocAnnotationsListAll200Response.properties.pages.items.properties.annotations.items
-        .anyOf[0].properties.actions,
-    ).toEqual(nullableAnnotationActions);
+    expect(schemas.Annotation.anyOf[0].properties.actions).toEqual(nullableAnnotationActions);
+    // Both annotation lists, and every write that returns annotations, name
+    // the one `Annotation` component.
+    const annotationRef = { $ref: '#/components/schemas/Annotation' };
+    expect(schemas.AnnotationList.properties.annotations.items).toEqual(annotationRef);
+    expect(schemas.DocAnnotationsList200Response).toEqual({
+      $ref: '#/components/schemas/AnnotationList',
+    });
+    expect(schemas.DocAnnotationsListAll200Response).toEqual({
+      $ref: '#/components/schemas/AnnotationList',
+    });
+    expect(schemas.DocAnnotationsCreate200Response.properties.annotation).toEqual(annotationRef);
+    expect(schemas.DocAnnotationsUpdate200Response.properties.annotation).toEqual(annotationRef);
     expect(
       schemas.DocFormsGet200Response.properties.fields.items.anyOf[0].properties.actions,
     ).toEqual({ $ref: '#/components/schemas/PdfFieldActions' });

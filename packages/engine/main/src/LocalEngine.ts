@@ -36,7 +36,7 @@ export interface LocalEngineOptions {
    * counterpart of the lattice a cloud deployment advertises over
    * `/v1/access`, configured the same way permissions are overridden:
    * by the embedder, at construction. Advertised verbatim via
-   * `doc.render.policy()`; a lattice's `maxRenderPixels` budget rides
+   * `doc.render.getPolicy()`; a lattice's `maxRenderPixels` budget rides
    * into every worker render, and `enforced: true` rejects off-lattice
    * requests exactly like the enforcing server does. Default:
    * `continuous` (render anything).

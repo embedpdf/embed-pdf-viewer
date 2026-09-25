@@ -224,10 +224,10 @@ export function runMultiReplicaSuite(factory: ReplicaDbFactory): void {
       });
       expect(created.status).toBe(200);
       const createdBody = created.body as {
-        created: { ref: { kind: string; annotObjectNumber: number } };
+        annotation: { ref: { kind: string; annotObjectNumber: number } };
       };
-      expect(createdBody.created.ref.kind).toBe('objectNumber');
-      const objectNumber = createdBody.created.ref.annotObjectNumber;
+      expect(createdBody.annotation.ref.kind).toBe('objectNumber');
+      const objectNumber = createdBody.annotation.ref.annotObjectNumber;
 
       const primed = await listAnnotations(b!, { tenantId: TENANT, docId: DOC, layerName: LAYER });
       expect(primed.annotations).toHaveLength(1);

@@ -6,11 +6,7 @@ import {
   type DocumentMetadata,
 } from '@embedpdf/core';
 
-import type {
-  MetadataCapability,
-  MetadataResyncedEvent,
-  MetadataUpdatedEvent,
-} from './contract';
+import type { MetadataCapability, MetadataResyncedEvent, MetadataUpdatedEvent } from './contract';
 import { changedKeys } from './model';
 
 const METADATA_MODIFY: DocCapability = 'doc.metadata.modify';
@@ -27,7 +23,7 @@ export function createMetadataController(ctx: PluginContext<void>) {
   const metadata = ctx.mirror<DocumentMetadata | null>({
     name: 'metadata',
     initial: () => null,
-    load: async (doc) => ({ value: await doc.metadata.read() }),
+    load: async (doc) => ({ value: await doc.metadata.get() }),
     fold: (value, event) => (event.type === 'metadata.updated' ? event.metadata : value),
     changed: ({ cause, event, previous, next }) => {
       if (!next) return;

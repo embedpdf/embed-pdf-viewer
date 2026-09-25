@@ -41,7 +41,9 @@ export function registerEffectRunners(
       ids: [effect.id],
       perform: async () => {
         try {
-          const { created } = await ctx.doc.page(record.page).annotations.create(create);
+          const { annotation: created } = await ctx.doc
+            .page(record.page)
+            .annotations.create(create);
           identity.confirm(effect.id, created.ref);
           return { [effect.id]: created.ref };
         } catch (error) {
@@ -87,7 +89,7 @@ export function registerEffectRunners(
                     ...creates[index]!,
                     reply: { to: written[0]!.ref, type: 'group' },
                   } as AnnotationDraft);
-            const { created } = await page.annotations.create(draft);
+            const { annotation: created } = await page.annotations.create(draft);
             identity.confirm(id, created.ref);
             written.push({ id, ref: created.ref });
           }

@@ -92,7 +92,7 @@ export class AnnotationFlattener {
 
       const results = refs.map((ref, i) => ({
         ref,
-        status: statuses[i] === STATUS_APPLIED ? ('applied' as const) : ('skipped' as const),
+        status: statuses[i] === STATUS_APPLIED ? ('applied' as const) : ('unchanged' as const),
       }));
       if (code === FLATTEN_NOTHING_TO_DO || code !== FLATTEN_SUCCESS) {
         return { page: toPageRef(pageObjectNumber), usage, results, meta: null };

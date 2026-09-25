@@ -87,7 +87,7 @@ export interface AnnotationImportDrop {
 
 export interface AnnotationImportResult {
   /** In bundle order, each as it is now. */
-  created: AnnotationDTO[];
+  annotations: AnnotationDTO[];
   /** Each imported annotation's ref in the bundle, and its ref in this document. */
   refMap: Array<{ from: AnnotationRef; to: AnnotationRef }>;
   /** What was left out, in bundle order. */
@@ -103,16 +103,16 @@ export interface AnnotationImportResult {
 export function annotationImportFacts(
   result: AnnotationImportResult,
 ): Array<{ page: PageRef } & AnnotationCreateResult> {
-  const last = result.created.length - 1;
-  return result.created.map((created, index) => {
-    const { page } = created.ref;
+  const last = result.annotations.length - 1;
+  return result.annotations.map((annotation, index) => {
+    const { page } = annotation.ref;
     const id: AnnotationStableId =
-      created.ref.kind === 'objectNumber'
-        ? { kind: 'objectNumber', value: created.ref.annotObjectNumber }
-        : { kind: 'nm', value: created.nm! };
+      annotation.ref.kind === 'objectNumber'
+        ? { kind: 'objectNumber', value: annotation.ref.annotObjectNumber }
+        : { kind: 'nm', value: annotation.nm! };
     return {
       page,
-      created,
+      annotation,
       meta: {
         affectedPages: result.meta.affectedPages.filter(
           (state) => state.page.pageObjectNumber === page.pageObjectNumber,
@@ -344,7 +344,7 @@ function fieldMarkersOf(
 ): Array<{ field: string; reason: AnnotationDropReason }> {
   const markers: Array<{ field: string; reason: AnnotationDropReason }> = [];
   const measure = (data as { measure?: { subtype?: unknown } | null }).measure;
-  if (measure?.subtype === 'GEO') markers.push({ field: 'measure', reason: 'geospatial' });
+  if (measure?.subtype === 'geospatial') markers.push({ field: 'measure', reason: 'geospatial' });
   if (measure?.subtype === 'unknown') markers.push({ field: 'measure', reason: 'unknown-measure' });
   const target = data.subtype === 'link' ? data.target : null;
   const carriedTarget = !!target && WRITABLE_LINK_TARGETS.has(target.kind);

@@ -606,7 +606,7 @@ describe('judging what a save would write', () => {
       // Remove the stroke: the document is the loaded one again, and the
       // plugin re-judges it as such: unchanged on the persisted basis (the
       // appearance stream left behind is an orphan the save never writes).
-      await doc.page(page.ref).annotations.delete(stroke.created.ref);
+      await doc.page(page.ref).annotations.delete(stroke.annotation.ref);
       await settle(700);
       expect(signature.getVerdict(SIG)).toMatchObject({
         summary: 'valid',

@@ -4,6 +4,7 @@ import {
   EngineError,
   EngineErrorCode,
   annotationImportFacts,
+  concatAnnotationLists,
   assertAnnotationBundle,
   assertBundleManifest,
   generateUuid,
@@ -13,8 +14,8 @@ import {
   type AnnotationImportManifest,
   type AnnotationImportOptions,
   type AnnotationImportResult,
-  type AnnotationListPageSnapshot,
-  type AnnotationListSnapshotAllPages,
+  type AnnotationList,
+  type AnnotationListOptions,
   type DocumentAnnotationsService,
   type DocumentManifest,
   type ManifestPage,
@@ -25,8 +26,7 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import {
   AnnotationImportResultSchema,
-  AnnotationListPageSnapshotSchema,
-  AnnotationListSnapshotAllPagesSchema,
+  AnnotationListSchema,
   WeakAnnotationSessionResponseSchema,
   wirePaths,
   type WeakAnnotationSessionResponse,
@@ -63,26 +63,36 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
   ) {}
 
   /**
-   * One coherent whole-document snapshot: a single read of the immutable
-   * `annotations/items@annotationsVersion=N` leaf at the manifest's pin —
-   * materialized server-side by one raw (no page-load) sweep, CDN-cacheable
-   * because the pin bumps only when annotation list bodies actually change.
-   * A stale pin mid-read (a concurrent mutation → 404) refreshes the
-   * manifest and retries, so the result always belongs to one document
-   * moment (the torn read this method exists to prevent).
+   * Every page: one coherent whole-document snapshot, a single read of the
+   * immutable `annotations/items@annotationsVersion=N` leaf at the
+   * manifest's pin — materialized server-side by one raw (no page-load)
+   * sweep, CDN-cacheable because the pin bumps only when annotation list
+   * bodies actually change. A stale pin mid-read (a concurrent mutation →
+   * 404) refreshes the manifest and retries, so the result always belongs
+   * to one document moment (the torn read this method exists to prevent).
+   *
+   * Some pages: each page's versioned leaf, the same read as
+   * `page.annotations.list()`, in the order asked.
    */
-  listRawAll(): AbortablePromise<AnnotationListSnapshotAllPages> {
+  list(options: AnnotationListOptions = {}): AbortablePromise<AnnotationList> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
-    return AbortablePromise.run<AnnotationListSnapshotAllPages>(async (signal) => {
+    const { pages } = options;
+    if (pages !== undefined) {
+      return AbortablePromise.run<AnnotationList>(async (signal) =>
+        concatAnnotationLists(await Promise.all(pages.map((page) => this.readPage(page, signal)))),
+      );
+    }
+    return AbortablePromise.run<AnnotationList>(async (signal) => {
       for (let attempt = 0; ; attempt++) {
         const manifest =
           attempt === 0 ? await this.manifest.get(signal) : await this.manifest.refresh(signal);
         try {
-          return await this.readBulkAt(manifest, signal);
+          const list = await this.readBulkAt(manifest, signal);
+          return { ...list, auditHead: list.auditHead ?? manifest.auditHead };
         } catch (err) {
           if (!EngineError.is(err, EngineErrorCode.NotFound) || attempt >= MAX_COHERENCE_RESTARTS) {
             throw err;
@@ -101,16 +111,24 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
   private async readBulkAt(
     manifest: DocumentManifest,
     signal: AbortSignal,
-  ): Promise<AnnotationListSnapshotAllPages> {
+  ): Promise<AnnotationList> {
     const path = planesInherited(manifest, ['annotations'])
       ? wirePaths.docAnnotationsAll(this.docId, manifest.annotationsVersion)
       : wirePaths.layerAnnotationsAll(this.docId, this.layerName, manifest.annotationsVersion);
-    const body = await this.http.getJson(
-      path,
-      (raw) => AnnotationListSnapshotAllPagesSchema.parse(raw),
+    return this.http.getJson(path, (raw) => AnnotationListSchema.parse(raw), signal);
+  }
+
+  /** One page's versioned leaf, with the standard stale-pin retry
+   *  (404 → refresh the manifest → once). */
+  private readPage(page: PageRef, signal: AbortSignal): Promise<AnnotationList> {
+    return this.http.getJsonWithRefresh(
+      async (s) => this.versionedPagePath(await this.manifest.get(s), page.pageObjectNumber),
+      (raw) => AnnotationListSchema.parse(raw),
+      async (s) => {
+        await this.manifest.refresh(s);
+      },
       signal,
     );
-    return { ...body, auditHead: body.auditHead ?? manifest.auditHead };
   }
 
   /**
@@ -242,26 +260,6 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
     }
   }
 
-  listRaw(page: PageRef): AbortablePromise<AnnotationListPageSnapshot> {
-    if (this.isClosed()) {
-      return AbortablePromise.rejectReason(
-        new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
-      );
-    }
-    // Same versioned, CDN-cacheable read as `page.annotations.list()`,
-    // with the standard stale-pin retry (404 → refresh manifest → once).
-    return AbortablePromise.run<AnnotationListPageSnapshot>((signal) =>
-      this.http.getJsonWithRefresh(
-        async (s) => this.versionedPagePath(await this.manifest.get(s), page.pageObjectNumber),
-        (raw) => AnnotationListPageSnapshotSchema.parse(raw),
-        async (s) => {
-          await this.manifest.refresh(s);
-        },
-        signal,
-      ),
-    );
-  }
-
   /** Versioned leaf URL for one manifest page entry, with the same
    *  plane routing as `CloudPageAnnotationsService.list()`: an inherited
    *  `annotations` plane reads the doc-level base leaf. */
@@ -291,7 +289,7 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
     return this.pagePathAt(manifest, page);
   }
 
-  beginWeakEdit(pages: readonly PageRef[]): AbortablePromise<WeakAnnotationEditSession> {
+  beginEdit(pages: readonly PageRef[]): AbortablePromise<WeakAnnotationEditSession> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
@@ -381,7 +379,7 @@ class CloudWeakAnnotationEditSession implements WeakAnnotationEditSession {
     });
   }
 
-  release(): AbortablePromise<void> {
+  close(): AbortablePromise<void> {
     if (this.released) {
       return AbortablePromise.resolveValue(undefined);
     }

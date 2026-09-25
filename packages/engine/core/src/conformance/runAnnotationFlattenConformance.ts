@@ -52,9 +52,9 @@ export function runAnnotationFlattenConformance(
         const page = doc.page(toPageRef(pageObjectNumber));
         if (!page.annotations.flatten) return;
 
-        const a = (await page.annotations.create(square(20, 20))).created.ref;
-        const b = (await page.annotations.create(square(80, 20))).created.ref;
-        const c = (await page.annotations.create(square(140, 20))).created.ref;
+        const a = (await page.annotations.create(square(20, 20))).annotation.ref;
+        const b = (await page.annotations.create(square(80, 20))).annotation.ref;
+        const c = (await page.annotations.create(square(140, 20))).annotation.ref;
         // Hide `c` — ineligible for display flatten, so it must be skipped.
         await page.annotations.update(c, { subtype: 'square', hidden: true });
         const before = await page.annotations.list();
@@ -69,7 +69,7 @@ export function runAnnotationFlattenConformance(
         expect(AnnotationFlattenResultSchema.safeParse(result).success).toBe(true);
         expect(result.page.pageObjectNumber).toBe(pageObjectNumber);
         expect(result.usage).toBe('display');
-        expect(result.results.map((item) => item.status)).toEqual(['applied', 'skipped']);
+        expect(result.results.map((item) => item.status)).toEqual(['applied', 'unchanged']);
         expect(result.meta === null).toBe(false);
         expect(events).toHaveLength(1);
 
@@ -80,9 +80,7 @@ export function runAnnotationFlattenConformance(
         expect(after.annotations.some((dto) => sameRef(dto.ref, b))).toBe(true);
         expect(after.annotations.some((dto) => sameRef(dto.ref, c))).toBe(true);
         expect(after.annotations.some((dto) => sameRef(dto.ref, a))).toBe(false);
-        expect(after.pageState.revision.generation > before.pageState.revision.generation).toBe(
-          true,
-        );
+        expect(after.pages[0].revision.generation > before.pages[0].revision.generation).toBe(true);
       } finally {
         await doc.close();
       }
@@ -96,8 +94,8 @@ export function runAnnotationFlattenConformance(
         const page0 = doc.page(layout.pages[0].ref);
         const page1 = doc.page(layout.pages[1].ref);
         if (!page0.annotations.flatten) return;
-        const own = (await page0.annotations.create(square(20, 100))).created.ref;
-        const foreign = (await page1.annotations.create(square(20, 100))).created.ref;
+        const own = (await page0.annotations.create(square(20, 100))).annotation.ref;
+        const foreign = (await page1.annotations.create(square(20, 100))).annotation.ref;
         const countBefore = (await page0.annotations.list()).annotations.length;
 
         await expect(page0.annotations.flatten([own, foreign])).rejects.toMatchObject({

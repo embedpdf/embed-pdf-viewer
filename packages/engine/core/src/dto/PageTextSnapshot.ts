@@ -1,7 +1,7 @@
 import type { CharMapAnchor } from '../text/charmap';
 
 /**
- * Per-page text snapshot returned by `PageHandle.text.read()` and over
+ * Per-page text snapshot returned by `PageHandle.text.get()` and over
  * the wire as the `GET …/text/pages/:pon/data@<contentVersion>` body.
  *
  * `text` is the full extracted page text in display order, UTF-16 faithful

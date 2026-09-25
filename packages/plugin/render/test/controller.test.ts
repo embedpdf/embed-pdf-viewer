@@ -86,7 +86,7 @@ async function boot(
     },
     pages: { list: () => Promise.resolve({ pageCount: pages.length, pages }) },
     security: { allows: () => options.allow ?? true },
-    render: { policy: () => Promise.resolve(options.policy ?? { kind: 'continuous' }) },
+    render: { getPolicy: () => Promise.resolve(options.policy ?? { kind: 'continuous' }) },
     page: (ref: PageRef) => ({
       render: {
         image: (imageOptions: Record<string, unknown>) => {
@@ -209,7 +209,10 @@ describe('policy conformance — the host door', () => {
     const fixture = await boot();
     expect(fixture.render.getRenderPolicy()).toEqual({ kind: 'continuous' });
     expect(fixture.render.getSourceKey(toPageRef(11), { scale: 0.5 })).toBe('11|w306|a1|e0');
-    expect(fixture.render.conformViewport(toPageRef(11), 0.5)).toEqual({ kind: 'width', width: 306 });
+    expect(fixture.render.conformViewport(toPageRef(11), 0.5)).toEqual({
+      kind: 'width',
+      width: 306,
+    });
     expect(fixture.render.getSourceKey(toPageRef(11), { scale: 1.53 })).toBe('11|w640|a1|e0');
     expect(fixture.render.getSourceKey(toPageRef(11), { scale: 8 })).toBe('11|w640|a1|e0');
     await fixture.kernel.destroy();
@@ -256,7 +259,10 @@ describe('policy conformance — the host door', () => {
   it('one consumer aborting a shared fetch leaves it alive; the last one aborts the engine call', async () => {
     const fixture = await boot({ policy: LATTICE });
     const controller = new AbortController();
-    const doomed = fixture.render.renderSource(toPageRef(11), { scale: 1.2, signal: controller.signal });
+    const doomed = fixture.render.renderSource(toPageRef(11), {
+      scale: 1.2,
+      signal: controller.signal,
+    });
     const survivor = fixture.render.renderSource(toPageRef(11), { scale: 1.5 });
     controller.abort();
     await expect(doomed).rejects.toBeTruthy();
@@ -344,7 +350,9 @@ describe('the public door — exact sizes', () => {
     fixture.tasks[2]!.reject(new Error('engine said no'));
     const result = await batch;
     expect(result.applied.map((entry) => entry.page.pageObjectNumber)).toEqual([22]);
-    expect(result.failed.map((failure) => [failure.ref.pageObjectNumber, failure.error.code])).toEqual([
+    expect(
+      result.failed.map((failure) => [failure.ref.pageObjectNumber, failure.error.code]),
+    ).toEqual([
       [99, 'not-found'],
       [33, 'operation-failed'],
     ]);
@@ -353,7 +361,9 @@ describe('the public door — exact sizes', () => {
 
   it('unknown pages are not-found; completed and failed renders are announced', async () => {
     const fixture = await boot();
-    await expect(fixture.render.renderPage(toPageRef(99))).rejects.toMatchObject({ code: 'not-found' });
+    await expect(fixture.render.renderPage(toPageRef(99))).rejects.toMatchObject({
+      code: 'not-found',
+    });
     const log: string[] = [];
     fixture.render.onRenderCompleted((event) => log.push(`ok:${event.page.pageObjectNumber}`));
     fixture.render.onRenderFailed((event) =>
@@ -402,7 +412,10 @@ describe('the tile surface — pure reads, page-space regions', () => {
     const fixture = await boot({ config: { tiles: { settleMs: 0, bleed: 0 } }, crop });
     const view = fixture.render.createViewDemand('stage');
     view.setDemand(toPageRef(11), deep);
-    const first = fixture.imageCalls[0]!.options.target as { kind: string; rect: Record<string, number> };
+    const first = fixture.imageCalls[0]!.options.target as {
+      kind: string;
+      rect: Record<string, number>;
+    };
     expect(first.kind).toBe('rect');
     // The page's top-left tile is at page-space (0,0): PDF left = crop.left, top = crop.top.
     expect(first.rect.left).toBe(10);

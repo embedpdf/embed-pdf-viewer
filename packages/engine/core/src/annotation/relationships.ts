@@ -62,8 +62,8 @@ export interface AnnotationThread<T extends AnnotationDTO = AnnotationDTO> {
 }
 
 /**
- * Compose a flat annotation list (one page, or a whole document via
- * `listRawAll()` flattened) into {@link AnnotationThread}s in primary
+ * Compose a flat annotation list (one page, or a whole document from
+ * `annotations.list()`) into {@link AnnotationThread}s in primary
  * order.
  *
  * Rules (ISO 32000 §12.5.6.2 + the spec's UI rule):

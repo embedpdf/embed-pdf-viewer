@@ -232,11 +232,11 @@ export interface AnnotationToolDef<K extends ToolAuthoringKind = ToolAuthoringKi
   intent?: K extends 'ink'
     ? InkIntent
     : K extends 'line'
-      ? 'LineDimension'
+      ? 'line-dimension'
       : K extends 'polygon'
-        ? 'PolygonDimension'
+        ? 'polygon-dimension'
         : K extends 'polyline'
-          ? 'PolyLineDimension'
+          ? 'polyline-dimension'
           : never;
   /** Caption defaults for a measurement preset. Shape centers use absolute PDF coordinates. */
   measurement?: K extends 'line'
@@ -345,7 +345,7 @@ export interface ResolvedTool {
   flags?: Partial<AnnotationFlags>;
   source?: StampSourceSpec;
   selection?: SelectionAuthoring;
-  intent?: InkIntent | 'LineDimension' | 'PolyLineDimension' | 'PolygonDimension';
+  intent?: InkIntent | 'line-dimension' | 'polyline-dimension' | 'polygon-dimension';
   measurement?: { caption: LineDimensionCaption | ShapeDimensionCaption; leader?: LineLeader };
   ink?: InkAuthoringOptions;
   /** Counter-rotate creations against the page's display rotation (see
@@ -412,7 +412,7 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
   {
     id: 'distance',
     extends: 'line',
-    intent: 'LineDimension',
+    intent: 'line-dimension',
     clickCreate: false,
     defaults: { strokeWidth: 1, lineEndings: { start: 'closed-arrow', end: 'closed-arrow' } },
     measurement: {
@@ -445,14 +445,14 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
   {
     id: 'perimeter',
     extends: 'polyline',
-    intent: 'PolyLineDimension',
+    intent: 'polyline-dimension',
     defaults: { strokeWidth: 1, lineEndings: { start: 'none', end: 'none' } },
     measurement: { caption: { enabled: true } },
   },
   {
     id: 'area',
     extends: 'polygon',
-    intent: 'PolygonDimension',
+    intent: 'polygon-dimension',
     defaults: { strokeWidth: 1 },
     measurement: { caption: { enabled: true } },
   },

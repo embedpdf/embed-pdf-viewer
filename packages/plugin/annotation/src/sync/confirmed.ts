@@ -41,7 +41,7 @@ export function followConfirmedChanges(
     const remote = event.origin.kind === 'remote';
     switch (event.type) {
       case 'annotation.created': {
-        const { created } = event;
+        const { annotation: created } = event;
         identity.confirmByName(created.nm, created.ref);
         const key = annotationKey(created.ref);
         ctx.state.update(remote ? preferBaked : preferVector, [key]);
@@ -49,8 +49,8 @@ export function followConfirmedChanges(
         return;
       }
       case 'annotation.updated':
-        if (remote) ctx.state.update(preferBaked, [annotationKey(event.updated.ref)]);
-        announce.updated(event.updated, origin);
+        if (remote) ctx.state.update(preferBaked, [annotationKey(event.annotation.ref)]);
+        announce.updated(event.annotation, origin);
         return;
       case 'annotation.deleted':
         if (event.deleted) {

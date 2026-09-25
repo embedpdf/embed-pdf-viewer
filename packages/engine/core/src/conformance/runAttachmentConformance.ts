@@ -13,7 +13,7 @@ import { toPageRef } from '../identity/PageRef';
  * Both attachment surfaces are optional on the contract (the
  * `downloadLayer?` pattern), probed independently and skipped cleanly:
  *   - `doc.attachments?` — document-level EmbeddedFiles (list/download)
- *   - `page.annotations.readResource(ref, 'file')` — annotation-level file bytes
+ *   - `page.annotations.downloadResource(ref, 'file')` — annotation-level file bytes
  *
  * Invariants:
  *   1. `list()` reflects the name tree: positional indices, non-empty
@@ -45,7 +45,7 @@ export function runAttachmentConformance(
       const pages = await probe.pages.list();
       firstPageObjectNumber = pages.pages[0].ref.pageObjectNumber;
       annotSupported =
-        probe.page(toPageRef(firstPageObjectNumber)).annotations.readResource !== undefined;
+        probe.page(toPageRef(firstPageObjectNumber)).annotations.downloadResource !== undefined;
       await probe.close();
     });
 
@@ -170,7 +170,7 @@ export function runAttachmentConformance(
         const data = new Uint8Array(2048);
         for (let i = 0; i < data.length; i++) data[i] = (i * 31 + 7) & 0xff;
 
-        const { created } = await annotations.create(
+        const { annotation: created } = await annotations.create(
           {
             subtype: 'file-attachment',
             rect: { left: 40, bottom: 40, right: 60, top: 60 },
@@ -198,7 +198,7 @@ export function runAttachmentConformance(
         expect(file.size).toBe(data.length);
 
         // Bytes come back byte-identical as the `file` resource.
-        const bytes = await annotations.readResource(dto.ref, 'file');
+        const bytes = await annotations.downloadResource(dto.ref, 'file');
         expect(bytes.length).toBe(data.length);
         expect(Array.from(bytes.slice(0, 16))).toEqual(Array.from(data.slice(0, 16)));
         expect(bytes.every((byte, i) => byte === data[i])).toBe(true);
@@ -212,7 +212,7 @@ export function runAttachmentConformance(
       const doc = await openFixture(engine, opts);
       try {
         const annotations = doc.page(toPageRef(firstPageObjectNumber)).annotations;
-        const { created } = await annotations.create({
+        const { annotation: created } = await annotations.create({
           subtype: 'text',
           rect: { left: 100, bottom: 100, right: 120, top: 120 },
           icon: 'comment',
@@ -227,7 +227,7 @@ export function runAttachmentConformance(
 
         // Icon is patchable; the file half of an attachment is not, and
         // the same presentation-only patch path applies to notes.
-        const { updated } = await annotations.update(dto.ref, {
+        const { annotation: updated } = await annotations.update(dto.ref, {
           subtype: 'text',
           icon: 'help',
         });

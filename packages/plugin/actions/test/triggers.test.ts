@@ -102,7 +102,7 @@ function harness(options?: {
       ...(options?.docActions !== undefined
         ? {
             actions: {
-              read: async () => ({
+              get: async () => ({
                 openAction: options.docActions?.openAction ?? null,
                 openDestination: options.docActions?.openDestination ?? null,
               }),

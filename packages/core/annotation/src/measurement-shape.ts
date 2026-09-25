@@ -7,7 +7,7 @@ import type { DistanceCaptionLayout, MeasurementAppearance } from './measurement
 import type { ContentGeometry, Quad, Rect, Style, Point } from './types';
 
 export interface ShapeMeasurementAppearance {
-  intent: 'PolyLineDimension' | 'PolygonDimension';
+  intent: 'polyline-dimension' | 'polygon-dimension';
   measure: PdfMeasurement | null;
   caption: ShapeDimensionCaption;
   crop: PdfRect;
@@ -45,7 +45,7 @@ export function transformMeasurementCaption(
   appearance: MeasurementAppearance | undefined,
   transform: (point: Point) => Point,
 ): MeasurementAppearance | undefined {
-  if (!appearance || appearance.intent === 'LineDimension') return appearance;
+  if (!appearance || appearance.intent === 'line-dimension') return appearance;
   const center = shapeCaptionPoint(appearance);
   return center ? withShapeCaptionPoint(appearance, transform(center)) : appearance;
 }
@@ -55,7 +55,7 @@ export function shapeMeasurementReadout(
   appearance: ShapeMeasurementAppearance,
 ) {
   return measurementReadout({
-    subtype: appearance.intent === 'PolygonDimension' ? 'polygon' : 'polyline',
+    subtype: appearance.intent === 'polygon-dimension' ? 'polygon' : 'polyline',
     intent: appearance.intent,
     measure: appearance.measure,
     vertices:
@@ -194,7 +194,7 @@ export function measurementLayout(
   appearance: MeasurementAppearance,
   style: Style,
 ) {
-  return appearance.intent === 'LineDimension'
+  return appearance.intent === 'line-dimension'
     ? distanceLayout(geometry, appearance, style.strokeWidth)
     : shapeMeasurementLayout(geometry, appearance, style);
 }
@@ -204,7 +204,7 @@ export function measurementSelectionQuad(
   appearance: MeasurementAppearance,
   style: Style,
 ): Quad {
-  if (appearance.intent === 'LineDimension') {
+  if (appearance.intent === 'line-dimension') {
     return distanceSelectionQuad(geometry, appearance, style.strokeWidth);
   }
   const layout = shapeMeasurementLayout(geometry, appearance, style);
@@ -227,7 +227,7 @@ export function moveMeasurementCaption(
   delta: Point,
   style: Style,
 ): MeasurementAppearance {
-  if (appearance.intent === 'LineDimension')
+  if (appearance.intent === 'line-dimension')
     return moveDistanceCaption(geometry, appearance, delta);
   const center = shapeMeasurementLayout(geometry, appearance, style)?.caption?.center;
   return center

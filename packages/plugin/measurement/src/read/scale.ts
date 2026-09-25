@@ -39,7 +39,7 @@ export function createScaleReads(
   ): MeasurementReadout | MeasurementUnavailable =>
     measurementReadout({
       subtype: 'line',
-      intent: 'LineDimension',
+      intent: 'line-dimension',
       measure: scaleOf(page).measure,
       linePoints: { start: toPdf(page, from), end: toPdf(page, to) },
     });
@@ -49,7 +49,7 @@ export function createScaleReads(
   ): MeasurementReadout | MeasurementUnavailable =>
     measurementReadout({
       subtype: 'polygon',
-      intent: 'PolygonDimension',
+      intent: 'polygon-dimension',
       measure: scaleOf(page).measure,
       vertices: vertices.map((vertex) => toPdf(page, vertex)),
     });

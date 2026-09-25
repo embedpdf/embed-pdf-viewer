@@ -148,12 +148,12 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
       expect(JSON.stringify(total?.value)).toContain('alice');
 
       // Signed bytes are served per version: contents, digest, the revision prefix, the whole file.
-      const contents = await alice.doc.signatures!.contents({ kind: 'fqn', name: 'sig' });
+      const contents = await alice.doc.signatures!.getContents({ kind: 'fqn', name: 'sig' });
       expect(contents.byteLength).toBe(sig.contentsSize);
       expect(contents[0]).toBe(0x30);
-      const digest = await alice.doc.signatures!.digest({ kind: 'fqn', name: 'sig' }, 'sha256');
+      const digest = await alice.doc.signatures!.getDigest({ kind: 'fqn', name: 'sig' }, 'sha256');
       expect(digest.byteLength).toBe(32);
-      const revision0 = await alice.doc.signatures!.revisionBytes(0);
+      const revision0 = await alice.doc.signatures!.downloadRevision(0);
       expect(revision0.byteLength).toBe(seeded.size);
       expect(sha256(revision0)).toBe(seeded.sha);
       const download = await fetch(
@@ -278,8 +278,8 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
       expect(
         await errorCode(doc.signatures!.prepare({ field: { kind: 'fqn', name: 'sig' } })),
       ).toBe(EngineErrorCode.SigningPending);
-      expect((await doc.signatures!.abort(prepared.signingId)).status).toBe('aborted');
-      expect((await doc.signatures!.abort(prepared.signingId)).status).toBe('unknown');
+      expect((await doc.signatures!.cancel(prepared.signingId)).status).toBe('aborted');
+      expect((await doc.signatures!.cancel(prepared.signingId)).status).toBe('unknown');
       // Writable again; the aborted candidate is gone for good.
       await doc.forms.setValue(
         { kind: 'fqn', name: 'group.total' },
@@ -327,7 +327,7 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
           }),
         ),
       ).toBe(EngineErrorCode.SignatureRefused);
-      expect((await doc.signatures!.abort(again.signingId)).status).toBe('already-completed');
+      expect((await doc.signatures!.cancel(again.signingId)).status).toBe('already-completed');
       // A stale fence is refused before any byte is touched.
       const third = await doc
         .signatures!.prepare({ field: { kind: 'fqn', name: 'sig' } })

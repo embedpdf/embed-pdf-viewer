@@ -261,7 +261,7 @@ export function scene(item: RenderItem): SceneNode[] {
   // border a PDF authored shows through the page raster). Selection chrome
   // still outlines it, so an editable link is findable when selected.
   if (item.subtype === 'link') return [];
-  if (item.measure?.intent === 'LineDimension')
+  if (item.measure?.intent === 'line-dimension')
     return distanceScene(item.geometry, item.measure, item.style);
   if (item.subtype === 'redact') return redactScene(item);
   if (item.geometry.kind === 'quads')

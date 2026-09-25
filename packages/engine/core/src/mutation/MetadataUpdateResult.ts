@@ -22,7 +22,7 @@ export interface MetadataCache {
  * Result of a `metadata.update()`. A metadata write is a layer mutation
  * (it rewrites the Info dict into the layer artifact, like `pages.move`),
  * so the result returns the re-read `metadata` (the same shape
- * `metadata.read()` returns) plus the cloud coherence pins. Callers
+ * `metadata.get()` returns) plus the cloud coherence pins. Callers
  * holding a previously-read `DocumentMetadata` swap it for
  * `result.metadata`.
  */

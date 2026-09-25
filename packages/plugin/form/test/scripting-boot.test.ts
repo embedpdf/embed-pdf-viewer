@@ -77,7 +77,7 @@ function makeDoc(applied: FormEffect[][]) {
     id: 'diag-doc',
     security: { identity: null },
     actions: {
-      read: async () => ({
+      get: async () => ({
         nameTreeScripts: [
           {
             name: '!ADBE::VersChk',
@@ -153,11 +153,11 @@ describe('FormScriptingController — boot failures degrade, never brick', () =>
     controller.dispose();
   });
 
-  it('a failing doc.actions.read also degrades to a diagnostic', async () => {
+  it('a failing doc.actions.get also degrades to a diagnostic', async () => {
     const applied: FormEffect[][] = [];
     const doc = makeDoc(applied);
     // The fake's `read` is a plain async function, not an AbortablePromise.
-    (doc.actions as unknown as { read: () => Promise<never> }).read = async () => {
+    (doc.actions as unknown as { get: () => Promise<never> }).get = async () => {
       throw new Error('actions unavailable');
     };
     const realm = standaloneRealm(doc, () => null, {

@@ -20,7 +20,7 @@ import { createValidTestLicenseGate } from '../../../server/src/licensing/testin
 
 /**
  * Shared cloud-test scaffolding for the versioned read pipeline. The
- * cloud SDK's `annotations.list()` and `text.read()` require the doc to
+ * cloud SDK's `annotations.list()` and `text.get()` require the doc to
  * be visible to `DocumentService` (which reads from the SQL `documents`
  * table), so these tests boot a full DB-backed `buildApp` and seed the
  * document via direct insert.

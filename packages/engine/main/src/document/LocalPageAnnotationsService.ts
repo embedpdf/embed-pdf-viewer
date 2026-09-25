@@ -3,6 +3,7 @@ import {
   CONTINUOUS_RENDER_POLICY,
   EngineError,
   EngineErrorCode,
+  deletedAnnotationOf,
   createPageImageHandle,
   hasAnnotationResources,
   resolveAnnotationResources,
@@ -14,7 +15,7 @@ import {
   type AnnotationAppearanceRenderOptions,
   type AnnotationAppearancesResult,
   type AnnotationDraft,
-  type AnnotationListPageSnapshot,
+  type AnnotationList,
   type AnnotationPatch,
   type AnnotationRef,
   type AnnotationResourceRole,
@@ -66,7 +67,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     private readonly policy: EngineRenderPolicy = CONTINUOUS_RENDER_POLICY,
   ) {}
 
-  list(): AbortablePromise<AnnotationListPageSnapshot> {
+  list(): AbortablePromise<AnnotationList> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -84,28 +85,23 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'annotations.listFullPage',
-            jobId,
-            docId,
-            page: ref,
-          }),
+          wirePack({ kind: 'annotations.list', jobId, docId, pages: [ref] }),
       },
       { priority: Priority.MEDIUM },
     );
-    return AbortablePromise.run<AnnotationListPageSnapshot>(async (signal) => {
+    return AbortablePromise.run<AnnotationList>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
       const payload = await submission;
-      if (payload.tag !== 'annotations.listFullPage') {
+      if (payload.tag !== 'annotations.list') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      return payload.snapshot;
+      return payload.list;
     });
   }
 
-  readResource(ref: AnnotationRef, role: AnnotationResourceRole): AbortablePromise<Uint8Array> {
+  downloadResource(ref: AnnotationRef, role: AnnotationResourceRole): AbortablePromise<Uint8Array> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -145,7 +141,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     });
   }
 
-  renderAppearances(
+  renderAppearancesRaw(
     options?: AnnotationAppearanceRenderOptions,
   ): AbortablePromise<AnnotationAppearancesResult> {
     if (this.view.isClosed()) {
@@ -193,11 +189,11 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     });
   }
 
-  renderAppearanceImages(
+  renderAppearances(
     options: AnnotationAppearanceImageOptions = {},
   ): AbortablePromise<AnnotationAppearanceImagesResult> {
     return AbortablePromise.run<AnnotationAppearanceImagesResult>(async (signal) => {
-      const raw = this.renderAppearances(options);
+      const raw = this.renderAppearancesRaw(options);
       const onAbort = () => raw.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
@@ -406,6 +402,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
       this.publisher.publishLocal({
         type: 'annotation.deleted',
         page: this.ref,
+        deleted: deletedAnnotationOf(payload.result),
         ...payload.result,
       });
       return payload.result;
@@ -551,7 +548,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
    * Resolve the collab subject (userId / groupId) of the target row
    * an update or DELETE is about to act on. Mirrors the cloud's
    * `LayerService.getAnnotationCollabTarget` — page-fetch + filter
-   * over the existing listFullPage worker job. Returns `{}` when the
+   * over the existing list worker job. Returns `{}` when the
    * row can't be located; the collab resolver then denies
    * `:self`/`:group=X` filters and the mutator's own InvalidReference
    * surfaces the real error.
@@ -560,12 +557,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'annotations.listFullPage',
-            jobId,
-            docId: this.docId,
-            page: ref.page,
-          }),
+          wirePack({ kind: 'annotations.list', jobId, docId: this.docId, pages: [ref.page] }),
       },
       { priority: Priority.MEDIUM },
     );
@@ -574,13 +566,13 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     else signal.addEventListener('abort', onAbort, { once: true });
 
     const payload = await submission;
-    if (payload.tag !== 'annotations.listFullPage') {
+    if (payload.tag !== 'annotations.list') {
       throw new EngineError(
         EngineErrorCode.WireFormat,
         `unexpected payload tag while resolving collab target: ${payload.tag}`,
       );
     }
-    const match = payload.snapshot.annotations.find((a) => {
+    const match = payload.list.annotations.find((a) => {
       switch (ref.kind) {
         case 'objectNumber':
           return a.ref.kind === 'objectNumber' && a.ref.annotObjectNumber === ref.annotObjectNumber;

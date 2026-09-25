@@ -23,7 +23,7 @@ export function readViewports(
     const measure = readMeasure(fn, mem, fn.EPDFViewport_GetMeasure(viewport));
     viewports.push({
       bbox,
-      owned: name === CALIBRATION_NAME && (!measure || measure.subtype === 'RL'),
+      owned: name === CALIBRATION_NAME && (!measure || measure.subtype === 'rectilinear'),
       ...(name !== null ? { name } : {}),
       ...(measure ? { measure } : {}),
     });

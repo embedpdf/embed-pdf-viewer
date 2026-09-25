@@ -1,4 +1,5 @@
 import {
+  appearanceLatticeScale,
   EngineError,
   EngineErrorCode,
   type AnnotationAppearanceRenderOptions,
@@ -86,9 +87,12 @@ export function assertAppearanceOnLattice(
   options: AnnotationAppearanceRenderOptions | undefined,
 ): void {
   if (policy.kind !== 'lattice' || !policy.enforced || policy.appearances === undefined) return;
-  const scale = options?.scale ?? 1;
-  if (policy.appearances.scales.includes(scale)) return;
-  rejectOffLattice(policy, 'use snapAppearanceScale(policy, scale)');
+  const scale = appearanceLatticeScale(options?.viewport);
+  if (scale !== undefined && policy.appearances.scales.includes(scale)) return;
+  rejectOffLattice(
+    policy,
+    "use a scale viewport: { kind: 'scale', scale: snapAppearanceScale(policy, scale) }",
+  );
 }
 
 function rejectOffLattice(policy: EngineRenderPolicy, hint: string): never {

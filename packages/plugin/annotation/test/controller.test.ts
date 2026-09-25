@@ -103,8 +103,8 @@ describe('Replace Text grouped persistence', () => {
   it('creates the Caret first, then writes StrikeOut /IRT + /RT /Group', async () => {
     const harness = createHarness();
     harness.create
-      .mockResolvedValueOnce({ created: caretDTO() })
-      .mockResolvedValueOnce({ created: strikeoutDTO() });
+      .mockResolvedValueOnce({ annotation: caretDTO() })
+      .mockResolvedValueOnce({ annotation: strikeoutDTO() });
     const rect = { x: 10, y: 20, width: 80, height: 15 };
 
     harness.capability.createReplaceText(
@@ -138,7 +138,7 @@ describe('Replace Text grouped persistence', () => {
     const harness = createHarness();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     harness.create
-      .mockResolvedValueOnce({ created: caretDTO() })
+      .mockResolvedValueOnce({ annotation: caretDTO() })
       .mockRejectedValueOnce(new Error('strikeout failed'));
     const rect = { x: 10, y: 20, width: 80, height: 15 };
 
@@ -185,7 +185,7 @@ describe('annotation flags', () => {
     await loadPage(harness, [squareDTO(20)]);
     const id = harness.model().order[0];
     harness.capability.select(ref(20));
-    harness.update.mockResolvedValueOnce({ updated: squareDTO(20, { locked: true }) });
+    harness.update.mockResolvedValueOnce({ annotation: squareDTO(20, { locked: true }) });
 
     harness.capability.updateSelectionFlags({ locked: true });
     // optimistic: the model flips immediately, source untouched (still baked)
@@ -222,7 +222,7 @@ describe('annotation flags', () => {
     await loadPage(harness, [squareDTO(23, { locked: true })]);
     const id = harness.model().order[0];
     harness.capability.select(ref(23));
-    harness.update.mockResolvedValueOnce({ updated: squareDTO(23) });
+    harness.update.mockResolvedValueOnce({ annotation: squareDTO(23) });
     harness.capability.updateSelectionFlags({ locked: false });
     expect(harness.model().byId[id].flags.locked).toBe(false);
     await vi.waitFor(() => expect(harness.update).toHaveBeenCalledTimes(1));
@@ -231,14 +231,14 @@ describe('annotation flags', () => {
   it('update writes each flag it names as its own engine field', async () => {
     const harness = createHarness();
     await loadPage(harness, [squareDTO(25)]);
-    harness.update.mockResolvedValueOnce({ updated: squareDTO(25, { hidden: true }) });
+    harness.update.mockResolvedValueOnce({ annotation: squareDTO(25, { hidden: true }) });
     await harness.capability.update(ref(25), { flags: { hidden: true } });
     expect(harness.update.mock.calls[0]![1]).toEqual({ subtype: 'square', hidden: true });
   });
 
   it('the data-API create defaults /F to print when the caller omits flags', async () => {
     const harness = createHarness();
-    harness.create.mockResolvedValueOnce({ created: squareDTO(24) });
+    harness.create.mockResolvedValueOnce({ annotation: squareDTO(24) });
     await harness.capability.createRaw(PAGE, {
       subtype: 'square',
       rect: { left: 0, bottom: 0, right: 10, top: 10 },
@@ -251,8 +251,8 @@ describe('claimsTouchAt (touch consent)', () => {
   it('a SELECTED text markup does not claim — selectable, not movable', async () => {
     const harness = createHarness();
     harness.create
-      .mockResolvedValueOnce({ created: caretDTO() })
-      .mockResolvedValueOnce({ created: strikeoutDTO() });
+      .mockResolvedValueOnce({ annotation: caretDTO() })
+      .mockResolvedValueOnce({ annotation: strikeoutDTO() });
     const rect = { x: 10, y: 20, width: 80, height: 15 };
     harness.capability.createReplaceText(
       PAGE,
@@ -317,7 +317,7 @@ const createdEvent = (dto: AnnotationDTO, serverId: number): DocumentEvent =>
     type: 'annotation.created',
     page: PAGE,
     origin: remoteOrigin(serverId),
-    created: dto,
+    annotation: dto,
     meta: META,
   }) as unknown as DocumentEvent;
 
@@ -326,7 +326,7 @@ const updatedEvent = (dto: AnnotationDTO, serverId: number, changed: boolean): D
     type: 'annotation.updated',
     page: PAGE,
     origin: remoteOrigin(serverId),
-    updated: dto,
+    annotation: dto,
     appearance: { changed },
     meta: META,
   }) as unknown as DocumentEvent;
@@ -341,27 +341,28 @@ const deletedEvent = (annotObjectNumber: number, serverId: number): DocumentEven
   }) as unknown as DocumentEvent;
 
 const snapshot = (dtos: AnnotationDTO[], auditHead?: number) => ({
-  pages: [{ pageState: { page: PAGE }, annotations: dtos }],
+  annotations: dtos,
+  pages: [{ page: PAGE }],
   ...(auditHead !== undefined ? { auditHead } : {}),
 });
 
 describe('the records mirror', () => {
   it('loads the whole document once, after connect', async () => {
     const harness = createHarness();
-    harness.listRawAll.mockResolvedValue(snapshot([hydrationSquare(20), hydrationSquare(21)], 40));
+    harness.listAll.mockResolvedValue(snapshot([hydrationSquare(20), hydrationSquare(21)], 40));
     expect(harness.capability.getStatus()).toBe('idle');
     harness.startSync();
     expect(harness.capability.getStatus()).toBe('loading');
     await harness.capability.whenSynced();
     expect(harness.capability.getStatus()).toBe('ready');
-    expect(harness.listRawAll).toHaveBeenCalledTimes(1);
+    expect(harness.listAll).toHaveBeenCalledTimes(1);
     expect(harness.model().order).toHaveLength(2);
   });
 
   it('queues events during the load and replays them past the audit cursor', async () => {
     const harness = createHarness();
     let resolveSnap!: (value: unknown) => void;
-    harness.listRawAll.mockReturnValueOnce(new Promise((resolve) => (resolveSnap = resolve)));
+    harness.listAll.mockReturnValueOnce(new Promise((resolve) => (resolveSnap = resolve)));
     harness.startSync();
 
     // A delete newer than the snapshot arrives during the load: the snapshot
@@ -382,9 +383,7 @@ describe('the records mirror', () => {
   it('applies events live when the load fails', async () => {
     const harness = createHarness();
     let rejectSnap!: (reason: unknown) => void;
-    harness.listRawAll.mockReturnValueOnce(
-      new Promise((_resolve, reject) => (rejectSnap = reject)),
-    );
+    harness.listAll.mockReturnValueOnce(new Promise((_resolve, reject) => (rejectSnap = reject)));
     harness.startSync();
     harness.emit(createdEvent(hydrationSquare(50), 45));
 
@@ -417,7 +416,7 @@ describe('the records mirror', () => {
     expect(newIds.length).toBeGreaterThan(0);
 
     // obj:41 was deleted while the stream could not be trusted.
-    harness.listRawAll.mockResolvedValueOnce(snapshot([hydrationSquare(40)], 60));
+    harness.listAll.mockResolvedValueOnce(snapshot([hydrationSquare(40)], 60));
     harness.emit({ type: 'stream.desynced', reason: 'backlog-overflow', ts: 0 } as DocumentEvent);
     await harness.capability.whenSynced();
 
@@ -432,7 +431,7 @@ describe('the records mirror', () => {
     const harness = createHarness();
     await harness.load([]);
     harness.create.mockImplementationOnce(async (draft: { nm: string }) => ({
-      created: { ...hydrationSquare(60), nm: draft.nm },
+      annotation: { ...hydrationSquare(60), nm: draft.nm },
     }));
     const created = await harness.capability.create({
       subtype: 'square',
@@ -451,7 +450,7 @@ describe('the records mirror', () => {
     const updated = vi.fn();
     harness.capability.onUpdated(updated);
     harness.update.mockResolvedValueOnce({
-      updated: hydrationSquare(70),
+      annotation: hydrationSquare(70),
       appearance: { changed: true },
     });
     await harness.capability.updateRaw(ref(70), { subtype: 'square', contents: 'x' } as never);
@@ -513,7 +512,7 @@ describe('links lens — substrate children, no ledger', () => {
   it('links.set creates the grouped child and resolves when committed; clear deletes it', async () => {
     const harness = createHarness();
     await harness.load([hydrationSquare(20)]);
-    harness.create.mockResolvedValueOnce({ created: childDTO(30, 20) });
+    harness.create.mockResolvedValueOnce({ annotation: childDTO(30, 20) });
 
     await harness.capability.links.set(ref(20), TARGET);
     // The engine write is the grouped child create…
@@ -687,7 +686,7 @@ describe('the comments lens', () => {
     const harness = createHarness();
     await seed(harness);
     harness.create.mockResolvedValueOnce({
-      created: textDto(40, { reply: { to: ref(20), type: 'reply' }, contents: 'agreed' }),
+      annotation: textDto(40, { reply: { to: ref(20), type: 'reply' }, contents: 'agreed' }),
     });
     const created = await harness.capability.comments.reply(ref(21), 'agreed'); // via the reply
     expect(harness.create).toHaveBeenCalledWith(
@@ -709,7 +708,7 @@ describe('the comments lens', () => {
     const harness = createHarness();
     await seed(harness);
     harness.create.mockResolvedValueOnce({
-      created: textDto(41, {
+      annotation: textDto(41, {
         reply: { to: ref(20), type: 'reply' },
         popup: null,
         groupId: null,
@@ -737,7 +736,7 @@ describe('the comments lens', () => {
     expect(harness.capability.comments.getThread(ref(20))!.review.mine?.state).toBe('accepted');
 
     harness.create.mockResolvedValueOnce({
-      created: textDto(42, {
+      annotation: textDto(42, {
         reply: { to: ref(41), type: 'reply' },
         popup: null,
         groupId: null,
@@ -761,7 +760,7 @@ describe('the comments lens', () => {
   it('edit patches contents with the wire subtype', async () => {
     const harness = createHarness();
     await seed(harness);
-    harness.update.mockResolvedValueOnce({ updated: rootAt(20, 760) });
+    harness.update.mockResolvedValueOnce({ annotation: rootAt(20, 760) });
     await harness.capability.comments.setText(ref(20), 'new text');
     expect(harness.update).toHaveBeenCalledWith(
       ref(20),
@@ -934,7 +933,7 @@ describe('the twin law — authority fused into presentation and gestures', () =
     harness.allows.mockImplementation((capability: string) => capability !== 'doc.annotate.read');
     await harness.capability.refresh();
     expect(harness.capability.getStatus()).toBe('forbidden');
-    expect(harness.listRawAll).not.toHaveBeenCalled();
+    expect(harness.listAll).not.toHaveBeenCalled();
     expect(harness.capability.canRead()).toBe(false);
   });
 
@@ -1021,7 +1020,7 @@ describe('remote delivery — echo-driven appearance invalidation', () => {
       type: 'annotation.moved',
       page: PAGE,
       origin: remoteOrigin(45),
-      moved: [hydrationSquare(70)],
+      annotations: [hydrationSquare(70)],
       meta: META,
     } as unknown as DocumentEvent);
     expect(harness.model().byId['obj:70']!.apVersion ?? 0).toBe(0);
@@ -1030,9 +1029,9 @@ describe('remote delivery — echo-driven appearance invalidation', () => {
 
 describe.each([
   { name: 'line', subtype: 'line' as const, intent: undefined },
-  { name: 'distance', subtype: 'line' as const, intent: 'LineDimension' as const },
-  { name: 'perimeter', subtype: 'polyline' as const, intent: 'PolyLineDimension' as const },
-  { name: 'area', subtype: 'polygon' as const, intent: 'PolygonDimension' as const },
+  { name: 'distance', subtype: 'line' as const, intent: 'line-dimension' as const },
+  { name: 'perimeter', subtype: 'polyline' as const, intent: 'polyline-dimension' as const },
+  { name: 'area', subtype: 'polygon' as const, intent: 'polygon-dimension' as const },
 ])('$name rendering after local edits', ({ intent, subtype }) => {
   const dto = {
     ...base(72),
@@ -1071,7 +1070,7 @@ describe.each([
     const epoch = harness.capability.getAppearanceEpoch(PAGE);
 
     const updated = { ...dto, strokeWidth: 2 };
-    harness.update.mockResolvedValueOnce({ updated, appearance: { changed: true } });
+    harness.update.mockResolvedValueOnce({ annotation: updated, appearance: { changed: true } });
     await harness.capability.updateRaw(dto.ref, { subtype, strokeWidth: 2 });
 
     expect(harness.capability.getRaw(dto.ref)).toEqual(updated);
@@ -1097,7 +1096,7 @@ describe.each([
       const epoch = harness.capability.getAppearanceEpoch(PAGE);
       expect(epoch).toBe('');
 
-      finishWrite({ updated, appearance: { changed: true } });
+      finishWrite({ annotation: updated, appearance: { changed: true } });
       await vi.waitFor(() => expect(harness.capability.getRaw(dto.ref)).toEqual(updated));
 
       expect(harness.capability.listPageItems(PAGE)[0].source).toBe('vector');
@@ -1124,13 +1123,13 @@ describe('distance authoring and recalibration', () => {
       opacity: 1,
       borderStyle: 'solid',
       subtype: 'line',
-      intent: 'LineDimension',
+      intent: 'line-dimension',
       rect: CROP,
       linePoints: { start: { x: 20, y: 780 }, end: { x: 220, y: 780 } },
       measure: region,
       captionEnabled: true,
     } as AnnotationDTO;
-    harness.create.mockResolvedValue({ created: dto });
+    harness.create.mockResolvedValue({ annotation: dto });
     harness.capability.createPointer('distance', 'down', PAGE, { x: 20, y: 20 });
     harness.capability.setPageViewports(PAGE, [], fallback);
     harness.capability.createPointer('distance', 'move', PAGE, { x: 220, y: 20 });
@@ -1139,7 +1138,7 @@ describe('distance authoring and recalibration', () => {
     harness.capability.createPointer('distance', 'down', PAGE, { x: 220, y: 8 });
     expect(harness.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        intent: 'LineDimension',
+        intent: 'line-dimension',
         measure: region,
         contents: '20.00 ft',
         captionEnabled: true,
@@ -1164,7 +1163,7 @@ describe('distance authoring and recalibration', () => {
       PAGE,
       [
         { owned: true, bbox: CROP, measure: measureFromRatio(1, 1, 'm') },
-        { owned: false, bbox: CROP, measure: { subtype: 'GEO' } },
+        { owned: false, bbox: CROP, measure: { subtype: 'geospatial' } },
       ],
       measureFromRatio(1, 1, 'm'),
     );
@@ -1204,8 +1203,8 @@ describe('distance authoring and recalibration', () => {
           borderStyle: 'solid',
           subtype: 'line',
           rect: CROP,
-          intent: 'LineDimension',
-          measure: objectNumber === 82 ? { subtype: 'GEO' } : scale,
+          intent: 'line-dimension',
+          measure: objectNumber === 82 ? { subtype: 'geospatial' } : scale,
           captionEnabled: true,
           linePoints: { start: { x: 0, y: 0 }, end: { x: 100, y: 0 } },
           ...NO_FLAGS,
@@ -1213,14 +1212,14 @@ describe('distance authoring and recalibration', () => {
           userId: objectNumber === 83 ? 'other' : 'me',
         }) as unknown as AnnotationDTO,
     );
-    harness.listRawAll.mockResolvedValue(snapshot(dtos));
+    harness.listAll.mockResolvedValue(snapshot(dtos));
     harness.allowsAnnotationMutation.mockImplementation(
       (_action, target) => target.userId !== 'other',
     );
     harness.update.mockImplementation(async (ref: AnnotationRef) => {
       if (ref.kind === 'objectNumber' && ref.annotObjectNumber === 84)
         throw new Error('write failed');
-      return { updated: dtos[0], appearance: { changed: true } };
+      return { annotation: dtos[0], appearance: { changed: true } };
     });
     const report = await harness.capability.remeasurePage(PAGE, scale);
     expect(report.updated).toEqual([ref(80)]);
@@ -1246,7 +1245,7 @@ describe.each(['area', 'perimeter'])('%s scale resolution', (tool) => {
     );
     const subtype = tool === 'area' ? 'polygon' : 'polyline';
     harness.create.mockResolvedValue({
-      created: {
+      annotation: {
         ...base(75),
         subtype,
         rect: CROP,
@@ -1255,7 +1254,7 @@ describe.each(['area', 'perimeter'])('%s scale resolution', (tool) => {
           { x: 220, y: 780 },
           { x: 220, y: 680 },
         ],
-        intent: tool === 'area' ? 'PolygonDimension' : 'PolyLineDimension',
+        intent: tool === 'area' ? 'polygon-dimension' : 'polyline-dimension',
         measure: region,
         captionEnabled: true,
         color: { r: 239, g: 68, b: 68 },
@@ -1288,7 +1287,7 @@ describe.each(['area', 'perimeter'])('%s scale resolution', (tool) => {
     expect(harness.model().draft).toBeNull();
     harness.capability.setPageViewports(
       PAGE,
-      [{ owned: false, bbox: CROP, measure: { subtype: 'GEO' } }],
+      [{ owned: false, bbox: CROP, measure: { subtype: 'geospatial' } }],
       measureFromRatio(1, 1, 'm'),
     );
     harness.capability.createPointer(tool, 'down', PAGE, { x: 20, y: 20 });

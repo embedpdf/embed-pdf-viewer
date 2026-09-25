@@ -80,7 +80,7 @@ export function standaloneRealm(
       };
     },
     bootSources: async () => {
-      const actions = doc.actions ? await doc.actions.read() : null;
+      const actions = doc.actions ? await doc.actions.get() : null;
       return (
         actions?.nameTreeScripts.map(({ action }) => javaScriptProgramFromActionTree(action)) ?? []
       );

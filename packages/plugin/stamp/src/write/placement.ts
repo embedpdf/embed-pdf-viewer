@@ -145,7 +145,7 @@ export function createPlacement(
         doc,
         document: () => targetDocument,
         bootSources: async () => {
-          const tree = doc.actions ? await doc.actions.read() : null;
+          const tree = doc.actions ? await doc.actions.get() : null;
           return (
             tree?.nameTreeScripts.map(({ action }) => javaScriptProgramFromActionTree(action)) ?? []
           );

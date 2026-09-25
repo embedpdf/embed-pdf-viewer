@@ -84,13 +84,13 @@ describe('drawing bytes across runtimes', () => {
       const acrobat = (await page.annotations.list()).annotations.filter(
         (annotation) => annotation.subtype === 'stamp',
       );
-      const { created } = await page.annotations.create(
+      const { annotation: created } = await page.annotations.create(
         { subtype: 'stamp', rect: { left: 20, bottom: 20, right: 120, top: 70 }, opacity: 0.5 },
         { appearance: drawing },
       );
       const drawings = [];
       for (const stamp of [created, ...acrobat]) {
-        drawings.push(await page.annotations.readResource(stamp.ref, 'appearance'));
+        drawings.push(await page.annotations.downloadResource(stamp.ref, 'appearance'));
       }
       await doc.close();
       return drawings;
@@ -161,14 +161,14 @@ describe('replacing a stamp drawing', () => {
       const rect = { left: 20, bottom: 20, right: 120, top: 120 };
       const small = (
         await page.annotations.create({ subtype: 'stamp', rect }, { appearance: drawing })
-      ).created;
+      ).annotation;
       const withSmall = (await doc.download({ mode: 'rewrite' })).length;
       await page.annotations.delete(small.ref);
 
       const image = noisePng();
       const stamp = (
         await page.annotations.create({ subtype: 'stamp', rect }, { appearance: image })
-      ).created;
+      ).annotation;
       const withImage = (await doc.download({ mode: 'rewrite' })).length;
       expect(withImage - withSmall > image.length / 2).toBe(true);
 

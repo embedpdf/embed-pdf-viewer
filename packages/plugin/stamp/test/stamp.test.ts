@@ -164,7 +164,7 @@ function makeAssetEngine(
     pageEntries.set(pageObjectNumber, {});
     return { insertedPages: [toPageRef(pageObjectNumber)], layout: layout(), cache: null };
   });
-  const createAnnotation = vi.fn(async () => ({ created: { ref: {} } }));
+  const createAnnotation = vi.fn(async () => ({ annotation: { ref: {} } }));
   const flatten = vi.fn(async (refs: PageRef[]) => ({
     pages: refs,
     usage: 'display',
@@ -189,7 +189,7 @@ function makeAssetEngine(
   const download = vi.fn(async () => new TextEncoder().encode(`%PDF-canonical-${++saveNumber}`));
 
   const pieceInfo = (entries: MetadataSeed) => ({
-    read: vi.fn(
+    get: vi.fn(
       async (): Promise<PieceInfoSnapshot | null> =>
         Object.keys(entries).length === 0 ? null : { entries: { ...entries }, modifiedAt: null },
     ),
@@ -199,8 +199,8 @@ function makeAssetEngine(
         else entries[key] = toEntry(value);
       }
     }),
-    applications: vi.fn(async () => []),
-    clear: vi.fn(async () => {}),
+    list: vi.fn(async () => []),
+    delete: vi.fn(async () => {}),
   });
 
   const catalogPieceInfo = pieceInfo(catalogEntries);
@@ -216,7 +216,7 @@ function makeAssetEngine(
     return service;
   };
   const metadata = {
-    read: vi.fn(async () => ({ title })),
+    get: vi.fn(async () => ({ title })),
     update: vi.fn(async (patch: { title?: string | null }) => {
       if (patch.title !== undefined) title = patch.title;
       return { title };
@@ -1142,7 +1142,7 @@ describe('stamp plugin: authoring marks (real engine)', () => {
         // Two registered marks (a created library keeps its blank first page, unregistered).
         const layout = await doc.pages.list();
         expect(layout.namedPages?.filter((entry) => entry.target.kind === 'page')).toHaveLength(2);
-        expect((await doc.metadata.read()).title).toBe('Bob Singor');
+        expect((await doc.metadata.get()).title).toBe('Bob Singor');
       } finally {
         await doc.close();
       }

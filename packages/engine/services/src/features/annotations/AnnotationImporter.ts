@@ -100,7 +100,7 @@ export class AnnotationImporter {
     ).create(creates, signal);
 
     return {
-      created,
+      annotations: created,
       refMap: plan.creates.map((planned, at) => ({
         from: bundle.items[planned.item]!.data.ref,
         to: created[at]!.ref,

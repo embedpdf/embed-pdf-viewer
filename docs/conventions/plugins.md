@@ -485,7 +485,7 @@ export function createTitleController(ctx: PluginContext<TitleState>) {
   const title = ctx.mirror<string | null>({
     name: 'title',
     initial: () => null,
-    load: async (doc) => ({ value: (await doc.metadata.read()).title }),
+    load: async (doc) => ({ value: (await doc.metadata.get()).title }),
     fold: foldTitle,
     changed: ({ cause, event, previous, next }) => {
       if (cause === 'load') resynced.emit({ title: next });

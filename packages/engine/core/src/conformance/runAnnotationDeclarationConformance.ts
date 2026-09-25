@@ -59,8 +59,7 @@ export function runAnnotationDeclarationConformance(
       for (const fixture of opts.documents) {
         const doc = await openFixture(engine, opts, fixture);
         try {
-          const snapshot = await doc.annotations.listRawAll();
-          for (const page of snapshot.pages) reads.push(...page.annotations);
+          reads.push(...(await doc.annotations.list()).annotations);
         } finally {
           await doc.close();
         }
@@ -68,14 +67,14 @@ export function runAnnotationDeclarationConformance(
 
       const doc = await openFixture(engine, opts, opts.authoring);
       try {
-        const first = (await doc.annotations.listRawAll()).pages[0];
+        const first = (await doc.annotations.list()).pages[0];
         expect(first !== undefined).toBe(true);
-        const page = first!.pageState.page;
+        const page = first!.page;
         for (const { data, resources } of creatables()) {
-          const { created } = await doc.page(page).annotations.create(data, resources);
+          const { annotation: created } = await doc.page(page).annotations.create(data, resources);
           reads.push(created);
         }
-        reads.push(...(await doc.annotations.listRaw(page)).annotations);
+        reads.push(...(await doc.annotations.list({ pages: [page] })).annotations);
       } finally {
         await doc.close();
       }
@@ -87,8 +86,8 @@ export function runAnnotationDeclarationConformance(
     const onAuthoringPage = async (run: (page: PageHandle) => Promise<void>): Promise<void> => {
       const doc = await openFixture(engine, opts, opts.authoring);
       try {
-        const first = (await doc.annotations.listRawAll()).pages[0]!;
-        await run(doc.page(first.pageState.page));
+        const first = (await doc.annotations.list()).pages[0]!;
+        await run(doc.page(first.page));
       } finally {
         await doc.close();
       }
@@ -97,7 +96,7 @@ export function runAnnotationDeclarationConformance(
     test('shared fields follow the write rules on every kind', async () => {
       await onAuthoringPage(async (page) => {
         for (const { data, resources } of creatables()) {
-          const { created } = await page.annotations.create(data, resources);
+          const { annotation: created } = await page.annotations.create(data, resources);
           const read = async () =>
             (await page.annotations.list()).annotations.find(
               (annotation) => annotationKey(annotation.ref) === annotationKey(created.ref),
@@ -130,11 +129,11 @@ export function runAnnotationDeclarationConformance(
     test('a read sent back as an update changes nothing', async () => {
       await onAuthoringPage(async (page) => {
         for (const { data, resources } of creatables()) {
-          const { created } = await page.annotations.create(data, resources);
+          const { annotation: created } = await page.annotations.create(data, resources);
           const result = await page.annotations.update(created.ref, created as never);
           expect(result.appearance.changed).toBe(false);
           const { modifiedAt: _before, ...expected } = created;
-          const { modifiedAt: _after, ...updated } = result.updated;
+          const { modifiedAt: _after, ...updated } = result.annotation;
           expect(updated).toEqual(expected);
         }
       });
@@ -142,9 +141,9 @@ export function runAnnotationDeclarationConformance(
 
     test('an update takes its subtype from the annotation it targets', async () => {
       await onAuthoringPage(async (page) => {
-        const { created } = await page.annotations.create(creatables()[0]!.data);
+        const { annotation: created } = await page.annotations.create(creatables()[0]!.data);
         const result = await page.annotations.update(created.ref, { contents: 'No subtype' });
-        expect(result.updated.contents).toBe('No subtype');
+        expect(result.annotation.contents).toBe('No subtype');
         await expect(
           page.annotations.update(created.ref, { subtype: 'square', contents: 'x' } as never),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
@@ -157,12 +156,15 @@ export function runAnnotationDeclarationConformance(
         await expect(
           page.annotations.create({ ...square, colour: { r: 0, g: 0, b: 0 } } as never),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
-        const { created } = await page.annotations.create({ ...square, nm: 'declared-square' });
+        const { annotation: created } = await page.annotations.create({
+          ...square,
+          nm: 'declared-square',
+        });
         await expect(
           page.annotations.update(created.ref, { quadPoints: [] } as never),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
         const same = await page.annotations.update(created.ref, { nm: 'declared-square' });
-        expect(same.updated.nm).toBe('declared-square');
+        expect(same.annotation.nm).toBe('declared-square');
         await expect(
           page.annotations.update(created.ref, { nm: 'renamed-square' }),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
@@ -172,9 +174,9 @@ export function runAnnotationDeclarationConformance(
     test('a popup links to its parent in both directions', async () => {
       await onAuthoringPage(async (page) => {
         const rect: PdfRect = { left: 200, bottom: 200, right: 260, top: 240 };
-        const note = (await page.annotations.create({ subtype: 'text', rect })).created;
+        const note = (await page.annotations.create({ subtype: 'text', rect })).annotation;
         const popup = (await page.annotations.create({ subtype: 'popup', rect, parent: note.ref }))
-          .created;
+          .annotation;
         const find = async (ref: AnnotationRef) =>
           (await page.annotations.list()).annotations.find(
             (annotation) => annotationKey(annotation.ref) === annotationKey(ref),
@@ -182,7 +184,7 @@ export function runAnnotationDeclarationConformance(
         expect(popup.subtype === 'popup' && popup.parent !== null).toBe(true);
         expect(annotationKey((await find(note.ref)).popup!)).toBe(annotationKey(popup.ref));
         const unlinked = await page.annotations.update(popup.ref, { parent: null });
-        expect(unlinked.updated.subtype === 'popup' && unlinked.updated.parent).toBe(null);
+        expect(unlinked.annotation.subtype === 'popup' && unlinked.annotation.parent).toBe(null);
         expect((await find(note.ref)).popup).toBe(null);
       });
     });
@@ -190,16 +192,16 @@ export function runAnnotationDeclarationConformance(
     test("a popup's open state is read and written", async () => {
       await onAuthoringPage(async (page) => {
         const rect: PdfRect = { left: 200, bottom: 260, right: 260, top: 300 };
-        const note = (await page.annotations.create({ subtype: 'text', rect })).created;
+        const note = (await page.annotations.create({ subtype: 'text', rect })).annotation;
         // A PDF that says nothing about /Open shows the window closed.
         const closed = (await page.annotations.create({ subtype: 'popup', rect, parent: note.ref }))
-          .created;
+          .annotation;
         expect(closed.subtype === 'popup' && closed.open).toBe(false);
         const opened = await page.annotations.update(closed.ref, { open: true });
-        expect(opened.updated.subtype === 'popup' && opened.updated.open).toBe(true);
+        expect(opened.annotation.subtype === 'popup' && opened.annotation.open).toBe(true);
         const created = (
           await page.annotations.create({ subtype: 'popup', rect, parent: note.ref, open: true })
-        ).created;
+        ).annotation;
         expect(created.subtype === 'popup' && created.open).toBe(true);
       });
     });
@@ -223,7 +225,7 @@ export function runAnnotationDeclarationConformance(
             { appearance: new TextEncoder().encode('not an image') },
           ),
         ).rejects.toMatchObject(refused);
-        const { created } = await page.annotations.create(
+        const { annotation: created } = await page.annotations.create(
           { subtype: 'stamp', rect },
           { appearance: PNG_1X1 },
         );
@@ -236,14 +238,14 @@ export function runAnnotationDeclarationConformance(
     test("a new appearance replaces a stamp's drawing and keeps its data", async () => {
       await onAuthoringPage(async (page) => {
         const rect: PdfRect = { left: 300, bottom: 400, right: 360, top: 440 };
-        const { created } = await page.annotations.create(
+        const { annotation: created } = await page.annotations.create(
           { subtype: 'stamp', rect, name: 'Approved' },
           { appearance: PNG_1X1 },
         );
         const result = await page.annotations.update(created.ref, {}, { appearance: PNG_1X1 });
         expect(result.appearance.changed).toBe(true);
         const { modifiedAt: _before, ...expected } = created;
-        const { modifiedAt: _after, ...updated } = result.updated;
+        const { modifiedAt: _after, ...updated } = result.annotation;
         expect(updated).toEqual(expected);
       });
     });
@@ -256,8 +258,8 @@ export function runAnnotationDeclarationConformance(
           { subtype: 'stamp', rect },
           { appearance: PNG_1X1 },
         );
-        expect(fitOf(plain.created)).toBe('contain');
-        const { created } = await page.annotations.create(
+        expect(fitOf(plain.annotation)).toBe('contain');
+        const { annotation: created } = await page.annotations.create(
           { subtype: 'stamp', rect, fit: 'cover' },
           { appearance: PNG_1X1 },
         );
@@ -265,19 +267,22 @@ export function runAnnotationDeclarationConformance(
         const moved = await page.annotations.update(created.ref, {
           rect: { ...rect, right: rect.right + 40 },
         });
-        expect(fitOf(moved.updated)).toBe('cover');
+        expect(fitOf(moved.annotation)).toBe('cover');
         const refit = await page.annotations.update(created.ref, { fit: 'fill' });
-        expect(fitOf(refit.updated)).toBe('fill');
+        expect(fitOf(refit.annotation)).toBe('fill');
         expect(refit.appearance.changed).toBe(true);
         const forgotten = await page.annotations.update(created.ref, { fit: null });
-        expect(fitOf(forgotten.updated)).toBe(null);
+        expect(fitOf(forgotten.annotation)).toBe(null);
       });
     });
 
     test('an attached file is renamed by its data and replaced by its resource', async () => {
       await onAuthoringPage(async (page) => {
         const attachment = creatables().find(({ data }) => data.subtype === 'file-attachment')!;
-        const { created } = await page.annotations.create(attachment.data, attachment.resources);
+        const { annotation: created } = await page.annotations.create(
+          attachment.data,
+          attachment.resources,
+        );
         const fileOf = (dto: { subtype: string }) =>
           (dto as { file?: { name: string; size?: number; checksum?: string } | null }).file;
         const original = fileOf(created)!;
@@ -287,7 +292,7 @@ export function runAnnotationDeclarationConformance(
           file: { ...original, name: 'renamed.txt', description: null },
         });
         expect(renamed.appearance.changed).toBe(false);
-        expect(fileOf(renamed.updated)).toEqual({
+        expect(fileOf(renamed.annotation)).toEqual({
           name: 'renamed.txt',
           mimeType: 'text/plain',
           size: original.size,
@@ -298,12 +303,12 @@ export function runAnnotationDeclarationConformance(
 
         const bytes = new TextEncoder().encode('replaced bytes');
         const replaced = await page.annotations.update(created.ref, {}, { file: bytes });
-        expect(fileOf(replaced.updated)).toMatchObject({
+        expect(fileOf(replaced.annotation)).toMatchObject({
           name: 'renamed.txt',
           mimeType: 'text/plain',
           size: bytes.byteLength,
         });
-        const read = await page.annotations.readResource(created.ref, 'file');
+        const read = await page.annotations.downloadResource(created.ref, 'file');
         expect(new TextDecoder().decode(read)).toBe('replaced bytes');
       });
     });

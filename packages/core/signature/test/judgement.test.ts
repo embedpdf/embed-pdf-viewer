@@ -154,7 +154,7 @@ describe('what a validator concludes', () => {
       expect(verdict.summary).toBe('valid');
       expect(verdict.modifications).toMatchObject({ verdict: 'permitted', basis: 'working-copy' });
 
-      await doc.page(page.ref).annotations.delete(created.created.ref);
+      await doc.page(page.ref).annotations.delete(created.annotation.ref);
       [verdict] = await validateSignatures(doc, { trust, until: 'working-copy' });
       expect(verdict.summary).toBe('valid');
       // Nothing to judge: the bytes a save would write are the loaded bytes.
@@ -202,7 +202,7 @@ describe('what a validator concludes', () => {
         color: { r: 1, g: 0, b: 0 },
         strokeWidth: 2,
       } as never);
-      ref = created.created.ref;
+      ref = created.annotation.ref;
       artifact = await doc.downloadLayer!();
     } finally {
       await doc.close();
@@ -263,7 +263,7 @@ describe('what a validator concludes', () => {
         'permitted',
       ]);
 
-      await doc.page(page.ref).annotations.delete(created.created.ref);
+      await doc.page(page.ref).annotations.delete(created.annotation.ref);
       verdicts = await validateSignatures(doc, { trust, until: 'working-copy' });
       expect(verdicts.map((verdict) => verdict.summary)).toEqual(['valid', 'valid']);
       expect(verdicts.map((verdict) => verdict.modifications.basis)).toEqual([

@@ -87,7 +87,8 @@ afterAll(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-const scratchFiles = async (tag: string) => (await readdir(dir)).filter((f) => f.includes(`.${tag}-`));
+const scratchFiles = async (tag: string) =>
+  (await readdir(dir)).filter((f) => f.includes(`.${tag}-`));
 const mib = (n: number) => `${(n / 1024 / 1024).toFixed(1)} MiB`;
 
 describe('server memory contract', () => {
@@ -96,8 +97,17 @@ describe('server memory contract', () => {
     // Four revisions, two signatures (corpus v3/85): the first signature's
     // window spans three later revisions. The net state needs the sealed and
     // the judged revision; a full replay walks two at a time.
-    const corpusPath = resolve(here, 'fixtures', 'signature-compat', 'v3', '85-locked-signed-change-restored.pdf');
-    const doc = await engine.open({ kind: 'layerFile', id: 'handles', basePath: corpusPath }, { scope: ['*'] });
+    const corpusPath = resolve(
+      here,
+      'fixtures',
+      'signature-compat',
+      'v3',
+      '85-locked-signed-change-restored.pdf',
+    );
+    const doc = await engine.open(
+      { kind: 'layerFile', id: 'handles', basePath: corpusPath },
+      { scope: ['*'] },
+    );
     try {
       for (const detail of ['summary', 'full'] as const) {
         prefixes.clear();
@@ -121,8 +131,13 @@ describe('server memory contract', () => {
       // filter shrinks it.
       const payload = new Uint8Array(PAYLOAD);
       for (let i = 0; i < payload.length; i += 4096) payload[i] = (i * 7919) & 0xff;
-      for (let i = 1; i < payload.length; i++) payload[i] = (payload[i - 1]! * 1103515245 + 12345 + i) & 0xff;
-      await doc.attachments!.create!({ data: payload, name: 'blob.bin', mimeType: 'application/octet-stream' });
+      for (let i = 1; i < payload.length; i++)
+        payload[i] = (payload[i - 1]! * 1103515245 + 12345 + i) & 0xff;
+      await doc.attachments!.create!({
+        data: payload,
+        name: 'blob.bin',
+        mimeType: 'application/octet-stream',
+      });
 
       // Preparing a signature: the candidate's layer is a scratch file beside
       // the base while the candidate is open, and gone when prepare returns.
@@ -135,7 +150,7 @@ describe('server memory contract', () => {
         expect.arrayContaining([expect.stringContaining(`.signing-${prepared.signingId}.pdf`)]),
       );
       expect((await scratchFiles('signing')).filter((f) => f.endsWith('.layer'))).toEqual([]);
-      await doc.signatures!.abort(prepared.signingId);
+      await doc.signatures!.cancel(prepared.signingId);
       expect(await scratchFiles('signing')).toEqual([]);
 
       // Judging the working copy: the delta goes to a scratch file and is

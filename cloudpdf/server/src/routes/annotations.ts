@@ -43,6 +43,7 @@ import {
   decodeAnnotationsExportToken,
   type AnnotationsExportToken,
   PageNetworkRenderFormatSchema,
+  unflatten,
   WeakAnnotationSessionPagesRequestSchema,
   type ManifestPage,
 } from '@embedpdf/engine-core/wire';
@@ -1071,12 +1072,12 @@ async function renderAnnotationAppearances(input: {
   if (input.tokenQuery !== undefined) rejectQueryParamsOnTokenUrl(input.query);
 
   // Token (versioned) and query (unversioned) both arrive as flat string maps.
-  // The appearance query schema has no nested keys, so no `unflatten` is needed
-  // — z.coerce handles the string→number/enum coercions.
+  // `unflatten` turns the dotted `viewport.*` keys into the nested object the
+  // schema expects; z.coerce handles the string→number/enum coercions.
   const flatInput = (input.tokenQuery ?? input.query) as Record<string, unknown>;
   const parsedQuery = parseOrInvalidArg(
     AnnotationAppearancesQuerySchema,
-    flatInput,
+    unflatten(flatInput),
     input.tokenQuery === undefined ? 'appearance render query' : 'appearance render token',
   );
   const imageOptions: AnnotationAppearanceImageOptions = parsedQuery.options;
@@ -1114,7 +1115,9 @@ async function renderAnnotationAppearances(input: {
     !derived.classifyAppearance({ imageOptions, format }).onLattice
   ) {
     setNoStore(input.reply);
-    derived.rejectOffLattice('use snapAppearanceScale(policy, scale)');
+    derived.rejectOffLattice(
+      "use a scale viewport: { kind: 'scale', scale: snapAppearanceScale(policy, scale) }",
+    );
   }
 
   if (input.scope.kind === 'layer') {
@@ -1319,11 +1322,11 @@ async function readAnnotations(input: {
   // forces this choice back onto the table (safe-by-conformance).
   const build = (jobId: WorkerJobId) =>
     wirePack({
-      kind: 'annotations.listRawPage' as const,
+      kind: 'annotations.list' as const,
       jobId,
       docId: input.scope.docId,
       ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
-      page: toPageRef(input.pageObjectNumber),
+      pages: [toPageRef(input.pageObjectNumber)],
     });
   const scope = input.scope;
   const result = await input.documentService.readOnPool(
@@ -1333,12 +1336,12 @@ async function readAnnotations(input: {
     build,
     input.signal,
   );
-  if (result.tag !== 'annotations.listRawPage') {
+  if (result.tag !== 'annotations.list') {
     throw new EngineError(
       EngineErrorCode.WireFormat,
       `unexpected ${
         input.scope.kind === 'layer' ? 'layer ' : ''
-      }annotations.listRawPage payload: ${result.tag}`,
+      }annotations.list payload: ${result.tag}`,
     );
   }
 
@@ -1364,11 +1367,12 @@ async function readAnnotations(input: {
   }
 
   input.requestedVersion === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
-  return input.revisionBridge.decorateAnnotationSnapshot(toPageState(page), result.snapshot);
+  const pageState = toPageState(page);
+  return input.revisionBridge.decorateAnnotationList(result.list, () => pageState);
 }
 
 /**
- * Whole-document bulk read: One `annotations.listRawAll` worker job per
+ * Whole-document bulk read: One `annotations.list` worker job per
  * attempt (the raw docPtr sweep — no per-page loads). Version-addressed
  * reads double-check the manifest pin before serving a CDN-immutable body.
  * The public current-version read retries once if a mutation races the
@@ -1481,7 +1485,7 @@ async function readAnnotationsAll(input: {
     }
     const build = (jobId: WorkerJobId) =>
       wirePack({
-        kind: 'annotations.listRawAll' as const,
+        kind: 'annotations.list' as const,
         jobId,
         docId: scope.docId,
         ...(scope.kind === 'layer' ? { layerName: scope.layerName } : {}),
@@ -1493,10 +1497,10 @@ async function readAnnotationsAll(input: {
       build,
       input.signal,
     );
-    if (result.tag !== 'annotations.listRawAll') {
+    if (result.tag !== 'annotations.list') {
       throw new EngineError(
         EngineErrorCode.WireFormat,
-        `unexpected ${scope.kind === 'layer' ? 'layer ' : ''}annotations.listRawAll payload: ${
+        `unexpected ${scope.kind === 'layer' ? 'layer ' : ''}annotations.list payload: ${
           result.tag
         }`,
       );
@@ -1528,13 +1532,12 @@ async function readAnnotationsAll(input: {
     const stateByPageObjectNumber = new Map(
       manifest.pages.map((page) => [page.state.page.pageObjectNumber, page.state]),
     );
-    const pages = result.snapshot.pages.map((page) => {
-      const state = stateByPageObjectNumber.get(page.pageState.page.pageObjectNumber);
-      return state ? input.revisionBridge.decorateAnnotationSnapshot(state, page) : page;
-    });
+    const list = input.revisionBridge.decorateAnnotationList(result.list, (page) =>
+      stateByPageObjectNumber.get(page.pageObjectNumber),
+    );
 
     input.requestedVersion === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
-    return { pages, auditHead: manifest.auditHead };
+    return { ...list, auditHead: manifest.auditHead };
   }
 
   throw new EngineError(

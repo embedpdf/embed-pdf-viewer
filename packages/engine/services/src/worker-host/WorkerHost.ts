@@ -47,9 +47,7 @@ import {
   type FontsClearWorkerRequest,
   type FontsAuthorizeEditingWorkerRequest,
   type DocumentSetFontSettingsWorkerRequest,
-  type AnnotationsListFullPageWorkerRequest,
-  type AnnotationsListRawAllWorkerRequest,
-  type AnnotationsListRawPageWorkerRequest,
+  type AnnotationsListWorkerRequest,
   type AnnotationsRenderAppearancesWorkerRequest,
   type AnnotationsMoveWorkerRequest,
   type AnnotationsUpdateWorkerRequest,
@@ -116,7 +114,6 @@ import {
 } from '../document-session/lifecycle/PdfDocumentOpener';
 import { DocumentActionsReader } from '../features/actions';
 import {
-  AnnotationReader,
   AnnotationAppearanceReader,
   AnnotationExporter,
   AnnotationImporter,
@@ -292,14 +289,8 @@ export class WorkerHost {
         case 'actions.read':
           resultPack = this.handleActionsRead(msg, ctrl.signal);
           break;
-        case 'annotations.listRawAll':
-          resultPack = this.handleAnnotationsListRawAll(msg, ctrl.signal);
-          break;
-        case 'annotations.listRawPage':
-          resultPack = this.handleAnnotationsListRawPage(msg, ctrl.signal);
-          break;
-        case 'annotations.listFullPage':
-          resultPack = this.handleAnnotationsListFullPage(msg, ctrl.signal);
+        case 'annotations.list':
+          resultPack = this.handleAnnotationsList(msg, ctrl.signal);
           break;
         case 'annotations.renderAppearances':
           resultPack = this.handleAnnotationsRenderAppearances(msg, ctrl.signal);
@@ -835,36 +826,14 @@ export class WorkerHost {
     return wirePack({ tag: 'actions.read', snapshot });
   }
 
-  private handleAnnotationsListRawAll(
-    req: AnnotationsListRawAllWorkerRequest,
+  private handleAnnotationsList(
+    req: AnnotationsListWorkerRequest,
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
+    const pages = req.pages?.map((page) => session.resolvePageRef(page).pageObjectNumber);
     const reader = new RawAnnotationReader(this.runtime, session, this.fonts);
-    const snapshot = reader.listAll(signal);
-    return wirePack({ tag: 'annotations.listRawAll', snapshot });
-  }
-
-  private handleAnnotationsListRawPage(
-    req: AnnotationsListRawPageWorkerRequest,
-    signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
-    const session = this.requireSession(req);
-    const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
-    const reader = new RawAnnotationReader(this.runtime, session, this.fonts);
-    const snapshot = reader.listOne(pageObjectNumber, signal);
-    return wirePack({ tag: 'annotations.listRawPage', snapshot });
-  }
-
-  private handleAnnotationsListFullPage(
-    req: AnnotationsListFullPageWorkerRequest,
-    signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
-    const session = this.requireSession(req);
-    const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
-    const reader = new AnnotationReader(this.runtime, session, this.fonts);
-    const snapshot = reader.list(pageObjectNumber, signal);
-    return wirePack({ tag: 'annotations.listFullPage', snapshot });
+    return wirePack({ tag: 'annotations.list', list: reader.list(pages, signal) });
   }
 
   private handleAnnotationsRenderAppearances(
@@ -968,7 +937,7 @@ export class WorkerHost {
       signal,
     );
     // Everything left out: nothing was written.
-    if (result.created.length === 0) return wirePack({ tag: 'annotations.import', result });
+    if (result.annotations.length === 0) return wirePack({ tag: 'annotations.import', result });
     return this.finishMutation(session, { tag: 'annotations.import', result }, req.artifactPath);
   }
 

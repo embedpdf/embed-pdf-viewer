@@ -1,6 +1,7 @@
 import type { PageScaleResult } from '../mutation/PageScaleResult';
 import type { FormEffectsResult } from '../forms/effects';
 import type { PdfRotation } from '../geometry/primitives';
+import type { AnnotationStableId } from '../identity/AnnotationStableId';
 import type { PageRef } from '../identity/PageRef';
 import type {
   AnnotationCreateResult,
@@ -107,6 +108,8 @@ export type DocumentEvent =
       type: 'annotation.deleted';
       page: PageRef;
       origin: EventOrigin;
+      /** What was deleted: its stable id, or `null` for a weak annotation (see `deletedAnnotationOf`). */
+      deleted: AnnotationStableId | null;
     } & AnnotationDeleteResult)
   | ({
       type: 'annotation.moved';
@@ -209,7 +212,7 @@ export type DocumentEvent =
        * (the server's SSE `full-refresh`) — state derived from earlier
        * events or snapshots may be stale, and the gap's mutations will
        * never arrive as events. Consumers must re-read the snapshots they
-       * keep fresh from this stream (`doc.annotations.listRawAll()`,
+       * keep fresh from this stream (`doc.annotations.list()`,
        * `doc.forms.list()`, …).
        *
        * Carries no `EventOrigin`: it is a transport notice, not a

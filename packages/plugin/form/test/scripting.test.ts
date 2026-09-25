@@ -134,7 +134,7 @@ function harness(snapshot: FormSnapshot, nameTreeScript?: string) {
   const doc = {
     id: 'form-doc',
     forms: { list: async () => snapshot, applyEffects },
-    actions: { read: readActions },
+    actions: { get: readActions },
     security: {
       identity: { userId: 'alex', displayName: 'Alex Morgan', organization: 'EmbedPDF' },
     },

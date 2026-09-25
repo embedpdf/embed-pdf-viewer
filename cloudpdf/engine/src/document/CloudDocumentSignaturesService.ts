@@ -74,7 +74,7 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
     );
   }
 
-  contents(field: FormFieldRef): AbortablePromise<Uint8Array> {
+  getContents(field: FormFieldRef): AbortablePromise<Uint8Array> {
     const rejected = this.closedRejection();
     if (rejected) return rejected;
     return AbortablePromise.run<Uint8Array>(async (signal) => {
@@ -87,7 +87,7 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
     });
   }
 
-  digest(field: FormFieldRef, algorithm: DigestAlgorithm): AbortablePromise<Uint8Array> {
+  getDigest(field: FormFieldRef, algorithm: DigestAlgorithm): AbortablePromise<Uint8Array> {
     const rejected = this.closedRejection();
     if (rejected) return rejected;
     return AbortablePromise.run<Uint8Array>(async (signal) => {
@@ -100,7 +100,7 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
     });
   }
 
-  revisionBytes(revisionIndex: number): AbortablePromise<Uint8Array> {
+  downloadRevision(revisionIndex: number): AbortablePromise<Uint8Array> {
     const rejected = this.closedRejection();
     if (rejected) return rejected;
     return AbortablePromise.run<Uint8Array>(async (signal) => {
@@ -232,7 +232,7 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
     });
   }
 
-  abort(signingId: string): AbortablePromise<SignatureAbortResult> {
+  cancel(signingId: string): AbortablePromise<SignatureAbortResult> {
     const rejected = this.closedRejection();
     if (rejected) return rejected;
     return AbortablePromise.run<SignatureAbortResult>(async (signal) => {

@@ -55,7 +55,7 @@ export function runRedactionApplyConformance(
           subtype: 'highlight',
           quadPoints: COLLATERAL_QUAD,
         } satisfies HighlightDraft);
-        expect(collateral.created.subtype).toBe('highlight');
+        expect(collateral.annotation.subtype).toBe('highlight');
 
         const marked = await page.annotations.create({
           subtype: 'redact',
@@ -64,7 +64,7 @@ export function runRedactionApplyConformance(
           overlayText: 'REDACTED',
           fontColor: { r: 255, g: 255, b: 255 },
         } satisfies RedactDraft);
-        expect(marked.created.subtype).toBe('redact');
+        expect(marked.annotation.subtype).toBe('redact');
 
         const before = await page.annotations.list();
         const events: DocumentEvent[] = [];
@@ -74,7 +74,7 @@ export function runRedactionApplyConformance(
 
         const result = await doc.redaction.apply({
           kind: 'annotations',
-          refs: [marked.created.ref],
+          refs: [marked.annotation.ref],
         });
         expect(RedactionApplyResultSchema.safeParse(result).success).toBe(true);
         expect(result.results).toHaveLength(1);
@@ -91,9 +91,7 @@ export function runRedactionApplyConformance(
         // casualty; the page revision advanced (weak refs invalidated).
         const after = await page.annotations.list();
         expect(after.annotations.length).toBe(before.annotations.length - 2);
-        expect(after.pageState.revision.generation > before.pageState.revision.generation).toBe(
-          true,
-        );
+        expect(after.pages[0].revision.generation > before.pages[0].revision.generation).toBe(true);
         expect(await doc.pages.list()).toEqual(layoutBefore);
       } finally {
         await doc.close();
@@ -151,7 +149,7 @@ export function runRedactionApplyConformance(
           quadPoints: COLLATERAL_QUAD,
         } satisfies HighlightDraft);
         await expect(
-          doc.redaction.apply({ kind: 'annotations', refs: [notRedact.created.ref] }),
+          doc.redaction.apply({ kind: 'annotations', refs: [notRedact.annotation.ref] }),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
       } finally {
         await doc.close();

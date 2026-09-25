@@ -89,7 +89,7 @@ describe('widget appearance refresh across planes (engine-local, wasm)', () => {
   async function widgetRaster(): Promise<Raster | null> {
     const result = await doc
       .page(toPageRef(pageObjectNumber))
-      .annotations.renderAppearances({ scale: 2 });
+      .annotations.renderAppearancesRaw({ viewport: { kind: 'scale', scale: 2 } });
     const entry = result.appearances.find(
       (a) =>
         a.ref.kind === 'objectNumber' &&

@@ -204,7 +204,7 @@ export function hitTest(
       if (hasHandles(model, annotation)) {
         const geometry = hitGeomOf(annotation, view);
         const distance =
-          annotation.measure?.intent === 'LineDimension' &&
+          annotation.measure?.intent === 'line-dimension' &&
           distanceLayout(geometry, annotation.measure, hitStrokeOf(annotation, view));
         const handles = distance ? distanceHandles(distance) : geomHandles(geometry);
         if (distance) {
@@ -306,7 +306,7 @@ export function hitTest(
     const geometry = hitGeomOf(annotation, view);
     const strokeWidth = hitStrokeOf(annotation, view);
     const distance =
-      annotation.measure?.intent === 'LineDimension' &&
+      annotation.measure?.intent === 'line-dimension' &&
       distanceLayout(geometry, annotation.measure, strokeWidth);
     const layout =
       annotation.measure &&

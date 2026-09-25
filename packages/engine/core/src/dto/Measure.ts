@@ -28,7 +28,7 @@ export interface PdfNumberFormat {
 
 /** Rectilinear /Measure. Empty arrays faithfully represent missing formats on import. */
 export interface PdfMeasure {
-  subtype: 'RL';
+  subtype: 'rectilinear';
   ratio?: string;
   /** X-axis conversion from PDF user-space units. */
   x: PdfNumberFormat[];
@@ -47,7 +47,7 @@ export interface PdfMeasure {
 
 /** Read-only presence marker. Foreign dictionaries are preserved in the PDF. */
 export interface PdfForeignMeasure {
-  subtype: 'GEO' | 'unknown';
+  subtype: 'geospatial' | 'unknown';
 }
 export type PdfMeasurement = PdfMeasure | PdfForeignMeasure;
 export interface PdfViewport {
@@ -59,9 +59,9 @@ export interface PageMeasurementViewport extends PdfViewport {
   owned: boolean;
 }
 
-export type LineIntent = 'LineArrow' | 'LineDimension';
-export type PolygonIntent = 'PolygonCloud' | 'PolygonDimension';
-export type PolylineIntent = 'PolyLineDimension';
+export type LineIntent = 'line-arrow' | 'line-dimension';
+export type PolygonIntent = 'polygon-cloud' | 'polygon-dimension';
+export type PolylineIntent = 'polyline-dimension';
 export interface LineDimensionCaption {
   enabled: boolean;
   position?: 'inline' | 'top';

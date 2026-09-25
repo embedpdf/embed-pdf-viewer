@@ -1,6 +1,6 @@
 import type {
   AnnotationDTO,
-  AnnotationListPageSnapshot,
+  AnnotationList,
   PageObjectNumber,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
@@ -33,7 +33,7 @@ export function collectPageAnnotations(input: {
   getAnnotPtrAt: (index: number) => Ptr;
   signal: AbortSignal;
   fonts?: FontRegistrar;
-}): AnnotationListPageSnapshot {
+}): AnnotationList {
   const { runtime, session, pageObjectNumber, count, getAnnotPtrAt, signal, fonts } = input;
   const { fn, mem } = runtime;
 
@@ -70,5 +70,5 @@ export function collectPageAnnotations(input: {
 
   joinWidgetFieldNumbers(runtime, session, annotations);
   session.recordWeakFlag(pageObjectNumber, hasWeak);
-  return { pageState: session.pageState(pageObjectNumber), annotations };
+  return { annotations, pages: [session.pageState(pageObjectNumber)] };
 }

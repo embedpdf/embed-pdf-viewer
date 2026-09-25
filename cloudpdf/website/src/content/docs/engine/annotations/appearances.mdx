@@ -22,7 +22,7 @@ const pageImage = await page.render.image({
   includeAnnotations: false,
 }); // the page on its own
 
-const { appearances } = await page.annotations.renderAppearances({
+const { appearances } = await page.annotations.renderAppearancesRaw({
   viewport: { kind: 'scale', scale: 2 },
 });
 
@@ -134,8 +134,6 @@ result.results; // [{ ref: refA, status: 'applied' }, { ref: refB, status: 'unch
 | :------------ | :---------------------------------------------------------------------------- |
 | `'applied'`   | Painted in and removed as an annotation.                                      |
 | `'unchanged'` | Left as it was: hidden for that use, a popup, or with no appearance to paint. |
-| `'failed'`    | Painting failed; `error` says why.                                            |
-| `'skipped'`   | Not tried, because an earlier one failed.                                     |
 
 So you can say "2 of 3 flattened".
 

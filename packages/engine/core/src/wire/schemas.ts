@@ -5,10 +5,7 @@ import { z } from 'zod';
 
 import { DateInputSchema, IsoDateTimeSchema } from '../dto/IsoDateTime.schema';
 
-import type {
-  AnnotationListPageSnapshot,
-  AnnotationListSnapshotAllPages,
-} from '../annotation/AnnotationListSnapshot';
+import type { AnnotationList } from '../annotation/AnnotationList';
 import {
   AnnotationRefSchema,
   AnnotationStableIdSchema,
@@ -502,17 +499,12 @@ export const DocumentManifestSchema = z.object({
 }) as unknown as z.ZodType<DocumentManifest>;
 export type { DocumentManifest } from '../dto/DocumentManifest';
 
-export const AnnotationListPageSnapshotSchema: z.ZodType<AnnotationListPageSnapshot> = z.object({
-  pageState: PageStateSchema,
+/** What both engines' `annotations.list()` return, and the server's list endpoints send. */
+export const AnnotationListSchema: z.ZodType<AnnotationList> = z.object({
   annotations: z.array(AnnotationDTOSchema),
+  pages: z.array(PageStateSchema),
+  auditHead: z.number().int().nonnegative().optional(),
 });
-
-export const AnnotationListSnapshotAllPagesSchema: z.ZodType<AnnotationListSnapshotAllPages> =
-  z.object({
-    pages: z.array(AnnotationListPageSnapshotSchema),
-    // Cloud stamps the manifest's transactional audit cursor; local omits it.
-    auditHead: z.number().int().nonnegative().optional(),
-  });
 
 /**
  * Wire shape of `GET …/text/pages/:pon/data@<contentVersion>` and the
@@ -785,7 +777,7 @@ export const PageRenderAnnotatedQuerySchema = buildPageRenderQuerySchema(true);
 
 /**
  * Query/token schema for the batch annotation-appearance render endpoint.
- * Mirrors `PageRenderQuerySchema` but without page target/viewport/background
+ * Mirrors `PageRenderQuerySchema` but without page target/background
  * or `includeAnnotations` (appearances are always annotation-derived), and
  * keyed by `annotationVersion` only — appearance bitmaps do not depend on
  * page base content, so `contentVersion` is not part of the cache key. The
@@ -796,7 +788,7 @@ export const AnnotationAppearancesQuerySchema = z
     annotationVersion: z.coerce.number().int().positive().optional(),
     format: PageNetworkRenderFormatSchema.optional(),
     rotation: RenderRotationSchema.optional(),
-    scale: z.coerce.number().positive().finite().optional(),
+    viewport: RenderViewportSchema.optional(),
     quality: RenderQualitySchema.optional(),
   })
   .strict()
@@ -814,7 +806,7 @@ export const AnnotationAppearancesQuerySchema = z
   .transform((v) => {
     const options: AnnotationAppearanceImageOptions = {
       ...(v.rotation !== undefined ? { rotation: v.rotation } : {}),
-      ...(v.scale !== undefined ? { scale: v.scale } : {}),
+      ...(v.viewport ? { viewport: v.viewport } : {}),
       ...(v.quality !== undefined ? { quality: v.quality } : {}),
       ...(v.format !== undefined ? { format: v.format } : {}),
     };
@@ -891,12 +883,12 @@ export const AnnotationListMutationMetaSchema: z.ZodType<AnnotationListMutationM
 });
 
 export const AnnotationCreateResultSchema: z.ZodType<AnnotationCreateResult> = z.object({
-  created: AnnotationDTOSchema,
+  annotation: AnnotationDTOSchema,
   meta: AnnotationListMutationMetaSchema,
 });
 
 export const AnnotationImportResultSchema: z.ZodType<AnnotationImportResult> = z.object({
-  created: z.array(AnnotationDTOSchema),
+  annotations: z.array(AnnotationDTOSchema),
   refMap: z.array(z.object({ from: AnnotationRefSchema, to: AnnotationRefSchema })),
   dropped: z.array(
     z.object({
@@ -925,29 +917,34 @@ export const AppearanceOutcomeSchema: z.ZodType<AppearanceOutcome> = z.object({
 });
 
 export const AnnotationUpdateResultSchema: z.ZodType<AnnotationUpdateResult> = z.object({
-  updated: AnnotationDTOSchema,
+  annotation: AnnotationDTOSchema,
   appearance: AppearanceOutcomeSchema,
   meta: AnnotationListMutationMetaSchema,
 });
 
-/**
- * `deleted` is nullable: a weak annotation (no /NM, no indirect object
- * number) has no durable id to report after removal. Cloud server and local
- * worker both emit `null` in that case so callers don't have to special-case
- * a sentinel.
- */
 export const AnnotationDeleteResultSchema: z.ZodType<AnnotationDeleteResult> = z.object({
-  deleted: AnnotationStableIdSchema.nullable(),
   meta: AnnotationListMutationMetaSchema,
 });
 
 /**
+ * Stable public component names for the annotation wire model, so an OpenAPI
+ * projection names each once (`Annotation`, not one type per response that
+ * carries one), like `PdfActionWireComponents`.
+ */
+export const AnnotationWireComponents = {
+  Annotation: AnnotationDTOSchema,
+  AnnotationList: AnnotationListSchema,
+  AnnotationMutationMeta: AnnotationListMutationMetaSchema,
+  PageState: PageStateSchema,
+} as const satisfies Record<string, z.ZodTypeAny>;
+
+/**
  * Batch annotation move (contiguous-block, symmetric with `pages.move`).
- * `moved` is in caller order; each `moved[i]` lives at index `toIndex + i`
- * after the move. One structural envelope per batch.
+ * `annotations` is in caller order; each `annotations[i]` lives at index
+ * `toIndex + i` after the move. One structural envelope per batch.
  */
 export const AnnotationMoveResultSchema: z.ZodType<AnnotationMoveResult> = z.object({
-  moved: z.array(AnnotationDTOSchema),
+  annotations: z.array(AnnotationDTOSchema),
   meta: AnnotationListMutationMetaSchema,
 });
 
@@ -1072,7 +1069,7 @@ export const AnnotationFlattenResultSchema: z.ZodType<AnnotationFlattenResult> =
   results: z.array(
     z.object({
       ref: AnnotationRefSchema,
-      status: z.enum(['applied', 'skipped']),
+      status: z.enum(['applied', 'unchanged']),
     }),
   ),
   meta: MutationMetaSchema.nullable(),

@@ -131,7 +131,7 @@ export function createScaleWrites(
   /** The page's current rectilinear scale, for unit and precision edits. */
   const rectilinearOf = (page: PageRef): PdfMeasure => {
     const scale = scaleOf(page).measure;
-    if (!scale || scale.subtype !== 'RL') {
+    if (!scale || scale.subtype !== 'rectilinear') {
       throw new PluginError(
         'not-ready',
         'measurement',

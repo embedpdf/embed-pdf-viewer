@@ -1,7 +1,4 @@
-import type {
-  AnnotationListPageSnapshot,
-  AnnotationListSnapshotAllPages,
-} from '../annotation/AnnotationListSnapshot';
+import type { AnnotationList, AnnotationListOptions } from '../annotation/AnnotationList';
 import type { PageRef } from '../identity/PageRef';
 import { AbortablePromise } from '../promise/AbortablePromise';
 import type { AnnotationBundle } from '../transfer/AnnotationBundle';
@@ -17,29 +14,21 @@ export interface WeakAnnotationEditSession {
   covers(page: PageRef): boolean;
   updatePages(pages: readonly PageRef[]): AbortablePromise<void>;
   heartbeat(): AbortablePromise<void>;
-  release(): AbortablePromise<void>;
+  close(): AbortablePromise<void>;
 }
 
 /**
  * Document-scoped annotation service exposed via
- * `DocumentHandle.annotations`. The two read paths matter:
- *
- *   `listRawAll()` - whole-doc raw read. No `pagePtr` is acquired; uses
- *                    `EPDFPage_GetAnnotCountRaw` + `EPDFPage_GetAnnotRaw`.
- *                    Cheapest possible path; ideal for "do anything with
- *                    a document" UX where the caller wants to know what's
- *                    where but does not need full per-subtype fields yet.
- *
- *   `listRaw(p)`   - single-page raw read. Same fast path scoped to one
- *                    page, by PDF object number.
- *
- * The slow per-subtype `pagePtr`-driven read lives on
- * `PageAnnotationsService.list()`.
+ * `DocumentHandle.annotations`.
  */
 export interface DocumentAnnotationsService {
-  listRawAll(): AbortablePromise<AnnotationListSnapshotAllPages>;
-  listRaw(page: PageRef): AbortablePromise<AnnotationListPageSnapshot>;
-  beginWeakEdit(pages: readonly PageRef[]): AbortablePromise<WeakAnnotationEditSession>;
+  /**
+   * The annotations of the given pages, or of every page. A raw read: no
+   * page is loaded, so listing a whole document is cheap. Returns what
+   * `page.annotations.list()` returns for each page.
+   */
+  list(options?: AnnotationListOptions): AbortablePromise<AnnotationList>;
+  beginEdit(pages: readonly PageRef[]): AbortablePromise<WeakAnnotationEditSession>;
   /**
    * Take annotations out of the document, with the bytes beside them, as one
    * bundle: every annotation, or the selection with what it points at and,
