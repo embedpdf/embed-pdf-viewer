@@ -2,7 +2,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { runDateConformance, type ConformanceTestRunner } from '@embedpdf/engine-core/conformance';
-import { createCloudEngine } from '../src/index';
+import { cloudEngine } from '../src/index';
 import {
   buildDbSeededFixture,
   seedDocumentFromBytes,
@@ -49,7 +49,7 @@ runDateConformance(runner, {
   label: 'cloud engine (HTTP -> @cloudpdf/server, native runtime)',
   makeEngine: () => {
     if (!fx) throw new Error('fixture not initialised');
-    return createCloudEngine({ baseUrl: fx.baseUrl, token: tenantToken(fx, TENANT_ID) });
+    return cloudEngine({ baseUrl: fx.baseUrl, token: tenantToken(fx, TENANT_ID) });
   },
   // Each test opens its own copy: the metadata test writes to its document.
   open: async (engine) => {

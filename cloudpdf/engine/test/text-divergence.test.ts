@@ -6,7 +6,7 @@ import {
   TEXT_DIVERGENCE_CASES,
   type ConformanceTestRunner,
 } from '@embedpdf/engine-core/conformance';
-import { createCloudEngine } from '../src/index';
+import { cloudEngine } from '../src/index';
 import {
   buildDbSeededFixture,
   docScopedToken,
@@ -56,7 +56,7 @@ for (const [key, c] of entries) {
     openKind: 'id',
     makeEngine: () => {
       if (!fx) throw new Error('fixture not initialised');
-      return createCloudEngine({
+      return cloudEngine({
         baseUrl: fx.baseUrl,
         token: docScopedToken(fx, TENANT_ID, docId(key)),
       });

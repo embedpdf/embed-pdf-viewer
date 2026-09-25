@@ -20,10 +20,9 @@ import { isValidPageObjectNumber } from './PageObjectNumber';
  * address consistent with the other refs and leaves room for an additive
  * kind should a real one ever appear.
  *
- * Records that mention a page — `AnnotationRef.pageObjectNumber`, event
- * payloads, per-page results, destinations, search matches — keep the
- * scalar `pageObjectNumber` foreign key; `toPageRef()` turns one into an
- * address.
+ * Records that mention a page (an annotation ref, event payloads, per-page
+ * results, destinations, search matches) carry the same `page: PageRef`;
+ * `toPageRef()` builds one from a page number you already hold.
  */
 export type PageRef = { kind: 'objectNumber'; pageObjectNumber: PageObjectNumber };
 

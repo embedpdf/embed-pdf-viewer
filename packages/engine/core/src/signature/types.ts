@@ -48,9 +48,9 @@ export type DocMdpPermission = 1 | 2 | 3;
  * The modification level a signed document allows, as a product policy:
  *   - `none`: no byte change at all (not a DocMDP value)
  *   - `lta`: DSS and document timestamps only (P = 1)
- *   - `fill`: + form fill, signatures, new signature fields (P = 2, and how a
- *     validator reads an approval signature)
- *   - `annotate`: + annotations (P = 3)
+ *   - `fill`: + form fill, signatures, new signature fields (P = 2)
+ *   - `annotate`: + annotations (P = 3, and how a validator reads an approval
+ *     signature)
  */
 export type ModificationLevel = 'none' | 'lta' | 'fill' | 'annotate';
 
@@ -154,11 +154,10 @@ export interface DocumentFieldLock {
  *     capabilities like encryption permission bits). A plain approval
  *     signature declares nothing: `null`.
  *   - `judged`: what a validator holds later changes to — the declared level,
- *     or the approval baseline (`fill`: form fill-in and signing keep the
- *     signature valid, anything else does not; Acrobat's reading, ISO 32000
- *     is silent) when only approval signatures exist. Never refused, only
- *     judged: an annotation after an approval signature is allowed and then
- *     reads as invalidating, exactly as in Acrobat.
+ *     or the approval baseline (`annotate`: form fill-in, signing and
+ *     annotations keep the signature valid, anything else does not;
+ *     Acrobat's reading, ISO 32000 is silent) when only approval signatures
+ *     exist. Never refused, only judged.
  */
 export interface DocumentProtection {
   /** Declared and enforced; `null` when nothing declared (unsigned, or approval signatures only). */

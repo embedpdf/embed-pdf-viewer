@@ -15,9 +15,9 @@ import { AbortablePromise } from '../promise/AbortablePromise';
  * Document-scoped page service exposed via `DocumentHandle.pages`.
  *
  * Mirrors the shape of `DocumentAnnotationsService` so that anything
- * touching "many things at the document level" lives in one place. The
- * structure verbs are `move`, `rotate`, and `delete`; the surface is
- * designed for `insert` to slot in without API churn.
+ * touching "many things at the document level" lives in one place: the
+ * structure verbs (`move`, `rotate`, `delete`, `insert`, `insertBlank`),
+ * `extract`, `flatten` and the page names.
  *
  * Identity rule: pages are addressed by `PageRef` (the durable object
  * number) everywhere except `list()`, which exposes display order through
@@ -67,35 +67,34 @@ export interface DocumentPagesService {
    * other key in the same job (rename). Named pages are layout — read them
    * back from `list().namedPages` — so this is a page-structure mutation:
    * `docVersion` + `layoutVersion` advance, per-page pins do not. Gated like
-   * `move` (`doc.pages.assemble`). Optional while transports ship;
-   * feature-detect with `pages.setName !== undefined`.
+   * `move` (`doc.pages.assemble`).
    *
    * Rejects with `InvalidArg` for an empty name and `NotFound` for a page
    * that is not in the page tree (hidden templates included).
    */
-  setName?(input: PageNameInput): AbortablePromise<PageNameResult>;
+  setName(input: PageNameInput): AbortablePromise<PageNameResult>;
 
   /**
    * Remove one `/Names /Pages` registration; the page itself is untouched.
    * `NotFound` when no registration has that decoded key. Page deletion
    * removes registrations by itself — callers never need to pair the two.
    */
-  removeName?(input: PageRemoveNameInput): AbortablePromise<PageNameResult>;
+  removeName(input: PageRemoveNameInput): AbortablePromise<PageNameResult>;
 
   /**
    * Paint eligible annotation appearances into page content and remove only
    * those annotations that were painted. This changes content and annotation
    * liveness, not layout. The default usage is normal display.
    */
-  flatten?(pages: PageRef[], usage?: PageFlattenUsage): AbortablePromise<PageFlattenResult>;
+  flatten(pages: PageRef[], usage?: PageFlattenUsage): AbortablePromise<PageFlattenResult>;
 
   /**
    * Export the given pages, in the supplied order, as a standalone PDF
    * (bytes of a new document containing copies of those pages). A read:
    * the source document is untouched — no revisions bump, no event is
    * published. This is how a page becomes a portable asset (a vector
-   * stamp, a signature) that re-enters a document as a stamp draft's
-   * `source` bytes. Gated by `doc.download` (it egresses content), not
+   * stamp, a signature) that re-enters a document as a stamp's `appearance`
+   * resource. Gated by `doc.download` (it egresses content), not
    * `doc.pages.assemble`.
    *
    * Required-parity, delivered: the local engine runs it in the worker,

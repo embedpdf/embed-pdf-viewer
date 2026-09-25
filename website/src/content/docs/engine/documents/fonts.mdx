@@ -152,7 +152,7 @@ Fallback fonts are tried in the order you add them; the first one that has the c
 ## Manage fonts
 
 ```ts
-await engine.fonts.list(); // every registered font, in the order you registered them
+engine.fonts.list(); // every registered font, in the order you registered them (no await: it's in memory)
 await engine.fonts.clearFallbacks(); // empty the fallback list; the fonts stay registered
 await engine.fonts.clear(); // unregister every font and empty the fallback list
 ```

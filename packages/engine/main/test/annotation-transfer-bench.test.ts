@@ -1,5 +1,5 @@
 /**
- * E8 (annotation transfer plan §6): what a bundle costs, and a bundle at
+ * E8 (the annotation transfer benchmarks): what a bundle costs, and a bundle at
  * every default limit. Env-gated (`EPDF_TRANSFER_BENCH=1`); prints tables and
  * asserts only that each run succeeds. `EPDF_TRANSFER_BENCH_LIMITS=1` also
  * runs a bundle at each default limit, which takes minutes.

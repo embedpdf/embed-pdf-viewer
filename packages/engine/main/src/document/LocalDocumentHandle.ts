@@ -46,7 +46,6 @@ import type { WorkerQueue } from '../worker/WorkerQueue';
 export class LocalDocumentHandle implements DocumentHandle {
   readonly capabilities = {
     weakAnnotationEditSessions: 'not-needed',
-    pageEditSessions: 'unsupported',
   } as const;
   readonly metadata: MetadataService;
   readonly pieceInfo: LocalPieceInfoService;
@@ -86,7 +85,7 @@ export class LocalDocumentHandle implements DocumentHandle {
   ) {
     const view = { isClosed: () => this.closed };
     this.renderPolicy = renderPolicy;
-    this.render = { policy: () => Promise.resolve(this.renderPolicy) };
+    this.render = { policy: () => AbortablePromise.resolveValue(this.renderPolicy) };
     const hub = new EventHub();
     this.events = hub;
     // A single instance, so every event is `kind: 'local'` — the same
@@ -140,19 +139,15 @@ export class LocalDocumentHandle implements DocumentHandle {
   }
 
   /**
-   * Returns a `PageHandle` keyed on the page's address (object number or
-   * `/Names /Pages` key). We don't validate the page exists synchronously -
-   * the worker resolves the address on every call. This matches the cloud engine, which
-   * cannot validate without a round-trip either.
-   *
-   * `pageIndex` is advisory metadata, reported as `-1`. Display order is
-   * geometry, not liveness: clients read it from `pages.list()` (each
-   * `PageLayout.index`), joined to this handle by `ref`.
+   * Returns a `PageHandle` keyed on the page's address. We don't validate
+   * the page exists synchronously: the worker resolves the address on every
+   * call. This matches the cloud engine, which cannot validate without a
+   * round-trip either. Display order is geometry, not liveness: clients read
+   * it from `pages.list()` (each `PageLayout.index`), joined by `ref`.
    */
   page(ref: PageRef): PageHandle {
     return new LocalPageHandle(
       ref,
-      -1,
       this.id,
       this.queue,
       {

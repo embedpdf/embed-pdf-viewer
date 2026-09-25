@@ -109,7 +109,7 @@ export class ScopeGuard {
    */
   assertAnyCapability(caps: ReadonlyArray<DocCapability>): void {
     if (!checkAnyCapability(caps, this.ctx.scope, this.ctx.pdfBits, this.protection)) {
-      throw new PermissionDenied(`one of: ${caps.join(', ')}`, 'engine-local');
+      throw new PermissionDenied(caps[0] ?? 'doc.open', 'engine-local', caps);
     }
   }
 

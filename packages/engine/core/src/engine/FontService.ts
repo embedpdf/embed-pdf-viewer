@@ -16,7 +16,7 @@ import type { AbortablePromise } from '../promise/AbortablePromise';
  *
  * `register` and `addFallback` are intentionally separate calls: registering a
  * font makes it available for explicit annotation authoring
- * (`FreeTextDraft.registeredFontKey`); adding it to the fallback chain *also*
+ * (a free text's `fontFamily`); adding it to the fallback chain *also*
  * makes it eligible for automatic missing-glyph substitution during page
  * rendering and appearance generation. Many fonts want one without the other.
  */

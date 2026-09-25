@@ -1380,6 +1380,7 @@ export class DocumentService {
       throw new EngineError(
         EngineErrorCode.Forbidden,
         'encrypted PDF access requires a doc token with jti',
+        { details: { required: 'jti' } },
       );
     }
     return jti;
@@ -1391,6 +1392,7 @@ export class DocumentService {
       throw new EngineError(
         EngineErrorCode.Forbidden,
         'encrypted PDF access requires a token embedpdf.unlock_key claim',
+        { details: { required: 'embedpdf.unlock_key' } },
       );
     }
     return unlockKey;

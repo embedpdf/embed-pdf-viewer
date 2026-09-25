@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { createCloudEngine } from '../src/index';
+import { cloudEngine } from '../src/index';
 import { HttpClient } from '../src/transport/HttpClient';
 import { CloudDocumentHandle } from '../src/document/CloudDocumentHandle';
 import {
@@ -533,7 +533,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
   });
 
   test('open token seeds the first manifest fetch so pages.list does not repeat /head', async () => {
-    const engine = createCloudEngine({
+    const engine = cloudEngine({
       baseUrl: 'http://stub',
       fetch: fx.fetch,
     });
@@ -557,7 +557,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
   });
 
   test('stale open seed falls back to /head before surfacing pages.list', async () => {
-    const engine = createCloudEngine({
+    const engine = cloudEngine({
       baseUrl: 'http://stub',
       fetch: fx.fetch,
     });
@@ -583,7 +583,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
   });
 
   test('refreshManifest still re-fetches /head after the open seed is consumed', async () => {
-    const engine = createCloudEngine({
+    const engine = cloudEngine({
       baseUrl: 'http://stub',
       fetch: fx.fetch,
     });
@@ -974,4 +974,4 @@ describe('CloudPageAnnotationsService — binary payload wire shape', () => {
   });
 });
 
-void createCloudEngine;
+void cloudEngine;

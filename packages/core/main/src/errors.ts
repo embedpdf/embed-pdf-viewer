@@ -88,9 +88,10 @@ const ENGINE_CODE_MAP: Readonly<Record<string, PluginErrorCode>> = {
 export function toPluginError(capability: string, error: unknown): PluginError {
   if (error instanceof PluginError) return error;
   if (error instanceof PermissionDenied) {
+    // `details` carries `required` (and `anyOf`, `context`), as the engine sent it.
     return new PluginError('permission-denied', capability, error.message, {
       cause: error,
-      details: { required: error.required, context: error.context },
+      details: error.details,
     });
   }
   if (isCancelled(error) || (error instanceof Error && error.name === 'AbortError')) {

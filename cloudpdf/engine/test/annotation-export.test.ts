@@ -5,7 +5,7 @@ import {
   runAnnotationExportConformance,
   type ConformanceTestRunner,
 } from '@embedpdf/engine-core/conformance';
-import { createCloudEngine } from '../src/index';
+import { cloudEngine } from '../src/index';
 import {
   buildDbSeededFixture,
   docScopedToken,
@@ -59,7 +59,7 @@ runAnnotationExportConformance(runner, {
   label: 'cloud engine (HTTP -> @cloudpdf/server, native runtime)',
   makeEngine: () => {
     if (!fx) throw new Error('fixture not initialised');
-    return createCloudEngine({ baseUrl: fx.baseUrl, token: tenantToken(fx, TENANT_ID) });
+    return cloudEngine({ baseUrl: fx.baseUrl, token: tenantToken(fx, TENANT_ID) });
   },
   // Each test opens its own copy: the tests write to their document.
   open: async (engine, fixture) => {
@@ -76,7 +76,7 @@ describe('annotation export on the cloud engine', () => {
     if (!fx) throw new Error('fixture not initialised');
     const id = `scoped-${++opened}`;
     await seedDocumentFromBytes(fx, TENANT_ID, id, fixtures['acrobat-stamps'], 1);
-    const engine = createCloudEngine({
+    const engine = cloudEngine({
       baseUrl: fx.baseUrl,
       token: docScopedToken(fx, TENANT_ID, id, ['doc.open', 'doc.annotate.read']),
     });

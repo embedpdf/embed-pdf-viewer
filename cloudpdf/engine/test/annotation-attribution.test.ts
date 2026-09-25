@@ -5,7 +5,7 @@ import {
   runAnnotationAttributionConformance,
   type ConformanceTestRunner,
 } from '@embedpdf/engine-core/conformance';
-import { createCloudEngine } from '../src/index';
+import { cloudEngine } from '../src/index';
 import {
   buildDbSeededFixture,
   docScopedToken,
@@ -53,7 +53,7 @@ runAnnotationAttributionConformance(runner, {
   label: 'cloud engine (HTTP -> @cloudpdf/server, native runtime)',
   makeEngine: () => {
     if (!fx) throw new Error('fixture not initialised');
-    return createCloudEngine({ baseUrl: fx.baseUrl });
+    return cloudEngine({ baseUrl: fx.baseUrl });
   },
   // Every session writes to the document's default layer, so a later one sees what an earlier one wrote.
   openAs: (engine, { scope, identity }) => {

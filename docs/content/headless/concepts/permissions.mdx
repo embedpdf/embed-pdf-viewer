@@ -64,14 +64,18 @@ Twins are for honest pixels, not safety — enforcement never depends on
 them. A refused verb rejects with the same shape everywhere:
 
 ```ts
+import { isPluginError } from '@embedpdf/core';
+
 try {
   await form.setText(key, 'value');
 } catch (err) {
-  if (err.name === 'PermissionDenied') {
-    // err.required — the capability that was missing, e.g. 'doc.forms.fill'
+  if (isPluginError(err, 'permission-denied')) {
+    // err.details.required — the capability that was missing, e.g. 'doc.forms.fill'
   }
 }
 ```
+
+The local and the cloud engine refuse the same way, so this one check covers both.
 
 Gesture-driven verbs go quietly inert instead of throwing — a drawing
 gesture without create authority paints nothing and sends nothing.

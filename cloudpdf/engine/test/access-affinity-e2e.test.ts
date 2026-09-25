@@ -1,7 +1,7 @@
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { createCloudEngine } from '../src/index';
+import { cloudEngine } from '../src/index';
 import {
   buildDbSeededFixture,
   seedDocumentFromBytes,
@@ -42,7 +42,7 @@ describe('doc-scoped access + affinity header (real server)', () => {
       });
       return globalThis.fetch(url, init);
     };
-    const engine = createCloudEngine({
+    const engine = cloudEngine({
       baseUrl: fx.baseUrl,
       token: tenantToken(fx, TENANT_ID),
       fetch: capturingFetch,

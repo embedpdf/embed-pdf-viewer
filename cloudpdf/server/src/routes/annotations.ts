@@ -26,6 +26,7 @@ import {
   type AnnotationFlattenInput,
   toPageRef,
   type AnnotationSubtype,
+  PermissionDenied,
 } from '@embedpdf/engine-core/runtime';
 import {
   AnnotationAppearancesQuerySchema,
@@ -922,10 +923,7 @@ function createGroupOf(
   const groupId = (draft as { groupId?: string | null }).groupId ?? jwt.identity.groupId;
   if (groupId !== undefined && groupId !== jwt.identity.groupId) {
     if (!checkSetGroup(groupId, jwt.identity.groupId, jwt.scope, pdfBits)) {
-      throw new EngineError(
-        EngineErrorCode.Forbidden,
-        `annotations:set-group denied for group=${groupId}`,
-      );
+      throw new PermissionDenied('annotations:set-group', `group=${groupId}`);
     }
   }
   return groupId;
@@ -1045,10 +1043,7 @@ function buildUpdateActor(
 
   if (isReassigningGroup) {
     if (!checkSetGroup(patchedGroupId, jwt.identity.groupId, jwt.scope, pdfBits)) {
-      throw new EngineError(
-        EngineErrorCode.Forbidden,
-        `annotations:set-group denied for group=${patchedGroupId}`,
-      );
+      throw new PermissionDenied('annotations:set-group', `group=${patchedGroupId}`);
     }
   }
 

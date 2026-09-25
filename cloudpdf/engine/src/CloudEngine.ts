@@ -16,7 +16,11 @@ import { engineErrorFromShareExchange, ShareExchangeError, shareSessionSource } 
 import { decodeUnverifiedClaims } from './transport/decodeUnverifiedClaims';
 import { HttpClient, type HttpClientOptions } from './transport/HttpClient';
 
-export interface CloudEngineOptions extends HttpClientOptions {}
+/**
+ * `cloudEngine()`'s options: the HTTP client's, minus the session id the
+ * engine mints for itself (one per engine instance, for its events' origin).
+ */
+export interface CloudEngineOptions extends Omit<HttpClientOptions, 'sessionId'> {}
 
 /**
  * Cloud engine: speaks the same Engine interface as @embedpdf/engine

@@ -2,7 +2,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { encodePageKey, toPageRef } from '@embedpdf/engine-core/runtime';
-import { createCloudEngine } from '../src/index';
+import { cloudEngine } from '../src/index';
 import {
   buildDbSeededFixture,
   docScopedToken,
@@ -39,7 +39,7 @@ afterAll(async () => {
 
 /** Open a handle on one visitor's layer, the layer-per-visitor shape. */
 async function openLayer(layer: string) {
-  const engine = createCloudEngine({
+  const engine = cloudEngine({
     baseUrl: fx!.baseUrl,
     token: docScopedToken(fx!, TENANT_ID, DOC_ID, ['*'], layer),
   });

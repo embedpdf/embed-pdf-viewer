@@ -20,9 +20,6 @@ import { AbortablePromise } from '../promise/AbortablePromise';
  * bytes leave the engine exclusively through {@link download}. The
  * annotation-level counterpart is
  * `PageAnnotationsService.readResource(ref, 'file')`.
- *
- * `create`/`delete` are optional (the `downloadLayer?` pattern) while
- * transports ship — feature-detect with `attachments.create !== undefined`.
  */
 export interface DocumentAttachmentsService {
   /** Snapshot of the `/EmbeddedFiles` name tree, in tree (key-sorted) order. */
@@ -42,7 +39,7 @@ export interface DocumentAttachmentsService {
    * published. Note the tree is key-sorted, so other entries' indices
    * may shift; keys never move.
    */
-  create?(file: AttachmentFileSource): AbortablePromise<AttachmentCreateResult>;
+  create(file: AttachmentFileSource): AbortablePromise<AttachmentCreateResult>;
   /**
    * Delete an embedded file from the name tree. Unlinks the entry only —
    * the stream bytes remain in the document until a full rewrite (the
@@ -50,5 +47,5 @@ export interface DocumentAttachmentsService {
    * unknown key. A mutation: layer sessions persist an artifact and an
    * `attachment.deleted` event is published.
    */
-  delete?(ref: EmbeddedFileRef): AbortablePromise<AttachmentDeleteResult>;
+  delete(ref: EmbeddedFileRef): AbortablePromise<AttachmentDeleteResult>;
 }

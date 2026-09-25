@@ -30,10 +30,6 @@ export type { ShareSession, ShareExchangeOptions } from './share';
 
 import { CloudEngine, type CloudEngineOptions } from './CloudEngine';
 
-export function createCloudEngine(opts: CloudEngineOptions): CloudEngine {
-  return CloudEngine.fromOptions(opts);
-}
-
 /**
  * Create a cloud {@link CloudEngine} — the drop-in counterpart of
  * `localEngine()`, so swapping local for cloud is a one-import change.
@@ -58,37 +54,6 @@ export function cloudEngine(opts: CloudEngineOptions): CloudEngine {
   return CloudEngine.fromOptions(opts);
 }
 
-// Re-export the shared engine runtime surface so consumers import every
-// public type and primitive from a single `@cloudpdf/engine` entrypoint
-// instead of reaching into the transitive `@embedpdf/engine-core` dep.
-export {
-  AbortablePromise,
-  AbortError,
-  EngineError,
-  EngineErrorCode,
-} from '@embedpdf/engine-core/runtime';
-export type {
-  Engine,
-  EngineFactory,
-  DocumentHandle,
-  DocumentCapabilities,
-  PageHandle,
-  OpenInput,
-  OpenInputShare,
-  OpenOptions,
-  TokenSource,
-  MetadataService,
-  DocumentPagesService,
-  DocumentAnnotationsService,
-  PageAnnotationsService,
-  PageTextService,
-  PageGeometryService,
-  PageRenderService,
-  DocumentSecurityService,
-  DocumentSecurityState,
-  DocumentUnlockInput,
-  DocumentUnlockResult,
-  DocumentAccessInfo,
-  Identity,
-  PdfSaveMode,
-} from '@embedpdf/engine-core/runtime';
+// The developer-facing surface both engine packages share: errors, refs,
+// helpers and the document types, from one list in engine-core.
+export * from '@embedpdf/engine-core/public';

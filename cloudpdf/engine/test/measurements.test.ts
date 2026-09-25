@@ -5,7 +5,7 @@ import {
   type ConformanceTestRunner,
 } from '@embedpdf/engine-core/conformance';
 import { EngineErrorCode, measureFromKnownLength } from '@embedpdf/engine-core/runtime';
-import { createCloudEngine } from '../src/index';
+import { cloudEngine } from '../src/index';
 import { auditRowToEvents } from '../src/realtime/auditRowToEvents';
 import {
   buildDbSeededFixture,
@@ -41,7 +41,7 @@ afterAll(async () => {
   await teardownDbSeededFixture(fx);
 });
 const makeEngine = (scope: string[] = ['*']) =>
-  createCloudEngine({ baseUrl: fx.baseUrl, token: docScopedToken(fx, tenant, id, scope) });
+  cloudEngine({ baseUrl: fx.baseUrl, token: docScopedToken(fx, tenant, id, scope) });
 runMeasurementConformance(runner, {
   label: 'cloud HTTP / native',
   openKind: 'id',

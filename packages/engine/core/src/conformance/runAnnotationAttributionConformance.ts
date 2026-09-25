@@ -4,6 +4,7 @@ import type { Identity } from '../auth/scope';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import type { PageHandle } from '../engine/PageHandle';
+import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import { annotationKey } from '../identity/annotationKey';
@@ -393,8 +394,10 @@ function expectNow(value: string | null, before: number, after: number): void {
   }
 }
 
+/** A refusal is the same on both engines: `Forbidden`, naming the permission it needed. */
 function isPermissionRefusal(error: unknown): boolean {
-  if (!error || typeof error !== 'object') return false;
-  const { name, code } = error as { name?: unknown; code?: unknown };
-  return name === 'PermissionDenied' || code === EngineErrorCode.Forbidden;
+  return (
+    EngineError.is(error, EngineErrorCode.Forbidden) &&
+    typeof error.details?.['required'] === 'string'
+  );
 }

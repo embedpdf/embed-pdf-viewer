@@ -181,7 +181,7 @@ export class FormsEffectsApplier {
     const resolved = resolveFieldRef(this.runtime, model, ref);
     if (resolved.fieldObjectNumber <= 0) {
       throw new EngineError(
-        EngineErrorCode.InvalidReference,
+        EngineErrorCode.InvalidArg,
         'direct-object form fields cannot be mutated',
       );
     }
@@ -195,7 +195,7 @@ export class FormsEffectsApplier {
     const model = acquireFormModel(this.runtime, this.session);
     const index = this.runtime.fn.EPDFForm_GetFieldIndexByObjNum(model, fieldObjectNumber);
     if (index < 0) {
-      throw new EngineError(EngineErrorCode.InvalidReference, 'form field disappeared');
+      throw new EngineError(EngineErrorCode.NotFound, 'form field disappeared');
     }
     return readFieldAt(this.runtime, model, index, this.session.requireDocPtr(), actionBudget);
   }

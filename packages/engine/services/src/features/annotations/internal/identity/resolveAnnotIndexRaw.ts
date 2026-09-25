@@ -7,7 +7,8 @@ import { annotationIndexByName } from '../read/annotationIndexByName';
 /**
  * Where the annotation `ref` names is: its page's index and its place in the
  * page's `/Annots`, found from the page's dictionaries without loading the
- * page. `InvalidReference` when it isn't there, as {@link resolveAnnotPtr}.
+ * page. `NotFound` when it isn't there, `InvalidReference` for a stale index
+ * ref, as {@link resolveAnnotPtr}.
  */
 export function resolveAnnotIndexRaw(
   runtime: PdfRuntimeModule,
@@ -27,7 +28,7 @@ export function resolveAnnotIndexRaw(
       );
       if (index < 0) {
         throw new EngineError(
-          EngineErrorCode.InvalidReference,
+          EngineErrorCode.NotFound,
           `no annotation with object number ${ref.annotObjectNumber} on page ${page}`,
         );
       }
@@ -37,7 +38,7 @@ export function resolveAnnotIndexRaw(
       const index = annotationIndexByName(runtime, docPtr, pageIndex, ref.nm);
       if (index < 0) {
         throw new EngineError(
-          EngineErrorCode.InvalidReference,
+          EngineErrorCode.NotFound,
           `no annotation with /NM '${ref.nm}' on page ${page}`,
         );
       }

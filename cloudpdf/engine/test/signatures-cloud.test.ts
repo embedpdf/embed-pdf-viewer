@@ -20,7 +20,7 @@ import {
 } from '@embedpdf/core-signature';
 import type { SignatureSubFilter } from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
-import { createCloudEngine } from '../src/index';
+import { cloudEngine } from '../src/index';
 import {
   buildDbSeededFixture,
   docScopedToken,
@@ -60,7 +60,7 @@ afterAll(async () => {
 });
 
 async function openLayer(layer: string) {
-  const engine = createCloudEngine({
+  const engine = cloudEngine({
     baseUrl: fx!.baseUrl,
     token: docScopedToken(fx!, TENANT_ID, DOC_ID, ['*'], layer),
   });
@@ -92,7 +92,10 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
     const alice = await openLayer('alice');
     try {
       // Bob edits his own layer before Alice signs: he will be behind the head.
-      await bob.doc.forms.setValue({ kind: 'fqn', name: 'group.total' }, { type: 'text', value: 'bob' });
+      await bob.doc.forms.setValue(
+        { kind: 'fqn', name: 'group.total' },
+        { type: 'text', value: 'bob' },
+      );
       const bobBefore = await bob.doc.signatures!.list();
       expect(bobBefore.signatures.some((s) => s.signed)).toBe(false);
 
@@ -131,7 +134,9 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
       expect(manifest.working).toBe(false);
       // A fresh layer (0) → the fill (1) → prepare (2) → complete (3).
       expect(manifest.layerVersion).toBe(3);
-      expect(Object.values(manifest.scopes)).toEqual(Object.values(manifest.scopes).map(() => 'base'));
+      expect(Object.values(manifest.scopes)).toEqual(
+        Object.values(manifest.scopes).map(() => 'base'),
+      );
 
       // The snapshot describes the sealed bytes; the fill and the signature share one revision.
       const after = await alice.doc.signatures!.list();
@@ -153,7 +158,11 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
       expect(sha256(revision0)).toBe(seeded.sha);
       const download = await fetch(
         `${fx!.baseUrl}/v1/docs/${DOC_ID}/versions/download/${result.version.sha256}`,
-        { headers: { Authorization: `Bearer ${docScopedToken(fx!, TENANT_ID, DOC_ID, ['*'], 'alice')}` } },
+        {
+          headers: {
+            Authorization: `Bearer ${docScopedToken(fx!, TENANT_ID, DOC_ID, ['*'], 'alice')}`,
+          },
+        },
       );
       expect(download.status).toBe(200);
       expect(download.headers.get('cache-control')).toContain('immutable');
@@ -176,12 +185,19 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
       ]);
 
       // The catalog: version 2 descends from version 1.
-      const versions = await fetchJson<{ head: string; versions: Array<{ sha256: string; number: number; parentSha256: string | null; producer: string }> }>(
-        `/v1/docs/${DOC_ID}/versions`,
-        'alice',
-      );
+      const versions = await fetchJson<{
+        head: string;
+        versions: Array<{
+          sha256: string;
+          number: number;
+          parentSha256: string | null;
+          producer: string;
+        }>;
+      }>(`/v1/docs/${DOC_ID}/versions`, 'alice');
       expect(versions.head).toBe(result.version.sha256);
-      expect(versions.versions.map((v) => [v.number, v.sha256, v.parentSha256, v.producer])).toEqual([
+      expect(
+        versions.versions.map((v) => [v.number, v.sha256, v.parentSha256, v.producer]),
+      ).toEqual([
         [1, seeded.sha, null, 'upload'],
         [2, result.version.sha256, seeded.sha, 'signature'],
       ]);
@@ -197,7 +213,11 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
         'bob',
       );
       expect(bobManifest.baseSha).toBe(seeded.sha);
-      expect(bobManifest.scopes).toMatchObject({ content: 'layer', metadata: 'layer', layout: 'layer' });
+      expect(bobManifest.scopes).toMatchObject({
+        content: 'layer',
+        metadata: 'layer',
+        layout: 'layer',
+      });
       expect(
         await errorCode(bob.doc.signatures!.prepare({ field: { kind: 'fqn', name: 'sig' } })),
       ).toBe(EngineErrorCode.StaleBase);
@@ -217,7 +237,10 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
       expect(snapshot.protection.certification?.permission).toBe(2);
 
       // A form fill on a P=2 document is permitted; the working copy is judged at the layer URL.
-      await carol.doc.forms.setValue({ kind: 'fqn', name: 'group.total' }, { type: 'text', value: 'carol' });
+      await carol.doc.forms.setValue(
+        { kind: 'fqn', name: 'group.total' },
+        { type: 'text', value: 'carol' },
+      );
       const analysis = await carol.doc.signatures!.analyze({ since: { signatureIndex: 0 } });
       expect(analysis.basis.source).toBe('working-copy');
       expect(analysis.verdict).toBe('permitted');
@@ -236,7 +259,7 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
     // A second document so this test owns its head.
     const docId = 'cloud-signatures-doc-2';
     const seeded2 = await seedDocumentFromBytes(fx!, TENANT_ID, docId, fixturePath, 1);
-    const engine = createCloudEngine({
+    const engine = cloudEngine({
       baseUrl: fx!.baseUrl,
       token: docScopedToken(fx!, TENANT_ID, docId, ['*'], 'dave'),
     });
@@ -258,7 +281,10 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
       expect((await doc.signatures!.abort(prepared.signingId)).status).toBe('aborted');
       expect((await doc.signatures!.abort(prepared.signingId)).status).toBe('unknown');
       // Writable again; the aborted candidate is gone for good.
-      await doc.forms.setValue({ kind: 'fqn', name: 'group.total' }, { type: 'text', value: 'dave' });
+      await doc.forms.setValue(
+        { kind: 'fqn', name: 'group.total' },
+        { type: 'text', value: 'dave' },
+      );
       expect(
         await errorCode(
           doc.signatures!.complete({
@@ -279,9 +305,17 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
         profile: profileFor(again.subFilter as SignatureSubFilter),
         signer,
       });
-      const completed = await doc.signatures!.complete({ signingId: again.signingId, cms, expectedVersion: again.expectedVersion });
+      const completed = await doc.signatures!.complete({
+        signingId: again.signingId,
+        cms,
+        expectedVersion: again.expectedVersion,
+      });
       expect(completed.status).toBe('completed');
-      const replay = await doc.signatures!.complete({ signingId: again.signingId, cms, expectedVersion: again.expectedVersion });
+      const replay = await doc.signatures!.complete({
+        signingId: again.signingId,
+        cms,
+        expectedVersion: again.expectedVersion,
+      });
       expect(replay.status).toBe('already-completed');
       expect(replay.version).toEqual(completed.version);
       expect(
@@ -295,7 +329,9 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
       ).toBe(EngineErrorCode.SignatureRefused);
       expect((await doc.signatures!.abort(again.signingId)).status).toBe('already-completed');
       // A stale fence is refused before any byte is touched.
-      const third = await doc.signatures!.prepare({ field: { kind: 'fqn', name: 'sig' } }).catch((e) => e);
+      const third = await doc
+        .signatures!.prepare({ field: { kind: 'fqn', name: 'sig' } })
+        .catch((e) => e);
       expect(third).toBeInstanceOf(EngineError);
       expect((third as EngineError).code).toBe(EngineErrorCode.SignatureRefused);
     } finally {

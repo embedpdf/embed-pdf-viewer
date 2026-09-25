@@ -15,6 +15,8 @@ export type {
   OpenInputById,
   OpenInputToken,
   OpenInputShare,
+  OpenInputLayerFile,
+  OpenInputLayerFileSource,
   OpenOptions,
   TokenSource,
 } from './dto/OpenInput';

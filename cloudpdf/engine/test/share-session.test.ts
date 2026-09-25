@@ -18,7 +18,7 @@ import {
 import { buildAppForTesting } from '../../server/src/app/buildApp';
 import { createValidTestLicenseGate } from '../../server/src/licensing/testing';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
-import { createCloudEngine } from '../src/index';
+import { cloudEngine } from '../src/index';
 import { exchangeShareToken, shareSessionSource, ShareExchangeError } from '../src/share';
 
 /**
@@ -160,7 +160,7 @@ describe('share sessions (SDK)', () => {
       fetch: browserFetch('https://acme.com', counter),
     });
 
-    const engine = createCloudEngine({ baseUrl: fx.baseUrl });
+    const engine = cloudEngine({ baseUrl: fx.baseUrl });
     try {
       const handle = await engine.open({ kind: 'token', token: source });
       expect(handle.id).toBe('doc-sdk-share');
@@ -182,7 +182,7 @@ describe('share sessions (SDK)', () => {
 
     const counterA = { exchanges: 0 };
     const counterB = { exchanges: 0 };
-    const engine = createCloudEngine({ baseUrl: fx.baseUrl });
+    const engine = cloudEngine({ baseUrl: fx.baseUrl });
     try {
       // Exactly what the viewer's `documents: [{ source: { kind: 'share' } }]`
       // lowering produces: one exchanging source per entry, opened as a batch.
@@ -244,7 +244,7 @@ describe('share sessions (SDK)', () => {
     // (fetchImpl + baseUrl) into the exchange. No engine-level token:
     // the anonymous-engine embed scenario.
     const counter = { exchanges: 0 };
-    const engine = createCloudEngine({
+    const engine = cloudEngine({
       baseUrl: fx.baseUrl,
       fetch: browserFetch('https://acme.com', counter),
     });
@@ -265,7 +265,7 @@ describe('share sessions (SDK)', () => {
       password: 'open-sesame',
     });
 
-    const engine = createCloudEngine({
+    const engine = cloudEngine({
       baseUrl: fx.baseUrl,
       fetch: browserFetch('https://acme.com'),
     });
@@ -296,7 +296,7 @@ describe('share sessions (SDK)', () => {
   });
 
   test("open({ kind: 'share' }) maps unknown grants to NotFound", async () => {
-    const engine = createCloudEngine({
+    const engine = cloudEngine({
       baseUrl: fx.baseUrl,
       fetch: browserFetch('https://acme.com'),
     });

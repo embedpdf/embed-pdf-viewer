@@ -1,5 +1,5 @@
 /**
- * E8 on the cloud (annotation transfer plan §6): an import and an export as
+ * E8 on the cloud (the annotation transfer benchmarks): an import and an export as
  * one request each against a server on localhost, what the import writes to
  * storage, and the two largest default limits over HTTP. Env-gated
  * (`EPDF_TRANSFER_BENCH=1`); prints tables and asserts only that each run
@@ -23,7 +23,7 @@ import {
   png,
   timed,
 } from '../../../packages/engine/main/test/helpers/transferBench';
-import { createCloudEngine } from '../src/index';
+import { cloudEngine } from '../src/index';
 import {
   buildDbSeededFixture,
   seedDocumentFromBytes,
@@ -90,7 +90,7 @@ async function onTheServer(
   await writeFile(path, base);
   const id = `e8-${++seeded}`;
   await seedDocumentFromBytes(fx, TENANT_ID, id, path, pageCount);
-  const engine = createCloudEngine({ baseUrl: fx.baseUrl, token: tenantToken(fx, TENANT_ID) });
+  const engine = cloudEngine({ baseUrl: fx.baseUrl, token: tenantToken(fx, TENANT_ID) });
   try {
     const doc = await engine.open({ kind: 'id', id });
     const before = await sizeOf(fx.storageRoot);

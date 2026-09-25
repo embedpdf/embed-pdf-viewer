@@ -5,7 +5,7 @@ import {
   runAnnotationTransferConformance,
   type ConformanceTestRunner,
 } from '@embedpdf/engine-core/conformance';
-import { createCloudEngine } from '../src/index';
+import { cloudEngine } from '../src/index';
 import {
   buildDbSeededFixture,
   seedDocumentFromBytes,
@@ -69,7 +69,7 @@ runAnnotationTransferConformance(runner, {
   label: 'cloud engine (HTTP -> @cloudpdf/server, native runtime)',
   makeEngine: () => {
     if (!fx) throw new Error('fixture not initialised');
-    return createCloudEngine({ baseUrl: fx.baseUrl, token: tenantToken(fx, TENANT_ID) });
+    return cloudEngine({ baseUrl: fx.baseUrl, token: tenantToken(fx, TENANT_ID) });
   },
   fixtures: Object.keys(fixtures),
   // Each round trip opens its own copies: it writes to both documents.

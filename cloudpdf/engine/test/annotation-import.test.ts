@@ -14,7 +14,7 @@ import {
   runAnnotationImportConformance,
   type ConformanceTestRunner,
 } from '@embedpdf/engine-core/conformance';
-import { createCloudEngine } from '../src/index';
+import { cloudEngine } from '../src/index';
 import {
   buildDbSeededFixture,
   docScopedToken,
@@ -68,7 +68,7 @@ runAnnotationImportConformance(runner, {
   label: 'cloud engine (HTTP -> @cloudpdf/server, native runtime)',
   makeEngine: () => {
     if (!fx) throw new Error('fixture not initialised');
-    return createCloudEngine({ baseUrl: fx.baseUrl, token: tenantToken(fx, TENANT_ID) });
+    return cloudEngine({ baseUrl: fx.baseUrl, token: tenantToken(fx, TENANT_ID) });
   },
   // Each test opens its own copies: the tests write to their documents.
   open: async (engine, fixture) => {
@@ -93,7 +93,7 @@ describe('annotation import on the cloud engine', () => {
 
   test('a retry under the same opId applies once and returns the same result', async () => {
     if (!fx) throw new Error('fixture not initialised');
-    const engine = createCloudEngine({ baseUrl: fx.baseUrl, token: tenantToken(fx, TENANT_ID) });
+    const engine = cloudEngine({ baseUrl: fx.baseUrl, token: tenantToken(fx, TENANT_ID) });
     const sourceId = `replay-source-${++opened}`;
     const targetId = `replay-target-${++opened}`;
     await seedDocumentFromBytes(fx, TENANT_ID, sourceId, fixtures.authoring, 1);
@@ -129,15 +129,15 @@ describe('annotation import on the cloud engine', () => {
     const sourceId = `remote-source-${++opened}`;
     await seedDocumentFromBytes(fx, TENANT_ID, docId, fixtures.authoring, 1);
     await seedDocumentFromBytes(fx, TENANT_ID, sourceId, fixtures.authoring, 1);
-    const engineA = createCloudEngine({
+    const engineA = cloudEngine({
       baseUrl: fx.baseUrl,
       token: docScopedToken(fx, TENANT_ID, docId),
     });
-    const engineB = createCloudEngine({
+    const engineB = cloudEngine({
       baseUrl: fx.baseUrl,
       token: docScopedToken(fx, TENANT_ID, docId),
     });
-    const engineSource = createCloudEngine({
+    const engineSource = cloudEngine({
       baseUrl: fx.baseUrl,
       token: tenantToken(fx, TENANT_ID),
     });
@@ -217,7 +217,7 @@ describe('the server holds the bundle limits while the request streams in', () =
 
   test('refuses each limit with PayloadTooLarge naming it, and writes nothing', async () => {
     if (!small) throw new Error('fixture not initialised');
-    const engine = createCloudEngine({
+    const engine = cloudEngine({
       baseUrl: small.baseUrl,
       token: tenantToken(small, TENANT_ID),
     });

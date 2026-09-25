@@ -3,6 +3,7 @@ import {
   EngineError,
   EngineErrorCode,
   type SerializedEngineError,
+  type TokenSource,
 } from '@embedpdf/engine-core/runtime';
 import {
   applyCdnAccess,
@@ -20,7 +21,7 @@ export interface HttpClientOptions {
    * scenario where the doc-scoped token is provided per-`open` and
    * the engine itself has no engine-level credentials.
    */
-  token?: string | (() => string | Promise<string>);
+  token?: TokenSource;
   /**
    * Engine-instance session id, sent as `X-Engine-Session-Id` on every
    * request. The server stores it on mutation audit rows so this

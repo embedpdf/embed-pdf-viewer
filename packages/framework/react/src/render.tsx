@@ -95,7 +95,7 @@ export function RenderLayer({ annotations = true, tiles = true }: RenderLayerPro
           includeAnnotations: annotations,
           signal: controller.signal,
         });
-        const obj = await image.objectUrl(controller.signal);
+        const obj = await image.objectUrl().abortWith(controller.signal);
         if (controller.signal.aborted) {
           obj.revoke();
           return;

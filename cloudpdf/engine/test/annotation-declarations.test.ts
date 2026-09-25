@@ -5,7 +5,7 @@ import {
   runAnnotationDeclarationConformance,
   type ConformanceTestRunner,
 } from '@embedpdf/engine-core/conformance';
-import { createCloudEngine } from '../src/index';
+import { cloudEngine } from '../src/index';
 import {
   buildDbSeededFixture,
   seedDocumentFromBytes,
@@ -72,6 +72,6 @@ runAnnotationDeclarationConformance(runner, {
   documents: [cloudFixture('annotations-pdf'), cloudFixture('measure-acrobat-metric')],
   makeEngine: () => {
     if (!fx) throw new Error('fixture not initialised');
-    return createCloudEngine({ baseUrl: fx.baseUrl, token: tenantToken(fx, TENANT_ID) });
+    return cloudEngine({ baseUrl: fx.baseUrl, token: tenantToken(fx, TENANT_ID) });
   },
 });

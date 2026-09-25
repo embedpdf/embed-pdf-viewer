@@ -21,15 +21,10 @@ export const EngineErrorCode = {
   WireFormat: 'WireFormat',
   RuntimeUnavailable: 'RuntimeUnavailable',
   /**
-   * Annotation/page reference could not be resolved. Surfaced when:
-   *   - `AnnotationRef.kind === 'objectNumber'` but the document has no
-   *     annotation with that indirect object number on the addressed page
-   *   - `AnnotationRef.kind === 'nm'` but no annotation on the page has
-   *     that `/NM`
-   *   - `AnnotationRef.kind === 'index'` but the supplied `RevisionToken`
-   *     does not match the current per-page generation
-   *   - `AnnotationRef.kind === 'index'` but `index` is out of range for
-   *     the page's current annotation count
+   * A position (index) ref no longer points where it did: its
+   * `RevisionToken` doesn't match the page's current generation, or its
+   * `index` is out of range. A ref by object number or `/NM` that finds
+   * nothing is `NotFound`, like any other missing thing.
    */
   InvalidReference: 'InvalidReference',
   /**
@@ -94,8 +89,9 @@ export const EngineErrorCode = {
   SignatureRefused: 'SignatureRefused',
   /**
    * A signature already in the document forbids this change (a
-   * certification's permission, a FieldMDP or `/Lock`, or the approval
-   * baseline). The message names the signature and the restriction. The
+   * certification's permission, or a FieldMDP or `/Lock`; the approval
+   * baseline is judged, never refused). The message names the signature and
+   * the restriction. The
    * engine option `signedDocumentPolicy: 'permit'` disables the guard.
    */
   ProtectedDocument: 'ProtectedDocument',

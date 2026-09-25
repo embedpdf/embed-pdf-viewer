@@ -9,7 +9,7 @@ import {
   type ScriptInput,
 } from '../../../packages/core/acrojs/src';
 import { createQuickJsSandbox } from '../../../packages/core/js-sandbox/src';
-import { createCloudEngine } from '../src/index';
+import { cloudEngine } from '../src/index';
 import {
   buildDbSeededFixture,
   seedDocumentFromBytes,
@@ -93,7 +93,7 @@ runFormConformance(runner, {
   },
   makeEngine: () => {
     if (!fx) throw new Error('fixture not initialised');
-    return createCloudEngine({
+    return cloudEngine({
       baseUrl: fx.baseUrl,
       token: tenantToken(fx, TENANT_ID),
     });
@@ -110,7 +110,7 @@ function sameRef(left: FormFieldRef, right: FormFieldRef): boolean {
 
 test('dynamic-stamp scripts feed the cloud effects sink and persist in its layer', async () => {
   if (!fx) throw new Error('fixture not initialised');
-  const engine = createCloudEngine({
+  const engine = cloudEngine({
     baseUrl: fx.baseUrl,
     token: tenantToken(fx, TENANT_ID),
   });

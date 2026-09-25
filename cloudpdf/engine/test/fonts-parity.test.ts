@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { createCloudEngine } from '../src/index';
+import { cloudEngine } from '../src/index';
 
 /**
  * The local-vs-cloud font split is a deliberate product decision: fallback
@@ -11,7 +11,7 @@ import { createCloudEngine } from '../src/index';
  */
 describe('cloud engine font parity', () => {
   test('does not expose a fonts service', () => {
-    const engine = createCloudEngine({ baseUrl: 'http://localhost' });
+    const engine = cloudEngine({ baseUrl: 'http://localhost' });
     expect(engine.fonts).toBeUndefined();
   });
 });

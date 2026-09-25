@@ -20,8 +20,9 @@ const DEFAULT_OPACITY = 1;
 
 /**
  * Apply a text (sticky-note) draft. The visual is entirely generator-owned:
- * the mutator's closing `regenerateAppearance` bakes the 20×20 note icon
- * from `/C` + `/Name` (GenerateTextAP), so this writer only records state.
+ * the closing appearance pass (`generateAppearance`) bakes the 20×20 note
+ * icon from `/C` + `/Name` (GenerateTextAP), so this writer only records
+ * state.
  * `/State` + `/StateModel` are dictionary-only (ISO 32000 §12.5.6.3) and
  * never reach the generator.
  */

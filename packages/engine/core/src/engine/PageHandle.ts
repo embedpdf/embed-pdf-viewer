@@ -13,12 +13,6 @@ import type { PageRef } from '../identity/PageRef';
  */
 export interface PageHandle {
   readonly ref: PageRef;
-  /**
-   * Display index at the time this handle was minted. The engine refreshes
-   * this on every annotation/list call against the live `PageRecord`, but
-   * callers should treat it as advisory metadata only.
-   */
-  readonly pageIndex: number;
   readonly annotations: PageAnnotationsService;
   readonly text: PageTextService;
   readonly geometry: PageGeometryService;
@@ -29,5 +23,5 @@ export interface PageHandle {
    * omits it until a cloud consumer ships (the `downloadLayer?` pattern).
    */
   readonly pieceInfo?: PieceInfoService;
-  readonly measure?: PageMeasureService;
+  readonly measure: PageMeasureService;
 }

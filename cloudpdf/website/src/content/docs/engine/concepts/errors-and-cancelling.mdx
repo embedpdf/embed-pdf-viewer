@@ -71,8 +71,19 @@ try {
 }
 ```
 
-To cancel together with something else that uses `AbortSignal` (a `fetch`, a framework's
-cleanup), use the promise's own `signal`, or call `abort()` from the other signal's `abort` event.
+When the rest of your code cancels with an `AbortController` (a `fetch`, a framework's cleanup),
+tie the call to its signal with `abortWith()`:
+
+```ts
+const controller = new AbortController();
+
+const image = await page.render.image().abortWith(controller.signal);
+
+// later, in your cleanup:
+controller.abort();
+```
+
+The call is cancelled when the signal aborts, or at once if it already has.
 
 ## Error codes
 

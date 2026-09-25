@@ -9,8 +9,9 @@ import {
   type DocCapability,
   type Identity,
   type PdfBits,
+  PermissionDenied,
 } from '@embedpdf/engine-core/runtime';
-import { checkResourceAccess, type DocResourceId } from '@embedpdf/engine-core/wire';
+import { checkResourceAccess, DOC_RESOURCES, type DocResourceId } from '@embedpdf/engine-core/wire';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 // checkResourceAccess + DocResourceId live in /wire (resource descriptor
 // table is HTTP-wire surface, used by route guards on every read endpoint).
@@ -477,7 +478,7 @@ export function requireCapability(
   const ctx = requireDocAccessOnly(req, docId);
   if (ctx.mode === 'tenant') return ctx;
   if (!checkCapability(capability, ctx.jwt.scope, pdfBits)) {
-    throwForbidden(`capability required: ${capability}`);
+    throw new PermissionDenied(capability);
   }
   return ctx;
 }
@@ -496,7 +497,7 @@ export function requireAnyCapability(
   const ctx = requireDocAccessOnly(req, docId);
   if (ctx.mode === 'tenant') return ctx;
   if (!checkAnyCapability(capabilities, ctx.jwt.scope, pdfBits)) {
-    throwForbidden(`one of: ${capabilities.join(', ')}`);
+    throw new PermissionDenied(capabilities[0] ?? 'doc.open', undefined, capabilities);
   }
   return ctx;
 }
@@ -516,7 +517,7 @@ export function requireResource(
   const ctx = requireDocAccessOnly(req, docId);
   if (ctx.mode === 'tenant') return ctx;
   if (!checkResourceAccess(resourceId, ctx.jwt.scope, pdfBits)) {
-    throwForbidden(`resource access denied: ${resourceId}`);
+    throwResourceDenied(resourceId, ctx.jwt.scope, pdfBits);
   }
   return ctx;
 }
@@ -537,7 +538,7 @@ export function requireCollabAction(
   const ctx = requireDocAccessOnly(req, docId);
   if (ctx.mode === 'tenant') return ctx;
   if (!checkCollab(action, target, ctx.jwt.scope, ctx.jwt.identity, pdfBits)) {
-    throwForbidden(`annotations:${action} denied for target`);
+    throw new PermissionDenied(`annotations:${action}`, 'target');
   }
   return ctx;
 }
@@ -679,11 +680,21 @@ function enforceLayerPin(req: FastifyRequest, layerName: string): void {
   }
 }
 
-function throwForbidden(message: string): never {
-  const err = new Error(message) as Error & { code: string; status: number };
-  err.code = 'Forbidden';
-  err.status = 403;
-  throw err;
+/** A resource the scope doesn't grant, naming what it needs as a local refusal does. */
+function throwResourceDenied(
+  resourceId: DocResourceId,
+  scope: ReadonlyArray<string>,
+  pdfBits: PdfBits,
+): never {
+  const { requirement } = DOC_RESOURCES[resourceId];
+  if (requirement.kind === 'single') throw new PermissionDenied(requirement.capability, resourceId);
+  const capabilities = requirement.capabilities;
+  if (requirement.kind === 'any') {
+    throw new PermissionDenied(capabilities[0] ?? 'doc.open', resourceId, capabilities);
+  }
+  // All of them: name the first one the scope lacks.
+  const missing = capabilities.find((cap) => !checkCapability(cap, scope, pdfBits));
+  throw new PermissionDenied(missing ?? capabilities[0] ?? 'doc.open', resourceId);
 }
 
 /**

@@ -21,14 +21,8 @@ import { AbortablePromise } from '../promise/AbortablePromise';
 /**
  * Per-page annotation service exposed via `PageHandle.annotations`.
  *
- * `list()` is the slow path: the engine acquires a `pagePtr` from the
- * `PagePtrPool`, dispatches per-subtype readers, and returns
- * fully-typed annotations. Mutations all funnel through this service
- * because they need a `pagePtr` anyway.
- *
- * Mutation methods are typed in this slice but throw
- * `EngineError(NotImplemented)` until the next slice. The signatures are
- * stable so client code can be written against them today.
+ * `list()` returns the page's fully typed annotations; every annotation
+ * write of one page goes through this service.
  */
 export interface PageAnnotationsService {
   list(): AbortablePromise<AnnotationListPageSnapshot>;
@@ -110,9 +104,8 @@ export interface PageAnnotationsService {
    * `annotations.flattened` event is published when anything was applied.
    * Gated like `pages.flatten` (`doc.pages.modify` + `doc.annotate.modify`).
    * `InvalidArg` for a ref on another page; `NotFound` for an unknown ref.
-   * Optional while transports ship — feature-detect.
    */
-  flatten?(
+  flatten(
     refs: AnnotationRef[],
     usage?: PageFlattenUsage,
   ): AbortablePromise<AnnotationFlattenResult>;
@@ -125,7 +118,7 @@ export interface PageAnnotationsService {
    * derived read that egresses content, so it is gated by `doc.download`
    * like `pages.extract`. All-or-nothing: `InvalidArg` when any ref is not
    * on this page, hidden, or has no appearance (a stamp silently missing a
-   * part would be worse than an error). Optional — feature-detect.
+   * part would be worse than an error).
    */
-  exportAppearance?(refs: AnnotationRef[]): AbortablePromise<Uint8Array>;
+  exportAppearance(refs: AnnotationRef[]): AbortablePromise<Uint8Array>;
 }

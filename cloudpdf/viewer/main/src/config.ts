@@ -87,7 +87,6 @@ export function resolveCloudConfig<T extends CloudSource>(options: T) {
   const {
     baseUrl,
     token,
-    sessionId,
     fetch: fetchFn,
     docToken,
     docId,
@@ -97,7 +96,7 @@ export function resolveCloudConfig<T extends CloudSource>(options: T) {
     ...rest
   } = options;
 
-  const engine: EngineFactory = () => cloudEngine({ baseUrl, token, sessionId, fetch: fetchFn });
+  const engine: EngineFactory = () => cloudEngine({ baseUrl, token, fetch: fetchFn });
 
   const initialDocuments: InitialDocument[] = documents ?? [
     ...(docToken !== undefined ? [{ source: { kind: 'token' as const, token: docToken } }] : []),

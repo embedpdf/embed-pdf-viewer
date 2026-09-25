@@ -2,7 +2,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { toPageRef, type DocumentEvent, type HighlightDraft } from '@embedpdf/engine-core/runtime';
-import { createCloudEngine } from '../src/index';
+import { cloudEngine } from '../src/index';
 import {
   buildDbSeededFixture,
   docScopedToken,
@@ -56,11 +56,11 @@ afterAll(async () => {
 describe('remote events: two engines, one document (the collaboration loop)', () => {
   test("A mutates → B receives kind:'remote' with A's payload; A gets NO echo", async () => {
     if (!fx) throw new Error('fixture not initialised');
-    const engineA = createCloudEngine({
+    const engineA = cloudEngine({
       baseUrl: fx.baseUrl,
       token: docScopedToken(fx, TENANT_ID, DOC_ID),
     });
-    const engineB = createCloudEngine({
+    const engineB = cloudEngine({
       baseUrl: fx.baseUrl,
       token: docScopedToken(fx, TENANT_ID, DOC_ID),
     });
@@ -119,11 +119,11 @@ describe('remote events: two engines, one document (the collaboration loop)', ()
 
   test('B mutates back: the channel is symmetric', async () => {
     if (!fx) throw new Error('fixture not initialised');
-    const engineA = createCloudEngine({
+    const engineA = cloudEngine({
       baseUrl: fx.baseUrl,
       token: docScopedToken(fx, TENANT_ID, DOC_ID),
     });
-    const engineB = createCloudEngine({
+    const engineB = cloudEngine({
       baseUrl: fx.baseUrl,
       token: docScopedToken(fx, TENANT_ID, DOC_ID),
     });

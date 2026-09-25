@@ -90,7 +90,7 @@ export class EpdfRenderLayer {
               includeAnnotations,
               signal: controller.signal,
             });
-            const objectUrl = await image.objectUrl(controller.signal);
+            const objectUrl = await image.objectUrl().abortWith(controller.signal);
             if (controller.signal.aborted) {
               objectUrl.revoke();
               return;

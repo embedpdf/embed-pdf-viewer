@@ -36,7 +36,7 @@ export interface FormRepairOptions {
  * fields hold the values and widget annotations are their page-scoped
  * views. Filling mutates the field plane; rendering only ever reads the
  * widget plane (through the annotation subsystem — join widgets to
- * annotations via `FormFieldWidget.annotObjectNumber`).
+ * annotations via `FormWidget.annotObjectNumber`).
  *
  * Reads are gated by `doc.forms.read`, value writes and imports by
  * `doc.forms.fill`, and repair by `doc.forms.modify`. On layer documents
@@ -79,7 +79,7 @@ export interface DocumentFormsService {
    * after a post-preflight internal failure the remaining effects are marked
    * skipped and any landed state is finalized as one artifact/event/version.
    */
-  applyEffects?(effects: FormEffect[]): AbortablePromise<FormEffectsResult>;
+  applyEffects(effects: FormEffect[]): AbortablePromise<FormEffectsResult>;
 
   /**
    * Deliver a resolved form submission to the document's home. Present only
@@ -135,10 +135,9 @@ export interface DocumentFormsService {
    * Draw a PDF page into every widget of an unsigned signature field — the
    * visual "sign" of a viewer that has no signer. The field's value stays
    * empty and nothing is sealed; a signed field is refused. Gated by
-   * `doc.forms.fill`. Emits `form.fieldUpdated`. Absent on engines that
-   * cannot draw appearances.
+   * `doc.forms.fill`. Emits `form.fieldUpdated`.
    */
-  setSignatureAppearance?(
+  setSignatureAppearance(
     ref: FormFieldRef,
     appearance: SignatureAppearanceInput,
   ): AbortablePromise<FormFieldUpdateResult>;

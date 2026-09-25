@@ -873,7 +873,7 @@ export function AnnotationLayer({ renderers }: AnnotationLayerProps = {}) {
           // converted to content space by the plugin — never a recomputed bound.
           const box = anno.pdfToPageRect(page.ref, ap.rect);
           if (!box) continue;
-          const obj = await ap.image.objectUrl(controller.signal);
+          const obj = await ap.image.objectUrl().abortWith(controller.signal);
           if (controller.signal.aborted) {
             obj.revoke();
             return;

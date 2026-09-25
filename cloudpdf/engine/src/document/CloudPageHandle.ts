@@ -24,7 +24,6 @@ export class CloudPageHandle implements PageHandle {
 
   constructor(
     readonly ref: PageRef,
-    readonly pageIndex: number,
     http: HttpClient,
     docId: string,
     layerName: string,

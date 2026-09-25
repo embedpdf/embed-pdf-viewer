@@ -223,7 +223,9 @@ describe.each(['wasm', 'native'] as const)(
           ['EPDFAnnot_SetLinkedAnnot', 1],
           ['FPDFAnnot_SetStringValue', count, (args) => args[1] === 'CreationDate'],
           ['FPDFAnnot_GetSubtype', count],
-          ...(attribution === 'restore' ? ([['FPDFAttachment_SetStringValue', 1]] as const) : []),
+          ...(attribution === 'restore'
+            ? [['FPDFAttachment_SetStringValue', 1] as [string, number]]
+            : []),
         ];
         for (const [name, at, when] of faults) {
           const what = `${attribution}: ${name} #${at}`;

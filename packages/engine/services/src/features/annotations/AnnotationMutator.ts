@@ -378,12 +378,12 @@ export class AnnotationMutator {
         case 'objectNumber': {
           // Probe so we 404 honestly before mutating. The fork helper
           // does its own existence check too, but we want a clean
-          // InvalidReference up front rather than a "false" return code
-          // we'd have to translate.
+          // NotFound up front rather than a "false" return code we'd have
+          // to translate.
           const probe = fn.EPDFPage_GetAnnotByObjectNumber(pagePtr, ref.annotObjectNumber);
           if (!probe) {
             throw new EngineError(
-              EngineErrorCode.InvalidReference,
+              EngineErrorCode.NotFound,
               `no annotation with object number ${ref.annotObjectNumber} on page ${ref.page.pageObjectNumber}`,
             );
           }
@@ -403,7 +403,7 @@ export class AnnotationMutator {
             const probe = fn.EPDFPage_GetAnnotByName(pagePtr, namePtr);
             if (!probe) {
               throw new EngineError(
-                EngineErrorCode.InvalidReference,
+                EngineErrorCode.NotFound,
                 `no annotation with /NM '${ref.nm}' on page ${ref.page.pageObjectNumber}`,
               );
             }

@@ -14,7 +14,7 @@ export type DocCapability =
   // Text/content extraction (PDF bit 5)
   | 'doc.text.select' // /pages/*/geometry
   | 'doc.text.copy' // /pages/*/text
-  | 'doc.text.search' // reserved for future /pages/*/search@*
+  | 'doc.text.search' // doc.search.query (match positions; snippets also need doc.text.copy)
   | 'doc.content.copy' // graphics/image extraction (reserved)
 
   // Output (cloud-only download capabilities)

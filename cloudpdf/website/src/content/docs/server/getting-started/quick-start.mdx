@@ -131,9 +131,9 @@ Your frontend uses [`@cloudpdf/engine`](/docs/engine), pointed at the server
 you just started:
 
 ```ts
-import { createCloudEngine } from '@cloudpdf/engine';
+import { cloudEngine } from '@cloudpdf/engine';
 
-const engine = createCloudEngine({
+const engine = cloudEngine({
   baseUrl: 'http://localhost:3000',
   token: () => getDocToken(), // doc-scoped JWT minted by your backend
 });

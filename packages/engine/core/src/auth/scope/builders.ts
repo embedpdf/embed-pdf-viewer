@@ -40,6 +40,7 @@ export const caps = {
       read: () => 'doc.forms.read' as const,
       fill: () => 'doc.forms.fill' as const,
       modify: () => 'doc.forms.modify' as const,
+      submit: () => 'doc.forms.submit' as const,
     },
     annotate: {
       read: () => 'doc.annotate.read' as const,
@@ -53,6 +54,9 @@ export const caps = {
       modify: () => 'doc.attachments.modify' as const,
     },
     redact: () => 'doc.redact' as const,
+    sign: Object.assign(() => 'doc.sign' as const, {
+      certify: () => 'doc.sign.certify' as const,
+    }),
   },
 } as const;
 

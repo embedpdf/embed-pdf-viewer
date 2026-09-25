@@ -47,8 +47,8 @@ export function preflightFileAttachmentDraft(
  *      Size/CheckSum/CreationDate), the MIME type via
  *      `EPDFAttachment_SetSubtype`, optional `/Desc`.
  *
- * The icon appearance itself is generator-owned: the mutator's closing
- * `regenerateAppearance` bakes it from `/C` + `/Name`
+ * The icon appearance itself is generator-owned: the closing appearance pass
+ * (`generateAppearance`) bakes it from `/C` + `/Name`
  * (GenerateFileAttachmentAP), exactly like the text note.
  */
 export function applyFileAttachmentDraft(

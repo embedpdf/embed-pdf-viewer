@@ -248,3 +248,45 @@ describe('materialize-vs-resolver parity (CRITICAL: keep in sync)', () => {
     expect(fromMaterialize).toEqual(fromExpand);
   });
 });
+
+describe('caps — covers every capability', () => {
+  it('has a builder for each one the scope grammar knows', () => {
+    // A Record over the union: a capability added to DocCapability without an
+    // entry here fails to compile, and one without a builder fails below.
+    const every: Record<DocCapability, true> = {
+      'doc.open': true,
+      'doc.render': true,
+      'doc.text.select': true,
+      'doc.text.copy': true,
+      'doc.text.search': true,
+      'doc.content.copy': true,
+      'doc.download': true,
+      'doc.download.flattened': true,
+      'doc.print': true,
+      'doc.print.high': true,
+      'doc.pages.modify': true,
+      'doc.pages.assemble': true,
+      'doc.forms.read': true,
+      'doc.forms.fill': true,
+      'doc.forms.modify': true,
+      'doc.forms.submit': true,
+      'doc.annotate.read': true,
+      'doc.annotate.modify': true,
+      'doc.annotate.import': true,
+      'doc.metadata.modify': true,
+      'doc.attachments.modify': true,
+      'doc.redact': true,
+      'doc.sign': true,
+      'doc.sign.certify': true,
+    };
+    const built = new Set<string>();
+    const walk = (node: unknown): void => {
+      if (typeof node === 'function') built.add((node as () => string)());
+      if (node && (typeof node === 'object' || typeof node === 'function')) {
+        for (const child of Object.values(node)) walk(child);
+      }
+    };
+    walk(caps);
+    expect([...built].sort()).toEqual(Object.keys(every).sort());
+  });
+});

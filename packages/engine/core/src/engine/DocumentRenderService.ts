@@ -1,6 +1,7 @@
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { PageRenderViewport } from '../dto/PageRender';
+import type { AbortablePromise } from '../promise/AbortablePromise';
 
 /**
  * The engine's render-parameter policy.
@@ -62,7 +63,7 @@ export const CONTINUOUS_RENDER_POLICY: EngineRenderPolicy = { kind: 'continuous'
  * carries policy, not pixels.
  */
 export interface DocumentRenderService {
-  policy(): Promise<EngineRenderPolicy>;
+  policy(): AbortablePromise<EngineRenderPolicy>;
 }
 
 /**

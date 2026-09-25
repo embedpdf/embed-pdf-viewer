@@ -2,7 +2,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { snapAppearanceScale, snapFullPageViewport } from '@embedpdf/engine-core/runtime';
-import { createCloudEngine } from '../src/index';
+import { cloudEngine } from '../src/index';
 import {
   buildDbSeededFixture,
   docScopedToken,
@@ -39,7 +39,7 @@ afterAll(async () => {
 
 describe('doc.render.policy (cloud)', () => {
   test('advertised lattice reaches the handle; snap conforms to it', async () => {
-    const engine = createCloudEngine({
+    const engine = cloudEngine({
       baseUrl: fx!.baseUrl,
       token: docScopedToken(fx!, TENANT_ID, DOC_ID),
     });

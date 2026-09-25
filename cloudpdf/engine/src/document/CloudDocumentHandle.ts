@@ -92,7 +92,6 @@ export class CloudDocumentHandle implements DocumentHandle {
   readonly id: string;
   readonly capabilities = {
     weakAnnotationEditSessions: 'required',
-    pageEditSessions: 'unsupported',
   } as const;
   readonly metadata: CloudMetadataService;
   readonly annotations: DocumentAnnotationsService;
@@ -164,23 +163,25 @@ export class CloudDocumentHandle implements DocumentHandle {
     // A pre-lattice server (no renderPolicy field) enforces nothing:
     // `continuous` is the honest answer.
     this.render = {
-      policy: async () => {
-        const cached = security.currentAccess ?? (await security.establishAccess()).access ?? null;
-        const advertised = cached?.renderPolicy;
-        if (!advertised) return CONTINUOUS_RENDER_POLICY;
-        return {
-          kind: 'lattice',
-          fullPage: { widths: advertised.fullPage.widths },
-          ...(advertised.tiles ? { tiles: advertised.tiles } : {}),
-          ...(advertised.appearances ? { appearances: advertised.appearances } : {}),
-          ...(advertised.maxRenderPixels !== undefined
-            ? { maxRenderPixels: advertised.maxRenderPixels }
-            : {}),
-          formats: advertised.formats,
-          background: advertised.background,
-          enforced: advertised.enforced,
-        };
-      },
+      policy: () =>
+        AbortablePromise.run(async () => {
+          const cached =
+            security.currentAccess ?? (await security.establishAccess()).access ?? null;
+          const advertised = cached?.renderPolicy;
+          if (!advertised) return CONTINUOUS_RENDER_POLICY;
+          return {
+            kind: 'lattice',
+            fullPage: { widths: advertised.fullPage.widths },
+            ...(advertised.tiles ? { tiles: advertised.tiles } : {}),
+            ...(advertised.appearances ? { appearances: advertised.appearances } : {}),
+            ...(advertised.maxRenderPixels !== undefined
+              ? { maxRenderPixels: advertised.maxRenderPixels }
+              : {}),
+            formats: advertised.formats,
+            background: advertised.background,
+            enforced: advertised.enforced,
+          };
+        }),
     };
     const hub = new EventHub();
     this.hub = hub;
@@ -292,7 +293,6 @@ export class CloudDocumentHandle implements DocumentHandle {
   page(ref: PageRef): PageHandle {
     return new CloudPageHandle(
       ref,
-      -1,
       this.http,
       this.id,
       this.layerName,

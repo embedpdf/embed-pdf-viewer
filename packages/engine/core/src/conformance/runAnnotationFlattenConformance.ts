@@ -109,7 +109,7 @@ export function runAnnotationFlattenConformance(
       }
     });
 
-    test('an empty ref list rejects InvalidArg; an unknown ref rejects', async () => {
+    test('an empty ref list rejects InvalidArg; an unknown ref rejects NotFound', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const pageObjectNumber = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
@@ -130,11 +130,7 @@ export function runAnnotationFlattenConformance(
         } catch (error) {
           unknown = error;
         }
-        expect(
-          EngineError.is(unknown, EngineErrorCode.NotFound) ||
-            EngineError.is(unknown, EngineErrorCode.InvalidArg) ||
-            EngineError.is(unknown, EngineErrorCode.InvalidReference),
-        ).toBe(true);
+        expect(EngineError.is(unknown, EngineErrorCode.NotFound)).toBe(true);
       } finally {
         await doc.close();
       }

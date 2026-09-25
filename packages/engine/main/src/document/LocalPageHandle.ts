@@ -22,9 +22,9 @@ interface DocClosedView {
 }
 
 /**
- * Local page handle. `pageIndex` is supplied as advisory metadata when
- * the document handle creates the page handle. The per-page services
- * each own their queue interaction; the handle is otherwise stateless.
+ * Local page handle: the page's address and its services. The per-page
+ * services each own their queue interaction; the handle is otherwise
+ * stateless.
  */
 export class LocalPageHandle implements PageHandle {
   readonly annotations: LocalPageAnnotationsService;
@@ -36,7 +36,6 @@ export class LocalPageHandle implements PageHandle {
 
   constructor(
     readonly ref: PageRef,
-    readonly pageIndex: number,
     docId: string,
     queue: WorkerQueue,
     view: DocClosedView,

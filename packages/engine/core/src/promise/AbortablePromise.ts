@@ -103,7 +103,28 @@ export class AbortablePromise<T, P = never> extends Promise<T> {
   }
 
   /**
+   * Abort this call when `signal` aborts, at once if it already has: the
+   * bridge to code that cancels with an `AbortController` (a framework's
+   * cleanup, a `fetch`). The listener is removed when the call settles.
+   * Returns this promise, so `await call().abortWith(signal)` reads as one.
+   */
+  abortWith(signal: AbortSignal): this {
+    if (signal.aborted) {
+      this.abort(signal.reason);
+      return this;
+    }
+    const onAbort = () => this.abort(signal.reason);
+    signal.addEventListener('abort', onAbort, { once: true });
+    const detach = () => signal.removeEventListener('abort', onAbort);
+    Promise.prototype.then.call(this, detach, detach);
+    return this;
+  }
+
+  /**
    * Subscribe to progress events. Returns an unsubscribe function.
+   *
+   * @internal No engine method reports progress today; this is plumbing for
+   * one that will, typed then per method. Not part of the public contract.
    */
   onProgress(cb: (p: P) => void): () => void {
     this._progressCbs.add(cb);

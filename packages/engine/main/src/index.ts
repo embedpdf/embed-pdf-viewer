@@ -45,22 +45,11 @@ import {
   type WorkerSource,
 } from './wasm-source';
 
-// Re-export the shared engine runtime surface so consumers (and code that
-// must stay engine-flavor-portable, like the docs samples) can name every
-// public document type from `@embedpdf/engine` itself — mirroring the
-// `@cloudpdf/engine` entrypoint — instead of reaching into the transitive
-// `@embedpdf/engine-core` dep.
-export type {
-  Engine,
-  EngineFactory,
-  DocumentHandle,
-  DocumentCapabilities,
-  PageHandle,
-  OpenInput,
-  OpenInputShare,
-  OpenOptions,
-  TokenSource,
-} from '@embedpdf/engine-core/runtime';
+// The developer-facing surface both engine packages share (errors, refs,
+// helpers, the document types), from one list in engine-core, so code names
+// everything from `@embedpdf/engine` exactly as it would from
+// `@cloudpdf/engine`.
+export * from '@embedpdf/engine-core/public';
 export { LocalEngine } from './LocalEngine';
 export type { LocalEngineOptions } from './LocalEngine';
 export type { Transport } from './transport/Transport';

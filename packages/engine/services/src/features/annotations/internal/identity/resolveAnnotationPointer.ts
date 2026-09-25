@@ -14,8 +14,9 @@ import type { DocumentSession } from '../../../../document-session/DocumentSessi
  *   2. `nm`           -> `EPDFPage_GetAnnotByName`
  *   3. `index`        -> revision validation, then `FPDFPage_GetAnnot`
  *
- * Surfaces `InvalidReference` deterministically when the ref doesn't
- * resolve, so mutation paths can fail fast before doing any work.
+ * Fails fast, before any work: `NotFound` when no annotation on the page
+ * has the number or name, `InvalidReference` for an index ref whose page
+ * changed (stale revision, or out of range).
  */
 export function resolveAnnotPtr(
   runtime: PdfRuntimeModule,
@@ -29,7 +30,7 @@ export function resolveAnnotPtr(
       const annotPtr = fn.EPDFPage_GetAnnotByObjectNumber(pagePtr, ref.annotObjectNumber);
       if (!annotPtr) {
         throw new EngineError(
-          EngineErrorCode.InvalidReference,
+          EngineErrorCode.NotFound,
           `no annotation with object number ${ref.annotObjectNumber} on page ${ref.page.pageObjectNumber}`,
         );
       }
@@ -41,7 +42,7 @@ export function resolveAnnotPtr(
         const annotPtr = fn.EPDFPage_GetAnnotByName(pagePtr, namePtr);
         if (!annotPtr) {
           throw new EngineError(
-            EngineErrorCode.InvalidReference,
+            EngineErrorCode.NotFound,
             `no annotation with /NM '${ref.nm}' on page ${ref.page.pageObjectNumber}`,
           );
         }

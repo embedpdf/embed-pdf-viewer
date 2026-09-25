@@ -162,9 +162,9 @@ Hand short-lived tokens to the engine through a **factory**, so they refresh
 transparently as your backend re-issues them:
 
 ```ts
-import { createCloudEngine } from '@cloudpdf/engine';
+import { cloudEngine } from '@cloudpdf/engine';
 
-const engine = createCloudEngine({
+const engine = cloudEngine({
   baseUrl: 'https://pdf.your-app.com',
   token: () => fetchFreshDocToken(), // called on every request
 });

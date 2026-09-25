@@ -18,7 +18,7 @@ import {
 import { buildAppForTesting } from '../../server/src/app/buildApp';
 import { createValidTestLicenseGate } from '../../server/src/licensing/testing';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
-import { createCloudEngine } from '../src/index';
+import { cloudEngine } from '../src/index';
 import { decodeUnverifiedClaims } from '../src/transport/decodeUnverifiedClaims';
 
 /**
@@ -160,7 +160,7 @@ describe('cloud engine — open({ kind: "token", token })', () => {
     const tenantId = 'tenant-open-token';
     const docId = 'docopen001';
     await seedDocument(fx, tenantId, docId, { pageCount: 5 });
-    const engine = createCloudEngine({ baseUrl: fx.baseUrl });
+    const engine = cloudEngine({ baseUrl: fx.baseUrl });
 
     const handle = await engine.open({
       kind: 'token',
@@ -173,7 +173,7 @@ describe('cloud engine — open({ kind: "token", token })', () => {
     const tenantId = 'tenant-multi';
     await seedDocument(fx, tenantId, 'docmulti01', { pageCount: 2 });
     await seedDocument(fx, tenantId, 'docmulti02', { pageCount: 7 });
-    const engine = createCloudEngine({ baseUrl: fx.baseUrl });
+    const engine = cloudEngine({ baseUrl: fx.baseUrl });
 
     // Opening with two distinct doc-scoped tokens concurrently. If
     // the engine were carrying a single shared bearer (the pre-fix
@@ -195,7 +195,7 @@ describe('cloud engine — open({ kind: "token", token })', () => {
     const docId = 'docasync22';
     await seedDocument(fx, tenantId, docId);
     let calls = 0;
-    const engine = createCloudEngine({ baseUrl: fx.baseUrl });
+    const engine = cloudEngine({ baseUrl: fx.baseUrl });
     const h = await engine.open({
       kind: 'token',
       token: async () => {
@@ -213,7 +213,7 @@ describe('cloud engine — open({ kind: "token", token })', () => {
       tenant_id: 'tenant-x',
       scope: ['docs.read'],
     });
-    const engine = createCloudEngine({ baseUrl: fx.baseUrl });
+    const engine = cloudEngine({ baseUrl: fx.baseUrl });
     await expect(engine.open({ kind: 'token', token: noDocIdTok })).rejects.toMatchObject({
       name: 'EngineError',
       code: EngineErrorCode.InvalidArg,
@@ -221,14 +221,14 @@ describe('cloud engine — open({ kind: "token", token })', () => {
   });
 
   test('a malformed token is rejected before any HTTP call is issued', async () => {
-    const engine = createCloudEngine({ baseUrl: fx.baseUrl });
+    const engine = cloudEngine({ baseUrl: fx.baseUrl });
     await expect(engine.open({ kind: 'token', token: 'not.a.jwt' })).rejects.toBeInstanceOf(
       EngineError,
     );
   });
 
   test('server-side 404 surfaces when the token references a doc that does not exist', async () => {
-    const engine = createCloudEngine({ baseUrl: fx.baseUrl });
+    const engine = cloudEngine({ baseUrl: fx.baseUrl });
     await expect(
       engine.open({
         kind: 'token',
@@ -241,7 +241,7 @@ describe('cloud engine — open({ kind: "token", token })', () => {
     const tenantId = 'tenant-scope';
     const docId = 'docscope01';
     await seedDocument(fx, tenantId, docId);
-    const engine = createCloudEngine({ baseUrl: fx.baseUrl });
+    const engine = cloudEngine({ baseUrl: fx.baseUrl });
     // Doc token with only `doc.annotate.read` cannot hit /head (which
     // requires `doc.open`). The server's doc-access guard returns 403,
     // which the SDK surfaces as `Forbidden`.
@@ -266,7 +266,7 @@ describe('cloud engine — open({ kind: "id", id })', () => {
     await seedDocument(fx, tenantId, 'docidopen01', { pageCount: 2 });
     await seedDocument(fx, tenantId, 'docidopen02', { pageCount: 5 });
 
-    const engine = createCloudEngine({
+    const engine = cloudEngine({
       baseUrl: fx.baseUrl,
       token: tenantToken(tenantId),
     });
@@ -285,7 +285,7 @@ describe('cloud engine — open({ kind: "id", id })', () => {
     // Engine has tenant A's token — would normally fail to open
     // tenant B's doc. The per-open `token` override passes tenant B's
     // tenant-token, which the service-layer requireOwned accepts.
-    const engine = createCloudEngine({
+    const engine = cloudEngine({
       baseUrl: fx.baseUrl,
       token: tenantToken(tenantA),
     });
@@ -302,7 +302,7 @@ describe('cloud engine — open({ kind: "id", id })', () => {
     const tenantId = 'tenant-no-token';
     await seedDocument(fx, tenantId, 'docnotoken01');
 
-    const engine = createCloudEngine({ baseUrl: fx.baseUrl });
+    const engine = cloudEngine({ baseUrl: fx.baseUrl });
     await expect(engine.open({ kind: 'id', id: 'docnotoken01' })).rejects.toMatchObject({
       code: EngineErrorCode.Unauthenticated,
     });
@@ -310,7 +310,7 @@ describe('cloud engine — open({ kind: "id", id })', () => {
 
   test('a tenant token from a different tenant gets 403 (doc-tenant mismatch)', async () => {
     await seedDocument(fx, 'tenant-owner', 'docowner-iso');
-    const engine = createCloudEngine({
+    const engine = cloudEngine({
       baseUrl: fx.baseUrl,
       token: tenantToken('tenant-attacker'),
     });

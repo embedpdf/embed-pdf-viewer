@@ -8,8 +8,8 @@ import type { PageState } from '../revision/PageState';
  *
  * One entry per page. Order is unspecified — the local engine serves
  * document order while the cloud engine serves manifest (pageObjectNumber
- * registry) order; join `pageState.pageObjectNumber` against
- * `pages.list()` when display order matters.
+ * registry) order; join `pageState.page` against `pages.list()` (by ref)
+ * when display order matters.
  */
 export interface AnnotationListSnapshotAllPages {
   pages: AnnotationListPageSnapshot[];
