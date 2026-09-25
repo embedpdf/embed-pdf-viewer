@@ -50,11 +50,11 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
         popup: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemHighlightPopup | null;
         groupId: string | null;
         author: string | null;
-        created: string | null;
-        modified: string | null;
+        createdAt: string | null;
+        modifiedAt: string | null;
         userId: string | null;
         createdBy: string | null;
-        updatedBy: string | null;
+        modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemHighlight.Color;
@@ -186,11 +186,11 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
         popup: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemUnderlinePopup | null;
         groupId: string | null;
         author: string | null;
-        created: string | null;
-        modified: string | null;
+        createdAt: string | null;
+        modifiedAt: string | null;
         userId: string | null;
         createdBy: string | null;
-        updatedBy: string | null;
+        modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemUnderline.Color;
@@ -322,11 +322,11 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
         popup: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemSquigglyPopup | null;
         groupId: string | null;
         author: string | null;
-        created: string | null;
-        modified: string | null;
+        createdAt: string | null;
+        modifiedAt: string | null;
         userId: string | null;
         createdBy: string | null;
-        updatedBy: string | null;
+        modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemSquiggly.Color;
@@ -458,11 +458,11 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
         popup: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemStrikeoutPopup | null;
         groupId: string | null;
         author: string | null;
-        created: string | null;
-        modified: string | null;
+        createdAt: string | null;
+        modifiedAt: string | null;
         userId: string | null;
         createdBy: string | null;
-        updatedBy: string | null;
+        modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemStrikeout.Color;
@@ -600,11 +600,11 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
         popup: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemCirclePopup | null;
         groupId: string | null;
         author: string | null;
-        created: string | null;
-        modified: string | null;
+        createdAt: string | null;
+        modifiedAt: string | null;
         userId: string | null;
         createdBy: string | null;
-        updatedBy: string | null;
+        modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemCircle.Color;
@@ -738,11 +738,11 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
         popup: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemSquarePopup | null;
         groupId: string | null;
         author: string | null;
-        created: string | null;
-        modified: string | null;
+        createdAt: string | null;
+        modifiedAt: string | null;
         userId: string | null;
         createdBy: string | null;
-        updatedBy: string | null;
+        modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemSquare.Color;
@@ -876,11 +876,11 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
         popup: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemPolygonPopup | null;
         groupId: string | null;
         author: string | null;
-        created: string | null;
-        modified: string | null;
+        createdAt: string | null;
+        modifiedAt: string | null;
         userId: string | null;
         createdBy: string | null;
-        updatedBy: string | null;
+        modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemPolygon.Color;
@@ -1023,11 +1023,11 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
         popup: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemPolylinePopup | null;
         groupId: string | null;
         author: string | null;
-        created: string | null;
-        modified: string | null;
+        createdAt: string | null;
+        modifiedAt: string | null;
         userId: string | null;
         createdBy: string | null;
-        updatedBy: string | null;
+        modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemPolyline.Color;
@@ -1203,11 +1203,11 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
         popup: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemLinePopup | null;
         groupId: string | null;
         author: string | null;
-        created: string | null;
-        modified: string | null;
+        createdAt: string | null;
+        modifiedAt: string | null;
         userId: string | null;
         createdBy: string | null;
-        updatedBy: string | null;
+        modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemLine.Color;
@@ -1405,11 +1405,11 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
         popup: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemLinkPopup | null;
         groupId: string | null;
         author: string | null;
-        created: string | null;
-        modified: string | null;
+        createdAt: string | null;
+        modifiedAt: string | null;
         userId: string | null;
         createdBy: string | null;
-        updatedBy: string | null;
+        modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
         target: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemLinkTarget | null;
@@ -1500,11 +1500,11 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
         popup: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemInkPopup | null;
         groupId: string | null;
         author: string | null;
-        created: string | null;
-        modified: string | null;
+        createdAt: string | null;
+        modifiedAt: string | null;
         userId: string | null;
         createdBy: string | null;
-        updatedBy: string | null;
+        modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemInk.Color;
@@ -1629,11 +1629,11 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
         popup: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemFreeTextPopup | null;
         groupId: string | null;
         author: string | null;
-        created: string | null;
-        modified: string | null;
+        createdAt: string | null;
+        modifiedAt: string | null;
         userId: string | null;
         createdBy: string | null;
-        updatedBy: string | null;
+        modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
         rotation: number | null;
@@ -1950,11 +1950,11 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
         popup: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemCaretPopup | null;
         groupId: string | null;
         author: string | null;
-        created: string | null;
-        modified: string | null;
+        createdAt: string | null;
+        modifiedAt: string | null;
         userId: string | null;
         createdBy: string | null;
-        updatedBy: string | null;
+        modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemCaret.Color;
@@ -2075,11 +2075,11 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
         popup: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemTextPopup | null;
         groupId: string | null;
         author: string | null;
-        created: string | null;
-        modified: string | null;
+        createdAt: string | null;
+        modifiedAt: string | null;
         userId: string | null;
         createdBy: string | null;
-        updatedBy: string | null;
+        modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemText.Color;
@@ -2191,16 +2191,18 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
         popup: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemStampPopup | null;
         groupId: string | null;
         author: string | null;
-        created: string | null;
-        modified: string | null;
+        createdAt: string | null;
+        modifiedAt: string | null;
         userId: string | null;
         createdBy: string | null;
-        updatedBy: string | null;
+        modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
         rotation: number | null;
         unrotatedRect: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemStamp.UnrotatedRect | null;
         name: string | null;
+        fit: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemStamp.Fit | null;
+        opacity: number;
     }
 
     export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItemStamp {
@@ -2268,6 +2270,13 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
             right: number;
             top: number;
         }
+
+        export const Fit = {
+            Contain: "contain",
+            Cover: "cover",
+            Fill: "fill",
+        } as const;
+        export type Fit = (typeof Fit)[keyof typeof Fit];
     }
 
     export interface FileAttachment {
@@ -2295,11 +2304,11 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
         popup: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemFileAttachmentPopup | null;
         groupId: string | null;
         author: string | null;
-        created: string | null;
-        modified: string | null;
+        createdAt: string | null;
+        modifiedAt: string | null;
         userId: string | null;
         createdBy: string | null;
-        updatedBy: string | null;
+        modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemFileAttachment.Color;
@@ -2387,7 +2396,8 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
             description?: string | undefined;
             size?: number | undefined;
             checksum?: string | undefined;
-            creationDate?: string | undefined;
+            createdAt?: (string | null) | undefined;
+            modifiedAt?: (string | null) | undefined;
         }
     }
 
@@ -2416,11 +2426,11 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
         popup: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemWidgetPopup | null;
         groupId: string | null;
         author: string | null;
-        created: string | null;
-        modified: string | null;
+        createdAt: string | null;
+        modifiedAt: string | null;
         userId: string | null;
         createdBy: string | null;
-        updatedBy: string | null;
+        modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemWidget.Color | null;
@@ -2581,11 +2591,11 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
         popup: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemRedactPopup | null;
         groupId: string | null;
         author: string | null;
-        created: string | null;
-        modified: string | null;
+        createdAt: string | null;
+        modifiedAt: string | null;
         userId: string | null;
         createdBy: string | null;
-        updatedBy: string | null;
+        modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
         color: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemRedact.Color;
@@ -2761,14 +2771,15 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
         popup: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemPopupPopup | null;
         groupId: string | null;
         author: string | null;
-        created: string | null;
-        modified: string | null;
+        createdAt: string | null;
+        modifiedAt: string | null;
         userId: string | null;
         createdBy: string | null;
-        updatedBy: string | null;
+        modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
         parent: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemPopupParent | null;
+        open: boolean;
     }
 
     export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItemPopup {
@@ -2856,11 +2867,11 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
         popup: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemUnsupportedPopup | null;
         groupId: string | null;
         author: string | null;
-        created: string | null;
-        modified: string | null;
+        createdAt: string | null;
+        modifiedAt: string | null;
         userId: string | null;
         createdBy: string | null;
-        updatedBy: string | null;
+        modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
         rawSubtypeCode: number;

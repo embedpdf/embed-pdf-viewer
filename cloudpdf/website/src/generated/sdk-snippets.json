@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "canonicalVersion": "3.0.0-next.14",
-  "openapiSha256": "be3519a3839f244c223a7038ad513cbbefb938b3eb85810964b3772b210fec44",
+  "openapiSha256": "2d7b62cf7f0db20cea8dd55adebca0ea7bc46f0c61372763927080a7f162b737",
   "languages": {
     "typescript": {
       "label": "TypeScript",
@@ -317,6 +317,43 @@
       "ruby": {
         "status": "available",
         "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.annotations.delete(\n  doc_id: \"docId\",\n  layer_name: \"layerName\",\n  page_key: \"pageKey\",\n  annot_key: \"annotKey\"\n)",
+        "frameLines": 7
+      }
+    },
+    "doc.annotations.readAppearance": {
+      "typescript": {
+        "status": "available",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.annotations.readAppearance({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  pageKey: \"pageKey\",\n  annotKey: \"annotKey\"\n});",
+        "frameLines": 7
+      },
+      "python": {
+        "status": "available",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.doc.annotations.read_appearance(\n    doc_id=\"docId\",\n    layer_name=\"layerName\",\n    page_key=\"pageKey\",\n    annot_key=\"annotKey\",\n)",
+        "frameLines": 7
+      },
+      "php": {
+        "status": "available",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->doc->annotations->readAppearance(\n    'docId',\n    'layerName',\n    'pageKey',\n    'annotKey',\n    new ReadAppearanceAnnotationsRequest([]),\n);",
+        "frameLines": 7
+      },
+      "csharp": {
+        "status": "available",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Doc.Annotations.ReadAppearanceAsync(\n    new ReadAppearanceAnnotationsRequest\n    {\n        DocId = \"docId\",\n        LayerName = \"layerName\",\n        PageKey = \"pageKey\",\n        AnnotKey = \"annotKey\",\n    }\n);",
+        "frameLines": 7
+      },
+      "go": {
+        "status": "available",
+        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &doc.ReadAppearanceAnnotationsRequest{\n    DocID: \"docId\",\n    LayerName: \"layerName\",\n    PageKey: \"pageKey\",\n    AnnotKey: \"annotKey\",\n}\nclient.Doc.Annotations.ReadAppearance(\n    context.TODO(),\n    request,\n)",
+        "frameLines": 12
+      },
+      "java": {
+        "status": "available",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.doc().annotations().readAppearance(\n    \"docId\",\n    \"layerName\",\n    \"pageKey\",\n    \"annotKey\",\n    ReadAppearanceAnnotationsRequest\n        .builder()\n        .build()\n);",
+        "frameLines": 8
+      },
+      "ruby": {
+        "status": "available",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.annotations.read_appearance(\n  doc_id: \"docId\",\n  layer_name: \"layerName\",\n  page_key: \"pageKey\",\n  annot_key: \"annotKey\"\n)",
         "frameLines": 7
       }
     },

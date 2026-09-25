@@ -155,6 +155,8 @@ export * from "./DocAnnotationsListAll200ResponsePagesItemAnnotationsItemWidgetR
 export * from "./DocAnnotationsListAll200ResponsePagesItemPageStateWeakAnnotationState.js";
 export * from "./DocAnnotationsListAll404Response.js";
 export * from "./DocAnnotationsListAll409Response.js";
+export * from "./DocAnnotationsReadAppearance400Response.js";
+export * from "./DocAnnotationsReadAppearance404Response.js";
 export * from "./DocAnnotationsUpdate200Response.js";
 export * from "./DocAnnotationsUpdate200ResponseMetaAffectedPagesItemWeakAnnotationState.js";
 export * from "./DocAnnotationsUpdate400Response.js";

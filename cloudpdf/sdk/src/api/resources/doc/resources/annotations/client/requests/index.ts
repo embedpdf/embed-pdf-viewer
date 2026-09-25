@@ -4,4 +4,5 @@ export type { ExportAppearanceAnnotationsRequest } from "./ExportAppearanceAnnot
 export type { FlattenAnnotationsRequest } from "./FlattenAnnotationsRequest.js";
 export type { ListAllAnnotationsRequest } from "./ListAllAnnotationsRequest.js";
 export type { ListAnnotationsRequest } from "./ListAnnotationsRequest.js";
+export type { ReadAppearanceAnnotationsRequest } from "./ReadAppearanceAnnotationsRequest.js";
 export type { UpdateAnnotationsRequest } from "./UpdateAnnotationsRequest.js";

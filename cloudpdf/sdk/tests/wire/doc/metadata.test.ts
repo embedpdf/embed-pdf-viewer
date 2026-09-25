@@ -16,8 +16,8 @@ describe("MetadataClient", () => {
             keywords: "keywords",
             producer: "producer",
             creator: "creator",
-            created: "2024-01-15T09:30:00Z",
-            modified: "2024-01-15T09:30:00Z",
+            createdAt: "2024-01-15T09:30:00Z",
+            modifiedAt: "2024-01-15T09:30:00Z",
             trapped: "true",
             custom: { key: "value" },
         };
