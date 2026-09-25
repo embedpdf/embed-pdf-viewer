@@ -6,7 +6,8 @@ import type { PdfFunctions, Ptr } from '@embedpdf/engine-runtime';
  * added is deleted and the numbers it used are free again, and the
  * dictionaries every page shares (the catalog, the form dictionary and its
  * resources) are put back. Each page is recorded before the change first
- * writes to it ({@link page}). A change that only adds, apart from those,
+ * writes to it ({@link page}), and any other object it changes before that
+ * write ({@link object}). A change that only adds, apart from those,
  * rolls back to the same object graph and the same save; that is what an
  * import is. Anything that holds object numbers across the change (the
  * drawing index) must be forgotten after a {@link rollback}.
@@ -37,6 +38,20 @@ export class DocumentCheckpoint {
       );
     }
     this.pages.add(pageIndex);
+  }
+
+  /**
+   * Record the dictionary numbered `objectNumber` before a write changes it,
+   * such as an annotation a new popup is linked to. One made after the
+   * checkpoint needs no record.
+   */
+  object(objectNumber: number): void {
+    if (!this.fn.EPDFDoc_CheckpointObject(this.require(), objectNumber)) {
+      throw new EngineError(
+        EngineErrorCode.Unknown,
+        `EPDFDoc_CheckpointObject refused object ${objectNumber}`,
+      );
+    }
   }
 
   /** Return the document to the checkpoint. */

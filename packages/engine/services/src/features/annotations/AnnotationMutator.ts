@@ -5,10 +5,8 @@ import {
   appearanceImpactOf,
   EngineError,
   EngineErrorCode,
-  PDF_SUBTYPE_TO_CODE,
   type AnnotationActor,
   type AppearanceOutcome,
-  type BlendMode,
   type AnnotationCreateResult,
   type AnnotationDeleteResult,
   type AnnotationDTO,
@@ -23,11 +21,13 @@ import {
   type AnnotationUpdateResult,
   type PageObjectNumber,
   PdfAnnotationSubtypeCode,
+  toPageRef,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
+import { AnnotationBatchApplier } from './AnnotationBatchApplier';
 import { blendModeFromCode } from './internal/blendMode';
-import { assertDeclaredFields, prepareCreate } from './internal/mutations/prepareCreate';
+import { assertDeclaredFields } from './internal/mutations/prepareCreate';
 import { prepareMeasurementPatch } from './internal/mutations/prepareMeasurementMutation';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
@@ -41,13 +41,11 @@ import {
   joinWidgetFieldNumbers,
   resolveWidgetFieldObjectNumber,
 } from './internal/read/joinWidgetField';
-import { annotationIndexByName } from './internal/read/annotationIndexByName';
 import { readAnnotationFromPtr } from './internal/read/readAnnotationFromPtr';
 import { assertRichTextAgreement } from './internal/richTextWire';
 import type { AnnotationWriteContext } from './internal/write/annotationWriteContext';
-import { applyDraft, applyPatch, preflightPatch } from './internal/write/annotationWriterRegistry';
+import { applyPatch, preflightPatch } from './internal/write/annotationWriterRegistry';
 import { generateAppearance } from './internal/write/generateAppearance';
-import { stampCreation } from './internal/write/stampCreation';
 import { writeAnnotationModified } from './internal/write/writeAnnotationBase';
 import {
   writeAnnotationRelationship,
@@ -70,10 +68,11 @@ const APPEARANCE_MODE_NORMAL = 0;
  * them is the underlying `PdfRuntimeModule` (WASM vs native).
  *
  * Identity rules enforced here, locked with the user:
- *   - `create` always uses `EPDFPage_CreateAnnot` (the fork helper that
- *     creates an indirect object) so new annotations are born durable.
- *     If the fork helper ever returns a direct object, we throw — never
- *     silently produce a weak annotation.
+ *   - `create` is a one-item change set on `AnnotationBatchApplier`, which
+ *     makes the annotation with `EPDFPage_CreateAnnotRaw` (an indirect
+ *     object, on a page that isn't loaded), so new annotations are born
+ *     durable. If the fork helper ever returns a direct object, it throws —
+ *     never silently producing a weak annotation.
  *   - `update` is non-structural. /NM is monotonic per annotation:
  *       * already durable (objectNumber > 0 or /NM present) -> never touched.
  *       * weak (no objectNumber, no /NM) -> stamp engine-generated UUID v4.
@@ -117,6 +116,11 @@ export class AnnotationMutator {
     };
   }
 
+  /**
+   * A one-item change set on {@link AnnotationBatchApplier}: checked before
+   * the first write, made without loading its page, all or nothing. A
+   * `reply` or a popup's `parent` names an annotation the document has.
+   */
   create(
     pageObjectNumber: PageObjectNumber,
     draft: AnnotationDraft,
@@ -124,119 +128,29 @@ export class AnnotationMutator {
     actor?: AnnotationActor,
     resources?: WireAnnotationResources,
   ): AnnotationCreateResult {
-    throwIfAborted(signal);
-    const { fn, mem } = this.runtime;
-    const subtypeCode = PDF_SUBTYPE_TO_CODE[draft.subtype];
-
-    const pool = this.session.pagePool();
-    const pagePtr = pool.acquire(pageObjectNumber);
-    try {
-      this.ensureKnownWeakStateFromPage(pageObjectNumber, pagePtr);
-      const writeCtx = this.writeContext(pagePtr, resources);
-      draft = prepareCreate(draft, resources, writeCtx);
-      this.assertNameFree(pageObjectNumber, draft.nm);
-      // `create` is append-only: PDFium drops the new annotation at
-      // `index = previousCount`, so no existing index ever shifts. Per
-      // the locked rule in `computeMutationImpact`, that means create is
-      // non-invalidating — no per-page revision bump, no weak-ref
-      // staleness signal. The DTO is read against the page's current
-      // revision (which both pre-existing and freshly-created
-      // annotations share, since nothing bumped it).
-      const pageStateBefore = this.session.pageState(pageObjectNumber);
-      throwIfAborted(signal);
-
-      const annotPtr = fn.EPDFPage_CreateAnnot(pagePtr, subtypeCode);
-      if (!annotPtr) {
-        throw new EngineError(
-          EngineErrorCode.Unknown,
-          `EPDFPage_CreateAnnot returned NULL for subtype '${draft.subtype}'`,
-        );
-      }
-
-      let dto;
-      let newObjNum: number;
-      let newIndex: number;
-      let linkedParentId: AnnotationStableId | null = null;
-      try {
-        applyDraft(fn, mem, annotPtr, draft, writeCtx);
-        // Link to an /IRT parent when the draft asks for one. This may
-        // promote a weak/direct parent to an indirect object (non-structural,
-        // no index shift); the strengthened parent id is folded into
-        // `meta.changed` below so the client can reconcile its cached ref.
-        if (draft.reply != null) {
-          linkedParentId = writeAnnotationRelationship(
-            this.runtime,
-            this.session,
-            pagePtr,
-            annotPtr,
-            pageObjectNumber,
-            { inReplyTo: draft.reply.to, replyType: draft.reply.type },
-          );
-        }
-        if (draft.subtype === 'popup' && draft.parent != null) {
-          linkedParentId = writePopupParent(
-            this.runtime,
-            this.session,
-            pagePtr,
-            annotPtr,
-            pageObjectNumber,
-            draft.parent,
-            null,
-          );
-        }
-        stampCreation(fn, mem, annotPtr, actor, new Date());
-        // Bake the /AP appearance stream now that every visual field is
-        // written, so the new annotation ships with a standard-compliant
-        // appearance.
-        this.regenerateAppearance(annotPtr, pagePtr, draft.blendMode);
-
-        newObjNum = fn.EPDFAnnot_GetObjectNumber(annotPtr);
-        if (newObjNum <= 0) {
-          // Defensive: the fork helper guarantees an indirect object.
-          throw new EngineError(
-            EngineErrorCode.Unknown,
-            `EPDFPage_CreateAnnot produced a direct object (no objectNumber); fork helper invariant broken`,
-          );
-        }
-        newIndex = fn.FPDFPage_GetAnnotIndex(pagePtr, annotPtr);
-        if (newIndex < 0) {
-          throw new EngineError(
-            EngineErrorCode.Unknown,
-            `FPDFPage_GetAnnotIndex returned ${newIndex} for freshly created annotation`,
-          );
-        }
-
-        dto = readAnnotationFromPtr(
-          fn,
-          mem,
-          annotPtr,
-          pageObjectNumber,
-          newIndex,
-          pageStateBefore.revision,
-          readContextFor(this.session, this.fonts),
-        );
-        joinWidgetFieldNumbers(this.runtime, this.session, [dto]);
-      } finally {
-        fn.FPDFPage_CloseAnnot(annotPtr);
-      }
-
-      const createdId: AnnotationStableId = { kind: 'objectNumber', value: newObjNum };
-      // Linking promoted the parent in place, so the page may now have one
-      // fewer weak annotation — refresh the flag that future delete/move
-      // refetch decisions read. (A plain create touches no existing annot.)
-      if (linkedParentId) this.recordWeakStateFromPage(pageObjectNumber, pagePtr);
-      const pageStateAfter = this.session.pageState(pageObjectNumber);
-      const meta: AnnotationListMutationMeta = computeMutationImpact({
-        mutation: 'create',
-        pageStateBefore,
-        pageStateAfter,
-        changed: linkedParentId ? [createdId, linkedParentId] : [createdId],
-      });
-
-      return { created: dto, meta };
-    } finally {
-      pool.release(pageObjectNumber);
-    }
+    const { reply, ...data } = draft as AnnotationDraft & { parent?: AnnotationRef | null };
+    const parent = draft.subtype === 'popup' ? draft.parent : null;
+    if (draft.subtype === 'popup') delete (data as { parent?: unknown }).parent;
+    const { created, meta } = new AnnotationBatchApplier(
+      this.runtime,
+      this.session,
+      this.fonts,
+    ).create(
+      [
+        {
+          page: toPageRef(pageObjectNumber),
+          draft: data as AnnotationDraft,
+          ...(reply
+            ? { replyTo: { to: { existing: reply.to }, type: reply.type ?? 'reply' } }
+            : {}),
+          ...(parent ? { parent: { existing: parent } } : {}),
+          ...(resources ? { resources } : {}),
+          attribution: { kind: 'stamp', ...(actor ? { actor } : {}) },
+        },
+      ],
+      signal,
+    );
+    return { created: created[0]!, meta };
   }
 
   update(
@@ -372,9 +286,9 @@ export class AnnotationMutator {
       ) {
         appearance = { action: 'preserved', changed: false };
       } else {
-        const ok = this.regenerateAppearance(
+        const ok = generateAppearance(
+          this.runtime.fn,
           annotPtr,
-          pagePtr,
           patch.blendMode ?? previousBlendMode,
         );
         appearance = ok
@@ -755,40 +669,6 @@ export class AnnotationMutator {
       if (bumpRequested) this.session.bumpRevision(pageObjectNumber);
       pool.release(pageObjectNumber);
     }
-  }
-
-  /**
-   * Bake (or re-bake) an annotation's `/AP` normal appearance stream from
-   * its current dictionary properties using PDFium's native AP generator,
-   * then flush the page content so the result is persisted into the
-   * page/object tree. Called on create and on every update that re-bakes.
-   *
-   * Best-effort: `EPDFAnnot_GenerateAppearance` returns false for subtypes
-   * PDFium has no generator for (e.g. widgets), in which case the
-   * annotation simply ships without a baked `/AP` and viewers synthesize
-   * one — so a false return is not a hard error; it is surfaced to `update`
-   * callers as the `generation-unavailable` appearance outcome. This step is
-   * non-structural: it never shifts annotation indices or bumps revisions.
-   */
-  private regenerateAppearance(annotPtr: Ptr, pagePtr: Ptr, blendMode?: BlendMode): boolean {
-    const { fn } = this.runtime;
-    const ok = generateAppearance(fn, annotPtr, blendMode);
-    fn.FPDFPage_GenerateContent(pagePtr);
-    return ok;
-  }
-
-  /** A name must be free on its page (ISO 32000-2 §12.5.2): `create` refuses a taken one. */
-  private assertNameFree(pageObjectNumber: PageObjectNumber, nm: string | null | undefined): void {
-    if (!nm) return;
-    const { pageIndex } = this.session.recordByObjectNumber(pageObjectNumber);
-    if (annotationIndexByName(this.runtime, this.session.requireDocPtr(), pageIndex, nm) < 0) {
-      return;
-    }
-    throw new EngineError(
-      EngineErrorCode.InvalidArg,
-      `nm '${nm}' is already used on page ${pageObjectNumber}`,
-      { details: { field: 'nm' } },
-    );
   }
 
   private captureOrStampStableId(annotPtr: Ptr): AnnotationStableId {

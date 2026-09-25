@@ -3,18 +3,25 @@ import {
   EngineErrorCode,
   PDF_SUBTYPE_TO_CODE,
   type AnnotationActor,
+  type AnnotationDraft,
   type AnnotationDTO,
   type AnnotationListMutationMeta,
+  type AnnotationRef,
+  type AnnotationReplyType,
   type AnnotationStableId,
   type PageObjectNumber,
-  type PlannedAnnotation,
+  type PageRef,
   type RevisionToken,
   type WireAnnotationResources,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
+import { captureOrStampStableId } from './internal/identity/captureOrStampStableId';
+import { resolveAnnotIndexRaw } from './internal/identity/resolveAnnotIndexRaw';
 import { prepareCreate } from './internal/mutations/prepareCreate';
+import { annotationIndexByName } from './internal/read/annotationIndexByName';
 import { readContextFor } from './internal/read/annotationReadContext';
+import { readAnnotString } from './internal/read/annotationReadPrimitives';
 import { joinWidgetFieldNumbers } from './internal/read/joinWidgetField';
 import { readAnnotationFromPtr } from './internal/read/readAnnotationFromPtr';
 import type { AnnotationWriteContext } from './internal/write/annotationWriteContext';
@@ -29,14 +36,22 @@ import { throwIfAborted } from '../../shared/abort';
 import type { FontRegistrar } from '../fonts/FontRegistrar';
 
 /**
- * One create of a change. Its links name other creates of the same change
- * by their place in it, so creates can refer to each other before any
- * exists.
+ * What a link points at: another create of the same change, by its place in
+ * it, so creates can refer to each other before any exists; or an annotation
+ * the document has.
  */
-export interface BatchCreate extends Pick<
-  PlannedAnnotation,
-  'page' | 'draft' | 'replyTo' | 'parent'
-> {
+export type BatchLinkTarget = { readonly planned: number } | { readonly existing: AnnotationRef };
+
+/** One create of a change. */
+export interface BatchCreate {
+  /** The page it goes on. */
+  readonly page: PageRef;
+  /** Its data, without its links, which are the two fields below. */
+  readonly draft: AnnotationDraft;
+  /** `reply`: the annotation it replies to, on the same page. */
+  readonly replyTo?: { readonly to: BatchLinkTarget; readonly type: AnnotationReplyType };
+  /** For a popup: the annotation it shows, on the same page. */
+  readonly parent?: BatchLinkTarget;
   /** The bytes beside the draft, by role. */
   readonly resources?: WireAnnotationResources;
   /**
@@ -52,7 +67,7 @@ export interface BatchCreate extends Pick<
         readonly importedBy?: string;
       };
   /** Names the create in an error, such as `import: item 3`. */
-  readonly label: string;
+  readonly label?: string;
 }
 
 export interface BatchCreateResult {
@@ -69,6 +84,12 @@ interface Placed {
   readonly objectNumber: number;
 }
 
+/** An annotation the document has, which a create links to: its place in its page's `/Annots`. */
+interface Existing {
+  readonly pageIndex: number;
+  readonly index: number;
+}
+
 /**
  * Applies a change set as one unit (the change-sets plan, §4.1): every item
  * is checked before the first write, the writes run inside a
@@ -82,7 +103,9 @@ interface Placed {
  *
  * 1. create every annotation in order, so each page's `/Annots` keeps it,
  *    with its data and its appearance;
- * 2. link replies and popups to the creates they name;
+ * 2. link replies and popups to what they name: another create, or an
+ *    annotation the document has, recorded before a write to it (a weak
+ *    one is named first, so the link has a durable address);
  * 3. attribute each, stamped as the session or restored as it was, last,
  *    so no later write touches `/M`.
  */
@@ -98,16 +121,29 @@ export class AnnotationBatchApplier {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
     const docPtr = this.session.requireDocPtr();
+    const claimed = new Set<string>();
     const prepared = creates.map((create) => {
       const record = this.session.resolvePageRef(create.page);
       const ctx = this.writeContext(create.resources);
       const draft = labelled(create.label, () =>
         prepareCreate(create.draft, create.resources, ctx),
       );
-      return { create, record, ctx, draft };
+      labelled(create.label, () => this.claimName(draft.nm, record, claimed));
+      const replyTo = create.replyTo && {
+        type: create.replyTo.type,
+        to: labelled(create.label, () =>
+          this.linkTarget(create.replyTo!.to, create.page, creates.length, 'reply'),
+        ),
+      };
+      const parent =
+        create.parent &&
+        labelled(create.label, () =>
+          this.linkTarget(create.parent!, create.page, creates.length, 'popup'),
+        );
+      return { create, record, ctx, draft, replyTo, parent };
     });
     throwIfAborted(signal);
-    if (prepared.length === 0) return { created: [], meta: metaOf(this.session, []) };
+    if (prepared.length === 0) return { created: [], meta: metaOf(this.session, [], []) };
 
     const checkpoint = DocumentCheckpoint.begin(fn, docPtr);
     try {
@@ -122,7 +158,7 @@ export class AnnotationBatchApplier {
         if (!annotPtr) {
           throw new EngineError(
             EngineErrorCode.Unknown,
-            `${create.label}: EPDFPage_CreateAnnotRaw returned NULL`,
+            `${create.label ?? 'create'}: EPDFPage_CreateAnnotRaw returned NULL`,
           );
         }
         let objectNumber: number;
@@ -133,7 +169,7 @@ export class AnnotationBatchApplier {
           if (objectNumber <= 0) {
             throw new EngineError(
               EngineErrorCode.Unknown,
-              `${create.label}: EPDFPage_CreateAnnotRaw made a direct object`,
+              `${create.label ?? 'create'}: EPDFPage_CreateAnnotRaw made a direct object`,
             );
           }
         } finally {
@@ -147,20 +183,31 @@ export class AnnotationBatchApplier {
         };
       });
 
-      prepared.forEach(({ create }, at) => {
-        const { replyTo, parent } = create;
+      // Parents that are already in the document, strengthened by a link.
+      const linked: AnnotationStableId[] = [];
+      const openTarget = <T>(target: number | Existing, body: (parentPtr: Ptr) => T): T => {
+        if (typeof target === 'number') return this.withOpen(placed[target]!, body);
+        return this.withOpenExisting(target, (parentPtr) => {
+          linked.push(captureOrStampStableId(this.runtime, parentPtr));
+          return body(parentPtr);
+        });
+      };
+      prepared.forEach(({ replyTo, parent }, at) => {
         if (replyTo) {
           this.withOpen(placed[at]!, (annotPtr) =>
-            this.withOpen(placed[replyTo.planned]!, (parentPtr) =>
+            openTarget(replyTo.to, (parentPtr) =>
               linkReply(this.runtime, annotPtr, parentPtr, replyTo.type),
             ),
           );
         }
         if (parent !== undefined) {
           this.withOpen(placed[at]!, (popupPtr) =>
-            this.withOpen(placed[parent]!, (parentPtr) =>
-              linkPopup(this.runtime, popupPtr, parentPtr),
-            ),
+            openTarget(parent, (parentPtr) => {
+              // The parent gets a /Popup: one the document had is recorded first.
+              const number = fn.EPDFAnnot_GetObjectNumber(parentPtr);
+              if (number > 0) checkpoint.object(number);
+              linkPopup(this.runtime, popupPtr, parentPtr);
+            }),
           );
         }
       });
@@ -197,7 +244,8 @@ export class AnnotationBatchApplier {
         );
       });
       joinWidgetFieldNumbers(this.runtime, this.session, created);
-      return { created, meta: metaOf(this.session, placed) };
+      this.knowWeakAnnotations(placed, linked.length > 0);
+      return { created, meta: metaOf(this.session, placed, linked) };
     } catch (error) {
       checkpoint.rollback();
       // The rollback freed the numbers the new drawings had.
@@ -205,6 +253,90 @@ export class AnnotationBatchApplier {
       throw error;
     } finally {
       checkpoint.end();
+    }
+  }
+
+  /**
+   * A name must be free on its page (ISO 32000-2 §12.5.2): not used there,
+   * and not by an earlier create of the change.
+   */
+  private claimName(
+    nm: string | null | undefined,
+    record: { pageIndex: number; pageObjectNumber: PageObjectNumber },
+    claimed: Set<string>,
+  ): void {
+    if (!nm) return;
+    const claim = `${record.pageIndex}\u0000${nm}`;
+    const docPtr = this.session.requireDocPtr();
+    if (
+      claimed.has(claim) ||
+      annotationIndexByName(this.runtime, docPtr, record.pageIndex, nm) >= 0
+    ) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `nm '${nm}' is already used on page ${record.pageObjectNumber}`,
+        { details: { field: 'nm' } },
+      );
+    }
+    claimed.add(claim);
+  }
+
+  /**
+   * A link's target, checked before the first write: another create of the
+   * change, or an annotation the document has, on the same page (ISO
+   * 32000-2 §12.5.6.2). Creates only append, so its place holds.
+   */
+  private linkTarget(
+    target: BatchLinkTarget,
+    page: PageRef,
+    count: number,
+    link: 'reply' | 'popup',
+  ): number | Existing {
+    if ('planned' in target) {
+      if (target.planned < 0 || target.planned >= count) {
+        throw new EngineError(EngineErrorCode.InvalidArg, `no create ${target.planned} to link to`);
+      }
+      return target.planned;
+    }
+    const { existing } = target;
+    if (existing.page.pageObjectNumber !== page.pageObjectNumber) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        link === 'reply'
+          ? `/IRT parent must be on the same page as the reply (parent page ${existing.page.pageObjectNumber}, reply page ${page.pageObjectNumber})`
+          : `a popup's parent must be on the same page (parent page ${existing.page.pageObjectNumber}, popup page ${page.pageObjectNumber})`,
+      );
+    }
+    return resolveAnnotIndexRaw(this.runtime, this.session, existing);
+  }
+
+  /**
+   * Keep each touched page's weak-annotation state known: read raw where it
+   * isn't known yet, or where a link may have strengthened a weak parent.
+   * New annotations are durable, so they never make a page weak.
+   */
+  private knowWeakAnnotations(placed: readonly Placed[], strengthened: boolean): void {
+    const { fn, mem } = this.runtime;
+    const docPtr = this.session.requireDocPtr();
+    const pages = new Map(placed.map((at) => [at.pageObjectNumber, at.pageIndex]));
+    for (const [pageObjectNumber, pageIndex] of pages) {
+      if (!strengthened && this.session.weakAnnotationState(pageObjectNumber).kind === 'known') {
+        continue;
+      }
+      let weak = false;
+      const count = fn.EPDFPage_GetAnnotCountRaw(docPtr, pageIndex);
+      for (let index = 0; index < count && !weak; index++) {
+        const annotPtr = fn.EPDFPage_GetAnnotRaw(docPtr, pageIndex, index);
+        if (!annotPtr) continue;
+        try {
+          weak =
+            fn.EPDFAnnot_GetObjectNumber(annotPtr) <= 0 &&
+            !readAnnotString(fn, mem, annotPtr, 'NM');
+        } finally {
+          fn.FPDFPage_CloseAnnot(annotPtr);
+        }
+      }
+      this.session.recordWeakFlag(pageObjectNumber, weak);
     }
   }
 
@@ -240,31 +372,54 @@ export class AnnotationBatchApplier {
       fn.FPDFPage_CloseAnnot(annotPtr);
     }
   }
+
+  // An annotation the document has; creates only append, so its place holds.
+  private withOpenExisting<T>(at: Existing, body: (annotPtr: Ptr) => T): T {
+    const { fn } = this.runtime;
+    const annotPtr = fn.EPDFPage_GetAnnotRaw(this.session.requireDocPtr(), at.pageIndex, at.index);
+    if (!annotPtr) {
+      throw new EngineError(
+        EngineErrorCode.Unknown,
+        'an annotation to link to is not where it was',
+      );
+    }
+    try {
+      return body(annotPtr);
+    } finally {
+      fn.FPDFPage_CloseAnnot(annotPtr);
+    }
+  }
 }
 
 /**
- * One envelope for the change: each page it touched, and each annotation.
- * Creates only append, so no revision moves and no weak ref goes stale.
+ * One envelope for the change: each page it touched, each annotation it made,
+ * and each it linked to and strengthened. Creates only append, so no
+ * revision moves and no weak ref goes stale.
  */
-function metaOf(session: DocumentSession, placed: readonly Placed[]): AnnotationListMutationMeta {
+function metaOf(
+  session: DocumentSession,
+  placed: readonly Placed[],
+  linked: readonly AnnotationStableId[],
+): AnnotationListMutationMeta {
   const pages = [...new Set(placed.map((at) => at.pageObjectNumber))];
   return {
     affectedPages: pages.map((page) => session.pageState(page)),
     cacheDelta: null,
-    changed: placed.map(
-      (at): AnnotationStableId => ({ kind: 'objectNumber', value: at.objectNumber }),
-    ),
+    changed: [
+      ...placed.map((at): AnnotationStableId => ({ kind: 'objectNumber', value: at.objectNumber })),
+      ...linked,
+    ],
     weakRefsInvalidated: false,
     shouldRefetch: null,
   };
 }
 
-/** Run `body`, naming `label` in the typed error it throws. */
-function labelled<T>(label: string, body: () => T): T {
+/** Run `body`, naming `label`, when there is one, in the typed error it throws. */
+function labelled<T>(label: string | undefined, body: () => T): T {
   try {
     return body();
   } catch (error) {
-    if (!EngineError.is(error)) throw error;
+    if (!label || !EngineError.is(error)) throw error;
     throw new EngineError(error.code, `${label}: ${error.message}`, {
       ...(error.details ? { details: error.details } : {}),
       cause: error,

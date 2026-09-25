@@ -82,7 +82,12 @@ export class AnnotationImporter {
         resources[role as keyof WireAnnotationResources] = bundle.resources[id]!;
       }
       return {
-        ...planned,
+        page: planned.page,
+        draft: planned.draft,
+        ...(planned.replyTo
+          ? { replyTo: { to: { planned: planned.replyTo.planned }, type: planned.replyTo.type } }
+          : {}),
+        ...(planned.parent !== undefined ? { parent: { planned: planned.parent } } : {}),
         resources,
         attribution: attributionOf(request, planned.draft, item.data),
         label: `import: item ${planned.item}`,

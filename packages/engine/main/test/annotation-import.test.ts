@@ -5,10 +5,13 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import {
   toPageRef,
   type AnnotationBundle,
+  type AnnotationRef,
+  type PageRef,
   type WireAnnotationBundle,
   type WirePack,
   type WorkerRequest,
   type WorkerResponse,
+  type WorkerResultPayload,
 } from '@embedpdf/engine-core/runtime';
 import {
   creatables,
@@ -26,6 +29,8 @@ const fixtures = {
   'acrobat-rewrapped': resolve(here, 'fixtures', 'stamp-rewrapped-acrobat.pdf'),
   'acrobat-roundtrip-60': resolve(here, 'fixtures', 'stamp-roundtrip-acrobat-60.pdf'),
   'acrobat-roundtrip-100': resolve(here, 'fixtures', 'stamp-roundtrip-acrobat-100.pdf'),
+  /** Annotations without a number or a name. */
+  weak: resolve(here, '../../../../examples/engine-runtime-demo/public/annotations.pdf'),
 };
 
 const runner: ConformanceTestRunner = {
@@ -95,9 +100,16 @@ function withFault(runtime: PdfRuntimeModule) {
   let armed: { name: string; at: number; when?: (args: unknown[]) => boolean } | null = null;
   let calls = 0;
   let fired = false;
+  const counted = new Map<string, number>();
   const fn = new Proxy(runtime.fn, {
     get(target, name, receiver) {
       const original = Reflect.get(target, name, receiver) as unknown;
+      if (typeof original === 'function' && typeof name === 'string' && counted.has(name)) {
+        return (...args: unknown[]) => {
+          counted.set(name, counted.get(name)! + 1);
+          return (original as (...values: unknown[]) => unknown)(...args);
+        };
+      }
       if (typeof original !== 'function' || armed?.name !== name) return original;
       return (...args: unknown[]) => {
         if (armed && (!armed.when || armed.when(args)) && ++calls === armed.at) {
@@ -117,6 +129,47 @@ function withFault(runtime: PdfRuntimeModule) {
       fired = false;
     },
     fired: () => fired,
+    /** Count the calls of `names` from now on. */
+    count(names: readonly string[]) {
+      for (const name of names) counted.set(name, 0);
+    },
+    counts: () => Object.fromEntries(counted),
+  };
+}
+
+/** A worker host on `runtime`, with `bytes` open as `docId`. */
+async function openWorker(runtime: PdfRuntimeModule, bytes: Uint8Array, docId: string) {
+  const results = new Map<number, (response: WorkerResponse) => void>();
+  const host = new WorkerHost(runtime, (pack: WirePack<WorkerResponse>) => {
+    results.get(pack.payload.jobId)?.(pack.payload);
+  });
+  let jobId = 0;
+  const send = (request: Record<string, unknown>) =>
+    new Promise<WorkerResponse>((resolveResponse) => {
+      results.set(++jobId, resolveResponse);
+      host.receive({ ...request, docId, jobId } as unknown as WorkerRequest);
+    });
+  const opened = await send({
+    kind: 'open.fatMem',
+    bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+    password: null,
+  });
+  expect(opened.kind).toBe('resolve');
+  const result = async <Tag extends string>(request: Record<string, unknown>, tag: Tag) => {
+    const response = await send(request);
+    if (response.kind !== 'resolve' || response.result.tag !== tag) {
+      throw new Error(`${tag} failed: ${JSON.stringify(response)}`);
+    }
+    return response.result as Extract<WorkerResultPayload, { tag: Tag }>;
+  };
+  return {
+    send,
+    result,
+    /** A save, with the trailer's /ID blanked. */
+    save: async (mode: 'rewrite' | 'incremental') =>
+      withoutId((await result({ kind: 'document.saveBuffer', mode }, 'document.saveBuffer')).bytes),
+    draw: async (page: PageRef) =>
+      Buffer.from((await result({ kind: 'pages.render', page }, 'pages.render')).raster.data),
   };
 }
 
@@ -145,50 +198,20 @@ describe.each(['wasm', 'native'] as const)(
       expect(count).toBeGreaterThan(20);
 
       const fault = withFault(await createPdfRuntime({ prefer }));
-      const results = new Map<number, (response: WorkerResponse) => void>();
-      const host = new WorkerHost(fault.runtime, (pack: WirePack<WorkerResponse>) => {
-        results.get(pack.payload.jobId)?.(pack.payload);
-      });
-      let jobId = 0;
-      const send = (request: Record<string, unknown>) =>
-        new Promise<WorkerResponse>((resolveResponse) => {
-          results.set(++jobId, resolveResponse);
-          host.receive({ ...request, jobId } as unknown as WorkerRequest);
-        });
-      const bytes = new Uint8Array(await readFile(fixtures.authoring));
-      expect(
-        (
-          await send({
-            kind: 'open.fatMem',
-            docId: 'r9',
-            bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
-            password: null,
-          })
-        ).kind,
-      ).toBe('resolve');
-
-      const save = async (mode: 'rewrite' | 'incremental') => {
-        const response = await send({ kind: 'document.saveBuffer', docId: 'r9', mode });
-        if (response.kind !== 'resolve' || response.result.tag !== 'document.saveBuffer') {
-          throw new Error(`save failed: ${JSON.stringify(response)}`);
-        }
-        return withoutId(response.result.bytes);
-      };
+      const worker = await openWorker(
+        fault.runtime,
+        new Uint8Array(await readFile(fixtures.authoring)),
+        'r9',
+      );
+      const { send, save } = worker;
       // The page is loaded and drawn first, as in a viewer: a rollback must
       // show on the loaded page too.
       const page = bundle.pages[0]!.page;
-      const draw = async () => {
-        const response = await send({ kind: 'pages.render', docId: 'r9', page });
-        if (response.kind !== 'resolve' || response.result.tag !== 'pages.render') {
-          throw new Error(`render failed: ${JSON.stringify(response)}`);
-        }
-        return Buffer.from(response.result.raster.data);
-      };
+      const draw = () => worker.draw(page);
       // Each attribution mode writes its own last pass: both run, each
       // against the document as the one before left it.
       for (const attribution of ['stamp', 'restore'] as const) {
-        const importing = () =>
-          send({ kind: 'annotations.import', docId: 'r9', bundle: wire, attribution });
+        const importing = () => send({ kind: 'annotations.import', bundle: wire, attribution });
         const drawn = await draw();
         const baseline = { rewrite: await save('rewrite'), incremental: await save('incremental') };
         expect(await save('rewrite')).toBe(baseline.rewrite);
@@ -265,5 +288,122 @@ describe('an import into an open document', () => {
     } finally {
       await engine.destroy();
     }
+  });
+});
+
+describe.each(['wasm', 'native'] as const)('one create (%s runtime)', (prefer) => {
+  /** A worker on hello_world.pdf with a note on its first page. */
+  async function withNote() {
+    const fault = withFault(await createPdfRuntime({ prefer }));
+    const worker = await openWorker(
+      fault.runtime,
+      new Uint8Array(await readFile(fixtures.authoring)),
+      'one-create',
+    );
+    const { snapshot } = await worker.result({ kind: 'pages.list' }, 'pages.list');
+    const page = toPageRef(snapshot.pages[0]!.ref.pageObjectNumber);
+    const rect = { left: 300, bottom: 300, right: 320, top: 320 };
+    const create = (draft: Record<string, unknown>) =>
+      worker.send({ kind: 'annotations.create', page, draft });
+    const created = await create({ subtype: 'text', rect });
+    if (created.kind !== 'resolve' || created.result.tag !== 'annotations.create') {
+      throw new Error(`the note: ${JSON.stringify(created)}`);
+    }
+    const note: AnnotationRef = created.result.result.created.ref;
+    return { fault, worker, page, rect, create, note };
+  }
+
+  test('loads no page, for any kind', async () => {
+    const { fault, worker, page, rect, create, note } = await withNote();
+    const loaders = ['EPDFDoc_LoadPageByObjectNumber', 'EPDFDoc_LoadPageByObjectNumberNormalized'];
+    fault.count(loaders);
+    const drafts: Array<Record<string, unknown>> = [
+      ...creatables()
+        .filter(({ resources }) => !resources)
+        .map(({ data }) => data as unknown as Record<string, unknown>),
+      { subtype: 'popup', rect, parent: note },
+      { subtype: 'text', rect, reply: { to: note } },
+      {
+        subtype: 'link',
+        rect,
+        target: { kind: 'goto', destination: { kind: 'fit', page } },
+      },
+    ];
+    expect(drafts.length).toBeGreaterThan(10);
+    for (const draft of drafts) {
+      const response = await create(draft);
+      expect(response.kind, String(draft.subtype)).toBe('resolve');
+    }
+    expect(fault.counts()).toEqual(Object.fromEntries(loaders.map((name) => [name, 0])));
+    // The count sees a load when one happens: a draw loads the page.
+    await worker.draw(page);
+    expect(Object.values(fault.counts()).reduce((sum, calls) => sum + calls)).toBeGreaterThan(0);
+  });
+
+  test('that fails after linking to a note leaves the note as it was', async () => {
+    const { fault, worker, rect, create, note } = await withNote();
+    const baseline = {
+      rewrite: await worker.save('rewrite'),
+      incremental: await worker.save('incremental'),
+    };
+    // The popup's /Parent and the note's /Popup are written before the
+    // creation date is: failing there must take the note's /Popup back too.
+    fault.arm('FPDFAnnot_SetStringValue', 1, (args) => args[1] === 'CreationDate');
+    const response = await create({ subtype: 'popup', rect, parent: note });
+    expect(fault.fired()).toBe(true);
+    expect(response.kind).toBe('reject');
+    expect(await worker.save('rewrite')).toBe(baseline.rewrite);
+    expect(await worker.save('incremental')).toBe(baseline.incremental);
+
+    // And a create that holds finds the note free.
+    expect((await create({ subtype: 'popup', rect, parent: note })).kind).toBe('resolve');
+    expect(await worker.save('rewrite')).toMatch(/\/Popup \d+ 0 R/);
+  });
+
+  test('that fails after naming a weak note leaves the note weak', async () => {
+    const fault = withFault(await createPdfRuntime({ prefer }));
+    const worker = await openWorker(
+      fault.runtime,
+      new Uint8Array(await readFile(fixtures.weak)),
+      'weak-reply',
+    );
+    const { snapshot } = await worker.result(
+      { kind: 'annotations.listRawAll' },
+      'annotations.listRawAll',
+    );
+    const weak = snapshot.pages
+      .flatMap((page) => page.annotations)
+      .find((dto) => dto.ref.kind === 'index' && dto.subtype !== 'popup')!.ref;
+    expect(weak).toBeDefined();
+    const baseline = {
+      rewrite: await worker.save('rewrite'),
+      incremental: await worker.save('incremental'),
+    };
+    const reply = () =>
+      worker.send({
+        kind: 'annotations.create',
+        page: weak.page,
+        draft: {
+          subtype: 'text',
+          rect: { left: 10, bottom: 10, right: 30, top: 30 },
+          reply: { to: weak },
+        },
+      });
+    // The reply names the note (and makes it indirect) before its creation
+    // date is written: failing there must take both back.
+    fault.arm('FPDFAnnot_SetStringValue', 1, (args) => args[1] === 'CreationDate');
+    const response = await reply();
+    expect(fault.fired()).toBe(true);
+    expect(response.kind).toBe('reject');
+    expect(await worker.save('rewrite')).toBe(baseline.rewrite);
+    expect(await worker.save('incremental')).toBe(baseline.incremental);
+    const after = await worker.result({ kind: 'annotations.listRawAll' }, 'annotations.listRawAll');
+    expect(after.snapshot).toEqual(snapshot);
+
+    // And a reply that holds names it.
+    const held = await reply();
+    expect(held.kind).toBe('resolve');
+    if (held.kind !== 'resolve' || held.result.tag !== 'annotations.create') return;
+    expect(held.result.result.meta.changed).toHaveLength(2);
   });
 });
