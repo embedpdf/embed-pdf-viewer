@@ -63,7 +63,7 @@ describe('security collab mirrors (engine-local, wasm runtime)', () => {
 
   test('coarse doc.annotate.modify: any target mutable, set-group NOT implied', async () => {
     const doc = await open({
-      scope: ['doc.annotate.modify'],
+      scope: ['doc.open', 'doc.annotate.modify'],
       identity: { userId: 'me' },
     });
     expect(doc.security.allowsAnnotationCreate()).toBe(true);
@@ -75,7 +75,7 @@ describe('security collab mirrors (engine-local, wasm runtime)', () => {
 
   test('narrowing: annotations:update:self SHADOWS modify for update only', async () => {
     const doc = await open({
-      scope: ['doc.annotate.modify', 'annotations:update:self'],
+      scope: ['doc.open', 'doc.annotate.modify', 'annotations:update:self'],
       identity: { userId: 'me' },
     });
     expect(doc.security.allowsAnnotationMutation('update', { userId: 'me' })).toBe(true);
@@ -88,7 +88,7 @@ describe('security collab mirrors (engine-local, wasm runtime)', () => {
 
   test('group grant: create derives from own identity, targets need the group stamp', async () => {
     const doc = await open({
-      scope: ['annotations:*:group=legal'],
+      scope: ['doc.open', 'annotations:*:group=legal'],
       identity: { userId: 'me', groupId: 'legal', groups: ['legal'] },
     });
     // Self-target carries the caller's default group → matches the filter.
@@ -101,9 +101,9 @@ describe('security collab mirrors (engine-local, wasm runtime)', () => {
     expect(doc.security.allowsAnnotationGroupAssignment('other')).toBe(false);
   });
 
-  test('assigning the caller\'s own default group needs no grant', async () => {
+  test("assigning the caller's own default group needs no grant", async () => {
     const doc = await open({
-      scope: ['doc.annotate.modify'],
+      scope: ['doc.open', 'doc.annotate.modify'],
       identity: { userId: 'me', groupId: 'legal' },
     });
     expect(doc.security.allowsAnnotationGroupAssignment('legal')).toBe(true);

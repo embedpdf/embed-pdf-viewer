@@ -94,7 +94,7 @@ The codes you'll handle most:
 | `InvalidArg`           | Something you passed isn't valid. The message says what.                                                     |
 | `Aborted`              | You cancelled the call.                                                                                      |
 | `DocPasswordRequired`  | The file needs a password. See [Opening documents](/docs/engine/documents/opening#password-protected-files). |
-| `DocPasswordIncorrect` | The password was wrong.                                                                                      |
+| `DocPasswordIncorrect` | `unlock()` got a wrong password.                                                                             |
 | `DocOpenFailed`        | The file isn't a PDF, or is too damaged to open.                                                             |
 | `PayloadTooLarge`      | An import or export is past a limit. `error.details` has the `limit` and `max`.                              |
 | `ProtectedDocument`    | A signature in the document forbids this change.                                                             |

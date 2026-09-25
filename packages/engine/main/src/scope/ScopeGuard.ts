@@ -8,6 +8,7 @@ import {
   checkCapability,
   checkCollab,
   checkSetGroup,
+  decodePdfBits,
   expandRawScope,
   type AnnotationActor,
   type CollabAction,
@@ -34,8 +35,18 @@ import type { HandleScopeContext } from './HandleScopeContext';
 export class ScopeGuard {
   private protection: DocumentProtection | null;
 
-  constructor(private readonly ctx: HandleScopeContext) {
+  constructor(private ctx: HandleScopeContext) {
     this.protection = ctx.signedDocumentPolicy === 'protect' ? ctx.protection : null;
+  }
+
+  /**
+   * Replace the file's own permission bits after an unlock loaded it with
+   * another password: the owner password lifts the file's restrictions,
+   * and a file opened locked only now has bits at all. What `pdf.permissions`
+   * grants follows.
+   */
+  setPdfPermissions(pdfPermissionsBits: number | null): void {
+    this.ctx = { ...this.ctx, pdfBits: decodePdfBits(pdfPermissionsBits) };
   }
 
   /** The signature-derived restrictions this guard subtracts (`null` when none apply). */

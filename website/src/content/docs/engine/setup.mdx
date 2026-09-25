@@ -48,7 +48,8 @@ component that opens documents with `'use client'`.
 
 ## Node.js
 
-The same call works in Node. There the engine runs PDFium natively, in the same process:
+The same call works in Node. There the engine runs PDFium in the same process, natively when
+your platform has a build and as WebAssembly otherwise:
 
 ```ts
 import { readFile, writeFile } from 'node:fs/promises';
@@ -65,6 +66,10 @@ await engine.destroy();
 ```
 
 In a script, destroy the engine at the end so the process can exit.
+
+Rendering works in Node without a canvas: `render.image()` gives you PNG or BMP bytes. WebP needs a
+canvas, so in Node pass your own `imageEncoder` (for example one built on `sharp`) if you need it.
+To pick the runtime yourself, pass `runtime: { prefer: 'wasm' }` or `{ prefer: 'native' }`.
 
 ## Fonts
 
@@ -104,4 +109,6 @@ The viewer can use your engine or create its own:
 | `worker`               | Your own worker: a `Worker`, a function returning one, a URL, or `'inline'`.                                                                     |
 | `wasmUrl`              | Where to load the WebAssembly file from, when you host it yourself.                                                                              |
 | `renderPolicy`         | The render sizes documents answer with; see [Render policy](/docs/engine/documents/rendering#render-policy).                                     |
+| `imageEncoder`         | Your own image encoder, for formats the engine can't encode where it runs (WebP in Node).                                                        |
 | `signedDocumentPolicy` | `'permit'` stops the engine refusing what signatures forbid; see [Turning protection off](/docs/engine/forms/signatures#turning-protection-off). |
+| `runtime`              | In Node: `{ prefer: 'native' }` or `{ prefer: 'wasm' }`. The engine picks native when it can.                                                    |

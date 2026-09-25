@@ -166,7 +166,7 @@ export class DocumentSession {
     this._source = handle.source;
     this.revisions = new LocalRevisionAuthority(this._sessionId);
     this.pages = new PagePtrPool(this.runtime, handle.docPtr);
-    this.parkedBytes = null;
+    this.parkedLoad = null;
     this.drawings = null;
     this.loadedSeq = this.mutationSeqCounter;
   }
@@ -241,30 +241,35 @@ export class DocumentSession {
   /**
    * Park this session in the password-locked state: the document could not
    * be loaded because a (correct) password is missing, so the session keeps
-   * the already-transferred bytes and waits for an unlock attempt to load
-   * them. A locked session occupies its docId key like an open one — every
-   * operation except the password check rejects with DocPasswordRequired.
+   * how to load it (the already-transferred bytes, a base's path, the layer
+   * to open) and waits for an unlock attempt. A locked session occupies its
+   * docId key like an open one — every operation except the password check
+   * rejects with DocPasswordRequired.
    */
-  parkLocked(bytes: Uint8Array): void {
+  parkLocked(load: (password: string | null) => void): void {
     if (this.docPtr) {
       throw new EngineError(EngineErrorCode.InvalidArg, 'document already open');
     }
-    this.parkedBytes = bytes;
+    this.parkedLoad = load;
   }
 
   isLocked(): boolean {
-    return this.docPtr === null && this.parkedBytes !== null;
+    return this.docPtr === null && this.parkedLoad !== null;
   }
 
-  /** The bytes retained for a later unlock attempt. Locked sessions only. */
-  lockedBytes(): Uint8Array {
-    if (!this.parkedBytes) {
+  /**
+   * Load a locked session with `password`. A wrong one throws
+   * `DocPasswordIncorrect` and leaves the session parked for another try.
+   */
+  unlockWith(password: string | null): void {
+    if (!this.parkedLoad) {
       throw new EngineError(EngineErrorCode.DocNotOpen, 'document session is not locked');
     }
-    return this.parkedBytes;
+    this.parkedLoad(password);
+    this.parkedLoad = null;
   }
 
-  private parkedBytes: Uint8Array | null = null;
+  private parkedLoad: ((password: string | null) => void) | null = null;
 
   /** Number of pages in the document. */
   pageCount(): number {
@@ -498,7 +503,7 @@ export class DocumentSession {
       this.docPtr = null;
       this._kind = null;
       this._source = null;
-      this.parkedBytes = null;
+      this.parkedLoad = null;
       this.pendingSigning = null;
       this.lastCompletion = null;
       this.drawings = null;

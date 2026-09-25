@@ -11,6 +11,7 @@ import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { PagesReader } from './PagesReader';
 import type { DocumentSession } from '../../document-session/DocumentSession';
+import { loadFailure } from '../../runtime/loadError';
 import { throwIfAborted } from '../../shared/abort';
 
 /**
@@ -57,9 +58,15 @@ export class PagesInserter {
       mem.writeBytes(dataPtr, new Uint8Array(bytes));
       srcPtr = fn.FPDF_LoadMemDocument(dataPtr, bytes.byteLength, '');
       if (!srcPtr) {
-        throw new EngineError(
-          EngineErrorCode.MalformedPdf,
-          'pages.insert source PDF could not be opened',
+        // A password-protected source is `DocPasswordRequired`, not a
+        // broken file.
+        throw loadFailure(
+          fn,
+          null,
+          new EngineError(
+            EngineErrorCode.MalformedPdf,
+            'pages.insert source PDF could not be opened',
+          ),
         );
       }
       insertedCount = fn.FPDF_GetPageCount(srcPtr);

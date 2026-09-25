@@ -98,7 +98,7 @@ describe('annotation export on the local engine', () => {
     try {
       const doc = await engine.open(
         { kind: 'bytes', id: `scoped-${++opened}`, bytes: await documentWithStamps() },
-        { scope: ['doc.annotate.read'] },
+        { scope: ['doc.open', 'doc.annotate.read'] },
       );
       await expect(doc.annotations.export()).rejects.toMatchObject({ name: 'PermissionDenied' });
       await doc.close();

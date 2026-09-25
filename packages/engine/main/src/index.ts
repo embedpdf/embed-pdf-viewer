@@ -67,6 +67,7 @@ export { LocalPageAnnotationsService } from './document/LocalPageAnnotationsServ
 export { LocalPageGeometryService } from './document/LocalPageGeometryService';
 export { LocalPageRenderService } from './document/LocalPageRenderService';
 export { BrowserImageEncoder } from './render/BrowserImageEncoder';
+export { PortableImageEncoder, encodePng } from './render/PortableImageEncoder';
 export type {
   BrowserImageEncoderOptions,
   EncoderWorkerSource,
@@ -331,10 +332,22 @@ export interface LocalEngineRecipeOptions extends WasmSourceOptions {
    * {@link LocalEngineOptions.renderPolicy}. Default: `continuous`.
    */
   renderPolicy?: EngineRenderPolicy;
+  /** How a signed document's protection is applied. See {@link LocalEngineOptions.signedDocumentPolicy}. */
+  signedDocumentPolicy?: LocalEngineOptions['signedDocumentPolicy'];
+  /** Layer or plain sessions. See {@link LocalEngineOptions.sessionKind}. */
+  sessionKind?: LocalEngineOptions['sessionKind'];
+  /**
+   * Where there is no `Worker` (Node), PDFium runs in this thread: natively
+   * when this platform has a build, as WebAssembly otherwise. `runtime`
+   * chooses (`{ prefer: 'wasm' }`). Ignored where the engine runs a worker.
+   */
+  runtime?: CreatePdfRuntimeOptions;
 }
 
 /**
- * Create a local (PDFium-in-a-Worker) {@link LocalEngine}.
+ * Create a local {@link LocalEngine}: PDFium in a Web Worker in the browser,
+ * in this thread where there is no `Worker` (Node, natively when the
+ * platform has a build). One factory for every environment.
  *
  * Synchronous and cheap: the returned object is a fully usable {@link Engine},
  * but it allocates nothing — no Worker, no WASM — until the first operation
@@ -361,7 +374,13 @@ export interface LocalEngineRecipeOptions extends WasmSourceOptions {
  * ```
  */
 export function localEngine(options: LocalEngineRecipeOptions = {}): LocalEngine {
-  const boot = workerBoot(options.worker, options);
+  const boot = runsInThisThread(options)
+    ? {
+        spawn: async (): Promise<Transport> =>
+          new InlineTransport(await createPdfRuntime(options.runtime ?? {})),
+        lazyOptions: {},
+      }
+    : workerBoot(options.worker, options);
   const transport = new LazyTransport(async () => {
     // Spawn and font fetches run in parallel; nothing queued by the caller can
     // reach the worker until this factory resolves.
@@ -393,8 +412,18 @@ export function localEngine(options: LocalEngineRecipeOptions = {}): LocalEngine
         ? new BrowserImageEncoder({ worker: options.encoderWorker })
         : undefined),
     renderPolicy: options.renderPolicy,
+    signedDocumentPolicy: options.signedDocumentPolicy,
+    sessionKind: options.sessionKind,
   });
   return engine;
+}
+
+/**
+ * No `Worker` global and none passed (Node, Deno, a test runner): PDFium
+ * runs in this thread instead of in a worker.
+ */
+function runsInThisThread(options: LocalEngineRecipeOptions): boolean {
+  return options.worker === undefined && typeof Worker === 'undefined';
 }
 
 interface ResolvedRecipeFont {

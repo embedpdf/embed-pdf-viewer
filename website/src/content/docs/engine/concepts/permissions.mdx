@@ -41,6 +41,9 @@ Without `scope`, the user gets every permission, and the engine logs a reminder 
 handy while you build; pass the permissions your users will really have, so you see the interface
 they'll see.
 
+A scope without `doc.open` can't open the document: `open()` fails with `Forbidden`, as it does
+on a cloud server.
+
 </Engine>
 
 <Engine cloud>
@@ -128,8 +131,10 @@ ignores them and only your permissions count.
 <Engine local>
 
 ```ts
-await engine.open(input, { scope: ['doc.open', 'doc.render', 'pdf.permissions'] });
+await engine.open(input, { scope: ['pdf.permissions'] });
 ```
+
+`pdf.permissions` also lets you open and render the document, so this scope works on its own.
 
 </Engine>
 

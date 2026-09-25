@@ -89,7 +89,7 @@ directly; a cloud session carries it in the token:
 
 ```ts
 const doc = await engine.open(source, {
-  scope: ['doc.render', 'doc.text.select', 'doc.annotate.read'],
+  scope: ['doc.open', 'doc.render', 'doc.text.select', 'doc.annotate.read'],
 });
 ```
 

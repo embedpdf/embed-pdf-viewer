@@ -1234,6 +1234,8 @@ export type WorkerResultPayload =
       security: DocumentSecurityProbeInfo;
       /** What the document's signatures forbid; `null` when unsigned or not probed (a locked open). */
       protection?: DocumentProtection | null;
+      /** A locked open whose password was given and wrong. */
+      passwordRejected?: boolean;
     }
   | { tag: 'signatures.list'; snapshot: SignatureSnapshot }
   | { tag: 'signatures.contents'; bytes: ArrayBuffer }

@@ -26,7 +26,16 @@ import type { DocumentSecurityState } from './DocumentSecurityService';
 
 export type PasswordPrompt =
   | { readonly state: 'none' }
-  | { readonly state: 'required'; readonly hint: 'user' | 'owner' | null }
+  | {
+      readonly state: 'required';
+      readonly hint: 'user' | 'owner' | null;
+      /**
+       * The last password tried (at `open()` or `unlock()`) was wrong, so a
+       * prompt can say so. A wrong password opens the document locked, as no
+       * password does: one path for "this file needs a password".
+       */
+      readonly incorrect: boolean;
+    }
   | { readonly state: 'optional'; readonly hint: 'owner' };
 
 /**
@@ -63,17 +72,20 @@ export type PasswordPrompt =
  *
  *   6. fallthrough → { state: 'none' }   open and nothing more available
  */
-export function passwordPromptFromState(state: DocumentSecurityState): PasswordPrompt {
+export function passwordPromptFromState(
+  state: DocumentSecurityState,
+  incorrect = false,
+): PasswordPrompt {
   if (state.encryption.state === 'none') {
     return { state: 'none' };
   }
 
   if (!state.permissions.known) {
-    return { state: 'required', hint: null };
+    return { state: 'required', hint: null, incorrect };
   }
 
   if (state.encryption.requiresPassword && state.permissions.openedAs === 'none') {
-    return { state: 'required', hint: 'user' };
+    return { state: 'required', hint: 'user', incorrect };
   }
 
   if (state.permissions.openedAs === 'owner') {

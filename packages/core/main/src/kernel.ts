@@ -123,8 +123,6 @@ const pendingToDocInfo = (meta: PendingMeta): DocInfo => ({
 /** The stable id an input implies, if it carries one ('bytes'/'layerBytes'/'id'). */
 const idOfInput = (input: OpenInput): string | null =>
   'id' in input && typeof input.id === 'string' ? input.id : null;
-const passwordOfInput = (input: OpenInput): string | null | undefined =>
-  'password' in input ? input.password : undefined;
 
 /**
  * Everything one open document owns, in one place: the engine handle, the
@@ -658,14 +656,12 @@ export function createKernel(config: {
 
         // 2. A password-locked handle parks here — before pages.list(), which
         //    would reject on a locked document. `documents.unlock()` finishes
-        //    the job later. `passwordProvided` records that a supplied password
-        //    was already tried and rejected (drives the "incorrect" copy).
-        if (handle.security?.passwordPrompt?.state === 'required') {
-          const passwordProvided =
-            ('password' in engineOptions && engineOptions.password != null) ||
-            passwordOfInput(source) != null;
+        //    the job later. The prompt's `incorrect` says a supplied password
+        //    was tried and rejected (drives the "incorrect" copy).
+        const prompt = handle.security?.passwordPrompt;
+        if (prompt?.state === 'required') {
           session.phase = 'locked';
-          publishLocked(session, passwordProvided);
+          publishLocked(session, prompt.incorrect);
           return session.id;
         }
 

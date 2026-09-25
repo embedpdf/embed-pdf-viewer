@@ -3,8 +3,7 @@ import type { PdfFileAccessHandle, PdfRuntimeModule, Ptr } from '@embedpdf/engin
 
 import type { AcquiredBaseDocument } from './PdfDocumentOpener';
 import { CloseStack, setRuntimeOwnerPermissionsIfEncrypted } from './PdfDocumentOpener';
-
-const FPDF_ERR_PASSWORD = 4;
+import { loadFailure } from '../../runtime/loadError';
 
 /**
  * A password failure is a recoverable state the caller can act on (prompt,
@@ -12,13 +11,15 @@ const FPDF_ERR_PASSWORD = 4;
  * `openFatMemoryDocument` draws, so a plain-bytes open that becomes a base
  * parks and unlocks exactly like it always did.
  */
-function baseOpenError(runtime: PdfRuntimeModule, password: string | null | undefined): EngineError {
-  if (runtime.fn.FPDF_GetLastError() === FPDF_ERR_PASSWORD) {
-    return password
-      ? new EngineError(EngineErrorCode.DocPasswordIncorrect, 'incorrect document password')
-      : new EngineError(EngineErrorCode.DocPasswordRequired, 'document requires a password');
-  }
-  return new EngineError(EngineErrorCode.DocOpenFailed, 'failed to open base document');
+function baseOpenError(
+  runtime: PdfRuntimeModule,
+  password: string | null | undefined,
+): EngineError {
+  return loadFailure(
+    runtime.fn,
+    password,
+    new EngineError(EngineErrorCode.DocOpenFailed, 'failed to open base document'),
+  );
 }
 
 interface BaseEntry {
@@ -63,7 +64,13 @@ export class BaseDocumentRegistry {
       setRuntimeOwnerPermissionsIfEncrypted(this.runtime, basePtr);
       stack.push(() => fn.EPDF_ReleaseBaseDocument(basePtr));
       this.supplyKnownSha(basePtr, opts.knownSha256);
-      return this.insert({ key: opts.key, kind: 'memory', basePtr, refs: 1, close: () => stack.close() });
+      return this.insert({
+        key: opts.key,
+        kind: 'memory',
+        basePtr,
+        refs: 1,
+        close: () => stack.close(),
+      });
     } catch (error) {
       stack.close();
       throw error;
@@ -94,7 +101,14 @@ export class BaseDocumentRegistry {
       setRuntimeOwnerPermissionsIfEncrypted(this.runtime, basePtr);
       stack.push(() => fn.EPDF_ReleaseBaseDocument(basePtr));
       this.supplyKnownSha(basePtr, opts.knownSha256);
-      return this.insert({ key: opts.key, kind: 'file', path: opts.path, basePtr, refs: 1, close: () => stack.close() });
+      return this.insert({
+        key: opts.key,
+        kind: 'file',
+        path: opts.path,
+        basePtr,
+        refs: 1,
+        close: () => stack.close(),
+      });
     } catch (error) {
       stack.close();
       throw error;

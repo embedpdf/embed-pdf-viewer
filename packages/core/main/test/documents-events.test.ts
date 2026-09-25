@@ -106,7 +106,7 @@ describe('documents · lifecycle events', () => {
   it('emits locked when a document parks on a password', async () => {
     const lockedHandle = {
       ...makeHandle('l'),
-      security: { passwordPrompt: { state: 'required' }, allows: () => true },
+      security: { passwordPrompt: { state: 'required', incorrect: false }, allows: () => true },
     } as unknown as DocumentHandle;
     const kernel = createKernel({ engine: immediateEngine({ l: lockedHandle }), plugins: [] });
     await kernel.start();

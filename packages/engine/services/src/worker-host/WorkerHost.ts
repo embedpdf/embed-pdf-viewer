@@ -556,42 +556,59 @@ export class WorkerHost {
     const session = new DocumentSession(this.runtime);
     session.signedDocumentPolicy = req.signedDocumentPolicy ?? 'protect';
     session.password = req.password;
+    // Every input kind loads the same way with or without a password, so a
+    // locked file parks and unlocks the same way whatever it came from.
+    let load: (password: string | null) => void;
     if (req.kind === 'open.fatMem') {
       session.sessionKind = req.sessionKind ?? 'layer';
       const bytes = new Uint8Array(req.bytes);
-      try {
-        this.openSignedAware(session, bytes, req.password);
-      } catch (error) {
-        // Password failures are a state, not an error: park the session with
-        // the already-transferred bytes and answer with a security probe that
-        // says "password required". The client handle comes up locked
-        // (`security.passwordPrompt === 'required'`); a later
-        // `document.checkPasswordPermissions` performs the actual load.
-        if (!isPasswordOpenError(error)) throw error;
-        session.parkLocked(bytes);
-        this.sessions.set(key, session);
-        return wirePack({
-          tag: 'open',
-          docId: req.docId,
-          security: passwordRequiredProbe(),
-        });
-      }
+      load = (password) => this.openSignedAware(session, bytes, password);
     } else if (req.kind === 'open.layerMemBase') {
-      const base = this.baseDocuments.acquireMemoryBase({
-        key: req.baseKey,
-        bytes: new Uint8Array(req.baseBytes),
-        password: req.password,
-        knownSha256: req.baseSha256,
-      });
-      session.openFromHandle(openLayerDocument(this.runtime, base, req.layer, req.password));
+      const baseBytes = new Uint8Array(req.baseBytes);
+      load = (password) => {
+        const base = this.baseDocuments.acquireMemoryBase({
+          key: req.baseKey,
+          bytes: baseBytes,
+          password,
+          knownSha256: req.baseSha256,
+        });
+        session.openFromHandle(openLayerDocument(this.runtime, base, req.layer, password));
+      };
     } else {
-      const base = this.baseDocuments.acquireFileBase({
-        key: req.baseKey,
-        path: req.basePath,
-        password: req.password,
-        knownSha256: req.baseSha256,
+      // A base read from disk needs the native runtime's file access.
+      if (this.runtime.kind !== 'native') {
+        throw new EngineError(
+          EngineErrorCode.NotImplemented,
+          "'layerFile' needs the native Node runtime; open the file's bytes instead",
+        );
+      }
+      load = (password) => {
+        const base = this.baseDocuments.acquireFileBase({
+          key: req.baseKey,
+          path: req.basePath,
+          password,
+          knownSha256: req.baseSha256,
+        });
+        session.openFromHandle(openLayerDocument(this.runtime, base, req.layer, password));
+      };
+    }
+    try {
+      load(req.password);
+    } catch (error) {
+      // A password failure is a state, not an error: park the session and
+      // answer with a security probe that says "password required". The
+      // client handle comes up locked (`security.passwordPrompt` is
+      // `'required'`, `incorrect` when a password was given and wrong); a
+      // later `document.checkPasswordPermissions` performs the actual load.
+      if (!isPasswordOpenError(error)) throw error;
+      session.parkLocked(load);
+      this.sessions.set(key, session);
+      return wirePack({
+        tag: 'open',
+        docId: req.docId,
+        security: passwordRequiredProbe(),
+        ...(req.password ? { passwordRejected: true } : {}),
       });
-      session.openFromHandle(openLayerDocument(this.runtime, base, req.layer, req.password));
     }
     this.sessions.set(key, session);
     return wirePack({
@@ -1584,13 +1601,13 @@ export class WorkerHost {
     req: DocumentCheckPasswordPermissionsWorkerRequest,
   ): WirePack<WorkerResultPayload> {
     // The one handler that accepts a locked session: on a locked session,
-    // "check this password" means "load the parked bytes with it". A wrong
-    // password throws DocPasswordIncorrect and the session stays parked
-    // (bytes retained) for the next attempt.
+    // "check this password" means "load the parked document with it". A
+    // wrong password throws DocPasswordIncorrect and the session stays
+    // parked for the next attempt.
     const parked = this.sessions.get(sessionKey(req.docId));
     let session: DocumentSession;
     if (parked?.isLocked()) {
-      this.openSignedAware(parked, parked.lockedBytes(), req.password);
+      parked.unlockWith(req.password);
       parked.password = req.password;
       session = parked;
     } else {

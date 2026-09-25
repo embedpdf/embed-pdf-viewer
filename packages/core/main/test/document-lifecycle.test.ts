@@ -222,11 +222,14 @@ describe('kernel: request-time tab slots', () => {
 });
 
 describe('kernel: locked documents (password)', () => {
-  function lockedSecurity(correctPassword: string) {
+  /** A locked document's security, as an engine reports it (`incorrect`: a password was given and wrong). */
+  function lockedSecurity(correctPassword: string, incorrect = false) {
     let unlocked = false;
     return {
       get passwordPrompt() {
-        return unlocked ? { state: 'none' as const } : { state: 'required' as const, hint: null };
+        return unlocked
+          ? { state: 'none' as const }
+          : { state: 'required' as const, hint: null, incorrect };
       },
       unlock: vi.fn(({ password }: { password: string }) => {
         if (password !== correctPassword) return Promise.reject(new Error('incorrect password'));
@@ -266,11 +269,11 @@ describe('kernel: locked documents (password)', () => {
     expect(created).toHaveBeenCalledTimes(1); // the normal lifecycle, just later
   });
 
-  it('flags passwordProvided when a supplied password was rejected at open', async () => {
+  it("flags passwordProvided when the engine says the open's password was wrong", async () => {
     const { engine, resolve } = controllableEngine();
     const kernel = createKernel({ engine, plugins: [] });
     const open = kernel.documents.open(bytesInput('a'), { password: 'wrong-guess' });
-    resolve('a', makeHandle('a', { security: lockedSecurity('hunter2') }));
+    resolve('a', makeHandle('a', { security: lockedSecurity('hunter2', true) }));
     await open;
 
     expect(kernel.documents.get('a')!.status).toBe('locked');

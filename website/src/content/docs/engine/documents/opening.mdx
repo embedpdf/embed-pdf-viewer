@@ -99,11 +99,13 @@ if (doc.security.passwordPrompt.state === 'required') {
 | `'optional'`           | The file is open, but its owner password would give more rights. You may offer it. |
 
 `passwordPrompt.hint` says which password to ask for (`'user'` or `'owner'`), when the engine
-knows.
+knows. When the state is `'required'`, `passwordPrompt.incorrect` is `true` if the last password
+you tried was wrong.
 
 A locked document still opens: without a password, `open()` succeeds, and every call that reads
-the file fails with `DocPasswordRequired` until you unlock it. A password you pass to `open()`
-that's wrong fails the open with `DocPasswordIncorrect`.
+the file fails with `DocPasswordRequired` until you unlock it. A wrong password doesn't fail
+`open()` either: the document opens locked, and `passwordPrompt.incorrect` is `true`, so you can
+say "that password is wrong" and ask again.
 
 `unlock()` fails with `DocPasswordIncorrect` when the password is wrong, so you can ask again:
 
@@ -286,7 +288,8 @@ needs them, so the file never has to fit in memory:
 const doc = await engine.open({ kind: 'layerFile', basePath: '/data/scan-4000-pages.pdf' });
 ```
 
-The changes can live in a file too: `layer: { kind: 'artifact-file', path }`.
+The changes can live in a file too: `layer: { kind: 'artifact-file', path }`. `layerFile` needs
+PDFium's native build; on the WebAssembly runtime it fails with `NotImplemented`.
 
 ### Your bytes after `open()`
 

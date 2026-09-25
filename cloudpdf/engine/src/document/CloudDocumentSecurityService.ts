@@ -135,8 +135,11 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
    * security state. See `passwordPromptFromState` for the rules.
    */
   get passwordPrompt(): PasswordPrompt {
-    return passwordPromptFromState(this.state);
+    return passwordPromptFromState(this.state, this.passwordRejected);
   }
+
+  /** Whether the last password tried was wrong (the prompt's `incorrect`). */
+  private passwordRejected = false;
 
   unlock(input: DocumentUnlockInput): AbortablePromise<DocumentUnlockResult> {
     if (this.view.isClosed()) {
@@ -145,10 +148,19 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
       );
     }
     return AbortablePromise.run<DocumentUnlockResult>(async (signal) => {
-      return await this.postAccess(signal, {
-        password: input.password,
-        mode: input.mode ?? 'any',
-      });
+      try {
+        const result = await this.postAccess(signal, {
+          password: input.password,
+          mode: input.mode ?? 'any',
+        });
+        this.passwordRejected = false;
+        return result;
+      } catch (error) {
+        if (EngineError.is(error, EngineErrorCode.DocPasswordIncorrect)) {
+          this.passwordRejected = true;
+        }
+        throw error;
+      }
     });
   }
 

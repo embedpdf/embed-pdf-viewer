@@ -74,6 +74,10 @@ of the turned image.
 `format` is `'png'` (the default), `'webp'`, or `'bmp'`. BMP is uncompressed: the fastest to make
 and the largest, for images you only keep in memory. A BMP image's `format` reads `'bmp'`.
 
+In Node there is no canvas, so the engine encodes PNG and BMP itself. WebP fails with
+`NotImplemented` there unless you give the engine your own `imageEncoder`; see
+[Setup](/docs/engine/setup#nodejs).
+
 </Engine>
 
 <Engine cloud>

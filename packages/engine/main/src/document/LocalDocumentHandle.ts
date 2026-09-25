@@ -15,7 +15,6 @@ import {
   type DocumentRenderService,
   type DocumentSecurityProbeInfo,
   type EngineRenderPolicy,
-  type DocumentSecurityService,
   type MetadataService,
   type PageHandle,
   type PageObjectNumber,
@@ -57,7 +56,7 @@ export class LocalDocumentHandle implements DocumentHandle {
   readonly search: LocalDocumentSearchService;
   readonly pages: DocumentPagesService;
   readonly redaction: DocumentRedactionService;
-  readonly security: DocumentSecurityService;
+  readonly security: LocalDocumentSecurityService;
   readonly signatures: LocalDocumentSignaturesService;
   /**
    * The engine's configured render policy, advertised through the same

@@ -37,6 +37,8 @@ export class CloudEngine implements Engine {
   }
 
   private destroyed = false;
+  /** The documents this engine opened and nobody closed yet. */
+  private readonly handles = new Set<CloudDocumentHandle>();
 
   private constructor(
     private readonly http: HttpClient,
@@ -57,12 +59,9 @@ export class CloudEngine implements Engine {
     void options?.scope;
     void options?.identity;
 
-    // Presence-based precedence, same rule the local engine documents: an
-    // options.password key wins (even explicitly null), else input.password.
-    // For 'share' inputs `input.password` is still the PDF password — the
-    // grant passphrase travels separately as `input.sharePassword`.
-    const effectivePassword =
-      options && 'password' in options ? (options.password ?? null) : (input.password ?? null);
+    // The PDF's own password is an open option for every input kind, as on
+    // the local engine. A share's passphrase is `input.sharePassword`.
+    const effectivePassword = options?.password ?? null;
 
     if (input.kind === 'share') {
       // Open by public share token: exchange `shr_…` for a short-lived
@@ -84,7 +83,7 @@ export class CloudEngine implements Engine {
           throw error instanceof ShareExchangeError ? engineErrorFromShareExchange(error) : error;
         }
       };
-      return this.open({ kind: 'token', token, password: input.password ?? null }, options);
+      return this.open({ kind: 'token', token }, options);
     }
 
     if (input.kind === 'token') {
@@ -123,8 +122,15 @@ export class CloudEngine implements Engine {
           head,
           token,
           this.sessionId,
+          () => this.handles.delete(handle),
         );
-        await maybeAutoEstablishAccess(handle, head, signal, effectivePassword);
+        this.handles.add(handle);
+        try {
+          await maybeAutoEstablishAccess(handle, head, signal, effectivePassword);
+        } catch (error) {
+          await handle.close();
+          throw error;
+        }
         return handle;
       });
     }
@@ -166,8 +172,15 @@ export class CloudEngine implements Engine {
           head,
           resolvedToken,
           this.sessionId,
+          () => this.handles.delete(handle),
         );
-        await maybeAutoEstablishAccess(handle, head, signal, effectivePassword);
+        this.handles.add(handle);
+        try {
+          await maybeAutoEstablishAccess(handle, head, signal, effectivePassword);
+        } catch (error) {
+          await handle.close();
+          throw error;
+        }
         return handle;
       });
     }
@@ -181,10 +194,18 @@ export class CloudEngine implements Engine {
     );
   }
 
+  /**
+   * Close every document this engine opened (their event streams stop), then
+   * refuse new opens. As on the local engine, a handle is unusable after.
+   */
   destroy(): AbortablePromise<void> {
     if (this.destroyed) return AbortablePromise.resolveValue<void>(undefined);
     this.destroyed = true;
-    return AbortablePromise.resolveValue<void>(undefined);
+    const open = [...this.handles];
+    this.handles.clear();
+    return AbortablePromise.run<void>(async () => {
+      await Promise.all(open.map((handle) => handle.close()));
+    });
   }
 }
 
@@ -202,7 +223,7 @@ export class CloudEngine implements Engine {
  *        the local engine on identical input.
  *    Outcomes follow "a password failure may only block what the password
  *    was needed for": a rejection in the required case leaves the handle
- *    locked (the caller's prompt takes over, showing "incorrect"); in the
+ *    locked (the prompt says `incorrect`, as on the local engine); in the
  *    upgrade case the document stays readable and the failure is
  *    non-fatal. The one /access POST also installs the CDN binding, so a
  *    successful unlock covers the `password + cdn` combined case.
@@ -238,9 +259,10 @@ async function maybeAutoEstablishAccess(
     const unlocked = await settleLinked(security.unlock({ password, mode: 'any' }), signal);
     if (unlocked) return; // /access succeeded — CDN binding installed too
     // Rejected or failed: in the required case the handle stays locked and
-    // the caller's password prompt takes over (retrying re-POSTs /access);
-    // in the upgrade case the document is readable regardless — fall
-    // through so a CDN-only establishment still happens.
+    // the caller's password prompt takes over (`incorrect` when the password
+    // was wrong; retrying re-POSTs /access); in the upgrade case the
+    // document is readable regardless — fall through so a CDN-only
+    // establishment still happens.
     if (reasons.has('password')) return;
   }
 

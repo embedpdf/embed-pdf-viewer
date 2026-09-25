@@ -144,6 +144,8 @@ export class CloudDocumentHandle implements DocumentHandle {
      */
     initialToken: string | null = null,
     sessionId: string = `cloud:anon:${id}`,
+    /** Called once, when the handle closes (the engine forgets it). */
+    private readonly onClose: () => void = () => {},
   ) {
     this.id = id;
     this.pendingInitialHead = initialHead ?? null;
@@ -646,6 +648,7 @@ export class CloudDocumentHandle implements DocumentHandle {
     this.sseClient = null;
     this.manifestCache = null;
     this.inflightManifest = null;
+    this.onClose();
     return AbortablePromise.resolveValue<void>(undefined);
   }
 

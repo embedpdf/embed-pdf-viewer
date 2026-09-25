@@ -98,7 +98,15 @@ export class LocalDocumentSecurityService implements DocumentSecurityService {
    * SDK calls. Identical contract across engines.
    */
   get passwordPrompt(): PasswordPrompt {
-    return passwordPromptFromState(this.state);
+    return passwordPromptFromState(this.state, this.passwordRejected);
+  }
+
+  /** Whether the last password tried was wrong (the prompt's `incorrect`). */
+  private passwordRejected = false;
+
+  /** A locked open whose password was given and wrong: the prompt says so. */
+  markPasswordRejected(): void {
+    this.passwordRejected = true;
   }
 
   unlock(input: DocumentUnlockInput): AbortablePromise<DocumentUnlockResult> {
@@ -125,13 +133,25 @@ export class LocalDocumentSecurityService implements DocumentSecurityService {
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
 
-      const payload = await submission;
+      let payload: WorkerResultPayload;
+      try {
+        payload = await submission;
+      } catch (error) {
+        if (EngineError.is(error, EngineErrorCode.DocPasswordIncorrect)) {
+          this.passwordRejected = true;
+        }
+        throw error;
+      }
+      this.passwordRejected = false;
       if (payload.tag !== 'document.checkPasswordPermissions') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
       this.state = securityStateFromProbe(payload.security);
-      // The unlock loaded the document for real: its signatures are now
-      // known, and what they forbid applies from the next call on.
+      // The unlock loaded the document for real: the file's permission bits
+      // are the ones this password opens it with (all of them for the owner
+      // password), its signatures are known, and both apply from the next
+      // call on.
+      this.guard?.setPdfPermissions(payload.security.pdfPermissionsBits);
       this.guard?.setProtection(payload.protection ?? null);
       return { security: this.state };
     });
