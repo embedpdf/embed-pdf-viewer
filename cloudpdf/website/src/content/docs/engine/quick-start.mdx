@@ -1,0 +1,206 @@
+---
+title: Quick start
+description: Open a PDF, render its first page, read and search its text, highlight a match and save the result.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+import { Cards, Card } from '@/components/docs/cards';
+import { Callout } from '@/components/docs/callout';
+
+# Quick start
+
+This guide opens a PDF, shows its first page, searches it, highlights a match and saves the
+result.
+
+## 1. Install
+
+<Engine local>
+
+```sh npm2yarn
+npm install @embedpdf/engine
+```
+
+</Engine>
+
+<Engine cloud>
+
+```sh npm2yarn
+npm install @cloudpdf/engine
+```
+
+</Engine>
+
+## 2. Create the engine
+
+Create one engine for your whole app and reuse it.
+
+<Engine local>
+
+```ts
+import { localEngine } from '@cloudpdf/engine';
+
+const engine = localEngine();
+```
+
+Creating it is instant. The engine starts PDFium in a Web Worker the first time you use it, so
+you don't have to wait for anything here.
+
+</Engine>
+
+<Engine cloud>
+
+```ts
+import { cloudEngine } from '@cloudpdf/engine';
+
+const engine = cloudEngine({ baseUrl: 'https://pdf.example.com' });
+```
+
+`baseUrl` is your CloudPDF server. Creating the engine makes no request yet.
+
+</Engine>
+
+## 3. Open a PDF
+
+<Engine local>
+
+Give the engine the file's bytes. Here we fetch them from a URL; a file the user picked works
+the same way (`await file.arrayBuffer()`).
+
+```ts
+const response = await fetch('/invoice.pdf');
+const doc = await engine.open({ kind: 'bytes', bytes: await response.arrayBuffer() });
+```
+
+</Engine>
+
+<Engine cloud>
+
+Open the document with a token your backend created for this user and this document. The token
+also says what the user may do with it.
+
+```ts
+const doc = await engine.open({ kind: 'token', token: () => fetchDocumentToken('invoice') });
+```
+
+[Authentication](/docs/engine/authentication) shows how your backend creates the token, and the
+other ways to open a document.
+
+</Engine>
+
+`doc` is your handle to the open document. Everything else starts from it.
+
+## 4. Show the first page
+
+List the pages, then render the first one as an image:
+
+```ts
+const { pages } = await doc.pages.list();
+const firstPage = doc.page(pages[0].ref);
+
+const image = await firstPage.render.image({ viewport: { kind: 'width', width: 800 } });
+const { url } = await image.objectUrl();
+
+document.querySelector('img')!.src = url;
+```
+
+Each page has a `ref`: its address in the document. `doc.page(ref)` gives you a handle for that
+page, and you pass the same `ref` to anything that works on pages.
+
+## 5. Read the text
+
+```ts
+const { text } = await firstPage.text.get();
+console.log(text);
+```
+
+## 6. Search
+
+Search the whole document. Each match says which page it's on and where it is:
+
+```ts
+const { matches } = await doc.search.query({ text: 'total' });
+
+console.log(`${matches.length} matches`);
+```
+
+## 7. Highlight a match
+
+A match carries one `segment` per line it covers, each with the four corners of that piece of
+text. A highlight takes exactly those corners:
+
+```ts
+const match = matches[0];
+
+await doc.page(match.page).annotations.create({
+  subtype: 'highlight',
+  quadPoints: match.segments.map((segment) => segment.quad),
+  color: { r: 255, g: 215, b: 0 },
+});
+```
+
+Render the page again and the highlight is there. See
+[Highlights & text markup](/docs/engine/annotations/text-markup) for underlines, strikeouts and
+the other fields.
+
+## 8. Save
+
+`download()` returns the PDF with your changes, as bytes:
+
+```ts
+const bytes = await doc.download();
+```
+
+<Engine local>
+
+To let the user save it, wrap the bytes in a `Blob`:
+
+```ts
+const link = document.createElement('a');
+link.href = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+link.download = 'invoice-highlighted.pdf';
+link.click();
+```
+
+</Engine>
+
+<Engine cloud>
+
+You don't need to save to keep the highlight: the server stored it when you created it.
+`download()` is for when you want the file itself.
+
+</Engine>
+
+## 9. Clean up
+
+Close the document when you're done with it. Keep the engine for the next one.
+
+```ts
+await doc.close();
+```
+
+<Callout type="info">
+  Every call returns a promise you can cancel: keep it and call <code>.abort()</code>, for example
+  when the user scrolls past a page before its image arrives. See [Errors &
+  cancelling](/docs/engine/concepts/errors-and-cancelling).
+</Callout>
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Setup"
+    description="Bundlers, workers, server-side rendering and fonts."
+    href="/docs/engine/setup"
+  />
+  <Card
+    title="Annotations"
+    description="Every kind of annotation, and how to change them."
+    href="/docs/engine/annotations"
+  />
+  <Card
+    title="Selection & geometry"
+    description="Find the text under the pointer and draw your own selection."
+    href="/docs/engine/text/selection-and-geometry"
+  />
+</Cards>

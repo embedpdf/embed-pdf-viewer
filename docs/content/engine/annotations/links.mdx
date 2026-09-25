@@ -1,0 +1,148 @@
+---
+title: Links
+description: Make an area of a page go to another page or open a website, and read what existing links do.
+---
+
+# Links
+
+A link is an area of a page that does something when it's clicked: go to another page of the
+document, or open a website.
+
+```ts
+await page.annotations.create({
+  subtype: 'link',
+  rect: { left: 72, bottom: 700, right: 200, top: 715 },
+  target: { kind: 'uri', uri: 'https://example.com' },
+});
+```
+
+A link is an area (`rect`) and what a click does (`target`). It's invisible: it has no color or
+border, and PDF apps draw nothing where it is. It takes the fields every annotation has, such as
+`contents` and the flags. Leave `target` out for a link that does nothing yet (`null`).
+
+## Link to a page
+
+A `goto` target names a page and how to show it:
+
+```ts
+const { pages } = await doc.pages.list();
+
+await page.annotations.create({
+  subtype: 'link',
+  rect,
+  target: { kind: 'goto', destination: { kind: 'fit', page: pages[4].ref } },
+});
+```
+
+| `kind`    | What the reader sees                                                 | Fields                           |
+| :-------- | :------------------------------------------------------------------- | :------------------------------- |
+| `'fit'`   | The whole page.                                                      |                                  |
+| `'xyz'`   | The point `left`, `top` at the top left of the window, at `zoom`.    | `left`, `top`, `zoom`            |
+| `'fitH'`  | The page's full width, with `top` at the top of the window.          | `top`                            |
+| `'fitV'`  | The page's full height, with `left` at the left of the window.       | `left`                           |
+| `'fitR'`  | The rectangle `left`, `bottom`, `right`, `top`, as large as it fits. | `left`, `bottom`, `right`, `top` |
+| `'fitB'`  | Like `'fit'`, for the box around the page's content.                 |                                  |
+| `'fitBH'` | Like `'fitH'`, for the box around the page's content.                | `top`                            |
+| `'fitBV'` | Like `'fitV'`, for the box around the page's content.                | `left`                           |
+
+Positions are in PDF points on the target page, with y going up. `zoom` is a factor: `2` shows
+the page at 200%. A position or zoom left out (or `null`) keeps what the reader has, so this link
+scrolls to a spot without changing the zoom:
+
+```ts
+await page.annotations.update(link.ref, {
+  target: {
+    kind: 'goto',
+    destination: { kind: 'xyz', page: pages[4].ref, left: null, top: 500, zoom: null },
+  },
+});
+```
+
+A link to a page the document doesn't have is refused with `NotFound`.
+
+## Link to a website
+
+A `uri` target opens its address, as you give it:
+
+```ts
+await page.annotations.update(link.ref, {
+  target: { kind: 'uri', uri: 'https://example.com/pricing' },
+});
+```
+
+## Read links
+
+```ts
+const { annotations } = await page.annotations.list();
+
+for (const annotation of annotations) {
+  if (annotation.subtype !== 'link' || !annotation.target) continue;
+  const { target } = annotation;
+  if (target.kind === 'goto') showPage(target.destination.page);
+  if (target.kind === 'uri') openInNewTab(target.uri);
+}
+```
+
+`target` says what a click does:
+
+| `kind`          | What a click does                                  | You can create it |
+| :-------------- | :------------------------------------------------- | :---------------- |
+| `'goto'`        | Goes to a page of this document (`destination`).   | Yes               |
+| `'uri'`         | Opens a web address (`uri`).                       | Yes               |
+| `'named'`       | Runs a viewer command such as `NextPage` (`name`). | No                |
+| `'goto-remote'` | Opens another PDF file (`file`).                   | No                |
+| `'launch'`      | Opens a file or an app (`path`).                   | No                |
+| `'javascript'`  | Runs a script.                                     | No                |
+| `'unsupported'` | Something the engine doesn't model.                | No                |
+
+`target: null` is a link that does nothing. A PDF can name a destination instead of spelling it
+out; the engine looks the name up, so you always get an explicit `destination` with its page.
+
+## Change or remove what a link does
+
+```ts
+await page.annotations.update(link.ref, {
+  target: { kind: 'goto', destination: { kind: 'fit', page: pages[0].ref } },
+});
+
+await page.annotations.update(link.ref, { target: null }); // does nothing when clicked
+```
+
+A new target replaces the old one, and `null` removes it.
+
+## What the engine doesn't run
+
+Links that run a script, open another file or run a viewer command are read and kept in the PDF
+as they are. The engine never runs or follows them, and you can't create them: a `target` of one
+of these kinds in a create is refused with `InvalidArg`. Changing another field of such a link
+(its `rect`, its `contents`) keeps what it does, and so does sending back a link you read: its
+`target` stays as it was.
+
+## Permissions
+
+Links are annotations: they need the same permissions as any annotation. See
+[Permissions](/docs/engine/concepts/permissions#annotations).
+
+## Good to know
+
+### The full action
+
+`target` is a simple view. The full action is in `annotation.actions` (read only). A click runs
+`actions.activate`; later steps are in `next`. An action the engine can't read safely reads as
+`unsupported`. Writing `target` replaces the whole action.
+
+### Destinations and actions in the PDF
+
+A PDF stores a link's target as a destination (`/Dest`) or as an action (`/A`). Both read as a
+`goto` target; the engine writes an action. `target: null` removes both.
+
+### Coordinates
+
+A destination's positions are the target page's own PDF coordinates, not relative to its crop
+box, the same coordinates as the page's annotations.
+
+### Copying links
+
+An [import](/docs/engine/annotations/import-export) maps a link's destination page the way it
+maps the link's own page. A link whose target the engine can't create is imported without it, and
+the import reports it in `dropped` (`unsupported-action`, field `target`).

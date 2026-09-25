@@ -66,7 +66,7 @@ export const LANDING_DEPLOYMENTS: readonly LandingDeployment[] = [
   {
     id: 'saas',
     title: 'Managed SaaS',
-    href: '/docs/engine/getting-started',
+    href: '/docs/engine/quick-start',
     landing: {
       lead: 'We host and manage everything.',
       sub: 'Get secure, scalable infrastructure so you can focus on your product.',
@@ -113,7 +113,7 @@ export const BACKEND_BAND = {
       method: null as string | null,
       title: 'Open in your viewer',
       description: 'The token is all the browser ever holds.',
-      href: '/docs/engine/getting-started',
+      href: '/docs/engine/quick-start',
     },
   ],
 } as const;

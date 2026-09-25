@@ -38,9 +38,12 @@ const ALL_FRAMEWORKS = ['react', 'vue', 'svelte', 'angular'];
 const MOUNTS = {
   mdx: [
     { from: 'headless', to: 'src/content/docs/headless' },
-    // Deliberately the core-concepts SUBTREE: each site owns its own
-    // engine/getting-started (genuinely different onboarding) and _meta.
-    { from: 'engine/core-concepts', to: 'src/content/docs/engine/core-concepts' },
+    // The whole engine corpus. Onboarding that differs per engine is a
+    // flavored page (`setup.local.mdx` / `setup.cloud.mdx`) or a page with
+    // `engines: [cloud]`, not a site-owned file.
+    // Its code imports from the local package; each flavor's copy imports
+    // from its own (`swapEngineImports`).
+    { from: 'engine', to: 'src/content/docs/engine', swapsEngineImports: true },
     { from: 'viewer', to: 'src/content/docs/viewer' },
   ],
   samples: [
@@ -100,6 +103,20 @@ function resolveMdxOverride(files, relative, engine) {
   }
   // A shared page: emit unless this flavor has an override sibling.
   return files.includes(`${base}.${engine}.mdx`) ? null : relative;
+}
+
+/**
+ * The engine pages' code blocks import from the local package, as the shared
+ * types and helpers are exported by both; a flavor's copy imports from its
+ * own package. Only `import … from '@embedpdf/engine';` lines change, never
+ * prose that names the package.
+ */
+function swapEngineImports(source, engine) {
+  if (engine === 'local') return source;
+  return source.replace(
+    /^(\s*import (?:type )?\{[^}]*\} from )'@embedpdf\/engine';$/gm,
+    `$1'${ENGINES[engine].package}';`,
+  );
 }
 
 function transformSample(source, engine, relative) {
@@ -205,7 +222,8 @@ function buildExpected(engine, frameworks) {
           skippedKeysByDir.set(directory, skipped);
           continue;
         }
-        const marked = source.replace(/^(---\n[\s\S]*?\n---\n)/, `$1\n${MDX_MARKER}\n`);
+        const flavored = mount.swapsEngineImports ? swapEngineImports(source, engine) : source;
+        const marked = flavored.replace(/^(---\n[\s\S]*?\n---\n)/, `$1\n${MDX_MARKER}\n`);
         expected.set(path.join(mount.to, emitAs), marked);
       } else if (relative.endsWith('_meta.ts')) {
         metas.push({ relative, source });

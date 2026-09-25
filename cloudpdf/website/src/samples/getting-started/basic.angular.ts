@@ -7,7 +7,7 @@ import { EpdfRenderLayer, renderPlugin } from '@embedpdf/angular/render';
 
 const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
-// Kernel readers live inside <epdf-viewer>, where the host is injectable —
+// Kernel readers live INSIDE <epdf-viewer>, where the host is injectable —
 // and document UI is gated on having a document.
 @Component({
   selector: 'demo-workspace',

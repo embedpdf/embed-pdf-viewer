@@ -1,0 +1,149 @@
+---
+title: Search
+description: Find text in a document, show where each match is, and page through results in a large file.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+import { Callout } from '@/components/docs/callout';
+
+# Search
+
+`doc.search.query()` finds text in the whole document:
+
+```ts
+const { matches } = await doc.search.query({ text: 'invoice' });
+
+for (const match of matches) {
+  console.log(match.page, match.start, match.count);
+}
+```
+
+Each match tells you three things:
+
+- `page`: the page it's on (a page ref, like `page.ref` from `doc.pages.list()`).
+- `start` and `count`: which characters it covers, as a range on that page.
+- `segments`: where it is on the page, one segment per line the match covers.
+
+## Show where a match is
+
+Each segment has a `rect` (a box, `{ left, bottom, right, top }` in PDF points) and a `quad` (the
+four corners of the text, which differ from the box when text is rotated). Draw the boxes over
+the rendered page, or turn the match into a highlight annotation:
+
+```ts
+await doc.page(match.page).annotations.create({
+  subtype: 'highlight',
+  quadPoints: match.segments.map((segment) => segment.quad),
+});
+```
+
+Segments are the same ones a text selection makes, so a highlighted match looks exactly like a
+highlighted selection of the same words. A match is also a range, so the selection plugin and
+`page.text.slice()` take it as it is. For the other markup kinds and their fields, see
+[Highlights & text markup](/docs/engine/annotations/text-markup).
+
+## Show the text around a match
+
+Ask for snippets to show each match in context, for a results list:
+
+```ts
+const { matches } = await doc.search.query({ text: 'invoice', snippets: true });
+
+const { before, match, after } = matches[0].snippet!;
+// before: "Please pay this "   match: "invoice"   after: " within 30 days."
+```
+
+Render `match` in bold or with a `<mark>` between `before` and `after`.
+
+## Options
+
+```ts
+await doc.search.query({ text: 'Total', matchCase: true, wholeWord: true });
+```
+
+| Option             | What it does                                                                 | Default    |
+| :----------------- | :--------------------------------------------------------------------------- | :--------- |
+| `text`             | What to find.                                                                |            |
+| `matchCase`        | `Total` doesn't match `total`.                                               | `false`    |
+| `wholeWord`        | `pay` doesn't match `payment`.                                               | `false`    |
+| `matchDiacritics`  | `café` doesn't match `cafe`.                                                 | `false`    |
+| `ignoreWhitespace` | `invoice` also matches `i n v o i c e` (letter-spaced headings, OCR).        | `false`    |
+| `regex`            | `text` is a regular expression.                                              | `false`    |
+| `snippets`         | Include the text around each match.                                          | `false`    |
+| `from`             | Start at this page and wrap around, so the matches the user sees come first. | first page |
+
+By default the search ignores case and accents, and treats any run of spaces and line breaks as
+one space, so `total amount` finds a phrase broken over two lines.
+
+### Regular expressions
+
+With `regex: true`, `text` is a pattern in JavaScript syntax without backreferences and
+lookaround (so it runs the same on every engine). `matchCase` and `wholeWord` still apply;
+`matchDiacritics` and `ignoreWhitespace` don't, and passing them with `regex` fails with
+`InvalidArg`, as does a pattern the engine can't run.
+
+```ts
+await doc.search.query({ text: 'INV-\\d{4}', regex: true });
+```
+
+To check a query before sending it (for example while the user types), use
+`validateSearchQuery(query)`. It runs the same check as the engine and returns `{ ok: true }`, or
+`{ ok: false, message }` with a message you can show:
+
+```ts
+import { validateSearchQuery } from '@cloudpdf/engine';
+
+const check = validateSearchQuery({ text: '(unclosed', regex: true });
+if (!check.ok) showError(check.message);
+```
+
+## Large documents
+
+A search returns matches in batches, so the first results show up quickly even in a very long
+document. When there's more to find, the result has a `nextCursor`; pass it back to continue:
+
+```ts
+let cursor: string | null = null;
+
+do {
+  const result = await doc.search.query({ text: 'invoice', cursor: cursor ?? undefined });
+  showMatches(result.matches);
+  showProgress(result.pagesSearched, result.pageCount);
+  cursor = result.nextCursor;
+} while (cursor);
+```
+
+`nextCursor` is `null` when the whole document has been searched. To stop a search (the user
+typed something else), just don't ask for the next batch.
+
+A cursor belongs to one query on one version of the document. If the document changes between
+batches, the next call fails with `InvalidArg`: start the search again.
+
+To choose how much each batch does, pass `limit: { matches, pages }`. The engine may do less than
+you ask.
+
+## Permissions
+
+Searching needs the `doc.text.search` permission. Snippets are text from the document, so
+`snippets: true` also needs `doc.text.copy`; without it the call fails with `Forbidden` rather
+than leaving the snippets out.
+
+That means you can let a user find words in a document (and see where they are) without letting
+them read its text, which is often what a document owner wants.
+
+<Engine local>
+
+<CloudPdfCallout
+  title="Search without sending the text"
+  href="https://www.cloudpdf.com/docs/engine/concepts/permissions"
+  cta="How CloudPDF enforces permissions"
+>
+
+On the local engine the search runs in the browser, over a file the user already has. With
+CloudPDF it runs on your server, and a user without `doc.text.copy` gets where the matches are,
+not the text around them.
+
+</CloudPdfCallout>
+
+</Engine>

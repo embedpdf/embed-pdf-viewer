@@ -296,9 +296,9 @@ doc.text.copy         denied
 | `onCommit(callback)`   | Observe the end of pointer selection gestures            |
 
 Application code should import this public surface from
-`@embedpdf/plugin-selection` or its framework adapter. The `/internal` entry
-point is for framework and plugin integration and is not a public application
-contract.
+`@embedpdf/plugin-selection` or its framework adapter. The `/contract/host`
+entry point is for framework and plugin integration and is not a public
+application contract.
 
 ## Next steps
 
@@ -306,7 +306,7 @@ contract.
   <Card
     title="Text"
     description="The engine side of text: extraction, search, and the character geometry selection is built on."
-    href="/docs/engine/core-concepts/text"
+    href="/docs/engine/text/selection-and-geometry"
   />
   <Card
     title="Render"

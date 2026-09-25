@@ -1,0 +1,112 @@
+---
+title: Reading text
+description: Get the text of a page, part of a page, or a whole document.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+import { Callout } from '@/components/docs/callout';
+
+# Reading text
+
+Get a page's text with `page.text.get()`:
+
+```ts
+const page = doc.page(pageRef);
+const { text } = await page.text.get();
+```
+
+`text` is the page's text in reading order, as a normal JavaScript string. Lines are separated
+by `\r\n`.
+
+## Part of a page
+
+Characters on a page are numbered from 0. To read just some of them (the text a user selected, or
+a search match), pass a range:
+
+```ts
+const selected = await page.text.slice({ start: 120, count: 42 });
+```
+
+A range is always `{ start, count }`: `start` is the first character, `count` how many. Search
+matches and selections are ranges too, so you can pass them straight in:
+
+```ts
+const { matches } = await doc.search.query({ text: 'total' });
+const found = await doc.page(matches[0].page).text.slice(matches[0]);
+```
+
+## A whole document
+
+There's no single call for the whole document; read the pages and join them:
+
+```ts
+const { pages } = await doc.pages.list();
+
+const texts = await Promise.all(pages.map((page) => doc.page(page.ref).text.get()));
+const fullText = texts.map(({ text }) => text).join('\n\n');
+```
+
+The engine reads pages one at a time in the background, so this is fine for long documents too.
+
+## Permissions
+
+Reading text needs the `doc.text.copy` permission, because text you read can leave the document.
+Without it, both calls fail with `Forbidden`.
+
+A user without `doc.text.copy` can still [search](/docs/engine/text/search) (without snippets)
+and [select](/docs/engine/text/selection-and-geometry) text: both need only where the text is,
+not what it says. That lets you allow highlighting a PDF while stopping its text from being
+copied.
+
+<Engine local>
+
+<CloudPdfCallout
+  title="Stop text from being copied, for real"
+  href="https://www.cloudpdf.com/docs/engine/concepts/permissions"
+  cta="How CloudPDF enforces permissions"
+>
+
+The local engine runs in the user's browser, which already holds the whole file, so a permission
+there keeps your interface honest but can't keep the text from a user who opens the file another
+way. With CloudPDF the file stays on your server: a user without `doc.text.copy` receives page
+images and highlight positions, never the text as characters they can copy.
+
+</CloudPdfCallout>
+
+</Engine>
+
+## Good to know
+
+### Characters and string positions
+
+The engine numbers characters the way the PDF stores them. Most of the time that matches the
+string: character 5 is `text[5]`. Two things make them differ:
+
+- **Characters outside the Basic Multilingual Plane** (most emoji, some CJK characters) are one
+  character in the PDF but two positions in a JavaScript string.
+- **Characters with no text of their own** (a glyph the PDF maps to no Unicode character) have a
+  number but add nothing to the string.
+
+That's why you pass ranges to `slice()` instead of cutting `text` yourself: `slice()` converts for
+you. `get()` also returns `charCount` (how many characters the page has) and, when the two
+numberings differ, a `charMap` that records where. You only need `charMap` if you convert
+positions yourself, for example to run your own search over `text`:
+
+```ts
+import { charRangeForTextOffsets } from '@embedpdf/engine';
+
+const snapshot = await page.text.get();
+const at = snapshot.text.indexOf('Total');
+const range = charRangeForTextOffsets(snapshot, { start: at, count: 'Total'.length });
+// range is { start, count } in characters: ready for slice(), layout.segments() or a highlight.
+```
+
+<Engine cloud>
+
+### Caching
+
+The text of a page only changes when the page's content changes (not when annotations do). The
+server caches it with the page, so reading an unchanged page again is fast.
+
+</Engine>

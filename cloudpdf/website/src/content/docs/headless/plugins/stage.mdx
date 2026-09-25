@@ -72,7 +72,7 @@ zoomTo({ pageWidth: 200 }); // every page 200px wide (thumbnail rails)
 ## Moving through pages
 
 `usePages()` gives you the current page, the page count, and the ways to move:
-`goToPage`, `next`, `prev`, and `reveal`.
+`goToPage`, `next`, `previous`, and `reveal`.
 
 <Example name="stage/navigation" />
 
@@ -83,7 +83,7 @@ zoomTo({ pageWidth: 200 }); // every page 200px wide (thumbnail rails)
 A few details that matter:
 
 - **Pages count from 0.** Page "1" in your UI is `goToPage(0)`.
-- **`next()` / `prev()` respect spreads.** When a two-page spread fits, they
+- **`next()` / `previous()` respect spreads.** When a two-page spread fits, they
   move one spread. Zoomed in, they move one page.
 - **`reveal` is gentler than `goToPage`.** It scrolls only as far as needed to
   make a page visible, and does nothing if it already is. Use it for thumbnail
@@ -240,8 +240,9 @@ with a CSS variable — no props involved:
 ## Scrollbars and progress
 
 The Stage uses the same scroll vocabulary as the browser.
-`scrollMetrics()` returns `scrollTop`, `scrollHeight`, and `clientHeight`
-(the same numbers a DOM element would report), and `scrollTo()` /
+`getScrollMetrics()` (on the host lens, `@embedpdf/plugin-stage/contract/host`)
+returns `scrollTop`, `scrollHeight`, and `clientHeight` (the same numbers a DOM
+element would report), and `scrollTo()` /
 `scrollBy()` work like `Element.scrollTo`. Anything you would build against a
 scrollable div, you can build against the Stage.
 
@@ -327,7 +328,7 @@ Save afterwards and the PDF is still untouched:
 <Example name="stage/rotate-view" />
 
 ```ts
-stage.rotateView(90); // one quarter-turn clockwise from here
+stage.rotateViewBy(90); // one quarter-turn clockwise from here
 stage.setViewRotation(180); // or jump to an absolute rotation
 ```
 
@@ -442,7 +443,7 @@ reflows.
   <Card
     title="Pages & rendering"
     description="Where the page sizes the Stage lays out come from, and what a render actually costs."
-    href="/docs/engine/core-concepts/pages-and-rendering"
+    href="/docs/engine/documents/rendering"
   />
   <Card
     title="All plugins"

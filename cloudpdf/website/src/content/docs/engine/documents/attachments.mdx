@@ -1,0 +1,136 @@
+---
+title: Attachments
+description: List, download, add and delete the files attached to a document.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Attachments
+
+A PDF can carry other files inside it: a spreadsheet with the numbers behind a report, the
+original of a scanned contract. PDF apps list them in an attachments panel.
+
+```ts
+const { attachments } = await doc.attachments.list();
+
+for (const attachment of attachments) {
+  console.log(attachment.name, attachment.size);
+}
+
+const { bytes, name } = await doc.attachments.download(attachments[0].ref);
+```
+
+## List
+
+`list()` returns the attached files, sorted by name. It doesn't read the files themselves, so it's
+quick however large they are.
+
+| Field         | What it is                                                         |
+| :------------ | :----------------------------------------------------------------- |
+| `ref`         | The attachment's address. Pass it to `download()` and `delete()`.  |
+| `name`        | The file name, such as `'figures.xlsx'`.                           |
+| `mimeType`    | The file type, such as `'application/pdf'`, or `null`.             |
+| `description` | A description, or `null`.                                          |
+| `size`        | The size in bytes, or `null`.                                      |
+| `checksum`    | The file's MD5 checksum, as lowercase hex, or `null`.              |
+| `createdAt`   | When the file was created, as an ISO date, or `null`.              |
+| `modifiedAt`  | When the file was last changed, as an ISO date, or `null`.         |
+| `index`       | Its position in the list. Changes when files are added or deleted. |
+
+A field reads `null` when the PDF doesn't say.
+
+## Download one
+
+`download(ref)` returns the file's bytes with its name and type, ready to hand to the user:
+
+```ts
+const { bytes, name, mimeType } = await doc.attachments.download(attachment.ref);
+
+const url = URL.createObjectURL(new Blob([bytes], { type: mimeType ?? '' }));
+const link = document.createElement('a');
+link.href = url;
+link.download = name;
+link.click();
+URL.revokeObjectURL(url);
+```
+
+## Attach a file
+
+`create()` takes the bytes and a name, and returns the new attachment:
+
+```ts
+const { attachment } = await doc.attachments.create({
+  data: bytes,
+  name: 'figures.xlsx',
+  mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  description: 'Numbers for the Q2 report',
+});
+```
+
+`data` is a `Uint8Array`, an `ArrayBuffer` or a `Blob`. A `File` the user picked brings its own
+name and type, so it's enough on its own:
+
+```ts
+const file = input.files![0];
+await doc.attachments.create({ data: file });
+```
+
+Only `data` and a name are needed; a `File` brings its name, and a `File` or `Blob` brings its
+type. The engine never guesses a type: without one, `mimeType` reads `null`. It records the size,
+the checksum and the time you attached it.
+
+Names are unique in a document: attaching a second file with a name that's already there fails
+with `InvalidArg`. Rename it and try again.
+
+## Delete
+
+```ts
+await doc.attachments.delete(attachment.ref);
+```
+
+The attachment disappears from the list. Its bytes stay in earlier versions of the file until you
+save with `mode: 'rewrite'`; see [Good to know](#deleted-files-and-saving).
+
+## Attachments or file-attachment annotations
+
+A PDF can hold a file in two places:
+
+- **An attachment** (this page) belongs to the whole document. PDF apps list it in their
+  attachments panel.
+- **A [file attachment annotation](/docs/engine/annotations/file-attachments)** is pinned to a spot
+  on a page, shown as an icon, and can carry a comment.
+
+They're separate: `doc.attachments.list()` doesn't include files pinned to pages, and deleting an
+attachment never touches an annotation.
+
+## Permissions
+
+| Call                   | Needs                                        |
+| :--------------------- | :------------------------------------------- |
+| `list()`               | `doc.open`                                   |
+| `download()`           | `doc.download`: the file leaves the document |
+| `create()`, `delete()` | `doc.attachments.modify`                     |
+
+So a user can see which files a document carries without being able to take them out.
+
+## Good to know
+
+### Deleted files and saving
+
+Deleting an attachment removes it from the document as it is now. An incremental save still
+contains the version you opened, and with it the deleted file. When a file must really be gone,
+save with `mode: 'rewrite'`. See [Saving](/docs/engine/documents/saving#incremental-or-rewrite).
+
+### Names and refs
+
+An attachment's ref is its name in the PDF's list of files, which is why names are unique. When
+you stored a name yourself, `toAttachmentRef('figures.xlsx')` turns it back into a ref. A file
+another app attached may show a different `name` than the one in its ref; always pass the ref.
+
+Adding or deleting a file changes the `index` of the files after it in name order, never their
+refs.
+
+### Events
+
+Other code can follow changes with the `attachments.created` and `attachments.deleted` events. See
+[Events](/docs/engine/concepts/events).

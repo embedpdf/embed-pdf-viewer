@@ -1,0 +1,207 @@
+---
+title: Stamps
+description: Place an image or a PDF drawing on a page, turn and resize it, and copy it to another page or document.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Stamps
+
+A stamp puts a picture on a page: a logo, a signature, an "Approved" mark. You give the engine the
+picture as PNG, JPEG or PDF bytes, and the box to put it in:
+
+```ts
+const image = await (await fetch('/approved.png')).blob();
+
+const { annotation } = await page.annotations.create(
+  { subtype: 'stamp', rect: { left: 72, bottom: 640, right: 222, top: 690 } },
+  { appearance: image },
+);
+```
+
+The picture goes in the second argument, as the `appearance`. A `Blob` (such as a file the user
+picked) and a `Uint8Array` both work.
+
+| Field           | What it is                                                                                                     | Default     |
+| :-------------- | :------------------------------------------------------------------------------------------------------------- | :---------- |
+| `rect`          | The box the stamp fills, `{ left, bottom, right, top }` in points; worked out for you when the stamp is turned | required    |
+| `fit`           | How the picture fills the box: `'contain'`, `'cover'` or `'fill'`                                              | `'contain'` |
+| `opacity`       | From `0` (invisible) to `1` (solid), over the whole picture                                                    | `1`         |
+| `name`          | A label for the stamp, such as `'Approved'`                                                                    | none        |
+| `rotation`      | How far the stamp is turned, in degrees; see [Turn a stamp](#turn-a-stamp)                                     | none        |
+| `unrotatedRect` | A turned stamp's own box, before turning                                                                       | none        |
+
+`fit` works like CSS `object-fit`: `'contain'` shows the whole picture at its own proportions,
+`'cover'` fills the box at its own proportions and crops what sticks out, `'fill'` stretches the
+picture to the box. The stamp remembers its `fit`, so a later resize fills the new box the same
+way.
+
+## Images and PDF drawings
+
+| Bytes | What you get                                                    |
+| :---- | :-------------------------------------------------------------- |
+| PNG   | The image, with its transparency.                               |
+| JPEG  | The image, stored as it is, without re-encoding.                |
+| PDF   | The page as a vector drawing, sharp at any zoom. One page only. |
+
+The engine tells which it is from the bytes themselves, never from a file name or a MIME type.
+Anything else, a PDF with more than one page included, is refused with `InvalidArg` before
+anything is written. So is a stamp without an `appearance`.
+
+### A page of a PDF
+
+To use a page of an open document as a stamp, extract it: `pages.extract()` returns a one-page
+PDF.
+
+```ts
+const drawing = await doc.pages.extract([pageRef]);
+
+await page.annotations.create({ subtype: 'stamp', rect }, { appearance: drawing });
+```
+
+### Standard stamps
+
+The engine has no stamps of its own. `name` is only a label stored with the stamp; the picture is
+always the `appearance` you give it.
+
+<Engine local>
+
+The standard set (Approved, Draft, Confidential, Sign Here and more) ships as vector drawings in
+`@embedpdf/default-stamps`: one PDF per language, one page per stamp. Each page is registered
+under a name `identifier=label`, such as `Approved=Goedgekeurd` in the Dutch file:
+
+```ts
+import { loadDefaultLibrary } from '@embedpdf/default-stamps/library';
+
+const library = await engine.open({ kind: 'bytes', bytes: await loadDefaultLibrary('en') });
+const { namedPages } = await library.pages.list();
+const approved = namedPages.find((entry) => entry.name.startsWith('Approved='));
+
+if (approved?.target.kind === 'page') {
+  const drawing = await library.pages.extract([approved.target.page]);
+  await page.annotations.create(
+    { subtype: 'stamp', rect, name: 'Approved', subject: 'Approved' },
+    { appearance: drawing },
+  );
+}
+await library.close();
+```
+
+The identifier becomes the stamp's `name` and the label its `subject`, the way Acrobat writes
+stamps from its own libraries. In a viewer, the [stamp plugin](/docs/headless/plugins/stamp)
+does this for you.
+
+</Engine>
+
+## Turn a stamp
+
+A stamp turns like a rectangle: give its own box as `unrotatedRect` and the angle as `rotation`,
+in degrees clockwise.
+See [Turned shapes](/docs/engine/annotations/shapes#turned-shapes).
+
+```ts
+const { annotation } = await page.annotations.create(
+  {
+    subtype: 'stamp',
+    unrotatedRect: { left: 300, bottom: 300, right: 400, top: 350 }, // 100 × 50
+    rotation: 90,
+  },
+  { appearance: image },
+);
+
+annotation.rect; // { left: 325, bottom: 275, right: 375, top: 375 }: the same box, turned
+```
+
+## Resize and refit
+
+A new `rect` or a new `fit` places the same picture again. Nothing is uploaded or re-encoded:
+
+```ts
+await page.annotations.update(annotation.ref, {
+  rect: { left: 72, bottom: 600, right: 372, top: 690 },
+});
+await page.annotations.update(annotation.ref, { fit: 'cover' });
+```
+
+The stamp keeps its whole picture, whatever box it's in, so a stamp set from `'cover'` back to
+`'contain'` shows all of it again.
+
+To change the picture itself, pass a new `appearance`:
+
+```ts
+await page.annotations.update(annotation.ref, {}, { appearance: otherImage });
+```
+
+A new `opacity` replaces the old one, and applies to the picture as a whole: overlapping parts of
+the artwork don't show through each other.
+
+## Download a stamp's drawing
+
+A read never contains the picture. `downloadResource()` returns it, as a one-page PDF:
+
+```ts
+const drawing = await page.annotations.downloadResource(annotation.ref, 'appearance');
+```
+
+The drawing is the picture before the stamp's `fit`, `rotation` and `opacity`. For a stamp made
+from a PNG or JPEG, it's the image at its own size, one pixel to a point, whatever box the stamp
+is in. For a stamp made by another app, it's the picture as that app drew it.
+
+## Copy a stamp
+
+The read and the drawing together make the same stamp again, on another page or in another
+document:
+
+```ts
+const drawing = await page.annotations.downloadResource(stamp.ref, 'appearance');
+
+await otherPage.annotations.create(stamp, { appearance: drawing });
+```
+
+The copy has the same box, `fit`, `rotation`, `opacity` and `name`; the engine records the user
+who makes it as its author.
+
+To copy on the same page, clear the unique name: `{ ...stamp, nm: null }` (see
+[Refs & identity](/docs/engine/concepts/identity)). A copy with a name that's taken on its page
+fails with `InvalidArg`.
+
+To copy many annotations at once, stamps included, use [Import & export](/docs/engine/annotations/import-export).
+
+## Permissions
+
+Stamps are annotations: creating, changing and deleting them needs the same permissions as any
+annotation (see [Permissions](/docs/engine/concepts/permissions#annotations)). Downloading a
+drawing sends document content out, so it needs `doc.download`, and so does `pages.extract()`.
+
+## Good to know
+
+### Shared drawings
+
+Stamps with the same picture share one drawing, so a logo placed 100 times is stored once, also
+after a save, and when you download it and place it again.
+
+Changing one stamp never changes the others. A new picture for one stamp gives that stamp a
+drawing of its own; the stamps that shared the old one keep it.
+
+### The same drawing is the same bytes
+
+A drawing always downloads as the same bytes: from the local and the cloud engine, and again
+after a copy. So you can store drawings by their hash and keep one copy for every stamp that uses
+it.
+
+### Stamps from other apps
+
+A stamp made by Acrobat or another app records no fit and reads `fit: null`. A resize stretches
+its picture to the new box, as every PDF app shows it. A stamp from another app keeps its saved
+opacity through a resize or copy; a new `opacity` replaces it. The same goes the other way:
+Acrobat can change the opacity of a stamp made here.
+
+### Large images
+
+An image becomes a drawing at its own size, one pixel to a point, scaled down to fit 14,400
+points (Acrobat's largest page size). The stamp's box then scales it to where it goes.
+
+### The name
+
+`name` takes any text that isn't empty: a standard stamp name such as `'Approved'`, or the id
+Acrobat gives a stamp from a custom library. In the PDF it's the stamp's `/Name`.

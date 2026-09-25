@@ -1,0 +1,431 @@
+---
+title: Digital signatures
+description: Check who signed a PDF and what changed since, sign a signature field with your own key or signing service, and certify a document.
+---
+
+# Digital signatures
+
+A digital signature seals a PDF as it was at the moment of signing. The engine reads every
+signature in a document, tells you what changed after it, and signs a field for you. It never
+sees your private key: it hands you the fingerprint of the file (a digest), your key signs it,
+and the engine writes the result into the PDF.
+
+```ts
+import { sign, webCryptoSigner } from '@embedpdf/core-signature';
+
+const { signatures } = await doc.signatures.list();
+const field = signatures.find((signature) => !signature.signed)!.field;
+
+await sign(doc, {
+  field,
+  key: webCryptoSigner({ privateKey, certificateChain }),
+  signer: { name: 'Ada Lovelace', reason: 'Approved' },
+});
+```
+
+Signing needs `doc.sign`, and `doc.forms.read` to find the field with `list()`; see
+[Permissions](#permissions).
+
+The cryptography (building a signature from a key, checking one against its certificate) lives
+in its own package, which works with both engines:
+
+```sh npm2yarn
+npm install @embedpdf/core-signature
+```
+
+## Sign a field
+
+`sign()` signs a field in one call. It gets the digest from the engine, has your `key` sign it,
+checks the result and writes it into the document. When anything fails, it cancels, and the
+document is as it was.
+
+```ts
+import { sign, webCryptoSigner } from '@embedpdf/core-signature';
+
+const result = await sign(doc, {
+  field,
+  key: webCryptoSigner({ privateKey, certificateChain }),
+  signer: { reason: 'Approved', location: 'Amsterdam' },
+});
+
+result.signature; // the new signature, as list() returns it
+```
+
+`key` is what signs the digest, one of:
+
+| Key                                                 | Use it when                                                              |
+| :-------------------------------------------------- | :----------------------------------------------------------------------- |
+| `webCryptoSigner({ privateKey, certificateChain })` | You hold a WebCrypto key and its certificates (DER, the signer's first). |
+| `remoteSigner({ sign })`                            | A signing service or HSM turns a digest into a finished signature (CMS). |
+| `createTestSigner()`                                | Tests and demos: a throwaway key with a self-signed certificate.         |
+
+After signing, the document is the signed file: `list()` shows the new signature, and
+`doc.download()` returns the signed PDF. When the signature your key returns doesn't match what
+the engine prepared, `sign()` fails with `SignatureRefused` and the message says why.
+
+### Options
+
+`sign()` and `prepare()` take these options (`sign()` also takes the `key`):
+
+| Option         | What it is                                                                       | Default                                       |
+| :------------- | :------------------------------------------------------------------------------- | :-------------------------------------------- |
+| `field`        | The signature field to sign. It must not be signed yet.                          |                                               |
+| `signer`       | `{ name, reason, location, contactInfo, signedAt }`, written into the signature. | none; `signedAt` now                          |
+| `appearance`   | `{ pdf }`: a PDF whose first page is drawn into the field's box.                 | none                                          |
+| `certify`      | `{ permission: 1 \| 2 \| 3 }`: [certify](#certify-a-document) the document.      | not certified                                 |
+| `lock`         | Fields this signature [locks](#lock-fields).                                     | none                                          |
+| `digest`       | `'sha256'`, `'sha384'` or `'sha512'`.                                            | `'sha256'`, or the `key`'s hash with `sign()` |
+| `subFilter`    | `'ETSI.CAdES.detached'` or `'adbe.pkcs7.detached'`.                              | `'ETSI.CAdES.detached'`                       |
+| `contentsSize` | Bytes reserved for the signature, from 256 to 4 MiB.                             | `8192`                                        |
+
+The field needs a widget to carry an `appearance`; without one, the call fails with
+`SignatureRefused`.
+
+## Sign in two steps
+
+When the key is somewhere else (a signing service, a hardware key, another device), sign in two
+steps. `prepare()` reserves room for the signature and returns the digest to sign; `complete()`
+writes it in:
+
+```ts
+const prepared = await doc.signatures.prepare({
+  field,
+  signer: { name: 'Ada Lovelace', reason: 'Approved' },
+});
+
+// prepared.digest is the fingerprint to sign, with prepared.algorithm ('sha256').
+const cms = await mySigningService.sign(prepared.digest, prepared.algorithm);
+
+const result = await doc.signatures.complete({
+  signingId: prepared.signingId,
+  cms,
+  expectedVersion: prepared.expectedVersion,
+});
+```
+
+`cms` is a detached CMS signature (PKCS #7 or CAdES) over the digest: what signing services
+return. To build one from a raw key yourself, use `buildDetachedCms()` from
+`@embedpdf/core-signature`.
+
+Between the two steps:
+
+- **The document is locked.** Every other change fails with `SigningPending` until you complete or
+  cancel; reading still works.
+- **To give up**, call `doc.signatures.cancel(prepared.signingId)`. It returns
+  `status: 'cancelled'`, and a `complete()` for that signing fails with `NotFound`.
+- **Pass `expectedVersion` back as it is.** It ties the signature to the version it was made
+  for; a different one fails with `SigningVersionMismatch`, and you prepare again.
+
+`complete()` checks that `cms` is one signature that fits the space `prepare()` reserved
+(`contentsSize`); if not, it fails with `SignatureRefused`. It doesn't check the cryptography:
+`sign()` does that before it calls `complete()`, and `validateSignatures()` does it afterwards.
+Calling `complete()` again with the same `cms` returns the same result, with
+`status: 'already-completed'`; a different `cms` fails with `SignatureRefused`.
+
+<Engine local>
+
+A prepared signature waits until you complete or cancel it: `prepared.expiresAt` is `null`.
+
+</Engine>
+
+<Engine cloud>
+
+A prepared signature waits 15 minutes for its CMS, until `prepared.expiresAt` (your server can
+change the time). After that, `complete()` fails with `SigningExpired`.
+
+</Engine>
+
+## Certify a document
+
+The first signature in a document can certify it: the signer says which changes may follow.
+
+```ts
+await sign(doc, { field, key, certify: { permission: 2 } });
+```
+
+| `permission` | What may change afterwards                                      |
+| :----------- | :-------------------------------------------------------------- |
+| `1`          | Nothing, except adding document timestamps and validation data. |
+| `2`          | Filling in the form and signing.                                |
+| `3`          | Filling in the form, signing and adding or changing comments.   |
+
+From the moment it completes, the engine refuses what the certification forbids, with
+`ProtectedDocument`: every level refuses page changes, new or changed fields, attachments and
+redaction; `1` and `2` also refuse annotations; `1` also refuses filling in. Certifying after a
+signature already exists fails with `SignatureRefused`.
+
+## Lock fields
+
+A signature can lock fields, so nobody changes what the signer saw:
+
+```ts
+await sign(doc, {
+  field,
+  key,
+  lock: { action: 'include', fields: ['invoice.total', 'invoice.date'] },
+});
+```
+
+`action` is `'include'` (lock the fields named), `'exclude'` (lock all others) or `'all'`. A name
+covers the fields in its group: `'invoice'` locks `invoice.total` too. Once signed, writing a
+locked field fails with `ProtectedDocument`, and an import skips it.
+
+## Signature fields and their look
+
+A signature field is a form field of family `'signature'`. Create one like any field (see
+[Creating form fields](/docs/engine/forms/authoring)):
+
+```ts
+const { field } = await doc.forms.create({
+  family: 'signature',
+  name: 'approver',
+  widgets: [{ page: page.ref, rect: { left: 300, bottom: 50, right: 500, top: 110 } }],
+});
+```
+
+To draw a mark into a field without signing it, for example a handwritten signature in a viewer
+that has no key, use `setSignatureAppearance()`. The field stays unsigned:
+
+```ts
+await doc.forms.setSignatureAppearance(field.ref, { pdf: artworkPdf });
+```
+
+Once a field is signed, its look is part of what the signature seals, so
+`setSignatureAppearance()` fails with `ProtectedDocument`. To sign with artwork, pass `appearance` to
+`sign()` or `prepare()`.
+
+<Engine cloud>
+
+## On the cloud
+
+- **Signing makes a new version.** A completed signature becomes a new version of the document on
+  the server, and everyone who opens the document from then on gets the signed file.
+- **Copies from before can't sign.** Someone who had the document open, and changed it, before the
+  signature completed can keep editing their copy, but `prepare()` fails with `StaleBase`.
+- **Signed bytes never change.** `getContents()`, `getDigest()` and `downloadRevision()` read a
+  version, and a version is never changed, so the server lets browsers and CDNs cache them.
+
+</Engine>
+
+## Read the signatures
+
+`list()` returns every signature field, signed or not, and what the signatures allow:
+
+```ts
+const { signatures, protection } = await doc.signatures.list();
+
+for (const signature of signatures) {
+  console.log(signature.fieldName, signature.signed, signature.signer.name);
+}
+```
+
+| Field       | What it is                                                                                          |
+| :---------- | :-------------------------------------------------------------------------------------------------- |
+| `field`     | The signature field's ref. Pass it to `sign()` and `prepare()`.                                     |
+| `fieldName` | The field's full name.                                                                              |
+| `signed`    | Whether the field holds a signature.                                                                |
+| `signer`    | What the signer wrote: `name`, `reason`, `location`, `contactInfo` and `signedAt`.                  |
+| `kind`      | `'signature'`, or `'timestamp'` for a document timestamp.                                           |
+| `docMdp`    | The [certification](#certify-a-document) level the signature declares (`1`, `2` or `3`), or `null`. |
+| `widget`    | The field's widget, with its `page`, `rect` and `ref`, or `null` when the field has none.           |
+
+The `signer` fields are claims, the same ones you pass when you sign: anyone can write any name.
+Who really signed is in the signature's certificate, which
+[`validateSignatures()`](#check-the-signatures) checks. `signedAt` is the signer's own clock.
+
+`protection` says what the signatures allow from now on; see
+[Protection](#protection-what-signatures-allow).
+
+The signatures describe the file as it was opened, or as it was last signed. Changes you haven't
+saved aren't part of any signature until you sign.
+
+## Check the signatures
+
+`validateSignatures()` answers, for each signature: are the signed bytes intact, does the
+signature match its certificate, do you trust that certificate, and what changed since.
+
+```ts
+import { validateSignatures } from '@embedpdf/core-signature';
+
+const results = await validateSignatures(doc, {
+  trust: { anchors: async () => [rootCertificate] },
+});
+
+for (const result of results) {
+  console.log(result.signature.fieldName, result.summary);
+}
+```
+
+`anchors` returns the certificates you trust (DER bytes), for example your company's root.
+
+| Field                   | What it answers                                | Values                                                         |
+| :---------------------- | :--------------------------------------------- | :------------------------------------------------------------- |
+| `integrity`             | Are the signed bytes unchanged?                | `'valid'`, `'invalid'`, `'indeterminate'`                      |
+| `cryptography`          | Does the signature match its own certificate?  | `'valid'`, `'invalid'`, `'unsupported'`                        |
+| `trust`                 | Does the certificate lead to one you trust?    | `'trusted'`, `'untrusted'`, `'unknown'`                        |
+| `modifications.verdict` | What changed after signing, and is it allowed? | See [What changed](#what-changed-since-a-signature)            |
+| `summary`               | All of the above together.                     | `'valid'`, `'valid-untrusted'`, `'invalid'`, `'indeterminate'` |
+
+`summary` is `'invalid'` only on proof: bytes that changed, a signature that doesn't match, or a
+change the signature forbids. When something can't be established, it's `'indeterminate'`.
+Without `trust`, a good signature is `'valid-untrusted'` at best.
+
+By default the check looks at the saved file. Pass `until: 'working-copy'` to include the changes
+you haven't saved yet: the answer is what the file will say once you save it. A viewer uses this
+to warn before a change breaks a signature.
+
+## What changed since a signature
+
+`analyze()` compares the document with the version a signature sealed, and says whether what
+changed is allowed:
+
+```ts
+const analysis = await doc.signatures.analyze({
+  since: { signatureIndex: 0 },
+  until: 'working-copy',
+});
+
+console.log(analysis.verdict);
+```
+
+| Verdict           | Meaning                                                                                         |
+| :---------------- | :---------------------------------------------------------------------------------------------- |
+| `'unchanged'`     | Nothing changed since the signature.                                                            |
+| `'permitted'`     | Something changed, and the signature allows it, such as a field filled in or another signature. |
+| `'forbidden'`     | A change the signature doesn't allow, such as a rotated page.                                   |
+| `'indeterminate'` | The engine can't tell: part of the file can't be read, or its structure is broken.              |
+
+With `'forbidden'`, the signature itself still checks out, but PDF apps such as Acrobat report
+that the document was changed after signing. For what `since` and `until` take, see
+[Analyzing in detail](#analyzing-in-detail).
+
+## Events
+
+| Event                  | Fired by                                                                                       |
+| :--------------------- | :--------------------------------------------------------------------------------------------- |
+| `signatures.prepared`  | `prepare()`, with the `signingId` and the `field`.                                             |
+| `signatures.completed` | `complete()`, with what it returned.                                                           |
+| `signatures.cancelled` | `cancel()`.                                                                                    |
+| `document.versioned`   | `complete()`: the document is now the signed file. Read revisions, digests and verdicts again. |
+
+`sign()` fires the same events. See [Events](/docs/engine/concepts/events).
+
+<Engine cloud>
+
+Everyone else with the document open receives the `signatures.*` events too, with
+`origin.kind: 'remote'`, so their viewer can show the new signature.
+
+</Engine>
+
+## Permissions
+
+Reading signatures (`list()`, `analyze()`, `getContents()`, `getDigest()`) needs
+`doc.forms.read`; `downloadRevision()` needs `doc.download`. Signing (`prepare()`, `complete()`,
+`cancel()`) needs `doc.sign`, and certifying also `doc.sign.certify`. See
+[Permissions](/docs/engine/concepts/permissions).
+
+A call the document's own signatures forbid fails with `ProtectedDocument`, whatever the user's
+permissions. A field that can't be signed (already signed, read-only, or locked by an earlier
+signature) fails with `SignatureRefused`; the message says why.
+
+## Good to know
+
+### Protection: what signatures allow
+
+`protection` from `list()` answers two different questions:
+
+| Field           | Question                                       | Values                                              |
+| :-------------- | :--------------------------------------------- | :-------------------------------------------------- |
+| `enforced`      | What does the engine refuse?                   | A level, or `null` when no signer declared a limit. |
+| `judged`        | What keeps the signatures valid?               | A level, or `null` when nothing is signed.          |
+| `certification` | The certifying signature and its `permission`. | `null` when the document isn't certified.           |
+| `fieldLocks`    | The fields signatures locked.                  | A list, empty when no field is locked.              |
+
+A level is `'lta'` (only document timestamps and validation data), `'fill'` (filling in and
+signing) or `'annotate'` (also comments).
+
+`enforced` is what the engine refuses. Only a certification or a field lock sets it; the calls it
+refuses fail with `ProtectedDocument`. A plain approval signature sets nothing, so every change
+stays possible.
+
+`judged` is what keeps signatures valid in Acrobat. For an approval signature it's `'annotate'`:
+filling in, signing and commenting keep it valid, while a rotated page, for example, makes
+Acrobat report that the document was changed.
+
+Use `allows()` to hide what the session may not do; a document's signatures can still refuse a
+change, with `ProtectedDocument`:
+
+```ts
+if (!doc.security.allows('doc.pages.assemble')) hidePageTools();
+```
+
+One save is always refused on a signed document: a rewrite (`download({ mode: 'rewrite' })`)
+would remove every signature, so it fails with `ProtectedDocument`. The default incremental save
+keeps them; see [Saving](/docs/engine/documents/saving).
+
+### Analyzing in detail
+
+`since` takes the signature's position in `list()` (`{ signatureIndex }`), or a revision (see
+[Revisions and byte ranges](#revisions-and-byte-ranges)). `until` is `'persisted'` (the saved file,
+the default), `'working-copy'` (with your unsaved changes) or `{ revisionIndex }`.
+
+`analysis.current.primary` is the change that decided the verdict, with the rule that allowed or
+forbade it. Show it next to a `'forbidden'` verdict.
+
+### Revisions and byte ranges
+
+A PDF that keeps its signatures grows by appending: each save adds a **revision** at the end of
+the file, and the older bytes stay as they were. A signature covers every byte of the revision it
+was made in, except the hole it sits in (the signature dictionary's `/ByteRange` and `/Contents`).
+
+`list()` also returns `revisions`, oldest first, each with its `index`, its `end` (the byte length
+of the file at that revision) and the `signatureIndex` that seals it. Each signature has its
+`revisionIndex` and a `coverage`:
+
+- `'whole-revision'`: it covers exactly one revision. That's the normal case.
+- `'partial'`: its byte ranges are valid but seal no revision. It can't be checked against later
+  changes, so `analyze()` from it fails with `InvalidArg`.
+- `'malformed'`: its byte ranges or its signature bytes can't be used.
+
+`chainValid: false` means the file's cross-reference chain is broken or was rebuilt, so no fact
+about its bytes can be trusted.
+
+### The raw bytes
+
+For your own verifier: `getContents(field)` returns the signature (DER, without padding),
+`getDigest(field, algorithm)` hashes the bytes the signature covers (`'sha1'` works too, for old
+signatures), and `downloadRevision(index)` returns the file exactly as it was at a revision.
+
+### How changes are judged
+
+- A signature is judged on the document as it is now against the revision it sealed. A change
+  that was undone later doesn't count, and an object written again with the same value isn't a
+  change.
+- A certification also checks every revision in between, so a forbidden change stays forbidden
+  even when a later revision hides it.
+- Missing evidence is never a pass: a value the engine can't read makes the verdict
+  `'indeterminate'`.
+- The rules follow what Acrobat reports.
+- `exploratoryLevel` asks what a level would allow; the answer (`mode: 'exploratory'`) isn't a
+  verdict.
+- `detail: 'full'` lists every changed object (large; for tools).
+
+### Unsaved changes when you sign
+
+Your unsaved changes become part of the signed version, so the signature seals them too. You
+don't need to save before you sign.
+
+### Document timestamps
+
+`kind: 'timestamp'` in `prepare()` makes a document timestamp instead of a signature. Its `cms` is
+a timestamp token from a timestamp authority, over `prepared.digest`.
+
+<Engine local>
+
+### Turning protection off
+
+For tools that must produce or test invalid files, create the engine with
+`localEngine({ signedDocumentPolicy: 'permit' })`: the engine then refuses nothing a signature
+forbids. `judged` and every verdict stay the same.
+
+</Engine>

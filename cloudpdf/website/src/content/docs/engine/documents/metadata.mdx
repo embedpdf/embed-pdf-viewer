@@ -1,0 +1,124 @@
+---
+title: Metadata
+description: Read and change a document's title, author, subject, keywords, dates and your own keys.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Metadata
+
+A PDF carries information about itself: a title, an author, when it was made. PDF apps show it in
+their document properties.
+
+```ts
+const metadata = await doc.metadata.get();
+console.log(metadata.title, metadata.author);
+
+await doc.metadata.update({ title: 'Q2 Proposal (final)' });
+```
+
+## Read
+
+`get()` returns every field. A field the file doesn't set is `null`:
+
+| Field        | What it is                                                      |
+| :----------- | :-------------------------------------------------------------- |
+| `title`      | The document's title.                                           |
+| `author`     | Who wrote it.                                                   |
+| `subject`    | What it's about.                                                |
+| `keywords`   | Keywords, as one string (often separated by commas).            |
+| `creator`    | The app the document was made in, such as a word processor.     |
+| `producer`   | The app that turned it into a PDF.                              |
+| `createdAt`  | When it was created, as an ISO date.                            |
+| `modifiedAt` | When it was last changed, as an ISO date.                       |
+| `trapped`    | A print-shop setting: `'true'`, `'false'` or `'unknown'`.       |
+| `custom`     | Your own keys (see below), as `{ key: value }`. `{}` when none. |
+
+## Change
+
+`update()` changes only the fields you pass. `null` removes a field:
+
+```ts
+const { metadata } = await doc.metadata.update({
+  title: 'Q2 Proposal (final)',
+  author: 'Dana Smith',
+  subject: null, // remove the subject
+});
+```
+
+It returns the metadata as it is after the change, the same shape `get()` returns. What you read
+goes back in as it is, so "change a copy, then save it" works:
+
+```ts
+const current = await doc.metadata.get();
+await doc.metadata.update({ ...current, keywords: `${current.keywords ?? ''}, approved` });
+```
+
+An empty string is a value, not a removal: `title: ''` sets an empty title.
+
+## Dates
+
+Dates are ISO strings, with the time zone offset the PDF gives:
+
+```ts
+metadata.createdAt; // '2017-07-12T21:44:38-07:00'
+```
+
+They're strings, not `Date` objects, so a date survives JSON and goes back into `update()` as it
+is. `new Date(metadata.createdAt)` turns one into a `Date` when you need to compute with it.
+
+When you write a date, pass an ISO string or a `Date`. A string keeps its offset; a `Date` is
+written in UTC:
+
+```ts
+await doc.metadata.update({
+  createdAt: '2026-01-04T09:00:00+01:00',
+  modifiedAt: new Date(),
+});
+```
+
+PDF dates have whole seconds, so milliseconds are dropped. A string that isn't an ISO date and
+time fails with `InvalidArg`.
+
+## Your own keys
+
+Store your own values in the document, next to the standard fields. A string sets a key, `null`
+removes it, and keys you leave out stay as they are:
+
+```ts
+await doc.metadata.update({
+  custom: {
+    reviewedBy: 'dana',
+    contractId: 'C-2026-114',
+    draftOwner: null, // remove this key
+  },
+});
+```
+
+A key is 1 to 127 printable ASCII characters, doesn't start with `/`, and isn't the name of a
+standard field (`Title`, `Author`, `CreationDate`, …): use the field itself for those. An invalid key fails with
+`InvalidArg` and changes nothing.
+
+## Permissions
+
+Reading metadata needs `doc.open`. Changing it needs `doc.metadata.modify`; without it,
+`update()` fails with `Forbidden`.
+
+## Good to know
+
+### The modified date
+
+The engine doesn't change `modifiedAt` for you, neither when you update metadata nor when you
+save. Set it yourself when your app wants it to say when the document last changed:
+
+```ts
+await doc.metadata.update({ modifiedAt: new Date() });
+```
+
+### Where it's stored
+
+The fields are the PDF's document information (the `/Info` dictionary, with keys like `/Title`
+and `/CreationDate`). `trapped` is `'unknown'` both when the file says so and when it doesn't say.
+
+Other code can follow changes with the `metadata.updated` event. See
+[Events](/docs/engine/concepts/events).

@@ -1,0 +1,203 @@
+---
+title: Drawing annotations yourself
+description: Render each annotation as its own image, bake annotations into the page, or export them as a PDF.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+import { Callout } from '@/components/docs/callout';
+
+# Drawing annotations yourself
+
+A rendered page includes its annotations, which is all most apps need. This page is for when you
+draw them yourself: each annotation as its own image over the page, so you can move, select and
+edit them without rendering the page again. It also covers baking annotations into the page and
+exporting them as a PDF.
+
+What you draw is an annotation's **appearance**: the drawing stored with it.
+
+```ts
+const pageImage = await page.render.image({
+  viewport: { kind: 'scale', scale: 2 },
+  includeAnnotations: false,
+}); // the page on its own
+
+const { appearances } = await page.annotations.renderAppearances({
+  viewport: { kind: 'scale', scale: 2 },
+});
+
+for (const appearance of appearances) {
+  const { url } = await appearance.image.objectUrl();
+  const box = pageImage.transform.pdfToPixels(appearance.rect); // { x, y, width, height } in the page image
+  placeImage(url, box);
+}
+```
+
+<Callout type="info">
+  The viewer's annotation plugin does all of this for you. This page is for drawing annotations
+  against the engine directly.
+</Callout>
+
+## Render each annotation as an image
+
+`renderAppearances()` draws every annotation of the page that has an appearance, each as its own
+image:
+
+| Field   | What it is                                                 |
+| :------ | :--------------------------------------------------------- |
+| `ref`   | Which annotation it is.                                    |
+| `rect`  | Where the image goes, in PDF points (y goes up).           |
+| `mode`  | Which look it is: `'normal'` unless you asked for others.  |
+| `image` | The image; `image.objectUrl()` gives a URL for an `<img>`. |
+
+| Option     | What it is                                                                                                                                                         | Default   |
+| :--------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------- |
+| `viewport` | The size, the same option as for [a page image](/docs/engine/documents/rendering#choose-the-size). Pass the page image's `viewport`, and the annotations match it. | scale `1` |
+| `rotation` | The page's rotation as you show it: `0`, `90`, `180` or `270`, clockwise.                                                                                          | `0`       |
+| `format`   | `'png'` or `'webp'`.                                                                                                                                               | see below |
+
+<Engine local>
+
+Images are PNG unless you ask for WebP.
+
+An annotation can also have a look for when the pointer is over it and for when it's pressed.
+`modes: ['normal', 'rollover', 'down']` renders those too, one image per look the annotation has.
+
+</Engine>
+
+<Engine cloud>
+
+Images are WebP unless you ask for PNG. The server sends the whole page's images in one response,
+and it's cached until the page's annotations change.
+
+</Engine>
+
+### Turned annotations
+
+Some annotations can be turned; see [Turned shapes](/docs/engine/annotations/shapes#turned-shapes).
+When a read has both `rotation` and `unrotatedRect`, its image is drawn unturned: the image's
+`rect` is the annotation's own box (`unrotatedRect`), and you turn the image yourself, about its
+centre. `rotation` is degrees clockwise, the same direction as CSS `rotate()`:
+
+```ts
+const rotation =
+  'unrotatedRect' in annotation && annotation.unrotatedRect ? (annotation.rotation ?? 0) : 0;
+
+img.style.transformOrigin = 'center';
+img.style.transform = `rotate(${rotation}deg)`;
+```
+
+Every other annotation comes as it is shown, placed by `rect`, with nothing to turn: lines,
+polygons and ink store their turn in their points.
+
+That split is what keeps editing cheap:
+
+- turning an annotation never needs a new image, only a new transform;
+- moving one never needs a new image, only a new position;
+- resizing can stretch the image while the user drags, then render once when they let go.
+
+Render again when the annotation's look changed, or for a sharper image at a new zoom. An
+update's result tells you: `appearance.changed` is `true` when the annotation looks different.
+
+<Engine local>
+
+### Raw pixels
+
+`renderAppearancesRaw()` takes the same options and returns each annotation's pixels instead of an
+image, with nothing encoded. Use it to draw on a canvas or in WebGL.
+
+```ts
+const { appearances } = await page.annotations.renderAppearancesRaw({
+  viewport: { kind: 'scale', scale: 2 },
+});
+
+const { width, height, stride, data } = appearances[0].raster;
+```
+
+`data` holds the pixels as RGBA, four bytes a pixel and `stride` bytes a row, without
+premultiplied alpha.
+
+</Engine>
+
+## Bake annotations into the page
+
+`flatten()` paints annotations into the page's own content and removes them as annotations.
+What's baked in can no longer be changed or deleted as an annotation.
+
+```ts
+const result = await page.annotations.flatten([refA, refB], { usage: 'display' });
+
+result.results; // [{ ref: refA, status: 'applied' }, { ref: refB, status: 'unchanged' }]
+```
+
+| `status`      | What happened                                                                 |
+| :------------ | :---------------------------------------------------------------------------- |
+| `'applied'`   | Painted in and removed as an annotation.                                      |
+| `'unchanged'` | Left as it was: hidden for that use, a popup, or with no appearance to paint. |
+| `'failed'`    | Painting failed; `error` says why.                                            |
+| `'skipped'`   | Not tried, because an earlier one failed.                                     |
+
+So you can say "2 of 3 flattened".
+
+| `usage`     | What's painted                                        |
+| :---------- | :---------------------------------------------------- |
+| `'display'` | The annotations shown on screen. The default.         |
+| `'print'`   | The annotations that print: those with `print: true`. |
+
+Every ref must be on this page: a ref on another page, or an empty list, refuses the whole call
+with `InvalidArg` and nothing changes. When something was painted, an `annotations.flattened`
+[event](/docs/engine/concepts/events) fires.
+
+To bake every annotation of some pages in one call, flatten the pages with `doc.pages.flatten()`;
+see [Flatten a page's annotations](/docs/engine/documents/pages#flatten-a-pages-annotations).
+
+## Export annotations as a PDF
+
+`exportAppearance()` makes a new one-page PDF of some annotations, exactly as the page shows them:
+vector, in their places, on a page the size of the box around them. The document doesn't change.
+
+```ts
+const pdf = await page.annotations.exportAppearance([refA, refB]);
+```
+
+It's all or nothing: a ref that isn't on the page, is hidden, or has no appearance refuses the call
+with `InvalidArg`. The PDF is a one-page drawing, so it can become a [stamp](/docs/engine/annotations/stamps):
+
+```ts
+await page.annotations.create({ subtype: 'stamp', rect }, { appearance: pdf });
+```
+
+## Permissions
+
+Rendering annotations needs `doc.annotate.read`: seeing an annotation includes seeing how it
+looks. Flattening changes the page, so it needs `doc.pages.modify` and `doc.annotate.modify`.
+Exporting sends content out, so it needs `doc.download`.
+
+## Good to know
+
+### Appearances, in the PDF
+
+An annotation's appearance is its `/AP`: a small drawing stored with it, with a normal look and
+optionally a rollover and a pressed one. The engine draws it for the annotations it
+creates, so they look the same in every PDF app. Another app's drawing stays as it is until you
+change how that annotation looks.
+
+### Which way `rotation` turns
+
+Every `rotation` in the engine turns clockwise, in degrees, as you see it: a page's rotation, the
+`rotation` option on this page, and an annotation's own `rotation`. So CSS `rotate()` and the
+engine always agree.
+
+In the PDF file, an annotation's angle is stored the way PDF measures angles (counterclockwise,
+because `y` goes up). The engine converts when it reads and writes, as it does with coordinates,
+so you never see the stored number.
+
+### Annotations without a number
+
+Annotations with only a position ref are rendered too. See
+[Refs & identity](/docs/engine/concepts/identity).
+
+### New annotations don't print
+
+New annotations have `print` off unless you set it, so `usage: 'print'` skips them. Set
+`print: true` on the annotations that should print, or flatten with `'display'`.

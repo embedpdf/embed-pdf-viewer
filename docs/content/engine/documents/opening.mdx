@@ -1,0 +1,305 @@
+---
+title: Opening documents
+description: Open a PDF, unlock a password-protected file, say who is working on it, and close it again.
+---
+
+# Opening documents
+
+`engine.open()` gives you a handle to one document. Everything you do with the document starts
+from that handle.
+
+<Engine local>
+
+```ts
+const response = await fetch('/contract.pdf');
+const doc = await engine.open({ kind: 'bytes', bytes: await response.arrayBuffer() });
+```
+
+</Engine>
+
+<Engine cloud>
+
+```ts
+const doc = await engine.open({ kind: 'token', token: () => fetchDocumentToken('contract') });
+```
+
+</Engine>
+
+## Open a document
+
+<Engine local>
+
+Give the engine the file's bytes, as an `ArrayBuffer` or a `Uint8Array`. Where they come from
+doesn't matter. A file the user picked:
+
+```ts
+const file = input.files![0];
+const doc = await engine.open({ kind: 'bytes', bytes: await file.arrayBuffer() });
+```
+
+A file on disk, in Node:
+
+```ts
+import { readFile } from 'node:fs/promises';
+
+const doc = await engine.open({ kind: 'bytes', bytes: await readFile('contract.pdf') });
+```
+
+The engine gives each document an id (`doc.id`). To choose it yourself, pass `id` (any input
+takes one); it must be unique among the documents open on this engine.
+
+A file that isn't a PDF, or is too damaged to read, fails with `DocOpenFailed`.
+
+</Engine>
+
+<Engine cloud>
+
+The document is already on your server, so you open it by reference. There are three ways,
+depending on where the credential comes from:
+
+| Input                           | When to use it                                                   |
+| :------------------------------ | :--------------------------------------------------------------- |
+| `{ kind: 'token', token }`      | Your backend created a token for this user and this document.    |
+| `{ kind: 'id', id }`            | Your app has a token for your whole account (admin tools, jobs). |
+| `{ kind: 'share', shareToken }` | A public share link from the CloudPDF dashboard.                 |
+
+[Authentication](/docs/engine/authentication) shows how to create tokens and when to use each.
+
+`open()` fetches the document's details from the server, never the file itself. Pages, text and
+images arrive as you ask for them.
+
+</Engine>
+
+## Password-protected files
+
+A PDF can have its own password. When you know it, pass it when you open:
+
+```ts
+const doc = await engine.open(input, { password: 'secret' });
+```
+
+When you don't, open without one and ask the user only if the file needs it.
+`doc.security.passwordPrompt` tells you:
+
+```ts
+const doc = await engine.open(input);
+
+if (doc.security.passwordPrompt.state === 'required') {
+  const password = await askUserForPassword();
+  await doc.security.unlock({ password });
+}
+```
+
+| `passwordPrompt.state` | What it means                                                                      |
+| :--------------------- | :--------------------------------------------------------------------------------- |
+| `'none'`               | Nothing to do: the file has no password, or it's already fully unlocked.           |
+| `'required'`           | The file can't be read without its password. Ask before you do anything else.      |
+| `'optional'`           | The file is open, but its owner password would give more rights. You may offer it. |
+
+`passwordPrompt.hint` says which password to ask for (`'user'` or `'owner'`), when the engine
+knows.
+
+A locked document still opens: without a password, `open()` succeeds, and every call that reads
+the file fails with `DocPasswordRequired` until you unlock it. A password you pass to `open()`
+that's wrong fails the open with `DocPasswordIncorrect`.
+
+`unlock()` fails with `DocPasswordIncorrect` when the password is wrong, so you can ask again:
+
+```ts
+import { EngineError, EngineErrorCode } from '@embedpdf/engine';
+
+while (doc.security.passwordPrompt.state === 'required') {
+  try {
+    await doc.security.unlock({ password: await askUserForPassword() });
+  } catch (error) {
+    if (!EngineError.is(error, EngineErrorCode.DocPasswordIncorrect)) throw error;
+    showMessage('That password is wrong. Try again.');
+  }
+}
+```
+
+### Owner password
+
+A PDF can have two passwords. The user password opens it; the owner password also lifts the
+file's own restrictions, such as "no printing" or "no copying". When a file is open but not with
+its owner password, `passwordPrompt` is `'optional'`.
+
+To accept only the owner password, pass `mode: 'owner'`. The user password then fails with
+`DocPasswordIncorrect`:
+
+```ts
+await doc.security.unlock({ password, mode: 'owner' });
+```
+
+The file's own restrictions only count when the user's permissions include `pdf.permissions`;
+see [Permissions](/docs/engine/concepts/permissions#the-pdfs-own-restrictions).
+
+<Engine local>
+
+## Who is working on it
+
+Tell the engine who the user is and what they may do when you open the document:
+
+```ts
+const doc = await engine.open(
+  { kind: 'bytes', bytes },
+  {
+    identity: { userId: 'u_381', displayName: 'Dana Smith', groupId: 'legal' },
+    scope: [
+      'doc.open',
+      'doc.render',
+      'doc.text.select',
+      'doc.annotate.read',
+      'annotations:create:self',
+      'annotations:update:self',
+      'annotations:delete:self',
+    ],
+  },
+);
+```
+
+`identity` is who the user is. The engine writes three of its fields into every annotation the
+user creates or changes:
+
+| Field         | What the engine does with it                                                                   |
+| :------------ | :--------------------------------------------------------------------------------------------- |
+| `displayName` | Becomes the annotation's `author`, the name PDF apps show.                                     |
+| `userId`      | Becomes the annotation's `userId`, `createdBy` and `modifiedBy`.                               |
+| `groupId`     | Becomes the annotation's `groupId`: the group new annotations belong to.                       |
+| `groups`      | Not written. The groups the user is in, for permissions like `annotations:update:group=legal`. |
+
+The other fields (`email`, `title`, `organization`, `organizationalUnit`) never go into the PDF.
+The viewer uses them in stamps and signature appearances.
+
+`scope` is what the user may do, as a list of permissions. Leave it out and the user may do
+everything; the engine logs a reminder once, so you notice before you ship. Permissions that
+name the user's own annotations or group (`:self`, `:group`) need an `identity` to check them
+against: without one, `open()` fails with `InvalidArg`.
+
+Read both back from `doc.security`:
+
+```ts
+doc.security.identity?.displayName; // 'Dana Smith'
+doc.security.allows('doc.download'); // false
+```
+
+[Permissions](/docs/engine/concepts/permissions) lists every permission and how to build an
+interface that matches them.
+
+</Engine>
+
+<Engine cloud>
+
+On the cloud, who the user is and what they may do come from their token, so `open()` has no
+options for them. See [What a token carries](/docs/engine/authentication#what-a-token-carries).
+
+</Engine>
+
+## Close a document
+
+Close a document when you're done with it:
+
+```ts
+await doc.close();
+```
+
+<Engine local>
+
+Closing frees the memory the document uses. After it, calls on `doc` fail with `DocNotOpen`.
+Closing twice is fine.
+
+</Engine>
+
+<Engine cloud>
+
+Closing stops the live updates for this document and forgets what the engine cached. The document
+itself stays on the server. After it, calls on `doc` fail with `DocNotOpen`. Closing twice is
+fine.
+
+</Engine>
+
+## One engine, many documents
+
+Create one engine for your app and open every document on it:
+
+```ts
+const [contract, invoice] = await Promise.all([
+  engine.open(contractInput),
+  engine.open(invoiceInput),
+]);
+```
+
+Keep the engine for as long as your app runs. When you do want to shut it down, at the end of a
+script for example, destroy it; that also closes every document still open on it:
+
+```ts
+await engine.destroy();
+```
+
+<Engine local>
+
+All documents on one engine share one copy of PDFium, so opening another document doesn't start
+another worker. Each open document holds its file in memory until you close it.
+
+</Engine>
+
+<Engine cloud>
+
+Each document keeps the token it was opened with, so one engine can hold documents opened for
+different users or with different permissions.
+
+</Engine>
+
+## Good to know
+
+<Engine local>
+
+### Layers: keep your changes apart from the file
+
+The engine can keep your changes apart from the original bytes: `downloadLayer()` saves just the
+changes (a **layer**), and you open them later on top of the original. A layer holds only what you
+changed, so it stays small however large the file is.
+
+```ts
+// Save only what changed
+const changes = await doc.downloadLayer();
+
+// Later: the original, with the changes on top
+const reopened = await engine.open({
+  kind: 'layerBytes',
+  baseBytes: original,
+  layer: { kind: 'artifact', bytes: changes },
+});
+```
+
+Leave out `layer` (or pass `{ kind: 'fresh' }`) to start with no changes. `baseKey` is an id for
+the original bytes; documents opened with the same `baseKey` share them in memory.
+
+### Large files in Node
+
+In Node, `layerFile` opens a file straight from disk. The engine reads the parts it needs when it
+needs them, so the file never has to fit in memory:
+
+```ts
+const doc = await engine.open({ kind: 'layerFile', basePath: '/data/scan-4000-pages.pdf' });
+```
+
+The changes can live in a file too: `layer: { kind: 'artifact-file', path }`.
+
+### Your bytes after `open()`
+
+In the browser, an `ArrayBuffer` you pass is transferred to the engine, not copied, so it's empty
+afterwards. Pass a copy to keep yours, such as `buffer.slice(0)`.
+
+</Engine>
+
+### Cancelling an open
+
+`open()` returns a promise you can cancel, like every call:
+
+```ts
+const opening = engine.open(input);
+cancelButton.onclick = () => opening.abort();
+```
+
+See [Errors & cancelling](/docs/engine/concepts/errors-and-cancelling).

@@ -1,0 +1,146 @@
+---
+title: Saving
+description: Get the PDF with your changes as bytes, save it in the browser or in Node, and choose between an incremental save and a full rewrite.
+---
+
+# Saving
+
+`doc.download()` returns the whole PDF, with every change you made, as bytes:
+
+```ts
+const bytes = await doc.download();
+```
+
+<Engine cloud>
+
+You don't need to save to keep a change: the server stores each change when the call returns.
+`download()` is for when you want the file itself. See [What the server keeps](#what-the-server-keeps).
+
+</Engine>
+
+## Save in the browser
+
+Wrap the bytes in a `Blob` and let the browser download it:
+
+```ts
+const bytes = await doc.download();
+
+const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+const link = document.createElement('a');
+link.href = url;
+link.download = 'contract-signed.pdf';
+link.click();
+URL.revokeObjectURL(url);
+```
+
+To send the file to your server instead, put the same `Blob` in a `FormData` or pass the bytes to
+`fetch()` as the body.
+
+## Save in Node
+
+```ts
+import { writeFile } from 'node:fs/promises';
+
+await writeFile('out.pdf', await doc.download());
+```
+
+<Engine local>
+
+For large files, `downloadToFile()` writes the PDF straight to disk, without the bytes passing
+through JavaScript:
+
+```ts
+await doc.downloadToFile('out.pdf');
+```
+
+It takes the same `mode` option as `download()`, and works in Node only.
+
+</Engine>
+
+## Incremental or rewrite
+
+`mode` chooses how the file is written:
+
+```ts
+const bytes = await doc.download({ mode: 'rewrite' });
+```
+
+| Mode                      | What you get                                                                  |
+| :------------------------ | :---------------------------------------------------------------------------- |
+| `'incremental'` (default) | The file as it was opened, byte for byte, with your changes added at the end. |
+| `'rewrite'`               | A new file with only the document as it is now. Earlier versions are gone.    |
+
+Pick by what the file is for:
+
+- **Signed documents: incremental.** A signature covers the bytes as they were signed. An
+  incremental save leaves those bytes alone, so the signatures stay valid. A rewrite would break
+  every one of them, so a signed document refuses it with `ProtectedDocument`.
+- **After a redaction, or after deleting something sensitive: rewrite.** An incremental file
+  still holds the version from before your changes, and PDF tools can recover it. Only a rewrite
+  leaves the removed content out. See [Redaction](/docs/engine/documents/redaction).
+- **The smallest file: rewrite.** It also leaves out anything nothing refers to anymore.
+- **Everything else: incremental.** It's the default, it's fast, and it never changes the parts of
+  the file you didn't touch.
+
+<Engine cloud>
+
+## What the server keeps
+
+The server stores the file as it was uploaded, and never changes it. Your changes are stored
+beside it, as they happen, and everyone who opens the document sees them.
+
+`download()` puts the two together into one PDF. With `'incremental'`, that's the uploaded file
+with your changes added at the end; with `'rewrite'`, a new file without the earlier version.
+
+Because the uploaded file is always inside an incremental download, give `doc.download` only to
+people who may see the document as it was uploaded. Everyone else can view it without downloading
+it: see [Permissions](/docs/engine/concepts/permissions).
+
+</Engine>
+
+<Engine local>
+
+## Where your changes are
+
+The engine keeps the file as you opened it, and never changes it. Your changes live beside it, in
+memory, until you download. When you close the document without downloading, they're gone.
+
+</Engine>
+
+## Permissions
+
+Downloading needs the `doc.download` permission. Without it, `download()` fails with `Forbidden`,
+so check before you show a download button:
+
+```ts
+if (doc.security.allows('doc.download')) {
+  showDownloadButton();
+}
+```
+
+## Good to know
+
+### An unchanged document
+
+When nothing changed since you opened the document, an incremental download returns the exact
+bytes you opened. The same holds when you changed something and then changed it back, such as an
+annotation added and deleted again. That keeps a signed document exactly as it was signed.
+
+### Password-protected files
+
+A file that had a password when you opened it still has it after you save, in both modes.
+
+<Engine local>
+
+### Saving only the changes
+
+`doc.downloadLayer()` returns only what you changed, as a small file you can store next to the
+original and open with it later. See
+[Layers](/docs/engine/documents/opening#layers-keep-your-changes-apart-from-the-file).
+
+</Engine>
+
+### Cancelling a download
+
+`download()` returns a promise you can cancel with `.abort()`, like every call. See
+[Errors & cancelling](/docs/engine/concepts/errors-and-cancelling).
