@@ -76,10 +76,7 @@ export function writeAnnotationRelationship(
       // Strengthen before the link promotes the parent to indirect, so the
       // reported id is the save-stable /NM rather than a renumberable objNum.
       const parentStableId = captureOrStampStableId(runtime, parentPtr);
-      if (!fn.EPDFAnnot_SetLinkedAnnot(annotPtr, 'IRT', parentPtr)) {
-        throw new EngineError(EngineErrorCode.Unknown, 'failed to set /IRT linked annotation');
-      }
-      fn.EPDFAnnot_SetReplyType(annotPtr, replyTypeToCode(rel.replyType ?? 'reply'));
+      linkReply(runtime, annotPtr, parentPtr, rel.replyType ?? 'reply');
       return parentStableId;
     } finally {
       fn.FPDFPage_CloseAnnot(parentPtr);
@@ -146,14 +143,34 @@ export function writePopupParent(
   const parentPtr = resolveAnnotPtr(runtime, session, pagePtr, parent);
   try {
     const parentStableId = captureOrStampStableId(runtime, parentPtr);
-    if (
-      !fn.EPDFAnnot_SetLinkedAnnot(popupPtr, 'Parent', parentPtr) ||
-      !fn.EPDFAnnot_SetLinkedAnnot(parentPtr, 'Popup', popupPtr)
-    ) {
-      throw new EngineError(EngineErrorCode.Unknown, 'failed to link a popup to its parent');
-    }
+    linkPopup(runtime, popupPtr, parentPtr);
     return parentStableId;
   } finally {
     fn.FPDFPage_CloseAnnot(parentPtr);
+  }
+}
+
+/** Make `annotPtr` a reply of `type` to `parentPtr`: `/IRT` and `/RT`. */
+export function linkReply(
+  runtime: PdfRuntimeModule,
+  annotPtr: Ptr,
+  parentPtr: Ptr,
+  type: AnnotationReplyType,
+): void {
+  const { fn } = runtime;
+  if (!fn.EPDFAnnot_SetLinkedAnnot(annotPtr, 'IRT', parentPtr)) {
+    throw new EngineError(EngineErrorCode.Unknown, 'failed to set /IRT linked annotation');
+  }
+  fn.EPDFAnnot_SetReplyType(annotPtr, replyTypeToCode(type));
+}
+
+/** Link a popup and the annotation it shows, both ways: `/Parent` and `/Popup`. */
+export function linkPopup(runtime: PdfRuntimeModule, popupPtr: Ptr, parentPtr: Ptr): void {
+  const { fn } = runtime;
+  if (
+    !fn.EPDFAnnot_SetLinkedAnnot(popupPtr, 'Parent', parentPtr) ||
+    !fn.EPDFAnnot_SetLinkedAnnot(parentPtr, 'Popup', popupPtr)
+  ) {
+    throw new EngineError(EngineErrorCode.Unknown, 'failed to link a popup to its parent');
   }
 }

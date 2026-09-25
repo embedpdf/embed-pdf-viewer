@@ -5,6 +5,7 @@ import type {
 import type { PageRef } from '../identity/PageRef';
 import { AbortablePromise } from '../promise/AbortablePromise';
 import type { AnnotationBundle } from '../transfer/AnnotationBundle';
+import type { AnnotationImportOptions, AnnotationImportResult } from '../transfer/annotationImport';
 import type { AnnotationExportSelection } from '../transfer/exportSelection';
 
 export interface WeakAnnotationEditSession {
@@ -50,4 +51,17 @@ export interface DocumentAnnotationsService {
    * `doc.download`.
    */
   export(selection?: AnnotationExportSelection): AbortablePromise<AnnotationBundle>;
+  /**
+   * Create a bundle's annotations in this document, as one change: every
+   * item is checked, its pages mapped and what can't be carried left out
+   * (`dropped`) before the first write, and a failure while writing leaves
+   * the document as it was. `reply.to` and a popup's `parent` link to the
+   * items they name in the bundle. Emits one `annotation.created` per
+   * annotation, sharing `origin.tx`. Needs `doc.annotate.modify`; the
+   * default `attribution: 'restore'` also needs `doc.annotate.import`.
+   */
+  import(
+    bundle: AnnotationBundle,
+    options?: AnnotationImportOptions,
+  ): AbortablePromise<AnnotationImportResult>;
 }

@@ -6,7 +6,7 @@ import {
 } from '@embedpdf/engine-core/conformance';
 import { EngineErrorCode, measureFromKnownLength } from '@embedpdf/engine-core/runtime';
 import { createCloudEngine } from '../src/index';
-import { auditRowToEvent } from '../src/realtime/auditRowToEvent';
+import { auditRowToEvents } from '../src/realtime/auditRowToEvents';
 import {
   buildDbSeededFixture,
   docScopedToken,
@@ -97,7 +97,7 @@ test('calibration persists an artifact and audit payload without bumping page ca
       meta: { affectedPages: [] },
     });
     expect(
-      auditRowToEvent(
+      auditRowToEvents(
         {
           id: Number(row.id),
           ts: row.ts,
@@ -110,7 +110,7 @@ test('calibration persists an artifact and audit payload without bumping page ca
         },
         'another-session',
       ),
-    ).toMatchObject({ type: 'page.viewportsChanged', ...payload });
+    ).toMatchObject([{ type: 'page.viewportsChanged', ...payload }]);
   } finally {
     await doc.close();
     await engine.destroy();

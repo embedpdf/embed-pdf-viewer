@@ -7,6 +7,7 @@ import type {
   DocumentPdfOpenedAs,
   DocumentState,
 } from '../schema';
+import { isUniqueViolation } from '../uniqueViolation';
 
 export interface DocumentListOptions {
   limit?: number;
@@ -452,18 +453,6 @@ function nullableBool(value: boolean | null | undefined): number | null {
 function nullableBooleanFromDb(value: boolean | number | null | undefined): boolean | null {
   if (value === null || value === undefined) return null;
   return typeof value === 'number' ? value !== 0 : value;
-}
-
-function isUniqueViolation(err: unknown): boolean {
-  const e = err as { code?: string; message?: string } | null;
-  if (!e) return false;
-  // better-sqlite3 surfaces UNIQUE failures as
-  // `SqliteError: UNIQUE constraint failed: documents.tenant_id, documents.idempotency_key`
-  if (e.code === 'SQLITE_CONSTRAINT_UNIQUE') return true;
-  if (e.message?.includes('UNIQUE constraint failed')) return true;
-  // Postgres surfaces 23505 on unique violations.
-  if (e.code === '23505') return true;
-  return false;
 }
 
 function throwError(code: 'NotFound' | 'Forbidden', msg: string): never {

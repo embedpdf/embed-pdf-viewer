@@ -379,6 +379,63 @@ pass one is refused with `PayloadTooLarge`, naming the limit, so you can export 
 time. The same document exports to the same bundle on the local and the cloud engine; on the cloud,
 an export is cached until the document's annotations or pages change.
 
+## Importing annotations
+
+`doc.annotations.import` creates a bundle's annotations in a document, in one call and as one
+change:
+
+```ts
+const result = await target.annotations.import(bundle, { attribution: 'stamp' });
+
+result.created; // the new annotations, in bundle order
+result.refMap; // each annotation's ref in the bundle, and its ref here
+result.dropped; // what couldn't be carried, and why
+```
+
+Everything is checked before anything is written, and the import is all or nothing: a failure
+while writing leaves the document exactly as it was.
+
+By default each annotation goes to the page with the same ref (`pages: 'same'`), which fits a
+bundle from the same document or a copy of it. For another document, map pages by their position,
+or name the pairs:
+
+```ts
+await target.annotations.import(bundle, { attribution: 'stamp', pages: 'by-position' });
+await target.annotations.import(bundle, {
+  attribution: 'stamp',
+  pages: [{ from: sourcePage, to: targetPage }],
+});
+```
+
+A link's destination maps the same way. A page an annotation is on or points at that maps to no
+page refuses the import with `InvalidArg`, naming the pages.
+
+Replies are linked to the comments they answer, and popups to their annotations, among the
+imported annotations. What an import can't carry it leaves out, reports in `dropped`, and imports
+the rest:
+
+- an annotation of a kind the engine doesn't model (`unsupported-kind`);
+- a field the engine can only read, such as a geospatial measure (`geospatial`) or a link's
+  JavaScript action (`unsupported-action`): the annotation is imported without it;
+- an annotation whose `nm` is already used on its page (`name-conflict`), so importing the same
+  bundle twice doesn't duplicate named annotations;
+- an annotation whose comment or popup parent was left out (`parent-dropped`) or isn't in the
+  bundle (`parent-missing`).
+
+By default an import restores the attribution the bundle has. Each annotation keeps its author,
+its creation and modification dates (in their own time zones) and its owner (`userId`,
+`groupId`), and records the importing session's user as `importedBy`. That writes authorship that
+isn't the session's, so it needs `doc.annotate.import`: grant it to trusted jobs, such as a sync
+from your own database, not to end users.
+
+`attribution: 'stamp'` makes each annotation as `create` would instead: the author, the dates and
+the owner are the session's, and it needs only the authority a create needs.
+
+An import emits one `annotation.created` event per annotation, all sharing `origin.tx`. On the
+cloud it is one request: its `opId` (minted when you don't pass one) makes a retry safe, as a
+second request with the same `opId` returns the first one's result. The limits are the export's;
+a bundle past one is refused with `PayloadTooLarge` before anything is written.
+
 ## Edit sessions (cloud)
 
 On the cloud, structural edits addressed by **index** (a delete or move that shifts the

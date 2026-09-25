@@ -2,6 +2,7 @@ import type {
   DocumentEvent,
   DocumentEventInit,
   DocumentEventStream,
+  EventOrigin,
 } from '@embedpdf/engine-core/runtime';
 
 /**
@@ -83,8 +84,11 @@ export class SessionEventPublisher {
     private readonly sub: string | null = null,
   ) {}
 
-  /** Publish a mutation this engine instance just confirmed. */
-  publishLocal(event: DocumentEventInit): void {
+  /**
+   * Publish a mutation this engine instance just confirmed. `tx` marks it as
+   * one of several facts committed together (`origin.tx`).
+   */
+  publishLocal(event: DocumentEventInit, tx?: EventOrigin['tx']): void {
     this.hub.publish({
       ...event,
       origin: {
@@ -93,6 +97,7 @@ export class SessionEventPublisher {
         sub: this.sub,
         ts: Date.now(),
         serverId: null,
+        ...(tx ? { tx } : {}),
       },
     } as DocumentEvent);
   }

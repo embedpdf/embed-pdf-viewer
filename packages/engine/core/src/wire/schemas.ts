@@ -104,6 +104,11 @@ import type { PageRotateInput } from '../mutation/PageRotateInput';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
 import type { PageStructureCache } from '../mutation/PageStructureCache';
 import type { RefetchReason } from '../mutation/RefetchReason';
+import type {
+  AnnotationImportManifest,
+  AnnotationImportOptions,
+  AnnotationImportResult,
+} from '../transfer/annotationImport';
 import type { AnnotationExportSelection } from '../transfer/exportSelection';
 import { fromBase64, toBase64 } from '../resource/base64';
 import type { PageState } from '../revision/PageState';
@@ -890,6 +895,27 @@ export const AnnotationCreateResultSchema: z.ZodType<AnnotationCreateResult> = z
   meta: AnnotationListMutationMetaSchema,
 });
 
+export const AnnotationImportResultSchema: z.ZodType<AnnotationImportResult> = z.object({
+  created: z.array(AnnotationDTOSchema),
+  refMap: z.array(z.object({ from: AnnotationRefSchema, to: AnnotationRefSchema })),
+  dropped: z.array(
+    z.object({
+      ref: AnnotationRefSchema,
+      field: z.string().optional(),
+      reason: z.enum([
+        'unsupported-kind',
+        'geospatial',
+        'unknown-measure',
+        'unsupported-action',
+        'name-conflict',
+        'parent-dropped',
+        'parent-missing',
+      ]),
+    }),
+  ),
+  meta: AnnotationListMutationMetaSchema,
+}) as z.ZodType<AnnotationImportResult>;
+
 /** The engine's `/AP` verdict riding every update result (see engine-core
  *  `annotation/appearance.ts`). `changed` drives client raster invalidation. */
 export const AppearanceOutcomeSchema: z.ZodType<AppearanceOutcome> = z.object({
@@ -1071,6 +1097,39 @@ export const AnnotationExportSelectionSchema: z.ZodType<AnnotationExportSelectio
     include: z.enum(['references', 'threads']).optional(),
   })
   .strict();
+
+/** `doc.annotations.import` options on the wire; the `opId` is the `Idempotency-Key` header. */
+export const AnnotationImportOptionsSchema: z.ZodType<Omit<AnnotationImportOptions, 'opId'>> = z
+  .object({
+    pages: z
+      .union([
+        z.literal('same'),
+        z.literal('by-position'),
+        z.array(z.object({ from: PageRefSchema, to: PageRefSchema }).strict()),
+      ])
+      .optional(),
+    attribution: z.enum(['restore', 'stamp']).optional(),
+  })
+  .strict();
+
+/**
+ * The `manifest` part of an import request. Only its envelope is checked
+ * here: the bundle's pages and items are the worker's to check, against the
+ * limits and each kind's create schema.
+ */
+export const AnnotationImportManifestSchema: z.ZodType<AnnotationImportManifest> = z
+  .object({
+    bundle: z
+      .object({
+        format: z.literal('embedpdf/annotations'),
+        version: z.literal(1),
+        pages: z.array(z.unknown()),
+        items: z.array(z.unknown()),
+      })
+      .strict(),
+    options: AnnotationImportOptionsSchema,
+  })
+  .strict() as unknown as z.ZodType<AnnotationImportManifest>;
 
 export const PageFlattenInputSchema: z.ZodType<PageFlattenInput> = z.object({
   pages: z.array(PageRefSchema),

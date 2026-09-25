@@ -229,10 +229,10 @@ interface DrawingTarget {
 }
 
 function requireDrawingTarget(ctx: AnnotationWriteContext | undefined): DrawingTarget {
-  if (ctx?.docPtr === undefined || ctx.pagePtr === undefined || !ctx.drawings) {
+  if (ctx?.docPtr === undefined || !ctx.drawings) {
     throw new EngineError(
       EngineErrorCode.Unknown,
-      'stamp writer requires docPtr/pagePtr/drawings on the write context',
+      'stamp writer requires docPtr/drawings on the write context',
     );
   }
   return { docPtr: ctx.docPtr, drawings: ctx.drawings };

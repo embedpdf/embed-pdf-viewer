@@ -42,6 +42,22 @@ export function positionKey(page: PageRef, index: number): string {
 }
 
 /**
+ * Every key a ref to this annotation can have: its own ref's, its position's
+ * and, when it has one, its name's. A ref another annotation holds (`/IRT`,
+ * `/Parent`) may use any of them.
+ */
+export function annotationKeysOf(annotation: {
+  readonly ref: AnnotationRef;
+  readonly index: number;
+  readonly nm: string | null;
+}): string[] {
+  const { ref } = annotation;
+  const keys = [annotationKey(ref), positionKey(ref.page, annotation.index)];
+  if (annotation.nm) keys.push(annotationKey({ kind: 'nm', page: ref.page, nm: annotation.nm }));
+  return keys;
+}
+
+/**
  * Rebuild an address from the two halves an event carries separately: the
  * page it happened on and the page-local stable id. The inverse of the
  * cloud client's split into `:pageKey` + `:annotKey`.

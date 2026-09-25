@@ -96,7 +96,7 @@ export class LocalDocumentHandle implements DocumentHandle {
     this.metadata = new LocalMetadataService(id, queue, view, guard, this.publisher);
     // Catalog-level /PieceInfo (no pon); page-level lives on each page handle.
     this.pieceInfo = new LocalPieceInfoService(id, queue, view, guard);
-    this.annotations = new LocalDocumentAnnotationsService(id, queue, view, guard);
+    this.annotations = new LocalDocumentAnnotationsService(id, queue, view, guard, this.publisher);
     this.attachments = new LocalDocumentAttachmentsService(id, queue, view, guard, this.publisher);
     this.actions = new LocalDocumentActionsService(id, queue, view, guard);
     this.forms = new LocalDocumentFormsService(id, queue, view, guard, this.publisher);

@@ -78,6 +78,7 @@ import {
   type AnnotationsReadFileWorkerRequest,
   type AnnotationsReadAppearanceWorkerRequest,
   type AnnotationsExportWorkerRequest,
+  type AnnotationsImportWorkerRequest,
   type PagesFlattenWorkerRequest,
   type RedactionApplyWorkerRequest,
   type PieceInfoApplicationsWorkerRequest,
@@ -118,6 +119,7 @@ import {
   AnnotationReader,
   AnnotationAppearanceReader,
   AnnotationExporter,
+  AnnotationImporter,
   AnnotationFlattener,
   AnnotationMutator,
   RawAnnotationReader,
@@ -409,6 +411,9 @@ export class WorkerHost {
           break;
         case 'annotations.export':
           resultPack = this.handleAnnotationsExport(msg, ctrl.signal);
+          break;
+        case 'annotations.import':
+          resultPack = this.handleAnnotationsImport(msg, ctrl.signal);
           break;
         case 'pages.removeName':
           resultPack = this.handlePagesRemoveName(msg, ctrl.signal);
@@ -934,6 +939,20 @@ export class WorkerHost {
       signal,
     );
     return wirePack({ tag: 'annotations.export', bundle }, Object.values(bundle.resources));
+  }
+
+  private handleAnnotationsImport(
+    req: AnnotationsImportWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const result = new AnnotationImporter(this.runtime, session, this.fonts).import(
+      { ...req, limits: req.limits ?? DEFAULT_ANNOTATION_BUNDLE_LIMITS },
+      signal,
+    );
+    // Everything left out: nothing was written.
+    if (result.created.length === 0) return wirePack({ tag: 'annotations.import', result });
+    return this.finishMutation(session, { tag: 'annotations.import', result }, req.artifactPath);
   }
 
   private handleAnnotationsReadAppearance(
@@ -1962,6 +1981,7 @@ const MUTATING_KINDS: ReadonlySet<WorkerRequest['kind']> = new Set<WorkerRequest
   'annotations.delete',
   'annotations.move',
   'annotations.flatten',
+  'annotations.import',
   'forms.setValue',
   'forms.reset',
   'forms.applyEffects',

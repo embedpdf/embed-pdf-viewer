@@ -111,7 +111,7 @@ export function runAnnotationResourceConformance(
         const appearance = await page.annotations.readResource(created.ref, 'appearance');
         expect([...appearance.subarray(0, 4)]).toEqual(PDF_MAGIC);
 
-        const data = JSON.parse(JSON.stringify(created)) as AnnotationDraft;
+        const data = copyOnItsPage(created);
         const copy = (await page.annotations.create(data, { appearance })).created;
         expect(dataOf(copy)).toEqual(dataOf(created));
         expectSameDrawing(await rasterOf(page, copy.ref), await rasterOf(page, created.ref));
@@ -136,10 +136,10 @@ export function runAnnotationResourceConformance(
           // Acrobat's 30%, in the 1/255 steps opacity is stored in.
           expect(stamp.opacity! > 0.25 && stamp.opacity! < 0.35).toBe(true);
           const appearance = await page.annotations.readResource(stamp.ref, 'appearance');
-          const data = JSON.parse(JSON.stringify(stamp)) as AnnotationDraft;
+          const data = copyOnItsPage(stamp);
           const copy = (await page.annotations.create(data, { appearance })).created;
           // The popup is another annotation; a copy is made without one.
-          expect(dataOf(copy)).toEqual({ ...dataOf(stamp), popup: null });
+          expect(dataOf(copy)).toEqual({ ...dataOf(stamp), popup: null, nm: null });
           const drawn = await rasterOf(page, copy.ref);
           expectPaintedOnce(drawn, stamp.opacity!);
           expectSameDrawing(drawn, await rasterOf(page, stamp.ref));
@@ -243,7 +243,7 @@ export function runAnnotationResourceConformance(
           200, 100,
         ]);
         // The same data and drawing made afresh: one turn, one fit, one opacity.
-        const data = JSON.parse(JSON.stringify(updated)) as AnnotationDraft;
+        const data = copyOnItsPage(updated);
         const twin = (await page.annotations.create(data, { appearance: drawing })).created;
         expectSameDrawing(await rasterOf(page, updated.ref), await rasterOf(page, twin.ref));
         expectPaintedOnce(await rasterOf(page, updated.ref), turned.opacity!);
@@ -277,7 +277,7 @@ export function runAnnotationResourceConformance(
           // Unturned as its twin made afresh from its data and drawing.
           const drawing = await page.annotations.readResource(stamp.ref, 'appearance');
           const twin = (
-            await page.annotations.create(JSON.parse(JSON.stringify(stamp)) as AnnotationDraft, {
+            await page.annotations.create(copyOnItsPage(stamp), {
               appearance: drawing,
             })
           ).created;
@@ -290,7 +290,7 @@ export function runAnnotationResourceConformance(
             rotation: stamp.rotation,
           });
           const resized = (
-            await page.annotations.create(JSON.parse(JSON.stringify(updated)) as AnnotationDraft, {
+            await page.annotations.create(copyOnItsPage(updated), {
               appearance: drawing,
             })
           ).created;
@@ -308,7 +308,7 @@ export function runAnnotationResourceConformance(
         // The drawing in its own box, which is /Rect's size here, the 35% included.
         const appearance = await page.annotations.readResource(stamp.ref, 'appearance');
         expect(pageSize(appearance)).toEqual([300, 120]);
-        const data = JSON.parse(JSON.stringify(stamp)) as AnnotationDraft;
+        const data = copyOnItsPage(stamp);
         const copy = (await page.annotations.create(data, { appearance })).created;
         expectSameDrawing(await rasterOf(page, copy.ref), shown);
       });
@@ -317,7 +317,7 @@ export function runAnnotationResourceConformance(
     /** Export, make a copy from the export, export the copy: `rounds` times. */
     const exportCycles = async (page: PageHandle, stamp: AnnotationDTO, rounds: number) => {
       const drawings = [await page.annotations.readResource(stamp.ref, 'appearance')];
-      const data = JSON.parse(JSON.stringify(stamp)) as AnnotationDraft;
+      const data = copyOnItsPage(stamp);
       for (let round = 0; round < rounds; round++) {
         const appearance = drawings[drawings.length - 1]!;
         const copy = (await page.annotations.create(data, { appearance })).created;
@@ -530,6 +530,14 @@ const PDF_MAGIC = [0x25, 0x50, 0x44, 0x46]; // %PDF
  * A read without what a copy doesn't take from its data: where it is, and the
  * attribution, which the engine writes for whoever makes the copy.
  */
+/**
+ * The data of a copy on the annotation's own page: a name is unique on its
+ * page (ISO 32000-2 §12.5.2), so the copy has none.
+ */
+function copyOnItsPage(dto: AnnotationDTO): AnnotationDraft {
+  return { ...(JSON.parse(JSON.stringify(dto)) as AnnotationDraft), nm: null };
+}
+
 function dataOf(dto: AnnotationDTO): Record<string, unknown> {
   const {
     ref: _ref,

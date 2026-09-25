@@ -1,4 +1,8 @@
-import type { AnnotationDraftBase, AnnotationPatchBase } from '@embedpdf/engine-core/runtime';
+import type {
+  AnnotationDraftBase,
+  AnnotationPatchBase,
+  DateInput,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import {
@@ -101,14 +105,15 @@ export function writeAnnotationNm(
 }
 
 /**
- * Stamp `/CreationDate` on a new annotation. The mutator calls it once, on
- * create, with the same moment it stamps as `/M`.
+ * Stamp `/CreationDate` on a new annotation: on create, the same moment it
+ * stamps as `/M`; on a restoring import, the date the annotation had, its
+ * offset kept.
  */
 export function writeAnnotationCreated(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  now: Date = new Date(),
+  now: DateInput = new Date(),
 ): void {
   writeAnnotString(fn, mem, annotPtr, 'CreationDate', formatPdfDate(now));
 }
@@ -131,7 +136,7 @@ export function writeAnnotationModified(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  now: Date = new Date(),
+  now: DateInput = new Date(),
 ): void {
   writeAnnotString(fn, mem, annotPtr, 'M', formatPdfDate(now));
 }

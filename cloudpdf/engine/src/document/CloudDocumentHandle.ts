@@ -47,7 +47,7 @@ import { CloudDocumentSecurityService } from './CloudDocumentSecurityService';
 import { CloudDocumentSignaturesService } from './CloudDocumentSignaturesService';
 import { CloudMetadataService } from './CloudMetadataService';
 import { CloudPageHandle } from './CloudPageHandle';
-import { auditRowToEvent } from '../realtime/auditRowToEvent';
+import { auditRowToEvents } from '../realtime/auditRowToEvents';
 import { SseClient } from '../realtime/SseClient';
 import type { HttpClient } from '../transport/HttpClient';
 
@@ -231,6 +231,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       layerName,
       () => this.closed,
       this.manifestAccessor,
+      this.publisher,
     );
     this.actions = new CloudDocumentActionsService(
       http,
@@ -666,12 +667,13 @@ export class CloudDocumentHandle implements DocumentHandle {
         if (this.manifestCache && row.id > this.manifestCache.auditHead) {
           this.manifestCache = { ...this.manifestCache, auditHead: row.id };
         }
-        const event = auditRowToEvent(row, this.sessionId);
-        if (!event) return; // own echo or unknown kind
-        // Absorb before publish: a listener reading the manifest in its
-        // callback must see post-mutation state (same order as local).
-        this.absorbRemoteEvent(event);
-        this.hub.publish(event);
+        // None for an own echo or an unknown kind; one per fact otherwise.
+        for (const event of auditRowToEvents(row, this.sessionId)) {
+          // Absorb before publish: a listener reading the manifest in its
+          // callback must see post-mutation state (same order as local).
+          this.absorbRemoteEvent(event);
+          this.hub.publish(event);
+        }
       },
       onFullRefresh: () => {
         // Too far behind to replay: drop the cache; the next read refetches.

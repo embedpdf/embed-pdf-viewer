@@ -3,7 +3,7 @@ import type { AnnotationDTO } from '../../src/annotation/kinds';
 import { EngineErrorCode } from '../../src/errors/EngineErrorCode';
 import type { AnnotationRef } from '../../src/identity/AnnotationRef';
 import { toPageRef, type PageRef } from '../../src/identity/PageRef';
-import { closeExportSelection, pageRefsIn } from '../../src/transfer/exportSelection';
+import { closeExportSelection } from '../../src/transfer/exportSelection';
 
 const first = toPageRef(3);
 const second = toPageRef(7);
@@ -125,16 +125,5 @@ describe('closeExportSelection', () => {
         expect.objectContaining({ code: EngineErrorCode.NotFound }),
       );
     }
-  });
-});
-
-describe('pageRefsIn', () => {
-  test('finds every page ref an item names, and nothing else', () => {
-    const link = {
-      ref: refOf(first, 10),
-      target: { kind: 'goto', destination: { kind: 'fit', page: second } },
-      rect: { left: 0, bottom: 0, right: 1, top: 1 },
-    };
-    expect(pageRefsIn(link)).toEqual([first, second]);
   });
 });

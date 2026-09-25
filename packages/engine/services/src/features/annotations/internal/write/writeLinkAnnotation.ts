@@ -98,8 +98,8 @@ function applyLinkTarget(
 
 /**
  * Build an indirect explicit-destination array for `dest`. The target page
- * is loaded just to reference its dictionary and closed immediately —
- * destinations routinely point at pages the mutator's pool never touches.
+ * is named by its object number and never loaded: a destination only refers
+ * to the page's dictionary.
  */
 function createDestination(
   fn: PdfFunctions,
@@ -107,40 +107,35 @@ function createDestination(
   docPtr: Ptr,
   dest: PdfDestination,
 ): Ptr {
-  const pagePtr = fn.EPDFDoc_LoadPageByObjectNumber(docPtr, dest.page.pageObjectNumber);
-  if (!pagePtr) {
+  const page = dest.page.pageObjectNumber;
+  const destPtr =
+    dest.kind === 'xyz'
+      ? // Absent axes write PDF nulls (spec: "retain current value").
+        fn.EPDFDest_CreateXYZByObjectNumber(
+          docPtr,
+          page,
+          dest.left != null,
+          dest.left ?? 0,
+          dest.top != null,
+          dest.top ?? 0,
+          dest.zoom != null,
+          dest.zoom ?? 0,
+        )
+      : createViewDestination(fn, mem, docPtr, page, dest);
+  if (!destPtr) {
     throw new EngineError(
       EngineErrorCode.NotFound,
-      `link destination page not found: pageObjectNumber=${dest.page.pageObjectNumber}`,
+      `link destination page not found: pageObjectNumber=${page}`,
     );
   }
-  try {
-    const destPtr =
-      dest.kind === 'xyz'
-        ? // Absent axes write PDF nulls (spec: "retain current value").
-          fn.EPDFDest_CreateXYZ(
-            pagePtr,
-            dest.left != null,
-            dest.left ?? 0,
-            dest.top != null,
-            dest.top ?? 0,
-            dest.zoom != null,
-            dest.zoom ?? 0,
-          )
-        : createViewDestination(fn, mem, pagePtr, dest);
-    if (!destPtr) {
-      throw new EngineError(EngineErrorCode.Unknown, `failed to create '${dest.kind}' destination`);
-    }
-    return destPtr;
-  } finally {
-    fn.FPDF_ClosePage(pagePtr);
-  }
+  return destPtr;
 }
 
 function createViewDestination(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
-  pagePtr: Ptr,
+  docPtr: Ptr,
+  page: number,
   dest: Exclude<PdfDestination, { kind: 'xyz' }>,
 ): Ptr {
   // The runtime pads missing params with 0 up to the fit type's arity —
@@ -162,9 +157,11 @@ function createViewDestination(
   })();
 
   const view = VIEW_CODE_BY_KIND[dest.kind];
-  if (!params.length) return fn.EPDFDest_CreateView(pagePtr, view, NULL_PTR, 0);
+  if (!params.length) {
+    return fn.EPDFDest_CreateViewByObjectNumber(docPtr, page, view, NULL_PTR, 0);
+  }
   return withScratch(mem, params.length * F32_BYTES, (buf) => {
     for (let i = 0; i < params.length; i++) mem.poke(buf, 'f32', params[i]!, i * F32_BYTES);
-    return fn.EPDFDest_CreateView(pagePtr, view, buf, params.length);
+    return fn.EPDFDest_CreateViewByObjectNumber(docPtr, page, view, buf, params.length);
   });
 }

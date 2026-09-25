@@ -340,8 +340,14 @@ export class HttpClient {
     body: FormData,
     parser: (raw: unknown) => T,
     signal: AbortSignal,
+    headers?: Record<string, string>,
   ): Promise<T> {
-    const res = await this.request(path, { method: 'POST', body, signal });
+    const res = await this.request(path, {
+      method: 'POST',
+      body,
+      signal,
+      ...(headers ? { headers } : {}),
+    });
     return await this.parseJsonResponse(res, parser);
   }
 

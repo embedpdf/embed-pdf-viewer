@@ -36,6 +36,7 @@ import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
 import type { PageRef } from '../identity/PageRef';
 import type { WireAnnotationBundle } from '../transfer/AnnotationBundle';
+import type { AnnotationImportPages, AnnotationImportResult } from '../transfer/annotationImport';
 import type { AnnotationBundleLimits } from '../transfer/bundleLimits';
 import type { AnnotationExportSelection } from '../transfer/exportSelection';
 import type {
@@ -410,6 +411,28 @@ export interface AnnotationsExportWorkerRequest {
   selection: AnnotationExportSelection;
   /** The limits the bundle must stay within; the defaults otherwise. */
   limits?: AnnotationBundleLimits;
+}
+
+/**
+ * A bundle's annotations, created as one change (`doc.annotations.import`).
+ * The producer puts each resource's buffer on the transfer list.
+ */
+export interface AnnotationsImportWorkerRequest {
+  kind: 'annotations.import';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  bundle: WireAnnotationBundle;
+  pages?: AnnotationImportPages;
+  attribution: 'restore' | 'stamp';
+  /**
+   * The session: who `'stamp'` attributes each annotation to, as on create,
+   * and whose user `'restore'` records as `importedBy`.
+   */
+  actor?: AnnotationActor;
+  /** The limits the bundle must stay within; the defaults otherwise. */
+  limits?: AnnotationBundleLimits;
+  artifactPath?: string;
 }
 
 /** An annotation's `appearance` resource: its drawing, as a one-page PDF (bytes). A read. */
@@ -1164,6 +1187,7 @@ export type WorkerRequest =
   | AnnotationsReadFileWorkerRequest
   | AnnotationsReadAppearanceWorkerRequest
   | AnnotationsExportWorkerRequest
+  | AnnotationsImportWorkerRequest
   | MeasureViewportsWorkerRequest
   | MeasureSetScaleWorkerRequest
   | PieceInfoReadWorkerRequest
@@ -1274,6 +1298,12 @@ export type WorkerResultPayload =
   | { tag: 'annotations.exportAppearance'; bytes: ArrayBuffer; size: number }
   | { tag: 'annotations.readAppearance'; bytes: ArrayBuffer; size: number }
   | { tag: 'annotations.export'; bundle: WireAnnotationBundle }
+  | {
+      tag: 'annotations.import';
+      result: AnnotationImportResult;
+      artifact?: LayerArtifactWorkerPayload;
+      artifactFile?: LayerArtifactFileWorkerPayload;
+    }
   | {
       tag: 'annotations.move';
       result: AnnotationMoveResult;

@@ -2449,6 +2449,27 @@ export function runAnnotationMutationConformance(
       }
     });
 
+    test('create refuses an nm already used on the page, naming the field', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(toPageRef(fix.pageObjectNumber));
+        const draft = { subtype: 'highlight', quadPoints: quad, nm: 'taken' } as const;
+        await page.annotations.create(draft satisfies HighlightDraft);
+        await expect(page.annotations.create(draft)).rejects.toMatchObject({
+          code: EngineErrorCode.InvalidArg,
+          details: { field: 'nm' },
+        });
+        // A name is unique per page (ISO 32000-2 §12.5.2): another page may use it.
+        const { pages } = await doc.pages.list();
+        const other = pages.find((entry) => entry.ref.pageObjectNumber !== fix.pageObjectNumber);
+        if (!other) return;
+        const elsewhere = await doc.page(other.ref).annotations.create(draft);
+        expect(elsewhere.created.nm).toBe('taken');
+      } finally {
+        await doc.close();
+      }
+    });
+
     // ─────────────────────────────────────────────────────────────────
     //  /State + /StateModel (review status, ISO 32000 §12.5.6.3) and
     //  /Subj. Locked rules:

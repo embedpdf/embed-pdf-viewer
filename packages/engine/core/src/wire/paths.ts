@@ -395,6 +395,10 @@ export const wirePaths = {
   layerAnnotationsExport: (docId: string, layerName: string, token: AnnotationsExportToken) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/export@${encodeAnnotationsExportToken(token)}`,
 
+  /** A bundle's annotations, created in the layer as one change (`doc.annotations.import`). */
+  layerAnnotationsImport: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/import`,
+
   /** Immutable layer whole-document annotation listing (bulk hydration). */
   layerAnnotationsAll: (docId: string, layerName: string, annotationsVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/items@${encodeAnnotationsAllToken(annotationsVersion)}`,

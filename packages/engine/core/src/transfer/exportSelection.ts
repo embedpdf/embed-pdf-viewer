@@ -1,7 +1,7 @@
 import type { AnnotationDTO } from '../annotation/kinds';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
-import { annotationKey, positionKey } from '../identity/annotationKey';
+import { annotationKey, annotationKeysOf } from '../identity/annotationKey';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import { encodePageKey, type PageRef } from '../identity/PageRef';
 
@@ -48,7 +48,7 @@ export function closeExportSelection(
     const annotations = readPage(page);
     read.set(pageKey, annotations);
     for (const annotation of annotations) {
-      for (const key of keysOf(annotation)) byKey.set(key, annotation);
+      for (const key of annotationKeysOf(annotation)) byKey.set(key, annotation);
     }
   };
   const find = (ref: AnnotationRef): AnnotationDTO | undefined => {
@@ -128,41 +128,4 @@ export function closeExportSelection(
     }
   }
   return ordered;
-}
-
-/** Every page `value` names: each `PageRef` anywhere in it, in the order met. */
-export function pageRefsIn(value: unknown): PageRef[] {
-  const found: PageRef[] = [];
-  const visit = (node: unknown) => {
-    if (typeof node !== 'object' || node === null) return;
-    if (Array.isArray(node)) {
-      node.forEach(visit);
-      return;
-    }
-    if (isPageRef(node)) {
-      found.push(node);
-      return;
-    }
-    Object.values(node).forEach(visit);
-  };
-  visit(value);
-  return found;
-}
-
-// The keys a ref to this annotation can have: by object number or index,
-// by name, and by position.
-function keysOf(annotation: AnnotationDTO): string[] {
-  const { ref } = annotation;
-  const keys = [annotationKey(ref), positionKey(ref.page, annotation.index)];
-  if (annotation.nm) keys.push(annotationKey({ kind: 'nm', page: ref.page, nm: annotation.nm }));
-  return keys;
-}
-
-function isPageRef(value: object): value is PageRef {
-  const keys = Object.keys(value);
-  return (
-    keys.length === 2 &&
-    (value as { kind?: unknown }).kind === 'objectNumber' &&
-    typeof (value as { pageObjectNumber?: unknown }).pageObjectNumber === 'number'
-  );
 }

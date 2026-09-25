@@ -1,6 +1,5 @@
 import { isDimension } from '@embedpdf/engine-core/runtime';
 import {
-  ANNOTATION_FIELD_NAMES,
   annotationKey,
   assertAnnotationResources,
   appearanceImpactOf,
@@ -20,7 +19,6 @@ import {
   type WireAnnotationResources,
   type AnnotationRef,
   type AnnotationReplyType,
-  type AnnotationSubtype,
   type AnnotationStableId,
   type AnnotationUpdateResult,
   type PageObjectNumber,
@@ -28,11 +26,9 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
-import { blendModeFromCode, blendModeToCode } from './internal/blendMode';
-import {
-  prepareMeasurementDraft,
-  prepareMeasurementPatch,
-} from './internal/mutations/prepareMeasurementMutation';
+import { blendModeFromCode } from './internal/blendMode';
+import { assertDeclaredFields, prepareCreate } from './internal/mutations/prepareCreate';
+import { prepareMeasurementPatch } from './internal/mutations/prepareMeasurementMutation';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import type { FontRegistrar } from '../fonts';
@@ -45,28 +41,19 @@ import {
   joinWidgetFieldNumbers,
   resolveWidgetFieldObjectNumber,
 } from './internal/read/joinWidgetField';
+import { annotationIndexByName } from './internal/read/annotationIndexByName';
 import { readAnnotationFromPtr } from './internal/read/readAnnotationFromPtr';
 import { assertRichTextAgreement } from './internal/richTextWire';
 import type { AnnotationWriteContext } from './internal/write/annotationWriteContext';
-import {
-  applyDraft,
-  applyPatch,
-  preflightDraft,
-  preflightPatch,
-} from './internal/write/annotationWriterRegistry';
-import {
-  writeAnnotationAuthor,
-  writeAnnotationCreated,
-  writeAnnotationModified,
-} from './internal/write/writeAnnotationBase';
+import { applyDraft, applyPatch, preflightPatch } from './internal/write/annotationWriterRegistry';
+import { generateAppearance } from './internal/write/generateAppearance';
+import { stampCreation } from './internal/write/stampCreation';
+import { writeAnnotationModified } from './internal/write/writeAnnotationBase';
 import {
   writeAnnotationRelationship,
   writePopupParent,
 } from './internal/write/writeAnnotationRelationship';
-import {
-  applyEmbedMetadataOnCreate,
-  applyEmbedMetadataOnUpdate,
-} from './internal/write/writeEmbedMetadata';
+import { applyEmbedMetadataOnUpdate } from './internal/write/writeEmbedMetadata';
 
 /** `FPDF_ANNOT_APPEARANCEMODE_NORMAL` — the `/AP /N` stream. */
 const APPEARANCE_MODE_NORMAL = 0;
@@ -146,11 +133,8 @@ export class AnnotationMutator {
     try {
       this.ensureKnownWeakStateFromPage(pageObjectNumber, pagePtr);
       const writeCtx = this.writeContext(pagePtr, resources);
-      assertDeclaredFields(draft.subtype, draft);
-      assertAnnotationResources(draft.subtype, resources, 'create');
-      preflightDraft(draft, writeCtx);
-      assertRichTextAgreement(draft);
-      draft = prepareMeasurementDraft(draft);
+      draft = prepareCreate(draft, resources, writeCtx);
+      this.assertNameFree(pageObjectNumber, draft.nm);
       // `create` is append-only: PDFium drops the new annotation at
       // `index = previousCount`, so no existing index ever shifts. Per
       // the locked rule in `computeMutationImpact`, that means create is
@@ -200,19 +184,7 @@ export class AnnotationMutator {
             null,
           );
         }
-        // Stamp identity + modification metadata after the per-subtype
-        // writer so a buggy subtype writer can't clobber them:
-        //   /T             ← actor.displayName  (when present)
-        //   /CreationDate  ← now                 (always)
-        //   /M             ← now                 (always)
-        //   /EMBD_Metadata ← actor.userId/groupId (when present)
-        if (actor?.displayName) {
-          writeAnnotationAuthor(fn, mem, annotPtr, actor.displayName);
-        }
-        const now = new Date();
-        writeAnnotationCreated(fn, mem, annotPtr, now);
-        writeAnnotationModified(fn, mem, annotPtr, now);
-        applyEmbedMetadataOnCreate(fn, mem, annotPtr, actor);
+        stampCreation(fn, mem, annotPtr, actor, new Date());
         // Bake the /AP appearance stream now that every visual field is
         // written, so the new annotation ships with a standard-compliant
         // appearance.
@@ -800,12 +772,23 @@ export class AnnotationMutator {
    */
   private regenerateAppearance(annotPtr: Ptr, pagePtr: Ptr, blendMode?: BlendMode): boolean {
     const { fn } = this.runtime;
-    const ok =
-      blendMode === undefined
-        ? fn.EPDFAnnot_GenerateAppearance(annotPtr)
-        : fn.EPDFAnnot_GenerateAppearanceWithBlend(annotPtr, blendModeToCode(blendMode));
+    const ok = generateAppearance(fn, annotPtr, blendMode);
     fn.FPDFPage_GenerateContent(pagePtr);
     return ok;
+  }
+
+  /** A name must be free on its page (ISO 32000-2 §12.5.2): `create` refuses a taken one. */
+  private assertNameFree(pageObjectNumber: PageObjectNumber, nm: string | null | undefined): void {
+    if (!nm) return;
+    const { pageIndex } = this.session.recordByObjectNumber(pageObjectNumber);
+    if (annotationIndexByName(this.runtime, this.session.requireDocPtr(), pageIndex, nm) < 0) {
+      return;
+    }
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      `nm '${nm}' is already used on page ${pageObjectNumber}`,
+      { details: { field: 'nm' } },
+    );
   }
 
   private captureOrStampStableId(annotPtr: Ptr): AnnotationStableId {
@@ -877,18 +860,6 @@ function patchForTarget(current: AnnotationDTO, patch: AnnotationPatch): Annotat
   }
   assertDeclaredFields(current.subtype, patch);
   return { ...patch, subtype: current.subtype } as AnnotationPatch;
-}
-
-/** A write names only fields its kind declares: a misspelled or foreign field is refused, never ignored. */
-function assertDeclaredFields(subtype: AnnotationSubtype, write: object): void {
-  const known = ANNOTATION_FIELD_NAMES[subtype];
-  const unknown = Object.keys(write).filter((name) => name !== 'subtype' && !known.includes(name));
-  if (unknown.length > 0) {
-    throw new EngineError(
-      EngineErrorCode.InvalidArg,
-      `${subtype} has no field ${unknown.map((name) => `'${name}'`).join(', ')}`,
-    );
-  }
 }
 
 const sameRef = (left: AnnotationRef | null, right: AnnotationRef | null): boolean =>

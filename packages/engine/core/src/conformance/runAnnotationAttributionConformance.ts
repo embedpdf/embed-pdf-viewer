@@ -44,6 +44,10 @@ const ALICE: Identity = {
   groups: ['legal'],
 };
 const BOB: Identity = { userId: 'bob', displayName: 'Bob Builder', groupId: 'ops' };
+/** A host's sync job, restoring annotations from its own store. */
+const IMPORTER: Identity = { userId: 'sync-job', displayName: 'Sync Job', groupId: 'ops' };
+/** What an export needs besides: reading the annotations. */
+const READ = [...SCOPE, 'doc.annotate.read'] as const;
 
 /** Attribution a caller has no business supplying on create or update. */
 const FORGED = {
@@ -253,6 +257,82 @@ export function runAnnotationAttributionConformance(
         const { created } = await page.annotations.create(SQUARE);
         await page.annotations.update(created.ref, { groupId: 'finance' });
         expect((await readBack(page, created.ref)).groupId).toBe('finance');
+      });
+    });
+
+    test('a restoring import keeps the attribution a bundle has, and records who imported it', async () => {
+      // Alice writes, Bob edits one of hers: the bundle carries both, and the
+      // annotations another tool wrote.
+      const alice = await opts.openAs(engine, { scope: READ, identity: ALICE });
+      const page = await firstPage(alice);
+      const rect = { left: 300, bottom: 300, right: 330, top: 330 };
+      const { created: square } = await page.annotations.create(SQUARE);
+      const { created: note } = await page.annotations.create({ subtype: 'text', rect });
+      await page.annotations.create({ subtype: 'text', rect, reply: { to: note.ref } });
+      await page.annotations.create(
+        { subtype: 'file-attachment', rect, file: { name: 'minutes.txt' } },
+        { file: new TextEncoder().encode('minutes') },
+      );
+      const bob = await opts.openAs(engine, { scope: READ, identity: BOB }, alice);
+      await alice.close();
+      await (await firstPage(bob)).annotations.update(square.ref, { contents: 'Checked' });
+      // Without names, so the copies land beside the originals.
+      const exported = await bob.annotations.export();
+      const bundle = {
+        ...exported,
+        items: exported.items.map((item) => ({ ...item, data: { ...item.data, nm: null } })),
+      } as typeof exported;
+
+      const importer = await opts.openAs(
+        engine,
+        { scope: [...READ, 'doc.annotate.import'], identity: IMPORTER },
+        bob,
+      );
+      await bob.close();
+      try {
+        // Another tool's annotations carry an author but no EmbedPDF identity.
+        expect(bundle.items.some(({ data }) => data.author !== null && data.userId === null)).toBe(
+          true,
+        );
+        // 'restore' is the default.
+        const result = await importer.annotations.import(bundle);
+        expect(result.created).toHaveLength(bundle.items.length);
+        result.created.forEach((created, index) => {
+          const source = bundle.items[index]!.data;
+          expect(attributionOf(created)).toEqual({
+            ...attributionOf(source),
+            importedBy: 'sync-job',
+          });
+          expect([created.createdAt, created.modifiedAt]).toEqual([
+            source.createdAt,
+            source.modifiedAt,
+          ]);
+          if (created.subtype === 'file-attachment' && source.subtype === 'file-attachment') {
+            expect(created.file?.createdAt).toBe(source.file?.createdAt);
+          }
+        });
+        const edited =
+          result.created[
+            bundle.items.findIndex(
+              (item) => annotationKey(item.data.ref) === annotationKey(square.ref),
+            )
+          ]!;
+        expect(attributionOf(edited)).toMatchObject({ userId: 'alice', modifiedBy: 'bob' });
+      } finally {
+        await importer.close();
+      }
+    });
+
+    test('a restoring import needs doc.annotate.import; one that stamps does not', async () => {
+      await asSession({ scope: READ, identity: ALICE }, async (page, doc) => {
+        const { created } = await page.annotations.create(SQUARE);
+        const bundle = await doc.annotations.export({ refs: [created.ref] });
+        await expectRefused(() => doc.annotations.import(bundle), 'doc.annotate.import');
+        const stamped = await doc.annotations.import(bundle, { attribution: 'stamp' });
+        expect(attributionOf(stamped.created[0]!)).toMatchObject({
+          userId: 'alice',
+          importedBy: null,
+        });
       });
     });
 

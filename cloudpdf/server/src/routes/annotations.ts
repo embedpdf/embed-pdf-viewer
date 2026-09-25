@@ -4,10 +4,12 @@ import {
   EngineError,
   EngineErrorCode,
   ANNOTATION_RESOURCE_ROLE_NAMES,
+  DEFAULT_ANNOTATION_BUNDLE_LIMITS,
   checkSetGroup,
   wirePack,
   type AnnotationActor,
   type AnnotationAppearanceImageOptions,
+  type AnnotationBundleLimits,
   type AnnotationAppearanceManifest,
   type AnnotationAppearanceManifestEntry,
   type AnnotationDraft,
@@ -56,6 +58,7 @@ import {
   toPageState,
   type SchemaLike,
 } from './_helpers';
+import { readAnnotationImportRequest } from './_annotationImportRequest';
 import { buildMultipart, type MultipartPart } from './_multipart';
 import { readMutationEnvelope, type MutationEnvelope } from './_mutationEnvelope';
 import { requireSharedDocRead } from './_planeGuard';
@@ -85,6 +88,8 @@ interface AnnotationRouteDeps {
   weakAnnotationSessions?: WeakAnnotationSessionService;
   /** Render-lattice policy plane (absent = legacy compute-only). */
   derivedRenders?: DerivedRenderService;
+  /** How large an exported or imported annotation bundle may be; the defaults otherwise. */
+  bundleLimits?: AnnotationBundleLimits;
 }
 
 type ReadScope =
@@ -104,6 +109,7 @@ export async function registerAnnotationRoutes(
     derivedRenders,
   } = deps;
   const encodeInEngine = deps.encodeInEngine ?? true;
+  const bundleLimits = deps.bundleLimits ?? DEFAULT_ANNOTATION_BUNDLE_LIMITS;
 
   // ── Plane-scoped doc-level reads: a base's own annotations —
   //    weak-identity ones included — are simply visible through every
@@ -284,6 +290,7 @@ export async function registerAnnotationRoutes(
       ]);
       return exportAnnotations({
         documentService,
+        limits: bundleLimits,
         reply,
         signal: abortSignalFromRequest(req),
         scope: { kind: 'base', ctx, docId },
@@ -310,6 +317,7 @@ export async function registerAnnotationRoutes(
       const ctx = requireLayerResource(req, docId, layerName, 'layer-annotations-export', pdfBits);
       return exportAnnotations({
         documentService,
+        limits: bundleLimits,
         reply,
         signal: abortSignalFromRequest(req),
         scope: { kind: 'layer', ctx, docId, layerName },
@@ -491,6 +499,59 @@ export async function registerAnnotationRoutes(
       return reply.code(204).send();
     },
   );
+
+  // A bundle's annotations, created as one change. The parts stream in
+  // under the bundle limits; the `Idempotency-Key` header names the import,
+  // so a retry returns what the first request committed.
+  app.post('/v1/docs/:docId/layers/:layerName/annotations/import', async (req, reply) => {
+    const { docId, layerName } = req.params as { docId: string; layerName: string };
+    const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const idempotencyKey = idempotencyKeyOf(req.headers['idempotency-key']);
+    const limits = bundleLimits;
+    const { manifest, resources } = await readAnnotationImportRequest(req, limits);
+    const attribution = manifest.options.attribution ?? 'restore';
+
+    let ctx = requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', pdfBits);
+    if (attribution === 'restore') {
+      // Restoring writes attribution that isn't the caller's, groups
+      // included, so it takes the capability instead of per-group checks.
+      ctx = requireLayerCapability(req, docId, layerName, 'doc.annotate.import', pdfBits);
+    } else {
+      // Each annotation is made as a create makes it, so each group the
+      // items name takes the authority a create in it would.
+      const groups = new Set<string | undefined>();
+      for (const item of manifest.bundle.items as unknown as Array<{
+        data?: { groupId?: unknown };
+      }>) {
+        const groupId = item?.data?.groupId;
+        groups.add(typeof groupId === 'string' ? groupId : undefined);
+      }
+      for (const groupId of groups) {
+        const group = createGroupOf(accessCtx.jwt, { groupId } as AnnotationDraft, pdfBits);
+        const target = targetForSelfCreate(accessCtx.jwt, group);
+        ctx = requireLayerCollabAction(req, docId, layerName, 'create', target, pdfBits);
+      }
+    }
+    // The caller: whom `stamp` attributes to, whom `restore` records as `importedBy`.
+    const actor = actorFromJwt(ctx.jwt, accessCtx.jwt.identity.groupId);
+
+    setNoStore(reply);
+    return layerService.importAnnotations(
+      ctx,
+      {
+        docId,
+        layerName,
+        bundle: { ...manifest.bundle, resources },
+        ...(manifest.options.pages !== undefined ? { pages: manifest.options.pages } : {}),
+        attribution,
+        ...(actor ? { actor } : {}),
+        limits,
+        ...(idempotencyKey ? { idempotencyKey } : {}),
+      },
+      abortSignalFromRequest(req),
+    );
+  });
 
   app.post(
     '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items',
@@ -868,6 +929,18 @@ function createGroupOf(
     }
   }
   return groupId;
+}
+
+/** The `Idempotency-Key` header: printable ASCII, 1 to 255 characters. */
+function idempotencyKeyOf(header: string | string[] | undefined): string | undefined {
+  if (header === undefined) return undefined;
+  if (typeof header !== 'string' || !/^[\x21-\x7e]{1,255}$/.test(header)) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      'Idempotency-Key must be 1 to 255 printable ASCII characters',
+    );
+  }
+  return header;
 }
 
 /**
@@ -1317,6 +1390,7 @@ async function readAnnotations(input: {
  */
 async function exportAnnotations(input: {
   documentService: DocumentService;
+  limits: AnnotationBundleLimits;
   reply: FastifyReply;
   signal: AbortSignal;
   scope: ReadScope;
@@ -1348,6 +1422,7 @@ async function exportAnnotations(input: {
       docId: scope.docId,
       ...(layerName !== undefined ? { layerName } : {}),
       selection: token.selection,
+      limits: input.limits,
     });
   const result = await input.documentService.readOnPool(
     scope.ctx,

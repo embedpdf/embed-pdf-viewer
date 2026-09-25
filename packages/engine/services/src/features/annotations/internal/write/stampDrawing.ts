@@ -40,10 +40,14 @@ export function drawingFor(
   bytes: ArrayBuffer,
   meta: BinaryMetadata,
 ): number {
+  const hashed = index.hashes.get(bytes);
+  const placed = hashed === undefined ? undefined : index.bySource.get(hashed);
+  if (placed !== undefined) return placed;
   const dataPtr = mem.alloc(bytes.byteLength);
   try {
     mem.writeBytes(dataPtr, new Uint8Array(bytes));
-    const source = sha256Hex(fn, mem, dataPtr, bytes.byteLength);
+    const source = hashed ?? sha256Hex(fn, mem, dataPtr, bytes.byteLength);
+    index.hashes.set(bytes, source);
     const noted = index.bySource.get(source);
     if (noted !== undefined) return noted;
 

@@ -1,11 +1,18 @@
 import {
   AbortablePromise,
+  DEFAULT_ANNOTATION_BUNDLE_LIMITS,
   EngineError,
   EngineErrorCode,
+  annotationImportFacts,
   assertAnnotationBundle,
+  assertBundleManifest,
+  generateUuid,
   type AnnotationBundle,
   type AnnotationBundleLimits,
   type AnnotationExportSelection,
+  type AnnotationImportManifest,
+  type AnnotationImportOptions,
+  type AnnotationImportResult,
   type AnnotationListPageSnapshot,
   type AnnotationListSnapshotAllPages,
   type DocumentAnnotationsService,
@@ -17,12 +24,14 @@ import {
   type WeakAnnotationEditSession,
 } from '@embedpdf/engine-core/runtime';
 import {
+  AnnotationImportResultSchema,
   AnnotationListPageSnapshotSchema,
   AnnotationListSnapshotAllPagesSchema,
   WeakAnnotationSessionResponseSchema,
   wirePaths,
   type WeakAnnotationSessionResponse,
 } from '@embedpdf/engine-core/wire';
+import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import { planesInherited } from './planes';
@@ -50,6 +59,7 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
     private readonly layerName: string,
     private readonly isClosed: () => boolean,
     private readonly manifest: ManifestAccessor,
+    private readonly publisher: SessionEventPublisher,
   ) {}
 
   /**
@@ -156,6 +166,57 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
       };
       await assertAnnotationBundle(bundle, NO_LIMITS);
       return bundle;
+    });
+  }
+
+  /**
+   * One request: the bundle's manifest and each resource once, as parts of
+   * one multipart POST under the import's `Idempotency-Key`, so a retry
+   * applies once. The server holds the limits; the same numbers are checked
+   * here first, so a bundle past one fails before its bytes move.
+   */
+  import(
+    bundle: AnnotationBundle,
+    options: AnnotationImportOptions = {},
+  ): AbortablePromise<AnnotationImportResult> {
+    if (this.isClosed()) {
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
+      );
+    }
+    const opId = options.opId ?? generateUuid();
+    return AbortablePromise.run<AnnotationImportResult>(async (signal) => {
+      const { resources, ...rest } = bundle;
+      const sizes = new Map(Object.entries(resources).map(([id, bytes]) => [id, bytes.length]));
+      assertBundleManifest(bundle, sizes, DEFAULT_ANNOTATION_BUNDLE_LIMITS);
+      const manifest: AnnotationImportManifest = {
+        bundle: rest,
+        options: {
+          ...(options.pages !== undefined ? { pages: options.pages } : {}),
+          ...(options.attribution !== undefined ? { attribution: options.attribution } : {}),
+        },
+      };
+      const form = new FormData();
+      form.append('manifest', JSON.stringify(manifest));
+      for (const [id, bytes] of Object.entries(resources)) {
+        form.append(`resource:${id}`, new Blob([bytes as BlobPart]), id);
+      }
+      const result = await this.http.postMultipartJson(
+        wirePaths.layerAnnotationsImport(this.docId, this.layerName),
+        form,
+        (raw) => AnnotationImportResultSchema.parse(raw),
+        signal,
+        { 'Idempotency-Key': opId },
+      );
+      this.manifest.apply(result.meta, ['annotations']);
+      const facts = annotationImportFacts(result);
+      facts.forEach((fact, index) => {
+        this.publisher.publishLocal(
+          { type: 'annotation.created', ...fact },
+          { id: opId, index, count: facts.length },
+        );
+      });
+      return result;
     });
   }
 

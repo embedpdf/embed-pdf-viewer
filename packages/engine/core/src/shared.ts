@@ -227,8 +227,25 @@ export type {
   WireAnnotationBundle,
 } from './transfer/AnnotationBundle';
 export type { AnnotationExportSelection } from './transfer/exportSelection';
-export { closeExportSelection, pageRefsIn } from './transfer/exportSelection';
-export { assertAnnotationBundle, resourceIdOf } from './transfer/AnnotationBundle';
+export type {
+  AnnotationDropReason,
+  AnnotationImportDrop,
+  AnnotationImportOptions,
+  AnnotationImportManifest,
+  AnnotationImportPages,
+  AnnotationImportPlan,
+  AnnotationImportResult,
+  AnnotationImportTarget,
+  PlannedAnnotation,
+} from './transfer/annotationImport';
+export { annotationImportFacts, planAnnotationImport } from './transfer/annotationImport';
+export { closeExportSelection } from './transfer/exportSelection';
+export { mapPageRefs, pageRefsIn } from './transfer/pageRefs';
+export {
+  assertAnnotationBundle,
+  assertBundleManifest,
+  resourceIdOf,
+} from './transfer/AnnotationBundle';
 export type { AnnotationBundleLimits } from './transfer/bundleLimits';
 export {
   assertWithinLimit,
@@ -358,7 +375,12 @@ export type {
 } from './annotation/AnnotationListSnapshot';
 
 export { classifyRelation, buildThreads } from './annotation/relationships';
-export { annotationKey, positionKey, refFromStableId } from './identity/annotationKey';
+export {
+  annotationKey,
+  annotationKeysOf,
+  positionKey,
+  refFromStableId,
+} from './identity/annotationKey';
 export type { AnnotationRelationKind, AnnotationThread } from './annotation/relationships';
 
 export { buildCommentThreads, isStateAnnotation } from './annotation/comments';

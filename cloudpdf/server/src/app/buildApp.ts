@@ -1,7 +1,11 @@
 import { TextDecoder } from 'node:util';
 
 import { adminOperations, adminWirePaths } from '@cloudpdf/contract';
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import {
+  EngineError,
+  EngineErrorCode,
+  type AnnotationBundleLimits,
+} from '@embedpdf/engine-core/runtime';
 import compress from '@fastify/compress';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
@@ -159,6 +163,11 @@ export interface BuildAppOptions {
   workerEntry: URL | string | null;
   /** Override Fastify body limit. Defaults to 50 MiB. */
   bodyLimit?: number;
+  /**
+   * How large an annotation bundle may be, exported or imported. Defaults to
+   * `DEFAULT_ANNOTATION_BUNDLE_LIMITS`.
+   */
+  annotationBundleLimits?: AnnotationBundleLimits;
   /** Origin-mediated upload policy. Defaults to `fallback-only`. */
   uploadProxyPolicy?: UploadProxyPolicy;
   /**
@@ -591,6 +600,8 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         'content-type',
         'x-engine-session-id',
         'last-event-id',
+        // Names a change a retry must not repeat (annotation import).
+        'idempotency-key',
         // Document affinity: SDKs may send the document routing key; the server
         // never parses it, but the preflight must allow it.
         'x-cloudpdf-doc',
@@ -1356,6 +1367,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         ...(opts.encodeInEngine !== undefined ? { encodeInEngine: opts.encodeInEngine } : {}),
         weakAnnotationSessions,
         ...(derivedRenders ? { derivedRenders } : {}),
+        ...(opts.annotationBundleLimits ? { bundleLimits: opts.annotationBundleLimits } : {}),
       });
       await registerFormRoutes(app, {
         documentService,

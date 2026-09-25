@@ -1,6 +1,8 @@
 import {
+  annotationImportFacts,
   toPageRef,
   type AnnotationCreateResult,
+  type AnnotationImportResult,
   type AnnotationDeleteResult,
   type AnnotationMoveResult,
   type AnnotationUpdateResult,
@@ -37,14 +39,19 @@ export interface AuditEventRow {
   pageObjectNumber: number | null;
   affectedPages: number[];
   originSessionId: string | null;
+  /** The request's `Idempotency-Key`, when it named the change. */
+  idempotencyKey?: string | null;
   payload: unknown;
 }
 
 /**
- * Translate a remote audit row into a `DocumentEvent` — pure, so the
- * exactly-once and verbatim-payload invariants are unit-testable without a
- * server. Returns `null` for kinds this engine version doesn't know
- * (a newer server's events degrade to "ignored", never to a crash).
+ * Translate a remote audit row into the `DocumentEvent`s it records — pure,
+ * so the exactly-once and verbatim-payload invariants are unit-testable
+ * without a server. Most rows are one fact; an import is one
+ * `annotation.created` per annotation, sharing `origin.tx` (its id the
+ * request's `Idempotency-Key`). Returns none for an own echo and for kinds
+ * this engine version doesn't know (a newer server's events degrade to
+ * "ignored", never to a crash).
  *
  * Context-field fidelity differs by op, by design of the audit row:
  *   - rotate/delete: `affectedPages` is exactly the op's page set; rotation
@@ -57,8 +64,8 @@ export interface AuditEventRow {
  * The audit row keys pages by object number (its storage identity); the
  * event carries them as `PageRef` addresses, like every other event.
  */
-export function auditRowToEvent(row: AuditEventRow, mySessionId: string): DocumentEvent | null {
-  if (row.originSessionId === mySessionId) return null; // own echo — local publish covered it
+export function auditRowToEvents(row: AuditEventRow, mySessionId: string): DocumentEvent[] {
+  if (row.originSessionId === mySessionId) return []; // own echo — local publish covered it
 
   const origin: EventOrigin = {
     kind: 'remote',
@@ -67,7 +74,21 @@ export function auditRowToEvent(row: AuditEventRow, mySessionId: string): Docume
     ts: row.ts,
     serverId: row.id,
   };
+  if (row.kind === 'annot.import') {
+    const facts = annotationImportFacts(row.payload as AnnotationImportResult);
+    const id = row.idempotencyKey ?? `audit:${row.id}`;
+    return facts.map((fact, index) => ({
+      type: 'annotation.created',
+      origin: { ...origin, tx: { id, index, count: facts.length } },
+      ...fact,
+    }));
+  }
+  const event = eventOf(row, origin);
+  return event ? [event] : [];
+}
 
+/** The one event a single-fact row records, or `null` for a kind this version doesn't know. */
+function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null {
   // The row's page: its explicit column, else the first affected page.
   const rowPage = () => toPageRef(row.pageObjectNumber ?? row.affectedPages[0] ?? 0);
   const affectedPages = () =>

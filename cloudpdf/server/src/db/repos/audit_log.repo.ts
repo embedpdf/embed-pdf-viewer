@@ -8,6 +8,8 @@ export type AuditMutationKind =
   | 'annot.update'
   | 'annot.delete'
   | 'annot.move'
+  /** A bundle's annotations, created as one change (`doc.annotations.import`). */
+  | 'annot.import'
   | 'pages.move'
   | 'pages.rotate'
   | 'pages.delete'
@@ -95,6 +97,20 @@ export class AuditLogRepo {
       .returning('id')
       .executeTakeFirstOrThrow();
     return Number(row.id);
+  }
+
+  /**
+   * The row a layer committed under `idempotencyKey`, if any: a retried
+   * request finds the change it already made (unique per layer).
+   */
+  async findByIdempotencyKey(layerId: string, idempotencyKey: string): Promise<AuditLogRow | null> {
+    const row = await this.db
+      .selectFrom('audit_log')
+      .selectAll()
+      .where('layer_id', '=', layerId)
+      .where('idempotency_key', '=', idempotencyKey)
+      .executeTakeFirst();
+    return row ? mapAuditRow(row) : null;
   }
 
   async findForDocTimeRange(input: {

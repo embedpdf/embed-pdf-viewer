@@ -182,6 +182,7 @@ export type {
   AnnotationsReadFileWorkerRequest,
   AnnotationsReadAppearanceWorkerRequest,
   AnnotationsExportWorkerRequest,
+  AnnotationsImportWorkerRequest,
   AttachmentFileWorkerPayload,
   LayerArtifactWorkerPayload,
   LayerArtifactFileWorkerPayload,

@@ -56,6 +56,12 @@ export interface EventOrigin {
    *  `null` until the mutation has a server identity (local engines; cloud
    *  own-mutation events before the server echoes the id). */
   serverId: number | null;
+  /**
+   * Set when this fact is one of several committed together, such as the
+   * annotations of one import: they share `id`, and `index` counts from 0 to
+   * `count - 1` in the order they were emitted.
+   */
+  tx?: { id: string; index: number; count: number };
 }
 
 /**
@@ -68,7 +74,9 @@ export interface EventOrigin {
  *   - exactly once: every mutation that touches your document appears in
  *     your stream exactly once. The engine that performs a mutation emits
  *     the event itself at confirmation time; the remote channel exists to
- *     tell everyone else (own echoes are dropped by `sessionId`).
+ *     tell everyone else (own echoes are dropped by `sessionId`). A change
+ *     that commits several facts at once, such as an import, emits one
+ *     event per fact, back to back, sharing `origin.tx`.
  *   - ground truth only: events fire after the mutation is confirmed —
  *     never optimistically. Optimism is a plugin concern.
  *   - results ride verbatim: each event embeds the mutation result the

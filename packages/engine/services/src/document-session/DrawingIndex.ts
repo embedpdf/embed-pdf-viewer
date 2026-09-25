@@ -23,6 +23,13 @@ export class DrawingIndex {
    */
   readonly bySource = new Map<string, number>();
 
+  /**
+   * SHA-256 (hex) of bytes already hashed, by the buffer holding them. The
+   * stamps of one import share one buffer per resource, so it is copied and
+   * hashed once. A fact about the bytes, so {@link forget} keeps it.
+   */
+  readonly hashes = new WeakMap<ArrayBuffer, string>();
+
   forget(): void {
     this.byContent = null;
     this.bySource.clear();

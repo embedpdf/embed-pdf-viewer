@@ -13,12 +13,16 @@ import {
   toPageRef,
   wirePack,
   type AnnotationActor,
+  type AnnotationBundleLimits,
   type AnnotationCreateResult,
+  type AnnotationImportPages,
+  type AnnotationImportResult,
   type AnnotationDeleteResult,
   type AnnotationDraft,
   type AnnotationFlattenResult,
   type AnnotationMoveResult,
   type AnnotationPatch,
+  type WireAnnotationBundle,
   type WireAnnotationResources,
   type WireResourceMap,
   type AnnotationRef,
@@ -89,12 +93,13 @@ import type { LayerStateService } from './LayerStateService';
 import type { MutationImpactKind } from './LayerStateService';
 import type { WeakAnnotationSessionService } from './WeakAnnotationSessionService';
 import type { EngineCounters } from '../app/engine-counters';
-import type { AuditMutationKind } from '../db/repos/audit_log.repo';
+import { AuditLogRepo, type AuditMutationKind } from '../db/repos/audit_log.repo';
 import type { DocumentSigningsRepo, SigningRow } from '../db/repos/document_signings.repo';
 import type { DocumentsRepo } from '../db/repos/documents.repo';
 import type { DurablePageRow, LayerRow } from '../db/repos/page_state.repo';
 import type { PdfPasswordSessionsRepo } from '../db/repos/pdf_password_sessions.repo';
 import type { Database as Schema } from '../db/schema';
+import { isUniqueViolation } from '../db/uniqueViolation';
 import type { RealtimeBus } from '../realtime/RealtimeBus';
 import type { EnginePool } from '../runtime/EnginePool';
 import { signingCandidatePath } from '../runtime/signing-paths';
@@ -398,6 +403,95 @@ export class LayerService {
         });
       });
     });
+  }
+
+  /**
+   * `doc.annotations.import` on a layer: one worker job, whose failure
+   * leaves the session as it was, then one artifact, one commit across every
+   * page it touched and one audit row. A retry under the same
+   * `idempotencyKey` gets back what the first request committed.
+   */
+  async importAnnotations(
+    ctx: LayerWriteContext,
+    input: {
+      docId: string;
+      layerName: string;
+      bundle: WireAnnotationBundle;
+      pages?: AnnotationImportPages;
+      attribution: 'restore' | 'stamp';
+      /** The caller's identity, which `'stamp'` attributes each annotation to. */
+      actor?: AnnotationActor;
+      limits: AnnotationBundleLimits;
+      idempotencyKey?: string;
+    },
+    signal?: AbortSignal,
+  ): Promise<AnnotationImportResult> {
+    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
+      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
+      const replay = await this.committedImport(layer.id, input.idempotencyKey);
+      if (replay) return replay;
+      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
+        const build = (jobId: WorkerJobId) =>
+          wirePack(
+            {
+              kind: 'annotations.import' as const,
+              jobId,
+              docId: input.docId,
+              layerName: input.layerName,
+              bundle: input.bundle,
+              ...(input.pages !== undefined ? { pages: input.pages } : {}),
+              attribution: input.attribution,
+              ...(input.actor ? { actor: input.actor } : {}),
+              limits: input.limits,
+              artifactPath,
+            },
+            Object.values(input.bundle.resources),
+          );
+        const payload = await this.requirePool().run(input.docId, build, signal);
+        if (payload.tag !== 'annotations.import') {
+          throw new EngineError(
+            EngineErrorCode.WireFormat,
+            `unexpected annotations.import payload: ${payload.tag}`,
+          );
+        }
+        // Everything was left out: nothing was written, nothing to commit.
+        if (payload.result.created.length === 0) return payload.result;
+        try {
+          return await this.persistAnnotationImport(ctx, input.docId, input.layerName, layer, {
+            result: payload.result,
+            artifact: requireLayerArtifact(payload as unknown),
+            ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
+          });
+        } catch (err) {
+          // Another replica committed the same key first: that is the result.
+          const committed = isUniqueViolation(err)
+            ? await this.committedImport(layer.id, input.idempotencyKey)
+            : null;
+          if (committed) return committed;
+          throw err;
+        }
+      });
+    });
+  }
+
+  /** The result an import committed under `idempotencyKey`, if one did. */
+  private async committedImport(
+    layerId: string,
+    idempotencyKey: string | undefined,
+  ): Promise<AnnotationImportResult | null> {
+    if (!idempotencyKey) return null;
+    const row = await new AuditLogRepo(this.requireDb()).findByIdempotencyKey(
+      layerId,
+      idempotencyKey,
+    );
+    if (!row) return null;
+    if (row.kind !== 'annot.import') {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `idempotency key ${idempotencyKey} was used for another change (${row.kind})`,
+      );
+    }
+    return row.payload as AnnotationImportResult;
   }
 
   async updateAnnotation(
@@ -2139,6 +2233,37 @@ export class LayerService {
     return committed.result;
   }
 
+  private async persistAnnotationImport(
+    ctx: LayerWriteContext,
+    docId: string,
+    layerName: string,
+    layer: LayerRow,
+    input: {
+      result: AnnotationImportResult;
+      artifact: LayerArtifactInput;
+      idempotencyKey?: string;
+    },
+  ): Promise<AnnotationImportResult> {
+    const nextVersion = layer.currentVersion + 1;
+    const artifactKey = this.nextArtifactKey(ctx, docId, layerName, nextVersion);
+    const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
+    const committed = await this.commitAnnotationImport({
+      ctx,
+      docId,
+      layerName,
+      layer,
+      raw: input.result,
+      artifactKey,
+      artifactSha: uploaded.sha256,
+      artifactSize: uploaded.size,
+      nextVersion,
+      idempotencyKey: input.idempotencyKey ?? null,
+    });
+    this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
+    // The response is the audited payload — one fact for caller and history.
+    return committed.result;
+  }
+
   private async persistRedactionApply(
     ctx: LayerWriteContext,
     docId: string,
@@ -3017,6 +3142,128 @@ export class LayerService {
               annotation_version: page.annotationVersion,
               annotation_generation: page.annotationGeneration,
               has_weak_annotations: page.hasWeakAnnotations ? 1 : 0,
+              updated_at: now,
+            })
+            .where('layer_id', '=', input.layer.id)
+            .where('page_object_number', '=', page.pageObjectNumber)
+            .execute();
+        }
+
+        return { result, auditId };
+      });
+  }
+
+  /**
+   * An import's commit: every page it touched advances as a create does
+   * (appended annotations shift no index), the layer's `doc_version` and bulk
+   * annotations pin once, and one audit row holds the finalized result
+   * under the request's idempotency key.
+   */
+  private async commitAnnotationImport(input: {
+    ctx: LayerWriteContext;
+    docId: string;
+    layerName: string;
+    layer: LayerRow;
+    raw: AnnotationImportResult;
+    artifactKey: string;
+    artifactSha: string;
+    artifactSize: number;
+    nextVersion: number;
+    idempotencyKey: string | null;
+  }): Promise<{ result: AnnotationImportResult; auditId: number }> {
+    return this.requireDb()
+      .transaction()
+      .execute(async (trx) => {
+        const now = Date.now();
+        const currentLayer = await this.readLayerForCommit(trx, input.layer);
+        const affected = input.raw.meta.affectedPages.map((state) => state.page.pageObjectNumber);
+
+        let bumpLayerDocVersion = false;
+        const nextPages: DurablePageRow[] = [];
+        for (const pageObjectNumber of affected) {
+          const row = await trx
+            .selectFrom('layer_pages')
+            .selectAll()
+            .where('layer_id', '=', input.layer.id)
+            .where('page_object_number', '=', pageObjectNumber)
+            .executeTakeFirst();
+          if (!row) {
+            throw new EngineError(
+              EngineErrorCode.WireFormat,
+              `annotations.import reported unknown page object number ${pageObjectNumber}`,
+            );
+          }
+          const hasWeakAnnotations = Boolean(row.has_weak_annotations);
+          const bumps = this.layerState.mutationBumps('create', { hasWeakAnnotations });
+          bumpLayerDocVersion ||= bumps.bumpLayerDocVersion;
+          nextPages.push({
+            pageObjectNumber,
+            contentVersion: Number(row.content_version) + (bumps.bumpContentVersion ? 1 : 0),
+            annotationVersion:
+              Number(row.annotation_version) + (bumps.bumpAnnotationVersion ? 1 : 0),
+            annotationGeneration:
+              Number(row.annotation_generation) + (bumps.bumpAnnotationGeneration ? 1 : 0),
+            // New annotations are indirect objects: no page gains a weak one.
+            hasWeakAnnotations,
+            updatedAt: now,
+          });
+        }
+
+        const previousLayerDocVersion = Number(currentLayer.doc_version);
+        const layerDocVersion = previousLayerDocVersion + (bumpLayerDocVersion ? 1 : 0);
+        const annotationsVersion = Number(currentLayer.annotations_version ?? 1) + 1;
+        // The created annotations are addressed by object number, which no
+        // revision token decorates; only the page states are the layer's.
+        const result: AnnotationImportResult = {
+          ...input.raw,
+          meta: {
+            ...input.raw.meta,
+            affectedPages: nextPages.map((page) =>
+              this.layerState.decorateLayerPageState(input.docId, input.layerName, page),
+            ),
+            cacheDelta: this.layerState.buildCacheDelta({
+              docId: input.docId,
+              layerName: input.layerName,
+              previousDocVersion: previousLayerDocVersion,
+              docVersion: layerDocVersion,
+              annotationsVersion,
+              pages: nextPages,
+            }),
+          },
+        };
+
+        const auditEvent = makeAuditEvent({
+          ctx: input.ctx,
+          docId: input.docId,
+          layer: input.layer,
+          layerName: input.layerName,
+          kind: 'annot.import',
+          pageObjectNumber: null,
+          affectedPages: affected,
+          artifactVersion: input.nextVersion,
+          artifactKey: input.artifactKey,
+          artifactSha: input.artifactSha,
+          artifactSize: input.artifactSize,
+          idempotencyKey: input.idempotencyKey,
+          payload: result,
+          ts: now,
+        });
+        const auditId = (await this.eventLog?.appendDb(trx, auditEvent)) ?? 0;
+
+        await this.writeLayerAdvance(
+          trx,
+          input,
+          { doc_version: layerDocVersion, annotations_version: annotationsVersion },
+          auditId,
+          now,
+        );
+        for (const page of nextPages) {
+          await trx
+            .updateTable('layer_pages')
+            .set({
+              content_version: page.contentVersion,
+              annotation_version: page.annotationVersion,
+              annotation_generation: page.annotationGeneration,
               updated_at: now,
             })
             .where('layer_id', '=', input.layer.id)
@@ -4369,12 +4616,6 @@ function sha256Hex(bytes: Uint8Array): string {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
-/** SQLite and Postgres spell a unique violation differently; both name the constraint kind. */
-function isUniqueViolation(err: unknown): boolean {
-  const message = err instanceof Error ? err.message : String(err);
-  return /UNIQUE constraint failed|duplicate key value|unique/i.test(message);
-}
-
 function makeAuditEvent(input: {
   ctx: LayerWriteContext;
   docId: string;
@@ -4387,6 +4628,8 @@ function makeAuditEvent(input: {
   artifactKey: string;
   artifactSha: string;
   artifactSize: number;
+  /** The request's `Idempotency-Key`, for the changes a retry must not repeat. */
+  idempotencyKey?: string | null;
   payload: unknown;
   ts: number;
 }): AuditEvent {
@@ -4404,7 +4647,7 @@ function makeAuditEvent(input: {
     artifactKey: input.artifactKey,
     artifactSha: input.artifactSha,
     artifactSize: input.artifactSize,
-    idempotencyKey: null,
+    idempotencyKey: input.idempotencyKey ?? null,
     payload: input.payload,
     originSessionId: input.ctx.originSessionId ?? null,
   };
