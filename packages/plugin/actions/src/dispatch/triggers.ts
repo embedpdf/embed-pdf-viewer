@@ -42,10 +42,10 @@ interface LifecycleAnnotation {
  */
 const annotationPagesOf = (event: DocumentEvent): readonly PageRef[] | 'all' | null => {
   switch (event.type) {
-    case 'annotation.created':
-    case 'annotation.updated':
-    case 'annotation.deleted':
-    case 'annotation.moved':
+    case 'annotations.created':
+    case 'annotations.updated':
+    case 'annotations.deleted':
+    case 'annotations.moved':
     case 'annotations.flattened':
       return [event.page];
     case 'pages.flattened':

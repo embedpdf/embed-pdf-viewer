@@ -22,13 +22,13 @@ import type { SignatureValidation } from './validation';
 
 /** Edits of the working copy: what a save would write changed, so a verdict may have too. */
 const WORKING_COPY_EDITS: ReadonlySet<DocumentEvent['type']> = new Set([
-  'annotation.created',
-  'annotation.updated',
-  'annotation.deleted',
-  'annotation.moved',
-  'form.valueChanged',
-  'form.fieldUpdated',
-  'form.effectsApplied',
+  'annotations.created',
+  'annotations.updated',
+  'annotations.deleted',
+  'annotations.moved',
+  'forms.valueSet',
+  'forms.updated',
+  'forms.effectsApplied',
 ]);
 
 const sameProtection = (
@@ -67,7 +67,7 @@ export function createSignaturesMirror(
       if (protection && !sameProtection(previous.snapshot?.protection ?? null, protection)) {
         protectionChanged.emit({ protection });
       }
-      if (event?.type === 'signature.completed') {
+      if (event?.type === 'signatures.completed') {
         signed.emit({
           field: event.signature.field,
           result: completeResultOf(event),

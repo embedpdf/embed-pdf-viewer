@@ -158,7 +158,7 @@ describe('kernel: document events → page registry', () => {
     await kernel.documents.open({ kind: 'bytes', id: 'doc-1', bytes: new Uint8Array() });
 
     events.emit({
-      type: 'annotation.created',
+      type: 'annotations.created',
       page: toPageRef(1),
       annotation: {} as never,
       meta: {} as never,

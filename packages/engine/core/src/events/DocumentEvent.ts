@@ -93,26 +93,26 @@ export interface EventOrigin {
  * provenance-aware features (undo, attribution toasts, camera etiquette).
  */
 export type DocumentEvent =
-  | ({ type: 'page.viewportsChanged'; origin: EventOrigin } & PageScaleResult)
+  | ({ type: 'pages.scaleSet'; origin: EventOrigin } & PageScaleResult)
   | ({
-      type: 'annotation.created';
+      type: 'annotations.created';
       page: PageRef;
       origin: EventOrigin;
     } & AnnotationCreateResult)
   | ({
-      type: 'annotation.updated';
+      type: 'annotations.updated';
       page: PageRef;
       origin: EventOrigin;
     } & AnnotationUpdateResult)
   | ({
-      type: 'annotation.deleted';
+      type: 'annotations.deleted';
       page: PageRef;
       origin: EventOrigin;
       /** What was deleted: its stable id, or `null` for a weak annotation (see `deletedAnnotationOf`). */
       deleted: AnnotationStableId | null;
     } & AnnotationDeleteResult)
   | ({
-      type: 'annotation.moved';
+      type: 'annotations.moved';
       page: PageRef;
       origin: EventOrigin;
     } & AnnotationMoveResult)
@@ -127,7 +127,7 @@ export type DocumentEvent =
        *  `layout` for positions, never reconstruct the gesture. */
       pages: PageRef[];
       /** The originator's insertion point; absent on remote events. */
-      destIndex?: number;
+      toIndex?: number;
       origin: EventOrigin;
     } & PageMoveResult)
   | ({
@@ -145,7 +145,7 @@ export type DocumentEvent =
   | ({
       type: 'pages.inserted';
       /** The originator's insertion point; absent on remote events. */
-      destIndex?: number;
+      toIndex?: number;
       origin: EventOrigin;
     } & PageInsertResult)
   | ({
@@ -156,23 +156,23 @@ export type DocumentEvent =
       page: PageRef | null;
       origin: EventOrigin;
     } & PageNameResult)
-  | ({ type: 'attachment.created'; origin: EventOrigin } & AttachmentCreateResult)
-  | ({ type: 'attachment.deleted'; origin: EventOrigin } & AttachmentDeleteResult)
+  | ({ type: 'attachments.created'; origin: EventOrigin } & AttachmentCreateResult)
+  | ({ type: 'attachments.deleted'; origin: EventOrigin } & AttachmentDeleteResult)
   | ({ type: 'metadata.updated'; origin: EventOrigin } & MetadataUpdateResult)
-  | ({ type: 'form.valueChanged'; origin: EventOrigin } & FormSetValueResult)
-  | ({ type: 'form.imported'; origin: EventOrigin } & FormImportResult)
-  | ({ type: 'form.repaired'; origin: EventOrigin } & FormRepairResult)
-  | ({ type: 'form.fieldCreated'; origin: EventOrigin } & FormFieldCreateResult)
-  | ({ type: 'form.fieldUpdated'; origin: EventOrigin } & FormFieldUpdateResult)
+  | ({ type: 'forms.valueSet'; origin: EventOrigin } & FormSetValueResult)
+  | ({ type: 'forms.imported'; origin: EventOrigin } & FormImportResult)
+  | ({ type: 'forms.repaired'; origin: EventOrigin } & FormRepairResult)
+  | ({ type: 'forms.created'; origin: EventOrigin } & FormFieldCreateResult)
+  | ({ type: 'forms.updated'; origin: EventOrigin } & FormFieldUpdateResult)
   | ({
-      type: 'form.fieldDeleted';
+      type: 'forms.deleted';
       origin: EventOrigin;
       /** The field that went (see `deletedFieldOf`). */
       deleted: FormFieldRef | null;
     } & FormFieldDeleteResult)
-  | ({ type: 'form.widgetAttached'; origin: EventOrigin } & FormWidgetLinkResult)
-  | ({ type: 'form.widgetDetached'; origin: EventOrigin } & FormWidgetLinkResult)
-  | ({ type: 'form.effectsApplied'; origin: EventOrigin } & FormEffectsResult)
+  | ({ type: 'forms.widgetAdded'; origin: EventOrigin } & FormWidgetLinkResult)
+  | ({ type: 'forms.widgetRemoved'; origin: EventOrigin } & FormWidgetLinkResult)
+  | ({ type: 'forms.effectsApplied'; origin: EventOrigin } & FormEffectsResult)
   | ({
       type: 'pages.flattened';
       pages: PageRef[];
@@ -185,19 +185,19 @@ export type DocumentEvent =
     } & RedactionApplyResult)
   | {
       /** A signing candidate was parked: the document is read-only until it completes or is cancelled. */
-      type: 'signature.prepared';
+      type: 'signatures.prepared';
       signingId: string;
       field: FormFieldRef;
       origin: EventOrigin;
     }
   | ({
       /** The sealed bytes are installed; `version` is what they became. */
-      type: 'signature.completed';
+      type: 'signatures.completed';
       signingId: string;
       origin: EventOrigin;
     } & SignatureCompleteResult)
   | {
-      type: 'signature.cancelled';
+      type: 'signatures.cancelled';
       signingId: string;
       origin: EventOrigin;
     }
@@ -231,6 +231,9 @@ export type DocumentEvent =
     };
 
 export type DocumentEventType = DocumentEvent['type'];
+
+/** The event of one type, such as `DocumentEventOf<'annotations.created'>`. */
+export type DocumentEventOf<T extends DocumentEventType> = Extract<DocumentEvent, { type: T }>;
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 

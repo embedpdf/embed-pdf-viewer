@@ -120,7 +120,11 @@ describe('the ledger — confirmed events and the invalidate verb', () => {
     const fixture = await boot();
     expect(fixture.render.getRenderEpoch(toPageRef(22))).toBe(0);
     fixture.emit(
-      documentEvent({ type: 'annotation.updated', page: toPageRef(22), origin: { kind: 'local' } }),
+      documentEvent({
+        type: 'annotations.updated',
+        page: toPageRef(22),
+        origin: { kind: 'local' },
+      }),
     );
     expect(fixture.render.getRenderEpoch(toPageRef(22))).toBe(1);
     expect(fixture.render.getRenderEpoch(toPageRef(22), false)).toBe(0);
@@ -139,12 +143,12 @@ describe('the ledger — confirmed events and the invalidate verb', () => {
     );
     fixture.emit(
       documentEvent({
-        type: 'annotation.moved',
+        type: 'annotations.moved',
         page: toPageRef(11),
         origin: { kind: 'remote', sessionId: 'other', sub: 'alice', ts: 1, serverId: 7 },
       }),
     );
-    fixture.emit(documentEvent({ type: 'form.imported', origin: { kind: 'local' } }));
+    fixture.emit(documentEvent({ type: 'forms.imported', origin: { kind: 'local' } }));
     fixture.render.invalidate({ pages: [toPageRef(22)], scope: 'content' });
     fixture.render.invalidate();
     expect(seen).toEqual([

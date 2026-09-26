@@ -203,7 +203,7 @@ async function play(seed: number, steps: number) {
       else engine.print = !engine.print;
       preferVector = false;
       harness.emit({
-        type: 'annotation.updated',
+        type: 'annotations.updated',
         page: PAGE,
         origin: { kind: 'remote', sessionId: 'cloud:bob', sub: 'bob', ts: 0, serverId: step + 100 },
         annotation: squareOf(engine),

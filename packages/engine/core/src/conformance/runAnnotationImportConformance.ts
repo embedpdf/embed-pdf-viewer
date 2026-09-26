@@ -101,7 +101,7 @@ export function runAnnotationImportConformance(
       });
     });
 
-    test('emits one annotation.created per annotation, as one transaction', async () => {
+    test('emits one annotations.created per annotation, as one transaction', async () => {
       await twoCopies('authoring', async (source, target, pageRef) => {
         const page = source.page(pageRef);
         await create(page, { subtype: 'square', rect: box(20) });
@@ -114,10 +114,10 @@ export function runAnnotationImportConformance(
           attribution: 'stamp',
           opId: 'import-1',
         });
-        const created = events.filter((event) => event.type === 'annotation.created');
+        const created = events.filter((event) => event.type === 'annotations.created');
         expect(created).toHaveLength(2);
         created.forEach((event, index) => {
-          if (event.type !== 'annotation.created') return;
+          if (event.type !== 'annotations.created') return;
           expect(event.annotation).toEqual(result.annotations[index]);
           expect(event.page).toEqual(pageRef);
           expect(event.origin.tx).toEqual({ id: 'import-1', index, count: 2 });

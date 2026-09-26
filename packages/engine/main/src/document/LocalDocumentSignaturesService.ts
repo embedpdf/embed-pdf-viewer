@@ -133,7 +133,7 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
     );
     return this.await(submission, 'signatures.prepare', (payload) => {
       this.publisher.publishLocal({
-        type: 'signature.prepared',
+        type: 'signatures.prepared',
         signingId: payload.result.signingId,
         field: input.field,
       });
@@ -158,7 +158,7 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
         // from the next call on, and every byte-level fact must be re-read.
         this.guard.setProtection(result.protection);
         this.publisher.publishLocal({
-          type: 'signature.completed',
+          type: 'signatures.completed',
           signingId: input.signingId,
           ...result,
         });
@@ -181,7 +181,7 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
     );
     return this.await(submission, 'signatures.cancel', (payload) => {
       if (payload.result.status === 'cancelled') {
-        this.publisher.publishLocal({ type: 'signature.cancelled', signingId });
+        this.publisher.publishLocal({ type: 'signatures.cancelled', signingId });
       }
       return payload.result;
     });

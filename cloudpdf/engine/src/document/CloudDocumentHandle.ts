@@ -4,6 +4,7 @@ import {
   DEFAULT_PDF_SAVE_MODE,
   EngineError,
   EngineErrorCode,
+  subscribeToType,
   type AttachmentsCache,
   type DocumentAnnotationsService,
   type DocumentActionsService,
@@ -194,19 +195,21 @@ export class CloudDocumentHandle implements DocumentHandle {
     // is lazy: it opens on the first subscriber and closes on the last —
     // non-collaborative usage never holds a connection (browsers cap ~6
     // per origin on HTTP/1.1).
+    const subscribe: DocumentEventStream['subscribe'] = (listener) => {
+      const unsubscribe = hub.subscribe(listener);
+      this.retainRemoteStream();
+      let released = false;
+      return () => {
+        unsubscribe();
+        if (!released) {
+          released = true;
+          this.releaseRemoteStream();
+        }
+      };
+    };
     this.events = {
-      subscribe: (listener) => {
-        const unsubscribe = hub.subscribe(listener);
-        this.retainRemoteStream();
-        let released = false;
-        return () => {
-          unsubscribe();
-          if (!released) {
-            released = true;
-            this.releaseRemoteStream();
-          }
-        };
-      },
+      subscribe,
+      on: (type, listener) => subscribeToType(subscribe, type, listener),
       lastServerId: () => hub.lastServerId(),
     };
     this.publisher = new SessionEventPublisher(hub, sessionId);
@@ -709,13 +712,13 @@ export class CloudDocumentHandle implements DocumentHandle {
    *  whose hand caused the change. */
   private absorbRemoteEvent(event: DocumentEvent): void {
     switch (event.type) {
-      case 'page.viewportsChanged':
+      case 'pages.scaleSet':
         this.absorbMutation(event.meta, []);
         return;
-      case 'annotation.created':
-      case 'annotation.updated':
-      case 'annotation.deleted':
-      case 'annotation.moved':
+      case 'annotations.created':
+      case 'annotations.updated':
+      case 'annotations.deleted':
+      case 'annotations.moved':
         this.absorbMutation(event.meta, ['annotations']);
         return;
       case 'pages.moved':
@@ -731,24 +734,24 @@ export class CloudDocumentHandle implements DocumentHandle {
       case 'metadata.updated':
         if (event.cache) this.absorbMetadata(event.cache);
         return;
-      case 'attachment.created':
-      case 'attachment.deleted':
+      case 'attachments.created':
+      case 'attachments.deleted':
         if (event.cache) this.absorbAttachments(event.cache);
         return;
-      case 'form.valueChanged':
-      case 'form.imported':
-      case 'form.repaired':
-      case 'form.fieldCreated':
-      case 'form.fieldUpdated':
-      case 'form.fieldDeleted':
-      case 'form.widgetAttached':
-      case 'form.widgetDetached':
+      case 'forms.valueSet':
+      case 'forms.imported':
+      case 'forms.repaired':
+      case 'forms.created':
+      case 'forms.updated':
+      case 'forms.deleted':
+      case 'forms.widgetAdded':
+      case 'forms.widgetRemoved':
         // Form mutations ship the same MutationMeta rails as annotations:
         // affected pages are the ones whose widget appearances changed.
         // Widgets are annotations, so they own the same plane.
         this.absorbMutation(event.meta, ['annotations']);
         return;
-      case 'form.effectsApplied':
+      case 'forms.effectsApplied':
         // No-op batches are never audited, but keep the nullable guard at
         // the consumer boundary for forward/backward wire compatibility.
         if (event.meta) this.absorbMutation(event.meta, ['annotations']);

@@ -45,7 +45,7 @@ export interface DocumentAnnotationsService {
    * item is checked, its pages mapped and what can't be carried left out
    * (`dropped`) before the first write, and a failure while writing leaves
    * the document as it was. `reply.to` and a popup's `parent` link to the
-   * items they name in the bundle. Emits one `annotation.created` per
+   * items they name in the bundle. Emits one `annotations.created` per
    * annotation, sharing `origin.tx`. Needs `doc.annotate.modify`; the
    * default `attribution: 'restore'` also needs `doc.annotate.import`.
    */

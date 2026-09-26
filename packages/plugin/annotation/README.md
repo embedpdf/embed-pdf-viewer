@@ -45,7 +45,7 @@ A user drags a square to a new place:
     │     patch → page.annotations.update(ref, geometry patch)
     │
     └─ intents.run(writes)
-          the engine applies the write and publishes `annotation.updated`
+          the engine applies the write and publishes `annotations.updated`
           before its promise resolves:
             records mirror folds it   → confirmed obj:12 is at the new place
           the write settles:

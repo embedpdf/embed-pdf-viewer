@@ -73,7 +73,7 @@ describe('session transitions', () => {
 describe('foldSignatureEvent', () => {
   it('parks a signing on prepare and releases it on abort', () => {
     const parked = foldSignatureEvent(loaded, {
-      type: 'signature.prepared',
+      type: 'signatures.prepared',
       signingId: 'one',
       field,
       origin,
@@ -81,14 +81,14 @@ describe('foldSignatureEvent', () => {
     expect(parked.pending).toEqual({ signingId: 'one', field });
     expect(parked.snapshot).toBe(snapshot);
     const released = foldSignatureEvent(parked, {
-      type: 'signature.cancelled',
+      type: 'signatures.cancelled',
       signingId: 'one',
       origin,
     });
     expect((released as SignatureRecord).pending).toBeNull();
     // Nothing parked: a cancel changes nothing.
     expect(
-      foldSignatureEvent(loaded, { type: 'signature.cancelled', signingId: 'one', origin }),
+      foldSignatureEvent(loaded, { type: 'signatures.cancelled', signingId: 'one', origin }),
     ).toBe(loaded);
   });
 
@@ -96,7 +96,7 @@ describe('foldSignatureEvent', () => {
     const sealed = { ...unsigned, signed: true } as SignatureDTO;
     const protection = { ...snapshot.protection, judged: 'annotate' };
     const next = foldSignatureEvent({ snapshot, pending: { signingId: 'one', field } }, {
-      type: 'signature.completed',
+      type: 'signatures.completed',
       signingId: 'one',
       origin,
       status: 'completed',
@@ -110,12 +110,12 @@ describe('foldSignatureEvent', () => {
 
   it('reloads when the set of fields changes, and ignores other events', () => {
     const created = foldSignatureEvent(emptySignatureRecord(), {
-      type: 'form.fieldCreated',
+      type: 'forms.created',
       origin,
     } as unknown as DocumentEvent);
     expect(created).toEqual(reload());
     expect(created).not.toEqual(reload({ pages: [] }));
-    const edited = { type: 'annotation.created', origin } as unknown as DocumentEvent;
+    const edited = { type: 'annotations.created', origin } as unknown as DocumentEvent;
     expect(foldSignatureEvent(loaded, edited)).toBe(loaded);
   });
 });

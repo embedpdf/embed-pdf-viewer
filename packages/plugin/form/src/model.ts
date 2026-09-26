@@ -90,28 +90,28 @@ export function removeField(index: FieldIndex, ref: FormFieldRef): FieldIndex {
  */
 export function foldFormEvent(index: FieldIndex, event: DocumentEvent): FieldIndex | MirrorReload {
   switch (event.type) {
-    case 'form.valueChanged':
-    case 'form.fieldUpdated':
-    case 'form.widgetAttached':
-    case 'form.widgetDetached':
+    case 'forms.valueSet':
+    case 'forms.updated':
+    case 'forms.widgetAdded':
+    case 'forms.widgetRemoved':
       return upsertFields(index, [event.field]);
-    case 'form.fieldCreated': {
+    case 'forms.created': {
       // The first field of a document without a form creates its /AcroForm.
       const created = upsertFields(index, [event.field]);
       return created.snapshot?.formKind === 'none'
         ? indexFields({ ...created.snapshot, formKind: 'acroform' })
         : created;
     }
-    case 'form.fieldDeleted':
+    case 'forms.deleted':
       return event.deleted ? removeField(index, event.deleted) : reload();
-    case 'form.effectsApplied':
+    case 'forms.effectsApplied':
       return upsertFields(
         index,
         event.results.flatMap((result) => result.fields),
       );
-    case 'form.imported':
+    case 'forms.imported':
       return indexFields(event.form);
-    case 'form.repaired':
+    case 'forms.repaired':
       return reload();
     default:
       return index;

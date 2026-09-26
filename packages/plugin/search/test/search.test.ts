@@ -248,8 +248,8 @@ describe('search session', () => {
     const { kernel, api, requests, emit } = await boot([slice([], null, 2), slice([], null, 2)]);
     await api.search({ text: 'x' });
     expect(requests.length).toBe(1);
-    emit({ type: 'annotation.created' });
-    emit({ type: 'annotation.updated' });
+    emit({ type: 'annotations.created' });
+    emit({ type: 'annotations.updated' });
     await vi.advanceTimersByTimeAsync(300);
     expect(requests.length).toBe(2);
     await kernel.destroy();

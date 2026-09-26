@@ -172,7 +172,7 @@ test('dynamic-stamp scripts feed the cloud effects sink and persist in its layer
       'applied',
     ]);
     expect(applied.meta).not.toBeNull();
-    expect(eventTypes).toContain('form.effectsApplied');
+    expect(eventTypes).toContain('forms.effectsApplied');
 
     const reread = await doc.forms.list();
     expect(

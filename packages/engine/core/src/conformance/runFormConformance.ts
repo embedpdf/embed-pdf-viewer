@@ -210,7 +210,7 @@ export function runFormConformance(
       try {
         const events: DocumentEvent[] = [];
         const unsubscribe = doc.events.subscribe((event) => {
-          if (event.type === 'form.effectsApplied') events.push(event);
+          if (event.type === 'forms.effectsApplied') events.push(event);
         });
         const result = await doc.forms.applyEffects([
           {
@@ -365,7 +365,7 @@ export function runFormConformance(
       try {
         const events: DocumentEvent[] = [];
         const unsubscribe = doc.events.subscribe((event) => {
-          if (event.type.startsWith('form.')) events.push(event);
+          if (event.type.startsWith('forms.')) events.push(event);
         });
         await doc.forms.setValue(
           { kind: 'fqn', name: 'maxlen_text' },
@@ -373,7 +373,7 @@ export function runFormConformance(
         );
         unsubscribe();
         expect(events.length).toBe(1);
-        expect(events[0]!.type).toBe('form.valueChanged');
+        expect(events[0]!.type).toBe('forms.valueSet');
       } finally {
         await doc.close();
       }

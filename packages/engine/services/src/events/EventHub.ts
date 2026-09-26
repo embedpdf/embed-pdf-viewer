@@ -1,7 +1,10 @@
+import { subscribeToType } from '@embedpdf/engine-core/runtime';
 import type {
   DocumentEvent,
   DocumentEventInit,
+  DocumentEventOf,
   DocumentEventStream,
+  DocumentEventType,
   EventOrigin,
 } from '@embedpdf/engine-core/runtime';
 
@@ -39,6 +42,13 @@ export class EventHub implements DocumentEventStream {
     return () => {
       this.listeners.delete(listener);
     };
+  }
+
+  on<T extends DocumentEventType>(
+    type: T,
+    listener: (event: DocumentEventOf<T>) => void,
+  ): () => void {
+    return subscribeToType((all) => this.subscribe(all), type, listener);
   }
 
   publish(event: DocumentEvent): void {

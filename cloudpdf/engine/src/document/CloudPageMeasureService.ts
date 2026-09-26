@@ -49,7 +49,7 @@ export class CloudPageMeasureService implements PageMeasureService {
         signal,
       );
       this.manifest.apply(result.meta, []);
-      this.publisher.publishLocal({ type: 'page.viewportsChanged', ...result });
+      this.publisher.publishLocal({ type: 'pages.scaleSet', ...result });
     });
   }
   private check(): void {

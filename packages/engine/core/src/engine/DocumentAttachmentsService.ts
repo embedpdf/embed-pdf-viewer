@@ -35,7 +35,7 @@ export interface DocumentAttachmentsService {
    * Create an embedded file in the name tree. The file's `name` becomes
    * the tree key (`/UF` = `/F` = key); a duplicate key rejects with
    * `EngineError(InvalidArg)` — rename and retry. A mutation: layer
-   * sessions persist an artifact and an `attachment.created` event is
+   * sessions persist an artifact and an `attachments.created` event is
    * published. Note the tree is key-sorted, so other entries' indices
    * may shift; keys never move.
    */
@@ -45,7 +45,7 @@ export interface DocumentAttachmentsService {
    * the stream bytes remain in the document until a full rewrite (the
    * immutable-base/layer model). Throws `EngineError(NotFound)` for an
    * unknown key. A mutation: layer sessions persist an artifact and an
-   * `attachment.deleted` event is published.
+   * `attachments.deleted` event is published.
    */
   delete(ref: EmbeddedFileRef): AbortablePromise<AttachmentDeleteResult>;
 }

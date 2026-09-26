@@ -152,16 +152,16 @@ export function foldFormEvent(
   event: DocumentEvent,
 ): FieldIndex | MirrorReload {
   switch (event.type) {
-    case 'form.valueChanged':
-    case 'form.fieldUpdated':
-    case 'form.widgetAttached':
-    case 'form.widgetDetached':
+    case 'forms.valueSet':
+    case 'forms.updated':
+    case 'forms.widgetAdded':
+    case 'forms.widgetRemoved':
       return upsertFields(index, [event.field]);
-    case 'form.fieldDeleted':
+    case 'forms.deleted':
       return removeField(index, event.deletedFieldObjectNumber);
-    case 'form.imported':
+    case 'forms.imported':
       return indexFields(event.snapshot);
-    case 'form.repaired':
+    case 'forms.repaired':
       return reload();
     // …
     default:
@@ -376,7 +376,7 @@ the actions plugin clears its per-page trigger cache.
    session edited or created from their description (a session preference,
    `vector` in its state).
 3. `fold` applies the data the event carries. It asks for a reload only when
-   the event does not carry enough (`form.repaired`, or `redaction.applied`
+   the event does not carry enough (`forms.repaired`, or `redaction.applied`
    for annotations).
 4. Verbs call the engine and return. They do not refetch, do not wait for
    revisions, and do not emit fact events.

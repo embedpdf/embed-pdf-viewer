@@ -1,6 +1,6 @@
 /**
  * The pages' viewports: a page mirror re-read whenever a confirmed
- * `page.viewportsChanged` names a loaded page, from this session or another
+ * `pages.scaleSet` names a loaded page, from this session or another
  * (stream gaps and version moves re-read every loaded page). Its `changed`
  * callback is the one place the annotation plugin learns a page's viewports.
  * `connect` loads every page in the registry, including pages inserted later.
@@ -36,7 +36,7 @@ export function createViewportSync(
         throw error;
       }
     },
-    affected: (event) => (event.type === 'page.viewportsChanged' ? [event.page] : null),
+    affected: (event) => (event.type === 'pages.scaleSet' ? [event.page] : null),
     changed: ({ page, cause, next }) => {
       if (cause === 'drop' || next === undefined) return;
       ctx.state.update(clearLoadError, page.pageObjectNumber);

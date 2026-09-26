@@ -142,18 +142,24 @@ const widgetKeys = (widgets: readonly FormWidget[]): string[] =>
 
 type AnnotationEvent = Extract<
   DocumentEvent,
-  { type: 'annotation.created' | 'annotation.updated' | 'annotation.deleted' | 'annotation.moved' }
+  {
+    type:
+      | 'annotations.created'
+      | 'annotations.updated'
+      | 'annotations.deleted'
+      | 'annotations.moved';
+  }
 >;
 
 const recordsOf = (event: AnnotationEvent): readonly AnnotationDTO[] => {
   switch (event.type) {
-    case 'annotation.created':
+    case 'annotations.created':
       return [event.annotation];
-    case 'annotation.updated':
+    case 'annotations.updated':
       return [event.annotation];
-    case 'annotation.moved':
+    case 'annotations.moved':
       return event.annotations;
-    case 'annotation.deleted':
+    case 'annotations.deleted':
       return [];
   }
 };
@@ -198,16 +204,16 @@ export function foldRecords(
   switch (event.type) {
     // A new record comes with a freshly baked appearance; the engine says
     // whether an update changed one; a z-order move changes none.
-    case 'annotation.created':
+    case 'annotations.created':
       return positionsReload(records, event) ?? put(records, [event.annotation], true);
-    case 'annotation.updated':
+    case 'annotations.updated':
       return (
         positionsReload(records, event) ??
         put(records, [event.annotation], event.appearance.changed)
       );
-    case 'annotation.moved':
+    case 'annotations.moved':
       return positionsReload(records, event) ?? put(records, event.annotations, false);
-    case 'annotation.deleted':
+    case 'annotations.deleted':
       return (
         positionsReload(records, event) ??
         (event.deleted
@@ -232,31 +238,31 @@ export function foldRecords(
         : records;
     // A repair links stray widgets into fields and re-bakes appearances, and
     // its result names none of them.
-    case 'form.repaired':
+    case 'forms.repaired':
       return event.widgetsLinked > 0 || event.appearancesBaked > 0 ? reload() : records;
-    case 'form.fieldCreated':
-    case 'form.widgetAttached':
-    case 'form.widgetDetached': {
+    case 'forms.created':
+    case 'forms.widgetAdded':
+    case 'forms.widgetRemoved': {
       const pages = pagesOfWidgets(event.field.widgets);
       return pages.length ? reload({ pages }) : records;
     }
-    case 'form.fieldDeleted':
+    case 'forms.deleted':
       return drop(records, widgetKeys(event.meta.changedWidgets));
-    case 'form.effectsApplied': {
+    case 'forms.effectsApplied': {
       // A script can change a widget's display flags.
       const pages = pagesOfWidgets(event.meta.changedWidgets);
       return pages.length ? reload({ pages }) : records;
     }
     // The form plane and signatures repaint widgets without changing their records.
-    case 'form.valueChanged':
+    case 'forms.valueSet':
       return bumpAppearance(records, widgetKeys(event.meta.changedWidgets));
-    case 'form.fieldUpdated':
+    case 'forms.updated':
       return bumpAppearance(records, widgetKeys(event.field.widgets));
-    case 'form.imported':
+    case 'forms.imported':
       return event.applied > 0
         ? bumpAppearance(records, widgetKeys(event.form.fields.flatMap((field) => field.widgets)))
         : records;
-    case 'signature.completed':
+    case 'signatures.completed':
       return event.signature.widget
         ? bumpAppearance(records, widgetKeys([event.signature.widget]))
         : records;

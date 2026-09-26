@@ -381,7 +381,7 @@ describe('page fan-out (ISO Table 197/198 order)', () => {
     await fixture.capability.dispatch(visible5);
     await fixture.capability.dispatch({ scope: 'page', event: 'invisible', page: toPageRef(5) });
     expect(readsOfPage5(fixture)).toBe(1); // cache hit
-    fixture.documentEvent({ type: 'annotation.updated', page: toPageRef(5) });
+    fixture.documentEvent({ type: 'annotations.updated', page: toPageRef(5) });
     await fixture.capability.dispatch(visible5);
     expect(readsOfPage5(fixture)).toBe(2);
     fixture.documentEvent({ type: 'stream.desynced' });
@@ -392,7 +392,7 @@ describe('page fan-out (ISO Table 197/198 order)', () => {
   it('an annotation event on another page keeps the cached page', async () => {
     const fixture = harness({ pages: fanPages, config: { openSequence: 'off' } });
     await fixture.capability.dispatch(visible5);
-    fixture.documentEvent({ type: 'annotation.updated', page: toPageRef(6) });
+    fixture.documentEvent({ type: 'annotations.updated', page: toPageRef(6) });
     await fixture.capability.dispatch(visible5);
     expect(readsOfPage5(fixture)).toBe(1);
   });
@@ -424,7 +424,7 @@ describe('page fan-out (ISO Table 197/198 order)', () => {
     });
     const first = fixture.capability.dispatch(visible5);
     await new Promise((resolve) => setTimeout(resolve, 0)); // the read is in flight
-    fixture.documentEvent({ type: 'annotation.updated', page: toPageRef(5) });
+    fixture.documentEvent({ type: 'annotations.updated', page: toPageRef(5) });
     delayed = false;
     release();
     await first;

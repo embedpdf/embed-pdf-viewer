@@ -123,7 +123,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
       if (result.cache) this.manifest.applyPageStructure(result.cache);
       // Publish after absorb: listeners reading the manifest in their
       // callback must see post-mutation state.
-      this.publisher.publishLocal({ type: 'pages.moved', pages, destIndex, ...result });
+      this.publisher.publishLocal({ type: 'pages.moved', pages, toIndex: destIndex, ...result });
       return result;
     });
   }
@@ -240,7 +240,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
       // the fresh page object numbers, so the absorb drops it for a lazy refetch (the
       // result already carries the full new layout — nothing waits).
       if (result.cache) this.manifest.applyPageInsert(result.cache);
-      this.publisher.publishLocal({ type: 'pages.inserted', destIndex, ...result });
+      this.publisher.publishLocal({ type: 'pages.inserted', toIndex: destIndex, ...result });
       return result;
     });
   }
@@ -263,7 +263,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
         signal,
       );
       if (result.cache) this.manifest.applyPageInsert(result.cache);
-      this.publisher.publishLocal({ type: 'pages.inserted', destIndex, ...result });
+      this.publisher.publishLocal({ type: 'pages.inserted', toIndex: destIndex, ...result });
       return result;
     });
   }

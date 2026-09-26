@@ -653,8 +653,8 @@ function runSigningTests(
         EngineErrorCode.SignatureRefused,
       );
 
-      expect(events.filter((t) => t === 'signature.prepared')).toHaveLength(1);
-      expect(events.filter((t) => t === 'signature.completed')).toHaveLength(1);
+      expect(events.filter((t) => t === 'signatures.prepared')).toHaveLength(1);
+      expect(events.filter((t) => t === 'signatures.completed')).toHaveLength(1);
       expect(events.filter((t) => t === 'document.versioned')).toHaveLength(1);
     } finally {
       unsubscribe();

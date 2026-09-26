@@ -33,7 +33,7 @@ interface DocClosedView {
  * egresses content bytes, so it gates on `doc.download` — the same rule
  * as `pages.extract` and the whole-document download. `create`/`delete`
  * are mutations gated on `doc.attachments.modify` and publish
- * `attachment.created`/`attachment.deleted` events after the worker
+ * `attachments.created`/`attachments.deleted` events after the worker
  * confirms — ground truth, never optimistic.
  */
 export class LocalDocumentAttachmentsService implements DocumentAttachmentsService {
@@ -155,7 +155,7 @@ export class LocalDocumentAttachmentsService implements DocumentAttachmentsServi
       if (payload.tag !== 'attachments.create') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.publisher.publishLocal({ type: 'attachment.created', ...payload.result });
+      this.publisher.publishLocal({ type: 'attachments.created', ...payload.result });
       return payload.result;
     });
   }
@@ -186,7 +186,7 @@ export class LocalDocumentAttachmentsService implements DocumentAttachmentsServi
       if (payload.tag !== 'attachments.delete') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.publisher.publishLocal({ type: 'attachment.deleted', ...payload.result });
+      this.publisher.publishLocal({ type: 'attachments.deleted', ...payload.result });
       return payload.result;
     });
   }

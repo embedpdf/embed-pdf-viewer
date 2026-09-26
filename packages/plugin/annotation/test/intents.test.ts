@@ -105,7 +105,7 @@ const freeText = (contents: string, extra: Record<string, unknown> = {}): Annota
 
 const remoteUpdate = (dto: AnnotationDTO): DocumentEvent =>
   ({
-    type: 'annotation.updated',
+    type: 'annotations.updated',
     page: PAGE,
     origin: { kind: 'remote', sessionId: 'cloud:bob', sub: 'bob', ts: 0, serverId: 50 },
     annotation: dto,
@@ -534,7 +534,7 @@ describe('what stays as it is', () => {
 
     void harness.capability.updateSelection({ color: '#00ff00' });
     harness.emit({
-      type: 'annotation.deleted',
+      type: 'annotations.deleted',
       page: PAGE,
       deleted: { kind: 'objectNumber', value: 20 },
       origin: { kind: 'remote', sessionId: 'cloud:bob', sub: 'bob', ts: 0, serverId: 51 },
@@ -738,7 +738,7 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     // The engine publishes the create before it answers (a cloud engine's event
     // can arrive well before the answer), then another session deletes it.
     harness.emit({
-      type: 'annotation.created',
+      type: 'annotations.created',
       page: PAGE,
       origin: { kind: 'local', sessionId: 'me', sub: null, ts: 0, serverId: null },
       annotation: dto,
@@ -746,7 +746,7 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     } as unknown as DocumentEvent);
     expect(harness.capability.get(ref(60))).not.toBeNull();
     harness.emit({
-      type: 'annotation.deleted',
+      type: 'annotations.deleted',
       page: PAGE,
       deleted: { kind: 'objectNumber', value: 60 },
       origin: { kind: 'remote', sessionId: 'cloud:bob', sub: 'bob', ts: 0, serverId: 50 },

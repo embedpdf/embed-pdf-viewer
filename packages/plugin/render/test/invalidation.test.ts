@@ -18,17 +18,19 @@ describe('pixelChangeOf — the built-in event → pixels map', () => {
   const changeOf = (partial: Record<string, unknown>) =>
     pixelChangeOf(documentEvent(partial), allPageObjectNumbers);
 
-  it.each(['annotation.created', 'annotation.updated', 'annotation.deleted', 'annotation.moved'])(
-    '%s repaints its page’s annotations',
-    (type) => {
-      expect(changeOf({ type, page: toPageRef(22) })).toEqual({
-        pages: [22],
-        scope: 'annotations',
-      });
-    },
-  );
+  it.each([
+    'annotations.created',
+    'annotations.updated',
+    'annotations.deleted',
+    'annotations.moved',
+  ])('%s repaints its page’s annotations', (type) => {
+    expect(changeOf({ type, page: toPageRef(22) })).toEqual({
+      pages: [22],
+      scope: 'annotations',
+    });
+  });
 
-  it.each(['form.valueChanged', 'form.effectsApplied'])(
+  it.each(['forms.valueSet', 'forms.effectsApplied'])(
     '%s repaints every page a changed widget lives on',
     (type) => {
       expect(changeOf({ type, meta: { changedWidgets: [widget(11), widget(33)] } })).toEqual({
@@ -38,16 +40,14 @@ describe('pixelChangeOf — the built-in event → pixels map', () => {
     },
   );
 
-  it('form.fieldDeleted repaints the removed widgets’ pages', () => {
-    expect(changeOf({ type: 'form.fieldDeleted', meta: { changedWidgets: [widget(22)] } })).toEqual(
-      {
-        pages: [22],
-        scope: 'annotations',
-      },
-    );
+  it('forms.deleted repaints the removed widgets’ pages', () => {
+    expect(changeOf({ type: 'forms.deleted', meta: { changedWidgets: [widget(22)] } })).toEqual({
+      pages: [22],
+      scope: 'annotations',
+    });
   });
 
-  it.each(['form.fieldCreated', 'form.fieldUpdated', 'form.widgetAttached', 'form.widgetDetached'])(
+  it.each(['forms.created', 'forms.updated', 'forms.widgetAdded', 'forms.widgetRemoved'])(
     '%s repaints the field’s widget pages',
     (type) => {
       expect(changeOf({ type, field: { widgets: [widget(11), widget(22)] } })).toEqual({
@@ -57,12 +57,12 @@ describe('pixelChangeOf — the built-in event → pixels map', () => {
     },
   );
 
-  it.each(['form.imported', 'form.repaired'])('%s (coarse result) repaints all pages', (type) => {
+  it.each(['forms.imported', 'forms.repaired'])('%s (coarse result) repaints all pages', (type) => {
     expect(changeOf({ type })).toEqual({ pages: PAGE_OBJECT_NUMBERS, scope: 'annotations' });
   });
 
-  it('signature.completed repaints the sealed widget’s page', () => {
-    expect(changeOf({ type: 'signature.completed', signature: { widget: widget(33) } })).toEqual({
+  it('signatures.completed repaints the sealed widget’s page', () => {
+    expect(changeOf({ type: 'signatures.completed', signature: { widget: widget(33) } })).toEqual({
       pages: [33],
       scope: 'annotations',
     });

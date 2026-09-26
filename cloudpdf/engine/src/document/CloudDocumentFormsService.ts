@@ -109,7 +109,7 @@ export class CloudDocumentFormsService implements DocumentFormsService {
         (raw) => FormSetValueResultSchema.parse(raw),
         signal,
       );
-      return this.absorbMutation(result, 'form.valueChanged');
+      return this.absorbMutation(result, 'forms.valueSet');
     });
   }
 
@@ -123,7 +123,7 @@ export class CloudDocumentFormsService implements DocumentFormsService {
         (raw) => FormSetValueResultSchema.parse(raw),
         signal,
       );
-      return this.absorbMutation(result, 'form.valueChanged');
+      return this.absorbMutation(result, 'forms.valueSet');
     });
   }
 
@@ -142,7 +142,7 @@ export class CloudDocumentFormsService implements DocumentFormsService {
       // advance, or event.
       if (result.meta.cacheDelta === null) return result;
       this.manifest.apply(result.meta, ['annotations']);
-      this.publisher.publishLocal({ type: 'form.effectsApplied', ...result });
+      this.publisher.publishLocal({ type: 'forms.effectsApplied', ...result });
       return result;
     });
   }
@@ -174,7 +174,7 @@ export class CloudDocumentFormsService implements DocumentFormsService {
         (raw) => FormImportResultSchema.parse(raw),
         signal,
       );
-      return this.absorbMutation(result, 'form.imported');
+      return this.absorbMutation(result, 'forms.imported');
     });
   }
 
@@ -188,7 +188,7 @@ export class CloudDocumentFormsService implements DocumentFormsService {
         (raw) => FormFieldCreateResultSchema.parse(raw),
         signal,
       );
-      return this.absorbMutation(result, 'form.fieldCreated');
+      return this.absorbMutation(result, 'forms.created');
     });
   }
 
@@ -202,7 +202,7 @@ export class CloudDocumentFormsService implements DocumentFormsService {
         (raw) => FormFieldUpdateResultSchema.parse(raw),
         signal,
       );
-      return this.absorbMutation(result, 'form.fieldUpdated');
+      return this.absorbMutation(result, 'forms.updated');
     });
   }
 
@@ -229,7 +229,7 @@ export class CloudDocumentFormsService implements DocumentFormsService {
         (raw) => FormFieldUpdateResultSchema.parse(raw),
         signal,
       );
-      return this.absorbMutation(result, 'form.fieldUpdated');
+      return this.absorbMutation(result, 'forms.updated');
     });
   }
 
@@ -244,7 +244,7 @@ export class CloudDocumentFormsService implements DocumentFormsService {
       );
       this.manifest.apply(result.meta, ['annotations']);
       this.publisher.publishLocal({
-        type: 'form.fieldDeleted',
+        type: 'forms.deleted',
         deleted: deletedFieldOf(result),
         ...result,
       });
@@ -267,7 +267,7 @@ export class CloudDocumentFormsService implements DocumentFormsService {
         (raw) => FormWidgetLinkResultSchema.parse(raw),
         signal,
       );
-      return this.absorbMutation(result, 'form.widgetAttached');
+      return this.absorbMutation(result, 'forms.widgetAdded');
     });
   }
 
@@ -281,7 +281,7 @@ export class CloudDocumentFormsService implements DocumentFormsService {
         (raw) => FormWidgetLinkResultSchema.parse(raw),
         signal,
       );
-      return this.absorbMutation(result, 'form.widgetDetached');
+      return this.absorbMutation(result, 'forms.widgetRemoved');
     });
   }
 
@@ -295,7 +295,7 @@ export class CloudDocumentFormsService implements DocumentFormsService {
         (raw) => FormRepairResultSchema.parse(raw),
         signal,
       );
-      return this.absorbMutation(result, 'form.repaired');
+      return this.absorbMutation(result, 'forms.repaired');
     });
   }
 
@@ -316,13 +316,13 @@ export class CloudDocumentFormsService implements DocumentFormsService {
   private absorbMutation<T extends { meta: MutationMeta }>(
     result: T,
     type:
-      | 'form.valueChanged'
-      | 'form.imported'
-      | 'form.repaired'
-      | 'form.fieldCreated'
-      | 'form.fieldUpdated'
-      | 'form.widgetAttached'
-      | 'form.widgetDetached',
+      | 'forms.valueSet'
+      | 'forms.imported'
+      | 'forms.repaired'
+      | 'forms.created'
+      | 'forms.updated'
+      | 'forms.widgetAdded'
+      | 'forms.widgetRemoved',
   ): T {
     this.manifest.apply(result.meta, ['annotations']);
     this.publisher.publishLocal({ type, ...result } as unknown as DocumentEventInit);

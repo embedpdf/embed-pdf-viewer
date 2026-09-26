@@ -27,7 +27,7 @@ const owned = (measure: PdfMeasure): PageMeasurementViewport => ({
 
 /**
  * A controller over one 600 × 800 page. With `engine: true` the page has a
- * measure service whose `setScale` publishes `page.viewportsChanged` before
+ * measure service whose `setScale` publishes `pages.scaleSet` before
  * resolving, like the real engines; without it scales are session-only.
  */
 function harness(
@@ -65,7 +65,7 @@ function harness(
     setScale: vi.fn(async (measure: PdfMeasure | null) => {
       engineViewports = measure ? [owned(measure)] : [];
       ctx.emitDocumentEvent({
-        type: 'page.viewportsChanged',
+        type: 'pages.scaleSet',
         page: PAGE,
         meta: null,
         origin: LOCAL_ORIGIN,
@@ -252,7 +252,7 @@ describe('page viewports from the engine', () => {
 
     setEngineViewports([owned(ONE_TO_HUNDRED)]);
     ctx.emitDocumentEvent({
-      type: 'page.viewportsChanged',
+      type: 'pages.scaleSet',
       page: PAGE,
       meta: null,
       origin: REMOTE_ORIGIN,

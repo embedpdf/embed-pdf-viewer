@@ -67,7 +67,7 @@ export class LocalPageMeasureService implements PageMeasureService {
       const payload = await this.wait(submission, signal);
       if (payload.tag !== 'measure.setScale')
         throw new EngineError(EngineErrorCode.WireFormat, 'Unexpected scale response');
-      this.publisher.publishLocal({ type: 'page.viewportsChanged', ...payload.result });
+      this.publisher.publishLocal({ type: 'pages.scaleSet', ...payload.result });
     });
   }
   private check(cap: 'doc.open' | 'doc.annotate.modify'): void {

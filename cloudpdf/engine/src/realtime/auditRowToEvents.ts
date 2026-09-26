@@ -50,7 +50,7 @@ export interface AuditEventRow {
  * Translate a remote audit row into the `DocumentEvent`s it records — pure,
  * so the exactly-once and verbatim-payload invariants are unit-testable
  * without a server. Most rows are one fact; an import is one
- * `annotation.created` per annotation, sharing `origin.tx` (its id the
+ * `annotations.created` per annotation, sharing `origin.tx` (its id the
  * request's `Idempotency-Key`). Returns none for an own echo and for kinds
  * this engine version doesn't know (a newer server's events degrade to
  * "ignored", never to a crash).
@@ -61,7 +61,7 @@ export interface AuditEventRow {
  *     carries the value).
  *   - move: the originator knows which block it moved; the audit row only
  *     records the resulting order, so `pages` is the full new order and
- *     `destIndex` is absent (remote consumers use `layout`).
+ *     `toIndex` is absent (remote consumers use `layout`).
  *
  * The audit row keys pages by object number (its storage identity); the
  * event carries them as `PageRef` addresses, like every other event.
@@ -80,7 +80,7 @@ export function auditRowToEvents(row: AuditEventRow, mySessionId: string): Docum
     const facts = annotationImportFacts(row.payload as AnnotationImportResult);
     const id = row.idempotencyKey ?? `audit:${row.id}`;
     return facts.map((fact, index) => ({
-      type: 'annotation.created',
+      type: 'annotations.created',
       origin: { ...origin, tx: { id, index, count: facts.length } },
       ...fact,
     }));
@@ -98,24 +98,24 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
 
   switch (row.kind) {
     case 'measure.setScale':
-      return { type: 'page.viewportsChanged', origin, ...(row.payload as PageScaleResult) };
+      return { type: 'pages.scaleSet', origin, ...(row.payload as PageScaleResult) };
     case 'annot.create':
       return {
-        type: 'annotation.created',
+        type: 'annotations.created',
         page: rowPage(),
         origin,
         ...(row.payload as AnnotationCreateResult),
       };
     case 'annot.update':
       return {
-        type: 'annotation.updated',
+        type: 'annotations.updated',
         page: rowPage(),
         origin,
         ...(row.payload as AnnotationUpdateResult),
       };
     case 'annot.delete':
       return {
-        type: 'annotation.deleted',
+        type: 'annotations.deleted',
         page: rowPage(),
         origin,
         deleted: deletedAnnotationOf(row.payload as AnnotationDeleteResult),
@@ -123,7 +123,7 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
       };
     case 'annot.move':
       return {
-        type: 'annotation.moved',
+        type: 'annotations.moved',
         page: rowPage(),
         origin,
         ...(row.payload as AnnotationMoveResult),
@@ -158,7 +158,7 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
     // Two audit kinds share the `pages.inserted` event (bytes-import and
     // blank creation produce the same result shape) — the audit log keeps
     // them distinct for history, the event stream cares about effect. The
-    // originator's `destIndex` gesture field stays absent on remote events
+    // originator's `toIndex` gesture field stays absent on remote events
     // by design: remote consumers derive placement from `layout`.
     case 'pages.insert':
     case 'pages.insertBlank':
@@ -181,41 +181,41 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
       };
     case 'attachment.create':
       return {
-        type: 'attachment.created',
+        type: 'attachments.created',
         origin,
         ...(row.payload as AttachmentCreateResult),
       };
     case 'attachment.delete':
       return {
-        type: 'attachment.deleted',
+        type: 'attachments.deleted',
         origin,
         ...(row.payload as AttachmentDeleteResult),
       };
-    // Form mutations: two audit kinds share the `form.valueChanged` event
+    // Form mutations: two audit kinds share the `forms.valueSet` event
     // (setValue and reset produce the same result shape) — the audit log
     // keeps them distinct for history, the event stream cares about effect.
     case 'form.setValue':
     case 'form.reset':
-      return { type: 'form.valueChanged', origin, ...(row.payload as FormSetValueResult) };
+      return { type: 'forms.valueSet', origin, ...(row.payload as FormSetValueResult) };
     case 'form.import':
-      return { type: 'form.imported', origin, ...(row.payload as FormImportResult) };
+      return { type: 'forms.imported', origin, ...(row.payload as FormImportResult) };
     case 'form.repair':
-      return { type: 'form.repaired', origin, ...(row.payload as FormRepairResult) };
+      return { type: 'forms.repaired', origin, ...(row.payload as FormRepairResult) };
     case 'form.createField':
-      return { type: 'form.fieldCreated', origin, ...(row.payload as FormFieldCreateResult) };
+      return { type: 'forms.created', origin, ...(row.payload as FormFieldCreateResult) };
     case 'form.updateField':
     case 'form.setSignatureAppearance':
-      return { type: 'form.fieldUpdated', origin, ...(row.payload as FormFieldUpdateResult) };
+      return { type: 'forms.updated', origin, ...(row.payload as FormFieldUpdateResult) };
     case 'form.deleteField': {
       const result = row.payload as FormFieldDeleteResult;
-      return { type: 'form.fieldDeleted', origin, deleted: deletedFieldOf(result), ...result };
+      return { type: 'forms.deleted', origin, deleted: deletedFieldOf(result), ...result };
     }
     case 'form.attachWidget':
-      return { type: 'form.widgetAttached', origin, ...(row.payload as FormWidgetLinkResult) };
+      return { type: 'forms.widgetAdded', origin, ...(row.payload as FormWidgetLinkResult) };
     case 'form.detachWidget':
-      return { type: 'form.widgetDetached', origin, ...(row.payload as FormWidgetLinkResult) };
+      return { type: 'forms.widgetRemoved', origin, ...(row.payload as FormWidgetLinkResult) };
     case 'form.applyEffects':
-      return { type: 'form.effectsApplied', origin, ...(row.payload as FormEffectsResult) };
+      return { type: 'forms.effectsApplied', origin, ...(row.payload as FormEffectsResult) };
     default:
       return null;
   }

@@ -139,7 +139,7 @@ export class LocalDocumentAnnotationsService implements DocumentAnnotationsServi
       const facts = annotationImportFacts(payload.result);
       facts.forEach((fact, index) => {
         this.publisher.publishLocal(
-          { type: 'annotation.created', ...fact },
+          { type: 'annotations.created', ...fact },
           { id: opId, index, count: facts.length },
         );
       });

@@ -172,7 +172,7 @@ export function runMeasurementConformance(
           expect((await page.annotations.list()).annotations).toEqual(annotations);
           await page.measure.setScale(null);
           expect(await page.measure.listViewports()).toEqual(foreign);
-          const changes = events.filter((e) => e.type === 'page.viewportsChanged');
+          const changes = events.filter((e) => e.type === 'pages.scaleSet');
           expect(changes).toHaveLength(2);
           for (const event of changes)
             expect(event).toMatchObject({

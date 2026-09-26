@@ -110,7 +110,7 @@ test('calibration persists an artifact and audit payload without bumping page ca
         },
         'another-session',
       ),
-    ).toMatchObject([{ type: 'page.viewportsChanged', ...payload }]);
+    ).toMatchObject([{ type: 'pages.scaleSet', ...payload }]);
   } finally {
     await doc.close();
     await engine.destroy();

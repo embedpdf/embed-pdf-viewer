@@ -23,7 +23,7 @@ import type {
   PageLayout,
   PageRef,
 } from '@embedpdf/engine-core/runtime';
-import { pageRefsEqual } from '@embedpdf/engine-core/runtime';
+import { pageRefsEqual, subscribeToType } from '@embedpdf/engine-core/runtime';
 import { pageSpace, type PageSpace, type PdfEdges } from '@embedpdf/core-geometry';
 
 import { PluginError } from './errors';
@@ -175,7 +175,12 @@ export function createTestContext<S = void>(options: TestContextOptions<S> = {})
         ? (options.doc as DocumentHandle)
         : ({
             id: documentId,
-            events: { subscribe: documentEvents.on, lastServerId: () => null },
+            events: {
+              subscribe: documentEvents.on,
+              on: (type: DocumentEvent['type'], listener: (event: DocumentEvent) => void) =>
+                subscribeToType(documentEvents.on, type, listener),
+              lastServerId: () => null,
+            },
             security: { allows: () => true },
             ...options.doc,
           } as unknown as DocumentHandle);

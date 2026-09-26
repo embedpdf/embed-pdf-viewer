@@ -291,7 +291,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
       this.publisher.publishLocal({
-        type: 'annotation.created',
+        type: 'annotations.created',
         page: this.ref,
         ...payload.result,
       });
@@ -361,7 +361,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
       this.publisher.publishLocal({
-        type: 'annotation.updated',
+        type: 'annotations.updated',
         page: this.ref,
         ...payload.result,
       });
@@ -400,7 +400,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
       this.publisher.publishLocal({
-        type: 'annotation.deleted',
+        type: 'annotations.deleted',
         page: this.ref,
         deleted: deletedAnnotationOf(payload.result),
         ...payload.result,
@@ -448,7 +448,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
       this.publisher.publishLocal({
-        type: 'annotation.moved',
+        type: 'annotations.moved',
         page: this.ref,
         ...payload.result,
       });

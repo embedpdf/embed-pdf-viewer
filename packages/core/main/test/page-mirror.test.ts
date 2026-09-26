@@ -14,7 +14,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 const origin = { kind: 'remote', sessionId: 'them', sub: null, ts: 0, serverId: null };
 const touched = (pageObjectNumber: number) =>
   ({
-    type: 'annotation.updated',
+    type: 'annotations.updated',
     page: pageRef(pageObjectNumber),
     origin,
   }) as unknown as DocumentEvent;
@@ -30,7 +30,7 @@ function setup(spec: Partial<PageMirrorSpec<string>> = {}) {
     name: 'text',
     load,
     affected: (event) =>
-      event.type === 'annotation.updated' ? [(event as unknown as { page: PageRef }).page] : null,
+      event.type === 'annotations.updated' ? [(event as unknown as { page: PageRef }).page] : null,
     ...spec,
   });
   return { ctx, mirror, load, reads };

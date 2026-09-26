@@ -126,7 +126,7 @@ export type PlaceMarkResult =
   | { kind: 'placed'; annotation: AnnotationRef };
 
 // ── events ──
-/** A signing completed, in this session or another: the confirmed `signature.completed` fact. */
+/** A signing completed, in this session or another: the confirmed `signatures.completed` fact. */
 export interface SignatureSignedEvent {
   /** The sealed field, by its durable object-number ref. */
   readonly field: FormFieldRef;

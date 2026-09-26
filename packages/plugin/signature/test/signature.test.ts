@@ -431,7 +431,7 @@ describe('facts from every session', () => {
     expect(signature.getSignature(field.field)?.signed).toBe(false);
 
     ctx.emitDocumentEvent({
-      type: 'signature.prepared',
+      type: 'signatures.prepared',
       signingId: 'remote-signing',
       field: field.field,
       origin: remote,
@@ -439,7 +439,7 @@ describe('facts from every session', () => {
     expect(signature.getPending()).toEqual({ signingId: 'remote-signing', field: field.field });
 
     ctx.emitDocumentEvent({
-      type: 'signature.completed',
+      type: 'signatures.completed',
       signingId: 'remote-signing',
       origin: remote,
       status: 'completed',

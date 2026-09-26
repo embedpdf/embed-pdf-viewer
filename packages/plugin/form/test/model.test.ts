@@ -66,7 +66,7 @@ describe('field index', () => {
     index = foldFormEvent(
       index,
       event({
-        type: 'form.valueChanged',
+        type: 'forms.valueSet',
         field: text({ value: 'abcde' }),
         meta: { changedWidgets: [] },
       }),
@@ -79,13 +79,13 @@ describe('field index', () => {
       name: 'other',
       widgets: [formWidget(8, toPageRef(3))],
     });
-    index = foldFormEvent(index, event({ type: 'form.fieldCreated', field: other })) as FieldIndex;
+    index = foldFormEvent(index, event({ type: 'forms.created', field: other })) as FieldIndex;
     expect(fieldForWidget(index, 8)?.name).toBe('other');
 
     index = foldFormEvent(
       index,
       event({
-        type: 'form.effectsApplied',
+        type: 'forms.effectsApplied',
         results: [
           { index: 0, status: 'applied', fields: [text({ value: 'script' })], changedWidgets: [] },
         ],
@@ -97,7 +97,7 @@ describe('field index', () => {
     index = foldFormEvent(
       index,
       event({
-        type: 'form.fieldDeleted',
+        type: 'forms.deleted',
         deleted: { kind: 'objectNumber', fieldObjectNumber: 7 },
         meta: {
           changedFields: [{ kind: 'objectNumber', fieldObjectNumber: 7 }],
@@ -112,7 +112,7 @@ describe('field index', () => {
     const empty = indexFields({ ...snapshot([]), formKind: 'none' });
     const index = foldFormEvent(
       empty,
-      event({ type: 'form.fieldCreated', field: text() }),
+      event({ type: 'forms.created', field: text() }),
     ) as FieldIndex;
     expect(index.snapshot?.formKind).toBe('acroform');
     expect(fieldByKey(index, 'obj:4')).not.toBeNull();
@@ -120,7 +120,7 @@ describe('field index', () => {
 
   test('a repair is too coarse to fold and asks for a reload', () => {
     const index = indexFields(snapshot([text()]));
-    expect(foldFormEvent(index, event({ type: 'form.repaired' }))).toEqual(reload());
+    expect(foldFormEvent(index, event({ type: 'forms.repaired' }))).toEqual(reload());
     expect(foldFormEvent(emptyFieldIndex(), event({ type: 'metadata.updated' }))).toEqual(
       emptyFieldIndex(),
     );

@@ -143,8 +143,8 @@ describe('remote events: two engines, one document (the collaboration loop)', ()
       await waitFor(() => eventsA.length >= 1, "A's remote annotation event");
       const remote = eventsA[0];
       expect(remote.origin.kind).toBe('remote');
-      expect(remote.type).toBe('annotation.created');
-      if (remote.type === 'annotation.created') {
+      expect(remote.type).toBe('annotations.created');
+      if (remote.type === 'annotations.created') {
         expect(remote.annotation).toEqual(created.annotation);
         // The remote meta carries the same cloud-stable revision tokens A
         // would get from its own reads — the finalize-in-txn work, visible.

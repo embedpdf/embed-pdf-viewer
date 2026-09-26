@@ -123,7 +123,7 @@ describe('annotation import on the cloud engine', () => {
     }
   });
 
-  test('another session receives one annotation.created per annotation, as one transaction', async () => {
+  test('another session receives one annotations.created per annotation, as one transaction', async () => {
     if (!fx) throw new Error('fixture not initialised');
     const docId = `remote-${++opened}`;
     const sourceId = `remote-source-${++opened}`;
@@ -164,12 +164,12 @@ describe('annotation import on the cloud engine', () => {
       });
       await waitFor(() => eventsB.length >= 3, "B's remote events");
       expect(eventsB.map((event) => event.type)).toEqual([
-        'annotation.created',
-        'annotation.created',
-        'annotation.created',
+        'annotations.created',
+        'annotations.created',
+        'annotations.created',
       ]);
       eventsB.forEach((event, index) => {
-        if (event.type !== 'annotation.created') return;
+        if (event.type !== 'annotations.created') return;
         expect(event.origin.kind).toBe('remote');
         expect(event.origin.tx).toEqual({ id: 'remote-import', index, count: 3 });
         expect(event.annotation).toEqual(result.annotations[index]);

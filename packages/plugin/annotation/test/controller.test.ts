@@ -314,7 +314,7 @@ const remoteOrigin = (serverId: number) => ({
 
 const createdEvent = (dto: AnnotationDTO, serverId: number): DocumentEvent =>
   ({
-    type: 'annotation.created',
+    type: 'annotations.created',
     page: PAGE,
     origin: remoteOrigin(serverId),
     annotation: dto,
@@ -323,7 +323,7 @@ const createdEvent = (dto: AnnotationDTO, serverId: number): DocumentEvent =>
 
 const updatedEvent = (dto: AnnotationDTO, serverId: number, changed: boolean): DocumentEvent =>
   ({
-    type: 'annotation.updated',
+    type: 'annotations.updated',
     page: PAGE,
     origin: remoteOrigin(serverId),
     annotation: dto,
@@ -333,7 +333,7 @@ const updatedEvent = (dto: AnnotationDTO, serverId: number, changed: boolean): D
 
 const deletedEvent = (annotObjectNumber: number, serverId: number): DocumentEvent =>
   ({
-    type: 'annotation.deleted',
+    type: 'annotations.deleted',
     page: PAGE,
     origin: remoteOrigin(serverId),
     deleted: { kind: 'objectNumber', value: annotObjectNumber },
@@ -487,7 +487,7 @@ describe('links lens — substrate children, no ledger', () => {
     // The child is substrate: never painted, never hit as itself.
     // A remote session deletes the child → ordinary remove, lens re-derives.
     harness.emit({
-      type: 'annotation.deleted',
+      type: 'annotations.deleted',
       page: PAGE,
       deleted: { kind: 'objectNumber', value: 21 },
       meta: META,
@@ -1017,7 +1017,7 @@ describe('remote delivery — echo-driven appearance invalidation', () => {
     const harness = createHarness();
     await seed(harness, hydrationSquare(70));
     harness.emit({
-      type: 'annotation.moved',
+      type: 'annotations.moved',
       page: PAGE,
       origin: remoteOrigin(45),
       annotations: [hydrationSquare(70)],

@@ -98,6 +98,6 @@ describe('selection model', () => {
     expect(
       contentChangedPagesOf(documentEvent({ type: 'redaction.applied', results: nothingApplied })),
     ).toBeNull();
-    expect(contentChangedPagesOf(documentEvent({ type: 'annotation.created' }))).toBeNull();
+    expect(contentChangedPagesOf(documentEvent({ type: 'annotations.created' }))).toBeNull();
   });
 });

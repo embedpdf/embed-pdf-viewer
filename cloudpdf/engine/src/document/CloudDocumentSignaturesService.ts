@@ -197,7 +197,7 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
       // that returns no mutation envelope: refresh, don't guess.
       await this.manifest.refresh(signal);
       this.publisher.publishLocal({
-        type: 'signature.prepared',
+        type: 'signatures.prepared',
         signingId: prepared.signingId,
         field: input.field,
       });
@@ -222,7 +222,7 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
       await this.manifest.refresh(signal);
       if (result.status === 'completed') {
         this.publisher.publishLocal({
-          type: 'signature.completed',
+          type: 'signatures.completed',
           signingId: input.signingId,
           ...result,
         });
@@ -242,7 +242,7 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
         signal,
       );
       if (result.status === 'cancelled') {
-        this.publisher.publishLocal({ type: 'signature.cancelled', signingId });
+        this.publisher.publishLocal({ type: 'signatures.cancelled', signingId });
       }
       return result;
     });

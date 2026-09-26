@@ -88,7 +88,7 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
             if (!(draft as { nm?: string }).nm) throw new Error('a create without an /NM');
             const result = await create(draft);
             ctx.emitDocumentEvent({
-              type: 'annotation.created',
+              type: 'annotations.created',
               page: result.annotation.page ?? page,
               origin: localOrigin,
               meta: metaOf(),
@@ -100,7 +100,7 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
             const result = await update(ref, patch);
             if (result?.annotation) {
               ctx.emitDocumentEvent({
-                type: 'annotation.updated',
+                type: 'annotations.updated',
                 page: result.annotation.page,
                 origin: localOrigin,
                 appearance: { changed: false },
@@ -115,7 +115,7 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
             // A weak delete reports no stable id and says the page's positions moved.
             const weak = ref.kind === 'index';
             ctx.emitDocumentEvent({
-              type: 'annotation.deleted',
+              type: 'annotations.deleted',
               page: ref.page,
               origin: localOrigin,
               deleted:

@@ -95,7 +95,7 @@ async function boot() {
           writes.push(() => {
             const result = { field: textField(value.value), meta: NOTHING_CHANGED };
             // Like both real engines: the event is published before the promise settles.
-            emit({ type: 'form.valueChanged', origin: origin('local'), ...result });
+            emit({ type: 'forms.valueSet', origin: origin('local'), ...result });
             resolve(result);
           }),
         ),
@@ -137,7 +137,7 @@ describe('form fields mirror', () => {
     expect(nameValue(harness.form as never)).toEqual({ type: 'text', value: 'own' });
 
     harness.emit({
-      type: 'form.valueChanged',
+      type: 'forms.valueSet',
       origin: origin('remote'),
       field: textField('remote'),
       meta: NOTHING_CHANGED,
@@ -154,7 +154,7 @@ describe('form fields mirror', () => {
     const written = harness.form.setText({ kind: 'objectNumber', fieldObjectNumber: 5 }, 'typed');
     await settle();
     harness.emit({
-      type: 'form.valueChanged',
+      type: 'forms.valueSet',
       origin: origin('remote'),
       field: textField('remote edit'),
       meta: NOTHING_CHANGED,

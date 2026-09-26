@@ -111,5 +111,7 @@ export type {
   FormFieldRef,
   FormFieldDTO,
   DocumentEvent,
+  DocumentEventOf,
+  DocumentEventType,
   EventOrigin,
 } from './runtime';

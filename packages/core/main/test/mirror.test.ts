@@ -46,12 +46,12 @@ const origin = (serverId: number | null, kind: 'local' | 'remote' = 'remote') =>
 });
 const upserted = (id: string, title: string, serverId: number | null = null) =>
   ({
-    type: 'annotation.updated',
+    type: 'annotations.updated',
     record: { id, title },
     origin: origin(serverId),
   }) as unknown as DocumentEvent;
 const deleted = (id: string, serverId: number | null = null) =>
-  ({ type: 'annotation.deleted', id, origin: origin(serverId) }) as unknown as DocumentEvent;
+  ({ type: 'annotations.deleted', id, origin: origin(serverId) }) as unknown as DocumentEvent;
 const desynced = { type: 'stream.desynced', reason: 'backlog-overflow', ts: 0 } as DocumentEvent;
 const versioned = {
   type: 'document.versioned',
@@ -65,10 +65,10 @@ const foldRecords = (value: Records, event: DocumentEvent): Records => {
     record?: { id: string; title: string };
     id?: string;
   };
-  if (raw.type === 'annotation.updated' && raw.record) {
+  if (raw.type === 'annotations.updated' && raw.record) {
     return { ...value, [raw.record.id]: raw.record.title };
   }
-  if (raw.type === 'annotation.deleted' && raw.id && raw.id in value) {
+  if (raw.type === 'annotations.deleted' && raw.id && raw.id in value) {
     const { [raw.id]: _removed, ...rest } = value;
     return rest;
   }

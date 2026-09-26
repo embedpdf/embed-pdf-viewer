@@ -67,7 +67,7 @@ export interface DocumentSignaturesService {
    * document's new version. `expectedVersion` must be what `prepare`
    * returned (`SigningVersionMismatch` otherwise). Idempotent: a replay
    * with the same CMS answers `already-completed`. Emits
-   * `signature.completed` and `document.versioned`.
+   * `signatures.completed` and `document.versioned`.
    */
   complete(input: SignatureCompleteInput): AbortablePromise<SignatureCompleteResult>;
 

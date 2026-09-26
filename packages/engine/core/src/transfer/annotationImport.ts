@@ -96,7 +96,7 @@ export interface AnnotationImportResult {
 }
 
 /**
- * The facts an import committed: one `annotation.created` per annotation, in
+ * The facts an import committed: one `annotations.created` per annotation, in
  * bundle order, each with the envelope of its own page and its own id. The
  * cache pins move once, with the last.
  */

@@ -93,9 +93,9 @@ export const emptySignatureRecord = (): SignatureRecord => ({ snapshot: null, pe
 export const hasSignedField = (snapshot: SignatureSnapshot | null): boolean =>
   snapshot?.signatures.some((signature) => signature.signed) ?? false;
 
-type SignatureCompletedEvent = Extract<DocumentEvent, { type: 'signature.completed' }>;
+type SignatureCompletedEvent = Extract<DocumentEvent, { type: 'signatures.completed' }>;
 
-/** The result a `signature.completed` event carries, without the event envelope. */
+/** The result a `signatures.completed` event carries, without the event envelope. */
 export const completeResultOf = (event: SignatureCompletedEvent): SignatureCompleteResult => ({
   status: event.status,
   signature: event.signature,
@@ -127,12 +127,12 @@ function withCompletedSignature(
 
 /** Events that change which signature fields exist; the snapshot lists fields, so it is re-read. */
 const FIELD_SET_EVENTS: ReadonlySet<DocumentEvent['type']> = new Set([
-  'form.fieldCreated',
-  'form.fieldDeleted',
-  'form.widgetAttached',
-  'form.widgetDetached',
-  'form.imported',
-  'form.repaired',
+  'forms.created',
+  'forms.deleted',
+  'forms.widgetAdded',
+  'forms.widgetRemoved',
+  'forms.imported',
+  'forms.repaired',
 ]);
 
 /** Apply one confirmed document event to the signature facts. Pure, the same for every origin. */
@@ -141,11 +141,11 @@ export function foldSignatureEvent(
   event: DocumentEvent,
 ): SignatureRecord | MirrorReload {
   switch (event.type) {
-    case 'signature.prepared':
+    case 'signatures.prepared':
       return { ...record, pending: { signingId: event.signingId, field: event.field } };
-    case 'signature.cancelled':
+    case 'signatures.cancelled':
       return record.pending ? { ...record, pending: null } : record;
-    case 'signature.completed':
+    case 'signatures.completed':
       return { snapshot: withCompletedSignature(record.snapshot, event), pending: null };
     default:
       return FIELD_SET_EVENTS.has(event.type) ? reload() : record;

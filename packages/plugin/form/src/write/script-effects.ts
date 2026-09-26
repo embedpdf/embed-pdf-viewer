@@ -85,7 +85,7 @@ export function createScriptEffects(ctx: FormContext) {
           };
         }
         // The fields mirror and the annotation plugin apply the confirmed
-        // effects from the `form.effectsApplied` event.
+        // effects from the `forms.effectsApplied` event.
         return result;
       },
     } satisfies Partial<FormHostCapability>,

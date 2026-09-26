@@ -35,13 +35,13 @@ const contains = (
 /** The pages whose annotation lists an event changed, each once. */
 function pagesChangedBy(event: DocumentEvent): readonly PageRef[] | null {
   switch (event.type) {
-    case 'annotation.created':
+    case 'annotations.created':
       return [event.annotation.page];
-    case 'annotation.updated':
+    case 'annotations.updated':
       return [event.annotation.page];
-    case 'annotation.deleted':
+    case 'annotations.deleted':
       return [event.page];
-    case 'annotation.moved': {
+    case 'annotations.moved': {
       const pages = new Map<number, PageRef>();
       for (const dto of event.annotations) pages.set(dto.page.pageObjectNumber, dto.page);
       return [...pages.values()];

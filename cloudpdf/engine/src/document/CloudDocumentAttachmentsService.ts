@@ -143,7 +143,7 @@ export class CloudDocumentAttachmentsService implements DocumentAttachmentsServi
       // attachmentsVersion (no per-page pin changes, no layoutVersion), so
       // the cached manifest is patched in place — no refetch.
       if (result.cache) this.manifest.applyAttachments(result.cache);
-      this.publisher.publishLocal({ type: 'attachment.created', ...result });
+      this.publisher.publishLocal({ type: 'attachments.created', ...result });
       return result;
     });
   }
@@ -163,7 +163,7 @@ export class CloudDocumentAttachmentsService implements DocumentAttachmentsServi
       );
       // Same absorb-then-publish rails as create().
       if (result.cache) this.manifest.applyAttachments(result.cache);
-      this.publisher.publishLocal({ type: 'attachment.deleted', ...result });
+      this.publisher.publishLocal({ type: 'attachments.deleted', ...result });
       return result;
     });
   }

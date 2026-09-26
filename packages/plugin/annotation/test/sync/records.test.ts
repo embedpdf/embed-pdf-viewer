@@ -55,13 +55,13 @@ describe('foldRecords', () => {
     const one = recordOn(11, 1);
     let records = applied(
       NO_RECORDS,
-      event({ type: 'annotation.created', page: one.page, annotation: one }),
+      event({ type: 'annotations.created', page: one.page, annotation: one }),
     );
     expect(records.order).toEqual(['obj:1']);
     records = applied(
       records,
       event({
-        type: 'annotation.deleted',
+        type: 'annotations.deleted',
         page: one.page,
         deleted: { kind: 'objectNumber', value: 1 },
       }),
@@ -123,7 +123,7 @@ describe('foldRecords', () => {
   it('re-reads everything after a form repair that linked widgets or baked appearances', () => {
     const records = recordsOf(recordOn(11, 1));
     const repair = (widgetsLinked: number, appearancesBaked: number) =>
-      event({ type: 'form.repaired', widgetsLinked, appearancesBaked });
+      event({ type: 'forms.repaired', widgetsLinked, appearancesBaked });
     expect(foldRecords(records, repair(1, 0))).toEqual(reload());
     expect(foldRecords(records, repair(0, 2))).toEqual(reload());
     expect(foldRecords(records, repair(0, 0))).toBe(records);
@@ -134,7 +134,7 @@ describe('foldRecords', () => {
       foldRecords(
         recordsOf(recordOn(11, 5)),
         event({
-          type: 'form.effectsApplied',
+          type: 'forms.effectsApplied',
           meta: { changedWidgets: [formWidget(5, toPageRef(11))] },
         }),
       ),
@@ -145,7 +145,7 @@ describe('foldRecords', () => {
     expect(
       foldRecords(
         NO_RECORDS,
-        event({ type: 'form.fieldCreated', field: { widgets: [formWidget(5, toPageRef(11))] } }),
+        event({ type: 'forms.created', field: { widgets: [formWidget(5, toPageRef(11))] } }),
       ),
     ).toEqual(reload({ pages: [toPageRef(11)] }));
   });
@@ -158,7 +158,7 @@ describe('appearance versions', () => {
   it('a created record starts with a freshly baked appearance', () => {
     const records = applied(
       NO_RECORDS,
-      event({ type: 'annotation.created', page: square.page, annotation: square }),
+      event({ type: 'annotations.created', page: square.page, annotation: square }),
     );
     expect(versionOf(records)).toBe(1);
   });
@@ -167,7 +167,7 @@ describe('appearance versions', () => {
     const records = recordsOf(square);
     const updated = (changed: boolean) =>
       event({
-        type: 'annotation.updated',
+        type: 'annotations.updated',
         page: square.page,
         annotation: square,
         appearance: { changed },
@@ -179,12 +179,12 @@ describe('appearance versions', () => {
   it('a z-order move never changes an appearance', () => {
     const records = applied(
       recordsOf(square),
-      event({ type: 'annotation.moved', page: square.page, annotations: [square] }),
+      event({ type: 'annotations.moved', page: square.page, annotations: [square] }),
     );
     expect(versionOf(records)).toBe(0);
   });
 
-  it.each(['form.valueChanged'])('%s repaints the changed widgets', (type) => {
+  it.each(['forms.valueSet'])('%s repaints the changed widgets', (type) => {
     const records = recordsOf(recordOn(11, 5));
     const next = applied(
       records,
@@ -201,16 +201,16 @@ describe('appearance versions', () => {
         { widgets: [formWidget(6, toPageRef(12)), formWidget(7, toPageRef(12))] },
       ],
     };
-    const imported = applied(records, event({ type: 'form.imported', applied: 2, form }));
+    const imported = applied(records, event({ type: 'forms.imported', applied: 2, form }));
     expect(['obj:5', 'obj:6', 'obj:7'].map((key) => versionOf(imported, key))).toEqual([1, 1, 1]);
-    expect(foldRecords(records, event({ type: 'form.imported', applied: 0, form }))).toBe(records);
+    expect(foldRecords(records, event({ type: 'forms.imported', applied: 0, form }))).toBe(records);
   });
 
   it('a signature repaints its widget', () => {
     const records = recordsOf(recordOn(11, 5));
     const next = applied(
       records,
-      event({ type: 'signature.completed', signature: { widget: formWidget(5, toPageRef(11)) } }),
+      event({ type: 'signatures.completed', signature: { widget: formWidget(5, toPageRef(11)) } }),
     );
     expect(versionOf(next, 'obj:5')).toBe(1);
   });
@@ -225,7 +225,7 @@ describe('weak annotations (addressed by position)', () => {
     const next = applied(
       records,
       event({
-        type: 'annotation.updated',
+        type: 'annotations.updated',
         page,
         annotation: named(weak, 'u-1'),
         appearance: { changed: true },
@@ -241,7 +241,7 @@ describe('weak annotations (addressed by position)', () => {
     const next = foldRecords(
       records,
       event({
-        type: 'annotation.updated',
+        type: 'annotations.updated',
         page,
         annotation: recordOn(11, 7),
         appearance: { changed: false },
@@ -254,7 +254,7 @@ describe('weak annotations (addressed by position)', () => {
   it('a change the engine says moved positions re-reads the page', () => {
     const records = recordsOf(weakOn(11, 3));
     const deleted = event({
-      type: 'annotation.deleted',
+      type: 'annotations.deleted',
       page,
       deleted: null,
       meta: { changed: [], shouldRefetch: { reason: 'weakRefsInvalidated' } },
@@ -266,7 +266,7 @@ describe('weak annotations (addressed by position)', () => {
     const records = recordsOf(weakOn(11, 3));
     const reply = recordOn(11, 9);
     const created = event({
-      type: 'annotation.created',
+      type: 'annotations.created',
       page,
       annotation: reply,
       meta: {
@@ -285,7 +285,7 @@ describe('weak annotations (addressed by position)', () => {
     const next = foldRecords(
       records,
       event({
-        type: 'annotation.created',
+        type: 'annotations.created',
         page,
         annotation: recordOn(11, 9),
         meta: { changed: [{ kind: 'nm', value: 'elsewhere' }], shouldRefetch: null },
@@ -326,7 +326,7 @@ describe('records mirror through the controller', () => {
     await harness.capability.whenSynced();
     expect(harness.model().byId['obj:5']?.apVersion ?? 0).toBe(0);
     harness.emit(
-      event({ type: 'form.valueChanged', meta: { changedWidgets: [formWidget(5, toPageRef(1))] } }),
+      event({ type: 'forms.valueSet', meta: { changedWidgets: [formWidget(5, toPageRef(1))] } }),
     );
     expect(harness.model().byId['obj:5']?.apVersion).toBe(1);
   });

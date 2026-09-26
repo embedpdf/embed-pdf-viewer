@@ -271,7 +271,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
             signal,
           )
         : await this.http.postJson(path, draft, parse, signal);
-      return this.absorbMutation(result, 'annotation.created');
+      return this.absorbMutation(result, 'annotations.created');
     });
   }
 
@@ -306,7 +306,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       return AbortablePromise.run<AnnotationUpdateResult>(async (signal) => {
         const wireResources = await resolveAnnotationResources(resources);
         const result = await this.patchMutation(path, { ref, patch }, wireResources, signal);
-        return this.absorbMutation(result, 'annotation.updated');
+        return this.absorbMutation(result, 'annotations.updated');
       });
     }
     const stableKey = encodeStableIdKey(refToStableId(ref));
@@ -319,7 +319,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     return AbortablePromise.run<AnnotationUpdateResult>(async (signal) => {
       const wireResources = await resolveAnnotationResources(resources);
       const result = await this.patchMutation(path, { patch }, wireResources, signal);
-      return this.absorbMutation(result, 'annotation.updated');
+      return this.absorbMutation(result, 'annotations.updated');
     });
   }
 
@@ -419,7 +419,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         (raw) => AnnotationMoveResultSchema.parse(raw),
         signal,
       );
-      return this.absorbMutation(result, 'annotation.moved');
+      return this.absorbMutation(result, 'annotations.moved');
     });
   }
 
@@ -496,7 +496,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
   private absorbDelete(result: AnnotationDeleteResult): AnnotationDeleteResult {
     this.manifest.apply(result.meta, ['annotations']);
     this.publisher.publishLocal({
-      type: 'annotation.deleted',
+      type: 'annotations.deleted',
       page: this.pageRef,
       deleted: deletedAnnotationOf(result),
       ...result,
@@ -506,7 +506,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
 
   private absorbMutation<T extends { meta: MutationMeta }>(
     result: T,
-    type: 'annotation.created' | 'annotation.updated' | 'annotation.moved',
+    type: 'annotations.created' | 'annotations.updated' | 'annotations.moved',
   ): T {
     this.manifest.apply(result.meta, ['annotations']);
     this.publisher.publishLocal({

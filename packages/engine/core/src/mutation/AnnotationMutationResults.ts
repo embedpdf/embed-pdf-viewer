@@ -56,7 +56,7 @@ export interface AnnotationDeleteResult {
 }
 
 /**
- * What a delete removed, as its `annotation.deleted` event names it for
+ * What a delete removed, as its `annotations.deleted` event names it for
  * listeners that didn't make the call: the stable id in `meta.changed`, or
  * `null` for a weak annotation (no objectNumber, no /NM), for which the
  * engine refuses to fabricate one — those listeners refetch the page list.

@@ -125,7 +125,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       this.publisher.publishLocal({
         type: 'pages.moved',
         pages,
-        destIndex,
+        toIndex: destIndex,
         ...payload.result,
       });
       return payload.result;
@@ -364,7 +364,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       }
       this.publisher.publishLocal({
         type: 'pages.inserted',
-        destIndex,
+        toIndex: destIndex,
         ...payload.result,
       });
       return payload.result;
@@ -410,7 +410,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       }
       this.publisher.publishLocal({
         type: 'pages.inserted',
-        destIndex,
+        toIndex: destIndex,
         ...payload.result,
       });
       return payload.result;

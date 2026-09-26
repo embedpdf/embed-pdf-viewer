@@ -19,10 +19,12 @@ export type { DocumentHandle } from './engine/DocumentHandle';
 export type {
   DocumentEvent,
   DocumentEventInit,
+  DocumentEventOf,
   DocumentEventType,
   EventOrigin,
 } from './events/DocumentEvent';
 export type { DocumentEventStream } from './events/DocumentEventStream';
+export { subscribeToType } from './events/DocumentEventStream';
 export {
   advisoryFromPdfBits,
   permissionInfoFromProbe,

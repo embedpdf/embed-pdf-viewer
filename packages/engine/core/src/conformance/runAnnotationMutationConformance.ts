@@ -1564,7 +1564,7 @@ export function runAnnotationMutationConformance(
         const weakSession = await beginEditIfRequired(doc, fix.pageObjectNumber, fix);
         const deletions: Array<AnnotationStableId | null> = [];
         const stop = doc.events.subscribe((event) => {
-          if (event.type === 'annotation.deleted') deletions.push(event.deleted);
+          if (event.type === 'annotations.deleted') deletions.push(event.deleted);
         });
         const result = await page.annotations.delete(created.annotation.ref);
         stop();

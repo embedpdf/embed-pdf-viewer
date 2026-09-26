@@ -195,11 +195,11 @@ describe('link plugin', () => {
   it('re-reads a loaded page when an annotation on it changes', async () => {
     const harness = await boot();
     await harness.link.ensureLoaded(toPageRef(1));
-    harness.emit({ type: 'annotation.deleted', page: toPageRef(1), origin: ORIGIN });
+    harness.emit({ type: 'annotations.deleted', page: toPageRef(1), origin: ORIGIN });
     await settle();
     expect(harness.reads).toEqual([1, 1]);
     // Page 2 is not loaded: nothing to re-read.
-    harness.emit({ type: 'annotation.deleted', page: toPageRef(2), origin: ORIGIN });
+    harness.emit({ type: 'annotations.deleted', page: toPageRef(2), origin: ORIGIN });
     await settle();
     expect(harness.reads).toEqual([1, 1]);
     await harness.kernel.destroy();
@@ -210,7 +210,7 @@ describe('link plugin', () => {
     await harness.link.listAllLinks();
     expect(harness.reads).toEqual([1, 2]);
     harness.emit({
-      type: 'annotation.moved',
+      type: 'annotations.moved',
       page: toPageRef(1),
       annotations: [PAGE_ONE_LINKS[0], PAGE_ONE_LINKS[1], linkDto(20, 2, crop, null)],
       origin: ORIGIN,
@@ -282,7 +282,7 @@ describe('link plugin', () => {
     expect(loaded).toEqual([1]);
 
     harness.failReads(true);
-    harness.emit({ type: 'annotation.deleted', page: toPageRef(1), origin: ORIGIN });
+    harness.emit({ type: 'annotations.deleted', page: toPageRef(1), origin: ORIGIN });
     await settle();
     expect(harness.reads).toEqual([1, 1]);
     expect(loaded).toEqual([1]);

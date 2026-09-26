@@ -61,7 +61,7 @@ export function createScaleWrites(
     const service = ctx.doc.page(page).measure;
     if (service) {
       await service.setScale(scale);
-      // The engine published `page.viewportsChanged` before resolving, so the
+      // The engine published `pages.scaleSet` before resolving, so the
       // mirror is already re-reading this page: join that read, never start another.
       await ensureLoaded(page);
     } else {

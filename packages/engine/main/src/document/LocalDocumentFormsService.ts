@@ -99,7 +99,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
       { priority: Priority.HIGH },
     );
     return this.await(submission, 'forms.setValue', (payload) => {
-      this.publisher.publishLocal({ type: 'form.valueChanged', ...payload.result });
+      this.publisher.publishLocal({ type: 'forms.valueSet', ...payload.result });
       return payload.result;
     });
   }
@@ -115,7 +115,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
       { priority: Priority.HIGH },
     );
     return this.await(submission, 'forms.reset', (payload) => {
-      this.publisher.publishLocal({ type: 'form.valueChanged', ...payload.result });
+      this.publisher.publishLocal({ type: 'forms.valueSet', ...payload.result });
       return payload.result;
     });
   }
@@ -133,7 +133,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     );
     return this.await(submission, 'forms.applyEffects', (payload) => {
       if (payload.wrote) {
-        this.publisher.publishLocal({ type: 'form.effectsApplied', ...payload.result });
+        this.publisher.publishLocal({ type: 'forms.effectsApplied', ...payload.result });
       }
       return payload.result;
     });
@@ -174,7 +174,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
       { priority: Priority.HIGH },
     );
     return this.await(submission, 'forms.import', (payload) => {
-      this.publisher.publishLocal({ type: 'form.imported', ...payload.result });
+      this.publisher.publishLocal({ type: 'forms.imported', ...payload.result });
       return payload.result;
     });
   }
@@ -190,7 +190,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
       { priority: Priority.HIGH },
     );
     return this.await(submission, 'forms.createField', (payload) => {
-      this.publisher.publishLocal({ type: 'form.fieldCreated', ...payload.result });
+      this.publisher.publishLocal({ type: 'forms.created', ...payload.result });
       return payload.result;
     });
   }
@@ -214,7 +214,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
       { priority: Priority.HIGH },
     );
     return this.await(submission, 'forms.setSignatureAppearance', (payload) => {
-      this.publisher.publishLocal({ type: 'form.fieldUpdated', ...payload.result });
+      this.publisher.publishLocal({ type: 'forms.updated', ...payload.result });
       return payload.result;
     });
   }
@@ -231,7 +231,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
       { priority: Priority.HIGH },
     );
     return this.await(submission, 'forms.updateField', (payload) => {
-      this.publisher.publishLocal({ type: 'form.fieldUpdated', ...payload.result });
+      this.publisher.publishLocal({ type: 'forms.updated', ...payload.result });
       return payload.result;
     });
   }
@@ -248,7 +248,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     );
     return this.await(submission, 'forms.deleteField', (payload) => {
       this.publisher.publishLocal({
-        type: 'form.fieldDeleted',
+        type: 'forms.deleted',
         deleted: deletedFieldOf(payload.result),
         ...payload.result,
       });
@@ -280,7 +280,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
       { priority: Priority.HIGH },
     );
     return this.await(submission, 'forms.attachWidget', (payload) => {
-      this.publisher.publishLocal({ type: 'form.widgetAttached', ...payload.result });
+      this.publisher.publishLocal({ type: 'forms.widgetAdded', ...payload.result });
       return payload.result;
     });
   }
@@ -297,7 +297,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
       { priority: Priority.HIGH },
     );
     return this.await(submission, 'forms.detachWidget', (payload) => {
-      this.publisher.publishLocal({ type: 'form.widgetDetached', ...payload.result });
+      this.publisher.publishLocal({ type: 'forms.widgetRemoved', ...payload.result });
       return payload.result;
     });
   }
@@ -315,7 +315,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
       { priority: Priority.HIGH },
     );
     return this.await(submission, 'forms.repair', (payload) => {
-      this.publisher.publishLocal({ type: 'form.repaired', ...payload.result });
+      this.publisher.publishLocal({ type: 'forms.repaired', ...payload.result });
       return payload.result;
     });
   }

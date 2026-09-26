@@ -63,13 +63,13 @@ export interface DocumentFormsService {
    * family (see {@link FormFieldValue}). Validation happens before any
    * write — a failed call leaves the document untouched. Appearance
    * streams regenerate for text/choice widgets; toggles flip their
-   * appearance state. Emits `form.valueChanged`.
+   * appearance state. Emits `forms.valueSet`.
    */
   setValue(ref: FormFieldRef, value: FormFieldValue): AbortablePromise<FormSetValueResult>;
 
   /**
    * Restore a field to its default value (/DV), or clear it when no
-   * default exists. Emits `form.valueChanged`.
+   * default exists. Emits `forms.valueSet`.
    */
   reset(ref: FormFieldRef): AbortablePromise<FormSetValueResult>;
 
@@ -107,7 +107,7 @@ export interface DocumentFormsService {
    * Apply an FDF or XFDF payload. The format is sniffed from the bytes
    * when `format` is omitted. Each entry replays through the same typed,
    * validated write path as `setValue` — one bad entry is skipped and
-   * counted, never fatal. Emits `form.imported`.
+   * counted, never fatal. Emits `forms.imported`.
    */
   import(
     data: Uint8Array | ArrayBuffer,
@@ -119,7 +119,7 @@ export interface DocumentFormsService {
    * atomic job. Widgets are born through the annotation plane and adopted
    * (see {@link addWidget}); the inline `widget(s)` config is sugar for
    * exactly that composition. Gated by `doc.forms.modify`. Emits
-   * `form.fieldCreated`.
+   * `forms.created`.
    */
   create(draft: FormFieldDraft): AbortablePromise<FormFieldCreateResult>;
 
@@ -127,7 +127,7 @@ export interface DocumentFormsService {
    * Update field-plane properties (name, universal and family flags,
    * options, default value, names). The patch's `family` must match the
    * target field. Validate-then-apply per property. Emits
-   * `form.fieldUpdated`.
+   * `forms.updated`.
    */
   update(ref: FormFieldRef, patch: FormFieldPatch): AbortablePromise<FormFieldUpdateResult>;
 
@@ -135,7 +135,7 @@ export interface DocumentFormsService {
    * Draw a PDF page into every widget of an unsigned signature field — the
    * visual "sign" of a viewer that has no signer. The field's value stays
    * empty and nothing is sealed; a signed field is refused. Gated by
-   * `doc.forms.fill`. Emits `form.fieldUpdated`.
+   * `doc.forms.fill`. Emits `forms.updated`.
    */
   setSignatureAppearance(
     ref: FormFieldRef,
@@ -145,7 +145,7 @@ export interface DocumentFormsService {
   /**
    * Delete a terminal field and cascade: every widget is removed from its
    * page, the field leaves the tree, and empty ancestors are pruned.
-   * Emits `form.fieldDeleted`.
+   * Emits `forms.deleted`.
    */
   delete(ref: FormFieldRef): AbortablePromise<FormFieldDeleteResult>;
 
@@ -154,7 +154,7 @@ export interface DocumentFormsService {
    * field. `onState` names the checked appearance state and is required
    * for radio groups (checkboxes default to "Yes"). Attaching into a
    * legacy merged field splits it — the field object number never
-   * changes; widget identity may. Emits `form.widgetAttached`.
+   * changes; widget identity may. Emits `forms.widgetAdded`.
    */
   addWidget(
     ref: FormFieldRef,
@@ -167,7 +167,7 @@ export interface DocumentFormsService {
    * placement and last appearance but becomes an ordinary, inert
    * annotation (deletable through the annotation APIs). The field
    * survives, "unplaced" when this was its last widget. Emits
-   * `form.widgetDetached`.
+   * `forms.widgetRemoved`.
    */
   removeWidget(ref: FormFieldRef, widget: AnnotationRef): AbortablePromise<FormWidgetLinkResult>;
 
@@ -176,7 +176,7 @@ export interface DocumentFormsService {
    * ("form doctor"): bootstrap a missing /AcroForm, link recovered field
    * roots into /Fields, re-attach stray widgets to their parent's /Kids,
    * and optionally bake appearances. Validate-then-apply and idempotent —
-   * a second call reports zero fixes. Emits `form.repaired`.
+   * a second call reports zero fixes. Emits `forms.repaired`.
    */
   repair(options?: FormRepairOptions): AbortablePromise<FormRepairResult>;
 }

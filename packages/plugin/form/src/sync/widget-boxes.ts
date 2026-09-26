@@ -16,21 +16,21 @@ const pagesOfWidgets = (widgets: readonly FormWidget[]): PageRef[] =>
 
 function affectedPages(event: DocumentEvent): readonly PageRef[] | 'all' | null {
   switch (event.type) {
-    case 'form.fieldCreated':
-    case 'form.fieldUpdated':
-    case 'form.widgetAttached':
-    case 'form.widgetDetached':
+    case 'forms.created':
+    case 'forms.updated':
+    case 'forms.widgetAdded':
+    case 'forms.widgetRemoved':
       return pagesOfWidgets(event.field.widgets);
-    case 'form.fieldDeleted':
+    case 'forms.deleted':
       return pagesOfWidgets(event.meta.changedWidgets);
-    case 'form.imported':
-    case 'form.repaired':
+    case 'forms.imported':
+    case 'forms.repaired':
       return 'all';
-    case 'annotation.created':
+    case 'annotations.created':
       return event.annotation.subtype === 'widget' ? [event.page] : null;
-    case 'annotation.updated':
+    case 'annotations.updated':
       return event.annotation.subtype === 'widget' ? [event.page] : null;
-    case 'annotation.deleted':
+    case 'annotations.deleted':
       return [event.page];
     default:
       return null;

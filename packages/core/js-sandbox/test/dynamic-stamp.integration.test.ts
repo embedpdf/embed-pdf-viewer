@@ -134,7 +134,7 @@ describe('dynamic stamp real-PDF vertical slice', () => {
         'applied',
       ]);
       expect(applied.meta).not.toBeNull();
-      expect(events).toEqual(['form.effectsApplied']);
+      expect(events).toEqual(['forms.effectsApplied']);
 
       const afterApply = await document.forms.list();
       expect(

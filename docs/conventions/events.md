@@ -37,7 +37,7 @@ changed: ({ cause, event, previous, next }) => {
   if (!event || !('origin' in event)) return;
   const origin = originOf(event);
   switch (event.type) {
-    case 'form.valueChanged':
+    case 'forms.valueSet':
       events.valueChanged.emit({ ref: event.field.ref, field: event.field, origin });
       return;
     // …
