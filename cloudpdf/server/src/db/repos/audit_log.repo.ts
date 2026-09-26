@@ -31,8 +31,12 @@ export type AuditMutationKind =
   | 'form.detachWidget'
   | 'form.applyEffects'
   | 'form.setSignatureAppearance'
+  /** A signing was prepared on this layer: the layer is locked until it ends. */
+  | 'signature.prepare'
+  /** A prepared signing was cancelled. */
+  | 'signature.cancel'
   /** A signature published a new base version through this layer. */
-  | 'signature.completed';
+  | 'signature.complete';
 
 export interface AppendAuditLogInput {
   tenantId: string;

@@ -123,7 +123,7 @@ describe('signature fields in the viewer phase', () => {
       // A signed field's appearance is sealed with the signature.
       await expect(
         doc.forms.setSignatureAppearance!({ kind: 'fqn', name: 'sig' }, { pdf: artwork }),
-      ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+      ).rejects.toMatchObject({ code: EngineErrorCode.ProtectedDocument });
       // The unsigned field can still be redrawn after the document was versioned.
       const again = await doc.forms.setSignatureAppearance!(
         { kind: 'fqn', name: 'sig2' },

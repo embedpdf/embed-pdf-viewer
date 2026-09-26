@@ -35,14 +35,15 @@ let fx: DbSeededFixture | undefined;
 const TENANT_ID = 'cloud-forms-conformance-tenant';
 
 // The suite opens several independent documents, so the engine carries a
-// tenant token (doc-scoped tokens bind to one docId). The import target is
-// a second copy of toggle_fields.pdf — id-opened docs are server state, so
-// the round-trip test can't mint one by re-opening bytes.
+// tenant token (doc-scoped tokens bind to one docId). The import and delete
+// targets are further copies of toggle_fields.pdf — id-opened docs are
+// server state, so those tests can't mint one by re-opening bytes.
 const DOCS = {
   toggleFields: { id: 'toggle-fields-cloud', file: 'toggle_fields.pdf', pages: 1 },
   orphanWidgets: { id: 'orphan-widgets-cloud', file: 'orphan_widgets.pdf', pages: 1 },
   choiceFields: { id: 'listbox-form-cloud', file: 'listbox_form.pdf', pages: 1 },
   importTarget: { id: 'toggle-fields-import-target-cloud', file: 'toggle_fields.pdf', pages: 1 },
+  deleteTarget: { id: 'toggle-fields-delete-target-cloud', file: 'toggle_fields.pdf', pages: 1 },
   dynamicStamp: {
     id: 'dynamic-approval-stamp-cloud',
     file: 'EmbedPDF_Dynamic_Approval_Stamp.pdf',
@@ -90,6 +91,7 @@ runFormConformance(runner, {
     orphanWidgets: fixture(DOCS.orphanWidgets.id),
     choiceFields: fixture(DOCS.choiceFields.id),
     importTarget: fixture(DOCS.importTarget.id),
+    deleteTarget: fixture(DOCS.deleteTarget.id),
   },
   makeEngine: () => {
     if (!fx) throw new Error('fixture not initialised');

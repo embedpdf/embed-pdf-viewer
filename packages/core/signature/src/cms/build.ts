@@ -116,11 +116,9 @@ export async function buildDetachedCms(input: BuildDetachedCmsInput): Promise<Ui
     value: attributes.map((attribute) => attribute.toSchema()),
   }).toBER(false);
   const raw = await input.signer.sign(new Uint8Array(toSign));
-  const signature =
-    input.signer.algorithm === 'ECDSA'
-      ? pkijs.createCMSECDSASignature(toArrayBuffer(raw))
-      : toArrayBuffer(raw);
-  signerInfo.signature = new asn1js.OctetString({ valueHex: signature });
+  signerInfo.signature = new asn1js.OctetString({
+    valueHex: cmsSignatureValue(input.signer.algorithm, raw),
+  });
 
   const signedData = new pkijs.SignedData({
     version: 1,
@@ -136,7 +134,15 @@ export async function buildDetachedCms(input: BuildDetachedCmsInput): Promise<Ui
   return new Uint8Array(contentInfo.toSchema().toBER(false));
 }
 
-function signatureAlgorithmFor(
+/** A raw signature as a SignerInfo carries it (ECDSA `r || s` becomes DER). */
+export function cmsSignatureValue(algorithm: RawSignatureAlgorithm, raw: Uint8Array): ArrayBuffer {
+  return algorithm === 'ECDSA'
+    ? pkijs.createCMSECDSASignature(toArrayBuffer(raw))
+    : toArrayBuffer(raw);
+}
+
+/** The SignerInfo signature algorithm of a raw key and hash. */
+export function signatureAlgorithmFor(
   algorithm: RawSignatureAlgorithm,
   hash: Exclude<DigestAlgorithm, 'sha1'>,
 ): pkijs.AlgorithmIdentifier {

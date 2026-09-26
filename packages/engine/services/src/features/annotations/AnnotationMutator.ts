@@ -346,23 +346,57 @@ export class AnnotationMutator {
   /**
    * Attached widgets are views of a form field: deleting one here would
    * orphan the field's /Kids (the corruption class doc.forms.repair
-   * exists to fix). Detach first, or use the forms-plane cascade.
+   * exists to fix). Remove it from its field first, or delete the field. A
+   * merged field/widget is the field's own dictionary and has nothing to be
+   * removed from, so only the field's delete removes it; that cascade passes
+   * the field it has unlinked as `releasedFieldObjectNumber`.
    */
-  private assertNotAttachedWidget(annotPtr: Ptr): void {
+  private assertNotAttachedWidget(annotPtr: Ptr, releasedFieldObjectNumber: number): void {
     const { fn } = this.runtime;
     if (fn.FPDFAnnot_GetSubtype(annotPtr) !== PdfAnnotationSubtypeCode.WIDGET) return;
     const annotObjectNumber = fn.EPDFAnnot_GetObjectNumber(annotPtr);
-    if (resolveWidgetFieldObjectNumber(this.runtime, this.session, annotObjectNumber) === 0) {
+    if (releasedFieldObjectNumber > 0 && annotObjectNumber === releasedFieldObjectNumber) {
+      return; // the unlinked field's own dictionary, leaving its page
+    }
+    const fieldObjectNumber = resolveWidgetFieldObjectNumber(
+      this.runtime,
+      this.session,
+      annotObjectNumber,
+    );
+    if (fieldObjectNumber === 0) {
       return; // inert widget: an ordinary annotation, ordinary delete
     }
     throw new EngineError(
       EngineErrorCode.InvalidArg,
-      'widget is attached to a form field - use doc.forms.detachWidget or doc.forms.deleteField',
+      fieldObjectNumber === annotObjectNumber
+        ? "widget is its form field's own dictionary (a merged field/widget) - delete the field with doc.forms.delete"
+        : 'widget is attached to a form field - use doc.forms.removeWidget or doc.forms.delete',
     );
   }
 
   delete(ref: AnnotationRef, signal: AbortSignal): AnnotationDeleteResult {
     throwIfAborted(signal);
+    return this.removeAnnotation(ref, signal, 0);
+  }
+
+  /**
+   * Remove a widget of the field `doc.forms.delete` has just unlinked from
+   * the field tree, including the field's own dictionary when it is a
+   * merged field/widget. The cascade runs past that mutation's apply
+   * boundary, so it takes no abort signal.
+   */
+  deleteReleasedWidget(
+    ref: AnnotationRef,
+    releasedFieldObjectNumber: number,
+  ): AnnotationDeleteResult {
+    return this.removeAnnotation(ref, null, releasedFieldObjectNumber);
+  }
+
+  private removeAnnotation(
+    ref: AnnotationRef,
+    signal: AbortSignal | null,
+    releasedFieldObjectNumber: number,
+  ): AnnotationDeleteResult {
     const { fn, mem } = this.runtime;
     const pool = this.session.pagePool();
     const pagePtr = pool.acquire(ref.page.pageObjectNumber);
@@ -370,7 +404,7 @@ export class AnnotationMutator {
     try {
       this.ensureKnownWeakStateFromPage(ref.page.pageObjectNumber, pagePtr);
       const pageStateBefore = this.session.pageState(ref.page.pageObjectNumber);
-      throwIfAborted(signal);
+      if (signal) throwIfAborted(signal);
 
       let deleted: AnnotationStableId | null;
       let ok = false;
@@ -388,7 +422,7 @@ export class AnnotationMutator {
             );
           }
           try {
-            this.assertNotAttachedWidget(probe);
+            this.assertNotAttachedWidget(probe, releasedFieldObjectNumber);
           } finally {
             fn.FPDFPage_CloseAnnot(probe);
           }
@@ -408,7 +442,7 @@ export class AnnotationMutator {
               );
             }
             try {
-              this.assertNotAttachedWidget(probe);
+              this.assertNotAttachedWidget(probe, releasedFieldObjectNumber);
             } finally {
               fn.FPDFPage_CloseAnnot(probe);
             }

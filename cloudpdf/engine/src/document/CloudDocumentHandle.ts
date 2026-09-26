@@ -21,7 +21,7 @@ import {
   type MutationMeta,
   type PageHandle,
   type PageRef,
-  type PdfSaveMode,
+  type DownloadOptions,
 } from '@embedpdf/engine-core/runtime';
 import {
   DEFAULT_LAYER_NAME,
@@ -293,13 +293,13 @@ export class CloudDocumentHandle implements DocumentHandle {
     );
   }
 
-  download(opts: { mode?: PdfSaveMode } = {}): AbortablePromise<Uint8Array> {
+  download(options: DownloadOptions = {}): AbortablePromise<Uint8Array> {
     if (this.closed) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.id} is closed`),
       );
     }
-    const mode = opts.mode ?? DEFAULT_PDF_SAVE_MODE;
+    const mode = options.mode ?? DEFAULT_PDF_SAVE_MODE;
     return AbortablePromise.run<Uint8Array>(async (signal) => {
       const buildPath = async () => {
         const manifest = await this.getManifest(signal);
@@ -661,6 +661,13 @@ export class CloudDocumentHandle implements DocumentHandle {
       case 'annotations.flattened':
         // Flatten bakes annotations into page content: both planes flip.
         this.absorbMutation(event.meta, ['content', 'annotations']);
+        return;
+      case 'signatures.prepared':
+      case 'document.versioned':
+        // Prepare moved the layer's version and working flag; a completion
+        // published a new base. Neither ships a delta: refetch the manifest.
+        this.manifestCache = null;
+        this.inflightManifest = null;
         return;
       case 'redaction.applied':
         // Redaction-apply rewrites content and consumes the marks: both

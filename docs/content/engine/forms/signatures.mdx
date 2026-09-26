@@ -53,11 +53,12 @@ result.signature; // the new signature, as list() returns it
 
 `key` is what signs the digest, one of:
 
-| Key                                                 | Use it when                                                              |
-| :-------------------------------------------------- | :----------------------------------------------------------------------- |
-| `webCryptoSigner({ privateKey, certificateChain })` | You hold a WebCrypto key and its certificates (DER, the signer's first). |
-| `remoteSigner({ sign })`                            | A signing service or HSM turns a digest into a finished signature (CMS). |
-| `createTestSigner()`                                | Tests and demos: a throwaway key with a self-signed certificate.         |
+| Key                                                 | Use it when                                                               |
+| :-------------------------------------------------- | :------------------------------------------------------------------------ |
+| `webCryptoSigner({ privateKey, certificateChain })` | You hold a WebCrypto key and its certificates (DER, the signer's first).  |
+| `remoteSigner({ sign })`                            | A signing service or HSM turns a digest into a finished signature (CMS).  |
+| `createTestSigner()`                                | Tests and demos: a throwaway key with a self-signed certificate.          |
+| `createTestTimestampAuthority()`                    | Tests and demos: a throwaway [timestamp authority](#document-timestamps). |
 
 After signing, the document is the signed file: `list()` shows the new signature, and
 `doc.download()` returns the signed PDF. When the signature your key returns doesn't match what
@@ -67,16 +68,17 @@ the engine prepared, `sign()` fails with `SignatureRefused` and the message says
 
 `sign()` and `prepare()` take these options (`sign()` also takes the `key`):
 
-| Option         | What it is                                                                       | Default                                       |
-| :------------- | :------------------------------------------------------------------------------- | :-------------------------------------------- |
-| `field`        | The signature field to sign. It must not be signed yet.                          |                                               |
-| `signer`       | `{ name, reason, location, contactInfo, signedAt }`, written into the signature. | none; `signedAt` now                          |
-| `appearance`   | `{ pdf }`: a PDF whose first page is drawn into the field's box.                 | none                                          |
-| `certify`      | `{ permission: 1 \| 2 \| 3 }`: [certify](#certify-a-document) the document.      | not certified                                 |
-| `lock`         | Fields this signature [locks](#lock-fields).                                     | none                                          |
-| `digest`       | `'sha256'`, `'sha384'` or `'sha512'`.                                            | `'sha256'`, or the `key`'s hash with `sign()` |
-| `subFilter`    | `'ETSI.CAdES.detached'` or `'adbe.pkcs7.detached'`.                              | `'ETSI.CAdES.detached'`                       |
-| `contentsSize` | Bytes reserved for the signature, from 256 to 4 MiB.                             | `8192`                                        |
+| Option         | What it is                                                                        | Default                                       |
+| :------------- | :-------------------------------------------------------------------------------- | :-------------------------------------------- |
+| `field`        | The signature field to sign. It must not be signed yet.                           |                                               |
+| `kind`         | `'signature'`, or `'timestamp'` for a [document timestamp](#document-timestamps). | `'signature'`                                 |
+| `signer`       | `{ name, reason, location, contactInfo, signedAt }`, written into the signature.  | none; `signedAt` now                          |
+| `appearance`   | `{ pdf }`: a PDF whose first page is drawn into the field's box.                  | none                                          |
+| `certify`      | `{ permission: 1 \| 2 \| 3 }`: [certify](#certify-a-document) the document.       | not certified                                 |
+| `lock`         | Fields this signature [locks](#lock-fields).                                      | none                                          |
+| `digest`       | `'sha256'`, `'sha384'` or `'sha512'`.                                             | `'sha256'`, or the `key`'s hash with `sign()` |
+| `subFilter`    | `'ETSI.CAdES.detached'` or `'adbe.pkcs7.detached'`.                               | `'ETSI.CAdES.detached'`                       |
+| `contentsSize` | Bytes reserved for the signature, from 256 to 4 MiB.                              | `8192`                                        |
 
 The field needs a widget to carry an `appearance`; without one, the call fails with
 `SignatureRefused`.
@@ -417,8 +419,16 @@ don't need to save before you sign.
 
 ### Document timestamps
 
-`kind: 'timestamp'` in `prepare()` makes a document timestamp instead of a signature. Its `cms` is
-a timestamp token from a timestamp authority, over `prepared.digest`.
+`kind: 'timestamp'` makes a document timestamp instead of a signature. With `sign()`, the `key` is
+your timestamp authority: a `remoteSigner` whose `sign` sends the digest to the authority and
+returns its timestamp token (`subFilter` is `'ETSI.RFC3161'`). A key you hold can't make one, so
+`sign()` fails with `InvalidArg`. With `prepare()` and `complete()`, the `cms` is the token over
+`prepared.digest`.
+
+```ts
+const result = await sign(doc, { field, kind: 'timestamp', key: myTimestampAuthority });
+result.signature.kind; // 'timestamp'
+```
 
 <Engine local>
 

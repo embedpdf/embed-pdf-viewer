@@ -42,14 +42,26 @@ export interface ParsedCmsInternal {
   certificates: pkijs.Certificate[];
   /** DER of the signing-certificate-v2 attribute's first certHash, when present. */
   essCertHash: Uint8Array | null;
+  /** A timestamp token's encapsulated TSTInfo (`content: 'tst-info'`); null for a detached CMS. */
+  eContent: Uint8Array | null;
 }
+
+/**
+ * What the CMS carries: nothing (a detached PDF signature over the
+ * `/ByteRange`), or an RFC 3161 TSTInfo (a document timestamp's token,
+ * whose message imprint is the `/ByteRange` digest).
+ */
+export type CmsContent = 'detached' | 'tst-info';
 
 /** Parse a detached CMS SignedData with exactly one signer. Throws `CmsError`. */
 export function parseDetachedCms(cms: Uint8Array): ParsedCms {
   return parseCmsInternal(cms).parsed;
 }
 
-export function parseCmsInternal(cms: Uint8Array): ParsedCmsInternal {
+export function parseCmsInternal(
+  cms: Uint8Array,
+  content: CmsContent = 'detached',
+): ParsedCmsInternal {
   if (cms.byteLength === 0) throw new CmsError('malformed', 'empty CMS');
   const asn1 = asn1js.fromBER(toArrayBuffer(cms));
   if (asn1.offset === -1) throw new CmsError('malformed', 'CMS is not valid BER');
@@ -72,11 +84,21 @@ export function parseCmsInternal(cms: Uint8Array): ParsedCmsInternal {
       `CMS does not parse as SignedData: ${(error as Error).message}`,
     );
   }
-  if (signedData.encapContentInfo.eContent) {
-    throw new CmsError(
-      'unsupported',
-      'CMS carries encapsulated content; a PDF signature is detached',
-    );
+  const encapsulated = signedData.encapContentInfo;
+  const expectedContentType = content === 'tst-info' ? OID.tstInfo : OID.data;
+  let eContent: Uint8Array | null = null;
+  if (content === 'detached') {
+    if (encapsulated.eContent) {
+      throw new CmsError(
+        'unsupported',
+        'CMS carries encapsulated content; a PDF signature is detached',
+      );
+    }
+  } else {
+    if (encapsulated.eContentType !== OID.tstInfo || !encapsulated.eContent) {
+      throw new CmsError('malformed', 'a timestamp token must carry a TSTInfo');
+    }
+    eContent = new Uint8Array(encapsulated.eContent.getValue());
   }
   if (signedData.signerInfos.length !== 1) {
     throw new CmsError(
@@ -108,10 +130,13 @@ export function parseCmsInternal(cms: Uint8Array): ParsedCmsInternal {
   const attr = (type: string): pkijs.Attribute | undefined =>
     signedAttrs.find((attribute) => attribute.type === type);
   const contentType = attr(OID.contentType);
-  if (contentType && contentType.values[0]?.valueBlock?.toString?.() !== OID.data) {
+  if (contentType) {
     const oid = contentType.values[0] as asn1js.ObjectIdentifier | undefined;
-    if (!oid || oid.valueBlock.toString() !== OID.data) {
-      throw new CmsError('unsupported', 'CMS content-type attribute is not id-data');
+    if (!oid || oid.valueBlock.toString() !== expectedContentType) {
+      throw new CmsError(
+        'unsupported',
+        `CMS content-type attribute is not ${content === 'tst-info' ? 'id-ct-TSTInfo' : 'id-data'}`,
+      );
     }
   }
   const messageDigestAttr = attr(OID.messageDigest);
@@ -187,6 +212,7 @@ export function parseCmsInternal(cms: Uint8Array): ParsedCmsInternal {
     signerCertificate,
     certificates: ordered,
     essCertHash,
+    eContent,
   };
 }
 

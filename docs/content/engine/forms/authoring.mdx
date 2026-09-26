@@ -51,8 +51,9 @@ and [add a widget](#add-a-widget) later.
 `flags` is `{ readOnly, required, noExport }`, the same shape as a field's `flags` when you read
 it.
 
-`create()` is one change: when any part of the draft is invalid, it fails with `InvalidArg` and
-creates nothing. A name that's already taken fails the same way. Push buttons can't be created.
+`create()` is one change: when any part of the draft is invalid, it fails with `InvalidArg` (or
+`NotFound` for a page that isn't there) and creates nothing. A name that's already taken fails
+with `InvalidArg` too. Push buttons can't be created.
 
 Each family adds its own settings:
 

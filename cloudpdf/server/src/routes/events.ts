@@ -127,15 +127,12 @@ export async function registerEventsRoutes(
           });
           for (const row of rows) {
             if (closed) return;
+            // A `signature.complete` row changes the whole manifest (base sha,
+            // every promoted page pin, the plane pointers); the client drops
+            // its cached manifest when it reads that row.
             raw.write(
               `id: ${row.id}\nevent: mutation\ndata: ${JSON.stringify(toJsonlEvent(row))}\n\n`,
             );
-            // A published version changes the whole manifest (base sha, every
-            // promoted page pin, the plane pointers): the client refetches
-            // head + manifest instead of absorbing a delta.
-            if (row.kind === 'signature.completed') {
-              raw.write(`event: full-refresh\nid: ${row.id}\ndata: {}\n\n`);
-            }
             cursor = row.id;
           }
           if (rows.length === DRAIN_LIMIT) ringAgain = true; // page through bursts

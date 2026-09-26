@@ -17,7 +17,7 @@ import {
   type EngineRenderPolicy,
   type MetadataService,
   type PageHandle,
-  type PageObjectNumber,
+  type DownloadOptions,
   type PdfSaveMode,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
@@ -159,7 +159,7 @@ export class LocalDocumentHandle implements DocumentHandle {
     );
   }
 
-  download(opts: { mode?: PdfSaveMode } = {}): AbortablePromise<Uint8Array> {
+  download(options: DownloadOptions = {}): AbortablePromise<Uint8Array> {
     if (this.closed) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.id}`),
@@ -171,19 +171,9 @@ export class LocalDocumentHandle implements DocumentHandle {
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.id;
-    const mode = opts.mode ?? DEFAULT_PDF_SAVE_MODE;
-    // A rewrite drops every revision, and with them every signature. A
-    // signed document refuses it unless the engine runs with
-    // `signedDocumentPolicy: 'permit'`.
-    const protection = this.guard.currentProtection();
-    if (mode === 'rewrite' && protection && protection.judged !== null) {
-      return AbortablePromise.rejectReason(
-        new EngineError(
-          EngineErrorCode.ProtectedDocument,
-          'the document is signed: a rewrite save would void every signature (use an incremental save)',
-        ),
-      );
-    }
+    const mode = options.mode ?? DEFAULT_PDF_SAVE_MODE;
+    // A rewrite of a signed document is refused by the worker (one rule for
+    // both engines).
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
@@ -242,26 +232,17 @@ export class LocalDocumentHandle implements DocumentHandle {
   }
 
   /** Node runtimes only: the document written to a local file, never through JS (see `DocumentHandle`). */
-  downloadToFile(path: string, opts?: { mode?: PdfSaveMode }): AbortablePromise<void> {
+  downloadToFile(path: string, options?: DownloadOptions): AbortablePromise<void> {
     if (this.closed) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.id}`),
       );
     }
-    const mode: PdfSaveMode = opts?.mode ?? DEFAULT_PDF_SAVE_MODE;
+    const mode: PdfSaveMode = options?.mode ?? DEFAULT_PDF_SAVE_MODE;
     try {
       this.guard.assertCapability('doc.download');
     } catch (err) {
       return AbortablePromise.rejectReason(err);
-    }
-    const protection = this.guard.currentProtection();
-    if (mode === 'rewrite' && protection && protection.judged !== null) {
-      return AbortablePromise.rejectReason(
-        new EngineError(
-          EngineErrorCode.ProtectedDocument,
-          'the document is signed: a rewrite save would void every signature (use an incremental save)',
-        ),
-      );
     }
     const docId = this.id;
     const submission = this.queue.enqueue<WorkerResultPayload>(

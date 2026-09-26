@@ -85,7 +85,66 @@ const errorCode = async (p: Promise<unknown>): Promise<string> => {
   }
 };
 
+async function waitFor(predicate: () => boolean, what: string, timeoutMs = 10_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}`);
+    await new Promise((r) => setTimeout(r, 25));
+  }
+}
+
 describe('digital signatures (cloud SDK, real runtime)', () => {
+  test('another session on the layer hears prepare, cancel and complete', async () => {
+    // Its own document: the completion below publishes a new version.
+    const docId = 'cloud-signatures-events-doc';
+    await seedDocumentFromBytes(fx!, TENANT_ID, docId, fixturePath, 1);
+    const open = async () => {
+      const engine = cloudEngine({
+        baseUrl: fx!.baseUrl,
+        token: docScopedToken(fx!, TENANT_ID, docId, ['*'], 'default'),
+      });
+      return { engine, doc: await engine.open({ kind: 'id', id: docId, layerName: 'default' }) };
+    };
+    const signerSession = await open();
+    const watcher = await open();
+    try {
+      const heard: string[] = [];
+      const stop = watcher.doc.events.subscribe((event) => heard.push(event.type));
+      // Let the watcher's live stream connect before anything happens.
+      await watcher.doc.pages.list();
+
+      const field = { kind: 'fqn', name: 'sig' } as const;
+      const first = await signerSession.doc.signatures.prepare({ field });
+      await waitFor(() => heard.includes('signatures.prepared'), 'the prepare');
+      await signerSession.doc.signatures.cancel(first.signingId);
+      await waitFor(() => heard.includes('signatures.cancelled'), 'the cancel');
+
+      const key = await createTestSigner({ commonName: 'Events Signer' });
+      await sign(signerSession.doc, { field, key });
+      await waitFor(() => heard.includes('document.versioned'), 'the completion');
+      stop();
+      expect(heard).toEqual([
+        'signatures.prepared',
+        'signatures.cancelled',
+        'signatures.prepared',
+        'signatures.completed',
+        'document.versioned',
+      ]);
+      // The watcher reads the new version, not a stale manifest.
+      const snapshot = await watcher.doc.signatures.list();
+      expect(snapshot.signatures.find((s) => s.fieldName === 'sig')?.signed).toBe(true);
+      // A rewrite would void the signature: refused, as locally.
+      expect(await errorCode(watcher.doc.download({ mode: 'rewrite' }))).toBe(
+        EngineErrorCode.ProtectedDocument,
+      );
+    } finally {
+      await watcher.doc.close();
+      await watcher.engine.destroy();
+      await signerSession.doc.close();
+      await signerSession.engine.destroy();
+    }
+  });
+
   test('a certification signs the layer, publishes a version, and every read follows it', async () => {
     const signer = await createTestSigner({ commonName: 'Cloud Signer' });
     const bob = await openLayer('bob');
@@ -241,7 +300,10 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
         { kind: 'fqn', name: 'group.total' },
         { type: 'text', value: 'carol' },
       );
-      const analysis = await carol.doc.signatures.analyze({ since: { signatureIndex: 0 } });
+      const analysis = await carol.doc.signatures.analyze({
+        since: { signatureIndex: 0 },
+        until: 'working-copy',
+      });
       expect(analysis.basis.source).toBe('working-copy');
       expect(analysis.verdict).toBe('permitted');
 
@@ -293,7 +355,7 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
             expectedVersion: prepared.expectedVersion,
           }),
         ),
-      ).toBe(EngineErrorCode.SigningExpired);
+      ).toBe(EngineErrorCode.NotFound);
 
       // Sign for real, then replay.
       const again = await doc.signatures.prepare({ field: { kind: 'fqn', name: 'sig' } });

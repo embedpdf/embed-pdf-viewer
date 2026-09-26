@@ -8,6 +8,7 @@ import type { Engine } from '../engine/Engine';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { DocumentEvent } from '../events/DocumentEvent';
 import type { FormFieldDTO } from '../forms/field';
+import { toFieldRef } from '../identity/FormFieldRef';
 import { toPageRef } from '../identity/PageRef';
 import {
   FormImportResultSchema,
@@ -42,6 +43,12 @@ export interface FormConformanceFixtures {
    * same bytes under a suffixed id the way the bytes transport does.
    */
   importTarget?: ConformanceFixture;
+  /**
+   * Another independent copy of `toggleFields`, whose merged field/widgets
+   * the delete test removes. Required for `openKind: 'id'` (cloud): the
+   * deletes are durable server state the other tests must not see.
+   */
+  deleteTarget?: ConformanceFixture;
 }
 
 export interface FormConformanceOptions extends Omit<ConformanceOptions, 'fixture'> {
@@ -494,13 +501,17 @@ export function runFormConformance(
         if (filled.field.family !== 'radio') throw new Error('expected radio');
         expect(filled.field.value).toBe('yes');
 
-        // updateField: rename + conflict validation.
-        await doc.forms.update(created.field.ref, {
-          family: 'radio',
-          name: 'renamed_radio',
-        });
+        // update: no family needed (the ref says it); rename + conflict validation.
+        await doc.forms.update(created.field.ref, { name: 'renamed_radio' });
         await expect(
-          doc.forms.update(created.field.ref, { family: 'radio', name: 'unison_radio' }),
+          doc.forms.update(created.field.ref, { name: 'unison_radio' }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+        // A member another family has, or a family that isn't the field's, is refused.
+        await expect(
+          doc.forms.update(created.field.ref, { multiline: true }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+        await expect(
+          doc.forms.update(created.field.ref, { family: 'text', name: 'x' }),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
 
         // delete cascades: field gone and its widgets gone; meta names both.
@@ -514,6 +525,146 @@ export function runFormConformance(
         await expect(doc.forms.get({ kind: 'fqn', name: 'renamed_radio' })).rejects.toMatchObject({
           code: EngineErrorCode.NotFound,
         });
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('create is one change: a rejected draft creates nothing', async () => {
+      const doc = await open(opts.fixtures.toggleFields);
+      const page = toPageRef(opts.fixtures.toggleFields.pageObjectNumber);
+      const names = async () => (await doc.forms.list()).fields.map((field) => field.name);
+      const widgetCount = async () => (await doc.page(page).annotations.list()).annotations.length;
+      try {
+        const namesBefore = await names();
+        const widgetsBefore = await widgetCount();
+        const placed = { page, rect: { left: 20, bottom: 100, right: 120, top: 120 } };
+
+        // Checked before anything is written.
+        await expect(
+          doc.forms.create({
+            family: 'text',
+            name: 'rejected_text',
+            maxLength: -5,
+            widget: placed,
+          }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+        await expect(
+          doc.forms.create({
+            family: 'text',
+            name: 'rejected_text',
+            widget: { ...placed, page: toPageRef(999_999) },
+          }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.NotFound });
+        // Refused after the field exists: the whole create is undone.
+        await expect(
+          doc.forms.create({
+            family: 'combobox',
+            name: 'rejected_choice',
+            options: [{ label: 'A', value: 'a' }],
+            defaultValue: 'not-an-option',
+            widget: placed,
+          }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+
+        expect(await names()).toEqual(namesBefore);
+        expect(await widgetCount()).toBe(widgetsBefore);
+
+        // The names are still free.
+        const created = await doc.forms.create({
+          family: 'text',
+          name: 'rejected_text',
+          widget: placed,
+        });
+        expect(created.field.name).toBe('rejected_text');
+        await doc.forms.delete(created.field.ref);
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('delete removes a merged field/widget from the tree and its page in one mutation', async () => {
+      // maxlen_text, opt_check and billing.name are each one dictionary that
+      // is both the field and its only widget: maxlen_text is listed in
+      // /AcroForm /Fields, billing.name in its parent's /Kids.
+      const doc = opts.fixtures.deleteTarget
+        ? await open(opts.fixtures.deleteTarget)
+        : await open(opts.fixtures.toggleFields, '-delete-target');
+      const page = doc.page(toPageRef(opts.fixtures.toggleFields.pageObjectNumber));
+      const placed = async () =>
+        (await page.annotations.list()).annotations.flatMap((a) =>
+          a.ref.kind === 'objectNumber' ? [a.ref.annotObjectNumber] : [],
+        );
+      try {
+        const events: DocumentEvent[] = [];
+        const unsubscribe = doc.events.subscribe((event) => events.push(event));
+        for (const name of ['maxlen_text', 'billing.name']) {
+          const field = await doc.forms.get(toFieldRef(name));
+          if (field.ref.kind !== 'objectNumber') throw new Error('expected an object-number ref');
+          const merged = field.ref.fieldObjectNumber;
+          expect(field.widgets.map((w) => w.annotObjectNumber)).toEqual([merged]);
+          expect(await placed()).toContain(merged);
+
+          const removed = await doc.forms.delete(field.ref);
+          expect(removed.meta.changedFields).toEqual([field.ref]);
+          expect(removed.meta.changedWidgets.map((w) => w.annotObjectNumber)).toEqual([merged]);
+          expect((await placed()).includes(merged)).toBe(false);
+          await expect(doc.forms.get(toFieldRef(name))).rejects.toMatchObject({
+            code: EngineErrorCode.NotFound,
+          });
+        }
+        unsubscribe();
+        expect(events.map((event) => event.type)).toEqual(['forms.deleted', 'forms.deleted']);
+
+        const names = (await doc.forms.list()).fields.map((f) => f.name);
+        expect(names.includes('maxlen_text') || names.includes('billing.name')).toBe(false);
+        expect(names).toContain('opt_check');
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('a merged field/widget cannot be removed from its field or deleted as an annotation', async () => {
+      const doc = await open(opts.fixtures.toggleFields);
+      const page = doc.page(toPageRef(opts.fixtures.toggleFields.pageObjectNumber));
+      try {
+        const field = await doc.forms.get(toFieldRef('opt_check'));
+        const widgetRef = field.widgets[0]?.ref;
+        if (field.ref.kind !== 'objectNumber' || widgetRef?.kind !== 'objectNumber') {
+          throw new Error('expected object-number refs');
+        }
+        expect(widgetRef.annotObjectNumber).toBe(field.ref.fieldObjectNumber);
+
+        // Removing the field's own dictionary from itself is refused.
+        const detach = await doc.forms.removeWidget(field.ref, widgetRef).then(
+          () => null,
+          (error: unknown) => error as { code?: unknown; message?: unknown },
+        );
+        expect(detach).toMatchObject({ code: EngineErrorCode.InvalidArg });
+        expect(String(detach?.message)).toMatch(/merged field\/widget/);
+
+        // The annotation plane refuses too, and names the only verb that works.
+        const remove = await page.annotations.delete(widgetRef).then(
+          () => null,
+          (error: unknown) => error as { code?: unknown; message?: unknown },
+        );
+        expect(remove).toMatchObject({ code: EngineErrorCode.InvalidArg });
+        expect(String(remove?.message)).toMatch(/doc\.forms\.delete/);
+        expect(String(remove?.message).includes('removeWidget')).toBe(false);
+
+        // Both refusals left the field and its placement untouched.
+        const after = await doc.forms.get(field.ref);
+        expect(after.widgets.map((w) => w.annotObjectNumber)).toEqual([
+          widgetRef.annotObjectNumber,
+        ]);
+        const { annotations } = await page.annotations.list();
+        expect(
+          annotations.some(
+            (a) =>
+              a.ref.kind === 'objectNumber' &&
+              a.ref.annotObjectNumber === widgetRef.annotObjectNumber,
+          ),
+        ).toBe(true);
       } finally {
         await doc.close();
       }

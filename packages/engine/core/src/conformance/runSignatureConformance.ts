@@ -293,6 +293,24 @@ export function runSignatureConformance(
           caught = err;
         }
         expect(EngineError.is(caught, EngineErrorCode.ProtectedDocument)).toBe(true);
+        // A script's effects can't reach it either: the effect is rejected.
+        const effects = await doc.forms.applyEffects([
+          { kind: 'setValue', ref: lockedRef, value: { type: 'text', value: 'changed' } },
+        ]);
+        expect(effects.results[0]).toMatchObject({
+          status: 'rejected',
+          error: { code: EngineErrorCode.ProtectedDocument },
+        });
+        // An import skips it and counts it.
+        const nested = fixture.lockedField
+          .split('.')
+          .reduceRight(
+            (inner, name) => `<field name="${name}">${inner}</field>`,
+            '<value>changed</value>',
+          );
+        const xfdf = `<?xml version="1.0"?><xfdf xmlns="http://ns.adobe.com/xfdf/"><fields>${nested}</fields></xfdf>`;
+        const imported = await doc.forms.import(new TextEncoder().encode(xfdf), 'xfdf');
+        expect(imported).toMatchObject({ applied: 0, skipped: 1 });
         const field = await doc.forms.get(lockedRef);
         expect(field.family).toBe('text');
         expect((field as { value?: string }).value === 'changed').toBe(false);

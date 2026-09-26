@@ -352,15 +352,18 @@ describe('signing', () => {
     const hardwareSigner = await createTestSigner();
     try {
       // A remote signer: the digest goes out, the CMS comes back; here built
-      // by a raw signer standing in for the service.
+      // by a raw signer standing in for the service (a signing service, not
+      // a timestamp authority).
       const remote = remoteSigner({
-        sign: ({ digest, algorithm, subFilter }) =>
-          buildDetachedCms({
+        sign: ({ digest, algorithm, subFilter }) => {
+          if (subFilter === 'ETSI.RFC3161') throw new Error('not a timestamp authority');
+          return buildDetachedCms({
             digest,
             hash: algorithm,
             profile: profileFor(subFilter),
             signer: hardwareSigner,
-          }),
+          });
+        },
       });
       const { signature } = makeSignature(
         doc,

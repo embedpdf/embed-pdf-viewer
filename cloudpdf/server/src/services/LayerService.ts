@@ -75,7 +75,6 @@ import {
   type SignatureCompleteResult,
   type SignaturePrepareInput,
   type SignaturePrepared,
-  type SignatureSubFilter,
   formWidget,
   type AnnotationSubtype,
 } from '@embedpdf/engine-core/runtime';
@@ -3522,6 +3521,7 @@ export class LayerService {
           expectedVersion,
           expiresAt: new Date(expiresAt).toISOString(),
         };
+        let auditId = 0;
         try {
           await this.requireDb()
             .transaction()
@@ -3530,6 +3530,16 @@ export class LayerService {
                 current_version: nextVersion,
                 doc_version: layer.docVersion + 1,
                 updated_at: now,
+              });
+              // Other sessions learn the layer is locked for signing.
+              auditId = await this.appendSigningAudit(trx, ctx, {
+                docId: input.docId,
+                layer,
+                layerName: input.layerName,
+                kind: 'signature.prepare',
+                artifactVersion: nextVersion,
+                payload: { field: input.input.field, ...encodePrepared(answer) },
+                ts: now,
               });
               await this.requireSignings().insertPrepared(trx, {
                 id: prepared.signingId,
@@ -3567,6 +3577,7 @@ export class LayerService {
           input.layerName,
           nextVersion,
         );
+        this.publishMutation(ctx, input.docId, auditId);
         return answer;
       } finally {
         // The worker's parked copy is redundant now (its tail is durable),
@@ -3618,6 +3629,10 @@ export class LayerService {
       // Fast-path answers from a plain read; every one of them is
       // re-established by the guarded claim inside the publish transaction.
       if (signing.state === 'completed') return this.replayCompletion(signing, input.cms);
+      // A cancelled signing is gone, as locally; only the time limit expires one.
+      if (signing.state === 'aborted') {
+        throw new EngineError(EngineErrorCode.NotFound, `no signing '${input.signingId}'`);
+      }
       if (signing.state !== 'prepared' || signing.expiresAt <= Date.now()) {
         throw new EngineError(
           EngineErrorCode.SigningExpired,
@@ -3652,7 +3667,7 @@ export class LayerService {
       const gate = await verifyForCompletion({
         cms: input.cms,
         prepared,
-        profile: profileFor(prepared.subFilter as SignatureSubFilter),
+        profile: profileFor(prepared.subFilter),
       });
       if (!gate.ok) {
         throw new EngineError(EngineErrorCode.SignatureRefused, `${gate.reason}: ${gate.detail}`);
@@ -3777,7 +3792,22 @@ export class LayerService {
     }
     if (signing.state === 'completed') return { status: 'already-completed' };
     if (signing.state !== 'prepared') return { status: 'unknown' };
-    await this.discardSigning(signing);
+    const layer = await this.layerState.repos.layers.findByDocAndName(input.docId, input.layerName);
+    const auditId = await this.discardSigning(signing, (trx) =>
+      layer
+        ? this.appendSigningAudit(trx, ctx, {
+            docId: input.docId,
+            layer,
+            layerName: input.layerName,
+            kind: 'signature.cancel',
+            artifactVersion: layer.currentVersion,
+            payload: { signingId: signing.id, status: 'cancelled' },
+            ts: Date.now(),
+          })
+        : Promise.resolve(0),
+    );
+    // Other sessions learn the layer is free again.
+    this.publishMutation(ctx, input.docId, auditId);
     return { status: 'cancelled' };
   }
 
@@ -3799,19 +3829,77 @@ export class LayerService {
     return (await signings.listForDocument(docId)).filter((s) => s.tenantId === ctx.tenantId);
   }
 
-  private async discardSigning(signing: SigningRow): Promise<void> {
-    const moved = await this.requireSignings().transition(
-      this.requireDb(),
-      signing.id,
-      'prepared',
-      'aborted',
-      { finishedAt: Date.now() },
-    );
-    if (moved) {
-      await this.requireStorage()
-        .delete(signing.tailKey)
-        .catch(() => undefined);
+  /**
+   * Move a prepared signing to `aborted` and drop its tail. `audit` runs in
+   * the same transaction when the move wins; its row id is returned (0 when
+   * the signing had already moved).
+   */
+  private async discardSigning(
+    signing: SigningRow,
+    audit?: (trx: Transaction<Schema>) => Promise<number>,
+  ): Promise<number> {
+    const auditId = await this.requireDb()
+      .transaction()
+      .execute(async (trx) => {
+        const moved = await this.requireSignings().transition(
+          trx,
+          signing.id,
+          'prepared',
+          'aborted',
+          { finishedAt: Date.now() },
+        );
+        if (!moved) return -1;
+        return audit ? await audit(trx) : 0;
+      });
+    if (auditId < 0) return 0;
+    await this.requireStorage()
+      .delete(signing.tailKey)
+      .catch(() => undefined);
+    return auditId;
+  }
+
+  /**
+   * The audit row of a signing step that writes no layer artifact (prepare,
+   * cancel): it names the layer's current artifact, and advances the
+   * layer's audit head so the manifest's cursor includes it.
+   */
+  private async appendSigningAudit(
+    trx: Transaction<Schema>,
+    ctx: LayerWriteContext,
+    input: {
+      docId: string;
+      layer: LayerRow;
+      layerName: string;
+      kind: 'signature.prepare' | 'signature.cancel';
+      artifactVersion: number;
+      payload: unknown;
+      ts: number;
+    },
+  ): Promise<number> {
+    const auditEvent = makeAuditEvent({
+      ctx,
+      docId: input.docId,
+      layer: input.layer,
+      layerName: input.layerName,
+      kind: input.kind,
+      pageObjectNumber: null,
+      affectedPages: [],
+      artifactVersion: input.artifactVersion,
+      artifactKey: input.layer.currentArtifactKey ?? '',
+      artifactSha: input.layer.currentArtifactSha ?? '',
+      artifactSize: input.layer.currentArtifactSize ?? 0,
+      payload: input.payload,
+      ts: input.ts,
+    });
+    const auditId = (await this.eventLog?.appendDb(trx, auditEvent)) ?? 0;
+    if (auditId > 0) {
+      await trx
+        .updateTable('layers')
+        .set({ last_audit_id: auditId })
+        .where('id', '=', input.layer.id)
+        .execute();
     }
+    return auditId;
   }
 
   private replayCompletion(signing: SigningRow, cms: Uint8Array): SignatureCompleteResult {
@@ -3990,9 +4078,12 @@ export class LayerService {
               'this signing already completed with a different CMS',
             );
           }
+          if (!current || current.state === 'aborted') {
+            throw new EngineError(EngineErrorCode.NotFound, `no signing '${signing.id}'`);
+          }
           throw new EngineError(
             EngineErrorCode.SigningExpired,
-            `signing '${signing.id}' is ${current?.state ?? 'gone'}`,
+            `signing '${signing.id}' is ${current.state}`,
           );
         }
 
@@ -4144,14 +4235,15 @@ export class LayerService {
           docId: input.docId,
           layer,
           layerName: input.layerName,
-          kind: 'signature.completed',
+          kind: 'signature.complete',
           pageObjectNumber: widgetPage,
           affectedPages: widgetPage !== null ? [widgetPage] : [],
           artifactVersion: nextVersion,
           artifactKey: input.versionKey,
           artifactSha: finalized.version.sha256,
           artifactSize: finalized.version.byteLength,
-          payload: result,
+          // The event names the signing, as the local engine's does.
+          payload: { signingId: signing.id, ...result },
           ts: now,
         });
         const auditId = (await this.eventLog?.appendDb(trx, auditEvent)) ?? 0;

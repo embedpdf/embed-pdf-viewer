@@ -8,6 +8,8 @@ export const OID = {
   signingTime: '1.2.840.113549.1.9.5',
   signingCertificateV2: '1.2.840.113549.1.9.16.2.47',
   timestampToken: '1.2.840.113549.1.9.16.2.14',
+  /** id-ct-TSTInfo: the content of an RFC 3161 timestamp token. */
+  tstInfo: '1.2.840.113549.1.9.16.1.4',
   sha1: '1.3.14.3.2.26',
   sha256: '2.16.840.1.101.3.4.2.1',
   sha384: '2.16.840.1.101.3.4.2.2',

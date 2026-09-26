@@ -1,9 +1,17 @@
 import type { SignaturePrepared } from '@embedpdf/engine-core/runtime';
 
 import type { SignatureProfile } from './cms/build';
-import { bytesEqual } from './cms/engine';
+import { bytesEqual, ensureEngine, toArrayBuffer } from './cms/engine';
+import { WEBCRYPTO_HASH } from './cms/oids';
 import { CmsError, parseCmsInternal } from './cms/parse';
+import { readTimestampInfo } from './cms/timestamp';
 import { verifyCmsSignature } from './cms/verify';
+
+/**
+ * The shape the CMS must have: a PDF signature's (`pkcs7`, `cades-b`), or a
+ * document timestamp's RFC 3161 token (`timestamp`).
+ */
+export type CompletionProfile = SignatureProfile | 'timestamp';
 
 export type CompletionRefusal =
   | 'malformed'
@@ -28,7 +36,7 @@ export type CompletionGate =
 export async function verifyForCompletion(input: {
   cms: Uint8Array;
   prepared: SignaturePrepared;
-  profile: SignatureProfile;
+  profile: CompletionProfile;
 }): Promise<CompletionGate> {
   const { cms, prepared, profile } = input;
   if (cms.byteLength > prepared.contentsSize) {
@@ -38,6 +46,7 @@ export async function verifyForCompletion(input: {
       detail: `the CMS is ${cms.byteLength} bytes; ${prepared.contentsSize} were reserved`,
     };
   }
+  if (profile === 'timestamp') return verifyTimestampToken(cms, prepared);
   let internal;
   try {
     internal = parseCmsInternal(cms);
@@ -88,6 +97,68 @@ export async function verifyForCompletion(input: {
         cryptography === 'unsupported'
           ? 'the signature algorithm is not supported'
           : 'the signature does not verify',
+    };
+  }
+  return { ok: true };
+}
+
+/**
+ * A document timestamp's token: it must stamp the prepared digest with the
+ * prepared algorithm, its own message digest must cover its TSTInfo, and
+ * its signature must verify with the authority's certificate.
+ */
+async function verifyTimestampToken(
+  cms: Uint8Array,
+  prepared: SignaturePrepared,
+): Promise<CompletionGate> {
+  let internal;
+  let info;
+  try {
+    internal = parseCmsInternal(cms, 'tst-info');
+    info = readTimestampInfo(internal.eContent!);
+  } catch (error) {
+    return {
+      ok: false,
+      reason: 'malformed',
+      detail: error instanceof CmsError ? error.message : String(error),
+    };
+  }
+  if (info.imprintAlgorithm !== prepared.algorithm) {
+    return {
+      ok: false,
+      reason: 'algorithm-mismatch',
+      detail: `the token stamps a ${info.imprintAlgorithm} digest, the document was prepared with ${prepared.algorithm}`,
+    };
+  }
+  if (!bytesEqual(info.imprint, prepared.digest)) {
+    return {
+      ok: false,
+      reason: 'digest-mismatch',
+      detail: "the token's message imprint is not the prepared digest",
+    };
+  }
+  const contentDigest = new Uint8Array(
+    await ensureEngine().digest(
+      WEBCRYPTO_HASH[internal.parsed.digestAlgorithm],
+      toArrayBuffer(internal.eContent!),
+    ),
+  );
+  if (!bytesEqual(contentDigest, internal.parsed.messageDigest)) {
+    return {
+      ok: false,
+      reason: 'signature-invalid',
+      detail: "the token's message digest does not cover its TSTInfo",
+    };
+  }
+  const cryptography = await verifyCmsSignature(internal);
+  if (cryptography !== 'valid') {
+    return {
+      ok: false,
+      reason: 'signature-invalid',
+      detail:
+        cryptography === 'unsupported'
+          ? 'the signature algorithm is not supported'
+          : 'the token signature does not verify',
     };
   }
   return { ok: true };

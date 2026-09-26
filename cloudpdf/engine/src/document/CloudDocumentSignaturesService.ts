@@ -113,18 +113,17 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
   }
 
   /**
-   * `until: 'working-copy'` (or unset while the layer holds edits) judges
-   * the layer's pending edits against the base at the layer URL; anything
-   * else is history of the base version and resolves at the version URL.
+   * `until: 'working-copy'` judges the layer's pending edits against the
+   * base at the layer URL; anything else, the default `'persisted'`
+   * included, is history of the base version and resolves at the version
+   * URL (the saved file, as the local engine judges by default).
    */
   analyze(input: AnalyzeInput): AbortablePromise<ChangeAnalysis> {
     const rejected = this.closedRejection();
     if (rejected) return rejected;
     return AbortablePromise.run<ChangeAnalysis>(async (signal) => {
       const manifest = await this.manifest.get(signal);
-      const workingCopy =
-        input.until === 'working-copy' || (input.until === undefined && manifest.working);
-      if (workingCopy) {
+      if (input.until === 'working-copy') {
         return this.http.getJsonWithRefresh(
           async (s) => {
             const current = await this.manifest.get(s);

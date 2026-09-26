@@ -21,6 +21,11 @@ import { withScratchN } from '../../runtime/memory/scratch';
 import { U64_BYTES, pokeU64 } from '../../runtime/memory/u64';
 import { throwIfAborted } from '../../shared/abort';
 import { acquireFormModel } from './internal/formModelCache';
+import {
+  assertFieldNotLocked,
+  readFieldLocks,
+  type FieldLockLookup,
+} from './internal/signatureLocks';
 import { formMutationMeta } from './internal/formMutationMeta';
 import { readFieldAt } from './internal/readFormSnapshot';
 import { resolveFieldRef } from './internal/resolveFieldRef';
@@ -62,7 +67,8 @@ export class FormsEffectsApplier {
     throwIfAborted(signal);
     const preflightActionBudget = new ActionReadBudgetTracker();
     const resultActionBudget = new ActionReadBudgetTracker();
-    const preflight = effects.map((effect) => this.preflight(effect, preflightActionBudget));
+    const locks = readFieldLocks(this.runtime, this.session);
+    const preflight = effects.map((effect) => this.preflight(effect, preflightActionBudget, locks));
     const results: FormEffectResult[] = [];
     const allChangedWidgets = new Map<string, FormWidget>();
     const allChangedFields = new Map<string, FormFieldRef>();
@@ -162,7 +168,11 @@ export class FormsEffectsApplier {
     return { result: { results, meta }, wrote: mustFinalize };
   }
 
-  private preflight(effect: FormEffect, actionBudget: ActionReadBudgetTracker): PreflightEffect {
+  private preflight(
+    effect: FormEffect,
+    actionBudget: ActionReadBudgetTracker,
+    locks: FieldLockLookup | null,
+  ): PreflightEffect {
     try {
       const refs = effect.kind === 'reset' ? effect.refs : [effect.ref];
       if (refs.length === 0) {
@@ -176,6 +186,8 @@ export class FormsEffectsApplier {
       const fields = resolved.map(({ fieldIndex }) =>
         readFieldAt(this.runtime, model, fieldIndex, this.session.requireDocPtr(), actionBudget),
       );
+      // A field a signature locked is rejected like any other refused write.
+      for (const field of fields) assertFieldNotLocked(field.name, locks);
       validateEffect(effect, fields);
       return {
         effect,

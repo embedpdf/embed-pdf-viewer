@@ -1,6 +1,8 @@
 import type { DigestAlgorithm } from '@embedpdf/engine-core/runtime';
 import type { RawSigner, RawSignatureAlgorithm } from '../cms/build';
 import { ensureEngine } from '../cms/engine';
+import { buildTimestampToken } from '../cms/timestamp';
+import type { CmsSigner } from '../sign';
 import { WEBCRYPTO_HASH } from '../cms/oids';
 import { selfSignedCertificate } from './self-signed';
 
@@ -99,6 +101,30 @@ export async function createTestSigner(
     hash,
   });
   return { ...signer, certificate, privateKey: keys.privateKey };
+}
+
+export interface TestTimestampAuthority extends CmsSigner {
+  /** DER of the authority's self-signed certificate. */
+  readonly certificate: Uint8Array;
+}
+
+/**
+ * A throwaway RFC 3161 timestamp authority for tests and demos: it stamps
+ * whatever digest it is given with the current time, signed by a fresh
+ * self-signed key. The key for `sign(doc, { kind: 'timestamp', key })`;
+ * never use it to stamp a real document.
+ */
+export async function createTestTimestampAuthority(
+  options: { commonName?: string } = {},
+): Promise<TestTimestampAuthority> {
+  const authority = await createTestSigner({
+    commonName: options.commonName ?? 'EmbedPDF test timestamp authority',
+  });
+  return {
+    kind: 'cms',
+    certificate: authority.certificate,
+    sign: ({ digest, algorithm }) => buildTimestampToken({ digest, hash: algorithm, authority }),
+  };
 }
 
 /** A WebCrypto signing key pair; `extractable: false` keeps the private key inside the runtime for good. */

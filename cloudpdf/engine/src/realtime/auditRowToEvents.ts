@@ -29,7 +29,10 @@ import {
   type PageRotateResult,
   type PageRotation,
   type PageScaleResult,
+  type FormFieldRef,
+  type SignatureCompleteResult,
 } from '@embedpdf/engine-core/runtime';
+import { decodePrepared, type SignaturePreparedWire } from '@embedpdf/engine-core/wire';
 
 /** The SSE `mutation` event body — the audit row in JSON (the server's
  *  `toJsonlEvent` shape). `payload` is byte-identical to what the mutating
@@ -85,6 +88,15 @@ export function auditRowToEvents(row: AuditEventRow, mySessionId: string): Docum
       origin: { ...origin, tx: { id, index, count: facts.length } },
       ...fact,
     }));
+  }
+  if (row.kind === 'signature.complete') {
+    // A completion is two facts, as locally: the sealed signature, and the
+    // document on a new version.
+    const { signingId, ...result } = row.payload as { signingId: string } & SignatureCompleteResult;
+    return [
+      { type: 'signatures.completed', origin, signingId, ...result },
+      { type: 'document.versioned', origin, version: result.version },
+    ];
   }
   const event = eventOf(row, origin);
   return event ? [event] : [];
@@ -218,6 +230,16 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
       return { type: 'forms.widgetRemoved', origin, ...(row.payload as FormWidgetLinkResult) };
     case 'form.applyEffects':
       return { type: 'forms.effectsApplied', origin, ...(row.payload as FormEffectsResult) };
+    case 'signature.prepare': {
+      const { field, ...wire } = row.payload as { field: FormFieldRef } & SignaturePreparedWire;
+      return { type: 'signatures.prepared', origin, field, ...decodePrepared(wire) };
+    }
+    case 'signature.cancel':
+      return {
+        type: 'signatures.cancelled',
+        origin,
+        signingId: (row.payload as { signingId: string }).signingId,
+      };
     default:
       return null;
   }

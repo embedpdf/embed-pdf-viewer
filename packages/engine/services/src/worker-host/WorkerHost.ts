@@ -41,6 +41,7 @@ import {
   type SignaturesRevisionBytesWorkerRequest,
   type DocumentVersionWorkerRequest,
   type DocumentProtection,
+  type PdfSaveMode,
   type FontsRegisterWorkerRequest,
   type FontsAddFallbackWorkerRequest,
   type FontsClearFallbacksWorkerRequest,
@@ -1460,10 +1461,27 @@ export class WorkerHost {
     );
   }
 
+  /**
+   * A rewrite drops every revision, and with them every signature: a signed
+   * document refuses it unless the session permits breaking signatures
+   * (`signedDocumentPolicy: 'permit'`). One rule for both engines.
+   */
+  private assertRewriteKeepsSignatures(session: DocumentSession, mode: PdfSaveMode): void {
+    if (mode !== 'rewrite' || session.signedDocumentPolicy !== 'protect') return;
+    const protection = this.probeProtection(session);
+    if (protection && protection.judged !== null) {
+      throw new EngineError(
+        EngineErrorCode.ProtectedDocument,
+        'the document is signed: a rewrite save would void every signature (use an incremental save)',
+      );
+    }
+  }
+
   private handleDocumentSaveBuffer(
     req: DocumentSaveBufferWorkerRequest,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
+    this.assertRewriteKeepsSignatures(session, req.mode);
     // A save that changes nothing returns the loaded bytes verbatim: a
     // signed file must come back exactly as it was sealed. Whether anything
     // changed is the saver's answer (`snapshot`): the session's counter when
@@ -1486,6 +1504,7 @@ export class WorkerHost {
     req: DocumentSaveFileWorkerRequest,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
+    this.assertRewriteKeepsSignatures(session, req.mode);
     // The no-op save law for files: a session whose document is still the
     // one it was opened with streams its loaded bytes — for a layer, the
     // base plus the loaded delta, never the base file alone — verbatim. The
@@ -1879,21 +1898,8 @@ export class WorkerHost {
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
     const mutator = new FormMutator(this.runtime, session);
-    const { deleted, detachedWidgets } = mutator.deleteField(req.ref, signal);
-
-    // Cascade: the mutator detached the widgets (inert annotations now);
-    // deleting them through the annotation feature keeps /Annots
-    // bookkeeping, weak-ref invalidation, and page revisions in one place.
-    const annotations = new AnnotationMutator(this.runtime, session);
-    for (const widget of detachedWidgets) {
-      if (!widget.ref) continue; // direct or unplaced: nothing the annotation plane can delete
-      annotations.delete(widget.ref, signal);
-    }
-    // The annotation deletes above mutated /Annots after the form
-    // mutator's own bump; bump again so the form-model cache rebuilds.
-    session.noteMutation();
-
-    const meta = formMutationMeta(session, [deleted], detachedWidgets);
+    const { deleted, removedWidgets } = mutator.deleteField(req.ref, signal);
+    const meta = formMutationMeta(session, [deleted], removedWidgets);
     return this.finishMutation(
       session,
       { tag: 'forms.deleteField', result: { meta } },

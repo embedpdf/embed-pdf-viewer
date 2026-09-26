@@ -426,18 +426,18 @@ describe('digital signatures over the wire (native runtime)', () => {
       ),
     ).toEqual({ status: 'already-completed' });
 
-    // The audit trail carries the completion; a subscriber refetches.
+    // The audit trail carries the prepare and the completion (naming the
+    // signing), so other sessions hear both.
     const audit = await fx.db
       .selectFrom('audit_log')
-      .select(['kind', 'artifact_sha'])
+      .select(['kind', 'artifact_sha', 'payload_json'])
       .where('doc_id', '=', docId)
       .orderBy('id', 'desc')
-      .limit(1)
-      .executeTakeFirst();
-    expect(audit).toMatchObject({
-      kind: 'signature.completed',
-      artifact_sha: completed.version.sha256,
-    });
+      .limit(2)
+      .execute();
+    expect(audit.map((row) => row.kind)).toEqual(['signature.complete', 'signature.prepare']);
+    expect(audit[0]).toMatchObject({ artifact_sha: completed.version.sha256 });
+    expect(JSON.parse(audit[0]!.payload_json)).toMatchObject({ signingId: prepared.signingId });
   });
 
   test('analysis URLs: the policy version is a served cache key, and only settled verdicts are immutable', async () => {
@@ -598,7 +598,7 @@ describe('digital signatures over the wire (native runtime)', () => {
           'application/json',
         )
       ).status,
-    ).toBe(410);
+    ).toBe(404); // cancelled: NotFound (SigningExpired is only the time limit)
     // The tail is gone with the row.
     expect(
       await new FsObjectStore({ root: fx.storageRoot }).exists(

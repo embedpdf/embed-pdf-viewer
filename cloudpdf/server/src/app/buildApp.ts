@@ -1626,15 +1626,17 @@ function mapToHttp(code: string): number {
       return 401;
     case EngineErrorCode.Forbidden:
       return 403;
-    case EngineErrorCode.WeakAnnotationSessionConflict:
-    case EngineErrorCode.LayerVersionConflict:
     // Signing: a pending candidate, a moved fence, or a layer behind the
     // head are all conflicts the client resolves by re-preparing; a dead
     // signing (expired/aborted) is gone for good; a refused CMS is the
-    // caller's input.
+    // caller's input. A change the document's own signatures refuse is a
+    // conflict with its state, not a matter of the caller's authority.
+    case EngineErrorCode.WeakAnnotationSessionConflict:
+    case EngineErrorCode.LayerVersionConflict:
     case EngineErrorCode.SigningPending:
     case EngineErrorCode.SigningVersionMismatch:
     case EngineErrorCode.StaleBase:
+    case EngineErrorCode.ProtectedDocument:
       return 409;
     case EngineErrorCode.NotFound:
     case EngineErrorCode.DocNotOpen:

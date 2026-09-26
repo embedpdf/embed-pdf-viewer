@@ -4,7 +4,13 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { createLocalEngine } from '@embedpdf/engine';
 import { EngineErrorCode, type Engine } from '@embedpdf/engine-core/runtime';
-import { createTestSigner, sign, validateSignatures, type TestSigner } from '../src/index';
+import {
+  createTestSigner,
+  createTestTimestampAuthority,
+  sign,
+  validateSignatures,
+  type TestSigner,
+} from '../src/index';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = resolve(here, '..', '..', '..', 'engine', 'main', 'test', 'fixtures');
@@ -149,6 +155,53 @@ describe('sign() and validateSignatures() over the local engine', () => {
       }
     });
   }
+
+  test('a document timestamp comes from a timestamp authority, and the gate checks its imprint', async () => {
+    const doc = await engine.open({ kind: 'bytes', id: 'timestamp', bytes });
+    try {
+      const authority = await createTestTimestampAuthority();
+      const result = await sign(doc, {
+        field: { kind: 'fqn', name: 'sig' },
+        kind: 'timestamp',
+        key: authority,
+      });
+      expect(result.status).toBe('completed');
+      expect(result.signature.kind).toBe('timestamp');
+      expect(result.signature.subFilter).toBe('ETSI.RFC3161');
+
+      // A raw key can't make a timestamp token, and an unknown subFilter is refused.
+      const other = await engine.open({ kind: 'bytes', id: 'timestamp-refusals', bytes });
+      try {
+        await expect(
+          sign(other, { field: { kind: 'fqn', name: 'sig' }, kind: 'timestamp', key: signer }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+        await expect(
+          sign(other, {
+            field: { kind: 'fqn', name: 'sig' },
+            subFilter: 'adbe.x509.rsa_sha1' as never,
+            key: signer,
+          }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+        // A token stamping another digest never reaches the document.
+        const wrong = await createTestTimestampAuthority();
+        await expect(
+          sign(other, {
+            field: { kind: 'fqn', name: 'sig' },
+            kind: 'timestamp',
+            key: { kind: 'cms', sign: (req) => wrong.sign({ ...req, digest: new Uint8Array(32) }) },
+          }),
+        ).rejects.toMatchObject({
+          code: EngineErrorCode.SignatureRefused,
+          details: { reason: 'digest-mismatch' },
+        });
+        expect((await other.signatures.list()).signatures[0].signed).toBe(false);
+      } finally {
+        await other.close();
+      }
+    } finally {
+      await doc.close();
+    }
+  });
 
   test('a signer that returns the wrong CMS never reaches the document', async () => {
     const doc = await engine.open({ kind: 'bytes', id: 'bad-signer', bytes });
