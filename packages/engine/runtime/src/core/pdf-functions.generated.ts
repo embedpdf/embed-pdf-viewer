@@ -416,6 +416,7 @@ export interface PdfFunctions {
   EPDFPage_RemoveAnnotByObjectNumber: (arg0: Ptr, arg1: number) => boolean;
   EPDFPage_RemoveAnnotRaw: (arg0: Ptr, arg1: number, arg2: number) => boolean;
   EPDFPage_RemoveViewport: (arg0: Ptr, arg1: number) => boolean;
+  EPDFPage_ResetRenderCache: (arg0: Ptr) => boolean;
   EPDFSig_CloseModel: (arg0: Ptr) => void;
   EPDFSig_Count: (arg0: Ptr) => number;
   EPDFSig_DigestByteRange: (arg0: Ptr, arg1: Ptr, arg2: number, arg3: Ptr, arg4: Ptr) => boolean;
@@ -1354,6 +1355,7 @@ export const pdfFunctionSignatures = {
   EPDFPage_RemoveAnnotByObjectNumber: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
   EPDFPage_RemoveAnnotRaw: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
   EPDFPage_RemoveViewport: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
+  EPDFPage_ResetRenderCache: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
   EPDFSig_CloseModel: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}}], result: null },
   EPDFSig_Count: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}}], result: {"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}} },
   EPDFSig_DigestByteRange: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}},{"ts":"Ptr","wasm":{"kind":"cstring","cwrap":"number"},"native":{"kind":"cstring","cwrap":"bigint"}},{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },

@@ -107,6 +107,7 @@ import {
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import { DocumentSession } from '../document-session/DocumentSession';
+import { IdlePageCache } from '../document-session/pages/IdlePageCache';
 import { BaseDocumentRegistry } from '../document-session/lifecycle/BaseDocumentRegistry';
 import {
   openFatMemoryDocument,
@@ -186,6 +187,24 @@ export interface WorkerHostOptions {
 }
 
 /**
+ * Job kinds that only read the document and may reuse pages kept loaded by an
+ * earlier job. Every other kind closes idle pages before it runs (see
+ * {@link IdlePageCache}). A kind belongs here only when its handler writes
+ * nothing that a loaded page holds: the appearance renderers may generate a
+ * missing form-field appearance stream, which lives in the annotation, not the
+ * page, and is read fresh by every render.
+ */
+const READ_ONLY_KINDS: ReadonlySet<WorkerRequest['kind']> = new Set<WorkerRequest['kind']>([
+  'pages.render',
+  'pages.renderEncoded',
+  'pages.text',
+  'pages.geometry',
+  'search.query',
+  'annotations.renderAppearances',
+  'annotations.renderAppearancesEncoded',
+]);
+
+/**
  * The piece that runs "inside the worker": owns runtime, manages document
  * sessions, dispatches requests to the engine-services synchronous code.
  *
@@ -207,6 +226,8 @@ export class WorkerHost {
    */
   private readonly fontIds = new Map<string, number>();
   private readonly fonts: FontRegistrar;
+  /** Pages kept loaded between read-only jobs, for every session on this runtime. */
+  private readonly idlePages: IdlePageCache;
   private destroyed = false;
 
   constructor(
@@ -226,6 +247,7 @@ export class WorkerHost {
     ensureInitialized(this.runtime);
     this.baseDocuments = new BaseDocumentRegistry(this.runtime);
     this.fonts = new FontRegistrar(this.runtime, this.fontIds);
+    this.idlePages = new IdlePageCache(this.runtime);
   }
 
   /**
@@ -244,6 +266,10 @@ export class WorkerHost {
       this.aborts.get(msg.jobId)?.abort();
       return;
     }
+
+    // Before either route below: any job that is not read-only closes every
+    // idle page first, so no change can meet a page parsed before it.
+    this.idlePages.beginJob(READ_ONLY_KINDS.has(msg.kind));
 
     // The encoded render kinds are the protocol's only async ops: their
     // raster comes from the same sync handlers as the raw kinds (all
@@ -546,6 +572,7 @@ export class WorkerHost {
       throw new EngineError(EngineErrorCode.InvalidArg, `document session already open: ${key}`);
     }
     const session = new DocumentSession(this.runtime);
+    session.idlePages = this.idlePages;
     session.signedDocumentPolicy = req.signedDocumentPolicy ?? 'protect';
     session.password = req.password;
     // Every input kind loads the same way with or without a password, so a
@@ -1734,6 +1761,7 @@ export class WorkerHost {
         session.close();
       }
       this.sessions.clear();
+      this.idlePages.closeAll();
       this.baseDocuments.releaseAll();
       destroyLibrary(this.runtime);
     }

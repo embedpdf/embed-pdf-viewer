@@ -137,3 +137,14 @@ signature conformance suite; both are a few hundred bytes of plain PDF.
 `two_page_sigfield.pdf` is `unsigned_sigfield.pdf` with one blank second page
 (pikepdf `add_blank_page`): a page that carries no `/Annots` in the base, for
 the "annotation added on a persisted layer, removed after a reopen" case.
+
+`jpx_resolution_levels.pdf` is synthetic: one 300 × 300 pt page drawing a
+1600 × 1600 JPEG 2000 image with six resolution levels, and two square
+annotations whose appearances draw the same image. PDFium decodes such an
+image at a resolution that depends on the size of the render, and caches the
+decode on the page, so it shows whether a page reused across renders still
+renders exactly as a freshly loaded one. Generated with Pillow (OpenJPEG) and
+pikepdf: a smooth three-channel sine pattern, `irreversible=True`,
+`num_resolutions=6`, `quality_layers=[60]`, the page content
+`q 300 0 0 300 0 0 cm /Im0 Do Q`, and annotations at `[20 20 140 140]` and
+`[160 160 280 280]` with 120 × 120 appearance forms.

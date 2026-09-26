@@ -29,10 +29,16 @@ TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 # args: <out-file> <environment> [extra flags...]
+#
+# -O3 here is the link-time optimization level: only with it does Emscripten run
+# wasm-opt over the whole module (the library's own -O2 compile does not). It
+# changes no floating-point semantics: there is no fast-math, and scalar wasm has
+# no fused multiply-add.
 link() {
   local out="$1" environment="$2"
   shift 2
   em++ "$LIB_DIR/lib/libembedpdf.a" \
+    -O3 \
     -sENVIRONMENT="$environment" \
     -sMODULARIZE=1 \
     -sWASM=1 \

@@ -26,6 +26,7 @@ import {
   type OpenedPdfDocument,
   type OpenedPdfDocumentKind,
 } from './lifecycle/PdfDocumentOpener';
+import type { IdlePageCache } from './pages/IdlePageCache';
 import { PagePtrPool } from './pages/PagePtrPool';
 import type { PageRecord } from './pages/PageRecord';
 import { LocalRevisionAuthority, type RevisionAuthority } from './revisions/RevisionAuthority';
@@ -86,6 +87,11 @@ export class DocumentSession {
   private revisions: RevisionAuthority | null = null;
   private mutationSeqCounter = 0;
   private pages: PagePtrPool | null = null;
+  /**
+   * The runtime's cache for pages kept between jobs. Set before the document
+   * loads; without it every page closes when its last holder releases it.
+   */
+  idlePages: IdlePageCache | null = null;
   /**
    * Whether writers honour what the document's signatures forbid (locked
    * fields, structural edits). Set at open from the engine option; the
@@ -165,7 +171,7 @@ export class DocumentSession {
     this._kind = handle.kind;
     this._source = handle.source;
     this.revisions = new LocalRevisionAuthority(this._sessionId);
-    this.pages = new PagePtrPool(this.runtime, handle.docPtr);
+    this.pages = new PagePtrPool(this.runtime, handle.docPtr, this.idlePages);
     this.parkedLoad = null;
     this.drawings = null;
     this.loadedSeq = this.mutationSeqCounter;
@@ -221,7 +227,7 @@ export class DocumentSession {
     this.closeDocument = () => handle.close();
     this._kind = handle.kind;
     this._source = handle.source;
-    this.pages = new PagePtrPool(this.runtime, handle.docPtr);
+    this.pages = new PagePtrPool(this.runtime, handle.docPtr, this.idlePages);
     this.recordsByIndex.clear();
     this.recordsByObjectNumber.clear();
     this.fullyEnumerated = false;
