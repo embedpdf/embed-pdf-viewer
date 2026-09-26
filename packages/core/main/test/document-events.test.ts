@@ -104,7 +104,7 @@ function rotatedEvent(
     pages: pageObjectNumbers.map((pageObjectNumber) => toPageRef(pageObjectNumber)),
     rotation,
     layout: { pageCount: pages.length, pages },
-    cache: null,
+    meta: { affectedPages: [], cacheDelta: null },
     origin: { kind: 'local', sessionId: 's', sub: null, ts: 1, serverId: null },
   };
 }
@@ -141,7 +141,7 @@ describe('kernel: document events → page registry', () => {
       type: 'pages.deleted',
       pages: [toPageRef(2)],
       layout: { pageCount: 2, pages: [page(1, 0), page(3, 1)] },
-      cache: null,
+      meta: { affectedPages: [], cacheDelta: null },
       origin: { kind: 'remote', sessionId: 'other', sub: 'alice', ts: 1, serverId: 7 },
     } as DocumentEvent);
 

@@ -95,7 +95,8 @@ export class AnnotationFlattener {
         status: statuses[i] === STATUS_APPLIED ? ('applied' as const) : ('unchanged' as const),
       }));
       if (code === FLATTEN_NOTHING_TO_DO || code !== FLATTEN_SUCCESS) {
-        return { page: toPageRef(pageObjectNumber), usage, results, meta: null };
+        const meta: MutationMeta = { affectedPages: [], cacheDelta: null };
+        return { page: toPageRef(pageObjectNumber), usage, results, meta };
       }
 
       // Content + annotation liveness changed on this page — the same

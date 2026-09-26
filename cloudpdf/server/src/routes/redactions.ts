@@ -42,11 +42,11 @@ export async function registerRedactionRoutes(
     requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', pdfBits);
     requireLayerCapability(req, docId, layerName, 'doc.redact', pdfBits);
 
-    const raw = (req.body ?? {}) as { scope?: unknown };
+    // The body is what `redaction.apply()` takes: `{ pages }` or `{ annotations }`.
     const scope = parseOrInvalidArg<RedactionApplyScope>(
       RedactionApplyScopeSchema as unknown as SchemaLike<RedactionApplyScope>,
-      raw.scope,
-      'request body scope',
+      req.body ?? {},
+      'request body',
     );
 
     setNoStore(reply);

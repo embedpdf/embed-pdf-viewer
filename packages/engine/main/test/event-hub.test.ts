@@ -19,7 +19,7 @@ function metadataEvent(
       trapped: 'unknown',
       custom: {},
     },
-    cache: null,
+    meta: { affectedPages: [], cacheDelta: null },
     origin: { kind: 'local', sessionId: 's', sub: null, ts: 1, serverId },
   };
 }

@@ -1,11 +1,11 @@
 import type {
   AnnotationRef,
   AttachmentFileWorkerPayload,
-  EmbeddedFileItem,
-  EmbeddedFileRef,
+  Attachment,
+  AttachmentRef,
   PageObjectNumber,
 } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import { EngineError, EngineErrorCode, toAttachmentRef } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import {
@@ -38,24 +38,28 @@ export class AttachmentReader {
   ) {}
 
   /** Snapshot of the `/EmbeddedFiles` name tree, in tree (key-sorted) order. */
-  list(signal: AbortSignal): EmbeddedFileItem[] {
+  list(signal: AbortSignal): Attachment[] {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
     const docPtr = this.session.requireDocPtr();
     const count = fn.FPDFDoc_GetAttachmentCount(docPtr);
-    const items: EmbeddedFileItem[] = [];
+    const items: Attachment[] = [];
     for (let index = 0; index < count; index++) {
       const attachmentPtr = fn.FPDFDoc_GetAttachment(docPtr, index);
       if (!attachmentPtr) continue;
       const key = readAttachmentKey(fn, mem, docPtr, index) ?? '';
-      items.push({ ...readAttachmentFileInfo(fn, mem, attachmentPtr), key, index });
+      items.push({
+        ...readAttachmentFileInfo(fn, mem, attachmentPtr),
+        ref: toAttachmentRef(key),
+        index,
+      });
     }
     return items;
   }
 
   /** Decode one document-level embedded file, addressed by key. */
   readFile(
-    ref: EmbeddedFileRef,
+    ref: AttachmentRef,
     path: string | undefined,
     maxDecodedBytes: number | undefined,
     signal: AbortSignal,

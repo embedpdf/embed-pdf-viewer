@@ -5,6 +5,7 @@ import type {
   DocumentEvent,
   EventOrigin,
   SignatureDTO,
+  SignaturePrepared,
   SignatureSnapshot,
 } from '@embedpdf/engine-core/runtime';
 
@@ -27,6 +28,8 @@ const origin: EventOrigin = {
   serverId: null,
 };
 const field = { kind: 'objectNumber', fieldObjectNumber: 9 } as const;
+/** A prepared signing; the fold reads only its id. */
+const prepared = (signingId: string) => ({ signingId }) as SignaturePrepared;
 const unsigned = { index: 0, field, fieldName: 'sig', signed: false } as unknown as SignatureDTO;
 const snapshot = {
   chainValid: true,
@@ -74,7 +77,7 @@ describe('foldSignatureEvent', () => {
   it('parks a signing on prepare and releases it on abort', () => {
     const parked = foldSignatureEvent(loaded, {
       type: 'signatures.prepared',
-      signingId: 'one',
+      ...prepared('one'),
       field,
       origin,
     }) as SignatureRecord;

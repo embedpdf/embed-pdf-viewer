@@ -110,7 +110,7 @@ export type {
 export type { CachePins } from './dto/CachePins';
 export { DEFAULT_PDF_SAVE_MODE } from './dto/PdfSaveMode';
 export type { SessionKind } from './dto/SessionKind';
-export type { PdfSaveMode } from './dto/PdfSaveMode';
+export type { DownloadOptions, PdfSaveMode } from './dto/PdfSaveMode';
 export type {
   FontEmbeddingPermission,
   FontHandle,
@@ -258,21 +258,24 @@ export type { AnnotationTransferOptions } from './transfer/AnnotationTransfer';
 export { AnnotationTransfer } from './transfer/AnnotationTransfer';
 
 // Attachment vocabulary — one set of file metadata fields shared by the
-// file-attachment kind and the document-level EmbeddedFiles service.
+// file-attachment kind and the document-level attachments service.
 export type {
   AttachmentFileBase,
   AttachmentFileSource,
   AttachmentFileInfo,
-  EmbeddedFileItem,
-  EmbeddedFileRef,
+  Attachment,
+  AttachmentList,
+  AttachmentRef,
   AttachmentContent,
   WireAttachmentFile,
 } from './dto/Attachment';
+export { toAttachmentRef } from './dto/Attachment';
 export type {
   AttachmentCreateResult,
   AttachmentDeleteResult,
-  AttachmentsCache,
+  AttachmentMutationMeta,
 } from './mutation/AttachmentMutationResults';
+export { deletedAttachmentOf } from './mutation/AttachmentMutationResults';
 
 export type {
   AnnotationKindModule,
@@ -610,8 +613,7 @@ export type { CharBoundaryBias, CharMapAnchor } from './text/charmap';
 export { searchContentEpoch, canonicalSearchQuery } from './search/epoch';
 
 export type { PageMoveInput } from './mutation/PageMoveInput';
-export type { PageMoveResult, PageMoveCache } from './mutation/PageMoveResult';
-export type { PageStructureCache } from './mutation/PageStructureCache';
+export type { PageMoveResult } from './mutation/PageMoveResult';
 export type { PageNameInput, PageRemoveNameInput } from './mutation/PageNameInput';
 export type { PageNameResult } from './mutation/PageNameResult';
 export type {
@@ -628,6 +630,7 @@ export type { PageInsertResult } from './mutation/PageInsertResult';
 export type { PageInsertBlankSpec } from './mutation/PageInsertBlankInput';
 export { PAGE_INSERT_BLANK_MAX_COUNT } from './mutation/PageInsertBlankInput';
 export type {
+  FlattenOptions,
   PageFlattenInput,
   PageFlattenUsage,
   PageFlattenStatus,
@@ -640,7 +643,7 @@ export type {
   RedactionApplyItemResult,
   RedactionApplyResult,
 } from './mutation/RedactionApplyResult';
-export type { MetadataUpdateResult, MetadataCache } from './mutation/MetadataUpdateResult';
+export type { MetadataUpdateResult } from './mutation/MetadataUpdateResult';
 
 export type {
   AnnotationActor,
@@ -660,6 +663,7 @@ export { PDF_BITS, decodePdfBits } from './auth/scope';
 export { parseScope, validateScopeArray } from './auth/scope';
 export { InvalidScope, MissingIdentity, PermissionDenied } from './auth/scope';
 export type { CollabTarget } from './auth/scope';
+export { collabTargetOf } from './auth/scope';
 export {
   checkAnyCapability,
   checkCapability,

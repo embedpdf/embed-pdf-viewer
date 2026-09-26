@@ -60,6 +60,10 @@ export const PageMeasurementViewportSchema = z.object({
   measure: PdfMeasurementSchema.optional(),
   owned: z.boolean(),
 });
+/** See `PageMeasurementViewportList`. */
+export const PageMeasurementViewportListSchema = z.object({
+  viewports: z.array(PageMeasurementViewportSchema),
+});
 export const LineIntentSchema = z.enum(['line-arrow', 'line-dimension']);
 export const PolygonIntentSchema = z.enum(['polygon-cloud', 'polygon-dimension']);
 export const PolylineIntentSchema = z.literal('polyline-dimension');

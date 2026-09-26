@@ -3,12 +3,124 @@
 import type * as CloudPDF from "../index.js";
 
 export interface DocPagesInsert200Response {
+    insertedPages: DocPagesInsert200Response.InsertedPages.Item[];
+    layout: DocPagesInsert200Response.Layout;
     meta: DocPagesInsert200Response.Meta;
-    /** Accepts any additional properties */
-    [key: string]: any;
 }
 
 export namespace DocPagesInsert200Response {
+    export type InsertedPages = InsertedPages.Item[];
+
+    export namespace InsertedPages {
+        export interface Item {
+            kind: Item.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Item {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+    }
+
+    export interface Layout {
+        pageCount: number;
+        pages: Layout.Pages.Item[];
+        namedPages?: Layout.NamedPages.Item[] | undefined;
+    }
+
+    export namespace Layout {
+        export type Pages = Pages.Item[];
+
+        export namespace Pages {
+            export interface Item {
+                index: number;
+                ref: Item.Ref;
+                label: string | null;
+                size: Item.Size;
+                rotation: number;
+                userUnit: number;
+                boxes: Item.Boxes;
+                actions?: CloudPDF.PdfPageActions | undefined;
+            }
+
+            export namespace Item {
+                export interface Ref {
+                    kind: Ref.Kind;
+                    pageObjectNumber: number;
+                }
+
+                export namespace Ref {
+                    export const Kind = {
+                        ObjectNumber: "objectNumber",
+                    } as const;
+                    export type Kind = (typeof Kind)[keyof typeof Kind];
+                }
+
+                export interface Size {
+                    width: number;
+                    height: number;
+                }
+
+                export interface Boxes {
+                    media: Boxes.Media;
+                    crop: Boxes.Crop;
+                    bleed?: Boxes.Bleed | undefined;
+                    trim?: Boxes.Trim | undefined;
+                    art?: Boxes.Art | undefined;
+                }
+
+                export namespace Boxes {
+                    export interface Media {
+                        left: number;
+                        bottom: number;
+                        right: number;
+                        top: number;
+                    }
+
+                    export interface Crop {
+                        left: number;
+                        bottom: number;
+                        right: number;
+                        top: number;
+                    }
+
+                    export interface Bleed {
+                        left: number;
+                        bottom: number;
+                        right: number;
+                        top: number;
+                    }
+
+                    export interface Trim {
+                        left: number;
+                        bottom: number;
+                        right: number;
+                        top: number;
+                    }
+
+                    export interface Art {
+                        left: number;
+                        bottom: number;
+                        right: number;
+                        top: number;
+                    }
+                }
+            }
+        }
+
+        export type NamedPages = NamedPages.Item[];
+
+        export namespace NamedPages {
+            export interface Item {
+                name: string;
+                target: CloudPDF.DocPagesInsert200ResponseLayoutNamedPagesItemTarget;
+            }
+        }
+    }
+
     export interface Meta {
         affectedPages: CloudPDF.PageState[];
         cacheDelta: Meta.CacheDelta | null;
@@ -19,6 +131,9 @@ export namespace DocPagesInsert200Response {
             previousDocVersion: number;
             docVersion: number;
             annotationsVersion?: number | undefined;
+            layoutVersion?: number | undefined;
+            metadataVersion?: number | undefined;
+            attachmentsVersion?: number | undefined;
             layerVersion?: number | undefined;
             working?: boolean | undefined;
             pages: CacheDelta.Pages.Item[];

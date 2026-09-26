@@ -2787,7 +2787,7 @@ await client.doc.pages.flatten({
 <dl>
 <dd>
 
-Multipart mutation envelope: a `body` field holding `{"destIndex"?: number}` (omitted → append) plus a `resource:source` file part carrying the standalone PDF whose pages are copied in. The inserted copies get fresh page object numbers, returned in insertion order.
+Multipart mutation envelope: a `body` field holding `{"toIndex"?: number}` (omitted → append) plus a `resource:source` file part carrying the standalone PDF whose pages are copied in. The inserted copies get fresh page object numbers, returned in insertion order.
 </dd>
 </dl>
 </dd>
@@ -2854,7 +2854,7 @@ await client.doc.pages.insert({
 <dl>
 <dd>
 
-Body is `{"size": {"width", "height"}, "count"?, "destIndex"?}` — size in PDF points, count in [1, 100], destIndex omitted → append.
+Body is `{"size": {"width", "height"}, "count"?, "toIndex"?}` — size in PDF points, count in [1, 100], toIndex omitted → append.
 </dd>
 </dl>
 </dd>
@@ -3147,10 +3147,7 @@ await client.doc.pages.rotate({
 ```typescript
 await client.doc.redactions.apply({
     docId: "docId",
-    layerName: "layerName",
-    body: {
-        "key": "value"
-    }
+    layerName: "layerName"
 });
 
 ```
@@ -3167,7 +3164,7 @@ await client.doc.redactions.apply({
 <dl>
 <dd>
 
-**request:** `CloudPDF.doc.ApplyRedactionsRequest` 
+**request:** `CloudPDF.doc.DocRedactionsApplyRequest` 
     
 </dd>
 </dl>

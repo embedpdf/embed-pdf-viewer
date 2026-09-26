@@ -160,7 +160,7 @@ describe('dynamic stamp real-PDF vertical slice', () => {
 
       const page = (await reopened.pages.list()).pages[0];
       expect(reopened.pages.flatten).toBeDefined();
-      const flattenedResult = await reopened.pages.flatten!([page.ref], 'display');
+      const flattenedResult = await reopened.pages.flatten!([page.ref], { usage: 'display' });
       expect(flattenedResult.results.map(({ status }) => status)).toEqual(['applied']);
       expect(reopened.pages.extract).toBeDefined();
       const extracted = await reopened.pages.extract!([page.ref]);

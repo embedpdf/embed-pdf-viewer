@@ -18,7 +18,7 @@ import { throwIfAborted } from '../../shared/abort';
  * Insert every page of a standalone PDF into the session document. A
  * structural mutation (like move/delete): the source bytes are loaded as a
  * throwaway PDFium document, `FPDF_ImportPagesByIndex` deep-copies its
- * pages in at `destIndex`, and the page registry is rebuilt. Pre-existing
+ * pages in at `toIndex`, and the page registry is rebuilt. Pre-existing
  * pages keep their identity and `RevisionToken`s; the inserted copies get
  * fresh object numbers, resolved from the post-insert registry.
  */
@@ -28,7 +28,7 @@ export class PagesInserter {
     private readonly session: DocumentSession,
   ) {}
 
-  insert(bytes: ArrayBuffer, destIndex: number | undefined, signal: AbortSignal): PageInsertResult {
+  insert(bytes: ArrayBuffer, toIndex: number | undefined, signal: AbortSignal): PageInsertResult {
     throwIfAborted(signal);
     if (bytes.byteLength === 0) {
       throw new EngineError(EngineErrorCode.InvalidArg, 'pages.insert requires non-empty bytes');
@@ -37,11 +37,11 @@ export class PagesInserter {
     const { fn, mem } = this.runtime;
     const destPtr = this.session.requireDocPtr();
     const beforeCount = fn.FPDF_GetPageCount(destPtr);
-    const at = destIndex ?? beforeCount;
+    const at = toIndex ?? beforeCount;
     if (!Number.isInteger(at) || at < 0 || at > beforeCount) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
-        `pages.insert destIndex ${at} out of range [0, ${beforeCount}]`,
+        `pages.insert toIndex ${at} out of range [0, ${beforeCount}]`,
       );
     }
 
@@ -99,11 +99,11 @@ export class PagesInserter {
     const insertedPages: PageRef[] = layout.pages
       .slice(at, at + insertedCount)
       .map((page) => page.ref);
-    return { insertedPages, layout, cache: null };
+    return { insertedPages, layout, meta: { affectedPages: [], cacheDelta: null } };
   }
 
   /**
-   * Create `count` blank pages of `size` at `destIndex`. Same mutation
+   * Create `count` blank pages of `size` at `toIndex`. Same mutation
    * contract as `insert`, but native creation (`FPDFPage_New`) instead of a
    * deep copy: no source document, so none of the retain-until-close
    * lifetime hazard above. Each page gets an empty content stream
@@ -112,7 +112,7 @@ export class PagesInserter {
    */
   insertBlank(
     spec: PageInsertBlankSpec,
-    destIndex: number | undefined,
+    toIndex: number | undefined,
     signal: AbortSignal,
   ): PageInsertResult {
     throwIfAborted(signal);
@@ -139,11 +139,11 @@ export class PagesInserter {
     const { fn } = this.runtime;
     const destPtr = this.session.requireDocPtr();
     const beforeCount = fn.FPDF_GetPageCount(destPtr);
-    const at = destIndex ?? beforeCount;
+    const at = toIndex ?? beforeCount;
     if (!Number.isInteger(at) || at < 0 || at > beforeCount) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
-        `pages.insertBlank destIndex ${at} out of range [0, ${beforeCount}]`,
+        `pages.insertBlank toIndex ${at} out of range [0, ${beforeCount}]`,
       );
     }
 
@@ -168,6 +168,6 @@ export class PagesInserter {
 
     const layout = new PagesReader(this.runtime, this.session).read(signal);
     const insertedPages: PageRef[] = layout.pages.slice(at, at + count).map((page) => page.ref);
-    return { insertedPages, layout, cache: null };
+    return { insertedPages, layout, meta: { affectedPages: [], cacheDelta: null } };
   }
 }

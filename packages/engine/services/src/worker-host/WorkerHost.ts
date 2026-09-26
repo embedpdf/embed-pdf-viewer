@@ -80,7 +80,7 @@ import {
   type PagesFlattenWorkerRequest,
   type RedactionApplyWorkerRequest,
   type PieceInfoApplicationsWorkerRequest,
-  type PieceInfoClearWorkerRequest,
+  type PieceInfoDeleteWorkerRequest,
   type PieceInfoReadWorkerRequest,
   type PieceInfoUpdateWorkerRequest,
   type PageNetworkRenderFormat,
@@ -103,7 +103,6 @@ import {
   type WorkerResponse,
   type WorkerResultPayload,
 } from '@embedpdf/engine-core/runtime';
-import type { MutationMeta } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import { DocumentSession } from '../document-session/DocumentSession';
@@ -455,8 +454,8 @@ export class WorkerHost {
         case 'pieceInfo.applications':
           resultPack = this.handlePieceInfoApplications(msg, ctrl.signal);
           break;
-        case 'pieceInfo.clear':
-          resultPack = this.handlePieceInfoClear(msg, ctrl.signal);
+        case 'pieceInfo.delete':
+          resultPack = this.handlePieceInfoDelete(msg, ctrl.signal);
           break;
         case 'pages.text':
           resultPack = this.handlePagesText(msg, ctrl.signal);
@@ -895,8 +894,14 @@ export class WorkerHost {
       req.usage,
       signal,
     );
-    if (result.meta === null) return wirePack({ tag: 'annotations.flatten', result });
-    return this.finishMutation(session, { tag: 'annotations.flatten', result }, req.artifactPath);
+    // A write always names its pages; applying nothing names none.
+    const wrote = result.meta.affectedPages.length > 0;
+    if (!wrote) return wirePack({ tag: 'annotations.flatten', result, wrote });
+    return this.finishMutation(
+      session,
+      { tag: 'annotations.flatten', result, wrote },
+      req.artifactPath,
+    );
   }
 
   private handleAnnotationsExportAppearance(
@@ -988,7 +993,7 @@ export class WorkerHost {
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
     const mutator = new PagesMutator(this.runtime, session);
-    const result = mutator.move(req.pages, req.destIndex, signal);
+    const result = mutator.move(req.pages, req.toIndex, signal);
     return this.finishMutation(session, { tag: 'pages.move', result }, req.artifactPath);
   }
 
@@ -1045,8 +1050,10 @@ export class WorkerHost {
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
     const result = new PagesFlattener(this.runtime, session).flatten(req.pages, req.usage, signal);
-    if (result.meta === null) return wirePack({ tag: 'pages.flatten', result });
-    return this.finishMutation(session, { tag: 'pages.flatten', result }, req.artifactPath);
+    // A write always names its pages; applying nothing names none.
+    const wrote = result.meta.affectedPages.length > 0;
+    if (!wrote) return wirePack({ tag: 'pages.flatten', result, wrote });
+    return this.finishMutation(session, { tag: 'pages.flatten', result, wrote }, req.artifactPath);
   }
 
   private handleRedactionApply(
@@ -1055,8 +1062,14 @@ export class WorkerHost {
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
     const result = new RedactionApplier(this.runtime, session).apply(req.scope, signal);
-    if (result.meta === null) return wirePack({ tag: 'redaction.apply', result });
-    return this.finishMutation(session, { tag: 'redaction.apply', result }, req.artifactPath);
+    // A write always names its pages; applying nothing names none.
+    const wrote = result.meta.affectedPages.length > 0;
+    if (!wrote) return wirePack({ tag: 'redaction.apply', result, wrote });
+    return this.finishMutation(
+      session,
+      { tag: 'redaction.apply', result, wrote },
+      req.artifactPath,
+    );
   }
 
   private handlePagesExtract(
@@ -1077,7 +1090,7 @@ export class WorkerHost {
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
     const inserter = new PagesInserter(this.runtime, session);
-    const result = inserter.insert(req.bytes, req.destIndex, signal);
+    const result = inserter.insert(req.bytes, req.toIndex, signal);
     return this.finishMutation(session, { tag: 'pages.insert', result }, req.artifactPath);
   }
 
@@ -1087,11 +1100,7 @@ export class WorkerHost {
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
     const inserter = new PagesInserter(this.runtime, session);
-    const result = inserter.insertBlank(
-      { size: req.size, count: req.count },
-      req.destIndex,
-      signal,
-    );
+    const result = inserter.insertBlank({ size: req.size, count: req.count }, req.toIndex, signal);
     return this.finishMutation(session, { tag: 'pages.insertBlank', result }, req.artifactPath);
   }
 
@@ -1100,8 +1109,8 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
-    const items = new AttachmentReader(this.runtime, session).list(signal);
-    return wirePack({ tag: 'attachments.list', items });
+    const attachments = new AttachmentReader(this.runtime, session).list(signal);
+    return wirePack({ tag: 'attachments.list', attachments });
   }
 
   private handleAttachmentsReadFile(
@@ -1222,8 +1231,12 @@ export class WorkerHost {
       req.page ? session.resolvePageRef(req.page).pageObjectNumber : undefined,
     );
     accessor.update(req.application, req.patch, signal);
+    const result = {
+      pieceInfo: accessor.read(req.application, signal),
+      meta: { affectedPages: [], cacheDelta: null },
+    };
     // A mutation: layer sessions persist the artifact like every other write.
-    return this.finishMutation(session, { tag: 'pieceInfo.update' }, req.artifactPath);
+    return this.finishMutation(session, { tag: 'pieceInfo.update', result }, req.artifactPath);
   }
 
   private handlePieceInfoApplications(
@@ -1240,8 +1253,8 @@ export class WorkerHost {
     return wirePack({ tag: 'pieceInfo.applications', applications });
   }
 
-  private handlePieceInfoClear(
-    req: PieceInfoClearWorkerRequest,
+  private handlePieceInfoDelete(
+    req: PieceInfoDeleteWorkerRequest,
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
@@ -1250,8 +1263,9 @@ export class WorkerHost {
       session,
       req.page ? session.resolvePageRef(req.page).pageObjectNumber : undefined,
     );
-    accessor.clear(req.application, signal);
-    return this.finishMutation(session, { tag: 'pieceInfo.clear' }, req.artifactPath);
+    accessor.delete(req.application, signal);
+    const result = { meta: { affectedPages: [], cacheDelta: null } };
+    return this.finishMutation(session, { tag: 'pieceInfo.delete', result }, req.artifactPath);
   }
 
   private handlePagesText(
@@ -1994,7 +2008,7 @@ const MUTATING_KINDS: ReadonlySet<WorkerRequest['kind']> = new Set<WorkerRequest
   'attachments.delete',
   'measure.setScale',
   'pieceInfo.update',
-  'pieceInfo.clear',
+  'pieceInfo.delete',
 ]);
 
 function sessionKey(docId: string, layerName?: string): string {

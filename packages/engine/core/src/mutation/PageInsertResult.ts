@@ -1,4 +1,4 @@
-import type { PageStructureCache } from './PageStructureCache';
+import type { MutationMeta } from './MutationMeta';
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
 import type { PageRef } from '../identity/PageRef';
 
@@ -14,6 +14,5 @@ export interface PageInsertResult {
   insertedPages: PageRef[];
   /** The new layout — every page in display order. */
   layout: PageListSnapshot;
-  /** Cloud-only manifest coherence pins; `null` for local engines. */
-  cache: PageStructureCache | null;
+  meta: MutationMeta;
 }

@@ -298,7 +298,13 @@ export function createStamps(
       tool,
       pageObjectNumber,
       point,
-      (picked) => void placeStampSource(pageObjectNumber, point, picked.data, rotCW),
+      (picked) =>
+        void placeStampSource(
+          pageObjectNumber,
+          point,
+          picked.data instanceof ArrayBuffer ? new Uint8Array(picked.data) : picked.data,
+          rotCW,
+        ),
     );
   };
 

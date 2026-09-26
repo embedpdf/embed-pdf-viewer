@@ -94,7 +94,7 @@ describe('remote events: two engines, one document (the collaboration loop)', ()
         expect(remote.rotation).toBe(90);
         expect(remote.pages).toEqual([toPageRef(pageObjectNumber)]);
         expect(remote.layout).toEqual(rotated.layout);
-        expect(remote.cache).toEqual(rotated.cache);
+        expect(remote.meta).toEqual(rotated.meta);
       }
       // Provenance: the remote event names A's engine instance.
       expect(remote.origin.sessionId).toBe(eventsA[0].origin.sessionId);

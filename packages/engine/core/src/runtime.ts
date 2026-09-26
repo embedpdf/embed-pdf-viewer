@@ -33,6 +33,7 @@ export {
   securityStateFromProbe,
 } from './engine/document-security-state';
 export type {
+  AnnotationOwner,
   CdnAccessInfo,
   CdnAdapter,
   DocumentAccessInfo,
@@ -74,7 +75,11 @@ export type { DocumentRedactionService } from './engine/DocumentRedactionService
 export type { DocumentSignaturesService } from './engine/DocumentSignaturesService';
 export type { PageAnnotationsService } from './engine/PageAnnotationsService';
 export type { DocumentAttachmentsService } from './engine/DocumentAttachmentsService';
-export type { PieceInfoService } from './engine/PieceInfoService';
+export type {
+  PieceInfoDeleteResult,
+  PieceInfoService,
+  PieceInfoUpdateResult,
+} from './engine/PieceInfoService';
 export type {
   PieceInfoEntry,
   PieceInfoPatch,
@@ -146,7 +151,7 @@ export type {
   PieceInfoReadWorkerRequest,
   PieceInfoUpdateWorkerRequest,
   PieceInfoApplicationsWorkerRequest,
-  PieceInfoClearWorkerRequest,
+  PieceInfoDeleteWorkerRequest,
   PagesTextWorkerRequest,
   PagesGeometryWorkerRequest,
   PagesRenderWorkerRequest,

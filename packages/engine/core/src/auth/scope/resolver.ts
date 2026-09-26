@@ -20,6 +20,17 @@ export interface CollabTarget {
   groupId?: string;
 }
 
+/** The collab target of a record read with nullable owner fields (an annotation). */
+export function collabTargetOf(owner: {
+  userId?: string | null;
+  groupId?: string | null;
+}): CollabTarget {
+  return {
+    ...(owner.userId ? { userId: owner.userId } : {}),
+    ...(owner.groupId ? { groupId: owner.groupId } : {}),
+  };
+}
+
 /**
  * True iff the given capability is granted by the scope array plus the
  * PDF bits visible via `pdf.permissions` expansion.

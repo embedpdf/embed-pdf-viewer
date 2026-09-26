@@ -32,7 +32,12 @@ import type { PageMoveResult } from '../mutation/PageMoveResult';
 import type { PageNameResult } from '../mutation/PageNameResult';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
 import type { FormFieldRef } from '../identity/FormFieldRef';
-import type { BaseVersionInfo, SignatureCompleteResult } from '../signature/types';
+import type {
+  BaseVersionInfo,
+  SignatureCompleteResult,
+  SignaturePrepared,
+} from '../signature/types';
+import type { AttachmentRef } from '../dto/Attachment';
 
 /**
  * Provenance of a `DocumentEvent` — whose hand caused the mutation, never
@@ -157,7 +162,12 @@ export type DocumentEvent =
       origin: EventOrigin;
     } & PageNameResult)
   | ({ type: 'attachments.created'; origin: EventOrigin } & AttachmentCreateResult)
-  | ({ type: 'attachments.deleted'; origin: EventOrigin } & AttachmentDeleteResult)
+  | ({
+      type: 'attachments.deleted';
+      origin: EventOrigin;
+      /** What was deleted (see `deletedAttachmentOf`). */
+      deleted: AttachmentRef | null;
+    } & AttachmentDeleteResult)
   | ({ type: 'metadata.updated'; origin: EventOrigin } & MetadataUpdateResult)
   | ({ type: 'forms.valueSet'; origin: EventOrigin } & FormSetValueResult)
   | ({ type: 'forms.imported'; origin: EventOrigin } & FormImportResult)
@@ -183,13 +193,12 @@ export type DocumentEvent =
       type: 'redaction.applied';
       origin: EventOrigin;
     } & RedactionApplyResult)
-  | {
+  | ({
       /** A signing candidate was parked: the document is read-only until it completes or is cancelled. */
       type: 'signatures.prepared';
-      signingId: string;
       field: FormFieldRef;
       origin: EventOrigin;
-    }
+    } & SignaturePrepared)
   | ({
       /** The sealed bytes are installed; `version` is what they became. */
       type: 'signatures.completed';

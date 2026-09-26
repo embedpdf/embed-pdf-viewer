@@ -210,6 +210,9 @@ describe("SignaturesClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [

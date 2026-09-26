@@ -79,9 +79,10 @@ export function runNamedPagesConformance(
           page: toPageRef(first.ref.pageObjectNumber),
         });
         expect((created.layout.namedPages ?? []).length).toBe(baseline + 1);
-        if (created.cache) {
-          expect(created.cache.docVersion > created.cache.previousDocVersion).toBe(true);
-          expect(created.cache.layoutVersion > 0).toBe(true);
+        const delta = created.meta.cacheDelta;
+        if (delta) {
+          expect(delta.docVersion > delta.previousDocVersion).toBe(true);
+          expect((delta.layoutVersion ?? 0) > 0).toBe(true);
         }
 
         // The result is the new layout.

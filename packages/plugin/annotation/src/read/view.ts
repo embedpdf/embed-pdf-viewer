@@ -40,8 +40,8 @@ export const authorityOf = (
     ...(dto.groupId != null ? { groupId: dto.groupId } : {}),
   };
   return {
-    update: security.allowsAnnotationMutation('update', target),
-    delete: security.allowsAnnotationMutation('delete', target),
+    update: security.allowsAnnotation('update', target),
+    delete: security.allowsAnnotation('delete', target),
   };
 };
 

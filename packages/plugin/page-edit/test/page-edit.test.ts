@@ -13,10 +13,10 @@ import { createPageEditController } from '../src/controller';
 /** A test context whose document handle's page verbs are spies. */
 function harness(options: { pages?: readonly TestPage[]; allows?: boolean } = {}) {
   const rotate = vi.fn(async (pages: PageRef[], rotation: number) => ({ pages, rotation }));
-  const move = vi.fn(async (pages: PageRef[], destIndex: number) => ({ pages, destIndex }));
+  const move = vi.fn(async (pages: PageRef[], toIndex: number) => ({ pages, toIndex }));
   const deletePages = vi.fn(async (pages: PageRef[]) => ({ pages }));
-  const insert = vi.fn(async (bytes: unknown, destIndex?: number) => ({ bytes, destIndex }));
-  const insertBlank = vi.fn(async (spec: unknown, destIndex?: number) => ({ spec, destIndex }));
+  const insert = vi.fn(async (bytes: unknown, toIndex?: number) => ({ bytes, toIndex }));
+  const insertBlank = vi.fn(async (spec: unknown, toIndex?: number) => ({ spec, toIndex }));
   const extract = vi.fn(async (_pages: PageRef[]) => new Uint8Array([9]));
   const allows = vi.fn(() => options.allows ?? true);
   const ctx = createTestContext<void>({

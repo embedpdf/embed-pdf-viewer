@@ -145,9 +145,19 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
       security: {
         allows,
         identity: { userId: 'me' },
-        allowsAnnotationCreate,
-        allowsAnnotationMutation,
-        allowsAnnotationGroupAssignment: () => true,
+        // One mock per question `allowsAnnotation` answers.
+        allowsAnnotation: (
+          action: 'create' | 'update' | 'delete' | 'set-group',
+          target?: { userId?: string | null; groupId?: string | null },
+        ) =>
+          action === 'create'
+            ? allowsAnnotationCreate()
+            : action === 'set-group'
+              ? true
+              : allowsAnnotationMutation(action, {
+                  ...(target?.userId ? { userId: target.userId } : {}),
+                  ...(target?.groupId ? { groupId: target.groupId } : {}),
+                }),
       },
     } as never,
   });

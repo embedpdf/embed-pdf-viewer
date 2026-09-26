@@ -39,12 +39,13 @@ export class CloudDocumentRedactionService implements DocumentRedactionService {
     return AbortablePromise.run<RedactionApplyResult>(async (signal) => {
       const result = await this.http.postJson(
         wirePaths.layerRedactionsApply(this.docId, this.layerName),
-        { scope },
+        scope,
         (raw) => RedactionApplyResultSchema.parse(raw),
         signal,
       );
-      // Nothing applied means no artifact and therefore no coherence bump.
-      if (result.meta === null) return result;
+      // Nothing applied comes back without a cache delta: no artifact, no
+      // coherence bump, no event.
+      if (result.meta.cacheDelta === null) return result;
       // Redaction-apply rewrites content and consumes the marks, so both
       // planes flip.
       this.manifest.apply(result.meta, ['content', 'annotations']);

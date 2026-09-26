@@ -4,10 +4,10 @@ import type { RedactionApplyResult } from '@embedpdf/engine-core';
 import { finishApply, initialRedactionState, setLastResult, startApply } from '../src/model';
 
 const result: RedactionApplyResult = {
-  scope: { kind: 'pages', pages: [] },
+  scope: { pages: [] },
   results: [],
   removedAnnotationCount: 0,
-  meta: null,
+  meta: { affectedPages: [], cacheDelta: null },
 };
 
 describe('redaction transitions', () => {

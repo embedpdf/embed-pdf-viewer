@@ -60,16 +60,13 @@ function harness(
   const service = {
     listViewports: vi.fn(async () => {
       if (failing) throw new Error('viewport read failed');
-      return engineViewports;
+      return { viewports: engineViewports };
     }),
     setScale: vi.fn(async (measure: PdfMeasure | null) => {
       engineViewports = measure ? [owned(measure)] : [];
-      ctx.emitDocumentEvent({
-        type: 'pages.scaleSet',
-        page: PAGE,
-        meta: null,
-        origin: LOCAL_ORIGIN,
-      } as never);
+      const result = { page: PAGE, meta: { affectedPages: [], cacheDelta: null } };
+      ctx.emitDocumentEvent({ type: 'pages.scaleSet', ...result, origin: LOCAL_ORIGIN } as never);
+      return result;
     }),
   };
   const ctx = createTestContext<MeasurementState>({
@@ -254,7 +251,7 @@ describe('page viewports from the engine', () => {
     ctx.emitDocumentEvent({
       type: 'pages.scaleSet',
       page: PAGE,
-      meta: null,
+      meta: { affectedPages: [], cacheDelta: null },
       origin: REMOTE_ORIGIN,
     } as never);
     await settle();

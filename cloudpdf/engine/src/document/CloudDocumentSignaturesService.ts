@@ -196,11 +196,7 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
       // Prepare is a layer write (layerVersion, working, docVersion moved)
       // that returns no mutation envelope: refresh, don't guess.
       await this.manifest.refresh(signal);
-      this.publisher.publishLocal({
-        type: 'signatures.prepared',
-        signingId: prepared.signingId,
-        field: input.field,
-      });
+      this.publisher.publishLocal({ type: 'signatures.prepared', field: input.field, ...prepared });
       return prepared;
     });
   }

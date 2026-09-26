@@ -25,11 +25,10 @@ import {
   type AnnotationDeleteResult,
   type AnnotationFlattenResult,
   type AnnotationMoveResult,
-  type PageFlattenUsage,
+  type FlattenOptions,
   type AnnotationUpdateResult,
   type CollabTarget,
   type PageAnnotationsService,
-  type PageObjectNumber,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
@@ -458,8 +457,9 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
 
   flatten(
     refs: AnnotationRef[],
-    usage: PageFlattenUsage = 'display',
+    options?: FlattenOptions,
   ): AbortablePromise<AnnotationFlattenResult> {
+    const usage = options?.usage ?? 'display';
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -497,7 +497,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
       if (payload.tag !== 'annotations.flatten') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      if (payload.result.meta !== null) {
+      if (payload.wrote) {
         this.publisher.publishLocal({ type: 'annotations.flattened', ...payload.result });
       }
       return payload.result;

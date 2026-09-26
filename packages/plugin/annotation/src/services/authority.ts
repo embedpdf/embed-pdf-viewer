@@ -17,7 +17,7 @@ export function createAuthority(
   store: AnnotationStore,
 ) {
   const canRead = (): boolean => ctx.doc?.security.allows('doc.annotate.read') ?? true;
-  const canCreate = (): boolean => ctx.doc?.security.allowsAnnotationCreate() ?? false;
+  const canCreate = (): boolean => ctx.doc?.security.allowsAnnotation('create') ?? false;
 
   const mutationTarget = (ref: AnnotationRef): { userId?: string; groupId?: string } => {
     const dto = store.model().byId[annotationKey(ref)]?.data;
@@ -27,7 +27,7 @@ export function createAuthority(
     };
   };
   const allowsMutation = (action: 'update' | 'delete', ref: AnnotationRef): boolean =>
-    ctx.doc?.security.allowsAnnotationMutation(action, mutationTarget(ref)) ?? false;
+    ctx.doc?.security.allowsAnnotation(action, mutationTarget(ref)) ?? false;
 
   // The twins answer "would the verb succeed?" — authority and flags, via
   // the same fused predicates the gestures and chrome consume, so a false

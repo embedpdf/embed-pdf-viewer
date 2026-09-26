@@ -15,7 +15,9 @@ export async function normalizeAttachmentFileSource(
   file: AttachmentFileSource,
   key: string,
 ): Promise<{ wireFile: WireAttachmentFile; resource: WireResource }> {
-  const resolved = await resolveBinarySource(file.data);
+  const resolved = await resolveBinarySource(
+    file.data instanceof ArrayBuffer ? new Uint8Array(file.data) : file.data,
+  );
   const name = file.name ?? resolved.name;
   if (!name) {
     throw new EngineError(

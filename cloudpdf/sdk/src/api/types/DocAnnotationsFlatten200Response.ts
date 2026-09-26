@@ -6,7 +6,7 @@ export interface DocAnnotationsFlatten200Response {
     page: DocAnnotationsFlatten200Response.Page;
     usage: DocAnnotationsFlatten200Response.Usage;
     results: DocAnnotationsFlatten200Response.Results.Item[];
-    meta: DocAnnotationsFlatten200Response.Meta | null;
+    meta: DocAnnotationsFlatten200Response.Meta;
 }
 
 export namespace DocAnnotationsFlatten200Response {
@@ -54,6 +54,9 @@ export namespace DocAnnotationsFlatten200Response {
             previousDocVersion: number;
             docVersion: number;
             annotationsVersion?: number | undefined;
+            layoutVersion?: number | undefined;
+            metadataVersion?: number | undefined;
+            attachmentsVersion?: number | undefined;
             layerVersion?: number | undefined;
             working?: boolean | undefined;
             pages: CacheDelta.Pages.Item[];

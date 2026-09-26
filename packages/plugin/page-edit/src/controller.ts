@@ -46,27 +46,26 @@ export function createPageEditController(ctx: PluginContext<void>) {
 
   /** A placement → the engine's index wire, from the registry at call time. */
   const resolvePlacement = (placement: PagePlacement | undefined) => {
-    if (!placement || placement === 'end') return { destIndex: undefined, anchor: undefined };
-    if ('index' in placement) return { destIndex: placement.index, anchor: undefined };
+    if (!placement || placement === 'end') return { toIndex: undefined, anchor: undefined };
+    if ('index' in placement) return { toIndex: placement.index, anchor: undefined };
     const anchor = requireEntry('after' in placement ? placement.after : placement.before);
-    return { destIndex: 'after' in placement ? anchor.index + 1 : anchor.index, anchor };
+    return { toIndex: 'after' in placement ? anchor.index + 1 : anchor.index, anchor };
   };
   /** Default blank-page size: the insertion point's predecessor, else the last page, else Letter. */
-  const neighbourSize = (destIndex: number | undefined): PdfSize => {
+  const neighbourSize = (toIndex: number | undefined): PdfSize => {
     const pages = registry();
     if (pages.length === 0) return LETTER_SIZE;
-    if (destIndex === undefined) return pages[pages.length - 1].size;
-    return pages[Math.max(0, Math.min(destIndex - 1, pages.length - 1))].size;
+    if (toIndex === undefined) return pages[pages.length - 1].size;
+    return pages[Math.max(0, Math.min(toIndex - 1, pages.length - 1))].size;
   };
   const insertAt = (
     bytes: Uint8Array | ArrayBuffer,
     placement: PagePlacement | undefined,
-  ): Promise<PageInsertResult> =>
-    ctx.doc.pages.insert(bytes, resolvePlacement(placement).destIndex);
+  ): Promise<PageInsertResult> => ctx.doc.pages.insert(bytes, resolvePlacement(placement).toIndex);
 
   const api: PageEditCapability = {
     // Wildcard-aware predicate (mirrors the engine's own enforcement), not an
-    // `effectiveScope.includes(...)` enumeration, which would drop the `*` grant.
+    // `scope.includes(...)` enumeration, which would drop the `*` grant.
     canEdit: () => ctx.doc.security.allows(ASSEMBLE_CAPABILITY),
 
     rotateBy: (pages, delta) =>
@@ -89,17 +88,17 @@ export function createPageEditController(ctx: PluginContext<void>) {
     setRotation: (pages, rotation) => enqueue(() => ctx.doc.pages.rotate([...pages], rotation)),
     move: (pages, placement) =>
       enqueue(() => {
-        const { destIndex } = resolvePlacement(placement);
-        return ctx.doc.pages.move([...pages], destIndex ?? registry().length);
+        const { toIndex } = resolvePlacement(placement);
+        return ctx.doc.pages.move([...pages], toIndex ?? registry().length);
       }),
     delete: (pages) => enqueue(() => ctx.doc.pages.delete([...pages])),
     insertBlank: (options = {}) =>
       enqueue(() => {
-        const { destIndex, anchor } = resolvePlacement(options.placement);
+        const { toIndex, anchor } = resolvePlacement(options.placement);
         // A ref placement matches the anchor the user is looking at; everything
         // else matches the neighbour the new page will follow.
-        const size = options.size ?? anchor?.size ?? neighbourSize(destIndex);
-        return ctx.doc.pages.insertBlank({ size, count: options.count }, destIndex);
+        const size = options.size ?? anchor?.size ?? neighbourSize(toIndex);
+        return ctx.doc.pages.insertBlank({ size, count: options.count }, toIndex);
       }),
     insertFromBytes: (bytes, options = {}) =>
       enqueue(async () => {

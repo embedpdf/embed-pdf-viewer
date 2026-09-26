@@ -90,7 +90,6 @@ export {
   PageNameInputSchema,
   PageNameResultSchema,
   PageRemoveNameInputSchema,
-  PageStructureCacheSchema,
   PageRotateInputSchema,
   PageRotateResultSchema,
   PageDeleteInputSchema,
@@ -348,11 +347,12 @@ export { DateInputSchema, IsoDateTimeSchema } from './dto/IsoDateTime.schema';
 export {
   AttachmentFileInfoSchema,
   WireAttachmentFileSchema,
-  EmbeddedFileItemSchema,
-  EmbeddedFileRefSchema,
+  AttachmentSchema,
+  AttachmentRefSchema,
 } from './dto/Attachment.schema';
 export {
-  AttachmentsCacheSchema,
+  AttachmentListSchema,
+  AttachmentMutationMetaSchema,
   AttachmentCreateResultSchema,
   AttachmentDeleteResultSchema,
 } from './wire/schemas';

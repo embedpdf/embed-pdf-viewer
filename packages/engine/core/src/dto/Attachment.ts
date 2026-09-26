@@ -15,8 +15,8 @@ import type { IsoDateTime } from './IsoDateTime';
  *             through an explicit download call.
  *
  * A file has exactly two possible homes: the document catalog's
- * `/EmbeddedFiles` name tree (addressed by {@link EmbeddedFileItem.index}),
- * and a FileAttachment annotation's `/FS` (addressed by the annotation ref).
+ * `/EmbeddedFiles` name tree (addressed by {@link Attachment.ref}), and a
+ * FileAttachment annotation's `/FS` (addressed by the annotation ref).
  */
 
 /** Metadata fields shared by the write and read forms. */
@@ -38,7 +38,7 @@ export interface AttachmentFileBase {
  * `application/octet-stream`.
  */
 export interface AttachmentFileSource {
-  data: Uint8Array | Blob;
+  data: Uint8Array | ArrayBuffer | Blob;
   name?: string;
   mimeType?: string;
   description?: string;
@@ -65,7 +65,7 @@ export interface AttachmentFileInfo extends AttachmentFileBase {
 }
 
 /**
- * Durable address of a document-level embedded file: its name-tree key.
+ * Durable address of a document-level attachment: its name-tree key.
  * Keys are unique within the tree by construction (ISO 32000 §7.9.6), so
  * — unlike annotations — no weak/index tier and no revision validation is
  * needed. A discriminated union so future ref kinds can be added without
@@ -75,17 +75,27 @@ export interface AttachmentFileInfo extends AttachmentFileBase {
  * engine-created attachments — but foreign PDFs may diverge, and `/UF`
  * values may collide while keys cannot. Address by `key`; display `name`.
  */
-export type EmbeddedFileRef = { kind: 'key'; key: string };
+export type AttachmentRef = { kind: 'key'; key: string };
+
+/** The ref of an attachment whose name-tree key you already hold. */
+export function toAttachmentRef(key: string): AttachmentRef {
+  return { kind: 'key', key };
+}
 
 /** One entry of the document-level `/EmbeddedFiles` name tree. */
-export interface EmbeddedFileItem extends AttachmentFileInfo {
-  /** The name-tree key — the durable address for download/remove. */
-  key: string;
+export interface Attachment extends AttachmentFileInfo {
+  /** The attachment's address, for download and delete. */
+  ref: AttachmentRef;
   /**
    * Position in name-tree (sorted) order — display metadata, not an
-   * address: both create and delete shift indices. Address by `key`.
+   * address: both create and delete shift indices. Address by `ref`.
    */
   index: number;
+}
+
+/** What `attachments.list()` returns: the attachments in name-tree order. */
+export interface AttachmentList {
+  attachments: Attachment[];
 }
 
 /**

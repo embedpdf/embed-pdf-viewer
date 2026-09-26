@@ -68,7 +68,7 @@ export function iconPlacement(
       file: attachmentMetadataOf(file),
       ...shared,
     },
-    resources: { file: file.data },
+    resources: { file: file.data instanceof ArrayBuffer ? new Uint8Array(file.data) : file.data },
   };
 }
 

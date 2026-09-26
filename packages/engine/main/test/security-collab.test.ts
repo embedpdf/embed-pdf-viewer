@@ -55,10 +55,10 @@ describe('security collab mirrors (engine-local, wasm runtime)', () => {
 
   test('default open (wildcard scope) allows everything', async () => {
     const doc = await open();
-    expect(doc.security.allowsAnnotationCreate()).toBe(true);
-    expect(doc.security.allowsAnnotationMutation('update', { userId: 'anyone' })).toBe(true);
-    expect(doc.security.allowsAnnotationMutation('delete', {})).toBe(true);
-    expect(doc.security.allowsAnnotationGroupAssignment('legal')).toBe(true);
+    expect(doc.security.allowsAnnotation('create')).toBe(true);
+    expect(doc.security.allowsAnnotation('update', { userId: 'anyone' })).toBe(true);
+    expect(doc.security.allowsAnnotation('delete', {})).toBe(true);
+    expect(doc.security.allowsAnnotation('set-group', { groupId: 'legal' })).toBe(true);
   });
 
   test('coarse doc.annotate.modify: any target mutable, set-group NOT implied', async () => {
@@ -66,11 +66,11 @@ describe('security collab mirrors (engine-local, wasm runtime)', () => {
       scope: ['doc.open', 'doc.annotate.modify'],
       identity: { userId: 'me' },
     });
-    expect(doc.security.allowsAnnotationCreate()).toBe(true);
-    expect(doc.security.allowsAnnotationMutation('update', { userId: 'alice' })).toBe(true);
-    expect(doc.security.allowsAnnotationMutation('delete', {})).toBe(true);
+    expect(doc.security.allowsAnnotation('create')).toBe(true);
+    expect(doc.security.allowsAnnotation('update', { userId: 'alice' })).toBe(true);
+    expect(doc.security.allowsAnnotation('delete', {})).toBe(true);
     // Set-group is a cloud-only assignment authority — decoupled from modify.
-    expect(doc.security.allowsAnnotationGroupAssignment('legal')).toBe(false);
+    expect(doc.security.allowsAnnotation('set-group', { groupId: 'legal' })).toBe(false);
   });
 
   test('narrowing: annotations:update:self SHADOWS modify for update only', async () => {
@@ -78,12 +78,12 @@ describe('security collab mirrors (engine-local, wasm runtime)', () => {
       scope: ['doc.open', 'doc.annotate.modify', 'annotations:update:self'],
       identity: { userId: 'me' },
     });
-    expect(doc.security.allowsAnnotationMutation('update', { userId: 'me' })).toBe(true);
+    expect(doc.security.allowsAnnotation('update', { userId: 'me' })).toBe(true);
     // The applicable narrowed grant shadows the coarse fallback…
-    expect(doc.security.allowsAnnotationMutation('update', { userId: 'alice' })).toBe(false);
-    expect(doc.security.allowsAnnotationMutation('update', {})).toBe(false);
+    expect(doc.security.allowsAnnotation('update', { userId: 'alice' })).toBe(false);
+    expect(doc.security.allowsAnnotation('update', {})).toBe(false);
     // …but only for its action: delete has no collab scope, falls back to modify.
-    expect(doc.security.allowsAnnotationMutation('delete', { userId: 'alice' })).toBe(true);
+    expect(doc.security.allowsAnnotation('delete', { userId: 'alice' })).toBe(true);
   });
 
   test('group grant: create derives from own identity, targets need the group stamp', async () => {
@@ -92,13 +92,13 @@ describe('security collab mirrors (engine-local, wasm runtime)', () => {
       identity: { userId: 'me', groupId: 'legal', groups: ['legal'] },
     });
     // Self-target carries the caller's default group → matches the filter.
-    expect(doc.security.allowsAnnotationCreate()).toBe(true);
-    expect(doc.security.allowsAnnotationMutation('update', { groupId: 'legal' })).toBe(true);
-    expect(doc.security.allowsAnnotationMutation('update', { groupId: 'other' })).toBe(false);
-    expect(doc.security.allowsAnnotationMutation('update', {})).toBe(false);
+    expect(doc.security.allowsAnnotation('create')).toBe(true);
+    expect(doc.security.allowsAnnotation('update', { groupId: 'legal' })).toBe(true);
+    expect(doc.security.allowsAnnotation('update', { groupId: 'other' })).toBe(false);
+    expect(doc.security.allowsAnnotation('update', {})).toBe(false);
     // Action wildcard includes set-group for the granted destination.
-    expect(doc.security.allowsAnnotationGroupAssignment('legal')).toBe(true);
-    expect(doc.security.allowsAnnotationGroupAssignment('other')).toBe(false);
+    expect(doc.security.allowsAnnotation('set-group', { groupId: 'legal' })).toBe(true);
+    expect(doc.security.allowsAnnotation('set-group', { groupId: 'other' })).toBe(false);
   });
 
   test("assigning the caller's own default group needs no grant", async () => {
@@ -106,7 +106,7 @@ describe('security collab mirrors (engine-local, wasm runtime)', () => {
       scope: ['doc.open', 'doc.annotate.modify'],
       identity: { userId: 'me', groupId: 'legal' },
     });
-    expect(doc.security.allowsAnnotationGroupAssignment('legal')).toBe(true);
-    expect(doc.security.allowsAnnotationGroupAssignment('other')).toBe(false);
+    expect(doc.security.allowsAnnotation('set-group', { groupId: 'legal' })).toBe(true);
+    expect(doc.security.allowsAnnotation('set-group', { groupId: 'other' })).toBe(false);
   });
 });

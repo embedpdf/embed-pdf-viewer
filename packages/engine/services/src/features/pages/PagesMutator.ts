@@ -54,7 +54,7 @@ export class PagesMutator {
 
   /**
    * Reorder pages. Mirrors `FPDF_MovePages`: detach the supplied pages,
-   * then re-insert them as a contiguous block at `destIndex` in the
+   * then re-insert them as a contiguous block at `toIndex` in the
    * post-removal index space, preserving caller order.
    *
    * Atomicity:
@@ -68,16 +68,16 @@ export class PagesMutator {
    *   - non-empty inputs;
    *   - duplicate `pageObjectNumber`s rejected;
    *   - every `pon` resolvable via the session's page registry;
-   *   - `destIndex` in `[0, pageCount - len]`.
+   *   - `toIndex` in `[0, pageCount - len]`.
    */
-  move(pages: PageRef[], destIndex: number, signal: AbortSignal): PageMoveResult {
+  move(pages: PageRef[], toIndex: number, signal: AbortSignal): PageMoveResult {
     const pageObjectNumbers = this.session.resolvePageRefs(pages);
     throwIfAborted(signal);
     this.requireUniquePageObjectNumbers('pages.move', pageObjectNumbers);
-    if (destIndex < 0 || !Number.isInteger(destIndex)) {
+    if (toIndex < 0 || !Number.isInteger(toIndex)) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
-        `pages.move destIndex must be a non-negative integer (got ${destIndex})`,
+        `pages.move toIndex must be a non-negative integer (got ${toIndex})`,
       );
     }
 
@@ -85,10 +85,10 @@ export class PagesMutator {
     const docPtr = this.session.requireDocPtr();
     const totalPages = fn.FPDF_GetPageCount(docPtr);
     const postRemoval = totalPages - pageObjectNumbers.length;
-    if (destIndex > postRemoval) {
+    if (toIndex > postRemoval) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
-        `pages.move destIndex ${destIndex} out of range; post-removal page count is ${postRemoval}`,
+        `pages.move toIndex ${toIndex} out of range; post-removal page count is ${postRemoval}`,
       );
     }
 
@@ -108,7 +108,7 @@ export class PagesMutator {
       for (let i = 0; i < fromIndices.length; i++) {
         mem.poke(arrPtr, 'i32', fromIndices[i], 4 * i);
       }
-      ok = fn.FPDF_MovePages(docPtr, arrPtr, fromIndices.length, destIndex);
+      ok = fn.FPDF_MovePages(docPtr, arrPtr, fromIndices.length, toIndex);
     } finally {
       mem.free(arrPtr);
     }
@@ -119,7 +119,7 @@ export class PagesMutator {
       // overlap our up-front checks did not catch — surface it cleanly.
       throw new EngineError(
         EngineErrorCode.InvalidArg,
-        `FPDF_MovePages rejected the request (destIndex=${destIndex}, fromIndices=[${fromIndices.join(
+        `FPDF_MovePages rejected the request (toIndex=${toIndex}, fromIndices=[${fromIndices.join(
           ',',
         )}])`,
       );
@@ -134,7 +134,7 @@ export class PagesMutator {
     // reordered session via the shared reader (identical output local +
     // cloud). `cache` is null — local engines have no manifest/CDN.
     const layout = new PagesReader(this.runtime, this.session).read(signal);
-    return { layout, cache: null };
+    return { layout, meta: { affectedPages: [], cacheDelta: null } };
   }
 
   /**
@@ -180,7 +180,7 @@ export class PagesMutator {
     }
 
     const layout = new PagesReader(this.runtime, this.session).read(signal);
-    return { layout, cache: null };
+    return { layout, meta: { affectedPages: [], cacheDelta: null } };
   }
 
   /**
@@ -241,7 +241,7 @@ export class PagesMutator {
     this.session.refreshPageRegistry();
 
     const layout = new PagesReader(this.runtime, this.session).read(signal);
-    return { layout, cache: null };
+    return { layout, meta: { affectedPages: [], cacheDelta: null } };
   }
 
   /**
@@ -275,7 +275,7 @@ export class PagesMutator {
       );
     }
     const layout = new PagesReader(this.runtime, this.session).read(signal);
-    return { layout, cache: null };
+    return { layout, meta: { affectedPages: [], cacheDelta: null } };
   }
 
   /** Remove one `/Names /Pages` registration; the page stays. */
@@ -299,7 +299,7 @@ export class PagesMutator {
       );
     }
     const layout = new PagesReader(this.runtime, this.session).read(signal);
-    return { layout, cache: null };
+    return { layout, meta: { affectedPages: [], cacheDelta: null } };
   }
 
   /** Shared input check: non-empty, no duplicate page object numbers. */

@@ -5,10 +5,11 @@ import {
   type PageMeasureService,
   type PageRef,
   type PdfMeasure,
-  type PageMeasurementViewport,
+  type PageMeasurementViewportList,
+  type PageScaleResult,
 } from '@embedpdf/engine-core/runtime';
 import {
-  PageMeasurementViewportSchema,
+  PageMeasurementViewportListSchema,
   PageScaleResultSchema,
   wirePaths,
 } from '@embedpdf/engine-core/wire';
@@ -26,18 +27,18 @@ export class CloudPageMeasureService implements PageMeasureService {
     private readonly manifest: ManifestAccessor,
     private readonly publisher: SessionEventPublisher,
   ) {}
-  listViewports(): AbortablePromise<PageMeasurementViewport[]> {
+  listViewports(): AbortablePromise<PageMeasurementViewportList> {
     return AbortablePromise.run(async (signal) => {
       this.check();
       // Viewports have no independent cache pin. Always read the current layer.
       return this.http.getJson(
         wirePaths.layerPageViewports(this.docId, this.layerName, this.pageRef),
-        (raw) => PageMeasurementViewportSchema.array().parse(raw),
+        (raw) => PageMeasurementViewportListSchema.parse(raw),
         signal,
       );
     });
   }
-  setScale(measure: PdfMeasure | null): AbortablePromise<void> {
+  setScale(measure: PdfMeasure | null): AbortablePromise<PageScaleResult> {
     return AbortablePromise.run(async (signal) => {
       await Promise.resolve();
       signal.throwIfAborted();
@@ -50,6 +51,7 @@ export class CloudPageMeasureService implements PageMeasureService {
       );
       this.manifest.apply(result.meta, []);
       this.publisher.publishLocal({ type: 'pages.scaleSet', ...result });
+      return result;
     });
   }
   private check(): void {

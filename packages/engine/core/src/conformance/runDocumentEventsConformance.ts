@@ -100,7 +100,7 @@ export function runDocumentEventsConformance(
           expect(evRotated.pages).toEqual([toPageRef(pageObjectNumber)]);
           expect(evRotated.rotation).toBe(90);
           expect(evRotated.layout).toEqual(rotated.layout);
-          expect(evRotated.cache).toEqual(rotated.cache);
+          expect(evRotated.meta).toEqual(rotated.meta);
         }
         if (evDeleted.type === 'pages.deleted') {
           expect(evDeleted.pages).toEqual([toPageRef(victim)]);
@@ -146,7 +146,7 @@ export function runDocumentEventsConformance(
         if (evInserted.type === 'pages.inserted') {
           expect(evInserted.insertedPages).toEqual(inserted.insertedPages);
           expect(evInserted.layout).toEqual(inserted.layout);
-          expect(evInserted.cache).toEqual(inserted.cache);
+          expect(evInserted.meta).toEqual(inserted.meta);
           expect(evInserted.toIndex).toBe(0);
           expect(evInserted.origin.kind).toBe('local');
         }

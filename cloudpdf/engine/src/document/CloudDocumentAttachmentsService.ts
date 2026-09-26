@@ -2,19 +2,20 @@ import {
   AbortablePromise,
   EngineError,
   EngineErrorCode,
+  deletedAttachmentOf,
   normalizeAttachmentFileSource,
   type AttachmentContent,
   type AttachmentCreateResult,
   type AttachmentDeleteResult,
   type AttachmentFileSource,
+  type AttachmentList,
+  type AttachmentRef,
   type DocumentAttachmentsService,
-  type EmbeddedFileItem,
-  type EmbeddedFileRef,
 } from '@embedpdf/engine-core/runtime';
 import {
   AttachmentCreateResultSchema,
   AttachmentDeleteResultSchema,
-  EmbeddedFileItemSchema,
+  AttachmentListSchema,
   wirePaths,
 } from '@embedpdf/engine-core/wire';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
@@ -26,8 +27,6 @@ import { parseAttachmentContent } from './parseAttachmentContent';
 import type { HttpClient } from '../transport/HttpClient';
 
 /** The `/attachments@…` listing leaf is a bare array of name-tree entries. */
-const EmbeddedFileListSchema = EmbeddedFileItemSchema.array();
-
 /**
  * Cloud-side document-level attachments (the catalog's `/EmbeddedFiles`
  * name tree). Reads use immutable leaves pinned by the manifest's
@@ -54,13 +53,13 @@ export class CloudDocumentAttachmentsService implements DocumentAttachmentsServi
    * The pin bumps only on attachment writes, so this leaf stays cached
    * across page and annotation edits.
    */
-  list(): AbortablePromise<EmbeddedFileItem[]> {
+  list(): AbortablePromise<AttachmentList> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
-    return AbortablePromise.run<EmbeddedFileItem[]>(async (signal) => {
+    return AbortablePromise.run<AttachmentList>(async (signal) => {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
         // Plane-scope rule: the listing depends on the `attachments` plane —
@@ -72,7 +71,7 @@ export class CloudDocumentAttachmentsService implements DocumentAttachmentsServi
       };
       return this.http.getJsonWithRefresh(
         buildPath,
-        (raw) => EmbeddedFileListSchema.parse(raw),
+        (raw) => AttachmentListSchema.parse(raw),
         async (s) => {
           await this.manifest.refresh(s);
         },
@@ -87,7 +86,7 @@ export class CloudDocumentAttachmentsService implements DocumentAttachmentsServi
    * `parseAttachmentContent`). Same versioned-leaf + refresh-retry rails
    * as {@link list}.
    */
-  download(ref: EmbeddedFileRef): AbortablePromise<AttachmentContent> {
+  download(ref: AttachmentRef): AbortablePromise<AttachmentContent> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
@@ -142,14 +141,14 @@ export class CloudDocumentAttachmentsService implements DocumentAttachmentsServi
       // state). An attachment write only advances docVersion +
       // attachmentsVersion (no per-page pin changes, no layoutVersion), so
       // the cached manifest is patched in place — no refetch.
-      if (result.cache) this.manifest.applyAttachments(result.cache);
+      this.manifest.apply(result.meta, ['attachments']);
       this.publisher.publishLocal({ type: 'attachments.created', ...result });
       return result;
     });
   }
 
   /** Delete an embedded file from the name tree by its durable key. */
-  delete(ref: EmbeddedFileRef): AbortablePromise<AttachmentDeleteResult> {
+  delete(ref: AttachmentRef): AbortablePromise<AttachmentDeleteResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
@@ -162,8 +161,12 @@ export class CloudDocumentAttachmentsService implements DocumentAttachmentsServi
         signal,
       );
       // Same absorb-then-publish rails as create().
-      if (result.cache) this.manifest.applyAttachments(result.cache);
-      this.publisher.publishLocal({ type: 'attachments.deleted', ...result });
+      this.manifest.apply(result.meta, ['attachments']);
+      this.publisher.publishLocal({
+        type: 'attachments.deleted',
+        deleted: deletedAttachmentOf(result),
+        ...result,
+      });
       return result;
     });
   }

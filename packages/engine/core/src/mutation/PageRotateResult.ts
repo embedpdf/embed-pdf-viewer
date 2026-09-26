@@ -1,4 +1,4 @@
-import type { PageStructureCache } from './PageStructureCache';
+import type { MutationMeta } from './MutationMeta';
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
 
 /**
@@ -13,6 +13,5 @@ import type { PageListSnapshot } from '../dto/PageListSnapshot';
 export interface PageRotateResult {
   /** The new layout — same pages, same order, new `rotation` values. */
   layout: PageListSnapshot;
-  /** Cloud-only manifest coherence pins; `null` for local engines. */
-  cache: PageStructureCache | null;
+  meta: MutationMeta;
 }

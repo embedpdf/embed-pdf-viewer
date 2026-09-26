@@ -758,16 +758,16 @@ parentPort.on('message', (msg) => {
       const moving = new Set(movingPons);
       const remaining = current.filter((pon) => !moving.has(pon));
       const next = [
-        ...remaining.slice(0, msg.destIndex),
+        ...remaining.slice(0, msg.toIndex),
         ...movingPons,
-        ...remaining.slice(msg.destIndex),
+        ...remaining.slice(msg.toIndex),
       ];
       meta.pageOrder = next;
-      // A move returns geometry, not liveness: the new layout + null cache
+      // A move returns geometry, not liveness: the new layout + empty meta
       // (the server fills in the real coherence pins on commit).
       const result = {
         layout: layoutSnapshot(meta),
-        cache: null,
+        meta: { affectedPages: [], cacheDelta: null },
       };
       resolveMutation(msg, {
         tag: 'pages.move',
@@ -790,7 +790,7 @@ parentPort.on('message', (msg) => {
       }
       resolveMutation(msg, {
         tag: 'pages.rotate',
-        result: { layout: layoutSnapshot(meta), cache: null },
+        result: { layout: layoutSnapshot(meta), meta: { affectedPages: [], cacheDelta: null } },
         artifact: layerArtifact(msg, meta),
       });
       return;
@@ -820,7 +820,7 @@ parentPort.on('message', (msg) => {
       meta.pageOrder = current.filter((pon) => !deleting.has(pon));
       resolveMutation(msg, {
         tag: 'pages.delete',
-        result: { layout: layoutSnapshot(meta), cache: null },
+        result: { layout: layoutSnapshot(meta), meta: { affectedPages: [], cacheDelta: null } },
         artifact: layerArtifact(msg, meta),
       });
       return;
@@ -1065,7 +1065,7 @@ parentPort.on('message', (msg) => {
       parentPort.postMessage({
         kind: 'resolve',
         jobId: msg.jobId,
-        result: { tag: 'attachments.list', items: [] },
+        result: { tag: 'attachments.list', attachments: [] },
       });
       return;
     }

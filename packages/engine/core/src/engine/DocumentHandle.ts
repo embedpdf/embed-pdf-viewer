@@ -12,7 +12,7 @@ import type { DocumentSignaturesService } from './DocumentSignaturesService';
 import type { MetadataService } from './MetadataService';
 import type { PageHandle } from './PageHandle';
 import type { PieceInfoService } from './PieceInfoService';
-import type { PdfSaveMode } from '../dto/PdfSaveMode';
+import type { DownloadOptions } from '../dto/PdfSaveMode';
 import type { DocumentEventStream } from '../events/DocumentEventStream';
 import type { PageRef } from '../identity/PageRef';
 import type { BaseVersionInfo } from '../signature/types';
@@ -66,7 +66,7 @@ export interface DocumentHandle {
   /**
    * Document-scoped page service. Use for cross-page operations:
    *   - `pages.list()` for the current display order.
-   *   - `pages.move(refs, destIndex)` for reorder.
+   *   - `pages.move(refs, toIndex)` for reorder.
    *
    * Per-page reads/writes still live on `page(ref).annotations`.
    */
@@ -94,14 +94,14 @@ export interface DocumentHandle {
    * call with `NotFound`. It carries no page data: `pages.list()` does.
    */
   page(ref: PageRef): PageHandle;
-  download(opts?: { mode?: PdfSaveMode }): AbortablePromise<Uint8Array>;
+  download(options?: DownloadOptions): AbortablePromise<Uint8Array>;
   /**
    * Local Node engines only: write the document to a local file without
    * moving its bytes through JS. An untouched session (no unsaved edits,
    * incremental mode) is streamed out verbatim — for a signed document,
    * exactly as sealed. Absent on engines that cannot reach a filesystem.
    */
-  downloadToFile?(path: string, opts?: { mode?: PdfSaveMode }): AbortablePromise<void>;
+  downloadToFile?(path: string, options?: DownloadOptions): AbortablePromise<void>;
   /**
    * The saved version this session is on: SHA-256 and length of the
    * loaded bytes (for a layer session, of its base). Changes only when

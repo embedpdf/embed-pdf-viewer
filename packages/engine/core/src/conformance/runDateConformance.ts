@@ -127,14 +127,12 @@ export function runDateConformance(
           createdAt: '2017-07-12T21:44:38-07:00',
           modifiedAt: '2018-01-01T12:00:00+01:00',
         });
-        if (doc.attachments) {
-          const [embedded] = await doc.attachments.list();
-          expect(embedded).toMatchObject({
-            name: 'a.txt',
-            createdAt: '2017-07-12T21:44:38-07:00',
-            modifiedAt: '2018-01-01T12:00:00+01:00',
-          });
-        }
+        const [embedded] = (await doc.attachments.list()).attachments;
+        expect(embedded).toMatchObject({
+          name: 'a.txt',
+          createdAt: '2017-07-12T21:44:38-07:00',
+          modifiedAt: '2018-01-01T12:00:00+01:00',
+        });
       });
     });
   });

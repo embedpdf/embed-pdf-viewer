@@ -67,7 +67,7 @@ const DEFAULT_QUAD: HighlightDraft['quadPoints'] = [
  *      "move never bumps a RevisionToken" invariant is asserted directly
  *      in the annotation mutation suite, where revision liveness lives.)
  *   4. Invalid inputs (duplicate page object numbers, unknown page object numbers, out-of-range
- *      `destIndex`) reject with `InvalidArg`.
+ *      `toIndex`) reject with `InvalidArg`.
  *   5. Abort propagates as `AbortError`.
  *
  * Both local (worker host + WASM) and cloud (HTTP + @cloudpdf/server)
@@ -250,7 +250,7 @@ export function runPageReorderConformance(
       }
     });
 
-    test('pages.move() rejects out-of-range destIndex with InvalidArg', async () => {
+    test('pages.move() rejects out-of-range toIndex with InvalidArg', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const list = await doc.pages.list();
@@ -258,7 +258,7 @@ export function runPageReorderConformance(
         const target = list.pages[0].ref;
         let caught: unknown;
         try {
-          // Post-removal count is `pages.length - 1`; destIndex one past that
+          // Post-removal count is `pages.length - 1`; toIndex one past that
           // is out of range.
           await doc.pages.move([target], list.pages.length);
         } catch (err) {

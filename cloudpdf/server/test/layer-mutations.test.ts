@@ -525,7 +525,7 @@ describe('Phase 5 layer mutation pipeline', () => {
         Authorization: `Bearer ${docToken(tenantId, docId, layerName)}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ pages: [3].map(toPageRef), destIndex: 0 }),
+      body: JSON.stringify({ pages: [3].map(toPageRef), toIndex: 0 }),
     });
 
     expect(res.status).toBe(200);
@@ -535,11 +535,13 @@ describe('Phase 5 layer mutation pipeline', () => {
         pageCount: number;
         pages: Array<{ ref: { pageObjectNumber: number }; index: number }>;
       };
-      cache: {
-        previousDocVersion: number;
-        docVersion: number;
-        layoutVersion: number;
-      } | null;
+      meta: {
+        cacheDelta: {
+          previousDocVersion: number;
+          docVersion: number;
+          layoutVersion: number;
+        } | null;
+      };
     };
     // A move returns the new geometry (order), not liveness.
     expect(body.layout.pageCount).toBe(3);
@@ -547,7 +549,12 @@ describe('Phase 5 layer mutation pipeline', () => {
     expect(body.layout.pages.map((page) => page.index)).toEqual([0, 1, 2]);
     // Cloud coherence pins: docVersion + layoutVersion both advance by one,
     // no per-page pin changes.
-    expect(body.cache).toEqual({ previousDocVersion: 1, docVersion: 2, layoutVersion: 2 });
+    expect(body.meta.cacheDelta).toEqual({
+      previousDocVersion: 1,
+      docVersion: 2,
+      layoutVersion: 2,
+      pages: [],
+    });
 
     const layer = await fx.db
       .selectFrom('layers')
@@ -598,11 +605,13 @@ describe('Phase 5 layer mutation pipeline', () => {
         pageCount: number;
         pages: Array<{ ref: { pageObjectNumber: number }; rotation: number }>;
       };
-      cache: {
-        previousDocVersion: number;
-        docVersion: number;
-        layoutVersion: number;
-      } | null;
+      meta: {
+        cacheDelta: {
+          previousDocVersion: number;
+          docVersion: number;
+          layoutVersion: number;
+        } | null;
+      };
     };
     // Rotation is presentation metadata: same pages, same order, new values.
     expect(body.layout.pageCount).toBe(3);
@@ -611,7 +620,12 @@ describe('Phase 5 layer mutation pipeline', () => {
       [2, 90],
       [3, 0],
     ]);
-    expect(body.cache).toEqual({ previousDocVersion: 1, docVersion: 2, layoutVersion: 2 });
+    expect(body.meta.cacheDelta).toEqual({
+      previousDocVersion: 1,
+      docVersion: 2,
+      layoutVersion: 2,
+      pages: [],
+    });
 
     // The audit trail records the rotate against the affected pages only.
     const audit = await fx.db
@@ -662,16 +676,23 @@ describe('Phase 5 layer mutation pipeline', () => {
         pageCount: number;
         pages: Array<{ ref: { pageObjectNumber: number }; index: number }>;
       };
-      cache: {
-        previousDocVersion: number;
-        docVersion: number;
-        layoutVersion: number;
-      } | null;
+      meta: {
+        cacheDelta: {
+          previousDocVersion: number;
+          docVersion: number;
+          layoutVersion: number;
+        } | null;
+      };
     };
     expect(body.layout.pageCount).toBe(2);
     expect(body.layout.pages.map((page) => page.ref.pageObjectNumber)).toEqual([1, 3]);
     expect(body.layout.pages.map((page) => page.index)).toEqual([0, 1]);
-    expect(body.cache).toEqual({ previousDocVersion: 1, docVersion: 2, layoutVersion: 2 });
+    expect(body.meta.cacheDelta).toEqual({
+      previousDocVersion: 1,
+      docVersion: 2,
+      layoutVersion: 2,
+      pages: [],
+    });
 
     const audit = await fx.db
       .selectFrom('audit_log')
@@ -725,7 +746,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     const moved = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/move`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ pages: [3].map(toPageRef), destIndex: 0 }),
+      body: JSON.stringify({ pages: [3].map(toPageRef), toIndex: 0 }),
     });
     expect(moved.status).toBe(200);
     mutations.push({ kind: 'pages.move', response: await moved.json() });

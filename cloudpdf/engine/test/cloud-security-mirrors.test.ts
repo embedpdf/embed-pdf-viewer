@@ -60,16 +60,16 @@ const openWith = (claims: Record<string, unknown> | null) =>
 describe('security collab mirrors (cloud SDK, token-fallback path)', () => {
   it('no token → fail closed on every mirror', () => {
     const doc = openWith(null);
-    expect(doc.security.allowsAnnotationCreate()).toBe(false);
-    expect(doc.security.allowsAnnotationMutation('update', { userId: 'me' })).toBe(false);
-    expect(doc.security.allowsAnnotationGroupAssignment('legal')).toBe(false);
+    expect(doc.security.allowsAnnotation('create')).toBe(false);
+    expect(doc.security.allowsAnnotation('update', { userId: 'me' })).toBe(false);
+    expect(doc.security.allowsAnnotation('set-group', { groupId: 'legal' })).toBe(false);
   });
 
   it('wildcard scope allows everything', () => {
     const doc = openWith({ scope: ['*'] });
-    expect(doc.security.allowsAnnotationCreate()).toBe(true);
-    expect(doc.security.allowsAnnotationMutation('delete', {})).toBe(true);
-    expect(doc.security.allowsAnnotationGroupAssignment('legal')).toBe(true);
+    expect(doc.security.allowsAnnotation('create')).toBe(true);
+    expect(doc.security.allowsAnnotation('delete', {})).toBe(true);
+    expect(doc.security.allowsAnnotation('set-group', { groupId: 'legal' })).toBe(true);
   });
 
   it('narrowing: annotations:update:self shadows modify for update only', () => {
@@ -77,12 +77,12 @@ describe('security collab mirrors (cloud SDK, token-fallback path)', () => {
       scope: ['doc.annotate.modify', 'annotations:update:self'],
       identity: { userId: 'me' },
     });
-    expect(doc.security.allowsAnnotationMutation('update', { userId: 'me' })).toBe(true);
-    expect(doc.security.allowsAnnotationMutation('update', { userId: 'alice' })).toBe(false);
-    expect(doc.security.allowsAnnotationMutation('update', {})).toBe(false);
+    expect(doc.security.allowsAnnotation('update', { userId: 'me' })).toBe(true);
+    expect(doc.security.allowsAnnotation('update', { userId: 'alice' })).toBe(false);
+    expect(doc.security.allowsAnnotation('update', {})).toBe(false);
     // Delete has no collab scope → coarse fallback still answers.
-    expect(doc.security.allowsAnnotationMutation('delete', { userId: 'alice' })).toBe(true);
-    expect(doc.security.allowsAnnotationCreate()).toBe(true);
+    expect(doc.security.allowsAnnotation('delete', { userId: 'alice' })).toBe(true);
+    expect(doc.security.allowsAnnotation('create')).toBe(true);
   });
 
   it('group grant: create from own identity, targets need the stamp + membership', () => {
@@ -90,12 +90,12 @@ describe('security collab mirrors (cloud SDK, token-fallback path)', () => {
       scope: ['annotations:*:group=legal'],
       identity: { userId: 'me', groupId: 'legal', groups: ['legal'] },
     });
-    expect(doc.security.allowsAnnotationCreate()).toBe(true);
-    expect(doc.security.allowsAnnotationMutation('update', { groupId: 'legal' })).toBe(true);
-    expect(doc.security.allowsAnnotationMutation('update', { groupId: 'other' })).toBe(false);
-    expect(doc.security.allowsAnnotationMutation('update', {})).toBe(false);
-    expect(doc.security.allowsAnnotationGroupAssignment('legal')).toBe(true);
-    expect(doc.security.allowsAnnotationGroupAssignment('other')).toBe(false);
+    expect(doc.security.allowsAnnotation('create')).toBe(true);
+    expect(doc.security.allowsAnnotation('update', { groupId: 'legal' })).toBe(true);
+    expect(doc.security.allowsAnnotation('update', { groupId: 'other' })).toBe(false);
+    expect(doc.security.allowsAnnotation('update', {})).toBe(false);
+    expect(doc.security.allowsAnnotation('set-group', { groupId: 'legal' })).toBe(true);
+    expect(doc.security.allowsAnnotation('set-group', { groupId: 'other' })).toBe(false);
   });
 
   it("assigning the caller's own default group needs no grant", () => {
@@ -103,7 +103,7 @@ describe('security collab mirrors (cloud SDK, token-fallback path)', () => {
       scope: ['doc.annotate.modify'],
       identity: { userId: 'me', groupId: 'legal' },
     });
-    expect(doc.security.allowsAnnotationGroupAssignment('legal')).toBe(true);
-    expect(doc.security.allowsAnnotationGroupAssignment('other')).toBe(false);
+    expect(doc.security.allowsAnnotation('set-group', { groupId: 'legal' })).toBe(true);
+    expect(doc.security.allowsAnnotation('set-group', { groupId: 'other' })).toBe(false);
   });
 });

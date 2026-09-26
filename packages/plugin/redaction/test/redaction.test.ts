@@ -51,7 +51,7 @@ const resultOf = (scope: RedactionApplyScope): RedactionApplyResult => ({
   scope,
   results: [],
   removedAnnotationCount: 0,
-  meta: null,
+  meta: { affectedPages: [], cacheDelta: null },
 });
 
 /** The annotation plugin's host lens, reduced to what redaction reads; lists stay stable until `setRaws`. */
@@ -237,8 +237,8 @@ describe('applying', () => {
 
     const result = await redaction.apply([MARK]);
 
-    expect(apply).toHaveBeenCalledWith({ kind: 'annotations', refs: [MARK] });
-    expect(result.scope).toEqual({ kind: 'annotations', refs: [MARK] });
+    expect(apply).toHaveBeenCalledWith({ annotations: [MARK] });
+    expect(result.scope).toEqual({ annotations: [MARK] });
     expect(redaction.getLastResult()).toEqual(result);
     expect(applied).toHaveLength(1);
     expect(applied[0]!.result).toEqual(result);
@@ -254,7 +254,7 @@ describe('applying', () => {
     const { ctx, redaction } = harness();
     const applied: RedactionAppliedEvent[] = [];
     redaction.onApplied((event) => applied.push(event));
-    const result = resultOf({ kind: 'pages', pages: [PAGE] });
+    const result = resultOf({ pages: [PAGE] });
 
     ctx.emitDocumentEvent({ type: 'redaction.applied', origin: REMOTE_ORIGIN, ...result });
 
@@ -312,12 +312,12 @@ describe('applying', () => {
     await first;
     await tick();
     expect(apply).toHaveBeenCalledTimes(2);
-    expect(apply.mock.calls[1]![0]).toEqual({ kind: 'pages', pages: [OTHER_PAGE] });
+    expect(apply.mock.calls[1]![0]).toEqual({ pages: [OTHER_PAGE] });
 
     releases[1]!();
     await second;
     expect(maxActive).toBe(1);
-    expect(redaction.getLastResult()?.scope).toEqual({ kind: 'pages', pages: [OTHER_PAGE] });
+    expect(redaction.getLastResult()?.scope).toEqual({ pages: [OTHER_PAGE] });
   });
 
   it('keeps applying after a failed apply', async () => {
@@ -334,7 +334,7 @@ describe('applying', () => {
     const failed = redaction.applyPages([PAGE]);
     const next = redaction.applyPages([OTHER_PAGE]);
     await expect(failed).rejects.toThrow('engine failure');
-    await expect(next).resolves.toMatchObject({ scope: { kind: 'pages', pages: [OTHER_PAGE] } });
+    await expect(next).resolves.toMatchObject({ scope: { pages: [OTHER_PAGE] } });
     expect(redaction.isApplying()).toBe(false);
   });
 
@@ -351,6 +351,6 @@ describe('applying', () => {
   it('applies every page of the document in pages scope', async () => {
     const { redaction, apply } = harness();
     await redaction.applyAll();
-    expect(apply).toHaveBeenCalledWith({ kind: 'pages', pages: [PAGE, OTHER_PAGE] });
+    expect(apply).toHaveBeenCalledWith({ pages: [PAGE, OTHER_PAGE] });
   });
 });

@@ -149,7 +149,7 @@ export class PieceInfoAccessor {
     return out;
   }
 
-  clear(application: string, signal: AbortSignal): void {
+  delete(application: string, signal: AbortSignal): void {
     throwIfAborted(signal);
     requireApplication(application);
     const { fn } = this.runtime;
@@ -162,7 +162,7 @@ export class PieceInfoAccessor {
     if (!ok) {
       throw new EngineError(
         EngineErrorCode.Unknown,
-        `pieceInfo clear rejected for application '${application}'`,
+        `pieceInfo delete rejected for application '${application}'`,
       );
     }
   }

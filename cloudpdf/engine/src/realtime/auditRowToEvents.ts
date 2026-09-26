@@ -1,6 +1,7 @@
 import {
   annotationImportFacts,
   deletedAnnotationOf,
+  deletedAttachmentOf,
   deletedFieldOf,
   toPageRef,
   type AnnotationCreateResult,
@@ -189,6 +190,7 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
       return {
         type: 'attachments.deleted',
         origin,
+        deleted: deletedAttachmentOf(row.payload as AttachmentDeleteResult),
         ...(row.payload as AttachmentDeleteResult),
       };
     // Form mutations: two audit kinds share the `forms.valueSet` event

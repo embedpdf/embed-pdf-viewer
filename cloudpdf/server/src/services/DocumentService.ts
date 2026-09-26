@@ -21,8 +21,8 @@ import {
   type PdfSaveMode,
   type WorkerJobId,
   type WorkerResultPayload,
-  type EmbeddedFileItem,
-  type EmbeddedFileRef,
+  type AttachmentList,
+  type AttachmentRef,
   type AnnotationRef,
   type WirePack,
   type WorkerRequest,
@@ -1655,7 +1655,7 @@ export class DocumentService {
     /** Omit for the base view (shared reads use no layer session). */
     layerName?: string,
     signal?: AbortSignal,
-  ): Promise<EmbeddedFileItem[]> {
+  ): Promise<AttachmentList> {
     if (layerName !== undefined) await this.ensureLayerOnPool(ctx, docId, layerName);
     else await this.openOnPool(ctx, docId);
     const build = (jobId: WorkerJobId) =>
@@ -1672,7 +1672,7 @@ export class DocumentService {
         `unexpected attachments.list payload: ${payload.tag}`,
       );
     }
-    return payload.items;
+    return { attachments: payload.attachments };
   }
 
   /** Decode one document-level embedded file (by key) to a temp path.
@@ -1681,7 +1681,7 @@ export class DocumentService {
     ctx: OpenContext,
     docId: string,
     layerName: string | undefined,
-    ref: EmbeddedFileRef,
+    ref: AttachmentRef,
     signal?: AbortSignal,
   ): Promise<SavedAttachmentFile> {
     return this.readFileToTemp(ctx, docId, layerName, signal, (jobId, path) =>

@@ -9,6 +9,7 @@ export * from "./pages/client/requests/index.js";
 export * as pages from "./pages/index.js";
 export * from "./redactions/client/requests/index.js";
 export * as redactions from "./redactions/index.js";
+export * from "./redactions/types/index.js";
 export * from "./signatures/client/requests/index.js";
 export * as signatures from "./signatures/index.js";
 export * from "./signatures/types/index.js";

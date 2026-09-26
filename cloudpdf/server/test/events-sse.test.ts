@@ -214,7 +214,7 @@ describe('GET /events — the SSE half of the document event stream', () => {
     const second = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/move`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ pages: [3].map(toPageRef), destIndex: 0 }),
+      body: JSON.stringify({ pages: [3].map(toPageRef), toIndex: 0 }),
     });
     expect(second.status).toBe(200);
 

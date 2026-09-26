@@ -128,7 +128,7 @@ export function createAssetWrites(
             },
             { appearance: new Uint8Array(resolved.bytes) },
           );
-          const flattened = await doc.pages.flatten([page], 'display');
+          const flattened = await doc.pages.flatten([page], { usage: 'display' });
           if (flattened.results.some(({ status }) => status !== 'applied')) {
             throw stampError('operation-failed', 'flattening the raster into its page failed');
           }

@@ -1,8 +1,8 @@
 import type {
   AttachmentContent,
   AttachmentFileSource,
-  EmbeddedFileItem,
-  EmbeddedFileRef,
+  AttachmentList,
+  AttachmentRef,
 } from '../dto/Attachment';
 import type {
   AttachmentCreateResult,
@@ -14,7 +14,7 @@ import { AbortablePromise } from '../promise/AbortablePromise';
  * Document-level attachments: the catalog's `/EmbeddedFiles` name tree
  * (ISO 32000 §7.11.4). Exposed via `DocumentHandle.attachments`.
  *
- * Addressing is by name-tree key (`EmbeddedFileRef`) — unique by
+ * Addressing is by name-tree key (`AttachmentRef`) — unique by
  * construction, so there is no weak/index tier and no revision to
  * validate (see the ref's doc comment). `list()` returns metadata only;
  * bytes leave the engine exclusively through {@link download}. The
@@ -23,14 +23,14 @@ import { AbortablePromise } from '../promise/AbortablePromise';
  */
 export interface DocumentAttachmentsService {
   /** Snapshot of the `/EmbeddedFiles` name tree, in tree (key-sorted) order. */
-  list(): AbortablePromise<EmbeddedFileItem[]>;
+  list(): AbortablePromise<AttachmentList>;
   /**
    * Decode and return one embedded file's bytes plus the metadata needed
    * to hand it to a user (name, mime type). Throws
    * `EngineError(NotFound)` when no entry has the ref's key and
    * `EngineError(InvalidArg)` when the entry has no embedded file stream.
    */
-  download(ref: EmbeddedFileRef): AbortablePromise<AttachmentContent>;
+  download(ref: AttachmentRef): AbortablePromise<AttachmentContent>;
   /**
    * Create an embedded file in the name tree. The file's `name` becomes
    * the tree key (`/UF` = `/F` = key); a duplicate key rejects with
@@ -47,5 +47,5 @@ export interface DocumentAttachmentsService {
    * unknown key. A mutation: layer sessions persist an artifact and an
    * `attachments.deleted` event is published.
    */
-  delete(ref: EmbeddedFileRef): AbortablePromise<AttachmentDeleteResult>;
+  delete(ref: AttachmentRef): AbortablePromise<AttachmentDeleteResult>;
 }

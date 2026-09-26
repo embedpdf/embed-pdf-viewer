@@ -12,9 +12,7 @@ export type RedactionApplyStatus = 'applied' | 'unchanged' | 'failed' | 'skipped
  * needed). Referencing a non-redact annotation fails that page with
  * `InvalidArg` before anything is written.
  */
-export type RedactionApplyScope =
-  | { kind: 'pages'; pages: PageRef[] }
-  | { kind: 'annotations'; refs: AnnotationRef[] };
+export type RedactionApplyScope = { pages: PageRef[] } | { annotations: AnnotationRef[] };
 
 export interface RedactionApplyItemResult {
   page: PageRef;
@@ -42,5 +40,5 @@ export interface RedactionApplyResult {
   results: RedactionApplyItemResult[];
   /** Total {@link RedactionApplyItemResult.removedAnnotationCount} across all pages. */
   removedAnnotationCount: number;
-  meta: MutationMeta | null;
+  meta: MutationMeta;
 }

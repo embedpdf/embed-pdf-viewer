@@ -1,7 +1,7 @@
 import {
   PageScaleInputSchema,
   PageScaleResultSchema,
-  PageMeasurementViewportSchema,
+  PageMeasurementViewportListSchema,
 } from '@embedpdf/engine-core/wire';
 import type { DocCapability } from '@embedpdf/engine-core/runtime';
 import {
@@ -18,7 +18,14 @@ import {
   FormSetValueResultSchema,
   FormSnapshotSchema,
   IdentitySchema,
-  MutationMetaSchema,
+  PageDeleteResultSchema,
+  PageFlattenResultSchema,
+  PageInsertResultSchema,
+  PageMoveResultSchema,
+  PageNameResultSchema,
+  PageRotateResultSchema,
+  RedactionApplyResultSchema,
+  RedactionApplyScopeSchema,
   PageTextSnapshotSchema,
   ChangeAnalysisSchema,
   DocumentVersionsSchema,
@@ -1344,13 +1351,6 @@ export const documentPasswordHeader: AdminOperationHeader = {
 const looseJson = z.record(z.string(), z.unknown());
 const docCredentials = ['api-token', 'doc-jwt'] as const;
 
-/**
- * Every doc-plane mutation responds with the shared meta envelope — the
- * cache/version deltas SDKs use to re-point immutable reads — plus
- * operation-specific fields that tighten per-op as they are ported.
- */
-const MutationResponseSchema = z.object({ meta: MutationMetaSchema }).passthrough();
-
 export const DocSigningParamsSchema = DocLayerParamsSchema.extend({
   signingId: z.string().min(1),
 });
@@ -1936,7 +1936,7 @@ export const docOperations = {
     requestHeaders: [documentPasswordHeader],
     params: DocPageParamsSchema,
     responses: {
-      200: { contentType: 'application/json', schema: z.array(PageMeasurementViewportSchema) },
+      200: { contentType: 'application/json', schema: PageMeasurementViewportListSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
   },
@@ -1972,7 +1972,7 @@ export const docOperations = {
     params: DocLayerParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: PageMoveResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
@@ -1990,7 +1990,7 @@ export const docOperations = {
     params: DocLayerParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: PageRotateResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
@@ -2008,7 +2008,7 @@ export const docOperations = {
     params: DocLayerParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: PageDeleteResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
@@ -2027,7 +2027,7 @@ export const docOperations = {
     params: DocLayerParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: PageNameResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
@@ -2045,7 +2045,7 @@ export const docOperations = {
     params: DocLayerParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: PageNameResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
@@ -2063,7 +2063,7 @@ export const docOperations = {
     params: DocLayerParamsSchema,
     body: { contentType: 'application/json', schema: looseJson, required: false },
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: PageFlattenResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
@@ -2083,12 +2083,12 @@ export const docOperations = {
       contentType: 'multipart/form-data',
     },
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: PageInsertResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
     notes:
-      'Multipart mutation envelope: a `body` field holding `{"destIndex"?: number}` (omitted → append) plus a `resource:source` file part carrying the standalone PDF whose pages are copied in. The inserted copies get fresh page object numbers, returned in insertion order.',
+      'Multipart mutation envelope: a `body` field holding `{"toIndex"?: number}` (omitted → append) plus a `resource:source` file part carrying the standalone PDF whose pages are copied in. The inserted copies get fresh page object numbers, returned in insertion order.',
   },
   'doc.pages.insertBlank': {
     operationId: 'doc.pages.insertBlank',
@@ -2103,12 +2103,12 @@ export const docOperations = {
     params: DocLayerParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: PageInsertResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
     notes:
-      'Body is `{"size": {"width", "height"}, "count"?, "destIndex"?}` — size in PDF points, count in [1, 100], destIndex omitted → append.',
+      'Body is `{"size": {"width", "height"}, "count"?, "toIndex"?}` — size in PDF points, count in [1, 100], toIndex omitted → append.',
   },
   'doc.pages.extract': {
     operationId: 'doc.pages.extract',
@@ -2141,9 +2141,9 @@ export const docOperations = {
     docCapabilities: ['doc.pages.modify', 'doc.annotate.modify', 'doc.redact'],
     requestHeaders: [documentPasswordHeader],
     params: DocLayerParamsSchema,
-    body: { contentType: 'application/json', schema: looseJson, required: false },
+    body: { contentType: 'application/json', schema: RedactionApplyScopeSchema },
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: RedactionApplyResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },

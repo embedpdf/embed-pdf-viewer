@@ -2,26 +2,26 @@
 
 import type * as CloudPDF from "../index.js";
 
-export type DocPagesViewports200ResponseItemMeasure =
-    | CloudPDF.DocPagesViewports200ResponseItemMeasure.Rectilinear
-    | CloudPDF.DocPagesViewports200ResponseItemMeasure.Geospatial
-    | CloudPDF.DocPagesViewports200ResponseItemMeasure.Unknown;
+export type DocPagesViewports200ResponseViewportsItemMeasure =
+    | CloudPDF.DocPagesViewports200ResponseViewportsItemMeasure.Rectilinear
+    | CloudPDF.DocPagesViewports200ResponseViewportsItemMeasure.Geospatial
+    | CloudPDF.DocPagesViewports200ResponseViewportsItemMeasure.Unknown;
 
-export namespace DocPagesViewports200ResponseItemMeasure {
+export namespace DocPagesViewports200ResponseViewportsItemMeasure {
     export interface Rectilinear {
         subtype: "rectilinear";
         ratio?: string | undefined;
-        x: DocPagesViewports200ResponseItemMeasureRectilinear.X.Item[];
-        y?: DocPagesViewports200ResponseItemMeasureRectilinear.Y.Item[] | undefined;
-        distance: DocPagesViewports200ResponseItemMeasureRectilinear.Distance.Item[];
-        area: DocPagesViewports200ResponseItemMeasureRectilinear.Area.Item[];
-        angle?: DocPagesViewports200ResponseItemMeasureRectilinear.Angle.Item[] | undefined;
-        slope?: DocPagesViewports200ResponseItemMeasureRectilinear.Slope.Item[] | undefined;
-        origin?: DocPagesViewports200ResponseItemMeasureRectilinear.Origin | undefined;
+        x: DocPagesViewports200ResponseViewportsItemMeasureRectilinear.X.Item[];
+        y?: DocPagesViewports200ResponseViewportsItemMeasureRectilinear.Y.Item[] | undefined;
+        distance: DocPagesViewports200ResponseViewportsItemMeasureRectilinear.Distance.Item[];
+        area: DocPagesViewports200ResponseViewportsItemMeasureRectilinear.Area.Item[];
+        angle?: DocPagesViewports200ResponseViewportsItemMeasureRectilinear.Angle.Item[] | undefined;
+        slope?: DocPagesViewports200ResponseViewportsItemMeasureRectilinear.Slope.Item[] | undefined;
+        origin?: DocPagesViewports200ResponseViewportsItemMeasureRectilinear.Origin | undefined;
         cyx?: number | undefined;
     }
 
-    export namespace DocPagesViewports200ResponseItemMeasureRectilinear {
+    export namespace DocPagesViewports200ResponseViewportsItemMeasureRectilinear {
         export type X = X.Item[];
 
         export namespace X {

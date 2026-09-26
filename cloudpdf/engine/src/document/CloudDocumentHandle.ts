@@ -5,7 +5,6 @@ import {
   EngineError,
   EngineErrorCode,
   subscribeToType,
-  type AttachmentsCache,
   type DocumentAnnotationsService,
   type DocumentActionsService,
   type DocumentAttachmentsService,
@@ -19,11 +18,9 @@ import {
   CONTINUOUS_RENDER_POLICY,
   type DocumentRenderService,
   type DocumentSecurityService,
-  type MetadataCache,
   type MutationMeta,
   type PageHandle,
   type PageRef,
-  type PageStructureCache,
   type PdfSaveMode,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -72,21 +69,13 @@ export interface ManifestAccessor {
    * base → layer, so any observed mutation proves the plane diverged.
    */
   apply(meta: MutationMeta, owns: readonly LayerScopePlane[]): void;
-  /** Advance the cached manifest's docVersion + layoutVersion after a page
-   *  Structure op that keeps the page set intact (move, rotate). */
-  applyPageStructure(cache: PageStructureCache): void;
-  /** Same advance for a page delete, additionally dropping the deleted
-   *  pages' manifest rows so per-page leaf URLs stop resolving locally. */
-  applyPageDelete(cache: PageStructureCache, deletedPages: readonly PageRef[]): void;
+  /** A page delete: the advance, plus dropping the deleted pages' manifest
+   *  rows so per-page leaf URLs stop resolving locally. */
+  applyPageDelete(meta: MutationMeta, deletedPages: readonly PageRef[]): void;
   /** Page insert: the cached manifest has no rows for the fresh page object numbers (the
    *  result carries only their object numbers), so the absorb drops the
    *  cache for a lazy refetch instead of patching. */
-  applyPageInsert(cache: PageStructureCache): void;
-  /** Advance the cached manifest's docVersion + metadataVersion after a metadata write. */
-  applyMetadata(cache: MetadataCache): void;
-  /** Advance the cached manifest's docVersion + attachmentsVersion after an
-   *  attachment create/delete. */
-  applyAttachments(cache: AttachmentsCache): void;
+  applyPageInsert(meta: MutationMeta): void;
 }
 
 export class CloudDocumentHandle implements DocumentHandle {
@@ -217,11 +206,8 @@ export class CloudDocumentHandle implements DocumentHandle {
       get: (signal) => this.getManifest(signal),
       refresh: (signal) => this.refreshManifest(signal),
       apply: (meta, owns) => this.absorbMutation(meta, owns),
-      applyPageStructure: (cache) => this.absorbPageStructure(cache),
-      applyPageDelete: (cache, deletedPages) => this.absorbPageDelete(cache, deletedPages),
-      applyPageInsert: (cache) => this.absorbPageInsert(cache),
-      applyMetadata: (cache) => this.absorbMetadata(cache),
-      applyAttachments: (cache) => this.absorbAttachments(cache),
+      applyPageDelete: (meta, deletedPages) => this.absorbPageDelete(meta, deletedPages),
+      applyPageInsert: (meta) => this.absorbPageInsert(meta),
     };
     this.metadata = new CloudMetadataService(
       http,
@@ -431,6 +417,13 @@ export class CloudDocumentHandle implements DocumentHandle {
       ...(delta?.annotationsVersion !== undefined
         ? { annotationsVersion: delta.annotationsVersion }
         : {}),
+      // The plane pins a page-structure, metadata or attachment write bumps:
+      // absorbed so the next read addresses the fresh leaf.
+      ...(delta?.layoutVersion !== undefined ? { layoutVersion: delta.layoutVersion } : {}),
+      ...(delta?.metadataVersion !== undefined ? { metadataVersion: delta.metadataVersion } : {}),
+      ...(delta?.attachmentsVersion !== undefined
+        ? { attachmentsVersion: delta.attachmentsVersion }
+        : {}),
       // The signing fences: every ordinary commit writes an artifact
       // (`working`), and the layer's write serial when the delta names it.
       ...(delta?.layerVersion !== undefined ? { layerVersion: delta.layerVersion } : {}),
@@ -446,59 +439,19 @@ export class CloudDocumentHandle implements DocumentHandle {
   }
 
   /**
-   * Patch the cached manifest after a set-preserving page-structure op (move,
-   * rotate). Both are purely structural: they advance `docVersion` (so leaf
-   * URLs re-resolve) and `layoutVersion` (so the /layout leaf re-fetches),
-   * but leave every per-page pin untouched — a rotate renders the same
-   * normalized bitmaps, a move the same pages. We raise the floor
-   * unconditionally and, when our cache is exactly one version behind,
-   * advance it in place; otherwise we drop it and refetch lazily.
+   * Patch the cached manifest after a page delete: the shared advance plus
+   * dropping the deleted pages' manifest rows, so no leaf URL for a retired
+   * page object number can be built from the cache (a stale request would
+   * 404 anyway — this keeps the failure local and instant). Delete changes
+   * the page set: a view that removed content must never resolve base
+   * artifacts again, so content and annotations flip with layout.
    */
-  private absorbPageStructure(cache: PageStructureCache): void {
-    // Move/rotate own the layout plane only: normalized render/text/
-    // geometry artifacts survive structural ops, so content keeps sharing.
-    this.flipScopes(['layout']);
-    this.manifestFloorVersion = Math.max(this.manifestFloorVersion, cache.docVersion);
-    this.inflightManifest = null;
-
+  private absorbPageDelete(meta: MutationMeta, deletedPages: readonly PageRef[]): void {
+    this.absorbMutation(meta, ['layout', 'content', 'annotations']);
     if (!this.manifestCache) return;
-    if (cache.docVersion <= this.manifestCache.docVersion) return;
-    if (cache.previousDocVersion !== this.manifestCache.docVersion) {
-      this.manifestCache = null;
-      return;
-    }
-    this.manifestCache = {
-      ...this.manifestCache,
-      docVersion: cache.docVersion,
-      layoutVersion: cache.layoutVersion,
-    };
-  }
-
-  /**
-   * Patch the cached manifest after a page delete: the shared structural
-   * advance plus dropping the deleted pages' manifest rows, so no leaf URL
-   * for a retired page object number can be built from the cache (a stale request would
-   * 404 anyway — this keeps the failure local and instant).
-   */
-  private absorbPageDelete(cache: PageStructureCache, deletedPages: readonly PageRef[]): void {
-    // Delete changes the page set: a view that removed content must never
-    // resolve base artifacts again, so content and annotations flip with
-    // layout.
-    this.flipScopes(['layout', 'content', 'annotations']);
-    this.manifestFloorVersion = Math.max(this.manifestFloorVersion, cache.docVersion);
-    this.inflightManifest = null;
-
-    if (!this.manifestCache) return;
-    if (cache.docVersion <= this.manifestCache.docVersion) return;
-    if (cache.previousDocVersion !== this.manifestCache.docVersion) {
-      this.manifestCache = null;
-      return;
-    }
     const deleted = new Set(deletedPages.map((page) => page.pageObjectNumber));
     this.manifestCache = {
       ...this.manifestCache,
-      docVersion: cache.docVersion,
-      layoutVersion: cache.layoutVersion,
       pages: this.manifestCache.pages.filter(
         (page) => !deleted.has(page.state.page.pageObjectNumber),
       ),
@@ -516,64 +469,13 @@ export class CloudDocumentHandle implements DocumentHandle {
    * that includes the new pages' rows. The UI never waits on that refetch:
    * the mutation result / event already carries the full new layout.
    */
-  private absorbPageInsert(cache: PageStructureCache): void {
+  private absorbPageInsert(meta: MutationMeta): void {
     this.flipScopes(['layout', 'content', 'annotations']);
-    this.manifestFloorVersion = Math.max(this.manifestFloorVersion, cache.docVersion);
+    if (meta.cacheDelta) {
+      this.manifestFloorVersion = Math.max(this.manifestFloorVersion, meta.cacheDelta.docVersion);
+    }
     this.inflightManifest = null;
     this.manifestCache = null;
-  }
-
-  /**
-   * Patch the cached manifest after a metadata write. Symmetric with
-   * {@link absorbPageMove}: a metadata edit advances `docVersion` (so leaf
-   * URLs re-resolve) and `metadataVersion` (so the /metadata leaf re-fetches),
-   * but leaves `layoutVersion` and every per-page pin untouched. Raise the
-   * floor unconditionally and, when our cache is exactly one version behind,
-   * advance it in place; otherwise drop it and refetch lazily.
-   */
-  private absorbMetadata(cache: MetadataCache): void {
-    this.flipScopes(['metadata']);
-    this.manifestFloorVersion = Math.max(this.manifestFloorVersion, cache.docVersion);
-    this.inflightManifest = null;
-
-    if (!this.manifestCache) return;
-    if (cache.docVersion <= this.manifestCache.docVersion) return;
-    if (cache.previousDocVersion !== this.manifestCache.docVersion) {
-      this.manifestCache = null;
-      return;
-    }
-    this.manifestCache = {
-      ...this.manifestCache,
-      docVersion: cache.docVersion,
-      metadataVersion: cache.metadataVersion,
-    };
-  }
-
-  /**
-   * Patch the cached manifest after an attachment create/delete. Symmetric
-   * with {@link absorbMetadata}: an attachment write advances `docVersion`
-   * (so leaf URLs re-resolve) and `attachmentsVersion` (so the /attachments
-   * listing and /attachment-files leaves re-fetch), but leaves
-   * `layoutVersion` and every per-page pin untouched. Raise the floor
-   * unconditionally and, when our cache is exactly one version behind,
-   * advance it in place; otherwise drop it and refetch lazily.
-   */
-  private absorbAttachments(cache: AttachmentsCache): void {
-    this.flipScopes(['attachments']);
-    this.manifestFloorVersion = Math.max(this.manifestFloorVersion, cache.docVersion);
-    this.inflightManifest = null;
-
-    if (!this.manifestCache) return;
-    if (cache.docVersion <= this.manifestCache.docVersion) return;
-    if (cache.previousDocVersion !== this.manifestCache.docVersion) {
-      this.manifestCache = null;
-      return;
-    }
-    this.manifestCache = {
-      ...this.manifestCache,
-      docVersion: cache.docVersion,
-      attachmentsVersion: cache.attachmentsVersion,
-    };
   }
 
   private startManifestFetch(opts: { allowInitialHead: boolean }): Promise<DocumentManifest> {
@@ -723,20 +625,21 @@ export class CloudDocumentHandle implements DocumentHandle {
         return;
       case 'pages.moved':
       case 'pages.rotated':
-        if (event.cache) this.absorbPageStructure(event.cache);
+      case 'pages.named':
+        this.absorbMutation(event.meta, ['layout']);
         return;
       case 'pages.deleted':
-        if (event.cache) this.absorbPageDelete(event.cache, event.pages);
+        this.absorbPageDelete(event.meta, event.pages);
         return;
       case 'pages.inserted':
-        if (event.cache) this.absorbPageInsert(event.cache);
+        this.absorbPageInsert(event.meta);
         return;
       case 'metadata.updated':
-        if (event.cache) this.absorbMetadata(event.cache);
+        this.absorbMutation(event.meta, ['metadata']);
         return;
       case 'attachments.created':
       case 'attachments.deleted':
-        if (event.cache) this.absorbAttachments(event.cache);
+        this.absorbMutation(event.meta, ['attachments']);
         return;
       case 'forms.valueSet':
       case 'forms.imported':
@@ -752,19 +655,18 @@ export class CloudDocumentHandle implements DocumentHandle {
         this.absorbMutation(event.meta, ['annotations']);
         return;
       case 'forms.effectsApplied':
-        // No-op batches are never audited, but keep the nullable guard at
-        // the consumer boundary for forward/backward wire compatibility.
-        if (event.meta) this.absorbMutation(event.meta, ['annotations']);
+        this.absorbMutation(event.meta, ['annotations']);
         return;
       case 'pages.flattened':
+      case 'annotations.flattened':
         // Flatten bakes annotations into page content: both planes flip.
-        if (event.meta) this.absorbMutation(event.meta, ['content', 'annotations']);
+        this.absorbMutation(event.meta, ['content', 'annotations']);
         return;
       case 'redaction.applied':
         // Redaction-apply rewrites content and consumes the marks: both
         // planes flip — and this is the security-relevant divergence, so a
         // remote apply must stop this client's base reads immediately.
-        if (event.meta) this.absorbMutation(event.meta, ['content', 'annotations']);
+        this.absorbMutation(event.meta, ['content', 'annotations']);
         return;
     }
   }

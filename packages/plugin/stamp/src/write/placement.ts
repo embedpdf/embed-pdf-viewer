@@ -167,7 +167,7 @@ export function createPlacement(
       }
 
       const page = selectedPage.ref;
-      const flattened = await doc.pages.flatten([page], 'display');
+      const flattened = await doc.pages.flatten([page], { usage: 'display' });
       const failed = flattened.results.find(
         ({ status }) => status === 'failed' || status === 'skipped',
       );

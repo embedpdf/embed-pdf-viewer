@@ -36,12 +36,14 @@ export function runPageFlattenConformance(
           if (event.type === 'pages.flattened') events.push(event);
         });
 
-        const result = await doc.pages.flatten([toPageRef(pageObjectNumber)], 'display');
+        const result = await doc.pages.flatten([toPageRef(pageObjectNumber)], { usage: 'display' });
         expect(PageFlattenResultSchema.safeParse(result).success).toBe(true);
         expect(result.pages).toEqual([toPageRef(pageObjectNumber)]);
         expect(result.usage).toBe('display');
         expect(result.results.map((item) => item.status)).toEqual(['applied']);
-        expect(result.meta === null).toBe(false);
+        expect(result.meta.affectedPages.map((state) => state.page)).toEqual([
+          toPageRef(pageObjectNumber),
+        ]);
         expect(events).toHaveLength(1);
 
         const layoutAfter = await doc.pages.list();
@@ -55,9 +57,9 @@ export function runPageFlattenConformance(
             annotationsBefore.pages[0].revision.generation,
         ).toBe(true);
 
-        const noOp = await doc.pages.flatten([toPageRef(pageObjectNumber)], 'display');
+        const noOp = await doc.pages.flatten([toPageRef(pageObjectNumber)], { usage: 'display' });
         expect(noOp.results.map((item) => item.status)).toEqual(['unchanged']);
-        expect(noOp.meta).toBeNull();
+        expect(noOp.meta).toEqual({ affectedPages: [], cacheDelta: null });
         expect(events).toHaveLength(1);
         unsubscribe();
 

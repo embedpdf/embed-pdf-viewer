@@ -3,9 +3,9 @@ import { z } from 'zod';
 import { IsoDateTimeSchema } from './IsoDateTime.schema';
 
 import type {
+  Attachment,
   AttachmentFileInfo,
-  EmbeddedFileItem,
-  EmbeddedFileRef,
+  AttachmentRef,
   WireAttachmentFile,
 } from './Attachment';
 
@@ -32,13 +32,14 @@ export const AttachmentFileInfoSchema: z.ZodType<AttachmentFileInfo> = z.object(
   modifiedAt: IsoDateTimeSchema.optional(),
 });
 
-export const EmbeddedFileRefSchema: z.ZodType<EmbeddedFileRef> = z.object({
+export const AttachmentRefSchema: z.ZodType<AttachmentRef> = z.object({
   kind: z.literal('key'),
   key: z.string().min(1),
 });
 
-export const EmbeddedFileItemSchema: z.ZodType<EmbeddedFileItem> = z.object({
-  key: z.string(),
+export const AttachmentSchema: z.ZodType<Attachment> = z.object({
+  // A foreign tree entry whose key can't be read lists with an empty key.
+  ref: z.object({ kind: z.literal('key'), key: z.string() }),
   name: z.string(),
   mimeType: z.string().optional(),
   description: z.string().optional(),

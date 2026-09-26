@@ -566,7 +566,7 @@ export const wirePaths = {
 
   /**
    * POST (multipart mutation envelope): copy every page of the `source`
-   * resource part (a standalone PDF) in at the body's `destIndex`.
+   * resource part (a standalone PDF) in at the body's `toIndex`.
    */
   layerPagesInsert: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/insert`,

@@ -78,7 +78,7 @@ function fakeDocument(options: { allowEdit?: boolean; readRejects?: unknown } = 
       },
       update: vi.fn(async (patch: { title?: string | null }) => {
         const metadata = META({ title: patch.title ?? null });
-        const result = { metadata, cache: null };
+        const result = { metadata, meta: { affectedPages: [], cacheDelta: null } };
         // Like both real engines: the confirmed event is published before the promise settles.
         emit({ type: 'metadata.updated', origin, ...result });
         return result;
@@ -136,7 +136,7 @@ describe('metadata controller', () => {
       type: 'metadata.updated',
       origin: { kind: 'remote', sessionId: 's2', sub: 'alice', ts: 2 },
       metadata: META({ title: 'newer' }),
-      cache: null,
+      meta: { affectedPages: [], cacheDelta: null },
     });
     doc.reads[0].resolve(META({ title: 'stale' }));
     await tick();

@@ -1,6 +1,6 @@
 import type {
   AttachmentFileInfo,
-  EmbeddedFileRef,
+  AttachmentRef,
   IsoDateTime,
   WireResource,
 } from '@embedpdf/engine-core/runtime';
@@ -24,7 +24,7 @@ import { formatPdfDate, pdfDateToIso } from '../../../shared/pdf-date';
  * (the annotation reader + `downloadResource(ref, 'file')`).
  */
 
-/** Read the name-tree key at |index| — the durable EmbeddedFileRef address. */
+/** Read the name-tree key at |index| — the durable AttachmentRef address. */
 export function readAttachmentKey(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
@@ -34,12 +34,12 @@ export function readAttachmentKey(
   return readUtf16String(mem, (buf, cap) => fn.EPDFDoc_GetAttachmentKey(docPtr, index, buf, cap));
 }
 
-/** Resolve an EmbeddedFileRef to its current name-tree index, or -1. */
+/** Resolve an AttachmentRef to its current name-tree index, or -1. */
 export function resolveAttachmentIndex(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   docPtr: Ptr,
-  ref: EmbeddedFileRef,
+  ref: AttachmentRef,
 ): number {
   const keyPtr = mem.writeU16String(ref.key);
   try {

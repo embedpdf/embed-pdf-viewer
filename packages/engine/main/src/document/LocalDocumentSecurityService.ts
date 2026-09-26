@@ -2,6 +2,7 @@ import {
   AbortablePromise,
   EngineError,
   EngineErrorCode,
+  collabTargetOf,
   passwordPromptFromState,
   securityStateFromProbe,
   wirePack,
@@ -12,7 +13,7 @@ import {
   type DocumentUnlockInput,
   type DocumentUnlockResult,
   type PasswordPrompt,
-  type CollabTarget,
+  type AnnotationOwner,
   type DocCapability,
 } from '@embedpdf/engine-core/runtime';
 
@@ -22,7 +23,7 @@ import type { JobId, WorkerResultPayload } from '../worker/protocol';
 import type { WorkerQueue } from '../worker/WorkerQueue';
 
 export class LocalDocumentSecurityService implements DocumentSecurityService {
-  private state: DocumentSecurityState;
+  private securityState: DocumentSecurityState;
 
   constructor(
     initial: DocumentSecurityProbeInfo,
@@ -31,18 +32,18 @@ export class LocalDocumentSecurityService implements DocumentSecurityService {
     private readonly view: { isClosed(): boolean },
     /**
      * Optional ScopeGuard so the service can expose the same
-     * `effectiveScope` / `identity` shape the cloud SDK does. Without
-     * it (legacy LocalEngine callers), `effectiveScope` is empty
+     * `scope` / `identity` shape the cloud SDK does. Without
+     * it (legacy LocalEngine callers), `scope` is empty
      * and `identity` is null — the security state itself still
      * works.
      */
     private readonly guard: ScopeGuard | null = null,
   ) {
-    this.state = securityStateFromProbe(initial);
+    this.securityState = securityStateFromProbe(initial);
   }
 
-  get current(): DocumentSecurityState {
-    return this.state;
+  get state(): DocumentSecurityState {
+    return this.securityState;
   }
 
   /**
@@ -52,7 +53,7 @@ export class LocalDocumentSecurityService implements DocumentSecurityService {
    * Returns an empty array when no ScopeGuard was wired (legacy
    * open path with no scope).
    */
-  get effectiveScope(): ReadonlyArray<string> {
+  get scope(): ReadonlyArray<string> {
     return this.guard ? this.guard.effectiveScope() : [];
   }
 
@@ -73,16 +74,23 @@ export class LocalDocumentSecurityService implements DocumentSecurityService {
    * never disagree with the engine's own deny. False on the legacy
    * no-scope open path, same rule as `allows`.
    */
-  allowsAnnotationCreate(): boolean {
-    return this.guard ? this.guard.canCollab('create', this.guard.targetForSelfCreate()) : false;
-  }
-
-  allowsAnnotationMutation(action: 'update' | 'delete', target: CollabTarget): boolean {
-    return this.guard ? this.guard.canCollab(action, target) : false;
-  }
-
-  allowsAnnotationGroupAssignment(groupId: string): boolean {
-    return this.guard ? this.guard.canSetGroup(groupId) : false;
+  allowsAnnotation(action: 'create'): boolean;
+  allowsAnnotation(action: 'update' | 'delete', annotation: AnnotationOwner): boolean;
+  allowsAnnotation(action: 'set-group', target: { groupId: string }): boolean;
+  allowsAnnotation(
+    action: 'create' | 'update' | 'delete' | 'set-group',
+    target?: AnnotationOwner | { groupId: string },
+  ): boolean {
+    const guard = this.guard;
+    if (!guard) return false;
+    switch (action) {
+      case 'create':
+        return guard.canCollab('create', guard.targetForSelfCreate());
+      case 'set-group':
+        return guard.canSetGroup((target as { groupId: string }).groupId);
+      default:
+        return guard.canCollab(action, collabTargetOf((target ?? {}) as AnnotationOwner));
+    }
   }
 
   /** Identity claims supplied at `engine.open()`, or null when none. */
@@ -146,7 +154,7 @@ export class LocalDocumentSecurityService implements DocumentSecurityService {
       if (payload.tag !== 'document.checkPasswordPermissions') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.state = securityStateFromProbe(payload.security);
+      this.securityState = securityStateFromProbe(payload.security);
       // The unlock loaded the document for real: the file's permission bits
       // are the ones this password opens it with (all of them for the owner
       // password), its signatures are known, and both apply from the next

@@ -46,6 +46,7 @@ import {
   type Identity,
   type MetadataPatch,
   type MetadataUpdateResult,
+  type CacheDelta,
   type MutationMeta,
   type PageDeleteResult,
   type PageFlattenResult,
@@ -62,12 +63,11 @@ import {
   type PageRotateResult,
   type PageRotation,
   type PageState,
-  type PageStructureCache,
   type WirePack,
   type WorkerJobId,
   type WorkerRequest,
   type WireAttachmentFile,
-  type EmbeddedFileRef,
+  type AttachmentRef,
   type AttachmentCreateResult,
   type AttachmentDeleteResult,
   type DocumentVersionRef,
@@ -730,7 +730,7 @@ export class LayerService {
       docId: string;
       layerName: string;
       pages: PageRef[];
-      destIndex: number;
+      toIndex: number;
     },
     signal?: AbortSignal,
   ): Promise<PageMoveResult> {
@@ -744,7 +744,7 @@ export class LayerService {
             docId: input.docId,
             layerName: input.layerName,
             pages: input.pages,
-            destIndex: input.destIndex,
+            toIndex: input.toIndex,
             artifactPath,
           });
         const payload = await this.requirePool().run(input.docId, build, signal);
@@ -939,9 +939,9 @@ export class LayerService {
             `unexpected annotations.flatten payload: ${payload.tag}`,
           );
         }
-        if (payload.result.meta === null) return payload.result;
+        if (!payload.wrote) return payload.result;
         return this.persistPageFlatten(ctx, input.docId, input.layerName, layer, {
-          result: payload.result as AnnotationFlattenResult & { meta: MutationMeta },
+          result: payload.result,
           artifact: requireLayerArtifact(payload as unknown),
         });
       });
@@ -1049,7 +1049,7 @@ export class LayerService {
        *  this op, and a transferred (detached) buffer would corrupt the
        *  retry. Structured clone copies it, like annotation resources. */
       bytes: ArrayBuffer;
-      destIndex?: number;
+      toIndex?: number;
     },
     signal?: AbortSignal,
   ): Promise<PageInsertResult> {
@@ -1065,7 +1065,7 @@ export class LayerService {
             docId: input.docId,
             layerName: input.layerName,
             bytes: input.bytes,
-            ...(input.destIndex !== undefined ? { destIndex: input.destIndex } : {}),
+            ...(input.toIndex !== undefined ? { toIndex: input.toIndex } : {}),
             artifactPath,
           });
         const payload = await this.requirePool().run(input.docId, build, signal);
@@ -1091,7 +1091,7 @@ export class LayerService {
       layerName: string;
       size: PdfSize;
       count?: number;
-      destIndex?: number;
+      toIndex?: number;
     },
     signal?: AbortSignal,
   ): Promise<PageInsertResult> {
@@ -1106,7 +1106,7 @@ export class LayerService {
             layerName: input.layerName,
             size: input.size,
             ...(input.count !== undefined ? { count: input.count } : {}),
-            ...(input.destIndex !== undefined ? { destIndex: input.destIndex } : {}),
+            ...(input.toIndex !== undefined ? { toIndex: input.toIndex } : {}),
             artifactPath,
           });
         const payload = await this.requirePool().run(input.docId, build, signal);
@@ -1169,9 +1169,9 @@ export class LayerService {
             `unexpected pages.flatten payload: ${payload.tag}`,
           );
         }
-        if (payload.result.meta === null) return payload.result;
+        if (!payload.wrote) return payload.result;
         return this.persistPageFlatten(ctx, input.docId, input.layerName, layer, {
-          result: payload.result as PageFlattenResult & { meta: MutationMeta },
+          result: payload.result,
           artifact: requireLayerArtifact(payload as unknown),
         });
       });
@@ -1193,9 +1193,9 @@ export class LayerService {
       // before the worker can shift any target page's index space — the same
       // guard flatten takes, over every page the scope can touch.
       const targetPages =
-        input.scope.kind === 'pages'
+        'pages' in input.scope
           ? pageObjectNumbersOf(input.scope.pages)
-          : [...new Set(input.scope.refs.map((ref) => ref.page.pageObjectNumber))];
+          : [...new Set(input.scope.annotations.map((ref) => ref.page.pageObjectNumber))];
       for (const pageObjectNumber of targetPages) {
         await this.assertWeakAnnotationStructuralEditAllowed(ctx, {
           docId: input.docId,
@@ -1224,9 +1224,9 @@ export class LayerService {
             `unexpected redaction.apply payload: ${payload.tag}`,
           );
         }
-        if (payload.result.meta === null) return payload.result;
+        if (!payload.wrote) return payload.result;
         return this.persistRedactionApply(ctx, input.docId, input.layerName, layer, {
-          result: payload.result as RedactionApplyResult & { meta: MutationMeta },
+          result: payload.result,
           artifact: requireLayerArtifact(payload as unknown),
         });
       });
@@ -1324,7 +1324,7 @@ export class LayerService {
     input: {
       docId: string;
       layerName: string;
-      ref: EmbeddedFileRef;
+      ref: AttachmentRef;
     },
     signal?: AbortSignal,
   ): Promise<AttachmentDeleteResult> {
@@ -2273,7 +2273,7 @@ export class LayerService {
     layerName: string,
     layer: LayerRow,
     input: {
-      result: RedactionApplyResult & { meta: MutationMeta };
+      result: RedactionApplyResult;
       artifact: LayerArtifactInput;
     },
   ): Promise<RedactionApplyResult> {
@@ -2682,7 +2682,7 @@ export class LayerService {
     artifactSize: number;
     nextVersion: number;
   }): Promise<{
-    result: { layout: PageListSnapshot; cache: PageStructureCache };
+    result: { layout: PageListSnapshot; meta: MutationMeta };
     auditId: number;
   }> {
     return this.requireDb()
@@ -2716,7 +2716,7 @@ export class LayerService {
         }
 
         const previousDocVersion = Number(currentLayer.doc_version);
-        const versions: PageStructureCache = {
+        const versions: LayoutVersions = {
           previousDocVersion,
           docVersion: previousDocVersion + 1,
           layoutVersion: Number(currentLayer.layout_version) + 1,
@@ -2724,7 +2724,7 @@ export class LayerService {
 
         // The finalized result — audited and returned identically: what we
         // tell the caller is what we tell history (and remote subscribers).
-        const result = { layout: input.layout, cache: versions };
+        const result = { layout: input.layout, meta: planeMeta(versions) };
 
         const auditEvent = makeAuditEvent({
           ctx: input.ctx,
@@ -2775,7 +2775,7 @@ export class LayerService {
     artifactSize: number;
     nextVersion: number;
   }): Promise<{
-    result: { layout: PageListSnapshot; cache: PageStructureCache };
+    result: { layout: PageListSnapshot; meta: MutationMeta };
     auditId: number;
   }> {
     return this.requireDb()
@@ -2843,7 +2843,7 @@ export class LayerService {
         }
 
         const previousDocVersion = Number(currentLayer.doc_version);
-        const versions: PageStructureCache = {
+        const versions: LayoutVersions = {
           previousDocVersion,
           docVersion: previousDocVersion + 1,
           layoutVersion: Number(currentLayer.layout_version) + 1,
@@ -2851,7 +2851,7 @@ export class LayerService {
 
         // The finalized result — audited and returned identically: what we
         // tell the caller is what we tell history (and remote subscribers).
-        const result = { layout: input.layout, cache: versions };
+        const result = { layout: input.layout, meta: planeMeta(versions) };
 
         const auditEvent = makeAuditEvent({
           ctx: input.ctx,
@@ -2877,7 +2877,7 @@ export class LayerService {
             doc_version: versions.docVersion,
             layout_version: versions.layoutVersion,
             // The page set shrank — the bulk annotation corpus changed.
-            // Clients re-pin via the 404-refresh rail (PageStructureCache
+            // Clients re-pin via the 404-refresh rail (the layout delta
             // carries no annotationsVersion).
             annotations_version: Number(currentLayer.annotations_version ?? 1) + 1,
           },
@@ -2974,7 +2974,7 @@ export class LayerService {
           .execute();
 
         const previousDocVersion = Number(currentLayer.doc_version);
-        const versions: PageStructureCache = {
+        const versions: LayoutVersions = {
           previousDocVersion,
           docVersion: previousDocVersion + 1,
           layoutVersion: Number(currentLayer.layout_version) + 1,
@@ -2985,7 +2985,7 @@ export class LayerService {
         const result: PageInsertResult = {
           insertedPages: input.insertedPages.map(toPageRef),
           layout: input.layout,
-          cache: versions,
+          meta: planeMeta(versions),
         };
 
         const auditEvent = makeAuditEvent({
@@ -3012,7 +3012,7 @@ export class LayerService {
             doc_version: versions.docVersion,
             layout_version: versions.layoutVersion,
             // The page set grew — the bulk annotation corpus changed.
-            // Clients re-pin via the 404-refresh rail (PageStructureCache
+            // Clients re-pin via the 404-refresh rail (the layout delta
             // carries no annotationsVersion).
             annotations_version: Number(currentLayer.annotations_version ?? 1) + 1,
           },
@@ -3284,7 +3284,7 @@ export class LayerService {
     docId: string;
     layerName: string;
     layer: LayerRow;
-    raw: RedactionApplyResult & { meta: MutationMeta };
+    raw: RedactionApplyResult;
     artifactKey: string;
     artifactSha: string;
     artifactSize: number;
@@ -4340,11 +4340,11 @@ export class LayerService {
         // tell the caller is what we tell history (and remote subscribers).
         const result: MetadataUpdateResult = {
           metadata: input.metadata,
-          cache: {
+          meta: planeMeta({
             previousDocVersion: previousLayerDocVersion,
             docVersion: layerDocVersion,
             metadataVersion,
-          },
+          }),
         };
 
         const auditEvent = makeAuditEvent({
@@ -4418,7 +4418,10 @@ export class LayerService {
         // tell the caller is what we tell history (and remote subscribers).
         const result = {
           ...input.result,
-          cache: { previousDocVersion, docVersion, attachmentsVersion },
+          meta: {
+            ...input.result.meta,
+            ...planeMeta({ previousDocVersion, docVersion, attachmentsVersion }),
+          },
         } as R;
 
         const auditEvent = makeAuditEvent({
@@ -4768,4 +4771,20 @@ function widgetOfRef(ref: AnnotationRef): FormWidget {
   return ref.kind === 'objectNumber'
     ? formWidget(ref.annotObjectNumber, ref.page)
     : formWidget(0, ref.page);
+}
+
+/** The version bumps of a page-structure write. */
+interface LayoutVersions {
+  previousDocVersion: number;
+  docVersion: number;
+  layoutVersion: number;
+}
+
+/**
+ * The `meta` of a write that moves a document-level plane pin (layout,
+ * metadata, attachments) and no page pin: the client absorbs it from
+ * `meta.cacheDelta`.
+ */
+function planeMeta(delta: Omit<CacheDelta, 'pages'>): MutationMeta {
+  return { affectedPages: [], cacheDelta: { ...delta, pages: [] } };
 }

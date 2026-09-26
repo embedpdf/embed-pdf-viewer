@@ -28,6 +28,16 @@ export interface CacheDelta {
    */
   annotationsVersion?: number;
   /**
+   * New plane pins, present when this mutation bumped them: `layoutVersion`
+   * for a page-structure write (move, rotate, delete, insert, names),
+   * `metadataVersion` for a metadata write, `attachmentsVersion` for an
+   * attachment write. Absorbing them re-points the cached manifest's leaf
+   * without a refetch.
+   */
+  layoutVersion?: number;
+  metadataVersion?: number;
+  attachmentsVersion?: number;
+  /**
    * The layer's write serial after this mutation and whether an artifact
    * now exists (cloud only). Absorbing them keeps the client's cached
    * manifest an honest `DocumentVersionRef` source between refreshes.
@@ -41,10 +51,12 @@ export interface CacheDelta {
 }
 
 /**
- * Base envelope for every layer-mutating operation.
+ * Base envelope for every layer-mutating operation: the `meta` of every
+ * write result.
  *
  * `affectedPages` is the state delta. `cacheDelta` is the cloud/CDN URL pin
- * delta and is `null` for local engines.
+ * delta and is `null` for local engines (and for a write that changed
+ * nothing).
  */
 export interface MutationMeta {
   affectedPages: PageState[];

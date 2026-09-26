@@ -1,1 +1,1 @@
-export type { ApplyRedactionsRequest } from "./ApplyRedactionsRequest.js";
+export { DocRedactionsApplyRequest } from "./DocRedactionsApplyRequest.js";

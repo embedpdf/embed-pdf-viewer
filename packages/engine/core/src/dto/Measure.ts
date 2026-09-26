@@ -59,6 +59,11 @@ export interface PageMeasurementViewport extends PdfViewport {
   owned: boolean;
 }
 
+/** What `page.measure.listViewports()` returns: the viewports in drawing order. */
+export interface PageMeasurementViewportList {
+  viewports: PageMeasurementViewport[];
+}
+
 export type LineIntent = 'line-arrow' | 'line-dimension';
 export type PolygonIntent = 'polygon-cloud' | 'polygon-dimension';
 export type PolylineIntent = 'polyline-dimension';

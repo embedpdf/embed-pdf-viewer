@@ -1,5 +1,5 @@
 import type { Identity } from '../auth/scope/types';
-import type { CollabTarget, DocCapability, PdfBits } from '../auth/scope';
+import type { DocCapability, PdfBits } from '../auth/scope';
 import type { AbortablePromise } from '../promise/AbortablePromise';
 
 export type DocumentOpenMode = 'none' | 'user' | 'owner';
@@ -169,13 +169,22 @@ export interface DocumentUnlockResult {
   readonly access?: DocumentAccessInfo;
 }
 
+/**
+ * Whose an annotation is: what `allowsAnnotation('update' | 'delete', …)`
+ * reads. An `AnnotationDTO` is one; so is `{ userId, groupId }`.
+ */
+export interface AnnotationOwner {
+  userId?: string | null;
+  groupId?: string | null;
+}
+
 export interface DocumentSecurityService {
   /**
    * Raw structured security probe. Stable across engines, refreshed
-   * after unlock/refresh. Power users and diagnostic tools read this;
-   * most dev code uses the higher-level accessors below.
+   * after an unlock. Power users and diagnostic tools read this; most
+   * code uses the higher-level accessors below.
    */
-  readonly current: DocumentSecurityState;
+  readonly state: DocumentSecurityState;
 
   /**
    * The caller's expanded capability set — raw scope + pdf bits +
@@ -189,15 +198,15 @@ export interface DocumentSecurityService {
    * listed here (they can't be). To gate UI, use {@link allows} — the
    * same wildcard-aware predicate the engine enforces with.
    */
-  readonly effectiveScope: ReadonlyArray<string>;
+  readonly scope: ReadonlyArray<string>;
 
   /**
    * Wildcard-aware authorization check — the same predicate the engine
    * enforces with (`checkCapability`). A shown control gated on this
    * mirrors exactly what the engine will allow: the `*` admin grant and
    * `pdf.permissions`-derived bits are both honored. Use this for edit
-   * gating (e.g. `allows('doc.pages.assemble')`); use `effectiveScope`
-   * only to *display* the concrete grants.
+   * gating (e.g. `allows('doc.pages.assemble')`); use `scope` only to
+   * *display* the concrete grants.
    */
   allows(capability: DocCapability): boolean;
 
@@ -211,17 +220,15 @@ export interface DocumentSecurityService {
    * grant is not a capability — whether "update" is allowed depends on
    * whose annotation you're touching.
    *
-   * Three surfaces because the questions genuinely differ:
-   *   - create derives its target from the caller's own identity
-   *     (`:self` trivially passes; `:group=X` matches the caller's
-   *     default group),
-   *   - update/delete are asked about the target record's stamped
-   *     owner (`userId`/`groupId` from its EMBD metadata; pass `{}`
-   *     when unstamped — matching the engine, which denies unstamped
-   *     targets under any narrowed grant),
-   *   - group assignment is asked about the destination group
-   *     (`annotations:set-group:` ladder; the caller's own default
-   *     group is always assignable).
+   * The target depends on the action:
+   *   - `create` needs none: it derives the target from the caller's
+   *     own identity (`:self` trivially passes; `:group=X` matches the
+   *     caller's default group),
+   *   - `update`/`delete` take the annotation itself, asked about its
+   *     stamped owner (`userId`/`groupId`; an unstamped annotation is
+   *     denied under any narrowed grant, as the engine does),
+   *   - `set-group` takes the destination group (`annotations:set-group:`
+   *     ladder; the caller's own default group is always assignable).
    *
    * These are a courtesy for UI gating — the engine (and the server,
    * on cloud) independently enforces every mutation with the same
@@ -229,9 +236,9 @@ export interface DocumentSecurityService {
    * access. Returns false when no scope context exists (legacy local
    * open without `scope`, cloud open without a token before /access).
    */
-  allowsAnnotationCreate(): boolean;
-  allowsAnnotationMutation(action: 'update' | 'delete', target: CollabTarget): boolean;
-  allowsAnnotationGroupAssignment(groupId: string): boolean;
+  allowsAnnotation(action: 'create'): boolean;
+  allowsAnnotation(action: 'update' | 'delete', annotation: AnnotationOwner): boolean;
+  allowsAnnotation(action: 'set-group', target: { groupId: string }): boolean;
 
   /**
    * Who the session acts for: from the document token's `identity` claim on

@@ -8,7 +8,7 @@ import type { PageMoveResult } from '../mutation/PageMoveResult';
 import type { PageNameInput, PageRemoveNameInput } from '../mutation/PageNameInput';
 import type { PageNameResult } from '../mutation/PageNameResult';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
-import type { PageFlattenResult, PageFlattenUsage } from '../mutation/PageFlattenResult';
+import type { FlattenOptions, PageFlattenResult } from '../mutation/PageFlattenResult';
 import { AbortablePromise } from '../promise/AbortablePromise';
 
 /**
@@ -34,16 +34,16 @@ export interface DocumentPagesService {
 
   /**
    * Reorder pages. The supplied pages are detached and re-inserted as
-   * a contiguous block starting at `destIndex` in the post-removal
+   * a contiguous block starting at `toIndex` in the post-removal
    * index space, preserving caller order. Per-page `RevisionToken`s
    * survive — index-based annotation refs the caller is holding remain
    * valid across a page reorder.
    *
    * @param pages Pages to move, in the order they should appear after
    *              the move.
-   * @param destIndex Insertion point in `[0, pageCount - len]`.
+   * @param toIndex Insertion point in `[0, pageCount - len]`.
    */
-  move(pages: PageRef[], destIndex: number): AbortablePromise<PageMoveResult>;
+  move(pages: PageRef[], toIndex: number): AbortablePromise<PageMoveResult>;
 
   /**
    * Set the absolute display rotation of the supplied pages (one value
@@ -86,7 +86,7 @@ export interface DocumentPagesService {
    * those annotations that were painted. This changes content and annotation
    * liveness, not layout. The default usage is normal display.
    */
-  flatten(pages: PageRef[], usage?: PageFlattenUsage): AbortablePromise<PageFlattenResult>;
+  flatten(pages: PageRef[], options?: FlattenOptions): AbortablePromise<PageFlattenResult>;
 
   /**
    * Export the given pages, in the supplied order, as a standalone PDF
@@ -103,7 +103,7 @@ export interface DocumentPagesService {
   extract(pages: PageRef[]): AbortablePromise<Uint8Array>;
 
   /**
-   * Insert every page of a standalone PDF (`bytes`) at `destIndex`
+   * Insert every page of a standalone PDF (`bytes`) at `toIndex`
    * (omitted → append). The pages are copied in; the inserted copies get
    * fresh object numbers, returned in insertion order. Bytes are a call
    * argument (the same law as annotation binaries): the local engine
@@ -114,11 +114,11 @@ export interface DocumentPagesService {
    * so this is a mandatory member: any engine implements it or is not a
    * conforming engine.
    */
-  insert(bytes: Uint8Array | ArrayBuffer, destIndex?: number): AbortablePromise<PageInsertResult>;
+  insert(bytes: Uint8Array | ArrayBuffer, toIndex?: number): AbortablePromise<PageInsertResult>;
 
   /**
    * Create `spec.count` (default 1) blank pages of `spec.size` (PDF points)
-   * at `destIndex` (omitted → append). The blank-page sibling of `insert`:
+   * at `toIndex` (omitted → append). The blank-page sibling of `insert`:
    * same gate (`doc.pages.assemble`), same result shape, same
    * `pages.inserted` event — it is a separate verb because its wire is pure
    * parameters where `insert`'s is a binary payload (cloud: JSON
@@ -126,5 +126,5 @@ export interface DocumentPagesService {
    * object numbers; every pre-existing page keeps its identity and
    * revisions. Mandatory, like `insert`.
    */
-  insertBlank(spec: PageInsertBlankSpec, destIndex?: number): AbortablePromise<PageInsertResult>;
+  insertBlank(spec: PageInsertBlankSpec, toIndex?: number): AbortablePromise<PageInsertResult>;
 }

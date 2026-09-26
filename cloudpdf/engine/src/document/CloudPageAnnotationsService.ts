@@ -23,7 +23,7 @@ import {
   type AnnotationDeleteResult,
   type AnnotationFlattenResult,
   type AnnotationMoveResult,
-  type PageFlattenUsage,
+  type FlattenOptions,
   type AnnotationUpdateResult,
   type DocumentEventInit,
   type MutationMeta,
@@ -425,8 +425,9 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
 
   flatten(
     refs: AnnotationRef[],
-    usage: PageFlattenUsage = 'display',
+    options?: FlattenOptions,
   ): AbortablePromise<AnnotationFlattenResult> {
+    const usage = options?.usage ?? 'display';
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
@@ -450,8 +451,9 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         (raw) => AnnotationFlattenResultSchema.parse(raw),
         signal,
       );
-      // Nothing applied means no artifact and no coherence bump.
-      if (result.meta === null) return result;
+      // Nothing applied comes back without a cache delta: no artifact, no
+      // coherence bump, no event.
+      if (result.meta.cacheDelta === null) return result;
       // Flatten bakes annotations into page content, so both planes flip.
       this.manifest.apply(result.meta, ['content', 'annotations']);
       this.publisher.publishLocal({ type: 'annotations.flattened', ...result });

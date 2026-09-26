@@ -2,7 +2,10 @@ import type { ConformanceTestRunner, ConformanceOptions } from './runMetadataCon
 import type { FileAttachmentAnnotationDTO, TextAnnotationDTO } from '../annotation/kinds';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
+import { toAttachmentRef } from '../dto/Attachment';
 import { EngineError } from '../errors/EngineError';
+import { deletedAttachmentOf } from '../mutation/AttachmentMutationResults';
+import { AttachmentCreateResultSchema, AttachmentListSchema } from '../wire/schemas';
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
 import { toPageRef } from '../identity/PageRef';
 
@@ -57,17 +60,19 @@ export function runAttachmentConformance(
       if (!docSupported) return;
       const doc = await openFixture(engine, opts);
       try {
-        const items = await doc.attachments!.list();
+        const list = await doc.attachments.list();
+        expect(AttachmentListSchema.safeParse(list).success).toBe(true);
+        const items = list.attachments;
         expect(items.length > 0).toBe(true);
         items.forEach((item, position) => {
           expect(item.index).toBe(position);
-          expect(item.key.length > 0).toBe(true);
+          expect(item.ref.key.length > 0).toBe(true);
           expect(item.name.length > 0).toBe(true);
         });
         // Keys are unique by construction — they are the durable refs.
-        expect(new Set(items.map((i) => i.key)).size).toBe(items.length);
+        expect(new Set(items.map((i) => i.ref.key)).size).toBe(items.length);
         // A read: calling again observes the identical snapshot.
-        expect(await doc.attachments!.list()).toEqual(items);
+        expect(await doc.attachments.list()).toEqual(list);
       } finally {
         await doc.close();
       }
@@ -77,9 +82,9 @@ export function runAttachmentConformance(
       if (!docSupported) return;
       const doc = await openFixture(engine, opts);
       try {
-        const items = await doc.attachments!.list();
-        for (const item of items) {
-          const content = await doc.attachments!.download({ kind: 'key', key: item.key });
+        const { attachments } = await doc.attachments.list();
+        for (const item of attachments) {
+          const content = await doc.attachments.download(item.ref);
           expect(content.name).toBe(item.name);
           if (item.mimeType !== undefined) {
             expect(content.mimeType).toBe(item.mimeType);
@@ -98,7 +103,7 @@ export function runAttachmentConformance(
       const doc = await openFixture(engine, opts);
       try {
         await expect(
-          doc.attachments!.download({ kind: 'key', key: 'conformance-no-such-key.bin' }),
+          doc.attachments.download(toAttachmentRef('conformance-no-such-key.bin')),
         ).rejects.toBeInstanceOf(EngineError);
       } finally {
         await doc.close();
@@ -108,55 +113,53 @@ export function runAttachmentConformance(
     test('create() and delete() round-trip the name tree; keys survive index shifts', async () => {
       if (!docSupported) return;
       const doc = await openFixture(engine, opts);
-      if (doc.attachments!.create === undefined || doc.attachments!.delete === undefined) {
-        await doc.close();
-        return;
-      }
       try {
-        const before = await doc.attachments!.list();
+        const { attachments: before } = await doc.attachments.list();
         const data = new Uint8Array(512);
         for (let i = 0; i < data.length; i++) data[i] = (i * 7 + 3) & 0xff;
 
         // "0-…" sorts before the fixture's entries, shifting their indices —
         // the sharpest difference from append-only annotation creates.
-        const { created } = await doc.attachments!.create!({
-          data,
+        const createdResult = await doc.attachments.create({
+          data: data.buffer,
           name: '0-conformance.bin',
           mimeType: 'application/octet-stream',
           description: 'added by conformance',
         });
-        expect(created.key).toBe('0-conformance.bin');
+        expect(AttachmentCreateResultSchema.safeParse(createdResult).success).toBe(true);
+        const created = createdResult.attachment;
+        expect(created.ref).toEqual(toAttachmentRef('0-conformance.bin'));
+        expect(createdResult.meta.changed).toEqual([created.ref]);
         expect(created.name).toBe('0-conformance.bin');
         expect(created.mimeType).toBe('application/octet-stream');
         expect(created.description).toBe('added by conformance');
         expect(created.size).toBe(data.length);
 
-        const after = await doc.attachments!.list();
+        const { attachments: after } = await doc.attachments.list();
         expect(after.length).toBe(before.length + 1);
         // Pre-existing keys still resolve even though their indices shifted.
         for (const item of before) {
-          const match = after.find((i) => i.key === item.key);
+          const match = after.find((i) => i.ref.key === item.ref.key);
           expect(match !== undefined).toBe(true);
         }
 
         // Duplicate keys reject — keys are the identity.
         await expect(
-          doc.attachments!.create!({ data, name: '0-conformance.bin' }),
+          doc.attachments.create({ data, name: '0-conformance.bin' }),
         ).rejects.toBeInstanceOf(EngineError);
 
         // The created file round-trips byte-identically.
-        const content = await doc.attachments!.download({ kind: 'key', key: created.key });
+        const content = await doc.attachments.download(created.ref);
         expect(content.bytes.length).toBe(data.length);
         expect(content.bytes.every((byte, i) => byte === data[i])).toBe(true);
 
-        // Delete by key; the key stops resolving and the rest are intact.
-        const { deleted } = await doc.attachments!.delete!({ kind: 'key', key: created.key });
-        expect(deleted).toEqual({ kind: 'key', key: created.key });
-        const final = await doc.attachments!.list();
-        expect(final.map((i) => i.key)).toEqual(before.map((i) => i.key));
-        await expect(
-          doc.attachments!.delete!({ kind: 'key', key: created.key }),
-        ).rejects.toBeInstanceOf(EngineError);
+        // Delete by ref; the ref stops resolving and the rest are intact.
+        const removed = await doc.attachments.delete(created.ref);
+        expect(Object.keys(removed)).toEqual(['meta']);
+        expect(deletedAttachmentOf(removed)).toEqual(created.ref);
+        const { attachments: final } = await doc.attachments.list();
+        expect(final.map((i) => i.ref)).toEqual(before.map((i) => i.ref));
+        await expect(doc.attachments.delete(created.ref)).rejects.toBeInstanceOf(EngineError);
       } finally {
         await doc.close();
       }

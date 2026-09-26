@@ -82,7 +82,7 @@ test('calibration persists an artifact and audit payload without bumping page ca
     ).toEqual(pages);
     // Discard the live worker session: the next read must load the saved artifact.
     fx.bundle.documentService!.invalidateLayerSession(id, 'default');
-    expect((await page.measure!.listViewports()).find((v) => v.owned)).toMatchObject({
+    expect((await page.measure!.listViewports()).viewports.find((v) => v.owned)).toMatchObject({
       measure: { x: [{ conversion: Math.fround(0.06) }] },
     });
     const row = await fx.db

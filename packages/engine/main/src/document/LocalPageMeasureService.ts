@@ -5,8 +5,8 @@ import {
   wirePack,
   type PageMeasureService,
   type PdfMeasure,
-  type PageMeasurementViewport,
-  type PageObjectNumber,
+  type PageMeasurementViewportList,
+  type PageScaleResult,
   type WorkerResultPayload,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
@@ -24,7 +24,7 @@ export class LocalPageMeasureService implements PageMeasureService {
     private readonly guard: ScopeGuard,
     private readonly publisher: SessionEventPublisher,
   ) {}
-  listViewports(): AbortablePromise<PageMeasurementViewport[]> {
+  listViewports(): AbortablePromise<PageMeasurementViewportList> {
     return AbortablePromise.run(async (signal) => {
       this.check('doc.open');
       const submission = this.queue.enqueue<WorkerResultPayload>(
@@ -42,10 +42,10 @@ export class LocalPageMeasureService implements PageMeasureService {
       const payload = await this.wait(submission, signal);
       if (payload.tag !== 'measure.viewports')
         throw new EngineError(EngineErrorCode.WireFormat, 'Unexpected viewport response');
-      return payload.viewports;
+      return { viewports: payload.viewports };
     });
   }
-  setScale(measure: PdfMeasure | null): AbortablePromise<void> {
+  setScale(measure: PdfMeasure | null): AbortablePromise<PageScaleResult> {
     return AbortablePromise.run(async (signal) => {
       // Allow immediate cancellation before an inline transport can apply the write.
       await Promise.resolve();
@@ -68,6 +68,7 @@ export class LocalPageMeasureService implements PageMeasureService {
       if (payload.tag !== 'measure.setScale')
         throw new EngineError(EngineErrorCode.WireFormat, 'Unexpected scale response');
       this.publisher.publishLocal({ type: 'pages.scaleSet', ...payload.result });
+      return payload.result;
     });
   }
   private check(cap: 'doc.open' | 'doc.annotate.modify'): void {

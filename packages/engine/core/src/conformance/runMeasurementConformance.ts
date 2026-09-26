@@ -162,16 +162,19 @@ export function runMeasurementConformance(
         const pageObjectNumber = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
         const page = doc.page(toPageRef(pageObjectNumber));
         if (!page.measure) throw new Error('Measurement service is required');
-        const foreign = (await page.measure.listViewports()).filter((v) => !v.owned);
+        const foreign = (await page.measure.listViewports()).viewports.filter((v) => !v.owned);
         const annotations = (await page.annotations.list()).annotations;
         const events: DocumentEvent[] = [];
         const off = doc.events.subscribe((event) => events.push(event));
         try {
-          await page.measure.setScale(scale);
-          expect((await page.measure.listViewports()).filter((v) => v.owned)).toHaveLength(1);
+          const set = await page.measure.setScale(scale);
+          expect(set.page).toEqual(page.ref);
+          expect(
+            (await page.measure.listViewports()).viewports.filter((v) => v.owned),
+          ).toHaveLength(1);
           expect((await page.annotations.list()).annotations).toEqual(annotations);
           await page.measure.setScale(null);
-          expect(await page.measure.listViewports()).toEqual(foreign);
+          expect((await page.measure.listViewports()).viewports).toEqual(foreign);
           const changes = events.filter((e) => e.type === 'pages.scaleSet');
           expect(changes).toHaveLength(2);
           for (const event of changes)

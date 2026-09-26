@@ -12,11 +12,10 @@ import {
   type PageNameInput,
   type PageNameResult,
   type PageRemoveNameInput,
-  type PageObjectNumber,
   type PageRotateResult,
   type PageRotation,
   type PageFlattenResult,
-  type PageFlattenUsage,
+  type FlattenOptions,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
@@ -87,7 +86,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     });
   }
 
-  move(pages: PageRef[], destIndex: number): AbortablePromise<PageMoveResult> {
+  move(pages: PageRef[], toIndex: number): AbortablePromise<PageMoveResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -109,7 +108,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
             jobId,
             docId,
             pages,
-            destIndex,
+            toIndex,
           }),
       },
       { priority: Priority.HIGH },
@@ -125,7 +124,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       this.publisher.publishLocal({
         type: 'pages.moved',
         pages,
-        toIndex: destIndex,
+        toIndex,
         ...payload.result,
       });
       return payload.result;
@@ -285,10 +284,8 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     });
   }
 
-  flatten(
-    pages: PageRef[],
-    usage: PageFlattenUsage = 'display',
-  ): AbortablePromise<PageFlattenResult> {
+  flatten(pages: PageRef[], options?: FlattenOptions): AbortablePromise<PageFlattenResult> {
+    const usage = options?.usage ?? 'display';
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -319,17 +316,14 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       if (payload.tag !== 'pages.flatten') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      if (payload.result.meta !== null) {
-        this.publisher.publishLocal({
-          type: 'pages.flattened',
-          ...payload.result,
-        });
+      if (payload.wrote) {
+        this.publisher.publishLocal({ type: 'pages.flattened', ...payload.result });
       }
       return payload.result;
     });
   }
 
-  insert(bytes: Uint8Array | ArrayBuffer, destIndex?: number): AbortablePromise<PageInsertResult> {
+  insert(bytes: Uint8Array | ArrayBuffer, toIndex?: number): AbortablePromise<PageInsertResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -350,7 +344,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'pages.insert', jobId, docId, bytes: buffer, destIndex }, [buffer]),
+          wirePack({ kind: 'pages.insert', jobId, docId, bytes: buffer, toIndex }, [buffer]),
       },
       { priority: Priority.HIGH },
     );
@@ -364,14 +358,14 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       }
       this.publisher.publishLocal({
         type: 'pages.inserted',
-        toIndex: destIndex,
+        toIndex,
         ...payload.result,
       });
       return payload.result;
     });
   }
 
-  insertBlank(spec: PageInsertBlankSpec, destIndex?: number): AbortablePromise<PageInsertResult> {
+  insertBlank(spec: PageInsertBlankSpec, toIndex?: number): AbortablePromise<PageInsertResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -395,7 +389,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
             docId,
             size: spec.size,
             count: spec.count,
-            destIndex,
+            toIndex,
           }),
       },
       { priority: Priority.HIGH },
@@ -410,7 +404,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       }
       this.publisher.publishLocal({
         type: 'pages.inserted',
-        toIndex: destIndex,
+        toIndex,
         ...payload.result,
       });
       return payload.result;

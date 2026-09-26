@@ -15,14 +15,14 @@ const SIZE = { width: 396, height: 612 };
  * loses the verb fails loudly instead of being skipped past.
  *
  * Invariants:
- *   1. `count` blank pages of exactly `size` appear at `destIndex` (omitted
+ *   1. `count` blank pages of exactly `size` appear at `toIndex` (omitted
  *      → append), rotation 0; the result lists their fresh page object numbers in insertion
  *      order and they agree with the returned layout.
  *   2. Pre-existing pages keep their identity: same page object numbers before and after,
  *      in the expected positions (an insert never invalidates neighbours).
  *   3. The mutation persists through save → re-open (bytes engines only).
  *   4. Non-positive size / count outside [1, PAGE_INSERT_BLANK_MAX_COUNT] /
- *      out-of-range destIndex reject with InvalidArg, leaving the document
+ *      out-of-range toIndex reject with InvalidArg, leaving the document
  *      untouched.
  */
 export function runPageInsertBlankConformance(
@@ -67,7 +67,7 @@ export function runPageInsertBlankConformance(
       }
     });
 
-    test('destIndex + count places the blank block mid-document', async () => {
+    test('toIndex + count places the blank block mid-document', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const before = await doc.pages.list();
@@ -117,7 +117,7 @@ export function runPageInsertBlankConformance(
       }
     });
 
-    test('non-positive size, bad count, and out-of-range destIndex reject with InvalidArg', async () => {
+    test('non-positive size, bad count, and out-of-range toIndex reject with InvalidArg', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const before = await doc.pages.list();

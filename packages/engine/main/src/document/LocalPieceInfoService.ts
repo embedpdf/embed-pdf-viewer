@@ -3,9 +3,10 @@ import {
   EngineError,
   EngineErrorCode,
   wirePack,
-  type PageObjectNumber,
+  type PieceInfoDeleteResult,
   type PieceInfoPatch,
   type PieceInfoService,
+  type PieceInfoUpdateResult,
   type PieceInfoSnapshot,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
@@ -59,9 +60,9 @@ export class LocalPieceInfoService implements PieceInfoService {
     });
   }
 
-  update(application: string, patch: PieceInfoPatch): AbortablePromise<void> {
+  update(application: string, patch: PieceInfoPatch): AbortablePromise<PieceInfoUpdateResult> {
     const rejected = this.gate('doc.metadata.modify');
-    if (rejected) return rejected as AbortablePromise<void>;
+    if (rejected) return rejected;
     const { docId, page } = this;
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
@@ -77,11 +78,12 @@ export class LocalPieceInfoService implements PieceInfoService {
       },
       { priority: Priority.HIGH },
     );
-    return AbortablePromise.run<void>(async (signal) => {
+    return AbortablePromise.run<PieceInfoUpdateResult>(async (signal) => {
       const payload = await this.await(submission, signal);
       if (payload.tag !== 'pieceInfo.update') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
+      return payload.result;
     });
   }
 
@@ -105,22 +107,23 @@ export class LocalPieceInfoService implements PieceInfoService {
     });
   }
 
-  delete(application: string): AbortablePromise<void> {
+  delete(application: string): AbortablePromise<PieceInfoDeleteResult> {
     const rejected = this.gate('doc.metadata.modify');
-    if (rejected) return rejected as AbortablePromise<void>;
+    if (rejected) return rejected;
     const { docId, page } = this;
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'pieceInfo.clear', jobId, docId, page, application }),
+          wirePack({ kind: 'pieceInfo.delete', jobId, docId, page, application }),
       },
       { priority: Priority.HIGH },
     );
-    return AbortablePromise.run<void>(async (signal) => {
+    return AbortablePromise.run<PieceInfoDeleteResult>(async (signal) => {
       const payload = await this.await(submission, signal);
-      if (payload.tag !== 'pieceInfo.clear') {
+      if (payload.tag !== 'pieceInfo.delete') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
+      return payload.result;
     });
   }
 

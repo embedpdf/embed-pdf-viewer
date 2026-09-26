@@ -121,11 +121,11 @@ function makeAssetEngine(
     if (input.replace !== undefined) names.delete(input.replace);
     names.delete(input.name);
     names.set(input.name, input.page.pageObjectNumber);
-    return { layout: layout(), cache: null };
+    return { layout: layout(), meta: { affectedPages: [], cacheDelta: null } };
   });
   const removeName = vi.fn(async (input: { name: string }) => {
     names.delete(input.name);
-    return { layout: layout(), cache: null };
+    return { layout: layout(), meta: { affectedPages: [], cacheDelta: null } };
   });
   const catalogEntries = { ...(seed?.catalog ?? {}) };
   const pageEntries = new Map<number, MetadataSeed>(
@@ -138,7 +138,7 @@ function makeAssetEngine(
   const extract = vi.fn(async (refs: PageRef[]) =>
     new TextEncoder().encode(`%PDF-page-${refs[0].pageObjectNumber}`),
   );
-  const insert = vi.fn(async (_bytes: Uint8Array | ArrayBuffer, _destIndex?: number) => {
+  const insert = vi.fn(async (_bytes: Uint8Array | ArrayBuffer, _toIndex?: number) => {
     const pageObjectNumber = Math.max(99, ...pages.map((page) => page.ref.pageObjectNumber)) + 1;
     pages = [
       ...pages,
@@ -152,7 +152,7 @@ function makeAssetEngine(
     return {
       insertedPages: [toPageRef(pageObjectNumber)],
       layout: layout(),
-      cache: null,
+      meta: { affectedPages: [], cacheDelta: null },
     };
   });
   const insertBlank = vi.fn(async (spec: { size: { width: number; height: number } }) => {
@@ -162,14 +162,18 @@ function makeAssetEngine(
       { ref: toPageRef(pageObjectNumber), index: pages.length, size: { ...spec.size } },
     ];
     pageEntries.set(pageObjectNumber, {});
-    return { insertedPages: [toPageRef(pageObjectNumber)], layout: layout(), cache: null };
+    return {
+      insertedPages: [toPageRef(pageObjectNumber)],
+      layout: layout(),
+      meta: { affectedPages: [], cacheDelta: null },
+    };
   });
   const createAnnotation = vi.fn(async () => ({ annotation: { ref: {} } }));
   const flatten = vi.fn(async (refs: PageRef[]) => ({
     pages: refs,
     usage: 'display',
     results: refs.map((page) => ({ page, status: 'applied' })),
-    meta: null,
+    meta: { affectedPages: [], cacheDelta: null },
   }));
   const deletePages = vi.fn(async (refs: PageRef[]) => {
     const deleted = refs.map((ref) => ref.pageObjectNumber);
@@ -183,7 +187,7 @@ function makeAssetEngine(
         if (target === pageObjectNumber) names.delete(name);
       }
     }
-    return { layout: layout(), cache: null };
+    return { layout: layout(), meta: { affectedPages: [], cacheDelta: null } };
   });
   let saveNumber = 0;
   const download = vi.fn(async () => new TextEncoder().encode(`%PDF-canonical-${++saveNumber}`));
@@ -436,7 +440,7 @@ describe('stamp plugin: assets', () => {
       expect.objectContaining({ subtype: 'stamp', fit: 'fill' }),
       { appearance: expect.any(Uint8Array) },
     );
-    expect(flatten).toHaveBeenCalledWith([toPageRef(100)], 'display');
+    expect(flatten).toHaveBeenCalledWith([toPageRef(100)], { usage: 'display' });
     expect(names.get('Logo=Company logo')).toBe(100);
     expect(stamp.getAsset(id)).toMatchObject({
       id: `${library.id}:Logo`,

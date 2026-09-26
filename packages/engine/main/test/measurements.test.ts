@@ -212,14 +212,16 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
       const annotations = (await doc.page(toPageRef(3)).annotations.list()).annotations;
       expect(annotations.map((a) => a.contents)).toEqual(['3.00 m', '6.00 m', '4.50 m²']);
       expect(annotations[1]).toMatchObject({ captionCenter: { x: 0, y: 0 } });
-      const viewports = await doc.page(toPageRef(3)).measure!.listViewports();
+      const { viewports } = await doc.page(toPageRef(3)).measure!.listViewports();
       expect(viewports).toHaveLength(2);
       expect(viewports[1]).toMatchObject({
         owned: true,
         bbox: { left: -20, bottom: -40, right: 592, top: 752 },
       });
       await doc.page(toPageRef(3)).measure!.setScale(null);
-      expect(await doc.page(toPageRef(3)).measure!.listViewports()).toEqual([viewports[0]]);
+      expect((await doc.page(toPageRef(3)).measure!.listViewports()).viewports).toEqual([
+        viewports[0],
+      ]);
     } finally {
       await doc.close();
     }
@@ -270,7 +272,7 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
       await expect(page.measure!.setScale(undefined as never)).rejects.toMatchObject({
         code: EngineErrorCode.InvalidArg,
       });
-      expect(await page.measure!.listViewports()).toEqual([]);
+      expect((await page.measure!.listViewports()).viewports).toEqual([]);
       expect((await page.annotations.list()).annotations[0].contents).toBe('3.00 m');
       const unavailable = await page.annotations.update(a.ref, {
         subtype: 'line',

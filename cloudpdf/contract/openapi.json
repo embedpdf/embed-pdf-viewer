@@ -2186,7 +2186,7 @@
         "x-fern-sdk-method-name": "insert",
         "x-docs-title": "Insert pages from a PDF",
         "summary": "Copy every page of an uploaded PDF into the document at an index.",
-        "description": "Multipart mutation envelope: a `body` field holding `{\"destIndex\"?: number}` (omitted → append) plus a `resource:source` file part carrying the standalone PDF whose pages are copied in. The inserted copies get fresh page object numbers, returned in insertion order.",
+        "description": "Multipart mutation envelope: a `body` field holding `{\"toIndex\"?: number}` (omitted → append) plus a `resource:source` file part carrying the standalone PDF whose pages are copied in. The inserted copies get fresh page object numbers, returned in insertion order.",
         "security": [
           {
             "apiToken": []
@@ -2294,7 +2294,7 @@
         "x-fern-sdk-method-name": "insertBlank",
         "x-docs-title": "Insert blank pages",
         "summary": "Create blank pages of an explicit size at an index.",
-        "description": "Body is `{\"size\": {\"width\", \"height\"}, \"count\"?, \"destIndex\"?}` — size in PDF points, count in [1, 100], destIndex omitted → append.",
+        "description": "Body is `{\"size\": {\"width\", \"height\"}, \"count\"?, \"toIndex\"?}` — size in PDF points, count in [1, 100], toIndex omitted → append.",
         "security": [
           {
             "apiToken": []
@@ -2835,7 +2835,7 @@
           }
         ],
         "requestBody": {
-          "required": false,
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -12037,7 +12037,6 @@
             "properties": {
               "previousDocVersion": {
                 "type": "integer",
-                "exclusiveMinimum": true,
                 "minimum": 0
               },
               "docVersion": {
@@ -12046,6 +12045,21 @@
                 "minimum": 0
               },
               "annotationsVersion": {
+                "type": "integer",
+                "exclusiveMinimum": true,
+                "minimum": 0
+              },
+              "layoutVersion": {
+                "type": "integer",
+                "exclusiveMinimum": true,
+                "minimum": 0
+              },
+              "metadataVersion": {
+                "type": "integer",
+                "exclusiveMinimum": true,
+                "minimum": 0
+              },
+              "attachmentsVersion": {
                 "type": "integer",
                 "exclusiveMinimum": true,
                 "minimum": 0
@@ -16618,7 +16632,6 @@
                 "properties": {
                   "previousDocVersion": {
                     "type": "integer",
-                    "exclusiveMinimum": true,
                     "minimum": 0
                   },
                   "docVersion": {
@@ -16627,6 +16640,21 @@
                     "minimum": 0
                   },
                   "annotationsVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "layoutVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "metadataVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "attachmentsVersion": {
                     "type": "integer",
                     "exclusiveMinimum": true,
                     "minimum": 0
@@ -18731,7 +18759,6 @@
                 "properties": {
                   "previousDocVersion": {
                     "type": "integer",
-                    "exclusiveMinimum": true,
                     "minimum": 0
                   },
                   "docVersion": {
@@ -18740,6 +18767,21 @@
                     "minimum": 0
                   },
                   "annotationsVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "layoutVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "metadataVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "attachmentsVersion": {
                     "type": "integer",
                     "exclusiveMinimum": true,
                     "minimum": 0
@@ -18788,8 +18830,7 @@
               }
             },
             "required": ["affectedPages", "cacheDelta"],
-            "additionalProperties": false,
-            "nullable": true
+            "additionalProperties": false
           }
         },
         "required": ["page", "usage", "results", "meta"],
@@ -20797,7 +20838,6 @@
                 "properties": {
                   "previousDocVersion": {
                     "type": "integer",
-                    "exclusiveMinimum": true,
                     "minimum": 0
                   },
                   "docVersion": {
@@ -20806,6 +20846,21 @@
                     "minimum": 0
                   },
                   "annotationsVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "layoutVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "metadataVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "attachmentsVersion": {
                     "type": "integer",
                     "exclusiveMinimum": true,
                     "minimum": 0
@@ -21790,7 +21845,6 @@
                 "properties": {
                   "previousDocVersion": {
                     "type": "integer",
-                    "exclusiveMinimum": true,
                     "minimum": 0
                   },
                   "docVersion": {
@@ -21799,6 +21853,21 @@
                     "minimum": 0
                   },
                   "annotationsVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "layoutVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "metadataVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "attachmentsVersion": {
                     "type": "integer",
                     "exclusiveMinimum": true,
                     "minimum": 0
@@ -22823,7 +22892,6 @@
                 "properties": {
                   "previousDocVersion": {
                     "type": "integer",
-                    "exclusiveMinimum": true,
                     "minimum": 0
                   },
                   "docVersion": {
@@ -22832,6 +22900,21 @@
                     "minimum": 0
                   },
                   "annotationsVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "layoutVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "metadataVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "attachmentsVersion": {
                     "type": "integer",
                     "exclusiveMinimum": true,
                     "minimum": 0
@@ -22985,167 +23068,174 @@
         "additionalProperties": false
       },
       "DocPagesViewports200Response": {
-        "type": "array",
-        "items": {
-          "type": "object",
-          "properties": {
-            "bbox": {
+        "type": "object",
+        "properties": {
+          "viewports": {
+            "type": "array",
+            "items": {
               "type": "object",
               "properties": {
-                "left": {
-                  "type": "number"
-                },
-                "bottom": {
-                  "type": "number"
-                },
-                "right": {
-                  "type": "number"
-                },
-                "top": {
-                  "type": "number"
-                }
-              },
-              "required": ["left", "bottom", "right", "top"],
-              "additionalProperties": false
-            },
-            "name": {
-              "type": "string"
-            },
-            "measure": {
-              "anyOf": [
-                {
+                "bbox": {
                   "type": "object",
                   "properties": {
-                    "subtype": {
-                      "type": "string",
-                      "enum": ["rectilinear"]
+                    "left": {
+                      "type": "number"
                     },
-                    "ratio": {
-                      "type": "string"
+                    "bottom": {
+                      "type": "number"
                     },
-                    "x": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "unit": {
-                            "type": "string"
-                          },
-                          "conversion": {
-                            "type": "number"
-                          },
-                          "fraction": {
-                            "type": "string",
-                            "enum": ["decimal", "fraction", "round", "truncate"]
-                          },
-                          "precision": {
-                            "type": "integer"
-                          },
-                          "fixed": {
-                            "type": "boolean"
-                          },
-                          "thousands": {
-                            "type": "string"
-                          },
-                          "decimal": {
-                            "type": "string"
-                          },
-                          "prefixSpacing": {
-                            "type": "string"
-                          },
-                          "suffixSpacing": {
-                            "type": "string"
-                          },
-                          "labelPosition": {
-                            "type": "string",
-                            "enum": ["suffix", "prefix"]
-                          }
-                        },
-                        "required": ["unit"],
-                        "additionalProperties": false
-                      }
+                    "right": {
+                      "type": "number"
                     },
-                    "y": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/DocPagesViewports200Response/items/properties/measure/anyOf/0/properties/x/items"
-                      }
-                    },
-                    "distance": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/DocPagesViewports200Response/items/properties/measure/anyOf/0/properties/x/items"
-                      }
-                    },
-                    "area": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/DocPagesViewports200Response/items/properties/measure/anyOf/0/properties/x/items"
-                      }
-                    },
-                    "angle": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/DocPagesViewports200Response/items/properties/measure/anyOf/0/properties/x/items"
-                      }
-                    },
-                    "slope": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/DocPagesViewports200Response/items/properties/measure/anyOf/0/properties/x/items"
-                      }
-                    },
-                    "origin": {
+                    "top": {
+                      "type": "number"
+                    }
+                  },
+                  "required": ["left", "bottom", "right", "top"],
+                  "additionalProperties": false
+                },
+                "name": {
+                  "type": "string"
+                },
+                "measure": {
+                  "anyOf": [
+                    {
                       "type": "object",
                       "properties": {
+                        "subtype": {
+                          "type": "string",
+                          "enum": ["rectilinear"]
+                        },
+                        "ratio": {
+                          "type": "string"
+                        },
                         "x": {
-                          "$ref": "#/components/schemas/DocPagesViewports200Response/items/properties/measure/anyOf/0/properties/x/items/properties/conversion"
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "unit": {
+                                "type": "string"
+                              },
+                              "conversion": {
+                                "type": "number"
+                              },
+                              "fraction": {
+                                "type": "string",
+                                "enum": ["decimal", "fraction", "round", "truncate"]
+                              },
+                              "precision": {
+                                "type": "integer"
+                              },
+                              "fixed": {
+                                "type": "boolean"
+                              },
+                              "thousands": {
+                                "type": "string"
+                              },
+                              "decimal": {
+                                "type": "string"
+                              },
+                              "prefixSpacing": {
+                                "type": "string"
+                              },
+                              "suffixSpacing": {
+                                "type": "string"
+                              },
+                              "labelPosition": {
+                                "type": "string",
+                                "enum": ["suffix", "prefix"]
+                              }
+                            },
+                            "required": ["unit"],
+                            "additionalProperties": false
+                          }
                         },
                         "y": {
-                          "$ref": "#/components/schemas/DocPagesViewports200Response/items/properties/measure/anyOf/0/properties/x/items/properties/conversion"
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/DocPagesViewports200Response/properties/viewports/items/properties/measure/anyOf/0/properties/x/items"
+                          }
+                        },
+                        "distance": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/DocPagesViewports200Response/properties/viewports/items/properties/measure/anyOf/0/properties/x/items"
+                          }
+                        },
+                        "area": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/DocPagesViewports200Response/properties/viewports/items/properties/measure/anyOf/0/properties/x/items"
+                          }
+                        },
+                        "angle": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/DocPagesViewports200Response/properties/viewports/items/properties/measure/anyOf/0/properties/x/items"
+                          }
+                        },
+                        "slope": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/DocPagesViewports200Response/properties/viewports/items/properties/measure/anyOf/0/properties/x/items"
+                          }
+                        },
+                        "origin": {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "$ref": "#/components/schemas/DocPagesViewports200Response/properties/viewports/items/properties/measure/anyOf/0/properties/x/items/properties/conversion"
+                            },
+                            "y": {
+                              "$ref": "#/components/schemas/DocPagesViewports200Response/properties/viewports/items/properties/measure/anyOf/0/properties/x/items/properties/conversion"
+                            }
+                          },
+                          "required": ["x", "y"],
+                          "additionalProperties": false
+                        },
+                        "cyx": {
+                          "$ref": "#/components/schemas/DocPagesViewports200Response/properties/viewports/items/properties/measure/anyOf/0/properties/x/items/properties/conversion"
                         }
                       },
-                      "required": ["x", "y"],
+                      "required": ["subtype", "x", "distance", "area"],
                       "additionalProperties": false
                     },
-                    "cyx": {
-                      "$ref": "#/components/schemas/DocPagesViewports200Response/items/properties/measure/anyOf/0/properties/x/items/properties/conversion"
+                    {
+                      "type": "object",
+                      "properties": {
+                        "subtype": {
+                          "type": "string",
+                          "enum": ["geospatial"]
+                        }
+                      },
+                      "required": ["subtype"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "subtype": {
+                          "type": "string",
+                          "enum": ["unknown"]
+                        }
+                      },
+                      "required": ["subtype"],
+                      "additionalProperties": false
                     }
-                  },
-                  "required": ["subtype", "x", "distance", "area"],
-                  "additionalProperties": false
+                  ]
                 },
-                {
-                  "type": "object",
-                  "properties": {
-                    "subtype": {
-                      "type": "string",
-                      "enum": ["geospatial"]
-                    }
-                  },
-                  "required": ["subtype"],
-                  "additionalProperties": false
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "subtype": {
-                      "type": "string",
-                      "enum": ["unknown"]
-                    }
-                  },
-                  "required": ["subtype"],
-                  "additionalProperties": false
+                "owned": {
+                  "type": "boolean"
                 }
-              ]
-            },
-            "owned": {
-              "type": "boolean"
+              },
+              "required": ["bbox", "owned"],
+              "additionalProperties": false
             }
-          },
-          "required": ["bbox", "owned"],
-          "additionalProperties": false
-        }
+          }
+        },
+        "required": ["viewports"],
+        "additionalProperties": false
       },
       "DocPagesViewports404Response": {
         "type": "object",
@@ -23341,7 +23431,6 @@
                 "properties": {
                   "previousDocVersion": {
                     "type": "integer",
-                    "exclusiveMinimum": true,
                     "minimum": 0
                   },
                   "docVersion": {
@@ -23350,6 +23439,21 @@
                     "minimum": 0
                   },
                   "annotationsVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "layoutVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "metadataVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "attachmentsVersion": {
                     "type": "integer",
                     "exclusiveMinimum": true,
                     "minimum": 0
@@ -23509,6 +23613,190 @@
       "DocPagesMove200Response": {
         "type": "object",
         "properties": {
+          "layout": {
+            "type": "object",
+            "properties": {
+              "pageCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "pages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "index": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "ref": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["objectNumber"]
+                        },
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["kind", "pageObjectNumber"],
+                      "additionalProperties": false
+                    },
+                    "label": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "size": {
+                      "type": "object",
+                      "properties": {
+                        "width": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "height": {
+                          "type": "number",
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["width", "height"],
+                      "additionalProperties": false
+                    },
+                    "rotation": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "enum": [0]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [90]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [180]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [270]
+                        }
+                      ]
+                    },
+                    "userUnit": {
+                      "type": "number",
+                      "exclusiveMinimum": true,
+                      "minimum": 0
+                    },
+                    "boxes": {
+                      "type": "object",
+                      "properties": {
+                        "media": {
+                          "type": "object",
+                          "properties": {
+                            "left": {
+                              "type": "number"
+                            },
+                            "bottom": {
+                              "type": "number"
+                            },
+                            "right": {
+                              "type": "number"
+                            },
+                            "top": {
+                              "type": "number"
+                            }
+                          },
+                          "required": ["left", "bottom", "right", "top"],
+                          "additionalProperties": false
+                        },
+                        "crop": {
+                          "$ref": "#/components/schemas/DocPagesMove200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        },
+                        "bleed": {
+                          "$ref": "#/components/schemas/DocPagesMove200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        },
+                        "trim": {
+                          "$ref": "#/components/schemas/DocPagesMove200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        },
+                        "art": {
+                          "$ref": "#/components/schemas/DocPagesMove200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        }
+                      },
+                      "required": ["media", "crop"],
+                      "additionalProperties": false
+                    },
+                    "actions": {
+                      "$ref": "#/components/schemas/PdfPageActions"
+                    }
+                  },
+                  "required": ["index", "ref", "label", "size", "rotation", "userUnit", "boxes"],
+                  "additionalProperties": false
+                }
+              },
+              "namedPages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "target": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["page"]
+                            },
+                            "page": {
+                              "$ref": "#/components/schemas/DocPagesMove200Response/properties/layout/properties/pages/items/properties/ref"
+                            }
+                          },
+                          "required": ["kind", "page"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["template"]
+                            },
+                            "objectNumber": {
+                              "type": "integer",
+                              "exclusiveMinimum": true,
+                              "minimum": 0
+                            }
+                          },
+                          "required": ["kind", "objectNumber"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["dangling"]
+                            }
+                          },
+                          "required": ["kind"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["name", "target"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["pageCount", "pages"],
+            "additionalProperties": false
+          },
           "meta": {
             "type": "object",
             "properties": {
@@ -23523,7 +23811,6 @@
                 "properties": {
                   "previousDocVersion": {
                     "type": "integer",
-                    "exclusiveMinimum": true,
                     "minimum": 0
                   },
                   "docVersion": {
@@ -23532,6 +23819,21 @@
                     "minimum": 0
                   },
                   "annotationsVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "layoutVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "metadataVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "attachmentsVersion": {
                     "type": "integer",
                     "exclusiveMinimum": true,
                     "minimum": 0
@@ -23549,20 +23851,7 @@
                       "type": "object",
                       "properties": {
                         "page": {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["objectNumber"]
-                            },
-                            "pageObjectNumber": {
-                              "type": "integer",
-                              "exclusiveMinimum": true,
-                              "minimum": 0
-                            }
-                          },
-                          "required": ["kind", "pageObjectNumber"],
-                          "additionalProperties": false
+                          "$ref": "#/components/schemas/DocPagesMove200Response/properties/layout/properties/pages/items/properties/ref"
                         },
                         "cache": {
                           "type": "object",
@@ -23596,8 +23885,8 @@
             "additionalProperties": false
           }
         },
-        "required": ["meta"],
-        "additionalProperties": true
+        "required": ["layout", "meta"],
+        "additionalProperties": false
       },
       "DocPagesMove400Response": {
         "type": "object",
@@ -23704,6 +23993,190 @@
       "DocPagesRotate200Response": {
         "type": "object",
         "properties": {
+          "layout": {
+            "type": "object",
+            "properties": {
+              "pageCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "pages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "index": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "ref": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["objectNumber"]
+                        },
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["kind", "pageObjectNumber"],
+                      "additionalProperties": false
+                    },
+                    "label": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "size": {
+                      "type": "object",
+                      "properties": {
+                        "width": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "height": {
+                          "type": "number",
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["width", "height"],
+                      "additionalProperties": false
+                    },
+                    "rotation": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "enum": [0]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [90]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [180]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [270]
+                        }
+                      ]
+                    },
+                    "userUnit": {
+                      "type": "number",
+                      "exclusiveMinimum": true,
+                      "minimum": 0
+                    },
+                    "boxes": {
+                      "type": "object",
+                      "properties": {
+                        "media": {
+                          "type": "object",
+                          "properties": {
+                            "left": {
+                              "type": "number"
+                            },
+                            "bottom": {
+                              "type": "number"
+                            },
+                            "right": {
+                              "type": "number"
+                            },
+                            "top": {
+                              "type": "number"
+                            }
+                          },
+                          "required": ["left", "bottom", "right", "top"],
+                          "additionalProperties": false
+                        },
+                        "crop": {
+                          "$ref": "#/components/schemas/DocPagesRotate200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        },
+                        "bleed": {
+                          "$ref": "#/components/schemas/DocPagesRotate200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        },
+                        "trim": {
+                          "$ref": "#/components/schemas/DocPagesRotate200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        },
+                        "art": {
+                          "$ref": "#/components/schemas/DocPagesRotate200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        }
+                      },
+                      "required": ["media", "crop"],
+                      "additionalProperties": false
+                    },
+                    "actions": {
+                      "$ref": "#/components/schemas/PdfPageActions"
+                    }
+                  },
+                  "required": ["index", "ref", "label", "size", "rotation", "userUnit", "boxes"],
+                  "additionalProperties": false
+                }
+              },
+              "namedPages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "target": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["page"]
+                            },
+                            "page": {
+                              "$ref": "#/components/schemas/DocPagesRotate200Response/properties/layout/properties/pages/items/properties/ref"
+                            }
+                          },
+                          "required": ["kind", "page"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["template"]
+                            },
+                            "objectNumber": {
+                              "type": "integer",
+                              "exclusiveMinimum": true,
+                              "minimum": 0
+                            }
+                          },
+                          "required": ["kind", "objectNumber"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["dangling"]
+                            }
+                          },
+                          "required": ["kind"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["name", "target"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["pageCount", "pages"],
+            "additionalProperties": false
+          },
           "meta": {
             "type": "object",
             "properties": {
@@ -23718,7 +24191,6 @@
                 "properties": {
                   "previousDocVersion": {
                     "type": "integer",
-                    "exclusiveMinimum": true,
                     "minimum": 0
                   },
                   "docVersion": {
@@ -23727,6 +24199,21 @@
                     "minimum": 0
                   },
                   "annotationsVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "layoutVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "metadataVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "attachmentsVersion": {
                     "type": "integer",
                     "exclusiveMinimum": true,
                     "minimum": 0
@@ -23744,20 +24231,7 @@
                       "type": "object",
                       "properties": {
                         "page": {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["objectNumber"]
-                            },
-                            "pageObjectNumber": {
-                              "type": "integer",
-                              "exclusiveMinimum": true,
-                              "minimum": 0
-                            }
-                          },
-                          "required": ["kind", "pageObjectNumber"],
-                          "additionalProperties": false
+                          "$ref": "#/components/schemas/DocPagesRotate200Response/properties/layout/properties/pages/items/properties/ref"
                         },
                         "cache": {
                           "type": "object",
@@ -23791,8 +24265,8 @@
             "additionalProperties": false
           }
         },
-        "required": ["meta"],
-        "additionalProperties": true
+        "required": ["layout", "meta"],
+        "additionalProperties": false
       },
       "DocPagesRotate400Response": {
         "type": "object",
@@ -23899,6 +24373,190 @@
       "DocPagesDelete200Response": {
         "type": "object",
         "properties": {
+          "layout": {
+            "type": "object",
+            "properties": {
+              "pageCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "pages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "index": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "ref": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["objectNumber"]
+                        },
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["kind", "pageObjectNumber"],
+                      "additionalProperties": false
+                    },
+                    "label": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "size": {
+                      "type": "object",
+                      "properties": {
+                        "width": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "height": {
+                          "type": "number",
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["width", "height"],
+                      "additionalProperties": false
+                    },
+                    "rotation": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "enum": [0]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [90]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [180]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [270]
+                        }
+                      ]
+                    },
+                    "userUnit": {
+                      "type": "number",
+                      "exclusiveMinimum": true,
+                      "minimum": 0
+                    },
+                    "boxes": {
+                      "type": "object",
+                      "properties": {
+                        "media": {
+                          "type": "object",
+                          "properties": {
+                            "left": {
+                              "type": "number"
+                            },
+                            "bottom": {
+                              "type": "number"
+                            },
+                            "right": {
+                              "type": "number"
+                            },
+                            "top": {
+                              "type": "number"
+                            }
+                          },
+                          "required": ["left", "bottom", "right", "top"],
+                          "additionalProperties": false
+                        },
+                        "crop": {
+                          "$ref": "#/components/schemas/DocPagesDelete200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        },
+                        "bleed": {
+                          "$ref": "#/components/schemas/DocPagesDelete200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        },
+                        "trim": {
+                          "$ref": "#/components/schemas/DocPagesDelete200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        },
+                        "art": {
+                          "$ref": "#/components/schemas/DocPagesDelete200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        }
+                      },
+                      "required": ["media", "crop"],
+                      "additionalProperties": false
+                    },
+                    "actions": {
+                      "$ref": "#/components/schemas/PdfPageActions"
+                    }
+                  },
+                  "required": ["index", "ref", "label", "size", "rotation", "userUnit", "boxes"],
+                  "additionalProperties": false
+                }
+              },
+              "namedPages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "target": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["page"]
+                            },
+                            "page": {
+                              "$ref": "#/components/schemas/DocPagesDelete200Response/properties/layout/properties/pages/items/properties/ref"
+                            }
+                          },
+                          "required": ["kind", "page"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["template"]
+                            },
+                            "objectNumber": {
+                              "type": "integer",
+                              "exclusiveMinimum": true,
+                              "minimum": 0
+                            }
+                          },
+                          "required": ["kind", "objectNumber"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["dangling"]
+                            }
+                          },
+                          "required": ["kind"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["name", "target"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["pageCount", "pages"],
+            "additionalProperties": false
+          },
           "meta": {
             "type": "object",
             "properties": {
@@ -23913,7 +24571,6 @@
                 "properties": {
                   "previousDocVersion": {
                     "type": "integer",
-                    "exclusiveMinimum": true,
                     "minimum": 0
                   },
                   "docVersion": {
@@ -23922,6 +24579,21 @@
                     "minimum": 0
                   },
                   "annotationsVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "layoutVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "metadataVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "attachmentsVersion": {
                     "type": "integer",
                     "exclusiveMinimum": true,
                     "minimum": 0
@@ -23939,20 +24611,7 @@
                       "type": "object",
                       "properties": {
                         "page": {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["objectNumber"]
-                            },
-                            "pageObjectNumber": {
-                              "type": "integer",
-                              "exclusiveMinimum": true,
-                              "minimum": 0
-                            }
-                          },
-                          "required": ["kind", "pageObjectNumber"],
-                          "additionalProperties": false
+                          "$ref": "#/components/schemas/DocPagesDelete200Response/properties/layout/properties/pages/items/properties/ref"
                         },
                         "cache": {
                           "type": "object",
@@ -23986,8 +24645,8 @@
             "additionalProperties": false
           }
         },
-        "required": ["meta"],
-        "additionalProperties": true
+        "required": ["layout", "meta"],
+        "additionalProperties": false
       },
       "DocPagesDelete400Response": {
         "type": "object",
@@ -24094,6 +24753,190 @@
       "DocPagesSetName200Response": {
         "type": "object",
         "properties": {
+          "layout": {
+            "type": "object",
+            "properties": {
+              "pageCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "pages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "index": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "ref": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["objectNumber"]
+                        },
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["kind", "pageObjectNumber"],
+                      "additionalProperties": false
+                    },
+                    "label": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "size": {
+                      "type": "object",
+                      "properties": {
+                        "width": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "height": {
+                          "type": "number",
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["width", "height"],
+                      "additionalProperties": false
+                    },
+                    "rotation": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "enum": [0]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [90]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [180]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [270]
+                        }
+                      ]
+                    },
+                    "userUnit": {
+                      "type": "number",
+                      "exclusiveMinimum": true,
+                      "minimum": 0
+                    },
+                    "boxes": {
+                      "type": "object",
+                      "properties": {
+                        "media": {
+                          "type": "object",
+                          "properties": {
+                            "left": {
+                              "type": "number"
+                            },
+                            "bottom": {
+                              "type": "number"
+                            },
+                            "right": {
+                              "type": "number"
+                            },
+                            "top": {
+                              "type": "number"
+                            }
+                          },
+                          "required": ["left", "bottom", "right", "top"],
+                          "additionalProperties": false
+                        },
+                        "crop": {
+                          "$ref": "#/components/schemas/DocPagesSetName200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        },
+                        "bleed": {
+                          "$ref": "#/components/schemas/DocPagesSetName200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        },
+                        "trim": {
+                          "$ref": "#/components/schemas/DocPagesSetName200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        },
+                        "art": {
+                          "$ref": "#/components/schemas/DocPagesSetName200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        }
+                      },
+                      "required": ["media", "crop"],
+                      "additionalProperties": false
+                    },
+                    "actions": {
+                      "$ref": "#/components/schemas/PdfPageActions"
+                    }
+                  },
+                  "required": ["index", "ref", "label", "size", "rotation", "userUnit", "boxes"],
+                  "additionalProperties": false
+                }
+              },
+              "namedPages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "target": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["page"]
+                            },
+                            "page": {
+                              "$ref": "#/components/schemas/DocPagesSetName200Response/properties/layout/properties/pages/items/properties/ref"
+                            }
+                          },
+                          "required": ["kind", "page"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["template"]
+                            },
+                            "objectNumber": {
+                              "type": "integer",
+                              "exclusiveMinimum": true,
+                              "minimum": 0
+                            }
+                          },
+                          "required": ["kind", "objectNumber"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["dangling"]
+                            }
+                          },
+                          "required": ["kind"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["name", "target"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["pageCount", "pages"],
+            "additionalProperties": false
+          },
           "meta": {
             "type": "object",
             "properties": {
@@ -24108,7 +24951,6 @@
                 "properties": {
                   "previousDocVersion": {
                     "type": "integer",
-                    "exclusiveMinimum": true,
                     "minimum": 0
                   },
                   "docVersion": {
@@ -24117,6 +24959,21 @@
                     "minimum": 0
                   },
                   "annotationsVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "layoutVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "metadataVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "attachmentsVersion": {
                     "type": "integer",
                     "exclusiveMinimum": true,
                     "minimum": 0
@@ -24134,20 +24991,7 @@
                       "type": "object",
                       "properties": {
                         "page": {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["objectNumber"]
-                            },
-                            "pageObjectNumber": {
-                              "type": "integer",
-                              "exclusiveMinimum": true,
-                              "minimum": 0
-                            }
-                          },
-                          "required": ["kind", "pageObjectNumber"],
-                          "additionalProperties": false
+                          "$ref": "#/components/schemas/DocPagesSetName200Response/properties/layout/properties/pages/items/properties/ref"
                         },
                         "cache": {
                           "type": "object",
@@ -24181,8 +25025,8 @@
             "additionalProperties": false
           }
         },
-        "required": ["meta"],
-        "additionalProperties": true
+        "required": ["layout", "meta"],
+        "additionalProperties": false
       },
       "DocPagesSetName400Response": {
         "type": "object",
@@ -24289,6 +25133,190 @@
       "DocPagesRemoveName200Response": {
         "type": "object",
         "properties": {
+          "layout": {
+            "type": "object",
+            "properties": {
+              "pageCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "pages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "index": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "ref": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["objectNumber"]
+                        },
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["kind", "pageObjectNumber"],
+                      "additionalProperties": false
+                    },
+                    "label": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "size": {
+                      "type": "object",
+                      "properties": {
+                        "width": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "height": {
+                          "type": "number",
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["width", "height"],
+                      "additionalProperties": false
+                    },
+                    "rotation": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "enum": [0]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [90]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [180]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [270]
+                        }
+                      ]
+                    },
+                    "userUnit": {
+                      "type": "number",
+                      "exclusiveMinimum": true,
+                      "minimum": 0
+                    },
+                    "boxes": {
+                      "type": "object",
+                      "properties": {
+                        "media": {
+                          "type": "object",
+                          "properties": {
+                            "left": {
+                              "type": "number"
+                            },
+                            "bottom": {
+                              "type": "number"
+                            },
+                            "right": {
+                              "type": "number"
+                            },
+                            "top": {
+                              "type": "number"
+                            }
+                          },
+                          "required": ["left", "bottom", "right", "top"],
+                          "additionalProperties": false
+                        },
+                        "crop": {
+                          "$ref": "#/components/schemas/DocPagesRemoveName200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        },
+                        "bleed": {
+                          "$ref": "#/components/schemas/DocPagesRemoveName200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        },
+                        "trim": {
+                          "$ref": "#/components/schemas/DocPagesRemoveName200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        },
+                        "art": {
+                          "$ref": "#/components/schemas/DocPagesRemoveName200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        }
+                      },
+                      "required": ["media", "crop"],
+                      "additionalProperties": false
+                    },
+                    "actions": {
+                      "$ref": "#/components/schemas/PdfPageActions"
+                    }
+                  },
+                  "required": ["index", "ref", "label", "size", "rotation", "userUnit", "boxes"],
+                  "additionalProperties": false
+                }
+              },
+              "namedPages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "target": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["page"]
+                            },
+                            "page": {
+                              "$ref": "#/components/schemas/DocPagesRemoveName200Response/properties/layout/properties/pages/items/properties/ref"
+                            }
+                          },
+                          "required": ["kind", "page"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["template"]
+                            },
+                            "objectNumber": {
+                              "type": "integer",
+                              "exclusiveMinimum": true,
+                              "minimum": 0
+                            }
+                          },
+                          "required": ["kind", "objectNumber"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["dangling"]
+                            }
+                          },
+                          "required": ["kind"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["name", "target"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["pageCount", "pages"],
+            "additionalProperties": false
+          },
           "meta": {
             "type": "object",
             "properties": {
@@ -24303,7 +25331,6 @@
                 "properties": {
                   "previousDocVersion": {
                     "type": "integer",
-                    "exclusiveMinimum": true,
                     "minimum": 0
                   },
                   "docVersion": {
@@ -24312,6 +25339,21 @@
                     "minimum": 0
                   },
                   "annotationsVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "layoutVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "metadataVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "attachmentsVersion": {
                     "type": "integer",
                     "exclusiveMinimum": true,
                     "minimum": 0
@@ -24329,20 +25371,7 @@
                       "type": "object",
                       "properties": {
                         "page": {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["objectNumber"]
-                            },
-                            "pageObjectNumber": {
-                              "type": "integer",
-                              "exclusiveMinimum": true,
-                              "minimum": 0
-                            }
-                          },
-                          "required": ["kind", "pageObjectNumber"],
-                          "additionalProperties": false
+                          "$ref": "#/components/schemas/DocPagesRemoveName200Response/properties/layout/properties/pages/items/properties/ref"
                         },
                         "cache": {
                           "type": "object",
@@ -24376,8 +25405,8 @@
             "additionalProperties": false
           }
         },
-        "required": ["meta"],
-        "additionalProperties": true
+        "required": ["layout", "meta"],
+        "additionalProperties": false
       },
       "DocPagesRemoveName400Response": {
         "type": "object",
@@ -24484,6 +25513,95 @@
       "DocPagesFlatten200Response": {
         "type": "object",
         "properties": {
+          "pages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": ["objectNumber"]
+                },
+                "pageObjectNumber": {
+                  "type": "integer",
+                  "exclusiveMinimum": true,
+                  "minimum": 0
+                }
+              },
+              "required": ["kind", "pageObjectNumber"],
+              "additionalProperties": false
+            }
+          },
+          "usage": {
+            "type": "string",
+            "enum": ["display", "print"]
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "page": {
+                  "$ref": "#/components/schemas/DocPagesFlatten200Response/properties/pages/items"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": ["applied", "unchanged", "failed", "skipped"]
+                },
+                "error": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "enum": ["EngineError"]
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "Unknown",
+                        "InvalidArg",
+                        "DocNotOpen",
+                        "DocOpenFailed",
+                        "DocPasswordRequired",
+                        "DocPasswordIncorrect",
+                        "SharePasswordRequired",
+                        "Aborted",
+                        "Network",
+                        "Unauthenticated",
+                        "Forbidden",
+                        "NotFound",
+                        "WireFormat",
+                        "RuntimeUnavailable",
+                        "InvalidReference",
+                        "WeakAnnotationSessionConflict",
+                        "LayerVersionConflict",
+                        "NotImplemented",
+                        "MalformedPdf",
+                        "SigningPending",
+                        "SigningExpired",
+                        "SigningVersionMismatch",
+                        "SignatureRefused",
+                        "ProtectedDocument",
+                        "StaleBase",
+                        "PayloadTooLarge"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": ["name", "code", "message"],
+                  "additionalProperties": false
+                }
+              },
+              "required": ["page", "status"],
+              "additionalProperties": false
+            }
+          },
           "meta": {
             "type": "object",
             "properties": {
@@ -24498,7 +25616,6 @@
                 "properties": {
                   "previousDocVersion": {
                     "type": "integer",
-                    "exclusiveMinimum": true,
                     "minimum": 0
                   },
                   "docVersion": {
@@ -24507,6 +25624,21 @@
                     "minimum": 0
                   },
                   "annotationsVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "layoutVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "metadataVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "attachmentsVersion": {
                     "type": "integer",
                     "exclusiveMinimum": true,
                     "minimum": 0
@@ -24524,20 +25656,7 @@
                       "type": "object",
                       "properties": {
                         "page": {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["objectNumber"]
-                            },
-                            "pageObjectNumber": {
-                              "type": "integer",
-                              "exclusiveMinimum": true,
-                              "minimum": 0
-                            }
-                          },
-                          "required": ["kind", "pageObjectNumber"],
-                          "additionalProperties": false
+                          "$ref": "#/components/schemas/DocPagesFlatten200Response/properties/pages/items"
                         },
                         "cache": {
                           "type": "object",
@@ -24571,8 +25690,8 @@
             "additionalProperties": false
           }
         },
-        "required": ["meta"],
-        "additionalProperties": true
+        "required": ["pages", "usage", "results", "meta"],
+        "additionalProperties": false
       },
       "DocPagesFlatten400Response": {
         "type": "object",
@@ -24675,6 +25794,196 @@
       "DocPagesInsert200Response": {
         "type": "object",
         "properties": {
+          "insertedPages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": ["objectNumber"]
+                },
+                "pageObjectNumber": {
+                  "type": "integer",
+                  "exclusiveMinimum": true,
+                  "minimum": 0
+                }
+              },
+              "required": ["kind", "pageObjectNumber"],
+              "additionalProperties": false
+            }
+          },
+          "layout": {
+            "type": "object",
+            "properties": {
+              "pageCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "pages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "index": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "ref": {
+                      "$ref": "#/components/schemas/DocPagesInsert200Response/properties/insertedPages/items"
+                    },
+                    "label": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "size": {
+                      "type": "object",
+                      "properties": {
+                        "width": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "height": {
+                          "type": "number",
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["width", "height"],
+                      "additionalProperties": false
+                    },
+                    "rotation": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "enum": [0]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [90]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [180]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [270]
+                        }
+                      ]
+                    },
+                    "userUnit": {
+                      "type": "number",
+                      "exclusiveMinimum": true,
+                      "minimum": 0
+                    },
+                    "boxes": {
+                      "type": "object",
+                      "properties": {
+                        "media": {
+                          "type": "object",
+                          "properties": {
+                            "left": {
+                              "type": "number"
+                            },
+                            "bottom": {
+                              "type": "number"
+                            },
+                            "right": {
+                              "type": "number"
+                            },
+                            "top": {
+                              "type": "number"
+                            }
+                          },
+                          "required": ["left", "bottom", "right", "top"],
+                          "additionalProperties": false
+                        },
+                        "crop": {
+                          "$ref": "#/components/schemas/DocPagesInsert200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        },
+                        "bleed": {
+                          "$ref": "#/components/schemas/DocPagesInsert200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        },
+                        "trim": {
+                          "$ref": "#/components/schemas/DocPagesInsert200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        },
+                        "art": {
+                          "$ref": "#/components/schemas/DocPagesInsert200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        }
+                      },
+                      "required": ["media", "crop"],
+                      "additionalProperties": false
+                    },
+                    "actions": {
+                      "$ref": "#/components/schemas/PdfPageActions"
+                    }
+                  },
+                  "required": ["index", "ref", "label", "size", "rotation", "userUnit", "boxes"],
+                  "additionalProperties": false
+                }
+              },
+              "namedPages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "target": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["page"]
+                            },
+                            "page": {
+                              "$ref": "#/components/schemas/DocPagesInsert200Response/properties/insertedPages/items"
+                            }
+                          },
+                          "required": ["kind", "page"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["template"]
+                            },
+                            "objectNumber": {
+                              "type": "integer",
+                              "exclusiveMinimum": true,
+                              "minimum": 0
+                            }
+                          },
+                          "required": ["kind", "objectNumber"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["dangling"]
+                            }
+                          },
+                          "required": ["kind"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["name", "target"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["pageCount", "pages"],
+            "additionalProperties": false
+          },
           "meta": {
             "type": "object",
             "properties": {
@@ -24689,7 +25998,6 @@
                 "properties": {
                   "previousDocVersion": {
                     "type": "integer",
-                    "exclusiveMinimum": true,
                     "minimum": 0
                   },
                   "docVersion": {
@@ -24698,6 +26006,21 @@
                     "minimum": 0
                   },
                   "annotationsVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "layoutVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "metadataVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "attachmentsVersion": {
                     "type": "integer",
                     "exclusiveMinimum": true,
                     "minimum": 0
@@ -24715,20 +26038,7 @@
                       "type": "object",
                       "properties": {
                         "page": {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["objectNumber"]
-                            },
-                            "pageObjectNumber": {
-                              "type": "integer",
-                              "exclusiveMinimum": true,
-                              "minimum": 0
-                            }
-                          },
-                          "required": ["kind", "pageObjectNumber"],
-                          "additionalProperties": false
+                          "$ref": "#/components/schemas/DocPagesInsert200Response/properties/insertedPages/items"
                         },
                         "cache": {
                           "type": "object",
@@ -24762,8 +26072,8 @@
             "additionalProperties": false
           }
         },
-        "required": ["meta"],
-        "additionalProperties": true
+        "required": ["insertedPages", "layout", "meta"],
+        "additionalProperties": false
       },
       "DocPagesInsert400Response": {
         "type": "object",
@@ -24870,6 +26180,196 @@
       "DocPagesInsertBlank200Response": {
         "type": "object",
         "properties": {
+          "insertedPages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": ["objectNumber"]
+                },
+                "pageObjectNumber": {
+                  "type": "integer",
+                  "exclusiveMinimum": true,
+                  "minimum": 0
+                }
+              },
+              "required": ["kind", "pageObjectNumber"],
+              "additionalProperties": false
+            }
+          },
+          "layout": {
+            "type": "object",
+            "properties": {
+              "pageCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "pages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "index": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "ref": {
+                      "$ref": "#/components/schemas/DocPagesInsertBlank200Response/properties/insertedPages/items"
+                    },
+                    "label": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "size": {
+                      "type": "object",
+                      "properties": {
+                        "width": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "height": {
+                          "type": "number",
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["width", "height"],
+                      "additionalProperties": false
+                    },
+                    "rotation": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "enum": [0]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [90]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [180]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [270]
+                        }
+                      ]
+                    },
+                    "userUnit": {
+                      "type": "number",
+                      "exclusiveMinimum": true,
+                      "minimum": 0
+                    },
+                    "boxes": {
+                      "type": "object",
+                      "properties": {
+                        "media": {
+                          "type": "object",
+                          "properties": {
+                            "left": {
+                              "type": "number"
+                            },
+                            "bottom": {
+                              "type": "number"
+                            },
+                            "right": {
+                              "type": "number"
+                            },
+                            "top": {
+                              "type": "number"
+                            }
+                          },
+                          "required": ["left", "bottom", "right", "top"],
+                          "additionalProperties": false
+                        },
+                        "crop": {
+                          "$ref": "#/components/schemas/DocPagesInsertBlank200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        },
+                        "bleed": {
+                          "$ref": "#/components/schemas/DocPagesInsertBlank200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        },
+                        "trim": {
+                          "$ref": "#/components/schemas/DocPagesInsertBlank200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        },
+                        "art": {
+                          "$ref": "#/components/schemas/DocPagesInsertBlank200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                        }
+                      },
+                      "required": ["media", "crop"],
+                      "additionalProperties": false
+                    },
+                    "actions": {
+                      "$ref": "#/components/schemas/PdfPageActions"
+                    }
+                  },
+                  "required": ["index", "ref", "label", "size", "rotation", "userUnit", "boxes"],
+                  "additionalProperties": false
+                }
+              },
+              "namedPages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "target": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["page"]
+                            },
+                            "page": {
+                              "$ref": "#/components/schemas/DocPagesInsertBlank200Response/properties/insertedPages/items"
+                            }
+                          },
+                          "required": ["kind", "page"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["template"]
+                            },
+                            "objectNumber": {
+                              "type": "integer",
+                              "exclusiveMinimum": true,
+                              "minimum": 0
+                            }
+                          },
+                          "required": ["kind", "objectNumber"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["dangling"]
+                            }
+                          },
+                          "required": ["kind"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["name", "target"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["pageCount", "pages"],
+            "additionalProperties": false
+          },
           "meta": {
             "type": "object",
             "properties": {
@@ -24884,7 +26384,6 @@
                 "properties": {
                   "previousDocVersion": {
                     "type": "integer",
-                    "exclusiveMinimum": true,
                     "minimum": 0
                   },
                   "docVersion": {
@@ -24893,6 +26392,21 @@
                     "minimum": 0
                   },
                   "annotationsVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "layoutVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "metadataVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "attachmentsVersion": {
                     "type": "integer",
                     "exclusiveMinimum": true,
                     "minimum": 0
@@ -24910,20 +26424,7 @@
                       "type": "object",
                       "properties": {
                         "page": {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["objectNumber"]
-                            },
-                            "pageObjectNumber": {
-                              "type": "integer",
-                              "exclusiveMinimum": true,
-                              "minimum": 0
-                            }
-                          },
-                          "required": ["kind", "pageObjectNumber"],
-                          "additionalProperties": false
+                          "$ref": "#/components/schemas/DocPagesInsertBlank200Response/properties/insertedPages/items"
                         },
                         "cache": {
                           "type": "object",
@@ -24957,8 +26458,8 @@
             "additionalProperties": false
           }
         },
-        "required": ["meta"],
-        "additionalProperties": true
+        "required": ["insertedPages", "layout", "meta"],
+        "additionalProperties": false
       },
       "DocPagesInsertBlank400Response": {
         "type": "object",
@@ -25162,11 +26663,287 @@
       },
       "DocRedactionsApplyRequest": {
         "type": "object",
-        "additionalProperties": {}
+        "properties": {
+          "pages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": ["objectNumber"]
+                },
+                "pageObjectNumber": {
+                  "type": "integer",
+                  "exclusiveMinimum": true,
+                  "minimum": 0
+                }
+              },
+              "required": ["kind", "pageObjectNumber"],
+              "additionalProperties": false
+            }
+          },
+          "annotations": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["objectNumber"]
+                    },
+                    "page": {
+                      "$ref": "#/components/schemas/DocRedactionsApplyRequest/properties/pages/items"
+                    },
+                    "annotObjectNumber": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "minimum": 0
+                    }
+                  },
+                  "required": ["kind", "page", "annotObjectNumber"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["nm"]
+                    },
+                    "page": {
+                      "$ref": "#/components/schemas/DocRedactionsApplyRequest/properties/pages/items"
+                    },
+                    "nm": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["kind", "page", "nm"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["index"]
+                    },
+                    "page": {
+                      "$ref": "#/components/schemas/DocRedactionsApplyRequest/properties/pages/items"
+                    },
+                    "index": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "revision": {
+                      "type": "object",
+                      "properties": {
+                        "docSessionId": {
+                          "type": "string"
+                        },
+                        "page": {
+                          "$ref": "#/components/schemas/DocRedactionsApplyRequest/properties/pages/items"
+                        },
+                        "generation": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["docSessionId", "page", "generation"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["kind", "page", "index", "revision"],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          }
+        },
+        "additionalProperties": false
       },
       "DocRedactionsApply200Response": {
         "type": "object",
         "properties": {
+          "scope": {
+            "type": "object",
+            "properties": {
+              "pages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["objectNumber"]
+                    },
+                    "pageObjectNumber": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "minimum": 0
+                    }
+                  },
+                  "required": ["kind", "pageObjectNumber"],
+                  "additionalProperties": false
+                }
+              },
+              "annotations": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["objectNumber"]
+                        },
+                        "page": {
+                          "$ref": "#/components/schemas/DocRedactionsApply200Response/properties/scope/properties/pages/items"
+                        },
+                        "annotObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["kind", "page", "annotObjectNumber"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["nm"]
+                        },
+                        "page": {
+                          "$ref": "#/components/schemas/DocRedactionsApply200Response/properties/scope/properties/pages/items"
+                        },
+                        "nm": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["kind", "page", "nm"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["index"]
+                        },
+                        "page": {
+                          "$ref": "#/components/schemas/DocRedactionsApply200Response/properties/scope/properties/pages/items"
+                        },
+                        "index": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "revision": {
+                          "type": "object",
+                          "properties": {
+                            "docSessionId": {
+                              "type": "string"
+                            },
+                            "page": {
+                              "$ref": "#/components/schemas/DocRedactionsApply200Response/properties/scope/properties/pages/items"
+                            },
+                            "generation": {
+                              "type": "integer",
+                              "minimum": 0
+                            }
+                          },
+                          "required": ["docSessionId", "page", "generation"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": ["kind", "page", "index", "revision"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "page": {
+                  "$ref": "#/components/schemas/DocRedactionsApply200Response/properties/scope/properties/pages/items"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": ["applied", "unchanged", "failed", "skipped"]
+                },
+                "removedAnnotationCount": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "error": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "enum": ["EngineError"]
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "Unknown",
+                        "InvalidArg",
+                        "DocNotOpen",
+                        "DocOpenFailed",
+                        "DocPasswordRequired",
+                        "DocPasswordIncorrect",
+                        "SharePasswordRequired",
+                        "Aborted",
+                        "Network",
+                        "Unauthenticated",
+                        "Forbidden",
+                        "NotFound",
+                        "WireFormat",
+                        "RuntimeUnavailable",
+                        "InvalidReference",
+                        "WeakAnnotationSessionConflict",
+                        "LayerVersionConflict",
+                        "NotImplemented",
+                        "MalformedPdf",
+                        "SigningPending",
+                        "SigningExpired",
+                        "SigningVersionMismatch",
+                        "SignatureRefused",
+                        "ProtectedDocument",
+                        "StaleBase",
+                        "PayloadTooLarge"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": ["name", "code", "message"],
+                  "additionalProperties": false
+                }
+              },
+              "required": ["page", "status", "removedAnnotationCount"],
+              "additionalProperties": false
+            }
+          },
+          "removedAnnotationCount": {
+            "type": "integer",
+            "minimum": 0
+          },
           "meta": {
             "type": "object",
             "properties": {
@@ -25181,7 +26958,6 @@
                 "properties": {
                   "previousDocVersion": {
                     "type": "integer",
-                    "exclusiveMinimum": true,
                     "minimum": 0
                   },
                   "docVersion": {
@@ -25190,6 +26966,21 @@
                     "minimum": 0
                   },
                   "annotationsVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "layoutVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "metadataVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "attachmentsVersion": {
                     "type": "integer",
                     "exclusiveMinimum": true,
                     "minimum": 0
@@ -25207,20 +26998,7 @@
                       "type": "object",
                       "properties": {
                         "page": {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["objectNumber"]
-                            },
-                            "pageObjectNumber": {
-                              "type": "integer",
-                              "exclusiveMinimum": true,
-                              "minimum": 0
-                            }
-                          },
-                          "required": ["kind", "pageObjectNumber"],
-                          "additionalProperties": false
+                          "$ref": "#/components/schemas/DocRedactionsApply200Response/properties/scope/properties/pages/items"
                         },
                         "cache": {
                           "type": "object",
@@ -25254,8 +27032,8 @@
             "additionalProperties": false
           }
         },
-        "required": ["meta"],
-        "additionalProperties": true
+        "required": ["scope", "results", "removedAnnotationCount", "meta"],
+        "additionalProperties": false
       },
       "DocRedactionsApply400Response": {
         "type": "object",

@@ -1,6 +1,6 @@
 import { createReadStream } from 'node:fs';
 
-import { EngineError, EngineErrorCode, type EmbeddedFileRef } from '@embedpdf/engine-core/runtime';
+import { EngineError, EngineErrorCode, type AttachmentRef } from '@embedpdf/engine-core/runtime';
 import {
   WireAttachmentFileSchema,
   decodeAttachmentsToken,
@@ -304,7 +304,7 @@ export async function registerAttachmentRoutes(
   });
 }
 
-function attachmentRefFromPath(fileKey: string): EmbeddedFileRef {
+function attachmentRefFromPath(fileKey: string): AttachmentRef {
   let key: string;
   try {
     key = decodeTokenText(fileKey);

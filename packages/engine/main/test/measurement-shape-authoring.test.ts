@@ -39,7 +39,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         await doc.page(toPageRef(pageObjectNumber)).measure!.setScale(scale);
         annotation.setPageViewports(
           page.ref,
-          await doc.page(toPageRef(pageObjectNumber)).measure!.listViewports(),
+          (await doc.page(toPageRef(pageObjectNumber)).measure!.listViewports()).viewports,
           scale,
         );
         for (const preset of annotation.listResolvedTools()) {

@@ -30,7 +30,7 @@ export interface AnnotationFlattenResult {
   page: PageRef;
   usage: PageFlattenUsage;
   results: AnnotationFlattenItemResult[];
-  meta: MutationMeta | null;
+  meta: MutationMeta;
 }
 
 /** Input for `page(pon).annotations.exportAppearance()`. */

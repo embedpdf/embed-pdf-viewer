@@ -101,7 +101,8 @@ export class RedactionApplier {
     }
 
     if (affected.size === 0) {
-      return { scope, results, removedAnnotationCount: totalRemoved, meta: null };
+      const meta: MutationMeta = { affectedPages: [], cacheDelta: null };
+      return { scope, results, removedAnnotationCount: totalRemoved, meta };
     }
 
     this.session.noteMutation();
@@ -130,7 +131,7 @@ export class RedactionApplier {
    */
   private buildPlan(scope: RedactionApplyScope): Map<PageObjectNumber, AnnotationRef[] | null> {
     const plan = new Map<PageObjectNumber, AnnotationRef[] | null>();
-    if (scope.kind === 'pages') {
+    if ('pages' in scope) {
       if (this.session.resolvePageRefs(scope.pages).length === 0) {
         throw new EngineError(
           EngineErrorCode.InvalidArg,
@@ -149,13 +150,13 @@ export class RedactionApplier {
       return plan;
     }
 
-    if (scope.refs.length === 0) {
+    if (scope.annotations.length === 0) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
         'redaction.apply requires at least one annotation ref',
       );
     }
-    for (const ref of scope.refs) {
+    for (const ref of scope.annotations) {
       const existing = plan.get(ref.page.pageObjectNumber);
       if (existing === null) {
         throw new EngineError(EngineErrorCode.InvalidArg, 'mixed redaction scopes on one page');

@@ -28,6 +28,7 @@ import {
   type FormFieldDTO,
   type FormFieldRef,
   type SignatureDTO,
+  type SignaturePrepared,
 } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '@embedpdf/engine';
 import { FormToken } from '@embedpdf/plugin-form/contract';
@@ -432,7 +433,8 @@ describe('facts from every session', () => {
 
     ctx.emitDocumentEvent({
       type: 'signatures.prepared',
-      signingId: 'remote-signing',
+      // The mirror reads only the signing's id.
+      ...({ signingId: 'remote-signing' } as SignaturePrepared),
       field: field.field,
       origin: remote,
     });

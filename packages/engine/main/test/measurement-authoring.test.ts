@@ -30,7 +30,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       await doc.page(toPageRef(pageObjectNumber)).measure!.setScale(scale);
       annotation.setPageViewports(
         page.ref,
-        await doc.page(toPageRef(pageObjectNumber)).measure!.listViewports(),
+        (await doc.page(toPageRef(pageObjectNumber)).measure!.listViewports()).viewports,
         scale,
       );
       for (const tool of annotation.listResolvedTools()) {
@@ -164,7 +164,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
           captionOffset: { along: 15, perpendicular: 25 },
         });
         expect(
-          (await layered.page(toPageRef(pageObjectNumber)).measure!.listViewports()).some(
+          (await layered.page(toPageRef(pageObjectNumber)).measure!.listViewports()).viewports.some(
             (v) => v.owned,
           ),
         ).toBe(true);
@@ -191,9 +191,9 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
         expect(restoredFrame.center.y).toBeCloseTo(frame.center.y, 3);
         expect(restoredFrame.angle).toBe(90);
         expect(
-          (await reopened.page(toPageRef(reopenedPageObjectNumber)).measure!.listViewports()).some(
-            (v) => v.owned && v.measure?.subtype === 'rectilinear',
-          ),
+          (
+            await reopened.page(toPageRef(reopenedPageObjectNumber)).measure!.listViewports()
+          ).viewports.some((v) => v.owned && v.measure?.subtype === 'rectilinear'),
         ).toBe(true);
       } finally {
         await reopened.close();

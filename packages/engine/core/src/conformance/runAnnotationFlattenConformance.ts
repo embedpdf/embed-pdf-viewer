@@ -63,14 +63,14 @@ export function runAnnotationFlattenConformance(
         const unsubscribe = doc.events.subscribe((event) => {
           if (event.type === 'annotations.flattened') events.push(event);
         });
-        const result = await page.annotations.flatten([a, c], 'display');
+        const result = await page.annotations.flatten([a, c], { usage: 'display' });
         unsubscribe();
 
         expect(AnnotationFlattenResultSchema.safeParse(result).success).toBe(true);
         expect(result.page.pageObjectNumber).toBe(pageObjectNumber);
         expect(result.usage).toBe('display');
         expect(result.results.map((item) => item.status)).toEqual(['applied', 'unchanged']);
-        expect(result.meta === null).toBe(false);
+        expect(result.meta.affectedPages.map((state) => state.page)).toEqual([page.ref]);
         expect(events).toHaveLength(1);
 
         // Layout untouched; `a` gone, `b` and `c` still there.

@@ -1,5 +1,17 @@
 import type { PieceInfoPatch, PieceInfoSnapshot } from '../dto/PieceInfo';
+import type { MutationMeta } from '../mutation/MutationMeta';
 import { AbortablePromise } from '../promise/AbortablePromise';
+
+/** Result of `pieceInfo.update()`: the application's data after the write. */
+export interface PieceInfoUpdateResult {
+  pieceInfo: PieceInfoSnapshot | null;
+  meta: MutationMeta;
+}
+
+/** Result of `pieceInfo.delete()`: nothing exists after it, so only `meta`. */
+export interface PieceInfoDeleteResult {
+  meta: MutationMeta;
+}
 
 /**
  * Access to `/PieceInfo` private application data (ISO 32000 §14.5). The
@@ -33,9 +45,9 @@ export interface PieceInfoService {
    * is one worker job — atomic with respect to every other engine
    * operation on this document.
    */
-  update(application: string, patch: PieceInfoPatch): AbortablePromise<void>;
+  update(application: string, patch: PieceInfoPatch): AbortablePromise<PieceInfoUpdateResult>;
   /** Application names present under this holder's `/PieceInfo`. */
   list(): AbortablePromise<string[]>;
   /** Remove the application's entire entry (sibling applications survive). */
-  delete(application: string): AbortablePromise<void>;
+  delete(application: string): AbortablePromise<PieceInfoDeleteResult>;
 }

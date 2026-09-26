@@ -292,10 +292,14 @@ function buildStub(initial: ServerState): StubbedFixture {
       return new Response(
         JSON.stringify({
           metadata: metadataSnapshot(state.title),
-          cache: {
-            previousDocVersion,
-            docVersion: state.docVersion,
-            metadataVersion: state.metadataVersion,
+          meta: {
+            affectedPages: [],
+            cacheDelta: {
+              previousDocVersion,
+              docVersion: state.docVersion,
+              metadataVersion: state.metadataVersion,
+              pages: [],
+            },
           },
         }),
         { status: 200, headers: { 'content-type': 'application/json' } },
@@ -718,7 +722,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
     }
   });
 
-  test('metadata update absorbs cache in place so the next read skips the 404 refresh', async () => {
+  test('metadata update absorbs its cache delta in place so the next read skips the 404 refresh', async () => {
     const doc = new CloudDocumentHandle(fx.http, DOC_ID);
     try {
       const first = await doc.metadata.get();
@@ -726,13 +730,14 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
 
       const result = await doc.metadata.update({ title: 'patched-title' });
       expect(result.metadata.title).toBe('patched-title');
-      expect(result.cache).toEqual({
+      expect(result.meta.cacheDelta).toEqual({
         previousDocVersion: 1,
         docVersion: 2,
         metadataVersion: 2,
+        pages: [],
       });
 
-      // applyMetadata advanced the cached manifest in place: the next read
+      // The absorb advanced the cached manifest in place: the next read
       // goes straight to the fresh /metadata leaf — no /head, no /manifest.
       const callsBeforeRead = fx.calls.length;
       const after = await doc.metadata.get();

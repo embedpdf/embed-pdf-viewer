@@ -134,8 +134,8 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
     return this.await(submission, 'signatures.prepare', (payload) => {
       this.publisher.publishLocal({
         type: 'signatures.prepared',
-        signingId: payload.result.signingId,
         field: input.field,
+        ...payload.result,
       });
       return payload.result;
     });

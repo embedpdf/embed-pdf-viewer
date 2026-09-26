@@ -15,6 +15,7 @@ export { EngineErrorCode } from './errors/EngineErrorCode';
 // Refs.
 export { toPageRef, pageRefsEqual } from './identity/PageRef';
 export { toFieldRef } from './identity/FormFieldRef';
+export { toAttachmentRef } from './dto/Attachment';
 export { annotationKey } from './identity/annotationKey';
 
 // Permissions.
@@ -70,6 +71,8 @@ export type {
   DocumentUnlockResult,
   DocumentAccessInfo,
   PdfSaveMode,
+  DownloadOptions,
+  FlattenOptions,
   // Data.
   PageRef,
   PageLayout,
@@ -110,6 +113,9 @@ export type {
   CommentThread,
   FormFieldRef,
   FormFieldDTO,
+  Attachment,
+  AttachmentList,
+  AttachmentRef,
   DocumentEvent,
   DocumentEventOf,
   DocumentEventType,

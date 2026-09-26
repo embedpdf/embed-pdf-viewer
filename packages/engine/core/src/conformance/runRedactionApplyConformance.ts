@@ -72,10 +72,7 @@ export function runRedactionApplyConformance(
           if (event.type === 'redaction.applied') events.push(event);
         });
 
-        const result = await doc.redaction.apply({
-          kind: 'annotations',
-          refs: [marked.annotation.ref],
-        });
+        const result = await doc.redaction.apply({ annotations: [marked.annotation.ref] });
         expect(RedactionApplyResultSchema.safeParse(result).success).toBe(true);
         expect(result.results).toHaveLength(1);
         expect(result.results[0].page.pageObjectNumber).toBe(pageObjectNumber);
@@ -83,7 +80,7 @@ export function runRedactionApplyConformance(
         // Exactly the highlight counts: the consumed redact never does.
         expect(result.results[0].removedAnnotationCount).toBe(1);
         expect(result.removedAnnotationCount).toBe(1);
-        expect(result.meta === null).toBe(false);
+        expect(result.meta.affectedPages.map((state) => state.page)).toEqual([page.ref]);
         expect(events).toHaveLength(1);
         unsubscribe();
 
@@ -117,27 +114,20 @@ export function runRedactionApplyConformance(
           if (event.type === 'redaction.applied') events.push(event);
         });
 
-        const applied = await doc.redaction.apply({
-          kind: 'pages',
-          pages: [toPageRef(pageObjectNumber)],
-        });
+        const applied = await doc.redaction.apply({ pages: [toPageRef(pageObjectNumber)] });
         expect(applied.results.map((item) => item.status)).toEqual(['applied']);
         expect(applied.removedAnnotationCount).toBe(0);
         expect(events).toHaveLength(1);
 
         // A page with no redactions left is unchanged: no artifact, no event.
-        const noOp = await doc.redaction.apply({
-          kind: 'pages',
-          pages: [toPageRef(pageObjectNumber)],
-        });
+        const noOp = await doc.redaction.apply({ pages: [toPageRef(pageObjectNumber)] });
         expect(noOp.results.map((item) => item.status)).toEqual(['unchanged']);
-        expect(noOp.meta).toBeNull();
+        expect(noOp.meta).toEqual({ affectedPages: [], cacheDelta: null });
         expect(events).toHaveLength(1);
         unsubscribe();
 
         await expect(
           doc.redaction.apply({
-            kind: 'pages',
             pages: [toPageRef(pageObjectNumber), toPageRef(pageObjectNumber)],
           }),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
@@ -149,7 +139,7 @@ export function runRedactionApplyConformance(
           quadPoints: COLLATERAL_QUAD,
         } satisfies HighlightDraft);
         await expect(
-          doc.redaction.apply({ kind: 'annotations', refs: [notRedact.annotation.ref] }),
+          doc.redaction.apply({ annotations: [notRedact.annotation.ref] }),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
       } finally {
         await doc.close();

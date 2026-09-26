@@ -48,14 +48,14 @@ export function createApplying(
       if (marks.length === 0) {
         throw new PluginError('not-found', 'redaction', 'no matching pending marks');
       }
-      return { kind: 'annotations', refs: marks };
+      return { annotations: marks };
     });
 
   const applyPages = (targets: readonly PageRef[]): Promise<RedactionApplyResult> => {
     if (targets.length === 0) {
       return Promise.reject(new PluginError('invalid-input', 'redaction', 'no pages given'));
     }
-    return runApply(() => ({ kind: 'pages', pages: [...targets] }));
+    return runApply(() => ({ pages: [...targets] }));
   };
 
   const applyAll = (): Promise<RedactionApplyResult> =>
@@ -66,7 +66,7 @@ export function createApplying(
       if (all.length === 0) {
         throw new PluginError('not-ready', 'redaction', 'the document has no pages');
       }
-      return { kind: 'pages', pages: all };
+      return { pages: all };
     });
 
   return { api: { apply, applyPages, applyAll } satisfies Partial<RedactionCapability> };

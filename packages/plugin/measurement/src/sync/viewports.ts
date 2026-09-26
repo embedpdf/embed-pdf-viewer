@@ -30,7 +30,7 @@ export function createViewportSync(
       // Without a page measure service, scales live for the session only.
       if (!service) return ctx.state.get().localViewports[page.pageObjectNumber] ?? [];
       try {
-        return await service.listViewports();
+        return (await service.listViewports()).viewports;
       } catch (error) {
         ctx.state.update(recordLoadError, page.pageObjectNumber, serializeError(error));
         throw error;

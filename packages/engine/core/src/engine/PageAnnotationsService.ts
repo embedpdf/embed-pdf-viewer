@@ -9,7 +9,7 @@ import type {
 } from '../dto/AnnotationRender';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { AnnotationFlattenResult } from '../mutation/AnnotationFlattenResult';
-import type { PageFlattenUsage } from '../mutation/PageFlattenResult';
+import type { FlattenOptions } from '../mutation/PageFlattenResult';
 import type {
   AnnotationCreateResult,
   AnnotationDeleteResult,
@@ -108,7 +108,7 @@ export interface PageAnnotationsService {
    */
   flatten(
     refs: AnnotationRef[],
-    usage?: PageFlattenUsage,
+    options?: FlattenOptions,
   ): AbortablePromise<AnnotationFlattenResult>;
 
   /**

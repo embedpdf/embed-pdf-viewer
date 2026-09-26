@@ -85,7 +85,9 @@ export class PagesFlattener {
       }
     }
 
-    if (affected.size === 0) return { pages, usage, results, meta: null };
+    if (affected.size === 0) {
+      return { pages, usage, results, meta: { affectedPages: [], cacheDelta: null } };
+    }
 
     this.session.noteMutation();
     for (const pageObjectNumber of affected) {

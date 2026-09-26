@@ -11,13 +11,13 @@ import { toPageRef } from '../identity/PageRef';
  * verb fails loudly instead of being skipped past.
  *
  * Invariants:
- *   1. Every page of the source bytes is copied in at `destIndex` (omitted →
+ *   1. Every page of the source bytes is copied in at `toIndex` (omitted →
  *      append), in source order; the result lists the fresh page object numbers in
  *      insertion order and they agree with the returned layout.
  *   2. Pre-existing pages keep their identity: same page object numbers before and after,
  *      in the expected positions (an insert never invalidates neighbours).
  *   3. The mutation persists through save → re-open (bytes engines only).
- *   4. Empty bytes / malformed bytes / out-of-range destIndex reject with
+ *   4. Empty bytes / malformed bytes / out-of-range toIndex reject with
  *      InvalidArg / MalformedPdf, leaving the document untouched.
  */
 export function runPageInsertConformance(
@@ -65,7 +65,7 @@ export function runPageInsertConformance(
       }
     });
 
-    test('destIndex places the block mid-document, in source order', async () => {
+    test('toIndex places the block mid-document, in source order', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const before = await doc.pages.list();
@@ -139,7 +139,7 @@ export function runPageInsertConformance(
       }
     });
 
-    test('out-of-range destIndex rejects with InvalidArg', async () => {
+    test('out-of-range toIndex rejects with InvalidArg', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const before = await doc.pages.list();

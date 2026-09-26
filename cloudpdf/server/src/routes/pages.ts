@@ -441,13 +441,14 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     const bits = await documentService.getEffectivePdfBits(access, docId, layerName);
     const ctx = requireLayerCapability(req, docId, layerName, 'doc.open', bits);
     setNoStore(reply);
-    return documentService.readPageViewports(
+    const viewports = await documentService.readPageViewports(
       ctx,
       docId,
       layerName,
       resolvePageKeyParam(pageKey),
       abortSignalFromRequest(req),
     );
+    return { viewports };
   });
   app.put('/v1/docs/:docId/layers/:layerName/pages/:pageKey/scale', async (req, reply) => {
     const { docId, layerName, pageKey } = req.params as {
@@ -488,7 +489,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
         docId,
         layerName,
         pages: body.pages,
-        destIndex: body.destIndex,
+        toIndex: body.toIndex,
       },
       abortSignalFromRequest(req),
     );
@@ -608,8 +609,8 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     // conformance contract wants malformed source bytes to surface as
     // MalformedPdf (the parser's verdict), never the envelope's InvalidArg.
     const envelope = await readMutationEnvelope(req, () => 'any');
-    const body = parseOrInvalidArg<{ destIndex?: number }>(
-      PageInsertInputSchema as unknown as SchemaLike<{ destIndex?: number }>,
+    const body = parseOrInvalidArg<{ toIndex?: number }>(
+      PageInsertInputSchema as unknown as SchemaLike<{ toIndex?: number }>,
       envelope.body,
       'request body',
     );
@@ -628,7 +629,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
         docId,
         layerName,
         bytes: source.bytes,
-        ...(body.destIndex !== undefined ? { destIndex: body.destIndex } : {}),
+        ...(body.toIndex !== undefined ? { toIndex: body.toIndex } : {}),
       },
       abortSignalFromRequest(req),
     );
@@ -645,12 +646,12 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     const body = parseOrInvalidArg<{
       size: { width: number; height: number };
       count?: number;
-      destIndex?: number;
+      toIndex?: number;
     }>(
       PageInsertBlankInputSchema as unknown as SchemaLike<{
         size: { width: number; height: number };
         count?: number;
-        destIndex?: number;
+        toIndex?: number;
       }>,
       req.body,
       'request body',
@@ -664,7 +665,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
         layerName,
         size: body.size,
         ...(body.count !== undefined ? { count: body.count } : {}),
-        ...(body.destIndex !== undefined ? { destIndex: body.destIndex } : {}),
+        ...(body.toIndex !== undefined ? { toIndex: body.toIndex } : {}),
       },
       abortSignalFromRequest(req),
     );

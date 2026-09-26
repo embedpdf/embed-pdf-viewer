@@ -10,7 +10,7 @@ import type {
   AnnotationAppearanceRenderOptions,
   AnnotationAppearancesResult,
 } from '../dto/AnnotationRender';
-import type { EmbeddedFileItem, EmbeddedFileRef, WireAttachmentFile } from '../dto/Attachment';
+import type { Attachment, AttachmentRef, WireAttachmentFile } from '../dto/Attachment';
 import type { DocumentMetadata } from '../dto/DocumentMetadata';
 import type { MetadataPatch } from '../dto/MetadataPatch';
 import type { PageGeometrySnapshot } from '../dto/PageGeometrySnapshot';
@@ -21,6 +21,7 @@ import type { PageTextSnapshot } from '../dto/PageTextSnapshot';
 import type { DocumentActionsSnapshot } from '../dto/PdfAction';
 import type { PdfSaveMode } from '../dto/PdfSaveMode';
 import type { PieceInfoPatch, PieceInfoSnapshot } from '../dto/PieceInfo';
+import type { PieceInfoDeleteResult, PieceInfoUpdateResult } from '../engine/PieceInfoService';
 import type { SerializedEngineError } from '../errors/EngineError';
 import type { FormFieldDraft } from '../forms/draft';
 import type { FormEffect, FormEffectsResult } from '../forms/effects';
@@ -738,7 +739,7 @@ export interface PagesMoveWorkerRequest {
   docId: string;
   layerName?: string;
   pages: PageRef[];
-  destIndex: number;
+  toIndex: number;
   artifactPath?: string;
 }
 
@@ -835,7 +836,7 @@ export interface AttachmentsReadFileWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  ref: EmbeddedFileRef;
+  ref: AttachmentRef;
   path?: string;
   /** Decompression-bomb cap forwarded to the runtime. Absent/0 = unlimited. */
   maxDecodedBytes?: number;
@@ -865,7 +866,7 @@ export interface AttachmentsDeleteWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  ref: EmbeddedFileRef;
+  ref: AttachmentRef;
   artifactPath?: string;
 }
 
@@ -884,7 +885,7 @@ export interface AnnotationsReadFileWorkerRequest {
 }
 
 /** Insert every page of a standalone PDF (transferable `bytes`) at
- *  `destIndex` (omitted → append). A structural mutation: layer sessions
+ *  `toIndex` (omitted → append). A structural mutation: layer sessions
  *  persist an artifact like move/rotate/delete. */
 export interface PagesInsertWorkerRequest {
   kind: 'pages.insert';
@@ -892,12 +893,12 @@ export interface PagesInsertWorkerRequest {
   docId: string;
   layerName?: string;
   bytes: ArrayBuffer;
-  destIndex?: number;
+  toIndex?: number;
   artifactPath?: string;
 }
 
 /** Create `count` (default 1) blank pages of `size` (PDF points) at
- *  `destIndex` (omitted → append). A structural mutation exactly like
+ *  `toIndex` (omitted → append). A structural mutation exactly like
  *  `pages.insert`, minus the bytes: pure parameters, so nothing transfers;
  *  layer sessions persist an artifact identically. */
 export interface PagesInsertBlankWorkerRequest {
@@ -907,7 +908,7 @@ export interface PagesInsertBlankWorkerRequest {
   layerName?: string;
   size: PdfSize;
   count?: number;
-  destIndex?: number;
+  toIndex?: number;
   artifactPath?: string;
 }
 
@@ -963,8 +964,8 @@ export interface PieceInfoApplicationsWorkerRequest {
   page?: PageRef;
 }
 
-export interface PieceInfoClearWorkerRequest {
-  kind: 'pieceInfo.clear';
+export interface PieceInfoDeleteWorkerRequest {
+  kind: 'pieceInfo.delete';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -1189,7 +1190,7 @@ export type WorkerRequest =
   | PieceInfoReadWorkerRequest
   | PieceInfoUpdateWorkerRequest
   | PieceInfoApplicationsWorkerRequest
-  | PieceInfoClearWorkerRequest
+  | PieceInfoDeleteWorkerRequest
   | PagesTextWorkerRequest
   | PagesGeometryWorkerRequest
   | PagesRenderWorkerRequest
@@ -1288,6 +1289,8 @@ export type WorkerResultPayload =
   | {
       tag: 'annotations.flatten';
       result: AnnotationFlattenResult;
+      /** False when nothing was applied: no artifact, event, or version bump. */
+      wrote: boolean;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
@@ -1410,17 +1413,21 @@ export type WorkerResultPayload =
   | {
       tag: 'pages.flatten';
       result: PageFlattenResult;
+      /** False when nothing was applied: no artifact, event, or version bump. */
+      wrote: boolean;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | {
       tag: 'redaction.apply';
       result: RedactionApplyResult;
+      /** False when nothing was applied: no artifact, event, or version bump. */
+      wrote: boolean;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | { tag: 'pages.extract'; bytes: ArrayBuffer; size: number }
-  | { tag: 'attachments.list'; items: EmbeddedFileItem[] }
+  | { tag: 'attachments.list'; attachments: Attachment[] }
   | { tag: 'attachments.readFile'; content: AttachmentFileWorkerPayload }
   | {
       tag: 'attachments.create';
@@ -1457,12 +1464,14 @@ export type WorkerResultPayload =
   | { tag: 'pieceInfo.read'; snapshot: PieceInfoSnapshot | null }
   | {
       tag: 'pieceInfo.update';
+      result: PieceInfoUpdateResult;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | { tag: 'pieceInfo.applications'; applications: string[] }
   | {
-      tag: 'pieceInfo.clear';
+      tag: 'pieceInfo.delete';
+      result: PieceInfoDeleteResult;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }

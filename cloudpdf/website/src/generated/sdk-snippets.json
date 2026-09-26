@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "canonicalVersion": "3.0.0-next.14",
-  "openapiSha256": "1c7f567d635c2d477cf6d3f15e41beff6206d228a8ee881f47266b1ebc0122dd",
+  "openapiSha256": "ab58c81b4df8c971344ad63b0e52aa027441d6fff544b33ef0a565ab2259a81d",
   "languages": {
     "typescript": {
       "label": "TypeScript",
@@ -1137,37 +1137,37 @@
     "doc.redactions.apply": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.redactions.apply({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  body: {\n    \"key\": \"value\"\n  }\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.redactions.apply({\n  docId: \"docId\",\n  layerName: \"layerName\"\n});",
         "frameLines": 7
       },
       "python": {
         "status": "available",
-        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.doc.redactions.apply(\n    doc_id=\"docId\",\n    layer_name=\"layerName\",\n    request={\n        \"key\": \"value\"\n    },\n)",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.doc.redactions.apply(\n    doc_id=\"docId\",\n    layer_name=\"layerName\",\n)",
         "frameLines": 7
       },
       "php": {
         "status": "available",
-        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->doc->redactions->apply(\n    'docId',\n    'layerName',\n    new ApplyRedactionsRequest([\n        'body' => [\n            'key' => \"value\",\n        ],\n    ]),\n);",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->doc->redactions->apply(\n    'docId',\n    'layerName',\n    new DocRedactionsApplyRequest([]),\n);",
         "frameLines": 7
       },
       "csharp": {
         "status": "available",
-        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Doc.Redactions.ApplyAsync(\n    new ApplyRedactionsRequest\n    {\n        DocId = \"docId\",\n        LayerName = \"layerName\",\n        Body = new Dictionary<string, object?>() { { \"key\", \"value\" } },\n    }\n);",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Doc.Redactions.ApplyAsync(\n    new DocRedactionsApplyRequest { DocId = \"docId\", LayerName = \"layerName\" }\n);",
         "frameLines": 7
       },
       "go": {
         "status": "available",
-        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &doc.ApplyRedactionsRequest{\n    DocID: \"docId\",\n    LayerName: \"layerName\",\n    Body: map[string]any{\n        \"key\": \"value\",\n    },\n}\nclient.Doc.Redactions.Apply(\n    context.TODO(),\n    request,\n)",
+        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &doc.DocRedactionsApplyRequest{\n    DocID: \"docId\",\n    LayerName: \"layerName\",\n}\nclient.Doc.Redactions.Apply(\n    context.TODO(),\n    request,\n)",
         "frameLines": 12
       },
       "java": {
         "status": "available",
-        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.doc().redactions().apply(\n    \"docId\",\n    \"layerName\",\n    ApplyRedactionsRequest\n        .builder()\n        .body(\n            new HashMap<String, Object>() {{\n                put(\"key\", \"value\");\n            }}\n        )\n        .build()\n);",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.doc().redactions().apply(\n    \"docId\",\n    \"layerName\",\n    DocRedactionsApplyRequest\n        .builder()\n        .build()\n);",
         "frameLines": 8
       },
       "ruby": {
         "status": "available",
-        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.redactions.apply(\n  doc_id: \"docId\",\n  layer_name: \"layerName\",\n  request: {\n    key: \"value\"\n  }\n)",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.redactions.apply(\n  doc_id: \"docId\",\n  layer_name: \"layerName\"\n)",
         "frameLines": 7
       }
     },
