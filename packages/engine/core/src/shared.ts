@@ -107,8 +107,30 @@ export type {
 } from './dto/AnnotationRender';
 export type { CachePins } from './dto/CachePins';
 export { DEFAULT_PDF_SAVE_MODE } from './dto/PdfSaveMode';
+export type { SessionKind } from './dto/SessionKind';
 export type { PdfSaveMode } from './dto/PdfSaveMode';
-export type { FontHandle, FontKey, FontSpec } from './dto/FontSpec';
+export type {
+  FontEmbeddingPermission,
+  FontHandle,
+  FontIdentityInfo,
+  FontKey,
+  FontSpec,
+} from './dto/FontSpec';
+export type {
+  RichTextAlign,
+  RichTextBody,
+  RichTextDecoration,
+  RichTextDirection,
+  RichTextDocument,
+  RichTextDocumentInput,
+  RichTextMargins,
+  RichTextParagraph,
+  RichTextParagraphProps,
+  RichTextRun,
+  RichTextRunStyle,
+  RichTextScript,
+} from './dto/RichText';
+export { richTextPlainText, richTextParagraphsFromPlainText } from './dto/RichText';
 
 export { EngineError, serializeError, deserializeError } from './errors/EngineError';
 export type { SerializedEngineError, EngineErrorOptions } from './errors/EngineError';
@@ -116,6 +138,8 @@ export { EngineErrorCode } from './errors/EngineErrorCode';
 
 export { isValidPageObjectNumber } from './identity/PageObjectNumber';
 export type { PageObjectNumber } from './identity/PageObjectNumber';
+export type { PageRef } from './identity/PageRef';
+export { toPageRef, pageRefsEqual, encodePageKey, decodePageKey } from './identity/PageRef';
 export type { AnnotationStableId } from './identity/AnnotationStableId';
 export { encodeStableIdKey, decodeStableIdKey } from './identity/AnnotationStableId';
 export type { AnnotationRef } from './identity/AnnotationRef';
@@ -297,7 +321,8 @@ export type {
   AnnotationListSnapshotAllPages,
 } from './annotation/AnnotationListSnapshot';
 
-export { classifyRelation, buildThreads, refKey } from './annotation/relationships';
+export { classifyRelation, buildThreads } from './annotation/relationships';
+export { annotationKey, refFromStableId } from './identity/annotationKey';
 export type { AnnotationRelationKind, AnnotationThread } from './annotation/relationships';
 
 export { buildCommentThreads, isStateAnnotation } from './annotation/comments';
@@ -333,7 +358,8 @@ export type {
   AppearanceOutcome,
 } from './annotation/appearance';
 export { appearanceImpactOf, semanticEqual } from './annotation/appearance';
-export type { FormFieldRef, FormWidgetRef } from './identity/FormFieldRef';
+export type { FormFieldRef, FormWidget } from './identity/FormFieldRef';
+export { formWidget } from './identity/FormFieldRef';
 export { encodeFieldRefKey, decodeFieldRefKey } from './identity/FormFieldRef';
 export type {
   FormFieldFamily,
@@ -391,6 +417,83 @@ export type {
   FormEffectResult,
   FormEffectsResult,
 } from './forms/effects';
+export type {
+  BaseVersionInfo,
+  DigestAlgorithm,
+  DocMdpPermission,
+  DocumentFieldLock,
+  DocumentProtection,
+  DocumentVersionRef,
+  FieldLockAction,
+  FieldLockSpec,
+  ModificationLevel,
+  PdfRevision,
+  SignatureAbortResult,
+  SignatureAppearanceInput,
+  SignatureCompleteInput,
+  SignatureCompleteResult,
+  SignatureCoverage,
+  SignatureDTO,
+  SignatureKind,
+  SignaturePrepareInput,
+  SignaturePrepared,
+  SignatureSeedValue,
+  SignatureSigner,
+  SignatureSnapshot,
+  SignatureSubFilter,
+  SignedDocumentPolicy,
+} from './signature/types';
+export type {
+  AnalyzeInput,
+  ChangeAnalysis,
+  ChangeFinding,
+  Assessment,
+  ObjectChange,
+  ObjectReadStatus,
+  RestrictionAnchor,
+  RevisionHealth,
+  ObjectChangeKind,
+  ObjectChangeType,
+  ObjectReferrer,
+  PdfValue,
+  RevisionAnalysis,
+  RevisionField,
+  RevisionStructure,
+  StepInput,
+  StepVerdict,
+} from './signature/analysis/types';
+export {
+  changedKeys,
+  dictEntries,
+  evaluateStep,
+  restrictionsFor,
+  sameEffectiveValue,
+  conclude,
+  combine,
+  assessmentOf,
+  primaryFinding,
+  parsePdfValue,
+  pdfValueEquals,
+  refsOf,
+  restrictionsOf,
+  stableStringify,
+  worstVerdict,
+  EdgeResolver,
+  DEFAULT_EDGE_RESOLVER_BUDGET,
+  USAGE_INCOMPLETE,
+} from './signature/analysis';
+export type { EdgeResolverBudget, ResolvedUsage } from './signature/analysis';
+export {
+  SIGNATURE_POLICY_VERSION,
+  deriveProtection,
+  fieldLockFor,
+  levelAllows,
+  levelFromPermission,
+  lockCovers,
+  lockNameCovers,
+  minLevel,
+  protectedCapabilities,
+} from './signature/protection';
 export type {
   FormSetValueResult,
   FormImportResult,
@@ -525,3 +628,8 @@ export { caps, collab, materializePdfPermissions, pdfPermissions } from './auth/
 // route guards and the cloud SDK consume it, and engine-local must not pull it
 // into its bundle. See ENGINE_CORE_BOUNDARIES.md (or wire/cdn/README.md) for
 // the rationale and where to import from.
+
+export * from './dto/Measure';
+export * from './measure';
+
+export type { PageScaleResult } from './mutation/PageScaleResult';

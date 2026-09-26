@@ -108,6 +108,8 @@ export function createLocalEngine(opts: CreateLocalEngineOptions = {}): LocalEng
     concurrency: opts.concurrency,
     imageEncoder: opts.imageEncoder,
     renderPolicy: opts.renderPolicy,
+    signedDocumentPolicy: opts.signedDocumentPolicy,
+    sessionKind: opts.sessionKind,
   });
 }
 
@@ -134,6 +136,8 @@ export function createLocalEngineWithWorker(opts: CreateLocalEngineWithWorkerOpt
     concurrency: opts.concurrency,
     imageEncoder: opts.imageEncoder,
     renderPolicy: opts.renderPolicy,
+    signedDocumentPolicy: opts.signedDocumentPolicy,
+    sessionKind: opts.sessionKind,
   });
 }
 
@@ -445,7 +449,7 @@ async function registerBootFonts(
     // is transferred (neutered) by the worker transport.
     fontService.seedRegistered(spec, { fallback });
     const bytes = toStandaloneArrayBuffer(spec.data);
-    await requestOverTransport(transport, (jobId) =>
+    const registered = await requestOverTransport(transport, (jobId) =>
       wirePack(
         {
           kind: 'fonts.register',
@@ -459,6 +463,9 @@ async function registerBootFonts(
         [bytes],
       ),
     );
+    if (registered.tag === 'fonts.register') {
+      fontService.applyIdentity(spec.key, registered.identity);
+    }
     if (fallback) {
       await requestOverTransport(transport, (jobId) =>
         wirePack({ kind: 'fonts.addFallback', jobId, fontKey: spec.key }),

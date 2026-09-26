@@ -1,4 +1,5 @@
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PageRef } from '../identity/PageRef';
 
 /**
  * Input to `pages.delete()`. Pages are addressed by durable
@@ -10,5 +11,5 @@ export interface PageDeleteInput {
    * Pages to delete. Duplicates and unknown PONs are rejected with
    * `EngineError(InvalidArg)` / `EngineError(NotFound)`.
    */
-  pageObjectNumbers: PageObjectNumber[];
+  pages: PageRef[];
 }

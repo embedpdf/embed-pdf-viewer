@@ -4,8 +4,27 @@ import type { PdfFileAccessHandle, PdfRuntimeModule, Ptr } from '@embedpdf/engin
 import type { AcquiredBaseDocument } from './PdfDocumentOpener';
 import { CloseStack, setRuntimeOwnerPermissionsIfEncrypted } from './PdfDocumentOpener';
 
+const FPDF_ERR_PASSWORD = 4;
+
+/**
+ * A password failure is a recoverable STATE the caller can act on (prompt,
+ * unlock), never a generic open failure — the same distinction
+ * `openFatMemoryDocument` draws, so a plain-bytes open that becomes a base
+ * parks and unlocks exactly like it always did.
+ */
+function baseOpenError(runtime: PdfRuntimeModule, password: string | null | undefined): EngineError {
+  if (runtime.fn.FPDF_GetLastError() === FPDF_ERR_PASSWORD) {
+    return password
+      ? new EngineError(EngineErrorCode.DocPasswordIncorrect, 'incorrect document password')
+      : new EngineError(EngineErrorCode.DocPasswordRequired, 'document requires a password');
+  }
+  return new EngineError(EngineErrorCode.DocOpenFailed, 'failed to open base document');
+}
+
 interface BaseEntry {
   key: string;
+  kind: 'memory' | 'file';
+  path?: string;
   basePtr: Ptr;
   refs: number;
   close: () => void;
@@ -20,6 +39,8 @@ export class BaseDocumentRegistry {
     key: string;
     bytes: Uint8Array;
     password?: string | null;
+    /** A verified SHA-256 (hex) of `bytes`; spares the runtime a full hashing pass. */
+    knownSha256?: string;
   }): AcquiredBaseDocument {
     const existing = this.retain(opts.key);
     if (existing) return existing;
@@ -37,11 +58,12 @@ export class BaseDocumentRegistry {
         opts.password ?? '',
       );
       if (!basePtr) {
-        throw new EngineError(EngineErrorCode.DocOpenFailed, 'failed to open base document');
+        throw baseOpenError(this.runtime, opts.password);
       }
       setRuntimeOwnerPermissionsIfEncrypted(this.runtime, basePtr);
       stack.push(() => fn.EPDF_ReleaseBaseDocument(basePtr));
-      return this.insert(opts.key, basePtr, () => stack.close());
+      this.supplyKnownSha(basePtr, opts.knownSha256);
+      return this.insert({ key: opts.key, kind: 'memory', basePtr, refs: 1, close: () => stack.close() });
     } catch (error) {
       stack.close();
       throw error;
@@ -52,6 +74,8 @@ export class BaseDocumentRegistry {
     key: string;
     path: string;
     password?: string | null;
+    /** A verified SHA-256 (hex) of the file; spares the runtime a full hashing pass. */
+    knownSha256?: string;
   }): AcquiredBaseDocument {
     const existing = this.retain(opts.key);
     if (existing) return existing;
@@ -65,14 +89,44 @@ export class BaseDocumentRegistry {
       stack.push(() => access?.close());
       const basePtr = fn.EPDF_LoadBaseDocument(access.ptr, opts.password ?? '');
       if (!basePtr) {
-        throw new EngineError(EngineErrorCode.DocOpenFailed, 'failed to open base document');
+        throw baseOpenError(this.runtime, opts.password);
       }
       setRuntimeOwnerPermissionsIfEncrypted(this.runtime, basePtr);
       stack.push(() => fn.EPDF_ReleaseBaseDocument(basePtr));
-      return this.insert(opts.key, basePtr, () => stack.close());
+      this.supplyKnownSha(basePtr, opts.knownSha256);
+      return this.insert({ key: opts.key, kind: 'file', path: opts.path, basePtr, refs: 1, close: () => stack.close() });
     } catch (error) {
       stack.close();
       throw error;
+    }
+  }
+
+  /**
+   * One more retain on a base already in the registry (a session holds one
+   * for its lifetime, so its key is live while it is open), or null. The
+   * way a signing candidate reopens over its session's own base without
+   * copying a byte.
+   */
+  retainByKey(key: string): AcquiredBaseDocument | null {
+    return this.retain(key);
+  }
+
+  /**
+   * Hand the runtime a hash the host already verified for these exact
+   * bytes, so it never hashes them itself. Malformed values are ignored:
+   * the runtime then hashes lazily on first use, which is always correct.
+   */
+  private supplyKnownSha(basePtr: Ptr, sha256Hex: string | undefined): void {
+    if (!sha256Hex || !/^[0-9a-fA-F]{64}$/.test(sha256Hex)) return;
+    const { mem, fn } = this.runtime;
+    const bytes = new Uint8Array(32);
+    for (let i = 0; i < 32; i++) bytes[i] = parseInt(sha256Hex.slice(i * 2, i * 2 + 2), 16);
+    const ptr = mem.alloc(32);
+    try {
+      mem.writeBytes(ptr, bytes);
+      fn.EPDF_SetBaseDocumentSha256(basePtr, ptr);
+    } finally {
+      mem.free(ptr);
     }
   }
 
@@ -102,9 +156,8 @@ export class BaseDocumentRegistry {
     return this.handleFor(entry);
   }
 
-  private insert(key: string, basePtr: Ptr, close: () => void): AcquiredBaseDocument {
-    const entry: BaseEntry = { key, basePtr, refs: 1, close };
-    this.entries.set(key, entry);
+  private insert(entry: BaseEntry): AcquiredBaseDocument {
+    this.entries.set(entry.key, entry);
     return this.handleFor(entry);
   }
 
@@ -112,6 +165,8 @@ export class BaseDocumentRegistry {
     let released = false;
     return {
       key: entry.key,
+      kind: entry.kind,
+      ...(entry.path !== undefined ? { path: entry.path } : {}),
       basePtr: entry.basePtr,
       release: () => {
         if (released) return;

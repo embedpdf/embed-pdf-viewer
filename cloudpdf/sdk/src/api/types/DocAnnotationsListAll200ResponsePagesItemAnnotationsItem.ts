@@ -27,7 +27,7 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     export interface Highlight {
         subtype: "highlight";
         ref: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemHighlightRef;
-        pageObjectNumber: number;
+        page: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemHighlight.Page;
         index: number;
         identityQuality: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemHighlight.IdentityQuality;
         nm: string | null;
@@ -52,6 +52,18 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     }
 
     export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItemHighlight {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+
         export const IdentityQuality = {
             Durable: "durable",
             Weak: "weak",
@@ -146,7 +158,7 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     export interface Underline {
         subtype: "underline";
         ref: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemUnderlineRef;
-        pageObjectNumber: number;
+        page: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemUnderline.Page;
         index: number;
         identityQuality: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemUnderline.IdentityQuality;
         nm: string | null;
@@ -171,6 +183,18 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     }
 
     export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItemUnderline {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+
         export const IdentityQuality = {
             Durable: "durable",
             Weak: "weak",
@@ -265,7 +289,7 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     export interface Squiggly {
         subtype: "squiggly";
         ref: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemSquigglyRef;
-        pageObjectNumber: number;
+        page: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemSquiggly.Page;
         index: number;
         identityQuality: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemSquiggly.IdentityQuality;
         nm: string | null;
@@ -290,6 +314,18 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     }
 
     export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItemSquiggly {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+
         export const IdentityQuality = {
             Durable: "durable",
             Weak: "weak",
@@ -384,7 +420,7 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     export interface Strikeout {
         subtype: "strikeout";
         ref: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemStrikeoutRef;
-        pageObjectNumber: number;
+        page: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemStrikeout.Page;
         index: number;
         identityQuality: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemStrikeout.IdentityQuality;
         nm: string | null;
@@ -410,6 +446,18 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     }
 
     export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItemStrikeout {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+
         export const IdentityQuality = {
             Durable: "durable",
             Weak: "weak",
@@ -509,7 +557,7 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     export interface Circle {
         subtype: "circle";
         ref: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemCircleRef;
-        pageObjectNumber: number;
+        page: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemCircle.Page;
         index: number;
         identityQuality: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemCircle.IdentityQuality;
         nm: string | null;
@@ -541,6 +589,18 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     }
 
     export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItemCircle {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+
         export const IdentityQuality = {
             Durable: "durable",
             Weak: "weak",
@@ -630,7 +690,7 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     export interface Square {
         subtype: "square";
         ref: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemSquareRef;
-        pageObjectNumber: number;
+        page: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemSquare.Page;
         index: number;
         identityQuality: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemSquare.IdentityQuality;
         nm: string | null;
@@ -662,6 +722,18 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     }
 
     export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItemSquare {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+
         export const IdentityQuality = {
             Durable: "durable",
             Weak: "weak",
@@ -750,8 +822,11 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
 
     export interface Polygon {
         subtype: "polygon";
+        intent?: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemPolygon.Intent | undefined;
+        measure?: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemPolygonMeasure | undefined;
+        caption?: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemPolygon.Caption | undefined;
         ref: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemPolygonRef;
-        pageObjectNumber: number;
+        page: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemPolygon.Page;
         index: number;
         identityQuality: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemPolygon.IdentityQuality;
         nm: string | null;
@@ -782,6 +857,36 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     }
 
     export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItemPolygon {
+        export const Intent = {
+            PolygonCloud: "PolygonCloud",
+            PolygonDimension: "PolygonDimension",
+        } as const;
+        export type Intent = (typeof Intent)[keyof typeof Intent];
+
+        export interface Caption {
+            enabled: boolean;
+            center?: Caption.Center | undefined;
+        }
+
+        export namespace Caption {
+            export interface Center {
+                x: number;
+                y: number;
+            }
+        }
+
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+
         export const IdentityQuality = {
             Durable: "durable",
             Weak: "weak",
@@ -865,8 +970,11 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
 
     export interface Polyline {
         subtype: "polyline";
+        intent?: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemPolyline.Intent | undefined;
+        measure?: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemPolylineMeasure | undefined;
+        caption?: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemPolyline.Caption | undefined;
         ref: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemPolylineRef;
-        pageObjectNumber: number;
+        page: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemPolyline.Page;
         index: number;
         identityQuality: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemPolyline.IdentityQuality;
         nm: string | null;
@@ -897,6 +1005,35 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     }
 
     export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItemPolyline {
+        export const Intent = {
+            PolyLineDimension: "PolyLineDimension",
+        } as const;
+        export type Intent = (typeof Intent)[keyof typeof Intent];
+
+        export interface Caption {
+            enabled: boolean;
+            center?: Caption.Center | undefined;
+        }
+
+        export namespace Caption {
+            export interface Center {
+                x: number;
+                y: number;
+            }
+        }
+
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+
         export const IdentityQuality = {
             Durable: "durable",
             Weak: "weak",
@@ -1014,8 +1151,12 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
 
     export interface Line {
         subtype: "line";
+        intent?: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemLine.Intent | undefined;
+        measure?: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemLineMeasure | undefined;
+        caption?: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemLine.Caption | undefined;
+        leader?: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemLine.Leader | undefined;
         ref: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemLineRef;
-        pageObjectNumber: number;
+        page: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemLine.Page;
         index: number;
         identityQuality: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemLine.IdentityQuality;
         nm: string | null;
@@ -1046,6 +1187,49 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     }
 
     export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItemLine {
+        export const Intent = {
+            LineArrow: "LineArrow",
+            LineDimension: "LineDimension",
+        } as const;
+        export type Intent = (typeof Intent)[keyof typeof Intent];
+
+        export interface Caption {
+            enabled: boolean;
+            position?: Caption.Position | undefined;
+            offset?: Caption.Offset | undefined;
+        }
+
+        export namespace Caption {
+            export const Position = {
+                Inline: "inline",
+                Top: "top",
+            } as const;
+            export type Position = (typeof Position)[keyof typeof Position];
+
+            export interface Offset {
+                along: number;
+                perpendicular: number;
+            }
+        }
+
+        export interface Leader {
+            length: number;
+            extension?: number | undefined;
+            offset?: number | undefined;
+        }
+
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+
         export const IdentityQuality = {
             Durable: "durable",
             Weak: "weak",
@@ -1172,7 +1356,7 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     export interface Link {
         subtype: "link";
         ref: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemLinkRef;
-        pageObjectNumber: number;
+        page: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemLink.Page;
         index: number;
         identityQuality: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemLink.IdentityQuality;
         nm: string | null;
@@ -1195,6 +1379,18 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     }
 
     export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItemLink {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+
         export const IdentityQuality = {
             Durable: "durable",
             Weak: "weak",
@@ -1250,7 +1446,7 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     export interface Ink {
         subtype: "ink";
         ref: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemInkRef;
-        pageObjectNumber: number;
+        page: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemInk.Page;
         index: number;
         identityQuality: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemInk.IdentityQuality;
         nm: string | null;
@@ -1280,6 +1476,18 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     }
 
     export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItemInk {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+
         export const IdentityQuality = {
             Durable: "durable",
             Weak: "weak",
@@ -1361,7 +1569,7 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     export interface FreeText {
         subtype: "free-text";
         ref: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemFreeTextRef;
-        pageObjectNumber: number;
+        page: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemFreeText.Page;
         index: number;
         identityQuality: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemFreeText.IdentityQuality;
         nm: string | null;
@@ -1381,9 +1589,10 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
         updatedBy?: string | undefined;
         actions?: CloudPDF.PdfAnnotationActions | undefined;
         intent: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemFreeText.Intent;
-        fontFamily: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemFreeText.FontFamily;
+        fontFamily: string;
         fontSize: number;
         textAlign: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemFreeText.TextAlign;
+        richText: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemFreeText.RichText;
         color: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemFreeText.Color;
         fontColor?: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemFreeText.FontColor | undefined;
         interiorColor: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemFreeText.InteriorColor | null;
@@ -1399,6 +1608,18 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     }
 
     export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItemFreeText {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+
         export const IdentityQuality = {
             Durable: "durable",
             Weak: "weak",
@@ -1454,29 +1675,156 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
             FreeTextCallout: "free-text-callout",
         } as const;
         export type Intent = (typeof Intent)[keyof typeof Intent];
-        export const FontFamily = {
-            Courier: "courier",
-            CourierBold: "courier-bold",
-            CourierBoldOblique: "courier-bold-oblique",
-            CourierOblique: "courier-oblique",
-            Helvetica: "helvetica",
-            HelveticaBold: "helvetica-bold",
-            HelveticaBoldOblique: "helvetica-bold-oblique",
-            HelveticaOblique: "helvetica-oblique",
-            TimesRoman: "times-roman",
-            TimesBold: "times-bold",
-            TimesBoldItalic: "times-bold-italic",
-            TimesItalic: "times-italic",
-            Symbol: "symbol",
-            ZapfDingbats: "zapf-dingbats",
-        } as const;
-        export type FontFamily = (typeof FontFamily)[keyof typeof FontFamily];
         export const TextAlign = {
             Left: "left",
             Center: "center",
             Right: "right",
         } as const;
         export type TextAlign = (typeof TextAlign)[keyof typeof TextAlign];
+
+        export interface RichText {
+            body: RichText.Body;
+            paragraphs: RichText.Paragraphs.Item[];
+        }
+
+        export namespace RichText {
+            export interface Body {
+                family: string;
+                weight: number;
+                italic: boolean;
+                size: number;
+                color: string;
+                decoration: Body.Decoration.Item[];
+                script: Body.Script;
+                letterSpacing: number;
+                horizontalScale: number;
+                unknown?: string | undefined;
+                align: Body.Align;
+                dir: Body.Dir;
+                lineHeight?: number | undefined;
+                margins?: Body.Margins | undefined;
+                textIndent?: number | undefined;
+            }
+
+            export namespace Body {
+                export type Decoration = Decoration.Item[];
+
+                export namespace Decoration {
+                    export const Item = {
+                        Underline: "underline",
+                        LineThrough: "line-through",
+                        Word: "word",
+                    } as const;
+                    export type Item = (typeof Item)[keyof typeof Item];
+                }
+
+                export const Script = {
+                    Normal: "normal",
+                    Sub: "sub",
+                    Super: "super",
+                } as const;
+                export type Script = (typeof Script)[keyof typeof Script];
+                export const Align = {
+                    Left: "left",
+                    Center: "center",
+                    Right: "right",
+                    Justify: "justify",
+                } as const;
+                export type Align = (typeof Align)[keyof typeof Align];
+                export const Dir = {
+                    Ltr: "ltr",
+                    Rtl: "rtl",
+                } as const;
+                export type Dir = (typeof Dir)[keyof typeof Dir];
+
+                export interface Margins {
+                    top: number;
+                    bottom: number;
+                    left: number;
+                    right: number;
+                }
+            }
+
+            export type Paragraphs = Paragraphs.Item[];
+
+            export namespace Paragraphs {
+                export interface Item {
+                    align?: Item.Align | undefined;
+                    dir?: Item.Dir | undefined;
+                    lineHeight?: number | undefined;
+                    margins?: Item.Margins | undefined;
+                    textIndent?: number | undefined;
+                    unknown?: string | undefined;
+                    runs: Item.Runs.Item[];
+                }
+
+                export namespace Item {
+                    export const Align = {
+                        Left: "left",
+                        Center: "center",
+                        Right: "right",
+                        Justify: "justify",
+                    } as const;
+                    export type Align = (typeof Align)[keyof typeof Align];
+                    export const Dir = {
+                        Ltr: "ltr",
+                        Rtl: "rtl",
+                    } as const;
+                    export type Dir = (typeof Dir)[keyof typeof Dir];
+
+                    export interface Margins {
+                        top: number;
+                        bottom: number;
+                        left: number;
+                        right: number;
+                    }
+
+                    export type Runs = Runs.Item[];
+
+                    export namespace Runs {
+                        export interface Item {
+                            text: string;
+                            style?: Item.Style | undefined;
+                        }
+
+                        export namespace Item {
+                            export interface Style {
+                                family?: string | undefined;
+                                weight?: number | undefined;
+                                italic?: boolean | undefined;
+                                size?: number | undefined;
+                                color?: string | undefined;
+                                decoration?: Style.Decoration.Item[] | undefined;
+                                script?: Style.Script | undefined;
+                                letterSpacing?: number | undefined;
+                                horizontalScale?: number | undefined;
+                                unknown?: string | undefined;
+                            }
+
+                            export namespace Style {
+                                export type Decoration = Decoration.Item[];
+
+                                export namespace Decoration {
+                                    export const Item = {
+                                        Underline: "underline",
+                                        LineThrough: "line-through",
+                                        Word: "word",
+                                    } as const;
+                                    export type Item = (typeof Item)[keyof typeof Item];
+                                }
+
+                                export const Script = {
+                                    Normal: "normal",
+                                    Sub: "sub",
+                                    Super: "super",
+                                } as const;
+                                export type Script = (typeof Script)[keyof typeof Script];
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         export interface Color {
             r: number;
@@ -1536,7 +1884,7 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     export interface Caret {
         subtype: "caret";
         ref: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemCaretRef;
-        pageObjectNumber: number;
+        page: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemCaret.Page;
         index: number;
         identityQuality: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemCaret.IdentityQuality;
         nm: string | null;
@@ -1564,6 +1912,18 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     }
 
     export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItemCaret {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+
         export const IdentityQuality = {
             Durable: "durable",
             Weak: "weak",
@@ -1644,7 +2004,7 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     export interface Text {
         subtype: "text";
         ref: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemTextRef;
-        pageObjectNumber: number;
+        page: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemText.Page;
         index: number;
         identityQuality: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemText.IdentityQuality;
         nm: string | null;
@@ -1671,6 +2031,18 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     }
 
     export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItemText {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+
         export const IdentityQuality = {
             Durable: "durable",
             Weak: "weak",
@@ -1743,7 +2115,7 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     export interface Stamp {
         subtype: "stamp";
         ref: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemStampRef;
-        pageObjectNumber: number;
+        page: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemStamp.Page;
         index: number;
         identityQuality: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemStamp.IdentityQuality;
         nm: string | null;
@@ -1768,6 +2140,18 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     }
 
     export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItemStamp {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+
         export const IdentityQuality = {
             Durable: "durable",
             Weak: "weak",
@@ -1830,7 +2214,7 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     export interface FileAttachment {
         subtype: "file-attachment";
         ref: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemFileAttachmentRef;
-        pageObjectNumber: number;
+        page: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemFileAttachment.Page;
         index: number;
         identityQuality: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemFileAttachment.IdentityQuality;
         nm: string | null;
@@ -1856,6 +2240,18 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     }
 
     export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItemFileAttachment {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+
         export const IdentityQuality = {
             Durable: "durable",
             Weak: "weak",
@@ -1934,7 +2330,7 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     export interface Widget {
         subtype: "widget";
         ref: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemWidgetRef;
-        pageObjectNumber: number;
+        page: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemWidget.Page;
         index: number;
         identityQuality: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemWidget.IdentityQuality;
         nm: string | null;
@@ -1966,6 +2362,18 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     }
 
     export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItemWidget {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+
         export const IdentityQuality = {
             Durable: "durable",
             Weak: "weak",
@@ -2082,7 +2490,7 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     export interface Redact {
         subtype: "redact";
         ref: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemRedactRef;
-        pageObjectNumber: number;
+        page: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemRedact.Page;
         index: number;
         identityQuality: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemRedact.IdentityQuality;
         nm: string | null;
@@ -2114,6 +2522,18 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     }
 
     export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItemRedact {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+
         export const IdentityQuality = {
             Durable: "durable",
             Weak: "weak",
@@ -2244,7 +2664,7 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     export interface Unsupported {
         subtype: "unsupported";
         ref: CloudPDF.DocAnnotationsListAll200ResponsePagesItemAnnotationsItemUnsupportedRef;
-        pageObjectNumber: number;
+        page: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemUnsupported.Page;
         index: number;
         identityQuality: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemUnsupported.IdentityQuality;
         nm: string | null;
@@ -2268,6 +2688,18 @@ export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItem {
     }
 
     export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItemUnsupported {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+
         export const IdentityQuality = {
             Durable: "durable",
             Weak: "weak",

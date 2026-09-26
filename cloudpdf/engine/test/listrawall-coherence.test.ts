@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import type { DocumentEvent } from '@embedpdf/engine-core/runtime';
+import { toPageRef, type DocumentEvent } from '@embedpdf/engine-core/runtime';
 import { HttpClient } from '../src/transport/HttpClient';
 import { CloudDocumentHandle } from '../src/document/CloudDocumentHandle';
 
@@ -11,7 +11,7 @@ import { CloudDocumentHandle } from '../src/document/CloudDocumentHandle';
  *   - a stale pin (concurrent mutation → 404) refreshes the manifest and
  *     retries the fresh leaf; an absorbed cacheDelta re-pins without any
  *     manifest refetch;
- *   - `listRaw(pon)` reads the versioned per-page leaf with the standard
+ *   - `listRaw(ref)` reads the versioned per-page leaf with the standard
  *     refresh-on-404 ladder;
  *   - the SSE `full-refresh` frame surfaces as a `stream.desynced` event.
  */
@@ -43,8 +43,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 function annotation(pon: number, index: number) {
   return {
     subtype: 'unsupported',
-    ref: { kind: 'objectNumber', pageObjectNumber: pon, annotObjectNumber: pon * 1000 + index },
-    pageObjectNumber: pon,
+    ref: { kind: 'objectNumber', page: toPageRef(pon), annotObjectNumber: pon * 1000 + index },
+    page: toPageRef(pon),
     index,
     identityQuality: 'durable',
     nm: `stub-${pon}-${index}`,
@@ -76,8 +76,8 @@ function annotation(pon: number, index: number) {
 
 function pageState(pon: number) {
   return {
-    pageObjectNumber: pon,
-    revision: { docSessionId: 'stub-session', pageObjectNumber: pon, generation: 0 },
+    page: toPageRef(pon),
+    revision: { docSessionId: 'stub-session', page: toPageRef(pon), generation: 0 },
     weakAnnotationState: { kind: 'known', hasAnyWeakAnnotations: false },
   };
 }
@@ -171,7 +171,9 @@ function buildStub(overrides: Partial<StubState> = {}): Stub {
       });
     }
 
-    const leafMatch = path.match(/\/annotations\/pages\/(\d+)\/items@annotationVersion=(\d+)$/);
+    const leafMatch = path.match(
+      /\/annotations\/pages\/obj%3A(\d+)\/items@annotationVersion=(\d+)$/,
+    );
     if (leafMatch) {
       const pon = Number(leafMatch[1]);
       const version = Number(leafMatch[2]);
@@ -224,7 +226,7 @@ describe('listRawAll — one bulk read at the manifest pin', () => {
 
       expect(snap.pages).toHaveLength(PAGE_OBJECT_NUMBERS.length);
       expect(snap.auditHead).toBe(40);
-      expect(new Set(snap.pages.map((p) => p.pageState.pageObjectNumber))).toEqual(
+      expect(new Set(snap.pages.map((p) => p.pageState.page.pageObjectNumber))).toEqual(
         new Set(PAGE_OBJECT_NUMBERS),
       );
       // Exactly ONE items request — the versioned bulk leaf; the per-page
@@ -298,10 +300,10 @@ describe('listRaw — versioned single-page reads', () => {
     const fx = buildStub();
     const doc = new CloudDocumentHandle(fx.http, DOC_ID);
     try {
-      const first = await doc.annotations.listRaw(11);
+      const first = await doc.annotations.listRaw(toPageRef(11));
       expect(first.annotations).toHaveLength(1);
       expect(fx.calls.filter((p) => p.includes('/items'))).toEqual([
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/11/items@annotationVersion=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/obj%3A11/items@annotationVersion=1`,
       ]);
 
       // Server moves on; the cached manifest pin goes stale → one 404,
@@ -309,12 +311,12 @@ describe('listRaw — versioned single-page reads', () => {
       fx.state.docVersion += 1;
       fx.state.annotationVersions.set(11, 2);
       const before = fx.calls.length;
-      const second = await doc.annotations.listRaw(11);
+      const second = await doc.annotations.listRaw(toPageRef(11));
       expect(second.annotations).toHaveLength(1);
       const tail = fx.calls.slice(before).filter((p) => p.includes('/items'));
       expect(tail).toEqual([
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/11/items@annotationVersion=1`,
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/11/items@annotationVersion=2`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/obj%3A11/items@annotationVersion=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/obj%3A11/items@annotationVersion=2`,
       ]);
     } finally {
       await doc.close();
@@ -329,10 +331,7 @@ describe('stream.desynced — the SSE full-refresh surfaces to subscribers', () 
     try {
       const events: DocumentEvent[] = [];
       doc.events.subscribe((e) => events.push(e));
-      await waitFor(
-        () => fx.calls.some((p) => p.endsWith('/events')),
-        'the SSE stream to open',
-      );
+      await waitFor(() => fx.calls.some((p) => p.endsWith('/events')), 'the SSE stream to open');
 
       fx.pushSse('event: full-refresh');
       await waitFor(() => events.length > 0, 'the desync event');

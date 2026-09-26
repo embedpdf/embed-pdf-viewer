@@ -6,6 +6,33 @@
  */
 
 export {
+  FieldLockSpecSchema,
+  SignatureSeedValueSchema,
+  SignatureDTOSchema,
+  DocumentProtectionSchema,
+  PdfRevisionSchema,
+  SignatureSnapshotSchema,
+  BaseVersionInfoSchema,
+  SignatureCompleteResultSchema,
+  SignatureAbortResultSchema,
+  ChangeAnalysisSchema,
+  SignaturePrepareBodySchema,
+  SignatureAppearanceBodySchema,
+  LayerAnalysisQuerySchema,
+  VersionAnalysisQuerySchema,
+  analyzeInputFromQuery,
+  DocumentVersionSchema,
+  DocumentVersionsSchema,
+  DigestAlgorithmSchema,
+  ModificationLevelSchema,
+  SignaturePreparedWireSchema,
+  SignatureCompleteBodySchema,
+  DocumentVersionRefSchema,
+  ByteRangeSchema,
+  encodePrepared,
+  decodePrepared,
+  toBase64,
+  fromBase64,
   DocumentMetadataSchema,
   MetadataPatchSchema,
   MetadataUpdateResultSchema,
@@ -110,7 +137,7 @@ export type {
 } from './wire/schemas';
 export {
   FormFieldRefSchema,
-  FormWidgetRefSchema,
+  FormWidgetSchema,
   FormFieldFlagsSchema,
   ToggleFieldWidgetSchema,
   FormFieldOptionSchema,
@@ -322,3 +349,19 @@ export {
   AttachmentCreateResultSchema,
   AttachmentDeleteResultSchema,
 } from './wire/schemas';
+export type { SignaturePreparedWire, SignatureCompleteBody } from './wire/schemas';
+export type {
+  SignaturePrepareBody,
+  SignatureAppearanceBody,
+  LayerAnalysisQuery,
+  VersionAnalysisQuery,
+  DocumentVersion,
+  DocumentVersions,
+} from './wire/schemas';
+export { encodeAnalysisToken, decodeAnalysisToken, type AnalysisToken } from './wire/tokens';
+export { analysisQueryString, type AnalysisQueryInput } from './wire/paths';
+
+export * from './dto/Measure.schema';
+
+export { PageScaleResultSchema } from './wire/schemas';
+export { PageRefSchema } from './identity/PageRef.schema';

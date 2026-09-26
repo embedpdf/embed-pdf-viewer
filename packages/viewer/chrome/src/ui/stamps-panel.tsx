@@ -21,16 +21,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTool } from '@embedpdf/react/interaction';
 import {
-  indexedDbByteStore,
-  persistStampLibraries,
-  restoreStampLibraries,
   useArmStampAsset,
   useStamp,
   useStampAssetPreviewUrl,
   useStampAssets,
   useStampLibraries,
   type StampAsset,
-  type StampCapability,
 } from '@embedpdf/react/stamp';
 import { useSurface } from '@embedpdf/react/shell';
 import { useLocale, useT } from '@embedpdf/react/i18n';
@@ -41,38 +37,21 @@ import {
   resolveStampsLocale,
 } from '../config/default-stamps';
 import { Icon } from './icons';
+import { restoreStampLibrariesOnce } from './stamp-store';
 
 const ALL = 'all';
-
-/** The user's libraries live in the browser (IndexedDB): restored on first
- *  open, written on every change. The built-in set is never stored — it is
- *  fetched again next time, in the locale of that moment. */
-const store =
-  typeof indexedDB === 'undefined'
-    ? null
-    : indexedDbByteStore('embedpdf-stamps', { storeName: 'libraries' });
-
-/** Restore runs ONCE per workspace — the panel mounts and unmounts with the
- *  sidebar, so the guard cannot live in component state. */
-const restored = new WeakMap<StampCapability, Promise<unknown>>();
-const restoreOnce = (stamp: StampCapability): Promise<unknown> => {
-  let pending = restored.get(stamp);
-  if (!pending) {
-    pending = store ? restoreStampLibraries(stamp, store) : Promise.resolve();
-    restored.set(stamp, pending);
-  }
-  return pending;
-};
 
 export function StampsPanel() {
   const t = useT();
   const stamp = useStamp();
-  const libraries = useStampLibraries();
+  const { defaultLibrary, sidebar } = useStampsConfig();
+  // Which catalogs this sidebar shows (`stamps.sidebar`): the plain stamps by
+  // default — never the people's marks, which have their own panel.
+  const libraries = useStampLibraries({ kind: sidebar ?? ['stamps'] });
   const assets = useStampAssets();
   const { armAsset } = useArmStampAsset();
   const { activeToolId } = useTool();
   const { locale } = useLocale();
-  const { defaultLibrary } = useStampsConfig();
   const surface = useSurface('stamps');
   const fileRef = useRef<HTMLInputElement>(null);
   const [armedId, setArmedId] = useState<string | null>(null);
@@ -86,14 +65,15 @@ export function StampsPanel() {
     if (typeof openedOn === 'string') setPicked(openedOn);
   }, [openedOn]);
 
-  // First open: bring the user's stored libraries back, THEN the built-in
-  // library for this locale — never at viewer boot, so a viewer whose user
-  // never opens this panel pays nothing for it. A locale change while open
-  // swaps the built-in library; the user's own are untouched.
+  // First open: the user's stored libraries (the workspace store restores
+  // them; this only awaits it), THEN the built-in library for this locale —
+  // never at viewer boot, so a viewer whose user never opens this panel pays
+  // nothing for it. A locale change while open swaps the built-in library;
+  // the user's own are untouched.
   useEffect(() => {
     let live = true;
     setBusy('loading');
-    restoreOnce(stamp)
+    restoreStampLibrariesOnce(stamp)
       .then(() => ensureDefaultLibrary(stamp, resolveStampsLocale(locale), defaultLibrary))
       .catch((err: unknown) => {
         console.error('[embedpdf] default stamps failed:', err);
@@ -106,13 +86,6 @@ export function StampsPanel() {
     // `t` and `defaultLibrary` are init-stable; only the locale re-runs this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stamp, locale]);
-
-  // From then on every change to a user library is written back.
-  useEffect(
-    () =>
-      store ? persistStampLibraries(stamp, store, { except: [DEFAULT_LIBRARY_ID] }) : undefined,
-    [stamp],
-  );
 
   // The interaction hub owns tool state: leaving the stamp tool (picking
   // another tool, pressing Escape) un-highlights the gallery.
@@ -136,7 +109,7 @@ export function StampsPanel() {
     // The file name is only a FALLBACK: an Acrobat-authored or previously
     // exported library names itself through its /Title.
     stamp
-      .importLibraryPdf(file, { name: file.name.replace(/\.pdf$/i, '') })
+      .importLibrary(file, { name: file.name.replace(/\.pdf$/i, '') })
       .then((id) => setPicked(id))
       .catch((err) => {
         console.error('[embedpdf] stamp library import failed:', err);
@@ -147,8 +120,8 @@ export function StampsPanel() {
 
   /** The library as the PDF it is — title, registry, artwork — for Acrobat
    *  or another viewer. */
-  const exportPdf = (libraryId: string, name: string) => {
-    const bytes = stamp.exportLibrary(libraryId);
+  const exportPdf = async (libraryId: string, name: string) => {
+    const bytes = await stamp.exportLibrary(libraryId).catch(() => null);
     if (!bytes) return;
     const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
@@ -208,7 +181,7 @@ export function StampsPanel() {
               {!isDefault(selected.id) && (
                 <button
                   type="button"
-                  onClick={() => void stamp.removeLibrary(selected.id)}
+                  onClick={() => void stamp.deleteLibrary(selected.id)}
                   title={t('demo.stampsRemoveLibrary')}
                   className="text-fg-muted hover:text-fg grid h-7 w-7 shrink-0 place-items-center rounded"
                 >
@@ -243,7 +216,7 @@ export function StampsPanel() {
                 {!isDefault(asset.libraryId) && (
                   <button
                     type="button"
-                    onClick={() => void stamp.removeAsset(asset.id)}
+                    onClick={() => void stamp.deleteAsset(asset.id)}
                     title={t('demo.stampsRemoveStamp')}
                     className="bg-surface border-border text-fg-muted hover:text-fg absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full border opacity-0 shadow-sm focus:opacity-100 group-hover:opacity-100"
                   >

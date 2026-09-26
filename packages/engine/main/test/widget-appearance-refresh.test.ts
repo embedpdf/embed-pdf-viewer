@@ -16,6 +16,7 @@ import type {
   Engine,
   FormFieldDTO,
 } from '@embedpdf/engine-core/runtime';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '../src/index';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -71,11 +72,11 @@ describe('widget appearance refresh across planes (engine-local, wasm)', () => {
     if (!found) throw new Error('fixture is missing the First_Name field');
     field = found;
     const widget = field.widgets[0]!;
-    pon = widget.pageObjectNumber;
+    pon = widget.page!.pageObjectNumber;
     widgetRef = {
       kind: 'objectNumber',
       annotObjectNumber: widget.annotObjectNumber,
-      pageObjectNumber: pon,
+      page: toPageRef(pon),
     };
   }, 30_000);
 
@@ -86,7 +87,7 @@ describe('widget appearance refresh across planes (engine-local, wasm)', () => {
 
   /** The widget's appearance raster, or null when none is emitted. */
   async function widgetRaster(): Promise<Raster | null> {
-    const result = await doc.page(pon).annotations.renderAppearances({ scale: 2 });
+    const result = await doc.page(toPageRef(pon)).annotations.renderAppearances({ scale: 2 });
     const entry = result.appearances.find(
       (a) =>
         a.ref.kind === 'objectNumber' &&
@@ -96,7 +97,7 @@ describe('widget appearance refresh across planes (engine-local, wasm)', () => {
   }
 
   test('an annotation-plane style patch shows up in the appearance render', async () => {
-    await doc.page(pon).annotations.update(widgetRef, {
+    await doc.page(toPageRef(pon)).annotations.update(widgetRef, {
       subtype: 'widget',
       interiorColor: { r: 255, g: 213, b: 0 },
     });

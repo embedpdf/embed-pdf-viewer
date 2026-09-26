@@ -38,7 +38,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
-import { wirePack, type WorkerJobId } from '@embedpdf/engine-core/runtime';
+import { toPageRef, wirePack, type WorkerJobId } from '@embedpdf/engine-core/runtime';
 import {
   createSqliteDb,
   migrate,
@@ -140,7 +140,7 @@ function renderBuild(docId: string, pageObjectNumber: number, width: number): Bu
       kind: 'pages.render' as const,
       jobId,
       docId,
-      pageObjectNumber,
+      page: toPageRef(pageObjectNumber),
       options: { viewport: { kind: 'width' as const, width }, includeAnnotations: false },
     });
 }
@@ -151,7 +151,7 @@ function renderEncodedBuild(docId: string, pageObjectNumber: number, width: numb
       kind: 'pages.renderEncoded' as const,
       jobId,
       docId,
-      pageObjectNumber,
+      page: toPageRef(pageObjectNumber),
       options: { viewport: { kind: 'width' as const, width }, includeAnnotations: false },
       encode: { format: 'webp' as const },
     });
@@ -467,7 +467,7 @@ async function main(): Promise<void> {
       wirePack({ kind: 'pages.list' as const, jobId, docId: docIds[0]! }),
     );
     if (list.tag !== 'pages.list') throw new Error(`unexpected ${list.tag}`);
-    const pons = list.snapshot.pages.slice(0, 8).map((p) => p.pageObjectNumber);
+    const pons = list.snapshot.pages.slice(0, 8).map((p) => p.ref.pageObjectNumber);
     e2ePon = pons[0]!;
     // eslint-disable-next-line no-console
     console.log(

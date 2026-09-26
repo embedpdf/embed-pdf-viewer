@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import { EngineErrorCode, toPageRef } from '@embedpdf/engine-core/runtime';
 import { afterEach, beforeAll, describe, expect, test } from 'vitest';
 
 import { createLocalEngine, type LocalEngine } from '../src/index';
@@ -99,7 +99,7 @@ describe('engine.fonts (local engine)', () => {
     await engine.fonts.register({ key: 'roboto', familyName: 'Roboto', data: roboto });
 
     const doc = await engine.open({ kind: 'bytes', id: 'fonts-subset', bytes: annotationsPdf });
-    const created = await doc.page(PAGE).annotations.create({
+    const created = await doc.page(toPageRef(PAGE)).annotations.create({
       subtype: 'free-text',
       intent: 'free-text',
       fontFamily: 'roboto', // ← the registered key, not a standard font
@@ -126,7 +126,7 @@ describe('engine.fonts (local engine)', () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
     const doc = await engine.open({ kind: 'bytes', id: 'fonts-missing', bytes: annotationsPdf });
     const err = await rejection(
-      doc.page(PAGE).annotations.create({
+      doc.page(toPageRef(PAGE)).annotations.create({
         subtype: 'free-text',
         intent: 'free-text',
         fontFamily: 'not-registered',
@@ -143,7 +143,7 @@ describe('engine.fonts (local engine)', () => {
   test('standard fonts still work unchanged (no embedded face)', async () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
     const doc = await engine.open({ kind: 'bytes', id: 'fonts-standard', bytes: annotationsPdf });
-    const created = await doc.page(PAGE).annotations.create({
+    const created = await doc.page(toPageRef(PAGE)).annotations.create({
       subtype: 'free-text',
       intent: 'free-text',
       fontFamily: 'helvetica',

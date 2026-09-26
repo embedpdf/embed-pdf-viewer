@@ -1,0 +1,10 @@
+# @embedpdf/plugin-shell — ./contract
+
+MenuEvent [InterfaceDeclaration]: export interface MenuEvent{ readonly id: string; }
+OpenSurfaceOptions [InterfaceDeclaration]: export interface OpenSurfaceOptions{ readonly exclusive?: string; readonly props?: SurfaceProps; }
+ShellCapability [InterfaceDeclaration]: export interface ShellCapability{ isOpen(id: string): boolean; getSurface(id: string): SurfaceState | null; listOpenSurfaces(): readonly SurfaceState[]; open(id: string, options?: OpenSurfaceOptions): void; close(id: string): void; toggle(id: string, options?: OpenSurfaceOptions): void; updateSurfaceProps(id: string, props: SurfaceProps): void; closeAll(): void; isMenuOpen(id: string): boolean; listOpenMenus(): readonly string[]; openMenu(id: string): void; closeMenu(id: string): void; toggleMenu(id: string): void; closeAllMenus(): void; getSnapshot(): ShellSnapshot; applySnapshot(snapshot: ShellSnapshot): void; readonly onSurfaceOpened: EventHook<SurfaceEvent>; readonly onSurfaceClosed: EventHook<SurfaceEvent>; readonly onMenuOpened: EventHook<MenuEvent>; readonly onMenuClosed: EventHook<MenuEvent>; }
+ShellSnapshot [InterfaceDeclaration]: export interface ShellSnapshot{ readonly surfaces: Readonly<Record<string, Omit<SurfaceState, 'id'>>>; readonly openMenus: readonly string[]; }
+ShellToken [VariableDeclaration] (from packages/plugin/shell/src/token.ts): ShellToken = createCapabilityToken<ShellCapability>('shell', { hint: `add shellPlugin() from '@embedpdf/plugin-shell' to your plugins list`, } )
+SurfaceEvent [InterfaceDeclaration]: export interface SurfaceEvent{ readonly id: string; readonly props?: SurfaceProps; }
+SurfaceProps [TypeAliasDeclaration]: export type SurfaceProps = Readonly<Record<string, unknown>>;
+SurfaceState [InterfaceDeclaration]: export interface SurfaceState{ readonly id: string; readonly open: boolean; readonly exclusive?: string; readonly props?: SurfaceProps; }

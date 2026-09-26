@@ -63,10 +63,16 @@ Holding a raw annotation and pointing the viewer at it is one call:
 
 ```ts
 const anno = useAnnotation();
-stage.reveal(pageIndex, { rect: anno.toContentBox(dto.pageObjectNumber, dto.rect) });
+stage.reveal(pageIndex, { rect: anno.toContentBox(dto.ref.page, dto.rect) });
 ```
 
 That's the only file ↔ viewer bridge you'll ever need.
+
+Calls that take a page address it by `PageRef` — `{ kind: 'objectNumber',
+pageObjectNumber }`, the page's indirect object number, which survives reorder
+and every edit. Records hand you one ready-made — `page.ref` on a page-list
+entry, `page` on anything that points at a page (`dto.ref.page`, a search hit's
+`hit.page`); `toPageRef(n)` builds one from a bare number.
 
 ## Pixels are never stored
 

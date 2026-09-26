@@ -1,4 +1,4 @@
-import type { PageObjectNumber } from './PageObjectNumber';
+import type { PageRef } from './PageRef';
 import type { RevisionToken } from '../revision/RevisionToken';
 
 /**
@@ -19,17 +19,17 @@ import type { RevisionToken } from '../revision/RevisionToken';
 export type AnnotationRef =
   | {
       kind: 'objectNumber';
-      pageObjectNumber: PageObjectNumber;
+      page: PageRef;
       annotObjectNumber: number;
     }
   | {
       kind: 'nm';
-      pageObjectNumber: PageObjectNumber;
+      page: PageRef;
       nm: string;
     }
   | {
       kind: 'index';
-      pageObjectNumber: PageObjectNumber;
+      page: PageRef;
       index: number;
       revision: RevisionToken;
     };

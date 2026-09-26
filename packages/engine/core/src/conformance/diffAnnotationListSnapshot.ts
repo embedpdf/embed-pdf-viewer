@@ -22,9 +22,9 @@ export function diffAnnotationListSnapshot(
 ): string[] {
   const errs: string[] = [];
 
-  if (a.pageState.pageObjectNumber !== b.pageState.pageObjectNumber) {
+  if (a.pageState.page.pageObjectNumber !== b.pageState.page.pageObjectNumber) {
     errs.push(
-      `pageState.pageObjectNumber mismatch: ${a.pageState.pageObjectNumber} vs ${b.pageState.pageObjectNumber}`,
+      `pageState.page.pageObjectNumber mismatch: ${a.pageState.page.pageObjectNumber} vs ${b.pageState.page.pageObjectNumber}`,
     );
   }
   if (

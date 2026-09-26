@@ -29,8 +29,8 @@ Anything you omit falls back to its default (a 1pt solid red stroke, full opacit
 fill).
 
 <Callout type="info">
-  Any annotation kind the engine doesn't author yet is read back as `unsupported`. It's
-  listed and preserved, but can't be created or have its type-specific fields edited.
+  Any annotation kind the engine doesn't author yet is read back as `unsupported`. It's listed and
+  preserved, but can't be created or have its type-specific fields edited.
 </Callout>
 
 ## Text markup
@@ -45,16 +45,21 @@ await page.annotations.create({
   color: { r: 255, g: 215, b: 0 },
   opacity: 0.4,
   quadPoints: [
-    { p1: { x: 72, y: 712 }, p2: { x: 272, y: 712 }, p3: { x: 72, y: 696 }, p4: { x: 272, y: 696 } },
+    {
+      p1: { x: 72, y: 712 },
+      p2: { x: 272, y: 712 },
+      p3: { x: 72, y: 696 },
+      p4: { x: 272, y: 696 },
+    },
   ],
 });
 ```
 
-| Field | What it is | Required | Default |
-| :--- | :--- | :--- | :--- |
-| `quadPoints` | One quad per marked text region | yes | — |
-| `color` | Markup color `{ r, g, b }` | no | red |
-| `opacity` | Transparency `0`–`1` | no | `1` |
+| Field        | What it is                      | Required | Default |
+| :----------- | :------------------------------ | :------- | :------ |
+| `quadPoints` | One quad per marked text region | yes      | —       |
+| `color`      | Markup color `{ r, g, b }`      | no       | red     |
+| `opacity`    | Transparency `0`–`1`            | no       | `1`     |
 
 ## Square and circle
 
@@ -73,17 +78,17 @@ await page.annotations.create({
 });
 ```
 
-| Field | What it is | Required | Default |
-| :--- | :--- | :--- | :--- |
-| `rect` | Bounding box `{ left, bottom, right, top }` | yes | — |
-| `color` | Stroke color | no | red |
-| `interiorColor` | Fill color, or `null` for none | no | none |
-| `strokeWidth` | Border thickness | no | `1` |
-| `borderStyle` | `'solid'`/`'dashed'`/`'beveled'`/`'inset'` | no | `'solid'` |
-| `dashArray` | Dash pattern (with `'dashed'`) | no | — |
-| `opacity` | Transparency `0`–`1` | no | `1` |
-| `cloudyIntensity` | Cloudy-border strength (`0` = plain) | no | `0` |
-| `rectDifferences` | Inset of the shape from `rect` (see below) | no | none |
+| Field             | What it is                                  | Required | Default   |
+| :---------------- | :------------------------------------------ | :------- | :-------- |
+| `rect`            | Bounding box `{ left, bottom, right, top }` | yes      | —         |
+| `color`           | Stroke color                                | no       | red       |
+| `interiorColor`   | Fill color, or `null` for none              | no       | none      |
+| `strokeWidth`     | Border thickness                            | no       | `1`       |
+| `borderStyle`     | `'solid'`/`'dashed'`/`'beveled'`/`'inset'`  | no       | `'solid'` |
+| `dashArray`       | Dash pattern (with `'dashed'`)              | no       | —         |
+| `opacity`         | Transparency `0`–`1`                        | no       | `1`       |
+| `cloudyIntensity` | Cloudy-border strength (`0` = plain)        | no       | `0`       |
+| `rectDifferences` | Inset of the shape from `rect` (see below)  | no       | none      |
 
 ## Polygon and polyline
 
@@ -120,18 +125,18 @@ await page.annotations.create({
 });
 ```
 
-| Field | What it is | Required | Default |
-| :--- | :--- | :--- | :--- |
-| `vertices` | Ordered points `{ x, y }` | yes | — |
-| `rect` | Bounding box | yes | — |
-| `color` | Stroke color | no | red |
-| `interiorColor` | Fill, or `null` (polygon) | no | none |
-| `strokeWidth` | Line thickness | no | `1` |
-| `borderStyle` | `'solid'`/`'dashed'`/`'beveled'`/`'inset'` | no | `'solid'` |
-| `dashArray` | Dash pattern (with `'dashed'`) | no | — |
-| `opacity` | Transparency `0`–`1` | no | `1` |
-| `lineEndings` | Arrowheads — **polyline only** | no | none |
-| `cloudyIntensity` | Cloudy border — **polygon only** | no | `0` |
+| Field             | What it is                                 | Required | Default   |
+| :---------------- | :----------------------------------------- | :------- | :-------- |
+| `vertices`        | Ordered points `{ x, y }`                  | yes      | —         |
+| `rect`            | Bounding box                               | yes      | —         |
+| `color`           | Stroke color                               | no       | red       |
+| `interiorColor`   | Fill, or `null` (polygon)                  | no       | none      |
+| `strokeWidth`     | Line thickness                             | no       | `1`       |
+| `borderStyle`     | `'solid'`/`'dashed'`/`'beveled'`/`'inset'` | no       | `'solid'` |
+| `dashArray`       | Dash pattern (with `'dashed'`)             | no       | —         |
+| `opacity`         | Transparency `0`–`1`                       | no       | `1`       |
+| `lineEndings`     | Arrowheads — **polyline only**             | no       | none      |
+| `cloudyIntensity` | Cloudy border — **polygon only**           | no       | `0`       |
 
 ## Line
 
@@ -148,16 +153,16 @@ await page.annotations.create({
 });
 ```
 
-| Field | What it is | Required | Default |
-| :--- | :--- | :--- | :--- |
-| `linePoints` | `{ start: { x, y }, end: { x, y } }` | yes | — |
-| `rect` | Bounding box | yes | — |
-| `color` | Stroke color | no | red |
-| `strokeWidth` | Line thickness | no | `1` |
-| `borderStyle` | `'solid'`/`'dashed'`/`'beveled'`/`'inset'` | no | `'solid'` |
-| `dashArray` | Dash pattern (with `'dashed'`) | no | — |
-| `opacity` | Transparency `0`–`1` | no | `1` |
-| `lineEndings` | Endings at start/end | no | none |
+| Field         | What it is                                 | Required | Default   |
+| :------------ | :----------------------------------------- | :------- | :-------- |
+| `linePoints`  | `{ start: { x, y }, end: { x, y } }`       | yes      | —         |
+| `rect`        | Bounding box                               | yes      | —         |
+| `color`       | Stroke color                               | no       | red       |
+| `strokeWidth` | Line thickness                             | no       | `1`       |
+| `borderStyle` | `'solid'`/`'dashed'`/`'beveled'`/`'inset'` | no       | `'solid'` |
+| `dashArray`   | Dash pattern (with `'dashed'`)             | no       | —         |
+| `opacity`     | Transparency `0`–`1`                       | no       | `1`       |
+| `lineEndings` | Endings at start/end                       | no       | none      |
 
 ## Ink
 
@@ -169,23 +174,30 @@ await page.annotations.create({
   subtype: 'ink',
   rect: { left: 60, bottom: 60, right: 300, top: 200 },
   inkList: [
-    [ { x: 70, y: 80 }, { x: 120, y: 180 }, { x: 180, y: 90 } ], // stroke 1
-    [ { x: 200, y: 100 }, { x: 260, y: 160 } ],                  // stroke 2
+    [
+      { x: 70, y: 80 },
+      { x: 120, y: 180 },
+      { x: 180, y: 90 },
+    ], // stroke 1
+    [
+      { x: 200, y: 100 },
+      { x: 260, y: 160 },
+    ], // stroke 2
   ],
   color: { r: 220, g: 20, b: 60 },
   strokeWidth: 3,
 });
 ```
 
-| Field | What it is | Required | Default |
-| :--- | :--- | :--- | :--- |
-| `inkList` | Array of strokes; each an array of points | yes | — |
-| `rect` | Box covering all strokes | yes | — |
-| `color` | Stroke color | no | red |
-| `strokeWidth` | Pen thickness | no | `1` |
-| `borderStyle` | `'solid'`/`'dashed'`/`'beveled'`/`'inset'` | no | `'solid'` |
-| `dashArray` | Dash pattern (with `'dashed'`) | no | — |
-| `opacity` | Transparency `0`–`1` | no | `1` |
+| Field         | What it is                                 | Required | Default   |
+| :------------ | :----------------------------------------- | :------- | :-------- |
+| `inkList`     | Array of strokes; each an array of points  | yes      | —         |
+| `rect`        | Box covering all strokes                   | yes      | —         |
+| `color`       | Stroke color                               | no       | red       |
+| `strokeWidth` | Pen thickness                              | no       | `1`       |
+| `borderStyle` | `'solid'`/`'dashed'`/`'beveled'`/`'inset'` | no       | `'solid'` |
+| `dashArray`   | Dash pattern (with `'dashed'`)             | no       | —         |
+| `opacity`     | Transparency `0`–`1`                       | no       | `1`       |
 
 ## Free text and callout
 
@@ -212,7 +224,7 @@ await page.annotations.create({
   fontSize: 14,
   textAlign: 'center',
   contents: 'Please review this section',
-  color: { r: 20, g: 40, b: 60 },        // border + text
+  color: { r: 20, g: 40, b: 60 }, // border + text
   interiorColor: { r: 250, g: 250, b: 210 }, // pale yellow background
 });
 
@@ -236,24 +248,25 @@ await page.annotations.create({
 });
 ```
 
-| Field | What it is | Required | Default |
-| :--- | :--- | :--- | :--- |
-| `intent` | `'free-text'` or `'free-text-callout'` | yes | — |
-| `rect` | Bounding box | yes | — |
-| `fontFamily` | A standard font or a registered font key (see below) | yes | — |
-| `fontSize` | Text size in points | yes | — |
-| `textAlign` | `'left'`/`'center'`/`'right'` | yes | — |
-| `contents` | The text to show | no | — |
-| `color` | Border + default text color | no | black |
-| `fontColor` | Text color override | no | follows `color` |
-| `interiorColor` | Box background, or `null` for none | no | none |
-| `opacity` | Transparency `0`–`1` | no | `1` |
-| `strokeWidth` | Border thickness | no | `1` |
-| `borderStyle` | `'solid'`/`'dashed'`/`'beveled'`/`'inset'` | no | `'solid'` |
-| `dashArray` | Dash pattern (with `'dashed'`) | no | — |
-| `calloutLine` | Leader line, 2 or 3 points — **callout only** | no | none |
-| `lineEnding` | Arrowhead at the called-out end — **callout only** | no | none |
-| `rectDifferences` | Inset of the text box from `rect` | no | none |
+| Field             | What it is                                               | Required | Default                                    |
+| :---------------- | :------------------------------------------------------- | :------- | :----------------------------------------- |
+| `intent`          | `'free-text'` or `'free-text-callout'`                   | yes      | —                                          |
+| `rect`            | Bounding box                                             | yes      | —                                          |
+| `fontFamily`      | A standard font or a registered font key (see below)     | yes      | —                                          |
+| `fontSize`        | Text size in points                                      | yes      | —                                          |
+| `textAlign`       | `'left'`/`'center'`/`'right'`                            | yes      | —                                          |
+| `contents`        | The text to show, plain — lines separated by `\r`        | no       | —                                          |
+| `richText`        | Styled paragraphs and runs — see [Rich text](#rich-text) | no       | one plain paragraph per line of `contents` |
+| `color`           | Border + default text color                              | no       | black                                      |
+| `fontColor`       | Text color override                                      | no       | follows `color`                            |
+| `interiorColor`   | Box background, or `null` for none                       | no       | none                                       |
+| `opacity`         | Transparency `0`–`1`                                     | no       | `1`                                        |
+| `strokeWidth`     | Border thickness                                         | no       | `1`                                        |
+| `borderStyle`     | `'solid'`/`'dashed'`/`'beveled'`/`'inset'`               | no       | `'solid'`                                  |
+| `dashArray`       | Dash pattern (with `'dashed'`)                           | no       | —                                          |
+| `calloutLine`     | Leader line, 2 or 3 points — **callout only**            | no       | none                                       |
+| `lineEnding`      | Arrowhead at the called-out end — **callout only**       | no       | none                                       |
+| `rectDifferences` | Inset of the text box from `rect`                        | no       | none                                       |
 
 The `calloutLine` is 2 points for a straight leader or 3 for a knee-jointed one. The
 **first** point is what's being pointed at; the **last** point touches the text box.
@@ -271,11 +284,92 @@ embedding:
 
 `fontFamily` also accepts the key of a font you've registered with the engine — pass
 `'noto-sc'` instead of a standard name to draw CJK, Cyrillic, or any other script, and a
-glyph subset is embedded on save. See [Custom fonts](/docs/engine/core-concepts/custom-fonts).
+glyph subset is embedded on save. An annotation set in a registered font reads `fontFamily`
+back as that key on any engine the font is registered on (elsewhere, as the family name the
+document carries). See [Custom fonts](/docs/engine/core-concepts/custom-fonts).
+
+### Rich text
+
+Every free text reads back a `richText` document next to its plain `contents`, and you
+can write one on create or update. It is the model Acrobat stores as `/RC` (XHTML) and
+`/DS`, so what you author here is what Acrobat and every other viewer show, and what you
+read is what they wrote:
+
+- `body` — the annotation's default style: the face (`family`, `weight` `100`–`900`,
+  `italic`), `size` in points, `color` as `#RRGGBB`, `decoration` (`'underline'`,
+  `'line-through'`), `script` (`'normal'`, `'sub'`, `'super'`), `letterSpacing`,
+  `horizontalScale`, and the paragraph defaults `align` (`'left'`, `'center'`, `'right'`,
+  `'justify'`) and `dir` (`'ltr'`, `'rtl'`).
+- `paragraphs` — each a list of `runs`. A run is `{ text, style? }` where `style` holds
+  **only the properties that run overrides**. Runs are deltas over the body: change the
+  body's size and every run that did not set its own size follows. A paragraph names
+  `align`/`dir` only where it differs from the body. A `\r` inside a run's text is a hard
+  line break inside the paragraph.
+
+`contents` is always the plain projection of `richText` — paragraphs joined by `\r`, runs
+concatenated — so a client that only knows plain text keeps working.
+
+```ts
+// Create with formatting: a bold word, a red word, a centred second line
+// with a subscript.
+await page.annotations.create({
+  subtype: 'free-text',
+  intent: 'free-text',
+  rect: { left: 60, bottom: 600, right: 360, top: 660 },
+  fontFamily: 'helvetica',
+  fontSize: 12,
+  textAlign: 'left',
+  color: { r: 0, g: 0, b: 0 },
+  richText: {
+    body: { family: 'Helvetica', size: 18, color: '#102030' },
+    paragraphs: [
+      {
+        runs: [
+          { text: 'Hello ' },
+          { text: 'bold', style: { weight: 700 } },
+          { text: ' red', style: { color: '#FF0000' } },
+        ],
+      },
+      { align: 'center', runs: [{ text: 'H' }, { text: '2', style: { script: 'sub' } }] },
+    ],
+  },
+});
+// contents reads back as 'Hello bold red\rH2'; fontSize as 18 (the body).
+```
+
+On a `body`, the face and size you give become the annotation's `fontFamily` and
+`fontSize`; anything you leave out of a body takes the engine's defaults, so send the
+whole body when you send one. Leave `body` out to keep the annotation's current one and
+replace only the paragraphs — the shape a text editor commits:
+
+```ts
+// Restyle a word: paragraphs only, the body (and its alignment) stays.
+await page.annotations.update(ref, {
+  subtype: 'free-text',
+  richText: {
+    paragraphs: [{ runs: [{ text: 'Hello ' }, { text: 'world', style: { italic: true } }] }],
+  },
+});
+```
+
+The patch rules, in one place:
+
+| You send                              | What happens                                                                                                                                           |
+| :------------------------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `richText`                            | Replaces the paragraphs, and the body when one is given.                                                                                               |
+| `contents` alone                      | Rewrites the text as plain paragraphs in the body style. Run formatting is dropped by design — a plain-text client cannot preserve what it cannot see. |
+| `fontFamily`, `fontSize`, `fontColor` | Move the **body**; runs keep their own overrides.                                                                                                      |
+| `textAlign`                           | Moves the body's alignment (and `/Q`).                                                                                                                 |
+| `contents` **and** `richText`         | Must agree (`contents` equal to the projection), else the update is refused with `InvalidArg` and nothing is written.                                  |
+
+Run `family` names a face the way a PDF does — `'Helvetica'`, `'Times'`, `'Courier'`, a
+registered font's family name (or its key), or a family the document already embeds. A
+family that resolves nowhere substitutes Helvetica; the box still renders and edits. The
+appearance stream is generated by the engine (shaped, line-broken and measured the way
+Acrobat lays rich text out), so the saved file looks the same everywhere.
 
 <Callout type="info">
-  Vertical alignment and rich text aren't authored yet — text is single-style and
-  top-aligned in the box.
+  Vertical alignment inside the box isn't authored: text is top-aligned, as in Acrobat.
 </Callout>
 
 ## Caret
@@ -292,12 +386,12 @@ await page.annotations.create({
 });
 ```
 
-| Field | What it is | Required | Default |
-| :--- | :--- | :--- | :--- |
-| `rect` | Where the caret sits | yes | — |
-| `color` | Caret color | no | red |
-| `opacity` | Transparency `0`–`1` | no | `1` |
-| `rectDifferences` | Inset of the drawn caret from `rect` | no | none |
+| Field             | What it is                           | Required | Default |
+| :---------------- | :----------------------------------- | :------- | :------ |
+| `rect`            | Where the caret sits                 | yes      | —       |
+| `color`           | Caret color                          | no       | red     |
+| `opacity`         | Transparency `0`–`1`                 | no       | `1`     |
+| `rectDifferences` | Inset of the drawn caret from `rect` | no       | none    |
 
 ## Stamp
 
@@ -308,7 +402,7 @@ takes the best path into the PDF:
 
 - **PNG** — decoded natively, transparency preserved.
 - **JPEG** — embedded as-is (no re-encoding).
-- **Single-page PDF** — cloned in as a *vector* appearance that stays crisp at any zoom.
+- **Single-page PDF** — cloned in as a _vector_ appearance that stays crisp at any zoom.
 
 ```ts
 // From a file input, a fetch, or raw bytes — Blob and Uint8Array both work.
@@ -320,12 +414,12 @@ await page.annotations.create({
 });
 ```
 
-| Field | What it is | Required | Default |
-| :--- | :--- | :--- | :--- |
-| `rect` | Bounding box | yes | — |
-| `source` | The content bytes: `Blob`, `Uint8Array`, or `{ data, mimeType?, name? }` | yes | — |
-| `fit` | How the content maps into `rect` (see below) | no | `'contain'` |
-| `name` | Standard stamp label (`'Approved'`, `'Draft'`, `'Confidential'`, …) | no | none |
+| Field    | What it is                                                               | Required | Default     |
+| :------- | :----------------------------------------------------------------------- | :------- | :---------- |
+| `rect`   | Bounding box                                                             | yes      | —           |
+| `source` | The content bytes: `Blob`, `Uint8Array`, or `{ data, mimeType?, name? }` | yes      | —           |
+| `fit`    | How the content maps into `rect` (see below)                             | no       | `'contain'` |
+| `name`   | Standard stamp label (`'Approved'`, `'Draft'`, `'Confidential'`, …)      | no       | none        |
 
 `fit` uses the CSS `object-fit` vocabulary: `'contain'` preserves the aspect ratio and
 keeps the content fully visible, `'cover'` preserves the aspect ratio and fills the box

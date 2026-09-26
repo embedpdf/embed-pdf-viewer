@@ -9,6 +9,7 @@
  *   zoom widget → viewers/snippet/src/components/custom-zoom-toolbar.tsx
  *   mode select → viewers/snippet/src/components/mode-select-button.tsx
  */
+import { MeasurementScaleButton } from './measurement';
 import { useEffect, useState } from 'react';
 import { useOptionalCapability, useOptionalSelector } from '@embedpdf/react/runtime';
 import { Toolbar } from '@embedpdf/react/toolbar';
@@ -20,6 +21,7 @@ import type {
 } from '@embedpdf/react/toolbar';
 import { useCommands } from '@embedpdf/react/commands';
 import type { ResolvedCommand } from '@embedpdf/react/commands';
+import { QuickStamps } from './quick-stamps';
 import { useMenus } from '@embedpdf/react/shell';
 import { useT } from '@embedpdf/react/i18n';
 import { StageToken } from '@embedpdf/react/stage';
@@ -127,7 +129,7 @@ function ZoomControls() {
   const stage = useOptionalCapability(StageToken);
   // Null-safe: the zoom strip is main-toolbar chrome, mounted before any
   // document exists — it reads 100% until a Stage is there to ask.
-  const level = useOptionalSelector(StageToken, (c) => c.zoomLevel(), 1);
+  const level = useOptionalSelector(StageToken, (c) => c.getZoomLevel(), 1);
   const pct = Math.round((level ?? 1) * 100);
   const [inputValue, setInputValue] = useState(String(pct));
   useEffect(() => setInputValue(String(pct)), [pct]);
@@ -397,7 +399,9 @@ export function AppToolbar({ bar, className }: { bar: BarSchema; className?: str
       className={className}
       renderCommand={(cmd, variant, run) => <CommandButton cmd={cmd} variant={variant} run={run} />}
       renderCustom={{
+        'measurement-scale': () => <MeasurementScaleButton />,
         'zoom-controls': (variant) => (variant === 'inline' ? <ZoomControls /> : <ZoomButton />),
+        'quick-stamps': () => <QuickStamps />,
       }}
       renderCollapsed={(view) => (view.id === 'modes' ? <CollapsedModes view={view} /> : undefined)}
       renderGroupTrigger={(view) => <GroupTrigger view={view} />}

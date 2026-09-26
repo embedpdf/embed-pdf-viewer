@@ -3,15 +3,15 @@ name: Build PDF Runtime
 on:
   workflow_dispatch:
   workflow_call:
-  pull_request:
-    paths:
-      - 'packages/engine/runtime/**'
-      - '.github/workflows/build-engine-runtime.yml'
+  # Pull requests and pushes to main reach this workflow through ci.yml,
+  # which builds the runtime once per run for every job that needs it (and,
+  # on main, publishes — the call runs with the caller's push event).
   push:
-    # Every branch: payloads are published content-addressed (see payload-key
-    # job), so feature-branch runtime changes get fetchable payloads for
-    # Vercel previews and fresh checkouts without waiting for next/main.
-    branches: ['**']
+    # Every other branch: payloads are published content-addressed (see
+    # payload-key job), so feature-branch runtime changes get fetchable
+    # payloads for Vercel previews and fresh checkouts without waiting for
+    # next/main. main is excluded so a merge builds once, not here AND there.
+    branches-ignore: [main]
     paths:
       - 'packages/engine/runtime/**'
       - '.github/workflows/build-engine-runtime.yml'

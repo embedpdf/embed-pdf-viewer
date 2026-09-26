@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-commands",
-  "version": "3.0.0-next.12",
+  "version": "3.0.0-next.14",
   "private": false,
   "description": "The command registry: the single vocabulary of verbs. Definitions are app content (mechanism/content split); state (label · icon · enabled · active · visible) derives purely from other capabilities, so every consumer is reactive through the kernel's one change stream — no events, no diffing.",
   "type": "module",
@@ -10,6 +10,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./contract": "./src/contract.ts",
+    "./contract/host": "./src/host-contract.ts",
+    "./internal": "./src/internal.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -24,6 +26,14 @@
       "./contract": {
         "import": "./dist/contract.js",
         "require": "./dist/contract.cjs"
+      },
+      "./contract/host": {
+        "import": "./dist/contract/host.js",
+        "require": "./dist/contract/host.cjs"
+      },
+      "./internal": {
+        "import": "./dist/internal.js",
+        "require": "./dist/internal.cjs"
       },
       "./package.json": "./package.json"
     }

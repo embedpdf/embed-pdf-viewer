@@ -13,9 +13,12 @@ import { AbortablePromise } from '../promise/AbortablePromise';
  * rewrites THIS LAYER's bytes only. The immutable base document still
  * contains the original content — byte-perfect original recovery is a
  * feature of the storage model, not a leak. Redacted content becomes truly
- * unrecoverable only in what leaves the system: a layer download/export, or
- * a local document saved after apply. Surfaces that promise "permanent
- * removal" must scope that promise to the exported artifact.
+ * unrecoverable only in a full-rewrite export after apply. Callers MUST select
+ * `download({ mode: 'rewrite' })` (or the corresponding file/cloud save mode)
+ * before sharing the redacted PDF. The default incremental download preserves
+ * the original content in prior revisions; apply does not change that default.
+ * Surfaces that promise "permanent removal" must scope that promise to the
+ * full-rewrite exported artifact.
  *
  * Applying is irreversible within the layer (no undo). Emits a
  * `redaction.applied` document event; content-scope raster invalidation and

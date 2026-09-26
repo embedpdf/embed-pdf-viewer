@@ -6,7 +6,7 @@ import type {
   PdfRect,
   PdfPageActions,
 } from '@embedpdf/engine-core/runtime';
-import { normalizePdfRect } from '@embedpdf/engine-core/runtime';
+import { normalizePdfRect, toPageRef } from '@embedpdf/engine-core/runtime';
 import type {
   PdfFunctions,
   PdfRuntimeMemory,
@@ -66,7 +66,7 @@ export class PagesReader {
           const actions = readPageActions(fn, mem, docPtr, record.pageObjectNumber, actionBudget);
           return {
             index,
-            pageObjectNumber: record.pageObjectNumber,
+            ref: toPageRef(record.pageObjectNumber),
             label: readLabel(fn, mem, docPtr, index),
             size: readSize(fn, mem, docPtr, index, sizePtr),
             rotation: readRotation(fn, docPtr, index),
@@ -245,7 +245,7 @@ function readNamedPages(fn: PdfFunctions, mem: PdfRuntimeMemory, docPtr: Ptr): N
           name,
           target:
             kind === NAMED_PAGE_KIND_PAGE
-              ? { kind: 'page', pageObjectNumber: objectNumber }
+              ? { kind: 'page', page: toPageRef(objectNumber) }
               : kind === NAMED_PAGE_KIND_TEMPLATE
                 ? { kind: 'template', objectNumber }
                 : { kind: 'dangling' },

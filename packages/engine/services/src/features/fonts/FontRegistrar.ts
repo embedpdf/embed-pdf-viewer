@@ -1,5 +1,30 @@
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import {
+  EngineError,
+  EngineErrorCode,
+  type FontEmbeddingPermission,
+  type FontIdentityInfo,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfFileAccessHandle, PdfRuntimeModule } from '@embedpdf/engine-runtime';
+
+import { readUtf8String } from '../../runtime/memory/strings';
+
+/** `EPDF_FONT_EMBEDDING_*` codes. Restricted (3) and bitmap-only (4) are
+ *  refused at registration, so they never reach a handle. */
+function permissionFromCode(code: number): FontEmbeddingPermission {
+  switch (code) {
+    case 1:
+      return 'editable';
+    case 2:
+      return 'preview-and-print';
+    default:
+      return 'installable';
+  }
+}
+
+/** The engine's family comparison: no case, spaces, hyphens, underscores. */
+function familyKey(family: string): string {
+  return family.toLowerCase().replace(/[\s\-_'"]/g, '');
+}
 
 /**
  * A font to register at thread startup from a local file. Used by hosts that
@@ -49,6 +74,9 @@ export class FontRegistrar {
    * base document. Closed in {@link clear}.
    */
   private readonly fileHandles: PdfFileAccessHandle[] = [];
+  /** What the runtime resolved for each key: the identity a document names
+   *  the face by, and the licence. */
+  private readonly identities = new Map<string, FontIdentityInfo>();
 
   constructor(
     private readonly runtime: PdfRuntimeModule,
@@ -86,6 +114,7 @@ export class FontRegistrar {
         );
       }
       this.ids.set(fontKey, id);
+      this.identities.set(fontKey, this.readIdentity(id, { familyName, weight, italic }));
     } finally {
       mem.free(ptr);
     }
@@ -121,7 +150,91 @@ export class FontRegistrar {
       );
     }
     this.ids.set(fontKey, id);
+    this.identities.set(fontKey, this.readIdentity(id, { familyName, weight, italic }));
     this.fileHandles.push(access);
+  }
+
+  /** The identity and licence the runtime resolved for a key. Throws if unknown. */
+  describe(fontKey: string): FontIdentityInfo {
+    const identity = this.identities.get(fontKey);
+    if (!identity) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `font not registered on this thread: ${fontKey}`,
+      );
+    }
+    return identity;
+  }
+
+  /** {@link describe} for callers that treat an unknown key as "not a key". */
+  describeOrUndefined(fontKey: string): FontIdentityInfo | undefined {
+    return this.identities.get(fontKey);
+  }
+
+  /**
+   * The key of the registered font whose identity matches a face (family
+   * compared the engine's way; the closest weight, italic first), or
+   * undefined when no registered family matches.
+   */
+  keyForFace(family: string, weight: number, italic: boolean): string | undefined {
+    const wanted = familyKey(family);
+    let best: { key: string; score: number } | undefined;
+    for (const [key, identity] of this.identities) {
+      if (familyKey(identity.familyName) !== wanted) continue;
+      const score = Math.abs(identity.weight - weight) + (identity.italic === italic ? 0 : 1000);
+      if (!best || score < best.score) best = { key, score };
+    }
+    return best?.key;
+  }
+
+  /** The application asserts a licence permitting editing with the font. */
+  authorizeEditing(fontKey: string): FontIdentityInfo {
+    const id = this.requireId(fontKey);
+    if (!this.runtime.fn.EPDFFont_AuthorizeEditing(id)) {
+      throw new EngineError(EngineErrorCode.InvalidArg, `authorizeEditing failed: ${fontKey}`);
+    }
+    const previous = this.describe(fontKey);
+    const identity = this.readIdentity(id, {
+      familyName: previous.familyName,
+      weight: previous.weight,
+      italic: previous.italic ? 1 : 0,
+    });
+    this.identities.set(fontKey, identity);
+    return identity;
+  }
+
+  private readIdentity(
+    id: number,
+    given: { familyName: string; weight: number; italic: number },
+  ): FontIdentityInfo {
+    const { fn, mem } = this.runtime;
+    // A runtime built before a getter existed reports what was given at
+    // registration (its own inference stays unknown to the host). A missing
+    // export surfaces as an absent binding or as a wrapper that throws when
+    // called, so each read falls back on its own.
+    const attempt = <T>(read: () => T, fallback: T): T => {
+      try {
+        return read();
+      } catch {
+        return fallback;
+      }
+    };
+    return {
+      familyName: attempt(
+        () =>
+          readUtf8String(mem, (buf, cap) => fn.EPDFFont_GetFamilyName(id, buf, cap)) ??
+          given.familyName,
+        given.familyName,
+      ),
+      weight: attempt(() => fn.EPDFFont_GetWeight(id), given.weight || 400),
+      italic: attempt(() => fn.EPDFFont_IsItalic(id), given.italic === 1),
+      embeddingPermission: attempt(
+        () => permissionFromCode(fn.EPDFFont_GetEmbeddingPermission(id)),
+        'installable' as const,
+      ),
+      editingAuthorized: attempt(() => fn.EPDFFont_IsEditingAuthorized(id), true),
+      instanced: attempt(() => fn.EPDFFont_IsInstanced(id), false),
+    };
   }
 
   /**
@@ -162,6 +275,7 @@ export class FontRegistrar {
   clear(): void {
     this.runtime.fn.EPDFFont_ClearRegisteredFonts();
     this.ids.clear();
+    this.identities.clear();
     // Native registry no longer reads through these — release the file handles.
     for (const access of this.fileHandles) {
       access.close();

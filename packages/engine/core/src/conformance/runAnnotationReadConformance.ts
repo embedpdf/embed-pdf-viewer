@@ -9,6 +9,7 @@ import type { AnnotationDTO } from '../annotation/kinds';
 import type { Engine } from '../engine/Engine';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
+import { toPageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
 import {
   AnnotationListPageSnapshotSchema,
@@ -85,7 +86,7 @@ export function runAnnotationReadConformance(
           expect(Number.isInteger(snap.auditHead) && snap.auditHead >= 0).toBe(true);
         }
         const target = snap.pages.find(
-          (p) => p.pageState.pageObjectNumber === opts.fixture.pageObjectNumber,
+          (p) => p.pageState.page.pageObjectNumber === opts.fixture.pageObjectNumber,
         );
         expect(target !== undefined).toBe(true);
         expect(target!.annotations.length).toBe(opts.fixture.expectedAnnotationCount);
@@ -97,7 +98,7 @@ export function runAnnotationReadConformance(
     test('listRaw on the test page returns the expected counts and DTO shape', async () => {
       const doc = await openFixture(engine, opts);
       try {
-        const snap = await doc.annotations.listRaw(opts.fixture.pageObjectNumber);
+        const snap = await doc.annotations.listRaw(toPageRef(opts.fixture.pageObjectNumber));
         expect(AnnotationListPageSnapshotSchema.safeParse(snap).success).toBe(true);
         expect(snap.annotations.length).toBe(opts.fixture.expectedAnnotationCount);
         const highlights = snap.annotations.filter((a) => a.subtype === 'highlight');
@@ -128,7 +129,7 @@ export function runAnnotationReadConformance(
     test('shape/vertex/line annotations expose their family fields', async () => {
       const doc = await openFixture(engine, opts);
       try {
-        const snap = await doc.annotations.listRaw(opts.fixture.pageObjectNumber);
+        const snap = await doc.annotations.listRaw(toPageRef(opts.fixture.pageObjectNumber));
         for (const a of snap.annotations) {
           // Ink carries the geometry styling (/C, /CA, /BS) but NOT /IC, plus
           // its /InkList (a non-empty array of point paths).
@@ -203,7 +204,7 @@ export function runAnnotationReadConformance(
     test('full page list dispatches per-subtype and matches raw counts', async () => {
       const doc = await openFixture(engine, opts);
       try {
-        const page = doc.page(opts.fixture.pageObjectNumber);
+        const page = doc.page(toPageRef(opts.fixture.pageObjectNumber));
         const full = await page.annotations.list();
         expect(AnnotationListPageSnapshotSchema.safeParse(full).success).toBe(true);
         expect(full.annotations.length).toBe(opts.fixture.expectedAnnotationCount);
@@ -215,7 +216,7 @@ export function runAnnotationReadConformance(
     test('every annotation DTO satisfies AnnotationDTOSchema (discriminated union)', async () => {
       const doc = await openFixture(engine, opts);
       try {
-        const snap = await doc.annotations.listRaw(opts.fixture.pageObjectNumber);
+        const snap = await doc.annotations.listRaw(toPageRef(opts.fixture.pageObjectNumber));
         for (const a of snap.annotations) {
           const result = AnnotationDTOSchema.safeParse(a);
           expect(result.success).toBe(true);
@@ -248,7 +249,7 @@ export function runAnnotationReadConformance(
       test('weak annotations carry identityQuality: weak and ref.kind: index', async () => {
         const doc = await openFixture(engine, opts);
         try {
-          const snap = await doc.annotations.listRaw(opts.fixture.pageObjectNumber);
+          const snap = await doc.annotations.listRaw(toPageRef(opts.fixture.pageObjectNumber));
           const weak = snap.annotations.find((a) => a.identityQuality === 'weak');
           expect(weak !== undefined).toBe(true);
           expect(weak!.ref.kind).toBe('index');
@@ -260,7 +261,7 @@ export function runAnnotationReadConformance(
       test('a stale revision token throws InvalidReference', async () => {
         const doc = await openFixture(engine, opts);
         try {
-          const page = doc.page(opts.fixture.pageObjectNumber);
+          const page = doc.page(toPageRef(opts.fixture.pageObjectNumber));
           const snap = await page.annotations.list();
           const weak = snap.annotations.find((a) => a.identityQuality === 'weak');
           expect(weak !== undefined).toBe(true);
@@ -283,7 +284,7 @@ export function runAnnotationReadConformance(
     test('abort() on listRaw rejects with AbortError', async () => {
       const doc = await openFixture(engine, opts);
       try {
-        const p = doc.annotations.listRaw(opts.fixture.pageObjectNumber);
+        const p = doc.annotations.listRaw(toPageRef(opts.fixture.pageObjectNumber));
         p.abort('test');
         await expect(p).rejects.toBeInstanceOf(AbortError);
       } finally {
@@ -296,7 +297,7 @@ export function runAnnotationReadConformance(
       try {
         let caught: unknown;
         try {
-          await doc.annotations.listRaw(999_999_999);
+          await doc.annotations.listRaw(toPageRef(999_999_999));
         } catch (err) {
           caught = err;
         }

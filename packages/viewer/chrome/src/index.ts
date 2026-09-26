@@ -9,7 +9,12 @@
  */
 export { FullViewer, themeConfigOf } from './viewer';
 export type { FullViewerProps, ThemeConfig, ThemeTokens, ViewerCustomization } from './viewer';
-export type { StampsCustomization } from './config-context';
+export type {
+  AnnotationFontSpec,
+  AnnotationsCustomization,
+  SignaturesCustomization,
+  StampsCustomization,
+} from './config-context';
 // The prop types a delivery needs to speak FullViewer's contract.
 export type { Engine, EngineFactory, InitialDocument } from '@embedpdf/react/runtime';
 
@@ -35,10 +40,34 @@ export { StageToken } from '@embedpdf/react/stage';
 export { SearchToken } from '@embedpdf/react/search';
 export { SelectionToken } from '@embedpdf/react/selection';
 export { FormToken } from '@embedpdf/react/form';
+export { MeasurementToken } from '@embedpdf/react/measurement';
+export type {
+  MeasurementCapability,
+  MeasurementConfig,
+  ScaleChangeReport,
+} from '@embedpdf/react/measurement';
 export { RedactionToken } from '@embedpdf/react/redaction';
 // Stamp LIBRARIES are workspace state an embedder seeds: `viewer.get(StampToken)
 // .importLibraryPdf(companyStamps)` puts their own stamps in the stamps sidebar.
 export { StampToken } from '@embedpdf/react/stamp';
+// Signatures: the act (`viewer.get(SignatureToken).signField(…)`) and the
+// signer ports a config names — one import for the whole feature.
+export { SignatureToken } from '@embedpdf/react/signature';
+export {
+  createTestSigner,
+  indexedDbKeyStore,
+  memoryKeyStore,
+  personalSigner,
+  remoteSigner,
+  webCryptoSigner,
+} from '@embedpdf/react/signature';
+export type {
+  Mark,
+  SignatureMode,
+  SignerPort,
+  SignFieldInput,
+  TrustPort,
+} from '@embedpdf/react/signature';
 export { InteractionToken } from '@embedpdf/react/interaction';
 export { I18nToken } from '@embedpdf/react/i18n';
 export { ShellToken } from '@embedpdf/react/shell';

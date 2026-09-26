@@ -11,6 +11,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { DocumentHandle, PageRaster } from '@embedpdf/engine-core/runtime';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine, type LocalEngine } from '../src/index';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -37,7 +38,7 @@ beforeAll(async () => {
   engine = createLocalEngine({ runtime: { prefer: 'wasm' } });
   doc = await engine.open({ kind: 'bytes', id: 'stitch-doc', bytes });
   const pages = (await doc.pages.list()).pages;
-  pon = pages[0]!.pageObjectNumber;
+  pon = pages[0]!.ref.pageObjectNumber;
   pageW = pages[0]!.size.width;
   pageH = pages[0]!.size.height;
 }, 60_000);
@@ -56,7 +57,9 @@ const eng = (x: number, y: number, w: number, h: number) => ({
 });
 
 const raw = (rect: ReturnType<typeof eng>, scale: number): Promise<PageRaster> =>
-  doc.page(pon).render.raw({ target: { kind: 'rect', rect }, viewport: { kind: 'scale', scale } });
+  doc
+    .page(toPageRef(pon))
+    .render.raw({ target: { kind: 'rect', rect }, viewport: { kind: 'scale', scale } });
 
 /** Max |RGB diff| over an aligned sub-rectangle of two rasters. */
 function maxDiff(
@@ -103,7 +106,10 @@ describe('tile stitching (wasm engine, real document)', () => {
     const tileC = await raw(eng(x0, y0 + span, span, span), s);
     const unionH = await raw(eng(x0, y0, 2 * span, span), s);
     const unionV = await raw(eng(x0, y0, span, 2 * span), s);
-    const bledA = await raw(eng(x0 - bleedPt, y0 - bleedPt, span + 2 * bleedPt, span + 2 * bleedPt), s);
+    const bledA = await raw(
+      eng(x0 - bleedPt, y0 - bleedPt, span + 2 * bleedPt, span + 2 * bleedPt),
+      s,
+    );
     const bledB = await raw(
       eng(x0 + span - bleedPt, y0 - bleedPt, span + 2 * bleedPt, span + 2 * bleedPt),
       s,

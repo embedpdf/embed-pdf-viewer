@@ -130,6 +130,8 @@ export interface LayerRow {
   docId: string;
   tenantId: string;
   name: string;
+  /** The base version this layer's artifact is a delta of (`layers.base_sha`). */
+  baseSha: string | null;
   docVersion: number;
   layoutVersion: number;
   metadataVersion: number;
@@ -151,6 +153,20 @@ export interface CreateLayerInput {
   docId: string;
   tenantId: string;
   name: string;
+  /** The head the layer is created over; `null` only for a document without a base. */
+  baseSha?: string | null;
+  /**
+   * Seeds (law 9c): an unwritten layer's manifest already advertises the
+   * HEAD's `docVersion`, so the row starts there — and its plane pointers
+   * are its base version's, not the initial-epoch constants, so a layer
+   * over a published version compares as inherited against the right
+   * epochs. Default 1 everywhere: a document that never published.
+   */
+  docVersion?: number;
+  layoutVersion?: number;
+  metadataVersion?: number;
+  attachmentsVersion?: number;
+  annotationsVersion?: number;
 }
 
 export class LayersRepo {
@@ -175,11 +191,12 @@ export class LayersRepo {
         doc_id: input.docId,
         tenant_id: input.tenantId,
         name: input.name,
-        doc_version: 1,
-        attachments_version: 1,
-        annotations_version: 1,
-        layout_version: 1,
-        metadata_version: 1,
+        base_sha: input.baseSha ?? null,
+        doc_version: input.docVersion ?? 1,
+        attachments_version: input.attachmentsVersion ?? 1,
+        annotations_version: input.annotationsVersion ?? 1,
+        layout_version: input.layoutVersion ?? 1,
+        metadata_version: input.metadataVersion ?? 1,
         last_audit_id: 0,
         current_version: 0,
         current_artifact_key: null,
@@ -308,6 +325,7 @@ function mapLayerRow(row: {
   doc_id: string;
   tenant_id: string;
   name: string;
+  base_sha?: string | null;
   doc_version: number;
   layout_version: number;
   metadata_version: number;
@@ -326,6 +344,7 @@ function mapLayerRow(row: {
     docId: row.doc_id,
     tenantId: row.tenant_id,
     name: row.name,
+    baseSha: row.base_sha ?? null,
     docVersion: Number(row.doc_version),
     layoutVersion: Number(row.layout_version),
     metadataVersion: Number(row.metadata_version),

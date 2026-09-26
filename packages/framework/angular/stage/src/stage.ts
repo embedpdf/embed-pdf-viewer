@@ -21,14 +21,16 @@ import {
   contentChild,
   effect,
   ElementRef,
+  forwardRef,
   inject,
   input,
   NgZone,
   PLATFORM_ID,
 } from '@angular/core';
 import { StageToken, createScrollHandler } from '@embedpdf/plugin-stage';
-import type { StageCapability, VisiblePage } from '@embedpdf/plugin-stage';
-import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
+import type { VisiblePage } from '@embedpdf/plugin-stage';
+import type { StageHostCapability } from '@embedpdf/plugin-stage/contract/host';
+import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import {
   injectDocumentId,
   injectKernelHost,
@@ -44,7 +46,9 @@ import { EpdfPageSurface } from './page-surface';
 
 /** Which stage lens to bind to. Defaults to the main StageToken — pass a custom
  *  token to drive an additional lens (e.g. a wrapped thumbnail sidebar). */
-export type StageTokenProp = CapabilityToken<StageCapability>;
+import { EPDF_STAGE_SCOPE, type EpdfStageScopeRef, type StageTokenProp } from './scope';
+
+export type { StageTokenProp } from './scope';
 
 const EMPTY_PAGES: VisiblePage[] = [];
 const NO_FRAME: PageFrame = { top: 0, right: 0, bottom: 0, left: 0 };
@@ -56,13 +60,16 @@ const frameEqual = (a: PageFrame, b: PageFrame) =>
   standalone: true,
   imports: [EpdfPageSurface],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  // Everything projected into the stage binds to THIS lens by default
+  // (React's `<Stage>` installing a `<StageScope>` for its overlay).
+  providers: [{ provide: EPDF_STAGE_SCOPE, useExisting: forwardRef(() => EpdfStage) }],
   host: {
     style: 'position: relative; overflow: hidden; touch-action: none; display: block;',
     '[style.cursor]': 'cursor()',
   },
   template: `
     @if (pageTemplate(); as tpl) {
-      @for (p of pages(); track p.pon) {
+      @for (p of pages(); track p.ref.pageObjectNumber) {
         <epdf-page-surface
           [vp]="p"
           [frame]="frame()"
@@ -77,7 +84,7 @@ const frameEqual = (a: PageFrame, b: PageFrame) =>
     <ng-content />
   `,
 })
-export class EpdfStage {
+export class EpdfStage implements EpdfStageScopeRef {
   /**
    * Route this Stage's pointer events to the interaction hub (page-resolved via
    * `pageAt`) — AND register this lens's tool-gated pan-scroll handler with it
@@ -105,15 +112,24 @@ export class EpdfStage {
    * cmd+wheel, not zoom); pinches are still swallowed either way.
    */
   readonly zoomGestures = input(true);
-  /** The stage lens to drive (default: the main StageToken). */
-  readonly token = input<StageTokenProp>(StageToken);
+  /** The stage lens to drive (default: the nearest `[epdfStageScope]`, else the main StageToken). */
+  readonly token = input<StageTokenProp | undefined>(undefined);
+  private readonly parentScope = inject(EPDF_STAGE_SCOPE, { optional: true, skipSelf: true });
+  /** The resolved lens — what this stage provides to its content. */
+  readonly stageToken = computed(
+    () => this.token() ?? this.parentScope?.stageToken() ?? StageToken,
+  );
 
   private readonly host = injectKernelHost();
-  private readonly stage = injectOptionalCapabilityFor(() => this.token());
+  // The surface is a HOST of the lens: it reports viewport size, drives gestures
+  // and reads the lens id. The host contract is the same runtime token, typed wider.
+  private readonly stage = injectOptionalCapabilityFor(
+    () => this.stageToken() as unknown as CapabilityToken<StageHostCapability>,
+  );
   private readonly ix = injectOptionalCapability(InteractionToken);
   private readonly useHub = computed(() => this.interaction() && this.ix() !== null);
   // The hub's resolved cursor (text/grab/…), applied to the viewport when driving.
-  private readonly hubCursor = this.host.value(() => this.ix()?.cursor() ?? 'default');
+  private readonly hubCursor = this.host.value(() => this.ix()?.getCursor() ?? 'default');
   protected readonly cursor = computed(() => (this.useHub() ? this.hubCursor() : null));
 
   protected readonly documentId = injectDocumentId();
@@ -122,15 +138,15 @@ export class EpdfStage {
   // no separate camera subscription needed for positioning. The capability
   // memoizes, so Object.is equality suffices.
   protected readonly pages = injectOptionalSelectorFor(
-    () => this.token(),
-    (c) => c.visiblePages(),
+    () => this.stageToken(),
+    (c) => c.listVisiblePages(),
     EMPTY_PAGES,
   );
   // Reserved chrome bands (screen px), uniform across pages — the frame the
   // outer box reserves and the chrome template paints into.
   protected readonly frame = injectOptionalSelectorFor(
-    () => this.token(),
-    (c) => c.pageFrame(),
+    () => this.stageToken(),
+    (c) => c.getSettings().pageFrame,
     NO_FRAME,
     frameEqual,
   );
@@ -165,7 +181,7 @@ export class EpdfStage {
         cleanups.push(
           createStageSurface(el, stage, {
             hub: useHub ? ix : null,
-            source: stage.lensId(),
+            source: stage.getLensId(),
             zoomGestures,
           }),
         );
@@ -175,7 +191,7 @@ export class EpdfStage {
         if (useHub && ix) {
           cleanups.push(
             ix.registerHandler(createScrollHandler(stage, ix, { panFallback }), {
-              source: stage.lensId(),
+              source: stage.getLensId(),
             }),
           );
         }

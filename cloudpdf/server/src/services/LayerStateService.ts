@@ -10,9 +10,17 @@ import {
   changesAnnotationList,
   invalidatesWeakIndexRefs,
   knownWeakAnnotationState,
+  toPageRef,
 } from '@embedpdf/engine-core/runtime';
+import type { Transaction } from 'kysely';
 
 import type { DocumentHead } from './DocumentService';
+import {
+  INITIAL_BASE_POINTERS,
+  type BasePlanePointers,
+  type BaseVersionsRepo,
+} from '../db/repos/base_versions.repo';
+import type { DocumentsRepo } from '../db/repos/documents.repo';
 import type {
   DocumentPagesRepo,
   DurablePageRow,
@@ -20,11 +28,25 @@ import type {
   LayerPagesRepo,
   LayersRepo,
 } from '../db/repos/page_state.repo';
+import type { Database as Schema } from '../db/schema';
 
 export interface LayerStateServiceOptions {
   documentPages: DocumentPagesRepo;
   layers: LayersRepo;
   layerPages: LayerPagesRepo;
+  documents: DocumentsRepo;
+  baseVersions: BaseVersionsRepo;
+}
+
+/**
+ * What a manifest says about the base version it is over: the sha, the
+ * byte length (with the sha, the `BaseVersionInfo` a client signs) and the
+ * plane pointers that version publishes (law 9c: comparisons and seeds
+ * use these, never the initial-epoch constants).
+ */
+export interface BaseVersionFacts extends BasePlanePointers {
+  sha256: string;
+  byteLength: number;
 }
 
 export type MutationImpactKind = AnnotationMutationKind;
@@ -40,15 +62,6 @@ const BASE_LAYOUT_VERSION = 1;
  * never edited (metadata writes always target a layer), so it stays at 1.
  */
 const BASE_METADATA_VERSION = 1;
-
-/** The immutable base /EmbeddedFiles tree's epoch — a layer whose
- *  `attachmentsVersion` still sits here has never written an attachment. */
-const BASE_ATTACHMENTS_VERSION = 1;
-
-/** The immutable base annotation corpus's epoch — the base view's
- *  annotations never change (all writes target a layer), so its bulk
- *  `/annotations/items@…` pin stays at the initial epoch. */
-const BASE_ANNOTATIONS_VERSION = 1;
 
 /** Every plane inherited — the scopes of a never-written layer. */
 const ALL_BASE_SCOPES: LayerScopes = {
@@ -89,11 +102,47 @@ export class LayerStateService {
   private readonly documentPages: DocumentPagesRepo;
   private readonly layers: LayersRepo;
   private readonly layerPages: LayerPagesRepo;
+  private readonly documents: DocumentsRepo;
+  private readonly baseVersions: BaseVersionsRepo;
 
   constructor(opts: LayerStateServiceOptions) {
     this.documentPages = opts.documentPages;
     this.layers = opts.layers;
     this.layerPages = opts.layerPages;
+    this.documents = opts.documents;
+    this.baseVersions = opts.baseVersions;
+  }
+
+  /**
+   * The facts of one base version. A document whose catalog row is
+   * missing (committed before migration 030 ran on this replica, or the
+   * row insert after commit failed) reads as version 1 at the initial
+   * epochs — exactly what the catalog would have recorded for it.
+   */
+  async baseVersionFacts(
+    docId: string,
+    sha256: string,
+    fallbackByteLength: number | null,
+  ): Promise<BaseVersionFacts> {
+    const row = await this.baseVersions.find(docId, sha256);
+    if (row) {
+      return {
+        sha256: row.sha256,
+        byteLength: row.byteLength,
+        layoutVersion: row.layoutVersion,
+        metadataVersion: row.metadataVersion,
+        attachmentsVersion: row.attachmentsVersion,
+        annotationsVersion: row.annotationsVersion,
+      };
+    }
+    return { sha256, byteLength: fallbackByteLength ?? 0, ...INITIAL_BASE_POINTERS };
+  }
+
+  /** The head's facts: `documents.base_sha` and its catalog row. */
+  async headBaseFacts(docId: string): Promise<BaseVersionFacts | null> {
+    const doc = await this.documents.findById(docId);
+    if (!doc?.baseSha) return null;
+    return this.baseVersionFacts(docId, doc.baseSha, doc.storageSizeBytes);
   }
 
   async ensureBasePages(
@@ -107,7 +156,7 @@ export class LayerStateService {
     await this.documentPages.upsertForDocument(
       docId,
       observed.map((page) => ({
-        pageObjectNumber: page.pageObjectNumber,
+        pageObjectNumber: page.page.pageObjectNumber,
         hasWeakAnnotations: requireKnownWeakAnnotationBoolean(page),
       })),
     );
@@ -145,20 +194,46 @@ export class LayerStateService {
    * Conservative by design: an unmatched page reads as owned.
    */
   computeLayerScopes(
-    layer: Pick<LayerRow, 'layoutVersion' | 'metadataVersion' | 'attachmentsVersion'> | null,
+    layer: Pick<
+      LayerRow,
+      'layoutVersion' | 'metadataVersion' | 'attachmentsVersion' | 'baseSha'
+    > | null,
     layerPages: DurablePageRow[],
     basePages: DurablePageRow[],
+    /** The HEAD version's facts; a never-published document is at the initial epochs. */
+    head: Pick<
+      BaseVersionFacts,
+      'sha256' | 'layoutVersion' | 'metadataVersion' | 'attachmentsVersion'
+    > | null = null,
   ): LayerScopes {
     if (!layer) return { ...ALL_BASE_SCOPES };
+    // Law 9: a layer whose base is not the head (a sibling published a
+    // version since) is diverged for EVERY plane — the head's layout,
+    // metadata and attachments are another version's. Its reads resolve
+    // at layer URLs over its own base until it is rebased.
+    if (head && layer.baseSha !== null && layer.baseSha !== head.sha256) {
+      return {
+        content: 'layer',
+        annotations: 'layer',
+        layout: 'layer',
+        attachments: 'layer',
+        metadata: 'layer',
+        actions: 'base',
+      };
+    }
+    const base = head ?? { ...INITIAL_BASE_POINTERS, sha256: layer.baseSha ?? '' };
     // A layer row without page rows means no page-level write ever
     // committed — content and annotations are trivially inherited.
     const pagesKnown = layerPages.length > 0;
     return {
       content: pagesKnown ? pagePlaneScope(layerPages, basePages, 'contentVersion') : 'base',
       annotations: pagesKnown ? pagePlaneScope(layerPages, basePages, 'annotationVersion') : 'base',
-      layout: layer.layoutVersion === BASE_LAYOUT_VERSION ? 'base' : 'layer',
-      attachments: layer.attachmentsVersion === BASE_ATTACHMENTS_VERSION ? 'base' : 'layer',
-      metadata: layer.metadataVersion === BASE_METADATA_VERSION ? 'base' : 'layer',
+      // Doc-level planes compare against the BASE VERSION's pointers (law
+      // 9c): a layer seeded over a published version whose metadata sits
+      // at epoch 2 is inherited at 2, not owned because 2 ≠ 1.
+      layout: layer.layoutVersion === base.layoutVersion ? 'base' : 'layer',
+      attachments: layer.attachmentsVersion === base.attachmentsVersion ? 'base' : 'layer',
+      metadata: layer.metadataVersion === base.metadataVersion ? 'base' : 'layer',
       actions: 'base',
     };
   }
@@ -173,38 +248,44 @@ export class LayerStateService {
   async computeLayerScopesFromDb(docId: string, layerName: string): Promise<LayerScopes> {
     const layer = await this.layers.findByDocAndName(docId, layerName);
     if (!layer) return { ...ALL_BASE_SCOPES };
-    const [layerPages, basePages] = await Promise.all([
+    const [layerPages, basePages, head] = await Promise.all([
       this.layerPages.findByLayer(layer.id),
       this.documentPages.findByDocument(docId),
+      this.headBaseFacts(docId),
     ]);
-    return this.computeLayerScopes(layer, layerPages, basePages);
+    return this.computeLayerScopes(layer, layerPages, basePages, head);
   }
 
-  buildBaseManifest(head: DocumentHead, pages: DurablePageRow[]): DocumentManifest {
+  buildBaseManifest(
+    head: DocumentHead,
+    pages: DurablePageRow[],
+    /** The head version's facts: its plane pointers are what the base view publishes (law 9). */
+    version: BaseVersionFacts,
+  ): DocumentManifest {
     return {
       docVersion: head.docVersion,
-      // The base view is never reordered (structural ops always target a
-      // layer), so its geometry pointer is the initial epoch.
-      layoutVersion: BASE_LAYOUT_VERSION,
-      // Likewise the base Info dict is never edited (metadata writes always
-      // target a layer), so its metadata pointer is the initial epoch.
-      metadataVersion: BASE_METADATA_VERSION,
+      // The base view's pointers are its VERSION's: the initial epochs for
+      // an upload, the signing layer's pointers for a published version.
+      layoutVersion: version.layoutVersion,
+      metadataVersion: version.metadataVersion,
       actionsVersion: 1,
-      // The base view's EmbeddedFiles tree is immutable (attachment writes
-      // always target a layer), so its pointer is the initial epoch.
-      attachmentsVersion: 1,
-      annotationsVersion: BASE_ANNOTATIONS_VERSION,
+      attachmentsVersion: version.attachmentsVersion,
+      annotationsVersion: version.annotationsVersion,
       // No layer writes have happened on the base view; a fresh subscriber's
       // gapless cursor starts at 0 ("everything in the log is new to me").
       auditHead: 0,
       baseSha: head.baseSha,
+      layerVersion: 0,
+      working: false,
+      baseByteLength: version.byteLength,
       pages: pages.map((page) => this.toManifestPage(`cloud:base:${head.id}`, page)),
     };
   }
 
   buildLayerManifest(
     docId: string,
-    baseSha: string,
+    /** The LAYER's base version (behind the head after a sibling published). */
+    base: Pick<BaseVersionFacts, 'sha256' | 'byteLength'>,
     layerName: string,
     layer: Pick<
       LayerRow,
@@ -214,6 +295,8 @@ export class LayerStateService {
       | 'attachmentsVersion'
       | 'annotationsVersion'
       | 'lastAuditId'
+      | 'currentVersion'
+      | 'currentArtifactKey'
     >,
     pages: DurablePageRow[],
     /**
@@ -233,7 +316,13 @@ export class LayerStateService {
       // Written in the same transaction as the audit append, so a client
       // subscribing from this manifest can never miss a row (gapless cursor).
       auditHead: layer.lastAuditId,
-      baseSha,
+      baseSha: base.sha256,
+      // The signing fences a client pins: the layer's write serial, and
+      // whether an artifact (edits not yet sealed into a version) exists —
+      // `currentVersion > 0` alone no longer says so after a publish.
+      layerVersion: layer.currentVersion,
+      working: layer.currentArtifactKey !== null,
+      baseByteLength: base.byteLength,
       scopes,
       pages: pages.map((page) =>
         this.toManifestPage(this.layerRevisionScopeId(docId, layerName), page),
@@ -262,11 +351,93 @@ export class LayerStateService {
       ...(input.annotationsVersion !== undefined
         ? { annotationsVersion: input.annotationsVersion }
         : {}),
+      // Every ordinary commit writes an artifact: the layer holds edits not
+      // yet sealed into a version (a signature's publish clears it again,
+      // and refreshes the manifest instead of sending a delta).
+      working: true,
       pages: input.pages.map((page) => ({
-        pageObjectNumber: page.pageObjectNumber,
+        page: toPageRef(page.pageObjectNumber),
         cache: this.toCachePins(page),
       })),
     };
+  }
+
+  /**
+   * Law 9: a published version contains everything the signing layer's
+   * artifact carried — every page it touched, its page order, metadata,
+   * attachments, annotations — so the head's catalog becomes the layer's
+   * COMPLETE surviving page set: rows the layer has replace the base's,
+   * pages it inserted are added, pages it deleted (seeded on first write,
+   * removed by pages.delete) disappear; the signed page gets one more
+   * annotation bump for the signature widget. The layer's rows are then
+   * the base's again (it inherits every plane over the new version). A
+   * layer with no page rows was never page-written: the base's rows carry
+   * over unchanged but for the signed page.
+   */
+  async promoteLayerToBase(
+    trx: Transaction<Schema>,
+    input: { docId: string; layerId: string; signedPage: number | null; now: number },
+  ): Promise<DurablePageRow[]> {
+    const layerRows = await trx
+      .selectFrom('layer_pages')
+      .selectAll()
+      .where('layer_id', '=', input.layerId)
+      .orderBy('page_object_number', 'asc')
+      .execute();
+    const baseRows = await trx
+      .selectFrom('document_pages')
+      .selectAll()
+      .where('doc_id', '=', input.docId)
+      .orderBy('page_object_number', 'asc')
+      .execute();
+    const source = layerRows.length > 0 ? layerRows : baseRows;
+    const promoted = source.map((row) => {
+      const signed =
+        input.signedPage !== null && Number(row.page_object_number) === input.signedPage;
+      return {
+        pageObjectNumber: Number(row.page_object_number),
+        contentVersion: Number(row.content_version),
+        annotationVersion: Number(row.annotation_version) + (signed ? 1 : 0),
+        annotationGeneration: Number(row.annotation_generation),
+        hasWeakAnnotations: Boolean(row.has_weak_annotations),
+        updatedAt: signed ? input.now : Number(row.updated_at),
+      };
+    });
+    await trx.deleteFrom('document_pages').where('doc_id', '=', input.docId).execute();
+    if (promoted.length > 0) {
+      await trx
+        .insertInto('document_pages')
+        .values(
+          promoted.map((page) => ({
+            doc_id: input.docId,
+            page_object_number: page.pageObjectNumber,
+            content_version: page.contentVersion,
+            annotation_version: page.annotationVersion,
+            annotation_generation: page.annotationGeneration,
+            has_weak_annotations: page.hasWeakAnnotations ? 1 : 0,
+            updated_at: page.updatedAt,
+          })),
+        )
+        .execute();
+    }
+    if (layerRows.length > 0) {
+      await trx.deleteFrom('layer_pages').where('layer_id', '=', input.layerId).execute();
+      await trx
+        .insertInto('layer_pages')
+        .values(
+          promoted.map((page) => ({
+            layer_id: input.layerId,
+            page_object_number: page.pageObjectNumber,
+            content_version: page.contentVersion,
+            annotation_version: page.annotationVersion,
+            annotation_generation: page.annotationGeneration,
+            has_weak_annotations: page.hasWeakAnnotations ? 1 : 0,
+            updated_at: page.updatedAt,
+          })),
+        )
+        .execute();
+    }
+    return promoted;
   }
 
   decorateBasePageState(docId: string, page: DurablePageRow): PageState {
@@ -326,11 +497,15 @@ export class LayerStateService {
     documentPages: DocumentPagesRepo;
     layers: LayersRepo;
     layerPages: LayerPagesRepo;
+    documents: DocumentsRepo;
+    baseVersions: BaseVersionsRepo;
   } {
     return {
       documentPages: this.documentPages,
       layers: this.layers,
       layerPages: this.layerPages,
+      documents: this.documents,
+      baseVersions: this.baseVersions,
     };
   }
 
@@ -350,10 +525,10 @@ export class LayerStateService {
 
   private toPageState(scopeId: string, page: DurablePageRow): PageState {
     return {
-      pageObjectNumber: page.pageObjectNumber,
+      page: toPageRef(page.pageObjectNumber),
       revision: {
         docSessionId: scopeId,
-        pageObjectNumber: page.pageObjectNumber,
+        page: toPageRef(page.pageObjectNumber),
         generation: page.annotationGeneration,
       },
       weakAnnotationState: {
@@ -367,7 +542,7 @@ export class LayerStateService {
 function requireKnownWeakAnnotationBoolean(page: PageState): boolean {
   if (page.weakAnnotationState.kind !== 'known') {
     throw new Error(
-      `cannot initialize durable manifest state from unknown weak annotation state for page ${page.pageObjectNumber}`,
+      `cannot initialize durable manifest state from unknown weak annotation state for page ${page.page.pageObjectNumber}`,
     );
   }
   return page.weakAnnotationState.hasAnyWeakAnnotations;

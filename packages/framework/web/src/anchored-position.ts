@@ -19,6 +19,8 @@
  *     scrolled) use an external listener ({@link observeClientGeometry}).
  */
 
+import type { PageRef } from './page-ref';
+
 export interface AnchoredRect {
   x: number;
   y: number;
@@ -54,7 +56,7 @@ export interface AnchoredPosition {
  *  Structural — plugin anchor reads satisfy it without importing this
  *  package. */
 export interface AnchorTarget {
-  pon: number;
+  page: PageRef;
   bounds: AnchoredRect;
   avoid?: AnchoredPoint[];
 }
@@ -78,11 +80,11 @@ export interface ViewProjector {
   space: 'overlay' | 'client';
   /** Content-space rect on a page → coords in `space`. Null: not projectable
    *  right now (page not shown / not measurable yet). */
-  toScreen(pon: number, rect: AnchoredRect): AnchoredRect | null;
-  toScreenPoint(pon: number, at: AnchoredPoint): AnchoredPoint | null;
+  toScreen(page: PageRef, rect: AnchoredRect): AnchoredRect | null;
+  toScreenPoint(page: PageRef, at: AnchoredPoint): AnchoredPoint | null;
   /** The page's live view facts (for anchor reads that need them — e.g. the
    *  screen-constant rotate-knob stalk), or null when the page isn't shown. */
-  viewEnv(pon: number): {
+  viewEnv(page: PageRef): {
     scale: number;
     rotation: 0 | 90 | 180 | 270;
     zoom: number;
@@ -102,10 +104,10 @@ export function projectAnchoredTarget(
   placement: AnchoredPlacement,
   gap: number,
 ): AnchoredPosition | null {
-  const box = projector.toScreen(anchor.pon, anchor.bounds);
+  const box = projector.toScreen(anchor.page, anchor.bounds);
   if (!box) return null;
   const avoid = anchor.avoid?.length
-    ? projector.toScreenPoint(anchor.pon, anchor.avoid[0])
+    ? projector.toScreenPoint(anchor.page, anchor.avoid[0])
     : null;
   return positionAnchoredRect(box, placement, gap, avoid);
 }

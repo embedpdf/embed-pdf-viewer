@@ -13,11 +13,20 @@
 export * from '@embedpdf/plugin-i18n';
 import { useMemo } from 'react';
 import { I18nToken } from '@embedpdf/plugin-i18n';
-import type { LocaleInfo, TranslateOptions } from '@embedpdf/plugin-i18n';
-import { useCapability, useKernelValue, useSelector } from './runtime';
+import type { I18nCapability, LocaleInfo, TranslateOptions } from '@embedpdf/plugin-i18n';
+import type { EventHook } from '@embedpdf/core';
+import { useCapability, useCapabilityEvent, useKernelValue, useSelector } from './runtime';
 
-/** The raw i18n capability (t / setLocale / locales / dir / …). */
+/** The raw i18n capability (t / setLocale / listLocales / getDirection / …). */
 export const useI18n = () => useCapability(I18nToken);
+
+/** Subscribe to one i18n event for the mounted lifetime: `useI18nEvent((c) => c.onLocaleChanged, handler)`. */
+export function useI18nEvent<T>(
+  select: (cap: I18nCapability) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  useCapabilityEvent(I18nToken, select, handler);
+}
 
 /**
  * A reactive translate function. New identity whenever i18n state changes
@@ -33,7 +42,7 @@ export function useT(): (key: string, options?: TranslateOptions) => string {
   return useMemo(() => (key, options) => i18n.t(key, options), [i18n, slice]);
 }
 
-const localeListEqual = (a: LocaleInfo[], b: LocaleInfo[]): boolean =>
+const localeListEqual = (a: readonly LocaleInfo[], b: readonly LocaleInfo[]): boolean =>
   a.length === b.length &&
   a.every((x, i) => x.code === b[i].code && x.name === b[i].name && x.loaded === b[i].loaded);
 
@@ -45,15 +54,16 @@ const localeListEqual = (a: LocaleInfo[], b: LocaleInfo[]): boolean =>
 export function useLocale(): {
   locale: string;
   dir: 'ltr' | 'rtl';
-  locales: LocaleInfo[];
+  locales: readonly LocaleInfo[];
   /** Code of a lazy pack being fetched, if any — show a spinner on it. */
   loading: string | null;
-  setLocale: (code: string) => void;
+  /** Resolves once the locale is usable (a lazy pack is fetched first). */
+  setLocale: (code: string) => Promise<void>;
 } {
   const i18n = useCapability(I18nToken);
-  const locale = useSelector(I18nToken, (c) => c.locale());
-  const dir = useSelector(I18nToken, (c) => c.dir());
-  const loading = useSelector(I18nToken, (c) => c.loading());
-  const locales = useSelector(I18nToken, (c) => c.locales(), localeListEqual);
+  const locale = useSelector(I18nToken, (c) => c.getLocale());
+  const dir = useSelector(I18nToken, (c) => c.getDirection());
+  const loading = useSelector(I18nToken, (c) => c.getLoadingLocale());
+  const locales = useSelector(I18nToken, (c) => c.listLocales(), localeListEqual);
   return { locale, dir, locales, loading, setLocale: i18n.setLocale };
 }

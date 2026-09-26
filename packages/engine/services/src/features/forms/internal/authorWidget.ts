@@ -22,7 +22,8 @@ export function createUnattachedWidget(
 ): number {
   const { fn, mem } = runtime;
   const pool = session.pagePool();
-  const pagePtr = pool.acquire(placement.pageObjectNumber);
+  const pageObjectNumber = session.resolvePageRef(placement.page).pageObjectNumber;
+  const pagePtr = pool.acquire(pageObjectNumber);
   try {
     const annotPtr = fn.EPDFPage_CreateAnnot(pagePtr, WIDGET_SUBTYPE_CODE);
     if (annotPtr === NULL_PTR) {
@@ -42,6 +43,6 @@ export function createUnattachedWidget(
       fn.FPDFPage_CloseAnnot(annotPtr);
     }
   } finally {
-    pool.release(placement.pageObjectNumber);
+    pool.release(pageObjectNumber);
   }
 }

@@ -46,7 +46,7 @@ function PlaceByCode() {
   useEffect(() => {
     if (assets.length > 0) return;
     loadDefaultLibrary('en')
-      .then((bytes) => stamp.importLibraryPdf(bytes))
+      .then((bytes) => stamp.importLibrary(bytes))
       .catch((err) => setStatus(err instanceof Error ? err.message : String(err)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stamp]);
@@ -57,13 +57,13 @@ function PlaceByCode() {
     const asset = assets.find((a) => a.name === identifier);
     if (!asset || !documentId || !page) return;
     const ref = await stamp.placeAsset(documentId, asset.id, {
-      pageObjectNumber: page.pon,
+      page: page.ref,
       at,
       targetWidth: 160,
       rotation,
     });
     setStatus(
-      `placed ${asset.label} on page ${ref.pageObjectNumber === page.pon ? currentPage + 1 : '?'}`,
+      `placed ${asset.label} on page ${ref.page.pageObjectNumber === page.ref.pageObjectNumber ? currentPage + 1 : '?'}`,
     );
   };
 

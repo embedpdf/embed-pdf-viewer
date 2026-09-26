@@ -1,5 +1,34 @@
 # @embedpdf/engine-runtime
 
+## 3.0.0-next.14
+
+## 3.0.0-next.13
+
+### Minor Changes
+
+- [#817](https://github.com/embedpdf/embed-pdf-viewer/pull/817) by [@bobsingor](https://github.com/bobsingor) – Add native and WASM APIs to read FreeText rich text as JSON, author it from JSON or XHTML, and generate appearances with multiple fonts, run styles, and text decorations.
+
+  Support CFF font resources, document-level embedding and typographic policies, variable-font instancing, and font embedding-permission enforcement. Preserve registered font identities in saved annotation resources and expose identity and editing-authorization APIs.
+
+- [#812](https://github.com/embedpdf/embed-pdf-viewer/pull/812) by [@bobsingor](https://github.com/bobsingor) – Add native and WASM APIs for signature inspection, revision comparison, byte-range digests, incremental signing, and signature-field appearances.
+
+  Make incremental layer saves omit unchanged objects and detect reverted edits, including after reopening a layer. Add file-backed layer and overlay reads, share immutable stream data, and compare stream contents in chunks to reduce copying and memory use.
+
+  Fix signature appearance placement, make newly authored form widgets printable, and resolve named pages through the current layer view.
+
+### Patch Changes
+
+- [#820](https://github.com/embedpdf/embed-pdf-viewer/pull/820) by [@bobsingor](https://github.com/bobsingor) – Fix native and WASM text redaction when multiple regions intersect the same text
+  object. Later regions no longer leave targeted text searchable or copyable in
+  saved PDFs or remove neighboring text. Preserve the positions of remaining text,
+  including vertical text.
+
+  Remove stale replacement and alternate text associated with redacted content,
+  correct redaction inside transformed nested forms, and preserve unredacted uses
+  of shared images and forms.
+
+  Fixes [#801](https://github.com/embedpdf/embed-pdf-viewer/issues/801).
+
 ## 3.0.0-next.12
 
 ### Minor Changes

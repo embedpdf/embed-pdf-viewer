@@ -1,4 +1,4 @@
-import type { FormFieldRef, FormWidgetRef } from '../identity/FormFieldRef';
+import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
 import type { PdfFieldActions } from '../dto/PdfAction';
 import type { FormValueEntry } from './value-entry';
 
@@ -52,7 +52,7 @@ export interface FormFieldFlags {
  * A widget of a toggle (checkbox/radio) field. Toggle widgets always carry
  * their appearance-state machinery — no nullable fields to probe.
  */
-export interface ToggleFieldWidget extends FormWidgetRef {
+export interface ToggleFieldWidget extends FormWidget {
   /**
    * The widget's appearance state name (the non-"Off" key of its /AP /N
    * dictionary) — the token toggle writes address widgets by.
@@ -104,7 +104,7 @@ export interface FormFieldBase {
   /** Effective inherited field `/AA` actions. */
   actions?: PdfFieldActions;
   /** The field's widget annotations, in control order. May be empty ("unplaced"). */
-  widgets: FormWidgetRef[];
+  widgets: FormWidget[];
 }
 
 /** A text field. Write with `{ type: 'text', value }`. */

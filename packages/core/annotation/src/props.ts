@@ -45,6 +45,9 @@ export const textStyleFromProps = (p: AnnotationProps): TextStyle => ({
   fontSize: p.fontSize,
   fontColor: p.fontColor,
   textAlign: p.textAlign,
+  ...(p.bold !== undefined ? { bold: p.bold } : {}),
+  ...(p.italic !== undefined ? { italic: p.italic } : {}),
+  ...(p.underline !== undefined ? { underline: p.underline } : {}),
 });
 
 /** Does this kind's prop table declare `link` (attachable link)? The link
@@ -86,6 +89,12 @@ export function readProp<K extends PropKey>(a: Annot, key: K): AnnotationProps[K
         return a.text?.fontColor;
       case 'textAlign':
         return a.text?.textAlign;
+      case 'bold':
+        return a.text ? (a.text.bold ?? false) : undefined;
+      case 'italic':
+        return a.text ? (a.text.italic ?? false) : undefined;
+      case 'underline':
+        return a.text ? (a.text.underline ?? false) : undefined;
       case 'icon':
         return a.icon;
       case 'link':
@@ -172,6 +181,13 @@ export function applyProps(a: Annot, patch: AnnotationPropsPatch): Annot | null 
     if (patch.textAlign !== undefined && takes.has('textAlign')) {
       text.textAlign = patch.textAlign;
       textChanged = true;
+    }
+    for (const key of ['bold', 'italic', 'underline'] as const) {
+      const value = patch[key];
+      if (value !== undefined && takes.has(key) && (text[key] ?? false) !== value) {
+        text[key] = value;
+        textChanged = true;
+      }
     }
     if (textChanged) next = { ...next, text };
   }

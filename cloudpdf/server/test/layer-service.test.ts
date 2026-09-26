@@ -4,6 +4,7 @@ import {
   createSqliteDb,
   migrate,
   sqliteMigrations,
+  BaseVersionsRepo,
   DocumentPagesRepo,
   DocumentsRepo,
   LayerPagesRepo,
@@ -24,6 +25,8 @@ describe('LayerService lazy materialization', () => {
       documentPages: new DocumentPagesRepo(db),
       layers: new LayersRepo(db),
       layerPages: new LayerPagesRepo(db),
+      documents: new DocumentsRepo(db),
+      baseVersions: new BaseVersionsRepo(db),
     });
     service = new LayerService({
       documents: new DocumentsRepo(db),

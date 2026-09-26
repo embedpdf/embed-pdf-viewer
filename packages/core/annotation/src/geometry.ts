@@ -133,7 +133,7 @@ function segDist(p: Vec, a: Vec, b: Vec): number {
   return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
 }
 /** Even-odd point-in-polygon. */
-function pointInPoly(p: Vec, pts: Vec[]): boolean {
+export function pointInPoly(p: Vec, pts: readonly Vec[]): boolean {
   let inside = false;
   for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
     const a = pts[i];
@@ -232,7 +232,8 @@ export const rotatePoint = (p: Vec, pivot: Vec, deg: number): Vec =>
 export function centroidOf(g: Geom): Vec {
   if (g.t === 'rect' || g.t === 'text' || g.t === 'caret') return rectCenter(g.rect);
   if (g.t === 'line') return { x: (g.a.x + g.b.x) / 2, y: (g.a.y + g.b.y) / 2 };
-  const pts = g.t === 'poly' ? g.points : g.t === 'ink' ? g.strokes.flat() : g.quads.flatMap(textQuadPoints);
+  const pts =
+    g.t === 'poly' ? g.points : g.t === 'ink' ? g.strokes.flat() : g.quads.flatMap(textQuadPoints);
   let sx = 0;
   let sy = 0;
   for (const p of pts) {
@@ -425,13 +426,13 @@ export function fitStampBox(center: Vec, desired: Size, page: Size, rotCW: numbe
 }
 
 /** Reset a geom to its as-authored orientation (`rot → 0`). Box: drop `rot`.
- *  Vertex: spin the points by `-rot` about their centroid so they return to the
- *  orientation they were drawn at, in place. */
-export function geomResetRotation(g: Geom): Geom {
+ *  Vertex: spin the points by `-rot` about the supplied selection center.
+ *  Geometry-only callers retain the centroid default. */
+export function geomResetRotation(g: Geom, pivot?: Vec): Geom {
   const rot = geomRotation(g);
   if (!rot) return g;
   if (g.t === 'rect' || g.t === 'text' || g.t === 'caret') return { ...g, rot: 0 };
-  const c = centroidOf(g);
+  const c = pivot ?? centroidOf(g);
   const rotated = geomRotateAbout(g, c, -rot);
   // geomRotateAbout already set rot = normalize(rot - rot) = 0.
   return rotated;
@@ -926,7 +927,8 @@ export function geomVisualBounds(g: Geom, strokeWidth: number, border?: Border):
     return expandRect(unionRect(all), strokeWidth / 2);
   }
   if (g.t === 'rect' || g.t === 'text' || g.t === 'caret') return g.rect;
-  if (g.t === 'quads') return expandRect(unionRect(g.quads.flatMap(textQuadPoints)), strokeWidth / 2);
+  if (g.t === 'quads')
+    return expandRect(unionRect(g.quads.flatMap(textQuadPoints)), strokeWidth / 2);
   // Ink is round-capped/round-joined: it never spikes, so a plain `h` grow of the
   // freehand hull is exact — left as-is (the freehand look must not change).
   if (g.t === 'ink') return expandRect(unionRect(g.strokes.flat()), strokeWidth / 2);
@@ -1111,10 +1113,7 @@ export function geomHit(
   // already-rotated points, so they hit-test directly (rot is advisory). A
   // callout is COMPOUND: only its box rotates (the leader is page-space), so the
   // inverse rotation applies to the box test alone — see the text branch below.
-  if (
-    (g.t === 'rect' || g.t === 'caret' || (g.t === 'text' && !g.callout)) &&
-    (g.rot ?? 0) !== 0
-  ) {
+  if ((g.t === 'rect' || g.t === 'caret' || (g.t === 'text' && !g.callout)) && (g.rot ?? 0) !== 0) {
     p = rotatePoint(p, rectCenter(g.rect), -(g.rot ?? 0));
   }
   // A text box is a solid hit target anywhere inside it (+ the click margin).
@@ -1318,53 +1317,77 @@ export function geomDragHandle(g: Geom, handle: string, to: Vec): Geom {
   return g;
 }
 
+/**
+ * The text PLATE inset of a free-text box: twice the border width. The plate
+ * — where text lays out, clips and scrolls — is the box deflated by this on
+ * every side: the ink band and an equal breathing band, so the text never
+ * touches the stroke. Acrobat's rule, measured 1–12 pt on plain boxes and
+ * 1–7 pt on callouts (plan `2026-09-15-free-text-plate-inset.md`); the
+ * engine's `FreeTextPlate` is the same formula, so the live editor sits
+ * exactly where the baked text lands. Acrobat's thinnest border is 1 pt; a
+ * width of 0 is ours alone and gives no inset (the plate is the box).
+ */
+export function textPlateInset(strokeWidth: number): number {
+  return 2 * Math.max(0, strokeWidth);
+}
+
+/** A callout's leader (open polyline, its connection point extended under
+ *  the box border by half the stroke — the AP generator's `adjusted_conn` —
+ *  so the leader meets the border ink without an angular gap) + the arrow at
+ *  its tip. */
+function calloutLeaderNodes(
+  g: Extract<Geom, { t: 'text' }>,
+  callout: NonNullable<Extract<Geom, { t: 'text' }>['callout']>,
+  strokeWidth: number,
+): RenderNode[] {
+  const pts = [...calloutLinePoints(g)];
+  if (strokeWidth > 0 && pts.length >= 2) {
+    const last = pts[pts.length - 1];
+    const prev = pts[pts.length - 2];
+    const dx = last.x - prev.x;
+    const dy = last.y - prev.y;
+    const len = Math.hypot(dx, dy);
+    if (len > 0) {
+      pts[pts.length - 1] = {
+        x: last.x + (dx / len) * (strokeWidth / 2),
+        y: last.y + (dy / len) * (strokeWidth / 2),
+      };
+    }
+  }
+  const nodes: RenderNode[] = [{ kind: 'poly', points: pts, closed: false }];
+  const seg = calloutEndingSeg(pts, callout.ending);
+  if (seg) nodes.push(...endingNodes(seg.tip, seg.angle, seg.ending, strokeWidth));
+  return nodes;
+}
+
 export function geomScene(g: Geom, strokeWidth = 0, border?: Border): RenderNode[] {
-  // A plain text box draws no vector nodes — the framework renders its editable
-  // element. A callout still draws its leader (open polyline) + arrow at the tip,
-  // plus a stroke-only box border (the DOM owns the text + background).
+  // A text box's BOX — its fill and its border — is the scene's, plain box and
+  // callout alike, so the live view paints exactly what the AP generator
+  // bakes (`GenerateBorderAP`: the `/DA` colour at the `/BS` width, inset by
+  // half the stroke). The framework's editable element owns only the TEXT: it
+  // sits on the plate inside the border band and paints no background. A
+  // callout adds its leader (open polyline) + arrow at the tip.
   if (g.t === 'text') {
-    if (!g.callout) return [];
-    const pts = [...calloutLinePoints(g)];
-    // Mirror the AP generator's `adjusted_conn`: extend the connection point
-    // under the box border by half the stroke, so the leader meets the border
-    // ink without an angular gap at the box edge.
-    if (strokeWidth > 0 && pts.length >= 2) {
-      const last = pts[pts.length - 1];
-      const prev = pts[pts.length - 2];
-      const dx = last.x - prev.x;
-      const dy = last.y - prev.y;
-      const len = Math.hypot(dx, dy);
-      if (len > 0) {
-        pts[pts.length - 1] = {
-          x: last.x + (dx / len) * (strokeWidth / 2),
-          y: last.y + (dy / len) * (strokeWidth / 2),
-        };
-      }
-    }
-    const nodes: RenderNode[] = [{ kind: 'poly', points: pts, closed: false }];
-    const seg = calloutEndingSeg(pts, g.callout.ending);
-    if (seg) nodes.push(...endingNodes(seg.tip, seg.angle, seg.ending, strokeWidth));
-    if (strokeWidth > 0) {
-      // The box border mirrors the AP generator (and the square/circle
-      // convention below): the drawn path insets by half the stroke so the
-      // ink sits INSIDE `g.rect` with its outer edge ON the rect — never
-      // straddling the selection outline.
-      const r = insetRect(g.rect, strokeWidth / 2);
-      // A tilted box (the upright policy) draws as its rotated corner ring —
-      // the scene stays plane-agnostic, so every framework painter gets the
-      // tilt for free (the leader above is page-space and never rotates).
-      const rot = g.rot ?? 0;
-      const c = rectCenter(g.rect);
-      nodes.push(
-        rot
-          ? {
-              kind: 'poly',
-              points: rectCornerPoints(r).map((p) => rotatePoint(p, c, rot)),
-              closed: true,
-            }
-          : { kind: 'rect', rect: r },
-      );
-    }
+    const nodes: RenderNode[] = [];
+    if (g.callout) nodes.push(...calloutLeaderNodes(g, g.callout, strokeWidth));
+    // The drawn path insets by half the stroke so the ink sits INSIDE
+    // `g.rect` with its outer edge ON the rect — never straddling the
+    // selection outline (the square/circle convention below). A tilted box
+    // (the upright policy) draws as its rotated corner ring — the scene stays
+    // plane-agnostic, so every framework painter gets the tilt for free (the
+    // leader is page-space and never rotates).
+    const r = insetRect(g.rect, strokeWidth / 2);
+    const rot = g.rot ?? 0;
+    const c = rectCenter(g.rect);
+    nodes.push(
+      rot
+        ? {
+            kind: 'poly',
+            points: rectCornerPoints(r).map((p) => rotatePoint(p, c, rot)),
+            closed: true,
+          }
+        : { kind: 'rect', rect: r },
+    );
     return nodes;
   }
   if (g.t === 'caret') {

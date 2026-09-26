@@ -41,12 +41,19 @@ import { useT } from '@embedpdf/react/i18n';
 import { getModeBar } from './config/chrome';
 import { useChromeSchema } from './config-context';
 import { AppToolbar } from './ui/toolbar';
+import { AnnotationFontsProvider } from './ui/annotation-fonts';
 import { AnnotationStrip } from './ui/annotation-strip';
 import { SelectionStrip } from './ui/selection-strip';
 import { TabBar } from './ui/tab-bar';
 import { ArmedToolCursor } from './ui/tool-cursor';
 import { LeftSidebar, RightSidebar, PageControls } from './ui/panels';
+import { CalibrationDialog } from './ui/measurement';
 import { RedactConfirmModal } from './ui/redact-confirm';
+import { SignDialog } from './ui/sign-dialog';
+import { SignatureBridge } from './ui/signature-bridge';
+import { SignatureInspector } from './ui/signature-inspector';
+import { SignatureMakerModal } from './ui/signature-maker';
+import { StampLibraryStore } from './ui/stamp-store';
 import { DocumentError, PasswordPrompt } from './ui/document-boot';
 
 // Annotation renderers — module scope, per the AnnotationRenderer identity
@@ -145,92 +152,104 @@ export function Shell() {
   );
 
   return (
-    <div className="bg-app text-fg flex h-full flex-col">
-      {/* The header socket. The chrome ships NO header of its own — branding,
+    <AnnotationFontsProvider>
+      <div className="bg-app text-fg flex h-full flex-col">
+        {/* the user's stamp + signature libraries: restored once, persisted for
+          the workspace's lifetime (workspace-scoped, like the stamp plugin) */}
+        <StampLibraryStore />
+        {/* The header socket. The chrome ships NO header of its own — branding,
           locale pickers and theme switches are the embedder's chrome, not the
           viewer's — so this renders nothing until a child fills the slot. */}
-      {(frame.header ?? true) && <slot name="header" />}
+        {(frame.header ?? true) && <slot name="header" />}
 
-      {/* the v2 document tab bar — the kernel's document registry IS the tab model */}
-      {(frame.tabs ?? 'always') !== 'never' && (
-        <slot name="tabs">
-          <TabBar visibility={frame.tabs ?? 'always'} />
-        </slot>
-      )}
+        {/* the v2 document tab bar — the kernel's document registry IS the tab model */}
+        {(frame.tabs ?? 'always') !== 'never' && (
+          <slot name="tabs">
+            <TabBar visibility={frame.tabs ?? 'always'} />
+          </slot>
+        )}
 
-      {toolbarEdge === 'top' && (
-        <>
-          {toolbarBand}
-          <ModeBand edge="top" />
-        </>
-      )}
+        {toolbarEdge === 'top' && (
+          <>
+            {toolbarBand}
+            <ModeBand edge="top" />
+          </>
+        )}
 
-      <div className="relative flex min-h-0 flex-1">
-        <DocumentArea>
-          <LeftSidebar />
-          <div className="relative min-w-0 flex-1">
-            {/* the armed tool's cursor: its toolbar icon as a real CSS cursor
+        <div className="relative flex min-h-0 flex-1">
+          <DocumentArea>
+            <LeftSidebar />
+            <div className="relative min-w-0 flex-1">
+              {/* the armed tool's cursor: its toolbar icon as a real CSS cursor
                 (zero-lag; the hub hides it over annotations/fields/gaps) */}
-            <ArmedToolCursor />
-            {/* ctrl/cmd+C and native Edit→Copy for the text selection —
+              <ArmedToolCursor />
+              {/* ctrl/cmd+C and native Edit→Copy for the text selection —
                 prefetches on commit so the copy event answers synchronously.
                 Renders nothing; mount ONCE per document view. */}
-            <SelectionClipboard />
-            <Stage
-              overlay={
-                <>
-                  <AnnotationStrip />
-                  <SelectionStrip />
-                  {/* touch: draggable start/end selection handles (long-press
+              <SelectionClipboard />
+              <Stage
+                overlay={
+                  <>
+                    <AnnotationStrip />
+                    <SelectionStrip />
+                    {/* a signed field's facts, anchored at its widget */}
+                    <SignatureInspector />
+                    {/* touch: draggable start/end selection handles (long-press
                       selects a word; the lollipops grow it from there) */}
-                  <SelectionHandles />
-                  {/* headless scrollbars: geometry/behavior from the stage's
+                    <SelectionHandles />
+                    {/* headless scrollbars: geometry/behavior from the stage's
                       scroller contract; the look is index.css (data-attrs) */}
-                  <Scrollbar axis="y" />
-                  <Scrollbar axis="x" />
-                </>
-              }
-              className="h-full w-full"
-              style={{ background: 'var(--ep-canvas)' }}
-            >
-              {() => (
-                <>
-                  {/* Base + deep-zoom tiles in one layer. Tiles engage by
+                    <Scrollbar axis="y" />
+                    <Scrollbar axis="x" />
+                  </>
+                }
+                className="h-full w-full"
+                style={{ background: 'var(--ep-canvas)' }}
+              >
+                {() => (
+                  <>
+                    {/* Base + deep-zoom tiles in one layer. Tiles engage by
                       demand arithmetic when the view wants more pixels than
                       the base budget supplies — the thumbnail rail's demand
                       never does, so it mounts the same layer for free. */}
-                  <RenderLayer annotations={false} />
-                  <SelectionLayer />
-                  <SearchLayer />
-                  {/* Clickable links (nav plane): anchors under the default
+                    <RenderLayer annotations={false} />
+                    <SelectionLayer />
+                    <SearchLayer />
+                    {/* Clickable links (nav plane): anchors under the default
                       pointer/pan tools; stands down whenever an authoring
                       tool is active (the annotation plane owns links then).
                       Below the AnnotationLayer so an editing free-text box
                       wins pointer hits; the annotation layer's own surface
                       is pointer-events: none, so clicks fall through to the
                       anchors everywhere else. */}
-                  <LinkLayer />
-                  {/* Form widgets plug into the annotation stack: engaged
+                    <LinkLayer />
+                    {/* Form widgets plug into the annotation stack: engaged
                       (fill mode) they render as fill controls over the baked
                       appearance; under the Form tab they're plain editable
                       annotations. */}
-                  <AnnotationLayer renderers={ANNOTATION_RENDERERS} />
-                </>
-              )}
-            </Stage>
-            <PageControls />
-          </div>
-          <RightSidebar />
-          <RedactConfirmModal />
-        </DocumentArea>
-      </div>
+                    <AnnotationLayer renderers={ANNOTATION_RENDERERS} />
+                  </>
+                )}
+              </Stage>
+              <PageControls />
+            </div>
+            <RightSidebar />
+            <RedactConfirmModal />
+            <CalibrationDialog />
+            {/* signatures: plugin intents → surfaces; the dialogs they open */}
+            <SignatureBridge />
+            <SignDialog />
+            <SignatureMakerModal />
+          </DocumentArea>
+        </div>
 
-      {toolbarEdge === 'bottom' && (
-        <>
-          <ModeBand edge="bottom" />
-          {toolbarBand}
-        </>
-      )}
-    </div>
+        {toolbarEdge === 'bottom' && (
+          <>
+            <ModeBand edge="bottom" />
+            {toolbarBand}
+          </>
+        )}
+      </div>
+    </AnnotationFontsProvider>
   );
 }

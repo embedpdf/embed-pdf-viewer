@@ -1,5 +1,5 @@
-import type { Kysely } from 'kysely';
-import type { Database as Schema, DocumentPdfOpenedAs, PdfPasswordSessionsTable } from '../schema';
+import type { ExpressionBuilder, Kysely, Transaction } from 'kysely';
+
 import type { KmsKeyring } from '../../security';
 import {
   decryptPasswordSession,
@@ -8,6 +8,7 @@ import {
   type PasswordSessionBinding,
   type PasswordSessionServerSecret,
 } from '../../security/password-session';
+import type { Database as Schema, DocumentPdfOpenedAs, PdfPasswordSessionsTable } from '../schema';
 
 export interface PasswordSessionFacts {
   openedAs: DocumentPdfOpenedAs;
@@ -218,6 +219,70 @@ export class PdfPasswordSessionsRepo {
     return this.findActive(binding, now);
   }
 
+  /**
+   * Move one active session to a new base version WITHOUT the password
+   * leaving the server. The AEAD binds the ciphertext to the binding —
+   * the base sha among it — so rewriting the column would leave a row
+   * that never decrypts again (`KmsAadMismatch`): decrypt under the old
+   * binding, re-encrypt under the new, and replace the row's binding and
+   * crypto columns in one update, inside the publishing transaction.
+   * `false` when the caller had no active session to move.
+   */
+  async rebind(
+    executor: Kysely<Schema> | Transaction<Schema>,
+    from: PasswordSessionBinding,
+    to: PasswordSessionBinding,
+    unlockKey: string,
+    now = Date.now(),
+  ): Promise<boolean> {
+    const row = await executor
+      .selectFrom('pdf_password_sessions')
+      .selectAll()
+      .where((eb) => eb.and(bindingClauses(eb, from)))
+      .where('active_expires_at', '>', now)
+      .executeTakeFirst();
+    if (!row) return false;
+    const password = await decryptPasswordSession({
+      encrypted: encryptedFromRow(row),
+      unlockKey,
+      binding: from,
+      serverSecret: this.serverSecret(row.server_secret_id),
+      keyring: this.opts.keyring,
+    });
+    const encrypted = await encryptPasswordSession({
+      password,
+      unlockKey,
+      binding: to,
+      serverSecret: this.currentServerSecret(),
+      keyring: this.opts.keyring,
+    });
+    const result = await executor
+      .updateTable('pdf_password_sessions')
+      .set({
+        tenant_id: to.tenantId,
+        doc_id: to.docId,
+        layer_name: to.layerName,
+        sub: to.sub,
+        jwt_jti: to.jwtJti,
+        base_sha: to.baseSha,
+        security_fingerprint: to.securityFingerprint,
+        updated_at: now,
+        server_secret_id: encrypted.serverSecretId,
+        kms_provider_id: encrypted.kmsProviderId,
+        kms_key_id: encrypted.kmsKeyId,
+        crypto_version: encrypted.cryptoVersion,
+        wrapped_data_key: encrypted.wrappedDataKey,
+        row_salt: encrypted.rowSalt,
+        nonce: encrypted.nonce,
+        ciphertext: encrypted.ciphertext,
+        auth_tag: encrypted.authTag,
+      })
+      .where((eb) => eb.and(bindingClauses(eb, from)))
+      .where('active_expires_at', '>', now)
+      .executeTakeFirst();
+    return Number(result?.numUpdatedRows ?? 0) === 1;
+  }
+
   private baseQuery(binding: PasswordSessionBinding) {
     return this.db
       .selectFrom('pdf_password_sessions')
@@ -242,6 +307,21 @@ export class PdfPasswordSessionsRepo {
     if (!found) throw new Error(`unknown pdf password session server secret: ${id}`);
     return found;
   }
+}
+
+function bindingClauses(
+  eb: ExpressionBuilder<Schema, 'pdf_password_sessions'>,
+  binding: PasswordSessionBinding,
+) {
+  return [
+    eb('tenant_id', '=', binding.tenantId),
+    eb('doc_id', '=', binding.docId),
+    eb('layer_name', '=', binding.layerName),
+    eb('sub', '=', binding.sub),
+    eb('jwt_jti', '=', binding.jwtJti),
+    eb('base_sha', '=', binding.baseSha),
+    eb('security_fingerprint', '=', binding.securityFingerprint),
+  ];
 }
 
 function encryptedFromRow(row: PdfPasswordSessionsTable): EncryptedPasswordSession {

@@ -3,15 +3,16 @@ import type { PageGeometryService } from './PageGeometryService';
 import type { PageRenderService } from './PageRenderService';
 import type { PageTextService } from './PageTextService';
 import type { PieceInfoService } from './PieceInfoService';
-import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PageMeasureService } from './PageMeasureService';
+import type { PageRef } from '../identity/PageRef';
 
 /**
- * Page-scoped handle returned by `DocumentHandle.page(pageObjectNumber)`.
- * The handle is keyed on the PDF indirect object number, never the page
- * index, so it survives page-list mutations.
+ * Page-scoped handle returned by `DocumentHandle.page(ref)`. The handle is
+ * keyed on the page's durable address (its PDF indirect object number),
+ * never the page index, so it survives page-list mutations.
  */
 export interface PageHandle {
-  readonly pageObjectNumber: PageObjectNumber;
+  readonly ref: PageRef;
   /**
    * Display index at the time this handle was minted. The engine refreshes
    * this on every annotation/list call against the live `PageRecord`, but
@@ -28,4 +29,5 @@ export interface PageHandle {
    * omits it until a cloud consumer ships (the `downloadLayer?` pattern).
    */
   readonly pieceInfo?: PieceInfoService;
+  readonly measure?: PageMeasureService;
 }

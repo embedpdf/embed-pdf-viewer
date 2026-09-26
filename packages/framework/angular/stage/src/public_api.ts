@@ -9,3 +9,4 @@ export * from './templates';
 export * from './page-surface';
 export * from './stage';
 export * from './facades';
+export * from './scope';

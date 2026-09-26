@@ -8,6 +8,7 @@ import type { Engine } from '../engine/Engine';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { DocumentEvent } from '../events/DocumentEvent';
 import type { FormFieldDTO } from '../forms/field';
+import { toPageRef } from '../identity/PageRef';
 import {
   FormImportResultSchema,
   FormRepairResultSchema,
@@ -394,7 +395,7 @@ export function runFormConformance(
       const pon = opts.fixtures.toggleFields.pageObjectNumber;
       try {
         // 1. Born as an annotation: inert, styled with the house vocabulary.
-        const page = doc.page(pon);
+        const page = doc.page(toPageRef(pon));
         const created = await page.annotations.create({
           subtype: 'widget',
           rect: { left: 20, bottom: 20, right: 200, top: 44 },
@@ -411,10 +412,7 @@ export function runFormConformance(
 
         // 2. Adopted by a field -> the DTO joins to the field plane.
         const field = await doc.forms.createField({ family: 'text', name: 'loop_field' });
-        await doc.forms.attachWidget(field.field.ref, {
-          annotObjectNumber: widgetRef.annotObjectNumber,
-          pageObjectNumber: pon,
-        });
+        await doc.forms.attachWidget(field.field.ref, widgetRef);
         const { annotations } = await page.annotations.list();
         const widgetDto = annotations.find(
           (a) =>
@@ -438,10 +436,7 @@ export function runFormConformance(
         });
 
         // 5. Detach -> inert again -> ordinary annotation delete succeeds.
-        await doc.forms.detachWidget(field.field.ref, {
-          annotObjectNumber: widgetRef.annotObjectNumber,
-          pageObjectNumber: pon,
-        });
+        await doc.forms.detachWidget(field.field.ref, widgetRef);
         await page.annotations.delete(widgetRef);
 
         // The field survives, unplaced.
@@ -462,13 +457,13 @@ export function runFormConformance(
           noToggleToOff: true,
           widgets: [
             {
-              pageObjectNumber: pon,
+              page: toPageRef(pon),
               rect: { left: 20, bottom: 60, right: 40, top: 80 },
               onState: 'yes',
               appearance: { color: { r: 0, g: 0, b: 0 }, strokeWidth: 1 },
             },
             {
-              pageObjectNumber: pon,
+              page: toPageRef(pon),
               rect: { left: 60, bottom: 60, right: 80, top: 80 },
               onState: 'no',
             },
@@ -496,10 +491,10 @@ export function runFormConformance(
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
 
         // deleteField cascades: field gone AND its widgets gone.
-        const before = await doc.page(pon).annotations.list();
+        const before = await doc.page(toPageRef(pon)).annotations.list();
         const removed = await doc.forms.deleteField(created.field.ref);
         expect(removed.removedWidgets.length).toBe(2);
-        const after = await doc.page(pon).annotations.list();
+        const after = await doc.page(toPageRef(pon)).annotations.list();
         expect(after.annotations.length).toBe(before.annotations.length - 2);
         await expect(doc.forms.get({ kind: 'fqn', name: 'renamed_radio' })).rejects.toMatchObject({
           code: EngineErrorCode.NotFound,

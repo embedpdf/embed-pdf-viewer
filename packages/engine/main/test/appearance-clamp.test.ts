@@ -12,6 +12,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { DocumentHandle } from '@embedpdf/engine-core/runtime';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine, type LocalEngine } from '../src/index';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -35,7 +36,7 @@ beforeAll(async () => {
   const bytes = new Uint8Array(await readFile(pdfPath));
   engine = createLocalEngine({ runtime: { prefer: 'wasm' } });
   doc = await engine.open({ kind: 'bytes', id: 'clamp-doc', bytes });
-  pon = (await doc.pages.list()).pages[0]!.pageObjectNumber;
+  pon = (await doc.pages.list()).pages[0]!.ref.pageObjectNumber;
 }, 60_000);
 
 afterAll(async () => {
@@ -47,7 +48,7 @@ describe('appearance pixel clamp (wasm engine, real document)', () => {
   test('a deep-zoom appearance batch stays bounded and complete', async () => {
     // Scale ~50 is the territory that OOM'd before the clamp. Raw rasters —
     // node has no canvas encoder, and pixels are what the clamp bounds.
-    const result = await doc.page(pon).annotations.renderAppearances({ scale: 50 });
+    const result = await doc.page(toPageRef(pon)).annotations.renderAppearances({ scale: 50 });
     expect(result.appearances.length).toBeGreaterThan(0);
     for (const ap of result.appearances) {
       expect(ap.raster.width).toBeGreaterThan(0);

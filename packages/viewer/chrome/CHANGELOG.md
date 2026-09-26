@@ -1,5 +1,27 @@
 # @embedpdf/viewer-chrome
 
+## 3.0.0-next.14
+
+### Minor Changes
+
+- [#827](https://github.com/embedpdf/embed-pdf-viewer/pull/827) by [@bobsingor](https://github.com/bobsingor) – Add a Measure toolbar with distance drawing, a scale sidebar, and known-length calibration controls. Support Escape to cancel an unfinished drawing, with English and Spanish labels.
+
+  Use distinct calibration and scale-setting icons that inherit the viewer's theme and active-state colors.
+
+  Add Perimeter and Area tools, dynamic stroke-colored measurement icons across toolbar and cursor, separate area-unit controls, selected area/perimeter readouts, and a reset-label-position action.
+
+## 3.0.0-next.13
+
+### Minor Changes
+
+- [#817](https://github.com/embedpdf/embed-pdf-viewer/pull/817) by [@bobsingor](https://github.com/bobsingor) – Add bold, italic, and underline controls to the FreeText style panel while preserving the active text selection.
+
+  Support `annotations.fonts` for additional font choices. Fonts are fetched, registered with the engine, and mounted for the live editor before appearing in the picker, so editing and PDF output use the same font bytes.
+
+- [#812](https://github.com/embedpdf/embed-pdf-viewer/pull/812) by [@bobsingor](https://github.com/bobsingor) – Add signature and initials libraries with drawn, typed, and imported artwork, plus signature-field authoring, signing dialogs, and visual-only filling. Configure signers, trust anchors, certification options, and signing modes.
+
+  Add signature inspection with validation details, signed revision downloads, and notices when pending edits would invalidate a signature. Support filtering the stamps sidebar by library kind and showing quick-access stamps in the toolbar.
+
 ## 3.0.0-next.12
 
 ### Minor Changes

@@ -10,18 +10,17 @@ name: Server Test Matrix
 # suites exercise real PDFium + sharp), so it reuses the same
 # build-runtime artifacts as engine-conformance.
 
+# Runs from ci.yml when packages/engine/** or cloudpdf/server/** changed (the
+# umbrella owns the path decision and builds the runtime once for every job
+# that needs it), or by hand — a manual run builds its own runtime.
 on:
-  pull_request:
-    paths:
-      - 'packages/engine/**'
-      - 'cloudpdf/server/**'
-      - '.github/workflows/server-tests.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'packages/engine/**'
-      - 'cloudpdf/server/**'
-      - '.github/workflows/server-tests.yml'
+  workflow_call:
+    inputs:
+      runtime_artifacts:
+        description: 'The caller uploaded engine-runtime-* artifacts in this run'
+        required: false
+        type: boolean
+        default: true
   workflow_dispatch: {}
 
 permissions:
@@ -35,13 +34,17 @@ env:
   CI: true
 
 jobs:
+  # Only a manual run builds here; under ci.yml the artifacts already exist.
   build-runtime:
+    if: ${{ !inputs.runtime_artifacts }}
     uses: ./.github/workflows/build-engine-runtime.yml
     secrets: inherit
 
   suite:
     name: ${{ matrix.leg.name }}
     needs: build-runtime
+    # A skipped build (artifacts from the caller) must not skip the suite.
+    if: ${{ !cancelled() && needs.build-runtime.result != 'failure' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -51,11 +54,11 @@ jobs:
           - { name: host, env: 'CLOUDPDF_TEST_ISOLATION=host' }
           - { name: 'host K=2', env: 'CLOUDPDF_TEST_ISOLATION=host CLOUDPDF_TEST_SHARDS=2' }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: pnpm/action-setup@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: pnpm

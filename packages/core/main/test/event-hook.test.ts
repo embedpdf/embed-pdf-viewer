@@ -91,3 +91,21 @@ describe('createSerialQueue', () => {
     await expect(enqueue(async () => 'ok')).resolves.toBe('ok');
   });
 });
+
+describe('createEventHook · signal option', () => {
+  it('removes the listener when the signal aborts, and never registers a pre-aborted one', () => {
+    const hook = createEventHook<number>();
+    const controller = new AbortController();
+    const listener = vi.fn();
+    hook.on(listener, { signal: controller.signal });
+    hook.emit(1);
+    controller.abort();
+    hook.emit(2);
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    const dead = vi.fn();
+    hook.on(dead, { signal: controller.signal });
+    hook.emit(3);
+    expect(dead).not.toHaveBeenCalled();
+  });
+});

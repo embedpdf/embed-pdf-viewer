@@ -217,7 +217,7 @@ export class EmbedPdfViewerElement extends ElementBase {
     this.#viewer = viewer;
     this.#disposers.push(
       viewer.watch(
-        () => viewer.documents.activeId(),
+        () => viewer.documents.getActiveId(),
         (documentId) =>
           this.dispatchEvent(new CustomEvent('epdf:documentchange', { detail: { documentId } })),
       ),

@@ -14,24 +14,25 @@ export * from '@embedpdf/plugin-link';
 import * as React from 'react';
 import { useEffect, useMemo } from 'react';
 import { ActionsToken, createHoverPump } from '@embedpdf/plugin-actions/contract';
-import type {
-  ActionSource,
-  PdfAnnotationEventKind,
-} from '@embedpdf/plugin-actions/contract';
+import type { ActionSource, PdfAnnotationEventKind } from '@embedpdf/plugin-actions/contract';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 import {
   LinkToken,
+  type Link,
   type LinkActivateContext,
   type LinkActivation,
   type LinkCapability,
-  type LinkNavItem,
   type PdfLinkTarget,
 } from '@embedpdf/plugin-link';
+// The layer paints anchors only while a navigation tool is active — a host fact.
+import { LinkToken as LinkHostToken } from '@embedpdf/plugin-link/contract/host';
 import { sanitizeExternalUri } from '@embedpdf/web';
+import type { EventHook } from '@embedpdf/core';
 
 import {
   shallowArray,
   useCapability,
+  useCapabilityEvent,
   useOptionalCapability,
   useOptionalSelector,
   usePage,
@@ -64,34 +65,19 @@ export function openLinkTarget(
 
 /** Content rect → view px (the page wrapper's own space) — the same idiom as
  *  the annotation and form layers: never re-derive `x * scale`. */
-function boxOf(item: LinkNavItem, page: PageContextValue) {
-  const tl = page.transform.toPixels({ x: item.rect.x, y: item.rect.y });
+function boxOf(item: Link, page: PageContextValue) {
+  const tl = page.transform.toPixels({ x: item.bounds.x, y: item.bounds.y });
   const br = page.transform.toPixels({
-    x: item.rect.x + item.rect.width,
-    y: item.rect.y + item.rect.height,
+    x: item.bounds.x + item.bounds.width,
+    y: item.bounds.y + item.bounds.height,
   });
   return { left: tl.x, top: tl.y, width: br.x - tl.x, height: br.y - tl.y };
-}
-
-/** A human label for the hover tooltip. Apps with i18n render their own via
- *  `renderLink`; this is the sensible default. */
-function labelOf(item: LinkNavItem): string {
-  switch (item.target.kind) {
-    case 'uri':
-      return item.target.uri;
-    case 'goto':
-      return 'Go to destination';
-    case 'named':
-      return item.target.name;
-    default:
-      return 'Link';
-  }
 }
 
 export interface LinkLayerProps {
   /** Wrap or replace a link's native anchor (badging, custom tooltips). */
   renderLink?: (args: {
-    item: LinkNavItem;
+    item: Link;
     nativeComponent: React.ReactNode;
   }) => React.ReactNode | undefined;
 }
@@ -106,21 +92,21 @@ export function LinkLayer({ renderLink }: LinkLayerProps = {}) {
   // sides submit synchronously in DOM event order.
   const actions = useOptionalCapability(ActionsToken);
   const linkPump = useMemo(() => (actions ? createHoverPump(actions.dispatch) : null), [actions]);
-  const items = useSelector(LinkToken, (c) => c.linksOn(page.pon), shallowArray);
-  const engaged = useSelector(LinkToken, (c) => c.engaged());
+  const items = useSelector(LinkToken, (c) => c.listLinks(page.ref), shallowArray);
+  const engaged = useSelector(LinkHostToken, (c) => c.isNavigationEngaged());
   // One owner per pixel: an ATTACHED link is a property of its parent — while
   // the active tool can edit annotations, the parent owns those pixels and
   // the anchor stands down (select/move/resize work; no tooltip, no swallowed
   // pointer). Standalone document links navigate under any link-nav tool.
   const editEnabled = useOptionalSelector(
     InteractionToken,
-    (c) => c.activeTool()?.enables.has('annotation-edit') ?? false,
+    (c) => c.getActiveTool()?.enables.has('annotation-edit') ?? false,
     false,
   );
 
   useEffect(() => {
-    link.ensurePage(page.pon);
-  }, [link, page.pon]);
+    void link.ensureLoaded(page.ref);
+  }, [link, page.ref]);
 
   // An authoring tool is active → the annotation plane owns links (they're
   // plain editable rects there); no nav anchors, no swallowed pointer events.
@@ -139,9 +125,13 @@ export function LinkLayer({ renderLink }: LinkLayerProps = {}) {
         const chained = (item.activate?.root?.next.length ?? 0) > 0;
         const href =
           item.target.kind === 'uri' && !chained ? sanitizeExternalUri(item.target.uri) : null;
-        const context: LinkActivateContext = { activate: item.activate, ref: item.ref, pon: page.pon };
+        const context: LinkActivateContext = {
+          activate: item.activate,
+          ref: item.ref,
+          page: page.ref,
+        };
         const linkSource: ActionSource | null = item.ref
-          ? { kind: 'link', annotation: item.ref, pon: page.pon }
+          ? { kind: 'link', annotation: item.ref, page: page.ref }
           : null;
         const notify = (event: Exclude<PdfAnnotationEventKind, 'cursorEnter' | 'cursorExit'>) => {
           if (!actions || !item.ref || !linkSource) return;
@@ -149,7 +139,7 @@ export function LinkLayer({ renderLink }: LinkLayerProps = {}) {
             scope: 'annotation',
             event,
             ref: item.ref,
-            pon: page.pon,
+            page: page.ref,
             source: linkSource,
           });
         };
@@ -160,8 +150,8 @@ export function LinkLayer({ renderLink }: LinkLayerProps = {}) {
             rel="noopener noreferrer"
             role="link"
             tabIndex={0}
-            title={labelOf(item)}
-            aria-label={labelOf(item)}
+            title={link.getLabel(item)}
+            aria-label={link.getLabel(item)}
             onClick={(e) => {
               // Modified clicks and middle-clicks on a real href keep their
               // native browser behaviour (new tab / copy link).
@@ -186,7 +176,7 @@ export function LinkLayer({ renderLink }: LinkLayerProps = {}) {
               if (!linkPump || !item.ref || !item.hoverEvents) return;
               linkPump.hover({
                 ref: item.ref,
-                pon: page.pon,
+                page: page.ref,
                 ...(linkSource ? { source: linkSource } : {}),
                 events: item.hoverEvents,
               });
@@ -221,4 +211,12 @@ export function LinkLayer({ renderLink }: LinkLayerProps = {}) {
 
 export function useLink() {
   return useCapability(LinkToken);
+}
+
+/** Subscribe to one link event for the mounted lifetime: `useLinkEvent((c) => c.onActivated, handler)`. */
+export function useLinkEvent<T>(
+  select: (cap: LinkCapability) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  useCapabilityEvent(LinkToken, select, handler);
 }

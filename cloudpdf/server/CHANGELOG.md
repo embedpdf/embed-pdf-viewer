@@ -1,5 +1,23 @@
 # @cloudpdf/server
 
+## 3.0.0-next.14
+
+### Minor Changes
+
+- [#827](https://github.com/embedpdf/embed-pdf-viewer/pull/827) by [@bobsingor](https://github.com/bobsingor) – Persist page measurement calibration in layer artifacts with authorization and audit events. Calibration advances the document version while retaining existing page cache versions and annotation scales.
+
+- [#800](https://github.com/embedpdf/embed-pdf-viewer/pull/800) by [@LazyCompiler](https://github.com/LazyCompiler) – The layer search routes (`/v1/docs/:docId/layers/:layerName/search/{rects,full}/data`) accept `ignoreWhitespace=true` alongside the other query flags and forward it to the engine, so a cloud search for `invoice` finds a letter-spaced `i n v o i c e`. Combining it with `regex=true` is rejected with `InvalidArg`, and the flag is carried by the search tokens that page through results.
+
+## 3.0.0-next.13
+
+### Minor Changes
+
+- [#812](https://github.com/embedpdf/embed-pdf-viewer/pull/812) by [@bobsingor](https://github.com/bobsingor) – Add durable two-phase digital signing with prepare, complete, abort, and expiry handling. Persist candidate data so completion can run on another replica, verify the supplied CMS, and reject completion when the document or layer has changed.
+
+  Publish each completed signature as an immutable document version while retaining the document ID and version history. Consume the signing layer's edits into the new base and refresh document state across replicas.
+
+  Add signature inspection and analysis routes, immutable version and revision downloads, and visual signature-field appearances. Use files and streaming storage transfers for signing candidates, with configurable temporary storage and signing expiry.
+
 ## 3.0.0-next.12
 
 ### Minor Changes

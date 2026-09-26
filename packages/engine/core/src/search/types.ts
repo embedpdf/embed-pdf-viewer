@@ -1,4 +1,5 @@
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PageRef } from '../identity/PageRef';
 import type { PdfTextSegment } from '../text/layout';
 
 /**
@@ -11,11 +12,13 @@ import type { PdfTextSegment } from '../text/layout';
  * | `matchCase`       | fold case        | `i` flag                       |
  * | `wholeWord`       | boundary check   | pattern is `\b(?:…)\b`-wrapped |
  * | `matchDiacritics` | mark fold        | REJECTED (`InvalidArg`)        |
+ * | `ignoreWhitespace`| whitespace drop  | REJECTED (`InvalidArg`)        |
  *
  * Literal queries match over FOLDED text; regex queries run the portable
- * dialect against the RAW page text — which is why `matchDiacritics`
- * cannot apply to them (diacritic folding is a property of the folded
- * text plane). Validate with `validateSearchQuery` for early UI feedback;
+ * dialect against the RAW page text — which is why `matchDiacritics` and
+ * `ignoreWhitespace` cannot apply to them (diacritic folding and whitespace
+ * dropping are properties of the folded text plane; a pattern spells its
+ * own `\s*`). Validate with `validateSearchQuery` for early UI feedback;
  * engines re-validate and reject with `EngineErrorCode.InvalidArg`.
  */
 export interface SearchQuery {
@@ -38,6 +41,17 @@ export interface SearchQuery {
    * LITERAL ONLY: combined with `regex` the query is rejected.
    */
   matchDiacritics?: boolean;
+  /**
+   * Drop whitespace on both sides instead of collapsing it, so "invoice"
+   * finds the letter-spaced "i n v o i c e" that OCR and tracked-out headings
+   * produce, and "total amount" finds "totalamount". Default false — the default
+   * fold collapses whitespace runs to one space, so a needle still has to
+   * carry a space wherever the page does. A hit spans the original text
+   * including the dropped whitespace; with `wholeWord` the boundaries are
+   * checked on the ORIGINAL text (the folded plane has no word gaps left).
+   * LITERAL ONLY: combined with `regex` the query is rejected.
+   */
+  ignoreWhitespace?: boolean;
 }
 
 /**
@@ -89,7 +103,7 @@ export interface SearchRequest {
    * the document, so the matches the user is looking at arrive in the
    * first slice. Ignored when `cursor` is set (the cursor owns position).
    */
-  startPage?: PageObjectNumber;
+  startPage?: PageRef;
   /**
    * Trusted absolute resume position: pages of the scan order already
    * consumed. For callers that pin content versions EXTERNALLY — the
@@ -131,7 +145,7 @@ export interface SearchSnippet {
  * and the reading `advance`.
  */
 export interface SearchMatch {
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
   charStart: number;
   charCount: number;
   segments: PdfTextSegment[];

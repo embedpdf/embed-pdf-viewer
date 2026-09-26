@@ -16,6 +16,7 @@ import {
   type FormFieldPatch,
   type FormFieldRef,
   type FormFieldUpdateResult,
+  type SignatureAppearanceInput,
   type FormFieldValue,
   type FormImportResult,
   type FormRepairOptions,
@@ -23,7 +24,8 @@ import {
   type FormSetValueResult,
   type FormSnapshot,
   type FormWidgetLinkResult,
-  type FormWidgetRef,
+  type FormWidget,
+  type AnnotationRef,
   type MutationMeta,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -41,6 +43,7 @@ import {
 } from '@embedpdf/engine-core/wire';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
+import { buildMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import type { HttpClient } from '../transport/HttpClient';
 
@@ -202,6 +205,33 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     });
   }
 
+  setSignatureAppearance(
+    ref: FormFieldRef,
+    appearance: SignatureAppearanceInput,
+  ): AbortablePromise<FormFieldUpdateResult> {
+    const rejected = this.rejectIfClosed<FormFieldUpdateResult>();
+    if (rejected) return rejected;
+    return AbortablePromise.run<FormFieldUpdateResult>(async (signal) => {
+      const bytes = new ArrayBuffer(appearance.pdf.byteLength);
+      new Uint8Array(bytes).set(appearance.pdf);
+      const form = buildMutationForm(
+        { resource: 'r0', pageIndex: appearance.pageIndex ?? 0 },
+        { r0: { bytes, mimeType: 'application/pdf', name: 'appearance.pdf' } },
+      );
+      const result = await this.http.postMultipartJson(
+        wirePaths.layerFormFieldSignatureAppearance(
+          this.docId,
+          this.layerName,
+          encodeFieldRefKey(ref),
+        ),
+        form,
+        (raw) => FormFieldUpdateResultSchema.parse(raw),
+        signal,
+      );
+      return this.absorbMutation(result, 'form.fieldUpdated');
+    });
+  }
+
   deleteField(ref: FormFieldRef): AbortablePromise<FormFieldDeleteResult> {
     const rejected = this.rejectIfClosed<FormFieldDeleteResult>();
     if (rejected) return rejected;
@@ -217,7 +247,7 @@ export class CloudDocumentFormsService implements DocumentFormsService {
 
   attachWidget(
     ref: FormFieldRef,
-    widget: FormWidgetRef,
+    widget: AnnotationRef,
     options?: { onState?: string },
   ): AbortablePromise<FormWidgetLinkResult> {
     const rejected = this.rejectIfClosed<FormWidgetLinkResult>();
@@ -234,7 +264,7 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     });
   }
 
-  detachWidget(ref: FormFieldRef, widget: FormWidgetRef): AbortablePromise<FormWidgetLinkResult> {
+  detachWidget(ref: FormFieldRef, widget: AnnotationRef): AbortablePromise<FormWidgetLinkResult> {
     const rejected = this.rejectIfClosed<FormWidgetLinkResult>();
     if (rejected) return rejected;
     return AbortablePromise.run<FormWidgetLinkResult>(async (signal) => {

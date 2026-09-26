@@ -1,5 +1,6 @@
 import type { PdfRotation } from '../geometry/primitives';
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PageRef } from '../identity/PageRef';
 
 /**
  * Input to `pages.rotate()`. Rotation is ABSOLUTE ("set to"), never relative
@@ -17,7 +18,7 @@ export interface PageRotateInput {
    * Pages to rotate. Duplicates and unknown PONs are rejected with
    * `EngineError(InvalidArg)` / `EngineError(NotFound)`.
    */
-  pageObjectNumbers: PageObjectNumber[];
+  pages: PageRef[];
   /** The absolute rotation to set, in degrees clockwise. */
   rotation: PdfRotation;
 }

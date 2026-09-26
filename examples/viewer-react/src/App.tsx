@@ -39,7 +39,7 @@ function DocStatus(props: { slot?: string }) {
 /** A fully custom tab bar — region slot + DRIVE. No chrome internals: the
  *  document list, active id, activate and close all ride el.viewer. */
 function AcmeTabBar({ viewer, ...props }: { viewer: ViewerHandle | null; slot?: string }) {
-  const [docs, setDocs] = useState<DocInfo[]>([]);
+  const [docs, setDocs] = useState<readonly DocInfo[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   useEffect(() => {
     if (!viewer) return;
@@ -48,9 +48,9 @@ function AcmeTabBar({ viewer, ...props }: { viewer: ViewerHandle | null; slot?: 
       setDocs,
       (a, b) => a.length === b.length && a.every((d, i) => d === b[i]),
     );
-    const offActive = viewer.watch(() => viewer.documents.activeId(), setActiveId);
+    const offActive = viewer.watch(() => viewer.documents.getActiveId(), setActiveId);
     setDocs(viewer.documents.list());
-    setActiveId(viewer.documents.activeId());
+    setActiveId(viewer.documents.getActiveId());
     return () => {
       offDocs();
       offActive();
@@ -86,7 +86,7 @@ const lazyDoc = (id: string, name: string): InitialDocument => ({
   source: async () => ({
     kind: 'bytes',
     id,
-    bytes: new Uint8Array(await (await fetch('/ebook.pdf')).arrayBuffer()),
+    bytes: new Uint8Array(await (await fetch('/testlab.pdf')).arrayBuffer()),
   }),
 });
 
@@ -96,29 +96,6 @@ export function App() {
     <PDFViewer
       documents={[lazyDoc('proposal', 'Proposal'), lazyDoc('contract', 'Contract')]}
       style={{ height: '100vh', display: 'block' }}
-      onReady={setViewer}
-      strings={{ en: { 'acme.status': 'Document status' } }}
-      commands={[
-        {
-          id: 'acme:status',
-          labelKey: 'acme.status',
-          run: () => console.log('[acme:status] opened from overflow'),
-        },
-      ]}
-      chrome={(base, h) => ({
-        ...h.addItem(base, {
-          bar: 'main',
-          section: 'start',
-          group: 'workspace',
-          item: h.custom('doc-status', { terminal: 'acme:status' }),
-        }),
-        // The FRAME: the whole measured toolbar (and its mode band) moves to
-        // the bottom edge — one line of structure, no layout code.
-        frame: { toolbar: 'bottom' },
-      })}
-    >
-      <AcmeTabBar slot="tabs" viewer={viewer} />
-      <DocStatus slot="doc-status" />
-    </PDFViewer>
+    ></PDFViewer>
   );
 }

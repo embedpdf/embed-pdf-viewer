@@ -21,11 +21,30 @@
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-render';
 import * as React from 'react';
-import { useEffect, useLayoutEffect, useRef } from 'react';
-import { RenderToken } from '@embedpdf/plugin-render';
-import type { PageViewDemand, TilePaintSource } from '@embedpdf/plugin-render';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+// The layer is a HOST of the render plugin: it paints conformed sources and
+// drives a view's tile demand. The host lens is the same runtime token.
+import { RenderToken } from '@embedpdf/plugin-render/contract/host';
+import type { PageViewDemand, TilePaintSource } from '@embedpdf/plugin-render/contract/host';
+import { RenderToken as RenderPublicToken } from '@embedpdf/plugin-render';
+import type { RenderCapability } from '@embedpdf/plugin-render';
+import type { EventHook } from '@embedpdf/core';
 import { bindPaintedImage } from '@embedpdf/web';
-import { useCapability, usePage, useSelector } from './runtime';
+import { useCapability, useCapabilityEvent, usePage, useSelector } from './runtime';
+import { usePageLayerFact } from './dev-registry';
+
+/** The render capability (renderPage / renderThumbnail / invalidation) for app code. */
+export function useRender(): RenderCapability {
+  return useCapability(RenderPublicToken);
+}
+
+/** Subscribe to one render event for the mounted lifetime: `useRenderEvent((c) => c.onInvalidated, handler)`. */
+export function useRenderEvent<T>(
+  select: (cap: RenderCapability) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  useCapabilityEvent(RenderPublicToken, select, handler);
+}
 
 export interface RenderLayerProps {
   /**
@@ -46,8 +65,9 @@ let warnedTileSize = false;
 export function RenderLayer({ annotations = true, tiles = true }: RenderLayerProps = {}) {
   const page = usePage();
   const render = useCapability(RenderToken);
-  const settings = render.paintSettings();
+  const settings = render.getPaintSettings();
   const ref = useRef<HTMLImageElement>(null);
+  usePageLayerFact(page, 'renderBakesAnnotations', annotations);
 
   // ONE dependency: the raster's canonical identity — conformed width +
   // annotations flag + epoch. Under a lattice it moves only at rung
@@ -55,7 +75,7 @@ export function RenderLayer({ annotations = true, tiles = true }: RenderLayerPro
   // the budget — so the deep-zoom backdrop never refetches, and the sub-
   // budget range refetches per settled demand exactly like v2 did.
   const sourceKey = useSelector(RenderToken, (c) =>
-    c.renderSourceKey(page.pon, {
+    c.getSourceKey(page.ref, {
       scale: page.transform.renderScale,
       includeAnnotations: annotations,
     }),
@@ -70,7 +90,7 @@ export function RenderLayer({ annotations = true, tiles = true }: RenderLayerPro
         // collapses same-key asks in its raster store. A stale-closure scale
         // is harmless by construction: any scale mapping to this key
         // produces this key's canonical request.
-        const image = await render.renderPage(page.pon, {
+        const image = await render.renderSource(page.ref, {
           scale: page.transform.renderScale,
           includeAnnotations: annotations,
           signal: controller.signal,
@@ -95,7 +115,7 @@ export function RenderLayer({ annotations = true, tiles = true }: RenderLayerPro
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sourceKey IS the
     // render identity; scale/annotations/epoch are folded into it upstream.
-  }, [render, page.pon, sourceKey]);
+  }, [render, page.ref, sourceKey]);
 
   return (
     <>
@@ -143,13 +163,19 @@ function TilePlane({ annotations, fadeMs }: { annotations: boolean; fadeMs: numb
   // THIS view's tile surface: state is per view × page, so a thumbnail
   // rail's never-engaging demand cannot disturb the main lens's plan (shared
   // state made the main view lose its tiles whenever a rail opened). The
-  // handle is reference-stable per view — a clean dependency.
-  const tiles = render.tilesFor(page.view);
-  const plan = useSelector(RenderToken, () =>
-    tiles.plan(page.pon, demand, { includeAnnotations: annotations }),
-  );
+  // handle is reference-stable per view and reference-counted — one
+  // `dispose` per `createViewDemand`.
+  const view = useMemo(() => render.createViewDemand(page.view), [render, page.view]);
+  useEffect(() => () => view.dispose(), [view]);
+  // Demand in, plan out: setting the demand is the one call that schedules
+  // fetches (and re-plans); the read below is pure. Layout-timed so a camera
+  // move re-plans before the browser paints this commit.
+  useLayoutEffect(() => {
+    view.setDemand(page.ref, demand, { includeAnnotations: annotations });
+  });
+  const plan = useSelector(RenderToken, () => view.getPlan(page.ref));
   // View unmounted its plane: stop in-flight fetches; resolved bytes stay cached.
-  useEffect(() => () => tiles.release(page.pon), [tiles, page.pon]);
+  useEffect(() => () => view.release(page.ref), [view, page.ref]);
   if (plan.paint.length === 0) return null;
   const t = page.transform;
   const s = t.viewScale;
@@ -186,8 +212,8 @@ function TilePlane({ annotations, fadeMs }: { annotations: boolean; fadeMs: numb
             height: source.rect.height * s,
           }}
           fadeMs={fadeMs}
-          onPainted={() => tiles.painted(page.pon, source.key)}
-          onUnpainted={() => tiles.unpainted(page.pon, source.key)}
+          onPainted={() => view.markPainted(page.ref, source.key)}
+          onUnpainted={() => view.markUnpainted(page.ref, source.key)}
         />
       ))}
     </div>

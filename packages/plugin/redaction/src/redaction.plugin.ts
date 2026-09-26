@@ -1,11 +1,14 @@
 import { definePlugin } from '@embedpdf/core';
 import { AnnotationToken } from '@embedpdf/plugin-annotation/contract/host';
-import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
+import { SearchToken } from '@embedpdf/plugin-search/contract';
 import { SelectionToken } from '@embedpdf/plugin-selection/contract';
-import { createRedactionCapability } from './capability';
-import { initialRedactionState, redactionReducer } from './reducer';
-import { RedactionToken } from './types';
-import type { RedactionAction, RedactionCapability, RedactionState } from './types';
+
+import type { RedactionConfig } from './contract';
+import { createRedactionController } from './controller';
+import { RedactionToken } from './host-contract';
+import type { RedactionHostCapability } from './host-contract';
+import { initialRedactionState, redactionReducer } from './model';
+import type { RedactionAction, RedactionState } from './model';
 
 /**
  * Document-scoped redaction plugin — the DESTRUCTIVE half of the two-stage
@@ -17,14 +20,14 @@ import type { RedactionAction, RedactionCapability, RedactionState } from './typ
  * Trust boundary: on a layered document, applying rewrites the LAYER's bytes;
  * the immutable base keeps the original. See the package README.
  */
-export const redactionPlugin = () =>
-  definePlugin<RedactionState, RedactionAction, RedactionCapability>({
+export const redactionPlugin = (config: RedactionConfig = {}) =>
+  definePlugin<RedactionState, RedactionAction, RedactionHostCapability>({
     id: 'redaction',
     token: RedactionToken,
     scope: 'document',
     requires: [AnnotationToken],
-    optional: [InteractionToken, SelectionToken],
+    optional: [SelectionToken, SearchToken],
     initialState: initialRedactionState,
     reduce: redactionReducer,
-    capability: createRedactionCapability,
+    create: (ctx) => createRedactionController(ctx, config),
   });

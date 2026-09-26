@@ -19,16 +19,42 @@ export namespace DocPagesInsertBlank200Response {
 
         export namespace AffectedPages {
             export interface Item {
-                pageObjectNumber: number;
+                page: Item.Page;
                 revision: Item.Revision;
                 weakAnnotationState: CloudPDF.DocPagesInsertBlank200ResponseMetaAffectedPagesItemWeakAnnotationState;
             }
 
             export namespace Item {
+                export interface Page {
+                    kind: Page.Kind;
+                    pageObjectNumber: number;
+                }
+
+                export namespace Page {
+                    export const Kind = {
+                        ObjectNumber: "objectNumber",
+                    } as const;
+                    export type Kind = (typeof Kind)[keyof typeof Kind];
+                }
+
                 export interface Revision {
                     docSessionId: string;
-                    pageObjectNumber: number;
+                    page: Revision.Page;
                     generation: number;
+                }
+
+                export namespace Revision {
+                    export interface Page {
+                        kind: Page.Kind;
+                        pageObjectNumber: number;
+                    }
+
+                    export namespace Page {
+                        export const Kind = {
+                            ObjectNumber: "objectNumber",
+                        } as const;
+                        export type Kind = (typeof Kind)[keyof typeof Kind];
+                    }
                 }
             }
         }
@@ -37,6 +63,8 @@ export namespace DocPagesInsertBlank200Response {
             previousDocVersion: number;
             docVersion: number;
             annotationsVersion?: number | undefined;
+            layerVersion?: number | undefined;
+            working?: boolean | undefined;
             pages: CacheDelta.Pages.Item[];
         }
 
@@ -45,11 +73,23 @@ export namespace DocPagesInsertBlank200Response {
 
             export namespace Pages {
                 export interface Item {
-                    pageObjectNumber: number;
+                    page: Item.Page;
                     cache: Item.Cache;
                 }
 
                 export namespace Item {
+                    export interface Page {
+                        kind: Page.Kind;
+                        pageObjectNumber: number;
+                    }
+
+                    export namespace Page {
+                        export const Kind = {
+                            ObjectNumber: "objectNumber",
+                        } as const;
+                        export type Kind = (typeof Kind)[keyof typeof Kind];
+                    }
+
                     export interface Cache {
                         contentVersion: number;
                         annotationVersion: number;

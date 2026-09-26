@@ -11,6 +11,9 @@ export interface DocManifest200Response {
     annotationsVersion?: number | undefined;
     auditHead: number;
     baseSha: string;
+    layerVersion?: number | undefined;
+    working?: boolean | undefined;
+    baseByteLength?: number | undefined;
     scopes?: DocManifest200Response.Scopes | undefined;
     pages: DocManifest200Response.Pages.Item[];
 }
@@ -68,16 +71,42 @@ export namespace DocManifest200Response {
 
         export namespace Item {
             export interface State {
-                pageObjectNumber: number;
+                page: State.Page;
                 revision: State.Revision;
                 weakAnnotationState: CloudPDF.DocManifest200ResponsePagesItemStateWeakAnnotationState;
             }
 
             export namespace State {
+                export interface Page {
+                    kind: Page.Kind;
+                    pageObjectNumber: number;
+                }
+
+                export namespace Page {
+                    export const Kind = {
+                        ObjectNumber: "objectNumber",
+                    } as const;
+                    export type Kind = (typeof Kind)[keyof typeof Kind];
+                }
+
                 export interface Revision {
                     docSessionId: string;
-                    pageObjectNumber: number;
+                    page: Revision.Page;
                     generation: number;
+                }
+
+                export namespace Revision {
+                    export interface Page {
+                        kind: Page.Kind;
+                        pageObjectNumber: number;
+                    }
+
+                    export namespace Page {
+                        export const Kind = {
+                            ObjectNumber: "objectNumber",
+                        } as const;
+                        export type Kind = (typeof Kind)[keyof typeof Kind];
+                    }
                 }
             }
 

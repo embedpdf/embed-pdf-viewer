@@ -1,0 +1,113 @@
+%PDF-1.7
+% ò¤ô
+% A page whose only font is a producer's subset of Helvetica: a Type0
+% CIDFontType2 over a renumbered TrueType program carrying glyf, loca,
+% hmtx, head, hhea and maxp and nothing else (no cmap, no OS/2, no name),
+% as Quartz and other producers emit for Identity-H. The program is a
+% three-glyph cut (.notdef, a, b) of the Roboto test font
+% (third_party/harfbuzz-ng/src/perf/fonts/Roboto-Regular.ttf) made with
+% fontTools, tables dropped after subsetting. Such a program renders what it
+% was made for and can author nothing: rich text asking for Helvetica must
+% resolve past it to the standard face.
+1 0 obj <<
+  /Type /Catalog
+  /Pages 2 0 R
+>>
+endobj
+2 0 obj <<
+  /Type /Pages
+  /Count 1
+  /Kids [3 0 R]
+>>
+endobj
+3 0 obj <<
+  /Type /Page
+  /Parent 2 0 R
+  /Contents 4 0 R
+  /MediaBox [0 0 300 300]
+  /Resources <<
+    /ProcSet [/PDF /Text]
+    /Font <<
+      /F1 5 0 R
+    >>
+  >>
+>>
+endobj
+4 0 obj <<
+  /Length 39
+>>
+stream
+BT
+/F1 24 Tf
+20 260 Td
+<00010002> Tj
+ET
+endstream
+endobj
+5 0 obj <<
+  /Type /Font
+  /Subtype /Type0
+  /BaseFont /ABCDEF+Helvetica
+  /Encoding /Identity-H
+  /DescendantFonts [6 0 R]
+>>
+endobj
+6 0 obj <<
+  /Type /Font
+  /Subtype /CIDFontType2
+  /BaseFont /ABCDEF+Helvetica
+  /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >>
+  /FontDescriptor 7 0 R
+  /CIDToGIDMap /Identity
+  /DW 1000
+  /W [0 [443 544 562]]
+>>
+endobj
+7 0 obj <<
+  /Type /FontDescriptor
+  /FontName /ABCDEF+Helvetica
+  /Flags 4
+  /FontBBox [49 -10 516 750]
+  /ItalicAngle 0
+  /Ascent 928
+  /Descent -244
+  /CapHeight 711
+  /StemV 0
+  /FontFile2 8 0 R
+>>
+endobj
+8 0 obj <<
+  /Filter [/ASCII85Decode /FlateDecode]
+  /Length1 556
+  /Length 625
+>>
+stream
+GhQY8A7/eQ@rPg`@SfVAWD)o0'5dpeq8:"`W0`X8R)35+Y6r@s!FiADTE+_!VUn*,&g15sa=XCL8
+R[P]Z<mSd:JQ@Z,"!9d5p6%4&9HnZ<YR6,12$^A-\,<M!G!"1E_+!RUcn8G2I@>t3>b$>aSW/g+S
+scVfm4&Us51%/Z@TNU5W:t/:`k&059:"5Q9'a7L0,3[YXuod)(`YKTZOtVdt+BhLEV?tMBNdL64]
+0Y"a&pLT\:*QN!ASPTM@D<I67r9$k1.-MLq?lb`%.TJrIp2N%%Fjrm"t`@Usl/..h]e,L7#Mk(!D
+62uF"jXnoYc.IM-0h\oN*T&0TC'n>82idh#<aSl-nq%\f0K,fLJ",!>:3ZFQoP+&A,MQsFcM41^_
+S#EWLRB_mAW1\sVW2buJ\Z%?BW/):sV@\O)S<RS4(ch#&0.tIbh"g6VL.?"YGZ#m3Xnd/b6f$MPI
+olNYX^MOTkq48p[VYgg2(_.f0?*WKgEGHjOM*g(OQ0u8"U9J_PHp?4]<\*7+ODke;+;iiG!Ri;@j
+<d.TIX+Yn!lM0ca@LhhQ\lGs(SC^.B>;$9P^eB&q'TF`5Gh;L;-5?s'>E9fTYOu:X^QQq*NJ_^fU
+gA&Mf/P~>
+endstream
+endobj
+xref
+0 9
+0000000000 65535 f 
+0000000622 00000 n 
+0000000675 00000 n 
+0000000738 00000 n 
+0000000916 00000 n 
+0000001007 00000 n 
+0000001141 00000 n 
+0000001390 00000 n 
+0000001599 00000 n 
+trailer <<
+  /Root 1 0 R
+  /Size 9
+>>
+startxref
+2332
+%%EOF

@@ -6,6 +6,7 @@ export default {
   annotations: 'Annotations',
   'annotation-types': 'Annotation types',
   forms: 'Forms',
+  signatures: 'Digital signatures',
   metadata: 'Metadata',
   'security-and-access': 'Security & access',
   'async-and-errors': 'Async & errors',

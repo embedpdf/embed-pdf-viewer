@@ -9,7 +9,7 @@ import type { AnnotationDTO, AnnotationRef } from '../../src/shared';
 
 const ref = (n: number): AnnotationRef => ({
   kind: 'objectNumber',
-  pageObjectNumber: 1,
+  page: { kind: 'objectNumber', pageObjectNumber: 1 },
   annotObjectNumber: n,
 });
 
@@ -18,7 +18,7 @@ const annot = (n: number, over: Record<string, unknown> = {}): AnnotationDTO =>
   ({
     subtype: 'highlight',
     ref: ref(n),
-    pageObjectNumber: 1,
+    page: { kind: 'objectNumber', pageObjectNumber: 1 },
     index: autoIndex++,
     nm: null,
     contents: `annot ${n}`,
@@ -31,7 +31,14 @@ const annot = (n: number, over: Record<string, unknown> = {}): AnnotationDTO =>
   }) as unknown as AnnotationDTO;
 
 const reply = (n: number, parent: number, over: Record<string, unknown> = {}): AnnotationDTO =>
-  annot(n, { subtype: 'text', state: null, stateModel: null, inReplyTo: ref(parent), replyType: 'reply', ...over });
+  annot(n, {
+    subtype: 'text',
+    state: null,
+    stateModel: null,
+    inReplyTo: ref(parent),
+    replyType: 'reply',
+    ...over,
+  });
 
 const state = (
   n: number,
@@ -134,7 +141,13 @@ describe('buildCommentThreads — threading', () => {
   it('resolves a parent addressed by /NM when its own ref is objectNumber-form', () => {
     const threads = buildCommentThreads([
       annot(1, { nm: 'root-nm' }),
-      reply(2, 0, { inReplyTo: { kind: 'nm', pageObjectNumber: 1, nm: 'root-nm' } }),
+      reply(2, 0, {
+        inReplyTo: {
+          kind: 'nm',
+          page: { kind: 'objectNumber', pageObjectNumber: 1 },
+          nm: 'root-nm',
+        },
+      }),
     ]);
     expect(threads).toHaveLength(1);
     expect(threads[0]!.replies).toHaveLength(1);
@@ -145,7 +158,12 @@ describe('buildCommentThreads — review status', () => {
   it('extracts state annotations into review instead of replies', () => {
     const threads = buildCommentThreads([
       annot(1),
-      state(2, 1, { state: 'accepted', stateModel: 'review', by: 'alice', at: '2026-08-28T10:00:00Z' }),
+      state(2, 1, {
+        state: 'accepted',
+        stateModel: 'review',
+        by: 'alice',
+        at: '2026-08-28T10:00:00Z',
+      }),
     ]);
     const t = threads[0]!;
     expect(t.replies).toHaveLength(0);
@@ -156,9 +174,19 @@ describe('buildCommentThreads — review status', () => {
   it('latest wins per reviewer, chained states included', () => {
     const threads = buildCommentThreads([
       annot(1),
-      state(2, 1, { state: 'accepted', stateModel: 'review', by: 'alice', at: '2026-08-28T10:00:00Z' }),
+      state(2, 1, {
+        state: 'accepted',
+        stateModel: 'review',
+        by: 'alice',
+        at: '2026-08-28T10:00:00Z',
+      }),
       // ISO chains the update as a reply to the previous state annotation.
-      state(3, 2, { state: 'rejected', stateModel: 'review', by: 'alice', at: '2026-08-28T11:00:00Z' }),
+      state(3, 2, {
+        state: 'rejected',
+        stateModel: 'review',
+        by: 'alice',
+        at: '2026-08-28T11:00:00Z',
+      }),
     ]);
     const review = threads[0]!.review;
     expect(review.byReviewer['alice']?.state).toBe('rejected');
@@ -171,8 +199,18 @@ describe('buildCommentThreads — review status', () => {
   it('keeps reviewers independent and lastChange overall', () => {
     const threads = buildCommentThreads([
       annot(1),
-      state(2, 1, { state: 'accepted', stateModel: 'review', by: 'alice', at: '2026-08-28T10:00:00Z' }),
-      state(3, 1, { state: 'rejected', stateModel: 'review', by: 'bob', at: '2026-08-28T12:00:00Z' }),
+      state(2, 1, {
+        state: 'accepted',
+        stateModel: 'review',
+        by: 'alice',
+        at: '2026-08-28T10:00:00Z',
+      }),
+      state(3, 1, {
+        state: 'rejected',
+        stateModel: 'review',
+        by: 'bob',
+        at: '2026-08-28T12:00:00Z',
+      }),
     ]);
     const review = threads[0]!.review;
     expect(review.byReviewer['alice']?.state).toBe('accepted');
@@ -192,7 +230,12 @@ describe('buildCommentThreads — review status', () => {
     const toggledOff = buildCommentThreads([
       annot(1),
       state(2, 1, { state: 'marked', stateModel: 'marked', by: 'bob', at: '2026-08-28T10:00:00Z' }),
-      state(3, 2, { state: 'unmarked', stateModel: 'marked', by: 'bob', at: '2026-08-28T11:00:00Z' }),
+      state(3, 2, {
+        state: 'unmarked',
+        stateModel: 'marked',
+        by: 'bob',
+        at: '2026-08-28T11:00:00Z',
+      }),
     ]);
     expect(toggledOff[0]!.review.markedBy).toEqual([]);
   });
@@ -211,7 +254,12 @@ describe('buildCommentThreads — review status', () => {
   it('round-trips custom models verbatim and skips undeterminable ones', () => {
     const threads = buildCommentThreads([
       annot(1),
-      state(2, 1, { state: 'in-progress', stateModel: 'X-ReviewWorkflow', by: 'alice', at: '2026-08-28T10:00:00Z' }),
+      state(2, 1, {
+        state: 'in-progress',
+        stateModel: 'X-ReviewWorkflow',
+        by: 'alice',
+        at: '2026-08-28T10:00:00Z',
+      }),
       state(3, 1, { stateModel: 'X-Other', by: 'bob', at: '2026-08-28T11:00:00Z' }), // no derivable state
       state(4, 1, { state: 'escalated', by: 'carol', at: '2026-08-28T12:00:00Z' }), // custom state, no model
     ]);
@@ -258,7 +306,12 @@ describe('buildCommentThreads — review status', () => {
   it('computes mine only when currentUserId is given', () => {
     const input = [
       annot(1),
-      state(2, 1, { state: 'accepted', stateModel: 'review', by: 'alice', at: '2026-08-28T10:00:00Z' }),
+      state(2, 1, {
+        state: 'accepted',
+        stateModel: 'review',
+        by: 'alice',
+        at: '2026-08-28T10:00:00Z',
+      }),
     ];
     expect(buildCommentThreads(input)[0]!.review.mine).toBeUndefined();
     expect(buildCommentThreads(input, { currentUserId: 'alice' })[0]!.review.mine?.state).toBe(

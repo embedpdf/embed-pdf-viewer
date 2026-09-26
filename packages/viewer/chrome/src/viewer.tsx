@@ -28,9 +28,11 @@ import { feedbackPlugin, interactionPlugin, vibrationFeedback } from '@embedpdf/
 import { selectionPlugin } from '@embedpdf/react/selection';
 import { annotationPlugin } from '@embedpdf/react/annotation';
 import { stampPlugin } from '@embedpdf/react/stamp';
+import { measurementPlugin } from '@embedpdf/react/measurement';
 import { redactionPlugin } from '@embedpdf/react/redaction';
 import { actionsPlugin } from '@embedpdf/react/actions';
 import { formPlugin } from '@embedpdf/react/form';
+import { signaturePlugin } from '@embedpdf/react/signature';
 import { linkPlugin } from '@embedpdf/react/link';
 import { searchPlugin } from '@embedpdf/react/search';
 import { i18nPlugin, negotiateLocale, useT } from '@embedpdf/react/i18n';
@@ -50,6 +52,7 @@ import {
   type ResolvedViewerConfig,
   type StampsCustomization,
 } from './config-context';
+import type { AnnotationsCustomization, SignaturesCustomization } from './config-context';
 import { createViewerHandle, type ViewerHandle } from './handle';
 import { ICON_PATHS, type IconDef } from './ui/icons';
 import { ThemeProvider, type ThemePreference } from './ui/theme';
@@ -116,6 +119,13 @@ export interface ViewerCustomization {
    *  self-hosted copy of `@embedpdf/default-stamps`. Default: the copy that
    *  ships with the viewer, as a lazy chunk of your own build — no CDN. */
   stamps?: StampsCustomization;
+  /** Digital signatures: the signer, trust anchors, the mode (sign / visual /
+   *  ask), which marks a person keeps, and script faces for typed marks. With
+   *  no signer, a mark placed on a field is drawn in without sealing. */
+  signatures?: SignaturesCustomization;
+  /** Annotations: fonts the free-text style panel offers beyond the standard
+   *  14 — fetched, registered on the engine and mounted for the live editor. */
+  annotations?: AnnotationsCustomization;
   /** Light/dark preference (string shorthand), or the full theme config with
    *  `--ep-*` token overrides. Tokens are applied by the DELIVERY (the custom
    *  element adopts them into its shadow root); direct consumers of this
@@ -189,6 +199,8 @@ export function FullViewer({
   disabledCategories,
   chrome,
   stamps,
+  signatures,
+  annotations,
   theme,
   themeTarget,
   onViewer,
@@ -234,6 +246,8 @@ export function FullViewer({
       chrome: resolvedChrome,
       icons: icons ?? {},
       stamps: stamps ?? {},
+      signatures: signatures ?? {},
+      annotations: annotations ?? {},
       i18n: { locales, loaders, initial },
     };
   });
@@ -316,6 +330,16 @@ export function FullViewer({
     // Forms: fillable under the default pointer/pan (widgets render as fill
     // controls), editable under the Form tab's 'form-edit' + palette tools.
     formPlugin(),
+    // Signatures: the ACT — a mark (a signatures-library asset) dropped on a
+    // signature field signs it through the configured signer, or is drawn in
+    // without sealing when there is none. Marks themselves are the stamp
+    // plugin's; the panel lists libraries of kind 'signatures'.
+    signaturePlugin({
+      mode: resolved.signatures.mode,
+      signer: resolved.signatures.signer,
+      trust: resolved.signatures.trust,
+      allowCertify: resolved.signatures.allowCertify,
+    }),
     // Links: navigable under the default pointer/pan ('link-nav'), editable
     // under the link tool — the annotation plane then owns them (select, move,
     // retarget via the style panel's Link control).
@@ -323,6 +347,7 @@ export function FullViewer({
     // Redaction: marking is the annotation plane's composed `redact` tool; this
     // plugin adds the pending-queue view + the destructive apply.
     redactionPlugin(),
+    measurementPlugin(),
     searchPlugin(),
     demoToolsPlugin(),
     i18nPlugin({

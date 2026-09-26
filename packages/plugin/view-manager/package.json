@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-view-manager",
-  "version": "3.0.0-next.12",
+  "version": "3.0.0-next.14",
   "private": false,
   "description": "Workspace-scoped plugin: arranges open documents into reorderable panes (views). Each view points at a document; the framework adapter renders one <DocumentScope> per view. Ships zero framework code.",
   "type": "module",
@@ -10,6 +10,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./contract": "./src/contract.ts",
+    "./contract/host": "./src/host-contract.ts",
+    "./internal": "./src/internal.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -25,6 +27,14 @@
         "import": "./dist/contract.js",
         "require": "./dist/contract.cjs"
       },
+      "./contract/host": {
+        "import": "./dist/contract/host.js",
+        "require": "./dist/contract/host.cjs"
+      },
+      "./internal": {
+        "import": "./dist/internal.js",
+        "require": "./dist/internal.cjs"
+      },
       "./package.json": "./package.json"
     }
   },
@@ -34,14 +44,16 @@
   "scripts": {
     "build": "epdf-build",
     "clean": "rimraf dist",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@embedpdf/core": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.0.0",
-    "@embedpdf/tooling-build": "workspace:*"
+    "@embedpdf/tooling-build": "workspace:*",
+    "vitest": "^2.1.9"
   },
   "license": "Apache-2.0",
   "sideEffects": false,

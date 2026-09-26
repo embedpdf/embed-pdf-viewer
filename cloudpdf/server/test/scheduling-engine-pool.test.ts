@@ -220,7 +220,7 @@ describe('overload over HTTP (host fixture, maxInFlight=1)', () => {
       expect(shed.status).toBe(503);
       expect(JSON.parse(shed.body).error.code).toBe('EngineBusy');
       const raw = await fetch(
-        `${fx.baseUrl}/v1/docs/docsched2/layers/alice/annotations/pages/1/items`,
+        `${fx.baseUrl}/v1/docs/docsched2/layers/alice/annotations/pages/obj:1/items`,
         { headers: { Authorization: `Bearer ${docToken('tenant-s', 'docsched2', 'alice')}` } },
       );
       expect(raw.status).toBe(503);

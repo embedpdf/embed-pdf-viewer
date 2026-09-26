@@ -6,6 +6,7 @@ import type {
 import type { Engine } from '../engine/Engine';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
+import { toPageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
 import { foldText } from '../search/fold';
 import type { SearchMatch, SearchSlice } from '../search/types';
@@ -76,9 +77,9 @@ export function runSearchConformance(
           query: { text: fixture.presentLiteral },
         });
         expect(matches.length > 0).toBe(true);
-        expect(matches.some((m) => m.pageObjectNumber === fixture.presentPageObjectNumber)).toBe(
-          true,
-        );
+        expect(
+          matches.some((m) => m.page.pageObjectNumber === fixture.presentPageObjectNumber),
+        ).toBe(true);
         for (const m of matches) {
           expect(m.charCount > 0).toBe(true);
           expect(m.segments.length > 0).toBe(true);
@@ -181,11 +182,11 @@ export function runSearchConformance(
       try {
         const slice = await doc.search.query({
           query: { text: fixture.presentLiteral },
-          startPage: fixture.presentPageObjectNumber,
+          startPage: toPageRef(fixture.presentPageObjectNumber),
           budget: { maxPages: 1 },
         });
         expect(slice.matches.length > 0).toBe(true);
-        expect(slice.matches[0].pageObjectNumber).toBe(fixture.presentPageObjectNumber);
+        expect(slice.matches[0].page.pageObjectNumber).toBe(fixture.presentPageObjectNumber);
       } finally {
         await doc.close();
       }
@@ -254,7 +255,7 @@ export function runSearchConformance(
         const all = await collectAll(doc, {
           query: { text: fixture.presentRegex, regex: true },
         });
-        const key = (m: SearchMatch) => `${m.pageObjectNumber}:${m.charStart}:${m.charCount}`;
+        const key = (m: SearchMatch) => `${m.page.pageObjectNumber}:${m.charStart}:${m.charCount}`;
         const allKeys = new Set(all.matches.map(key));
         // Each flag can only REMOVE matches, never invent them — true for
         // any fixture pattern, so the suite needs no per-fixture counts.
@@ -270,18 +271,42 @@ export function runSearchConformance(
       }
     });
 
-    test('regex + matchDiacritics is rejected with InvalidArg', async () => {
+    test('ignoreWhitespace keeps every default hit and finds the space-free needle', async () => {
       const doc = await openFixture(engine, opts);
       try {
-        let caught: unknown;
-        try {
-          await doc.search.query({
-            query: { text: fixture.presentRegex, regex: true, matchDiacritics: true },
-          });
-        } catch (err) {
-          caught = err;
+        const key = (m: SearchMatch) => `${m.page.pageObjectNumber}:${m.charStart}:${m.charCount}`;
+        const plain = await collectAll(doc, { query: { text: fixture.presentLiteral } });
+        // Dropping whitespace can only ADD matches over the collapsing default
+        // fold — every default hit survives, at the same place.
+        const relaxed = await collectAll(doc, {
+          query: { text: fixture.presentLiteral, ignoreWhitespace: true },
+        });
+        const relaxedKeys = new Set(relaxed.matches.map(key));
+        for (const m of plain.matches) expect(relaxedKeys.has(key(m))).toBe(true);
+        // ...and the needle no longer needs the page's spaces.
+        const squashed = await collectAll(doc, {
+          query: { text: fixture.presentLiteral.replace(/\s+/g, ''), ignoreWhitespace: true },
+        });
+        expect(squashed.matches.map(key)).toEqual(relaxed.matches.map(key));
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('regex + matchDiacritics / ignoreWhitespace are rejected with InvalidArg', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        for (const flags of [{ matchDiacritics: true }, { ignoreWhitespace: true }]) {
+          let caught: unknown;
+          try {
+            await doc.search.query({
+              query: { text: fixture.presentRegex, regex: true, ...flags },
+            });
+          } catch (err) {
+            caught = err;
+          }
+          expect(EngineError.is(caught, EngineErrorCode.InvalidArg)).toBe(true);
         }
-        expect(EngineError.is(caught, EngineErrorCode.InvalidArg)).toBe(true);
       } finally {
         await doc.close();
       }

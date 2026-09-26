@@ -10,6 +10,7 @@ import {
   EngineErrorCode,
   serializeError,
   subtypeFromCode,
+  toPageRef,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
@@ -61,7 +62,11 @@ export class RedactionApplier {
     for (const [pageObjectNumber, refs] of plan) {
       if (stop || (signal.aborted && affected.size > 0)) {
         stop = true;
-        results.push({ pageObjectNumber, status: 'skipped', removedAnnotationCount: 0 });
+        results.push({
+          page: toPageRef(pageObjectNumber),
+          status: 'skipped',
+          removedAnnotationCount: 0,
+        });
         continue;
       }
       if (signal.aborted) throwIfAborted(signal);
@@ -77,14 +82,14 @@ export class RedactionApplier {
           totalRemoved += outcome.removed;
         }
         results.push({
-          pageObjectNumber,
+          page: toPageRef(pageObjectNumber),
           status: outcome.status,
           removedAnnotationCount: outcome.removed,
         });
       } catch (error) {
         affected.add(pageObjectNumber);
         results.push({
-          pageObjectNumber,
+          page: toPageRef(pageObjectNumber),
           status: 'failed',
           removedAnnotationCount: 0,
           error: serializeError(error),
@@ -126,13 +131,13 @@ export class RedactionApplier {
   private buildPlan(scope: RedactionApplyScope): Map<PageObjectNumber, AnnotationRef[] | null> {
     const plan = new Map<PageObjectNumber, AnnotationRef[] | null>();
     if (scope.kind === 'pages') {
-      if (scope.pageObjectNumbers.length === 0) {
+      if (this.session.resolvePageRefs(scope.pages).length === 0) {
         throw new EngineError(
           EngineErrorCode.InvalidArg,
           'redaction.apply requires at least one page',
         );
       }
-      for (const pageObjectNumber of scope.pageObjectNumbers) {
+      for (const pageObjectNumber of this.session.resolvePageRefs(scope.pages)) {
         if (plan.has(pageObjectNumber)) {
           throw new EngineError(
             EngineErrorCode.InvalidArg,
@@ -151,12 +156,12 @@ export class RedactionApplier {
       );
     }
     for (const ref of scope.refs) {
-      const existing = plan.get(ref.pageObjectNumber);
+      const existing = plan.get(ref.page.pageObjectNumber);
       if (existing === null) {
         throw new EngineError(EngineErrorCode.InvalidArg, 'mixed redaction scopes on one page');
       }
       if (existing) existing.push(ref);
-      else plan.set(ref.pageObjectNumber, [ref]);
+      else plan.set(ref.page.pageObjectNumber, [ref]);
     }
     // Applying removes annotations, which shifts positional indices — a
     // batch of multiple refs on one page can only address the survivors

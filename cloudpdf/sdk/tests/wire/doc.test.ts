@@ -75,6 +75,9 @@ describe("DocClient", () => {
             annotationsVersion: 1,
             auditHead: 1,
             baseSha: "baseSha",
+            layerVersion: 1,
+            working: true,
+            baseByteLength: 1,
             scopes: {
                 content: "base",
                 annotations: "base",
@@ -86,8 +89,12 @@ describe("DocClient", () => {
             pages: [
                 {
                     state: {
-                        pageObjectNumber: 1,
-                        revision: { docSessionId: "docSessionId", pageObjectNumber: 1, generation: 1 },
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        revision: {
+                            docSessionId: "docSessionId",
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            generation: 1,
+                        },
                         weakAnnotationState: { kind: "unknown" },
                     },
                     cache: { contentVersion: 1, annotationVersion: 1 },
@@ -140,7 +147,7 @@ describe("DocClient", () => {
 
         server
             .mockEndpoint()
-            .get("/v1/docs/docId/layers/layerName/text/pages/1/data")
+            .get("/v1/docs/docId/layers/layerName/text/pages/pageKey/data")
             .respondWith()
             .statusCode(200)
             .jsonBody(rawResponseBody)
@@ -149,7 +156,7 @@ describe("DocClient", () => {
         const response = await client.doc.text({
             docId: "docId",
             layerName: "layerName",
-            pon: 1,
+            pageKey: "pageKey",
         });
         expect(response).toEqual(rawResponseBody);
     });
@@ -162,7 +169,7 @@ describe("DocClient", () => {
 
         server
             .mockEndpoint()
-            .get("/v1/docs/docId/layers/layerName/text/pages/1/data")
+            .get("/v1/docs/docId/layers/layerName/text/pages/pageKey/data")
             .respondWith()
             .statusCode(404)
             .jsonBody(rawResponseBody)
@@ -172,7 +179,7 @@ describe("DocClient", () => {
             return await client.doc.text({
                 docId: "docId",
                 layerName: "layerName",
-                pon: 1,
+                pageKey: "pageKey",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });

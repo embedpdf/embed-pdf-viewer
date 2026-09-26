@@ -1,4 +1,5 @@
 export { runMetadataConformance } from './conformance/runMetadataConformance';
+export { runMeasurementConformance } from './conformance/runMeasurementConformance';
 export type {
   ConformanceTestRunner,
   ConformanceExpect,
@@ -76,3 +77,8 @@ export {
   diffAnnotationListSnapshot,
   diffAnnotationListSnapshotAll,
 } from './conformance/diffAnnotationListSnapshot';
+export { runSignatureConformance } from './conformance/runSignatureConformance';
+export type {
+  SignatureConformanceFixtures,
+  SignatureConformanceOptions,
+} from './conformance/runSignatureConformance';

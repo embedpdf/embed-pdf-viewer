@@ -6,7 +6,7 @@
  * mapping each rect through PageContext.toPixels (the same path markers use).
  * Zero pointer handling here; that's the PagePointerSource + the hub.
  *
- * The layer resolves the HOST lens (`/internal`: geometry warming, the
+ * The layer resolves the HOST lens (`/contract/host`: geometry warming, the
  * highlight handshake) — the adapter is exactly what that entry exists for.
  * `useSelection()` hands app code the PUBLIC lens only.
  */
@@ -19,7 +19,7 @@ export { copySelection } from '@embedpdf/web';
 import * as React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { textQuadEquals } from '@embedpdf/core-geometry';
-import type { CapabilityToken } from '@embedpdf/core';
+import type { CapabilityToken, EventHook, PageRef } from '@embedpdf/core';
 import {
   HANDLE_BAR,
   HANDLE_HEAD,
@@ -29,19 +29,24 @@ import {
   selectionHandleGeom,
   type SelectionHandleEndpoint,
   type SelectionHandleView,
-  type SelectionMenuAnchor,
+  type SelectionAnchor,
+  type SelectionCapability,
+  type TextRange,
 } from '@embedpdf/plugin-selection';
-import { SelectionToken as SelectionHostToken } from '@embedpdf/plugin-selection/internal';
-import { StageToken, type StageCapability } from '@embedpdf/plugin-stage/contract';
+import { SelectionToken as SelectionHostToken } from '@embedpdf/plugin-selection/contract/host';
+import type { StageCapability } from '@embedpdf/plugin-stage/contract';
 import {
   attachSelectionHandle,
   wireSelectionClipboard,
   type SelectionClipboardOptions,
 } from '@embedpdf/web';
-import { Anchored, type AnchoredPlacement } from './anchored';
+import { Anchored, useOptionalProjectorBinding, type AnchoredPlacement } from './anchored';
+import { devWarn } from './dev';
+import { useStageToken } from './stage-scope';
 import {
   shallowArray,
   useCapability,
+  useCapabilityEvent,
   useKernelValue,
   useOptionalCapability,
   usePage,
@@ -56,21 +61,17 @@ export interface SelectionLayerProps {
 export function SelectionLayer({ color = 'rgba(33, 150, 243, 0.35)' }: SelectionLayerProps) {
   const page = usePage();
   const selection = useCapability(SelectionHostToken);
-  const segments = useSelector(
-    SelectionHostToken,
-    (c) => c.segmentsForPage(page.pon),
-    shallowArray,
-  );
+  const segments = useSelector(SelectionHostToken, (c) => c.listSegments(page.ref), shallowArray);
   // A consumer (e.g. a markup tool drawing its own preview) can take over the
   // selection visual; when it does, we render nothing so the two never overlap.
-  const visible = useSelector(SelectionHostToken, (c) => c.highlightVisible());
+  const visible = useSelector(SelectionHostToken, (c) => c.isHighlightVisible());
 
   // Warm this page's text geometry as soon as it's on screen, so the first
   // pointer-down can hit-test without waiting on the engine round-trip.
   // (A no-op without doc.text.select — nothing warms, nothing renders.)
   useEffect(() => {
-    selection.ensurePage(page.pon);
-  }, [selection, page.pon]);
+    void selection.ensureLoaded(page.ref);
+  }, [selection, page.ref]);
 
   if (!visible) return null;
 
@@ -92,9 +93,7 @@ export function SelectionLayer({ color = 'rgba(33, 150, 243, 0.35)' }: Selection
         const ring = [s.quad.upperStart, s.quad.upperEnd, s.quad.lowerEnd, s.quad.lowerStart].map(
           (p) => page.transform.toPixels(p),
         );
-        return (
-          <polygon key={i} points={ring.map((p) => `${p.x},${p.y}`).join(' ')} fill={color} />
-        );
+        return <polygon key={i} points={ring.map((p) => `${p.x},${p.y}`).join(' ')} fill={color} />;
       })}
     </svg>
   );
@@ -106,17 +105,47 @@ export function useSelection() {
   return useCapability(SelectionToken);
 }
 
+/** Subscribe to one selection event for the mounted lifetime: `useSelectionEvent((c) => c.onCommitted, handler)`. */
+export function useSelectionEvent<T>(
+  select: (cap: SelectionCapability) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  useCapabilityEvent(SelectionToken, select, handler);
+}
+
+const sameRange = (a: TextRange | null, b: TextRange | null): boolean =>
+  a === b ||
+  (!!a &&
+    !!b &&
+    a.start.page.pageObjectNumber === b.start.page.pageObjectNumber &&
+    a.start.index === b.start.index &&
+    a.end.page.pageObjectNumber === b.end.page.pageObjectNumber &&
+    a.end.index === b.end.index);
+const samePages = (a: readonly PageRef[], b: readonly PageRef[]): boolean =>
+  a === b ||
+  (a.length === b.length && a.every((p, i) => p.pageObjectNumber === b[i]!.pageObjectNumber));
+
+/** The selection's reactive read-model for chrome: whether anything is
+ *  selected, the character range (persist/restore), and the pages it spans. */
+export function useSelectionState(): {
+  hasSelection: boolean;
+  range: TextRange | null;
+  pageRefs: readonly PageRef[];
+} {
+  const hasSelection = useSelector(SelectionToken, (c) => c.hasSelection());
+  const range = useSelector(SelectionToken, (c) => c.getRange(), sameRange);
+  const pageRefs = useSelector(SelectionToken, (c) => c.listSelectedPages(), samePages);
+  return { hasSelection, range, pageRefs };
+}
+
 /** Structural equality for the selection's menu anchor — keeps the menu from
  *  re-rendering on unrelated dispatches (the capability returns a fresh
  *  object each call). */
-const sameMenuAnchor = (
-  a: SelectionMenuAnchor | null,
-  b: SelectionMenuAnchor | null,
-): boolean => {
+const sameAnchor = (a: SelectionAnchor | null, b: SelectionAnchor | null): boolean => {
   if (a === b) return true;
   if (!a || !b) return false;
   return (
-    a.pon === b.pon &&
+    a.page.pageObjectNumber === b.page.pageObjectNumber &&
     a.bounds.x === b.bounds.x &&
     a.bounds.y === b.bounds.y &&
     a.bounds.width === b.bounds.width &&
@@ -135,18 +164,18 @@ export interface SelectionMenuProps {
 /**
  * Floats over the current TEXT selection (one anchor regardless of
  * cross-page selection; it rides the gesture's end page) — and only once the
- * selection SETTLES: hidden while `isSelecting()` (mid-drag), it appears at
+ * selection SETTLES: hidden while a gesture is active (mid-drag), it appears at
  * pointer-up; programmatic selections show immediately (born settled). Works
  * under `<Stage>` (mount in the overlay slot) and `<PageView>` alike — the
  * surface provides the projection. Compose the contents from hooks:
  * `useSelection()` for copy/clear, `useAnnotation()` for
  * `markupFromSelection('highlight')`, `copySelection` for the clipboard.
  * For live-follow UI during the drag, compose `<Anchored>` with
- * `menuAnchor()` yourself — the primitive carries no policy.
+ * `getAnchor()` yourself — the primitive carries no policy.
  */
 export function SelectionMenu({ children, gap = 8, placement = 'top' }: SelectionMenuProps) {
-  const selecting = useSelector(SelectionToken, (c) => c.isSelecting());
-  const anchor = useSelector(SelectionToken, (c) => c.menuAnchor(), sameMenuAnchor);
+  const selecting = useSelector(SelectionHostToken, (c) => c.isGestureActive());
+  const anchor = useSelector(SelectionToken, (c) => c.getAnchor(), sameAnchor);
   if (selecting || !anchor) return null;
   return (
     <Anchored anchor={anchor} placement={placement} gap={gap}>
@@ -172,8 +201,8 @@ const sameEndpoints = (a: Endpoints | null, b: Endpoints | null): boolean => {
   if (a === b) return true;
   if (!a || !b) return false;
   return (
-    a.start.pon === b.start.pon &&
-    a.end.pon === b.end.pon &&
+    a.start.page.pageObjectNumber === b.start.page.pageObjectNumber &&
+    a.end.page.pageObjectNumber === b.end.page.pageObjectNumber &&
     a.start.advance === b.start.advance &&
     a.end.advance === b.end.advance &&
     // corner-wise, so a boundary that ROTATES without moving its bounding box
@@ -184,21 +213,20 @@ const sameEndpoints = (a: Endpoints | null, b: Endpoints | null): boolean => {
 };
 
 /** The plugin's structural view over this Stage: point-exact projection in,
- *  page resolution out. (`pageRectToScreen` is the AABB projector — upright
+ *  page resolution out. (`pageRectToViewport` is the AABB projector — upright
  *  overlays only — and would collapse exactly the orientation handles need.) */
 const handleView = (stage: StageCapability): SelectionHandleView => ({
-  toOverlay: (pon, pt) => {
-    const world = stage.pageToWorld(pon, pt);
-    return world ? stage.toScreen(world) : null;
+  toOverlay: (page, pt) => {
+    return stage.pageToViewport(page, pt);
   },
-  pageAt: (overlay) => stage.pageAt(overlay),
-  pointOnPage: (pon, overlay) => stage.pointOnPage(pon, overlay),
+  pageAt: (overlay) => stage.getPageAt(overlay),
+  pointOnPage: (page, overlay) => stage.viewportToPage(page, overlay),
 });
 
 export interface SelectionHandlesProps {
   /** Handle colour (default: the selection blue). */
   color?: string;
-  /** The stage lens hosting this overlay (default: the main StageToken). */
+  /** The stage lens hosting this overlay (default: the enclosing `<Stage>`'s lens). */
   token?: CapabilityToken<StageCapability>;
 }
 
@@ -212,25 +240,39 @@ export interface SelectionHandlesProps {
  * On touch, where a caret drag isn't available, the handles ARE the way to
  * grow or shrink a selection: a long-press selects a word, then each handle
  * extends from the OPPOSITE endpoint, snapping to glyphs and crossing pages
- * exactly like a pointer drag — it rides the same `beginAt`/`extendTo`
+ * exactly like a pointer drag — it rides the same `beginGestureAt`/`extendTo`
  * gesture path, so highlights, menus, and commit signals all behave
  * identically. Mount in the `<Stage>` overlay slot next to `<SelectionMenu>`;
  * outside a Stage it renders nothing (a `PageView` has no camera to project
  * through). Pointer-isolated, so grabbing a handle never pans the stage.
  */
-export function SelectionHandles({ color = '#2196f3', token = StageToken }: SelectionHandlesProps) {
+export function SelectionHandles({
+  color = '#2196f3',
+  token: explicitToken,
+}: SelectionHandlesProps) {
+  const token = useStageToken(explicitToken);
   const host = useCapability(SelectionHostToken);
   const stage = useOptionalCapability(token);
-  const selecting = useSelector(SelectionToken, (c) => c.isSelecting());
-  const visible = useSelector(SelectionHostToken, (c) => c.highlightVisible());
+  // Outside a Stage there is no camera to project through: say so instead of
+  // rendering nothing silently.
+  const surface = useOptionalProjectorBinding();
+  if (!surface || surface.projector.space !== 'overlay') {
+    devWarn(
+      'selection-handles-outside-stage',
+      '<SelectionHandles> renders nothing here: mount it in the <Stage> overlay slot ' +
+        '(a <PageView> has no camera to project the handles through).',
+    );
+  }
+  const selecting = useSelector(SelectionHostToken, (c) => c.isGestureActive());
+  const visible = useSelector(SelectionHostToken, (c) => c.isHighlightVisible());
   const endpoints = useSelector(
     SelectionHostToken,
     (c): Endpoints | null => {
-      const s = c.snapshot();
+      const s = c.getSnapshot();
       if (!s.start || !s.end) return null;
       return {
-        start: { pon: s.start.pon, glyphQuad: s.start.glyphQuad, advance: s.start.advance },
-        end: { pon: s.end.pon, glyphQuad: s.end.glyphQuad, advance: s.end.advance },
+        start: { page: s.start.page, glyphQuad: s.start.glyphQuad, advance: s.start.advance },
+        end: { page: s.end.page, glyphQuad: s.end.glyphQuad, advance: s.end.advance },
       };
     },
     sameEndpoints,
@@ -239,7 +281,7 @@ export function SelectionHandles({ color = '#2196f3', token = StageToken }: Sele
   // camera, so they must re-render whenever the camera moves — visiblePages is
   // the stage's reference-stable revision for exactly that (the same value the
   // page surfaces re-render on, so handle and highlight move in one commit).
-  useKernelValue(() => stage?.visiblePages() ?? null);
+  useKernelValue(() => stage?.listVisiblePages() ?? null);
   const [dragging, setDragging] = useState<'start' | 'end' | null>(null);
   // The web binder's `arm` must read the CURRENT endpoints/stage at pointer
   // down, not the ones captured when the listener attached — a stable ref
@@ -260,12 +302,7 @@ export function SelectionHandles({ color = '#2196f3', token = StageToken }: Sele
           const geom = selectionHandleGeom(view, src.endpoints[role], role);
           if (!geom) return null;
           const opposite = src.endpoints[role === 'start' ? 'end' : 'start'];
-          const drag = createSelectionHandleDrag(
-            host,
-            view,
-            opposite,
-            src.endpoints[role].pon,
-          );
+          const drag = createSelectionHandleDrag(host, view, opposite, src.endpoints[role].page);
           setDragging(role);
           return {
             // the point the user grabbed: the bar's midpoint
@@ -276,7 +313,7 @@ export function SelectionHandles({ color = '#2196f3', token = StageToken }: Sele
             session: {
               move: drag.move,
               end: () => {
-                drag.end(); // settle → menu reappears, onCommit fires
+                drag.end(); // settle → menu reappears, onCommitted fires
                 setDragging(null);
               },
             },
@@ -363,7 +400,6 @@ export function SelectionHandles({ color = '#2196f3', token = StageToken }: Sele
     </>
   );
 }
-
 
 export type SelectionClipboardProps = Pick<SelectionClipboardOptions, 'prefetch'>;
 

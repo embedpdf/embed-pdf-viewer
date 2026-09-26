@@ -49,6 +49,29 @@ kept in the browser across reloads. For the whole picture — the engine's
 WebAssembly, workers, CSP — see [Self-hosting & air-gapped
 deployments](./self-hosting).
 
+## Fonts for text annotations
+
+Text annotations use the 14 standard PDF fonts out of the box. To offer more — a brand
+typeface, a script the standard fonts don't cover — list them under `annotations.fonts`:
+
+```ts
+annotations: {
+  fonts: [
+    { key: 'brand-sans', url: '/fonts/BrandSans-Regular.ttf', label: 'Brand Sans' },
+    { key: 'noto-sc', url: '/fonts/NotoSansSC-Regular.otf', label: 'Noto Sans SC' },
+  ];
+}
+```
+
+Each font is fetched once when the viewer mounts, registered on the engine under its
+`key` (a glyph subset is embedded in the PDF when you save), and mounted as a `@font-face`
+of the same name so the text editor shows the very face the document will carry. The
+style panel then lists it by `label`, next to bold, italic and underline (also
+`Ctrl`/`Cmd`+`B`/`I`/`U` while typing), which apply to the selected text or to the whole
+box. A `key` must not be one of the standard names (`helvetica`, `times-roman`, …); a
+URL that fails to load is skipped with a console warning. Fonts on the cloud engine are a
+server policy, so the option applies to the built-in local engine.
+
 ## Where to go next
 
 - Configure the toolbar and available viewer controls.

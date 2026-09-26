@@ -19,7 +19,7 @@ interface PageTextService {
 ## Reading text
 
 ```ts
-const page = doc.page(pageObjectNumber);
+const page = doc.page(pageRef);
 const { text, charCount } = await page.text.read();
 
 console.log(text);      // full page text in display order
@@ -56,7 +56,7 @@ There's no document-level text call — iterate the page list and read each page
 const { pages } = await doc.pages.list();
 
 const fullText = (
-  await Promise.all(pages.map((p) => doc.page(p.pageObjectNumber).text.read()))
+  await Promise.all(pages.map((p) => doc.page(p.ref).text.read()))
 )
   .map((snapshot) => snapshot.text)
   .join('\n\n');

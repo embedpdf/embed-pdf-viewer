@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
   EngineError,
   EngineErrorCode,
+  toPageRef,
   type AnnotationDTO,
   type AnnotationListPageSnapshot,
   type AnnotationRef,
@@ -17,7 +18,7 @@ describe('CloudRevisionBridge', () => {
       pageState: pageState('sess_worker', 0),
       annotations: [
         annotation(indexRef('sess_worker', 0)),
-        annotation({ kind: 'objectNumber', pageObjectNumber: 3, annotObjectNumber: 10 }),
+        annotation({ kind: 'objectNumber', page: toPageRef(3), annotObjectNumber: 10 }),
       ],
     };
 
@@ -32,13 +33,13 @@ describe('CloudRevisionBridge', () => {
       kind: 'index',
       revision: {
         docSessionId: 'cloud:layer:doc:alice',
-        pageObjectNumber: 3,
+        page: toPageRef(3),
         generation: 7,
       },
     });
     expect(decorated.annotations[1]?.ref).toEqual({
       kind: 'objectNumber',
-      pageObjectNumber: 3,
+      page: toPageRef(3),
       annotObjectNumber: 10,
     });
     expect(JSON.stringify(decorated)).not.toContain('sess_worker');
@@ -70,7 +71,7 @@ describe('CloudRevisionBridge', () => {
     );
     const stable: AnnotationRef = {
       kind: 'objectNumber',
-      pageObjectNumber: 3,
+      page: toPageRef(3),
       annotObjectNumber: 42,
     };
 
@@ -78,7 +79,7 @@ describe('CloudRevisionBridge', () => {
       kind: 'index',
       revision: {
         docSessionId: 'sess_worker_2',
-        pageObjectNumber: 3,
+        page: toPageRef(3),
         generation: 0,
       },
     });
@@ -88,8 +89,8 @@ describe('CloudRevisionBridge', () => {
 
 function pageState(docSessionId: string, generation: number): PageState {
   return {
-    pageObjectNumber: 3,
-    revision: { docSessionId, pageObjectNumber: 3, generation },
+    page: toPageRef(3),
+    revision: { docSessionId, page: toPageRef(3), generation },
     weakAnnotationState: { kind: 'known', hasAnyWeakAnnotations: true },
   };
 }
@@ -97,9 +98,9 @@ function pageState(docSessionId: string, generation: number): PageState {
 function indexRef(docSessionId: string, generation: number): AnnotationRef {
   return {
     kind: 'index',
-    pageObjectNumber: 3,
+    page: toPageRef(3),
     index: 1,
-    revision: { docSessionId, pageObjectNumber: 3, generation },
+    revision: { docSessionId, page: toPageRef(3), generation },
   };
 }
 
@@ -109,7 +110,7 @@ function annotation(ref: AnnotationRef): AnnotationDTO {
     rawSubtypeCode: 999,
     rawSubtypeName: 'Debug',
     ref,
-    pageObjectNumber: 3,
+    page: toPageRef(3),
     index: ref.kind === 'index' ? ref.index : 0,
     identityQuality: ref.kind === 'index' ? 'weak' : 'durable',
     nm: null,

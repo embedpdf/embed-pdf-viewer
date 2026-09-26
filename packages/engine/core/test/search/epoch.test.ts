@@ -12,8 +12,13 @@ function manifest(
     metadataVersion: 3,
     auditHead: 42,
     baseSha: 'abc',
+    layerVersion: 0,
+    working: false,
+    baseByteLength: 0,
     pages: pages.map(([pon, contentVersion]) => ({
-      state: { pageObjectNumber: pon } as DocumentManifest['pages'][number]['state'],
+      state: {
+        page: { kind: 'objectNumber', pageObjectNumber: pon },
+      } as DocumentManifest['pages'][number]['state'],
       cache: { contentVersion } as DocumentManifest['pages'][number]['cache'],
     })),
   };
@@ -114,5 +119,7 @@ describe('canonicalSearchQuery', () => {
     expect(canonicalSearchQuery(caseSensitive)).toEqual(caseSensitive);
     const regex = { text: 'C\\d+', regex: true } as const;
     expect(canonicalSearchQuery(regex)).toEqual(regex);
+    const whitespaceInsensitive = { text: 'i n v o i c e', ignoreWhitespace: true } as const;
+    expect(canonicalSearchQuery(whitespaceInsensitive)).toEqual(whitespaceInsensitive);
   });
 });

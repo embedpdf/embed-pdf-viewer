@@ -24,12 +24,14 @@ import { InteractionToken } from '@embedpdf/react/interaction';
 import { ShellToken } from '@embedpdf/react/shell';
 import { AnnotationToken } from '@embedpdf/react/annotation';
 import { copySelection, SelectionToken, type TextRange } from '@embedpdf/react/selection';
-import { fieldKeyOf, FormToken } from '@embedpdf/react/form';
+import { FormToken, type FormFieldRef } from '@embedpdf/react/form';
 import { ActionsToken } from '@embedpdf/react/actions';
 import { LinkToken, openLinkTarget, type PdfLinkTarget } from '@embedpdf/react/link';
 import { SearchToken } from '@embedpdf/react/search';
+import { MeasurementToken } from '@embedpdf/react/measurement';
 import { RedactionToken } from '@embedpdf/react/redaction';
 import { StampToken } from '@embedpdf/react/stamp';
+import { SignatureToken } from '@embedpdf/react/signature';
 import { I18nToken } from '@embedpdf/react/i18n';
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -46,16 +48,17 @@ const sameTextRange = (a: TextRange | null, b: TextRange | null): boolean =>
   a === b ||
   (!!a &&
     !!b &&
-    a.start.pon === b.start.pon &&
+    a.start.page.pageObjectNumber === b.start.page.pageObjectNumber &&
     a.start.index === b.start.index &&
-    a.end.pon === b.end.pon &&
+    a.end.page.pageObjectNumber === b.end.page.pageObjectNumber &&
     a.end.index === b.end.index);
 
 // ── annotation-selection predicates (drive the floating strip's contents) ────
-const hasAnnotationSelection = (c: Ctx) => (anno(c)?.selection().length ?? 0) > 0;
+const hasAnnotationSelection = (c: Ctx) => (anno(c)?.getSelection().length ?? 0) > 0;
 /** v2 gated strip items per subtype (comment hidden on links/widgets) — here
  *  it's one derivation over the selected DTOs instead of per-command lookups. */
-const selectionSubtypes = (c: Ctx) => new Set((anno(c)?.getSelected() ?? []).map((a) => a.subtype));
+const selectionSubtypes = (c: Ctx) =>
+  new Set((anno(c)?.listSelected() ?? []).map((a) => a.subtype));
 /**
  * The selection's `link` value: a target, `null` (linkable but none set), or
  * `undefined` when the selection cannot carry a link at all (widgets, mixed
@@ -98,7 +101,7 @@ const toolAccent = (
   if (!accent) return null;
   const anno = c.tryGet(AnnotationToken);
   if (!anno) return null;
-  const d = anno.currentDefaults(toolId);
+  const d = anno.getToolDefaults(toolId);
   return {
     primary: d[accent.primary] ?? undefined,
     secondary: accent.secondary ? (d[accent.secondary] ?? undefined) : undefined,
@@ -136,7 +139,7 @@ const tool = (
     icon,
     categories: ['tool'],
     run: (c) => interaction(c)?.activateTool(toolId),
-    active: (c) => interaction(c)?.activeToolId() === toolId,
+    active: (c) => interaction(c)?.getActiveToolId() === toolId,
     enabled: (c) => interaction(c) != null && (authority?.(c) ?? true),
     iconAccent: (c) => toolAccent(c, toolId, accent),
   };
@@ -157,7 +160,7 @@ const spread = (id: string, mode: SpreadMode, labelKey: string, icon: string): C
   icon,
   categories: ['page', 'spread'],
   run: (c) => stage(c)?.setSpread(mode),
-  active: (c) => stage(c)?.spread() === mode,
+  active: (c) => stage(c)?.getSettings().spread === mode,
   enabled: (c) => stage(c) != null,
 });
 
@@ -188,7 +191,7 @@ export const defaultCommands: CommandDef[] = [
     shortcut: 'Mod+0',
     categories: ['zoom'],
     run: (c) => stage(c)?.fitPage(),
-    active: (c) => stage(c)?.zoomMode() === ZoomMode.FitPage,
+    active: (c) => stage(c)?.getZoomMode() === ZoomMode.FitPage,
     enabled: (c) => stage(c) != null,
   },
   {
@@ -198,15 +201,15 @@ export const defaultCommands: CommandDef[] = [
     shortcut: 'Mod+1',
     categories: ['zoom'],
     run: (c) => stage(c)?.fitWidth(),
-    active: (c) => stage(c)?.zoomMode() === ZoomMode.FitWidth,
+    active: (c) => stage(c)?.getZoomMode() === ZoomMode.FitWidth,
     enabled: (c) => stage(c) != null,
   },
   {
     id: 'zoom:automatic',
     labelKey: 'commands.zoom.automatic',
     categories: ['zoom'],
-    run: (c) => stage(c)?.automatic(),
-    active: (c) => stage(c)?.zoomMode() === ZoomMode.Automatic,
+    run: (c) => stage(c)?.fitAutomatic(),
+    active: (c) => stage(c)?.getZoomMode() === ZoomMode.Automatic,
     enabled: (c) => stage(c) != null,
   },
   zoomLevel('zoom:50', 0.5, 'commands.zoom.p50'),
@@ -229,7 +232,7 @@ export const defaultCommands: CommandDef[] = [
     icon: 'hand',
     categories: ['tools'],
     run: (c) => interaction(c)?.activateTool('pan'),
-    active: (c) => interaction(c)?.activeToolId() === 'pan',
+    active: (c) => interaction(c)?.getActiveToolId() === 'pan',
     enabled: (c) => interaction(c) != null,
   },
   {
@@ -238,7 +241,7 @@ export const defaultCommands: CommandDef[] = [
     icon: 'pointer',
     categories: ['tools'],
     run: (c) => interaction(c)?.activateTool('pointer'),
-    active: (c) => interaction(c)?.activeToolId() === 'pointer',
+    active: (c) => interaction(c)?.getActiveToolId() === 'pointer',
     enabled: (c) => interaction(c) != null,
   },
 
@@ -302,7 +305,7 @@ export const defaultCommands: CommandDef[] = [
       const id = c.documentId ?? undefined;
       const documents = c.tryGet(DocumentsToken);
       if (!documents) return;
-      const pull = () => documents.download(id);
+      const pull = () => documents.save(id);
       // The Phase-4 verb-owner contract: WS → serialize → DS as ONE queued
       // operation, so the WillSave mutations are IN the downloaded bytes
       // and two rapid saves can never interleave. Without the actions
@@ -365,7 +368,7 @@ export const defaultCommands: CommandDef[] = [
     icon: 'vertical',
     categories: ['page', 'scroll'],
     run: (c) => stage(c)?.setLayout('vertical'),
-    active: (c) => stage(c)?.layout() === 'vertical',
+    active: (c) => stage(c)?.getSettings().layout === 'vertical',
     enabled: (c) => stage(c) != null,
   },
   {
@@ -374,7 +377,7 @@ export const defaultCommands: CommandDef[] = [
     icon: 'horizontal',
     categories: ['page', 'scroll'],
     run: (c) => stage(c)?.setLayout('horizontal'),
-    active: (c) => stage(c)?.layout() === 'horizontal',
+    active: (c) => stage(c)?.getSettings().layout === 'horizontal',
     enabled: (c) => stage(c) != null,
   },
   // VIEW rotation (Adobe's "Rotate View"): rotates how every page displays in
@@ -386,7 +389,7 @@ export const defaultCommands: CommandDef[] = [
     labelKey: 'commands.rotate.clockwise',
     icon: 'rotateClockwise',
     categories: ['page', 'rotate'],
-    run: (c) => stage(c)?.rotateView(90),
+    run: (c) => stage(c)?.rotateViewBy(90),
     enabled: (c) => stage(c) != null,
   },
   {
@@ -394,7 +397,7 @@ export const defaultCommands: CommandDef[] = [
     labelKey: 'commands.rotate.counterclockwise',
     icon: 'rotateCounterClockwise',
     categories: ['page', 'rotate'],
-    run: (c) => stage(c)?.rotateView(-90),
+    run: (c) => stage(c)?.rotateViewBy(-90),
     enabled: (c) => stage(c) != null,
   },
 
@@ -419,6 +422,7 @@ export const defaultCommands: CommandDef[] = [
   modeCommand('mode:insert', 'commands.mode.insert'),
   modeCommand('mode:form', 'commands.mode.form', 'form-edit'),
   modeCommand('mode:redact', 'commands.mode.redact'),
+  modeCommand('mode:measure', 'commands.mode.measure'),
 
   // ── annotate tools (real interaction tools) ─────────────────────────────
   tool('annotation:add-highlight', 'highlight', 'commands.annotate.highlight', 'highlight', {
@@ -510,7 +514,18 @@ export const defaultCommands: CommandDef[] = [
   },
   // File attachment — click the spot, pick the file (the attachment provider).
   tool('insert:add-attachment', 'attachment', 'commands.insert.attachment', 'paperclip'),
-  tool('insert:add-signature', 'signature', 'commands.insert.signature', 'signature'),
+  // Signatures open the PEOPLE panel (libraries of kind 'signatures'): pick a
+  // mark → with a target field it signs (or fills) it, else it arms — a click
+  // on a signature field signs, anywhere else drops a stamp (Preview).
+  {
+    id: 'insert:add-signature',
+    labelKey: 'commands.insert.signature',
+    icon: 'signature',
+    visible: (c) => c.tryGet(StampToken) != null && c.tryGet(SignatureToken) != null,
+    enabled: (c) => anno(c)?.canCreate() ?? true,
+    categories: ['panel'],
+    panel: { id: 'signatures', exclusive: 'right' },
+  },
   // Image — the click-then-pick placement: click the spot, the file dialog
   // opens (narrowed to rasters), the picture lands where you clicked. The
   // tool itself is a `stamp` preset registered in viewer.tsx.
@@ -522,6 +537,7 @@ export const defaultCommands: CommandDef[] = [
   tool('form:add-radio', 'form-radio', 'commands.form.radio', 'formRadio'),
   tool('form:add-select', 'form-combobox', 'commands.form.select', 'formSelect'),
   tool('form:add-listbox', 'form-listbox', 'commands.form.listbox', 'formListbox'),
+  tool('form:add-signature', 'form-signature', 'commands.form.signature', 'signature'),
 
   // ── redaction (v2 parity: the toolbar arms the tool; the panel owns the
   // destructive verbs — Apply All / Clear live in the redaction sidebar) ────
@@ -540,7 +556,62 @@ export const defaultCommands: CommandDef[] = [
     panel: { id: 'redaction', exclusive: 'right' },
   },
 
+  {
+    ...tool('measurement:distance', 'distance', 'measurement.distance', 'distance', {
+      primary: 'color',
+    }),
+    enabled: (c) => {
+      const s = stage(c);
+      const page = s?.getCurrentPage()?.ref;
+      return page != null && (c.tryGet(MeasurementToken)?.canMeasure(page) ?? false);
+    },
+  },
+  {
+    ...tool('measurement:perimeter', 'perimeter', 'measurement.perimeter', 'perimeter', {
+      primary: 'color',
+    }),
+    enabled: (c) => {
+      const s = stage(c);
+      const page = s?.getCurrentPage()?.ref;
+      return page != null && (c.tryGet(MeasurementToken)?.canMeasure(page) ?? false);
+    },
+  },
+  {
+    ...tool('measurement:area', 'area', 'measurement.area', 'area', {
+      primary: 'color',
+    }),
+    enabled: (c) => {
+      const s = stage(c);
+      const page = s?.getCurrentPage()?.ref;
+      return page != null && (c.tryGet(MeasurementToken)?.canMeasure(page) ?? false);
+    },
+  },
+  {
+    id: 'measurement:calibrate',
+    labelKey: 'measurement.calibrate',
+    icon: 'calibrate',
+    categories: ['tool'],
+    enabled: (c) => c.tryGet(MeasurementToken)?.canCalibrate() ?? false,
+    active: (c) => interaction(c)?.getActiveToolId() === 'calibrate',
+    run: (c) => c.tryGet(MeasurementToken)?.startCalibration(),
+  },
+  {
+    id: 'panel:measurement',
+    labelKey: 'measurement.title',
+    icon: 'updateScale',
+    categories: ['panel'],
+    panel: { id: 'measurement', exclusive: 'right' },
+  },
+
   // ── annotation selection (the floating strip's verbs) ──────────────────
+  {
+    id: 'annotation:cancel-creation',
+    labelKey: 'commands.annotate.cancelCreation',
+    categories: ['annotation'],
+    shortcut: 'Escape',
+    enabled: (c) => anno(c)?.hasCreationDraft() ?? false,
+    run: (c) => anno(c)?.cancelCreationDraft(),
+  },
   {
     id: 'annotation:delete',
     labelKey: 'commands.annotate.delete',
@@ -550,24 +621,24 @@ export const defaultCommands: CommandDef[] = [
       const a = anno(c);
       if (!a) return;
       const form = c.tryGet(FormToken);
-      const dtos = a.getSelected();
-      const widgets = form ? dtos.filter((d) => d.subtype === 'widget') : [];
+      const dtos = a.listSelected();
+      const isWidget = (subtype: string) => subtype.startsWith('widget');
+      const widgets = form ? dtos.filter((d) => isWidget(d.subtype)) : [];
       if (widgets.length === 0) {
-        a.deleteSelection();
+        void a.deleteSelection();
         return;
       }
       // Widgets are FIELD-plane citizens: deleting one goes through doc.forms
       // (the field and every widget of it cascade), never the raw annotation —
       // otherwise the /AcroForm entry would be orphaned.
-      const keys = new Set<string>();
+      const fields = new Map<number, FormFieldRef>();
       for (const w of widgets) {
-        const objnum = w.ref.kind === 'objectNumber' ? w.ref.annotObjectNumber : 0;
-        const field = objnum > 0 ? form!.fieldForWidget(objnum) : null;
-        if (field) keys.add(fieldKeyOf(field));
+        const field = form!.getFieldForWidget(w.ref);
+        if (field) fields.set(field.fieldObjectNumber, field.ref);
       }
-      for (const key of keys) void form!.deleteField(key);
-      for (const d of dtos) if (d.subtype !== 'widget') void a.delete(d.ref);
-      a.deselect();
+      for (const ref of fields.values()) void form!.deleteField(ref);
+      for (const d of dtos) if (!isWidget(d.subtype)) void a.delete(d.ref);
+      a.clearSelection();
     },
     visible: hasAnnotationSelection,
     // Mirrors the engine's own authorization: locked/unauthorized annotations
@@ -611,23 +682,23 @@ export const defaultCommands: CommandDef[] = [
       const stamp = c.tryGet(StampToken);
       const documentId = c.documentId;
       if (!a || !stamp || documentId == null) return;
-      const dtos = a.getSelected();
-      const pon = dtos[0]?.ref.pageObjectNumber;
-      if (pon === undefined) return;
+      const dtos = a.listSelected();
+      const page = dtos[0]?.ref.page;
+      if (page === undefined) return;
       const i18n = c.tryGet(I18nToken);
       const label = i18n?.t('demo.stampsCustomLabel') ?? 'Custom stamp';
       const libraryName = i18n?.t('demo.stampsCustomLibrary') ?? 'My stamps';
       const libraryId = CUSTOM_LIBRARY_ID;
-      const ensureLibrary = stamp.library(libraryId)
+      const ensureLibrary = stamp.getLibrary(libraryId)
         ? Promise.resolve(libraryId)
         : stamp.createLibrary(libraryName, { id: libraryId, categories: ['custom'] });
       ensureLibrary
         .then((id) =>
-          stamp.addAssetFromAnnotations(
+          stamp.createAssetFromAnnotations(
             documentId,
-            pon,
+            page,
             dtos.map((d) => d.ref),
-            { libraryId: id, label: `${label} ${stamp.assets(id).length + 1}` },
+            { libraryId: id, label: `${label} ${stamp.listAssets({ libraryId: id }).length + 1}` },
           ),
         )
         // v2 jumped the sidebar to the custom library; the panel reads the
@@ -649,7 +720,7 @@ export const defaultCommands: CommandDef[] = [
       hasAnnotationSelection(c) &&
       !selectionSubtypes(c).has('widget') &&
       !selectionSubtypes(c).has('redact') &&
-      new Set((anno(c)?.getSelected() ?? []).map((d) => d.ref.pageObjectNumber)).size === 1,
+      new Set((anno(c)?.listSelected() ?? []).map((d) => d.ref.page.pageObjectNumber)).size === 1,
     enabled: (c) => c.tryGet(DocumentsToken)?.allows('doc.download') ?? true,
   },
   {
@@ -688,12 +759,12 @@ export const defaultCommands: CommandDef[] = [
     run: (c) => {
       const s = textSelection(c);
       if (!s) return;
-      const copiedRange = s.snapshot().range;
+      const copiedRange = s.getRange();
       void copySelection(s).then(
         (text) => {
           // Clipboard writes can outlive the click. Never let an older copy
           // completion clear a newer selection the user made in the meantime.
-          if (text !== '' && sameTextRange(s.snapshot().range, copiedRange)) s.clear();
+          if (text !== '' && sameTextRange(s.getRange(), copiedRange)) s.clear();
         },
         () => {}, // Copy failed: preserve the selection so the user can retry.
       );
@@ -765,6 +836,7 @@ export const MODE_SURFACES = [
   'mode:insert',
   'mode:form',
   'mode:redact',
+  'mode:measure',
 ] as const;
 
 function modeCommand(

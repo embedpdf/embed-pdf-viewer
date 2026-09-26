@@ -107,11 +107,11 @@ function createDestination(
   docPtr: Ptr,
   dest: PdfDestination,
 ): Ptr {
-  const pagePtr = fn.EPDFDoc_LoadPageByObjectNumber(docPtr, dest.pageObjectNumber);
+  const pagePtr = fn.EPDFDoc_LoadPageByObjectNumber(docPtr, dest.page.pageObjectNumber);
   if (!pagePtr) {
     throw new EngineError(
       EngineErrorCode.NotFound,
-      `link destination page not found: pageObjectNumber=${dest.pageObjectNumber}`,
+      `link destination page not found: pageObjectNumber=${dest.page.pageObjectNumber}`,
     );
   }
   try {

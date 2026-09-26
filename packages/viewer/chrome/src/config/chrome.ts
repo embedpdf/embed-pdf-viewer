@@ -59,6 +59,7 @@ const mainBar: BarSchema = {
           item('mode:insert', { variants: ['label'], importance: 1 }),
           item('mode:form', { variants: ['label'], importance: 1 }),
           item('mode:redact', { variants: ['label'], importance: 1 }),
+          item('mode:measure', { variants: ['label'], importance: 1 }),
         ],
       }),
     ],
@@ -114,6 +115,9 @@ const insertBar: BarSchema = {
     center: [
       group('stamps', { importance: 4 }, [
         'insert:add-stamp',
+        // Quick marks (`stamps.toolbar`): thumbnails that arm on click; in a
+        // menu the stamps panel stands in for them.
+        custom('quick-stamps', { terminal: 'insert:add-stamp', importance: 3 }),
         'insert:add-attachment',
         'insert:add-signature',
         'insert:add-image',
@@ -134,7 +138,26 @@ const formBar: BarSchema = {
         'form:add-radio',
       ]),
       group('choice-fields', { importance: 2 }, ['form:add-select', 'form:add-listbox']),
+      group('signature-fields', { importance: 2 }, ['form:add-signature']),
       history,
+    ],
+  },
+};
+
+const measureBar: BarSchema = {
+  id: 'measure',
+  sections: {
+    center: [
+      group('measure', { importance: 5 }, [
+        'measurement:distance',
+        'measurement:perimeter',
+        'measurement:area',
+        'measurement:calibrate',
+      ]),
+      group('scale', { importance: 4 }, [
+        custom('measurement-scale', { variants: ['inline'], terminal: 'panel:measurement' }),
+      ]),
+      style,
     ],
   },
 };
@@ -228,6 +251,7 @@ export const defaultChrome = defineChrome({
     'mode:insert': insertBar,
     'mode:form': formBar,
     'mode:redact': redactBar,
+    'mode:measure': measureBar,
   },
   menus: { document: documentMenu, zoom: zoomMenu, 'page-settings': pageSettingsMenu },
   strips: { annotation: annotationStrip, selection: selectionStrip },

@@ -61,6 +61,9 @@ export class CloudDocumentSearchService implements DocumentSearchService {
           signal,
         );
       const query = canonicalSearchQuery(request.query);
+      // The search token (the URL, the cache key) pins the scan origin by
+      // the page's object number.
+      const startPage = request.startPage?.pageObjectNumber;
 
       if (request.cursor !== undefined) {
         let token: SearchToken;
@@ -77,7 +80,7 @@ export class CloudDocumentSearchService implements DocumentSearchService {
             'search cursor belongs to a different query — restart the search',
           );
         }
-        if (request.startPage !== undefined && request.startPage !== token.startPage) {
+        if (startPage !== undefined && startPage !== token.startPage) {
           throw new EngineError(
             EngineErrorCode.InvalidArg,
             'startPage conflicts with the cursor — omit startPage when resuming',
@@ -100,7 +103,7 @@ export class CloudDocumentSearchService implements DocumentSearchService {
         encodeSearchToken({
           epoch,
           query,
-          ...(request.startPage !== undefined ? { startPage: request.startPage } : {}),
+          ...(startPage !== undefined ? { startPage } : {}),
           skip: 0,
           ...(request.budget !== undefined ? { budget: request.budget } : {}),
         });
@@ -126,5 +129,6 @@ function queryIdentity(query: SearchQuery): string {
     query.matchCase ? 1 : 0,
     query.matchDiacritics ? 1 : 0,
     query.wholeWord ? 1 : 0,
+    query.ignoreWhitespace ? 1 : 0,
   ]);
 }

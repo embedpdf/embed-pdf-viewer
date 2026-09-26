@@ -1,7 +1,7 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import type { DocumentEvent, HighlightDraft } from '@embedpdf/engine-core/runtime';
+import { toPageRef, type DocumentEvent, type HighlightDraft } from '@embedpdf/engine-core/runtime';
 import { createCloudEngine } from '../src/index';
 import {
   buildDbSeededFixture,
@@ -75,8 +75,8 @@ describe('remote events: two engines, one document (the collaboration loop)', ()
       await new Promise((r) => setTimeout(r, 300));
 
       const list = await docA.pages.list();
-      const pon = list.pages[0].pageObjectNumber;
-      const rotated = await docA.pages.rotate([pon], 90);
+      const pon = list.pages[0].ref.pageObjectNumber;
+      const rotated = await docA.pages.rotate([toPageRef(pon)], 90);
 
       // A: exactly one event, its own, local.
       await waitFor(() => eventsA.length >= 1, "A's local event");
@@ -92,7 +92,7 @@ describe('remote events: two engines, one document (the collaboration loop)', ()
       expect(typeof remote.origin.serverId).toBe('number');
       if (remote.type === 'pages.rotated') {
         expect(remote.rotation).toBe(90);
-        expect(remote.pageObjectNumbers).toEqual([pon]);
+        expect(remote.pages).toEqual([toPageRef(pon)]);
         expect(remote.layout).toEqual(rotated.layout);
         expect(remote.cache).toEqual(rotated.cache);
       }
@@ -106,7 +106,7 @@ describe('remote events: two engines, one document (the collaboration loop)', ()
       // And B's manifest absorbed the pins: a follow-up read on B sees the
       // rotation without a manual refresh.
       const listB = await docB.pages.list();
-      expect(listB.pages.find((p) => p.pageObjectNumber === pon)?.rotation).toBe(90);
+      expect(listB.pages.find((p) => p.ref.pageObjectNumber === pon)?.rotation).toBe(90);
     } finally {
       await docA.close();
       await docB.close();
@@ -133,9 +133,9 @@ describe('remote events: two engines, one document (the collaboration loop)', ()
       await new Promise((r) => setTimeout(r, 300));
 
       const list = await docB.pages.list();
-      const pon = list.pages[0].pageObjectNumber;
+      const pon = list.pages[0].ref.pageObjectNumber;
       const created = await docB
-        .page(pon)
+        .page(toPageRef(pon))
         .annotations.create({ subtype: 'highlight', contents: 'from B', quadPoints: QUAD });
 
       await waitFor(() => eventsA.length >= 1, "A's remote annotation event");

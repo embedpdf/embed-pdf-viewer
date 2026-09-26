@@ -21,7 +21,7 @@ export PDFIUM_EMBEDDER_FILTER="${PDFIUM_EMBEDDER_FILTER:-}"
 export PDFIUM_GTEST_ARGS="${PDFIUM_GTEST_ARGS:-}"
 
 image_name="pdf-runtime-pdf-runtime-linux-test"
-WORKSPACE="$(cd "$ROOT/../.." && pwd)"
+WORKSPACE="$(cd "$ROOT/../../.." && pwd)"  # the monorepo root (oss/embedpdf): ROOT is packages/engine/runtime
 LINUX_CLANG_VOLUME="pdf-runtime_linux-llvm-build"
 LINUX_CLANG_DIR="/workspace/packages/engine/runtime/runtime-src/third_party/llvm-build/Release+Asserts"
 LINUX_CLANG_URL="https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/clang-llvmorg-23-init-2224-g5bd8dadb-1.tar.xz"

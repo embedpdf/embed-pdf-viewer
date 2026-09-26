@@ -4,6 +4,7 @@ import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { EngineError } from '../errors/EngineError';
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import { toPageRef } from '../identity/PageRef';
 
 /**
  * Attachment conformance suite. Fixture requirement: a document whose
@@ -42,8 +43,8 @@ export function runAttachmentConformance(
       const probe = await openFixture(engine, opts);
       docSupported = probe.attachments !== undefined;
       const pages = await probe.pages.list();
-      firstPon = pages.pages[0].pageObjectNumber;
-      annotSupported = probe.page(firstPon).annotations.downloadFile !== undefined;
+      firstPon = pages.pages[0].ref.pageObjectNumber;
+      annotSupported = probe.page(toPageRef(firstPon)).annotations.downloadFile !== undefined;
       await probe.close();
     });
 
@@ -164,7 +165,7 @@ export function runAttachmentConformance(
       if (!annotSupported) return;
       const doc = await openFixture(engine, opts);
       try {
-        const annotations = doc.page(firstPon).annotations;
+        const annotations = doc.page(toPageRef(firstPon)).annotations;
         const data = new Uint8Array(2048);
         for (let i = 0; i < data.length; i++) data[i] = (i * 31 + 7) & 0xff;
 
@@ -207,7 +208,7 @@ export function runAttachmentConformance(
       if (!annotSupported) return;
       const doc = await openFixture(engine, opts);
       try {
-        const annotations = doc.page(firstPon).annotations;
+        const annotations = doc.page(toPageRef(firstPon)).annotations;
         const { created } = await annotations.create({
           subtype: 'text',
           rect: { left: 100, bottom: 100, right: 120, top: 120 },

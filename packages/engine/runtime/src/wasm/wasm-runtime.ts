@@ -178,6 +178,12 @@ function createWasmFileAccess(
     fromNodeFile() {
       throw new Error('fromNodeFile() is only available on the native Node runtime');
     },
+    readRange() {
+      throw new Error('readRange() is only available on the native Node runtime');
+    },
+    sizeOf() {
+      throw new Error('sizeOf() is only available on the native Node runtime');
+    },
   };
 }
 
@@ -185,6 +191,15 @@ function createWasmFileWrite(): PdfRuntimeFileWrite {
   return {
     toNodeFile() {
       throw new Error('toNodeFile() is only available on the native Node runtime');
+    },
+    writeRange() {
+      throw new Error('writeRange() is only available on the native Node runtime');
+    },
+    appendBytes() {
+      throw new Error('appendBytes() is only available on the native Node runtime');
+    },
+    removeFile() {
+      throw new Error('removeFile() is only available on the native Node runtime');
     },
   };
 }

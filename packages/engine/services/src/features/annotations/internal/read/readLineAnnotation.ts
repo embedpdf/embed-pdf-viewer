@@ -1,3 +1,5 @@
+import { readAnnotationMeasure, readLineCaption, readLineLeader } from './readMeasurementFields';
+import { readIntent } from './annotationReadPrimitives';
 import type { AnnotationBase, LineAnnotationDTO } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -15,8 +17,15 @@ export function readLine(
   base: AnnotationBase,
 ): LineAnnotationDTO {
   const rotation = readAnnotationRotation(fn, mem, annotPtr);
+  const intent = readIntent(fn, mem, annotPtr);
+  const caption = readLineCaption(fn, mem, annotPtr);
+  const leader = readLineLeader(fn, mem, annotPtr);
   return {
     ...base,
+    ...readAnnotationMeasure(fn, mem, annotPtr),
+    ...(intent === 'LineDimension' || intent === 'LineArrow' ? { intent } : {}),
+    ...(caption ? { caption } : {}),
+    ...(leader ? { leader } : {}),
     subtype: 'line',
     ...readFilledStyleExtras(fn, mem, annotPtr),
     linePoints: readLinePoints(fn, mem, annotPtr) ?? ZERO_LINE,

@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
 import { useCapability } from '@embedpdf/react/runtime';
 import { AnnotationToken } from '@embedpdf/react/annotation';
+import { annotationKey } from '@embedpdf/react/annotation';
 import { usePendingRedactions, useRedaction } from '@embedpdf/react/redaction';
 import { useSurface } from '@embedpdf/react/shell';
 import { useT } from '@embedpdf/react/i18n';
@@ -18,13 +18,6 @@ export function RedactionPanel() {
   const anno = useCapability(AnnotationToken);
   const confirm = useSurface('redact-confirm');
 
-  // The annotation plane loads lazily per page; pull every page in so the
-  // panel shows marks on pages never scrolled to.
-  useEffect(() => {
-    void redaction.preparePending();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
@@ -36,7 +29,7 @@ export function RedactionPanel() {
         ) : (
           <ul className="flex flex-col gap-1">
             {pending.map((item) => (
-              <li key={item.id}>
+              <li key={annotationKey(item.ref)}>
                 <div
                   role="button"
                   tabIndex={0}

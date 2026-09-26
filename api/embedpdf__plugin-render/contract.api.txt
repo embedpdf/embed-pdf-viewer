@@ -1,0 +1,18 @@
+# @embedpdf/plugin-render — ./contract
+
+FullPageOptions [InterfaceDeclaration] (from packages/plugin/render/src/paint-plan.ts): export interface FullPageOptions{ maxWidth?: number; quantize?: 'exact' | readonly number[]; }
+InvalidateOptions [InterfaceDeclaration]: export interface InvalidateOptions{ pages?: readonly PageRef[]; scope?: InvalidateScope; }
+InvalidateScope [TypeAliasDeclaration]: export type InvalidateScope = 'content' | 'annotations';
+PageImage [TypeAliasDeclaration]: export type PageImage = PageImageHandle;
+PageRender [InterfaceDeclaration]: export interface PageRender{ readonly page: PageRef; readonly image: PageImage; }
+PageViewDemand [InterfaceDeclaration] (from packages/plugin/render/src/paint-plan.ts): export interface PageViewDemand{ desiredDeviceWidth: number; visibleRect?: Rect; velocity?:{ dx: number; dy: number} ; }
+RenderCapability [InterfaceDeclaration]: export interface RenderCapability{ canRender(): boolean; renderPage(page: PageRef, options?: RenderPageOptions): Promise<PageImage>; renderThumbnail(page: PageRef, options: RenderThumbnailOptions): Promise<PageImage>; renderPages( pages: readonly PageRef[], options?: RenderPagesOptions, ): Promise<BatchResult<PageRender, PageRef>>; getRenderPolicy(): EngineRenderPolicy; getRenderEpoch(page: PageRef, includeAnnotations?: boolean): number; invalidate(options?: InvalidateOptions): void; readonly onInvalidated: EventHook<RenderInvalidatedEvent>; }
+RenderConfig [InterfaceDeclaration]: export interface RenderConfig{ fullPage?: FullPageOptions; tiles?: TilesOptions | false; format?: RenderFormat; quality?: number; debug?: boolean; }
+RenderFormat [TypeAliasDeclaration]: export type RenderFormat = NonNullable<PageImageOptions['format']>;
+RenderInvalidatedEvent [InterfaceDeclaration]: export interface RenderInvalidatedEvent{ readonly pages: readonly PageRef[]; readonly scope: InvalidateScope; readonly origin: ChangeOrigin; }
+RenderPageOptions [InterfaceDeclaration]: export interface RenderPageOptions extends OperationOptions{ width?: number; scale?: number; includeAnnotations?: boolean; format?: RenderFormat; quality?: number; }
+RenderPagesOptions [InterfaceDeclaration]: export interface RenderPagesOptions extends RenderPageOptions{ concurrency?: number; }
+RenderThumbnailOptions [InterfaceDeclaration]: export interface RenderThumbnailOptions extends OperationOptions{ maxWidth: number; includeAnnotations?: boolean; }
+RenderToken [VariableDeclaration] (from packages/plugin/render/src/token.ts): RenderToken = createCapabilityToken<RenderCapability>('render', { hint: `add renderPlugin() from '@embedpdf/plugin-render' to your plugins list`, } )
+TilesOptions [InterfaceDeclaration] (from packages/plugin/render/src/paint-plan.ts): export interface TilesOptions{ size?: number; quantize?: 'exact' | readonly number[]; maxScale?: number; bleed?: number; engageAt?: number; prefetch?:{ margin?: number; velocityBias?: boolean; } ; settleMs?: number; fadeMs?: number; }
+ViewDemandInput [InterfaceDeclaration] (from packages/plugin/render/src/paint-plan.ts): export interface PageViewDemand{ desiredDeviceWidth: number; visibleRect?: Rect; velocity?:{ dx: number; dy: number} ; }

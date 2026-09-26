@@ -1,4 +1,5 @@
-import type { I18nState, TranslateOptions, TranslationDictionary } from './types';
+import type { TranslateOptions, TranslationDictionary } from './contract';
+import type { I18nState } from './model';
 
 /**
  * The pure lookup core — state in, string out. No platform access anywhere

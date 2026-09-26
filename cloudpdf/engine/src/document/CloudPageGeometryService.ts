@@ -4,7 +4,7 @@ import {
   EngineErrorCode,
   type PageGeometryService,
   type PageGeometrySnapshot,
-  type PageObjectNumber,
+  type PageRef,
 } from '@embedpdf/engine-core/runtime';
 import { PageGeometrySnapshotSchema, wirePaths } from '@embedpdf/engine-core/wire';
 
@@ -17,7 +17,7 @@ export class CloudPageGeometryService implements PageGeometryService {
     private readonly http: HttpClient,
     private readonly docId: string,
     private readonly layerName: string,
-    private readonly pageObjectNumber: PageObjectNumber,
+    private readonly pageRef: PageRef,
     private readonly isClosed: () => boolean,
     private readonly manifest: ManifestAccessor,
   ) {}
@@ -31,21 +31,22 @@ export class CloudPageGeometryService implements PageGeometryService {
     return AbortablePromise.run<PageGeometrySnapshot>(async (signal) => {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        const page = manifest.pages.find((p) => p.state.pageObjectNumber === this.pageObjectNumber);
+        const pon = this.pageRef.pageObjectNumber;
+        const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pon);
         if (!page) {
           throw new EngineError(
             EngineErrorCode.NotFound,
-            `no page with object number ${this.pageObjectNumber} in document ${this.docId}`,
+            `no page with object number ${pon} in document ${this.docId}`,
           );
         }
         // Plane-scope rule: geometry depends on the `content` plane (see
         // CloudPageTextService for the full rationale).
         return planesInherited(manifest, ['content'])
-          ? wirePaths.docPageGeometry(this.docId, this.pageObjectNumber, page.cache.contentVersion)
+          ? wirePaths.docPageGeometry(this.docId, this.pageRef, page.cache.contentVersion)
           : wirePaths.layerPageGeometry(
               this.docId,
               this.layerName,
-              this.pageObjectNumber,
+              this.pageRef,
               page.cache.contentVersion,
             );
       };

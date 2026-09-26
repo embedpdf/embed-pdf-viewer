@@ -1,0 +1,2088 @@
+{
+  "corpusVersion": "role-probes-v3",
+  "capturedAt": "2026-09-14",
+  "runtimeParity": "WASM and native layerFile reports agree",
+  "cases": [
+    {
+      "id": "53",
+      "sha256": "5158c883d1d0e6e53b90fb371eb2b25c92f252ceb61730fb17e0f0cd02da7d06",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "unchanged",
+            "basis": "persisted"
+          },
+          "summary": "valid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": []
+    },
+    {
+      "id": "54",
+      "sha256": "a5e825d98b7ecd5e03c0a1678a7d91a1974b65dcef6c1c715c4decc51238c753",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 6, identical-rewrite: rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "identical-rewrite",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "detail": "rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)"
+            },
+            {
+              "rule": "identical-rewrite",
+              "verdict": "forbidden",
+              "objectNumber": 8,
+              "detail": "rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "55",
+      "sha256": "ad8d0137d40fbc7a720b473782d52ba0881c538a690bf6b28240d88d951779f0",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 6, identical-rewrite: rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "identical-rewrite",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "detail": "rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)"
+            },
+            {
+              "rule": "identical-rewrite",
+              "verdict": "forbidden",
+              "objectNumber": 8,
+              "detail": "rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)"
+            },
+            {
+              "rule": "trailer",
+              "verdict": "permitted",
+              "objectNumber": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "56",
+      "sha256": "58b3945de9f19b2b4212dd845595482f8d7ffc492059e67f9c7ae30371885b34",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 6, identical-rewrite: rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "identical-rewrite",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "detail": "rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)"
+            },
+            {
+              "rule": "identical-rewrite",
+              "verdict": "forbidden",
+              "objectNumber": 8,
+              "detail": "rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)"
+            },
+            {
+              "rule": "trailer",
+              "verdict": "permitted",
+              "objectNumber": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "57",
+      "sha256": "2936a12a149e18cf7477f46ca7ef3e07c23d66bace89f8bcd41173dc9edff0ee",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 6, identical-rewrite: rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "identical-rewrite",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "detail": "rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)"
+            },
+            {
+              "rule": "identical-rewrite",
+              "verdict": "forbidden",
+              "objectNumber": 8,
+              "detail": "rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)"
+            },
+            {
+              "rule": "trailer",
+              "verdict": "permitted",
+              "objectNumber": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "58",
+      "sha256": "6568703971663df4f21fb004cd3318d43faf8dc7446137854ceb98a8ad68bf4d",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "unchanged",
+            "basis": "persisted"
+          },
+          "summary": "valid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": []
+    },
+    {
+      "id": "59",
+      "sha256": "dcc48ec83187be12ea1e0fced180e456da5ce7110c3cea232f5282ccd2654172",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 18, identical-rewrite: rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "identical-rewrite",
+              "verdict": "forbidden",
+              "objectNumber": 18,
+              "detail": "rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "60",
+      "sha256": "720c776e772804e9c730578554005b463db48daba61604550a8839190bc442b9",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 6, identical-rewrite: rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "identical-rewrite",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "detail": "rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)"
+            },
+            {
+              "rule": "identical-rewrite",
+              "verdict": "forbidden",
+              "objectNumber": 18,
+              "detail": "rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)"
+            },
+            {
+              "rule": "trailer",
+              "verdict": "permitted",
+              "objectNumber": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "61",
+      "sha256": "31df7fcc706d486f3f1a04bb0a2fbd18a138b36200188e801a80b66e6094e432",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 6, identical-rewrite: rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "identical-rewrite",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "detail": "rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "62",
+      "sha256": "8d0c67f1bd2595ba479c47c12cc277df3c7171fc206d38e21e5af7beca70f53a",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 13, identical-rewrite: rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "identical-rewrite",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "detail": "rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "63",
+      "sha256": "97678d9ddc30c3ddfeafb9a93183540f5403e2a77685f26a571fdc369120c7dd",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "unchanged",
+            "basis": "persisted"
+          },
+          "summary": "valid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": []
+    },
+    {
+      "id": "64",
+      "sha256": "2f918ba7879dacc1fce3ea93aa18cbc53e7a18515a99d3bdd13c8a1a2d16ffb6",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 13, form-fill: field \"ValueOne\" flags changed (only a lock landing in this revision may set ReadOnly)",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "trailer",
+              "verdict": "permitted",
+              "objectNumber": 0
+            },
+            {
+              "rule": "form-fill",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "detail": "field \"ValueOne\" flags changed (only a lock landing in this revision may set ReadOnly)"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "edge": "6:Annots/[2]",
+              "detail": "was referenced from object 6 at Annots/[2] and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "edge": "7:Fields/[2]",
+              "detail": "was referenced from object 7 at Fields/[2] and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "edge": "6:Annots/[2]",
+              "detail": "is referenced from object 6 at Annots/[2] and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "edge": "7:Fields/[2]",
+              "detail": "is referenced from object 7 at Fields/[2] and no rule explains it"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "65",
+      "sha256": "f31a834cb4c16c8bd1edd9d3308d0dd6a910c10dbff61c81f36d8ebba3bcdd34",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "permitted",
+            "basis": "persisted"
+          },
+          "summary": "valid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "permitted",
+          "findings": [
+            {
+              "rule": "trailer",
+              "verdict": "permitted",
+              "objectNumber": 0
+            },
+            {
+              "rule": "form-fill",
+              "verdict": "permitted",
+              "objectNumber": 13,
+              "detail": "field \"ValueOne\" filled"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "66",
+      "sha256": "769e04ae1bb9ae20f1bfd5b53d1829a686a81c879cafac9609f06c905524dd51",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 13, form-fill: field \"ValueOne\" keys changed: TU",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "trailer",
+              "verdict": "permitted",
+              "objectNumber": 0
+            },
+            {
+              "rule": "form-fill",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "detail": "field \"ValueOne\" keys changed: TU"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "edge": "6:Annots/[2]",
+              "detail": "was referenced from object 6 at Annots/[2] and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "edge": "7:Fields/[2]",
+              "detail": "was referenced from object 7 at Fields/[2] and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "edge": "6:Annots/[2]",
+              "detail": "is referenced from object 6 at Annots/[2] and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "edge": "7:Fields/[2]",
+              "detail": "is referenced from object 7 at Fields/[2] and no rule explains it"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "67",
+      "sha256": "9b8bcb38194ee6ab4d1bb4e6527c80a82ebb6d9641ae7f4145874fb5b819ebf6",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 13, form-fill: field \"ValueOne\" keys changed: F",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "trailer",
+              "verdict": "permitted",
+              "objectNumber": 0
+            },
+            {
+              "rule": "form-fill",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "detail": "field \"ValueOne\" keys changed: F"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "edge": "6:Annots/[2]",
+              "detail": "was referenced from object 6 at Annots/[2] and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "edge": "7:Fields/[2]",
+              "detail": "was referenced from object 7 at Fields/[2] and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "edge": "6:Annots/[2]",
+              "detail": "is referenced from object 6 at Annots/[2] and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "edge": "7:Fields/[2]",
+              "detail": "is referenced from object 7 at Fields/[2] and no rule explains it"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "68",
+      "sha256": "8ce2c3024b9ce44497be385be48c9e3c0c9588dd68c5c45c457d5af8be539135",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "permitted",
+            "basis": "persisted"
+          },
+          "summary": "valid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "permitted",
+          "findings": [
+            {
+              "rule": "trailer",
+              "verdict": "permitted",
+              "objectNumber": 0
+            },
+            {
+              "rule": "form-fill",
+              "verdict": "permitted",
+              "objectNumber": 12,
+              "detail": "appearance of field \"ValueOne\" regenerated"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "69",
+      "sha256": "572f5e3e5504345452dad62682c1d490956bea9bacc08e18e5a2d152e8a45d16",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 10, signature-added: signature field keys changed: TU, Lock",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        },
+        {
+          "field": "SignatureTwo",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "unchanged",
+            "basis": "persisted"
+          },
+          "summary": "valid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "trailer",
+              "verdict": "permitted",
+              "objectNumber": 0
+            },
+            {
+              "rule": "signature-added",
+              "verdict": "forbidden",
+              "objectNumber": 10,
+              "detail": "signature field keys changed: TU, Lock"
+            },
+            {
+              "rule": "signature-added",
+              "verdict": "permitted",
+              "objectNumber": 21,
+              "detail": "signature value"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "70",
+      "sha256": "3712a5d6df9113edb6048bc88a14b597de4e5234d7620b808e0d2b8590539552",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 6, identical-rewrite: rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "identical-rewrite",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "detail": "rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "71",
+      "sha256": "965876a41a5e968884aedcd5435078b33b14507ad7604dd9a22afde8cdcf1c9b",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 13, identical-rewrite: rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "identical-rewrite",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "detail": "rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "72",
+      "sha256": "a6922ff25482eb6746c098fdd55c12c436062ecb87e9b6feb8bd3a7b4463c659",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "unchanged",
+            "basis": "persisted"
+          },
+          "summary": "valid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": []
+    },
+    {
+      "id": "73",
+      "sha256": "079965a6785ee38185048d6d2caa52028e7ef450ec3eee2b151759796a9bd4bc",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 13, field-lock: field \"ValueOne\" is locked by an earlier signature",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "field-lock",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "detail": "field \"ValueOne\" is locked by an earlier signature"
+            },
+            {
+              "rule": "trailer",
+              "verdict": "permitted",
+              "objectNumber": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "74",
+      "sha256": "01205cf3f531e90324f2e9c18b236743a47ffe9b4996f1fe7fab4b16812d9e52",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 13, field-lock: field \"ValueOne\" is locked by an earlier signature",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "field-lock",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "detail": "field \"ValueOne\" is locked by an earlier signature"
+            },
+            {
+              "rule": "trailer",
+              "verdict": "permitted",
+              "objectNumber": 0
+            },
+            {
+              "rule": "form-fill",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "detail": "field \"ValueOne\" keys changed: TU"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "75",
+      "sha256": "a46e5201b96c43d8cd0e9d133516d616ee5545757cda86b72b0df02148c78ed1",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 12, field-lock: part of a locked field changed",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "field-lock",
+              "verdict": "forbidden",
+              "objectNumber": 12,
+              "detail": "part of a locked field changed"
+            },
+            {
+              "rule": "trailer",
+              "verdict": "permitted",
+              "objectNumber": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "76",
+      "sha256": "1f3af6161bfa37e89b77e31e31acac9725d1d6bcaa864ad50989342b69334fb2",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 13, field-lock: field \"ValueOne\" is locked by an earlier signature",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "field-lock",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "detail": "field \"ValueOne\" is locked by an earlier signature"
+            },
+            {
+              "rule": "trailer",
+              "verdict": "permitted",
+              "objectNumber": 0
+            },
+            {
+              "rule": "form-fill",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "detail": "field \"ValueOne\" flags changed (only a lock landing in this revision may set ReadOnly)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "77",
+      "sha256": "81e0863ff2cf2dca63a6bf5f177a0bd4ceb73ca852696fcc9751494c3de46d3b",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 13, identical-rewrite: rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "identical-rewrite",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "detail": "rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "78",
+      "sha256": "21c0bea74ec01ae94827d97013359d66d87ce95daac73423827c5ec59d3bc7f2",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "unchanged",
+            "basis": "persisted"
+          },
+          "summary": "valid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": []
+    },
+    {
+      "id": "79",
+      "sha256": "2c514bb74de5e4e6670e66ec8e02f871ceb55a586d5e93045af2ea0ac3ac25da",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 18, unexplained: was referenced from object 13 at AP/N/Resources/Font/F1/CharProcs/A and no rule explains it",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "trailer",
+              "verdict": "permitted",
+              "objectNumber": 0
+            },
+            {
+              "rule": "form-fill",
+              "verdict": "permitted",
+              "objectNumber": 15,
+              "detail": "field \"ValueTwo\" filled"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 18,
+              "edge": "13:AP/N/Resources/Font/F1/CharProcs/A",
+              "detail": "was referenced from object 13 at AP/N/Resources/Font/F1/CharProcs/A and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 18,
+              "edge": "7:DR/Font/Shared/CharProcs/A",
+              "detail": "was referenced from object 7 at DR/Font/Shared/CharProcs/A and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 18,
+              "edge": "13:AP/N/Resources/Font/F1/CharProcs/A",
+              "detail": "is referenced from object 13 at AP/N/Resources/Font/F1/CharProcs/A and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 18,
+              "edge": "7:DR/Font/Shared/CharProcs/A",
+              "detail": "is referenced from object 7 at DR/Font/Shared/CharProcs/A and no rule explains it"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "80",
+      "sha256": "0ef2691cde4008f6412f65d7b89639847cb079b97000273c93f5caa9dbb8e545",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 13, field-lock: field \"ValueOne\" is locked by an earlier signature",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "field-lock",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "detail": "field \"ValueOne\" is locked by an earlier signature"
+            },
+            {
+              "rule": "trailer",
+              "verdict": "permitted",
+              "objectNumber": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "81",
+      "sha256": "c9635ee7e7e85c959832edc15a8a5ff3f6e698b795c2746958f6bbd45a841da6",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 13, field-lock: field \"ValueOne\" is locked by an earlier signature",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "field-lock",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "detail": "field \"ValueOne\" is locked by an earlier signature"
+            },
+            {
+              "rule": "trailer",
+              "verdict": "permitted",
+              "objectNumber": 0
+            }
+          ]
+        },
+        {
+          "older": 1,
+          "newer": 2,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "field-lock",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "detail": "field \"ValueOne\" is locked by an earlier signature"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "82",
+      "sha256": "d8d9cb6439467e8f9c2e096bd9658582276344bb3cfb28cc541fcc96ec3d0587",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 5, unexplained: was referenced from object 6 at Contents and no rule explains it",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 5,
+              "edge": "6:Contents",
+              "detail": "was referenced from object 6 at Contents and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 5,
+              "edge": "6:Contents",
+              "detail": "is referenced from object 6 at Contents and no rule explains it"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "83",
+      "sha256": "98c6647198f718c06818f1c5747a95144bd79f5823a5b594099c3fef9456c048",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 5, unexplained: was referenced from object 6 at Contents and no rule explains it",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 5,
+              "edge": "6:Contents",
+              "detail": "was referenced from object 6 at Contents and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 5,
+              "edge": "6:Contents",
+              "detail": "is referenced from object 6 at Contents and no rule explains it"
+            }
+          ]
+        },
+        {
+          "older": 1,
+          "newer": 2,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 5,
+              "edge": "6:Contents",
+              "detail": "was referenced from object 6 at Contents and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 5,
+              "edge": "6:Contents",
+              "detail": "is referenced from object 6 at Contents and no rule explains it"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "84",
+      "sha256": "3cefa842cd7d8b095dc7a1754810e3f76b1b9b23c462fd4966782f983863ad4c",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 13, field-lock: field \"ValueOne\" is locked by an earlier signature",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        },
+        {
+          "field": "SignatureTwo",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "unchanged",
+            "basis": "persisted"
+          },
+          "summary": "valid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "field-lock",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "detail": "field \"ValueOne\" is locked by an earlier signature"
+            },
+            {
+              "rule": "trailer",
+              "verdict": "permitted",
+              "objectNumber": 0
+            }
+          ]
+        },
+        {
+          "older": 1,
+          "newer": 2,
+          "level": "fill",
+          "verdict": "permitted",
+          "findings": [
+            {
+              "rule": "trailer",
+              "verdict": "permitted",
+              "objectNumber": 0
+            },
+            {
+              "rule": "signature-added",
+              "verdict": "permitted",
+              "objectNumber": 10,
+              "detail": "field \"SignatureTwo\" signed"
+            },
+            {
+              "rule": "signature-added",
+              "verdict": "permitted",
+              "objectNumber": 23,
+              "detail": "signature value"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "85",
+      "sha256": "36fa67f25cbcc03ee83d9a4add4b7897b446009cc73583e48900b11db4e0f232",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 13, field-lock: field \"ValueOne\" is locked by an earlier signature",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        },
+        {
+          "field": "SignatureTwo",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 3: object 13, field-lock: field \"ValueOne\" is locked by an earlier signature",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "field-lock",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "detail": "field \"ValueOne\" is locked by an earlier signature"
+            },
+            {
+              "rule": "trailer",
+              "verdict": "permitted",
+              "objectNumber": 0
+            }
+          ]
+        },
+        {
+          "older": 1,
+          "newer": 2,
+          "level": "fill",
+          "verdict": "permitted",
+          "findings": [
+            {
+              "rule": "trailer",
+              "verdict": "permitted",
+              "objectNumber": 0
+            },
+            {
+              "rule": "signature-added",
+              "verdict": "permitted",
+              "objectNumber": 10,
+              "detail": "field \"SignatureTwo\" signed"
+            },
+            {
+              "rule": "signature-added",
+              "verdict": "permitted",
+              "objectNumber": 23,
+              "detail": "signature value"
+            }
+          ]
+        },
+        {
+          "older": 2,
+          "newer": 3,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "field-lock",
+              "verdict": "forbidden",
+              "objectNumber": 13,
+              "detail": "field \"ValueOne\" is locked by an earlier signature"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "86",
+      "sha256": "b324489dc1b6ef6b81f4ecbb87daab79512935714d770fdf23a11d7fd2149af2",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 7, acroform-housekeeping: /AcroForm /Fields gained non-signature fields: 22",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "trailer",
+              "verdict": "permitted",
+              "objectNumber": 0
+            },
+            {
+              "rule": "acroform-housekeeping",
+              "verdict": "forbidden",
+              "objectNumber": 7,
+              "detail": "/AcroForm /Fields gained non-signature fields: 22"
+            },
+            {
+              "rule": "form-fill",
+              "verdict": "forbidden",
+              "objectNumber": 22,
+              "detail": "field \"ValueThree\" keys changed: F, FT, P, Rect, Subtype, T, TU, Type"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "3:Kids/[0]",
+              "detail": "was referenced from object 3 at Kids/[0] and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "15:P",
+              "detail": "was referenced from object 15 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "13:P",
+              "detail": "was referenced from object 13 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "10:P",
+              "detail": "was referenced from object 10 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "8:P",
+              "detail": "was referenced from object 8 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "3:Kids/[0]",
+              "detail": "is referenced from object 3 at Kids/[0] and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "22:P",
+              "detail": "is referenced from object 22 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "15:P",
+              "detail": "is referenced from object 15 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "13:P",
+              "detail": "is referenced from object 13 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "10:P",
+              "detail": "is referenced from object 10 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "8:P",
+              "detail": "is referenced from object 8 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 7,
+              "edge": "1:AcroForm",
+              "detail": "was referenced from object 1 at AcroForm and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 7,
+              "edge": "1:AcroForm",
+              "detail": "is referenced from object 1 at AcroForm and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 21,
+              "edge": "22:AP/N",
+              "detail": "is referenced from object 22 at AP/N and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 22,
+              "edge": "6:Annots/[4]",
+              "detail": "is referenced from object 6 at Annots/[4] and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 22,
+              "edge": "7:Fields/[4]",
+              "detail": "is referenced from object 7 at Fields/[4] and no rule explains it"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "87",
+      "sha256": "af9ae1bb3f2ecbeb2f881ea66c9c49d17e50d304e8e2aa2d45d12af4f962ae9b",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 7, acroform-housekeeping: /AcroForm /Fields is not append-only",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "trailer",
+              "verdict": "permitted",
+              "objectNumber": 0
+            },
+            {
+              "rule": "acroform-housekeeping",
+              "verdict": "forbidden",
+              "objectNumber": 7,
+              "detail": "/AcroForm /Fields is not append-only"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "3:Kids/[0]",
+              "detail": "was referenced from object 3 at Kids/[0] and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "15:P",
+              "detail": "was referenced from object 15 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "13:P",
+              "detail": "was referenced from object 13 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "10:P",
+              "detail": "was referenced from object 10 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "8:P",
+              "detail": "was referenced from object 8 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "3:Kids/[0]",
+              "detail": "is referenced from object 3 at Kids/[0] and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "13:P",
+              "detail": "is referenced from object 13 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "10:P",
+              "detail": "is referenced from object 10 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "8:P",
+              "detail": "is referenced from object 8 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 7,
+              "edge": "1:AcroForm",
+              "detail": "was referenced from object 1 at AcroForm and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 7,
+              "edge": "1:AcroForm",
+              "detail": "is referenced from object 1 at AcroForm and no rule explains it"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "88",
+      "sha256": "bdef80ca9a49798700eb675bf43bdf8941c42a2047816465da39be2fac6829a5",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 22, annotation: annotation change under level 'fill'",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "trailer",
+              "verdict": "permitted",
+              "objectNumber": 0
+            },
+            {
+              "rule": "annotation",
+              "verdict": "forbidden",
+              "objectNumber": 22,
+              "detail": "annotation change under level 'fill'"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "3:Kids/[0]",
+              "detail": "was referenced from object 3 at Kids/[0] and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "15:P",
+              "detail": "was referenced from object 15 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "13:P",
+              "detail": "was referenced from object 13 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "10:P",
+              "detail": "was referenced from object 10 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "8:P",
+              "detail": "was referenced from object 8 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "3:Kids/[0]",
+              "detail": "is referenced from object 3 at Kids/[0] and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "22:P",
+              "detail": "is referenced from object 22 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "15:P",
+              "detail": "is referenced from object 15 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "13:P",
+              "detail": "is referenced from object 13 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "10:P",
+              "detail": "is referenced from object 10 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "8:P",
+              "detail": "is referenced from object 8 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 21,
+              "edge": "22:AP/N",
+              "detail": "is referenced from object 22 at AP/N and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 22,
+              "edge": "6:Annots/[4]",
+              "detail": "is referenced from object 6 at Annots/[4] and no rule explains it"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "89",
+      "sha256": "41eb0ed3307e2e20b81a7733756203d303c074cae24f5aad744651802aabe173",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "unchanged",
+            "basis": "persisted"
+          },
+          "summary": "valid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": []
+    },
+    {
+      "id": "90",
+      "sha256": "6a75de59267d8f656ab48d2f459d98b5d10b5cd9b91303b9452a1d87c97fdeab",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 6, annotation: annotation change under level 'fill'",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "trailer",
+              "verdict": "permitted",
+              "objectNumber": 0
+            },
+            {
+              "rule": "annotation",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "detail": "annotation change under level 'fill'"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "3:Kids/[0]",
+              "detail": "was referenced from object 3 at Kids/[0] and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "6:Annots/[4]/P",
+              "detail": "was referenced from object 6 at Annots/[4]/P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "15:P",
+              "detail": "was referenced from object 15 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "13:P",
+              "detail": "was referenced from object 13 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "10:P",
+              "detail": "was referenced from object 10 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "8:P",
+              "detail": "was referenced from object 8 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "3:Kids/[0]",
+              "detail": "is referenced from object 3 at Kids/[0] and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "15:P",
+              "detail": "is referenced from object 15 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "13:P",
+              "detail": "is referenced from object 13 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "10:P",
+              "detail": "is referenced from object 10 at P and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 6,
+              "edge": "8:P",
+              "detail": "is referenced from object 8 at P and no rule explains it"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "91",
+      "sha256": "53cb154ed56e06fea13b1c737ba78dfd7c1d4b3adda3ebf744ba33a976f3497d",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 16, annotation: annotation change under level 'fill'",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ],
+      "policyVersion": 3,
+      "steps": [
+        {
+          "older": 0,
+          "newer": 1,
+          "level": "fill",
+          "verdict": "forbidden",
+          "findings": [
+            {
+              "rule": "trailer",
+              "verdict": "permitted",
+              "objectNumber": 0
+            },
+            {
+              "rule": "annotation",
+              "verdict": "forbidden",
+              "objectNumber": 16,
+              "detail": "annotation change under level 'fill'"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 16,
+              "edge": "6:Annots/[4]",
+              "detail": "was referenced from object 6 at Annots/[4] and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 16,
+              "edge": "6:Annots/[4]",
+              "detail": "is referenced from object 6 at Annots/[4] and no rule explains it"
+            },
+            {
+              "rule": "unexplained",
+              "verdict": "forbidden",
+              "objectNumber": 22,
+              "edge": "16:AP/N",
+              "detail": "is referenced from object 16 at AP/N and no rule explains it"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

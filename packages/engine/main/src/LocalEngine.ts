@@ -1,4 +1,6 @@
 import {
+  type SessionKind,
+  type SignedDocumentPolicy,
   AbortablePromise,
   CONTINUOUS_RENDER_POLICY,
   EngineError,
@@ -36,6 +38,22 @@ export interface LocalEngineOptions {
    * `continuous` (render anything — v2 parity).
    */
   renderPolicy?: EngineRenderPolicy;
+  /**
+   * Whether this engine enforces what a document's signatures forbid
+   * (`protect`, the default: a certified document loses page assembly,
+   * a locked field refuses writes, a rewrite save is refused) or leaves
+   * every edit to the caller (`permit`, for tools that produce or test
+   * invalid files). Signature analysis never depends on it.
+   */
+  signedDocumentPolicy?: SignedDocumentPolicy;
+  /**
+   * The shape every `open({ kind: 'bytes' })` session takes. Default
+   * `layer`: an immutable base with a layer of edits on top, so saves append
+   * only what changed and signatures survive later edits. `plain` keeps the
+   * classic single in-memory document (a signed file still opens as a
+   * layer). See {@link SessionKind}.
+   */
+  sessionKind?: SessionKind;
 }
 
 /**
@@ -50,6 +68,8 @@ export class LocalEngine implements Engine {
       opts.concurrency ?? 1,
       opts.imageEncoder,
       opts.renderPolicy,
+      opts.signedDocumentPolicy ?? 'protect',
+      opts.sessionKind ?? 'layer',
     );
   }
 
@@ -75,6 +95,8 @@ export class LocalEngine implements Engine {
     concurrency: number,
     imageEncoder: LocalImageEncoder | undefined,
     renderPolicy: EngineRenderPolicy | undefined,
+    private readonly signedDocumentPolicy: SignedDocumentPolicy,
+    private readonly sessionKind: SessionKind,
   ) {
     this.queue = new WorkerQueue(transport, { concurrency });
     this.imageEncoder = imageEncoder ?? new BrowserImageEncoder();
@@ -108,12 +130,61 @@ export class LocalEngine implements Engine {
       return this.openLayerBytes(input, options);
     }
 
+    if (input.kind === 'layerFile') {
+      return this.openLayerFile(input, options);
+    }
+
     return AbortablePromise.rejectReason(
       new EngineError(
         EngineErrorCode.InvalidArg,
-        `local engine only supports OpenInput.kind === 'bytes' or 'layerBytes' (got '${input.kind}')`,
+        `local engine only supports OpenInput.kind === 'bytes', 'layerBytes' or 'layerFile' (got '${input.kind}')`,
       ),
     );
+  }
+
+  /** A layer over a base FILE: PDFium range-reads the base from disk (Node runtimes only). */
+  private openLayerFile(
+    input: Extract<OpenInput, { kind: 'layerFile' }>,
+    options?: OpenOptions,
+  ): AbortablePromise<DocumentHandle> {
+    const queue = this.queue;
+    const password = options?.password ?? input.password ?? null;
+    const docId = input.id;
+    const baseKey = input.baseKey ?? input.basePath;
+    const artifactBytes =
+      input.layer?.kind === 'artifact' ? toArrayBuffer(input.layer.bytes) : undefined;
+    const layer =
+      input.layer?.kind === 'artifact-file'
+        ? ({ kind: 'artifact-file', path: input.layer.path } as const)
+        : artifactBytes === undefined
+          ? ({ kind: 'fresh' } as const)
+          : ({ kind: 'artifact', bytes: artifactBytes } as const);
+    const transfer = artifactBytes ? [artifactBytes] : [];
+    const signedDocumentPolicy = this.signedDocumentPolicy;
+    const baseSha256 = input.baseSha256;
+
+    const submission = queue.enqueue<WorkerResultPayload>(
+      {
+        buildPack: (jobId: JobId) =>
+          wirePack(
+            {
+              kind: 'open.layerFileBase',
+              jobId,
+              docId,
+              baseKey,
+              basePath: input.basePath,
+              layer,
+              password,
+              signedDocumentPolicy,
+              ...(baseSha256 ? { baseSha256 } : {}),
+            },
+            transfer,
+          ),
+      },
+      { priority: Priority.HIGH },
+    );
+
+    return this.openResult(submission, options);
   }
 
   private openBytes(
@@ -124,6 +195,8 @@ export class LocalEngine implements Engine {
     const password = options?.password ?? input.password ?? null;
     const buffer = toArrayBuffer(input.bytes);
     const docId = input.id;
+    const signedDocumentPolicy = this.signedDocumentPolicy;
+    const sessionKind = this.sessionKind;
 
     const submission = queue.enqueue<WorkerResultPayload>(
       {
@@ -133,7 +206,18 @@ export class LocalEngine implements Engine {
         // sender's `buffer.byteLength` becomes 0 after the transport hands
         // it off to the worker.
         buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'open.fatMem', jobId, docId, bytes: buffer, password }, [buffer]),
+          wirePack(
+            {
+              kind: 'open.fatMem',
+              jobId,
+              docId,
+              bytes: buffer,
+              password,
+              signedDocumentPolicy,
+              sessionKind,
+            },
+            [buffer],
+          ),
       },
       { priority: Priority.HIGH },
     );
@@ -157,6 +241,7 @@ export class LocalEngine implements Engine {
         ? ({ kind: 'fresh' } as const)
         : ({ kind: 'artifact', bytes: artifactBytes } as const);
     const transfer = artifactBytes ? [baseBytes, artifactBytes] : [baseBytes];
+    const signedDocumentPolicy = this.signedDocumentPolicy;
 
     const submission = queue.enqueue<WorkerResultPayload>(
       {
@@ -170,6 +255,7 @@ export class LocalEngine implements Engine {
               baseBytes,
               layer,
               password,
+              signedDocumentPolicy,
             },
             transfer,
           ),
@@ -204,6 +290,8 @@ export class LocalEngine implements Engine {
           scope: options?.scope,
           identity: options?.identity,
           pdfPermissionsBits: payload.security.pdfPermissionsBits,
+          protection: payload.protection ?? null,
+          signedDocumentPolicy: this.signedDocumentPolicy,
         }),
       );
       return new LocalDocumentHandle(

@@ -1,4 +1,5 @@
 import {
+  type BaseVersionInfo,
   AbortablePromise,
   DEFAULT_PDF_SAVE_MODE,
   EngineError,
@@ -19,6 +20,7 @@ import {
   type PageHandle,
   type PageObjectNumber,
   type PdfSaveMode,
+  type PageRef,
 } from '@embedpdf/engine-core/runtime';
 import { EventHub, SessionEventPublisher } from '@embedpdf/engine-services';
 
@@ -27,11 +29,13 @@ import type { ScopeGuard } from '../scope';
 import { LocalDocumentActionsService } from './LocalDocumentActionsService';
 import { LocalDocumentAnnotationsService } from './LocalDocumentAnnotationsService';
 import { LocalDocumentAttachmentsService } from './LocalDocumentAttachmentsService';
+import { LocalDocumentFontSettings } from './LocalDocumentFontSettings';
 import { LocalDocumentFormsService } from './LocalDocumentFormsService';
 import { LocalDocumentPagesService } from './LocalDocumentPagesService';
 import { LocalDocumentRedactionService } from './LocalDocumentRedactionService';
 import { LocalDocumentSearchService } from './LocalDocumentSearchService';
 import { LocalDocumentSecurityService } from './LocalDocumentSecurityService';
+import { LocalDocumentSignaturesService } from './LocalDocumentSignaturesService';
 import { LocalMetadataService } from './LocalMetadataService';
 import { LocalPageHandle } from './LocalPageHandle';
 import { LocalPieceInfoService } from './LocalPieceInfoService';
@@ -50,10 +54,12 @@ export class LocalDocumentHandle implements DocumentHandle {
   readonly attachments: LocalDocumentAttachmentsService;
   readonly actions: DocumentActionsService;
   readonly forms: LocalDocumentFormsService;
+  readonly fonts: LocalDocumentFontSettings;
   readonly search: LocalDocumentSearchService;
   readonly pages: DocumentPagesService;
   readonly redaction: DocumentRedactionService;
   readonly security: DocumentSecurityService;
+  readonly signatures: LocalDocumentSignaturesService;
   /**
    * The engine's configured render policy, advertised through the same
    * `policy()` every engine exposes (engine parity: plugin code never
@@ -94,24 +100,58 @@ export class LocalDocumentHandle implements DocumentHandle {
     this.attachments = new LocalDocumentAttachmentsService(id, queue, view, guard, this.publisher);
     this.actions = new LocalDocumentActionsService(id, queue, view, guard);
     this.forms = new LocalDocumentFormsService(id, queue, view, guard, this.publisher);
+    this.fonts = new LocalDocumentFontSettings(id, queue, view, guard);
     this.search = new LocalDocumentSearchService(id, queue, view, guard);
     this.pages = new LocalDocumentPagesService(id, queue, view, guard, this.publisher);
     this.redaction = new LocalDocumentRedactionService(id, queue, view, guard, this.publisher);
+    this.signatures = new LocalDocumentSignaturesService(id, queue, view, guard, this.publisher);
   }
 
   /**
-   * Returns a `PageHandle` keyed on the page's PDF indirect object
-   * number. We don't validate the page exists synchronously - the worker
-   * does that on the next call. This matches the cloud engine, which
+   * The saved version this session is on: SHA-256 and length of the
+   * loaded bytes (for a layer session, of its base).
+   */
+  version(): AbortablePromise<BaseVersionInfo> {
+    if (this.closed) {
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.id}`),
+      );
+    }
+    try {
+      this.guard.assertCapability('doc.open');
+    } catch (err) {
+      return AbortablePromise.rejectReason(err);
+    }
+    const docId = this.id;
+    const submission = this.queue.enqueue<WorkerResultPayload>(
+      { buildPack: (jobId: JobId) => wirePack({ kind: 'document.version', jobId, docId }) },
+      { priority: Priority.MEDIUM },
+    );
+    return AbortablePromise.run<BaseVersionInfo>(async (signal) => {
+      const onAbort = () => submission.abort(signal.reason);
+      if (signal.aborted) onAbort();
+      else signal.addEventListener('abort', onAbort, { once: true });
+      const payload = await submission;
+      if (payload.tag !== 'document.version') {
+        throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
+      }
+      return payload.version;
+    });
+  }
+
+  /**
+   * Returns a `PageHandle` keyed on the page's address (object number or
+   * `/Names /Pages` key). We don't validate the page exists synchronously -
+   * the worker resolves the address on every call. This matches the cloud engine, which
    * cannot validate without a round-trip either.
    *
    * `pageIndex` is advisory metadata, reported as `-1`. Display order is
    * geometry, not liveness: clients read it from `pages.list()` (each
-   * `PageLayout.index`), joined to this handle by `pageObjectNumber`.
+   * `PageLayout.index`), joined to this handle by `ref`.
    */
-  page(pageObjectNumber: PageObjectNumber): PageHandle {
+  page(ref: PageRef): PageHandle {
     return new LocalPageHandle(
-      pageObjectNumber,
+      ref,
       -1,
       this.id,
       this.queue,
@@ -138,6 +178,18 @@ export class LocalDocumentHandle implements DocumentHandle {
     }
     const docId = this.id;
     const mode = opts.mode ?? DEFAULT_PDF_SAVE_MODE;
+    // A rewrite drops every revision, and with them every signature. A
+    // signed document refuses it unless the engine runs with
+    // `signedDocumentPolicy: 'permit'`.
+    const protection = this.guard.currentProtection();
+    if (mode === 'rewrite' && protection && protection.judged !== null) {
+      return AbortablePromise.rejectReason(
+        new EngineError(
+          EngineErrorCode.ProtectedDocument,
+          'the document is signed: a rewrite save would void every signature (use an incremental save)',
+        ),
+      );
+    }
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
@@ -162,8 +214,9 @@ export class LocalDocumentHandle implements DocumentHandle {
     });
   }
 
-  /** Export just this document's layer as a re-openable artifact. Rejects when the
-   *  document was opened without a layer (the worker rejects a base-only session). */
+  /** Export just this document's layer as a re-openable artifact. Works for every
+   *  session opened as a layer (the default); rejects on a `sessionKind: 'plain'`
+   *  session, which has no layer to export. */
   downloadLayer(): AbortablePromise<Uint8Array> {
     if (this.closed) {
       return AbortablePromise.rejectReason(
@@ -191,6 +244,47 @@ export class LocalDocumentHandle implements DocumentHandle {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
       return new Uint8Array(payload.bytes);
+    });
+  }
+
+  /** Node runtimes only: the document written to a local file, never through JS (see `DocumentHandle`). */
+  downloadToFile(path: string, opts?: { mode?: PdfSaveMode }): AbortablePromise<void> {
+    if (this.closed) {
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.id}`),
+      );
+    }
+    const mode: PdfSaveMode = opts?.mode ?? DEFAULT_PDF_SAVE_MODE;
+    try {
+      this.guard.assertCapability('doc.download');
+    } catch (err) {
+      return AbortablePromise.rejectReason(err);
+    }
+    const protection = this.guard.currentProtection();
+    if (mode === 'rewrite' && protection && protection.judged !== null) {
+      return AbortablePromise.rejectReason(
+        new EngineError(
+          EngineErrorCode.ProtectedDocument,
+          'the document is signed: a rewrite save would void every signature (use an incremental save)',
+        ),
+      );
+    }
+    const docId = this.id;
+    const submission = this.queue.enqueue<WorkerResultPayload>(
+      {
+        buildPack: (jobId: JobId) =>
+          wirePack({ kind: 'document.saveFile', jobId, docId, mode, path }),
+      },
+      { priority: Priority.HIGH },
+    );
+    return AbortablePromise.run<void>(async (signal) => {
+      const onAbort = () => submission.abort(signal.reason);
+      if (signal.aborted) onAbort();
+      else signal.addEventListener('abort', onAbort, { once: true });
+      const payload = await submission;
+      if (payload.tag !== 'document.saveFile') {
+        throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
+      }
     });
   }
 

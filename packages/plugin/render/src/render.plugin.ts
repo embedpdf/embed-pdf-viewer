@@ -1,28 +1,24 @@
 import { definePlugin } from '@embedpdf/core';
-import { createRenderCapability } from './capability';
-import { registerRenderEffects } from './effects';
-import { initialRenderState, renderReducer } from './reducer';
-import { RenderToken } from './types';
-import type { RenderAction, RenderCapability, RenderPluginOptions, RenderState } from './types';
+import type { RenderConfig } from './contract';
+import { createRenderController } from './controller';
+import { RenderToken, type RenderHostCapability } from './host-contract';
+import { initialRenderState, reduceRender, type RenderAction, type RenderState } from './model';
 
 /**
- * Document-scoped. The ONE policy consumer in the client stack: the doc-bind
- * effect resolves the engine's advertised render
- * policy; `renderPage` conforms desired scales to it and collapses
- * same-rung asks in the raster store; the tile manager turns host-supplied
- * demand into a retention-safe paint plan over the SAME store. State is the
- * per-page ledger — raster versions (two doors: the document event stream's
- * built-in map and the `invalidate` verb), the policy latch, and the tile
- * wake-up counter. Layers key on `renderSourceKey`/`tilePlan` and refetch
- * exactly when those change.
+ * Document-scoped. The ONE policy consumer in the client stack: the kernel
+ * materializes the engine's advertised render policy on the document, the
+ * controller conforms desired scales to it and collapses same-key asks in
+ * its raster store, and the tile manager turns host-supplied demand into a
+ * retention-safe paint plan over the SAME store. State is the per-page
+ * ledger — raster versions (two doors: the document event stream's built-in
+ * map and the `invalidate` verb) and the tile wake-up counter.
  */
-export const renderPlugin = (options: RenderPluginOptions = {}) =>
-  definePlugin<RenderState, RenderAction, RenderCapability>({
+export const renderPlugin = (config: RenderConfig = {}) =>
+  definePlugin<RenderState, RenderAction, RenderHostCapability>({
     id: 'render',
     scope: 'document',
     token: RenderToken,
     initialState: initialRenderState,
-    reduce: renderReducer,
-    capability: (ctx) => createRenderCapability(ctx, options),
-    effects: registerRenderEffects,
+    reduce: reduceRender,
+    create: (ctx) => createRenderController(ctx, config),
   });

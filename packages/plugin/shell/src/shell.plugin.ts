@@ -1,8 +1,10 @@
 import { definePlugin } from '@embedpdf/core';
-import { createShellCapability } from './capability';
-import { initialShellState, shellReducer } from './reducer';
-import { ShellToken } from './types';
-import type { ShellAction, ShellCapability, ShellState } from './types';
+
+import { createShellController } from './controller';
+import { ShellToken } from './host-contract';
+import type { ShellHostCapability } from './host-contract';
+import { initialShellState, shellReducer } from './model';
+import type { ShellAction, ShellState } from './model';
 
 /**
  * The shell plugin: document-scoped (each document keeps its own panels, so
@@ -10,11 +12,11 @@ import type { ShellAction, ShellCapability, ShellState } from './types';
  * surfaces; commands toggle them.
  */
 export const shellPlugin = () =>
-  definePlugin<ShellState, ShellAction, ShellCapability>({
+  definePlugin<ShellState, ShellAction, ShellHostCapability>({
     id: 'shell',
     scope: 'document',
     token: ShellToken,
     initialState: initialShellState,
     reduce: shellReducer,
-    capability: createShellCapability,
+    create: (ctx) => ({ api: createShellController(ctx) }),
   });

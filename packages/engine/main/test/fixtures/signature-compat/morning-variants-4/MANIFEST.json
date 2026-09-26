@@ -1,0 +1,34 @@
+[
+  {
+    "file": "morning-T1-dense+lf-signed-plus-orphan.pdf",
+    "sha256": "f62044c320a9f46f5a233adade99d3fe489141e495f3f13aebe7113a7acdcca7"
+  },
+  {
+    "file": "morning-T2-id+info+lf-signed-plus-orphan.pdf",
+    "sha256": "29d205eac8563a464abbf6adf34c1fafc4c8687a4ac4f8622ec9830f78b68f2f"
+  },
+  {
+    "file": "morning-T3-dense+id+info-signed-plus-orphan.pdf",
+    "sha256": "5efc895aa24f99fdbcfec8b83d26f9dde8ff87b8d7e187ddeff4fa3496b59558"
+  },
+  {
+    "file": "morning-T4-dense+id-signed-plus-orphan.pdf",
+    "sha256": "47563a4189e29ca764d8a88bfe783ab01541cfac336abffa7b194c03010d2989"
+  },
+  {
+    "file": "morning-T5-dense+info-signed-plus-orphan.pdf",
+    "sha256": "31b8ee089761ba0fb2259e9d5aac096e9bf75688906fe99165870eac8a0426e2"
+  },
+  {
+    "file": "morning-T6-id+lf-signed-plus-orphan.pdf",
+    "sha256": "3f00770ca2c376cd293b943ed9b160808ee98abe4d2cd0ac410b060aeaa5f80a"
+  },
+  {
+    "file": "morning-T7-info+lf-signed-plus-orphan.pdf",
+    "sha256": "55e04793f812825dfabf34b439bd507528499c062fd855633b86825b6e01b82b"
+  },
+  {
+    "file": "morning-T8-dense+true-lf-signed-plus-orphan.pdf",
+    "sha256": "6fcfcaa3dc3c79593fc3ba3a86d6d2ac276618f9c0ba3c78a31bd1093d2d0a05"
+  }
+]

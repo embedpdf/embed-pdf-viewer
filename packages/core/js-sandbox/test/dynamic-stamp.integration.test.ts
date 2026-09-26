@@ -155,10 +155,10 @@ describe('dynamic stamp real-PDF vertical slice', () => {
 
       const page = (await reopened.pages.list()).pages[0];
       expect(reopened.pages.flatten).toBeDefined();
-      const flattenedResult = await reopened.pages.flatten!([page.pageObjectNumber], 'display');
+      const flattenedResult = await reopened.pages.flatten!([page.ref], 'display');
       expect(flattenedResult.results.map(({ status }) => status)).toEqual(['applied']);
       expect(reopened.pages.extract).toBeDefined();
-      const extracted = await reopened.pages.extract!([page.pageObjectNumber]);
+      const extracted = await reopened.pages.extract!([page.ref]);
 
       flattened = await engine.open(
         { kind: 'bytes', id: 'dynamic-stamp-flattened', bytes: extracted },
@@ -166,9 +166,7 @@ describe('dynamic stamp real-PDF vertical slice', () => {
       );
       const flattenedPage = (await flattened.pages.list()).pages[0];
       expect((await flattened.forms.list()).fields).toEqual([]);
-      expect(
-        (await flattened.page(flattenedPage.pageObjectNumber).annotations.list()).annotations,
-      ).toEqual([]);
+      expect((await flattened.page(flattenedPage.ref).annotations.list()).annotations).toEqual([]);
     } finally {
       sandbox.dispose();
       await close(flattened);

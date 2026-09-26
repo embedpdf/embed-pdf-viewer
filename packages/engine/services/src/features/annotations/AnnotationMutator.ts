@@ -1,3 +1,8 @@
+import { isDimension } from '@embedpdf/engine-core/runtime';
+import {
+  prepareMeasurementDraft,
+  prepareMeasurementPatch,
+} from './internal/mutations/prepareMeasurementMutation';
 import {
   appearanceImpactOf,
   EngineError,
@@ -29,6 +34,7 @@ import type { FontRegistrar } from '../fonts';
 import { captureOrStampStableId } from './internal/identity/captureOrStampStableId';
 import { resolveAnnotPtr } from './internal/identity/resolveAnnotationPointer';
 import { computeMutationImpact } from './internal/mutations/computeMutationImpact';
+import { assertRichTextAgreement } from './internal/richTextWire';
 import { readContextFor } from './internal/read/annotationReadContext';
 import { readAnnotString } from './internal/read/annotationReadPrimitives';
 import {
@@ -102,7 +108,12 @@ export class AnnotationMutator {
   private writeContext(pagePtr: Ptr, resources?: WireResourceMap): AnnotationWriteContext {
     const fonts = this.fonts;
     return {
-      ...(fonts ? { resolveRegisteredFontId: (key: string) => fonts.idFor(key) } : {}),
+      ...(fonts
+        ? {
+            resolveRegisteredFontId: (key: string) => fonts.idFor(key),
+            describeRegisteredFont: (key: string) => fonts.describeOrUndefined(key),
+          }
+        : {}),
       docPtr: this.session.requireDocPtr(),
       pagePtr,
       ...(resources ? { resources } : {}),
@@ -126,6 +137,8 @@ export class AnnotationMutator {
       this.ensureKnownWeakStateFromPage(pageObjectNumber, pagePtr);
       const writeCtx = this.writeContext(pagePtr, resources);
       preflightDraft(draft, writeCtx);
+      assertRichTextAgreement(draft);
+      draft = prepareMeasurementDraft(draft);
       // `create` is append-only: PDFium drops the new annotation at
       // `index = previousCount`, so no existing index ever shifts. Per
       // the locked rule in `computeMutationImpact`, that means create is
@@ -202,7 +215,7 @@ export class AnnotationMutator {
           pageObjectNumber,
           newIndex,
           pageStateBefore.revision,
-          readContextFor(this.session),
+          readContextFor(this.session, this.fonts),
         );
         joinWidgetFieldNumbers(this.runtime, this.session, [dto]);
       } finally {
@@ -238,7 +251,7 @@ export class AnnotationMutator {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
     const pool = this.session.pagePool();
-    const pagePtr = pool.acquire(ref.pageObjectNumber);
+    const pagePtr = pool.acquire(ref.page.pageObjectNumber);
     let annotPtr: Ptr | null = null;
     try {
       annotPtr = resolveAnnotPtr(this.runtime, this.session, pagePtr, ref);
@@ -246,19 +259,10 @@ export class AnnotationMutator {
 
       const writeCtx = this.writeContext(pagePtr, resources);
       preflightPatch(patch, writeCtx);
+      assertRichTextAgreement(patch);
 
-      this.ensureKnownWeakStateFromPage(ref.pageObjectNumber, pagePtr);
-      const pageStateBefore = this.session.pageState(ref.pageObjectNumber);
-
-      // Apply boundary: validation and cancellation are complete before the
-      // first possible document write (weak-id strengthening below).
-      throwIfAborted(signal);
-
-      // Opportunistic /NM stamp for weak annotations + capture the
-      // resulting stable id for `meta.changed`. Same monotonic /NM
-      // rule that `move()` uses; sharing the helper guarantees the
-      // two paths cannot drift in their identity bookkeeping.
-      const stableId = this.captureOrStampStableId(annotPtr);
+      this.ensureKnownWeakStateFromPage(ref.page.pageObjectNumber, pagePtr);
+      const pageStateBefore = this.session.pageState(ref.page.pageObjectNumber);
 
       // Blend mode lives inside the existing /AP graphics state rather than in
       // the annotation dictionary. Capture it before re-baking so an unrelated
@@ -279,14 +283,35 @@ export class AnnotationMutator {
         fn,
         mem,
         annotPtr,
-        ref.pageObjectNumber,
+        ref.page.pageObjectNumber,
         preIndex,
         pageStateBefore.revision,
-        readContextFor(this.session),
+        readContextFor(this.session, this.fonts),
       );
+
+      patch = prepareMeasurementPatch(fn, annotPtr, currentDto, patch);
+
+      // Apply boundary: validation and cancellation are complete before the
+      // first possible document write (weak-id strengthening below).
+      throwIfAborted(signal);
+
+      // Opportunistic /NM stamp for weak annotations + capture the
+      // resulting stable id for `meta.changed`. Same monotonic /NM
+      // rule that `move()` uses; sharing the helper guarantees the
+      // two paths cannot drift in their identity bookkeeping.
+      const stableId = this.captureOrStampStableId(annotPtr);
 
       // Apply caller-supplied subtype-specific writes.
       applyPatch(fn, mem, annotPtr, patch, writeCtx);
+      // A derived plain label supersedes imported rich contents; retaining stale /RC
+      // would show a different value in consumers that prefer rich text.
+      if (
+        patch.contents !== undefined &&
+        patch.contents !== currentDto.contents &&
+        isDimension({ ...currentDto, ...patch })
+      ) {
+        fn.EPDFAnnot_RemoveKey(annotPtr, 'RC');
+      }
       // Apply /IRT + /RT changes (set/relink/clear, or RT-only). Setting a
       // link may promote a weak parent to indirect (non-structural); the
       // strengthened parent id is folded into `meta.changed` below.
@@ -297,7 +322,7 @@ export class AnnotationMutator {
           this.session,
           pagePtr,
           annotPtr,
-          ref.pageObjectNumber,
+          ref.page.pageObjectNumber,
           { inReplyTo: patch.inReplyTo, replyType: patch.replyType },
         );
       }
@@ -363,15 +388,15 @@ export class AnnotationMutator {
         fn,
         mem,
         annotPtr,
-        ref.pageObjectNumber,
+        ref.page.pageObjectNumber,
         newIndex,
         pageStateBefore.revision,
-        readContextFor(this.session),
+        readContextFor(this.session, this.fonts),
       );
       joinWidgetFieldNumbers(this.runtime, this.session, [dto]);
 
-      this.recordWeakStateFromPage(ref.pageObjectNumber, pagePtr);
-      const pageStateAfter = this.session.pageState(ref.pageObjectNumber);
+      this.recordWeakStateFromPage(ref.page.pageObjectNumber, pagePtr);
+      const pageStateAfter = this.session.pageState(ref.page.pageObjectNumber);
       const meta = computeMutationImpact({
         mutation: 'update',
         pageStateBefore,
@@ -381,7 +406,7 @@ export class AnnotationMutator {
       return { updated: dto, appearance, meta };
     } finally {
       if (annotPtr !== null) fn.FPDFPage_CloseAnnot(annotPtr);
-      pool.release(ref.pageObjectNumber);
+      pool.release(ref.page.pageObjectNumber);
     }
   }
 
@@ -407,11 +432,11 @@ export class AnnotationMutator {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
     const pool = this.session.pagePool();
-    const pagePtr = pool.acquire(ref.pageObjectNumber);
+    const pagePtr = pool.acquire(ref.page.pageObjectNumber);
     let bumpRequested = false;
     try {
-      this.ensureKnownWeakStateFromPage(ref.pageObjectNumber, pagePtr);
-      const pageStateBefore = this.session.pageState(ref.pageObjectNumber);
+      this.ensureKnownWeakStateFromPage(ref.page.pageObjectNumber, pagePtr);
+      const pageStateBefore = this.session.pageState(ref.page.pageObjectNumber);
       throwIfAborted(signal);
 
       let deleted: AnnotationStableId | null;
@@ -426,7 +451,7 @@ export class AnnotationMutator {
           if (!probe) {
             throw new EngineError(
               EngineErrorCode.InvalidReference,
-              `no annotation with object number ${ref.annotObjectNumber} on page ${ref.pageObjectNumber}`,
+              `no annotation with object number ${ref.annotObjectNumber} on page ${ref.page.pageObjectNumber}`,
             );
           }
           try {
@@ -446,7 +471,7 @@ export class AnnotationMutator {
             if (!probe) {
               throw new EngineError(
                 EngineErrorCode.InvalidReference,
-                `no annotation with /NM '${ref.nm}' on page ${ref.pageObjectNumber}`,
+                `no annotation with /NM '${ref.nm}' on page ${ref.page.pageObjectNumber}`,
               );
             }
             try {
@@ -468,7 +493,7 @@ export class AnnotationMutator {
           if (!annotPtr) {
             throw new EngineError(
               EngineErrorCode.InvalidReference,
-              `index ${ref.index} out of range on page ${ref.pageObjectNumber}`,
+              `index ${ref.index} out of range on page ${ref.page.pageObjectNumber}`,
             );
           }
           let probedObjNum: number;
@@ -501,10 +526,10 @@ export class AnnotationMutator {
       // the finally-bump. Do not gate this on the page's current weak state:
       // old snapshots can still hold index refs from before annotations were
       // strengthened, and delete/move can make those refs point elsewhere.
-      this.session.bumpRevision(ref.pageObjectNumber);
+      this.session.bumpRevision(ref.page.pageObjectNumber);
       bumpRequested = false;
-      this.recordWeakStateFromPage(ref.pageObjectNumber, pagePtr);
-      const pageStateAfter = this.session.pageState(ref.pageObjectNumber);
+      this.recordWeakStateFromPage(ref.page.pageObjectNumber, pagePtr);
+      const pageStateAfter = this.session.pageState(ref.page.pageObjectNumber);
 
       const meta = computeMutationImpact({
         mutation: 'delete',
@@ -514,8 +539,8 @@ export class AnnotationMutator {
       });
       return { deleted, meta };
     } finally {
-      if (bumpRequested) this.session.bumpRevision(ref.pageObjectNumber);
-      pool.release(ref.pageObjectNumber);
+      if (bumpRequested) this.session.bumpRevision(ref.page.pageObjectNumber);
+      pool.release(ref.page.pageObjectNumber);
     }
   }
 
@@ -568,10 +593,10 @@ export class AnnotationMutator {
       );
     }
     for (const r of refs) {
-      if (r.pageObjectNumber !== pageObjectNumber) {
+      if (r.page.pageObjectNumber !== pageObjectNumber) {
         throw new EngineError(
           EngineErrorCode.InvalidArg,
-          `move refs must all target page ${pageObjectNumber}; got ref on page ${r.pageObjectNumber}`,
+          `move refs must all target page ${pageObjectNumber}; got ref on page ${r.page.pageObjectNumber}`,
         );
       }
     }
@@ -691,7 +716,7 @@ export class AnnotationMutator {
             pageObjectNumber,
             newIdx,
             bumpedRev,
-            readContextFor(this.session),
+            readContextFor(this.session, this.fonts),
           );
         } finally {
           fn.FPDFPage_CloseAnnot(annotPtr);

@@ -1,3 +1,5 @@
+import { PageRefSchema } from '../identity/PageRef.schema';
+import type { PageRef } from '../identity/PageRef';
 import { z } from 'zod';
 
 import type {
@@ -21,6 +23,20 @@ import type { DocumentManifest, ManifestPage } from '../dto/DocumentManifest';
 import type { LayerScopes } from '../dto/LayerScopes';
 import type { DocumentMetadata } from '../dto/DocumentMetadata';
 import type { MetadataPatch } from '../dto/MetadataPatch';
+import type { AnalyzeInput, ChangeAnalysis } from '../signature/analysis/types';
+import type {
+  BaseVersionInfo,
+  DocumentProtection,
+  DocumentVersionRef,
+  FieldLockSpec,
+  PdfRevision,
+  SignatureAbortResult,
+  SignatureCompleteResult,
+  SignatureDTO,
+  SignaturePrepared,
+  SignatureSeedValue,
+  SignatureSnapshot,
+} from '../signature/types';
 import type { PageGeometryRun, PageGeometrySnapshot } from '../dto/PageGeometrySnapshot';
 import { charMapViolation } from '../text/charmap';
 import type { PageBoxes, PageLayout } from '../dto/PageLayout';
@@ -34,7 +50,7 @@ import type { DocumentSecurityState, PdfPermissionInfo } from '../engine/Documen
 import type { SerializedEngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { FormEffectsResult, FormEffect } from '../forms/effects';
-import { FormFieldDTOSchema, FormSnapshotSchema, FormWidgetRefSchema } from '../forms/schema';
+import { FormFieldDTOSchema, FormSnapshotSchema, FormWidgetSchema } from '../forms/schema';
 import { FormFieldRefSchema, FormFieldValueSchema } from '../forms/schema';
 import {
   PdfQuadSchema,
@@ -387,7 +403,7 @@ export const WeakAnnotationStateSchema: z.ZodType<WeakAnnotationState> = z.discr
 );
 
 export const PageStateSchema: z.ZodType<PageState> = z.object({
-  pageObjectNumber: z.number().int().positive(),
+  page: PageRefSchema,
   revision: RevisionTokenSchema,
   weakAnnotationState: WeakAnnotationStateSchema,
 });
@@ -459,6 +475,10 @@ export const DocumentManifestSchema = z.object({
   annotationsVersion: z.number().int().positive().default(1),
   auditHead: z.number().int().nonnegative(),
   baseSha: z.string(),
+  // Signing fences (absent on pre-signature servers: unwritten, unknown length).
+  layerVersion: z.number().int().nonnegative().default(0),
+  working: z.boolean().default(false),
+  baseByteLength: z.number().int().nonnegative().default(0),
   // Plane scopes: layer manifests only; absent = all-'layer'.
   scopes: LayerScopesSchema.optional(),
   pages: z.array(ManifestPageSchema),
@@ -552,6 +572,7 @@ export const SearchQuerySchema: z.ZodType<SearchQuery> = z.object({
   matchCase: z.boolean().optional(),
   wholeWord: z.boolean().optional(),
   matchDiacritics: z.boolean().optional(),
+  ignoreWhitespace: z.boolean().optional(),
 });
 
 export const SearchModeSchema = z.enum(['rects', 'full']);
@@ -560,7 +581,7 @@ export const SearchRequestSchema: z.ZodType<SearchRequest> = z.object({
   query: SearchQuerySchema,
   mode: SearchModeSchema.optional(),
   cursor: z.string().optional(),
-  startPage: z.number().int().positive().optional(),
+  startPage: PageRefSchema.optional(),
   skip: z.number().int().nonnegative().optional(),
   budget: z
     .object({
@@ -583,7 +604,7 @@ export const PdfTextSegmentSchema: z.ZodType<PdfTextSegment> = z.object({
 });
 
 export const SearchMatchSchema: z.ZodType<SearchMatch> = z.object({
-  pageObjectNumber: z.number().int().positive(),
+  page: PageRefSchema,
   charStart: z.number().int().nonnegative(),
   charCount: z.number().int().positive(),
   segments: z.array(PdfTextSegmentSchema),
@@ -823,9 +844,11 @@ export const CacheDeltaSchema: z.ZodType<CacheDelta> = z.object({
   previousDocVersion: z.number().int().positive(),
   docVersion: z.number().int().positive(),
   annotationsVersion: z.number().int().positive().optional(),
+  layerVersion: z.number().int().nonnegative().optional(),
+  working: z.boolean().optional(),
   pages: z.array(
     z.object({
-      pageObjectNumber: z.number().int().positive(),
+      page: PageRefSchema,
       cache: CachePinsSchema,
     }),
   ),
@@ -891,7 +914,7 @@ export const AnnotationMoveResultSchema: z.ZodType<AnnotationMoveResult> = z.obj
 
 export const FormSetValueResultSchema: z.ZodType<FormSetValueResult> = z.object({
   field: FormFieldDTOSchema,
-  changedWidgets: z.array(FormWidgetRefSchema),
+  changedWidgets: z.array(FormWidgetSchema),
   meta: MutationMetaSchema,
 });
 
@@ -912,11 +935,11 @@ export const FormEffectsResultSchema: z.ZodType<FormEffectsResult> = z.object({
       index: z.number().int().nonnegative(),
       status: z.enum(['applied', 'unchanged', 'rejected', 'failed', 'skipped']),
       fields: z.array(FormFieldDTOSchema),
-      changedWidgets: z.array(FormWidgetRefSchema),
+      changedWidgets: z.array(FormWidgetSchema),
       error: EngineErrorPayloadSchema.optional(),
     }),
   ),
-  changedWidgets: z.array(FormWidgetRefSchema),
+  changedWidgets: z.array(FormWidgetSchema),
   meta: MutationMetaSchema.nullable(),
 });
 
@@ -941,7 +964,7 @@ export const FormFieldUpdateResultSchema: z.ZodType<FormFieldUpdateResult> = z.o
 
 export const FormFieldDeleteResultSchema: z.ZodType<FormFieldDeleteResult> = z.object({
   deletedFieldObjectNumber: z.number().int().positive(),
-  removedWidgets: z.array(FormWidgetRefSchema),
+  removedWidgets: z.array(FormWidgetSchema),
   meta: MutationMetaSchema,
 });
 
@@ -981,7 +1004,7 @@ export const PageBoxesSchema: z.ZodType<PageBoxes> = z.object({
  */
 export const PageLayoutSchema: z.ZodType<PageLayout> = z.object({
   index: z.number().int().nonnegative(),
-  pageObjectNumber: z.number().int().positive(),
+  ref: PageRefSchema,
   label: z.string().nullable(),
   size: PdfSizeSchema,
   rotation: PdfRotationSchema,
@@ -991,11 +1014,11 @@ export const PageLayoutSchema: z.ZodType<PageLayout> = z.object({
 });
 
 export const PageFlattenResultSchema: z.ZodType<PageFlattenResult> = z.object({
-  pageObjectNumbers: z.array(z.number().int().positive()),
+  pages: z.array(PageRefSchema),
   usage: z.enum(['display', 'print']),
   results: z.array(
     z.object({
-      pageObjectNumber: z.number().int().positive(),
+      page: PageRefSchema,
       status: z.enum(['applied', 'unchanged', 'failed', 'skipped']),
       error: EngineErrorPayloadSchema.optional(),
     }),
@@ -1005,7 +1028,7 @@ export const PageFlattenResultSchema: z.ZodType<PageFlattenResult> = z.object({
 
 /** See `AnnotationFlattenResult`. */
 export const AnnotationFlattenResultSchema: z.ZodType<AnnotationFlattenResult> = z.object({
-  pageObjectNumber: z.number().int().positive(),
+  page: PageRefSchema,
   usage: z.enum(['display', 'print']),
   results: z.array(
     z.object({
@@ -1029,7 +1052,7 @@ export const AnnotationAppearanceExportInputSchema: z.ZodType<AnnotationAppearan
   });
 
 export const PageFlattenInputSchema: z.ZodType<PageFlattenInput> = z.object({
-  pageObjectNumbers: z.array(z.number().int().positive()),
+  pages: z.array(PageRefSchema),
   usage: z.enum(['display', 'print']),
 });
 
@@ -1038,7 +1061,7 @@ export const RedactionApplyScopeSchema: z.ZodType<RedactionApplyScope> = z.discr
   [
     z.object({
       kind: z.literal('pages'),
-      pageObjectNumbers: z.array(z.number().int().positive()),
+      pages: z.array(PageRefSchema),
     }),
     z.object({
       kind: z.literal('annotations'),
@@ -1051,7 +1074,7 @@ export const RedactionApplyResultSchema: z.ZodType<RedactionApplyResult> = z.obj
   scope: RedactionApplyScopeSchema,
   results: z.array(
     z.object({
-      pageObjectNumber: z.number().int().positive(),
+      page: PageRefSchema,
       status: z.enum(['applied', 'unchanged', 'failed', 'skipped']),
       removedAnnotationCount: z.number().int().nonnegative(),
       error: EngineErrorPayloadSchema.optional(),
@@ -1070,7 +1093,7 @@ export const RedactionApplyResultSchema: z.ZodType<RedactionApplyResult> = z.obj
 export const NamedPageEntrySchema: z.ZodType<NamedPageEntry> = z.object({
   name: z.string(),
   target: z.discriminatedUnion('kind', [
-    z.object({ kind: z.literal('page'), pageObjectNumber: z.number().int().positive() }),
+    z.object({ kind: z.literal('page'), page: PageRefSchema }),
     z.object({ kind: z.literal('template'), objectNumber: z.number().int().positive() }),
     z.object({ kind: z.literal('dangling') }),
   ]),
@@ -1085,7 +1108,7 @@ export const PageListSnapshotSchema: z.ZodType<PageListSnapshot> = z.object({
 /** `pages.setName` input — see `PageNameInput`. */
 export const PageNameInputSchema: z.ZodType<PageNameInput> = z.object({
   name: z.string().min(1),
-  pageObjectNumber: z.number().int().positive(),
+  page: PageRefSchema,
   replace: z.string().min(1).optional(),
 });
 
@@ -1095,11 +1118,11 @@ export const PageRemoveNameInputSchema: z.ZodType<PageRemoveNameInput> = z.objec
 });
 
 /**
- * Page reorder input. Pages are always addressed by `pageObjectNumber`;
- * `destIndex` is the insertion point in the post-removal index space.
+ * Page reorder input. Pages are addressed by `PageRef`; `destIndex` is the
+ * insertion point in the post-removal index space.
  */
 export const PageMoveInputSchema: z.ZodType<PageMoveInput> = z.object({
-  pageObjectNumbers: z.array(z.number().int().positive()),
+  pages: z.array(PageRefSchema),
   destIndex: z.number().int().nonnegative(),
 });
 
@@ -1134,7 +1157,7 @@ export const PageNameResultSchema: z.ZodType<PageNameResult> = z.object({
  * one value applied to every listed page.
  */
 export const PageRotateInputSchema: z.ZodType<PageRotateInput> = z.object({
-  pageObjectNumbers: z.array(z.number().int().positive()),
+  pages: z.array(PageRefSchema),
   rotation: PdfRotationSchema,
 });
 
@@ -1150,7 +1173,7 @@ export const PageRotateResultSchema: z.ZodType<PageRotateResult> = z.object({
 
 /** Page delete input. Deleting every page is rejected server/worker-side. */
 export const PageDeleteInputSchema: z.ZodType<PageDeleteInput> = z.object({
-  pageObjectNumbers: z.array(z.number().int().positive()),
+  pages: z.array(PageRefSchema),
 });
 
 /**
@@ -1191,8 +1214,8 @@ export const PageInsertBlankInputSchema: z.ZodType<{
 });
 
 /** Page extract input: the pages to export, in the order they should appear. */
-export const PageExtractInputSchema: z.ZodType<{ pageObjectNumbers: number[] }> = z.object({
-  pageObjectNumbers: z.array(z.number().int().positive()).min(1),
+export const PageExtractInputSchema: z.ZodType<{ pages: PageRef[] }> = z.object({
+  pages: z.array(PageRefSchema).min(1),
 });
 
 /**
@@ -1200,7 +1223,7 @@ export const PageExtractInputSchema: z.ZodType<{ pageObjectNumbers: number[] }> 
  * PONs in insertion order plus the full new layout (see `PageInsertResult`).
  */
 export const PageInsertResultSchema: z.ZodType<PageInsertResult> = z.object({
-  insertedPageObjectNumbers: z.array(z.number().int().positive()),
+  insertedPages: z.array(PageRefSchema),
   layout: PageListSnapshotSchema,
   cache: PageStructureCacheSchema.nullable(),
 });
@@ -1242,13 +1265,373 @@ export const WeakAnnotationSessionResponseSchema = z.object({
   sessionId: z.string().min(1),
   expiresAt: z.number().int().positive(),
   heartbeatIntervalMs: z.number().int().positive(),
-  pageObjectNumbers: z.array(z.number().int().positive()),
+  pages: z.array(PageRefSchema),
 });
 export type WeakAnnotationSessionResponse = z.infer<typeof WeakAnnotationSessionResponseSchema>;
 
 export const WeakAnnotationSessionPagesRequestSchema = z.object({
-  pageObjectNumbers: z.array(z.number().int().positive()).transform((pages) => [...new Set(pages)]),
+  pages: z.array(PageRefSchema),
 });
 export type WeakAnnotationSessionPagesRequest = z.infer<
   typeof WeakAnnotationSessionPagesRequestSchema
 >;
+
+// ---------------------------------------------------------------------------
+// Digital signatures: the JSON forms of the two-phase signing DTOs.
+//
+// `SignaturePrepared.digest` and `SignatureCompleteInput.cms` are bytes;
+// `JSON.stringify` turns a typed array into an index-keyed object, which
+// the completion gate then rejects. These codecs are the ONE definition
+// the HTTP bodies and the server's durable `prepared_json` share.
+// ---------------------------------------------------------------------------
+
+const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+/** Standard base64 (padded). Dependency-free: no Buffer, runs in browsers too. */
+export function toBase64(bytes: Uint8Array): string {
+  let out = '';
+  for (let i = 0; i < bytes.length; i += 3) {
+    const b0 = bytes[i];
+    const b1 = bytes[i + 1];
+    const b2 = bytes[i + 2];
+    out += BASE64_ALPHABET[b0 >> 2];
+    out += BASE64_ALPHABET[((b0 & 0x03) << 4) | ((b1 ?? 0) >> 4)];
+    out += b1 === undefined ? '=' : BASE64_ALPHABET[((b1 & 0x0f) << 2) | ((b2 ?? 0) >> 6)];
+    out += b2 === undefined ? '=' : BASE64_ALPHABET[b2 & 0x3f];
+  }
+  return out;
+}
+
+export function fromBase64(encoded: string): Uint8Array {
+  // Scan backward to avoid regex backtracking on long runs of interior padding.
+  let end = encoded.length;
+  while (end > 0 && encoded[end - 1] === '=') {
+    end -= 1;
+  }
+  const clean = encoded.slice(0, end);
+  if (clean.length % 4 === 1 || /[^A-Za-z0-9+/]/.test(clean)) {
+    throw new Error('malformed base64');
+  }
+  const bytes: number[] = [];
+  let buffer = 0;
+  let bits = 0;
+  for (const ch of clean) {
+    buffer = (buffer << 6) | BASE64_ALPHABET.indexOf(ch);
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      bytes.push((buffer >> bits) & 0xff);
+    }
+  }
+  return Uint8Array.from(bytes);
+}
+
+const Base64Schema = z.string().regex(/^[A-Za-z0-9+/]*={0,2}$/, 'base64');
+
+export const DocumentVersionRefSchema: z.ZodType<DocumentVersionRef> = z.object({
+  baseSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  editsVersion: z.number().int().nonnegative(),
+});
+
+export const ByteRangeSchema = z.tuple([
+  z.number().int().nonnegative(),
+  z.number().int().nonnegative(),
+  z.number().int().nonnegative(),
+  z.number().int().nonnegative(),
+]);
+
+/** `SignaturePrepared` with the digest as base64. */
+export const SignaturePreparedWireSchema = z.object({
+  signingId: z.string().min(1),
+  digest: Base64Schema,
+  algorithm: z.enum(['sha256', 'sha384', 'sha512']),
+  byteRange: ByteRangeSchema,
+  contentsSize: z.number().int().positive(),
+  subFilter: z.string(),
+  expectedVersion: DocumentVersionRefSchema,
+  expiresAt: z.string().nullable(),
+});
+export type SignaturePreparedWire = z.infer<typeof SignaturePreparedWireSchema>;
+
+export function encodePrepared(prepared: SignaturePrepared): SignaturePreparedWire {
+  return { ...prepared, digest: toBase64(prepared.digest) };
+}
+
+export function decodePrepared(wire: SignaturePreparedWire): SignaturePrepared {
+  return {
+    ...wire,
+    digest: fromBase64(wire.digest),
+    subFilter: wire.subFilter as SignaturePrepared['subFilter'],
+  };
+}
+
+/** The JSON body of a completion: the CMS as base64 beside the fence. */
+export const SignatureCompleteBodySchema = z.object({
+  cms: Base64Schema.refine((v) => v.length > 0, 'cms is required'),
+  expectedVersion: DocumentVersionRefSchema,
+});
+export type SignatureCompleteBody = z.infer<typeof SignatureCompleteBodySchema>;
+
+// ---------------------------------------------------------------------------
+// Digital signatures: the read-side DTOs, the prepare body, the analysis
+// query, and the version catalog.
+// ---------------------------------------------------------------------------
+
+const DocMdpPermissionSchema = z.union([z.literal(1), z.literal(2), z.literal(3)]);
+const ModificationLevelSchema = z.enum(['none', 'lta', 'fill', 'annotate']);
+const DigestAlgorithmSchema = z.enum(['sha1', 'sha256', 'sha384', 'sha512']);
+
+export const FieldLockSpecSchema: z.ZodType<FieldLockSpec> = z.object({
+  action: z.enum(['all', 'include', 'exclude']),
+  fields: z.array(z.string()),
+  permission: DocMdpPermissionSchema.optional(),
+});
+
+export const SignatureSeedValueSchema: z.ZodType<SignatureSeedValue> = z.object({
+  requiredFlags: z.number().int(),
+  presentFlags: z.number().int(),
+  version: z.number().int().nullable(),
+  mdp: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]).nullable(),
+  filter: z.string().nullable(),
+  subFilters: z.array(z.string()),
+  digestMethods: z.array(z.string()),
+  reasons: z.array(z.string()),
+  unsupportedRequired: z.boolean(),
+});
+
+export const SignatureDTOSchema: z.ZodType<SignatureDTO> = z.object({
+  index: z.number().int().nonnegative(),
+  field: FormFieldRefSchema,
+  fieldName: z.string(),
+  widget: FormWidgetSchema.nullable(),
+  signed: z.boolean(),
+  kind: z.enum(['signature', 'timestamp']),
+  filter: z.string().nullable(),
+  subFilter: z.string().nullable(),
+  byteRange: ByteRangeSchema.nullable(),
+  contentsSize: z.number().int().nonnegative(),
+  coverage: z.enum(['whole-revision', 'partial', 'malformed']).nullable(),
+  revisionIndex: z.number().int().nonnegative().nullable(),
+  signer: z.object({
+    name: z.string().nullable(),
+    reason: z.string().nullable(),
+    location: z.string().nullable(),
+    contactInfo: z.string().nullable(),
+    claimedTime: z.string().nullable(),
+  }),
+  docMdp: DocMdpPermissionSchema.nullable(),
+  catalogCertification: z.boolean(),
+  fieldMdp: FieldLockSpecSchema.nullable(),
+  lock: FieldLockSpecSchema.nullable(),
+  seedValue: SignatureSeedValueSchema.nullable(),
+});
+
+export const DocumentProtectionSchema: z.ZodType<DocumentProtection> = z.object({
+  enforced: ModificationLevelSchema.nullable(),
+  judged: ModificationLevelSchema.nullable(),
+  certification: z
+    .object({ signatureIndex: z.number().int().nonnegative(), permission: DocMdpPermissionSchema })
+    .nullable(),
+  fieldLocks: z.array(
+    z.object({
+      signatureIndex: z.number().int().nonnegative(),
+      source: z.enum(['fieldmdp', 'lock']),
+      spec: FieldLockSpecSchema,
+    }),
+  ),
+  policyVersion: z.number().int(),
+});
+
+export const PdfRevisionSchema: z.ZodType<PdfRevision> = z.object({
+  index: z.number().int().nonnegative(),
+  end: z.number().int().nonnegative(),
+  xrefOffset: z.number().int().nonnegative(),
+  signatureIndex: z.number().int().nonnegative().nullable(),
+});
+
+export const SignatureSnapshotSchema: z.ZodType<SignatureSnapshot> = z.object({
+  chainValid: z.boolean(),
+  revisions: z.array(PdfRevisionSchema),
+  signatures: z.array(SignatureDTOSchema),
+  protection: DocumentProtectionSchema,
+});
+
+export const BaseVersionInfoSchema: z.ZodType<BaseVersionInfo> = z.object({
+  sha256: z.string().regex(/^[0-9a-f]{64}$/),
+  byteLength: z.number().int().nonnegative(),
+});
+
+export const SignatureCompleteResultSchema: z.ZodType<SignatureCompleteResult> = z.object({
+  status: z.enum(['completed', 'already-completed']),
+  signature: SignatureDTOSchema,
+  version: BaseVersionInfoSchema,
+  previous: DocumentVersionRefSchema,
+  protection: DocumentProtectionSchema,
+  meta: MutationMetaSchema,
+});
+
+export const SignatureAbortResultSchema: z.ZodType<SignatureAbortResult> = z.object({
+  status: z.enum(['aborted', 'already-completed', 'unknown']),
+});
+
+const ChangeFindingSchema = z.object({
+  rule: z.string(),
+  verdict: z.enum(['permitted', 'forbidden', 'incomplete']),
+  objectNumber: z.number().int().nonnegative(),
+  edge: z.string().optional(),
+  detail: z.string().optional(),
+});
+
+const AnalysisDetailSchema = z.enum(['summary', 'full']);
+
+/** The analysis: one verdict (`current`) with its findings, the restrictions it was judged under, and facts about the revisions in between. */
+export const ChangeAnalysisSchema = z.object({
+  mode: z.enum(['authoritative', 'exploratory']),
+  policyVersion: z.number().int(),
+  basis: z.object({
+    version: BaseVersionInfoSchema,
+    editsVersion: z.number().int().nonnegative(),
+    source: z.enum(['persisted', 'working-copy']),
+  }),
+  since: z.object({
+    revisionIndex: z.number().int().nonnegative(),
+    signatureIndex: z.number().int().nonnegative().nullable(),
+  }),
+  until: z.object({ revisionIndex: z.number().int().nonnegative() }),
+  restrictions: z.array(
+    z.object({
+      signatureIndex: z.number().int().nonnegative(),
+      revisionIndex: z.number().int().nonnegative(),
+      source: z.enum(['docmdp', 'fieldmdp', 'lock']),
+      own: z.boolean(),
+      permission: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
+      fields: z.unknown().optional(),
+    }),
+  ),
+  current: z.object({
+    verdict: z.enum(['unchanged', 'permitted', 'forbidden', 'indeterminate']),
+    complete: z.boolean(),
+    primary: ChangeFindingSchema.optional(),
+    findings: z.array(ChangeFindingSchema),
+    method: z.enum(['net-state', 'net-state+replay']),
+  }),
+  later: z.object({
+    revisionCount: z.number().int().nonnegative(),
+    undoneObjectNumbers: z.array(z.number().int().nonnegative()),
+  }),
+  /** Equals `current.verdict`. */
+  verdict: z.enum(['unchanged', 'permitted', 'forbidden', 'indeterminate']),
+  /** The step DTOs are large and evolving; carried verbatim. */
+  steps: z.array(z.unknown()),
+}) as unknown as z.ZodType<ChangeAnalysis>;
+
+const SignatureAttributionSchema = z.object({
+  name: z.string().optional(),
+  reason: z.string().optional(),
+  location: z.string().optional(),
+  contactInfo: z.string().optional(),
+});
+
+/** The JSON part of a visual signature fill (multipart envelope): which resource part holds the PDF, and its page. */
+export const SignatureAppearanceBodySchema = z.object({
+  resource: z.string().min(1),
+  pageIndex: z.number().int().nonnegative().optional(),
+});
+export type SignatureAppearanceBody = z.infer<typeof SignatureAppearanceBodySchema>;
+
+/**
+ * The JSON part of a prepare (multipart envelope): `SignaturePrepareInput`
+ * with the appearance artwork referenced by its resource part instead of
+ * inline bytes.
+ */
+export const SignaturePrepareBodySchema = z.object({
+  field: FormFieldRefSchema,
+  kind: z.enum(['signature', 'timestamp']).optional(),
+  subFilter: z.enum(['adbe.pkcs7.detached', 'ETSI.CAdES.detached']).optional(),
+  digest: z.enum(['sha256', 'sha384', 'sha512']).optional(),
+  contentsSize: z.number().int().positive().optional(),
+  attribution: SignatureAttributionSchema.optional(),
+  /** @deprecated the pre-rename spelling of `attribution`; servers read either. */
+  signer: SignatureAttributionSchema.optional(),
+  signingTime: z.string().optional(),
+  certify: z.object({ permission: DocMdpPermissionSchema }).optional(),
+  lock: FieldLockSpecSchema.optional(),
+  appearance: z
+    .object({ resource: z.string().min(1), pageIndex: z.number().int().nonnegative().optional() })
+    .optional(),
+});
+export type SignaturePrepareBody = z.infer<typeof SignaturePrepareBodySchema>;
+
+const optionalIndex = z.coerce.number().int().nonnegative().optional();
+
+/** Layer analysis query (the current form): exactly one `since.*`; the working copy is the end. */
+export const LayerAnalysisQuerySchema = z
+  .object({
+    'since.signature': optionalIndex,
+    'since.revision': optionalIndex,
+    level: ModificationLevelSchema.optional(),
+    detail: AnalysisDetailSchema.optional(),
+  })
+  .refine((q) => (q['since.signature'] === undefined) !== (q['since.revision'] === undefined), {
+    message: 'exactly one of since.signature / since.revision is required',
+  });
+export type LayerAnalysisQuery = z.infer<typeof LayerAnalysisQuerySchema>;
+
+/** Version analysis query: as the layer's, plus `until` (a revision index; default the last). */
+export const VersionAnalysisQuerySchema = z
+  .object({
+    'since.signature': optionalIndex,
+    'since.revision': optionalIndex,
+    until: optionalIndex,
+    level: ModificationLevelSchema.optional(),
+    detail: AnalysisDetailSchema.optional(),
+    /** The judging policy version the caller expects — a cache key, not an input (version responses are immutable). */
+    policy: optionalIndex,
+  })
+  .refine((q) => (q['since.signature'] === undefined) !== (q['since.revision'] === undefined), {
+    message: 'exactly one of since.signature / since.revision is required',
+  });
+export type VersionAnalysisQuery = z.infer<typeof VersionAnalysisQuerySchema>;
+
+export function analyzeInputFromQuery(
+  query: LayerAnalysisQuery | VersionAnalysisQuery,
+  until: AnalyzeInput['until'],
+): AnalyzeInput {
+  const since =
+    query['since.signature'] !== undefined
+      ? { signatureIndex: query['since.signature'] }
+      : { revisionIndex: query['since.revision'] ?? 0 };
+  return {
+    since,
+    ...(until !== undefined ? { until } : {}),
+    ...(query.level !== undefined ? { exploratoryLevel: query.level } : {}),
+    ...(query.detail !== undefined ? { detail: query.detail } : {}),
+  };
+}
+
+/** One row of the document's version catalog. */
+export const DocumentVersionSchema = z.object({
+  sha256: z.string().regex(/^[0-9a-f]{64}$/),
+  byteLength: z.number().int().nonnegative(),
+  number: z.number().int().positive(),
+  parentSha256: z.string().nullable(),
+  producer: z.enum(['upload', 'signature']),
+  signingId: z.string().nullable(),
+  createdAt: z.number().int(),
+});
+export type DocumentVersion = z.infer<typeof DocumentVersionSchema>;
+
+export const DocumentVersionsSchema = z.object({
+  /** `documents.base_sha`: the version every layer is over, or behind. */
+  head: z.string().regex(/^[0-9a-f]{64}$/),
+  /** Oldest first. */
+  versions: z.array(DocumentVersionSchema),
+});
+export type DocumentVersions = z.infer<typeof DocumentVersionsSchema>;
+
+export { DigestAlgorithmSchema, ModificationLevelSchema };
+
+export const PageScaleResultSchema = z.object({
+  page: PageRefSchema,
+  meta: MutationMetaSchema,
+});

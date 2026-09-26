@@ -4,6 +4,7 @@ import type {
   RevisionToken,
   PdfAnnotationActions,
 } from '@embedpdf/engine-core/runtime';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { readAnnotFlags, readAnnotRect, readAnnotString } from './annotationReadPrimitives';
@@ -48,7 +49,7 @@ export function readAnnotationBase(
 
   return {
     ref: identity.ref,
-    pageObjectNumber,
+    page: toPageRef(pageObjectNumber),
     index,
     identityQuality: identity.identityQuality,
     nm: identity.nm,

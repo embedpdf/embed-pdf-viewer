@@ -9,7 +9,13 @@
  * feeds content-space boxes into the model via `pageGeom`. The field plane
  * (this snapshot) contributes identity, value, and behavior.
  */
-import type { FormFieldDTO, FormFieldOption, FormSnapshot } from '@embedpdf/engine-core/runtime';
+import type {
+  AnnotationRef,
+  FormFieldDTO,
+  FormFieldOption,
+  FormFieldRef,
+  FormSnapshot,
+} from '@embedpdf/engine-core/runtime';
 
 import { fieldForWidget, fieldKeyOf, type Box, type FieldKey, type Model } from './model';
 
@@ -17,8 +23,12 @@ export type { Box } from './model';
 
 interface FillItemBase {
   key: FieldKey;
+  /** The field this widget belongs to — what the public write verbs take. */
+  fieldRef: FormFieldRef;
   /** Widget identity — joins to the annotation plane. */
   annotObjectNumber: number;
+  /** The widget's annotation address (null until the engine has placed it). */
+  annotationRef: AnnotationRef | null;
   box: Box;
   /** Read-only field or write in flight: render, don't accept input. */
   disabled: boolean;
@@ -46,6 +56,13 @@ export type FillItem = FillItemBase &
         selected: string[];
       }
     | { control: 'button' }
+    /**
+     * A signature field's widget. `signed` = it carries a `/V` (a signature
+     * dictionary): the field is final and its appearance sealed — the
+     * control inspects rather than signs. Unsigned: "sign here" — the
+     * signing act itself belongs to the signature plugin.
+     */
+    | { control: 'signature'; signed: boolean }
   );
 
 const ZERO_BOX: Box = { x: 0, y: 0, width: 0, height: 0 };
@@ -55,7 +72,7 @@ const ZERO_BOX: Box = { x: 0, y: 0, width: 0, height: 0 };
  * caller: the page projection reads the model's widget geometry; a consumer
  * that already owns a live box (the annotation plane's RenderItem) passes it —
  * or nothing, when only the semantics matter. Null for families with no fill
- * control (signature/unknown: rendered by the annotation plane only).
+ * control (unknown: rendered by the annotation plane only).
  */
 export function projectWidget(
   model: Model,
@@ -66,7 +83,10 @@ export function projectWidget(
   const key = fieldKeyOf(field);
   const base: FillItemBase = {
     key,
+    fieldRef: field.ref,
     annotObjectNumber,
+    annotationRef:
+      field.widgets.find((w) => w.annotObjectNumber === annotObjectNumber)?.ref ?? null,
     box,
     disabled: field.flags.readOnly || model.writing[key] === true,
     label: field.alternateName ?? field.name,
@@ -124,6 +144,8 @@ export function projectWidget(
       };
     case 'pushbutton':
       return { ...base, control: 'button' };
+    case 'signature':
+      return { ...base, control: 'signature', signed: field.valueEntry.kind !== 'none' };
     default:
       return null;
   }
@@ -142,7 +164,7 @@ export function fillItems(model: Model, pageObjectNumber: number): FillItem[] {
 
   for (const field of snapshot.fields) {
     for (const widget of field.widgets) {
-      if (widget.pageObjectNumber !== pageObjectNumber) continue;
+      if (widget.page?.pageObjectNumber !== pageObjectNumber) continue;
       const box = geom[widget.annotObjectNumber];
       if (!box) continue;
       const item = projectWidget(model, field, widget.annotObjectNumber, box);
@@ -164,6 +186,8 @@ export function fillItemForWidget(model: Model, annotObjectNumber: number): Fill
   if (!field) return null;
   const widget = field.widgets.find((w) => w.annotObjectNumber === annotObjectNumber);
   if (!widget) return null;
-  const box = model.geom[widget.pageObjectNumber]?.[annotObjectNumber];
+  const box = widget.page
+    ? model.geom[widget.page.pageObjectNumber]?.[annotObjectNumber]
+    : undefined;
   return projectWidget(model, field, annotObjectNumber, box);
 }

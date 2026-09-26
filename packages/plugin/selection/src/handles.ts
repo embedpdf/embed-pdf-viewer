@@ -9,7 +9,7 @@
  *
  * Everything here is DOM-free and framework-free: geometry is pure given a
  * projector, and the drag session speaks the selection's own gesture verbs
- * (`beginAt`/`extendTo`/`end` — the same ones the pointer handler uses; a
+ * (`beginGestureAt`/`extendTo`/`endGesture` — the same ones the pointer handler uses; a
  * handle drag IS a selection gesture, re-anchored). The framework adapters
  * keep only subscriptions and markup; the DOM listener mechanics live in
  * `@embedpdf/web`'s `attachSelectionHandle`.
@@ -20,22 +20,22 @@
  */
 import { textQuadEdge } from '@embedpdf/core-geometry';
 import type { Point, TextQuad } from '@embedpdf/core-geometry';
-import type { PageObjectNumber } from '@embedpdf/core';
+import type { PageRef } from '@embedpdf/engine-core/runtime';
 
 /** What handle geometry & drags need from the hosting view. */
 export interface SelectionHandleView {
   /** Page content point → overlay px. Must be POINT-exact (compose
    *  `pageToWorld` with `toScreen`); an AABB projector loses orientation. */
-  toOverlay(pon: PageObjectNumber, pt: Point): Point | null;
+  toOverlay(page: PageRef, pt: Point): Point | null;
   /** Overlay px → the page under it, or null over a gap. */
-  pageAt(overlay: Point): { pon: PageObjectNumber; point: Point } | null;
+  pageAt(overlay: Point): { ref: PageRef; point: Point } | null;
   /** Overlay px → a SPECIFIC page's content space, unclamped. */
-  pointOnPage(pon: PageObjectNumber, overlay: Point): Point | null;
+  pointOnPage(page: PageRef, overlay: Point): Point | null;
 }
 
 /** One selection boundary, as the handle needs it (a `SelectionEndpoint` slice). */
 export interface SelectionHandleEndpoint {
-  pon: PageObjectNumber;
+  page: PageRef;
   /** The boundary glyph's own oriented cell, page content space. */
   glyphQuad: TextQuad;
   /** Reading direction of its segment (+1 = the frame's +x) — decides which
@@ -45,9 +45,9 @@ export interface SelectionHandleEndpoint {
 
 /** The gesture verbs a handle drag drives — `SelectionHostCapability` satisfies it. */
 export interface SelectionHandleTarget {
-  beginAt(pon: PageObjectNumber, point: Point): boolean;
-  extendTo(pon: PageObjectNumber, point: Point): void;
-  end(): void;
+  beginGestureAt(page: PageRef, point: Point): boolean;
+  extendTo(page: PageRef, point: Point): void;
+  endGesture(): void;
 }
 
 // The iOS caret-handle design, one source for every adapter: a thin BAR that
@@ -89,8 +89,8 @@ export function selectionHandleGeom(
   // question (`advance`), never a geometric one.
   const leading = role === 'start' ? ep.advance > 0 : ep.advance < 0;
   const [upperPage, lowerPage] = textQuadEdge(ep.glyphQuad, leading ? 'start' : 'end');
-  const upper = view.toOverlay(ep.pon, upperPage);
-  const lower = view.toOverlay(ep.pon, lowerPage);
+  const upper = view.toOverlay(ep.page, upperPage);
+  const lower = view.toOverlay(ep.page, lowerPage);
   if (!upper || !lower) return null;
   const dx = lower.x - upper.x;
   const dy = lower.y - upper.y;
@@ -129,32 +129,35 @@ export function createSelectionHandleDrag(
   selection: SelectionHandleTarget,
   view: SelectionHandleView,
   opposite: SelectionHandleEndpoint,
-  draggedPon: PageObjectNumber,
+  draggedPage: PageRef,
 ): SelectionHandleDragSession {
   // The fixed anchor: the opposite endpoint's cell CENTRE — orientation-free
   // (a parallelogram's diagonal midpoints coincide), so it lands inside the
   // glyph for rotated text too.
   const q = opposite.glyphQuad;
-  const anchorPoint = midpoint(midpoint(q.upperStart, q.lowerEnd), midpoint(q.upperEnd, q.lowerStart));
+  const anchorPoint = midpoint(
+    midpoint(q.upperStart, q.lowerEnd),
+    midpoint(q.upperEnd, q.lowerStart),
+  );
   let begun = false;
-  let lastPon = draggedPon;
+  let lastPage = draggedPage;
   return {
     move: (overlay) => {
       if (!begun) {
-        if (!selection.beginAt(opposite.pon, anchorPoint)) return;
+        if (!selection.beginGestureAt(opposite.page, anchorPoint)) return;
         begun = true;
       }
       const hit = view.pageAt(overlay);
       if (hit) {
-        lastPon = hit.pon;
-        selection.extendTo(hit.pon, hit.point);
+        lastPage = hit.ref;
+        selection.extendTo(hit.ref, hit.point);
       } else {
-        const p = view.pointOnPage(lastPon, overlay);
-        if (p) selection.extendTo(lastPon, p);
+        const p = view.pointOnPage(lastPage, overlay);
+        if (p) selection.extendTo(lastPage, p);
       }
     },
     end: () => {
-      if (begun) selection.end(); // settle → menu reappears, onCommit fires
+      if (begun) selection.endGesture(); // settle → menu reappears, onCommitted fires
     },
   };
 }

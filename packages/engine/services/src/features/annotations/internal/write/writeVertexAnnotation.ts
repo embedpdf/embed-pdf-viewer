@@ -1,3 +1,4 @@
+import { writeMeasurementFields } from './writeMeasurementFields';
 import type {
   PolygonDraft,
   PolygonPatch,
@@ -42,6 +43,7 @@ export function applyPolygonDraft(
   draft: PolygonDraft,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
+  writeMeasurementFields(fn, mem, annotPtr, draft);
   setAnnotRect(fn, mem, annotPtr, draft.rect);
   applyFilledStyleDraft(fn, mem, annotPtr, draft);
   setVertices(fn, mem, annotPtr, draft.vertices);
@@ -60,6 +62,7 @@ export function applyPolygonPatch(
   patch: PolygonPatch,
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);
+  writeMeasurementFields(fn, mem, annotPtr, patch);
   if (patch.rect !== undefined) {
     setAnnotRect(fn, mem, annotPtr, patch.rect);
   }
@@ -96,6 +99,7 @@ export function applyPolylineDraft(
   draft: PolylineDraft,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
+  writeMeasurementFields(fn, mem, annotPtr, draft);
   setAnnotRect(fn, mem, annotPtr, draft.rect);
   applyFilledStyleDraft(fn, mem, annotPtr, draft);
   setVertices(fn, mem, annotPtr, draft.vertices);
@@ -111,6 +115,7 @@ export function applyPolylinePatch(
   patch: PolylinePatch,
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);
+  writeMeasurementFields(fn, mem, annotPtr, patch);
   if (patch.rect !== undefined) {
     setAnnotRect(fn, mem, annotPtr, patch.rect);
   }

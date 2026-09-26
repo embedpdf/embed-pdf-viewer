@@ -4,7 +4,7 @@ import {
   PAGE_INSERT_BLANK_MAX_COUNT,
   type PageInsertBlankSpec,
   type PageInsertResult,
-  type PageObjectNumber,
+  type PageRef,
 } from '@embedpdf/engine-core/runtime';
 import { NULL_PTR } from '@embedpdf/engine-runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
@@ -89,10 +89,10 @@ export class PagesInserter {
     this.session.refreshPageRegistry();
 
     const layout = new PagesReader(this.runtime, this.session).read(signal);
-    const insertedPageObjectNumbers: PageObjectNumber[] = layout.pages
+    const insertedPages: PageRef[] = layout.pages
       .slice(at, at + insertedCount)
-      .map((page) => page.pageObjectNumber);
-    return { insertedPageObjectNumbers, layout, cache: null };
+      .map((page) => page.ref);
+    return { insertedPages, layout, cache: null };
   }
 
   /**
@@ -160,9 +160,7 @@ export class PagesInserter {
     this.session.refreshPageRegistry();
 
     const layout = new PagesReader(this.runtime, this.session).read(signal);
-    const insertedPageObjectNumbers: PageObjectNumber[] = layout.pages
-      .slice(at, at + count)
-      .map((page) => page.pageObjectNumber);
-    return { insertedPageObjectNumbers, layout, cache: null };
+    const insertedPages: PageRef[] = layout.pages.slice(at, at + count).map((page) => page.ref);
+    return { insertedPages, layout, cache: null };
   }
 }

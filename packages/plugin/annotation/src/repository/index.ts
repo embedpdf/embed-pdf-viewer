@@ -16,20 +16,16 @@
  * it can never change in the model. Any key a kind cannot lower degrades to
  * the FULL patch — verbose, never a dropped write.
  */
+import { propsFor, type Annot, type PatchScope, type PropKey } from '@embedpdf/core-annotation';
+import { geomRotation } from '@embedpdf/core-annotation';
 import type {
   AnnotationDraft,
   AnnotationDTO,
   AnnotationPatch,
   PdfRect,
 } from '@embedpdf/engine-core/runtime';
-import { propsFor, type Annot, type PatchScope, type PropKey } from '@embedpdf/core-annotation';
 
-import { boxEmit, type KindProjection, type Wire } from './projection';
-import { GENERIC_PROPS } from './props';
-import { circle, square } from './kinds/shape';
-import { ink, line, polygon, polyline } from './kinds/stroke';
 import { freeText } from './kinds/freeText';
-import { caret, highlight, redact, squiggly, strikeout, underline } from './kinds/quads';
 import {
   fileAttachment,
   link,
@@ -39,14 +35,18 @@ import {
   widget,
   widgetKindOf,
 } from './kinds/misc';
-import { pdfToContentRect, refKey, styleFromDTO } from './seam';
-import { geomRotation } from '@embedpdf/core-annotation';
+import { caret, highlight, redact, squiggly, strikeout, underline } from './kinds/quads';
+import { circle, square } from './kinds/shape';
+import { ink, line, polygon, polyline } from './kinds/stroke';
+import { boxEmit, type KindProjection, type Wire } from './projection';
+import { GENERIC_PROPS } from './props';
+import { pdfToContentRect, annotationKey, styleFromDTO } from './seam';
 
 export {
   boxGeomFields,
   colorToCss,
   cssToColor,
-  refKey,
+  annotationKey,
   styleFromDTO,
   widgetAppearanceFromProps,
   writableTarget,
@@ -117,9 +117,9 @@ export function fromDTO(
       ? dto.unrotatedRect
       : undefined;
   return {
-    id: refKey(dto.ref),
+    id: annotationKey(dto.ref),
     ref: dto.ref,
-    pon: dto.pageObjectNumber,
+    page: dto.page,
     subtype: dto.subtype === 'widget' ? widgetKindOf(dto.fieldFamily) : dto.subtype,
     // `/F` verbatim — every behavioral question (visible? selectable? frozen?)
     // is answered by the core's flag predicates, never derived here.
@@ -130,8 +130,8 @@ export function fromDTO(
     // Relationship to a parent annotation. `irt` mirrors `/IRT`; `group` is the
     // primary's key for `/RT /Group` subordinates only (a visual group acts as
     // a unit). `/RT /R` (comment replies) keep `irt` but are NOT a visual group.
-    ...(dto.inReplyTo ? { irt: refKey(dto.inReplyTo) } : {}),
-    ...(dto.replyType === 'group' && dto.inReplyTo ? { group: refKey(dto.inReplyTo) } : {}),
+    ...(dto.inReplyTo ? { irt: annotationKey(dto.inReplyTo) } : {}),
+    ...(dto.replyType === 'group' && dto.inReplyTo ? { group: annotationKey(dto.inReplyTo) } : {}),
     style: styleFromDTO(dto),
     ...slice,
     apBox: pdfToContentRect(strippedRect ?? dto.rect, crop),
@@ -176,6 +176,16 @@ export function toPatch(a: Annot, crop: PdfRect): AnnotationPatch | null {
  */
 export function toScopedPatch(a: Annot, scope: PatchScope, crop: PdfRect): AnnotationPatch | null {
   const kind = projectionOf(a.subtype);
+  if (scope.kind === 'caption') {
+    return a.measure
+      ? ({ subtype: wireSubtypeOf(a), caption: a.measure.caption } as AnnotationPatch)
+      : null;
+  }
+  if (scope.kind === 'leader') {
+    return a.measure?.intent === 'LineDimension'
+      ? { subtype: 'line', leader: a.measure.leader }
+      : null;
+  }
   if (scope.kind === 'geometry') {
     const geo = kind.geometry(a, crop);
     return geo ? ({ subtype: wireSubtypeOf(a), ...geo } as AnnotationPatch) : toPatch(a, crop);

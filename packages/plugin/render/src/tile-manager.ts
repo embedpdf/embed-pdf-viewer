@@ -1,4 +1,4 @@
-import type { EngineRenderPolicy, PageImageHandle, PdfRect } from '@embedpdf/core';
+import type { EngineRenderPolicy, PageImageHandle } from '@embedpdf/core';
 import type { Rect } from '@embedpdf/core-geometry';
 
 import {
@@ -19,7 +19,6 @@ import {
   tileGrid,
   tilesInRect,
   tilePaintRect,
-  toEngineRect,
   type PageSizePt,
   type TileCoord,
   type TileGrid,
@@ -89,9 +88,10 @@ export class TileManager {
       getPolicy(): EngineRenderPolicy;
       getPageSize(pon: number): PageSizePt | undefined;
       getEpoch(pon: number, includeAnnotations: boolean): number;
+      /** Render a page-space (y-down page points) region; the owner converts to PDF space. */
       fetchTile(
         pon: number,
-        rect: PdfRect,
+        rect: Rect,
         scale: number,
         includeAnnotations: boolean,
         signal: AbortSignal,
@@ -111,7 +111,12 @@ export class TileManager {
     return this.strategyMemo.strategy;
   }
 
-  plan(view: string, pon: number, demand: PageViewDemand, includeAnnotations: boolean): TilePaintPlan {
+  plan(
+    view: string,
+    pon: number,
+    demand: PageViewDemand,
+    includeAnnotations: boolean,
+  ): TilePaintPlan {
     const { options } = this.deps;
     if (!options.tiles.enabled) return EMPTY_TILE_PLAN;
     const strategy = this.strategy();
@@ -179,9 +184,7 @@ export class TileManager {
     if (!demand.visibleRect) {
       const maxStagelessWidth = Math.max(
         strategy.tileSize,
-        Math.floor(
-          strategy.tileSize * Math.sqrt((STAGELESS_TILE_CAP * page.width) / page.height),
-        ),
+        Math.floor(strategy.tileSize * Math.sqrt((STAGELESS_TILE_CAP * page.width) / page.height)),
       );
       if (wantWidth > maxStagelessWidth) {
         if (!this.warnedStageless) {
@@ -511,7 +514,7 @@ export class TileManager {
               pon,
               // The RENDERED region is the bled rect — it matches the bled
               // placement rect the paint list emits for this entry.
-              toEngineRect(page, bleedPt > 0 ? bleedRect(logical, bleedPt, page) : logical),
+              bleedPt > 0 ? bleedRect(logical, bleedPt, page) : logical,
               grid.scale,
               includeAnnotations,
               signal,
@@ -595,7 +598,9 @@ export class TileManager {
           const st = !e ? 'NO-ENTRY' : !e.resolved ? 'PENDING' : 'RESOLVED-unpainted';
           return `${c.ix},${c.iy}=${st}`;
         });
-        this.deps.debug(`retained ${key} blocked by: ${detail.join(' ')} (${missing.length} missing)`);
+        this.deps.debug(
+          `retained ${key} blocked by: ${detail.join(' ')} (${missing.length} missing)`,
+        );
       }
     }
     return released;

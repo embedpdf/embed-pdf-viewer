@@ -32,6 +32,7 @@ export function searchQueryKey(query: SearchQuery, mode: string): string {
     query.matchCase ? 1 : 0,
     query.matchDiacritics ? 1 : 0,
     query.wholeWord ? 1 : 0,
+    query.ignoreWhitespace ? 1 : 0,
     mode,
   ]);
 }
@@ -69,7 +70,7 @@ export function decodeSearchCursor(
     );
   }
   // The cursor owns position; a startPage alongside it is a caller bug.
-  if (request.startPage !== undefined && request.startPage !== state.start) {
+  if (request.startPage !== undefined && request.startPage.pageObjectNumber !== state.start) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
       'startPage conflicts with the cursor — omit startPage when resuming',

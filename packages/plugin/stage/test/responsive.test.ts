@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS } from '../src/settings';
-import { boxOf, eqSetting, matchesQuery, mergeSettings, resolveResponsive } from '../src/responsive';
-import type { ResponsiveRule, StageSettings } from '../src/types';
+import {
+  boxOf,
+  eqSetting,
+  matchesQuery,
+  mergeSettings,
+  resolveResponsive,
+} from '../src/responsive';
+import type { ResponsiveRule, StageSettings } from '../src/host-contract';
 
 const BASE: StageSettings = { ...DEFAULT_SETTINGS };
 
@@ -48,7 +54,11 @@ describe('resolveResponsive', () => {
 
   it('supports predicate rules and pure named queries (no settings)', () => {
     const rules: ResponsiveRule[] = [
-      { name: 'ultrawide', when: (box) => box.width / box.height > 2, settings: { layout: 'horizontal' } },
+      {
+        name: 'ultrawide',
+        when: (box) => box.width / box.height > 2,
+        settings: { layout: 'horizontal' },
+      },
       { name: 'phone', when: { maxWidth: 600 } }, // pure query — a shared breakpoint
     ];
     const r = resolveResponsive(BASE, rules, boxOf({ width: 500, height: 200 }));
@@ -68,7 +78,11 @@ describe('resolveResponsive', () => {
 
   it('does not mutate the base', () => {
     const before = { ...BASE };
-    resolveResponsive(BASE, [{ when: {}, settings: { padding: 1 } }], boxOf({ width: 1, height: 1 }));
+    resolveResponsive(
+      BASE,
+      [{ when: {}, settings: { padding: 1 } }],
+      boxOf({ width: 1, height: 1 }),
+    );
     expect(BASE).toEqual(before);
   });
 });

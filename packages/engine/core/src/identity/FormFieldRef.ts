@@ -1,4 +1,5 @@
-import type { PageObjectNumber } from './PageObjectNumber';
+import type { PageRef } from './PageRef';
+import type { AnnotationRef } from './AnnotationRef';
 
 /**
  * How callers address a logical form field.
@@ -66,8 +67,20 @@ export function decodeFieldRefKey(key: string): FormFieldRef | null {
   return null;
 }
 
-/** A widget annotation of a field, as the forms subsystem sees it. */
-export interface FormWidgetRef {
+/**
+ * A widget annotation of a field, as the FIELD TREE sees it. The forms reader
+ * learns widgets from the field's `/Kids`, not from a page's `/Annots`, so it
+ * must be able to report widgets the annotation subsystem cannot reach.
+ *
+ * `ref` is the widget as an annotation address, computed once by the engine:
+ * present exactly when the widget is an indirect object (`annotObjectNumber
+ * > 0`) placed on a page (`page !== null`). In a conforming PDF every widget
+ * has one; the two raw fields survive for the degenerate cases and for the
+ * forms model's own joins by object number.
+ */
+export interface FormWidget {
+  /** The widget as an annotation address, or null when it cannot be addressed as one. */
+  ref: AnnotationRef | null;
   /**
    * Indirect object number of the widget annotation — the join key to the
    * annotation subsystem's `objectNumber` refs. `0` when the widget is
@@ -75,8 +88,17 @@ export interface FormWidgetRef {
    */
   annotObjectNumber: number;
   /**
-   * Object number of the page whose /Annots array references the widget.
-   * `0` when the widget is not reachable from any page ("unplaced").
+   * The page whose /Annots array references the widget; `null` when the
+   * widget is not reachable from any page ("unplaced").
    */
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef | null;
+}
+
+/** The ONE place a widget record is built: computes `ref` from the raw facts. */
+export function formWidget(annotObjectNumber: number, page: PageRef | null): FormWidget {
+  return {
+    ref: annotObjectNumber > 0 && page ? { kind: 'objectNumber', page, annotObjectNumber } : null,
+    annotObjectNumber,
+    page,
+  };
 }

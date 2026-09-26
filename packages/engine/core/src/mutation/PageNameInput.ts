@@ -1,4 +1,5 @@
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PageRef } from '../identity/PageRef';
 
 /**
  * Input for `pages.setName()`: register `name` → the page in
@@ -11,7 +12,7 @@ import type { PageObjectNumber } from '../identity/PageObjectNumber';
  */
 export interface PageNameInput {
   name: string;
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
   /** An existing key to drop in the same job (rename). */
   replace?: string;
 }

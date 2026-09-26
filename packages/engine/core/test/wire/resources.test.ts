@@ -459,6 +459,13 @@ describe('cdnCoverageForScope', () => {
         'actions',
         'attachments',
         'layer-attachments',
+        // doc.forms.read (bit 6) covers the signature reads: the layer's
+        // snapshot and analysis, and the version-scoped families that need
+        // no download right (contents/digests, history).
+        'layer-signatures',
+        'layer-signatures-analysis',
+        'version-signatures',
+        'version-analysis',
       ]),
     );
     // download is cloud-only — not granted by pdf.permissions

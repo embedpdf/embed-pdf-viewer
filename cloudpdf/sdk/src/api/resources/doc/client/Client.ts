@@ -12,6 +12,8 @@ import { FormsClient } from "../resources/forms/client/Client.js";
 import { MetadataClient } from "../resources/metadata/client/Client.js";
 import { PagesClient } from "../resources/pages/client/Client.js";
 import { RedactionsClient } from "../resources/redactions/client/Client.js";
+import { SignaturesClient } from "../resources/signatures/client/Client.js";
+import { VersionsClient } from "../resources/versions/client/Client.js";
 
 export declare namespace DocClient {
     export type Options = BaseClientOptions;
@@ -26,6 +28,8 @@ export class DocClient {
     protected _metadata: MetadataClient | undefined;
     protected _pages: PagesClient | undefined;
     protected _redactions: RedactionsClient | undefined;
+    protected _signatures: SignaturesClient | undefined;
+    protected _versions: VersionsClient | undefined;
 
     constructor(options: DocClient.Options) {
         this._options = normalizeClientOptionsWithAuth(options);
@@ -49,6 +53,14 @@ export class DocClient {
 
     public get redactions(): RedactionsClient {
         return (this._redactions ??= new RedactionsClient(this._options));
+    }
+
+    public get signatures(): SignaturesClient {
+        return (this._signatures ??= new SignaturesClient(this._options));
+    }
+
+    public get versions(): VersionsClient {
+        return (this._versions ??= new VersionsClient(this._options));
     }
 
     /**
@@ -274,7 +286,7 @@ export class DocClient {
         request: CloudPDF.RenderDocRequest,
         requestOptions?: DocClient.RequestOptions,
     ): Promise<core.WithRawResponse<core.BinaryResponse>> {
-        const { docId, layerName, pon, "X-Document-Password": documentPassword } = request;
+        const { docId, layerName, pageKey, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -286,7 +298,7 @@ export class DocClient {
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)),
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/render/pages/${core.url.encodePathParam(pon)}/data`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/render/pages/${core.url.encodePathParam(pageKey)}/data`,
             ),
             method: "GET",
             headers: _headers,
@@ -319,7 +331,7 @@ export class DocClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/layers/{layerName}/render/pages/{pon}/data",
+            "/v1/docs/{docId}/layers/{layerName}/render/pages/{pageKey}/data",
         );
     }
 
@@ -335,7 +347,7 @@ export class DocClient {
      *     await client.doc.text({
      *         docId: "docId",
      *         layerName: "layerName",
-     *         pon: 1
+     *         pageKey: "pageKey"
      *     })
      */
     public text(
@@ -349,7 +361,7 @@ export class DocClient {
         request: CloudPDF.TextDocRequest,
         requestOptions?: DocClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocText200Response>> {
-        const { docId, layerName, pon, "X-Document-Password": documentPassword } = request;
+        const { docId, layerName, pageKey, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -361,7 +373,7 @@ export class DocClient {
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)),
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/text/pages/${core.url.encodePathParam(pon)}/data`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/text/pages/${core.url.encodePathParam(pageKey)}/data`,
             ),
             method: "GET",
             headers: _headers,
@@ -393,7 +405,7 @@ export class DocClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/layers/{layerName}/text/pages/{pon}/data",
+            "/v1/docs/{docId}/layers/{layerName}/text/pages/{pageKey}/data",
         );
     }
 }

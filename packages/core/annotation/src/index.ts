@@ -33,6 +33,23 @@ export {
 } from './view';
 export type { TextBox } from './view';
 export { hitTest, cursorAt, isSelectable, canMove, type Target } from './hit';
+// Rich text run algebra (pure): what the editor binding and the plugin's
+// selection styling compute with.
+export {
+  applyStyleToRange,
+  isPlainRichText,
+  locateOffset,
+  normalizeRuns,
+  paragraphsFromPlainText,
+  plainTextOf,
+  rangeHasStyle,
+  richTextLength,
+  sameStyleDelta,
+  splitRunsAt,
+  styleAt,
+  type RichTextRange,
+  type RichTextStyleDelta,
+} from './richtext';
 export { groupKeyOf, groupMembers, expandGroups, groupCaps, type GroupCaps } from './group';
 export { isAttachedLink, isConversationOnly, isSubstrateOnly } from './plane';
 export { linkChildrenOf, linkOf } from './links';
@@ -83,6 +100,7 @@ export {
 } from './props';
 export {
   geomScene,
+  textPlateInset,
   geomBounds,
   geomVisualBounds,
   geomHit,
@@ -136,6 +154,9 @@ export {
   groupResizeFactors,
 } from './geometry';
 export { cloudyPath, cloudyBorderExtent } from './cloudy';
+export * from './measurement';
+export * from './measurement-shape';
+export { annotationSelectionFrame, type SelectionFrame } from './selection';
 export { scene } from './scene';
 export { straightenInkStroke } from './ink';
 export type { BlendMode } from '@embedpdf/engine-core/runtime';

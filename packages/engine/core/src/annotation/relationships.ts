@@ -17,6 +17,7 @@
 import type { AnnotationBase } from './base';
 import type { AnnotationDTO } from './kinds';
 import type { AnnotationRef } from '../identity/AnnotationRef';
+import { annotationKey } from '../identity/annotationKey';
 
 /**
  * Where a single annotation sits in the reply/group taxonomy.
@@ -63,23 +64,6 @@ export interface AnnotationThread<T extends AnnotationDTO = AnnotationDTO> {
 }
 
 /**
- * Stable string key for an {@link AnnotationRef}, used to match a child's
- * `inReplyTo` against a candidate parent's `ref`. Both sides are produced
- * by the engine with the same identity precedence (objectNumber, then nm,
- * then index), so equal keys mean "same annotation".
- */
-export function refKey(ref: AnnotationRef): string {
-  switch (ref.kind) {
-    case 'objectNumber':
-      return `obj:${ref.pageObjectNumber}:${ref.annotObjectNumber}`;
-    case 'nm':
-      return `nm:${ref.pageObjectNumber}:${ref.nm}`;
-    case 'index':
-      return `idx:${ref.pageObjectNumber}:${ref.index}`;
-  }
-}
-
-/**
  * Compose a flat annotation list (one page, or a whole document via
  * `listRawAll()` flattened) into {@link AnnotationThread}s in primary
  * order.
@@ -100,11 +84,11 @@ export function refKey(ref: AnnotationRef): string {
 export function buildThreads(annotations: readonly AnnotationDTO[]): AnnotationThread[] {
   const byKey = new Map<string, AnnotationDTO>();
   for (const a of annotations) {
-    byKey.set(refKey(a.ref), a);
+    byKey.set(annotationKey(a.ref), a);
     // Index under /NM too, so a child that points at the parent by name
     // still resolves when the parent's own ref is objectNumber-form.
     if (a.nm && a.nm.length > 0) {
-      byKey.set(`nm:${a.ref.pageObjectNumber}:${a.nm}`, a);
+      byKey.set(`nm:${a.ref.page.pageObjectNumber}:${a.nm}`, a);
     }
   }
 
@@ -112,7 +96,7 @@ export function buildThreads(annotations: readonly AnnotationDTO[]): AnnotationT
   const threadByPrimaryKey = new Map<string, AnnotationThread>();
 
   const primaryThread = (primary: AnnotationDTO): AnnotationThread => {
-    const key = refKey(primary.ref);
+    const key = annotationKey(primary.ref);
     let thread = threadByPrimaryKey.get(key);
     if (!thread) {
       thread = { primary, groupedParts: [], replies: [] };
@@ -130,7 +114,7 @@ export function buildThreads(annotations: readonly AnnotationDTO[]): AnnotationT
   // Pass 2: attach children to their primary; orphans become primaries.
   for (const a of annotations) {
     if (!a.inReplyTo) continue;
-    const parent = byKey.get(refKey(a.inReplyTo));
+    const parent = byKey.get(annotationKey(a.inReplyTo));
     if (!parent || parent.inReplyTo) {
       // Parent missing from the set, or itself a child (one-level-deep
       // limitation): surface the annotation as its own primary so it is

@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-interaction",
-  "version": "3.0.0-next.12",
+  "version": "3.0.0-next.14",
   "private": false,
   "description": "The interaction hub: the active tool, the cursor, and pointer routing. Pure mechanism — knows nothing about selection/annotations/forms; they contribute tools + handlers.",
   "type": "module",
@@ -10,6 +10,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./contract": "./src/contract.ts",
+    "./contract/host": "./src/host-contract.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -24,6 +25,10 @@
       "./contract": {
         "import": "./dist/contract.js",
         "require": "./dist/contract.cjs"
+      },
+      "./contract/host": {
+        "import": "./dist/contract/host.js",
+        "require": "./dist/contract/host.cjs"
       },
       "./package.json": "./package.json"
     }

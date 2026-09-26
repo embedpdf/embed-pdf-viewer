@@ -1,6 +1,6 @@
 import type { WidgetAppearance } from '../annotation/kinds/widget.shared';
 import type { PdfRect } from '../geometry/primitives';
-import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PageRef } from '../identity/PageRef';
 
 export type { WidgetAppearance } from '../annotation/kinds/widget.shared';
 
@@ -10,7 +10,7 @@ export type { WidgetAppearance } from '../annotation/kinds/widget.shared';
  * engine job.
  */
 export interface WidgetPlacement {
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
   /** PDF user space. */
   rect: PdfRect;
   /**
@@ -86,12 +86,23 @@ export interface ListBoxFieldDraft extends FormFieldDraftBase {
 }
 
 /**
+ * A signature field: identity and (usually) one widget. Created unsigned;
+ * signing it is `doc.signatures`' job, drawing a mark into it without
+ * signing is `doc.forms.setSignatureAppearance`.
+ */
+export interface SignatureFieldDraft extends FormFieldDraftBase {
+  family: 'signature';
+  widget?: WidgetPlacement;
+}
+
+/**
  * What `doc.forms.createField` takes: per-family, mirroring the DTO union.
- * Push buttons and signatures are not authorable.
+ * Push buttons are not authorable.
  */
 export type FormFieldDraft =
   | TextFieldDraft
   | CheckboxFieldDraft
   | RadioFieldDraft
   | ComboBoxFieldDraft
-  | ListBoxFieldDraft;
+  | ListBoxFieldDraft
+  | SignatureFieldDraft;

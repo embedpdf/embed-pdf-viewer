@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-form",
-  "version": "3.0.0-next.12",
+  "version": "3.0.0-next.14",
   "private": false,
   "description": "Document-scoped interactive forms: reactive field state over doc.forms, fill-mode controls (FillItem projection), and form-data interchange. Widgets stay annotations; this plugin owns the field plane.",
   "type": "module",
@@ -12,7 +12,7 @@
     "./contract": "./src/contract.ts",
     "./contract/host": "./src/host-contract.ts",
     "./internal": "./src/internal.ts",
-    "./scripting": "./src/scripting.ts",
+    "./scripting": "./src/scripting/controller.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -53,13 +53,14 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@embedpdf/core-acrojs": "workspace:*",
-    "@embedpdf/core-js-sandbox": "workspace:*",
     "@embedpdf/core": "workspace:*",
-    "@embedpdf/plugin-interaction": "workspace:*",
-    "@embedpdf/plugin-annotation": "workspace:*",
+    "@embedpdf/core-acrojs": "workspace:*",
+    "@embedpdf/core-geometry": "workspace:*",
+    "@embedpdf/core-js-sandbox": "workspace:*",
     "@embedpdf/engine-core": "workspace:*",
-    "@embedpdf/plugin-actions": "workspace:*"
+    "@embedpdf/plugin-actions": "workspace:*",
+    "@embedpdf/plugin-annotation": "workspace:*",
+    "@embedpdf/plugin-interaction": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

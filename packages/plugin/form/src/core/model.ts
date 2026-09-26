@@ -126,3 +126,39 @@ export const fieldForWidget = (model: Model, annotObjectNumber: number): FormFie
   const i = model.byWidget[annotObjectNumber];
   return i === undefined ? null : (model.snapshot?.fields[i] ?? null);
 };
+
+/** A widget hit: the annotation under the point and the field it belongs to. */
+export interface WidgetHit {
+  annotObjectNumber: number;
+  field: FormFieldDTO;
+  /** The widget's content-space box. */
+  box: Box;
+}
+
+const contains = (b: Box, p: { x: number; y: number }): boolean =>
+  p.x >= b.x && p.x <= b.x + b.width && p.y >= b.y && p.y <= b.y + b.height;
+
+/**
+ * The widget under a content-space point, from the model's loaded geometry
+ * for that page (null when the page's geometry has not arrived, or nothing
+ * is there). Nested widgets resolve to the smallest containing box.
+ */
+export const widgetAt = (
+  model: Model,
+  pageObjectNumber: number,
+  point: { x: number; y: number },
+): WidgetHit | null => {
+  const geom = model.geom[pageObjectNumber];
+  if (!geom) return null;
+  let best: WidgetHit | null = null;
+  for (const [key, box] of Object.entries(geom)) {
+    if (!contains(box, point)) continue;
+    const annotObjectNumber = Number(key);
+    const field = fieldForWidget(model, annotObjectNumber);
+    if (!field) continue;
+    if (!best || box.width * box.height < best.box.width * best.box.height) {
+      best = { annotObjectNumber, field, box };
+    }
+  }
+  return best;
+};

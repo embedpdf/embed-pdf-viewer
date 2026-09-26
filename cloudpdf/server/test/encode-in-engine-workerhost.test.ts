@@ -3,7 +3,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createPdfRuntime } from '@embedpdf/engine-runtime';
 import { WorkerHost, type WorkerImageEncoder } from '@embedpdf/engine-services';
-import type { WirePack, WorkerRequest, WorkerResponse } from '@embedpdf/engine-core/runtime';
+import {
+  toPageRef,
+  type WirePack,
+  type WorkerRequest,
+  type WorkerResponse,
+} from '@embedpdf/engine-core/runtime';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { SharpImageEncoder } from '../src/render/SharpImageEncoder';
 
@@ -122,16 +127,16 @@ describe('encoded kinds through the real WorkerHost (native runtime + sharp)', (
     });
     const list = (await resolved({ kind: 'pages.list', jobId: nextJob++, docId })).result as {
       tag: string;
-      snapshot: { pages: Array<{ pageObjectNumber: number }> };
+      snapshot: { pages: Array<{ ref: { pageObjectNumber: number } }> };
     };
     expect(list.tag).toBe('pages.list');
-    const pon = list.snapshot.pages[0]!.pageObjectNumber;
+    const pon = list.snapshot.pages[0]!.ref.pageObjectNumber;
 
     const { result, transfer } = await resolved({
       kind: 'pages.renderEncoded',
       jobId: nextJob++,
       docId,
-      pageObjectNumber: pon,
+      page: toPageRef(pon),
       options: { viewport: { kind: 'width', width: 120 } },
       encode: { format: 'webp' },
     });
@@ -156,7 +161,7 @@ describe('encoded kinds through the real WorkerHost (native runtime + sharp)', (
         kind: 'pages.renderEncoded',
         jobId: nextJob++,
         docId,
-        pageObjectNumber: pon,
+        page: toPageRef(pon),
         options: { viewport: { kind: 'width', width: 120 } },
         encode: { format: 'png' },
       })
@@ -177,13 +182,13 @@ describe('encoded kinds through the real WorkerHost (native runtime + sharp)', (
     });
     const payload = result as {
       tag: string;
-      pageObjectNumber: number;
+      page: { pageObjectNumber: number };
       pageCount: number;
       image: { bytes: Uint8Array };
     };
     expect(payload.tag).toBe('document.renderPageFileEncoded');
     expect(payload.pageCount).toBe(1);
-    expect(payload.pageObjectNumber).toBeGreaterThan(0);
+    expect(payload.page.pageObjectNumber).toBeGreaterThan(0);
     expect(isWebp(payload.image.bytes)).toBe(true);
     expect(transfer[0]).toBe(payload.image.bytes.buffer);
   }, 30_000);
@@ -193,7 +198,7 @@ describe('encoded kinds through the real WorkerHost (native runtime + sharp)', (
       kind: 'annotations.renderAppearancesEncoded',
       jobId: nextJob++,
       docId: 'real-doc',
-      pageObjectNumber: 3, // the page object of the minimal PDF
+      page: toPageRef(3), // the page object of the minimal PDF
       encode: { format: 'webp' },
     });
     const payload = result as { tag: string; result: { appearances: unknown[] } };

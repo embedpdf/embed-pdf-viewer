@@ -4,6 +4,7 @@ import type {
   PageObjectNumber,
   RevisionToken,
 } from '@embedpdf/engine-core/runtime';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { readAnnotString } from './annotationReadPrimitives';
@@ -33,6 +34,7 @@ export function readAnnotationIdentity(
   index: number,
   revision: RevisionToken,
 ): AnnotationIdentity {
+  const page = toPageRef(pageObjectNumber);
   const objectNumber = fn.EPDFAnnot_GetObjectNumber(annotPtr);
   const nm = readAnnotString(fn, mem, annotPtr, 'NM');
 
@@ -40,7 +42,7 @@ export function readAnnotationIdentity(
     return {
       ref: {
         kind: 'objectNumber',
-        pageObjectNumber,
+        page,
         annotObjectNumber: objectNumber,
       },
       identityQuality: 'durable',
@@ -50,14 +52,14 @@ export function readAnnotationIdentity(
 
   if (nm && nm.length > 0) {
     return {
-      ref: { kind: 'nm', pageObjectNumber, nm },
+      ref: { kind: 'nm', page, nm },
       identityQuality: 'durable',
       nm,
     };
   }
 
   return {
-    ref: { kind: 'index', pageObjectNumber, index, revision },
+    ref: { kind: 'index', page, index, revision },
     identityQuality: 'weak',
     nm: nm ?? null,
   };

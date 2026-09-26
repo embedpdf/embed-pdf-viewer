@@ -10,7 +10,7 @@
  * calls once. These helpers are the proof that the two capability calls are
  * all a store needs.
  */
-import type { StampCapability } from './types';
+import type { StampCapability } from './contract';
 
 /** The persistence port: bytes by library id. */
 export interface StampLibraryStore {
@@ -46,7 +46,7 @@ export async function restoreStampLibraries(
   const restored: string[] = [];
   for (const { id, bytes } of await store.list()) {
     try {
-      restored.push(await stamp.importLibraryPdf(bytes));
+      restored.push(await stamp.importLibrary(bytes));
     } catch (error) {
       globalThis.console?.warn(`[stamp] stored library '${id}' could not be restored:`, error);
     }
@@ -69,11 +69,12 @@ export function persistStampLibraries(
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
   const write = (libraryId: string) => {
     timers.delete(libraryId);
-    const bytes = stamp.exportLibrary(libraryId);
-    if (!bytes) return;
-    store.put(libraryId, bytes).catch((error) => {
-      globalThis.console?.warn(`[stamp] persisting library '${libraryId}' failed:`, error);
-    });
+    stamp
+      .exportLibrary(libraryId)
+      .then((bytes) => store.put(libraryId, bytes))
+      .catch((error) => {
+        globalThis.console?.warn(`[stamp] persisting library '${libraryId}' failed:`, error);
+      });
   };
   const off = stamp.onLibraryChanged(({ libraryId, reason }) => {
     if (except.has(libraryId)) return;

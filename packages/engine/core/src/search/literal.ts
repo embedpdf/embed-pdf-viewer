@@ -9,7 +9,11 @@ import type { SearchQuery } from './types';
  * queries fold the original page text at query time).
  */
 export function foldOptionsFor(query: SearchQuery): FoldOptions {
-  return { keepCase: !!query.matchCase, keepMarks: !!query.matchDiacritics };
+  return {
+    keepCase: !!query.matchCase,
+    keepMarks: !!query.matchDiacritics,
+    dropWhitespace: !!query.ignoreWhitespace,
+  };
 }
 
 // ONE definition of "word character" for the whole search subsystem —
@@ -36,6 +40,25 @@ export function wordAt(text: string, index: number): boolean {
 }
 
 /**
+ * Whether the folded hit at `at` sits on word boundaries. Checked on the
+ * folded plane, except under `ignoreWhitespace`: dropping whitespace glues
+ * neighbouring words together ("i n v o i c e 42" folds to "invoice42"), so there the
+ * boundaries are read off the ORIGINAL text around the mapped range.
+ */
+function isWholeWordHit(
+  haystack: FoldedText,
+  at: number,
+  needleLength: number,
+  query: SearchQuery,
+): boolean {
+  if (!query.ignoreWhitespace) {
+    return !wordBefore(haystack.folded, at) && !wordAt(haystack.folded, at + needleLength);
+  }
+  const { start, length } = toOriginalRange(haystack, at, needleLength);
+  return !wordBefore(haystack.original, start) && !wordAt(haystack.original, start + length);
+}
+
+/**
  * All non-overlapping literal matches, in original code-unit space.
  * `haystack` must have been folded with `foldOptionsFor(query)`.
  */
@@ -50,10 +73,7 @@ export function matchLiteral(haystack: FoldedText, query: SearchQuery): SearchMa
   while (from <= haystack.folded.length - needle.length) {
     const at = haystack.folded.indexOf(needle, from);
     if (at < 0) break;
-    if (
-      query.wholeWord &&
-      (wordBefore(haystack.folded, at) || wordAt(haystack.folded, at + needle.length))
-    ) {
+    if (query.wholeWord && !isWholeWordHit(haystack, at, needle.length, query)) {
       from = at + 1;
       continue;
     }

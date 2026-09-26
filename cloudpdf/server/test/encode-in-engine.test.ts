@@ -163,7 +163,7 @@ describe('encode-in-engine', () => {
       fx,
       't1',
       'docenc001',
-      '/render/pages/1/data?viewport.kind=scale&viewport.scale=1',
+      '/render/pages/obj:1/data?viewport.kind=scale&viewport.scale=1',
     );
     expect(res.status).toBe(200);
     expect(res.contentType).toContain('image/webp');
@@ -177,7 +177,7 @@ describe('encode-in-engine', () => {
       fx,
       't1',
       'docenc001',
-      '/render/pages/1/data?viewport.kind=scale&viewport.scale=1&format=png',
+      '/render/pages/obj:1/data?viewport.kind=scale&viewport.scale=1&format=png',
     );
     expect(png.status).toBe(200);
     expect(png.contentType).toContain('image/png');
@@ -190,7 +190,7 @@ describe('encode-in-engine', () => {
     await seed(inEngine, 't1', 'docenc002');
     await seed(legacy, 't1', 'docenc002');
 
-    const renderPath = '/render/pages/1/data?viewport.kind=scale&viewport.scale=1';
+    const renderPath = '/render/pages/obj:1/data?viewport.kind=scale&viewport.scale=1';
     const a = await get(inEngine, 't1', 'docenc002', renderPath);
     const b = await get(legacy, 't1', 'docenc002', renderPath);
     expect(a.status).toBe(200);
@@ -199,7 +199,7 @@ describe('encode-in-engine', () => {
 
     // Appearances: same stub appearance, worker-encoded vs API-encoded —
     // manifests and image parts must match byte for byte.
-    const appearancesPath = '/layers/main/annotations/pages/1/appearances?scale=1';
+    const appearancesPath = '/layers/main/annotations/pages/obj:1/appearances?scale=1';
     const am = await get(inEngine, 't1', 'docenc002', appearancesPath);
     const bm = await get(legacy, 't1', 'docenc002', appearancesPath);
     expect(am.status).toBe(200);

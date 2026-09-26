@@ -1,4 +1,10 @@
-import { EngineError, EngineErrorCode, type PageState } from '@embedpdf/engine-core/runtime';
+import {
+  EngineError,
+  EngineErrorCode,
+  type PageState,
+  decodePageKey,
+  type PageRef,
+} from '@embedpdf/engine-core/runtime';
 import type { ManifestPage } from '@embedpdf/engine-core/wire';
 
 /**
@@ -45,15 +51,41 @@ export function setNoStore(reply: { header(name: 'Cache-Control', value: string)
   reply.header('Cache-Control', NO_STORE);
 }
 
-export function parsePageObjectNumber(raw: string): number {
-  const n = Number.parseInt(raw, 10);
-  if (!Number.isInteger(n) || n <= 0) {
+/**
+ * Decode the `:pageKey` route parameter (`obj:12`, the page-plane sibling
+ * of `:annotKey` and `:fieldKey`) into a `PageRef`. Malformed keys answer
+ * 400 InvalidArg. The segment arrives already URL-decoded.
+ */
+export function parsePageKey(raw: string): PageRef {
+  const ref = decodePageKey(raw);
+  if (!ref) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
-      `pageObjectNumber must be a positive integer, got '${raw}'`,
+      `pageKey '${raw}' is not a valid page key (expected 'obj:N')`,
     );
   }
-  return n;
+  return ref;
+}
+
+/**
+ * Unwrap a `PageRef` to its page object number. The wire address has one
+ * kind — the canonical `objectNumber` — so this is a pure projection; the
+ * guard only exists so a foreign kind can never reach number-keyed code
+ * (DB rows, storage keys, audit rows) unnoticed.
+ */
+export function resolvePageRefToNumber(ref: PageRef): number {
+  if (ref.kind !== 'objectNumber') {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      `unsupported page address kind '${String((ref as { kind: unknown }).kind)}'`,
+    );
+  }
+  return ref.pageObjectNumber;
+}
+
+/** `parsePageKey` + `resolvePageRefToNumber` in one call, for route handlers. */
+export function resolvePageKeyParam(raw: string): number {
+  return resolvePageRefToNumber(parsePageKey(raw));
 }
 
 export function toPageState(page: ManifestPage): PageState {

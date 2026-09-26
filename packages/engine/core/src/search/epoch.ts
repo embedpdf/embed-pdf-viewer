@@ -18,7 +18,7 @@ import type { SearchQuery } from './types';
 export function searchContentEpoch(manifest: DocumentManifest): string {
   let input = `${manifest.layoutVersion}`;
   for (const page of manifest.pages) {
-    input += `|${page.state.pageObjectNumber}:${page.cache.contentVersion}`;
+    input += `|${page.state.page.pageObjectNumber}:${page.cache.contentVersion}`;
   }
   return fnv1a64(input);
 }
@@ -45,7 +45,9 @@ function fnv1a64(input: string): string {
  * untouched (their raw form IS the query).
  */
 export function canonicalSearchQuery(query: SearchQuery): SearchQuery {
-  if (query.regex || query.matchCase || query.matchDiacritics) return query;
+  if (query.regex || query.matchCase || query.matchDiacritics || query.ignoreWhitespace) {
+    return query;
+  }
   const canonical: SearchQuery = { text: foldText(query.text).folded };
   if (query.wholeWord) canonical.wholeWord = true;
   return canonical;

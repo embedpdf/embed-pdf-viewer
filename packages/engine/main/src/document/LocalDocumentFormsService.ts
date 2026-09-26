@@ -13,8 +13,10 @@ import {
   type FormFieldPatch,
   type FormFieldRef,
   type FormFieldUpdateResult,
+  type SignatureAppearanceInput,
   type FormWidgetLinkResult,
-  type FormWidgetRef,
+  type FormWidget,
+  type AnnotationRef,
   type FormFieldValue,
   type FormImportResult,
   type FormRepairOptions,
@@ -193,6 +195,30 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     });
   }
 
+  setSignatureAppearance(
+    ref: FormFieldRef,
+    appearance: SignatureAppearanceInput,
+  ): AbortablePromise<FormFieldUpdateResult> {
+    const rejected = this.gate('doc.forms.fill');
+    if (rejected) return rejected;
+    const docId = this.docId;
+    const pdf = appearance.pdf.slice().buffer as ArrayBuffer;
+    const pageIndex = appearance.pageIndex ?? 0;
+    const submission = this.queue.enqueue<WorkerResultPayload>(
+      {
+        buildPack: (jobId: JobId) =>
+          wirePack({ kind: 'forms.setSignatureAppearance', jobId, docId, ref, pdf, pageIndex }, [
+            pdf,
+          ]),
+      },
+      { priority: Priority.HIGH },
+    );
+    return this.await(submission, 'forms.setSignatureAppearance', (payload) => {
+      this.publisher.publishLocal({ type: 'form.fieldUpdated', ...payload.result });
+      return payload.result;
+    });
+  }
+
   updateField(ref: FormFieldRef, patch: FormFieldPatch): AbortablePromise<FormFieldUpdateResult> {
     const rejected = this.gate('doc.forms.modify');
     if (rejected) return rejected;
@@ -228,7 +254,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
 
   attachWidget(
     ref: FormFieldRef,
-    widget: FormWidgetRef,
+    widget: AnnotationRef,
     options?: { onState?: string },
   ): AbortablePromise<FormWidgetLinkResult> {
     const rejected = this.gate('doc.forms.modify');
@@ -255,7 +281,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     });
   }
 
-  detachWidget(ref: FormFieldRef, widget: FormWidgetRef): AbortablePromise<FormWidgetLinkResult> {
+  detachWidget(ref: FormFieldRef, widget: AnnotationRef): AbortablePromise<FormWidgetLinkResult> {
     const rejected = this.gate('doc.forms.modify');
     if (rejected) return rejected;
     const docId = this.docId;

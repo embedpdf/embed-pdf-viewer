@@ -1,8 +1,8 @@
 import type {
-  InteractionCapability,
+  InteractionHostCapability,
   InteractionHandler,
-} from '@embedpdf/plugin-interaction/contract';
-import type { StageCapability } from './types';
+} from '@embedpdf/plugin-interaction/contract/host';
+import type { StageCapability } from './contract';
 
 export interface ScrollHandlerOptions {
   /**
@@ -27,12 +27,12 @@ export interface ScrollHandlerOptions {
  */
 export function createScrollHandler(
   stage: StageCapability,
-  interaction: InteractionCapability,
+  interaction: InteractionHostCapability,
   options: ScrollHandlerOptions = {},
 ): InteractionHandler {
   const panFallback = options.panFallback ?? true;
   let last = { x: 0, y: 0 };
-  const isPanTool = (): boolean => interaction.activeTool().enables.has('scroll');
+  const isPanTool = (): boolean => interaction.getActiveTool().enables.has('scroll');
   return {
     id: 'stage-scroll',
     priority: 10, // below page-aware handlers (selection/annotation) — they claim first
@@ -42,20 +42,20 @@ export function createScrollHandler(
       // tool's own (higher-priority) handler keeps the down it already captured.
       if (!isPanTool() && s.page) return false;
       last = s.viewport;
-      interaction.setCursor('stage-grab', 'grabbing', 40); // closed hand while panning
+      interaction.claimCursor('stage-grab', 'grabbing', 40); // closed hand while panning
       return true; // capture the drag
     },
     onMove: (s) => {
       stage.panBy(s.viewport.x - last.x, s.viewport.y - last.y);
       last = s.viewport;
     },
-    onUp: () => interaction.setCursor('stage-grab', null),
+    onUp: () => interaction.claimCursor('stage-grab', null),
     onHover: (s) => {
       // Open hand over a gap when a non-pan tool would fall back to pan there;
       // cleared over a page (the tool's cursor shows). The pan tool skips this —
       // its resting `grab` is the tool cursor.
       if (panFallback && !isPanTool()) {
-        interaction.setCursor('stage-pan-fallback', s.page ? null : 'grab', 5);
+        interaction.claimCursor('stage-pan-fallback', s.page ? null : 'grab', 5);
       }
     },
   };

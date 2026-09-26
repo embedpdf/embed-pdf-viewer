@@ -2,16 +2,17 @@ import type {
   AnnotationListPageSnapshot,
   AnnotationListSnapshotAllPages,
 } from '../annotation/AnnotationListSnapshot';
-import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PageRef } from '../identity/PageRef';
 import { AbortablePromise } from '../promise/AbortablePromise';
 
 export interface WeakAnnotationEditSession {
   readonly id: string;
   readonly expiresAt: number;
   readonly heartbeatIntervalMs: number;
-  readonly pageObjectNumbers: readonly PageObjectNumber[];
-  covers(pageObjectNumber: PageObjectNumber): boolean;
-  updatePages(pageObjectNumbers: readonly PageObjectNumber[]): AbortablePromise<void>;
+  /** The pages this session claims edit presence on. */
+  readonly pages: readonly PageRef[];
+  covers(page: PageRef): boolean;
+  updatePages(pages: readonly PageRef[]): AbortablePromise<void>;
   heartbeat(): AbortablePromise<void>;
   release(): AbortablePromise<void>;
 }
@@ -34,8 +35,6 @@ export interface WeakAnnotationEditSession {
  */
 export interface DocumentAnnotationsService {
   listRawAll(): AbortablePromise<AnnotationListSnapshotAllPages>;
-  listRaw(pageObjectNumber: PageObjectNumber): AbortablePromise<AnnotationListPageSnapshot>;
-  beginWeakEdit(
-    pageObjectNumbers: readonly PageObjectNumber[],
-  ): AbortablePromise<WeakAnnotationEditSession>;
+  listRaw(page: PageRef): AbortablePromise<AnnotationListPageSnapshot>;
+  beginWeakEdit(pages: readonly PageRef[]): AbortablePromise<WeakAnnotationEditSession>;
 }

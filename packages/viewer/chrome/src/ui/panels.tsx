@@ -18,9 +18,11 @@ import { ThumbsStageToken } from '../config/stage';
 import { Icon } from './icons';
 import { AnnotationStylePanel } from './annotation-style';
 import { CommentsPanel } from './comments-panel';
+import { MeasurementSection } from './measurement';
 import { RedactionPanel } from './redaction-panel';
 import { SearchPanel } from './search-panel';
 import { StampsPanel } from './stamps-panel';
+import { SignaturesPanel } from './signatures-panel';
 
 // ── left sidebar (thumbnails / outline tabs) ─────────────────────────────────
 export function LeftSidebar() {
@@ -128,40 +130,54 @@ export function RightSidebar() {
   const comment = useSurface('comment');
   const style = useSurface('annotation-style');
   const redaction = useSurface('redaction');
+  const measurement = useSurface('measurement');
   const stamps = useSurface('stamps');
-  const active = search.isOpen
-    ? 'search'
-    : comment.isOpen
-      ? 'comment'
-      : style.isOpen
-        ? 'style'
-        : redaction.isOpen
-          ? 'redaction'
-          : stamps.isOpen
-            ? 'stamps'
-            : null;
+  const signatures = useSurface('signatures');
+  const active = measurement.isOpen
+    ? 'measurement'
+    : search.isOpen
+      ? 'search'
+      : comment.isOpen
+        ? 'comment'
+        : style.isOpen
+          ? 'style'
+          : redaction.isOpen
+            ? 'redaction'
+            : stamps.isOpen
+              ? 'stamps'
+              : signatures.isOpen
+                ? 'signatures'
+                : null;
   if (!active) return null;
 
   const titleKey =
-    active === 'search'
-      ? 'demo.searchTitle'
-      : active === 'comment'
-        ? 'demo.commentsTitle'
-        : active === 'redaction'
-          ? 'demo.redactionTitle'
-          : active === 'stamps'
-            ? 'demo.stampsTitle'
-            : 'demo.styleTitle';
+    active === 'measurement'
+      ? 'measurement.title'
+      : active === 'search'
+        ? 'demo.searchTitle'
+        : active === 'comment'
+          ? 'demo.commentsTitle'
+          : active === 'redaction'
+            ? 'demo.redactionTitle'
+            : active === 'stamps'
+              ? 'demo.stampsTitle'
+              : active === 'signatures'
+                ? 'demo.signaturesTitle'
+                : 'demo.styleTitle';
   const close =
-    active === 'search'
-      ? search.close
-      : active === 'comment'
-        ? comment.close
-        : active === 'redaction'
-          ? redaction.close
-          : active === 'stamps'
-            ? stamps.close
-            : style.close;
+    active === 'measurement'
+      ? measurement.close
+      : active === 'search'
+        ? search.close
+        : active === 'comment'
+          ? comment.close
+          : active === 'redaction'
+            ? redaction.close
+            : active === 'stamps'
+              ? stamps.close
+              : active === 'signatures'
+                ? signatures.close
+                : style.close;
 
   return (
     <aside className="border-border-subtle bg-surface flex w-72 shrink-0 flex-col border-l">
@@ -175,7 +191,9 @@ export function RightSidebar() {
           <Icon name="x" size={16} />
         </button>
       </div>
-      {active === 'style' ? (
+      {active === 'measurement' ? (
+        <MeasurementSection key={documentId ?? 'none'} />
+      ) : active === 'style' ? (
         <AnnotationStylePanel />
       ) : active === 'search' ? (
         <SearchPanel key={documentId ?? 'none'} />
@@ -183,6 +201,8 @@ export function RightSidebar() {
         <RedactionPanel />
       ) : active === 'stamps' ? (
         <StampsPanel />
+      ) : active === 'signatures' ? (
+        <SignaturesPanel />
       ) : (
         <CommentsPanel key={documentId ?? 'none'} />
       )}
@@ -194,8 +214,8 @@ export function RightSidebar() {
 export function PageControls() {
   const t = useT();
   // the Stage cursor is a 0-based display index; people count from 1
-  const current = useSelector(StageToken, (c) => c.currentPage() + 1);
-  const total = useSelector(StageToken, (c) => c.pageCount());
+  const current = useSelector(StageToken, (c) => c.getCurrentPageIndex() + 1);
+  const { pageCount: total } = usePages();
   if (!total) return null;
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-5 flex justify-center">

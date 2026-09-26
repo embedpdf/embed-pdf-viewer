@@ -1,0 +1,22 @@
+# @embedpdf/plugin-interaction — ./contract
+
+ActivateToolOptions [InterfaceDeclaration]: export interface ActivateToolOptions{ readonly payload?: unknown; }
+Cursor [TypeAliasDeclaration]: export type Cursor = string;
+FeedbackPluginOptions [InterfaceDeclaration] (from packages/plugin/interaction/src/feedback.types.ts): export interface FeedbackPluginOptions{ provider?: PlatformFeedback; }
+FeedbackToken [VariableDeclaration] (from packages/plugin/interaction/src/feedback.types.ts): FeedbackToken = createCapabilityToken<PlatformFeedback>('feedback')
+GestureEvent [InterfaceDeclaration]: export interface GestureEvent{ readonly handlerId: string; readonly page: PageRef | null; readonly pointerType: PointerKind; }
+InteractionCapability [InterfaceDeclaration]: export interface InteractionCapability{ getActiveTool(): Tool; getActiveToolId(): ToolId; getDefaultToolId(): ToolId; listTools(): readonly Tool[]; getTool(id: ToolId): Tool | null; hasTool(id: ToolId): boolean; activeToolEnables(behavior: string): boolean; activateTool(id: ToolId, options?: ActivateToolOptions): void; activateDefaultTool(): void; pushTool(id: ToolId, options?: ActivateToolOptions): void; popTool(): void; setToolCursor(id: ToolId, skin: ToolCursorSkin | null): void; registerTool(tool: Tool, options?: RegisterToolOptions): Unsubscribe; readonly onToolChanged: EventHook<ToolChangedEvent>; readonly onGestureStarted: EventHook<GestureEvent>; readonly onGestureEnded: EventHook<GestureEvent>; readonly onGestureCancelled: EventHook<GestureEvent>; }
+InteractionConfig [InterfaceDeclaration]: export interface InteractionConfig{ defaultTool?: ToolId; tools?: readonly Tool[]; }
+InteractionHandler [InterfaceDeclaration]: export interface InteractionHandler{ id: string; priority: number; enabledFor(tool: Tool): boolean; onDown(sample: PointerSample): boolean; onMove?(sample: PointerSample): void; onUp?(sample: PointerSample): void; onCancel?(sample: PointerSample): void; onHover?(sample: PointerSample): void; claimsTouch?(sample: PointerSample): boolean; }
+InteractionToken [VariableDeclaration] (from packages/plugin/interaction/src/token.ts): InteractionToken = createCapabilityToken<InteractionCapability>('interaction', { hint: `add interactionPlugin() from '@embedpdf/plugin-interaction' to your plugins list`, } )
+Modifiers [InterfaceDeclaration]: export interface Modifiers{ shift: boolean; alt: boolean; ctrl: boolean; meta: boolean; }
+Phase [TypeAliasDeclaration]: export type Phase = 'down' | 'move' | 'up' | 'cancel';
+PlatformFeedback [InterfaceDeclaration] (from packages/plugin/interaction/src/feedback.types.ts): export interface PlatformFeedback{ selection(): void; impact(weight?: 'light' | 'medium' | 'heavy'): void; notify(kind: 'success' | 'warning' | 'error'): void; }
+PointerKind [TypeAliasDeclaration]: export type PointerKind = 'mouse' | 'pen' | 'touch';
+PointerSample [InterfaceDeclaration]: export interface PointerSample{ phase: Phase; viewport: Point; page?:{ ref: PageRef; point: Point; scale?: number; rotation?: PageRotation; zoom?: number; } ; modifiers: Modifiers; clickCount?: number; pointerType?: PointerKind; gesture?: 'long-press'; source?: string; project?(page: PageRef): Point | null; }
+RegisterToolOptions [InterfaceDeclaration]: export interface RegisterToolOptions{ readonly replace?: boolean; }
+Tool [InterfaceDeclaration]: export interface Tool{ id: ToolId; cursor: Cursor; gapCursor?: Cursor; enables: ReadonlySet<string>; touchDirect?: boolean; }
+ToolChangedEvent [InterfaceDeclaration]: export interface ToolChangedEvent{ readonly toolId: ToolId; readonly previousToolId: ToolId; readonly tool: Tool; readonly payload?: unknown; }
+ToolCursorSkin [TypeAliasDeclaration]: export type ToolCursorSkin = Record<Cursor, Cursor>;
+ToolId [TypeAliasDeclaration]: export type ToolId = string;
+samplePointOn [VariableDeclaration]: samplePointOn = (s: PointerSample, page: PageRef): Point | null => s.project?.(page) ?? (s.page?.ref.pageObjectNumber === page.pageObjectNumber ? s.page.point : null)

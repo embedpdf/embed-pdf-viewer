@@ -51,6 +51,15 @@ describe('search token codec', () => {
     expect(decodeSearchToken(encodeSearchToken(token))).toEqual(token);
   });
 
+  test('round-trips whitespace-insensitive queries', () => {
+    const token: SearchToken = {
+      epoch: '00000000000000ff',
+      query: { text: 'invoice', ignoreWhitespace: true, wholeWord: true },
+      skip: 0,
+    };
+    expect(decodeSearchToken(encodeSearchToken(token))).toEqual(token);
+  });
+
   test('canonical: defaults are omitted, equal searches are byte-equal', () => {
     const a = encodeSearchToken({
       epoch: 'e',

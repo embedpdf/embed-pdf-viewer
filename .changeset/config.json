@@ -21,6 +21,7 @@
       "@embedpdf/core-annotation",
       "@embedpdf/core-geometry",
       "@embedpdf/core-js-sandbox",
+      "@embedpdf/core-signature",
       "@embedpdf/core-stage",
       "@embedpdf/core-ui",
       "@embedpdf/engine",
@@ -49,6 +50,7 @@
       "@embedpdf/plugin-search",
       "@embedpdf/plugin-selection",
       "@embedpdf/plugin-shell",
+      "@embedpdf/plugin-signature",
       "@embedpdf/plugin-stage",
       "@embedpdf/plugin-stamp",
       "@embedpdf/plugin-view-manager",
@@ -56,7 +58,8 @@
       "@embedpdf/viewer",
       "@embedpdf/viewer-chrome",
       "@embedpdf/viewer-react",
-      "@embedpdf/web"
+      "@embedpdf/web",
+      "@embedpdf/plugin-measurement"
     ]
   ],
   "linked": [],

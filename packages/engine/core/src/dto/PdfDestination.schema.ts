@@ -1,8 +1,9 @@
 import { z } from 'zod';
 
 import type { PdfDestination } from './PdfDestination';
+import { PageRefSchema } from '../identity/PageRef.schema';
 
-const pageObjectNumber = z.number().int().positive();
+const page = PageRefSchema;
 /** Spec-nullable axis value: absent and `null` both mean "retain current". */
 const axis = z.number().nullable().optional();
 
@@ -13,19 +14,19 @@ const axis = z.number().nullable().optional();
  * through the annotation tree.
  */
 export const PdfDestinationSchema: z.ZodType<PdfDestination> = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('xyz'), pageObjectNumber, left: axis, top: axis, zoom: axis }),
-  z.object({ kind: z.literal('fit'), pageObjectNumber }),
-  z.object({ kind: z.literal('fitH'), pageObjectNumber, top: axis }),
-  z.object({ kind: z.literal('fitV'), pageObjectNumber, left: axis }),
+  z.object({ kind: z.literal('xyz'), page, left: axis, top: axis, zoom: axis }),
+  z.object({ kind: z.literal('fit'), page }),
+  z.object({ kind: z.literal('fitH'), page, top: axis }),
+  z.object({ kind: z.literal('fitV'), page, left: axis }),
   z.object({
     kind: z.literal('fitR'),
-    pageObjectNumber,
+    page,
     left: z.number(),
     bottom: z.number(),
     right: z.number(),
     top: z.number(),
   }),
-  z.object({ kind: z.literal('fitB'), pageObjectNumber }),
-  z.object({ kind: z.literal('fitBH'), pageObjectNumber, top: axis }),
-  z.object({ kind: z.literal('fitBV'), pageObjectNumber, left: axis }),
+  z.object({ kind: z.literal('fitB'), page }),
+  z.object({ kind: z.literal('fitBH'), page, top: axis }),
+  z.object({ kind: z.literal('fitBV'), page, left: axis }),
 ]) as unknown as z.ZodType<PdfDestination>;

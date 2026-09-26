@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { memoryStampStore, persistStampLibraries, restoreStampLibraries } from '../src/persistence';
-import type { StampCapability, StampLibraryChange } from '../src/types';
+import type { StampCapability, StampLibraryChange } from '../src/host-contract';
 
 function fakeStamp() {
   const listeners = new Set<(change: StampLibraryChange) => void>();
@@ -11,8 +11,12 @@ function fakeStamp() {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    exportLibrary: (id: string) => bytes.get(id) ?? null,
-    importLibraryPdf: vi.fn(async (source: Uint8Array) => {
+    exportLibrary: async (id: string) => {
+      const b = bytes.get(id);
+      if (!b) throw new Error(`unknown library '${id}'`);
+      return b;
+    },
+    importLibrary: vi.fn(async (source: Uint8Array) => {
       const id = new TextDecoder().decode(source).replace('%PDF-', '');
       bytes.set(id, source);
       return id;
@@ -72,6 +76,6 @@ describe('stamp persistence helper', () => {
     await store.put('b', new TextEncoder().encode('%PDF-lib-b'));
     const restored = await restoreStampLibraries(stamp, store);
     expect(restored).toEqual(['lib-a', 'lib-b']);
-    expect(stamp.importLibraryPdf).toHaveBeenCalledTimes(2);
+    expect(stamp.importLibrary).toHaveBeenCalledTimes(2);
   });
 });

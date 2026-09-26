@@ -1,5 +1,13 @@
 # @embedpdf/plugin-form
 
+## 3.0.0-next.14
+
+## 3.0.0-next.13
+
+### Minor Changes
+
+- [#812](https://github.com/embedpdf/embed-pdf-viewer/pull/812) by [@bobsingor](https://github.com/bobsingor) – Add signature-field authoring and fill controls that expose whether a field is signed. Provide widget hit testing for placing marks on existing fields, and refresh form state after signing or a document version change.
+
 ## 3.0.0-next.12
 
 ## 3.0.0-next.11

@@ -13,8 +13,12 @@ describe("RedactionsClient", () => {
             meta: {
                 affectedPages: [
                     {
-                        pageObjectNumber: 1,
-                        revision: { docSessionId: "docSessionId", pageObjectNumber: 1, generation: 1 },
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        revision: {
+                            docSessionId: "docSessionId",
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            generation: 1,
+                        },
                         weakAnnotationState: { kind: "unknown" },
                     },
                 ],
@@ -22,7 +26,14 @@ describe("RedactionsClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
-                    pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
+                    layerVersion: 1,
+                    working: true,
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1 },
+                        },
+                    ],
                 },
             },
         };

@@ -76,7 +76,9 @@ export function resolveStrategy(
   const clientPyramid =
     options.tiles.quantize === 'exact' ? null : ascending(options.tiles.quantize);
   const pyramid = lattice
-    ? (policy.tiles?.scales ? ascending(policy.tiles.scales) : (clientPyramid ?? options.tiles.fallbackPyramid))
+    ? policy.tiles?.scales
+      ? ascending(policy.tiles.scales)
+      : (clientPyramid ?? options.tiles.fallbackPyramid)
     : clientPyramid;
 
   const tileSize =

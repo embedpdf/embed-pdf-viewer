@@ -2,7 +2,7 @@ import {
   AbortablePromise,
   EngineError,
   EngineErrorCode,
-  type PageObjectNumber,
+  type PageRef,
   type PageTextService,
   type PageTextSnapshot,
 } from '@embedpdf/engine-core/runtime';
@@ -25,7 +25,7 @@ export class CloudPageTextService implements PageTextService {
     private readonly http: HttpClient,
     private readonly docId: string,
     private readonly layerName: string,
-    private readonly pageObjectNumber: PageObjectNumber,
+    private readonly pageRef: PageRef,
     private readonly isClosed: () => boolean,
     private readonly manifest: ManifestAccessor,
   ) {}
@@ -39,22 +39,23 @@ export class CloudPageTextService implements PageTextService {
     return AbortablePromise.run<PageTextSnapshot>(async (signal) => {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        const page = manifest.pages.find((p) => p.state.pageObjectNumber === this.pageObjectNumber);
+        const pon = this.pageRef.pageObjectNumber;
+        const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pon);
         if (!page) {
           throw new EngineError(
             EngineErrorCode.NotFound,
-            `no page with object number ${this.pageObjectNumber} in document ${this.docId}`,
+            `no page with object number ${pon} in document ${this.docId}`,
           );
         }
         // Plane-scope rule: text depends on the `content` plane — while it
         // is inherited, every visitor's layer reads ONE doc-level URL (and
         // the base worker session at the origin).
         return planesInherited(manifest, ['content'])
-          ? wirePaths.docPageText(this.docId, this.pageObjectNumber, page.cache.contentVersion)
+          ? wirePaths.docPageText(this.docId, this.pageRef, page.cache.contentVersion)
           : wirePaths.layerPageText(
               this.docId,
               this.layerName,
-              this.pageObjectNumber,
+              this.pageRef,
               page.cache.contentVersion,
             );
       };

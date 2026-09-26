@@ -69,3 +69,24 @@ export function writeUtf16String(
     mem.free(ptr);
   }
 }
+
+/**
+ * A NUL-terminated UTF-8 copy of `value` in runtime memory for the duration
+ * of `fn` (a `FPDF_STRING` parameter: a file system path, say).
+ */
+export function withUtf8CString<T>(
+  mem: PdfRuntimeMemory,
+  value: string,
+  fn: (ptr: Ptr) => T,
+): T {
+  const encoded = new TextEncoder().encode(value);
+  const bytes = new Uint8Array(encoded.byteLength + 1);
+  bytes.set(encoded);
+  const ptr = mem.alloc(bytes.byteLength);
+  try {
+    mem.writeBytes(ptr, bytes);
+    return fn(ptr);
+  } finally {
+    mem.free(ptr);
+  }
+}

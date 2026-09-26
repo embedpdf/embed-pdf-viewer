@@ -3,6 +3,7 @@ import type { DocumentEvent } from '../events/DocumentEvent';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
+import { toPageRef } from '../identity/PageRef';
 import { RedactionApplyResultSchema } from '../wire/schemas';
 import type { ConformanceOptions, ConformanceTestRunner } from './runMetadataConformance';
 
@@ -47,8 +48,8 @@ export function runRedactionApplyConformance(
       try {
         if (!doc.redaction) return;
         const layoutBefore = await doc.pages.list();
-        const pageObjectNumber = layoutBefore.pages[0].pageObjectNumber;
-        const page = doc.page(pageObjectNumber);
+        const pageObjectNumber = layoutBefore.pages[0].ref.pageObjectNumber;
+        const page = doc.page(toPageRef(pageObjectNumber));
 
         const collateral = await page.annotations.create({
           subtype: 'highlight',
@@ -77,7 +78,7 @@ export function runRedactionApplyConformance(
         });
         expect(RedactionApplyResultSchema.safeParse(result).success).toBe(true);
         expect(result.results).toHaveLength(1);
-        expect(result.results[0].pageObjectNumber).toBe(pageObjectNumber);
+        expect(result.results[0].page.pageObjectNumber).toBe(pageObjectNumber);
         expect(result.results[0].status).toBe('applied');
         // Exactly the highlight counts: the consumed REDACT never does.
         expect(result.results[0].removedAnnotationCount).toBe(1);
@@ -104,8 +105,8 @@ export function runRedactionApplyConformance(
       try {
         if (!doc.redaction) return;
         const layout = await doc.pages.list();
-        const pageObjectNumber = layout.pages[0].pageObjectNumber;
-        const page = doc.page(pageObjectNumber);
+        const pageObjectNumber = layout.pages[0].ref.pageObjectNumber;
+        const page = doc.page(toPageRef(pageObjectNumber));
 
         await page.annotations.create({
           subtype: 'redact',
@@ -120,7 +121,7 @@ export function runRedactionApplyConformance(
 
         const applied = await doc.redaction.apply({
           kind: 'pages',
-          pageObjectNumbers: [pageObjectNumber],
+          pages: [toPageRef(pageObjectNumber)],
         });
         expect(applied.results.map((item) => item.status)).toEqual(['applied']);
         expect(applied.removedAnnotationCount).toBe(0);
@@ -129,7 +130,7 @@ export function runRedactionApplyConformance(
         // A page with no redactions left is unchanged: no artifact, no event.
         const noOp = await doc.redaction.apply({
           kind: 'pages',
-          pageObjectNumbers: [pageObjectNumber],
+          pages: [toPageRef(pageObjectNumber)],
         });
         expect(noOp.results.map((item) => item.status)).toEqual(['unchanged']);
         expect(noOp.meta).toBeNull();
@@ -139,7 +140,7 @@ export function runRedactionApplyConformance(
         await expect(
           doc.redaction.apply({
             kind: 'pages',
-            pageObjectNumbers: [pageObjectNumber, pageObjectNumber],
+            pages: [toPageRef(pageObjectNumber), toPageRef(pageObjectNumber)],
           }),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
 

@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { deflateSync } from 'node:zlib';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 import {
@@ -52,7 +53,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     await seedDocument(fx, tenantId, docId, { pageCount: 2 });
 
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/1/items`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items`,
       {
         method: 'POST',
         headers: {
@@ -71,22 +72,25 @@ describe('Phase 5 layer mutation pipeline', () => {
           previousDocVersion: number;
           docVersion: number;
           pages: Array<{
-            pageObjectNumber: number;
+            page: { pageObjectNumber: number };
             cache: {
               annotationVersion: number;
               contentVersion: number;
             };
           }>;
         };
-        affectedPages: Array<{ pageObjectNumber: number; revision: { generation: number } }>;
+        affectedPages: Array<{
+          page: { pageObjectNumber: number };
+          revision: { generation: number };
+        }>;
       };
     };
-    expect(body.meta.affectedPages[0]?.pageObjectNumber).toBe(1);
+    expect(body.meta.affectedPages[0]?.page.pageObjectNumber).toBe(1);
     expect(body.meta.affectedPages[0]?.revision.generation).toBe(0);
     expect(body.meta.cacheDelta).toMatchObject({
       previousDocVersion: 1,
       docVersion: 2,
-      pages: [{ pageObjectNumber: 1, cache: { annotationVersion: 2, contentVersion: 1 } }],
+      pages: [{ page: toPageRef(1), cache: { annotationVersion: 2, contentVersion: 1 } }],
     });
 
     const layer = await fx.db
@@ -210,12 +214,12 @@ describe('Phase 5 layer mutation pipeline', () => {
     expect(fresh.status).toBe(200);
     const manifest = (await fresh.json()) as {
       pages: Array<{
-        state: { pageObjectNumber: number };
+        state: { page: { pageObjectNumber: number } };
         cache: { annotationVersion: number };
       }>;
     };
     expect(
-      manifest.pages.find((p) => p.state.pageObjectNumber === 1)?.cache.annotationVersion,
+      manifest.pages.find((p) => p.state.page.pageObjectNumber === 1)?.cache.annotationVersion,
     ).toBe(2);
   });
 
@@ -225,17 +229,20 @@ describe('Phase 5 layer mutation pipeline', () => {
     const layerName = 'alice';
     await seedDocument(fx, tenantId, docId, { pageCount: 1 });
 
-    await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/1/items`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${docToken(tenantId, docId, layerName)}`,
-        'Content-Type': 'application/json',
+    await fetch(
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${docToken(tenantId, docId, layerName)}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(highlightDraft()),
       },
-      body: JSON.stringify(highlightDraft()),
-    });
+    );
 
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/1/items/obj%3A10001`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items/obj%3A10001`,
       {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${docToken(tenantId, docId, layerName)}` },
@@ -282,7 +289,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     await beginWeakAnnotationSession(fx, tenantId, docId, layerName, [1]);
 
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/1/items/index`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items/index`,
       {
         method: 'PATCH',
         headers: {
@@ -293,11 +300,11 @@ describe('Phase 5 layer mutation pipeline', () => {
           op: 'delete',
           ref: {
             kind: 'index',
-            pageObjectNumber: 1,
+            page: toPageRef(1),
             index: 0,
             revision: {
               docSessionId: `cloud:layer:${docId}:${layerName}`,
-              pageObjectNumber: 1,
+              page: toPageRef(1),
               generation: 10,
             },
           },
@@ -353,7 +360,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     });
 
     const denied = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/1/items/index`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items/index`,
       {
         method: 'PATCH',
         headers: {
@@ -370,7 +377,7 @@ describe('Phase 5 layer mutation pipeline', () => {
 
     const session = await beginWeakAnnotationSession(fx, tenantId, docId, layerName, []);
     const stillDenied = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/1/items/index`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items/index`,
       {
         method: 'PATCH',
         headers: {
@@ -393,13 +400,13 @@ describe('Phase 5 layer mutation pipeline', () => {
           Authorization: `Bearer ${docToken(tenantId, docId, layerName)}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ pageObjectNumbers: [1] }),
+        body: JSON.stringify({ pages: [1].map(toPageRef) }),
       },
     );
     expect(update.status).toBe(200);
 
     const allowed = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/1/items/index`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items/index`,
       {
         method: 'PATCH',
         headers: {
@@ -432,7 +439,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     await beginWeakAnnotationSession(fx, tenantId, docId, layerName, [1], 'user-2');
 
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/1/items/index`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items/index`,
       {
         method: 'PATCH',
         headers: {
@@ -472,7 +479,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     await beginWeakAnnotationSession(fx, tenantId, docId, layerName, [1]);
 
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/1/items/index`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items/index`,
       {
         method: 'PATCH',
         headers: {
@@ -483,11 +490,11 @@ describe('Phase 5 layer mutation pipeline', () => {
           op: 'delete',
           ref: {
             kind: 'index',
-            pageObjectNumber: 1,
+            page: toPageRef(1),
             index: 0,
             revision: {
               docSessionId: `cloud:layer:${docId}:${layerName}`,
-              pageObjectNumber: 1,
+              page: toPageRef(1),
               generation: 9,
             },
           },
@@ -518,7 +525,7 @@ describe('Phase 5 layer mutation pipeline', () => {
         Authorization: `Bearer ${docToken(tenantId, docId, layerName)}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ pageObjectNumbers: [3], destIndex: 0 }),
+      body: JSON.stringify({ pages: [3].map(toPageRef), destIndex: 0 }),
     });
 
     expect(res.status).toBe(200);
@@ -526,7 +533,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     const body = (await res.json()) as {
       layout: {
         pageCount: number;
-        pages: Array<{ pageObjectNumber: number; index: number }>;
+        pages: Array<{ ref: { pageObjectNumber: number }; index: number }>;
       };
       cache: {
         previousDocVersion: number;
@@ -536,7 +543,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     };
     // A move returns the new geometry (order), not liveness.
     expect(body.layout.pageCount).toBe(3);
-    expect(body.layout.pages.map((page) => page.pageObjectNumber)).toEqual([3, 1, 2]);
+    expect(body.layout.pages.map((page) => page.ref.pageObjectNumber)).toEqual([3, 1, 2]);
     expect(body.layout.pages.map((page) => page.index)).toEqual([0, 1, 2]);
     // Cloud coherence pins: docVersion + layoutVersion both advance by one,
     // no per-page pin changes.
@@ -581,7 +588,7 @@ describe('Phase 5 layer mutation pipeline', () => {
         Authorization: `Bearer ${docToken(tenantId, docId, layerName)}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ pageObjectNumbers: [1, 2], rotation: 90 }),
+      body: JSON.stringify({ pages: [1, 2].map(toPageRef), rotation: 90 }),
     });
 
     expect(res.status).toBe(200);
@@ -589,7 +596,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     const body = (await res.json()) as {
       layout: {
         pageCount: number;
-        pages: Array<{ pageObjectNumber: number; rotation: number }>;
+        pages: Array<{ ref: { pageObjectNumber: number }; rotation: number }>;
       };
       cache: {
         previousDocVersion: number;
@@ -599,7 +606,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     };
     // Rotation is presentation metadata: same pages, same order, new values.
     expect(body.layout.pageCount).toBe(3);
-    expect(body.layout.pages.map((page) => [page.pageObjectNumber, page.rotation])).toEqual([
+    expect(body.layout.pages.map((page) => [page.ref.pageObjectNumber, page.rotation])).toEqual([
       [1, 90],
       [2, 90],
       [3, 0],
@@ -646,14 +653,14 @@ describe('Phase 5 layer mutation pipeline', () => {
         Authorization: `Bearer ${docToken(tenantId, docId, layerName)}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ pageObjectNumbers: [2] }),
+      body: JSON.stringify({ pages: [2].map(toPageRef) }),
     });
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       layout: {
         pageCount: number;
-        pages: Array<{ pageObjectNumber: number; index: number }>;
+        pages: Array<{ ref: { pageObjectNumber: number }; index: number }>;
       };
       cache: {
         previousDocVersion: number;
@@ -662,7 +669,7 @@ describe('Phase 5 layer mutation pipeline', () => {
       } | null;
     };
     expect(body.layout.pageCount).toBe(2);
-    expect(body.layout.pages.map((page) => page.pageObjectNumber)).toEqual([1, 3]);
+    expect(body.layout.pages.map((page) => page.ref.pageObjectNumber)).toEqual([1, 3]);
     expect(body.layout.pages.map((page) => page.index)).toEqual([0, 1]);
     expect(body.cache).toEqual({ previousDocVersion: 1, docVersion: 2, layoutVersion: 2 });
 
@@ -709,7 +716,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     const mutations: Array<{ kind: string; response: unknown }> = [];
 
     const created = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/1/items`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items`,
       { method: 'POST', headers, body: JSON.stringify(highlightDraft()) },
     );
     expect(created.status).toBe(200);
@@ -718,7 +725,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     const moved = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/move`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ pageObjectNumbers: [3], destIndex: 0 }),
+      body: JSON.stringify({ pages: [3].map(toPageRef), destIndex: 0 }),
     });
     expect(moved.status).toBe(200);
     mutations.push({ kind: 'pages.move', response: await moved.json() });
@@ -726,7 +733,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     const rotated = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/rotate`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ pageObjectNumbers: [2], rotation: 90 }),
+      body: JSON.stringify({ pages: [2].map(toPageRef), rotation: 90 }),
     });
     expect(rotated.status).toBe(200);
     mutations.push({ kind: 'pages.rotate', response: await rotated.json() });
@@ -734,7 +741,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     const deleted = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/delete`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ pageObjectNumbers: [2] }),
+      body: JSON.stringify({ pages: [2].map(toPageRef) }),
     });
     expect(deleted.status).toBe(200);
     mutations.push({ kind: 'pages.delete', response: await deleted.json() });
@@ -770,7 +777,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     form.append('resource:r0', new Blob([tinyPng()], { type: 'image/png' }), 'stamp.png');
 
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/1/items`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items`,
       {
         method: 'POST',
         headers: { Authorization: `Bearer ${docToken(tenantId, docId, layerName)}` },
@@ -814,7 +821,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     );
 
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/1/items`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items`,
       {
         method: 'POST',
         headers: { Authorization: `Bearer ${docToken(tenantId, docId, layerName)}` },
@@ -842,7 +849,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     form.append('resource:r0', new Blob([tinyPng()], { type: 'image/png' }), 'stamp.png');
 
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/1/items`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items`,
       {
         method: 'POST',
         headers: { Authorization: `Bearer ${docToken(tenantId, docId, layerName)}` },
@@ -864,7 +871,7 @@ describe('Phase 5 layer mutation pipeline', () => {
         Authorization: `Bearer ${docToken(tenantId, docId, layerName)}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ pageObjectNumbers: [1, 2, 3] }),
+      body: JSON.stringify({ pages: [1, 2, 3].map(toPageRef) }),
     });
     expect(res.status).toBe(400);
 
@@ -926,7 +933,7 @@ async function beginWeakAnnotationSession(
   layerName: string,
   pageObjectNumbers: number[],
   sub = 'user-1',
-): Promise<{ sessionId: string; pageObjectNumbers: number[] }> {
+): Promise<{ sessionId: string; pages: Array<{ pageObjectNumber: number }> }> {
   const res = await fetch(
     `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/weak-annotation-sessions`,
     {
@@ -935,11 +942,11 @@ async function beginWeakAnnotationSession(
         Authorization: `Bearer ${docToken(tenantId, docId, layerName, sub)}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ pageObjectNumbers }),
+      body: JSON.stringify({ pages: pageObjectNumbers.map(toPageRef) }),
     },
   );
   expect(res.status).toBe(200);
-  return (await res.json()) as { sessionId: string; pageObjectNumbers: number[] };
+  return (await res.json()) as { sessionId: string; pages: Array<{ pageObjectNumber: number }> };
 }
 
 function cloudIndexRef(
@@ -951,11 +958,11 @@ function cloudIndexRef(
 ): unknown {
   return {
     kind: 'index',
-    pageObjectNumber,
+    page: toPageRef(pageObjectNumber),
     index,
     revision: {
       docSessionId: `cloud:layer:${docId}:${layerName}`,
-      pageObjectNumber,
+      page: toPageRef(pageObjectNumber),
       generation,
     },
   };

@@ -22,7 +22,7 @@ underlying work and (optionally) observe progress.
 ```ts
 import { AbortablePromise } from '@cloudpdf/engine';
 
-const pending = doc.page(pon).render.image({ viewport: { kind: 'width', width: 1600 } });
+const pending = doc.page(pageRef).render.image({ viewport: { kind: 'width', width: 1600 } });
 
 // Later — the user scrolled away before it finished:
 pending.abort();
@@ -58,7 +58,7 @@ Failures reject with an `EngineError` carrying a stable `code` from
 import { EngineError, EngineErrorCode } from '@cloudpdf/engine';
 
 try {
-  const text = await doc.page(pon).text.read();
+  const text = await doc.page(pageRef).text.read();
 } catch (err) {
   if (EngineError.is(err, EngineErrorCode.Forbidden)) {
     showUpgradePrompt();
@@ -124,7 +124,7 @@ const engine = cloudEngine({
 ## Putting it together
 
 ```ts
-const pending = doc.page(pon).render.image({ viewport: { kind: 'width', width: 1200 } });
+const pending = doc.page(pageRef).render.image({ viewport: { kind: 'width', width: 1200 } });
 
 try {
   const image = await pending;

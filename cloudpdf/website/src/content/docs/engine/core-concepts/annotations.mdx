@@ -12,7 +12,7 @@ import { Cards, Card } from '@/components/docs/cards';
 
 You read and edit annotations through two services: the **document** service
 (`doc.annotations`) for cheap whole-document reads, and the **page** service
-(`doc.page(pon).annotations`) for typed reads and edits. The examples below assume
+(`doc.page(ref).annotations`) for typed reads and edits. The examples below assume
 you already opened a document (see [Quick start](/docs/engine/getting-started/quick-start)).
 
 ## Reading annotations
@@ -23,14 +23,14 @@ For a quick "what's where" overview, the document service has two fast read path
 // Every page, cheapest read.
 const all = await doc.annotations.listRawAll();
 
-// A single page, by its page object number.
-const onePage = await doc.annotations.listRaw(pageObjectNumber);
+// A single page, by its ref.
+const onePage = await doc.annotations.listRaw(pageRef);
 ```
 
 To get the full, typed annotations on one page, use the page service:
 
 ```ts
-const page = doc.page(pageObjectNumber);
+const page = doc.page(pageRef);
 const { annotations } = await page.annotations.list();
 ```
 
@@ -41,19 +41,116 @@ Call `create()` with the annotation you want. Each kind has its own fields — s
 Here's a highlight:
 
 ```ts
-const page = doc.page(pageObjectNumber);
+const page = doc.page(pageRef);
 
 const { created } = await page.annotations.create({
   subtype: 'highlight',
   color: { r: 255, g: 215, b: 0 },
   opacity: 0.4,
   quadPoints: [
-    { p1: { x: 72, y: 712 }, p2: { x: 272, y: 712 }, p3: { x: 72, y: 696 }, p4: { x: 272, y: 696 } },
+    {
+      p1: { x: 72, y: 712 },
+      p2: { x: 272, y: 712 },
+      p3: { x: 72, y: 696 },
+      p4: { x: 272, y: 696 },
+    },
   ],
 });
 
 // `created` is the new annotation. Keep `created.ref` to edit it later.
 ```
+
+## Measurements
+
+Measurements use the existing annotation types and editing methods. Set the
+dimension intent and attach a rectilinear `measure` dictionary:
+
+| Measurement | `subtype`  | `intent`            | Geometry     |
+| ----------- | ---------- | ------------------- | ------------ |
+| Distance    | `line`     | `LineDimension`     | `linePoints` |
+| Perimeter   | `polyline` | `PolyLineDimension` | `vertices`   |
+| Area        | `polygon`  | `PolygonDimension`  | `vertices`   |
+
+The pure helpers exported by `@embedpdf/engine-core` include
+`measureFromKnownLength`, `measureFromRatio`, `measurementReadout`, and
+`formatMeasurement`. A known-length calibration takes a length in PDF user-space
+units and its real-world value and unit. A ratio calibration also accepts the
+page's `userUnit`. The readout reports the formatted label and numeric value, or
+an `unavailable` reason when the imported scale or geometry cannot be interpreted.
+Polygon readouts also include a formatted perimeter when distance formats exist.
+A perimeter sums the open polyline's segments; it does not add a closing segment.
+Areas require a simple, nonzero boundary. Crossing, overlapping, or degenerate
+boundaries return `invalid-geometry` instead of a potentially misleading area.
+
+The engine derives `contents` on creation and when geometry, measure, intent, or
+contents is updated. Supplying a different contents string cannot override an
+available measurement result. A style-only edit preserves the stored label;
+missing or unsupported scales leave it unchanged. Preview calculations normalize
+coordinates and conversion factors to the same float precision used by the PDF
+runtime.
+
+### Captions and placement
+
+Set `caption.enabled` to paint the saved label into the annotation's appearance.
+Imported polygons and polylines keep their existing appearance behavior until
+explicitly enabled.
+
+- A line caption uses `position: 'inline' | 'top'` and an optional
+  `offset: { along, perpendicular }`. These are displacements in PDF units along
+  the directed line and its positive 90-degree normal.
+- A polygon or polyline caption uses an optional `center: { x, y }`. This is an
+  absolute point in PDF user space: y increases upward and the original page
+  origin is retained. The point `(0, 0)` is a valid manual placement.
+- Caption patches merge with saved placement. Hiding a caption retains its
+  position; `offset: null` or `center: null` restores automatic placement, and
+  `caption: null` clears the caption settings.
+- A manual shape center follows a verified translation or rotation of all
+  vertices. Editing individual vertices leaves it fixed. An explicit center in
+  the patch takes precedence. The editor also carries the center during group
+  resizing; it writes the resulting absolute PDF point explicitly.
+- Automatic area captions use the polygon centroid, with an interior fallback
+  for concave polygons. Perimeter captions sit just above the halfway point of
+  the path. Captions follow the annotation's authored rotation, including when
+  the label has been placed manually.
+
+### Viewer authoring
+
+The Measure toolbar provides Distance, Perimeter, Area, and Calibrate. Each
+drawing icon previews that tool's current stroke color; changing the default
+updates its toolbar, overflow-menu, and cursor icon together.
+
+Click successive vertices for perimeter or area, then double-click or use the
+normal drawing completion action to finish. Press Escape to cancel. The scale is
+captured at the first vertex and stays fixed throughout that drawing. An invalid
+area previews an unavailable value and cannot be finished.
+
+Select a measurement and drag its text to reposition the label. Labels have no
+separate visible handle. The selection frame encloses the shape and label, and
+rotation uses that frame's center. Edited measurements stay vector-rendered,
+following the same lifecycle as other annotations.
+
+The measurement sidebar shows both area and perimeter for a selected area. Its
+Area unit control changes the area display independently of distance formatting;
+Reset label position returns selected shape labels to automatic placement.
+The measurement capability exposes `areaUnits()` and `setAreaUnit()` alongside
+its existing unit, precision, and calibration methods.
+
+### Page calibration
+
+Both local and cloud engines expose `page.measure`. Its `viewports()` method
+returns the page's measurement regions in drawing order; `viewportForPoint`
+selects the last containing region, including regions with unsupported measures.
+The `owned` flag identifies EmbedPDF's calibration viewport.
+
+`setScale(measure)` saves a full-page calibration, while `setScale(null)` removes
+it. Other producers' viewports survive both operations. Calibration emits
+`page.viewportsChanged`, persists with the document or layer, and leaves existing
+annotations' scale snapshots unchanged. To recalibrate an existing annotation,
+update its `measure` explicitly.
+
+Reading viewports requires `doc.open`; changing calibration requires
+`doc.annotate.modify`. Foreign measures such as `/GEO` remain readable and are
+preserved in the PDF, but cannot be authored through the measurement API.
 
 ## Updating and deleting
 
@@ -72,10 +169,10 @@ await page.annotations.delete(note.ref);
 ```
 
 <Callout type="info">
-  Advanced: a `ref` points at an annotation in one of three ways — by PDF object
-  number (preferred, durable), by its `/NM` name, or by its position (array index).
-  You normally don't care which: just reuse the `ref` you were handed. Index refs are a
-  legacy escape hatch and need an edit session for structural edits (see below).
+  Advanced: a `ref` points at an annotation in one of three ways — by PDF object number (preferred,
+  durable), by its `/NM` name, or by its position (array index). You normally don't care which: just
+  reuse the `ref` you were handed. Index refs are a legacy escape hatch and need an edit session for
+  structural edits (see below).
 </Callout>
 
 ## Reordering
@@ -102,23 +199,22 @@ await page.annotations.update(note.ref, {
 });
 ```
 
-| Field | What it is | Values |
-| :--- | :--- | :--- |
-| `color` | Stroke color (or highlight color) | `{ r, g, b }`, 0–255 |
-| `interiorColor` | Fill color for closed shapes | `{ r, g, b }` or `null` (no fill) |
-| `opacity` | Whole-annotation transparency | `0`–`1` |
-| `strokeWidth` | Line/border thickness in points | number, default `1` |
-| `borderStyle` | Border style | `'solid'`, `'dashed'`, `'beveled'`, `'inset'` |
-| `dashArray` | Dash pattern (with `'dashed'`) | array of numbers |
+| Field           | What it is                        | Values                                        |
+| :-------------- | :-------------------------------- | :-------------------------------------------- |
+| `color`         | Stroke color (or highlight color) | `{ r, g, b }`, 0–255                          |
+| `interiorColor` | Fill color for closed shapes      | `{ r, g, b }` or `null` (no fill)             |
+| `opacity`       | Whole-annotation transparency     | `0`–`1`                                       |
+| `strokeWidth`   | Line/border thickness in points   | number, default `1`                           |
+| `borderStyle`   | Border style                      | `'solid'`, `'dashed'`, `'beveled'`, `'inset'` |
+| `dashArray`     | Dash pattern (with `'dashed'`)    | array of numbers                              |
 
 When you omit a styling field, the engine uses a sensible default: a 1pt solid red
 stroke at full opacity.
 
 <Callout type="info">
-  Free text is the one exception to "`color` = stroke": there `color` is the border **and**
-  the text color, `interiorColor` is the box background, and an optional `fontColor`
-  overrides just the text. See
-  [Free text and callout](/docs/engine/core-concepts/annotation-types#free-text-and-callout).
+  Free text is the one exception to "`color` = stroke": there `color` is the border **and** the text
+  color, `interiorColor` is the box background, and an optional `fontColor` overrides just the text.
+  See [Free text and callout](/docs/engine/core-concepts/annotation-types#free-text-and-callout).
 </Callout>
 
 ## Flags
@@ -188,20 +284,19 @@ This split is what makes interactions cheap:
 - **Resizing** can stretch the existing image live during the gesture, then fetch once
   after committing the new `rect` (the engine re-fits the appearance natively).
 
-Re-render appearances when the *content* changed — a committed geometry edit, a style
+Re-render appearances when the _content_ changed — a committed geometry edit, a style
 patch, a replaced stamp `source` — or when your zoom level changes and you want a
 sharper raster (`scale`).
 
 <Callout type="info">
-  If you use the viewer packages (`plugin-annotation` + a framework adapter), all of
-  this is wired for you. This section is for rendering annotations yourself against the
-  raw engine.
+  If you use the viewer packages (`plugin-annotation` + a framework adapter), all of this is wired
+  for you. This section is for rendering annotations yourself against the raw engine.
 </Callout>
 
 ## Flattening chosen annotations
 
 `pages.flatten` bakes every annotation of a page into its content. The
-per-page annotation service does the same for a *chosen set*, and reports
+per-page annotation service does the same for a _chosen set_, and reports
 what happened to each:
 
 ```ts
@@ -239,7 +334,7 @@ array) need an active edit session. It proves you're the only one editing those 
 guard against two clients shifting the same page at once.
 
 ```ts
-const session = await doc.annotations.beginWeakEdit([pageObjectNumber]);
+const session = await doc.annotations.beginWeakEdit([pageRef]);
 
 try {
   // …index-addressed structural edits on covered pages…
@@ -250,10 +345,9 @@ try {
 ```
 
 <Callout type="info">
-  Edits that reuse a `ref` from `list()`/`create()` (object number or `/NM`) and
-  non-shifting updates don't need a session. You only need `beginWeakEdit` for
-  index-addressed structural edits. A conflicting edit fails with a
-  `WeakAnnotationSessionConflict` error.
+  Edits that reuse a `ref` from `list()`/`create()` (object number or `/NM`) and non-shifting
+  updates don't need a session. You only need `beginWeakEdit` for index-addressed structural edits.
+  A conflicting edit fails with a `WeakAnnotationSessionConflict` error.
 </Callout>
 
 <Callout type="warn">

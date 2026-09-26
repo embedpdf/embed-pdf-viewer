@@ -1,3 +1,4 @@
+import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldDraft } from '../forms/draft';
 import type { FormFieldDTO } from '../forms/field';
 import type { FormFieldPatch } from '../forms/patch';
@@ -5,7 +6,8 @@ import type { FormSnapshot } from '../forms/snapshot';
 import type { FormDataFormat, FormFieldValue } from '../forms/value';
 import type { FormEffect, FormEffectsResult } from '../forms/effects';
 import type { FormSubmissionReceipt, FormSubmissionRequest } from '../forms/submission';
-import type { FormFieldRef, FormWidgetRef } from '../identity/FormFieldRef';
+import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
+import type { SignatureAppearanceInput } from '../signature/types';
 import type {
   FormDataExport,
   FormFieldCreateResult,
@@ -130,6 +132,18 @@ export interface DocumentFormsService {
   updateField(ref: FormFieldRef, patch: FormFieldPatch): AbortablePromise<FormFieldUpdateResult>;
 
   /**
+   * Draw a PDF page into every widget of an UNSIGNED signature field — the
+   * visual "sign" of a viewer that has no signer. The field's value stays
+   * empty and nothing is sealed; a signed field is refused. Gated by
+   * `doc.forms.fill`. Emits `form.fieldUpdated`. Absent on engines that
+   * cannot draw appearances.
+   */
+  setSignatureAppearance?(
+    ref: FormFieldRef,
+    appearance: SignatureAppearanceInput,
+  ): AbortablePromise<FormFieldUpdateResult>;
+
+  /**
    * Delete a terminal field and cascade: every widget is removed from its
    * page, the field leaves the tree, and empty ancestors are pruned.
    * Emits `form.fieldDeleted`.
@@ -145,7 +159,7 @@ export interface DocumentFormsService {
    */
   attachWidget(
     ref: FormFieldRef,
-    widget: FormWidgetRef,
+    widget: AnnotationRef,
     options?: { onState?: string },
   ): AbortablePromise<FormWidgetLinkResult>;
 
@@ -156,7 +170,7 @@ export interface DocumentFormsService {
    * survives, "unplaced" when this was its last widget. Emits
    * `form.widgetDetached`.
    */
-  detachWidget(ref: FormFieldRef, widget: FormWidgetRef): AbortablePromise<FormWidgetLinkResult>;
+  detachWidget(ref: FormFieldRef, widget: AnnotationRef): AbortablePromise<FormWidgetLinkResult>;
 
   /**
    * Make the engine's read-time reconciliation durable in the document

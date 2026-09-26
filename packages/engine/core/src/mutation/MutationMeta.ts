@@ -1,5 +1,5 @@
 import type { CachePins } from '../dto/CachePins';
-import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PageRef } from '../identity/PageRef';
 import type { PageState } from '../revision/PageState';
 
 /**
@@ -27,8 +27,15 @@ export interface CacheDelta {
    * without a 404-refresh round trip.
    */
   annotationsVersion?: number;
+  /**
+   * The layer's write serial after this mutation and whether an artifact
+   * now exists (cloud only). Absorbing them keeps the client's cached
+   * manifest an honest `DocumentVersionRef` source between refreshes.
+   */
+  layerVersion?: number;
+  working?: boolean;
   pages: Array<{
-    pageObjectNumber: PageObjectNumber;
+    page: PageRef;
     cache: CachePins;
   }>;
 }

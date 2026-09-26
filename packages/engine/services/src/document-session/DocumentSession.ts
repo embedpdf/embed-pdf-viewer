@@ -1,7 +1,12 @@
 import type {
+  DocumentVersionRef,
   PageObjectNumber,
   PageState,
   RevisionToken,
+  SessionKind,
+  SignatureCompleteResult,
+  SignaturePrepared,
+  SignedDocumentPolicy,
   WeakAnnotationState,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -9,11 +14,14 @@ import {
   EngineErrorCode,
   knownWeakAnnotationState,
   isValidPageObjectNumber,
+  toPageRef,
 } from '@embedpdf/engine-core/runtime';
+import type { PageRef } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import {
   openFatMemoryDocument,
+  type DocumentSource,
   type OpenedPdfDocument,
   type OpenedPdfDocumentKind,
 } from './lifecycle/PdfDocumentOpener';
@@ -31,10 +39,41 @@ import { LocalRevisionAuthority, type RevisionAuthority } from './revisions/Revi
  * this exactly the same way; the only thing that differs is the
  * underlying PdfRuntimeModule (WASM vs native).
  */
+/**
+ * A serialised signing candidate: the sealed-to-be file with the
+ * zero-filled /Contents hole, either as one buffer in JS memory (the local
+ * engine) or as a file beside the session's base (the server), plus where
+ * the signature value object lies in it.
+ */
+export type SavedCandidate =
+  | { kind: 'memory'; bytes: Uint8Array; size: number; objectOffset: number; objectLength: number }
+  | { kind: 'file'; path: string; size: number; objectOffset: number; objectLength: number };
+
+/**
+ * A sealed-to-be candidate parked on a session between `prepare` and
+ * `complete`/`abort`. The native candidate documents are closed as soon as
+ * the seal is computed; only the serialised candidate remains.
+ */
+export interface PendingSigning {
+  readonly prepared: SignaturePrepared;
+  readonly fieldObjectNumber: number;
+  readonly saved: SavedCandidate;
+  readonly contentsOffset: number;
+  readonly contentsHexLength: number;
+}
+
+/** What a completed signing left behind, for idempotent replays. */
+export interface SigningCompletion {
+  readonly signingId: string;
+  readonly cms: Uint8Array;
+  readonly result: SignatureCompleteResult;
+}
+
 export class DocumentSession {
   private docPtr: Ptr | null = null;
   private closeDocument: (() => void) | null = null;
   private _kind: OpenedPdfDocumentKind | null = null;
+  private _source: DocumentSource | null = null;
   private readonly _sessionId: string;
 
   /** pon -> record */
@@ -46,6 +85,37 @@ export class DocumentSession {
   private revisions: RevisionAuthority | null = null;
   private mutationSeqCounter = 0;
   private pages: PagePtrPool | null = null;
+  /**
+   * Whether writers honour what the document's signatures forbid (locked
+   * fields, structural edits). Set at open from the engine option; the
+   * main-thread guard subtracts the matching capabilities.
+   */
+  signedDocumentPolicy: SignedDocumentPolicy = 'protect';
+  /**
+   * The shape the caller asked for when opening plain bytes. `layer` (the
+   * default) opens them as an immutable base with a fresh layer; `plain`
+   * keeps one in-memory document unless the bytes already carry a
+   * signature, which always opens as a layer.
+   */
+  sessionKind: SessionKind = 'layer';
+  /** The password the document was opened with; signing candidates open with the same one. */
+  password: string | null = null;
+  /**
+   * Whether mutations on a layer session also serialize the layer artifact
+   * into their response (what a server persists). False for a session that
+   * became a layer only because its document is signed (see
+   * `WorkerHost.openSignedAware`): the caller opened plain bytes and never
+   * asked for artifacts.
+   */
+  persistLayerArtifact = true;
+  /** The mutation sequence the current bytes were loaded at (see `hasUnsavedEdits`). */
+  private loadedSeq = 0;
+  /** SHA-256 (hex) of a plain session's loaded bytes, hashed once per load. */
+  private plainSha256: { loadedSeq: number; sha256: string } | null = null;
+  /** The signing candidate parked by `signatures.prepare`, if any. */
+  pendingSigning: PendingSigning | null = null;
+  /** The last completed signing, so a replayed `complete` answers `already-completed`. */
+  lastCompletion: SigningCompletion | null = null;
 
   constructor(
     private readonly runtime: PdfRuntimeModule,
@@ -60,6 +130,18 @@ export class DocumentSession {
 
   get kind(): OpenedPdfDocumentKind | null {
     return this._kind;
+  }
+
+  /**
+   * Where the current bytes come from: the immutable base (registry key,
+   * file path for file bases) and the layer the session was opened with.
+   * One interpretation for signing candidates, overlays and verbatim reads.
+   */
+  get source(): DocumentSource {
+    if (!this._source) {
+      throw new EngineError(EngineErrorCode.DocNotOpen, 'document is not open');
+    }
+    return this._source;
   }
 
   isOpen(): boolean {
@@ -78,9 +160,77 @@ export class DocumentSession {
     this.docPtr = handle.docPtr;
     this.closeDocument = () => handle.close();
     this._kind = handle.kind;
+    this._source = handle.source;
     this.revisions = new LocalRevisionAuthority(this._sessionId);
     this.pages = new PagePtrPool(this.runtime, handle.docPtr);
     this.parkedBytes = null;
+    this.loadedSeq = this.mutationSeqCounter;
+  }
+
+  /**
+   * Whether anything was mutated since the current bytes were loaded. When
+   * false, the loaded bytes ARE the document: a save returns them verbatim
+   * and a signing candidate is built straight on them.
+   */
+  hasUnsavedEdits(): boolean {
+    return this.mutationSeqCounter !== this.loadedSeq;
+  }
+
+  /** Cached hash of the current loaded bytes, or `null` when not computed since the last load. */
+  cachedPlainSha256(): string | null {
+    return this.plainSha256 && this.plainSha256.loadedSeq === this.loadedSeq
+      ? this.plainSha256.sha256
+      : null;
+  }
+
+  rememberPlainSha256(sha256: string): void {
+    this.plainSha256 = { loadedSeq: this.loadedSeq, sha256 };
+  }
+
+  /**
+   * Re-point this session at new bytes — the one operation that changes
+   * what an open session is backed by, used when a completed signature
+   * installs its sealed file. The session id, its page object numbers
+   * (an incremental save never renumbers) and its retained resources
+   * survive; the old document is closed, every page is re-pinned (its
+   * revision bumped, its cached pointer dropped), and the mutation
+   * sequence advances so every version-keyed cache rebuilds.
+   */
+  install(handle: OpenedPdfDocument): void {
+    if (!this.docPtr) {
+      handle.close();
+      throw new EngineError(EngineErrorCode.DocNotOpen, 'no document to replace');
+    }
+    const previousPages = Array.from(this.recordsByObjectNumber.keys());
+    let firstError: unknown = null;
+    try {
+      this.pages?.closeAll();
+    } catch (error) {
+      firstError = error;
+    }
+    try {
+      this.closeDocument?.();
+    } catch (error) {
+      firstError ??= error;
+    }
+    this.docPtr = handle.docPtr;
+    this.closeDocument = () => handle.close();
+    this._kind = handle.kind;
+    this._source = handle.source;
+    this.pages = new PagePtrPool(this.runtime, handle.docPtr);
+    this.recordsByIndex.clear();
+    this.recordsByObjectNumber.clear();
+    this.fullyEnumerated = false;
+    for (const pon of previousPages) this.requireRevisions().bump(pon);
+    this.mutationSeqCounter++;
+    this.loadedSeq = this.mutationSeqCounter;
+    this.pendingSigning = null;
+    if (firstError) throw firstError;
+  }
+
+  /** The two publish fences a candidate is built on. */
+  versionRef(baseSha256: string): DocumentVersionRef {
+    return { baseSha256, editsVersion: this.mutationSeqCounter };
   }
 
   /**
@@ -181,6 +331,20 @@ export class DocumentSession {
     return found;
   }
 
+  /**
+   * Resolve a page ADDRESS to its registry record — the one boundary where
+   * a `PageRef` becomes a page object number. Throws `NotFound` for an
+   * unknown page.
+   */
+  resolvePageRef(ref: PageRef): PageRecord {
+    return this.recordByObjectNumber(ref.pageObjectNumber);
+  }
+
+  /** `resolvePageRef` over a batch, preserving order. */
+  resolvePageRefs(refs: readonly PageRef[]): PageObjectNumber[] {
+    return refs.map((ref) => this.resolvePageRef(ref).pageObjectNumber);
+  }
+
   /** All page records, in display order. Forces full enumeration. */
   allRecords(): PageRecord[] {
     this.ensureFullPageRegistry();
@@ -210,7 +374,7 @@ export class DocumentSession {
     this.recordByObjectNumber(pageObjectNumber);
     const weakAnnotationState = this.requireRevisions().weakAnnotationState(pageObjectNumber);
     return {
-      pageObjectNumber,
+      page: toPageRef(pageObjectNumber),
       revision: this.requireRevisions().token(pageObjectNumber),
       weakAnnotationState,
     };
@@ -302,6 +466,15 @@ export class DocumentSession {
       this.pages = null;
     }
 
+    // A candidate written to a file must not outlive the session that parked it.
+    if (this.pendingSigning?.saved.kind === 'file') {
+      try {
+        this.runtime.fileWrite.removeFile(this.pendingSigning.saved.path);
+      } catch (error) {
+        firstError ??= error;
+      }
+    }
+
     try {
       this.closeDocument?.();
     } catch (error) {
@@ -310,7 +483,10 @@ export class DocumentSession {
       this.closeDocument = null;
       this.docPtr = null;
       this._kind = null;
+      this._source = null;
       this.parkedBytes = null;
+      this.pendingSigning = null;
+      this.lastCompletion = null;
       this.revisions?.clear();
       this.revisions = null;
       this.recordsByIndex.clear();

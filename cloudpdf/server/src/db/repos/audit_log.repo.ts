@@ -3,6 +3,7 @@ import type { Kysely, Transaction } from 'kysely';
 import type { Database as Schema } from '../schema';
 
 export type AuditMutationKind =
+  | 'measure.setScale'
   | 'annot.create'
   | 'annot.update'
   | 'annot.delete'
@@ -26,7 +27,10 @@ export type AuditMutationKind =
   | 'form.deleteField'
   | 'form.attachWidget'
   | 'form.detachWidget'
-  | 'form.applyEffects';
+  | 'form.applyEffects'
+  | 'form.setSignatureAppearance'
+  /** A signature published a new base version through this layer. */
+  | 'signature.completed';
 
 export interface AppendAuditLogInput {
   tenantId: string;

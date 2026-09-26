@@ -13,15 +13,23 @@ describe("AnnotationsClient", () => {
             pages: [
                 {
                     pageState: {
-                        pageObjectNumber: 1,
-                        revision: { docSessionId: "docSessionId", pageObjectNumber: 1, generation: 1 },
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        revision: {
+                            docSessionId: "docSessionId",
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            generation: 1,
+                        },
                         weakAnnotationState: { kind: "unknown" },
                     },
                     annotations: [
                         {
                             subtype: "highlight",
-                            ref: { kind: "objectNumber", pageObjectNumber: 1, annotObjectNumber: 1 },
-                            pageObjectNumber: 1,
+                            ref: {
+                                kind: "objectNumber",
+                                page: { kind: "objectNumber", pageObjectNumber: 1 },
+                                annotObjectNumber: 1,
+                            },
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
                             index: 1,
                             identityQuality: "durable",
                             nm: null,
@@ -128,15 +136,23 @@ describe("AnnotationsClient", () => {
 
         const rawResponseBody = {
             pageState: {
-                pageObjectNumber: 1,
-                revision: { docSessionId: "docSessionId", pageObjectNumber: 1, generation: 1 },
+                page: { kind: "objectNumber", pageObjectNumber: 1 },
+                revision: {
+                    docSessionId: "docSessionId",
+                    page: { kind: "objectNumber", pageObjectNumber: 1 },
+                    generation: 1,
+                },
                 weakAnnotationState: { kind: "unknown" },
             },
             annotations: [
                 {
                     subtype: "highlight",
-                    ref: { kind: "objectNumber", pageObjectNumber: 1, annotObjectNumber: 1 },
-                    pageObjectNumber: 1,
+                    ref: {
+                        kind: "objectNumber",
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        annotObjectNumber: 1,
+                    },
+                    page: { kind: "objectNumber", pageObjectNumber: 1 },
                     index: 1,
                     identityQuality: "durable",
                     nm: "nm",
@@ -159,7 +175,11 @@ describe("AnnotationsClient", () => {
                     created: "2024-01-15T09:30:00Z",
                     modified: "2024-01-15T09:30:00Z",
                     blendMode: "normal",
-                    inReplyTo: { kind: "objectNumber", pageObjectNumber: 1, annotObjectNumber: 1 },
+                    inReplyTo: {
+                        kind: "objectNumber",
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        annotObjectNumber: 1,
+                    },
                     replyType: "reply",
                     userId: "userId",
                     groupId: "groupId",
@@ -181,7 +201,7 @@ describe("AnnotationsClient", () => {
 
         server
             .mockEndpoint()
-            .get("/v1/docs/docId/layers/layerName/annotations/pages/1/items")
+            .get("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items")
             .respondWith()
             .statusCode(200)
             .jsonBody(rawResponseBody)
@@ -190,7 +210,7 @@ describe("AnnotationsClient", () => {
         const response = await client.doc.annotations.list({
             docId: "docId",
             layerName: "layerName",
-            pon: 1,
+            pageKey: "pageKey",
         });
         expect(response).toEqual(rawResponseBody);
     });
@@ -203,7 +223,7 @@ describe("AnnotationsClient", () => {
 
         server
             .mockEndpoint()
-            .get("/v1/docs/docId/layers/layerName/annotations/pages/1/items")
+            .get("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items")
             .respondWith()
             .statusCode(404)
             .jsonBody(rawResponseBody)
@@ -213,7 +233,7 @@ describe("AnnotationsClient", () => {
             return await client.doc.annotations.list({
                 docId: "docId",
                 layerName: "layerName",
-                pon: 1,
+                pageKey: "pageKey",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });
@@ -226,8 +246,12 @@ describe("AnnotationsClient", () => {
             meta: {
                 affectedPages: [
                     {
-                        pageObjectNumber: 1,
-                        revision: { docSessionId: "docSessionId", pageObjectNumber: 1, generation: 1 },
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        revision: {
+                            docSessionId: "docSessionId",
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            generation: 1,
+                        },
                         weakAnnotationState: { kind: "unknown" },
                     },
                 ],
@@ -235,14 +259,21 @@ describe("AnnotationsClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
-                    pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
+                    layerVersion: 1,
+                    working: true,
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1 },
+                        },
+                    ],
                 },
             },
         };
 
         server
             .mockEndpoint()
-            .post("/v1/docs/docId/layers/layerName/annotations/pages/1/items")
+            .post("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(200)
@@ -252,7 +283,7 @@ describe("AnnotationsClient", () => {
         const response = await client.doc.annotations.create({
             docId: "docId",
             layerName: "layerName",
-            pon: 1,
+            pageKey: "pageKey",
             body: {
                 key: "value",
             },
@@ -268,7 +299,7 @@ describe("AnnotationsClient", () => {
 
         server
             .mockEndpoint()
-            .post("/v1/docs/docId/layers/layerName/annotations/pages/1/items")
+            .post("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(400)
@@ -279,7 +310,7 @@ describe("AnnotationsClient", () => {
             return await client.doc.annotations.create({
                 docId: "docId",
                 layerName: "layerName",
-                pon: 1,
+                pageKey: "pageKey",
                 body: {
                     string: {
                         key: "value",
@@ -297,7 +328,7 @@ describe("AnnotationsClient", () => {
 
         server
             .mockEndpoint()
-            .post("/v1/docs/docId/layers/layerName/annotations/pages/1/items")
+            .post("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(404)
@@ -308,7 +339,7 @@ describe("AnnotationsClient", () => {
             return await client.doc.annotations.create({
                 docId: "docId",
                 layerName: "layerName",
-                pon: 1,
+                pageKey: "pageKey",
                 body: {
                     string: {
                         key: "value",
@@ -326,8 +357,12 @@ describe("AnnotationsClient", () => {
             meta: {
                 affectedPages: [
                     {
-                        pageObjectNumber: 1,
-                        revision: { docSessionId: "docSessionId", pageObjectNumber: 1, generation: 1 },
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        revision: {
+                            docSessionId: "docSessionId",
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            generation: 1,
+                        },
                         weakAnnotationState: { kind: "unknown" },
                     },
                 ],
@@ -335,14 +370,21 @@ describe("AnnotationsClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
-                    pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
+                    layerVersion: 1,
+                    working: true,
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1 },
+                        },
+                    ],
                 },
             },
         };
 
         server
             .mockEndpoint()
-            .delete("/v1/docs/docId/layers/layerName/annotations/pages/1/items/annotKey")
+            .delete("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/annotKey")
             .respondWith()
             .statusCode(200)
             .jsonBody(rawResponseBody)
@@ -351,7 +393,7 @@ describe("AnnotationsClient", () => {
         const response = await client.doc.annotations.delete({
             docId: "docId",
             layerName: "layerName",
-            pon: 1,
+            pageKey: "pageKey",
             annotKey: "annotKey",
         });
         expect(response).toEqual(rawResponseBody);
@@ -365,7 +407,7 @@ describe("AnnotationsClient", () => {
 
         server
             .mockEndpoint()
-            .delete("/v1/docs/docId/layers/layerName/annotations/pages/1/items/annotKey")
+            .delete("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/annotKey")
             .respondWith()
             .statusCode(404)
             .jsonBody(rawResponseBody)
@@ -375,7 +417,7 @@ describe("AnnotationsClient", () => {
             return await client.doc.annotations.delete({
                 docId: "docId",
                 layerName: "layerName",
-                pon: 1,
+                pageKey: "pageKey",
                 annotKey: "annotKey",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
@@ -389,8 +431,12 @@ describe("AnnotationsClient", () => {
             meta: {
                 affectedPages: [
                     {
-                        pageObjectNumber: 1,
-                        revision: { docSessionId: "docSessionId", pageObjectNumber: 1, generation: 1 },
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        revision: {
+                            docSessionId: "docSessionId",
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            generation: 1,
+                        },
                         weakAnnotationState: { kind: "unknown" },
                     },
                 ],
@@ -398,14 +444,21 @@ describe("AnnotationsClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
-                    pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
+                    layerVersion: 1,
+                    working: true,
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1 },
+                        },
+                    ],
                 },
             },
         };
 
         server
             .mockEndpoint()
-            .patch("/v1/docs/docId/layers/layerName/annotations/pages/1/items/annotKey")
+            .patch("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/annotKey")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(200)
@@ -415,7 +468,7 @@ describe("AnnotationsClient", () => {
         const response = await client.doc.annotations.update({
             docId: "docId",
             layerName: "layerName",
-            pon: 1,
+            pageKey: "pageKey",
             annotKey: "annotKey",
             body: {
                 key: "value",
@@ -432,7 +485,7 @@ describe("AnnotationsClient", () => {
 
         server
             .mockEndpoint()
-            .patch("/v1/docs/docId/layers/layerName/annotations/pages/1/items/annotKey")
+            .patch("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/annotKey")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(400)
@@ -443,7 +496,7 @@ describe("AnnotationsClient", () => {
             return await client.doc.annotations.update({
                 docId: "docId",
                 layerName: "layerName",
-                pon: 1,
+                pageKey: "pageKey",
                 annotKey: "annotKey",
                 body: {
                     string: {
@@ -462,7 +515,7 @@ describe("AnnotationsClient", () => {
 
         server
             .mockEndpoint()
-            .patch("/v1/docs/docId/layers/layerName/annotations/pages/1/items/annotKey")
+            .patch("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/annotKey")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(404)
@@ -473,7 +526,7 @@ describe("AnnotationsClient", () => {
             return await client.doc.annotations.update({
                 docId: "docId",
                 layerName: "layerName",
-                pon: 1,
+                pageKey: "pageKey",
                 annotKey: "annotKey",
                 body: {
                     string: {
@@ -492,8 +545,12 @@ describe("AnnotationsClient", () => {
             meta: {
                 affectedPages: [
                     {
-                        pageObjectNumber: 1,
-                        revision: { docSessionId: "docSessionId", pageObjectNumber: 1, generation: 1 },
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        revision: {
+                            docSessionId: "docSessionId",
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            generation: 1,
+                        },
                         weakAnnotationState: { kind: "unknown" },
                     },
                 ],
@@ -501,14 +558,21 @@ describe("AnnotationsClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
-                    pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
+                    layerVersion: 1,
+                    working: true,
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1 },
+                        },
+                    ],
                 },
             },
         };
 
         server
             .mockEndpoint()
-            .post("/v1/docs/docId/layers/layerName/annotations/pages/1/items/flatten")
+            .post("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/flatten")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(200)
@@ -518,7 +582,7 @@ describe("AnnotationsClient", () => {
         const response = await client.doc.annotations.flatten({
             docId: "docId",
             layerName: "layerName",
-            pon: 1,
+            pageKey: "pageKey",
             body: {
                 key: "value",
             },
@@ -534,7 +598,7 @@ describe("AnnotationsClient", () => {
 
         server
             .mockEndpoint()
-            .post("/v1/docs/docId/layers/layerName/annotations/pages/1/items/flatten")
+            .post("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/flatten")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(400)
@@ -545,7 +609,7 @@ describe("AnnotationsClient", () => {
             return await client.doc.annotations.flatten({
                 docId: "docId",
                 layerName: "layerName",
-                pon: 1,
+                pageKey: "pageKey",
                 body: {
                     string: {
                         key: "value",
@@ -563,7 +627,7 @@ describe("AnnotationsClient", () => {
 
         server
             .mockEndpoint()
-            .post("/v1/docs/docId/layers/layerName/annotations/pages/1/items/flatten")
+            .post("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/flatten")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(404)
@@ -574,7 +638,7 @@ describe("AnnotationsClient", () => {
             return await client.doc.annotations.flatten({
                 docId: "docId",
                 layerName: "layerName",
-                pon: 1,
+                pageKey: "pageKey",
                 body: {
                     string: {
                         key: "value",

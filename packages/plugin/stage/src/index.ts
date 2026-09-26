@@ -2,8 +2,8 @@
  * @embedpdf/plugin-stage — the coordinate core, as a kernel plugin.
  *
  * In v2 these were five fighting plugins (viewport, scroll, zoom, pan, spread).
- * Here they are one Camera + Scene + flat settings. See the standard plugin layout:
- *   types.ts · settings.ts · reducer.ts · capability.ts · stage.plugin.ts
+ * Here they are one Camera + Scene + flat settings — `contract.ts` · `model.ts` ·
+ * `controller.ts` (services / read / camera / navigation / settings / view) · `stage.plugin.ts`.
  */
 export { stagePlugin } from './stage.plugin';
 export type { StagePluginOptions } from './stage.plugin';

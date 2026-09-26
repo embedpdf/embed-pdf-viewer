@@ -1,6 +1,6 @@
 import type { PageStructureCache } from './PageStructureCache';
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
-import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PageRef } from '../identity/PageRef';
 
 /**
  * Result of a `pages.insert()`. The inserted pages are COPIES of the source
@@ -10,8 +10,8 @@ import type { PageObjectNumber } from '../identity/PageObjectNumber';
  * neighbours (same rule as `pages.move`).
  */
 export interface PageInsertResult {
-  /** The new pages' object numbers, in the order they were inserted. */
-  insertedPageObjectNumbers: PageObjectNumber[];
+  /** The new pages, in the order they were inserted. */
+  insertedPages: PageRef[];
   /** The new layout — every page in display order. */
   layout: PageListSnapshot;
   /** Cloud-only manifest coherence pins; `null` for local engines. */

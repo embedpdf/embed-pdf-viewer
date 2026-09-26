@@ -1,4 +1,7 @@
+import type { DistanceAppearance, MeasurementAppearance } from './measurement';
+import type { ShapeMeasurementAppearance } from './measurement-shape';
 import type {
+  RichTextDocumentInput,
   AnnotationDTO,
   AnnotationFlags,
   AnnotationRef,
@@ -7,16 +10,11 @@ import type {
   InkIntent,
   LineEnding,
   LineEndings,
+  PageRef,
   PdfLinkTarget,
   StrikeoutIntent,
 } from '@embedpdf/engine-core/runtime';
-import type { PageObjectNumber } from '@embedpdf/core';
-import type {
-  PageRotation,
-  Point,
-  Rect as GeometryRect,
-  TextQuad,
-} from '@embedpdf/core-geometry';
+import type { PageRotation, Point, Rect as GeometryRect, TextQuad } from '@embedpdf/core-geometry';
 
 export type { TextQuad } from '@embedpdf/core-geometry';
 
@@ -169,6 +167,15 @@ export interface TextStyle {
   fontSize: number;
   fontColor: string;
   textAlign: TextAlign;
+  /**
+   * The rich body's formatting (free text only): bold = body weight ≥ 600,
+   * italic = the body face's italic, underline = the body's decoration.
+   * Absent = off. Runs override these as deltas (a bold word in a regular
+   * box), which the plugin routes to the editor's text selection instead.
+   */
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
 }
 
 /**
@@ -210,7 +217,11 @@ export type PropKey = keyof AnnotationProps;
  * verbatim. Text content never rides this effect (the debounced text-edit
  * write owns `contents`).
  */
-export type PatchScope = { kind: 'geometry' } | { kind: 'props'; keys: PropKey[] };
+export type PatchScope =
+  | { kind: 'geometry' }
+  | { kind: 'caption' }
+  | { kind: 'leader' }
+  | { kind: 'props'; keys: PropKey[] };
 
 /** A partial property write. `lineEndings` merges per side (set just `end`
  *  without knowing `start`); every other key overwrites. */
@@ -221,7 +232,9 @@ export type AnnotationPropsPatch = {
 export interface Annot {
   id: Id;
   ref: AnnotationRef | null;
-  pon: PageObjectNumber;
+  /** The page this annotation lives on. Internals may key by
+   *  `page.pageObjectNumber`; the address itself is what callers pass around. */
+  page: PageRef;
   subtype: Subtype;
   geom: Geom;
   style: Style;
@@ -231,6 +244,7 @@ export interface Annot {
   /** Redaction label (`/OverlayText` + `/Repeat`) — redact kind only. A
    *  projection of `data` like `text`; the hover preview scene draws it. */
   label?: { text: string; repeat: boolean };
+  measure?: MeasurementAppearance;
   /** `/Name` icon — present only for icon kinds (text note, file attachment).
    *  Like `style`, a projection of `data`, editable via `setProps`. */
   icon?: string;
@@ -355,7 +369,7 @@ export type Draft =
       g: 'create-rect';
       subtype: Subtype;
       preset?: string;
-      pon: PageObjectNumber;
+      page: PageRef;
       from: Vec;
       to: Vec;
       ellipse: boolean;
@@ -371,10 +385,23 @@ export type Draft =
       flags?: Partial<AnnotationFlags>;
     }
   | {
+      g: 'create-distance';
+      step: 'endpoints' | 'offset';
+      subtype: 'line';
+      preset: string;
+      page: PageRef;
+      from: Vec;
+      to: Vec;
+      measure: DistanceAppearance;
+      flags?: Partial<AnnotationFlags>;
+    }
+  | {
       g: 'create-line';
+      measure?: MeasurementAppearance;
+      capture?: string;
       subtype: Subtype;
       preset?: string;
-      pon: PageObjectNumber;
+      page: PageRef;
       from: Vec;
       to: Vec;
       /** The tool's click-create policy, captured at DOWN like `upright`. */
@@ -384,9 +411,10 @@ export type Draft =
     }
   | {
       g: 'create-poly';
+      measure?: ShapeMeasurementAppearance;
       subtype: Subtype;
       preset?: string;
-      pon: PageObjectNumber;
+      page: PageRef;
       points: Vec[];
       cur: Vec;
       closed: boolean;
@@ -397,7 +425,7 @@ export type Draft =
       g: 'create-ink';
       subtype: Subtype;
       preset?: string;
-      pon: PageObjectNumber;
+      page: PageRef;
       strokes: Vec[][];
       intent?: InkIntent;
       /** The tool's `/F` seed, captured at DOWN (see the rect draft). */
@@ -411,13 +439,16 @@ export type Draft =
       g: 'create-callout';
       subtype: Subtype;
       preset?: string;
-      pon: PageObjectNumber;
+      page: PageRef;
       step: 'knee' | 'box';
       tip: Vec;
       knee?: Vec;
       cur: Vec;
       boxFrom?: Vec;
       boxTo?: Vec;
+      /** Home-page box captured at the TIP click. The default text box slides
+       *  fully inside it; a drag is already point-clamped and ignores this. */
+      pageBox?: Rect;
       /** Display rotation + upright policy captured at the TIP click (the
        *  gesture's home page) — the text BOX commits counter-rotated so it
        *  reads upright; the leader (tip/knee) is page-space and never turns.
@@ -461,7 +492,9 @@ export type Draft =
       cur: Rect;
       view?: ViewEnv;
     }
-  | { g: 'marquee'; pon: PageObjectNumber; from: Vec; to: Vec };
+  | { g: 'caption'; id: Id; start: Vec; delta: Vec }
+  | { g: 'leader'; id: Id; start: Vec; delta: number }
+  | { g: 'marquee'; page: PageRef; from: Vec; to: Vec };
 
 /** A live text-markup preview (the in-progress selection rendered as the markup it
  *  will become). Per page, since a selection can span pages. */
@@ -469,6 +502,7 @@ export interface MarkupPreview {
   subtype: Subtype;
   /** Defaults key, distinct from subtype for presets such as replace-text. */
   preset: string;
+  /** Keyed by `page.pageObjectNumber` (an internal lookup, not an address). */
   byPage: Record<number, TextQuad[]>;
 }
 
@@ -476,7 +510,7 @@ export interface MarkupPreview {
 export interface CreationDraftAnchor {
   kind: 'poly';
   subtype: PolySubtype;
-  pon: PageObjectNumber;
+  page: PageRef;
   bounds: Rect;
   pointCount: number;
   minPoints: number;
@@ -528,7 +562,8 @@ export interface ChromeGeom {
 }
 
 export interface PointerInput {
-  pon: PageObjectNumber;
+  /** The page the sample resolved against (its own content-space frame). */
+  page: PageRef;
   point: Vec;
   shift: boolean;
   finish?: boolean;
@@ -601,6 +636,8 @@ export type Msg =
   | { t: 'marqueePointer'; phase: 'down' | 'move' | 'up'; in: PointerInput }
   | {
       t: 'createPointer';
+      measure?: MeasurementAppearance;
+      capture?: string;
       phase: 'down' | 'move' | 'up';
       subtype: Subtype;
       /** The authoring tool's `defaults` key (see {@link Draft}). Defaults to `subtype`. */
@@ -620,15 +657,32 @@ export type Msg =
     }
   | { t: 'finishInkDraft' }
   | { t: 'finishCreationDraft' }
+  /**
+   * Programmatic creation from page-space geometry — the data API's `create`.
+   * Mints the same optimistic `tmp:` annotation a draw tool commits, from the
+   * preset's defaults with `props` layered on top, and emits the same `create`
+   * effect: ONE commit path for pointer and API. `preset` defaults to `subtype`.
+   */
+  | {
+      t: 'createAnnot';
+      page: PageRef;
+      subtype: Subtype;
+      geom: Geom;
+      preset?: string;
+      props?: AnnotationPropsPatch;
+      flags?: Partial<AnnotationFlags>;
+      /** Select the new annotation (a tool would); default false for API creates. */
+      select?: boolean;
+    }
   | {
       t: 'createCaret';
-      pon: PageObjectNumber;
+      page: PageRef;
       anchor: TextEndAnchor;
       flags?: Partial<AnnotationFlags>;
     }
   | {
       t: 'createReplaceText';
-      pon: PageObjectNumber;
+      page: PageRef;
       quads: TextQuad[];
       anchor: TextEndAnchor;
       preset?: string;
@@ -639,7 +693,7 @@ export type Msg =
   | {
       t: 'createMarkup';
       subtype: Subtype;
-      pon: PageObjectNumber;
+      page: PageRef;
       quads: TextQuad[];
       preset?: string;
       /** The tool's `/F` seed — merged over {@link DRAWN_FLAGS} at commit. */
@@ -649,6 +703,7 @@ export type Msg =
   | {
       t: 'setMarkupPreview';
       subtype: Subtype;
+      /** Per-page quads keyed by `page.pageObjectNumber` (a lookup, not an address). */
       quadsByPage: Record<number, TextQuad[]>;
       preset?: string;
     }
@@ -723,9 +778,13 @@ export type Msg =
   // write). `setText` flips the annotation to `vector` so the live text shows.
   | { t: 'beginTextEdit'; id: Id }
   | { t: 'setText'; id: Id; text: string }
+  // The editor's rich result (runs of deltas over the body), applied
+  // optimistically like `setText`; `contents` follows as the projection.
+  | { t: 'setRichText'; id: Id; doc: RichTextDocumentInput }
   | { t: 'endTextEdit' };
 
 export type Effect =
+  | { fx: 'captured'; tool: string; page: PageRef; geom: Geom }
   | { fx: 'create'; id: Id }
   | { fx: 'createGroup'; primary: Id; members: Id[] }
   /** `apChanged` is set (to `true`) ONLY when this patch INVALIDATED a baked
@@ -791,6 +850,7 @@ export interface RenderItem {
   hovered?: boolean;
   /** Redaction label projection (redact kind only) — see {@link Annot.label}. */
   label?: { text: string; repeat: boolean };
+  measure?: MeasurementAppearance;
   /**
    * Applied rotation (deg, CW), or 0/undefined. For BOX kinds (`rect`/`text`)
    * `box` is the UNROTATED visual box and the renderer applies this rotation
@@ -850,7 +910,15 @@ export type SceneNode =
   /** Painted (non-interactive) text — `at` is the BASELINE start point in
    *  content units. Editable text (free text) stays a framework element;
    *  this is for pure pixels, e.g. a redaction label preview. */
-  | { kind: 'text'; at: Vec; text: string; fontSize: number; fontFamily?: string; paint: Paint };
+  | {
+      kind: 'text';
+      at: Vec;
+      text: string;
+      fontSize: number;
+      fontFamily?: string;
+      rotation?: number;
+      paint: Paint;
+    };
 
 /** Pure geometry settings for recognising and axis-snapping a freehand stroke. */
 export interface InkStraightenOptions {

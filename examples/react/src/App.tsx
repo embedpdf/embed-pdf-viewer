@@ -1,31 +1,6 @@
 import * as React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createCapabilityToken } from '@embedpdf/core';
-import { stagePlugin } from '@embedpdf/plugin-stage';
-import type {
-  Direction,
-  FlowMode,
-  GridColumns,
-  LayoutKind,
-  SpreadMode,
-  SizingMode,
-  StageCapability,
-  StageSettings,
-} from '@embedpdf/plugin-stage';
-import { interactionPlugin } from '@embedpdf/plugin-interaction';
-import { selectionPlugin } from '@embedpdf/plugin-selection';
-import { annotationPlugin } from '@embedpdf/plugin-annotation';
-import { renderPlugin } from '@embedpdf/plugin-render';
-import { pageEditPlugin } from '@embedpdf/plugin-page-edit';
-import { metadataPlugin } from '@embedpdf/plugin-metadata';
-import { formPlugin, fieldKeyOf } from '@embedpdf/plugin-form';
-import type { FormFieldPatch } from '@embedpdf/plugin-form';
-import { searchPlugin, validateSearchRegex, SearchToken } from '@embedpdf/plugin-search';
-import { stampPlugin } from '@embedpdf/plugin-stamp';
-import type { StampAsset } from '@embedpdf/plugin-stamp';
-import { i18nPlugin, negotiateLocale } from '@embedpdf/plugin-i18n';
-import { viewManagerPlugin } from '@embedpdf/plugin-view-manager';
-import type { ViewInfo } from '@embedpdf/plugin-view-manager';
 import {
   Viewer,
   Stage,
@@ -49,7 +24,7 @@ import {
   useLayout,
   useStageSettings,
   useDocuments,
-  useViews,
+  usePanes,
   usePageEditor,
   useMetadata,
   useSelector,
@@ -65,6 +40,32 @@ import {
   useArmStampAsset,
   useT,
   useLocale,
+  stagePlugin,
+  interactionPlugin,
+  selectionPlugin,
+  annotationPlugin,
+  renderPlugin,
+  pageEditPlugin,
+  metadataPlugin,
+  formPlugin,
+  searchPlugin,
+  validateSearchRegex,
+  SearchToken,
+  stampPlugin,
+  i18nPlugin,
+  negotiateLocale,
+  viewManagerPlugin,
+  type Direction,
+  type FlowMode,
+  type GridColumns,
+  type LayoutKind,
+  type SpreadMode,
+  type SizingMode,
+  type StageCapability,
+  type StageSettings,
+  type FormFieldPatch,
+  type StampAsset,
+  type PaneInfo,
 } from '@embedpdf/react';
 import type {
   AnnotationProps,
@@ -210,10 +211,10 @@ function AnnotationMenuBar() {
       {(canGroup || canUngroup) && (
         <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,.18)' }} />
       )}
-      <button onClick={anno.deleteSelection} style={MENU_BTN}>
+      <button onClick={() => void anno.deleteSelection()} style={MENU_BTN}>
         Delete{selected.length > 1 ? ` (${selected.length})` : ''}
       </button>
-      <button onClick={anno.deselect} style={MENU_BTN}>
+      <button onClick={anno.clearSelection} style={MENU_BTN}>
         Done
       </button>
     </div>
@@ -526,7 +527,7 @@ function StampLibraryBar() {
   const importPdf = (source: Blob, name: string) => {
     setBusy(true);
     stamp
-      .importLibraryPdf(source, { name })
+      .importLibrary(source, { name })
       .catch((err) => console.error('[demo] library import failed:', err))
       .finally(() => setBusy(false));
   };
@@ -629,7 +630,7 @@ function AnnotationBar({
   // default makes a CLOSED ending (closed arrow / circle / square) solid out of the
   // box; stroke and fill stay independently editable.
   useEffect(() => {
-    annotation.setDefaults('line', {
+    annotation.setToolDefaults('line', {
       interiorColor: '#e5484d',
       lineEndings: { start: 'none', end: 'open-arrow' },
     });
@@ -923,9 +924,8 @@ function FieldPanel() {
   const form = useForm();
   const field = useFormField();
   if (!field) return null;
-  const key = fieldKeyOf(field);
   const patch = (p: Record<string, unknown>) =>
-    void form.updateField(key, { family: field.family, ...p } as FormFieldPatch);
+    void form.updateField(field.ref, { family: field.family, ...p } as FormFieldPatch);
   return (
     <div
       style={{
@@ -961,7 +961,7 @@ function FieldPanel() {
       {(field.family === 'combobox' || field.family === 'listbox') && (
         <SideField label="Options (one per line)">
           <textarea
-            key={key}
+            key={field.fieldObjectNumber}
             defaultValue={field.options.map((o) => o.label).join('\n')}
             rows={4}
             onBlur={(e) => {
@@ -981,7 +981,7 @@ function FieldPanel() {
           <button
             style={tbBtn}
             title="unlink this widget; the field keeps its other widgets"
-            onClick={() => void form.detachWidget(key, field.widgets[0]!.annotObjectNumber)}
+            onClick={() => void form.detachWidget(field.ref, field.widgets[0]!.ref!)}
           >
             ⛓ Detach widget
           </button>
@@ -989,7 +989,7 @@ function FieldPanel() {
         <button
           style={{ ...tbBtn, color: '#c0322b', borderColor: '#e3b3b0' }}
           title="delete the field and all of its widgets"
-          onClick={() => void form.deleteField(key)}
+          onClick={() => void form.deleteField(field.ref)}
         >
           🗑 Delete field
         </button>
@@ -1014,10 +1014,10 @@ function AnnotationSidebar({ onClose }: { onClose: () => void }) {
   const selCount = useAnnotationSelection().length;
 
   const hasSel = sel.specs.length > 0;
-  const specs = hasSel ? sel.specs : annotation.propsForTool(activeToolId);
+  const specs = hasSel ? sel.specs : annotation.listPropSpecs(activeToolId);
   const values: Partial<AnnotationProps> = hasSel ? sel.values : defaults;
   const write = (patch: AnnotationPropsPatch) =>
-    hasSel ? annotation.updateSelection(patch) : annotation.setDefaults(activeToolId, patch);
+    hasSel ? annotation.updateSelection(patch) : annotation.setToolDefaults(activeToolId, patch);
 
   return (
     <aside style={annoSidebar}>
@@ -1113,7 +1113,7 @@ function SearchControls() {
     return () => clearTimeout(t);
   }, [text, matchCase, wholeWord, regex, patternError, search]);
 
-  const hits = useSelector(SearchToken, (c) => c.hits());
+  const hits = useSelector(SearchToken, (c) => c.listHits());
   const counter =
     hitCount > 0
       ? `${activeIndex + 1}/${hitCount}`
@@ -1133,7 +1133,7 @@ function SearchControls() {
           setListOpen(true);
         }}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') e.shiftKey ? search.prev() : search.next();
+          if (e.key === 'Enter') e.shiftKey ? search.previousHit() : search.nextHit();
           if (e.key === 'Escape') {
             setText('');
             setListOpen(false);
@@ -1160,10 +1160,14 @@ function SearchControls() {
         title="regular expression (RE2-portable dialect)"
         onClick={() => setRegex((v) => !v)}
       />
-      <button onClick={() => search.prev()} title="previous match (shift+Enter)" style={tbBtn}>
+      <button
+        onClick={() => search.previousHit()}
+        title="previous match (shift+Enter)"
+        style={tbBtn}
+      >
         ↑
       </button>
-      <button onClick={() => search.next()} title="next match (Enter)" style={tbBtn}>
+      <button onClick={() => search.nextHit()} title="next match (Enter)" style={tbBtn}>
         ↓
       </button>
       <span
@@ -1195,8 +1199,8 @@ function SearchControls() {
         >
           {hits.slice(0, 100).map((hit, i) => (
             <button
-              key={`${hit.pon}:${hit.charStart}`}
-              onClick={() => search.goTo(i)}
+              key={`${hit.page.pageObjectNumber}:${hit.charStart}`}
+              onClick={() => search.goToHit(i)}
               style={{
                 display: 'block',
                 width: '100%',
@@ -1231,7 +1235,7 @@ function SearchControls() {
             {status === 'searching'
               ? `scanning… ${progress.scanned}/${progress.total} pages`
               : `${hitCount} matches${hitCount > 100 ? ' (first 100 shown)' : ''}`}
-            {error && <span style={{ color: '#e5484d' }}>{error}</span>}
+            {error && <span style={{ color: '#e5484d' }}>{error.message}</span>}
             <span style={{ marginLeft: 'auto' }} />
             <button
               onClick={() => setListOpen(false)}
@@ -1509,7 +1513,7 @@ function ThumbnailSidebar() {
   const { currentPage, goToPage } = usePages(); // the MAIN lens
   const editor = usePageEditor(); // PERSISTED page edits (document-scoped, shared by lenses)
   const canEdit = editor.canEdit();
-  const pageCount = useSelector(ThumbsStageToken, (c) => c.pageCount()); // gates move/delete edges
+  const { pageCount } = usePages(ThumbsStageToken); // gates move/delete edges
   const [menuPage, setMenuPage] = useState<number | null>(null); // which thumb's action menu is open
   const thumbs = useStageSettings(ThumbsStageToken); // the SIDEBAR lens
   const thumbPx = 'pageWidth' in thumbs.settings.zoom ? thumbs.settings.zoom.pageWidth : 110;
@@ -1664,7 +1668,7 @@ function ThumbnailSidebar() {
                   >
                     <button
                       style={itemStyle}
-                      onClick={(e) => act(e, () => editor.rotateBy(page.pon, 90))}
+                      onClick={(e) => act(e, () => editor.rotateBy([page.ref], 90))}
                     >
                       ↻ Rotate
                     </button>
@@ -1672,7 +1676,9 @@ function ThumbnailSidebar() {
                     {page.pageIndex > 0 && (
                       <button
                         style={itemStyle}
-                        onClick={(e) => act(e, () => editor.move([page.pon], page.pageIndex - 1))}
+                        onClick={(e) =>
+                          act(e, () => editor.move([page.ref], { index: page.pageIndex - 1 }))
+                        }
                       >
                         ↑ Move page up
                       </button>
@@ -1680,7 +1686,9 @@ function ThumbnailSidebar() {
                     {page.pageIndex < pageCount - 1 && (
                       <button
                         style={itemStyle}
-                        onClick={(e) => act(e, () => editor.move([page.pon], page.pageIndex + 1))}
+                        onClick={(e) =>
+                          act(e, () => editor.move([page.ref], { index: page.pageIndex + 1 }))
+                        }
                       >
                         ↓ Move page down
                       </button>
@@ -1689,7 +1697,7 @@ function ThumbnailSidebar() {
                     {pageCount > 1 && (
                       <button
                         style={{ ...itemStyle, color: '#c0322b' }}
-                        onClick={(e) => act(e, () => editor.delete([page.pon]))}
+                        onClick={(e) => act(e, () => editor.delete([page.ref]))}
                       >
                         🗑 Delete
                       </button>
@@ -1733,13 +1741,13 @@ function Pane({
   names,
   canRemove,
 }: {
-  view: ViewInfo;
+  view: PaneInfo;
   names: Record<string, string>;
   canRemove: boolean;
 }) {
   const { open, close } = useDocuments();
-  const v = useViews();
-  const focused = view.id === v.focusedViewId;
+  const v = usePanes();
+  const focused = view.id === v.focusedPaneId;
 
   const dropDoc = (e: React.DragEvent, index: number) => {
     const payload = readPayload(e);
@@ -1751,15 +1759,15 @@ function Pane({
   const dropPane = (e: React.DragEvent) => {
     const payload = readPayload(e);
     if (!payload || payload.kind !== 'view' || payload.viewId === view.id) return;
-    v.moveView(
+    v.movePane(
       payload.viewId,
-      v.views.findIndex((x) => x.id === view.id),
+      v.panes.findIndex((x) => x.id === view.id),
     );
   };
 
   return (
     <div
-      onMouseDown={() => v.setFocused(view.id)}
+      onMouseDown={() => v.setFocusedPane(view.id)}
       onDragOver={(e) => e.preventDefault()}
       onDrop={dropPane}
       style={{
@@ -1807,7 +1815,7 @@ function Pane({
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => dropDoc(e, i)}
               onClick={() => {
-                v.setFocused(view.id);
+                v.setFocusedPane(view.id);
                 v.setActiveDocument(view.id, docId);
               }}
               style={{
@@ -1846,7 +1854,7 @@ function Pane({
         })}
         <button
           onClick={() => {
-            v.setFocused(view.id);
+            v.setFocusedPane(view.id);
             void newDocument().then((doc) => open(doc.source, { name: doc.name }));
           }}
           title="open a new document in this pane"
@@ -1863,7 +1871,7 @@ function Pane({
         </button>
         {canRemove && (
           <button
-            onClick={() => v.removeView(view.id)}
+            onClick={() => v.removePane(view.id)}
             title="close this pane (documents stay open)"
             style={{
               marginLeft: 'auto',
@@ -1901,7 +1909,7 @@ function Pane({
 function Workspace() {
   const { docs } = useDocuments();
   const t = useT();
-  const { views, createView } = useViews();
+  const { panes: views, createPane: createView } = usePanes();
   const names = useMemo(() => Object.fromEntries(docs.map((d) => [d.id, d.name ?? d.id])), [docs]);
   return (
     <div
@@ -1951,8 +1959,8 @@ const pickFile = (accept: string): Promise<File | null> =>
   });
 
 function FileMenu() {
-  const { open, download, downloadLayer } = useDocuments();
-  const { views, focusedViewId } = useViews();
+  const { open, save, saveLayer } = useDocuments();
+  const { panes: views, focusedPaneId: focusedViewId } = usePanes();
   const focused = views.find((v) => v.id === focusedViewId) ?? views[0];
   const targetId = focused?.activeDocumentId ?? null;
   const [sampleId, setSampleId] = useState(SAMPLES[0].id);
@@ -2018,7 +2026,7 @@ function FileMenu() {
     setMenu(false);
     if (!targetId) return;
     try {
-      const bytes = await downloadLayer(targetId);
+      const bytes = await saveLayer(targetId);
       saveToDisk(bytes, `${sample().id}.layer`);
       setStatus(`Saved layer (${bytes.byteLength.toLocaleString()} bytes).`);
     } catch (e) {
@@ -2029,7 +2037,7 @@ function FileMenu() {
     setMenu(false);
     if (!targetId) return;
     try {
-      const bytes = await download(targetId, { mode });
+      const bytes = await save(targetId, { mode });
       saveToDisk(bytes, `${sample().id}-${mode}.pdf`);
       setStatus(`Saved ${mode} PDF (${bytes.byteLength.toLocaleString()} bytes).`);
     } catch (e) {
