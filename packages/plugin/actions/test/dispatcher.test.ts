@@ -246,8 +246,7 @@ describe('actions dispatcher', () => {
           fields: [],
           changedWidgets: [],
         })),
-        changedWidgets: [],
-        meta: null,
+        meta: { affectedPages: [], cacheDelta: null, changedFields: [], changedWidgets: [] },
       };
     });
     const flagged: Array<{ annotObjectNumber: number; hidden: boolean | undefined }> = [];

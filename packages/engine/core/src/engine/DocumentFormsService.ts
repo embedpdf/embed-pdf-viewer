@@ -6,7 +6,7 @@ import type { FormSnapshot } from '../forms/snapshot';
 import type { FormDataFormat, FormFieldValue } from '../forms/value';
 import type { FormEffect, FormEffectsResult } from '../forms/effects';
 import type { FormSubmissionReceipt, FormSubmissionRequest } from '../forms/submission';
-import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
+import type { FormFieldRef } from '../identity/FormFieldRef';
 import type { SignatureAppearanceInput } from '../signature/types';
 import type {
   FormDataExport,
@@ -101,7 +101,7 @@ export interface DocumentFormsService {
    * `list()`, so recovered fields are included and, on layer documents,
    * filled values win over the base.
    */
-  exportData(format?: FormDataFormat): AbortablePromise<FormDataExport>;
+  export(format?: FormDataFormat): AbortablePromise<FormDataExport>;
 
   /**
    * Apply an FDF or XFDF payload. The format is sniffed from the bytes
@@ -109,7 +109,7 @@ export interface DocumentFormsService {
    * validated write path as `setValue` — one bad entry is skipped and
    * counted, never fatal. Emits `form.imported`.
    */
-  importData(
+  import(
     data: Uint8Array | ArrayBuffer,
     format?: FormDataFormat,
   ): AbortablePromise<FormImportResult>;
@@ -117,11 +117,11 @@ export interface DocumentFormsService {
   /**
    * Create a logical form field, optionally with styled widgets, in one
    * atomic job. Widgets are born through the annotation plane and adopted
-   * (see {@link attachWidget}); the inline `widget(s)` config is sugar for
+   * (see {@link addWidget}); the inline `widget(s)` config is sugar for
    * exactly that composition. Gated by `doc.forms.modify`. Emits
    * `form.fieldCreated`.
    */
-  createField(draft: FormFieldDraft): AbortablePromise<FormFieldCreateResult>;
+  create(draft: FormFieldDraft): AbortablePromise<FormFieldCreateResult>;
 
   /**
    * Update field-plane properties (name, universal and family flags,
@@ -129,7 +129,7 @@ export interface DocumentFormsService {
    * target field. Validate-then-apply per property. Emits
    * `form.fieldUpdated`.
    */
-  updateField(ref: FormFieldRef, patch: FormFieldPatch): AbortablePromise<FormFieldUpdateResult>;
+  update(ref: FormFieldRef, patch: FormFieldPatch): AbortablePromise<FormFieldUpdateResult>;
 
   /**
    * Draw a PDF page into every widget of an unsigned signature field — the
@@ -147,7 +147,7 @@ export interface DocumentFormsService {
    * page, the field leaves the tree, and empty ancestors are pruned.
    * Emits `form.fieldDeleted`.
    */
-  deleteField(ref: FormFieldRef): AbortablePromise<FormFieldDeleteResult>;
+  delete(ref: FormFieldRef): AbortablePromise<FormFieldDeleteResult>;
 
   /**
    * Adopt an existing, unattached widget annotation as a view of the
@@ -156,20 +156,20 @@ export interface DocumentFormsService {
    * legacy merged field splits it — the field object number never
    * changes; widget identity may. Emits `form.widgetAttached`.
    */
-  attachWidget(
+  addWidget(
     ref: FormFieldRef,
     widget: AnnotationRef,
     options?: { onState?: string },
   ): AbortablePromise<FormWidgetLinkResult>;
 
   /**
-   * The inverse of {@link attachWidget}: the widget keeps its page
+   * The inverse of {@link addWidget}: the widget keeps its page
    * placement and last appearance but becomes an ordinary, inert
    * annotation (deletable through the annotation APIs). The field
    * survives, "unplaced" when this was its last widget. Emits
    * `form.widgetDetached`.
    */
-  detachWidget(ref: FormFieldRef, widget: AnnotationRef): AbortablePromise<FormWidgetLinkResult>;
+  removeWidget(ref: FormFieldRef, widget: AnnotationRef): AbortablePromise<FormWidgetLinkResult>;
 
   /**
    * Make the engine's read-time reconciliation durable in the document

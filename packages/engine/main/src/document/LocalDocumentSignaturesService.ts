@@ -8,7 +8,7 @@ import {
   type DigestAlgorithm,
   type DocumentSignaturesService,
   type FormFieldRef,
-  type SignatureAbortResult,
+  type SignatureCancelResult,
   type SignatureCompleteInput,
   type SignatureCompleteResult,
   type SignaturePrepareInput,
@@ -168,20 +168,20 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
     });
   }
 
-  cancel(signingId: string): AbortablePromise<SignatureAbortResult> {
+  cancel(signingId: string): AbortablePromise<SignatureCancelResult> {
     const rejected = this.gate('doc.sign');
     if (rejected) return rejected;
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'signatures.abort', jobId, docId, signingId }),
+          wirePack({ kind: 'signatures.cancel', jobId, docId, signingId }),
       },
       { priority: Priority.HIGH },
     );
-    return this.await(submission, 'signatures.abort', (payload) => {
-      if (payload.result.status === 'aborted') {
-        this.publisher.publishLocal({ type: 'signature.aborted', signingId });
+    return this.await(submission, 'signatures.cancel', (payload) => {
+      if (payload.result.status === 'cancelled') {
+        this.publisher.publishLocal({ type: 'signature.cancelled', signingId });
       }
       return payload.result;
     });

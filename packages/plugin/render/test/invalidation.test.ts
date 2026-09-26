@@ -31,7 +31,7 @@ describe('pixelChangeOf — the built-in event → pixels map', () => {
   it.each(['form.valueChanged', 'form.effectsApplied'])(
     '%s repaints every page a changed widget lives on',
     (type) => {
-      expect(changeOf({ type, changedWidgets: [widget(11), widget(33)] })).toEqual({
+      expect(changeOf({ type, meta: { changedWidgets: [widget(11), widget(33)] } })).toEqual({
         pages: [11, 33],
         scope: 'annotations',
       });
@@ -39,10 +39,12 @@ describe('pixelChangeOf — the built-in event → pixels map', () => {
   );
 
   it('form.fieldDeleted repaints the removed widgets’ pages', () => {
-    expect(changeOf({ type: 'form.fieldDeleted', removedWidgets: [widget(22)] })).toEqual({
-      pages: [22],
-      scope: 'annotations',
-    });
+    expect(changeOf({ type: 'form.fieldDeleted', meta: { changedWidgets: [widget(22)] } })).toEqual(
+      {
+        pages: [22],
+        scope: 'annotations',
+      },
+    );
   });
 
   it.each(['form.fieldCreated', 'form.fieldUpdated', 'form.widgetAttached', 'form.widgetDetached'])(

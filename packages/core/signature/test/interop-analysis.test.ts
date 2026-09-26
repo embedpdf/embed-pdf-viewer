@@ -77,7 +77,11 @@ describe.skipIf(!OUT)('interop fixtures for the revision analysis (pyHanko)', ()
   ): Promise<Uint8Array> {
     const doc = await open(bytes);
     try {
-      await sign(doc, { field: { kind: 'fqn', name: fieldName }, signer, certify: { permission } });
+      await sign(doc, {
+        field: { kind: 'fqn', name: fieldName },
+        key: signer,
+        certify: { permission },
+      });
       return new Uint8Array(await doc.download());
     } finally {
       await doc.close();
@@ -87,7 +91,7 @@ describe.skipIf(!OUT)('interop fixtures for the revision analysis (pyHanko)', ()
   async function ourVerdict(bytes: Uint8Array): Promise<Verdict> {
     const doc = await open(bytes);
     try {
-      return (await doc.signatures!.analyze({ since: { signatureIndex: 0 } })).verdict;
+      return (await doc.signatures.analyze({ since: { signatureIndex: 0 } })).verdict;
     } finally {
       await doc.close();
     }
@@ -246,7 +250,7 @@ describe.skipIf(!OUT)('interop fixtures for the revision analysis (pyHanko)', ()
         try {
           await sign(doc, {
             field: { kind: 'fqn', name: 'sig2' },
-            signer,
+            key: signer,
             lock: { action: 'include', fields: ['text'] },
           });
           return new Uint8Array(await doc.download());
@@ -297,7 +301,7 @@ describe.skipIf(!OUT)('interop fixtures for the revision analysis (pyHanko)', ()
     const { readFile } = await import('node:fs/promises');
     const doc = await open(new Uint8Array(await readFile(process.env.EPDF_INTEROP_ANALYZE!)));
     try {
-      const analysis = await doc.signatures!.analyze({ since: { signatureIndex: 0 } });
+      const analysis = await doc.signatures.analyze({ since: { signatureIndex: 0 } });
       console.log(
         JSON.stringify({
           verdict: analysis.verdict,
@@ -344,7 +348,7 @@ describe.skipIf(!OUT)('interop fixtures for the revision analysis (pyHanko)', ()
           );
           const result = await sign(doc, {
             field: { kind: 'fqn', name: 'sig' },
-            signer,
+            key: signer,
             certify: { permission: 2 },
           });
           expect(result.status).toBe('completed');

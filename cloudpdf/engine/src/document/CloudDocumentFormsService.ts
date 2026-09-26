@@ -2,6 +2,7 @@ import {
   AbortablePromise,
   EngineError,
   EngineErrorCode,
+  deletedFieldOf,
   encodeFieldRefKey,
   type DocumentEventInit,
   type DocumentFormsService,
@@ -24,7 +25,6 @@ import {
   type FormSetValueResult,
   type FormSnapshot,
   type FormWidgetLinkResult,
-  type FormWidget,
   type AnnotationRef,
   type MutationMeta,
 } from '@embedpdf/engine-core/runtime';
@@ -137,16 +137,17 @@ export class CloudDocumentFormsService implements DocumentFormsService {
         (raw) => FormEffectsResultSchema.parse(raw),
         signal,
       );
-      // An all-no-op/all-preflight-rejected batch deliberately has no
-      // artifact, cache advance, or event.
-      if (result.meta === null) return result;
+      // A batch that wrote nothing (every effect a no-op or rejected in
+      // preflight) comes back without a cache delta: no artifact, cache
+      // advance, or event.
+      if (result.meta.cacheDelta === null) return result;
       this.manifest.apply(result.meta, ['annotations']);
       this.publisher.publishLocal({ type: 'form.effectsApplied', ...result });
       return result;
     });
   }
 
-  exportData(format: FormDataFormat = 'xfdf'): AbortablePromise<FormDataExport> {
+  export(format: FormDataFormat = 'xfdf'): AbortablePromise<FormDataExport> {
     const rejected = this.rejectIfClosed<FormDataExport>();
     if (rejected) return rejected;
     return AbortablePromise.run<FormDataExport>(async (signal) => {
@@ -158,7 +159,7 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     });
   }
 
-  importData(
+  import(
     data: Uint8Array | ArrayBuffer,
     format?: FormDataFormat,
   ): AbortablePromise<FormImportResult> {
@@ -177,7 +178,7 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     });
   }
 
-  createField(draft: FormFieldDraft): AbortablePromise<FormFieldCreateResult> {
+  create(draft: FormFieldDraft): AbortablePromise<FormFieldCreateResult> {
     const rejected = this.rejectIfClosed<FormFieldCreateResult>();
     if (rejected) return rejected;
     return AbortablePromise.run<FormFieldCreateResult>(async (signal) => {
@@ -191,7 +192,7 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     });
   }
 
-  updateField(ref: FormFieldRef, patch: FormFieldPatch): AbortablePromise<FormFieldUpdateResult> {
+  update(ref: FormFieldRef, patch: FormFieldPatch): AbortablePromise<FormFieldUpdateResult> {
     const rejected = this.rejectIfClosed<FormFieldUpdateResult>();
     if (rejected) return rejected;
     return AbortablePromise.run<FormFieldUpdateResult>(async (signal) => {
@@ -232,7 +233,7 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     });
   }
 
-  deleteField(ref: FormFieldRef): AbortablePromise<FormFieldDeleteResult> {
+  delete(ref: FormFieldRef): AbortablePromise<FormFieldDeleteResult> {
     const rejected = this.rejectIfClosed<FormFieldDeleteResult>();
     if (rejected) return rejected;
     return AbortablePromise.run<FormFieldDeleteResult>(async (signal) => {
@@ -241,11 +242,17 @@ export class CloudDocumentFormsService implements DocumentFormsService {
         (raw) => FormFieldDeleteResultSchema.parse(raw),
         signal,
       );
-      return this.absorbMutation(result, 'form.fieldDeleted');
+      this.manifest.apply(result.meta, ['annotations']);
+      this.publisher.publishLocal({
+        type: 'form.fieldDeleted',
+        deleted: deletedFieldOf(result),
+        ...result,
+      });
+      return result;
     });
   }
 
-  attachWidget(
+  addWidget(
     ref: FormFieldRef,
     widget: AnnotationRef,
     options?: { onState?: string },
@@ -264,7 +271,7 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     });
   }
 
-  detachWidget(ref: FormFieldRef, widget: AnnotationRef): AbortablePromise<FormWidgetLinkResult> {
+  removeWidget(ref: FormFieldRef, widget: AnnotationRef): AbortablePromise<FormWidgetLinkResult> {
     const rejected = this.rejectIfClosed<FormWidgetLinkResult>();
     if (rejected) return rejected;
     return AbortablePromise.run<FormWidgetLinkResult>(async (signal) => {
@@ -314,7 +321,6 @@ export class CloudDocumentFormsService implements DocumentFormsService {
       | 'form.repaired'
       | 'form.fieldCreated'
       | 'form.fieldUpdated'
-      | 'form.fieldDeleted'
       | 'form.widgetAttached'
       | 'form.widgetDetached',
   ): T {

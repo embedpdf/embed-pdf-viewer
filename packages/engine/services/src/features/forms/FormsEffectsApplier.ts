@@ -6,11 +6,11 @@ import type {
   FormFieldRef,
   FormFieldValue,
   FormWidget,
-  MutationMeta,
 } from '@embedpdf/engine-core/runtime';
 import {
   EngineError,
   EngineErrorCode,
+  encodeFieldRefKey,
   formWidget,
   serializeError,
 } from '@embedpdf/engine-core/runtime';
@@ -21,13 +21,13 @@ import { withScratchN } from '../../runtime/memory/scratch';
 import { U64_BYTES, pokeU64 } from '../../runtime/memory/u64';
 import { throwIfAborted } from '../../shared/abort';
 import { acquireFormModel } from './internal/formModelCache';
+import { formMutationMeta } from './internal/formMutationMeta';
 import { readFieldAt } from './internal/readFormSnapshot';
 import { resolveFieldRef } from './internal/resolveFieldRef';
 import { withWideStringArray } from './internal/wideStringArray';
 import { ActionReadBudgetTracker } from '../actions/ActionModelReader';
 
 const CHANGED_WIDGETS_CAPACITY = 1024;
-const EMPTY_META: MutationMeta = { affectedPages: [], cacheDelta: null };
 const DISPLAY_CODE = { visible: 0, hidden: 1, noPrint: 2, noView: 3 } as const;
 
 interface PreflightEffect {
@@ -42,6 +42,15 @@ interface NativeEffectResult {
   changedWidgetObjectNumbers: number[];
 }
 
+/**
+ * An effects batch's result, plus whether anything was written: a batch that
+ * wrote nothing needs no artifact, event, or version bump.
+ */
+export interface AppliedFormEffects {
+  result: FormEffectsResult;
+  wrote: boolean;
+}
+
 /** Ordered, non-rollback-atomic sink for one committed client script run. */
 export class FormsEffectsApplier {
   constructor(
@@ -49,13 +58,14 @@ export class FormsEffectsApplier {
     private readonly session: DocumentSession,
   ) {}
 
-  apply(effects: FormEffect[], signal: AbortSignal): FormEffectsResult {
+  apply(effects: FormEffect[], signal: AbortSignal): AppliedFormEffects {
     throwIfAborted(signal);
     const preflightActionBudget = new ActionReadBudgetTracker();
     const resultActionBudget = new ActionReadBudgetTracker();
     const preflight = effects.map((effect) => this.preflight(effect, preflightActionBudget));
     const results: FormEffectResult[] = [];
     const allChangedWidgets = new Map<string, FormWidget>();
+    const allChangedFields = new Map<string, FormFieldRef>();
     let mustFinalize = false;
     let stop = false;
 
@@ -103,6 +113,7 @@ export class FormsEffectsApplier {
           const fields = this.readFieldsBestEffort(item.fieldObjectNumbers, resultActionBudget);
           const changedWidgets = widgetRefs(native.changedWidgetObjectNumbers, before, fields);
           rememberWidgets(allChangedWidgets, changedWidgets);
+          rememberFields(allChangedFields, fields);
           results.push({
             index,
             status: 'failed',
@@ -127,6 +138,7 @@ export class FormsEffectsApplier {
         const fields = this.readFieldsBestEffort(item.fieldObjectNumbers, resultActionBudget);
         const changedWidgets = widgetRefs(native.changedWidgetObjectNumbers, before, fields);
         rememberWidgets(allChangedWidgets, changedWidgets);
+        rememberFields(allChangedFields, fields);
         results.push({ index, status: 'applied', fields, changedWidgets });
       } catch (error) {
         mustFinalize = true;
@@ -142,11 +154,12 @@ export class FormsEffectsApplier {
       }
     }
 
-    return {
-      results,
-      changedWidgets: [...allChangedWidgets.values()],
-      meta: mustFinalize ? EMPTY_META : null,
-    };
+    const meta = formMutationMeta(
+      this.session,
+      [...allChangedFields.values()],
+      [...allChangedWidgets.values()],
+    );
+    return { result: { results, meta }, wrote: mustFinalize };
   }
 
   private preflight(effect: FormEffect, actionBudget: ActionReadBudgetTracker): PreflightEffect {
@@ -446,6 +459,10 @@ function widgetRefs(
     .map((objectNumber) => byObjectNumber.get(objectNumber))
     .filter((widget): widget is FormWidget => widget !== undefined)
     .map(({ annotObjectNumber, page }) => formWidget(annotObjectNumber, page));
+}
+
+function rememberFields(target: Map<string, FormFieldRef>, fields: FormFieldDTO[]): void {
+  for (const field of fields) target.set(encodeFieldRefKey(field.ref), field.ref);
 }
 
 function rememberWidgets(target: Map<string, FormWidget>, widgets: FormWidget[]): void {

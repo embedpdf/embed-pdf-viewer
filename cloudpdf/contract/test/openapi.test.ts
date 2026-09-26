@@ -259,7 +259,7 @@ describe('openapi document', () => {
     expect(schemas.DocAnnotationsCreate200Response.properties.annotation).toEqual(annotationRef);
     expect(schemas.DocAnnotationsUpdate200Response.properties.annotation).toEqual(annotationRef);
     expect(
-      schemas.DocFormsGet200Response.properties.fields.items.anyOf[0].properties.actions,
+      schemas.DocFormsList200Response.properties.fields.items.anyOf[0].properties.actions,
     ).toEqual({ $ref: '#/components/schemas/PdfFieldActions' });
 
     const refs: string[] = [];

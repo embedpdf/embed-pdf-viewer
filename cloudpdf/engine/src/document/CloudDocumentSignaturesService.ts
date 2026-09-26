@@ -7,7 +7,7 @@ import {
   type DigestAlgorithm,
   type DocumentSignaturesService,
   type FormFieldRef,
-  type SignatureAbortResult,
+  type SignatureCancelResult,
   type SignatureCompleteInput,
   type SignatureCompleteResult,
   type SignaturePrepareInput,
@@ -16,7 +16,7 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import {
   ChangeAnalysisSchema,
-  SignatureAbortResultSchema,
+  SignatureCancelResultSchema,
   SignatureCompleteResultSchema,
   SignaturePreparedWireSchema,
   SignatureSnapshotSchema,
@@ -232,17 +232,17 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
     });
   }
 
-  cancel(signingId: string): AbortablePromise<SignatureAbortResult> {
+  cancel(signingId: string): AbortablePromise<SignatureCancelResult> {
     const rejected = this.closedRejection();
     if (rejected) return rejected;
-    return AbortablePromise.run<SignatureAbortResult>(async (signal) => {
+    return AbortablePromise.run<SignatureCancelResult>(async (signal) => {
       const result = await this.http.deleteJson(
-        wirePaths.layerSignatureAbort(this.docId, this.layerName, signingId),
-        (raw) => SignatureAbortResultSchema.parse(raw),
+        wirePaths.layerSignatureCancel(this.docId, this.layerName, signingId),
+        (raw) => SignatureCancelResultSchema.parse(raw),
         signal,
       );
-      if (result.status === 'aborted') {
-        this.publisher.publishLocal({ type: 'signature.aborted', signingId });
+      if (result.status === 'cancelled') {
+        this.publisher.publishLocal({ type: 'signature.cancelled', signingId });
       }
       return result;
     });

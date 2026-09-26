@@ -28,10 +28,10 @@ export interface SignaturesCustomization {
   readonly kinds?: ReadonlyArray<'signature' | 'initials'>;
   /** `'one'`: a single person per browser (no "new signature" once one exists). Default `'many'`. */
   readonly libraries?: 'one' | 'many';
-  /** What placing a mark on a field does; default `sign` with a signer, else `visual`. */
+  /** What placing a mark on a field does; default `sign` with a key, else `visual`. */
   readonly mode?: SignatureMode;
-  /** The key holder — `webCryptoSigner`, `remoteSigner`, `personalSigner`, or a thunk resolving one per signing. */
-  readonly signer?: SignerPort | (() => Promise<SignerPort>);
+  /** The key — `webCryptoSigner`, `remoteSigner`, `personalSigner`, or a thunk resolving one per signing. */
+  readonly key?: SignerPort | (() => Promise<SignerPort>);
   /** Trust anchors for validation; none → verdicts top out at "valid, signer unknown". */
   readonly trust?: TrustPort;
   /** Offer a certification (first signature, DocMDP) in the sign dialog. Default false. */

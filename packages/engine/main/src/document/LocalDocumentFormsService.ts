@@ -2,6 +2,7 @@ import {
   AbortablePromise,
   EngineError,
   EngineErrorCode,
+  deletedFieldOf,
   wirePack,
   type DocumentFormsService,
   type FormDataExport,
@@ -15,7 +16,6 @@ import {
   type FormFieldUpdateResult,
   type SignatureAppearanceInput,
   type FormWidgetLinkResult,
-  type FormWidget,
   type AnnotationRef,
   type FormFieldValue,
   type FormImportResult,
@@ -132,14 +132,14 @@ export class LocalDocumentFormsService implements DocumentFormsService {
       { priority: Priority.HIGH },
     );
     return this.await(submission, 'forms.applyEffects', (payload) => {
-      if (payload.result.meta !== null) {
+      if (payload.wrote) {
         this.publisher.publishLocal({ type: 'form.effectsApplied', ...payload.result });
       }
       return payload.result;
     });
   }
 
-  exportData(format: FormDataFormat = 'xfdf'): AbortablePromise<FormDataExport> {
+  export(format: FormDataFormat = 'xfdf'): AbortablePromise<FormDataExport> {
     const rejected = this.gate('doc.forms.read');
     if (rejected) return rejected;
     const docId = this.docId;
@@ -155,7 +155,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     }));
   }
 
-  importData(
+  import(
     data: Uint8Array | ArrayBuffer,
     format?: FormDataFormat,
   ): AbortablePromise<FormImportResult> {
@@ -179,7 +179,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     });
   }
 
-  createField(draft: FormFieldDraft): AbortablePromise<FormFieldCreateResult> {
+  create(draft: FormFieldDraft): AbortablePromise<FormFieldCreateResult> {
     const rejected = this.gate('doc.forms.modify');
     if (rejected) return rejected;
     const docId = this.docId;
@@ -219,7 +219,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     });
   }
 
-  updateField(ref: FormFieldRef, patch: FormFieldPatch): AbortablePromise<FormFieldUpdateResult> {
+  update(ref: FormFieldRef, patch: FormFieldPatch): AbortablePromise<FormFieldUpdateResult> {
     const rejected = this.gate('doc.forms.modify');
     if (rejected) return rejected;
     const docId = this.docId;
@@ -236,7 +236,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     });
   }
 
-  deleteField(ref: FormFieldRef): AbortablePromise<FormFieldDeleteResult> {
+  delete(ref: FormFieldRef): AbortablePromise<FormFieldDeleteResult> {
     const rejected = this.gate('doc.forms.modify');
     if (rejected) return rejected;
     const docId = this.docId;
@@ -247,12 +247,16 @@ export class LocalDocumentFormsService implements DocumentFormsService {
       { priority: Priority.HIGH },
     );
     return this.await(submission, 'forms.deleteField', (payload) => {
-      this.publisher.publishLocal({ type: 'form.fieldDeleted', ...payload.result });
+      this.publisher.publishLocal({
+        type: 'form.fieldDeleted',
+        deleted: deletedFieldOf(payload.result),
+        ...payload.result,
+      });
       return payload.result;
     });
   }
 
-  attachWidget(
+  addWidget(
     ref: FormFieldRef,
     widget: AnnotationRef,
     options?: { onState?: string },
@@ -281,7 +285,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     });
   }
 
-  detachWidget(ref: FormFieldRef, widget: AnnotationRef): AbortablePromise<FormWidgetLinkResult> {
+  removeWidget(ref: FormFieldRef, widget: AnnotationRef): AbortablePromise<FormWidgetLinkResult> {
     const rejected = this.gate('doc.forms.modify');
     if (rejected) return rejected;
     const docId = this.docId;

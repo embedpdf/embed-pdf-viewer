@@ -30,7 +30,7 @@ import type {
   DocumentVersionRef,
   FieldLockSpec,
   PdfRevision,
-  SignatureAbortResult,
+  SignatureCancelResult,
   SignatureCompleteResult,
   SignatureDTO,
   SignaturePrepared,
@@ -77,6 +77,7 @@ import type {
   FormFieldUpdateResult,
   FormImportResult,
   FormRepairResult,
+  FormMutationMeta,
   FormSetValueResult,
   FormWidgetLinkResult,
 } from '../mutation/FormMutationResults';
@@ -947,10 +948,17 @@ export const AnnotationMoveResultSchema: z.ZodType<AnnotationMoveResult> = z.obj
   meta: AnnotationListMutationMetaSchema,
 });
 
+/** A single-field write's meta: the envelope plus the fields and widgets it changed. */
+export const FormMutationMetaSchema: z.ZodType<FormMutationMeta> = z.object({
+  affectedPages: z.array(PageStateSchema),
+  cacheDelta: CacheDeltaSchema.nullable(),
+  changedFields: z.array(FormFieldRefSchema),
+  changedWidgets: z.array(FormWidgetSchema),
+});
+
 export const FormSetValueResultSchema: z.ZodType<FormSetValueResult> = z.object({
   field: FormFieldDTOSchema,
-  changedWidgets: z.array(FormWidgetSchema),
-  meta: MutationMetaSchema,
+  meta: FormMutationMetaSchema,
 });
 
 export const FormEffectSchema: z.ZodType<FormEffect> = z.discriminatedUnion('kind', [
@@ -974,38 +982,33 @@ export const FormEffectsResultSchema: z.ZodType<FormEffectsResult> = z.object({
       error: EngineErrorPayloadSchema.optional(),
     }),
   ),
-  changedWidgets: z.array(FormWidgetSchema),
-  meta: MutationMetaSchema.nullable(),
+  meta: FormMutationMetaSchema,
 });
 
 export const FormImportResultSchema: z.ZodType<FormImportResult> = z.object({
-  fieldsTotal: z.number().int().nonnegative(),
-  fieldsApplied: z.number().int().nonnegative(),
-  fieldsSkipped: z.number().int().nonnegative(),
-  widgetsChanged: z.number().int().nonnegative(),
-  snapshot: FormSnapshotSchema,
+  form: FormSnapshotSchema,
+  applied: z.number().int().nonnegative(),
+  skipped: z.number().int().nonnegative(),
   meta: MutationMetaSchema,
 });
 
 export const FormFieldCreateResultSchema: z.ZodType<FormFieldCreateResult> = z.object({
   field: FormFieldDTOSchema,
-  meta: MutationMetaSchema,
+  meta: FormMutationMetaSchema,
 });
 
 export const FormFieldUpdateResultSchema: z.ZodType<FormFieldUpdateResult> = z.object({
   field: FormFieldDTOSchema,
-  meta: MutationMetaSchema,
+  meta: FormMutationMetaSchema,
 });
 
 export const FormFieldDeleteResultSchema: z.ZodType<FormFieldDeleteResult> = z.object({
-  deletedFieldObjectNumber: z.number().int().positive(),
-  removedWidgets: z.array(FormWidgetSchema),
-  meta: MutationMetaSchema,
+  meta: FormMutationMetaSchema,
 });
 
 export const FormWidgetLinkResultSchema: z.ZodType<FormWidgetLinkResult> = z.object({
   field: FormFieldDTOSchema,
-  meta: MutationMetaSchema,
+  meta: FormMutationMetaSchema,
 });
 
 export const FormRepairResultSchema: z.ZodType<FormRepairResult> = z.object({
@@ -1014,7 +1017,7 @@ export const FormRepairResultSchema: z.ZodType<FormRepairResult> = z.object({
   widgetsLinked: z.number().int().nonnegative(),
   fieldsUnrepairable: z.number().int().nonnegative(),
   appearancesBaked: z.number().int().nonnegative(),
-  needAppearancesCleared: z.boolean(),
+  needsAppearancesCleared: z.boolean(),
   meta: MutationMetaSchema,
 });
 
@@ -1508,8 +1511,8 @@ export const SignatureCompleteResultSchema: z.ZodType<SignatureCompleteResult> =
   meta: MutationMetaSchema,
 });
 
-export const SignatureAbortResultSchema: z.ZodType<SignatureAbortResult> = z.object({
-  status: z.enum(['aborted', 'already-completed', 'unknown']),
+export const SignatureCancelResultSchema: z.ZodType<SignatureCancelResult> = z.object({
+  status: z.enum(['cancelled', 'already-completed', 'unknown']),
 });
 
 const ChangeFindingSchema = z.object({
@@ -1563,11 +1566,12 @@ export const ChangeAnalysisSchema = z.object({
   steps: z.array(z.unknown()),
 }) as unknown as z.ZodType<ChangeAnalysis>;
 
-const SignatureAttributionSchema = z.object({
+const SignatureSignerInputSchema = z.object({
   name: z.string().optional(),
   reason: z.string().optional(),
   location: z.string().optional(),
   contactInfo: z.string().optional(),
+  signedAt: IsoDateTimeSchema.optional(),
 });
 
 /** The JSON part of a visual signature fill (multipart envelope): which resource part holds the PDF, and its page. */
@@ -1588,10 +1592,7 @@ export const SignaturePrepareBodySchema = z.object({
   subFilter: z.enum(['adbe.pkcs7.detached', 'ETSI.CAdES.detached']).optional(),
   digest: z.enum(['sha256', 'sha384', 'sha512']).optional(),
   contentsSize: z.number().int().positive().optional(),
-  attribution: SignatureAttributionSchema.optional(),
-  /** @deprecated the pre-rename spelling of `attribution`; servers read either. */
-  signer: SignatureAttributionSchema.optional(),
-  signedAt: IsoDateTimeSchema.optional(),
+  signer: SignatureSignerInputSchema.optional(),
   certify: z.object({ permission: DocMdpPermissionSchema }).optional(),
   lock: FieldLockSpecSchema.optional(),
   appearance: z

@@ -72,10 +72,12 @@ export function upsertFields(index: FieldIndex, fields: readonly FormFieldDTO[])
   return indexFields({ ...index.snapshot, fields: next });
 }
 
-export function removeField(index: FieldIndex, fieldObjectNumber: number): FieldIndex {
+export function removeField(index: FieldIndex, ref: FormFieldRef): FieldIndex {
   if (!index.snapshot) return index;
-  const fields = index.snapshot.fields.filter(
-    (field) => field.fieldObjectNumber !== fieldObjectNumber,
+  const fields = index.snapshot.fields.filter((field) =>
+    ref.kind === 'objectNumber'
+      ? field.fieldObjectNumber !== ref.fieldObjectNumber
+      : field.name !== ref.name,
   );
   if (fields.length === index.snapshot.fields.length) return index;
   return indexFields({ ...index.snapshot, fields });
@@ -101,14 +103,14 @@ export function foldFormEvent(index: FieldIndex, event: DocumentEvent): FieldInd
         : created;
     }
     case 'form.fieldDeleted':
-      return removeField(index, event.deletedFieldObjectNumber);
+      return event.deleted ? removeField(index, event.deleted) : reload();
     case 'form.effectsApplied':
       return upsertFields(
         index,
         event.results.flatMap((result) => result.fields),
       );
     case 'form.imported':
-      return indexFields(event.snapshot);
+      return indexFields(event.form);
     case 'form.repaired':
       return reload();
     default:
@@ -121,7 +123,10 @@ export const fieldByKey = (index: FieldIndex, key: FieldKey): FormFieldDTO | nul
   return position === undefined ? null : (index.snapshot?.fields[position] ?? null);
 };
 
-export const fieldForWidget = (index: FieldIndex, annotObjectNumber: number): FormFieldDTO | null => {
+export const fieldForWidget = (
+  index: FieldIndex,
+  annotObjectNumber: number,
+): FormFieldDTO | null => {
   const position = index.byWidget[annotObjectNumber];
   return position === undefined ? null : (index.snapshot?.fields[position] ?? null);
 };

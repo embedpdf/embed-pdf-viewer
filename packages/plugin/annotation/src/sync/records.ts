@@ -241,23 +241,20 @@ export function foldRecords(
       return pages.length ? reload({ pages }) : records;
     }
     case 'form.fieldDeleted':
-      return drop(records, widgetKeys(event.removedWidgets));
+      return drop(records, widgetKeys(event.meta.changedWidgets));
     case 'form.effectsApplied': {
       // A script can change a widget's display flags.
-      const pages = pagesOfWidgets(event.changedWidgets);
+      const pages = pagesOfWidgets(event.meta.changedWidgets);
       return pages.length ? reload({ pages }) : records;
     }
     // The form plane and signatures repaint widgets without changing their records.
     case 'form.valueChanged':
-      return bumpAppearance(records, widgetKeys(event.changedWidgets));
+      return bumpAppearance(records, widgetKeys(event.meta.changedWidgets));
     case 'form.fieldUpdated':
       return bumpAppearance(records, widgetKeys(event.field.widgets));
     case 'form.imported':
-      return event.widgetsChanged > 0
-        ? bumpAppearance(
-            records,
-            widgetKeys(event.snapshot.fields.flatMap((field) => field.widgets)),
-          )
+      return event.applied > 0
+        ? bumpAppearance(records, widgetKeys(event.form.fields.flatMap((field) => field.widgets)))
         : records;
     case 'signature.completed':
       return event.signature.widget

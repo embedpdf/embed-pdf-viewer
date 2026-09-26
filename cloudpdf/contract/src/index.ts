@@ -14,13 +14,15 @@ import {
   DocumentManifestSchema,
   DocumentMetadataSchema,
   EngineErrorPayloadSchema,
+  FormImportResultSchema,
+  FormSetValueResultSchema,
   FormSnapshotSchema,
   IdentitySchema,
   MutationMetaSchema,
   PageTextSnapshotSchema,
   ChangeAnalysisSchema,
   DocumentVersionsSchema,
-  SignatureAbortResultSchema,
+  SignatureCancelResultSchema,
   SignatureCompleteBodySchema,
   SignatureCompleteResultSchema,
   SignaturePreparedWireSchema,
@@ -1491,7 +1493,7 @@ export const docOperations = {
     notes:
       'The multipart envelope: a JSON `body` part (field, subFilter, digest, contentsSize, signer, certify, lock, appearance) ' +
       "and an optional `resource:<key>` PDF part the body's `appearance.resource` names. A certification (`certify.permission`) " +
-      'additionally requires `doc.sign.certify`. The layer is read-only until the signing completes, is aborted, or expires (15 minutes). ' +
+      'additionally requires `doc.sign.certify`. The layer is read-only until the signing completes, is cancelled, or expires (15 minutes). ' +
       'A layer behind the document head cannot sign (StaleBase).',
   },
   'doc.signatures.complete': {
@@ -1518,19 +1520,19 @@ export const docOperations = {
       'Idempotent by signing id: the same CMS again answers `already-completed`. Every layer of the document then sits over the new version; ' +
       'refetch the manifest after a completion.',
   },
-  'doc.signatures.abort': {
-    operationId: 'doc.signatures.abort',
-    title: 'Abort a signature',
+  'doc.signatures.cancel': {
+    operationId: 'doc.signatures.cancel',
+    title: 'Cancel a signature',
     summary: 'Discard a pending signing candidate.',
     method: 'DELETE',
-    path: wireTemplates.layerSignatureAbort,
+    path: wireTemplates.layerSignatureCancel,
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.sign'],
     requestHeaders: [documentPasswordHeader],
     params: DocSigningParamsSchema,
     responses: {
-      200: { contentType: 'application/json', schema: SignatureAbortResultSchema },
+      200: { contentType: 'application/json', schema: SignatureCancelResultSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
   },
@@ -1837,9 +1839,9 @@ export const docOperations = {
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
   },
-  'doc.forms.get': {
-    operationId: 'doc.forms.get',
-    title: 'Get form snapshot',
+  'doc.forms.list': {
+    operationId: 'doc.forms.list',
+    title: 'List form fields',
     summary: 'Reconciled form snapshot: fields, widgets, values.',
     method: 'GET',
     path: wireTemplates.layerForm,
@@ -1866,7 +1868,7 @@ export const docOperations = {
     params: DocFieldParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: FormSetValueResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
@@ -1883,7 +1885,7 @@ export const docOperations = {
     requestHeaders: [documentPasswordHeader],
     params: DocFieldParamsSchema,
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: FormSetValueResultSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
   },
@@ -1917,7 +1919,7 @@ export const docOperations = {
     params: DocLayerParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: FormImportResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },

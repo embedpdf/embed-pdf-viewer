@@ -3,15 +3,16 @@
 import type * as CloudPDF from "../index.js";
 
 export interface DocFormsSetValue200Response {
+    field: CloudPDF.DocFormsSetValue200ResponseField;
     meta: DocFormsSetValue200Response.Meta;
-    /** Accepts any additional properties */
-    [key: string]: any;
 }
 
 export namespace DocFormsSetValue200Response {
     export interface Meta {
         affectedPages: CloudPDF.PageState[];
         cacheDelta: Meta.CacheDelta | null;
+        changedFields: CloudPDF.DocFormsSetValue200ResponseMetaChangedFieldsItem[];
+        changedWidgets: Meta.ChangedWidgets.Item[];
     }
 
     export namespace Meta {
@@ -50,6 +51,30 @@ export namespace DocFormsSetValue200Response {
                         contentVersion: number;
                         annotationVersion: number;
                     }
+                }
+            }
+        }
+
+        export type ChangedWidgets = ChangedWidgets.Item[];
+
+        export namespace ChangedWidgets {
+            export interface Item {
+                ref: CloudPDF.DocFormsSetValue200ResponseMetaChangedWidgetsItemRef | null;
+                annotObjectNumber: number;
+                page: Item.Page | null;
+            }
+
+            export namespace Item {
+                export interface Page {
+                    kind: Page.Kind;
+                    pageObjectNumber: number;
+                }
+
+                export namespace Page {
+                    export const Kind = {
+                        ObjectNumber: "objectNumber",
+                    } as const;
+                    export type Kind = (typeof Kind)[keyof typeof Kind];
                 }
             }
         }

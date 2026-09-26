@@ -128,7 +128,6 @@ function harness(snapshot: FormSnapshot, sandbox: ScriptSandbox = new NodeSandbo
         fields: [],
         changedWidgets: [],
       })),
-      changedWidgets: [],
       meta: {} as never,
     };
   });

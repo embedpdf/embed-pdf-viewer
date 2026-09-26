@@ -58,7 +58,7 @@ describe('file-backed signing candidate', () => {
         { kind: 'fqn', name: 'group.total' },
         { type: 'text', value: 'on disk' },
       );
-      const prepared = await doc.signatures!.prepare({
+      const prepared = await doc.signatures.prepare({
         field: { kind: 'fqn', name: 'sig' },
         certify: { permission: 2 },
       });
@@ -73,7 +73,7 @@ describe('file-backed signing candidate', () => {
       expect(r2 + r3).toBe((await stat(candidatePath)).size);
       expect(r1).toBeLessThan(r2);
 
-      const result = await doc.signatures!.complete({
+      const result = await doc.signatures.complete({
         signingId: prepared.signingId,
         expectedVersion: prepared.expectedVersion,
         cms: FAKE_CMS,
@@ -89,14 +89,14 @@ describe('file-backed signing candidate', () => {
       expect(sha256(downloaded)).toBe(sha256(sealed));
 
       // Editing continues on a fresh layer over the sealed file; the fill survived.
-      const after = await doc.signatures!.list();
+      const after = await doc.signatures.list();
       expect(after.signatures[0].signed).toBe(true);
       const text = await doc.forms.get({ kind: 'fqn', name: 'group.total' });
       expect((text as { value?: string }).value).toBe('on disk');
 
-      // A second signing reuses the sealed file as its base and, when aborted, leaves nothing behind.
-      const second = await doc
-        .signatures!.prepare({ field: { kind: 'fqn', name: 'sig' } })
+      // A second signing reuses the sealed file as its base and, when cancelled, leaves nothing behind.
+      const second = await doc.signatures
+        .prepare({ field: { kind: 'fqn', name: 'sig' } })
         .catch(() => null);
       expect(second).toBeNull(); // the only field is signed
       expect(await candidates()).toHaveLength(1); // the sealed file itself
@@ -105,7 +105,7 @@ describe('file-backed signing candidate', () => {
     }
   });
 
-  test('abort removes the candidate file; close removes a still-pending one', async () => {
+  test('cancel removes the candidate file; close removes a still-pending one', async () => {
     if (!available) return;
     const before = await candidates();
     const doc = await engine.open(
@@ -113,11 +113,11 @@ describe('file-backed signing candidate', () => {
       { scope: ['*'] },
     );
     try {
-      const prepared = await doc.signatures!.prepare({ field: { kind: 'fqn', name: 'sig' } });
+      const prepared = await doc.signatures.prepare({ field: { kind: 'fqn', name: 'sig' } });
       expect((await candidates()).length).toBe(before.length + 1);
-      expect((await doc.signatures!.cancel(prepared.signingId)).status).toBe('aborted');
+      expect((await doc.signatures.cancel(prepared.signingId)).status).toBe('cancelled');
       expect((await candidates()).length).toBe(before.length);
-      await doc.signatures!.prepare({ field: { kind: 'fqn', name: 'sig' } });
+      await doc.signatures.prepare({ field: { kind: 'fqn', name: 'sig' } });
       expect((await candidates()).length).toBe(before.length + 1);
     } finally {
       await doc.close();

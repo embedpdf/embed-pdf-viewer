@@ -1,6 +1,7 @@
 import {
   annotationImportFacts,
   deletedAnnotationOf,
+  deletedFieldOf,
   toPageRef,
   type AnnotationCreateResult,
   type AnnotationImportResult,
@@ -205,8 +206,10 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
     case 'form.updateField':
     case 'form.setSignatureAppearance':
       return { type: 'form.fieldUpdated', origin, ...(row.payload as FormFieldUpdateResult) };
-    case 'form.deleteField':
-      return { type: 'form.fieldDeleted', origin, ...(row.payload as FormFieldDeleteResult) };
+    case 'form.deleteField': {
+      const result = row.payload as FormFieldDeleteResult;
+      return { type: 'form.fieldDeleted', origin, deleted: deletedFieldOf(result), ...result };
+    }
     case 'form.attachWidget':
       return { type: 'form.widgetAttached', origin, ...(row.payload as FormWidgetLinkResult) };
     case 'form.detachWidget':

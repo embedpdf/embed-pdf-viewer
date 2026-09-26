@@ -8,6 +8,7 @@ import {
   EngineErrorCode,
   serializeError,
   type FormEffectsResult,
+  type FormMutationMeta,
 } from '@embedpdf/engine-core/runtime';
 import type {
   ActionContext,
@@ -62,8 +63,7 @@ export function createScriptEffects(ctx: FormContext) {
                 new EngineError(EngineErrorCode.NotImplemented, 'no form-effects batch door'),
               ),
             })),
-            changedWidgets: [],
-            meta: null,
+            meta: nothingChanged(),
           };
         }
         let result: FormEffectsResult;
@@ -81,8 +81,7 @@ export function createScriptEffects(ctx: FormContext) {
               changedWidgets: [],
               error: refusal,
             })),
-            changedWidgets: [],
-            meta: null,
+            meta: nothingChanged(),
           };
         }
         // The fields mirror and the annotation plugin apply the confirmed
@@ -91,4 +90,9 @@ export function createScriptEffects(ctx: FormContext) {
       },
     } satisfies Partial<FormHostCapability>,
   };
+}
+
+/** The meta of a batch that wrote nothing. */
+function nothingChanged(): FormMutationMeta {
+  return { affectedPages: [], cacheDelta: null, changedFields: [], changedWidgets: [] };
 }

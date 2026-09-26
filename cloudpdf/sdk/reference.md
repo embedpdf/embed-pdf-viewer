@@ -2166,7 +2166,7 @@ await client.doc.annotations.flatten({
 </details>
 
 ## Doc Forms
-<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">get</a>({ ...params }) -> CloudPDF.DocFormsGet200Response</code></summary>
+<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocFormsList200Response</code></summary>
 <dl>
 <dd>
 
@@ -2179,7 +2179,7 @@ await client.doc.annotations.flatten({
 <dd>
 
 ```typescript
-await client.doc.forms.get({
+await client.doc.forms.list({
     docId: "docId",
     layerName: "layerName"
 });
@@ -2198,7 +2198,7 @@ await client.doc.forms.get({
 <dl>
 <dd>
 
-**request:** `CloudPDF.doc.GetFormsRequest` 
+**request:** `CloudPDF.doc.ListFormsRequest` 
     
 </dd>
 </dl>
@@ -3254,7 +3254,7 @@ await client.doc.signatures.list({
 </dl>
 </details>
 
-<details><summary><code>client.doc.signatures.<a href="/src/api/resources/doc/resources/signatures/client/Client.ts">abort</a>({ ...params }) -> CloudPDF.DocSignaturesAbort200Response</code></summary>
+<details><summary><code>client.doc.signatures.<a href="/src/api/resources/doc/resources/signatures/client/Client.ts">cancel</a>({ ...params }) -> CloudPDF.DocSignaturesCancel200Response</code></summary>
 <dl>
 <dd>
 
@@ -3267,7 +3267,7 @@ await client.doc.signatures.list({
 <dd>
 
 ```typescript
-await client.doc.signatures.abort({
+await client.doc.signatures.cancel({
     docId: "docId",
     layerName: "layerName",
     signingId: "signingId"
@@ -3287,7 +3287,7 @@ await client.doc.signatures.abort({
 <dl>
 <dd>
 
-**request:** `CloudPDF.doc.AbortSignaturesRequest` 
+**request:** `CloudPDF.doc.CancelSignaturesRequest` 
     
 </dd>
 </dl>
@@ -3457,7 +3457,7 @@ await client.doc.signatures.analysis({
 <dl>
 <dd>
 
-The multipart envelope: a JSON `body` part (field, subFilter, digest, contentsSize, signer, certify, lock, appearance) and an optional `resource:<key>` PDF part the body's `appearance.resource` names. A certification (`certify.permission`) additionally requires `doc.sign.certify`. The layer is read-only until the signing completes, is aborted, or expires (15 minutes). A layer behind the document head cannot sign (StaleBase).
+The multipart envelope: a JSON `body` part (field, subFilter, digest, contentsSize, signer, certify, lock, appearance) and an optional `resource:<key>` PDF part the body's `appearance.resource` names. A certification (`certify.permission`) additionally requires `doc.sign.certify`. The layer is read-only until the signing completes, is cancelled, or expires (15 minutes). A layer behind the document head cannot sign (StaleBase).
 </dd>
 </dl>
 </dd>

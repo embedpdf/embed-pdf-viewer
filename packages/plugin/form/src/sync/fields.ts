@@ -50,11 +50,7 @@ export function createFieldsMirror(
           events.fieldUpdated.emit({ ref: event.field.ref, field: event.field, origin });
           return;
         case 'form.fieldDeleted':
-          events.fieldDeleted.emit({
-            ref: { kind: 'objectNumber', fieldObjectNumber: event.deletedFieldObjectNumber },
-            field: null,
-            origin,
-          });
+          if (event.deleted) events.fieldDeleted.emit({ ref: event.deleted, field: null, origin });
           return;
         case 'form.effectsApplied':
         case 'form.imported':

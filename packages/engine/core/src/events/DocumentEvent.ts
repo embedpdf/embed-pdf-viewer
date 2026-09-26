@@ -164,7 +164,12 @@ export type DocumentEvent =
   | ({ type: 'form.repaired'; origin: EventOrigin } & FormRepairResult)
   | ({ type: 'form.fieldCreated'; origin: EventOrigin } & FormFieldCreateResult)
   | ({ type: 'form.fieldUpdated'; origin: EventOrigin } & FormFieldUpdateResult)
-  | ({ type: 'form.fieldDeleted'; origin: EventOrigin } & FormFieldDeleteResult)
+  | ({
+      type: 'form.fieldDeleted';
+      origin: EventOrigin;
+      /** The field that went (see `deletedFieldOf`). */
+      deleted: FormFieldRef | null;
+    } & FormFieldDeleteResult)
   | ({ type: 'form.widgetAttached'; origin: EventOrigin } & FormWidgetLinkResult)
   | ({ type: 'form.widgetDetached'; origin: EventOrigin } & FormWidgetLinkResult)
   | ({ type: 'form.effectsApplied'; origin: EventOrigin } & FormEffectsResult)
@@ -179,7 +184,7 @@ export type DocumentEvent =
       origin: EventOrigin;
     } & RedactionApplyResult)
   | {
-      /** A signing candidate was parked: the document is read-only until it completes or aborts. */
+      /** A signing candidate was parked: the document is read-only until it completes or is cancelled. */
       type: 'signature.prepared';
       signingId: string;
       field: FormFieldRef;
@@ -192,7 +197,7 @@ export type DocumentEvent =
       origin: EventOrigin;
     } & SignatureCompleteResult)
   | {
-      type: 'signature.aborted';
+      type: 'signature.cancelled';
       signingId: string;
       origin: EventOrigin;
     }

@@ -32,7 +32,7 @@ export function createValueWrites(
     }
     const result = await ctx.doc.forms.setValue(ref, value);
     return {
-      status: result.changedWidgets.length > 0 ? 'applied' : 'unchanged',
+      status: result.meta.changedWidgets.length > 0 ? 'applied' : 'unchanged',
       scripted: false,
       effectsResult: null,
       uiEffects: [],

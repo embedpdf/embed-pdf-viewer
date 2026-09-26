@@ -89,6 +89,15 @@ export interface SignatureSigner {
   signedAt: IsoDateTime | null;
 }
 
+/** What a signature says about its signer, as `prepare()` and `sign()` take it. */
+export interface SignatureSignerInput {
+  name?: string;
+  reason?: string;
+  location?: string;
+  contactInfo?: string;
+  signedAt?: DateInput;
+}
+
 /** The field's `/SV` seed value: what a signature on this field must satisfy. */
 export interface SignatureSeedValue {
   /** `/Ff` bits: which of the entries below are requirements rather than suggestions. */
@@ -222,10 +231,12 @@ export interface SignaturePrepareInput {
   digest?: Exclude<DigestAlgorithm, 'sha1'>;
   /** Room reserved for the CMS, in bytes (256 .. 4 MiB). Default 8192. */
   contentsSize?: number;
-  /** What the signature dictionary says about the signer: `/Name`, `/Reason`, `/Location`, `/ContactInfo`. */
-  attribution?: { name?: string; reason?: string; location?: string; contactInfo?: string };
-  /** `/M`; default: now. */
-  signedAt?: DateInput;
+  /**
+   * What the signature dictionary says about the signer — `/Name`, `/Reason`,
+   * `/Location`, `/ContactInfo` and `/M` (`signedAt`, default: now): the
+   * fields a read returns as `signer`.
+   */
+  signer?: SignatureSignerInput;
   /** Make this the certification signature (`/Root /Perms /DocMDP`). Only ever the first signature. */
   certify?: { permission: DocMdpPermission };
   /** FieldMDP for this signature plus a mirroring `/Lock` on the field. */
@@ -266,6 +277,6 @@ export interface SignatureCompleteResult {
   meta: MutationMeta;
 }
 
-export interface SignatureAbortResult {
-  status: 'aborted' | 'already-completed' | 'unknown';
+export interface SignatureCancelResult {
+  status: 'cancelled' | 'already-completed' | 'unknown';
 }

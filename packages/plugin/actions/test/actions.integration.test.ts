@@ -85,8 +85,7 @@ describe('plugin-actions integration (real engine)', () => {
           fields: [],
           changedWidgets: [],
         })),
-        changedWidgets: [],
-        meta: null,
+        meta: { affectedPages: [], cacheDelta: null, changedFields: [], changedWidgets: [] },
       };
     });
     actions.registerAnnotCommitSink(async (entries) => {

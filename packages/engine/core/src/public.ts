@@ -14,6 +14,7 @@ export { EngineErrorCode } from './errors/EngineErrorCode';
 
 // Refs.
 export { toPageRef, pageRefsEqual } from './identity/PageRef';
+export { toFieldRef } from './identity/FormFieldRef';
 export { annotationKey } from './identity/annotationKey';
 
 // Permissions.

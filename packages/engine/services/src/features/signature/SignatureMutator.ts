@@ -1,7 +1,7 @@
 import type {
   DigestAlgorithm,
   DocumentVersionRef,
-  SignatureAbortResult,
+  SignatureCancelResult,
   SignatureCompleteInput,
   SignatureCompleteResult,
   SignaturePrepareInput,
@@ -114,7 +114,7 @@ const PREPARE_LP64: PrepareLayout = {
  * it, and parks the saved candidate on the session. `complete` writes the
  * CMS into it, opens it as a new base with a fresh layer, proves the new
  * signature seals a whole revision, and installs it as the session's
- * document. `abort` discards the candidate.
+ * document. `cancel` discards the candidate.
  */
 export class SignatureMutator {
   constructor(
@@ -129,7 +129,7 @@ export class SignatureMutator {
     if (this.session.pendingSigning) {
       throw new EngineError(
         EngineErrorCode.SigningPending,
-        `a signing is pending (${this.session.pendingSigning.prepared.signingId}); complete or abort it first`,
+        `a signing is pending (${this.session.pendingSigning.prepared.signingId}); complete or cancel it first`,
       );
     }
     const reader = new SignatureReader(this.runtime, this.session);
@@ -181,18 +181,16 @@ export class SignatureMutator {
       const candidate = this.openCandidate(signingId, stack);
       stack.push(() => candidate.close());
 
-      // `signer` is the pre-rename wire spelling: older clients still send it.
-      const attribution =
-        input.attribution ?? (input as { signer?: SignaturePrepareInput['attribution'] }).signer;
+      const signer = input.signer;
       const valueObjNum = this.callPrepare(candidate.docPtr, field.fieldObjectNumber, {
         subfilter: SUBFILTER_CODE[subFilter],
         digest: DIGEST_CODE[algorithm],
         contentsSize,
-        name: attribution?.name ?? null,
-        reason: attribution?.reason ?? null,
-        location: attribution?.location ?? null,
-        contactInfo: attribution?.contactInfo ?? null,
-        signingTime: input.signedAt !== undefined ? formatPdfDate(input.signedAt) : null,
+        name: signer?.name ?? null,
+        reason: signer?.reason ?? null,
+        location: signer?.location ?? null,
+        contactInfo: signer?.contactInfo ?? null,
+        signingTime: signer?.signedAt !== undefined ? formatPdfDate(signer.signedAt) : null,
         docmdpPermission: input.certify?.permission ?? 0,
         fieldmdpAction: input.lock ? FIELD_ACTION_CODE[input.lock.action] : 0,
         fieldmdpFields: input.lock?.action === 'all' ? [] : (input.lock?.fields ?? []),
@@ -326,12 +324,12 @@ export class SignatureMutator {
     return result;
   }
 
-  abort(signingId: string): SignatureAbortResult {
+  cancel(signingId: string): SignatureCancelResult {
     const pending = this.session.pendingSigning;
     if (pending && pending.prepared.signingId === signingId) {
       this.session.pendingSigning = null;
       this.storeFor().discard(pending.saved);
-      return { status: 'aborted' };
+      return { status: 'cancelled' };
     }
     if (this.session.lastCompletion?.signingId === signingId) {
       return { status: 'already-completed' };

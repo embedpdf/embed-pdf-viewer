@@ -23,6 +23,7 @@ import type {
   SignatureCompleteResult,
   SignatureDTO,
   SignaturePrepared,
+  SignatureSignerInput,
   SignatureSnapshot,
   SignatureSubFilter,
 } from '@embedpdf/engine-core/runtime';
@@ -51,17 +52,17 @@ export type {
 
 /**
  * What placing a mark on a signature field does:
- *   - `sign`    seal the field with the configured signer (the mark is the appearance);
+ *   - `sign`    seal the field with the configured key (the mark is the appearance);
  *   - `visual`  draw the mark into the field without sealing (Preview's "signature");
  *   - `ask`     neither: `onSignRequested` fires so the chrome can open its dialog and decide.
- * Default `sign` when a signer is configured, else `visual`.
+ * Default `sign` when a key is configured, else `visual`.
  */
 export type SignatureMode = 'sign' | 'visual' | 'ask';
 
 export interface SignatureConfig {
   mode?: SignatureMode;
-  /** The key holder: a raw signer (the CMS is built here) or a CMS signer (a service builds it). A thunk resolves per signing. */
-  signer?: SignerPort | (() => Promise<SignerPort>);
+  /** The key: a raw signer (the CMS is built here) or a CMS signer (a service builds it). A thunk resolves per signing. */
+  key?: SignerPort | (() => Promise<SignerPort>);
   /** Trust anchors for validation. None → every verdict tops out at `valid-untrusted`. */
   trust?: TrustPort;
   /** Let the UI offer a certification (still needs `doc.sign.certify`). Default false. */
@@ -77,10 +78,10 @@ export type SignatureFieldAddress = FormFieldRef | AnnotationRef | { annotObject
 export interface SignFieldInput {
   field: FormFieldRef;
   mark: Mark;
-  /** A per-call key holder; the configured `signer` otherwise. */
-  signer?: SignerPort | (() => Promise<SignerPort>);
-  /** What the signature dictionary says (`/Name` `/Reason` `/Location` `/ContactInfo`); the name defaults to the certificate's subject. */
-  attribution?: { name?: string; reason?: string; location?: string; contactInfo?: string };
+  /** A per-call key; the configured `key` otherwise. */
+  key?: SignerPort | (() => Promise<SignerPort>);
+  /** What the signature dictionary says about the signer; the name defaults to the certificate's subject. */
+  signer?: SignatureSignerInput;
   /** Instead of the mark: a ready one-page appearance PDF the embedder composed itself. */
   appearance?: BinarySource;
   certify?: { permission: DocMdpPermission };
@@ -92,7 +93,7 @@ export interface PrepareSignatureInput {
   field: FormFieldRef;
   mark?: Mark;
   appearance?: BinarySource;
-  attribution?: { name?: string; reason?: string; location?: string; contactInfo?: string };
+  signer?: SignatureSignerInput;
   certify?: { permission: DocMdpPermission };
   lock?: FieldLockSpec;
   subFilter?: SignatureSubFilter;
@@ -188,7 +189,7 @@ export interface SignatureCapability {
   getTarget(): FormFieldRef | null;
 
   // ── the act ──
-  /** Seal the field: the mark's page becomes the widget's appearance, the signer signs. */
+  /** Seal the field: the mark's page becomes the widget's appearance, the key signs. */
   sign(input: SignFieldInput, options?: OperationOptions): Promise<SignatureCompleteResult>;
   /** Two-phase signing, step one: the digest to sign comes back and the signing is parked. */
   prepareSignature(
@@ -202,7 +203,7 @@ export interface SignatureCapability {
     options?: OperationOptions,
   ): Promise<SignatureCompleteResult>;
   /** Cancel the parked signing, if any. */
-  abortPending(options?: OperationOptions): Promise<void>;
+  cancelPending(options?: OperationOptions): Promise<void>;
   /** Visual only: the mark becomes the widget's appearance; nothing is sealed. Rejects `conflict` on a signed field. */
   fillField(field: FormFieldRef, mark: Mark, options?: OperationOptions): Promise<void>;
   /** Undo a visual fill (a blank appearance). Rejects `conflict` on a signed field. */
@@ -242,7 +243,7 @@ export interface SignatureCapability {
   ): Promise<Uint8Array>;
 
   // ── twins ──
-  /** `doc.sign` is granted and a signer is configured (or resolvable). */
+  /** `doc.sign` is granted and a key is configured (or resolvable). */
   canSign(): boolean;
   /** Visual fills ride `doc.forms.fill`. */
   canFill(): boolean;

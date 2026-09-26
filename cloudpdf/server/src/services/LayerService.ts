@@ -71,7 +71,7 @@ import {
   type AttachmentCreateResult,
   type AttachmentDeleteResult,
   type DocumentVersionRef,
-  type SignatureAbortResult,
+  type SignatureCancelResult,
   type SignatureCompleteResult,
   type SignaturePrepareInput,
   type SignaturePrepared,
@@ -1441,7 +1441,8 @@ export class LayerService {
             value: input.value,
             artifactPath,
           }),
-        impacts: (result: FormSetValueResult) => widgetImpacts(result.changedWidgets, 'update'),
+        impacts: (result: FormSetValueResult) =>
+          widgetImpacts(result.meta.changedWidgets, 'update'),
       },
       signal,
     );
@@ -1468,7 +1469,8 @@ export class LayerService {
             ref: input.ref,
             artifactPath,
           }),
-        impacts: (result: FormSetValueResult) => widgetImpacts(result.changedWidgets, 'update'),
+        impacts: (result: FormSetValueResult) =>
+          widgetImpacts(result.meta.changedWidgets, 'update'),
       },
       signal,
     );
@@ -1503,9 +1505,9 @@ export class LayerService {
           );
         }
         const result = payload.result;
-        if (result.meta === null) return result;
+        if (!payload.wrote) return result;
 
-        const impacts = widgetImpacts(result.changedWidgets, 'update');
+        const impacts = widgetImpacts(result.meta.changedWidgets, 'update');
         const failed = result.results.filter((entry) => entry.status === 'failed');
         for (const entry of failed) {
           impacts.push(
@@ -1525,7 +1527,7 @@ export class LayerService {
         return this.persistDocumentMutation(ctx, input.docId, input.layerName, layer, {
           auditKind: 'form.applyEffects',
           impacts: conservativeImpacts,
-          result: result as FormEffectsResult & { meta: MutationMeta },
+          result,
           artifact: requireLayerArtifact(payload as unknown),
         });
       });
@@ -1716,7 +1718,8 @@ export class LayerService {
           }),
         // The cascade removes widget annotations — /Annots index space
         // shifts on those pages ('delete' also advances the generation).
-        impacts: (result: FormFieldDeleteResult) => widgetImpacts(result.removedWidgets, 'delete'),
+        impacts: (result: FormFieldDeleteResult) =>
+          widgetImpacts(result.meta.changedWidgets, 'delete'),
       },
       signal,
     );
@@ -2029,7 +2032,7 @@ export class LayerService {
     if (pending && pending.expiresAt > Date.now()) {
       throw new EngineError(
         EngineErrorCode.SigningPending,
-        `a signing is pending (${pending.id}); complete or abort it before mutating the layer`,
+        `a signing is pending (${pending.id}); complete or cancel it before mutating the layer`,
       );
     }
     // The fence alignment: the worker session must embody exactly the layer
@@ -3554,7 +3557,7 @@ export class LayerService {
           if (isUniqueViolation(err)) {
             throw new EngineError(
               EngineErrorCode.SigningPending,
-              'a signing is already pending on this layer; complete or abort it first',
+              'a signing is already pending on this layer; complete or cancel it first',
             );
           }
           throw err;
@@ -3571,7 +3574,7 @@ export class LayerService {
         await this.requirePool()
           .run(input.docId, (jobId: WorkerJobId) =>
             wirePack({
-              kind: 'signatures.abort' as const,
+              kind: 'signatures.cancel' as const,
               jobId,
               docId: input.docId,
               layerName: input.layerName,
@@ -3757,11 +3760,11 @@ export class LayerService {
     });
   }
 
-  /** Abort: forget a pending signing and its tail. */
-  async abortSignature(
+  /** Cancel: forget a pending signing and its tail. */
+  async cancelSignature(
     ctx: LayerWriteContext,
     input: { docId: string; layerName: string; signingId: string },
-  ): Promise<SignatureAbortResult> {
+  ): Promise<SignatureCancelResult> {
     const signings = this.requireSignings();
     const signing = await signings.find(input.signingId);
     if (
@@ -3775,7 +3778,7 @@ export class LayerService {
     if (signing.state === 'completed') return { status: 'already-completed' };
     if (signing.state !== 'prepared') return { status: 'unknown' };
     await this.discardSigning(signing);
-    return { status: 'aborted' };
+    return { status: 'cancelled' };
   }
 
   /** The sweep tick: expire pending signings past their deadline and drop their tails. */

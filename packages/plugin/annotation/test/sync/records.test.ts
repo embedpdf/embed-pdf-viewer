@@ -133,7 +133,10 @@ describe('foldRecords', () => {
     expect(
       foldRecords(
         recordsOf(recordOn(11, 5)),
-        event({ type: 'form.effectsApplied', changedWidgets: [formWidget(5, toPageRef(11))] }),
+        event({
+          type: 'form.effectsApplied',
+          meta: { changedWidgets: [formWidget(5, toPageRef(11))] },
+        }),
       ),
     ).toEqual(reload({ pages: [toPageRef(11)] }));
   });
@@ -183,26 +186,24 @@ describe('appearance versions', () => {
 
   it.each(['form.valueChanged'])('%s repaints the changed widgets', (type) => {
     const records = recordsOf(recordOn(11, 5));
-    const next = applied(records, event({ type, changedWidgets: [formWidget(5, toPageRef(11))] }));
+    const next = applied(
+      records,
+      event({ type, meta: { changedWidgets: [formWidget(5, toPageRef(11))] } }),
+    );
     expect(versionOf(next, 'obj:5')).toBe(1);
   });
 
-  it('an import that changed widgets repaints every widget of the imported form', () => {
+  it('an import that applied values repaints every widget of the imported form', () => {
     const records = recordsOf(recordOn(11, 5), recordOn(12, 6), recordOn(12, 7));
-    const snapshot = {
+    const form = {
       fields: [
         { widgets: [formWidget(5, toPageRef(11))] },
         { widgets: [formWidget(6, toPageRef(12)), formWidget(7, toPageRef(12))] },
       ],
     };
-    const imported = applied(
-      records,
-      event({ type: 'form.imported', widgetsChanged: 2, snapshot }),
-    );
+    const imported = applied(records, event({ type: 'form.imported', applied: 2, form }));
     expect(['obj:5', 'obj:6', 'obj:7'].map((key) => versionOf(imported, key))).toEqual([1, 1, 1]);
-    expect(
-      foldRecords(records, event({ type: 'form.imported', widgetsChanged: 0, snapshot })),
-    ).toBe(records);
+    expect(foldRecords(records, event({ type: 'form.imported', applied: 0, form }))).toBe(records);
   });
 
   it('a signature repaints its widget', () => {
@@ -325,7 +326,7 @@ describe('records mirror through the controller', () => {
     await harness.capability.whenSynced();
     expect(harness.model().byId['obj:5']?.apVersion ?? 0).toBe(0);
     harness.emit(
-      event({ type: 'form.valueChanged', changedWidgets: [formWidget(5, toPageRef(1))] }),
+      event({ type: 'form.valueChanged', meta: { changedWidgets: [formWidget(5, toPageRef(1))] } }),
     );
     expect(harness.model().byId['obj:5']?.apVersion).toBe(1);
   });

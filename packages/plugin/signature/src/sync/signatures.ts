@@ -83,7 +83,7 @@ export function createSignaturesMirror(
   return {
     mirror,
     /**
-     * The engine does not know this parked signing (its abort answered
+     * The engine does not know this parked signing (its cancel answered
      * `unknown`), so no event will ever clear it: reload without it.
      */
     disown(signingId: string): Promise<void> {

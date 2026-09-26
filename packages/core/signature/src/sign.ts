@@ -1,3 +1,4 @@
+import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type {
   DigestAlgorithm,
   DocumentHandle,
@@ -21,16 +22,21 @@ export interface CmsSigner {
 
 export type SignerPort = CmsSigner | RawSigner;
 
-export type SignInput = Omit<SignaturePrepareInput, 'kind'> & { signer: SignerPort };
+/** What `prepare` takes, plus the key that signs the digest. */
+export type SignInput = Omit<SignaturePrepareInput, 'kind'> & { key: SignerPort };
 
-export class SigningError extends Error {
-  constructor(
-    readonly reason: CompletionRefusal,
-    detail: string,
-  ) {
-    super(`signing refused (${reason}): ${detail}`);
-    this.name = 'SigningError';
-  }
+/**
+ * The gate refused the key's answer: `SignatureRefused`, with the gate's
+ * reason in `details.reason`.
+ */
+function signingRefused(reason: CompletionRefusal, detail: string): EngineError {
+  return new EngineError(
+    EngineErrorCode.SignatureRefused,
+    `signing refused (${reason}): ${detail}`,
+    {
+      details: { reason },
+    },
+  );
 }
 
 export function profileFor(subFilter: SignatureSubFilter): SignatureProfile {
@@ -38,35 +44,34 @@ export function profileFor(subFilter: SignatureSubFilter): SignatureProfile {
 }
 
 /**
- * Sign a field in one call: `prepare` on the engine, the signer turns the
+ * Sign a field in one call: `prepare` on the engine, the key turns the
  * digest into a CMS (or a raw signature this package wraps), the gate
  * checks the CMS matches what was prepared, `complete` installs it. Any
- * failure aborts the candidate and rethrows; the document is never left
+ * failure cancels the candidate and rethrows; the document is never left
  * with a pending signing.
  */
 export async function sign(
   doc: DocumentHandle,
   input: SignInput,
 ): Promise<SignatureCompleteResult> {
-  if (!doc.signatures) throw new Error('this engine does not implement signatures');
-  const { signer, ...rest } = input;
+  const { key, ...rest } = input;
   const subFilter: SignatureSubFilter = rest.subFilter ?? 'ETSI.CAdES.detached';
   const profile = profileFor(subFilter);
-  const digest = rest.digest ?? (signer.kind === 'raw' ? signer.hash : 'sha256');
+  const digest = rest.digest ?? (key.kind === 'raw' ? key.hash : 'sha256');
   const prepared = await doc.signatures.prepare({ ...rest, subFilter, digest });
   try {
     const cms =
-      signer.kind === 'cms'
-        ? await signer.sign({ digest: prepared.digest, algorithm: prepared.algorithm, subFilter })
+      key.kind === 'cms'
+        ? await key.sign({ digest: prepared.digest, algorithm: prepared.algorithm, subFilter })
         : await buildDetachedCms({
             digest: prepared.digest,
             hash: prepared.algorithm,
             profile,
-            signer,
+            signer: key,
             signingTime: profile === 'pkcs7' ? new Date() : undefined,
           });
     const gate = await verifyForCompletion({ cms, prepared, profile });
-    if (!gate.ok) throw new SigningError(gate.reason, gate.detail);
+    if (!gate.ok) throw signingRefused(gate.reason, gate.detail);
     return await doc.signatures.complete({
       signingId: prepared.signingId,
       cms,

@@ -33,7 +33,7 @@ import {
   type SignaturesListWorkerRequest,
   type SignaturesPrepareWorkerRequest,
   type SignaturesCompleteWorkerRequest,
-  type SignaturesAbortWorkerRequest,
+  type SignaturesCancelWorkerRequest,
   type SignaturesAnalyzeWorkerRequest,
   type SignaturesFinalizeCandidateWorkerRequest,
   type SignaturesContentsWorkerRequest,
@@ -124,6 +124,7 @@ import {
 import { AttachmentMutator, AttachmentReader } from '../features/attachments';
 import { FontRegistrar, type StartupFontSpec } from '../features/fonts';
 import { FormMutator, FormReader, FormsEffectsApplier, disposeFormModel } from '../features/forms';
+import { formMutationMeta } from '../features/forms/internal/formMutationMeta';
 import { PageGeometryReader } from '../features/geometry';
 import { MetadataMutator, MetadataReader } from '../features/metadata';
 import {
@@ -271,7 +272,7 @@ export class WorkerHost {
     try {
       // A parked signing candidate freezes the session: every mutating kind
       // is refused at dispatch, before any native write, until the signing
-      // completes or aborts. Reads keep seeing the live document, which the
+      // completes or is cancelled. Reads keep seeing the live document, which the
       // candidate never changed.
       this.assertNoPendingSigning(msg);
       switch (msg.kind) {
@@ -328,8 +329,8 @@ export class WorkerHost {
         case 'signatures.complete':
           resultPack = this.handleSignaturesComplete(msg);
           break;
-        case 'signatures.abort':
-          resultPack = this.handleSignaturesAbort(msg);
+        case 'signatures.cancel':
+          resultPack = this.handleSignaturesCancel(msg);
           break;
         case 'signatures.analyze':
           resultPack = this.handleSignaturesAnalyze(msg);
@@ -770,15 +771,17 @@ export class WorkerHost {
     return wirePack({ tag: 'signatures.finalizeCandidate', ...finalized });
   }
 
-  private handleSignaturesAbort(req: SignaturesAbortWorkerRequest): WirePack<WorkerResultPayload> {
+  private handleSignaturesCancel(
+    req: SignaturesCancelWorkerRequest,
+  ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
     const result = new SignatureMutator(
       this.runtime,
       session,
       this.baseDocuments,
       this.options.signingCandidatePath,
-    ).abort(req.signingId);
-    return wirePack({ tag: 'signatures.abort', result });
+    ).cancel(req.signingId);
+    return wirePack({ tag: 'signatures.cancel', result });
   }
 
   /**
@@ -793,7 +796,7 @@ export class WorkerHost {
     if (session?.pendingSigning) {
       throw new EngineError(
         EngineErrorCode.SigningPending,
-        `a signing is pending (${session.pendingSigning.prepared.signingId}); complete or abort it before mutating the document`,
+        `a signing is pending (${session.pendingSigning.prepared.signingId}); complete or cancel it before mutating the document`,
       );
     }
   }
@@ -1763,9 +1766,16 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
-    const result = new FormsEffectsApplier(this.runtime, session).apply(req.effects, signal);
-    if (result.meta === null) return wirePack({ tag: 'forms.applyEffects', result });
-    return this.finishMutation(session, { tag: 'forms.applyEffects', result }, req.artifactPath);
+    const { result, wrote } = new FormsEffectsApplier(this.runtime, session).apply(
+      req.effects,
+      signal,
+    );
+    if (!wrote) return wirePack({ tag: 'forms.applyEffects', result, wrote });
+    return this.finishMutation(
+      session,
+      { tag: 'forms.applyEffects', result, wrote },
+      req.artifactPath,
+    );
   }
 
   private handleFormsExport(
@@ -1807,9 +1817,10 @@ export class WorkerHost {
     const session = this.requireSession(req);
     const mutator = new FormMutator(this.runtime, session);
     const { field } = mutator.createField(req.draft, signal);
+    const meta = formMutationMeta(session, [field.ref], field.widgets);
     return this.finishMutation(
       session,
-      { tag: 'forms.createField', result: { field, meta: EMPTY_FORM_META } },
+      { tag: 'forms.createField', result: { field, meta } },
       req.artifactPath,
     );
   }
@@ -1821,9 +1832,10 @@ export class WorkerHost {
     const session = this.requireSession(req);
     const mutator = new FormMutator(this.runtime, session);
     const { field } = mutator.updateField(req.ref, req.patch, signal);
+    const meta = formMutationMeta(session, [field.ref], field.widgets);
     return this.finishMutation(
       session,
-      { tag: 'forms.updateField', result: { field, meta: EMPTY_FORM_META } },
+      { tag: 'forms.updateField', result: { field, meta } },
       req.artifactPath,
     );
   }
@@ -1833,16 +1845,13 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
-    const { field, pages } = new FormMutator(this.runtime, session).setSignatureAppearance(
+    const { field } = new FormMutator(this.runtime, session).setSignatureAppearance(
       req.ref,
       new Uint8Array(req.pdf),
       req.pageIndex,
       signal,
     );
-    const meta: MutationMeta = {
-      affectedPages: pages.map((pageObjectNumber) => session.pageState(pageObjectNumber)),
-      cacheDelta: null,
-    };
+    const meta = formMutationMeta(session, [field.ref], field.widgets);
     return this.finishMutation(
       session,
       { tag: 'forms.setSignatureAppearance', result: { field, meta } },
@@ -1856,7 +1865,7 @@ export class WorkerHost {
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
     const mutator = new FormMutator(this.runtime, session);
-    const { deletedFieldObjectNumber, detachedWidgets } = mutator.deleteField(req.ref, signal);
+    const { deleted, detachedWidgets } = mutator.deleteField(req.ref, signal);
 
     // Cascade: the mutator detached the widgets (inert annotations now);
     // deleting them through the annotation feature keeps /Annots
@@ -1870,16 +1879,10 @@ export class WorkerHost {
     // mutator's own bump; bump again so the form-model cache rebuilds.
     session.noteMutation();
 
+    const meta = formMutationMeta(session, [deleted], detachedWidgets);
     return this.finishMutation(
       session,
-      {
-        tag: 'forms.deleteField',
-        result: {
-          deletedFieldObjectNumber,
-          removedWidgets: detachedWidgets,
-          meta: EMPTY_FORM_META,
-        },
-      },
+      { tag: 'forms.deleteField', result: { meta } },
       req.artifactPath,
     );
   }
@@ -1890,10 +1893,11 @@ export class WorkerHost {
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
     const mutator = new FormMutator(this.runtime, session);
-    const { field } = mutator.attachWidget(req.ref, req.widget, req.onState, signal);
+    const { field, widget } = mutator.attachWidget(req.ref, req.widget, req.onState, signal);
+    const meta = formMutationMeta(session, [field.ref], [widget]);
     return this.finishMutation(
       session,
-      { tag: 'forms.attachWidget', result: { field, meta: EMPTY_FORM_META } },
+      { tag: 'forms.attachWidget', result: { field, meta } },
       req.artifactPath,
     );
   }
@@ -1904,10 +1908,11 @@ export class WorkerHost {
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
     const mutator = new FormMutator(this.runtime, session);
-    const { field } = mutator.detachWidget(req.ref, req.widget, signal);
+    const { field, widget } = mutator.detachWidget(req.ref, req.widget, signal);
+    const meta = formMutationMeta(session, [field.ref], [widget]);
     return this.finishMutation(
       session,
-      { tag: 'forms.detachWidget', result: { field, meta: EMPTY_FORM_META } },
+      { tag: 'forms.detachWidget', result: { field, meta } },
       req.artifactPath,
     );
   }
@@ -1953,9 +1958,6 @@ interface LayerArtifactSave {
   payload: { artifact: { bytes: ArrayBuffer; size: number } } | { artifactFile: { path: string } };
   transfer: ArrayBuffer[];
 }
-
-/** Form mutations are non-structural at the page-list level. */
-const EMPTY_FORM_META: MutationMeta = { affectedPages: [], cacheDelta: null };
 
 const BASE_SESSION_SUFFIX = '__base__';
 

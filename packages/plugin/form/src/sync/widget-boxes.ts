@@ -22,7 +22,7 @@ function affectedPages(event: DocumentEvent): readonly PageRef[] | 'all' | null 
     case 'form.widgetDetached':
       return pagesOfWidgets(event.field.widgets);
     case 'form.fieldDeleted':
-      return pagesOfWidgets(event.removedWidgets);
+      return pagesOfWidgets(event.meta.changedWidgets);
     case 'form.imported':
     case 'form.repaired':
       return 'all';

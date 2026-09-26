@@ -81,7 +81,7 @@ export function createFieldWrites(
                   ],
             }
           : { family, name, widget: placement };
-    const result = await ctx.doc.forms.createField(draft);
+    const result = await ctx.doc.forms.create(draft);
     // Wait for the annotation plugin to read the new widget, so a caller can
     // select it right away.
     if (annotationHost) await annotationHost.whenSynced();
@@ -92,25 +92,24 @@ export function createFieldWrites(
     return { field: result.field, widget };
   };
 
-
   return {
     api: {
       createField: (input) => enqueue(() => placeField(input)),
       updateField: (ref, patch) =>
         enqueue(async () => {
-          await ctx.doc.forms.updateField(ref, patch);
+          await ctx.doc.forms.update(ref, patch);
         }),
       deleteField: (ref) =>
         enqueue(async () => {
-          await ctx.doc.forms.deleteField(ref);
+          await ctx.doc.forms.delete(ref);
         }),
       detachWidget: (ref, widget) =>
         enqueue(async () => {
-          await ctx.doc.forms.detachWidget(ref, widget);
+          await ctx.doc.forms.removeWidget(ref, widget);
         }),
       attachWidget: (ref, widget) =>
         enqueue(async () => {
-          await ctx.doc.forms.attachWidget(ref, widget);
+          await ctx.doc.forms.addWidget(ref, widget);
         }),
     } satisfies Partial<FormCapability>,
   };

@@ -50,6 +50,13 @@ const textField = (value: string): FormFieldDTO =>
     comb: false,
   }) as unknown as FormFieldDTO;
 
+const NOTHING_CHANGED = {
+  affectedPages: [],
+  cacheDelta: null,
+  changedFields: [],
+  changedWidgets: [],
+};
+
 const snapshot = (value: string): FormSnapshot => ({
   formKind: 'acroform',
   needsAppearances: false,
@@ -86,7 +93,7 @@ async function boot() {
       setValue: (_ref: unknown, value: { value: string }) =>
         new Promise((resolve) =>
           writes.push(() => {
-            const result = { field: textField(value.value), changedWidgets: [], meta: null };
+            const result = { field: textField(value.value), meta: NOTHING_CHANGED };
             // Like both real engines: the event is published before the promise settles.
             emit({ type: 'form.valueChanged', origin: origin('local'), ...result });
             resolve(result);
@@ -133,8 +140,7 @@ describe('form fields mirror', () => {
       type: 'form.valueChanged',
       origin: origin('remote'),
       field: textField('remote'),
-      changedWidgets: [],
-      meta: null,
+      meta: NOTHING_CHANGED,
     });
     expect(nameValue(harness.form as never)).toEqual({ type: 'text', value: 'remote' });
     expect(harness.reads).toHaveLength(1);
@@ -151,8 +157,7 @@ describe('form fields mirror', () => {
       type: 'form.valueChanged',
       origin: origin('remote'),
       field: textField('remote edit'),
-      changedWidgets: [],
-      meta: null,
+      meta: NOTHING_CHANGED,
     });
     expect(harness.form.getFillItem(9)?.disabled).toBe(true);
     harness.writes[0]!();

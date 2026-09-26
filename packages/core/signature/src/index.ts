@@ -20,14 +20,7 @@ export {
   type TrustVerdict,
   type ValidationTime,
 } from './trust';
-export {
-  sign,
-  SigningError,
-  profileFor,
-  type CmsSigner,
-  type SignInput,
-  type SignerPort,
-} from './sign';
+export { sign, profileFor, type CmsSigner, type SignInput, type SignerPort } from './sign';
 export {
   validateSignatures,
   type IntegrityVerdict,

@@ -81,14 +81,14 @@ describe('foldSignatureEvent', () => {
     expect(parked.pending).toEqual({ signingId: 'one', field });
     expect(parked.snapshot).toBe(snapshot);
     const released = foldSignatureEvent(parked, {
-      type: 'signature.aborted',
+      type: 'signature.cancelled',
       signingId: 'one',
       origin,
     });
     expect((released as SignatureRecord).pending).toBeNull();
-    // Nothing parked: an abort changes nothing.
+    // Nothing parked: a cancel changes nothing.
     expect(
-      foldSignatureEvent(loaded, { type: 'signature.aborted', signingId: 'one', origin }),
+      foldSignatureEvent(loaded, { type: 'signature.cancelled', signingId: 'one', origin }),
     ).toBe(loaded);
   });
 

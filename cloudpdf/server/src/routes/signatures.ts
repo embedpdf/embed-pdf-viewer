@@ -217,9 +217,8 @@ export async function registerSignatureRoutes(
     if (parsed.certify) {
       requireLayerCapability(req, docId, layerName, 'doc.sign.certify', pdfBits);
     }
-    const { appearance, signer, ...rest } = parsed;
+    const { appearance, ...rest } = parsed;
     const input: SignaturePrepareInput = { ...rest };
-    if (!input.attribution && signer) input.attribution = signer;
     if (appearance) {
       const resource = resources?.[appearance.resource];
       if (!resource) {
@@ -288,7 +287,7 @@ export async function registerSignatureRoutes(
     const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
     const ctx = requireLayerCapability(req, docId, layerName, 'doc.sign', pdfBits);
     setNoStore(reply);
-    return layerService.abortSignature(ctx, { docId, layerName, signingId });
+    return layerService.cancelSignature(ctx, { docId, layerName, signingId });
   });
 
   // ---- version-scoped reads -----------------------------------------------
@@ -338,7 +337,12 @@ export async function registerSignatureRoutes(
     const accessCtx = requireDocAccessOnly(req, docId);
     const pdfBits = await bitsForDoc(accessCtx, docId);
     const ctx = requireResource(req, docId, 'version-signatures', pdfBits);
-    const snapshot = await versionSignatures(ctx, docId, requireSha(sha), abortSignalFromRequest(req));
+    const snapshot = await versionSignatures(
+      ctx,
+      docId,
+      requireSha(sha),
+      abortSignalFromRequest(req),
+    );
     setImmutableCache(reply);
     return snapshot;
   });

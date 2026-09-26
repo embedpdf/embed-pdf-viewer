@@ -202,7 +202,7 @@ describe('synthetic signature compatibility corpus', () => {
       { scope: ['*'] },
     );
     try {
-      const snapshot = await doc.signatures!.list();
+      const snapshot = await doc.signatures.list();
       expect(snapshot.chainValid).toBe(true);
       expect(snapshot.revisions).toHaveLength(fixture.facts.revisionCount);
       const verdicts = await validateSignatures(doc, {
@@ -219,7 +219,7 @@ describe('synthetic signature compatibility corpus', () => {
         expect(verdict.cryptography).toBe('valid');
         expect(verdict.trust).toBe('trusted');
       }
-      const analysis = await doc.signatures!.analyze({ since: { signatureIndex: 0 } });
+      const analysis = await doc.signatures.analyze({ since: { signatureIndex: 0 } });
       report.push({
         id: fixture.id,
         sha256: fixture.facts.sha256,

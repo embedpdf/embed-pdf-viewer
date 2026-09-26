@@ -121,9 +121,9 @@ export interface ViewerCustomization {
    *  self-hosted copy of `@embedpdf/default-stamps`. Default: the copy that
    *  ships with the viewer, as a lazy chunk of your own build — no CDN. */
   stamps?: StampsCustomization;
-  /** Digital signatures: the signer, trust anchors, the mode (sign / visual /
+  /** Digital signatures: the key, trust anchors, the mode (sign / visual /
    *  ask), which marks a person keeps, and script faces for typed marks. With
-   *  no signer, a mark placed on a field is drawn in without sealing. */
+   *  no key, a mark placed on a field is drawn in without sealing. */
   signatures?: SignaturesCustomization;
   /** Annotations: fonts the free-text style panel offers beyond the standard
    *  14 — fetched, registered on the engine and mounted for the live editor. */
@@ -333,12 +333,12 @@ export function FullViewer({
     // controls), editable under the Form tab's 'form-edit' + palette tools.
     formPlugin(),
     // Signatures: the act — a mark (a signatures-library asset) dropped on a
-    // signature field signs it through the configured signer, or is drawn in
+    // signature field signs it through the configured key, or is drawn in
     // without sealing when there is none. Marks themselves are the stamp
     // plugin's; the panel lists libraries of kind 'signatures'.
     signaturePlugin({
       mode: resolved.signatures.mode,
-      signer: resolved.signatures.signer,
+      key: resolved.signatures.key,
       trust: resolved.signatures.trust,
       allowCertify: resolved.signatures.allowCertify,
     }),

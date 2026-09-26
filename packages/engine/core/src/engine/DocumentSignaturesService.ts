@@ -3,7 +3,7 @@ import type { AbortablePromise } from '../promise/AbortablePromise';
 import type { AnalyzeInput, ChangeAnalysis } from '../signature/analysis/types';
 import type {
   DigestAlgorithm,
-  SignatureAbortResult,
+  SignatureCancelResult,
   SignatureCompleteInput,
   SignatureCompleteResult,
   SignaturePrepareInput,
@@ -72,5 +72,5 @@ export interface DocumentSignaturesService {
   complete(input: SignatureCompleteInput): AbortablePromise<SignatureCompleteResult>;
 
   /** Discard a pending candidate. */
-  cancel(signingId: string): AbortablePromise<SignatureAbortResult>;
+  cancel(signingId: string): AbortablePromise<SignatureCancelResult>;
 }

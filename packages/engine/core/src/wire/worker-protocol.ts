@@ -72,7 +72,7 @@ import type {
   BaseVersionInfo,
   DigestAlgorithm,
   DocumentProtection,
-  SignatureAbortResult,
+  SignatureCancelResult,
   SignatureCompleteInput,
   SignatureCompleteResult,
   SignatureDTO,
@@ -225,8 +225,8 @@ export interface SignaturesCompleteWorkerRequest {
   artifactPath?: string;
 }
 
-export interface SignaturesAbortWorkerRequest {
-  kind: 'signatures.abort';
+export interface SignaturesCancelWorkerRequest {
+  kind: 'signatures.cancel';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -1209,7 +1209,7 @@ export type WorkerRequest =
   | DocumentVersionWorkerRequest
   | SignaturesPrepareWorkerRequest
   | SignaturesCompleteWorkerRequest
-  | SignaturesAbortWorkerRequest
+  | SignaturesCancelWorkerRequest
   | SignaturesAnalyzeWorkerRequest
   | SignaturesFinalizeCandidateWorkerRequest
   | FontsRegisterWorkerRequest
@@ -1245,7 +1245,7 @@ export type WorkerResultPayload =
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
-  | { tag: 'signatures.abort'; result: SignatureAbortResult }
+  | { tag: 'signatures.cancel'; result: SignatureCancelResult }
   | { tag: 'signatures.analyze'; analysis: ChangeAnalysis }
   | {
       tag: 'signatures.finalizeCandidate';
@@ -1322,6 +1322,8 @@ export type WorkerResultPayload =
   | {
       tag: 'forms.applyEffects';
       result: FormEffectsResult;
+      /** False when the batch wrote nothing: no artifact, event, or version bump. */
+      wrote: boolean;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }

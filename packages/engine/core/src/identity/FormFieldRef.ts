@@ -18,6 +18,11 @@ export type FormFieldRef =
   | { kind: 'objectNumber'; fieldObjectNumber: number }
   | { kind: 'fqn'; name: string };
 
+/** A ref to a field by its full name (`'billing.name'`), for a name you already know. */
+export function toFieldRef(name: string): FormFieldRef {
+  return { kind: 'fqn', name };
+}
+
 /**
  * URL-safe encoding of a `FormFieldRef`, used by the cloud HTTP surface as
  * the `:fieldKey` route parameter. Decoded by the server back into a

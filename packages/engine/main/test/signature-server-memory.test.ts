@@ -112,7 +112,7 @@ describe('server memory contract', () => {
       for (const detail of ['summary', 'full'] as const) {
         prefixes.clear();
         maxLivePrefixes = 0;
-        const analysis = await doc.signatures!.analyze({ since: { signatureIndex: 0 }, detail });
+        const analysis = await doc.signatures.analyze({ since: { signatureIndex: 0 }, detail });
         expect(analysis.later.revisionCount).toBe(3);
         expect(analysis.steps).toHaveLength(detail === 'full' ? 3 : 0);
         expect(maxLivePrefixes).toBeLessThanOrEqual(2);
@@ -143,20 +143,20 @@ describe('server memory contract', () => {
       // the base while the candidate is open, and gone when prepare returns.
       ownedBufferSaves = 0;
       const rssBefore = process.memoryUsage().rss;
-      const prepared = await doc.signatures!.prepare({ field: { kind: 'fqn', name: 'sig' } });
+      const prepared = await doc.signatures.prepare({ field: { kind: 'fqn', name: 'sig' } });
       const rssAfterPrepare = process.memoryUsage().rss;
       expect(ownedBufferSaves).toBe(0);
       expect(await scratchFiles('signing')).toEqual(
         expect.arrayContaining([expect.stringContaining(`.signing-${prepared.signingId}.pdf`)]),
       );
       expect((await scratchFiles('signing')).filter((f) => f.endsWith('.layer'))).toEqual([]);
-      await doc.signatures!.cancel(prepared.signingId);
+      await doc.signatures.cancel(prepared.signingId);
       expect(await scratchFiles('signing')).toEqual([]);
 
       // Judging the working copy: the delta goes to a scratch file and is
       // composed over the base in place; nothing is left behind.
       ownedBufferSaves = 0;
-      const analysis = await doc.signatures!.analyze({
+      const analysis = await doc.signatures.analyze({
         since: { revisionIndex: 0 },
         until: 'working-copy',
       });

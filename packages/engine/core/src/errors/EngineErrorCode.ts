@@ -67,7 +67,7 @@ export const EngineErrorCode = {
   MalformedPdf: 'MalformedPdf',
   /**
    * A signing candidate is parked on this session: every mutation is
-   * refused until `signatures.complete` or `signatures.abort`.
+   * refused until `signatures.complete` or `signatures.cancel`.
    */
   SigningPending: 'SigningPending',
   /** The candidate's TTL elapsed; prepare again. */

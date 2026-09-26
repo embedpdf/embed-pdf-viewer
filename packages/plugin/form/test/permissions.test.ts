@@ -41,7 +41,7 @@ const SNAPSHOT: FormSnapshot = {
 
 function harness(granted: readonly string[]) {
   const list = vi.fn(async () => SNAPSHOT);
-  const setValue = vi.fn(async () => ({ changedWidgets: [] }));
+  const setValue = vi.fn(async () => ({ meta: { changedWidgets: [] } }));
   const interaction = {
     registerTool: () => () => {},
     registerHandler: () => () => {},

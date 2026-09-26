@@ -143,7 +143,7 @@ export function foldSignatureEvent(
   switch (event.type) {
     case 'signature.prepared':
       return { ...record, pending: { signingId: event.signingId, field: event.field } };
-    case 'signature.aborted':
+    case 'signature.cancelled':
       return record.pending ? { ...record, pending: null } : record;
     case 'signature.completed':
       return { snapshot: withCompletedSignature(record.snapshot, event), pending: null };

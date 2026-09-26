@@ -93,10 +93,10 @@ async function validateOne(
     integrity = snapshot.chainValid ? 'invalid' : 'indeterminate';
   } else {
     try {
-      const contents = await doc.signatures!.getContents(signature.field);
+      const contents = await doc.signatures.getContents(signature.field);
       internal = parseCmsInternal(contents);
       cms = internal.parsed;
-      const digest = await doc.signatures!.getDigest(signature.field, cms.digestAlgorithm);
+      const digest = await doc.signatures.getDigest(signature.field, cms.digestAlgorithm);
       const digestMatches = bytesEqual(digest, cms.messageDigest);
       integrity = signature.coverage === 'whole-revision' && digestMatches ? 'valid' : 'invalid';
     } catch (error) {
@@ -178,7 +178,7 @@ async function modificationsOf(
   try {
     // The analysis reports its own basis: `persisted` when there were no
     // unsaved edits to include, even when the working copy was asked for.
-    const analysis = await doc.signatures!.analyze({
+    const analysis = await doc.signatures.analyze({
       since: { signatureIndex: signature.index },
       until,
     });

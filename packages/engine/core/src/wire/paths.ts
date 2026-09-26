@@ -197,7 +197,7 @@ export const wirePaths = {
   layerSignatureComplete: (docId: string, layerName: string, signingId: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/signatures/${encodeURIComponent(signingId)}/complete`,
   /** DELETE: discard a pending signing. */
-  layerSignatureAbort: (docId: string, layerName: string, signingId: string) =>
+  layerSignatureCancel: (docId: string, layerName: string, signingId: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/signatures/${encodeURIComponent(signingId)}`,
 
   /** The document's base versions, oldest first (grows; never cached). */
@@ -691,7 +691,7 @@ export const wireTemplates = {
   layerSignaturesAnalysis: '/v1/docs/:docId/layers/:layerName/signatures/analysis',
   layerSignaturesPrepare: '/v1/docs/:docId/layers/:layerName/signatures/prepare',
   layerSignatureComplete: '/v1/docs/:docId/layers/:layerName/signatures/:signingId/complete',
-  layerSignatureAbort: '/v1/docs/:docId/layers/:layerName/signatures/:signingId',
+  layerSignatureCancel: '/v1/docs/:docId/layers/:layerName/signatures/:signingId',
   docVersions: '/v1/docs/:docId/versions',
   docVersionSignatures: '/v1/docs/:docId/versions/signatures/:sha',
   docVersionSignatureContents: '/v1/docs/:docId/versions/signatures/:sha/:fieldKey/contents',

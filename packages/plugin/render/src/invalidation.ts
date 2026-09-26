@@ -39,14 +39,13 @@ export function pixelChangeOf(
     case 'annotation.deleted':
     case 'annotation.moved': // z-order move: baked stacking can change
       return annotations([event.page.pageObjectNumber]);
-    // A field's widgets can live on several pages; the results name exactly
-    // the widgets whose appearance changed, each with its page. An unplaced
-    // widget (`page: null`) has no pixels to repaint.
+    // A field's widgets can live on several pages; `meta.changedWidgets`
+    // names exactly the widgets whose appearance changed, each with its page.
+    // An unplaced widget (`page: null`) has no pixels to repaint.
     case 'form.valueChanged':
     case 'form.effectsApplied':
-      return annotations(placedPages(event.changedWidgets));
     case 'form.fieldDeleted':
-      return annotations(placedPages(event.removedWidgets));
+      return annotations(placedPages(event.meta.changedWidgets));
     case 'form.fieldCreated':
     case 'form.fieldUpdated':
     case 'form.widgetAttached':

@@ -717,7 +717,7 @@ function FormDataButtons() {
           const file = await pickFile('.xfdf,.fdf');
           if (!file) return;
           const r = await form.importData(new Uint8Array(await file.arrayBuffer()));
-          setNote(`applied ${r.fieldsApplied}/${r.fieldsTotal}`);
+          setNote(`applied ${r.applied}, skipped ${r.skipped}`);
         }}
       >
         ⇧ form

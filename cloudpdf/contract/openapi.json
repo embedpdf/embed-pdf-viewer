@@ -1045,10 +1045,10 @@
     },
     "/v1/docs/{docId}/layers/{layerName}/form": {
       "get": {
-        "operationId": "doc.forms.get",
+        "operationId": "doc.forms.list",
         "x-fern-sdk-group-name": ["doc", "forms"],
-        "x-fern-sdk-method-name": "get",
-        "x-docs-title": "Get form snapshot",
+        "x-fern-sdk-method-name": "list",
+        "x-docs-title": "List form fields",
         "summary": "Reconciled form snapshot: fields, widgets, values.",
         "security": [
           {
@@ -1095,7 +1095,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFormsGet200Response"
+                  "$ref": "#/components/schemas/DocFormsList200Response"
                 }
               }
             }
@@ -1105,7 +1105,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFormsGet404Response"
+                  "$ref": "#/components/schemas/DocFormsList404Response"
                 }
               }
             }
@@ -3064,10 +3064,10 @@
     },
     "/v1/docs/{docId}/layers/{layerName}/signatures/{signingId}": {
       "delete": {
-        "operationId": "doc.signatures.abort",
+        "operationId": "doc.signatures.cancel",
         "x-fern-sdk-group-name": ["doc", "signatures"],
-        "x-fern-sdk-method-name": "abort",
-        "x-docs-title": "Abort a signature",
+        "x-fern-sdk-method-name": "cancel",
+        "x-docs-title": "Cancel a signature",
         "summary": "Discard a pending signing candidate.",
         "security": [
           {
@@ -3123,7 +3123,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocSignaturesAbort200Response"
+                  "$ref": "#/components/schemas/DocSignaturesCancel200Response"
                 }
               }
             }
@@ -3133,7 +3133,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocSignaturesAbort404Response"
+                  "$ref": "#/components/schemas/DocSignaturesCancel404Response"
                 }
               }
             }
@@ -3396,7 +3396,7 @@
         "x-fern-sdk-method-name": "prepare",
         "x-docs-title": "Prepare a signature",
         "summary": "Author and seal a signing candidate; returns the digest to sign and the version fences.",
-        "description": "The multipart envelope: a JSON `body` part (field, subFilter, digest, contentsSize, signer, certify, lock, appearance) and an optional `resource:<key>` PDF part the body's `appearance.resource` names. A certification (`certify.permission`) additionally requires `doc.sign.certify`. The layer is read-only until the signing completes, is aborted, or expires (15 minutes). A layer behind the document head cannot sign (StaleBase).",
+        "description": "The multipart envelope: a JSON `body` part (field, subFilter, digest, contentsSize, signer, certify, lock, appearance) and an optional `resource:<key>` PDF part the body's `appearance.resource` names. A certification (`certify.permission`) additionally requires `doc.sign.certify`. The layer is read-only until the signing completes, is cancelled, or expires (15 minutes). A layer behind the document head cannot sign (StaleBase).",
         "security": [
           {
             "apiToken": []
@@ -16828,18 +16828,18 @@
         "required": ["name", "code", "message"],
         "additionalProperties": false
       },
-      "DocSignaturesAbort200Response": {
+      "DocSignaturesCancel200Response": {
         "type": "object",
         "properties": {
           "status": {
             "type": "string",
-            "enum": ["aborted", "already-completed", "unknown"]
+            "enum": ["cancelled", "already-completed", "unknown"]
           }
         },
         "required": ["status"],
         "additionalProperties": false
       },
-      "DocSignaturesAbort404Response": {
+      "DocSignaturesCancel404Response": {
         "type": "object",
         "properties": {
           "name": {
@@ -19093,7 +19093,7 @@
         "required": ["name", "code", "message"],
         "additionalProperties": false
       },
-      "DocFormsGet200Response": {
+      "DocFormsList200Response": {
         "type": "object",
         "properties": {
           "formKind": {
@@ -19242,7 +19242,7 @@
                       ]
                     },
                     "defaultValueEntry": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/valueEntry"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/valueEntry"
                     },
                     "actions": {
                       "$ref": "#/components/schemas/PdfFieldActions"
@@ -19294,7 +19294,7 @@
                                     "enum": ["nm"]
                                   },
                                   "page": {
-                                    "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
+                                    "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
                                   },
                                   "nm": {
                                     "type": "string"
@@ -19311,7 +19311,7 @@
                                     "enum": ["index"]
                                   },
                                   "page": {
-                                    "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
+                                    "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
                                   },
                                   "index": {
                                     "type": "integer",
@@ -19324,7 +19324,7 @@
                                         "type": "string"
                                       },
                                       "page": {
-                                        "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
+                                        "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
                                       },
                                       "generation": {
                                         "type": "integer",
@@ -19348,7 +19348,7 @@
                           "page": {
                             "allOf": [
                               {
-                                "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
+                                "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
                               }
                             ],
                             "nullable": true
@@ -19409,31 +19409,31 @@
                   "type": "object",
                   "properties": {
                     "ref": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/ref"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/ref"
                     },
                     "fieldObjectNumber": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/fieldObjectNumber"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/fieldObjectNumber"
                     },
                     "name": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/name"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/name"
                     },
                     "origin": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/origin"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/origin"
                     },
                     "flags": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/flags"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/flags"
                     },
                     "alternateName": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/alternateName"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/alternateName"
                     },
                     "mappingName": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/mappingName"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/mappingName"
                     },
                     "valueEntry": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/valueEntry"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/valueEntry"
                     },
                     "defaultValueEntry": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/valueEntry"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/valueEntry"
                     },
                     "actions": {
                       "$ref": "#/components/schemas/PdfFieldActions"
@@ -19444,13 +19444,13 @@
                         "type": "object",
                         "properties": {
                           "ref": {
-                            "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref"
+                            "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref"
                           },
                           "annotObjectNumber": {
-                            "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/annotObjectNumber"
+                            "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/annotObjectNumber"
                           },
                           "page": {
-                            "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/page"
+                            "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/page"
                           },
                           "onState": {
                             "type": "string"
@@ -19505,31 +19505,31 @@
                   "type": "object",
                   "properties": {
                     "ref": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/ref"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/ref"
                     },
                     "fieldObjectNumber": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/fieldObjectNumber"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/fieldObjectNumber"
                     },
                     "name": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/name"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/name"
                     },
                     "origin": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/origin"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/origin"
                     },
                     "flags": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/flags"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/flags"
                     },
                     "alternateName": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/alternateName"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/alternateName"
                     },
                     "mappingName": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/mappingName"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/mappingName"
                     },
                     "valueEntry": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/valueEntry"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/valueEntry"
                     },
                     "defaultValueEntry": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/valueEntry"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/valueEntry"
                     },
                     "actions": {
                       "$ref": "#/components/schemas/PdfFieldActions"
@@ -19537,7 +19537,7 @@
                     "widgets": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/1/properties/widgets/items"
+                        "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/1/properties/widgets/items"
                       }
                     },
                     "family": {
@@ -19576,37 +19576,37 @@
                   "type": "object",
                   "properties": {
                     "ref": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/ref"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/ref"
                     },
                     "fieldObjectNumber": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/fieldObjectNumber"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/fieldObjectNumber"
                     },
                     "name": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/name"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/name"
                     },
                     "origin": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/origin"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/origin"
                     },
                     "flags": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/flags"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/flags"
                     },
                     "alternateName": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/alternateName"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/alternateName"
                     },
                     "mappingName": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/mappingName"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/mappingName"
                     },
                     "valueEntry": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/valueEntry"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/valueEntry"
                     },
                     "defaultValueEntry": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/valueEntry"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/valueEntry"
                     },
                     "actions": {
                       "$ref": "#/components/schemas/PdfFieldActions"
                     },
                     "widgets": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/widgets"
                     },
                     "family": {
                       "type": "string",
@@ -19664,37 +19664,37 @@
                   "type": "object",
                   "properties": {
                     "ref": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/ref"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/ref"
                     },
                     "fieldObjectNumber": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/fieldObjectNumber"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/fieldObjectNumber"
                     },
                     "name": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/name"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/name"
                     },
                     "origin": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/origin"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/origin"
                     },
                     "flags": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/flags"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/flags"
                     },
                     "alternateName": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/alternateName"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/alternateName"
                     },
                     "mappingName": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/mappingName"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/mappingName"
                     },
                     "valueEntry": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/valueEntry"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/valueEntry"
                     },
                     "defaultValueEntry": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/valueEntry"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/valueEntry"
                     },
                     "actions": {
                       "$ref": "#/components/schemas/PdfFieldActions"
                     },
                     "widgets": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/widgets"
                     },
                     "family": {
                       "type": "string",
@@ -19712,7 +19712,7 @@
                     "options": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/3/properties/options/items"
+                        "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/3/properties/options/items"
                       }
                     }
                   },
@@ -19738,37 +19738,37 @@
                   "type": "object",
                   "properties": {
                     "ref": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/ref"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/ref"
                     },
                     "fieldObjectNumber": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/fieldObjectNumber"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/fieldObjectNumber"
                     },
                     "name": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/name"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/name"
                     },
                     "origin": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/origin"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/origin"
                     },
                     "flags": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/flags"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/flags"
                     },
                     "alternateName": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/alternateName"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/alternateName"
                     },
                     "mappingName": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/mappingName"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/mappingName"
                     },
                     "valueEntry": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/valueEntry"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/valueEntry"
                     },
                     "defaultValueEntry": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/valueEntry"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/valueEntry"
                     },
                     "actions": {
                       "$ref": "#/components/schemas/PdfFieldActions"
                     },
                     "widgets": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/widgets"
                     },
                     "family": {
                       "type": "string",
@@ -19794,37 +19794,37 @@
                   "type": "object",
                   "properties": {
                     "ref": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/ref"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/ref"
                     },
                     "fieldObjectNumber": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/fieldObjectNumber"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/fieldObjectNumber"
                     },
                     "name": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/name"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/name"
                     },
                     "origin": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/origin"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/origin"
                     },
                     "flags": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/flags"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/flags"
                     },
                     "alternateName": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/alternateName"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/alternateName"
                     },
                     "mappingName": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/mappingName"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/mappingName"
                     },
                     "valueEntry": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/valueEntry"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/valueEntry"
                     },
                     "defaultValueEntry": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/valueEntry"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/valueEntry"
                     },
                     "actions": {
                       "$ref": "#/components/schemas/PdfFieldActions"
                     },
                     "widgets": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/widgets"
                     },
                     "family": {
                       "type": "string",
@@ -19850,37 +19850,37 @@
                   "type": "object",
                   "properties": {
                     "ref": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/ref"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/ref"
                     },
                     "fieldObjectNumber": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/fieldObjectNumber"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/fieldObjectNumber"
                     },
                     "name": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/name"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/name"
                     },
                     "origin": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/origin"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/origin"
                     },
                     "flags": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/flags"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/flags"
                     },
                     "alternateName": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/alternateName"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/alternateName"
                     },
                     "mappingName": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/mappingName"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/mappingName"
                     },
                     "valueEntry": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/valueEntry"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/valueEntry"
                     },
                     "defaultValueEntry": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/valueEntry"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/valueEntry"
                     },
                     "actions": {
                       "$ref": "#/components/schemas/PdfFieldActions"
                     },
                     "widgets": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets"
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/widgets"
                     },
                     "family": {
                       "type": "string",
@@ -19914,7 +19914,7 @@
             "items": {
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/ref"
+                  "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/ref"
                 }
               ],
               "nullable": true
@@ -19924,7 +19924,7 @@
         "required": ["formKind", "needsAppearances", "fields", "calculationOrder"],
         "additionalProperties": false
       },
-      "DocFormsGet404Response": {
+      "DocFormsList404Response": {
         "type": "object",
         "properties": {
           "name": {
@@ -19980,6 +19980,809 @@
       "DocFormsSetValue200Response": {
         "type": "object",
         "properties": {
+          "field": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["objectNumber"]
+                          },
+                          "fieldObjectNumber": {
+                            "type": "integer",
+                            "exclusiveMinimum": true,
+                            "minimum": 0
+                          }
+                        },
+                        "required": ["kind", "fieldObjectNumber"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["fqn"]
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": ["kind", "name"],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "fieldObjectNumber": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "origin": {
+                    "type": "string",
+                    "enum": ["acroform", "recovered"]
+                  },
+                  "flags": {
+                    "type": "object",
+                    "properties": {
+                      "readOnly": {
+                        "type": "boolean"
+                      },
+                      "required": {
+                        "type": "boolean"
+                      },
+                      "noExport": {
+                        "type": "boolean"
+                      },
+                      "raw": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "required": ["readOnly", "required", "noExport", "raw"],
+                    "additionalProperties": false
+                  },
+                  "alternateName": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "mappingName": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "valueEntry": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["none"]
+                          }
+                        },
+                        "required": ["kind"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["scalar"]
+                          },
+                          "value": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["kind", "value"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["array"]
+                          },
+                          "values": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": ["kind", "values"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["unsupported"]
+                          }
+                        },
+                        "required": ["kind"],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "defaultValueEntry": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "actions": {
+                    "$ref": "#/components/schemas/PdfFieldActions"
+                  },
+                  "widgets": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "ref": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": ["objectNumber"]
+                                },
+                                "page": {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": ["objectNumber"]
+                                    },
+                                    "pageObjectNumber": {
+                                      "type": "integer",
+                                      "exclusiveMinimum": true,
+                                      "minimum": 0
+                                    }
+                                  },
+                                  "required": ["kind", "pageObjectNumber"],
+                                  "additionalProperties": false
+                                },
+                                "annotObjectNumber": {
+                                  "type": "integer",
+                                  "exclusiveMinimum": true,
+                                  "minimum": 0
+                                }
+                              },
+                              "required": ["kind", "page", "annotObjectNumber"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": ["nm"]
+                                },
+                                "page": {
+                                  "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
+                                },
+                                "nm": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["kind", "page", "nm"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": ["index"]
+                                },
+                                "page": {
+                                  "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
+                                },
+                                "index": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "revision": {
+                                  "type": "object",
+                                  "properties": {
+                                    "docSessionId": {
+                                      "type": "string"
+                                    },
+                                    "page": {
+                                      "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
+                                    },
+                                    "generation": {
+                                      "type": "integer",
+                                      "minimum": 0
+                                    }
+                                  },
+                                  "required": ["docSessionId", "page", "generation"],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": ["kind", "page", "index", "revision"],
+                              "additionalProperties": false
+                            }
+                          ],
+                          "nullable": true
+                        },
+                        "annotObjectNumber": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "page": {
+                          "allOf": [
+                            {
+                              "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
+                            }
+                          ],
+                          "nullable": true
+                        }
+                      },
+                      "required": ["ref", "annotObjectNumber", "page"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "family": {
+                    "type": "string",
+                    "enum": ["text"]
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "defaultValue": {
+                    "type": "string"
+                  },
+                  "maxLength": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0,
+                    "nullable": true
+                  },
+                  "multiline": {
+                    "type": "boolean"
+                  },
+                  "password": {
+                    "type": "boolean"
+                  },
+                  "comb": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "ref",
+                  "fieldObjectNumber",
+                  "name",
+                  "origin",
+                  "flags",
+                  "alternateName",
+                  "mappingName",
+                  "valueEntry",
+                  "defaultValueEntry",
+                  "widgets",
+                  "family",
+                  "value",
+                  "defaultValue",
+                  "maxLength",
+                  "multiline",
+                  "password",
+                  "comb"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/ref"
+                  },
+                  "fieldObjectNumber": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/fieldObjectNumber"
+                  },
+                  "name": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/name"
+                  },
+                  "origin": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/origin"
+                  },
+                  "flags": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/flags"
+                  },
+                  "alternateName": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/alternateName"
+                  },
+                  "mappingName": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/mappingName"
+                  },
+                  "valueEntry": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "defaultValueEntry": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "actions": {
+                    "$ref": "#/components/schemas/PdfFieldActions"
+                  },
+                  "widgets": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "ref": {
+                          "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/widgets/items/properties/ref"
+                        },
+                        "annotObjectNumber": {
+                          "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/widgets/items/properties/annotObjectNumber"
+                        },
+                        "page": {
+                          "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/widgets/items/properties/page"
+                        },
+                        "onState": {
+                          "type": "string"
+                        },
+                        "exportValue": {
+                          "type": "string"
+                        },
+                        "checked": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ref",
+                        "annotObjectNumber",
+                        "page",
+                        "onState",
+                        "exportValue",
+                        "checked"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "family": {
+                    "type": "string",
+                    "enum": ["checkbox"]
+                  },
+                  "checked": {
+                    "type": "boolean"
+                  },
+                  "exportValue": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "ref",
+                  "fieldObjectNumber",
+                  "name",
+                  "origin",
+                  "flags",
+                  "alternateName",
+                  "mappingName",
+                  "valueEntry",
+                  "defaultValueEntry",
+                  "widgets",
+                  "family",
+                  "checked",
+                  "exportValue"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/ref"
+                  },
+                  "fieldObjectNumber": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/fieldObjectNumber"
+                  },
+                  "name": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/name"
+                  },
+                  "origin": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/origin"
+                  },
+                  "flags": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/flags"
+                  },
+                  "alternateName": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/alternateName"
+                  },
+                  "mappingName": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/mappingName"
+                  },
+                  "valueEntry": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "defaultValueEntry": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "actions": {
+                    "$ref": "#/components/schemas/PdfFieldActions"
+                  },
+                  "widgets": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/1/properties/widgets/items"
+                    }
+                  },
+                  "family": {
+                    "type": "string",
+                    "enum": ["radio"]
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "radiosInUnison": {
+                    "type": "boolean"
+                  },
+                  "noToggleToOff": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "ref",
+                  "fieldObjectNumber",
+                  "name",
+                  "origin",
+                  "flags",
+                  "alternateName",
+                  "mappingName",
+                  "valueEntry",
+                  "defaultValueEntry",
+                  "widgets",
+                  "family",
+                  "value",
+                  "radiosInUnison",
+                  "noToggleToOff"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/ref"
+                  },
+                  "fieldObjectNumber": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/fieldObjectNumber"
+                  },
+                  "name": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/name"
+                  },
+                  "origin": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/origin"
+                  },
+                  "flags": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/flags"
+                  },
+                  "alternateName": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/alternateName"
+                  },
+                  "mappingName": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/mappingName"
+                  },
+                  "valueEntry": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "defaultValueEntry": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "actions": {
+                    "$ref": "#/components/schemas/PdfFieldActions"
+                  },
+                  "widgets": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/widgets"
+                  },
+                  "family": {
+                    "type": "string",
+                    "enum": ["combobox"]
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "defaultValue": {
+                    "type": "string"
+                  },
+                  "edit": {
+                    "type": "boolean"
+                  },
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string"
+                        },
+                        "selected": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": ["label", "value", "selected"],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "ref",
+                  "fieldObjectNumber",
+                  "name",
+                  "origin",
+                  "flags",
+                  "alternateName",
+                  "mappingName",
+                  "valueEntry",
+                  "defaultValueEntry",
+                  "widgets",
+                  "family",
+                  "value",
+                  "defaultValue",
+                  "edit",
+                  "options"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/ref"
+                  },
+                  "fieldObjectNumber": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/fieldObjectNumber"
+                  },
+                  "name": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/name"
+                  },
+                  "origin": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/origin"
+                  },
+                  "flags": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/flags"
+                  },
+                  "alternateName": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/alternateName"
+                  },
+                  "mappingName": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/mappingName"
+                  },
+                  "valueEntry": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "defaultValueEntry": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "actions": {
+                    "$ref": "#/components/schemas/PdfFieldActions"
+                  },
+                  "widgets": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/widgets"
+                  },
+                  "family": {
+                    "type": "string",
+                    "enum": ["listbox"]
+                  },
+                  "selectedValues": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "multiSelect": {
+                    "type": "boolean"
+                  },
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/3/properties/options/items"
+                    }
+                  }
+                },
+                "required": [
+                  "ref",
+                  "fieldObjectNumber",
+                  "name",
+                  "origin",
+                  "flags",
+                  "alternateName",
+                  "mappingName",
+                  "valueEntry",
+                  "defaultValueEntry",
+                  "widgets",
+                  "family",
+                  "selectedValues",
+                  "multiSelect",
+                  "options"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/ref"
+                  },
+                  "fieldObjectNumber": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/fieldObjectNumber"
+                  },
+                  "name": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/name"
+                  },
+                  "origin": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/origin"
+                  },
+                  "flags": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/flags"
+                  },
+                  "alternateName": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/alternateName"
+                  },
+                  "mappingName": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/mappingName"
+                  },
+                  "valueEntry": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "defaultValueEntry": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "actions": {
+                    "$ref": "#/components/schemas/PdfFieldActions"
+                  },
+                  "widgets": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/widgets"
+                  },
+                  "family": {
+                    "type": "string",
+                    "enum": ["pushbutton"]
+                  }
+                },
+                "required": [
+                  "ref",
+                  "fieldObjectNumber",
+                  "name",
+                  "origin",
+                  "flags",
+                  "alternateName",
+                  "mappingName",
+                  "valueEntry",
+                  "defaultValueEntry",
+                  "widgets",
+                  "family"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/ref"
+                  },
+                  "fieldObjectNumber": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/fieldObjectNumber"
+                  },
+                  "name": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/name"
+                  },
+                  "origin": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/origin"
+                  },
+                  "flags": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/flags"
+                  },
+                  "alternateName": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/alternateName"
+                  },
+                  "mappingName": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/mappingName"
+                  },
+                  "valueEntry": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "defaultValueEntry": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "actions": {
+                    "$ref": "#/components/schemas/PdfFieldActions"
+                  },
+                  "widgets": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/widgets"
+                  },
+                  "family": {
+                    "type": "string",
+                    "enum": ["signature"]
+                  }
+                },
+                "required": [
+                  "ref",
+                  "fieldObjectNumber",
+                  "name",
+                  "origin",
+                  "flags",
+                  "alternateName",
+                  "mappingName",
+                  "valueEntry",
+                  "defaultValueEntry",
+                  "widgets",
+                  "family"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/ref"
+                  },
+                  "fieldObjectNumber": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/fieldObjectNumber"
+                  },
+                  "name": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/name"
+                  },
+                  "origin": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/origin"
+                  },
+                  "flags": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/flags"
+                  },
+                  "alternateName": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/alternateName"
+                  },
+                  "mappingName": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/mappingName"
+                  },
+                  "valueEntry": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "defaultValueEntry": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "actions": {
+                    "$ref": "#/components/schemas/PdfFieldActions"
+                  },
+                  "widgets": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/widgets"
+                  },
+                  "family": {
+                    "type": "string",
+                    "enum": ["unknown"]
+                  },
+                  "rawValue": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "ref",
+                  "fieldObjectNumber",
+                  "name",
+                  "origin",
+                  "flags",
+                  "alternateName",
+                  "mappingName",
+                  "valueEntry",
+                  "defaultValueEntry",
+                  "widgets",
+                  "family",
+                  "rawValue"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
           "meta": {
             "type": "object",
             "properties": {
@@ -20020,20 +20823,7 @@
                       "type": "object",
                       "properties": {
                         "page": {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["objectNumber"]
-                            },
-                            "pageObjectNumber": {
-                              "type": "integer",
-                              "exclusiveMinimum": true,
-                              "minimum": 0
-                            }
-                          },
-                          "required": ["kind", "pageObjectNumber"],
-                          "additionalProperties": false
+                          "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
                         },
                         "cache": {
                           "type": "object",
@@ -20061,14 +20851,26 @@
                 "required": ["previousDocVersion", "docVersion", "pages"],
                 "additionalProperties": false,
                 "nullable": true
+              },
+              "changedFields": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/ref"
+                }
+              },
+              "changedWidgets": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/widgets/items"
+                }
               }
             },
-            "required": ["affectedPages", "cacheDelta"],
+            "required": ["affectedPages", "cacheDelta", "changedFields", "changedWidgets"],
             "additionalProperties": false
           }
         },
-        "required": ["meta"],
-        "additionalProperties": true
+        "required": ["field", "meta"],
+        "additionalProperties": false
       },
       "DocFormsSetValue400Response": {
         "type": "object",
@@ -20171,6 +20973,809 @@
       "DocFormsReset200Response": {
         "type": "object",
         "properties": {
+          "field": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["objectNumber"]
+                          },
+                          "fieldObjectNumber": {
+                            "type": "integer",
+                            "exclusiveMinimum": true,
+                            "minimum": 0
+                          }
+                        },
+                        "required": ["kind", "fieldObjectNumber"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["fqn"]
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": ["kind", "name"],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "fieldObjectNumber": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "origin": {
+                    "type": "string",
+                    "enum": ["acroform", "recovered"]
+                  },
+                  "flags": {
+                    "type": "object",
+                    "properties": {
+                      "readOnly": {
+                        "type": "boolean"
+                      },
+                      "required": {
+                        "type": "boolean"
+                      },
+                      "noExport": {
+                        "type": "boolean"
+                      },
+                      "raw": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "required": ["readOnly", "required", "noExport", "raw"],
+                    "additionalProperties": false
+                  },
+                  "alternateName": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "mappingName": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "valueEntry": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["none"]
+                          }
+                        },
+                        "required": ["kind"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["scalar"]
+                          },
+                          "value": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["kind", "value"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["array"]
+                          },
+                          "values": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": ["kind", "values"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["unsupported"]
+                          }
+                        },
+                        "required": ["kind"],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "defaultValueEntry": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "actions": {
+                    "$ref": "#/components/schemas/PdfFieldActions"
+                  },
+                  "widgets": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "ref": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": ["objectNumber"]
+                                },
+                                "page": {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": ["objectNumber"]
+                                    },
+                                    "pageObjectNumber": {
+                                      "type": "integer",
+                                      "exclusiveMinimum": true,
+                                      "minimum": 0
+                                    }
+                                  },
+                                  "required": ["kind", "pageObjectNumber"],
+                                  "additionalProperties": false
+                                },
+                                "annotObjectNumber": {
+                                  "type": "integer",
+                                  "exclusiveMinimum": true,
+                                  "minimum": 0
+                                }
+                              },
+                              "required": ["kind", "page", "annotObjectNumber"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": ["nm"]
+                                },
+                                "page": {
+                                  "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
+                                },
+                                "nm": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["kind", "page", "nm"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": ["index"]
+                                },
+                                "page": {
+                                  "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
+                                },
+                                "index": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "revision": {
+                                  "type": "object",
+                                  "properties": {
+                                    "docSessionId": {
+                                      "type": "string"
+                                    },
+                                    "page": {
+                                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
+                                    },
+                                    "generation": {
+                                      "type": "integer",
+                                      "minimum": 0
+                                    }
+                                  },
+                                  "required": ["docSessionId", "page", "generation"],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": ["kind", "page", "index", "revision"],
+                              "additionalProperties": false
+                            }
+                          ],
+                          "nullable": true
+                        },
+                        "annotObjectNumber": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "page": {
+                          "allOf": [
+                            {
+                              "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
+                            }
+                          ],
+                          "nullable": true
+                        }
+                      },
+                      "required": ["ref", "annotObjectNumber", "page"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "family": {
+                    "type": "string",
+                    "enum": ["text"]
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "defaultValue": {
+                    "type": "string"
+                  },
+                  "maxLength": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0,
+                    "nullable": true
+                  },
+                  "multiline": {
+                    "type": "boolean"
+                  },
+                  "password": {
+                    "type": "boolean"
+                  },
+                  "comb": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "ref",
+                  "fieldObjectNumber",
+                  "name",
+                  "origin",
+                  "flags",
+                  "alternateName",
+                  "mappingName",
+                  "valueEntry",
+                  "defaultValueEntry",
+                  "widgets",
+                  "family",
+                  "value",
+                  "defaultValue",
+                  "maxLength",
+                  "multiline",
+                  "password",
+                  "comb"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/ref"
+                  },
+                  "fieldObjectNumber": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/fieldObjectNumber"
+                  },
+                  "name": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/name"
+                  },
+                  "origin": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/origin"
+                  },
+                  "flags": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/flags"
+                  },
+                  "alternateName": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/alternateName"
+                  },
+                  "mappingName": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/mappingName"
+                  },
+                  "valueEntry": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "defaultValueEntry": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "actions": {
+                    "$ref": "#/components/schemas/PdfFieldActions"
+                  },
+                  "widgets": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "ref": {
+                          "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/widgets/items/properties/ref"
+                        },
+                        "annotObjectNumber": {
+                          "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/widgets/items/properties/annotObjectNumber"
+                        },
+                        "page": {
+                          "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/widgets/items/properties/page"
+                        },
+                        "onState": {
+                          "type": "string"
+                        },
+                        "exportValue": {
+                          "type": "string"
+                        },
+                        "checked": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ref",
+                        "annotObjectNumber",
+                        "page",
+                        "onState",
+                        "exportValue",
+                        "checked"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "family": {
+                    "type": "string",
+                    "enum": ["checkbox"]
+                  },
+                  "checked": {
+                    "type": "boolean"
+                  },
+                  "exportValue": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "ref",
+                  "fieldObjectNumber",
+                  "name",
+                  "origin",
+                  "flags",
+                  "alternateName",
+                  "mappingName",
+                  "valueEntry",
+                  "defaultValueEntry",
+                  "widgets",
+                  "family",
+                  "checked",
+                  "exportValue"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/ref"
+                  },
+                  "fieldObjectNumber": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/fieldObjectNumber"
+                  },
+                  "name": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/name"
+                  },
+                  "origin": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/origin"
+                  },
+                  "flags": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/flags"
+                  },
+                  "alternateName": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/alternateName"
+                  },
+                  "mappingName": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/mappingName"
+                  },
+                  "valueEntry": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "defaultValueEntry": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "actions": {
+                    "$ref": "#/components/schemas/PdfFieldActions"
+                  },
+                  "widgets": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/1/properties/widgets/items"
+                    }
+                  },
+                  "family": {
+                    "type": "string",
+                    "enum": ["radio"]
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "radiosInUnison": {
+                    "type": "boolean"
+                  },
+                  "noToggleToOff": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "ref",
+                  "fieldObjectNumber",
+                  "name",
+                  "origin",
+                  "flags",
+                  "alternateName",
+                  "mappingName",
+                  "valueEntry",
+                  "defaultValueEntry",
+                  "widgets",
+                  "family",
+                  "value",
+                  "radiosInUnison",
+                  "noToggleToOff"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/ref"
+                  },
+                  "fieldObjectNumber": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/fieldObjectNumber"
+                  },
+                  "name": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/name"
+                  },
+                  "origin": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/origin"
+                  },
+                  "flags": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/flags"
+                  },
+                  "alternateName": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/alternateName"
+                  },
+                  "mappingName": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/mappingName"
+                  },
+                  "valueEntry": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "defaultValueEntry": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "actions": {
+                    "$ref": "#/components/schemas/PdfFieldActions"
+                  },
+                  "widgets": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/widgets"
+                  },
+                  "family": {
+                    "type": "string",
+                    "enum": ["combobox"]
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "defaultValue": {
+                    "type": "string"
+                  },
+                  "edit": {
+                    "type": "boolean"
+                  },
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string"
+                        },
+                        "selected": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": ["label", "value", "selected"],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "ref",
+                  "fieldObjectNumber",
+                  "name",
+                  "origin",
+                  "flags",
+                  "alternateName",
+                  "mappingName",
+                  "valueEntry",
+                  "defaultValueEntry",
+                  "widgets",
+                  "family",
+                  "value",
+                  "defaultValue",
+                  "edit",
+                  "options"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/ref"
+                  },
+                  "fieldObjectNumber": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/fieldObjectNumber"
+                  },
+                  "name": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/name"
+                  },
+                  "origin": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/origin"
+                  },
+                  "flags": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/flags"
+                  },
+                  "alternateName": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/alternateName"
+                  },
+                  "mappingName": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/mappingName"
+                  },
+                  "valueEntry": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "defaultValueEntry": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "actions": {
+                    "$ref": "#/components/schemas/PdfFieldActions"
+                  },
+                  "widgets": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/widgets"
+                  },
+                  "family": {
+                    "type": "string",
+                    "enum": ["listbox"]
+                  },
+                  "selectedValues": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "multiSelect": {
+                    "type": "boolean"
+                  },
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/3/properties/options/items"
+                    }
+                  }
+                },
+                "required": [
+                  "ref",
+                  "fieldObjectNumber",
+                  "name",
+                  "origin",
+                  "flags",
+                  "alternateName",
+                  "mappingName",
+                  "valueEntry",
+                  "defaultValueEntry",
+                  "widgets",
+                  "family",
+                  "selectedValues",
+                  "multiSelect",
+                  "options"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/ref"
+                  },
+                  "fieldObjectNumber": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/fieldObjectNumber"
+                  },
+                  "name": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/name"
+                  },
+                  "origin": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/origin"
+                  },
+                  "flags": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/flags"
+                  },
+                  "alternateName": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/alternateName"
+                  },
+                  "mappingName": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/mappingName"
+                  },
+                  "valueEntry": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "defaultValueEntry": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "actions": {
+                    "$ref": "#/components/schemas/PdfFieldActions"
+                  },
+                  "widgets": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/widgets"
+                  },
+                  "family": {
+                    "type": "string",
+                    "enum": ["pushbutton"]
+                  }
+                },
+                "required": [
+                  "ref",
+                  "fieldObjectNumber",
+                  "name",
+                  "origin",
+                  "flags",
+                  "alternateName",
+                  "mappingName",
+                  "valueEntry",
+                  "defaultValueEntry",
+                  "widgets",
+                  "family"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/ref"
+                  },
+                  "fieldObjectNumber": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/fieldObjectNumber"
+                  },
+                  "name": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/name"
+                  },
+                  "origin": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/origin"
+                  },
+                  "flags": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/flags"
+                  },
+                  "alternateName": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/alternateName"
+                  },
+                  "mappingName": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/mappingName"
+                  },
+                  "valueEntry": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "defaultValueEntry": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "actions": {
+                    "$ref": "#/components/schemas/PdfFieldActions"
+                  },
+                  "widgets": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/widgets"
+                  },
+                  "family": {
+                    "type": "string",
+                    "enum": ["signature"]
+                  }
+                },
+                "required": [
+                  "ref",
+                  "fieldObjectNumber",
+                  "name",
+                  "origin",
+                  "flags",
+                  "alternateName",
+                  "mappingName",
+                  "valueEntry",
+                  "defaultValueEntry",
+                  "widgets",
+                  "family"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/ref"
+                  },
+                  "fieldObjectNumber": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/fieldObjectNumber"
+                  },
+                  "name": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/name"
+                  },
+                  "origin": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/origin"
+                  },
+                  "flags": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/flags"
+                  },
+                  "alternateName": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/alternateName"
+                  },
+                  "mappingName": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/mappingName"
+                  },
+                  "valueEntry": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "defaultValueEntry": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/valueEntry"
+                  },
+                  "actions": {
+                    "$ref": "#/components/schemas/PdfFieldActions"
+                  },
+                  "widgets": {
+                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/widgets"
+                  },
+                  "family": {
+                    "type": "string",
+                    "enum": ["unknown"]
+                  },
+                  "rawValue": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "ref",
+                  "fieldObjectNumber",
+                  "name",
+                  "origin",
+                  "flags",
+                  "alternateName",
+                  "mappingName",
+                  "valueEntry",
+                  "defaultValueEntry",
+                  "widgets",
+                  "family",
+                  "rawValue"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
           "meta": {
             "type": "object",
             "properties": {
@@ -20211,20 +21816,7 @@
                       "type": "object",
                       "properties": {
                         "page": {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["objectNumber"]
-                            },
-                            "pageObjectNumber": {
-                              "type": "integer",
-                              "exclusiveMinimum": true,
-                              "minimum": 0
-                            }
-                          },
-                          "required": ["kind", "pageObjectNumber"],
-                          "additionalProperties": false
+                          "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
                         },
                         "cache": {
                           "type": "object",
@@ -20252,14 +21844,26 @@
                 "required": ["previousDocVersion", "docVersion", "pages"],
                 "additionalProperties": false,
                 "nullable": true
+              },
+              "changedFields": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/ref"
+                }
+              },
+              "changedWidgets": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DocFormsReset200Response/properties/field/anyOf/0/properties/widgets/items"
+                }
               }
             },
-            "required": ["affectedPages", "cacheDelta"],
+            "required": ["affectedPages", "cacheDelta", "changedFields", "changedWidgets"],
             "additionalProperties": false
           }
         },
-        "required": ["meta"],
-        "additionalProperties": true
+        "required": ["field", "meta"],
+        "additionalProperties": false
       },
       "DocFormsReset404Response": {
         "type": "object",
@@ -20366,6 +21970,845 @@
       "DocFormsImportData200Response": {
         "type": "object",
         "properties": {
+          "form": {
+            "type": "object",
+            "properties": {
+              "formKind": {
+                "type": "string",
+                "enum": ["none", "acroform", "xfa"]
+              },
+              "needsAppearances": {
+                "type": "boolean"
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ref": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": ["objectNumber"]
+                                },
+                                "fieldObjectNumber": {
+                                  "type": "integer",
+                                  "exclusiveMinimum": true,
+                                  "minimum": 0
+                                }
+                              },
+                              "required": ["kind", "fieldObjectNumber"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": ["fqn"]
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": ["kind", "name"],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "fieldObjectNumber": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "origin": {
+                          "type": "string",
+                          "enum": ["acroform", "recovered"]
+                        },
+                        "flags": {
+                          "type": "object",
+                          "properties": {
+                            "readOnly": {
+                              "type": "boolean"
+                            },
+                            "required": {
+                              "type": "boolean"
+                            },
+                            "noExport": {
+                              "type": "boolean"
+                            },
+                            "raw": {
+                              "type": "integer",
+                              "minimum": 0
+                            }
+                          },
+                          "required": ["readOnly", "required", "noExport", "raw"],
+                          "additionalProperties": false
+                        },
+                        "alternateName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "mappingName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "valueEntry": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": ["none"]
+                                }
+                              },
+                              "required": ["kind"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": ["scalar"]
+                                },
+                                "value": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["kind", "value"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": ["array"]
+                                },
+                                "values": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "required": ["kind", "values"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": ["unsupported"]
+                                }
+                              },
+                              "required": ["kind"],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "defaultValueEntry": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/valueEntry"
+                        },
+                        "actions": {
+                          "$ref": "#/components/schemas/PdfFieldActions"
+                        },
+                        "widgets": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "ref": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["objectNumber"]
+                                      },
+                                      "page": {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["objectNumber"]
+                                          },
+                                          "pageObjectNumber": {
+                                            "type": "integer",
+                                            "exclusiveMinimum": true,
+                                            "minimum": 0
+                                          }
+                                        },
+                                        "required": ["kind", "pageObjectNumber"],
+                                        "additionalProperties": false
+                                      },
+                                      "annotObjectNumber": {
+                                        "type": "integer",
+                                        "exclusiveMinimum": true,
+                                        "minimum": 0
+                                      }
+                                    },
+                                    "required": ["kind", "page", "annotObjectNumber"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["nm"]
+                                      },
+                                      "page": {
+                                        "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
+                                      },
+                                      "nm": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": ["kind", "page", "nm"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["index"]
+                                      },
+                                      "page": {
+                                        "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
+                                      },
+                                      "index": {
+                                        "type": "integer",
+                                        "minimum": 0
+                                      },
+                                      "revision": {
+                                        "type": "object",
+                                        "properties": {
+                                          "docSessionId": {
+                                            "type": "string"
+                                          },
+                                          "page": {
+                                            "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
+                                          },
+                                          "generation": {
+                                            "type": "integer",
+                                            "minimum": 0
+                                          }
+                                        },
+                                        "required": ["docSessionId", "page", "generation"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["kind", "page", "index", "revision"],
+                                    "additionalProperties": false
+                                  }
+                                ],
+                                "nullable": true
+                              },
+                              "annotObjectNumber": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "page": {
+                                "allOf": [
+                                  {
+                                    "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
+                                  }
+                                ],
+                                "nullable": true
+                              }
+                            },
+                            "required": ["ref", "annotObjectNumber", "page"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "family": {
+                          "type": "string",
+                          "enum": ["text"]
+                        },
+                        "value": {
+                          "type": "string"
+                        },
+                        "defaultValue": {
+                          "type": "string"
+                        },
+                        "maxLength": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0,
+                          "nullable": true
+                        },
+                        "multiline": {
+                          "type": "boolean"
+                        },
+                        "password": {
+                          "type": "boolean"
+                        },
+                        "comb": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ref",
+                        "fieldObjectNumber",
+                        "name",
+                        "origin",
+                        "flags",
+                        "alternateName",
+                        "mappingName",
+                        "valueEntry",
+                        "defaultValueEntry",
+                        "widgets",
+                        "family",
+                        "value",
+                        "defaultValue",
+                        "maxLength",
+                        "multiline",
+                        "password",
+                        "comb"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ref": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/ref"
+                        },
+                        "fieldObjectNumber": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/fieldObjectNumber"
+                        },
+                        "name": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/name"
+                        },
+                        "origin": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/origin"
+                        },
+                        "flags": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/flags"
+                        },
+                        "alternateName": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/alternateName"
+                        },
+                        "mappingName": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/mappingName"
+                        },
+                        "valueEntry": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/valueEntry"
+                        },
+                        "defaultValueEntry": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/valueEntry"
+                        },
+                        "actions": {
+                          "$ref": "#/components/schemas/PdfFieldActions"
+                        },
+                        "widgets": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "ref": {
+                                "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref"
+                              },
+                              "annotObjectNumber": {
+                                "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/widgets/items/properties/annotObjectNumber"
+                              },
+                              "page": {
+                                "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/widgets/items/properties/page"
+                              },
+                              "onState": {
+                                "type": "string"
+                              },
+                              "exportValue": {
+                                "type": "string"
+                              },
+                              "checked": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "ref",
+                              "annotObjectNumber",
+                              "page",
+                              "onState",
+                              "exportValue",
+                              "checked"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "family": {
+                          "type": "string",
+                          "enum": ["checkbox"]
+                        },
+                        "checked": {
+                          "type": "boolean"
+                        },
+                        "exportValue": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "ref",
+                        "fieldObjectNumber",
+                        "name",
+                        "origin",
+                        "flags",
+                        "alternateName",
+                        "mappingName",
+                        "valueEntry",
+                        "defaultValueEntry",
+                        "widgets",
+                        "family",
+                        "checked",
+                        "exportValue"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ref": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/ref"
+                        },
+                        "fieldObjectNumber": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/fieldObjectNumber"
+                        },
+                        "name": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/name"
+                        },
+                        "origin": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/origin"
+                        },
+                        "flags": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/flags"
+                        },
+                        "alternateName": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/alternateName"
+                        },
+                        "mappingName": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/mappingName"
+                        },
+                        "valueEntry": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/valueEntry"
+                        },
+                        "defaultValueEntry": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/valueEntry"
+                        },
+                        "actions": {
+                          "$ref": "#/components/schemas/PdfFieldActions"
+                        },
+                        "widgets": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/1/properties/widgets/items"
+                          }
+                        },
+                        "family": {
+                          "type": "string",
+                          "enum": ["radio"]
+                        },
+                        "value": {
+                          "type": "string"
+                        },
+                        "radiosInUnison": {
+                          "type": "boolean"
+                        },
+                        "noToggleToOff": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ref",
+                        "fieldObjectNumber",
+                        "name",
+                        "origin",
+                        "flags",
+                        "alternateName",
+                        "mappingName",
+                        "valueEntry",
+                        "defaultValueEntry",
+                        "widgets",
+                        "family",
+                        "value",
+                        "radiosInUnison",
+                        "noToggleToOff"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ref": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/ref"
+                        },
+                        "fieldObjectNumber": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/fieldObjectNumber"
+                        },
+                        "name": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/name"
+                        },
+                        "origin": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/origin"
+                        },
+                        "flags": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/flags"
+                        },
+                        "alternateName": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/alternateName"
+                        },
+                        "mappingName": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/mappingName"
+                        },
+                        "valueEntry": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/valueEntry"
+                        },
+                        "defaultValueEntry": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/valueEntry"
+                        },
+                        "actions": {
+                          "$ref": "#/components/schemas/PdfFieldActions"
+                        },
+                        "widgets": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/widgets"
+                        },
+                        "family": {
+                          "type": "string",
+                          "enum": ["combobox"]
+                        },
+                        "value": {
+                          "type": "string"
+                        },
+                        "defaultValue": {
+                          "type": "string"
+                        },
+                        "edit": {
+                          "type": "boolean"
+                        },
+                        "options": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "label": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "type": "string"
+                              },
+                              "selected": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": ["label", "value", "selected"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "ref",
+                        "fieldObjectNumber",
+                        "name",
+                        "origin",
+                        "flags",
+                        "alternateName",
+                        "mappingName",
+                        "valueEntry",
+                        "defaultValueEntry",
+                        "widgets",
+                        "family",
+                        "value",
+                        "defaultValue",
+                        "edit",
+                        "options"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ref": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/ref"
+                        },
+                        "fieldObjectNumber": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/fieldObjectNumber"
+                        },
+                        "name": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/name"
+                        },
+                        "origin": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/origin"
+                        },
+                        "flags": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/flags"
+                        },
+                        "alternateName": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/alternateName"
+                        },
+                        "mappingName": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/mappingName"
+                        },
+                        "valueEntry": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/valueEntry"
+                        },
+                        "defaultValueEntry": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/valueEntry"
+                        },
+                        "actions": {
+                          "$ref": "#/components/schemas/PdfFieldActions"
+                        },
+                        "widgets": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/widgets"
+                        },
+                        "family": {
+                          "type": "string",
+                          "enum": ["listbox"]
+                        },
+                        "selectedValues": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "multiSelect": {
+                          "type": "boolean"
+                        },
+                        "options": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/3/properties/options/items"
+                          }
+                        }
+                      },
+                      "required": [
+                        "ref",
+                        "fieldObjectNumber",
+                        "name",
+                        "origin",
+                        "flags",
+                        "alternateName",
+                        "mappingName",
+                        "valueEntry",
+                        "defaultValueEntry",
+                        "widgets",
+                        "family",
+                        "selectedValues",
+                        "multiSelect",
+                        "options"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ref": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/ref"
+                        },
+                        "fieldObjectNumber": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/fieldObjectNumber"
+                        },
+                        "name": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/name"
+                        },
+                        "origin": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/origin"
+                        },
+                        "flags": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/flags"
+                        },
+                        "alternateName": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/alternateName"
+                        },
+                        "mappingName": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/mappingName"
+                        },
+                        "valueEntry": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/valueEntry"
+                        },
+                        "defaultValueEntry": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/valueEntry"
+                        },
+                        "actions": {
+                          "$ref": "#/components/schemas/PdfFieldActions"
+                        },
+                        "widgets": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/widgets"
+                        },
+                        "family": {
+                          "type": "string",
+                          "enum": ["pushbutton"]
+                        }
+                      },
+                      "required": [
+                        "ref",
+                        "fieldObjectNumber",
+                        "name",
+                        "origin",
+                        "flags",
+                        "alternateName",
+                        "mappingName",
+                        "valueEntry",
+                        "defaultValueEntry",
+                        "widgets",
+                        "family"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ref": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/ref"
+                        },
+                        "fieldObjectNumber": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/fieldObjectNumber"
+                        },
+                        "name": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/name"
+                        },
+                        "origin": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/origin"
+                        },
+                        "flags": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/flags"
+                        },
+                        "alternateName": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/alternateName"
+                        },
+                        "mappingName": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/mappingName"
+                        },
+                        "valueEntry": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/valueEntry"
+                        },
+                        "defaultValueEntry": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/valueEntry"
+                        },
+                        "actions": {
+                          "$ref": "#/components/schemas/PdfFieldActions"
+                        },
+                        "widgets": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/widgets"
+                        },
+                        "family": {
+                          "type": "string",
+                          "enum": ["signature"]
+                        }
+                      },
+                      "required": [
+                        "ref",
+                        "fieldObjectNumber",
+                        "name",
+                        "origin",
+                        "flags",
+                        "alternateName",
+                        "mappingName",
+                        "valueEntry",
+                        "defaultValueEntry",
+                        "widgets",
+                        "family"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ref": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/ref"
+                        },
+                        "fieldObjectNumber": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/fieldObjectNumber"
+                        },
+                        "name": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/name"
+                        },
+                        "origin": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/origin"
+                        },
+                        "flags": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/flags"
+                        },
+                        "alternateName": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/alternateName"
+                        },
+                        "mappingName": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/mappingName"
+                        },
+                        "valueEntry": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/valueEntry"
+                        },
+                        "defaultValueEntry": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/valueEntry"
+                        },
+                        "actions": {
+                          "$ref": "#/components/schemas/PdfFieldActions"
+                        },
+                        "widgets": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/widgets"
+                        },
+                        "family": {
+                          "type": "string",
+                          "enum": ["unknown"]
+                        },
+                        "rawValue": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "ref",
+                        "fieldObjectNumber",
+                        "name",
+                        "origin",
+                        "flags",
+                        "alternateName",
+                        "mappingName",
+                        "valueEntry",
+                        "defaultValueEntry",
+                        "widgets",
+                        "family",
+                        "rawValue"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "calculationOrder": {
+                "type": "array",
+                "items": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/ref"
+                    }
+                  ],
+                  "nullable": true
+                }
+              }
+            },
+            "required": ["formKind", "needsAppearances", "fields", "calculationOrder"],
+            "additionalProperties": false
+          },
+          "applied": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "skipped": {
+            "type": "integer",
+            "minimum": 0
+          },
           "meta": {
             "type": "object",
             "properties": {
@@ -20406,20 +22849,7 @@
                       "type": "object",
                       "properties": {
                         "page": {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["objectNumber"]
-                            },
-                            "pageObjectNumber": {
-                              "type": "integer",
-                              "exclusiveMinimum": true,
-                              "minimum": 0
-                            }
-                          },
-                          "required": ["kind", "pageObjectNumber"],
-                          "additionalProperties": false
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
                         },
                         "cache": {
                           "type": "object",
@@ -20453,8 +22883,8 @@
             "additionalProperties": false
           }
         },
-        "required": ["meta"],
-        "additionalProperties": true
+        "required": ["form", "applied", "skipped", "meta"],
+        "additionalProperties": false
       },
       "DocFormsImportData400Response": {
         "type": "object",

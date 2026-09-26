@@ -123,7 +123,6 @@ function harness(snapshot: FormSnapshot, nameTreeScript?: string) {
         fields: [],
         changedWidgets: [],
       })),
-      changedWidgets: [],
       meta: {} as never,
     };
   });

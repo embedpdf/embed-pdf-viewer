@@ -3,12 +3,29 @@
 import type * as CloudPDF from "../index.js";
 
 export interface DocFormsImportData200Response {
+    form: DocFormsImportData200Response.Form;
+    applied: number;
+    skipped: number;
     meta: DocFormsImportData200Response.Meta;
-    /** Accepts any additional properties */
-    [key: string]: any;
 }
 
 export namespace DocFormsImportData200Response {
+    export interface Form {
+        formKind: Form.FormKind;
+        needsAppearances: boolean;
+        fields: CloudPDF.DocFormsImportData200ResponseFormFieldsItem[];
+        calculationOrder: (CloudPDF.DocFormsImportData200ResponseFormCalculationOrderItem | null)[];
+    }
+
+    export namespace Form {
+        export const FormKind = {
+            None: "none",
+            Acroform: "acroform",
+            Xfa: "xfa",
+        } as const;
+        export type FormKind = (typeof FormKind)[keyof typeof FormKind];
+    }
+
     export interface Meta {
         affectedPages: CloudPDF.PageState[];
         cacheDelta: Meta.CacheDelta | null;

@@ -55,7 +55,7 @@ describe('signature fields in the viewer phase', () => {
     );
     try {
       const page = (await doc.pages.list()).pages[0]!;
-      const created = await doc.forms.createField({
+      const created = await doc.forms.create({
         family: 'signature',
         name: 'sig2',
         widget: {
@@ -65,7 +65,7 @@ describe('signature fields in the viewer phase', () => {
       });
       expect(created.field.family).toBe('signature');
       expect(created.field.widgets).toHaveLength(1);
-      const before = await doc.signatures!.list();
+      const before = await doc.signatures.list();
       expect(before.signatures.map((s) => [s.fieldName, s.signed])).toEqual([
         ['sig', false],
         ['sig2', false],
@@ -90,19 +90,19 @@ describe('signature fields in the viewer phase', () => {
         ),
       ).toBeGreaterThan(50);
       expect(
-        (await doc.signatures!.list()).signatures.find((s) => s.fieldName === 'sig2')?.signed,
+        (await doc.signatures.list()).signatures.find((s) => s.fieldName === 'sig2')?.signed,
       ).toBe(false);
       await expect(
         doc.forms.setSignatureAppearance!({ kind: 'fqn', name: 'group.total' }, { pdf: artwork }),
       ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
 
-      // Sign the other field with attribution; the facts land in the dictionary.
-      const prepared = await doc.signatures!.prepare({
+      // Sign the other field with a signer; the facts land in the dictionary.
+      const prepared = await doc.signatures.prepare({
         field: { kind: 'fqn', name: 'sig' },
-        attribution: { name: 'Bob Singor', reason: 'approved', location: 'Amsterdam' },
+        signer: { name: 'Bob Singor', reason: 'approved', location: 'Amsterdam' },
         appearance: { pdf: artwork },
       });
-      const result = await doc.signatures!.complete({
+      const result = await doc.signatures.complete({
         signingId: prepared.signingId,
         cms: FAKE_CMS,
         expectedVersion: prepared.expectedVersion,

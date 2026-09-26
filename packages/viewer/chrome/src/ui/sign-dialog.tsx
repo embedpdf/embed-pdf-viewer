@@ -32,7 +32,7 @@ export function SignDialog() {
   const preview = useStampAssetPreviewUrl(assetId);
   if (!surface.isOpen || !field || !mark) return null;
 
-  const attribution = {
+  const signer = {
     ...(reason.trim() ? { reason: reason.trim() } : {}),
     ...(location.trim() ? { location: location.trim() } : {}),
   };
@@ -44,7 +44,7 @@ export function SignDialog() {
         await signature.sign({
           field,
           mark,
-          attribution,
+          signer,
           ...(signKind !== 'approval' && signature.canCertify()
             ? { certify: { permission: Number(signKind.slice(-1)) as 1 | 2 | 3 } }
             : {}),

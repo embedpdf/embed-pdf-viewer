@@ -11,7 +11,6 @@ import type {
   FormWidget,
   MutationMeta,
   WidgetPlacement,
-  PageObjectNumber,
 } from '@embedpdf/engine-core/runtime';
 import {
   EngineError,
@@ -29,6 +28,7 @@ import { U64_BYTES, pokeU64 } from '../../runtime/memory/u64';
 import { createUnattachedWidget } from './internal/authorWidget';
 import { flagMasks } from './internal/fieldFlagBits';
 import { acquireFormModel } from './internal/formModelCache';
+import { formMutationMeta } from './internal/formMutationMeta';
 import { bakeWidgetAppearance } from '../signature/internal/appearance';
 import {
   readSignaturesFromModel,
@@ -140,7 +140,7 @@ export class FormMutator {
     const call = resolvedFormat === 'fdf' ? fn.EPDFForm_ImportFDF : fn.EPDFForm_ImportXFDF;
     const docPtr = this.session.requireDocPtr();
 
-    const counters = withScratchN(mem, [bytes.byteLength, 16], ([dataPtr, resultPtr]) => {
+    const counts = withScratchN(mem, [bytes.byteLength, 16], ([dataPtr, resultPtr]) => {
       mem.writeBytes(dataPtr, bytes);
       const ok = call(docPtr, dataPtr, bytes.byteLength, resultPtr);
       if (!ok) {
@@ -149,21 +149,20 @@ export class FormMutator {
           `payload is not valid ${resolvedFormat.toUpperCase()}`,
         );
       }
+      // The report also counts all fields (offset 0) and changed widgets (12).
       return {
-        fieldsTotal: Number(mem.peek(resultPtr, 'i32', 0)),
-        fieldsApplied: Number(mem.peek(resultPtr, 'i32', 4)),
-        fieldsSkipped: Number(mem.peek(resultPtr, 'i32', 8)),
-        widgetsChanged: Number(mem.peek(resultPtr, 'i32', 12)),
+        applied: Number(mem.peek(resultPtr, 'i32', 4)),
+        skipped: Number(mem.peek(resultPtr, 'i32', 8)),
       };
     });
 
     this.session.noteMutation();
     const fresh = acquireFormModel(this.runtime, this.session);
-    return {
-      ...counters,
-      snapshot: readFormSnapshot(this.runtime, fresh, this.session.requireDocPtr()),
-      meta: EMPTY_META,
-    };
+    const form = readFormSnapshot(this.runtime, fresh, this.session.requireDocPtr());
+    // The import names no widgets, so every page with a widget may have repainted.
+    const widgets = counts.applied > 0 ? form.fields.flatMap((field) => field.widgets) : [];
+    const { affectedPages, cacheDelta } = formMutationMeta(this.session, [], widgets);
+    return { form, ...counts, meta: { affectedPages, cacheDelta } };
   }
 
   repair(bakeAppearances: boolean, signal: AbortSignal): FormRepairResult {
@@ -182,7 +181,7 @@ export class FormMutator {
         widgetsLinked: Number(mem.peek(reportPtr, 'i32', 8)),
         fieldsUnrepairable: Number(mem.peek(reportPtr, 'i32', 12)),
         appearancesBaked: Number(mem.peek(reportPtr, 'i32', 16)),
-        needAppearancesCleared: Number(mem.peek(reportPtr, 'i32', 20)) !== 0,
+        needsAppearancesCleared: Number(mem.peek(reportPtr, 'i32', 20)) !== 0,
       };
     });
 
@@ -284,15 +283,15 @@ export class FormMutator {
    * Draw a PDF page into every widget of an unsigned signature field: the
    * visual "sign" of a viewer without a signer. The field's value stays
    * empty and nothing is sealed; a signed field is refused (its appearance
-   * is part of what the signature covers). Pages whose widgets changed are
-   * reported so their renders re-pin.
+   * is part of what the signature covers). The pages of its widgets get a
+   * new revision so their renders re-pin.
    */
   setSignatureAppearance(
     ref: FormFieldRef,
     pdf: Uint8Array,
     pageIndex: number,
     signal: AbortSignal,
-  ): { field: FormFieldDTO; pages: PageObjectNumber[] } {
+  ): { field: FormFieldDTO } {
     throwIfAborted(signal);
     const docPtr = this.session.requireDocPtr();
     const model = acquireFormModel(this.runtime, this.session);
@@ -333,7 +332,7 @@ export class FormMutator {
       ...new Set(before.widgets.flatMap((w) => (w.page ? [w.page.pageObjectNumber] : []))),
     ];
     for (const pageObjectNumber of pages) this.session.bumpRevision(pageObjectNumber);
-    return { field: this.readBackField(resolved.fieldObjectNumber), pages };
+    return { field: this.readBackField(resolved.fieldObjectNumber) };
   }
 
   updateField(
@@ -426,7 +425,7 @@ export class FormMutator {
   deleteField(
     ref: FormFieldRef,
     signal: AbortSignal,
-  ): { deletedFieldObjectNumber: number; detachedWidgets: FormWidget[] } {
+  ): { deleted: FormFieldRef; detachedWidgets: FormWidget[] } {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
     const model = acquireFormModel(this.runtime, this.session);
@@ -456,7 +455,7 @@ export class FormMutator {
 
     this.session.noteMutation();
     return {
-      deletedFieldObjectNumber: resolved.fieldObjectNumber,
+      deleted: before.ref,
       detachedWidgets: before.widgets.map((w) => formWidget(w.annotObjectNumber, w.page)),
     };
   }
@@ -466,7 +465,7 @@ export class FormMutator {
     widget: AnnotationRef,
     onState: string | undefined,
     signal: AbortSignal,
-  ): { field: FormFieldDTO } {
+  ): { field: FormFieldDTO; widget: FormWidget } {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const model = acquireFormModel(this.runtime, this.session);
@@ -500,14 +499,17 @@ export class FormMutator {
       );
     }
     this.session.noteMutation();
-    return { field: this.readBackField(resolved.fieldObjectNumber) };
+    return {
+      field: this.readBackField(resolved.fieldObjectNumber),
+      widget: formWidget(widgetObjectNumber(widget), widget.page),
+    };
   }
 
   detachWidget(
     ref: FormFieldRef,
     widget: AnnotationRef,
     signal: AbortSignal,
-  ): { field: FormFieldDTO } {
+  ): { field: FormFieldDTO; widget: FormWidget } {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const model = acquireFormModel(this.runtime, this.session);
@@ -523,7 +525,10 @@ export class FormMutator {
       throw new EngineError(EngineErrorCode.InvalidArg, 'widget is not attached to this field');
     }
     this.session.noteMutation();
-    return { field: this.readBackField(resolved.fieldObjectNumber) };
+    return {
+      field: this.readBackField(resolved.fieldObjectNumber),
+      widget: formWidget(widgetObjectNumber(widget), widget.page),
+    };
   }
 
   private placementsOf(draft: FormFieldDraft): WidgetPlacement[] {
@@ -723,7 +728,7 @@ export class FormMutator {
     const changedWidgets: FormWidget[] = field.widgets
       .filter((w) => changedSet.has(w.annotObjectNumber))
       .map((w) => formWidget(w.annotObjectNumber, w.page));
-    return { field, changedWidgets, meta: EMPTY_META };
+    return { field, meta: formMutationMeta(this.session, [field.ref], changedWidgets) };
   }
 }
 

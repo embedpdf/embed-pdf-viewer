@@ -74,13 +74,13 @@ describe.skipIf(!ENABLED)('signature analysis cost on a large multi-revision doc
     );
     try {
       const prepared = await timed('prepare (certify P=2)', rows, () =>
-        doc.signatures!.prepare({
+        doc.signatures.prepare({
           field: { kind: 'fqn', name: 'sig' },
           certify: { permission: 2 },
         }),
       );
       await timed('complete', rows, () =>
-        doc.signatures!.complete({
+        doc.signatures.complete({
           signingId: prepared.signingId,
           expectedVersion: prepared.expectedVersion,
           cms: FAKE_CMS,
@@ -112,17 +112,17 @@ describe.skipIf(!ENABLED)('signature analysis cost on a large multi-revision doc
       eng.open({ kind: 'bytes', id: `bench-${label}`, bytes: signed }, { scope: ['*'] }),
     );
     try {
-      const snapshot = await timed(`${label} list() first`, rows, () => doc.signatures!.list());
-      await timed(`${label} list() again`, rows, () => doc.signatures!.list());
+      const snapshot = await timed(`${label} list() first`, rows, () => doc.signatures.list());
+      await timed(`${label} list() again`, rows, () => doc.signatures.list());
       await timed(`${label} version()`, rows, () => doc.version!());
       await timed(`${label} version() again`, rows, () => doc.version!());
       const all = await timed(`${label} analyze all ${REVS} steps`, rows, () =>
-        doc.signatures!.analyze({ since: { signatureIndex: 0 } }),
+        doc.signatures.analyze({ since: { signatureIndex: 0 } }),
       );
       expect(all.verdict).toBe('permitted');
       const last = snapshot.revisions.length - 1;
       await timed(`${label} analyze last step`, rows, () =>
-        doc.signatures!.analyze({
+        doc.signatures.analyze({
           since: { revisionIndex: last - 1 },
           until: { revisionIndex: last },
         }),
@@ -130,13 +130,13 @@ describe.skipIf(!ENABLED)('signature analysis cost on a large multi-revision doc
       await timed(`${label} download (no edits, verbatim)`, rows, () => doc.download());
       await doc.forms.setValue({ kind: 'fqn', name: 'f3' }, { type: 'text', value: 'unsaved' });
       const working = await timed(`${label} analyze working-copy (1 unsaved edit)`, rows, () =>
-        doc.signatures!.analyze({ since: { signatureIndex: 0 }, until: 'working-copy' }),
+        doc.signatures.analyze({ since: { signatureIndex: 0 }, until: 'working-copy' }),
       );
       expect(working.verdict).toBe('permitted');
       const prepared = await timed(`${label} prepare (2nd sig, unsaved edit)`, rows, () =>
-        doc.signatures!.prepare({ field: { kind: 'fqn', name: 'sig' } }).catch(() => null),
+        doc.signatures.prepare({ field: { kind: 'fqn', name: 'sig' } }).catch(() => null),
       );
-      if (prepared) await doc.signatures!.cancel(prepared.signingId);
+      if (prepared) await doc.signatures.cancel(prepared.signingId);
     } finally {
       await doc.close();
     }

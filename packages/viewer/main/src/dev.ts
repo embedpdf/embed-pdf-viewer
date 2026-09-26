@@ -17,7 +17,7 @@ const element = EmbedPDF.init({
   target: '#viewer',
   src: '/ebook.pdf',
   signatures: {
-    signer: () => signer,
+    key: () => signer,
     trust: { anchors: async () => [(await signer).certificate] },
     allowCertify: true,
   },

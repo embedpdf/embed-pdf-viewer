@@ -324,14 +324,14 @@ import { FullViewer, personalSigner, indexedDbKeyStore } from '@embedpdf/viewer-
 <FullViewer
   engine={engine}
   signatures={{
-    // The key holder: your own key (`webCryptoSigner`), a signing service
+    // The key: your own (`webCryptoSigner`), a signing service
     // (`remoteSigner`), or one self-signed identity per person kept in the
-    // browser (`personalSigner`). Without a signer the mark is only DRAWN
+    // browser (`personalSigner`). Without a key the mark is only DRAWN
     // into the field — nothing is sealed.
-    signer: () => personalSigner({ subject: 'Ada Lovelace', store: indexedDbKeyStore('acme-keys') }),
+    key: () => personalSigner({ subject: 'Ada Lovelace', store: indexedDbKeyStore('acme-keys') }),
     // Anchors a reader trusts; none → "valid, signer not trusted" at best.
     trust: { anchors: async () => [rootCertificateDer] },
-    // 'sign' (default with a signer) | 'visual' (default without) | 'ask' (a dialog first)
+    // 'sign' (default with a key) | 'visual' (default without) | 'ask' (a dialog first)
     mode: 'ask',
     allowCertify: true, // offer a certification (first signature) in the dialog
     kinds: ['signature'], // no initials

@@ -65,7 +65,11 @@ describe('field index', () => {
     let index: FieldIndex = indexFields(snapshot([text()]));
     index = foldFormEvent(
       index,
-      event({ type: 'form.valueChanged', field: text({ value: 'abcde' }), changedWidgets: [] }),
+      event({
+        type: 'form.valueChanged',
+        field: text({ value: 'abcde' }),
+        meta: { changedWidgets: [] },
+      }),
     ) as FieldIndex;
     expect((fieldByKey(index, 'obj:4') as { value: string }).value).toBe('abcde');
 
@@ -82,23 +86,34 @@ describe('field index', () => {
       index,
       event({
         type: 'form.effectsApplied',
-        results: [{ index: 0, status: 'applied', fields: [text({ value: 'script' })], changedWidgets: [] }],
-        changedWidgets: [],
-        meta: null,
+        results: [
+          { index: 0, status: 'applied', fields: [text({ value: 'script' })], changedWidgets: [] },
+        ],
+        meta: { changedFields: [], changedWidgets: [] },
       }),
     ) as FieldIndex;
     expect((fieldByKey(index, 'obj:4') as { value: string }).value).toBe('script');
 
     index = foldFormEvent(
       index,
-      event({ type: 'form.fieldDeleted', deletedFieldObjectNumber: 7, removedWidgets: [] }),
+      event({
+        type: 'form.fieldDeleted',
+        deleted: { kind: 'objectNumber', fieldObjectNumber: 7 },
+        meta: {
+          changedFields: [{ kind: 'objectNumber', fieldObjectNumber: 7 }],
+          changedWidgets: [],
+        },
+      }),
     ) as FieldIndex;
     expect(fieldForWidget(index, 8)).toBeNull();
   });
 
   test('the first field of a document without a form creates an AcroForm', () => {
     const empty = indexFields({ ...snapshot([]), formKind: 'none' });
-    const index = foldFormEvent(empty, event({ type: 'form.fieldCreated', field: text() })) as FieldIndex;
+    const index = foldFormEvent(
+      empty,
+      event({ type: 'form.fieldCreated', field: text() }),
+    ) as FieldIndex;
     expect(index.snapshot?.formKind).toBe('acroform');
     expect(fieldByKey(index, 'obj:4')).not.toBeNull();
   });
@@ -147,7 +162,9 @@ describe('fill projection', () => {
 
   test('read-only and in-flight fields project as disabled', () => {
     const readOnly = text({ flags: { readOnly: true, required: false, noExport: false, raw: 1 } });
-    expect(fillItems(indexFields(snapshot([readOnly])), 3, BOXES, NO_WRITES)[0]!.disabled).toBe(true);
+    expect(fillItems(indexFields(snapshot([readOnly])), 3, BOXES, NO_WRITES)[0]!.disabled).toBe(
+      true,
+    );
     const writing = beginWrite(initialFormState(), 'obj:4').writing;
     expect(fillItems(indexFields(snapshot([text()])), 3, BOXES, writing)[0]!.disabled).toBe(true);
   });

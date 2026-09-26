@@ -60,7 +60,7 @@ describe('what a validator concludes', () => {
       { scope: ['*'] },
     );
     try {
-      const signed = await sign(doc, { field: { kind: 'fqn', name: 'sig' }, signer });
+      const signed = await sign(doc, { field: { kind: 'fqn', name: 'sig' }, key: signer });
       // Declared nothing, judged at the baseline; annotations are not refused.
       expect(signed.protection).toMatchObject({ enforced: null, judged: 'annotate' });
       expect(doc.security.allows('doc.annotate.modify')).toBe(true);
@@ -89,7 +89,7 @@ describe('what a validator concludes', () => {
         { scope: ['*'] },
       );
       try {
-        const analysis = await reopened.signatures!.analyze({ since: { signatureIndex: 0 } });
+        const analysis = await reopened.signatures.analyze({ since: { signatureIndex: 0 } });
         expect(analysis.steps).toHaveLength(1);
         expect(analysis.steps[0]!.levelInForce).toBe('annotate');
         expect(analysis.verdict).toBe('permitted');
@@ -119,7 +119,7 @@ describe('what a validator concludes', () => {
     try {
       const signed = await sign(doc, {
         field: { kind: 'fqn', name: 'sig' },
-        signer,
+        key: signer,
         certify: { permission: 3 },
       });
       expect(signed.protection).toMatchObject({ enforced: 'annotate', judged: 'annotate' });
@@ -138,7 +138,7 @@ describe('what a validator concludes', () => {
       { scope: ['*'] },
     );
     try {
-      await sign(doc, { field: { kind: 'fqn', name: 'sig' }, signer });
+      await sign(doc, { field: { kind: 'fqn', name: 'sig' }, key: signer });
       const signedBytes = await doc.download();
 
       // The engine bakes /AP at create: the orphaned appearance stream the
@@ -192,7 +192,7 @@ describe('what a validator concludes', () => {
     let pageRef: PageRef;
     let ref: import('@embedpdf/engine-core/runtime').AnnotationRef;
     try {
-      await sign(doc, { field: { kind: 'fqn', name: 'sig' }, signer });
+      await sign(doc, { field: { kind: 'fqn', name: 'sig' }, key: signer });
       signed = await doc.download();
       const page2 = (await doc.pages.list()).pages[1]!;
       pageRef = page2.ref;
@@ -234,10 +234,10 @@ describe('what a validator concludes', () => {
       { scope: ['*'] },
     );
     try {
-      await sign(doc, { field: { kind: 'fqn', name: 'sig' }, signer });
+      await sign(doc, { field: { kind: 'fqn', name: 'sig' }, key: signer });
       // A new signature field after an approval signature is permitted.
       const page = (await doc.pages.list()).pages[0]!;
-      await doc.forms.createField({
+      await doc.forms.create({
         family: 'signature',
         name: 'sig2',
         widget: {
@@ -245,7 +245,7 @@ describe('what a validator concludes', () => {
           rect: { left: 300, bottom: 50, right: 500, top: 120 },
         },
       } as never);
-      await sign(doc, { field: { kind: 'fqn', name: 'sig2' }, signer });
+      await sign(doc, { field: { kind: 'fqn', name: 'sig2' }, key: signer });
       const sealed = await doc.download();
       let verdicts = await validateSignatures(doc, { trust });
       expect(verdicts.map((verdict) => verdict.summary)).toEqual(['valid', 'valid']);
@@ -285,7 +285,7 @@ describe('what a validator concludes', () => {
     try {
       const signed = await sign(doc, {
         field: { kind: 'fqn', name: 'sig' },
-        signer,
+        key: signer,
         certify: { permission: 2 },
       });
       expect(signed.protection).toMatchObject({ enforced: 'fill', judged: 'fill' });

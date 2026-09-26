@@ -126,7 +126,7 @@ export type {
   DocumentVersionWorkerRequest,
   SignaturesPrepareWorkerRequest,
   SignaturesCompleteWorkerRequest,
-  SignaturesAbortWorkerRequest,
+  SignaturesCancelWorkerRequest,
   SignaturesAnalyzeWorkerRequest,
   SignaturesFinalizeCandidateWorkerRequest,
   PagesMoveWorkerRequest,

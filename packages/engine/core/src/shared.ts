@@ -418,7 +418,7 @@ export type {
 } from './annotation/appearance';
 export { appearanceImpactOf, semanticEqual } from './annotation/appearance';
 export type { FormFieldRef, FormWidget } from './identity/FormFieldRef';
-export { formWidget } from './identity/FormFieldRef';
+export { formWidget, toFieldRef } from './identity/FormFieldRef';
 export { encodeFieldRefKey, decodeFieldRefKey } from './identity/FormFieldRef';
 export type {
   FormFieldFamily,
@@ -487,7 +487,8 @@ export type {
   FieldLockSpec,
   ModificationLevel,
   PdfRevision,
-  SignatureAbortResult,
+  SignatureCancelResult,
+  SignatureSignerInput,
   SignatureAppearanceInput,
   SignatureCompleteInput,
   SignatureCompleteResult,
@@ -553,7 +554,9 @@ export {
   minLevel,
   protectedCapabilities,
 } from './signature/protection';
+export { deletedFieldOf } from './mutation/FormMutationResults';
 export type {
+  FormMutationMeta,
   FormSetValueResult,
   FormImportResult,
   FormDataExport,

@@ -132,7 +132,12 @@ export function runFormConformance(
         FormSetValueResultSchema.parse(result);
         expect(result.field.family).toBe('text');
         if (result.field.family === 'text') expect(result.field.value).toBe('abcde');
-        expect(result.changedWidgets.length).toBe(1);
+        expect(result.meta.changedWidgets.length).toBe(1);
+        // The meta names the field and the page its repainted widget is on.
+        expect(result.meta.changedFields).toEqual([result.field.ref]);
+        expect(result.meta.affectedPages.map((state) => state.page)).toEqual([
+          result.meta.changedWidgets[0]!.page,
+        ]);
 
         const truncated = await doc.forms.setValue(
           { kind: 'fqn', name: 'maxlen_text' },
@@ -140,7 +145,7 @@ export function runFormConformance(
         );
         if (truncated.field.family !== 'text') throw new Error('expected text family');
         expect(truncated.field.value).toBe('abcde');
-        expect(truncated.changedWidgets).toHaveLength(0);
+        expect(truncated.meta.changedWidgets).toHaveLength(0);
 
         // Re-read through the (invalidated) snapshot: the write is visible.
         const after = await doc.forms.get({ kind: 'fqn', name: 'maxlen_text' });
@@ -158,7 +163,7 @@ export function runFormConformance(
         if (result.field.family !== 'radio') throw new Error('expected radio family');
         expect(result.field.value).toBe('y');
         expect(result.field.widgets.map((w) => w.checked)).toEqual([false, true]);
-        expect(result.changedWidgets.length).toBe(2); // x -> Off, y -> on
+        expect(result.meta.changedWidgets.length).toBe(2); // x -> Off, y -> on
 
         // Clearing a NoToggleToOff group is a validation error.
         await expect(
@@ -229,7 +234,11 @@ export function runFormConformance(
           'rejected',
           'unchanged',
         ]);
-        expect(result.meta === null).toBe(false);
+        // The meta names the written field and every widget an effect repainted.
+        expect(result.meta.changedFields.length).toBe(1);
+        expect(result.meta.changedWidgets).toEqual(
+          result.results.flatMap((entry) => entry.changedWidgets),
+        );
         expect(events).toHaveLength(1);
         const appliedText = result.results[0]?.fields[0];
         if (appliedText?.family !== 'text') throw new Error('expected text family');
@@ -243,7 +252,11 @@ export function runFormConformance(
           },
         ]);
         expect(noOp.results.map((entry) => entry.status)).toEqual(['unchanged']);
-        expect(noOp.meta).toBeNull();
+        // Nothing written: the meta names nothing, and no event fires.
+        expect(noOp.meta.changedFields).toEqual([]);
+        expect(noOp.meta.changedWidgets).toEqual([]);
+        expect(noOp.meta.affectedPages).toEqual([]);
+        expect(noOp.meta.cacheDelta).toBeNull();
         expect(events).toHaveLength(1);
         unsubscribe();
       } finally {
@@ -315,18 +328,18 @@ export function runFormConformance(
           { type: 'text', value: tricky },
         );
 
-        const xfdf = await first.forms.exportData('xfdf');
+        const xfdf = await first.forms.export('xfdf');
         expect(xfdf.format).toBe('xfdf');
         expect(xfdf.bytes.length > 0).toBe(true);
 
-        const imported = await second!.forms.importData(xfdf.bytes);
+        const imported = await second!.forms.import(xfdf.bytes);
         FormImportResultSchema.parse(imported);
-        expect(imported.fieldsSkipped).toBe(0);
-        expect(imported.fieldsApplied > 0).toBe(true);
-        const nested = imported.snapshot.fields.find((f) => f.name === 'billing.name');
+        expect(imported.skipped).toBe(0);
+        expect(imported.applied > 0).toBe(true);
+        const nested = imported.form.fields.find((f) => f.name === 'billing.name');
         if (nested?.family === 'text') expect(nested.value).toBe(tricky);
 
-        const fdf = await first.forms.exportData('fdf');
+        const fdf = await first.forms.export('fdf');
         expect(fdf.format).toBe('fdf');
         const head = String.fromCharCode(...fdf.bytes.slice(0, 5));
         expect(head).toBe('%FDF-');
@@ -340,7 +353,7 @@ export function runFormConformance(
       const doc = await open(opts.fixtures.toggleFields);
       try {
         await expect(
-          doc.forms.importData(new TextEncoder().encode('not a form payload')),
+          doc.forms.import(new TextEncoder().encode('not a form payload')),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
       } finally {
         await doc.close();
@@ -411,8 +424,8 @@ export function runFormConformance(
         if (widgetRef.kind !== 'objectNumber') throw new Error('expected durable ref');
 
         // 2. Adopted by a field -> the DTO joins to the field plane.
-        const field = await doc.forms.createField({ family: 'text', name: 'loop_field' });
-        await doc.forms.attachWidget(field.field.ref, widgetRef);
+        const field = await doc.forms.create({ family: 'text', name: 'loop_field' });
+        await doc.forms.addWidget(field.field.ref, widgetRef);
         const { annotations } = await page.annotations.list();
         const widgetDto = annotations.find(
           (a) =>
@@ -436,7 +449,7 @@ export function runFormConformance(
         });
 
         // 5. Detach -> inert again -> ordinary annotation delete succeeds.
-        await doc.forms.detachWidget(field.field.ref, widgetRef);
+        await doc.forms.removeWidget(field.field.ref, widgetRef);
         await page.annotations.delete(widgetRef);
 
         // The field survives, unplaced.
@@ -451,7 +464,7 @@ export function runFormConformance(
       const doc = await open(opts.fixtures.toggleFields);
       const pageObjectNumber = opts.fixtures.toggleFields.pageObjectNumber;
       try {
-        const created = await doc.forms.createField({
+        const created = await doc.forms.create({
           family: 'radio',
           name: 'authored_radio',
           noToggleToOff: true,
@@ -482,18 +495,20 @@ export function runFormConformance(
         expect(filled.field.value).toBe('yes');
 
         // updateField: rename + conflict validation.
-        await doc.forms.updateField(created.field.ref, {
+        await doc.forms.update(created.field.ref, {
           family: 'radio',
           name: 'renamed_radio',
         });
         await expect(
-          doc.forms.updateField(created.field.ref, { family: 'radio', name: 'unison_radio' }),
+          doc.forms.update(created.field.ref, { family: 'radio', name: 'unison_radio' }),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
 
-        // deleteField cascades: field gone and its widgets gone.
+        // delete cascades: field gone and its widgets gone; meta names both.
         const before = await doc.page(toPageRef(pageObjectNumber)).annotations.list();
-        const removed = await doc.forms.deleteField(created.field.ref);
-        expect(removed.removedWidgets.length).toBe(2);
+        const removed = await doc.forms.delete(created.field.ref);
+        expect(Object.keys(removed)).toEqual(['meta']);
+        expect(removed.meta.changedFields).toEqual([created.field.ref]);
+        expect(removed.meta.changedWidgets.length).toBe(2);
         const after = await doc.page(toPageRef(pageObjectNumber)).annotations.list();
         expect(after.annotations.length).toBe(before.annotations.length - 2);
         await expect(doc.forms.get({ kind: 'fqn', name: 'renamed_radio' })).rejects.toMatchObject({

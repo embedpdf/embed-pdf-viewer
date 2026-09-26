@@ -153,19 +153,19 @@ const stampStub = (bytes: Uint8Array) => ({
 const settle = (delayMs: number) => new Promise((resolve) => setTimeout(resolve, delayMs));
 
 describe('mode', () => {
-  it('is visual without a signer and sign with one, unless configured', async () => {
+  it('is visual without a key and sign with one, unless configured', async () => {
     const doc = await openDoc();
     try {
       const { signature: visual } = makeSignature(doc, {});
       expect(visual.getMode()).toBe('visual');
       expect(visual.canSign()).toBe(false);
       const signer = await createTestSigner();
-      const { signature: signing } = makeSignature(doc, { signer });
+      const { signature: signing } = makeSignature(doc, { key: signer });
       expect(signing.getMode()).toBe('sign');
       expect(signing.canSign()).toBe(true);
       expect(signing.canCertify()).toBe(false);
       const { signature: asking } = makeSignature(doc, {
-        signer,
+        key: signer,
         mode: 'ask',
         allowCertify: true,
       });
@@ -191,7 +191,7 @@ describe('visual fill', () => {
       // An occurrence of this session's verb: the field, and nothing else.
       expect(events.at(-1)).toEqual({ type: 'filled', field: SIG });
       expect(signature.isBusy()).toBe(false);
-      expect((await doc.signatures!.list()).signatures[0]!.signed).toBe(false);
+      expect((await doc.signatures.list()).signatures[0]!.signed).toBe(false);
 
       await signature.clearField(SIG);
       expect(events.at(-1)).toEqual({ type: 'cleared', field: SIG });
@@ -218,7 +218,7 @@ describe('signing', () => {
     try {
       const { signature } = makeSignature(
         doc,
-        { signer, trust: { anchors: async () => [signer.certificate] } },
+        { key: signer, trust: { anchors: async () => [signer.certificate] } },
         { stamp: stampStub(artwork) },
       );
       const events: SignatureChange[] = [];
@@ -230,7 +230,7 @@ describe('signing', () => {
       const result = await signature.sign({
         field: SIG,
         mark: { assetId: 'people:signature' },
-        attribution: { reason: 'approved' },
+        signer: { reason: 'approved' },
       });
       expect(result.status).toBe('completed');
       expect(result.signature.signer).toMatchObject({ name: 'Bob Singor', reason: 'approved' });
@@ -272,7 +272,7 @@ describe('signing', () => {
     }
   });
 
-  it('parks a two-phase signing from its confirmed event, and completes or aborts it', async () => {
+  it('parks a two-phase signing from its confirmed event, and completes or cancels it', async () => {
     const doc = await openDoc();
     const signer = await createTestSigner();
     try {
@@ -286,7 +286,7 @@ describe('signing', () => {
         mark: { assetId: 'people:signature' },
       });
       expect(signature.getPending()).toEqual({ signingId: aborted.signingId, field: SIG });
-      await signature.abortPending();
+      await signature.cancelPending();
       expect(signature.getPending()).toBeNull();
 
       const prepared = await signature.prepareSignature({
@@ -339,7 +339,7 @@ describe('signing', () => {
       await signature.prepareSignature({ field: SIG, mark: { assetId: 'people:signature' } });
       expect(signature.getPending()).not.toBeNull();
 
-      await signature.abortPending();
+      await signature.cancelPending();
       expect(signature.getPending()).toBeNull();
     } finally {
       await doc.close();
@@ -363,7 +363,7 @@ describe('signing', () => {
       });
       const { signature } = makeSignature(
         doc,
-        { signer: () => Promise.resolve(remote) },
+        { key: () => Promise.resolve(remote) },
         { stamp: stampStub(artwork) },
       );
       const result = await signature.sign({ field: SIG, mark: { source: artwork } });
@@ -385,7 +385,7 @@ describe('signing', () => {
     try {
       const { signature } = makeSignature(
         secondDoc,
-        { signer: again, trust: { anchors: async () => [first.certificate] } },
+        { key: again, trust: { anchors: async () => [first.certificate] } },
         { stamp: stampStub(artwork) },
       );
       const result = await signature.sign({ field: SIG, mark: { source: artwork } });
@@ -403,7 +403,7 @@ describe('facts from every session', () => {
     // document the plugin watches is a stub, so the remote events can be
     // delivered by hand.
     const doc = await openDoc();
-    const unsigned = await doc.signatures!.list();
+    const unsigned = await doc.signatures.list();
     await doc.close();
     const field = unsigned.signatures[0]!;
     const sealed: SignatureDTO = {
@@ -479,7 +479,7 @@ describe('the destination rule', () => {
         field: SIG,
         mark: { assetId: 'people:signature' },
       });
-      expect((await doc.signatures!.list()).signatures[0]!.signed).toBe(false);
+      expect((await doc.signatures.list()).signatures[0]!.signed).toBe(false);
 
       await ask.placeMark(
         { assetId: 'people:signature' },
@@ -564,7 +564,7 @@ describe('judging what a save would write', () => {
     try {
       const { signature } = makeSignature(
         doc,
-        { signer, trust: { anchors: async () => [signer.certificate] } },
+        { key: signer, trust: { anchors: async () => [signer.certificate] } },
         { stamp: stampStub(artwork) },
       );
       const events: SignatureChange[] = [];
@@ -616,7 +616,7 @@ describe('judging what a save would write', () => {
       // A new form field after an approval signature is not fill-in, signing
       // or commenting (corpus v3/86: "Form Fields Added", invalid): the
       // working copy is judged forbidden and the plugin warns, once.
-      await doc.forms.createField({ family: 'text', name: 'late_field' } as never);
+      await doc.forms.create({ family: 'text', name: 'late_field' } as never);
       await settle(700);
       expect(signature.getVerdict(SIG)).toMatchObject({
         summary: 'invalid',
@@ -629,7 +629,7 @@ describe('judging what a save would write', () => {
       expect((warnings[0] as { detail: string }).detail).toMatch(/field/i);
 
       // A second forbidden edit changes nothing about the verdict: no second warning.
-      await doc.forms.createField({ family: 'text', name: 'later_field' } as never);
+      await doc.forms.create({ family: 'text', name: 'later_field' } as never);
       await settle(700);
       expect(events.filter((event) => event.type === 'invalidating')).toHaveLength(1);
 
@@ -648,7 +648,7 @@ describe('judging what a save would write', () => {
     try {
       const { signature } = makeSignature(
         doc,
-        { signer, allowCertify: true },
+        { key: signer, allowCertify: true },
         { stamp: stampStub(artwork) },
       );
       const events: SignatureChange[] = [];
@@ -658,7 +658,7 @@ describe('judging what a save would write', () => {
       // table: the chrome decides (its dialog), the plugin does not seal.
       await signature.placeMark({ assetId: 'people:signature' }, { field: SIG });
       expect(events.at(-1)).toMatchObject({ type: 'ask', field: SIG });
-      expect((await doc.signatures!.list()).signatures[0]!.signed).toBe(false);
+      expect((await doc.signatures.list()).signatures[0]!.signed).toBe(false);
       // The chrome's answer: certify with P=3.
       const result = await signature.sign({
         field: SIG,

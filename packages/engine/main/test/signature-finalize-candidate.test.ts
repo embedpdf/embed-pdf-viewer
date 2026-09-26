@@ -31,7 +31,10 @@ let host: WorkerHost | null = null;
 let dir: string;
 let basePath: string;
 let nextJob = 1;
-const pending = new Map<number, { resolve: (r: WorkerResultPayload) => void; reject: (e: unknown) => void }>();
+const pending = new Map<
+  number,
+  { resolve: (r: WorkerResultPayload) => void; reject: (e: unknown) => void }
+>();
 
 /** Omit a key from each member of a union (a plain `Omit` collapses the union). */
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
@@ -53,7 +56,11 @@ function call<T extends WorkerResultPayload['tag']>(
   });
 }
 
-async function rejects(req: Parameters<typeof call>[0], code: string, message?: RegExp): Promise<void> {
+async function rejects(
+  req: Parameters<typeof call>[0],
+  code: string,
+  message?: RegExp,
+): Promise<void> {
   let error: { code?: string; message?: string } | null = null;
   try {
     await call(req, 'signatures.finalizeCandidate');
@@ -96,20 +103,32 @@ describe('signatures.finalizeCandidate', () => {
   test('rebuilt base ⊕ tail finalizes to the version the prepare sealed', async () => {
     if (!host) return;
     await call(
-      { kind: 'open.layerFileBase', docId: 'sign', baseKey: 'base', basePath, layer: { kind: 'fresh' }, password: null },
+      {
+        kind: 'open.layerFileBase',
+        docId: 'sign',
+        baseKey: 'base',
+        basePath,
+        layer: { kind: 'fresh' },
+        password: null,
+      },
       'open',
     );
     const before = await call({ kind: 'signatures.list', docId: 'sign' }, 'signatures.list');
     const field = before.snapshot.signatures.find((s) => s.fieldName === 'sig')!;
     expect(field.signed).toBe(false);
-    const fieldObjectNumber = field.field.kind === 'objectNumber' ? field.field.fieldObjectNumber : -1;
+    const fieldObjectNumber =
+      field.field.kind === 'objectNumber' ? field.field.fieldObjectNumber : -1;
     expect(fieldObjectNumber).toBeGreaterThan(0);
 
     const { result: prepared } = await call(
       {
         kind: 'signatures.prepare',
         docId: 'sign',
-        input: { field: { kind: 'fqn', name: 'sig' }, certify: { permission: 2 }, contentsSize: CONTENTS_SIZE },
+        input: {
+          field: { kind: 'fqn', name: 'sig' },
+          certify: { permission: 2 },
+          contentsSize: CONTENTS_SIZE,
+        },
       },
       'signatures.prepare',
     );
@@ -124,8 +143,11 @@ describe('signatures.finalizeCandidate', () => {
     expect(tail.byteLength).toBeGreaterThan(0);
 
     // The preparing worker forgets the signing; another replica rebuilds it.
-    const aborted = await call({ kind: 'signatures.abort', docId: 'sign', signingId: prepared.signingId }, 'signatures.abort');
-    expect(aborted.result.status).toBe('aborted');
+    const cancelled = await call(
+      { kind: 'signatures.cancel', docId: 'sign', signingId: prepared.signingId },
+      'signatures.cancel',
+    );
+    expect(cancelled.result.status).toBe('cancelled');
     await expect(stat(candidatePath)).rejects.toThrow();
     const rebuilt = join(dir, 'rebuilt.pdf');
     await writeFile(rebuilt, Buffer.concat([base, tail]));
@@ -166,7 +188,14 @@ describe('signatures.finalizeCandidate', () => {
 
     // The sealed file opens as an ordinary signed document.
     await call(
-      { kind: 'open.layerFileBase', docId: 'verify', baseKey: 'sealed', basePath: rebuilt, layer: { kind: 'fresh' }, password: null },
+      {
+        kind: 'open.layerFileBase',
+        docId: 'verify',
+        baseKey: 'sealed',
+        basePath: rebuilt,
+        layer: { kind: 'fresh' },
+        password: null,
+      },
       'open',
     );
     const after = await call({ kind: 'signatures.list', docId: 'verify' }, 'signatures.list');
@@ -175,7 +204,11 @@ describe('signatures.finalizeCandidate', () => {
     const sig = after.snapshot.signatures.find((s) => s.fieldName === 'sig')!;
     expect(sig.revisionIndex).toBe(after.snapshot.revisions.length - 1);
     const contents = await call(
-      { kind: 'signatures.contents', docId: 'verify', ref: { kind: 'objectNumber', fieldObjectNumber } },
+      {
+        kind: 'signatures.contents',
+        docId: 'verify',
+        ref: { kind: 'objectNumber', fieldObjectNumber },
+      },
       'signatures.contents',
     );
     expect(new Uint8Array(contents.bytes)).toEqual(FAKE_CMS);
@@ -216,13 +249,29 @@ describe('signatures.finalizeCandidate', () => {
     const p1 = await fresh('r1.pdf');
     await rejects({ ...input(p1), byteRange: [r0, r1, r2, r3 + 1] }, 'InvalidArg', /does not span/);
     await rejects({ ...input(p1), contentsSize: CONTENTS_SIZE - 1 }, 'InvalidArg', /hex digits/);
-    await rejects({ ...input(p1), byteRange: [r0, r1 + 1, r2 + 1, r3 - 1] }, 'InvalidArg', /Contents hole/);
-    await rejects({ ...input(p1), cms: new Uint8Array(CONTENTS_SIZE + 1).fill(0x30).buffer }, 'SignatureRefused', /does not fit/);
-    await rejects({ ...input(p1), cms: new Uint8Array([0x04, 1, 1]).buffer }, 'SignatureRefused', /DER SEQUENCE/);
+    await rejects(
+      { ...input(p1), byteRange: [r0, r1 + 1, r2 + 1, r3 - 1] },
+      'InvalidArg',
+      /Contents hole/,
+    );
+    await rejects(
+      { ...input(p1), cms: new Uint8Array(CONTENTS_SIZE + 1).fill(0x30).buffer },
+      'SignatureRefused',
+      /does not fit/,
+    );
+    await rejects(
+      { ...input(p1), cms: new Uint8Array([0x04, 1, 1]).buffer },
+      'SignatureRefused',
+      /DER SEQUENCE/,
+    );
     // Nothing above touched the file.
     expect((await readFile(p1)).equals(Buffer.concat([base, tail]))).toBe(true);
     // A wrong field: the bytes carry the signature on another object.
-    await rejects({ ...input(p1), fieldObjectNumber: fieldObjectNumber + 1 }, 'SignatureRefused', /lost the signature field/);
+    await rejects(
+      { ...input(p1), fieldObjectNumber: fieldObjectNumber + 1 },
+      'SignatureRefused',
+      /lost the signature field/,
+    );
     // A tampered rebuild: a byte appended past what the prepare sealed.
     const p2 = await fresh('r2.pdf');
     await writeFile(p2, Buffer.concat([base, tail, Buffer.from('\n')]));
