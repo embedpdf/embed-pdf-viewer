@@ -118,7 +118,7 @@ export async function buildHostFixture(
 
 /** The EngineHostClient serving `docId` — shard-aware: under the
  *  CLOUDPDF_TEST_SHARDS matrix leg a kill/recycle must target the
- *  document's OWN shard, not blindly shard 0. K=1 → the single host. */
+ *  document's own shard, not blindly shard 0. K=1 → the single host. */
 export function clientFor(fx: HostFixture, docId: string): EngineHostClient {
   const hosts = fx.bundle.engineHosts ?? [fx.client];
   if (hosts.length === 1) return hosts[0]!;

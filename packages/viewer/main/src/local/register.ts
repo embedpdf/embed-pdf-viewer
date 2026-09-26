@@ -1,8 +1,8 @@
 /**
- * Registers the built-in LOCAL engine as the element's default.
+ * Registers the built-in local engine as the element's default.
  *
  * This is the one place the local engine enters the viewer's runtime module
- * graph — calling `registerLocalEngine()` IS what makes a door the local door.
+ * graph — calling `registerLocalEngine()` is what makes a door the local door.
  * The engine-agnostic door never calls it, and so structurally excludes PDFium:
  * no wasm, no worker source, no stub surgery.
  */

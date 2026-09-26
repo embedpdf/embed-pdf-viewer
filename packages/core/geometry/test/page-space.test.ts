@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { pageSpace } from '../src/page-space';
 
 /**
- * G9: one owner of page ↔ PDF conversion, correct under a CropBox whose
- * origin is not (0, 0). Numbers from the contract document, §2.
+ * One owner of page ↔ PDF conversion, correct under a CropBox whose
+ * origin is not (0, 0).
  */
 describe('pageSpace', () => {
   const crop = { left: 10, bottom: 20, right: 210, top: 320 };
@@ -39,8 +39,8 @@ describe('pageSpace', () => {
   });
 
   it('handles a negative crop origin', () => {
-    const s = pageSpace({ left: -50, bottom: -100, right: 150, top: 200 });
-    expect(s.pdfToPage({ x: -50, y: 200 })).toEqual({ x: 0, y: 0 });
-    expect(s.pdfToPage({ x: 150, y: -100 })).toEqual({ x: 200, y: 300 });
+    const offsetSpace = pageSpace({ left: -50, bottom: -100, right: 150, top: 200 });
+    expect(offsetSpace.pdfToPage({ x: -50, y: 200 })).toEqual({ x: 0, y: 0 });
+    expect(offsetSpace.pdfToPage({ x: 150, y: -100 })).toEqual({ x: 200, y: 300 });
   });
 });

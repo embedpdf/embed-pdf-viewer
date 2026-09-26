@@ -1,20 +1,19 @@
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it, vi } from 'vitest';
 import type { DocumentHandle, Engine, PageLayout } from '@embedpdf/engine-core/runtime';
 import { createKernel } from '../src/kernel';
-import type { AnyPlugin, EffectContext, PluginContext } from '../src/types';
+import type { AnyPlugin, PluginContext } from '../src/types';
 
 /**
- * Characterization tests written BEFORE the lifecycle refactor (sessions +
- * transactional open). They pin behavior the refactor must preserve that the
- * other suites don't cover: activation handoff on close, duplicate-open
- * rejection, what plugin code observes during init/effects, and per-document
- * capability identity.
+ * The document lifecycle as plugin code and adapters observe it: activation
+ * handoff on close, duplicate-open rejection, what plugin code sees while it
+ * is created and connected, and per-document capability identity.
  */
 
 const box = { left: 0, bottom: 0, right: 600, top: 800 } as const;
-const page = (pon: number, index: number): PageLayout => ({
+const page = (pageObjectNumber: number, index: number): PageLayout => ({
   index,
-  pageObjectNumber: pon,
+  ref: toPageRef(pageObjectNumber),
   label: null,
   size: { width: 600, height: 800 },
   rotation: 0,
@@ -83,7 +82,9 @@ describe('characterization: duplicate opens', () => {
     await kernel.documents.open(bytesInput('a'));
 
     await expect(kernel.documents.open(bytesInput('a'))).rejects.toThrow(/already open/);
-    expect(kernel.documents.list().map((d) => [d.id, d.status])).toEqual([['a', 'ready']]);
+    expect(
+      kernel.documents.list().map((documentInfo) => [documentInfo.id, documentInfo.status]),
+    ).toEqual([['a', 'ready']]);
   });
 
   it('an error tab keeps its id: re-opening it rejects until it is closed', async () => {
@@ -103,15 +104,16 @@ describe('characterization: duplicate opens', () => {
 });
 
 describe('characterization: what plugin code observes', () => {
-  it('ctx.document() and ctx.doc are live during a document plugin init', async () => {
+  it('ctx.document() and ctx.doc are live while a document plugin is created', async () => {
     let sawMeta: unknown = null;
     let sawHandle: unknown = null;
     const plugin: AnyPlugin = {
       id: 'probe',
       scope: 'document',
-      init: (ctx: PluginContext<unknown>) => {
+      create: (ctx: PluginContext<unknown>) => {
         sawMeta = ctx.document();
         sawHandle = ctx.doc;
+        return { api: {} };
       },
     };
     const kernel = createKernel({ engine: instantEngine(), plugins: [plugin] });
@@ -121,22 +123,26 @@ describe('characterization: what plugin code observes', () => {
     expect(sawHandle).not.toBeNull();
   });
 
-  it('document effects: watch fires on slice dispatch and stops after close', async () => {
+  it('a watch set up in connect fires on state updates and stops after close', async () => {
     const seen: number[] = [];
     const counterToken = { name: 'counter' };
+    const increment = (state: { count: number }) => ({ count: state.count + 1 });
     const plugin: AnyPlugin = {
       id: 'counter',
       scope: 'document',
-      initialState: { n: 0 },
-      reduce: (s: { n: number }, a) => (a.type === 'inc' ? { n: s.n + 1 } : s),
-      effects: (ctx: EffectContext<{ n: number }>) => {
-        ctx.watch(
-          () => ctx.getState().n,
-          (n) => seen.push(n),
-        );
-        ctx.cleanup(() => seen.push(-1));
-      },
-      capability: (ctx) => ({ inc: () => ctx.dispatch({ type: 'inc' }) }),
+      state: () => ({ count: 0 }),
+      create: (ctx: PluginContext<{ count: number }>) => ({
+        api: { inc: () => ctx.state.update(increment) },
+        connect: () => {
+          ctx.watch(
+            () => ctx.state.get().count,
+            (count) => seen.push(count),
+          );
+          ctx.cleanup(() => {
+            seen.push(-1);
+          });
+        },
+      }),
       token: counterToken,
     };
     const kernel = createKernel({ engine: instantEngine(), plugins: [plugin] });
@@ -155,7 +161,7 @@ describe('characterization: what plugin code observes', () => {
       id: 'stage',
       scope: 'document',
       token,
-      capability: (ctx: PluginContext<unknown>) => ({ boundTo: ctx.documentId }),
+      create: (ctx: PluginContext<unknown>) => ({ api: { boundTo: ctx.documentId } }),
     };
     const kernel = createKernel({ engine: instantEngine(), plugins: [plugin] });
     await kernel.documents.open(bytesInput('a'));

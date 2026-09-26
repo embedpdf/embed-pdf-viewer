@@ -1,12 +1,12 @@
 /**
- * Boot-state panes for the document area — what renders INSTEAD of the Stage
+ * Boot-state panes for the document area — what renders instead of the Stage
  * while the selected tab's document isn't ready:
  *
- *   `locked` → <PasswordPrompt/>  (per-tab, v2's document-password-prompt port)
+ *   `locked` → <PasswordPrompt/>
  *   `error`  → <DocumentError/>
  *
- * Both are per-TAB, not modal: several tabs can be locked/broken at once and
- * switching tabs stays free. The prompt drives ONE call —
+ * Both are per-tab, not modal: several tabs can be locked/broken at once and
+ * switching tabs stays free. The prompt drives one call —
  * `documents.unlock(id, { password })` — identical on the local (worker loads
  * the parked bytes) and cloud (/access grant) engines. The "incorrect" copy
  * keys on a real rejection: either this session's failed attempt, or
@@ -25,7 +25,7 @@ export function PasswordPrompt() {
   const [rejected, setRejected] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const doc = docs.find((d) => d.id === docId);
+  const doc = docs.find((documentInfo) => documentInfo.id === docId);
   if (!docId || !doc) return null;
   const incorrect = rejected || doc.passwordProvided === true;
 
@@ -66,8 +66,8 @@ export function PasswordPrompt() {
             id="doc-password"
             type="password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && void submit()}
+            onChange={(event) => setPassword(event.target.value)}
+            onKeyDown={(event) => event.key === 'Enter' && void submit()}
             disabled={busy}
             placeholder={t('passwordPrompt.placeholder')}
             className="bg-surface border-border focus:border-accent focus:ring-accent text-fg placeholder:text-fg-muted block w-full rounded-md border px-3 py-2.5 text-sm focus:outline-none focus:ring-1 disabled:opacity-50"
@@ -109,7 +109,7 @@ export function DocumentError() {
   const docId = useDocumentId();
   const { docs, close } = useDocuments();
   const t = useT();
-  const doc = docs.find((d) => d.id === docId);
+  const doc = docs.find((documentInfo) => documentInfo.id === docId);
   if (!docId || !doc) return null;
 
   return (

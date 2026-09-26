@@ -2,7 +2,7 @@
  * Engine-isolation performance and backpressure benchmark.
  *
  * Compute-only boundary measurements: direct pool dispatches (no derived
- * read-through, no HTTP cache) so EVERY iteration crosses the engine
+ * read-through, no HTTP cache) so every iteration crosses the engine
  * boundary. Run once per mode and compare:
  *
  *   node --import tsx --import ./test/bench/register-sql-loader.mjs \
@@ -25,10 +25,10 @@
  * (clean rejections, no hangs), measures time back to first successful
  * render, and samples API event-loop delay across the window.
  *
- * Also reports a cold END-TO-END section (HTTP render route, off-lattice
+ * Also reports a cold end-to-end section (HTTP render route, off-lattice
  * → compute path incl. sharp encode) for real-traffic proportion; warm
- * on-lattice traffic is served by the WS2b store read-through and never
- * touches this boundary (covered by DerivedRenderService tests).
+ * on-lattice traffic is served by `DerivedRenderService`'s object-store
+ * read-through and never touches this boundary (covered by its tests).
  */
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -69,7 +69,7 @@ const POOL_SIZE = 2; // the production default (min(2, cpus)); identical in both
 const N_DOCS = 4; // round-robin so both worker slots stay busy
 const CONC_LEVELS = [1, 4, 16];
 
-// The BUILT engine artifacts: production-faithful (no loader inside the
+// The built engine artifacts: production-faithful (no loader inside the
 // engine processes), and worker_threads need no TS support. Run
 // `pnpm build` first.
 const WORKER_ENTRY = new URL('../../dist/runtime/worker-entry.js', import.meta.url);
@@ -276,7 +276,7 @@ interface KillResult {
 async function killUnderLoad(
   pool: EngineHostClient,
   docIds: string[],
-  pons: number[],
+  pageObjectNumbers: number[],
 ): Promise<KillResult> {
   const eld = monitorEventLoopDelay({ resolution: 5 });
   eld.enable();
@@ -291,7 +291,14 @@ async function killUnderLoad(
       for (let i = 0; !stop; i++) {
         const docId = docIds[(i + w) % docIds.length]!;
         try {
-          await pool.run(docId, renderBuild(docId, pons[(i + w) % pons.length]!, widthFor(seq++)));
+          await pool.run(
+            docId,
+            renderBuild(
+              docId,
+              pageObjectNumbers[(i + w) % pageObjectNumbers.length]!,
+              widthFor(seq++),
+            ),
+          );
           if (killedAt > 0 && recoveredAt === 0) recoveredAt = performance.now();
         } catch (err) {
           rejected++;
@@ -330,7 +337,10 @@ async function killUnderLoad(
   for (let i = 0; i < 5; i++) {
     const docId = docIds[i % docIds.length]!;
     try {
-      await pool.run(docId, renderBuild(docId, pons[i % pons.length]!, widthFor(1000 + i)));
+      await pool.run(
+        docId,
+        renderBuild(docId, pageObjectNumbers[i % pageObjectNumbers.length]!, widthFor(1000 + i)),
+      );
       postRecoveryOk++;
     } catch {
       await pool.runOpen(docId, PDF_SHA, openBuild(docId)).catch(() => undefined);
@@ -355,7 +365,7 @@ interface E2eResult {
 
 /** Cold end-to-end: HTTP render route, off-lattice widths → compute path
  *  (engine + sharp encode) on every request. */
-async function endToEndCold(mode: Mode, pon: number): Promise<E2eResult> {
+async function endToEndCold(mode: Mode, pageObjectNumber: number): Promise<E2eResult> {
   const secret = 'isolation-bench-secret';
   const storageRoot = await mkdtemp(join(tmpdir(), 'bench-store-'));
   const cacheRoot = await mkdtemp(join(tmpdir(), 'bench-cache-'));
@@ -426,7 +436,7 @@ async function endToEndCold(mode: Mode, pon: number): Promise<E2eResult> {
           const width = 561 + ((i * 11) % 90); // off-lattice + unique → always computes
           const s = performance.now();
           const res = await fetch(
-            `${baseUrl}/v1/docs/${docId}/render/pages/${pon}/data?viewport.kind=width&viewport.width=${width}&format=webp`,
+            `${baseUrl}/v1/docs/${docId}/render/pages/${pageObjectNumber}/data?viewport.kind=width&viewport.width=${width}&format=webp`,
             { headers: { Authorization: `Bearer ${token}` } },
           );
           const body = await res.arrayBuffer();
@@ -459,7 +469,7 @@ async function main(): Promise<void> {
   const results: Record<string, LevelResult[]> = {};
   let kill: KillResult | null = null;
   let e2e: E2eResult | null = null;
-  let e2ePon = 0;
+  let e2ePageObjectNumber = 0;
   try {
     const docIds = Array.from({ length: N_DOCS }, (_, i) => `bench-doc-${i}`);
     for (const docId of docIds) await pool.runOpen(docId, PDF_SHA, openBuild(docId));
@@ -467,11 +477,11 @@ async function main(): Promise<void> {
       wirePack({ kind: 'pages.list' as const, jobId, docId: docIds[0]! }),
     );
     if (list.tag !== 'pages.list') throw new Error(`unexpected ${list.tag}`);
-    const pons = list.snapshot.pages.slice(0, 8).map((p) => p.ref.pageObjectNumber);
-    e2ePon = pons[0]!;
+    const pageObjectNumbers = list.snapshot.pages.slice(0, 8).map((p) => p.ref.pageObjectNumber);
+    e2ePageObjectNumber = pageObjectNumbers[0]!;
     // eslint-disable-next-line no-console
     console.log(
-      `opened ${N_DOCS} docs, ${list.snapshot.pageCount} pages, using pons=${pons.join(',')}`,
+      `opened ${N_DOCS} docs, ${list.snapshot.pageCount} pages, using pages=${pageObjectNumbers.join(',')}`,
     );
 
     // ---- render (large payloads)
@@ -479,7 +489,10 @@ async function main(): Promise<void> {
     let warm = 0;
     await runLevel(pool, 2, QUICK ? 8 : 24, async (i) => {
       const docId = docIds[i % N_DOCS]!;
-      const r = await pool.run(docId, renderBuild(docId, pons[i % pons.length]!, widthFor(i)));
+      const r = await pool.run(
+        docId,
+        renderBuild(docId, pageObjectNumbers[i % pageObjectNumbers.length]!, widthFor(i)),
+      );
       return r.tag === 'pages.render' ? r.raster.data.byteLength : 0;
     });
     results['render'] = [];
@@ -488,7 +501,11 @@ async function main(): Promise<void> {
         const docId = docIds[i % N_DOCS]!;
         const res = await pool.run(
           docId,
-          renderBuild(docId, pons[(i + warm) % pons.length]!, widthFor(i)),
+          renderBuild(
+            docId,
+            pageObjectNumbers[(i + warm) % pageObjectNumbers.length]!,
+            widthFor(i),
+          ),
         );
         if (res.tag !== 'pages.render') throw new Error(`unexpected ${res.tag}`);
         return res.raster.data.byteLength;
@@ -506,7 +523,11 @@ async function main(): Promise<void> {
         const docId = docIds[i % N_DOCS]!;
         const res = await pool.run(
           docId,
-          renderEncodedBuild(docId, pons[(i + warm) % pons.length]!, widthFor(i)),
+          renderEncodedBuild(
+            docId,
+            pageObjectNumbers[(i + warm) % pageObjectNumbers.length]!,
+            widthFor(i),
+          ),
         );
         if (res.tag !== 'pages.renderEncoded') throw new Error(`unexpected ${res.tag}`);
         return res.image.bytes.byteLength;
@@ -550,7 +571,7 @@ async function main(): Promise<void> {
 
     // ---- kill-under-load (host only)
     if (pool instanceof EngineHostClient) {
-      kill = await killUnderLoad(pool, docIds, pons);
+      kill = await killUnderLoad(pool, docIds, pageObjectNumbers);
       // eslint-disable-next-line no-console
       console.log(
         `kill-under-load: rejected=${kill.rejected} codes=${JSON.stringify(kill.errorCodes)} ` +
@@ -563,7 +584,7 @@ async function main(): Promise<void> {
   }
 
   // ---- end-to-end cold (separate app instance; informational)
-  e2e = await endToEndCold(MODE, e2ePon);
+  e2e = await endToEndCold(MODE, e2ePageObjectNumber);
   // eslint-disable-next-line no-console
   console.log(
     `e2e-cold (HTTP, off-lattice webp): n=${e2e.iters} c=${e2e.conc} p50=${e2e.p50.toFixed(1)}ms p95=${e2e.p95.toFixed(1)}ms meanBody=${mb(e2e.meanBytes)}`,

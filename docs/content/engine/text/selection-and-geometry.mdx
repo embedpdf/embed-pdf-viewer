@@ -1,0 +1,164 @@
+---
+title: Selection & geometry
+description: Find the character under the pointer, select words and lines, and get the boxes to draw a selection or a highlight.
+---
+
+import { Callout } from '@/components/docs/callout';
+
+# Selection & geometry
+
+A PDF page doesn't store sentences; it stores characters and where each one is drawn. The
+engine gives you that layout, so you can find the text under the pointer, select a word or a
+line, and draw the selection yourself.
+
+```ts
+const layout = await page.text.layout();
+
+const word = layout.wordAt({ x: 120, y: 700 }); // { start, count } or null
+const boxes = word ? layout.segments(word) : []; // where to draw it
+```
+
+<Callout type="info">
+  Using the viewer or the headless components? The [Selection
+  plugin](/docs/headless/plugins/selection) does all of this for you, including drag and touch
+  handles. This page is for building your own.
+</Callout>
+
+## The layout
+
+`page.text.layout()` reads where every character on the page is. Read it once per page and keep
+it: every method on it answers right away, without another call to the engine.
+
+```ts
+const layout = await page.text.layout();
+```
+
+Positions are PDF points (1/72 inch), with `y` going up from the bottom of the page, the way
+every position in the engine is.
+
+## Find the character under the pointer
+
+`charAt(point)` returns the number of the character at a point, or `null` when there's no text
+there. It forgives a near miss, so a click just beside a letter still finds it.
+
+```ts
+const index = layout.charAt(point);
+```
+
+To turn a click on a rendered page into a point, use the image's `transform`. It knows the page's
+crop box, its rotation and your zoom:
+
+```ts
+const image = await page.render.image({ viewport: { kind: 'width', width: 800 } });
+
+img.addEventListener('click', (event) => {
+  const scale = image.width / img.clientWidth; // image pixels per CSS pixel
+  const point = image.transform.pixelsToPdf({ x: event.offsetX * scale, y: event.offsetY * scale });
+  const index = layout.charAt(point);
+});
+```
+
+`scale` turns the click's CSS pixels into image pixels, so this works at whatever size you show
+the image. Without an image at hand (while zooming, or for a page you draw yourself),
+`pageTransform()` gives the same transform from the page's layout; see
+[From image pixels to PDF points](/docs/engine/documents/rendering#from-image-pixels-to-pdf-points).
+
+## Select a word, a line, a range
+
+Double-click and triple-click, the way text editors do it:
+
+```ts
+const word = layout.wordAt(point); // the word under the point
+const line = layout.lineAt(point); // the whole line
+```
+
+Both return a range, `{ start, count }`, or `null`. When you already have a character number,
+pass it instead of a point: `layout.wordAt(42)`. For a drag, take the characters at the start and
+at the end of the drag and select everything between them:
+
+```ts
+const from = layout.charAt(dragStart);
+const to = layout.charAt(dragEnd);
+
+if (from !== null && to !== null) {
+  const range = { start: Math.min(from, to), count: Math.abs(to - from) + 1 };
+}
+```
+
+## Draw the selection
+
+`segments(range)` returns one segment per line the range covers:
+
+```ts
+for (const segment of layout.segments(range)) {
+  const box = image.transform.pdfToPixels(segment.rect); // { x, y, width, height } in image pixels
+  drawSelectionBox(box);
+}
+```
+
+Each segment has:
+
+| Field  | What it is                                                                                |
+| :----- | :---------------------------------------------------------------------------------------- |
+| `rect` | The box around the text on that line, `{ left, bottom, right, top }`.                     |
+| `quad` | The four corners of the text, `{ p1, p2, p3, p4 }`. Differs from `rect` for rotated text. |
+
+Use `rect` for a simple box. Use `quad` when text can be rotated, and for annotations: a highlight
+takes quads.
+
+## Copy it, or highlight it
+
+A range works everywhere a range goes. Read its text with `slice()`, or make it a highlight:
+
+```ts
+const text = await page.text.slice(range);
+
+await page.annotations.create({
+  subtype: 'highlight',
+  quadPoints: layout.segments(range).map((segment) => segment.quad),
+});
+```
+
+Search matches are ranges too, with their segments already worked out: see
+[Search](/docs/engine/text/search). For underlines, strikeouts and the highlight's fields, see
+[Highlights & text markup](/docs/engine/annotations/text-markup).
+
+## Permissions
+
+The layout needs the `doc.text.select` permission: it tells you where text is, not what it says.
+`slice()` needs `doc.text.copy`. So a user may select and highlight text without being able to
+copy it.
+
+## Good to know
+
+### Lines, not letters
+
+Segments follow visual lines: a selection over three lines is three segments, however many
+letters or fonts it covers. Selection, search and highlights all use the same segments, so they
+line up exactly.
+
+### Rotated and vertical text
+
+On a line that runs at an angle, `rect` is the upright box around it and `quad` follows the text.
+The corners of a quad are, in order: the two ends of the top edge, then the two ends of the bottom
+edge, each from the line's start side (the left, for upright text). That's the order PDF
+highlights use, so you can pass quads to an annotation unchanged.
+
+The corners describe the shape, not the reading direction. For that, each segment has `advance`:
+`1` when the text reads from the start side (left to right on an upright line), `-1` when it reads
+the other way, as Arabic and Hebrew do.
+
+### The raw geometry
+
+`layout.runs` is the raw geometry: characters grouped by line and font. Each character has a
+loose box (the full line height; segments use it) and, when the font says, a tight box around the
+glyph (`charAt` checks it first). A space has `space: true`, and a character with no box of its
+own has `empty: true`. You need runs only for things like one box per letter.
+
+Two shortcuts save you reading runs: `layout.charCount` is how many characters the page has, and
+`layout.charQuad(index)` is one character's box as a quad, or `null` when it has none (use it to
+place a caret at the edge of a selection).
+
+A run of turned text also has `baselineAngle`: the angle of its baseline in radians, measured the
+way PDF measures angles (counterclockwise from the x axis, as in `Math.atan2`). It's raw math
+data, so it isn't a `rotation`, which in the engine always means degrees clockwise.

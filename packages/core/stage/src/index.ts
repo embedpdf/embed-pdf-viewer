@@ -6,14 +6,13 @@
  * (a focal point relative to a page — what survives layout/zoom changes & reloads).
  *
  * Navigation is pure camera math. Bounds/home/margin are three separate functions.
- * No DOM, no framework; plain-data model plus derived spatial queries (the DATA
- * is serializable — `Scene` also carries query methods derived from it). This
- * is the v4 Rust core, verbatim.
+ * No DOM, no framework; plain-data model plus derived spatial queries (the data
+ * is serializable — `Scene` also carries query methods derived from it).
  */
 
 // The pure coordinate primitives live in the dependency-free geometry base
-// (shared with the framework adapters); stage-core re-exports them so existing
-// `from '@embedpdf/core-stage'` imports are unaffected.
+// (shared with the framework adapters); stage-core re-exports them so consumers
+// can import them from `@embedpdf/core-stage`.
 import {
   displaySize,
   NO_FRAME,
@@ -37,16 +36,16 @@ export interface Camera {
 }
 
 export interface PageGeom {
-  /** UN-rotated (intrinsic) page size — the content's own dimensions before rotation. */
+  /** Un-rotated (intrinsic) page size — the content's own dimensions before rotation. */
   size: Size;
   /** Total display rotation. Layout swaps w↔h for 90/270 so the box is the
    *  on-screen footprint; the renderer rotates the content into it. */
   rotation?: PageRotation;
   /**
-   * PDF `/UserUnit` (§14.11.6): how many 1/72" units one point of THIS page
+   * PDF `/UserUnit` (§14.11.6): how many 1/72" units one point of this page
    * spans — the page is physically `userUnit ×` larger than its point size
    * says. Folded into the layout (a userUnit-5 page lays out 5× bigger, like
-   * Acrobat) AND into its `contentScale`, so "world per content point" stays
+   * Acrobat) and into its `contentScale`, so "world per content point" stays
    * true per page. Default 1 (virtually every document).
    */
   userUnit?: number;
@@ -55,9 +54,9 @@ export interface PageBox {
   pageIndex: number;
   x: number;
   y: number;
-  /** DISPLAY width — swapped to the page's height for 90/270 rotations. */
+  /** Display width — swapped to the page's height for 90/270 rotations. */
   width: number;
-  /** DISPLAY height — swapped to the page's width for 90/270 rotations. */
+  /** Display height — swapped to the page's width for 90/270 rotations. */
   height: number;
   /** The page's total display rotation; the renderer rotates the (normalized,
    *  un-rotated) content bitmap by this to fill the display box. */
@@ -72,14 +71,14 @@ export interface PageBox {
 }
 
 /** The page's on-screen footprint: w↔h swapped for quarter-turns (via the shared
- *  geometry primitive), scaled by its `/UserUnit` (the page's PHYSICAL size — a
+ *  geometry primitive), scaled by its `/UserUnit` (the page's physical size — a
  *  userUnit-5 page measures 5× its point size). Everything the layout packs uses
  *  these display dims; the content scale (isotropic) and the renderer's
  *  transform recover the content. */
 function displayDims(pg: PageGeom): Size {
-  const u = pg.userUnit ?? 1;
-  const d = displaySize(pg.size, pg.rotation ?? 0);
-  return u === 1 ? d : { width: d.width * u, height: d.height * u };
+  const userUnit = pg.userUnit ?? 1;
+  const size = displaySize(pg.size, pg.rotation ?? 0);
+  return userUnit === 1 ? size : { width: size.width * userUnit, height: size.height * userUnit };
 }
 export interface SceneItem {
   index: number;
@@ -98,7 +97,7 @@ export interface Scene {
   axis: Axis;
   /**
    * The largest item width & height in the document. Fit-modes resolve against this
-   * (not the current page) so the zoom is STABLE across the whole document and no
+   * (not the current page) so the zoom is stable across the whole document and no
    * page ever overflows — matching a conventional PDF viewer's "fit width".
    */
   maxItemSize: Size;
@@ -109,12 +108,12 @@ export interface Scene {
 export interface CameraConstraint {
   bounded: boolean;
   /**
-   * Breathing room (screen px) around the content — the ONE spacing concept.
+   * Breathing room (screen px) around the content — the one spacing concept.
    * Fit-modes inset by it, placement leaves it as gutter, and the clamp lets the
    * camera reveal exactly this much beyond each content edge.
    */
   padding: number;
-  /** Where content RESTS on an axis it FITS (locked — there is nowhere else to
+  /** Where content rests on an axis it fits (locked — there is nowhere else to
    *  be). Default center/center. x is logical against `direction`. */
   fitAlign?: Alignment;
   direction?: Direction;
@@ -124,9 +123,9 @@ export interface CameraConstraint {
  *   { mode }       — viewport-relative: fit-width / fit-page / automatic / fit-all
  *   { level }      — document-relative: a fixed scale factor
  *   { pageWidth }  — absolute: the page unit renders N **screen px** wide. The only
- *                    intent stable across BOTH viewport and document differences —
+ *                    intent stable across both viewport and document differences —
  *                    e.g. thumbnails at 200px for any document. Targets the page
- *                    UNIT (a spread counts as one, exactly as in fit-page/fit-width);
+ *                    unit (a spread counts as one, exactly as in fit-page/fit-width);
  *                    combine with sizing 'uniform' to make every page exactly N px.
  *   { pageHeight } — absolute, vertical twin (horizontal filmstrip thumbnails).
  */
@@ -142,7 +141,7 @@ export interface Anchor {
 }
 export type SpreadMode = 'none' | 'odd' | 'even';
 /**
- * Reading direction — a LAYOUT property, not a navigation one. Navigation steps by
+ * Reading direction — a layout property, not a navigation one. Navigation steps by
  * index (reading order); direction only decides where reading-order puts pages in
  * space: horizontal items advance leftward, spreads bind on the right, grid rows
  * fill right→left. The camera, cursor, fit and clamp never learn about it.
@@ -151,7 +150,7 @@ export type Direction = 'ltr' | 'rtl';
 /**
  * Page sizing policy (per-item world scale, set in the layout):
  *   'intrinsic' — true PDF sizes; relative proportions preserved.
- *   'uniform'   — every item scaled to the same CROSS-axis size (vertical → equal
+ *   'uniform'   — every item scaled to the same cross-axis size (vertical → equal
  *                 widths, horizontal → equal heights, grid → equal widths), so pages
  *                 sit flush with no left/right gaps. Camera/zoom are untouched.
  */
@@ -163,43 +162,43 @@ export const ZoomMode = {
   Automatic: 'automatic',
   FitPage: 'fit-page',
   FitWidth: 'fit-width',
-  /** Fit the WHOLE scene (every page) in view — the construction overview. */
+  /** Fit the whole scene (every page) in view — the construction overview. */
   FitAll: 'fit-all',
 } as const;
 export type ZoomModeValue = (typeof ZoomMode)[keyof typeof ZoomMode];
 
-const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
+const clamp = (value: number, lo: number, hi: number) => Math.min(Math.max(value, lo), hi);
 
 // ── Projection ──────────────────────────────────────────────────────────────
-export const toScreen = (c: Camera, w: Point): Point => ({
-  x: (w.x - c.x) * c.zoom,
-  y: (w.y - c.y) * c.zoom,
+export const toScreen = (camera: Camera, point: Point): Point => ({
+  x: (point.x - camera.x) * camera.zoom,
+  y: (point.y - camera.y) * camera.zoom,
 });
-export const toWorld = (c: Camera, s: Point): Point => ({
-  x: c.x + s.x / c.zoom,
-  y: c.y + s.y / c.zoom,
+export const toWorld = (camera: Camera, point: Point): Point => ({
+  x: camera.x + point.x / camera.zoom,
+  y: camera.y + point.y / camera.zoom,
 });
-export const cameraWorldRect = (c: Camera, vp: Size): Rect => ({
-  x: c.x,
-  y: c.y,
-  width: vp.width / c.zoom,
-  height: vp.height / c.zoom,
+export const cameraWorldRect = (camera: Camera, vp: Size): Rect => ({
+  x: camera.x,
+  y: camera.y,
+  width: vp.width / camera.zoom,
+  height: vp.height / camera.zoom,
 });
 
 // ── Camera operations ────────────────────────────────────────────────────────
 /** Focal zoom: keep the world point under `screenPt` fixed (no bounce). */
-export const zoomAround = (c: Camera, screenPt: Point, factor: number): Camera => {
-  const zoom = clamp(c.zoom * factor, ZOOM_MIN, ZOOM_MAX);
+export const zoomAround = (camera: Camera, screenPt: Point, factor: number): Camera => {
+  const zoom = clamp(camera.zoom * factor, ZOOM_MIN, ZOOM_MAX);
   return {
-    x: c.x + screenPt.x / c.zoom - screenPt.x / zoom,
-    y: c.y + screenPt.y / c.zoom - screenPt.y / zoom,
+    x: camera.x + screenPt.x / camera.zoom - screenPt.x / zoom,
+    y: camera.y + screenPt.y / camera.zoom - screenPt.y / zoom,
     zoom,
   };
 };
-export const panByScreen = (c: Camera, dxScreen: number, dyScreen: number): Camera => ({
-  x: c.x - dxScreen / c.zoom,
-  y: c.y - dyScreen / c.zoom,
-  zoom: c.zoom,
+export const panByScreen = (camera: Camera, dxScreen: number, dyScreen: number): Camera => ({
+  x: camera.x - dxScreen / camera.zoom,
+  y: camera.y - dyScreen / camera.zoom,
+  zoom: camera.zoom,
 });
 export const centerOnWorld = (worldPt: Point, vp: Size, zoom: number): Camera => ({
   zoom,
@@ -208,11 +207,11 @@ export const centerOnWorld = (worldPt: Point, vp: Size, zoom: number): Camera =>
 });
 
 /**
- * One axis of camera travel against content bounds — THE scroll geometry.
+ * One axis of camera travel against content bounds — the scroll geometry.
  * `near`/`far` are the two flush camera positions (content start edge at the
  * padded viewport start / content end edge at the padded viewport end); the
  * camera travels in [near, far] while the padded content overflows the view.
- * When it FITS the interval inverts and `fits` is true — there is nowhere to
+ * When it fits the interval inverts and `fits` is true — there is nowhere to
  * travel, and the clamp locks the camera to its fitAlign rest instead. Shared
  * by `clampCamera` and `scrollMetrics`, so the pan clamp and a scrollbar can
  * never disagree about where travel ends.
@@ -240,35 +239,55 @@ export const travelRange = (
  * with a `padding` gutter the camera may reveal beyond each content edge.
  *
  * Per axis the travel interval is `travelRange`'s [near, far]. If the padded
- * content OVERFLOWS the viewport, the camera travels freely in it. If it FITS,
- * the camera is LOCKED to the `fitAlign` rest point — start = near, end = far,
+ * content overflows the viewport, the camera travels freely in it. If it fits,
+ * the camera is locked to the `fitAlign` rest point — start = near, end = far,
  * center = midpoint (x resolved logically against `direction`).
  */
-export const clampCamera = (c: Camera, bounds: Rect, vp: Size, k: CameraConstraint): Camera => {
-  if (!k.bounded) return c;
-  const p = k.padding;
-  const fit = k.fitAlign ?? { x: 'center', y: 'center' };
-  const axis = (pos: number, origin: number, content: number, view: number, a: Align): number => {
-    const t = travelRange(origin, content, view, c.zoom, p);
-    if (t.fits) return a === 'start' ? t.near : a === 'end' ? t.far : (t.near + t.far) / 2; // fits: rest & lock
-    return clamp(pos, t.near, t.far);
+export const clampCamera = (
+  camera: Camera,
+  bounds: Rect,
+  vp: Size,
+  constraint: CameraConstraint,
+): Camera => {
+  if (!constraint.bounded) return camera;
+  const padding = constraint.padding;
+  const fit = constraint.fitAlign ?? { x: 'center', y: 'center' };
+  const axis = (
+    pos: number,
+    origin: number,
+    content: number,
+    view: number,
+    align: Align,
+  ): number => {
+    const travel = travelRange(origin, content, view, camera.zoom, padding);
+    if (travel.fits)
+      return align === 'start'
+        ? travel.near
+        : align === 'end'
+          ? travel.far
+          : (travel.near + travel.far) / 2; // fits: rest & lock
+    return clamp(pos, travel.near, travel.far);
   };
-  // logical x: under RTL the reading start is the RIGHT edge
+  // logical x: under RTL the reading start is the right edge
   const ax =
-    k.direction === 'rtl' && fit.x !== 'center' ? (fit.x === 'start' ? 'end' : 'start') : fit.x;
+    constraint.direction === 'rtl' && fit.x !== 'center'
+      ? fit.x === 'start'
+        ? 'end'
+        : 'start'
+      : fit.x;
   return {
-    zoom: c.zoom,
-    x: axis(c.x, bounds.x, bounds.width, vp.width, ax),
-    y: axis(c.y, bounds.y, bounds.height, vp.height, fit.y),
+    zoom: camera.zoom,
+    x: axis(camera.x, bounds.x, bounds.width, vp.width, ax),
+    y: axis(camera.y, bounds.y, bounds.height, vp.height, fit.y),
   };
 };
 
 /**
- * The camera as a NATIVE SCROLLER — the DOM scroll vocabulary, in screen px:
+ * The camera as a native scroller — the DOM scroll vocabulary, in screen px:
  * every field means exactly what it means on a DOM element. Per axis the scroll
- * range is the UNION of the padded content extent and the current camera window:
+ * range is the union of the padded content extent and the current camera window:
  *   • bounded — the clamp already keeps the window inside the padded content
- *     (or rests it when the axis fits), so the union IS the padded content and
+ *     (or rests it when the axis fits), so the union is the padded content and
  *     the numbers degenerate to the classic scroller (scrollLeft ∈
  *     [0, scrollWidth − clientWidth], aligned with `travelRange`'s [near, far]).
  *   • unbounded — pan beyond the content and the union grows (the Figma
@@ -276,7 +295,7 @@ export const clampCamera = (c: Camera, bounds: Rect, vp: Size, k: CameraConstrai
  *     back over the content.
  * `scrollableX/Y` false ⇔ the window covers the whole range (native: no bar).
  * One formula, no mode branching — the clamp did the branching already.
- * Coordinates are PHYSICAL on both axes (RTL included), deliberately sidestepping
+ * Coordinates are physical on both axes (RTL included), deliberately sidestepping
  * the DOM's negative-scrollLeft-under-RTL behavior.
  */
 export interface ScrollMetrics {
@@ -290,40 +309,40 @@ export interface ScrollMetrics {
   scrollableY: boolean;
 }
 export const scrollMetrics = (
-  c: Camera,
+  camera: Camera,
   bounds: Rect,
   vp: Size,
   padding: number,
 ): ScrollMetrics => {
   const axis = (pos: number, origin: number, content: number, view: number) => {
-    const lo = Math.min(origin - padding / c.zoom, pos);
-    const hi = Math.max(origin + content + padding / c.zoom, pos + view / c.zoom);
-    const total = (hi - lo) * c.zoom;
+    const lo = Math.min(origin - padding / camera.zoom, pos);
+    const hi = Math.max(origin + content + padding / camera.zoom, pos + view / camera.zoom);
+    const total = (hi - lo) * camera.zoom;
     // half-px slack, like the fits-predicate: sub-pixel overflow must not flash a bar
-    return { offset: (pos - lo) * c.zoom, total, scrollable: total > view + 0.5 };
+    return { offset: (pos - lo) * camera.zoom, total, scrollable: total > view + 0.5 };
   };
-  const x = axis(c.x, bounds.x, bounds.width, vp.width);
-  const y = axis(c.y, bounds.y, bounds.height, vp.height);
+  const horizontal = axis(camera.x, bounds.x, bounds.width, vp.width);
+  const vertical = axis(camera.y, bounds.y, bounds.height, vp.height);
   return {
-    scrollLeft: x.offset,
-    scrollTop: y.offset,
-    scrollWidth: x.total,
-    scrollHeight: y.total,
+    scrollLeft: horizontal.offset,
+    scrollTop: vertical.offset,
+    scrollWidth: horizontal.total,
+    scrollHeight: vertical.total,
     clientWidth: vp.width,
     clientHeight: vp.height,
-    scrollableX: x.scrollable,
-    scrollableY: y.scrollable,
+    scrollableX: horizontal.scrollable,
+    scrollableY: vertical.scrollable,
   };
 };
 
 /**
  * The inverse write — `Element.scrollTo` semantics: absolute offsets into the
- * CURRENT range (the same union `scrollMetrics` reports), clamped into
+ * current range (the same union `scrollMetrics` reports), clamped into
  * [0, total − view]; an omitted axis does not move. Zoom is untouched: scrolling
  * is a pan in scroller clothing.
  */
 export const cameraFromScroll = (
-  c: Camera,
+  camera: Camera,
   bounds: Rect,
   vp: Size,
   padding: number,
@@ -337,15 +356,15 @@ export const cameraFromScroll = (
     view: number,
   ): number => {
     if (want === undefined) return pos;
-    const lo = Math.min(origin - padding / c.zoom, pos);
-    const hi = Math.max(origin + content + padding / c.zoom, pos + view / c.zoom);
-    const max = Math.max(0, (hi - lo) * c.zoom - view);
-    return lo + clamp(want, 0, max) / c.zoom;
+    const lo = Math.min(origin - padding / camera.zoom, pos);
+    const hi = Math.max(origin + content + padding / camera.zoom, pos + view / camera.zoom);
+    const max = Math.max(0, (hi - lo) * camera.zoom - view);
+    return lo + clamp(want, 0, max) / camera.zoom;
   };
   return {
-    zoom: c.zoom,
-    x: axis(target.left, c.x, bounds.x, bounds.width, vp.width),
-    y: axis(target.top, c.y, bounds.y, bounds.height, vp.height),
+    zoom: camera.zoom,
+    x: axis(target.left, camera.x, bounds.x, bounds.width, vp.width),
+    y: axis(target.top, camera.y, bounds.y, bounds.height, vp.height),
   };
 };
 
@@ -353,8 +372,8 @@ export const cameraFromScroll = (
  * Per-axis alignment value. Used by the rest constraint (fitAlign — where
  * content settles on an axis the camera cannot travel) and, extended with
  * fractions (see {@link AlignValue}), by the arrival/zoom/anchor policies.
- * On the x-axis the NAMED values are LOGICAL (CSS-style): 'start' = where
- * reading begins (left in LTR, RIGHT in RTL), 'end' = where it ends. On the
+ * On the x-axis the named values are logical (CSS-style): 'start' = where
+ * reading begins (left in LTR, right in RTL), 'end' = where it ends. On the
  * y-axis they are physical (start = top). So a 'start' default is
  * automatically correct in both directions — no 'auto' value needed.
  */
@@ -364,8 +383,8 @@ export interface Alignment {
   y: Align;
 }
 /**
- * One axis of an alignment POLICY: a named stop, or a viewport fraction 0–1
- * that positions the subject's CENTER at that fraction of the viewport
+ * One axis of an alignment policy: a named stop, or a viewport fraction 0–1
+ * that positions the subject's center at that fraction of the viewport
  * ('center' ≡ 0.5; 0.35 = the browser find-bar line). Named stops are logical
  * on x; fractions are physical, like every screen coordinate.
  */
@@ -376,15 +395,15 @@ export interface AlignmentValue {
 }
 
 /**
- * THE placement algorithm — every arrival (goToPage, next/prev, reset) lands
+ * The placement algorithm — every arrival (goToPage, next/prev, reset) lands
  * through it. Pure alignment: put the subject at `align` in the viewport —
  * per axis 'start' (reading edge at the padded viewport edge), 'end' (far
  * edge), 'center', or a fraction — with x resolved logically against the
- * reading direction. The SAME rule at every zoom: whether the subject fits or
+ * reading direction. The same rule at every zoom: whether the subject fits or
  * overflows never changes where it lands. Landing is policy, not a side
  * effect of magnification.
  *
- * Deliberately clamp-free: the caller clamps the result against the TRUE
+ * Deliberately clamp-free: the caller clamps the result against the true
  * travel bounds (the scene in continuous flow, the item slice in paged). On
  * an axis with no real freedom that clamp collapses the landing to the
  * `fitAlign` rest point — "rests where it must" comes out of the clamp's
@@ -398,11 +417,11 @@ export function placeCamera(
   align: AlignmentValue = { x: 'start', y: 'start' },
   direction: Direction = 'ltr',
 ): Camera {
-  const axis = (a: AlignValue, pos: number, extent: number, view: number): number => {
-    if (a === 'start') return pos - padding / zoom;
-    if (a === 'end') return pos + extent - (view - padding) / zoom;
-    const f = a === 'center' ? 0.5 : clamp(a, 0, 1);
-    return pos + extent / 2 - (view * f) / zoom;
+  const axis = (alignValue: AlignValue, pos: number, extent: number, view: number): number => {
+    if (alignValue === 'start') return pos - padding / zoom;
+    if (alignValue === 'end') return pos + extent - (view - padding) / zoom;
+    const fraction = alignValue === 'center' ? 0.5 : clamp(alignValue, 0, 1);
+    return pos + extent / 2 - (view * fraction) / zoom;
   };
   const ax =
     direction === 'rtl' && align.x === 'start'
@@ -418,13 +437,13 @@ export function placeCamera(
 }
 
 /**
- * The MINIMAL camera move that makes `rect` fully visible (with a `padding` gutter)
+ * The minimal camera move that makes `rect` fully visible (with a `padding` gutter)
  * — DOM scrollIntoView({ block: 'nearest' }) as camera math. Per axis, the cameras
- * that show the rect form an interval; the answer is the current camera CLAMPED
+ * that show the rect form an interval; the answer is the current camera clamped
  * into it: already inside → unchanged (the no-op case, by construction, not by
  * condition). An oversized rect (interval inverted) aligns to its start.
  *
- * This is deliberately NOT placement: `placeCamera` answers "I am navigating here"
+ * This is deliberately not placement: `placeCamera` answers "I am navigating here"
  * (canonical); `revealCamera` answers "make sure this is seeable" (minimal).
  */
 export function revealCamera(cam: Camera, rect: Rect, vp: Size, padding = 0): Camera {
@@ -464,9 +483,9 @@ export function resolveZoom(spec: ZoomSpec, box: Size, vp: Size, padding = 0): n
   }
 }
 
-// ── Anchor — a PAGE-RELATIVE point, the durable "what am I looking at". The world
+// ── Anchor — a page-relative point, the durable "what am I looking at". The world
 //    point under a screen position is meaningless across a re-layout (pages move);
-//    the page-point survives. Point-generalized: WHICH viewport point the anchor
+//    the page-point survives. Point-generalized: Which viewport point the anchor
 //    lives at is the caller's policy (anchorAlign for reframes, zoomAlign for
 //    zoom-intent changes); the wrappers default to the classic center. ──────────
 /** The anchor at an arbitrary world point: its nearest page + the point, page-relative. */
@@ -474,11 +493,11 @@ export function anchorAtPoint(scene: Scene, worldPt: Point): Anchor {
   const item = scene.nearestItem(worldPt);
   let page = item.pages[0];
   let best = Infinity;
-  for (const p of item.pages) {
-    const d = Math.abs(p.x + p.width / 2 - worldPt.x);
-    if (d < best) {
-      best = d;
-      page = p;
+  for (const candidate of item.pages) {
+    const distance = Math.abs(candidate.x + candidate.width / 2 - worldPt.x);
+    if (distance < best) {
+      best = distance;
+      page = candidate;
     }
   }
   return {
@@ -488,7 +507,7 @@ export function anchorAtPoint(scene: Scene, worldPt: Point): Anchor {
   };
 }
 
-/** The camera that puts the anchor's world point at a given SCREEN point. */
+/** The camera that puts the anchor's world point at a given screen point. */
 export function cameraForAnchorAtScreen(
   anchor: Anchor,
   scene: Scene,
@@ -497,7 +516,8 @@ export function cameraForAnchorAtScreen(
 ): Camera {
   const item = scene.items[scene.itemOfPage(anchor.pageIndex)];
   let page = item.pages[0];
-  for (const p of item.pages) if (p.pageIndex === anchor.pageIndex) page = p;
+  for (const candidate of item.pages)
+    if (candidate.pageIndex === anchor.pageIndex) page = candidate;
   const world = { x: page.x + anchor.fx * page.width, y: page.y + anchor.fy * page.height };
   return { zoom, x: world.x - screenPt.x / zoom, y: world.y - screenPt.y / zoom };
 }
@@ -508,7 +528,7 @@ export function anchorFromCamera(cam: Camera, scene: Scene, vp: Size, at?: Point
   return anchorAtPoint(scene, toWorld(cam, at ?? { x: vp.width / 2, y: vp.height / 2 }));
 }
 /** The camera that restores an anchor to the same viewport point it was
- *  captured at — capture and restore MUST agree on `at` for exact round-trips. */
+ *  captured at — capture and restore must agree on `at` for exact round-trips. */
 export function cameraFromAnchor(
   anchor: Anchor,
   scene: Scene,
@@ -520,22 +540,22 @@ export function cameraFromAnchor(
 }
 
 // ── Spatial-index helpers ──────────────────────────────────────────────────────
-function lowerBound(arr: number[], t: number): number {
+function lowerBound(arr: number[], value: number): number {
   let lo = 0;
   let hi = arr.length;
   while (lo < hi) {
     const mid = (lo + hi) >> 1;
-    if (arr[mid] < t) lo = mid + 1;
+    if (arr[mid] < value) lo = mid + 1;
     else hi = mid;
   }
   return lo;
 }
-function upperBound(arr: number[], t: number): number {
+function upperBound(arr: number[], value: number): number {
   let lo = 0;
   let hi = arr.length;
   while (lo < hi) {
     const mid = (lo + hi) >> 1;
-    if (arr[mid] <= t) lo = mid + 1;
+    if (arr[mid] <= value) lo = mid + 1;
     else hi = mid;
   }
   return lo;
@@ -543,9 +563,9 @@ function upperBound(arr: number[], t: number): number {
 const OVERSCAN = 2;
 
 /**
- * Reserved chrome space around each PAGE — the `PageFrame` primitive (world
+ * Reserved chrome space around each page — the `PageFrame` primitive (world
  * units in this pure layer; the shell derives them from screen px). The frame
- * belongs to PAGES, not items — in a spread every page keeps its own flanks,
+ * belongs to pages, not items — in a spread every page keeps its own flanks,
  * so left/right chrome works everywhere.
  */
 
@@ -556,32 +576,32 @@ interface LocalBox {
   w: number;
   h: number;
   rotation: PageRotation;
-  /** The page's `/UserUnit` — folded into ITS `contentScale` at placement, so
+  /** The page's `/UserUnit` — folded into its `contentScale` at placement, so
    *  "world units per content point" stays true for every page of a spread. */
   userUnit: number;
 }
 
 /** Intrinsic item dimensions (pages only, no margins) — the `uniform` reference.
- *  Uses DISPLAY dims, so `uniform` equalizes the rotated footprint and a rotated
+ *  Uses display dims, so `uniform` equalizes the rotated footprint and a rotated
  *  page sizes to match its neighbours as it actually appears. */
 function measureItem(
   pages: readonly PageGeom[],
   group: number[],
   gap: number,
 ): { width: number; height: number } {
-  let w = 0;
-  let h = 0;
+  let width = 0;
+  let height = 0;
   for (let j = 0; j < group.length; j++) {
-    const d = displayDims(pages[group[j]]);
-    w += d.width + (j > 0 ? gap : 0);
-    if (d.height > h) h = d.height;
+    const size = displayDims(pages[group[j]]);
+    width += size.width + (j > 0 ? gap : 0);
+    if (size.height > height) height = size.height;
   }
-  return { width: w, height: h };
+  return { width, height };
 }
 
 /**
- * Pack one item from SCALED pages plus constant per-page margins. The page boxes
- * (and the spread's inner gap) scale with the sizing factor; the margins do NOT —
+ * Pack one item from scaled pages plus constant per-page margins. The page boxes
+ * (and the spread's inner gap) scale with the sizing factor; the margins do not —
  * they are screen-px-derived chrome bands and stay constant in world space.
  */
 function packScaledItem(
@@ -598,42 +618,42 @@ function packScaledItem(
   const local: LocalBox[] = [];
   let lx = 0;
   for (let j = 0; j < group.length; j++) {
-    const d = displayDims(pages[group[j]]);
-    const w = d.width * scale;
-    const h = d.height * scale;
+    const size = displayDims(pages[group[j]]);
+    const scaledWidth = size.width * scale;
+    const scaledHeight = size.height * scale;
     local.push({
       pageIndex: group[j],
       lx: lx + frame.left,
-      ly: frame.top + (maxH - h) / 2, // page centers within the inner band
-      w,
-      h,
+      ly: frame.top + (maxH - scaledHeight) / 2, // page centers within the inner band
+      w: scaledWidth,
+      h: scaledHeight,
       rotation: pages[group[j]].rotation ?? 0,
       userUnit: pages[group[j]].userUnit ?? 1,
     });
-    lx += frame.left + w + frame.right + gap * scale;
+    lx += frame.left + scaledWidth + frame.right + gap * scale;
   }
   const width = Math.max(0, lx - gap * scale);
   const height = frame.top + maxH + frame.bottom;
   if (direction === 'rtl') {
-    // reading-first page takes the RIGHTMOST slot (the spread binds on the right);
-    // slots mirror, but each page keeps its PHYSICAL margins (left room stays left)
-    for (const b of local) b.lx = width - b.lx - b.w + (frame.left - frame.right);
+    // reading-first page takes the rightmost slot (the spread binds on the right);
+    // slots mirror, but each page keeps its physical margins (left room stays left)
+    for (const box of local) box.lx = width - box.lx - box.w + (frame.left - frame.right);
   }
   return { local, width, height };
 }
 
 function placePages(item: SceneItem, local: LocalBox[], contentScale: number): PageBox[] {
-  return local.map((b) => ({
-    pageIndex: b.pageIndex,
-    x: item.x + b.lx,
-    y: item.y + b.ly,
-    width: b.w,
-    height: b.h,
-    rotation: b.rotation,
-    // Per PAGE, not per item: the box was measured at `size × userUnit`, so
+  return local.map((box) => ({
+    pageIndex: box.pageIndex,
+    x: item.x + box.lx,
+    y: item.y + box.ly,
+    width: box.w,
+    height: box.h,
+    rotation: box.rotation,
+    // Per page, not per item: the box was measured at `size × userUnit`, so
     // the world-per-content-point factor must carry the same userUnit — every
     // content→world mapping downstream divides/multiplies by exactly this.
-    contentScale: contentScale * b.userUnit,
+    contentScale: contentScale * box.userUnit,
   }));
 }
 
@@ -656,7 +676,7 @@ export interface LinearOptions {
   align?: 'center' | 'start';
   sizing?: SizingMode;
   direction?: Direction;
-  /** Reserved chrome space around each PAGE (world units; constant, never scaled). */
+  /** Reserved chrome space around each page (world units; constant, never scaled). */
   pageFrame?: PageFrame;
   /** Points→view-px factor folded into each page's scale (default 1). */
   viewUnitsPerPoint?: number;
@@ -664,25 +684,26 @@ export interface LinearOptions {
 export function linearLayout(
   pages: readonly PageGeom[],
   grouping: number[][],
-  opts: LinearOptions = {},
+  options: LinearOptions = {},
 ): Scene {
-  const gap = opts.gap ?? 16;
-  const vertical = (opts.axis ?? 'y') === 'y';
-  const align = opts.align ?? 'center';
-  const sizing = opts.sizing ?? 'intrinsic';
-  const direction = opts.direction ?? 'ltr';
+  const gap = options.gap ?? 16;
+  const vertical = (options.axis ?? 'y') === 'y';
+  const align = options.align ?? 'center';
+  const sizing = options.sizing ?? 'intrinsic';
+  const direction = options.direction ?? 'ltr';
   // RTL mirrors the main axis only when it's horizontal; vertical scroll is
   // direction-agnostic (RTL books still scroll down) — only spreads swap.
   const mirrored = !vertical && direction === 'rtl';
 
-  const frame = opts.pageFrame ?? NO_FRAME;
+  const frame = options.pageFrame ?? NO_FRAME;
 
-  // Pass 1: measure every item at intrinsic PAGE size (no margins) — the cross axis
+  // Pass 1: measure every item at intrinsic page size (no margins) — the cross axis
   // (width when vertical) gives the reference for `uniform` sizing, so uniform
   // equalizes the pages themselves; constant margins then keep outer edges flush.
   const measures = grouping.map((group) => measureItem(pages, group, gap));
-  const crossOf = (p: { width: number; height: number }) => (vertical ? p.width : p.height);
-  const refCross = measures.reduce((m, p) => Math.max(m, crossOf(p)), 0);
+  const crossOf = (measure: { width: number; height: number }) =>
+    vertical ? measure.width : measure.height;
+  const refCross = measures.reduce((largest, measure) => Math.max(largest, crossOf(measure)), 0);
 
   // Pass 2: pack each item from scaled pages + constant margins, lay along the axis.
   const items: SceneItem[] = new Array(grouping.length);
@@ -694,10 +715,10 @@ export function linearLayout(
   let maxH = 0;
 
   for (let i = 0; i < grouping.length; i++) {
-    const s = itemScale(crossOf(measures[i]), refCross, sizing, opts.viewUnitsPerPoint);
-    const packed = packScaledItem(pages, grouping[i], s, gap, frame, direction);
+    const scale = itemScale(crossOf(measures[i]), refCross, sizing, options.viewUnitsPerPoint);
+    const packed = packScaledItem(pages, grouping[i], scale, gap, frame, direction);
     const { width, height } = packed;
-    scales[i] = s;
+    scales[i] = scale;
     locals[i] = packed.local;
     const it: SceneItem = {
       index: i,
@@ -734,15 +755,15 @@ export function linearLayout(
     it.pages = placePages(it, locals[i], scales[i]);
   }
 
-  // Spatial index in POSITION order (ascending coordinates for binary search).
+  // Spatial index in position order (ascending coordinates for binary search).
   // In a mirrored layout position order is reverse index order — `posIdx` maps back.
-  const posIdx = (k: number): number => (mirrored ? items.length - 1 - k : k);
-  const starts = items.map((_, k) => {
-    const it = items[posIdx(k)];
+  const posIdx = (position: number): number => (mirrored ? items.length - 1 - position : position);
+  const starts = items.map((_, position) => {
+    const it = items[posIdx(position)];
     return vertical ? it.y : it.x;
   });
-  const ends = items.map((_, k) => {
-    const it = items[posIdx(k)];
+  const ends = items.map((_, position) => {
+    const it = items[posIdx(position)];
     return vertical ? it.y + it.height : it.x + it.width;
   });
   const firstPage = items.map((it) => it.pageIndexes[0]);
@@ -753,18 +774,18 @@ export function linearLayout(
     itemCount: items.length,
     axis: vertical ? 'y' : 'x',
     maxItemSize: { width: maxW, height: maxH },
-    query(r) {
-      const a0 = vertical ? r.y : r.x;
-      const a1 = vertical ? r.y + r.height : r.x + r.width;
+    query(rect) {
+      const a0 = vertical ? rect.y : rect.x;
+      const a1 = vertical ? rect.y + rect.height : rect.x + rect.width;
       const lo = Math.max(0, lowerBound(ends, a0) - OVERSCAN);
       const hi = Math.min(items.length, upperBound(starts, a1) + OVERSCAN);
       const out: SceneItem[] = [];
-      for (let k = lo; k < hi; k++) out.push(items[posIdx(k)]);
+      for (let position = lo; position < hi; position++) out.push(items[posIdx(position)]);
       return out;
     },
     nearestItem(pt) {
-      const k = clamp(upperBound(starts, vertical ? pt.y : pt.x) - 1, 0, items.length - 1);
-      return items[posIdx(k)];
+      const position = clamp(upperBound(starts, vertical ? pt.y : pt.x) - 1, 0, items.length - 1);
+      return items[posIdx(position)];
     },
     itemOfPage(pi) {
       return clamp(upperBound(firstPage, pi) - 1, 0, items.length - 1);
@@ -776,14 +797,14 @@ export interface GridOptions {
   gap?: number;
   columns?: number;
   /**
-   * WRAPPED mode: instead of declaring `columns`, give the available line width
+   * Wrapped mode: instead of declaring `columns`, give the available line width
    * (world units) and the grid derives how many cells fit — the responsive
    * thumbnail-sidebar behavior. Takes precedence over `columns`.
    */
   lineWidth?: number;
   sizing?: SizingMode;
   direction?: Direction;
-  /** Reserved chrome space around each PAGE (world units; constant, never scaled). */
+  /** Reserved chrome space around each page (world units; constant, never scaled). */
   pageFrame?: PageFrame;
   /** Points→view-px factor folded into each page's scale (default 1). */
   viewUnitsPerPoint?: number;
@@ -791,70 +812,70 @@ export interface GridOptions {
 export function gridLayout(
   pages: readonly PageGeom[],
   grouping: number[][],
-  opts: GridOptions = {},
+  options: GridOptions = {},
 ): Scene {
-  const gap = opts.gap ?? 48;
-  const n = grouping.length;
-  const sizing = opts.sizing ?? 'intrinsic';
-  const direction = opts.direction ?? 'ltr';
+  const gap = options.gap ?? 48;
+  const itemCount = grouping.length;
+  const sizing = options.sizing ?? 'intrinsic';
+  const direction = options.direction ?? 'ltr';
 
-  const frame = opts.pageFrame ?? NO_FRAME;
+  const frame = options.pageFrame ?? NO_FRAME;
 
-  // Pass 1: measure at intrinsic PAGE size; the widest item is the `uniform` reference.
+  // Pass 1: measure at intrinsic page size; the widest item is the `uniform` reference.
   const measures = grouping.map((group) => measureItem(pages, group, gap));
-  const refW = measures.reduce((m, p) => Math.max(m, p.width), 0);
+  const refW = measures.reduce((widest, measure) => Math.max(widest, measure.width), 0);
 
   // Pass 2: pack each item from scaled pages + constant margins (uniform → equal
-  // page widths; equal margins keep the OUTER boxes equal too, so columns line up).
-  const locals: LocalBox[][] = new Array(n);
-  const sizes: Array<{ width: number; height: number }> = new Array(n);
-  const scales: number[] = new Array(n);
+  // page widths; equal margins keep the outer boxes equal too, so columns line up).
+  const locals: LocalBox[][] = new Array(itemCount);
+  const sizes: Array<{ width: number; height: number }> = new Array(itemCount);
+  const scales: number[] = new Array(itemCount);
   let cellW = 1;
   let cellH = 1;
-  for (let i = 0; i < n; i++) {
-    const s = itemScale(measures[i].width, refW, sizing, opts.viewUnitsPerPoint);
-    const packed = packScaledItem(pages, grouping[i], s, gap, frame, direction);
-    scales[i] = s;
+  for (let i = 0; i < itemCount; i++) {
+    const scale = itemScale(measures[i].width, refW, sizing, options.viewUnitsPerPoint);
+    const packed = packScaledItem(pages, grouping[i], scale, gap, frame, direction);
+    scales[i] = scale;
     locals[i] = packed.local;
     sizes[i] = { width: packed.width, height: packed.height };
     cellW = Math.max(cellW, sizes[i].width);
     cellH = Math.max(cellH, sizes[i].height);
   }
 
-  // Column count — declared, or DERIVED from the available line width (wrapped):
+  // Column count — declared, or derived from the available line width (wrapped):
   // how many cells fit the line. Computed here because it needs cellW. Clamped to
   // the item count so a short document doesn't occupy (or mirror across) a wider
   // line than it fills.
   const wanted =
-    opts.lineWidth !== undefined
-      ? Math.floor((opts.lineWidth + gap) / (cellW + gap))
-      : (opts.columns ?? Math.ceil(Math.sqrt(n)));
-  const columns = Math.max(1, Math.min(wanted, Math.max(1, n)));
+    options.lineWidth !== undefined
+      ? Math.floor((options.lineWidth + gap) / (cellW + gap))
+      : (options.columns ?? Math.ceil(Math.sqrt(itemCount)));
+  const columns = Math.max(1, Math.min(wanted, Math.max(1, itemCount)));
   // RTL fills each row right→left (like RTL text wrap); rows stay top→bottom.
   const colAt = (col: number): number => (direction === 'rtl' ? columns - 1 - col : col);
 
-  // Rows are as tall as THEIR tallest item — a wrapped grid is text-wrap for pages,
+  // Rows are as tall as their tallest item — a wrapped grid is text-wrap for pages,
   // and a wrapped line is as tall as its own tallest glyph, not the document's
   // tallest. (A single global cell height left short pages floating in huge voids
   // with mixed page sizes.) Columns keep a uniform width: that's what makes a
   // column grid a grid — and `sizing: 'uniform'` removes the horizontal voids.
   const stepX = cellW + gap;
-  const rows = Math.max(1, Math.ceil(n / columns));
+  const rows = Math.max(1, Math.ceil(itemCount / columns));
   const rowHeight: number[] = new Array(rows).fill(1);
-  for (let i = 0; i < n; i++) {
+  for (let i = 0; i < itemCount; i++) {
     const row = Math.floor(i / columns);
     rowHeight[row] = Math.max(rowHeight[row], sizes[i].height);
   }
   const rowTop: number[] = new Array(rows);
   let yCursor = 0;
-  for (let r = 0; r < rows; r++) {
-    rowTop[r] = yCursor;
-    yCursor += rowHeight[r] + gap;
+  for (let row = 0; row < rows; row++) {
+    rowTop[row] = yCursor;
+    yCursor += rowHeight[row] + gap;
   }
-  const rowEnd = rowTop.map((top, r) => top + rowHeight[r]);
+  const rowEnd = rowTop.map((top, row) => top + rowHeight[row]);
 
-  const items: SceneItem[] = new Array(n);
-  for (let i = 0; i < n; i++) {
+  const items: SceneItem[] = new Array(itemCount);
+  for (let i = 0; i < itemCount; i++) {
     const col = colAt(i % columns);
     const row = Math.floor(i / columns);
     const it: SceneItem = {
@@ -876,31 +897,31 @@ export function gridLayout(
   return {
     size,
     items,
-    itemCount: n,
+    itemCount,
     axis: 'grid',
     maxItemSize: { width: cellW, height: cellH },
-    query(r) {
-      const c0 = Math.max(0, Math.floor(r.x / stepX));
-      const c1 = Math.min(columns - 1, Math.floor((r.x + r.width) / stepX));
+    query(rect) {
+      const c0 = Math.max(0, Math.floor(rect.x / stepX));
+      const c1 = Math.min(columns - 1, Math.floor((rect.x + rect.width) / stepX));
       // rows by binary search over the prefix-summed row extents (O(log rows))
-      const r0 = Math.max(0, lowerBound(rowEnd, r.y));
-      const r1 = Math.min(rows - 1, upperBound(rowTop, r.y + r.height) - 1);
+      const r0 = Math.max(0, lowerBound(rowEnd, rect.y));
+      const r1 = Math.min(rows - 1, upperBound(rowTop, rect.y + rect.height) - 1);
       const out: SceneItem[] = [];
       for (let row = r0; row <= r1; row++)
         for (let col = c0; col <= c1; col++) {
           // colAt is its own inverse: spatial column → reading-order column
-          const idx = row * columns + colAt(col);
-          if (idx < n) out.push(items[idx]);
+          const index = row * columns + colAt(col);
+          if (index < itemCount) out.push(items[index]);
         }
       return out;
     },
     nearestItem(pt) {
       const col = clamp(Math.floor(pt.x / stepX), 0, columns - 1);
       const row = clamp(upperBound(rowTop, pt.y) - 1, 0, rows - 1);
-      return items[clamp(row * columns + colAt(col), 0, n - 1)];
+      return items[clamp(row * columns + colAt(col), 0, itemCount - 1)];
     },
     itemOfPage(pi) {
-      return clamp(upperBound(firstPage, pi) - 1, 0, n - 1);
+      return clamp(upperBound(firstPage, pi) - 1, 0, itemCount - 1);
     },
   };
 }

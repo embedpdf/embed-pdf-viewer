@@ -1,16 +1,19 @@
-import { readAnnotationMeasure, readShapeCaption } from './readMeasurementFields';
-import { readIntent } from './annotationReadPrimitives';
 import type {
   AnnotationBase,
+  PdfPoint,
   PolygonAnnotationDTO,
   PolylineAnnotationDTO,
+  ShapeDimensionCaption,
   VertexAnnotationFields,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
+import { readIntent } from './annotationReadPrimitives';
+import { polygonIntentFromName, polylineIntentFromName } from '../measurementIntent';
 import { readBorderEffect, readLineEndings, readVertices } from './annotationReadPrimitives';
-import { readFilledStyleExtras } from './readStyle';
 import { readAnnotationRotation } from './readAnnotationTransformMetadata';
+import { readAnnotationMeasure, readShapeCaption } from './readMeasurementFields';
+import { readFilledStyleExtras } from './readStyle';
 
 /**
  * Shared reader for the two vertex subtypes (polygon/polyline). Reads the
@@ -27,7 +30,7 @@ export function readVertexExtras(
   return {
     ...readFilledStyleExtras(fn, mem, annotPtr),
     vertices: readVertices(fn, mem, annotPtr),
-    ...(rotation != null ? { rotation } : {}),
+    rotation: rotation ?? null,
   };
 }
 
@@ -42,8 +45,8 @@ export function readPolygon(
   return {
     ...base,
     ...readAnnotationMeasure(fn, mem, annotPtr),
-    ...(caption ? { caption } : {}),
-    ...(intent === 'PolygonDimension' || intent === 'PolygonCloud' ? { intent } : {}),
+    ...shapeCaptionFieldsOf(caption),
+    intent: polygonIntentFromName(intent),
     subtype: 'polygon',
     ...readVertexExtras(fn, mem, annotPtr),
     // Absent /BE reads as explicit `null` (never omission), so a read DTO
@@ -63,10 +66,18 @@ export function readPolyline(
   return {
     ...base,
     ...readAnnotationMeasure(fn, mem, annotPtr),
-    ...(caption ? { caption } : {}),
-    ...(intent === 'PolyLineDimension' ? { intent } : {}),
+    ...shapeCaptionFieldsOf(caption),
+    intent: polylineIntentFromName(intent),
     subtype: 'polyline',
     ...readVertexExtras(fn, mem, annotPtr),
     lineEndings: readLineEndings(fn, mem, annotPtr),
   };
+}
+
+/** A shape without our caption flag reads `captionEnabled: null`, so an imported shape keeps its appearance. */
+function shapeCaptionFieldsOf(caption: ShapeDimensionCaption | undefined): {
+  captionEnabled: boolean | null;
+  captionCenter: PdfPoint | null;
+} {
+  return { captionEnabled: caption?.enabled ?? null, captionCenter: caption?.center ?? null };
 }

@@ -36,7 +36,7 @@ const PRODUCTS: DocsProductItem[] = [
   {
     key: 'engine',
     label: 'Engine',
-    href: '/docs/engine/getting-started',
+    href: '/docs/engine',
     icon: <EngineIcon />,
     tintClass: 'bg-[#DFF5F1] text-[#087F73]',
   },

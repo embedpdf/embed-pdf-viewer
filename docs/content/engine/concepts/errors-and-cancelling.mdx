@@ -1,0 +1,142 @@
+---
+title: Errors & cancelling
+description: Every failure is an EngineError with a code you can branch on, and every call can be cancelled.
+---
+
+import { Callout } from '@/components/docs/callout';
+
+# Errors & cancelling
+
+Every call that fails rejects with an `EngineError`. Its `code` says what went wrong, so you can
+handle each case:
+
+```ts
+import { EngineError, EngineErrorCode } from '@embedpdf/engine';
+
+try {
+  await page.annotations.update(ref, { contents: 'Done' });
+} catch (error) {
+  if (EngineError.is(error, EngineErrorCode.Forbidden)) {
+    showMessage('You can only edit your own comments.');
+  } else if (EngineError.is(error, EngineErrorCode.NotFound)) {
+    showMessage('This comment was deleted.');
+  } else {
+    throw error;
+  }
+}
+```
+
+`EngineError.is(error, code)` checks both that it's an engine error and that it has that code.
+Branch on the code, never on the message: messages are for people and can change.
+
+## Cancelling a call
+
+Every call returns a promise you can cancel. Keep it, and call `abort()` when you no longer need
+the answer:
+
+```ts
+const rendering = page.render.image({ viewport: { kind: 'width', width: 1600 } });
+
+// The user scrolled past the page:
+rendering.abort();
+```
+
+The promise rejects right away with code `Aborted`, and the engine stops the work if it hasn't
+finished. Cancelling a call that already finished does nothing.
+
+```ts
+try {
+  const image = await rendering;
+} catch (error) {
+  if (EngineError.is(error, EngineErrorCode.Aborted)) return; // we cancelled it
+  throw error;
+}
+```
+
+Only the promise the call returned has `abort()`: `rendering.then(…)` gives a plain promise. Keep
+the original.
+
+A time limit is a cancel on a timer:
+
+```ts
+const listing = doc.annotations.list();
+const timer = setTimeout(() => listing.abort(), 5000);
+
+try {
+  return await listing;
+} finally {
+  clearTimeout(timer);
+}
+```
+
+When the rest of your code cancels with an `AbortController` (a `fetch`, a framework's cleanup),
+tie the call to its signal with `abortWith()`:
+
+```ts
+const controller = new AbortController();
+
+const image = await page.render.image().abortWith(controller.signal);
+
+// later, in your cleanup:
+controller.abort();
+```
+
+The call is cancelled when the signal aborts, or at once if it already has.
+
+## Error codes
+
+The codes you'll handle most:
+
+| Code                   | What happened                                                                                                |
+| :--------------------- | :----------------------------------------------------------------------------------------------------------- |
+| `Forbidden`            | The user doesn't have the permission. `error.details.required` names it.                                     |
+| `NotFound`             | The page, annotation or field isn't there (anymore).                                                         |
+| `InvalidArg`           | Something you passed isn't valid. The message says what.                                                     |
+| `Aborted`              | You cancelled the call.                                                                                      |
+| `DocPasswordRequired`  | The file needs a password. See [Opening documents](/docs/engine/documents/opening#password-protected-files). |
+| `DocPasswordIncorrect` | `unlock()` got a wrong password.                                                                             |
+| `DocOpenFailed`        | The file isn't a PDF, or is too damaged to open.                                                             |
+| `PayloadTooLarge`      | An import or export is past a limit. `error.details` has the `limit` and `max`.                              |
+| `ProtectedDocument`    | A signature in the document forbids this change.                                                             |
+
+<Engine cloud>
+
+On the cloud you'll also meet:
+
+| Code                    | What happened                                                          |
+| :---------------------- | :--------------------------------------------------------------------- |
+| `Unauthenticated`       | The token is missing, invalid or expired.                              |
+| `SharePasswordRequired` | The share link needs its passphrase, or the one you gave was wrong.    |
+| `Network`               | The request didn't reach the server (offline, DNS, TLS).               |
+| `LayerVersionConflict`  | Someone else saved at the same moment. Nothing was changed; try again. |
+
+When the server is busy or restarting, the engine retries for you before any of these reach you;
+see [Setup](/docs/engine/setup#busy-servers).
+
+</Engine>
+
+## Good to know
+
+### Every code
+
+| Code                            | What happened                                                                                             |
+| :------------------------------ | :-------------------------------------------------------------------------------------------------------- |
+| `DocNotOpen`                    | The document was closed.                                                                                  |
+| `RuntimeUnavailable`            | The engine was destroyed, or the browser lacks something it needs.                                        |
+| `MalformedPdf`                  | The file opened, but part of it is too damaged to use.                                                    |
+| `InvalidReference`              | An index ref whose page changed since you read it.                                                        |
+| `WeakAnnotationSessionConflict` | Someone else is editing the same page by position. See [Refs & identity](/docs/engine/concepts/identity). |
+| `NotImplemented`                | This engine can't do this (yet).                                                                          |
+| `SigningPending`                | A signature is being made; finish or cancel it first.                                                     |
+| `SigningExpired`                | The signature took too long; start it again.                                                              |
+| `SigningVersionMismatch`        | The document changed while the signature was being made; start it again.                                  |
+| `SignatureRefused`              | This field can't be signed. The message says why.                                                         |
+| `StaleBase`                     | The document was signed elsewhere; this copy can be edited but not signed.                                |
+| `WireFormat`                    | The server sent something the engine didn't expect.                                                       |
+| `Unknown`                       | Anything else. Please report it.                                                                          |
+
+### `details`
+
+Some errors carry more in `error.details`: the missing permission for `Forbidden`, the field for
+`InvalidArg`, the limit for `PayloadTooLarge`. Log `error.toJSON()` to see everything an error
+has.

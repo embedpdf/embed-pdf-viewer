@@ -1,6 +1,6 @@
-import type { ControllerContext } from '@embedpdf/core';
+import type { PluginContext } from '@embedpdf/core';
 
-import type { MeasurementAction, MeasurementState } from '../model';
+import type { MeasurementState } from '../model';
 
-/** The plugin context every area receives — the kernel's, typed to this slice. */
-export type MeasurementContext = ControllerContext<MeasurementState, MeasurementAction>;
+/** The plugin context every area receives: the kernel's, typed to this plugin's state. */
+export type MeasurementContext = PluginContext<MeasurementState>;

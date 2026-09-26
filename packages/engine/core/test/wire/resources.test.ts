@@ -249,7 +249,7 @@ describe('cdnCoverageForScope', () => {
     ] as const) {
       expect(shared.has(id)).toBe(true);
     }
-    // Content owned (redaction apply / page surgery): the content trio AND
+    // Content owned (redaction apply / page surgery): the content trio and
     // the annotated family (content+annotations) go; annotation-plane and
     // attachments-plane resources stay — a redacted layer still shares the
     // base annotations and attachments it never touched.
@@ -272,7 +272,7 @@ describe('cdnCoverageForScope', () => {
     expect(contentOwned.has('attachments')).toBe(true);
     expect(contentOwned.has('layout')).toBe(true);
     // Layer-scoped variants are never plane-gated — a diverged layer still
-    // reads ITS OWN view.
+    // reads its own view.
     expect(contentOwned.has('layer-page-render')).toBe(true);
     expect(contentOwned.has('layer-page-text')).toBe(true);
     // Omitted scopes = tenant token / no layer in play: capability rules only.
@@ -297,7 +297,7 @@ describe('cdnCoverageForScope', () => {
     expect(annotationsOwned.has('page-render-annotated')).toBe(false);
     expect(annotationsOwned.has('page-render')).toBe(true);
     expect(annotationsOwned.has('attachments')).toBe(true);
-    // attachment-files stays granted on annotation divergence BY DESIGN: the
+    // attachment-files stays granted on annotation divergence by design: the
     // FileAttachment-annotation byte route carries its own origin-side
     // annotations check; withholding the whole prefix would break plain
     // attachment-file sharing (see RESOURCE_PLANES in coverage.ts).
@@ -315,7 +315,7 @@ describe('cdnCoverageForScope', () => {
     expect(attachmentsOwned.has('page-render')).toBe(true);
     expect(attachmentsOwned.has('layer-attachments')).toBe(true);
 
-    // Layout owned (move/rotate): ONLY the layout leaf goes — normalized
+    // Layout owned (move/rotate): Only the layout leaf goes — normalized
     // render/text/geometry artifacts survive structural ops.
     const layoutOwned = ids(
       cdnCoverageForScope(['*'], NO_BITS, {
@@ -340,7 +340,7 @@ describe('cdnCoverageForScope', () => {
   });
 
   it('a single capability scope covers both doc-level and layer-scoped variants gated by that capability', () => {
-    // doc.render → page-render (doc-level) AND layer-page-render (layer-scoped).
+    // doc.render → page-render (doc-level) and layer-page-render (layer-scoped).
     // Both share the same capability gate; both get signed so the CDN
     // covers whichever variant the SDK actually requests.
     const coverage = cdnCoverageForScope(['doc.render'], NO_BITS, { docId: 'doc_1' });
@@ -452,7 +452,7 @@ describe('cdnCoverageForScope', () => {
         'annotations-read',
         'layer-annotations-all',
         // doc.open (session establishment) also covers the doc-level shared
-        // families (plane-scope model); attachment BYTES stay behind
+        // families (plane-scope model); attachment bytes stay behind
         // doc.download.
         'layout',
         'metadata',
@@ -507,10 +507,9 @@ describe('DOC_RESOURCES — pathPrefix invariants (anti-drift)', () => {
   });
 
   it('every cacheable resource has a DISTINCT pathPrefix (so prefix-matching CDNs can enforce per-resource scope)', () => {
-    // The whole point of paths v2: each cacheable resource lives at
-    // its own prefix. Two resources sharing a prefix would mean a
-    // prefix-matching CDN (Bunny / Cloud CDN / Azure FD) couldn't
-    // tell them apart at the edge.
+    // Each cacheable resource lives at its own prefix. Two resources
+    // sharing a prefix would mean a prefix-matching CDN (Bunny / Cloud
+    // CDN / Azure FD) couldn't tell them apart at the edge.
     const cacheablePrefixes = Object.values(DOC_RESOURCES)
       .filter((r) => r.cdnCacheable)
       .map((r) => r.resolvePathPrefix('doc_X', 'myLayer'));

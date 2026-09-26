@@ -1,7 +1,7 @@
 /**
  * The mark maker (`signature-maker` modal surface): a person's signature and
- * initials, drawn, typed, or uploaded, saved as ONE library of kind
- * `signatures` — the file IS the person (Preview's model). Chrome code over
+ * initials, drawn, typed, or uploaded, saved as one library of kind
+ * `signatures` — the file is the person (Preview's model). Chrome code over
  * the stamp plugin's generic calls: `createLibrary` + `addAsset({ mark })`;
  * rename/export/delete are the library verbs. Opened on an existing library
  * (`props.libraryId`) it only adds the missing initials.
@@ -51,29 +51,31 @@ function MarkPad({
 
   // Paint the strokes (device-pixel sharp).
   useEffect(() => {
-    const el = canvas.current;
-    if (!el) return;
+    const element = canvas.current;
+    if (!element) return;
     const dpr = window.devicePixelRatio || 1;
-    el.width = PAD.width * dpr;
-    el.height = PAD.height * dpr;
-    const ctx = el.getContext('2d');
+    element.width = PAD.width * dpr;
+    element.height = PAD.height * dpr;
+    const ctx = element.getContext('2d');
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, PAD.width, PAD.height);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.lineWidth = 2.5;
-    ctx.strokeStyle = getComputedStyle(el).color || '#000';
+    ctx.strokeStyle = getComputedStyle(element).color || '#000';
     for (const stroke of strokes) {
       ctx.beginPath();
-      stroke.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+      stroke.forEach((vertex, i) =>
+        i === 0 ? ctx.moveTo(vertex.x, vertex.y) : ctx.lineTo(vertex.x, vertex.y),
+      );
       ctx.stroke();
     }
   }, [strokes, tab]);
 
-  const point = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const r = e.currentTarget.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  const point = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
   };
   const commitStrokes = (next: Stroke[]) => {
     setStrokes(next);
@@ -135,22 +137,22 @@ function MarkPad({
           ref={canvas}
           style={{ width: PAD.width, height: PAD.height, touchAction: 'none' }}
           className="border-border-subtle bg-surface text-fg rounded-md border"
-          onPointerDown={(e) => {
-            e.currentTarget.setPointerCapture(e.pointerId);
-            drawing.current = [point(e)];
-            setStrokes((s) => [...s, drawing.current!]);
+          onPointerDown={(event) => {
+            event.currentTarget.setPointerCapture(event.pointerId);
+            drawing.current = [point(event)];
+            setStrokes((previous) => [...previous, drawing.current!]);
           }}
-          onPointerMove={(e) => {
+          onPointerMove={(event) => {
             if (!drawing.current) return;
-            drawing.current.push(point(e));
-            setStrokes((s) => [...s.slice(0, -1), [...drawing.current!]]);
+            drawing.current.push(point(event));
+            setStrokes((previous) => [...previous.slice(0, -1), [...drawing.current!]]);
           }}
           onPointerUp={() => {
             if (!drawing.current) return;
             const done = drawing.current;
             drawing.current = null;
-            setStrokes((s) => {
-              const next = [...s.slice(0, -1), done];
+            setStrokes((previous) => {
+              const next = [...previous.slice(0, -1), done];
               commitStrokes(next);
               return next;
             });
@@ -161,19 +163,19 @@ function MarkPad({
           <input
             value={text}
             placeholder={t('demo.makerTypePlaceholder')}
-            onChange={(e) => void commitText(e.target.value, font)}
+            onChange={(event) => void commitText(event.target.value, font)}
             className="border-border bg-surface text-fg w-full rounded border px-2 py-1.5 text-sm"
           />
           <label className="text-fg-muted flex items-center gap-2 text-xs">
             {t('demo.makerFont')}
             <select
               value={font}
-              onChange={(e) => void commitText(text, e.target.value)}
+              onChange={(event) => void commitText(text, event.target.value)}
               className="border-border bg-surface text-fg rounded border px-2 py-1 text-xs"
             >
-              {fonts.map((f) => (
-                <option key={f.key} value={f.key}>
-                  {f.label}
+              {fonts.map((fontOption) => (
+                <option key={fontOption.key} value={fontOption.key}>
+                  {fontOption.label}
                 </option>
               ))}
             </select>
@@ -186,9 +188,9 @@ function MarkPad({
             type="file"
             accept="image/png,image/jpeg,application/pdf"
             className="hidden"
-            onChange={(e) => {
-              const file = e.currentTarget.files?.[0];
-              e.currentTarget.value = '';
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0];
+              event.currentTarget.value = '';
               if (file) pickFile(file);
             }}
           />
@@ -214,14 +216,14 @@ export function SignatureMakerModal() {
   const existing = existingId ? stamp.getLibrary(existingId) : null;
   const wantsInitials = (config.kinds ?? ['signature', 'initials']).includes('initials');
   const fonts = [
-    ...(config.fonts ?? []).map((f) => ({ key: f.key, label: f.label })),
+    ...(config.fonts ?? []).map((font) => ({ key: font.key, label: font.label })),
     ...BUILTIN_FONTS,
   ];
   const registered = useRef(new Set<string>());
   // A configured script face is registered on the engine the stamp plugin
   // authors with (the viewer's own) the first time a typed mark uses it.
   const registerFont = async (key: string) => {
-    const spec = config.fonts?.find((f) => f.key === key);
+    const spec = config.fonts?.find((font) => font.key === key);
     if (!spec || registered.current.has(key) || !kernel.engine.fonts) return;
     const response = await fetch(spec.url);
     if (!response.ok) throw new Error(`${spec.url}: HTTP ${response.status}`);
@@ -264,8 +266,8 @@ export function SignatureMakerModal() {
       setSignatureMark(null);
       setInitialsMark(null);
       surface.close();
-    } catch (err) {
-      console.error('[embedpdf] saving the signature failed:', err);
+    } catch (error) {
+      console.error('[embedpdf] saving the signature failed:', error);
       setError(t('demo.makerError'));
     } finally {
       setBusy(false);
@@ -294,7 +296,7 @@ export function SignatureMakerModal() {
             <input
               value={name}
               placeholder={t('demo.makerNamePlaceholder')}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(event) => setName(event.target.value)}
               className="border-border bg-surface text-fg mt-1 w-full rounded border px-2 py-1.5 text-sm"
             />
           </label>

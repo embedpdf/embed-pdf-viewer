@@ -1,5 +1,5 @@
 /**
- * @embedpdf/viewer — the SNIPPET door (`dist/embedpdf.js`).
+ * @embedpdf/viewer — the snippet door (`dist/embedpdf.js`).
  *
  * ```html
  * <div id="viewer" style="height:100vh"></div>
@@ -10,7 +10,7 @@
  * ```
  *
  * The same local door, with one line of difference: the default wasm location.
- * Loaded as a real URL module, this door SELF-LOCATES — `embedpdf.wasm` ships
+ * Loaded as a real URL module, this door self-locates — `embedpdf.wasm` ships
  * in the dist folder, and Vite hands this import back as a URL relative to
  * whichever chunk ends up holding it (`?no-inline` makes it a file, not
  * base64). It resolves against wherever the folder lives: jsDelivr when

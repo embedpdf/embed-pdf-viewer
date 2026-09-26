@@ -1,6 +1,6 @@
 import { createLocalEngineWithWorker } from '@embedpdf/engine';
 import EngineWorker from '@embedpdf/engine/worker-entry?worker';
-import { runAnnotationsDemo, summarizeRawAll } from './annotations-demo.ts';
+import { runAnnotationsDemo, summarizeList } from './annotations-demo.ts';
 
 const out = document.getElementById('out');
 if (!out) throw new Error('out element not found');
@@ -20,20 +20,23 @@ try {
     label: result.label,
     docId: result.docId,
     elapsedMs: result.elapsedMs,
-    summary: summarizeRawAll(result.rawAll),
+    summary: summarizeList(result.all),
     pageStateByPon: Object.fromEntries(
-      Object.entries(result.fullByPage).map(([pon, page]) => [
-        pon,
-        {
-          pageObjectNumber: page.pageState.pageObjectNumber,
-          hasAnyWeakAnnotations:
-            page.pageState.weakAnnotationState.kind === 'known'
-              ? page.pageState.weakAnnotationState.hasAnyWeakAnnotations
-              : null,
-          generation: page.pageState.revision.generation,
-          count: page.annotations.length,
-        },
-      ]),
+      Object.entries(result.byPage).map(([pageObjectNumber, list]) => {
+        const state = list.pages[0]!;
+        return [
+          pageObjectNumber,
+          {
+            pageObjectNumber: state.page.pageObjectNumber,
+            hasAnyWeakAnnotations:
+              state.weakAnnotationState.kind === 'known'
+                ? state.weakAnnotationState.hasAnyWeakAnnotations
+                : null,
+            generation: state.revision.generation,
+            count: list.annotations.length,
+          },
+        ];
+      }),
     ),
   };
   out.textContent = JSON.stringify(view, null, 2);

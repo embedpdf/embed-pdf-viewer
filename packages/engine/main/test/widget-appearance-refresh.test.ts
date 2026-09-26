@@ -1,6 +1,6 @@
 /**
- * Regression: a widget style patch through the ANNOTATION plane followed by a
- * value write through the FORM plane must both be visible in the appearance
+ * Regression: a widget style patch through the annotation plane followed by a
+ * value write through the form plane must both be visible in the appearance
  * render — the exact interleaving a viewer produces (style a field in design
  * mode, then fill it). Guards the "yellow background lost / committed text
  * invisible" bug class where the appearance raster came back empty or one
@@ -61,7 +61,7 @@ describe('widget appearance refresh across planes (engine-local, wasm)', () => {
   let doc: DocumentHandle;
   let field: FormFieldDTO;
   let widgetRef: AnnotationRef;
-  let pon: number;
+  let pageObjectNumber: number;
 
   beforeAll(async () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
@@ -72,11 +72,11 @@ describe('widget appearance refresh across planes (engine-local, wasm)', () => {
     if (!found) throw new Error('fixture is missing the First_Name field');
     field = found;
     const widget = field.widgets[0]!;
-    pon = widget.page!.pageObjectNumber;
+    pageObjectNumber = widget.page!.pageObjectNumber;
     widgetRef = {
       kind: 'objectNumber',
       annotObjectNumber: widget.annotObjectNumber,
-      page: toPageRef(pon),
+      page: toPageRef(pageObjectNumber),
     };
   }, 30_000);
 
@@ -87,7 +87,9 @@ describe('widget appearance refresh across planes (engine-local, wasm)', () => {
 
   /** The widget's appearance raster, or null when none is emitted. */
   async function widgetRaster(): Promise<Raster | null> {
-    const result = await doc.page(toPageRef(pon)).annotations.renderAppearances({ scale: 2 });
+    const result = await doc
+      .page(toPageRef(pageObjectNumber))
+      .annotations.renderAppearancesRaw({ viewport: { kind: 'scale', scale: 2 } });
     const entry = result.appearances.find(
       (a) =>
         a.ref.kind === 'objectNumber' &&
@@ -97,7 +99,7 @@ describe('widget appearance refresh across planes (engine-local, wasm)', () => {
   }
 
   test('an annotation-plane style patch shows up in the appearance render', async () => {
-    await doc.page(toPageRef(pon)).annotations.update(widgetRef, {
+    await doc.page(toPageRef(pageObjectNumber)).annotations.update(widgetRef, {
       subtype: 'widget',
       interiorColor: { r: 255, g: 213, b: 0 },
     });

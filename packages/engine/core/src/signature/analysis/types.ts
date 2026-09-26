@@ -46,7 +46,7 @@ export type ObjectChangeType = 'added' | 'modified' | 'freed';
 /**
  * What reading the object from one revision's bytes came to. `failed` is a
  * live mapping whose bytes do not parse (or a stream whose data cannot be
- * read): the side is present and its value is NOT evidence - two failed
+ * read): the side is present and its value is not evidence - two failed
  * reads are never "the same value".
  */
 export type ObjectReadStatus = 'ok' | 'failed' | 'absent';
@@ -214,7 +214,7 @@ export interface AnalyzeInput {
 
 /**
  * How the judged revision stands against the revision the signature
- * sealed. The verdict is the NET state - `until` compared with `since`
+ * sealed. The verdict is the net state - `until` compared with `since`
  * directly - the way Acrobat judges an approval signature (a page changed
  * and byte-restored later is unchanged; corpus v2/15, 42, 44, v3/81, 85).
  * A certification window replays every intervening revision as well
@@ -228,7 +228,7 @@ export interface ChangeAnalysis {
   until: { revisionIndex: number };
   /** The restrictions this window was judged under (see `RestrictionAnchor`). */
   restrictions: RestrictionAnchor[];
-  /** THE verdict, with the findings behind it. */
+  /** The verdict, with the findings behind it. */
   current: Assessment & { method: 'net-state' | 'net-state+replay' };
   /** Facts about the revisions between `since` and `until`; never a verdict. */
   later: {

@@ -1,5 +1,5 @@
 /**
- * C2–C4: a file-backed session (a base FILE, Node native runtime) signs
+ * C2–C4: a file-backed session (a base file, Node native runtime) signs
  * through a file candidate beside its base: the base streams through the
  * writer, only the signature object's span is ever held in memory, the
  * sealed file becomes the session's new file base, and an untouched
@@ -49,10 +49,19 @@ const candidates = async () => (await readdir(dir)).filter((f) => f.includes('.s
 describe('file-backed signing candidate', () => {
   test('prepare writes the candidate beside the base; complete installs it as the new file base', async () => {
     if (!available) return;
-    const doc = await engine.open({ kind: 'layerFile', id: 'file-sign', basePath }, { scope: ['*'] });
+    const doc = await engine.open(
+      { kind: 'layerFile', id: 'file-sign', basePath },
+      { scope: ['*'] },
+    );
     try {
-      await doc.forms.setValue({ kind: 'fqn', name: 'group.total' }, { type: 'text', value: 'on disk' });
-      const prepared = await doc.signatures!.prepare({ field: { kind: 'fqn', name: 'sig' }, certify: { permission: 2 } });
+      await doc.forms.setValue(
+        { kind: 'fqn', name: 'group.total' },
+        { type: 'text', value: 'on disk' },
+      );
+      const prepared = await doc.signatures.prepare({
+        field: { kind: 'fqn', name: 'sig' },
+        certify: { permission: 2 },
+      });
       const pending = await candidates();
       expect(pending).toHaveLength(1);
       expect(pending[0]).toContain(prepared.signingId);
@@ -64,25 +73,31 @@ describe('file-backed signing candidate', () => {
       expect(r2 + r3).toBe((await stat(candidatePath)).size);
       expect(r1).toBeLessThan(r2);
 
-      const result = await doc.signatures!.complete({ signingId: prepared.signingId, expectedVersion: prepared.expectedVersion, cms: FAKE_CMS });
+      const result = await doc.signatures.complete({
+        signingId: prepared.signingId,
+        expectedVersion: prepared.expectedVersion,
+        cms: FAKE_CMS,
+      });
       expect(result.status).toBe('completed');
       expect(result.signature.coverage).toBe('whole-revision');
       expect(result.signature.docMdp).toBe(2);
 
-      // The session's version IS the sealed file's hash, and a download returns it verbatim.
+      // The session's version is the sealed file's hash, and a download returns it verbatim.
       const sealed = await readFile(candidatePath);
       expect(result.version.sha256).toBe(sha256(sealed));
       const downloaded = new Uint8Array(await doc.download());
       expect(sha256(downloaded)).toBe(sha256(sealed));
 
       // Editing continues on a fresh layer over the sealed file; the fill survived.
-      const after = await doc.signatures!.list();
+      const after = await doc.signatures.list();
       expect(after.signatures[0].signed).toBe(true);
       const text = await doc.forms.get({ kind: 'fqn', name: 'group.total' });
       expect((text as { value?: string }).value).toBe('on disk');
 
-      // A second signing reuses the sealed file as its base and, when aborted, leaves nothing behind.
-      const second = await doc.signatures!.prepare({ field: { kind: 'fqn', name: 'sig' } }).catch(() => null);
+      // A second signing reuses the sealed file as its base and, when cancelled, leaves nothing behind.
+      const second = await doc.signatures
+        .prepare({ field: { kind: 'fqn', name: 'sig' } })
+        .catch(() => null);
       expect(second).toBeNull(); // the only field is signed
       expect(await candidates()).toHaveLength(1); // the sealed file itself
     } finally {
@@ -90,16 +105,19 @@ describe('file-backed signing candidate', () => {
     }
   });
 
-  test('abort removes the candidate file; close removes a still-pending one', async () => {
+  test('cancel removes the candidate file; close removes a still-pending one', async () => {
     if (!available) return;
     const before = await candidates();
-    const doc = await engine.open({ kind: 'layerFile', id: 'file-abort', basePath }, { scope: ['*'] });
+    const doc = await engine.open(
+      { kind: 'layerFile', id: 'file-abort', basePath },
+      { scope: ['*'] },
+    );
     try {
-      const prepared = await doc.signatures!.prepare({ field: { kind: 'fqn', name: 'sig' } });
+      const prepared = await doc.signatures.prepare({ field: { kind: 'fqn', name: 'sig' } });
       expect((await candidates()).length).toBe(before.length + 1);
-      expect((await doc.signatures!.abort(prepared.signingId)).status).toBe('aborted');
+      expect((await doc.signatures.cancel(prepared.signingId)).status).toBe('cancelled');
       expect((await candidates()).length).toBe(before.length);
-      await doc.signatures!.prepare({ field: { kind: 'fqn', name: 'sig' } });
+      await doc.signatures.prepare({ field: { kind: 'fqn', name: 'sig' } });
       expect((await candidates()).length).toBe(before.length + 1);
     } finally {
       await doc.close();
@@ -110,15 +128,29 @@ describe('file-backed signing candidate', () => {
   test('an untouched file session saves itself verbatim (base plus loaded delta)', async () => {
     if (!available) return;
     // Build a layer artifact with an edit, then open a fresh session over the base with it.
-    const editing = await engine.open({ kind: 'layerFile', id: 'file-edit', basePath }, { scope: ['*'] });
+    const editing = await engine.open(
+      { kind: 'layerFile', id: 'file-edit', basePath },
+      { scope: ['*'] },
+    );
     let artifact: Uint8Array;
     try {
-      await editing.forms.setValue({ kind: 'fqn', name: 'group.total' }, { type: 'text', value: 'delta' });
-      artifact = new Uint8Array(await editing.downloadLayer());
+      await editing.forms.setValue(
+        { kind: 'fqn', name: 'group.total' },
+        { type: 'text', value: 'delta' },
+      );
+      artifact = new Uint8Array(await editing.downloadLayer!());
     } finally {
       await editing.close();
     }
-    const doc = await engine.open({ kind: 'layerFile', id: 'file-verbatim', basePath, layer: { kind: 'artifact', bytes: artifact } }, { scope: ['*'] });
+    const doc = await engine.open(
+      {
+        kind: 'layerFile',
+        id: 'file-verbatim',
+        basePath,
+        layer: { kind: 'artifact', bytes: artifact },
+      },
+      { scope: ['*'] },
+    );
     try {
       const target = join(dir, 'verbatim.pdf');
       await doc.downloadToFile!(target);

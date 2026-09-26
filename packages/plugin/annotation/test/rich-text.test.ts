@@ -1,4 +1,4 @@
-import type { Annot, TextStyle } from '@embedpdf/core-annotation';
+import type { ModelAnnotation, TextStyle } from '@embedpdf/core-annotation';
 import type { FontHandle, RichTextDocument } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
@@ -48,13 +48,13 @@ const text: TextStyle = {
   textAlign: 'left',
 };
 
-const annot = (extra: Partial<Annot> = {}): Annot =>
+const annot = (extra: Partial<ModelAnnotation> = {}): ModelAnnotation =>
   ({
     id: 'a',
     ref: null,
     page: toPageRef(1),
     subtype: 'freeText',
-    geom: { t: 'text', rect: { x: 0, y: 0, width: 100, height: 20 } },
+    geometry: { kind: 'text', rect: { x: 0, y: 0, width: 100, height: 20 } },
     style: {
       color: '#000000',
       interiorColor: null,
@@ -67,7 +67,7 @@ const annot = (extra: Partial<Annot> = {}): Annot =>
     source: 'vector',
     apVersion: 0,
     ...extra,
-  }) as unknown as Annot;
+  }) as unknown as ModelAnnotation;
 
 describe('faces', () => {
   it('maps standard fonts, registered keys and unknown families both ways', () => {
@@ -122,15 +122,15 @@ describe('documents', () => {
   it('commits the rich paragraphs, with paragraph properties equal to the body stripped', () => {
     const plain = [{ runs: [{ text: 'hello' }] }];
     const styled = [{ runs: [{ text: 'hel', style: { weight: 700 } }, { text: 'lo' }] }];
-    const a = annot({ data: { subtype: 'free-text' } } as never);
-    expect(textCommitPatch(a, plain)).toEqual({ richText: { paragraphs: plain } });
-    expect(textCommitPatch(a, styled)).toEqual({ richText: { paragraphs: styled } });
+    const annotation = annot({ data: { subtype: 'free-text' } } as never);
+    expect(textCommitPatch(annotation, plain)).toEqual({ richText: { paragraphs: plain } });
+    expect(textCommitPatch(annotation, styled)).toEqual({ richText: { paragraphs: styled } });
     // Paragraph align/dir equal to the body's (the editor round-trips what it
     // renders) are not overrides; a differing one is kept.
     const echoed = [{ align: 'left' as const, dir: 'ltr' as const, runs: [{ text: 'hello' }] }];
-    expect(textCommitPatch(a, echoed)).toEqual({ richText: { paragraphs: plain } });
+    expect(textCommitPatch(annotation, echoed)).toEqual({ richText: { paragraphs: plain } });
     const centred = [{ align: 'center' as const, dir: 'ltr' as const, runs: [{ text: 'hello' }] }];
-    expect(textCommitPatch(a, centred)).toEqual({
+    expect(textCommitPatch(annotation, centred)).toEqual({
       richText: { paragraphs: [{ align: 'center', runs: [{ text: 'hello' }] }] },
     });
   });

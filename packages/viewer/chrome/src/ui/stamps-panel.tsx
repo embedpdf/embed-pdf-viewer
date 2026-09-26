@@ -1,21 +1,20 @@
 /**
- * The stamps sidebar (right panel) — v2's rubber-stamp sidebar on v3 parts.
- * The stamp plugin owns the libraries, the asset bytes and the cached
- * previews; this panel is the PICKER over them:
+ * The stamps sidebar (right panel). The stamp plugin owns the libraries, the
+ * asset bytes and the cached previews; this panel is the picker over them:
  *
  *   a library <select> ("All stamps" + one per library, shown once there
  *   are two) → a two-column grid of thumbnails → click a stamp → `armAsset`
  *   arms the annotation plugin's stamp tool → hovering a page ghosts the
  *   exact placement → each click on a page places one.
  *
- * Deliberately NOT a file dialog: picking arbitrary image bytes is the Image
+ * Deliberately not a file dialog: picking arbitrary image bytes is the Image
  * tool's job (a click-then-pick tool, `insert:add-image`). The stamp button
  * opens a library; a library is a set of reusable, named assets — the two
  * gestures are different, so they are different controls.
  *
  * The panel stays open while you place, so a stamp can be dropped on several
  * pages and swapped without a round trip through the toolbar. A command can
- * open it ON a library (`annotation:stamp-from-selection` → "My stamps")
+ * open it on a library (`annotation:stamp-from-selection` → "My stamps")
  * through the surface's open props.
  */
 import { useEffect, useRef, useState } from 'react';
@@ -59,14 +58,14 @@ export function StampsPanel() {
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<string>(ALL);
 
-  // A command opened the panel ON a library (v2's `selectedLibraryId` prop).
+  // A command opened the panel on a library (the surface's `libraryId` prop).
   const openedOn = surface.props?.libraryId;
   useEffect(() => {
     if (typeof openedOn === 'string') setPicked(openedOn);
   }, [openedOn]);
 
   // First open: the user's stored libraries (the workspace store restores
-  // them; this only awaits it), THEN the built-in library for this locale —
+  // them; this only awaits it), then the built-in library for this locale —
   // never at viewer boot, so a viewer whose user never opens this panel pays
   // nothing for it. A locale change while open swaps the built-in library;
   // the user's own are untouched.
@@ -75,8 +74,8 @@ export function StampsPanel() {
     setBusy('loading');
     restoreStampLibrariesOnce(stamp)
       .then(() => ensureDefaultLibrary(stamp, resolveStampsLocale(locale), defaultLibrary))
-      .catch((err: unknown) => {
-        console.error('[embedpdf] default stamps failed:', err);
+      .catch((error: unknown) => {
+        console.error('[embedpdf] default stamps failed:', error);
         if (live) setError(t('demo.stampsError'));
       })
       .finally(() => live && setBusy(null));
@@ -96,8 +95,8 @@ export function StampsPanel() {
   const arm = (asset: StampAsset) => {
     setError(null);
     setArmedId(asset.id);
-    void armAsset(asset.id).catch((err) => {
-      console.error('[embedpdf] arm stamp failed:', err);
+    void armAsset(asset.id).catch((error) => {
+      console.error('[embedpdf] arm stamp failed:', error);
       setArmedId(null);
       setError(t('demo.stampsArmError'));
     });
@@ -106,13 +105,13 @@ export function StampsPanel() {
   const importPdf = (file: File) => {
     setError(null);
     setBusy('importing');
-    // The file name is only a FALLBACK: an Acrobat-authored or previously
+    // The file name is only a fallback: an Acrobat-authored or previously
     // exported library names itself through its /Title.
     stamp
       .importLibrary(file, { name: file.name.replace(/\.pdf$/i, '') })
       .then((id) => setPicked(id))
-      .catch((err) => {
-        console.error('[embedpdf] stamp library import failed:', err);
+      .catch((error) => {
+        console.error('[embedpdf] stamp library import failed:', error);
         setError(t('demo.stampsImportError'));
       })
       .finally(() => setBusy(null));
@@ -125,10 +124,10 @@ export function StampsPanel() {
     if (!bytes) return;
     const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${name || 'stamps'}.pdf`;
-    a.click();
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${name || 'stamps'}.pdf`;
+    anchor.click();
     URL.revokeObjectURL(url);
   };
 
@@ -141,8 +140,10 @@ export function StampsPanel() {
       : libraries.some((library) => library.id === picked)
         ? picked
         : ALL;
-  const selected = selectedId === ALL ? null : (libraries.find((l) => l.id === selectedId) ?? null);
-  const shown = selectedId === ALL ? assets : assets.filter((a) => a.libraryId === selectedId);
+  const selected =
+    selectedId === ALL ? null : (libraries.find((library) => library.id === selectedId) ?? null);
+  const shown =
+    selectedId === ALL ? assets : assets.filter((asset) => asset.libraryId === selectedId);
   const isDefault = (libraryId: string) => libraryId === DEFAULT_LIBRARY_ID;
 
   return (
@@ -255,9 +256,9 @@ export function StampsPanel() {
           type="file"
           accept="application/pdf"
           className="hidden"
-          onChange={(e) => {
-            const file = e.currentTarget.files?.[0];
-            e.currentTarget.value = ''; // allow re-picking the same file
+          onChange={(event) => {
+            const file = event.currentTarget.files?.[0];
+            event.currentTarget.value = ''; // allow re-picking the same file
             if (file) importPdf(file);
           }}
         />
@@ -268,7 +269,7 @@ export function StampsPanel() {
 
 /** One grid cell: the plugin's cached preview through the object-URL hook
  *  (the DOM resource's lifetime belongs to the framework layer, not the
- *  store). Image only, as v2 — the artwork IS the label; the label is the
+ *  store). Image only — the artwork is the label; the label is the
  *  tooltip for the curious. */
 function StampAssetCell({
   asset,

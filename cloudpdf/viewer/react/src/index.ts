@@ -12,8 +12,8 @@
  * />
  * ```
  *
- * A cloud DOOR, and nothing more. It renders the open-source `<PDFViewer>` from
- * `@embedpdf/viewer-react/core` — the ENGINE-AGNOSTIC door, where `engine` is
+ * A cloud door, and nothing more. It renders the open-source `<PDFViewer>` from
+ * `@embedpdf/viewer-react/core` — the engine-agnostic door, where `engine` is
  * required — and supplies that engine from the cloud vocabulary via
  * `resolveCloudConfig`. Because the core door registers no default engine, the
  * local PDFium engine (6 MB of wasm, the worker source, the main-thread recipe)
@@ -29,7 +29,7 @@ import { resolveCloudConfig, type CloudSource } from '@cloudpdf/viewer/config';
 import { PDFViewer, type PDFViewerProps } from '@embedpdf/viewer-react/core';
 import { createElement } from 'react';
 
-// The open viewer's whole vocabulary rides along, so a cloud app imports ONE
+// The open viewer's whole vocabulary rides along, so a cloud app imports one
 // package — same ladder as the cloud snippet.
 export * from '@embedpdf/viewer-react/core';
 export { resolveCloudConfig } from '@cloudpdf/viewer/config';

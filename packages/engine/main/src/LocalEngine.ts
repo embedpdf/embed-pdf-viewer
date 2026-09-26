@@ -2,9 +2,12 @@ import {
   type SessionKind,
   type SignedDocumentPolicy,
   AbortablePromise,
+  checkCapability,
   CONTINUOUS_RENDER_POLICY,
+  decodePdfBits,
   EngineError,
   EngineErrorCode,
+  PermissionDenied,
   wirePack,
   type DocumentHandle,
   type Engine,
@@ -17,6 +20,7 @@ import { generateUuid } from '@embedpdf/engine-services';
 import { LocalDocumentHandle } from './document/LocalDocumentHandle';
 import { LocalFontService } from './fonts/LocalFontService';
 import { BrowserImageEncoder, type LocalImageEncoder } from './render/BrowserImageEncoder';
+import { PortableImageEncoder } from './render/PortableImageEncoder';
 import { buildHandleScopeContext, ScopeGuard } from './scope';
 import type { Transport } from './transport/Transport';
 import { Priority } from './worker/Priority';
@@ -28,14 +32,14 @@ export interface LocalEngineOptions {
   concurrency?: number;
   imageEncoder?: LocalImageEncoder;
   /**
-   * Deployment render policy for THIS engine instance — the local
+   * Deployment render policy for this engine instance — the local
    * counterpart of the lattice a cloud deployment advertises over
    * `/v1/access`, configured the same way permissions are overridden:
    * by the embedder, at construction. Advertised verbatim via
-   * `doc.render.policy()`; a lattice's `maxRenderPixels` budget rides
+   * `doc.render.getPolicy()`; a lattice's `maxRenderPixels` budget rides
    * into every worker render, and `enforced: true` rejects off-lattice
    * requests exactly like the enforcing server does. Default:
-   * `continuous` (render anything — v2 parity).
+   * `continuous` (render anything).
    */
   renderPolicy?: EngineRenderPolicy;
   /**
@@ -99,7 +103,13 @@ export class LocalEngine implements Engine {
     private readonly sessionKind: SessionKind,
   ) {
     this.queue = new WorkerQueue(transport, { concurrency });
-    this.imageEncoder = imageEncoder ?? new BrowserImageEncoder();
+    // A canvas where there is one; the portable PNG/BMP encoder elsewhere
+    // (Node), so an image render works in every environment.
+    this.imageEncoder =
+      imageEncoder ??
+      (typeof document === 'undefined' && typeof OffscreenCanvas === 'undefined'
+        ? new PortableImageEncoder()
+        : new BrowserImageEncoder());
     this.renderPolicy = renderPolicy ?? CONTINUOUS_RENDER_POLICY;
     this.fonts = new LocalFontService(this.queue);
   }
@@ -122,6 +132,17 @@ export class LocalEngine implements Engine {
       );
     }
 
+    // A session without `doc.open` could do nothing: refuse it here, before
+    // the file is loaded, as the cloud refuses the token at `/head`.
+    // (`pdf.permissions` grants it, and an omitted scope means every one.)
+    try {
+      if (options?.scope && !checkCapability('doc.open', options.scope, decodePdfBits(null))) {
+        return AbortablePromise.rejectReason(new PermissionDenied('doc.open', 'engine-local'));
+      }
+    } catch (error) {
+      return AbortablePromise.rejectReason(error); // an invalid scope string
+    }
+
     if (input.kind === 'bytes') {
       return this.openBytes(input, options);
     }
@@ -142,14 +163,14 @@ export class LocalEngine implements Engine {
     );
   }
 
-  /** A layer over a base FILE: PDFium range-reads the base from disk (Node runtimes only). */
+  /** A layer over a base file: PDFium range-reads the base from disk (Node runtimes only). */
   private openLayerFile(
     input: Extract<OpenInput, { kind: 'layerFile' }>,
     options?: OpenOptions,
   ): AbortablePromise<DocumentHandle> {
     const queue = this.queue;
-    const password = options?.password ?? input.password ?? null;
-    const docId = input.id;
+    const password = options?.password ?? null;
+    const docId = input.id ?? generateUuid();
     const baseKey = input.baseKey ?? input.basePath;
     const artifactBytes =
       input.layer?.kind === 'artifact' ? toArrayBuffer(input.layer.bytes) : undefined;
@@ -192,9 +213,9 @@ export class LocalEngine implements Engine {
     options?: OpenOptions,
   ): AbortablePromise<DocumentHandle> {
     const queue = this.queue;
-    const password = options?.password ?? input.password ?? null;
+    const password = options?.password ?? null;
     const buffer = toArrayBuffer(input.bytes);
-    const docId = input.id;
+    const docId = input.id ?? generateUuid();
     const signedDocumentPolicy = this.signedDocumentPolicy;
     const sessionKind = this.sessionKind;
 
@@ -230,9 +251,9 @@ export class LocalEngine implements Engine {
     options?: OpenOptions,
   ): AbortablePromise<DocumentHandle> {
     const queue = this.queue;
-    const password = options?.password ?? input.password ?? null;
-    const docId = input.id;
-    const baseKey = input.baseKey ?? input.id;
+    const password = options?.password ?? null;
+    const docId = input.id ?? generateUuid();
+    const baseKey = input.baseKey ?? docId;
     const baseBytes = toArrayBuffer(input.baseBytes);
     const artifactBytes =
       input.layer?.kind === 'artifact' ? toArrayBuffer(input.layer.bytes) : undefined;
@@ -294,7 +315,7 @@ export class LocalEngine implements Engine {
           signedDocumentPolicy: this.signedDocumentPolicy,
         }),
       );
-      return new LocalDocumentHandle(
+      const handle = new LocalDocumentHandle(
         payload.docId,
         queue,
         imageEncoder,
@@ -303,6 +324,8 @@ export class LocalEngine implements Engine {
         this.sessionId,
         this.renderPolicy,
       );
+      if (payload.passwordRejected) handle.security.markPasswordRejected();
+      return handle;
     });
   }
 

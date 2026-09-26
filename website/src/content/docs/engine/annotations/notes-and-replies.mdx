@@ -1,0 +1,219 @@
+---
+title: Notes & replies
+description: Add sticky notes, reply to any annotation, set review states, and show a note's text in a popup.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Notes & replies
+
+A note is the sticky-note icon PDF apps show on a page, with a comment in it. Any annotation can
+have replies, so a note, a highlight or a shape can each start a conversation.
+
+```ts
+const { annotation: note } = await page.annotations.create({
+  subtype: 'text',
+  rect: { left: 500, bottom: 700, right: 520, top: 720 },
+  contents: 'Is this total right?',
+});
+
+await page.annotations.create({
+  subtype: 'text',
+  rect: note.rect,
+  contents: 'Yes, checked against the invoice.',
+  reply: { to: note.ref },
+});
+```
+
+A note's `subtype` is `'text'`.
+
+## Add a note
+
+| Field      | What it is                                                                                      | Default  |
+| :--------- | :---------------------------------------------------------------------------------------------- | :------- |
+| `rect`     | Where the icon goes. Required. The icon is 20 × 20 points, at the bottom-left corner of `rect`. |          |
+| `contents` | The comment.                                                                                    | none     |
+| `icon`     | `'note'`, `'comment'`, `'key'`, `'help'`, `'insert'`, `'paragraph'` or `'new-paragraph'`        | `'note'` |
+| `color`    | The icon's color, `{ r, g, b }`.                                                                | yellow   |
+| `opacity`  | From `0` to `1`.                                                                                | `1`      |
+| `subject`  | A short label for the comment, such as `'Question'`.                                            | none     |
+
+Change the comment like any other field:
+
+```ts
+await page.annotations.update(note.ref, { contents: 'Is this total right? It looks low.' });
+```
+
+## Reply to an annotation
+
+A reply is an annotation with a `reply` field that names the one it answers. It's usually a
+note placed where its parent is. Here a note answers a highlight:
+
+```ts
+await page.annotations.create({
+  subtype: 'text',
+  rect: highlight.rect,
+  contents: 'Agreed, this needs a source.',
+  reply: { to: highlight.ref },
+});
+```
+
+A reply is on the same page as the annotation it answers; a `to` on another page fails with
+`InvalidArg`. You can reply to a reply: it joins the same thread.
+
+To take a reply out of its thread, set `reply: null`. It stays in the document as an annotation
+of its own.
+
+## Read a thread
+
+Replies aren't nested inside their parent. Each one is its own annotation in the page's list,
+and its `reply.to` is the parent's ref. To find a note's direct replies, compare refs with
+`annotationKey()`:
+
+```ts
+import { annotationKey } from '@embedpdf/engine';
+
+const { annotations } = await page.annotations.list();
+const key = annotationKey(note.ref);
+
+const replies = annotations.filter((a) => a.reply && annotationKey(a.reply.to) === key);
+```
+
+For a comments panel, `buildCommentThreads()` does the whole job. It turns a list into threads,
+one per annotation that isn't a reply:
+
+```ts
+import { buildCommentThreads } from '@embedpdf/engine';
+
+const { annotations } = await page.annotations.list();
+
+for (const thread of buildCommentThreads(annotations)) {
+  showComment(thread.root);
+  thread.replies.forEach(showReply); // oldest first, replies to replies included
+}
+```
+
+Each thread has:
+
+| Field          | What it is                                                                         |
+| :------------- | :--------------------------------------------------------------------------------- |
+| `root`         | The annotation the thread is about.                                                |
+| `replies`      | Every reply below it, oldest first. Review states aren't in it.                    |
+| `groupedParts` | Parts of the root, such as the strikeout of a suggested replacement (not replies). |
+| `review`       | The review states set on it (below).                                               |
+
+Popups, links and form widgets are left out: they're never a comment.
+
+## Review states
+
+A reviewer's verdict, such as _accepted_ or _rejected_, is a reply too: a note with a `state`.
+It isn't a comment, so hide its icon:
+
+```ts
+await page.annotations.create({
+  subtype: 'text',
+  rect: note.rect,
+  reply: { to: note.ref },
+  state: 'accepted',
+  hidden: true,
+});
+```
+
+Each state belongs to a `stateModel`, which the engine sets from the state:
+
+| `state`                                                            | `stateModel` |
+| :----------------------------------------------------------------- | :----------- |
+| `'accepted'`, `'rejected'`, `'cancelled'`, `'completed'`, `'none'` | `'review'`   |
+| `'marked'`, `'unmarked'` (a personal checkmark)                    | `'marked'`   |
+
+Other PDF apps can define models and states of their own; they read back as written. To write
+one, give both `state` and `stateModel`: a state the engine doesn't know, without a
+`stateModel`, fails with `InvalidArg`.
+
+To change a verdict, add a new state reply rather than editing the old one. Each reviewer's
+latest state counts, and `buildCommentThreads()` works that out for you:
+
+```ts
+thread.review.lastChange?.state; // the latest verdict, from anyone
+thread.review.byReviewer; // each reviewer's latest, by user id (or author name)
+thread.review.markedBy; // who has checked it off
+```
+
+## Popups
+
+A popup is the window a PDF app opens to show an annotation's comment. It's an annotation of its
+own, `subtype: 'popup'`, linked to the one it shows by `parent`:
+
+```ts
+const { annotation: popup } = await page.annotations.create({
+  subtype: 'popup',
+  parent: note.ref,
+  rect: { left: 320, bottom: 600, right: 500, top: 700 },
+  open: true,
+});
+```
+
+| Field    | What it is                                       | Default |
+| :------- | :----------------------------------------------- | :------ |
+| `parent` | The annotation whose comment it shows. Required. |         |
+| `rect`   | Where the window is when it's open. Required.    |         |
+| `open`   | Whether PDF apps show the window open.           | `false` |
+
+The engine keeps the link both ways: after this call, the note's `popup` field is the popup's ref.
+You never set `popup` yourself. An annotation normally has one popup; to move it, update its
+`rect`.
+
+A popup has no text of its own: it shows its parent's `contents`. To open or close it:
+
+```ts
+await page.annotations.update(popup.ref, { open: false });
+```
+
+You don't need a popup to have a note. Add one when the document should say where the comment
+window goes, or whether it starts open.
+
+## Delete a note
+
+Deleting a note deletes its whole thread, in one change: its replies (and their replies), its
+grouped parts, its review states and every popup. Deleting a reply deletes that reply and the
+replies under it. This is how Acrobat treats a thread too, and it keeps other viewers from
+showing a reply without its note.
+
+```ts
+const { meta } = await page.annotations.delete(note.ref);
+// meta.changed names everything that went, the note first
+```
+
+It's all or nothing: when the user may not delete one of them (someone else's reply, for a user who
+may only change their own annotations), nothing is deleted and the call fails with `Forbidden`.
+`error.details.refs` names the ones in the way.
+
+## Permissions
+
+A reply, a state and a popup are annotations, so creating one needs permission to create
+annotations, and deleting one needs permission to delete it. A user who may only change their
+own annotations can still reply to anyone's. See
+[Permissions](/docs/engine/concepts/permissions#annotations).
+
+## Good to know
+
+### Groups are parts, not replies
+
+`reply.type` is `'reply'` unless you say otherwise. `'group'` makes an annotation part of
+another one, such as the strikeout of a suggested replacement (see
+[Highlights & text markup](/docs/engine/annotations/text-markup#suggest-an-insertion-or-a-replacement)).
+PDF apps show a group as one annotation, with the comment, author and date of the annotation
+its parts point to; the parts' own comments are ignored.
+
+### The note icon
+
+The icon is always 20 × 20 points: the engine keeps the bottom-left corner of the `rect` you pass
+and sets its size. It's filled with `color` and outlined in black or white, whichever stands out
+against it.
+
+### How it's stored
+
+For readers who know PDF: `reply` is `/IRT` with `/RT`, a popup is linked by the parent's
+`/Popup` and the popup's `/Parent`, `open` is `/Open`, and states are `/State` and `/StateModel`
+on a text annotation, as ISO 32000 describes them. So threads, states and popups made here show
+up in other PDF apps, and theirs show up here.

@@ -49,20 +49,20 @@ export interface Engine {
 /**
  * A thunk that constructs a fresh {@link Engine}. Construction is synchronous
  * and cheap — engines allocate no live resources (no Worker, no WASM, no
- * socket) until first use — so the thunk exists purely to express OWNERSHIP:
+ * socket) until first use — so the thunk exists purely to express ownership:
  *
- *   - Pass an `Engine` INSTANCE to an adapter (`<Viewer>`, `provideEmbedPdf`)
- *     and it is BORROWED: the adapter never destroys it. You own the
+ *   - Pass an `Engine` instance to an adapter (`<Viewer>`, `provideEmbedPdf`)
+ *     and it is borrowed: the adapter never destroys it. You own the
  *     lifetime — the module-scope singleton case.
- *   - Pass a THUNK (`() => localEngine()`) and the adapter OWNS the result:
+ *   - Pass a thunk (`() => localEngine()`) and the adapter owns the result:
  *     it calls the thunk on mount and destroys the engine on unmount. Use
  *     this for per-mount isolation (StrictMode/HMR-clean teardown,
  *     multi-viewer independence).
  *
- * DELIBERATELY synchronous — an async thunk would reintroduce a "maybe
+ * Deliberately synchronous — an async thunk would reintroduce a "maybe
  * engine" that every consumer must await (the deferredEngine problem this
  * design removed). Async acquisition (dynamic `import()`, remote config)
- * belongs OUTSIDE the thunk: await it, then hand over the instance. Code
+ * belongs outside the thunk: await it, then hand over the instance. Code
  * that genuinely needs a lazily-resolved engine models that itself with
  * `Engine | Promise<Engine>` (see the stamp plugin's `assetEngine`).
  */

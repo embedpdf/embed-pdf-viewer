@@ -162,7 +162,7 @@ describe('GET /events — the SSE half of the document event stream', () => {
     expect(row.kind).toBe('pages.rotate');
     expect(row.layerName).toBe(layerName);
     expect(row.originSessionId).toBe('engine-session-A');
-    // The streamed payload IS the mutating caller's response — the
+    // The streamed payload is the mutating caller's response — the
     // three-way identity (response = audit payload = event payload).
     expect(row.payload).toEqual(responseBody);
     await sse.close();
@@ -204,7 +204,7 @@ describe('GET /events — the SSE half of the document event stream', () => {
       'Content-Type': 'application/json',
     };
 
-    // Two mutations BEFORE any subscriber exists.
+    // Two mutations before any subscriber exists.
     const first = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/rotate`, {
       method: 'POST',
       headers,
@@ -214,7 +214,7 @@ describe('GET /events — the SSE half of the document event stream', () => {
     const second = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/move`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ pages: [3].map(toPageRef), destIndex: 0 }),
+      body: JSON.stringify({ pages: [3].map(toPageRef), toIndex: 0 }),
     });
     expect(second.status).toBe(200);
 
@@ -257,7 +257,7 @@ describe('GET /events — the SSE half of the document event stream', () => {
     expect(fresh.status).toBe(200);
 
     await sse.waitFor(1);
-    expect(sse.events).toHaveLength(1); // the old rotate did NOT replay
+    expect(sse.events).toHaveLength(1); // the old rotate did not replay
     expect(sse.events[0].id).toBe(2);
     await sse.close();
   });
@@ -390,9 +390,9 @@ describe('drain + readiness — shutdown ends streams instead of hanging on them
   test('shutdown() completes within its budget with a connected SSE viewer', async () => {
     const sse = await openStream('tenant-drain2', 'docdrain02', 'alice');
 
-    // THE regression this feature exists for: with a live SSE socket,
-    // app.close() used to wait forever (heartbeats keep it alive) and
-    // the supervisor's SIGKILL preempted pool/cache teardown.
+    // The failure this feature prevents: with a live SSE socket,
+    // app.close() alone waits forever (heartbeats keep it alive) and
+    // the supervisor's SIGKILL preempts pool/cache teardown.
     const started = Date.now();
     await fx.bundle.shutdown();
     expect(Date.now() - started).toBeLessThan(10_000);
@@ -402,7 +402,7 @@ describe('drain + readiness — shutdown ends streams instead of hanging on them
   test('teardown stays far inside the runner hook budget when a request is stuck', async () => {
     // The defect this locks: buildApp's production `shutdownTimeoutMs`
     // (30s — the budget real in-flight traffic gets before a supervisor
-    // kill) is EXACTLY vitest's `hookTimeout`, so one stuck connection
+    // kill) is exactly vitest's `hookTimeout`, so one stuck connection
     // at teardown consumed the entire hook budget and surfaced as
     // "Hook timed out in 30000ms" — a phantom flake that looked like
     // load. `buildAppForTesting` bounds it to 2s; if anyone restores the

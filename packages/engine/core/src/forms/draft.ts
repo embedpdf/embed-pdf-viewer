@@ -6,7 +6,7 @@ export type { WidgetAppearance } from '../annotation/kinds/widget.shared';
 
 /**
  * Where (and how) a widget is born during `createField`. Under the hood
- * this IS an annotation create + `attachWidget`, composed in one atomic
+ * this is an annotation create + `attachWidget`, composed in one atomic
  * engine job.
  */
 export interface WidgetPlacement {
@@ -60,7 +60,7 @@ export interface CheckboxFieldDraft extends FormFieldDraftBase {
   widget?: WidgetPlacement;
 }
 
-/** ONE field, N widgets — the ISO radio model. */
+/** One field, N widgets — the ISO radio model. */
 export interface RadioFieldDraft extends FormFieldDraftBase {
   family: 'radio';
   radiosInUnison?: boolean;

@@ -1,0 +1,240 @@
+---
+title: Pages
+description: List a document's pages, then rotate, move, delete, insert, extract and flatten them.
+---
+
+# Pages
+
+List the pages of a document to learn their size and order, then work on them by `ref`:
+
+```ts
+const { pageCount, pages } = await doc.pages.list();
+
+await doc.pages.rotate([pages[0].ref], 90); // turn the first page
+await doc.pages.delete([pages[pageCount - 1].ref]); // delete the last one
+```
+
+## List pages
+
+`doc.pages.list()` returns every page in display order. It doesn't load any page content, so it's
+quick even for a long document.
+
+```ts
+const { pages } = await doc.pages.list();
+
+for (const page of pages) {
+  console.log(page.index, page.label, page.size.width, page.size.height, page.rotation);
+}
+```
+
+| Field      | What it is                                                                                                   |
+| :--------- | :----------------------------------------------------------------------------------------------------------- |
+| `index`    | Position in the document, from 0. Changes when pages move.                                                   |
+| `ref`      | The page's address. Stays the same when pages move; pass it to every page call.                              |
+| `label`    | The page's label from the PDF (`'iii'`, `'A-1'`), or `null` when the file has none.                          |
+| `size`     | `{ width, height }` of the visible area (the crop box) in points, before rotation.                           |
+| `rotation` | `0`, `90`, `180` or `270`: how far the page is turned clockwise when shown.                                  |
+| `userUnit` | How large one point is, in multiples of 1/72 inch. `1` for almost every file.                                |
+| `boxes`    | The page's boxes in PDF points: `media` and `crop` always, `bleed`, `trim` and `art` when the file has them. |
+
+`size` is the page before it's turned. For a page at `90` or `270`, swap width and height to get
+the size it's shown at:
+
+```ts
+const { size, rotation } = pages[0];
+const turned = rotation === 90 || rotation === 270;
+const shown = turned ? { width: size.height, height: size.width } : size;
+```
+
+## Refs, not positions
+
+Every call that works on pages takes refs, never indexes. A ref stays valid when pages move,
+rotate, or when pages before it are inserted or deleted, so you can keep it for as long as the
+page exists.
+
+```ts
+const page = doc.page(ref); // a handle for one page: render, text, annotations
+```
+
+`doc.page(ref)` makes no request. When you stored a page's object number yourself,
+`toPageRef(12)` turns it back into a ref. See [Refs & identity](/docs/engine/concepts/identity).
+
+## Rotate
+
+`rotate()` sets how pages are turned: `0`, `90`, `180` or `270` degrees clockwise. It sets the
+rotation, it doesn't add to it, so one value works for several pages at once:
+
+```ts
+await doc.pages.rotate([pageA.ref, pageB.ref], 90);
+```
+
+To turn a page a further quarter, add 90 to its current `rotation` from `list()`. After 270,
+start again at 0.
+
+Rotating changes how the page is shown, not its content, so annotations and text keep their
+positions. Renders don't turn by themselves: pass the page's `rotation` to show it turned (see
+[Turn the page](/docs/engine/documents/rendering#turn-the-page)).
+
+## Move
+
+`move(refs, toIndex)` takes the pages out and puts them back together, in the order you pass
+them, at `toIndex`:
+
+```ts
+const { pages } = await doc.pages.list();
+
+// Move the last page to the front
+await doc.pages.move([pages[pages.length - 1].ref], 0);
+```
+
+`toIndex` counts the pages that remain after the moved ones are taken out: from `0` to
+`pageCount - refs.length`.
+
+## Delete
+
+```ts
+await doc.pages.delete([page.ref]);
+```
+
+A page's annotations go with it. A document keeps at least one page: deleting every page fails
+with `InvalidArg`.
+
+## Insert another PDF
+
+`insert(bytes, toIndex?)` copies every page of another PDF into this one, with their annotations.
+Without `toIndex`, the pages go at the end:
+
+```ts
+const response = await fetch('/appendix.pdf');
+const { insertedPages } = await doc.pages.insert(await response.arrayBuffer());
+```
+
+`insertedPages` holds the refs of the new pages, in order. To merge several files, insert them one
+after the other.
+
+## Insert blank pages
+
+`insertBlank()` adds empty pages of the size you give, in points:
+
+```ts
+// Two US Letter pages after the first page
+await doc.pages.insertBlank({ size: { width: 612, height: 792 }, count: 2 }, 1);
+```
+
+A4 is `{ width: 595, height: 842 }`. `count` is 1 by default and at most 100 per call.
+
+## Extract pages to a new PDF
+
+`extract(refs)` returns a new PDF with copies of those pages, in the order you pass them. The
+document itself doesn't change.
+
+```ts
+const bytes = await doc.pages.extract([pages[0].ref, pages[1].ref]);
+```
+
+That makes splitting a document a loop, one file per page:
+
+```ts
+for (const { ref, index } of pages) {
+  const bytes = await doc.pages.extract([ref]);
+  await save(`page-${index + 1}.pdf`, bytes);
+}
+```
+
+And taking pages from one document into another is `extract()` then `insert()`:
+
+```ts
+const bytes = await source.pages.extract([ref]);
+await target.pages.insert(bytes, 0);
+```
+
+## Flatten a page's annotations
+
+Flattening draws a page's annotations into the page itself and removes them, so they can't be
+changed or deleted anymore. Filled-in form fields become plain content the same way.
+
+```ts
+const { results } = await doc.pages.flatten([page.ref]);
+// results: [{ page, status: 'applied' }]
+```
+
+Each page's `status` is `'applied'`, or `'unchanged'` when it had nothing to flatten. If a page
+fails, its status is `'failed'` (with an `error`) and the pages after it are `'skipped'`. Hidden
+annotations, popups and annotations without an appearance stay as they are.
+
+By default the page is flattened as it's shown on screen. Pass `{ usage: 'print' }` to flatten it
+as it prints, which leaves out annotations that don't print:
+
+```ts
+await doc.pages.flatten([page.ref], { usage: 'print' });
+```
+
+New annotations don't print unless you set `print: true`; see
+[Drawing annotations yourself](/docs/engine/annotations/appearances#new-annotations-dont-print).
+
+To flatten only some annotations, see
+[Drawing annotations yourself](/docs/engine/annotations/appearances).
+
+## Permissions
+
+| Call                                                          | Needs                                        |
+| :------------------------------------------------------------ | :------------------------------------------- |
+| `list()`                                                      | `doc.open`                                   |
+| `rotate()`, `move()`, `delete()`, `insert()`, `insertBlank()` | `doc.pages.assemble`                         |
+| `extract()`                                                   | `doc.download`: the pages leave the document |
+| `flatten()`                                                   | `doc.pages.modify` and `doc.annotate.modify` |
+
+See [Permissions](/docs/engine/concepts/permissions).
+
+## Good to know
+
+### What a change returns
+
+`rotate()`, `move()`, `delete()`, `insert()`, `insertBlank()`, `setName()` and `removeName()`
+return the new page list as `layout`, the same shape `list()` returns, so you can replace the list
+you hold without asking again:
+
+```ts
+const { layout } = await doc.pages.move([ref], 0);
+showThumbnails(layout.pages);
+```
+
+Other code that shows pages can listen for `pages.moved`, `pages.rotated`, `pages.deleted`,
+`pages.inserted` and `pages.flattened` instead. See [Events](/docs/engine/concepts/events).
+
+### Inserting
+
+A password-protected PDF can't be inserted: `insert()` fails with `DocPasswordRequired`. Open it,
+unlock it, and `extract()` its pages instead. Pages you insert get new refs; the pages already in
+the document keep theirs.
+
+<Engine local>
+
+In the browser, an `ArrayBuffer` you pass to `insert()` is transferred to the engine, not copied,
+so it's empty afterwards. Pass a copy to keep yours.
+
+</Engine>
+
+### Named pages
+
+A PDF can give pages names. Acrobat's stamp files work this way: each page is one stamp, named
+`identifier=label`. The names come with the page list:
+
+```ts
+const { namedPages } = await doc.pages.list();
+// [{ name: 'Approved=Approved', target: { kind: 'page', page: ref } }, …]
+```
+
+`target` is `{ kind: 'page', page }` for a page in the document. A name can also point at a hidden
+page template (`{ kind: 'template' }`), which isn't a page you can show, or at nothing
+(`{ kind: 'dangling' }`) in a file another app made.
+
+Add, change or remove a name with `setName()` and `removeName()`. The page itself stays:
+
+```ts
+await doc.pages.setName({ name: 'Draft=Draft', page: page.ref });
+await doc.pages.setName({ name: 'Draft=Concept', page: page.ref, replace: 'Draft=Draft' }); // rename
+await doc.pages.removeName({ name: 'Draft=Concept' });
+```
+
+Both need `doc.pages.assemble`. Deleting a page removes its names.

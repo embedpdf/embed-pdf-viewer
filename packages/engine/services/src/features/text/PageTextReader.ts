@@ -12,8 +12,8 @@ import { throwIfAborted } from '../../shared/abort';
  * the page text, and releases everything in reverse order.
  *
  * Index spaces (see engine-core `text/charmap.ts`): `charCount` is the
- * CHARACTER space (`FPDFText_CountChars` — the space geometry runs tile);
- * `text` is the TEXT projection. The two diverge when a character
+ * character space (`FPDFText_CountChars` — the space geometry runs tile);
+ * `text` is the text projection. The two diverge when a character
  * contributes zero text units (non-printing) or two (supplementary plane);
  * `charMap` anchors encode exactly those deviations.
  *
@@ -79,7 +79,7 @@ export class PageTextReader {
  * Full-fidelity page text in one call: the buffer is sized at the maximum
  * possible expansion (every character a surrogate pair, plus the NUL), so
  * the returned requirement always fits and the measure round-trip is
- * skipped. The return value counts UTF-16 units INCLUDING the terminator.
+ * skipped. The return value counts UTF-16 units including the terminator.
  */
 function readTextFull(
   runtime: PdfRuntimeModule,

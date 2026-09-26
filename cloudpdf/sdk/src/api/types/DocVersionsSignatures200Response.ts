@@ -83,7 +83,7 @@ export namespace DocVersionsSignatures200Response {
                 reason: string | null;
                 location: string | null;
                 contactInfo: string | null;
-                claimedTime: string | null;
+                signedAt: string | null;
             }
 
             export interface FieldMdp {

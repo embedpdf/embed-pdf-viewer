@@ -112,13 +112,13 @@ deployment. This is the whole app:
 <Engine local>
 Prefer the viewer to own the engine's lifetime — created on mount, destroyed on
 unmount? Pass a thunk instead: `engine={() => localEngine()}`. See the
-[Engine getting started](/docs/engine/getting-started) for the ownership model,
+[Engine setup](/docs/engine/setup) for the ownership model,
 fallback fonts, cloud, and SSR.
 </Engine>
 
 <Engine cloud>
 Prefer the viewer to own the engine's lifetime — created on mount, destroyed on
 unmount? Pass a thunk instead: `engine={() => cloudEngine({ baseUrl })}`. See
-the [Engine getting started](/docs/engine/getting-started) for tokens, public
+the [Engine setup](/docs/engine/setup) for tokens, public
 shares, and the ownership model.
 </Engine>

@@ -1,5 +1,5 @@
-/** @embedpdf/plugin-link/contract — the PUBLIC link vocabulary. */
-import type { ChangeOrigin, EventHook, OperationOptions, PageRef } from '@embedpdf/core';
+/** @embedpdf/plugin-link/contract: the public link vocabulary. */
+import type { EventHook, OperationOptions, PageRef, ResourceStatus } from '@embedpdf/core';
 import type { Point } from '@embedpdf/core-geometry';
 import type {
   AnnotationRef,
@@ -27,7 +27,7 @@ export type LinkActivation =
   | { outcome: 'dispatched'; dispatch: Promise<ActionDispatchResult> }
   | { outcome: 'none' };
 
-/** What activating a target WOULD do — no side effect. */
+/** What activating a target would do, with no side effect. */
 export type LinkResolution =
   | { kind: 'reveal'; page: PageRef; pageIndex: number; options: RevealOptions }
   | { kind: 'destination'; destination: PdfDestination }
@@ -42,11 +42,12 @@ export interface LinkActivateContext {
   page?: PageRef;
 }
 
+/** A link target was activated through this capability. */
 export interface LinkActivatedEvent {
   readonly target: PdfLinkTarget;
   readonly activation: LinkActivation;
-  readonly origin: ChangeOrigin;
 }
+/** A page's links were read from the engine. */
 export interface LinkLoadedEvent {
   readonly page: PageRef;
 }
@@ -58,11 +59,17 @@ export interface LinkCapability {
   getLink(page: PageRef, linkId: string): Link | null;
   /** The topmost (smallest) link under a page point. */
   getLinkAt(page: PageRef, point: Point): Link | null;
-  /** Every link in the document; loads pages as needed. */
+  /** Every link in the document; loads pages as needed. Rejects when a page's read fails. */
   listAllLinks(options?: OperationOptions): Promise<readonly Link[]>;
-  /** Load a page's links. Resolves at once when the annotation plugin owns them. */
+  /**
+   * Load a page's links. Resolves at once when the annotation plugin owns
+   * them; rejects when the read fails, which `getStatus(page)` then reports.
+   */
   ensureLoaded(page: PageRef, options?: OperationOptions): Promise<void>;
+  /** The page's links were read and are current. Always true with the annotation plugin. */
   isLoaded(page: PageRef): boolean;
+  /** Load state of a page's links: `idle`, `loading`, `ready`, `error` or `forbidden`. */
+  getStatus(page: PageRef): ResourceStatus;
   /** What activation would do, with no side effect. */
   resolve(target: PdfLinkTarget): LinkResolution;
   /**
@@ -78,6 +85,9 @@ export interface LinkCapability {
   getLabel(link: Link | PdfLinkTarget): string;
   /** After the built-in handling of any activation. */
   readonly onActivated: EventHook<LinkActivatedEvent>;
-  /** A page's links arrived. */
+  /**
+   * A page's links were read, first or again after an annotation change on
+   * it. Never fires for a failed read, nor while the annotation plugin owns the links.
+   */
   readonly onLoaded: EventHook<LinkLoadedEvent>;
 }

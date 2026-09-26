@@ -1,11 +1,11 @@
 /**
- * PageContext — the seam. A layer depends ONLY on this, never on the Stage, so
+ * PageContext — the seam. A layer depends only on this, never on the Stage, so
  * the same layer works inside a virtualized `<epdf-stage>` page and a future
  * standalone `<epdf-page-view>`.
  *
- * THE STABILITY INVARIANT (the one performance rule of this adapter): a page's
- * context is ONE STABLE OBJECT per mounted surface — identity never changes;
- * the volatile parts (`transform`, `frame`, `pageIndex`) are signals INSIDE it.
+ * The stability invariant (the one performance rule of this adapter): a page's
+ * context is one stable object per mounted surface — identity never changes;
+ * the volatile parts (`transform`, `frame`, `pageIndex`) are signals inside it.
  * The per-page injector providing `EPDF_PAGE` is likewise created once. Camera
  * frames then flow as signal writes — `NgTemplateOutlet` never recreates the
  * embedded views, in-flight renders survive, and updates stay per-binding.
@@ -29,14 +29,14 @@ export interface EpdfPageContext {
   /** Reserved chrome bands around the page (screen px per side). */
   readonly frame: Signal<PageFrame>;
   /** The single bridge between PDF points, view px, and device px for this
-   *  page. Layers do ALL coordinate work through it — never re-derive
+   *  page. Layers do all coordinate work through it — never re-derive
    *  `x * scale` or `* dpr`. Updates per camera frame. */
   readonly transform: Signal<PageTransform>;
   /** Client (screen) point → the viewer's coordinates (content point) — the
    *  one platform-bound hit-test. */
   toContentPoint(clientX: number, clientY: number): Point;
   /** Content point → client (screen) px — the exact inverse of `toContentPoint`. */
-  toClientPoint(p: Point): Point;
+  toClientPoint(point: Point): Point;
   /** Content rect → client (screen) px AABB. */
   toClientRect(rect: Rect): Rect;
 }
@@ -59,7 +59,7 @@ export function createPageContext(parts: {
   pageIndex: Signal<number>;
   frame: Signal<PageFrame>;
   transform: Signal<PageTransform>;
-  /** The rotated content wrapper's LIVE bounding box (the page's display box). */
+  /** The rotated content wrapper's live bounding box (the page's display box). */
   getRect: () => DOMRect;
 }): EpdfPageContext {
   const { transform, getRect } = parts;
@@ -76,20 +76,25 @@ export function createPageContext(parts: {
     toContentPoint: (clientX, clientY) => {
       // Client → box-local view px, then invert rotation + scale via the
       // transform (verified once in geometry, not re-derived per adapter).
-      const r = getRect();
-      return transform().viewToContent({ x: clientX - r.left, y: clientY - r.top });
+      const rect = getRect();
+      return transform().viewToContent({ x: clientX - rect.left, y: clientY - rect.top });
     },
-    toClientPoint: (p) => {
+    toClientPoint: (point) => {
       // Exact inverse of `toContentPoint`, offset by the same live display-box
       // origin — the two can never drift.
-      const r = getRect();
-      const v = transform().contentToView(p);
-      return { x: r.left + v.x, y: r.top + v.y };
+      const rect = getRect();
+      const viewPoint = transform().contentToView(point);
+      return { x: rect.left + viewPoint.x, y: rect.top + viewPoint.y };
     },
     toClientRect: (rect) => {
-      const r = getRect();
-      const v = transform().contentToViewRect(rect);
-      return { x: r.left + v.x, y: r.top + v.y, width: v.width, height: v.height };
+      const elementRect = getRect();
+      const viewRect = transform().contentToViewRect(rect);
+      return {
+        x: elementRect.left + viewRect.x,
+        y: elementRect.top + viewRect.y,
+        width: viewRect.width,
+        height: viewRect.height,
+      };
     },
   };
 }

@@ -3,7 +3,7 @@ import { APPROVAL_BASELINE, levelFromPermission, minLevel } from '../protection'
 import type { RestrictionAnchor, RevisionStructure } from './types';
 
 /**
- * The restrictions a window is judged under, read from the SEALED
+ * The restrictions a window is judged under, read from the sealed
  * revision's structure (what that revision declared, not what the final
  * file says).
  *
@@ -13,7 +13,7 @@ import type { RestrictionAnchor, RevisionStructure } from './types';
  *     Every certification's level, own or earlier, applies (inherited:
  *     conservative until observed otherwise), as does a /Lock's /P.
  *   - no `judged` (a revision-anchored analysis): every signed signature's
- *     locks and levels, as before.
+ *     locks and levels apply.
  */
 export function restrictionsFor(
   before: RevisionStructure,

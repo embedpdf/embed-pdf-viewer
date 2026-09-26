@@ -22,13 +22,13 @@ export interface CreateSqliteDbOptions {
 
 /**
  * Build a Kysely instance backed by `better-sqlite3`. SQLite is the
- * primary dialect for Phase 1; Postgres lands in Phase 2 via a parallel
- * driver in `db/drivers/postgres.ts`.
+ * default dialect; Postgres is the parallel driver in
+ * `db/drivers/postgres.ts`.
  *
  * Pragmas applied at boot:
  * - `journal_mode=WAL` for safe concurrent readers + writer
  * - `synchronous=NORMAL` (durable across crashes, fast)
- * - `foreign_keys=ON` for cascade-delete on documents -> layers later
+ * - `foreign_keys=ON` so deleting a document cascades to its dependent rows
  * - `busy_timeout=5000` so writers don't fail under brief contention
  */
 export function createSqliteDb(opts: CreateSqliteDbOptions): Kysely<Schema> {

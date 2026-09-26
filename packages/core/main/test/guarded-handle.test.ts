@@ -7,10 +7,10 @@ import { isPluginError } from '../src/errors';
 /** The guarded `ctx.doc`: lifetime and error vocabulary, invisible to the caller. */
 
 function deferred<T>() {
-  let resolve!: (v: T) => void;
-  let reject!: (e: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
+  let resolve!: (value: T) => void;
+  let reject!: (event: unknown) => void;
+  const promise = new Promise<T>((result, rej) => {
+    resolve = result;
     reject = rej;
   });
   return { promise, resolve, reject };
@@ -27,7 +27,7 @@ function fakeHandle() {
     id: 'd',
     security: { allows: (cap: string) => cap === 'doc.read' },
     metadata: {
-      read: () => read.promise,
+      get: () => read.promise,
       update: () => Promise.reject(new PermissionDenied('doc.metadata.modify')),
       fail: () => Promise.reject(new EngineError('NotFound', 'gone')),
       sync: () => {
@@ -49,7 +49,7 @@ describe('guardHandle', () => {
     const controller = new AbortController();
     const doc = guardHandle(handle, { signal: controller.signal, instanceId: 'd#1' }, 'test');
     expect(doc.security.allows('doc.read' as never)).toBe(true); // sync passthrough
-    const pending = doc.metadata.read();
+    const pending = doc.metadata.get();
     read.resolve('meta');
     await expect(pending).resolves.toBe('meta');
     // nested objects are wrapped lazily and cached
@@ -62,11 +62,11 @@ describe('guardHandle', () => {
     const { handle, read } = fakeHandle();
     const controller = new AbortController();
     const doc = guardHandle(handle, { signal: controller.signal, instanceId: 'd#1' }, 'test');
-    const pending = doc.metadata.read();
+    const pending = doc.metadata.get();
     controller.abort('closed');
-    await expect(pending).rejects.toSatisfy((e) => isPluginError(e, 'instance-closed'));
+    await expect(pending).rejects.toSatisfy((error) => isPluginError(error, 'instance-closed'));
     read.resolve('late'); // must not surface anywhere
-    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
   });
 
   it('aborts an abortable engine call at close', async () => {
@@ -75,7 +75,7 @@ describe('guardHandle', () => {
     const doc = guardHandle(handle, { signal: controller.signal, instanceId: 'd#1' }, 'test');
     const pending = doc.pages.list();
     controller.abort('closed');
-    await expect(pending).rejects.toSatisfy((e) => isPluginError(e, 'instance-closed'));
+    await expect(pending).rejects.toSatisfy((error) => isPluginError(error, 'instance-closed'));
     expect(abort).toHaveBeenCalledTimes(1);
   });
 
@@ -84,7 +84,9 @@ describe('guardHandle', () => {
     const controller = new AbortController();
     controller.abort('closed');
     const doc = guardHandle(handle, { signal: controller.signal, instanceId: 'd#1' }, 'test');
-    await expect(doc.metadata.read()).rejects.toSatisfy((e) => isPluginError(e, 'instance-closed'));
+    await expect(doc.metadata.get()).rejects.toSatisfy((error) =>
+      isPluginError(error, 'instance-closed'),
+    );
   });
 
   it('maps engine errors to the plugin vocabulary, sync and async', async () => {
@@ -97,10 +99,12 @@ describe('guardHandle', () => {
     ) as never as {
       metadata: { update(): Promise<unknown>; fail(): Promise<unknown>; sync(): unknown };
     };
-    await expect(doc.metadata.update()).rejects.toSatisfy((e) =>
-      isPluginError(e, 'permission-denied'),
+    await expect(doc.metadata.update()).rejects.toSatisfy((error) =>
+      isPluginError(error, 'permission-denied'),
     );
-    await expect(doc.metadata.fail()).rejects.toSatisfy((e) => isPluginError(e, 'not-found'));
+    await expect(doc.metadata.fail()).rejects.toSatisfy((error) =>
+      isPluginError(error, 'not-found'),
+    );
     expect(() => doc.metadata.sync()).toThrow(expect.objectContaining({ code: 'invalid-input' }));
   });
 
@@ -108,7 +112,7 @@ describe('guardHandle', () => {
     const { handle, abort } = fakeHandle();
     const controller = new AbortController();
     const doc = guardHandle(handle, { signal: controller.signal, instanceId: 'd#1' }, 'test');
-    const pending = doc.pages.list() as Promise<unknown> & { abort?: (r?: unknown) => void };
+    const pending = doc.pages.list() as Promise<unknown> & { abort?: (reason?: unknown) => void };
     expect(typeof pending.abort).toBe('function');
     pending.abort!('caller');
     expect(abort).toHaveBeenCalledTimes(1);

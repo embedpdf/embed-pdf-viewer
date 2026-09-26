@@ -9,7 +9,7 @@ import { writeAnnotationNm } from '../write/writeAnnotationBase';
  * Read an annotation's stable id, opportunistically stamping a fresh
  * engine-generated UUID v4 as `/NM` if it is currently weak (no object
  * number, no `/NM`). Monotonic `/NM` rule: an already-durable annotation
- * is NEVER touched. Caller owns the lifecycle of `annotPtr`.
+ * is never touched. Caller owns the lifecycle of `annotPtr`.
  *
  * Shared by the create/update/move mutator paths and the `/IRT`
  * relationship writer (which strengthens a weak parent before linking to

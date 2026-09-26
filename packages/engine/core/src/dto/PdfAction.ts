@@ -4,7 +4,7 @@ import type { PdfDestination } from './PdfDestination';
 export type PdfActionType = PdfActionNode['type'];
 
 /**
- * One Hide `/T` or ResetForm `/Fields` entry. Deliberately UNSCOPED: a
+ * One Hide `/T` or ResetForm `/Fields` entry. Deliberately unscoped: a
  * dictionary reference carries no page, so resolution (a name to widgets, an
  * object number to an annotation or field) is the interpreter's job — never
  * the extractor's.
@@ -15,14 +15,14 @@ export type PdfActionTargetRef =
 
 /**
  * Decoded SubmitForm `/Flags` word (ISO 32000-2:2020 Table 240) plus the raw
- * value. `exclude` is DERIVED from bit 1 — never stored separately, so the
+ * value. `exclude` is derived from bit 1 — never stored separately, so the
  * two cannot disagree. Note the two easily-missed positions verified against
  * the spec: bit 12 is `ExclFKey` (not "ExclFDFTemplate") and bit 13 is
  * reserved/undefined, so `EmbedForm` is bit 14.
  */
 export interface SubmitFormFlags {
   raw: number;
-  /** Bit 1: set → `fields` lists EXCLUDED fields. */
+  /** Bit 1: set → `fields` lists excluded fields. */
   exclude: boolean;
   /** Bit 2: submit designated valueless fields too, as name-only entries. */
   includeNoValueFields: boolean;
@@ -76,10 +76,10 @@ export const decodeSubmitFormFlags = (raw: number): SubmitFormFlags => {
 };
 
 /**
- * SubmitForm's extracted intent. ATOMIC on purpose: either every required
+ * SubmitForm's extracted intent. Atomic on purpose: either every required
  * component resolved (a complete, executable payload) or the node carries no
  * payload at all — partial states are unrepresentable. An unreadable
- * REQUIRED component (`/F`) degrades the whole node to `unknown` +
+ * required component (`/F`) degrades the whole node to `unknown` +
  * `payload-dropped` at read time instead.
  */
 export interface SubmitFormPayload {
@@ -88,9 +88,9 @@ export interface SubmitFormPayload {
    *  as a producer-compat extension. */
   url: string;
   /**
-   * `null` = `/Fields` ABSENT → Include/Exclude is ignored and every field
+   * `null` = `/Fields` absent → Include/Exclude is ignored and every field
    * except NoExport-flagged ones is submitted (Table 239). `[]` =
-   * present-but-empty: include mode submits NOTHING, exclude mode submits
+   * present-but-empty: include mode submits nothing, exclude mode submits
    * everything eligible — presence and emptiness are different states.
    */
   fields: PdfActionTargetRef[] | null;
@@ -124,9 +124,9 @@ export type PdfActionNode = PdfActionNodeCommon &
     | {
         type: 'reset-form';
         /**
-         * `null` = `/Fields` ABSENT → reset every field (`exclude` is
+         * `null` = `/Fields` absent → reset every field (`exclude` is
          * meaningless). `[]` = present-but-empty: with `exclude` false reset
-         * NOTHING, with `exclude` true reset EVERYTHING — PDFium's executor
+         * nothing, with `exclude` true reset everything — PDFium's executor
          * branches on presence first.
          */
         fields: PdfActionTargetRef[] | null;
@@ -139,8 +139,8 @@ export type PdfActionNode = PdfActionNodeCommon &
     /** ISO allows `/Rendition` to carry `/JS`; preserved, not collected. */
     | { type: 'rendition'; script?: string }
     /** Recognized; executable only when `payload` is present. Absent payload
-     *  = extracted by an older runtime (skew) — the node stays
-     *  recognized-inert exactly as before this payload existed. */
+     *  = extracted by a runtime without the SubmitForm getters (version
+     *  skew) — the node stays recognized-inert. */
     | { type: 'submit-form'; payload?: SubmitFormPayload }
     | { type: 'thread' }
     | { type: 'sound' }
@@ -236,6 +236,6 @@ export interface ActionReadBudget {
   maxTargetEntries: number;
   /** Payload string code units (URIs, submit URLs/CharSets, names, file
    *  paths, name-tree script names), aggregate across the job. Reserved
-   *  BEFORE allocation. */
+   *  before allocation. */
   maxPayloadCodeUnits: number;
 }

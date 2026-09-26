@@ -23,7 +23,7 @@ export class RedactionsClient {
     }
 
     /**
-     * @param {CloudPDF.doc.ApplyRedactionsRequest} request
+     * @param {CloudPDF.doc.DocRedactionsApplyRequest} request
      * @param {RedactionsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link CloudPDF.BadRequestError}
@@ -34,24 +34,21 @@ export class RedactionsClient {
      * @example
      *     await client.doc.redactions.apply({
      *         docId: "docId",
-     *         layerName: "layerName",
-     *         body: {
-     *             "key": "value"
-     *         }
+     *         layerName: "layerName"
      *     })
      */
     public apply(
-        request: CloudPDF.doc.ApplyRedactionsRequest,
+        request: CloudPDF.doc.DocRedactionsApplyRequest,
         requestOptions?: RedactionsClient.RequestOptions,
     ): core.HttpResponsePromise<CloudPDF.DocRedactionsApply200Response> {
         return core.HttpResponsePromise.fromPromise(this.__apply(request, requestOptions));
     }
 
     private async __apply(
-        request: CloudPDF.doc.ApplyRedactionsRequest,
+        request: CloudPDF.doc.DocRedactionsApplyRequest,
         requestOptions?: RedactionsClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocRedactionsApply200Response>> {
-        const { docId, layerName, "X-Document-Password": documentPassword, body: _body } = request;
+        const { docId, layerName, "X-Document-Password": documentPassword, ..._body } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,

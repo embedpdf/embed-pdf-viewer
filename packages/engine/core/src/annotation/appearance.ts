@@ -1,11 +1,11 @@
 import type { PdfRect } from '../geometry/primitives';
-import type { AnnotationDTO, WireAnnotationPatch } from './kinds';
+import type { AnnotationDTO, AnnotationPatch } from './kinds';
 
 /**
  * Appearance-impact classification: the shared, pure decision for whether an
  * update patch requires re-baking the `/AP` normal appearance stream.
  *
- * An `/AP` stream is CONTENT, not cache — a foreign producer's appearance
+ * An `/AP` stream is content, not cache — a foreign producer's appearance
  * (Acrobat's rich `/AP`, an image-backed stamp) generally cannot be
  * recomputed, so destroying it is only acceptable as the explicit consequence
  * of a semantic edit. Per ISO 32000 §12.5.5 a form XObject's `BBox` is
@@ -15,7 +15,7 @@ import type { AnnotationDTO, WireAnnotationPatch } from './kinds';
  * caller's claim of "this is just a move" — it checks the geometric fact that
  * licenses preservation.
  *
- * The classifier compares in DTO space on both sides (the patch vocabulary IS
+ * The classifier compares in DTO space on both sides (the patch vocabulary is
  * the DTO vocabulary, produced by the same readers), so value-diffing drops
  * no-op keys even from clients that send full-object patches. Unknown keys
  * and unknown subtypes classify as `regenerate` — conservative by default.
@@ -51,20 +51,46 @@ export interface AppearanceOutcome {
 const EPSILON = 1e-3;
 
 /**
- * Keys that never affect `/AP` on any kind: the discriminator, behavioral
- * flags, reply relationships, grouping, and the conversation-plane
+ * Keys that never affect `/AP` on any kind: the discriminator, the `/F`
+ * flags, the name, relationships and grouping, the conversation-plane
  * entries (`/Subj` subject line, `/State` + `/StateModel` review status —
- * dictionary-only per ISO 32000 §12.5.6.3, never painted).
+ * dictionary-only per ISO 32000 §12.5.6.3, never painted), and the fields a
+ * write accepts but never applies (addresses, attribution, `/A` and `/AA`).
  */
 const INERT_KEYS: ReadonlySet<string> = new Set([
   'subtype',
-  'flags',
-  'inReplyTo',
-  'replyType',
+  'invisible',
+  'hidden',
+  'print',
+  'noZoom',
+  'noRotate',
+  'noView',
+  'readOnly',
+  'locked',
+  'toggleNoView',
+  'lockedContents',
+  'nm',
+  'reply',
+  'popup',
+  'parent',
   'groupId',
   'subject',
   'state',
   'stateModel',
+  'ref',
+  'page',
+  'index',
+  'identityQuality',
+  'author',
+  'createdAt',
+  'modifiedAt',
+  'userId',
+  'createdBy',
+  'modifiedBy',
+  'importedBy',
+  'actions',
+  // A file attachment's icon is drawn from `/Name` and `/C`, never from its file.
+  'file',
 ]);
 
 /**
@@ -83,7 +109,7 @@ const ADVISORY_ROTATION: ReadonlySet<string> = new Set(['line', 'polyline', 'pol
 
 /**
  * The box kinds carry the `/EMBD_Metadata` transform pair (`rotation` +
- * `unrotatedRect`), tri-state on writes: omitted fields are PRESERVED, `null`
+ * `unrotatedRect`), tri-state on writes: omitted fields are preserved, `null`
  * (or `0` for rotation) clears. Translation verification therefore compares
  * the after-state — `patch.rotation ?? current.rotation` — not the patch keys.
  */
@@ -124,7 +150,7 @@ const normDeg = (v: unknown): number => {
 
 /**
  * Semantic equality between a patch value and the current DTO value.
- * Numbers compare within {@link EPSILON}; `null` and `undefined` both mean
+ * Numbers compare within {@link epsilon}; `null` and `undefined` both mean
  * "entry absent" (the tri-state clear of an absent entry is a no-op); arrays
  * and objects compare structurally.
  */
@@ -186,7 +212,7 @@ function shiftedBy(cur: unknown, next: unknown, dx: number, dy: number): boolean
  * Requires `patch.rect` (a translation always moves `/Rect`) with width and
  * height preserved; every other geometry field present on the annotation must
  * ride along shifted by the same delta — a rect move that leaves `vertices`
- * behind is NOT a translation (the dictionary would desync from the pixels).
+ * behind is not a translation (the dictionary would desync from the pixels).
  * For box kinds the `/EMBD_Metadata` transform group is checked as an
  * after-state: writes are tri-state (omitted preserves, null/0 clears), so an
  * omitted rotation keeps the current one — but a preserved-yet-unshifted
@@ -207,7 +233,7 @@ function isRigidTranslation(
   if (!numEq(patRect.top - patRect.bottom, curRect.top - curRect.bottom)) return false;
 
   if (BOX_TRANSFORM.has(subtype)) {
-    // Tri-state writes: an omitted rotation PRESERVES the current one; `null`
+    // Tri-state writes: an omitted rotation preserves the current one; `null`
     // clears (≡ 0). Compare the resulting after-state.
     const rotAfter = pat.rotation === undefined ? cur.rotation : pat.rotation;
     if (!numEq(normDeg(cur.rotation), normDeg(rotAfter))) return false;
@@ -231,24 +257,23 @@ function isRigidTranslation(
  *    plus the always-inert metadata keys (and per-kind inert keys: `contents`
  *    where it isn't painted, advisory `rotation` on the vertex family).
  *    Nothing left → `'inert'`.
- * 2. If every remaining key is translatable geometry for this kind AND the
+ * 2. If every remaining key is translatable geometry for this kind and the
  *    values are one rigid translation → `'translation'`.
  * 3. Anything else — style, text, unknown keys, unknown kinds → `'regenerate'`.
  */
 export function appearanceImpactOf(
   current: AnnotationDTO,
-  patch: WireAnnotationPatch,
+  patch: AnnotationPatch,
 ): AppearanceImpact {
-  if (patch.subtype !== current.subtype) return 'regenerate';
+  if (patch.subtype !== undefined && patch.subtype !== current.subtype) return 'regenerate';
 
   const cur = current as unknown as Record<string, unknown>;
   const pat = patch as unknown as Record<string, unknown>;
-  const subtype = patch.subtype;
-  const caption = pat.caption === undefined ? cur.caption : pat.caption;
+  const subtype = current.subtype;
+  const captionEnabled = pat.captionEnabled === undefined ? cur.captionEnabled : pat.captionEnabled;
   const contentsPainted =
     CONTENTS_PAINTED.has(subtype) ||
-    (['line', 'polygon', 'polyline'].includes(subtype) &&
-      !!(caption as { enabled?: boolean } | null | undefined)?.enabled);
+    (['line', 'polygon', 'polyline'].includes(subtype) && captionEnabled === true);
 
   const touched: string[] = [];
   for (const [key, value] of Object.entries(pat)) {
@@ -263,10 +288,8 @@ export function appearanceImpactOf(
   // A manual shape caption is page-space geometry and must ride with a rigid
   // move. Automatic centers follow the vertices without an explicit patch.
   const geometryKeys =
-    baseGeometryKeys &&
-    (subtype === 'polygon' || subtype === 'polyline') &&
-    (cur.caption as { center?: unknown } | undefined)?.center
-      ? [...baseGeometryKeys, 'caption']
+    baseGeometryKeys && (subtype === 'polygon' || subtype === 'polyline') && cur.captionCenter
+      ? [...baseGeometryKeys, 'captionCenter']
       : baseGeometryKeys;
   if (!geometryKeys) return 'regenerate';
   if (!touched.every((k) => geometryKeys.includes(k))) return 'regenerate';

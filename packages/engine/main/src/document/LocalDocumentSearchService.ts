@@ -18,9 +18,9 @@ interface DocClosedView {
 }
 
 /**
- * Document-scoped search service. `'rects'` mode gates on
- * `doc.text.search`; `'full'` (snippets) additionally needs
- * `doc.text.copy` — a snippet IS extracted text, so the copy denial must
+ * Document-scoped search service. A search gates on `doc.text.search`;
+ * `snippets: true` additionally needs `doc.text.copy` — a snippet is
+ * extracted text, so the copy denial must
  * hold here too (cloud parity: the server's search route enforces the
  * same pair). The worker fans out to `SearchReader`, which serves page
  * text from the session's version-keyed corpus cache.
@@ -41,7 +41,7 @@ export class LocalDocumentSearchService implements DocumentSearchService {
     }
     try {
       this.guard.assertCapability('doc.text.search');
-      if ((request.mode ?? 'full') === 'full') {
+      if (request.snippets) {
         this.guard.assertCapability('doc.text.copy');
       }
     } catch (err) {

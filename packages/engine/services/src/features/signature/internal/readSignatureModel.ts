@@ -1,6 +1,7 @@
 import type {
   DocMdpPermission,
   FieldLockSpec,
+  IsoDateTime,
   PdfRevision,
   RevisionField,
   RevisionStructure,
@@ -14,6 +15,7 @@ import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runt
 
 import { withScratch, withScratchN } from '../../../runtime/memory/scratch';
 import { readUtf16String } from '../../../runtime/memory/strings';
+import { pdfDateToIso } from '../../../shared/pdf-date';
 import { U64_BYTES, peekU64, pokeU64 } from '../../../runtime/memory/u64';
 import { readFormSnapshot, widgetPageRef } from '../../forms/internal/readFormSnapshot';
 
@@ -182,7 +184,7 @@ export function readSignaturesFromModel(runtime: PdfRuntimeModule, model: Ptr): 
         reason: str(i, STRING_REASON),
         location: str(i, STRING_LOCATION),
         contactInfo: str(i, STRING_CONTACT_INFO),
-        claimedTime: str(i, STRING_M),
+        signedAt: signedAtOf(str(i, STRING_M)),
       },
       docMdp: isPermission(docMdp) ? docMdp : null,
       catalogCertification: fn.EPDFSig_IsCatalogCertification(model, i),
@@ -316,4 +318,9 @@ export function readStructure(runtime: PdfRuntimeModule, docPtr: Ptr): RevisionS
     readSignaturesFromModel(runtime, model),
   );
   return { root, acroForm, pagesRoot, pages, fields, signatures };
+}
+
+/** `/M` as `IsoDateTime`; `null` when absent or not a date. */
+function signedAtOf(raw: string | null): IsoDateTime | null {
+  return raw ? pdfDateToIso(raw) : null;
 }

@@ -1,0 +1,271 @@
+---
+title: Measurements
+description: Measure distances, perimeters and areas at a real-world scale, with labels the engine keeps up to date.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Measurements
+
+A measurement is a line, a path or a shape that shows a real-world size, such as "2.00 m" or
+"12.45 m²". You give the engine the scale of the drawing; it works out the value and writes the
+label.
+
+```ts
+import { measureFromKnownLength } from '@embedpdf/engine';
+
+// 144 points on this drawing are 2 metres in reality.
+const scale = measureFromKnownLength(144, { value: 2, unit: 'm' });
+
+const { annotation } = await page.annotations.create({
+  subtype: 'line',
+  intent: 'line-dimension',
+  measure: scale,
+  linePoints: { start: { x: 72, y: 702 }, end: { x: 216, y: 702 } },
+  captionEnabled: true,
+});
+
+annotation.contents; // "2.00 m"
+```
+
+## Distance, perimeter and area
+
+A measurement is a line, polyline or polygon annotation with a measuring `intent` and a `measure`
+(the scale):
+
+| Measurement | `subtype`    | `intent`               | Its points   |
+| :---------- | :----------- | :--------------------- | :----------- |
+| Distance    | `'line'`     | `'line-dimension'`     | `linePoints` |
+| Perimeter   | `'polyline'` | `'polyline-dimension'` | `vertices`   |
+| Area        | `'polygon'`  | `'polygon-dimension'`  | `vertices`   |
+
+Everything else works as it does for [shapes](/docs/engine/annotations/shapes): style, flags,
+moving, deleting.
+
+```ts
+await page.annotations.create({
+  subtype: 'polygon',
+  intent: 'polygon-dimension',
+  measure: scale,
+  vertices: [
+    { x: 100, y: 100 },
+    { x: 200, y: 100 },
+    { x: 200, y: 200 },
+    { x: 100, y: 200 },
+  ],
+  captionEnabled: true,
+});
+```
+
+A perimeter adds up the segments of the open path; it doesn't add a segment back to the start.
+An area needs one simple outline: edges that cross or overlap give no value, rather than a wrong
+one.
+
+## The scale
+
+Two helpers make a scale, from a length you know or from the drawing's ratio:
+
+```ts
+import { measureFromKnownLength, measureFromRatio } from '@embedpdf/engine';
+
+measureFromKnownLength(144, { value: 2, unit: 'm' }); // 144 points on the page are 2 m
+measureFromRatio(1, 100, 'm'); // the drawing is at 1:100, shown in metres
+```
+
+A known length is in PDF points, for example the length of a line the user drew over a
+dimension printed on the plan. A ratio compares a length on paper with the same length in reality.
+
+Units are `'pt'`, `'mm'`, `'cm'`, `'m'`, `'km'`, `'in'`, `'ft'`, `'yd'` and `'mi'`. The last
+argument sets how values are shown:
+
+```ts
+measureFromKnownLength(144, { value: 2, unit: 'm' }, { precision: 10, areaUnit: 'ha' });
+measureFromKnownLength(72, { value: 10, unit: 'ft' }, { imperialFeetInches: true });
+```
+
+| Option                | What it does                                                               | Default                |
+| :-------------------- | :------------------------------------------------------------------------- | :--------------------- |
+| `precision`           | Decimals, as `1`, `10`, `100`, …: `100` shows two.                         | `100`                  |
+| `areaUnit`            | The unit for areas: `'m2'`, `'ft2'` and so on, `'ha'` or `'acre'`.         | the square of the unit |
+| `imperialFeetInches`  | Show feet and inches, such as `1 ft 6 in`.                                 | `false`                |
+| `fractionalPrecision` | With feet and inches: inches in steps of `1/16`, `1/8`, …                  | `16`                   |
+| `userUnit`            | For a ratio: the page's `userUnit`, when its points are larger than usual. | `1`                    |
+
+```ts
+const { pages } = await doc.pages.list();
+
+measureFromRatio(1, 100, 'm', { userUnit: pages[0].userUnit });
+```
+
+Both helpers throw an `EngineError` with code `InvalidArg` for a length, value or ratio that isn't
+a positive number.
+
+## Labels
+
+The engine writes the label into `contents`: when you create a measurement, and whenever you
+change its points, its `measure` or its `intent`. You can't set another label. A `contents` you
+send is replaced by the value, so the label is always what the scale says:
+
+```ts
+await page.annotations.update(annotation.ref, {
+  linePoints: { start: { x: 72, y: 702 }, end: { x: 288, y: 702 } },
+});
+// contents is now "3.00 m"
+```
+
+A change to style or flags leaves the label as it is, so a label another app wrote stays as it
+wrote it. So does a measurement without a scale the engine can use.
+
+Labels show every decimal the precision asks for, as Acrobat does: `3.00 m`, `1.50 m`.
+
+### Show a value before you create it
+
+`measurementReadout()` works out what the engine would write, for example while the user is
+still drawing:
+
+```ts
+import { measurementReadout } from '@embedpdf/engine';
+
+const readout = measurementReadout(draft);
+
+if ('label' in readout)
+  showLabel(readout.label); // "12.45 m²"
+else showHint(readout.unavailable); // "invalid-geometry"
+```
+
+| Field       | What it is                                     |
+| :---------- | :--------------------------------------------- |
+| `kind`      | `'distance'`, `'perimeter'` or `'area'`.       |
+| `label`     | The label, as the engine writes it.            |
+| `value`     | The number, in the label's (first) unit.       |
+| `perimeter` | For an area, the length around it, as a label. |
+
+When there's no value, `unavailable` says why; see
+[Why a readout has no value](#why-a-readout-has-no-value).
+
+`formatMeasurement(value, formats)` formats any number the way a scale does, such as
+`formatMeasurement(1.5, scale.distance)` for `"1.50 m"`.
+
+## Captions
+
+`captionEnabled: true` draws the label on the measurement. Whether a label shows and where it
+sits are separate fields, so hiding a label keeps its position.
+
+| Field             | Kind            | What it is                                                                     | Default    |
+| :---------------- | :-------------- | :----------------------------------------------------------------------------- | :--------- |
+| `captionEnabled`  | all             | Draw the label. `null` when it was never set.                                  | `null`     |
+| `captionPosition` | distance        | `'inline'` (in the line) or `'top'` (above it).                                | `'inline'` |
+| `captionOffset`   | distance        | `{ along, perpendicular }`: points along the line and square to it, or `null`. | `null`     |
+| `captionCenter`   | perimeter, area | The label's centre `{ x, y }` on the page, or `null`.                          | `null`     |
+| `leader`          | distance        | Leader lines at the ends: `{ length, extension?, offset? }` in points.         | none       |
+
+`null` for `captionOffset` or `captionCenter` places the label automatically. `captionEnabled:
+false` hides the label and keeps its place. On a perimeter or area, `captionEnabled: null` removes
+the caption and its place together.
+
+A label you placed moves with the shape when you move or turn the whole shape, and stays put when
+you edit single points. A `captionCenter` you send wins.
+
+A measurement without a caption reads `captionEnabled: null`, a distance line too. One another app
+made keeps its look until you turn a caption on.
+
+## Page calibration
+
+A page can carry its own scale, for PDF apps and measuring tools to use when someone measures on
+it:
+
+```ts
+await page.measure.setScale(scale); // the whole page is at this scale
+await page.measure.setScale(null); // remove it
+
+const { viewports } = await page.measure.listViewports();
+```
+
+A page can have several measured regions, called viewports, each with its own scale: a plan and a
+detail at another scale on one sheet. `listViewports()` returns them in the order they're drawn:
+
+| Field     | What it is                                            |
+| :-------- | :---------------------------------------------------- |
+| `bbox`    | The region, `{ left, bottom, right, top }` in points. |
+| `measure` | Its scale, or `null`.                                 |
+| `name`    | Its name, or `null`.                                  |
+| `owned`   | `true` for the one `setScale()` writes.               |
+
+`setScale()` writes one region of its own that covers the whole page; other apps' regions stay as
+they are. When regions overlap, the last one that contains a point is the one for that point:
+
+```ts
+import { viewportForPoint } from '@embedpdf/engine';
+
+const region = viewportForPoint(viewports, linePoints.start);
+
+if (region?.measure?.subtype === 'rectilinear') {
+  await page.annotations.create({
+    subtype: 'line',
+    intent: 'line-dimension',
+    measure: region.measure,
+    linePoints,
+  });
+}
+```
+
+A page's scale isn't applied for you: each measurement carries its own copy of the scale it was
+made with. Setting or removing the page's scale leaves existing measurements as they are; to
+recalibrate one, update its `measure`. Each change fires a `pages.scaleSet`
+[event](/docs/engine/concepts/events).
+
+## Permissions
+
+Measurements are annotations and need the same permissions (see
+[Permissions](/docs/engine/concepts/permissions#annotations)). `listViewports()` needs `doc.open`;
+`setScale()` needs `doc.annotate.modify`.
+
+## Good to know
+
+### Why a readout has no value
+
+When a readout has no value, `unavailable` is one of these:
+
+| `unavailable`          | Why                                                               |
+| :--------------------- | :---------------------------------------------------------------- |
+| `'not-dimension'`      | The annotation isn't a measurement (its `intent`).                |
+| `'no-measure'`         | It has no scale.                                                  |
+| `'foreign-measure'`    | Its scale is of a kind the engine can't compute, such as a map's. |
+| `'no-scale'`           | Its scale has no usable conversion.                               |
+| `'no-distance-format'` | Its scale says nothing about showing lengths.                     |
+| `'no-area-format'`     | Its scale says nothing about showing areas.                       |
+| `'invalid-format'`     | Its scale shows numbers in a way that isn't valid.                |
+| `'invalid-geometry'`   | Too few points, or an area outline that crosses itself.           |
+
+### Scales the engine can't compute
+
+A map's geospatial scale reads as `{ subtype: 'geospatial' }`, and a scale of a kind the engine doesn't
+know as `{ subtype: 'unknown' }`. Both stay in the PDF untouched, give no readout, and can't be
+written: a new one is refused with `InvalidArg`. Sending back the one you read keeps it, so an
+annotation you read and update keeps its scale. An [import](/docs/engine/annotations/import-export)
+leaves such a scale out and reports it (`geospatial`, `unknown-measure`).
+
+### What a scale is
+
+`measure` is the PDF's own rectilinear measure (ISO 32000-2 §12.9): `x` converts points to the
+first unit, and `distance` and `area` list how values are shown, one entry per unit of a cascade
+such as feet and inches. `ratio` is the text PDF apps show for the scale, such as `"1:100"`. The
+helpers build all of it; you rarely need to write one by hand.
+
+### Digits, as Acrobat shows them
+
+A number format's precision is its `/RD`. The standard lets an app drop trailing zeros when the
+format doesn't say to keep them; Acrobat shows every digit, and so does the engine, so the same
+measurement reads the same in both. A cascade that ends on a whole unit stops there: `2 ft`, not
+`2 ft 0 in`.
+
+### Precision
+
+The engine computes with the precision PDF stores numbers in, so a readout you show while the user
+draws is exactly the label that's saved.
+
+### Intents in the PDF
+
+The intents are the PDF's `/IT` names, spelled like the engine's other names: `'line-dimension'`
+is `/LineDimension`, `'polyline-dimension'` is `/PolyLineDimension` and `'polygon-dimension'` is
+`/PolygonDimension`.

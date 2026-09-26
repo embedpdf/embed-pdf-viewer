@@ -55,8 +55,8 @@ export class MetadataReader {
       keywords,
       producer,
       creator,
-      created: creationRaw ? pdfDateToIso(creationRaw) : null,
-      modified: modRaw ? pdfDateToIso(modRaw) : null,
+      createdAt: creationRaw ? pdfDateToIso(creationRaw) : null,
+      modifiedAt: modRaw ? pdfDateToIso(modRaw) : null,
       trapped,
       custom,
     };

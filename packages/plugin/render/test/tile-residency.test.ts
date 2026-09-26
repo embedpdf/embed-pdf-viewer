@@ -7,7 +7,7 @@ import { TileManager } from '../src/tile-manager';
 
 /**
  * Memory-residency red lines: the manager's bookkeeping and the store's
- * bytes must stay BOUNDED under sustained use. Bytes live in exactly one
+ * bytes must stay bounded under sustained use. Bytes live in exactly one
  * budgeted owner (the RasterStore); the manager holds keys; raw fetch
  * concurrency is backpressured; stage-less demand is capped. These are the
  * invariants that keep a long deep-zoom pan session flat instead of
@@ -16,8 +16,10 @@ import { TileManager } from '../src/tile-manager';
 
 const PAGE = { width: 612, height: 792 };
 
-function harness(opts?: { tiling?: TilesOptions; storeBudget?: number; handleBytes?: number }) {
-  const store = new RasterStore(opts?.storeBudget ?? 1024 * 1024 * 1024);
+function createHarness(
+  options?: { tiling?: TilesOptions; storeBudget?: number; handleBytes?: number },
+) {
+  const store = new RasterStore(options?.storeBudget ?? 1024 * 1024 * 1024);
   const pending: Array<{
     key: string;
     resolve: () => void;
@@ -27,13 +29,13 @@ function harness(opts?: { tiling?: TilesOptions; storeBudget?: number; handleByt
   let liveFetches = 0;
   let maxLiveFetches = 0;
 
-  const raw = new TileManager({
+  const tileManager = new TileManager({
     store,
-    options: resolveRenderOptions({ tiles: { settleMs: 0, bleed: 0, ...opts?.tiling } }),
+    options: resolveRenderOptions({ tiles: { settleMs: 0, bleed: 0, ...options?.tiling } }),
     getPolicy: () => ({ kind: 'continuous' }) as never,
     getPageSize: () => PAGE,
     getEpoch: () => 0,
-    fetchTile: (_pon, rect, scale: number, _a, signal) =>
+    fetchTile: (_pageObjectNumber, rect, scale: number, _includeAnnotations, signal) =>
       new Promise<PageImageHandle>((resolve, reject) => {
         liveFetches += 1;
         maxLiveFetches = Math.max(maxLiveFetches, liveFetches);
@@ -45,7 +47,7 @@ function harness(opts?: { tiling?: TilesOptions; storeBudget?: number; handleByt
             record.settled = true;
             liveFetches -= 1;
             resolve({
-              source: { kind: 'bytes', bytes: new Uint8Array(opts?.handleBytes ?? 1000) },
+              source: { kind: 'bytes', bytes: new Uint8Array(options?.handleBytes ?? 1000) },
               objectUrl: () => Promise.reject(new Error('unused')),
             } as unknown as PageImageHandle);
           },
@@ -66,17 +68,23 @@ function harness(opts?: { tiling?: TilesOptions; storeBudget?: number; handleByt
     onAdvance: () => {},
   });
 
-  // The tests predate the view axis and address one implicit view; this
-  // facade binds it (trailing `view` overrides for multi-view tests) so the
-  // suite exercises the REAL required-view API through one seam.
+  // The suite addresses one implicit view; this facade binds it (a trailing
+  // `view` overrides it for multi-view tests), so the suite exercises the
+  // view-scoped API through one seam.
   const manager = {
-    plan: (pon: number, demand: Parameters<TileManager['plan']>[2], ann: boolean, view = 'test') =>
-      raw.plan(view, pon, demand, ann),
-    sourcePainted: (pon: number, key: string, view = 'test') => raw.sourcePainted(view, pon, key),
-    sourceUnpainted: (pon: number, key: string, view = 'test') =>
-      raw.sourceUnpainted(view, pon, key),
-    releasePage: (pon: number, view = 'test') => raw.releasePage(view, pon),
-    stats: (pon: number, view = 'test') => raw.stats(view, pon),
+    plan: (
+      pageObjectNumber: number,
+      demand: Parameters<TileManager['plan']>[2],
+      includeAnnotations: boolean,
+      view = 'test',
+    ) => tileManager.plan(view, pageObjectNumber, demand, includeAnnotations),
+    sourcePainted: (pageObjectNumber: number, key: string, view = 'test') =>
+      tileManager.sourcePainted(view, pageObjectNumber, key),
+    sourceUnpainted: (pageObjectNumber: number, key: string, view = 'test') =>
+      tileManager.sourceUnpainted(view, pageObjectNumber, key),
+    releasePage: (pageObjectNumber: number, view = 'test') =>
+      tileManager.releasePage(view, pageObjectNumber),
+    stats: (pageObjectNumber: number, view = 'test') => tileManager.stats(view, pageObjectNumber),
   };
   return {
     manager,
@@ -87,9 +95,9 @@ function harness(opts?: { tiling?: TilesOptions; storeBudget?: number; handleByt
       // Resolve-and-replan until the want set is fully fetched — the test's
       // stand-in for the wake → plan pump that drives backpressure.
       for (let round = 0; round < 200; round++) {
-        const open = pending.filter((p) => !p.settled && !p.aborted());
+        const open = pending.filter((request) => !request.settled && !request.aborted());
         if (open.length === 0) break;
-        for (const p of open) p.resolve();
+        for (const request of open) request.resolve();
         await drain();
       }
     },
@@ -102,7 +110,7 @@ const drain = async () => {
   await Promise.resolve();
 };
 
-// Deep-zoom demand: level 4896 (scale 8); the walk scrolls DOWN the page
+// Deep-zoom demand: level 4896 (scale 8); the walk scrolls down the page
 // (792 pt tall — room for a long walk without clamping at the edge).
 const demandAt = (y: number) => ({
   desiredDeviceWidth: 4896,
@@ -110,78 +118,78 @@ const demandAt = (y: number) => ({
 });
 
 describe('tile residency (the memory red lines)', () => {
-  it('PAN: manager entries stay bounded across a long walk — bytes live in the store, not the manager', async () => {
-    const h = harness();
+  it('pan: manager entries stay bounded across a long walk — bytes live in the store, not the manager', async () => {
+    const harness = createHarness();
     // Walk across the page one tile-span at a time; at each stop, pump the
     // wake → plan loop until the want set fully resolves (backpressure
     // starts deferred fetches on each replan, exactly like live wake-ups).
     const settleAt = async (x: number) => {
       for (let round = 0; round < 50; round++) {
-        h.manager.plan(1, demandAt(x), true);
-        const open = h.pending.filter((p) => !p.settled && !p.aborted());
+        harness.manager.plan(1, demandAt(x), true);
+        const open = harness.pending.filter((request) => !request.settled && !request.aborted());
         if (open.length === 0) break;
-        for (const p of open) p.resolve();
+        for (const request of open) request.resolve();
         await drain();
       }
     };
     for (let step = 0; step < 10; step++) await settleAt(step * 64);
     // Want set at this level: 2×2 visible + prefetch ring ≈ up to ~16 tiles.
-    // Same-level tiles that left the want set must NOT accumulate.
-    const { entries } = h.manager.stats(1);
+    // Same-level tiles that left the want set must not accumulate.
+    const { entries } = harness.manager.stats(1);
     expect(entries).toBeLessThanOrEqual(24);
     // The walk touched meaningfully more distinct tiles than the resident
     // bound — proving eviction, not merely a small walk.
-    expect(h.pending.length).toBeGreaterThan(entries + 8);
+    expect(harness.pending.length).toBeGreaterThan(entries + 8);
   });
 
-  it('BACKPRESSURE: in-flight tile fetches never exceed the cap; the want set still completes', async () => {
+  it('backpressure: in-flight tile fetches never exceed the cap; the want set still completes', async () => {
     // Big visible window → want far more tiles than the cap at once.
-    const h = harness({ tiling: { prefetch: { margin: 0 } } });
+    const harness = createHarness({ tiling: { prefetch: { margin: 0 } } });
     const wide = { desiredDeviceWidth: 4896, visibleRect: { x: 0, y: 0, width: 512, height: 384 } };
-    h.manager.plan(1, wide, true);
-    expect(h.maxLive()).toBeLessThanOrEqual(8);
+    harness.manager.plan(1, wide, true);
+    expect(harness.maxLive()).toBeLessThanOrEqual(8);
     // Pump: resolve what's open, replan (the wake), repeat until done.
     for (let round = 0; round < 60; round++) {
-      const open = h.pending.filter((p) => !p.settled && !p.aborted());
+      const open = harness.pending.filter((request) => !request.settled && !request.aborted());
       if (open.length === 0) break;
-      for (const p of open) p.resolve();
+      for (const request of open) request.resolve();
       await drain();
-      h.manager.plan(1, wide, true);
+      harness.manager.plan(1, wide, true);
     }
-    expect(h.maxLive()).toBeLessThanOrEqual(8);
+    expect(harness.maxLive()).toBeLessThanOrEqual(8);
     // 8×6 visible tiles all resolved and paintable.
-    const plan = h.manager.plan(1, wide, true);
+    const plan = harness.manager.plan(1, wide, true);
     expect(plan.paint.length).toBe(48);
   });
 
-  it('STORE BUDGET: cached bytes respect the budget during a pan; visible tiles stay paintable', async () => {
+  it('store budget: cached bytes respect the budget during a pan; visible tiles stay paintable', async () => {
     // Budget of 12 tiles' worth; each fake handle costs 1000.
-    const h = harness({ storeBudget: 12_000, handleBytes: 1000 });
+    const harness = createHarness({ storeBudget: 12_000, handleBytes: 1000 });
     for (let step = 0; step < 6; step++) {
       for (let round = 0; round < 50; round++) {
-        h.manager.plan(1, demandAt(step * 64), true);
-        const open = h.pending.filter((p) => !p.settled && !p.aborted());
+        harness.manager.plan(1, demandAt(step * 64), true);
+        const open = harness.pending.filter((request) => !request.settled && !request.aborted());
         if (open.length === 0) break;
-        for (const p of open) p.resolve();
+        for (const request of open) request.resolve();
         await drain();
       }
-      expect(h.store.costUsed).toBeLessThanOrEqual(12_000);
+      expect(harness.store.costUsed).toBeLessThanOrEqual(12_000);
     }
     // The final stop still paints its visible tiles from the store.
-    const plan = h.manager.plan(1, demandAt(5 * 64), true);
+    const plan = harness.manager.plan(1, demandAt(5 * 64), true);
     expect(plan.paint.length).toBeGreaterThanOrEqual(4);
   });
 
-  it('STAGE-LESS: absent visibleRect is capped — bounded tiles, not a whole-page explosion', async () => {
-    const h = harness({ tiling: { prefetch: { margin: 0 } } });
+  it('stage-less: an absent visibleRect is capped — bounded tiles, not a whole-page explosion', async () => {
+    const harness = createHarness({ tiling: { prefetch: { margin: 0 } } });
     // A absurdly deep stage-less demand (the 4,650%-PageView scenario).
-    h.manager.plan(1, { desiredDeviceWidth: 80_000 }, true);
-    await h.resolveAll();
-    const plan = h.manager.plan(1, { desiredDeviceWidth: 80_000 }, true);
+    harness.manager.plan(1, { desiredDeviceWidth: 80_000 }, true);
+    await harness.resolveAll();
+    const plan = harness.manager.plan(1, { desiredDeviceWidth: 80_000 }, true);
     expect(plan.engaged).toBe(true);
     // The whole page is still covered…
     expect(plan.paint.length).toBeGreaterThan(0);
     // …but by a bounded tile count (the clamp), not tens of thousands.
-    expect(h.pending.length).toBeLessThanOrEqual(64);
+    expect(harness.pending.length).toBeLessThanOrEqual(64);
   });
 });

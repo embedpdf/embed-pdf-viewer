@@ -26,7 +26,7 @@ interface CacheEntry {
  * live credentials and needs sub-minute propagation; suspension gates a
  * tenant's whole namespace and a bounded TTL is the simpler contract.
  * The suspend/resume routes prime the local replica synchronously, so
- * the TTL only governs OTHER replicas.
+ * the TTL only governs other replicas.
  *
  * The guard answers for JWT-authenticated requests and share
  * exchanges. API-token requests never consult it — the operator must

@@ -4,7 +4,7 @@ import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
 import { AbortablePromise } from '../promise/AbortablePromise';
 
 export interface MetadataService {
-  read(): AbortablePromise<DocumentMetadata>;
+  get(): AbortablePromise<DocumentMetadata>;
   /**
    * Rewrite the document Info dict via a three-state {@link MetadataPatch}
    * (undefined=leave, null=clear, value=set). Returns the re-read metadata

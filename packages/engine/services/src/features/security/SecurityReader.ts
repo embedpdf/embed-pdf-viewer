@@ -5,10 +5,8 @@ import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 import { buildSecurityInfo, openedAsFromCode } from './internal/buildSecurityInfo';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { ensureInitialized } from '../../runtime/lifecycle/bootstrap';
+import { FPDF_ERR_PASSWORD, FPDF_ERR_SECURITY } from '../../runtime/loadError';
 import { normalizeU32 } from '../../shared/securityPermissions';
-
-const FPDF_ERR_PASSWORD = 4;
-const FPDF_ERR_SECURITY = 5;
 
 /**
  * Reads document security/permission state. Three entry points:
@@ -88,7 +86,7 @@ export class SecurityReader {
   }
 
   /**
-   * Snapshot of the live session's EFFECTIVE security state.
+   * Snapshot of the live session's effective security state.
    * `FPDF_GetDocUserPermissions` reports the permission word in force
    * right now (e.g. after an owner unlock), as opposed to the declared
    * word the cold `probeFile` path reads.

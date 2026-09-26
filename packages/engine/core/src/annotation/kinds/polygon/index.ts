@@ -1,14 +1,17 @@
-import type { PolygonDraft } from './draft';
-import type { PolygonAnnotationDTO } from './dto';
-import type { PolygonPatch } from './patch';
-import { PolygonDTOSchema, PolygonDraftSchema, PolygonPatchSchema } from './schema';
+import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
+import { PolygonDeclaration } from './declaration';
 
-export type { PolygonAnnotationDTO } from './dto';
-export type { PolygonDraft } from './draft';
-export type { PolygonPatch } from './patch';
-export { PolygonDTOSchema, PolygonDraftSchema, PolygonPatchSchema } from './schema';
+export { PolygonDeclaration } from './declaration';
+
+export type PolygonAnnotationDTO = ReadOf<typeof PolygonDeclaration>;
+export type PolygonDraft = CreateOf<typeof PolygonDeclaration>;
+export type PolygonPatch = UpdateOf<typeof PolygonDeclaration>;
+
+export const PolygonDTOSchema = PolygonDeclaration.readSchema;
+export const PolygonDraftSchema = PolygonDeclaration.createSchema;
+export const PolygonPatchSchema = PolygonDeclaration.updateSchema;
 
 export const PolygonKind: AnnotationKindModule<
   'polygon',
@@ -21,4 +24,5 @@ export const PolygonKind: AnnotationKindModule<
   dtoSchema: PolygonDTOSchema,
   draftSchema: PolygonDraftSchema,
   patchSchema: PolygonPatchSchema,
+  readBackWrites: PolygonDeclaration.readBackWrites,
 };

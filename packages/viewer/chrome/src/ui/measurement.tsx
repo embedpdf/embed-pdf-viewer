@@ -21,7 +21,8 @@ const button =
   'border-border text-fg hover:bg-hover rounded-md border px-3 py-1.5 text-sm disabled:opacity-50';
 
 /** The current page's address, or null with no page (empty document). */
-const useCurrentPage = () => useSelector(StageToken, (c) => c.getCurrentPage()?.ref ?? null);
+const useCurrentPage = () =>
+  useSelector(StageToken, (stage) => stage.getCurrentPage()?.ref ?? null);
 
 export function MeasurementScaleButton() {
   const t = useT();
@@ -39,7 +40,7 @@ export function MeasurementScaleButton() {
       <Icon name="updateScale" size={20} className="shrink-0" />
       <span>
         {t('measurement.scale')}:{' '}
-        {scale?.measure?.subtype === 'RL'
+        {scale?.measure?.subtype === 'rectilinear'
           ? (scale.measure.ratio ?? t('measurement.custom'))
           : t('measurement.unavailable')}
       </span>
@@ -53,50 +54,52 @@ export function MeasurementSection() {
   const page = useCurrentPage();
 
   const measurement = useMeasurement();
+  const canCalibrate = useSelector(MeasurementToken, (current) => current.canCalibrate());
 
   const scale = usePageScale(page);
   const anno = useCapability(AnnotationToken);
-  const selected = useSelector(AnnotationToken, (c) => c.getSelection());
+  const selected = useSelector(AnnotationToken, (annotation) => annotation.getSelection());
   const resettable = useSelector(
     AnnotationToken,
-    (c) =>
-      c
+    (annotation) =>
+      annotation
         .listSelected()
         .filter(
-          (annotation) =>
-            (annotation.subtype === 'polygon' || annotation.subtype === 'polyline') &&
-            annotation.raw &&
-            (annotation.raw.subtype === 'polygon' || annotation.raw.subtype === 'polyline') &&
-            annotation.raw.caption?.center &&
-            c.canEdit(annotation.ref) &&
-            !annotation.flags.lockedContents,
+          (candidate) =>
+            (candidate.subtype === 'polygon' || candidate.subtype === 'polyline') &&
+            candidate.raw &&
+            (candidate.raw.subtype === 'polygon' || candidate.raw.subtype === 'polyline') &&
+            candidate.raw.captionCenter &&
+            annotation.canEdit(candidate.ref) &&
+            !candidate.flags.lockedContents,
         ),
-    (a, b) => a.length === b.length && a.every((annotation, i) => annotation === b[i]),
+    (left, right) =>
+      left.length === right.length && left.every((annotation, i) => annotation === right[i]),
   );
   const readouts = useSelector(
     MeasurementToken,
-    (c) =>
+    (measurement) =>
       anno
         .listSelected()
-        .map((d) => c.getReadout(d.ref))
-        .filter((r): r is MeasurementReadout => !('unavailable' in r)),
-    (a, b) => JSON.stringify(a) === JSON.stringify(b),
+        .map((annotation) => measurement.getReadout(annotation.ref))
+        .filter((readout): readout is MeasurementReadout => !('unavailable' in readout)),
+    (left, right) => JSON.stringify(left) === JSON.stringify(right),
   );
-  const reports = useSelector(MeasurementToken, (c) => c.listLastReports());
+  const reports = useSelector(MeasurementToken, (measurement) => measurement.listLastReports());
   const [allPages, setAllPages] = useState(false);
 
   const [recalculate, setRecalculate] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const disabled = !page || measurement.busy || !measurement.canCalibratePage || !scale?.ready;
-  const rectilinear = scale?.measure?.subtype === 'RL' ? scale.measure : null;
+  const disabled = !page || measurement.busy || !canCalibrate || !scale?.ready;
+  const rectilinear = scale?.measure?.subtype === 'rectilinear' ? scale.measure : null;
   const target = allPages ? 'all' : page!;
   const options = { recalculate };
   const run = async (work: () => Promise<unknown>) => {
     setError(null);
     try {
       await work();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+    } catch (error) {
+      setError(error instanceof Error ? error.message : String(error));
     }
   };
   const precision = rectilinear?.distance[rectilinear.distance.length - 1]?.precision ?? 100;
@@ -120,7 +123,7 @@ export function MeasurementSection() {
           type="checkbox"
           checked={allPages}
           disabled={measurement.busy}
-          onChange={(e) => setAllPages(e.target.checked)}
+          onChange={(event) => setAllPages(event.target.checked)}
         />
         {t('measurement.allPages')}
       </label>
@@ -129,7 +132,7 @@ export function MeasurementSection() {
           type="checkbox"
           checked={recalculate}
           disabled={measurement.busy}
-          onChange={(e) => setRecalculate(e.target.checked)}
+          onChange={(event) => setRecalculate(event.target.checked)}
         />
         {t('measurement.recalculate')}
       </label>
@@ -140,14 +143,16 @@ export function MeasurementSection() {
           className={control}
           value=""
           disabled={disabled}
-          onChange={(e) => void run(() => measurement.setPreset(target, e.target.value, options))}
+          onChange={(event) =>
+            void run(() => measurement.setPreset(target, event.target.value, options))
+          }
         >
           <option value="" disabled>
             {t('measurement.choosePreset')}
           </option>
-          {measurement.listPresets().map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.label}
+          {measurement.listPresets().map((preset) => (
+            <option key={preset.id} value={preset.id}>
+              {preset.label}
             </option>
           ))}
         </select>
@@ -159,8 +164,8 @@ export function MeasurementSection() {
           className={control}
           value={rectilinear?.distance[0]?.unit.trim() ?? ''}
           disabled={disabled || !rectilinear}
-          onChange={(e) =>
-            void run(() => measurement.setUnit(target, e.target.value as LengthUnit, options))
+          onChange={(event) =>
+            void run(() => measurement.setUnit(target, event.target.value as LengthUnit, options))
           }
         >
           {!measurement
@@ -170,9 +175,9 @@ export function MeasurementSection() {
               {t('measurement.custom')}
             </option>
           )}
-          {measurement.listUnits().map((u) => (
-            <option key={u} value={u}>
-              {u}
+          {measurement.listUnits().map((unit) => (
+            <option key={unit} value={unit}>
+              {unit}
             </option>
           ))}
         </select>
@@ -184,8 +189,8 @@ export function MeasurementSection() {
           className={control}
           value={rectilinear?.area[0]?.unit.trim().replace('²', '2') ?? ''}
           disabled={disabled || !rectilinear}
-          onChange={(e) =>
-            void run(() => measurement.setAreaUnit(target, e.target.value as AreaUnit, options))
+          onChange={(event) =>
+            void run(() => measurement.setAreaUnit(target, event.target.value as AreaUnit, options))
           }
         >
           {!measurement
@@ -209,16 +214,16 @@ export function MeasurementSection() {
           className={control}
           value={precision}
           disabled={disabled || !rectilinear}
-          onChange={(e) =>
-            void run(() => measurement.setPrecision(target, Number(e.target.value), options))
+          onChange={(event) =>
+            void run(() => measurement.setPrecision(target, Number(event.target.value), options))
           }
         >
           {![1, 10, 100, 1000, 10000].includes(precision) && (
             <option value={precision}>{t('measurement.custom')}</option>
           )}
-          {[1, 10, 100, 1000, 10000].map((p) => (
-            <option key={p} value={p}>
-              {1 / p}
+          {[1, 10, 100, 1000, 10000].map((candidate) => (
+            <option key={candidate} value={candidate}>
+              {1 / candidate}
             </option>
           ))}
         </select>
@@ -256,7 +261,7 @@ export function MeasurementSection() {
                     if (raw && (raw.subtype === 'polygon' || raw.subtype === 'polyline')) {
                       await anno.updateRaw(annotation.ref, {
                         subtype: raw.subtype,
-                        caption: { center: null },
+                        captionCenter: null,
                       });
                     }
                   }
@@ -272,10 +277,11 @@ export function MeasurementSection() {
         <p role="status">
           {t('measurement.report', {
             params: {
-              updated: reports.reduce((n, r) => n + r.updated.length, 0),
-              skipped: reports.reduce((n, r) => n + r.skipped.length, 0),
+              updated: reports.reduce((total, report) => total + report.updated.length, 0),
+              skipped: reports.reduce((total, report) => total + report.skipped.length, 0),
               failed: reports.reduce(
-                (n, r) => n + r.failed.length + (r.scaleError || r.error ? 1 : 0),
+                (total, report) =>
+                  total + report.failed.length + (report.scaleError || report.error ? 1 : 0),
                 0,
               ),
             },
@@ -295,7 +301,10 @@ export function CalibrationDialog() {
   const t = useT();
 
   const measurement = useMeasurement();
-  const request = useSelector(MeasurementToken, (c) => c.getCalibrationRequest());
+  const canCalibrate = useSelector(MeasurementToken, (current) => current.canCalibrate());
+  const request = useSelector(MeasurementToken, (measurement) =>
+    measurement.getCalibrationRequest(),
+  );
   const input = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState('');
 
@@ -323,15 +332,15 @@ export function CalibrationDialog() {
         { recalculate, applyTo: allPages ? 'all' : undefined },
       );
       measurement.dismissCalibration();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+    } catch (error) {
+      setError(error instanceof Error ? error.message : String(error));
     }
   };
   return (
     <div
       className="fixed inset-0 z-50 grid place-items-center bg-black/40"
-      onKeyDown={(e) => {
-        if (e.key === 'Escape' && !measurement.busy) measurement.dismissCalibration();
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && !measurement.busy) measurement.dismissCalibration();
       }}
     >
       <form
@@ -339,8 +348,8 @@ export function CalibrationDialog() {
         aria-modal="true"
         aria-labelledby="measurement-calibration-title"
         className="border-border bg-surface flex w-96 flex-col gap-4 rounded-lg border p-5 shadow-xl"
-        onSubmit={(e) => {
-          e.preventDefault();
+        onSubmit={(event) => {
+          event.preventDefault();
           void submit();
         }}
       >
@@ -358,7 +367,7 @@ export function CalibrationDialog() {
             min="0"
             step="any"
             value={value}
-            onChange={(e) => setValue(e.target.value)}
+            onChange={(event) => setValue(event.target.value)}
           />
         </label>
         <label>
@@ -367,10 +376,10 @@ export function CalibrationDialog() {
             className={control}
             aria-label={t('measurement.unit')}
             value={unit}
-            onChange={(e) => setUnit(e.target.value as LengthUnit)}
+            onChange={(event) => setUnit(event.target.value as LengthUnit)}
           >
-            {measurement.listUnits().map((u) => (
-              <option key={u}>{u}</option>
+            {measurement.listUnits().map((lengthUnit) => (
+              <option key={lengthUnit}>{lengthUnit}</option>
             ))}
           </select>
         </label>
@@ -378,7 +387,7 @@ export function CalibrationDialog() {
           <input
             type="checkbox"
             checked={allPages}
-            onChange={(e) => setAllPages(e.target.checked)}
+            onChange={(event) => setAllPages(event.target.checked)}
           />
           {t('measurement.allPages')}
         </label>
@@ -386,7 +395,7 @@ export function CalibrationDialog() {
           <input
             type="checkbox"
             checked={recalculate}
-            onChange={(e) => setRecalculate(e.target.checked)}
+            onChange={(event) => setRecalculate(event.target.checked)}
           />
           {t('measurement.recalculate')}
         </label>
@@ -409,7 +418,7 @@ export function CalibrationDialog() {
             type="submit"
             disabled={
               measurement.busy ||
-              !measurement.canCalibratePage ||
+              !canCalibrate ||
               !(Number(value) > 0) ||
               !Number.isFinite(Number(value))
             }

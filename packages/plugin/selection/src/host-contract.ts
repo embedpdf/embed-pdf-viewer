@@ -1,12 +1,12 @@
 /**
- * @embedpdf/plugin-selection/contract/host — the HOST lens.
+ * @embedpdf/plugin-selection/contract/host — the host lens.
  *
  * What render layers, the interaction hub and sibling plugins need on top
  * of the public contract: gesture bracketing, geometry warming and the
  * highlight-visibility handshake. Same runtime token as the public one,
  * typed wider. Never use this from application code.
  */
-import type { CapabilityToken, PageRef } from '@embedpdf/core';
+import { createHostToken, type PageRef } from '@embedpdf/core';
 import type { Point } from '@embedpdf/core-geometry';
 import { SelectionToken as PublicSelectionToken, type SelectionCapability } from './contract';
 
@@ -17,12 +17,13 @@ export interface SelectionHostCapability extends SelectionCapability {
    *  (nothing requested) without `doc.text.select` or for an unknown page. A
    *  failed read resolves too — the layer simply has nothing to paint. */
   ensureLoaded(page: PageRef): Promise<void>;
+  /** Whether the page's text geometry is loaded and current. */
   isLoaded(page: PageRef): boolean;
   /** Is a page-space point on (or near) text? Drives the I-beam cursor. */
   isOverText(page: PageRef, point: Point): boolean;
   /**
    * A pointer gesture that drives the selection opened (pointer-down). From
-   * here until {@link endGesture}, changes carry a `user` origin and
+   * here until {@link endGesture}, {@link isGestureActive} is true and
    * selection-scoped UI hides. Programmatic writes never open a gesture.
    */
   beginGesture(): void;
@@ -32,7 +33,7 @@ export interface SelectionHostCapability extends SelectionCapability {
   /** The gesture ended (pointer-up). Settles first, then emits `onCommitted`
    *  when a selection is in place. */
   endGesture(): void;
-  /** Whether a selection gesture is in flight. A readable FACT: derived
+  /** Whether a selection gesture is in flight. A readable fact: derived
    *  recomputes never touch it, programmatic selections are born settled. */
   isGestureActive(): boolean;
   /** Suppress / restore the default highlight visual (a consumer drawing its
@@ -41,5 +42,4 @@ export interface SelectionHostCapability extends SelectionCapability {
   isHighlightVisible(): boolean;
 }
 
-export const SelectionToken =
-  PublicSelectionToken as unknown as CapabilityToken<SelectionHostCapability>;
+export const SelectionToken = createHostToken<SelectionHostCapability>(PublicSelectionToken);

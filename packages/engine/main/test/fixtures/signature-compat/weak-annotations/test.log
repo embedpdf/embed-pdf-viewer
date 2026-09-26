@@ -1,0 +1,153 @@
+ WARN  Issue while reading "/Users/bobsingor/GitHub/cloudpdf-platform/oss/embedpdf/.npmrc". Failed to replace env in config: ${NPM_TOKEN}
+ WARN  Issue while reading "/Users/bobsingor/GitHub/cloudpdf-platform/oss/embedpdf/.npmrc". Failed to replace env in config: ${NPM_TOKEN}
+packages/engine/runtime/npm/darwin-x64   |  WARN  Unsupported platform: wanted: {"cpu":["x64"],"os":["darwin"],"libc":["any"]} (current: {"os":"darwin","cpu":"arm64","libc":"unknown"})
+packages/engine/runtime/npm/linux-arm64  |  WARN  Unsupported platform: wanted: {"cpu":["arm64"],"os":["linux"],"libc":["glibc"]} (current: {"os":"darwin","cpu":"arm64","libc":"unknown"})
+packages/engine/runtime/npm/linux-x64    |  WARN  Unsupported platform: wanted: {"cpu":["x64"],"os":["linux"],"libc":["glibc"]} (current: {"os":"darwin","cpu":"arm64","libc":"unknown"})
+.../engine/runtime/npm/linuxmusl-arm64   |  WARN  Unsupported platform: wanted: {"cpu":["arm64"],"os":["linux"],"libc":["musl"]} (current: {"os":"darwin","cpu":"arm64","libc":"unknown"})
+.../engine/runtime/npm/linuxmusl-x64     |  WARN  Unsupported platform: wanted: {"cpu":["x64"],"os":["linux"],"libc":["musl"]} (current: {"os":"darwin","cpu":"arm64","libc":"unknown"})
+packages/engine/runtime/npm/win32-arm64  |  WARN  Unsupported platform: wanted: {"cpu":["arm64"],"os":["win32"],"libc":["any"]} (current: {"os":"darwin","cpu":"arm64","libc":"unknown"})
+packages/engine/runtime/npm/win32-x64    |  WARN  Unsupported platform: wanted: {"cpu":["x64"],"os":["win32"],"libc":["any"]} (current: {"os":"darwin","cpu":"arm64","libc":"unknown"})
+
+ RUN  v2.1.9 /tmp/epdf-weak-nm-probes
+
+ ❯ probe.test.ts (148 tests | 40 failed) 1526ms
+   × wasm > 'approval-indirect-array-delete' 13ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × wasm > 'approval-indirect-array-delete-names' 11ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × wasm > 'approval-indirect-array-names' 9ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × wasm > 'approval-indirect-array-reorder' 10ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × wasm > 'approval-indirect-array-reorder-names' 9ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × wasm > 'p3-indirect-array-delete' 9ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × wasm > 'p3-indirect-array-delete-names' 8ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × wasm > 'p3-indirect-array-names' 9ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × wasm > 'p3-indirect-array-reorder' 10ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × wasm > 'p3-indirect-array-reorder-names' 10ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × wasm > 'fieldmdp-indirect-array-delete' 9ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × wasm > 'fieldmdp-indirect-array-delete-names' 10ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × wasm > 'fieldmdp-indirect-array-names' 9ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × wasm > 'fieldmdp-indirect-array-reorder' 9ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × wasm > 'fieldmdp-indirect-array-reorder-names' 8ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × wasm > 'locked-markup-indirect-array-delete' 7ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × wasm > 'locked-markup-indirect-array-delete-n…' 8ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × wasm > 'locked-markup-indirect-array-names' 8ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × wasm > 'locked-markup-indirect-array-reorder' 8ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × wasm > 'locked-markup-indirect-array-reorder-…' 9ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × native > 'approval-indirect-array-delete' 7ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × native > 'approval-indirect-array-delete-names' 8ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × native > 'approval-indirect-array-names' 9ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × native > 'approval-indirect-array-reorder' 8ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × native > 'approval-indirect-array-reorder-names' 7ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × native > 'p3-indirect-array-delete' 9ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × native > 'p3-indirect-array-delete-names' 7ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × native > 'p3-indirect-array-names' 7ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × native > 'p3-indirect-array-reorder' 11ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × native > 'p3-indirect-array-reorder-names' 8ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × native > 'fieldmdp-indirect-array-delete' 7ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × native > 'fieldmdp-indirect-array-delete-names' 8ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × native > 'fieldmdp-indirect-array-names' 8ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × native > 'fieldmdp-indirect-array-reorder' 7ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × native > 'fieldmdp-indirect-array-reorder-names' 7ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × native > 'locked-markup-indirect-array-delete' 7ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × native > 'locked-markup-indirect-array-delete-n…' 7ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × native > 'locked-markup-indirect-array-names' 7ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × native > 'locked-markup-indirect-array-reorder' 7ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+   × native > 'locked-markup-indirect-array-reorder-…' 8ms
+     → expected 'forbidden' to be 'permitted' // Object.is equality
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 40 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  probe.test.ts > wasm > 'approval-indirect-array-delete'
+ FAIL  probe.test.ts > wasm > 'approval-indirect-array-delete-names'
+ FAIL  probe.test.ts > wasm > 'approval-indirect-array-names'
+ FAIL  probe.test.ts > wasm > 'approval-indirect-array-reorder'
+ FAIL  probe.test.ts > wasm > 'approval-indirect-array-reorder-names'
+ FAIL  probe.test.ts > wasm > 'p3-indirect-array-delete'
+ FAIL  probe.test.ts > wasm > 'p3-indirect-array-delete-names'
+ FAIL  probe.test.ts > wasm > 'p3-indirect-array-names'
+ FAIL  probe.test.ts > wasm > 'p3-indirect-array-reorder'
+ FAIL  probe.test.ts > wasm > 'p3-indirect-array-reorder-names'
+ FAIL  probe.test.ts > wasm > 'fieldmdp-indirect-array-delete'
+ FAIL  probe.test.ts > wasm > 'fieldmdp-indirect-array-delete-names'
+ FAIL  probe.test.ts > wasm > 'fieldmdp-indirect-array-names'
+ FAIL  probe.test.ts > wasm > 'fieldmdp-indirect-array-reorder'
+ FAIL  probe.test.ts > wasm > 'fieldmdp-indirect-array-reorder-names'
+ FAIL  probe.test.ts > wasm > 'locked-markup-indirect-array-delete'
+ FAIL  probe.test.ts > wasm > 'locked-markup-indirect-array-delete-n…'
+ FAIL  probe.test.ts > wasm > 'locked-markup-indirect-array-names'
+ FAIL  probe.test.ts > wasm > 'locked-markup-indirect-array-reorder'
+ FAIL  probe.test.ts > wasm > 'locked-markup-indirect-array-reorder-…'
+ FAIL  probe.test.ts > native > 'approval-indirect-array-delete'
+ FAIL  probe.test.ts > native > 'approval-indirect-array-delete-names'
+ FAIL  probe.test.ts > native > 'approval-indirect-array-names'
+ FAIL  probe.test.ts > native > 'approval-indirect-array-reorder'
+ FAIL  probe.test.ts > native > 'approval-indirect-array-reorder-names'
+ FAIL  probe.test.ts > native > 'p3-indirect-array-delete'
+ FAIL  probe.test.ts > native > 'p3-indirect-array-delete-names'
+ FAIL  probe.test.ts > native > 'p3-indirect-array-names'
+ FAIL  probe.test.ts > native > 'p3-indirect-array-reorder'
+ FAIL  probe.test.ts > native > 'p3-indirect-array-reorder-names'
+ FAIL  probe.test.ts > native > 'fieldmdp-indirect-array-delete'
+ FAIL  probe.test.ts > native > 'fieldmdp-indirect-array-delete-names'
+ FAIL  probe.test.ts > native > 'fieldmdp-indirect-array-names'
+ FAIL  probe.test.ts > native > 'fieldmdp-indirect-array-reorder'
+ FAIL  probe.test.ts > native > 'fieldmdp-indirect-array-reorder-names'
+ FAIL  probe.test.ts > native > 'locked-markup-indirect-array-delete'
+ FAIL  probe.test.ts > native > 'locked-markup-indirect-array-delete-n…'
+ FAIL  probe.test.ts > native > 'locked-markup-indirect-array-names'
+ FAIL  probe.test.ts > native > 'locked-markup-indirect-array-reorder'
+ FAIL  probe.test.ts > native > 'locked-markup-indirect-array-reorder-…'
+AssertionError: expected 'forbidden' to be 'permitted' // Object.is equality
+
+Expected: "permitted"
+Received: "forbidden"
+
+ ❯ probe.test.ts:31:49
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/40]⎯
+
+ Test Files  1 failed (1)
+      Tests  40 failed | 108 passed (148)
+   Start at  15:04:37
+   Duration  3.06s (transform 961ms, setup 0ms, collect 1.30s, tests 1.53s, environment 0ms, prepare 43ms)
+
+undefined
+/Users/bobsingor/GitHub/cloudpdf-platform/oss/embedpdf/packages/core/signature:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run --config /tmp/epdf-weak-nm-probes/vitest.config.mts

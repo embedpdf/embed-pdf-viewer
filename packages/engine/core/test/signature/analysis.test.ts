@@ -112,7 +112,7 @@ function signature(
     contentsSize: 8,
     coverage: 'whole-revision',
     revisionIndex: 1,
-    signer: { name: null, reason: null, location: null, contactInfo: null, claimedTime: null },
+    signer: { name: null, reason: null, location: null, contactInfo: null, signedAt: null },
     docMdp: null,
     catalogCertification: false,
     fieldMdp: null,
@@ -172,7 +172,7 @@ describe('evaluateStep: the edge-claim law', () => {
     expect(step.verdict).toBe('indeterminate');
     expect(step.findings.map((f) => f.rule)).not.toContain('identical-rewrite');
     expect(step.findings.some((f) => f.verdict === 'incomplete')).toBe(true);
-    // A real null object rewritten as null, both sides read: that IS an identical rewrite.
+    // A real null object rewritten as null, both sides read: that is an identical rewrite.
     const realNull = change(
       20,
       { old: 'null', new: 'null' },
@@ -190,7 +190,10 @@ describe('evaluateStep: the edge-claim law', () => {
     const before = structure();
     const pageContent = change(
       3,
-      { old: '<</Type /Page/Parent 2 0 R/Contents 40 0 R>>', new: '<</Type /Page/Parent 2 0 R/Contents 41 0 R>>' },
+      {
+        old: '<</Type /Page/Parent 2 0 R/Contents 40 0 R>>',
+        new: '<</Type /Page/Parent 2 0 R/Contents 41 0 R>>',
+      },
       { old: [edge(2, 'Kids/[0]')], new: [edge(2, 'Kids/[0]')] },
     );
     const tooBig = change(
@@ -199,7 +202,13 @@ describe('evaluateStep: the edge-claim law', () => {
       { old: [edge(1, 'Big')], new: [edge(1, 'Big')] },
       { value: { old: null, new: null, truncated: true } },
     );
-    const step = evaluateStep({ older: 1, newer: 2, changes: [pageContent, tooBig], before, after: before });
+    const step = evaluateStep({
+      older: 1,
+      newer: 2,
+      changes: [pageContent, tooBig],
+      before,
+      after: before,
+    });
     expect(step.findings.some((f) => f.verdict === 'forbidden')).toBe(true);
     expect(step.findings.some((f) => f.verdict === 'incomplete')).toBe(true);
     expect(step.verdict).toBe('forbidden');
@@ -215,25 +224,58 @@ describe('evaluateStep: the edge-claim law', () => {
     );
     const healthy = { sparseXref: false, bareReferences: 0, referrersComplete: true };
     expect(
-      evaluateStep({ older: 1, newer: 2, changes: [fill], before, after: before, health: { old: healthy, new: healthy } }).verdict,
+      evaluateStep({
+        older: 1,
+        newer: 2,
+        changes: [fill],
+        before,
+        after: before,
+        health: { old: healthy, new: healthy },
+      }).verdict,
     ).toBe('permitted');
     for (const sick of [
       { ...healthy, sparseXref: true },
       { ...healthy, bareReferences: 1 },
     ]) {
-      const step = evaluateStep({ older: 1, newer: 2, changes: [fill], before, after: before, health: { old: sick, new: healthy } });
+      const step = evaluateStep({
+        older: 1,
+        newer: 2,
+        changes: [fill],
+        before,
+        after: before,
+        health: { old: sick, new: healthy },
+      });
       expect(step.verdict).toBe('indeterminate');
-      expect(step.findings.find((f) => f.rule === 'base-unverifiable')).toMatchObject({ verdict: 'incomplete', objectNumber: 0 });
+      expect(step.findings.find((f) => f.rule === 'base-unverifiable')).toMatchObject({
+        verdict: 'incomplete',
+        objectNumber: 0,
+      });
       expect(step.findings.find((f) => f.rule === 'base-unverifiable')!.detail).toMatch(/Acrobat/);
     }
     // The newer revision's health is not the sealed revision's problem...
     expect(
-      evaluateStep({ older: 1, newer: 2, changes: [fill], before, after: before, health: { old: healthy, new: { ...healthy, sparseXref: true } } }).verdict,
+      evaluateStep({
+        older: 1,
+        newer: 2,
+        changes: [fill],
+        before,
+        after: before,
+        health: { old: healthy, new: { ...healthy, sparseXref: true } },
+      }).verdict,
     ).toBe('permitted');
     // ...but an incomplete reachability walk on either side leaves every use unproven.
-    const walked = evaluateStep({ older: 1, newer: 2, changes: [fill], before, after: before, health: { old: healthy, new: { ...healthy, referrersComplete: false } } });
+    const walked = evaluateStep({
+      older: 1,
+      newer: 2,
+      changes: [fill],
+      before,
+      after: before,
+      health: { old: healthy, new: { ...healthy, referrersComplete: false } },
+    });
     expect(walked.verdict).toBe('indeterminate');
-    expect(walked.findings.some((f) => f.rule === 'unexplained' && f.verdict === 'incomplete')).toBe(true);
+    expect(
+      walked.findings.some((f) => f.rule === 'unexplained' && f.verdict === 'incomplete'),
+    ).toBe(true);
   });
 
   test('no changes is unchanged; under P=1 an identical rewrite is still forbidden (not established)', () => {
@@ -259,7 +301,10 @@ describe('evaluateStep: the edge-claim law', () => {
     const before = structure(); // one approval signature: judged at the annotate baseline
     const samePage = change(
       3,
-      { old: '<</Type /Page/Parent 2 0 R/Annots [30 0 R]>>', new: '<</Type /Page/Parent 2 0 R/Annots [30 0 R]>>' },
+      {
+        old: '<</Type /Page/Parent 2 0 R/Annots [30 0 R]>>',
+        new: '<</Type /Page/Parent 2 0 R/Annots [30 0 R]>>',
+      },
       { old: [edge(2, 'Kids/[0]')], new: [edge(2, 'Kids/[0]')] },
     );
     const step = evaluateStep({ older: 1, newer: 2, changes: [samePage], before, after: before });
@@ -274,7 +319,13 @@ describe('evaluateStep: the edge-claim law', () => {
         signatures: [signature(0, 30, { docMdp: permission, catalogCertification: true })],
       });
       expect(
-        evaluateStep({ older: 1, newer: 2, changes: [samePage], before: certified, after: certified }).verdict,
+        evaluateStep({
+          older: 1,
+          newer: 2,
+          changes: [samePage],
+          before: certified,
+          after: certified,
+        }).verdict,
       ).toBe('unchanged');
     }
   });
@@ -283,10 +334,19 @@ describe('evaluateStep: the edge-claim law', () => {
     const unsigned = structure({ signatures: [signature(0, 30, { signed: false })] });
     const samePage = change(
       3,
-      { old: '<</Type /Page/Parent 2 0 R/Annots [30 0 R]>>', new: '<</Type /Page/Parent 2 0 R/Annots [30 0 R]>>' },
+      {
+        old: '<</Type /Page/Parent 2 0 R/Annots [30 0 R]>>',
+        new: '<</Type /Page/Parent 2 0 R/Annots [30 0 R]>>',
+      },
       { old: [edge(2, 'Kids/[0]')], new: [edge(2, 'Kids/[0]')] },
     );
-    const step = evaluateStep({ older: 0, newer: 1, changes: [samePage], before: unsigned, after: unsigned });
+    const step = evaluateStep({
+      older: 0,
+      newer: 1,
+      changes: [samePage],
+      before: unsigned,
+      after: unsigned,
+    });
     expect(step.verdict).toBe('unchanged');
     expect(step.findings).toEqual([
       expect.objectContaining({ rule: 'identical-rewrite', verdict: 'permitted', objectNumber: 3 }),
@@ -619,7 +679,9 @@ describe('evaluateStep: the edge-claim law', () => {
     ];
     const step = evaluateStep({ older: 1, newer: 2, changes: signing, before, after });
     expect(step.verdict).toBe('permitted');
-    expect(step.findings.some((f) => f.objectNumber === 63 && f.verdict === 'permitted')).toBe(true);
+    expect(step.findings.some((f) => f.objectNumber === 63 && f.verdict === 'permitted')).toBe(
+      true,
+    );
 
     // The same signing under a P=2 certification: the lock is not form fill-in.
     const certifiedBefore = structure({
@@ -631,7 +693,10 @@ describe('evaluateStep: the edge-claim law', () => {
     });
     const certifiedAfter = structure({
       fields: before.fields,
-      signatures: [signature(0, 30, { docMdp: 2, catalogCertification: true }), after.signatures[1]],
+      signatures: [
+        signature(0, 30, { docMdp: 2, catalogCertification: true }),
+        after.signatures[1],
+      ],
     });
     const certified = evaluateStep({
       older: 1,

@@ -1,31 +1,32 @@
 /**
- * Reveals. A bare reveal is NOT navigation: minimal visibility, cursor
- * untouched (paged flow: revealing a page IS navigating to it). A positioned
- * reveal (rect / anchor / zoom — a search hit, a PDF destination) is an
- * ARRIVAL: the cursor is set up front, the camera lands per the anchor
+ * Reveals. A bare reveal is not navigation: minimal visibility, cursor
+ * untouched (in paged flow, revealing a page is navigating to it). A
+ * positioned reveal (rect, anchor or zoom: a search hit, a PDF destination)
+ * is an arrival: the cursor is set up front, the camera lands per the anchor
  * policy, and a resolved zoom becomes the zoom intent.
  */
-import * as S from '@embedpdf/core-stage';
-import type { PageRef } from '@embedpdf/core';
+import { revealCamera, type Camera, type Rect as StageRect } from '@embedpdf/core-stage';
+import type { PluginContext, PageRef } from '@embedpdf/core';
 
 import type { RevealAnchorValue, RevealOptions } from '../contract';
 import type { StageAnimation } from '../camera/animation';
 import type { StageCameraWrite } from '../camera/write';
 import type { StageHostCapability } from '../host-contract';
-import type { StageContext, StageServices } from '../services';
+import { patchSettings, setCursor, type StageState } from '../model';
+import type { StageServices } from '../services';
 import type { StageArrival } from './arrive';
 
 export function createReveal(
-  ctx: StageContext,
+  ctx: PluginContext<StageState>,
   { scene }: Pick<StageServices, 'scene'>,
-  { setCam, markCause }: Pick<StageCameraWrite, 'setCam' | 'markCause'>,
-  { cancelAnim, animateTo }: Pick<StageAnimation, 'cancelAnim' | 'animateTo'>,
+  { writeCamera, markCause }: Pick<StageCameraWrite, 'writeCamera' | 'markCause'>,
+  { cancelAnimation, animateTo }: Pick<StageAnimation, 'cancelAnimation' | 'animateTo'>,
   { stabilized, goToTarget }: Pick<StageArrival, 'stabilized' | 'goToTarget'>,
 ) {
   const {
-    cam,
-    vp,
-    pad,
+    camera,
+    viewport,
+    padding,
     paged,
     itemIndexOfPage,
     worldPageFrame,
@@ -36,121 +37,136 @@ export function createReveal(
     boundsFor,
     indexOfPage,
   } = scene;
+  const state = () => ctx.state.get();
 
   /**
-   * One axis of a positioned-reveal camera. `undefined` = 'nearest' (only
-   * move if the target is outside the padded view) — unless the zoom just
-   * changed, where "don't move" is meaningless and the spec's slack-axis
-   * rule (center) applies. 'keep' never moves the axis (PDF /XYZ null).
+   * One axis of a positioned-reveal camera. `undefined` is 'nearest' (move
+   * only when the target is outside the padded view), unless the zoom just
+   * changed: then "do not move" is meaningless and the slack-axis rule
+   * (center) applies. 'keep' never moves the axis (PDF /XYZ null).
    */
   const revealAxis = (
-    a: RevealAnchorValue | undefined,
-    camPos: number,
-    rectPos: number,
+    anchor: RevealAnchorValue | undefined,
+    cameraPosition: number,
+    rectPosition: number,
     rectExtent: number,
-    vpExtent: number,
+    viewportExtent: number,
     zoom: number,
     zoomChanged: boolean,
   ): number => {
-    if (a === 'keep') return camPos;
-    const p = pad();
-    if (a === undefined) {
+    if (anchor === 'keep') return cameraPosition;
+    const inset = padding();
+    if (anchor === undefined) {
       if (!zoomChanged) {
-        const lo = camPos + p / zoom;
-        const hi = camPos + (vpExtent - p) / zoom;
-        if (rectPos >= lo && rectPos + rectExtent <= hi) return camPos; // already visible
-        if (rectExtent > hi - lo || rectPos < lo) return rectPos - p / zoom;
-        return rectPos + rectExtent - (vpExtent - p) / zoom;
+        const low = cameraPosition + inset / zoom;
+        const high = cameraPosition + (viewportExtent - inset) / zoom;
+        if (rectPosition >= low && rectPosition + rectExtent <= high) return cameraPosition; // already visible
+        if (rectExtent > high - low || rectPosition < low) return rectPosition - inset / zoom;
+        return rectPosition + rectExtent - (viewportExtent - inset) / zoom;
       }
-      a = 'center';
+      anchor = 'center';
     }
-    if (a === 'start') return rectPos - p / zoom;
-    if (a === 'end') return rectPos + rectExtent - (vpExtent - p) / zoom;
-    const f = a === 'center' ? 0.5 : Math.min(1, Math.max(0, a));
-    return rectPos + rectExtent / 2 - (vpExtent * f) / zoom;
+    if (anchor === 'start') return rectPosition - inset / zoom;
+    if (anchor === 'end') return rectPosition + rectExtent - (viewportExtent - inset) / zoom;
+    const fraction = anchor === 'center' ? 0.5 : Math.min(1, Math.max(0, anchor));
+    return rectPosition + rectExtent / 2 - (viewportExtent * fraction) / zoom;
   };
 
-  const revealIndex = (pageIndex: number, opts?: RevealOptions): void => {
+  const revealIndex = (pageIndex: number, options?: RevealOptions): void => {
     markCause('programmatic');
-    const doc = ctx.document();
-    if (!doc || doc.pageCount === 0) return;
-    const target = Math.max(0, Math.min(pageIndex, doc.pageCount - 1));
+    const pageCount = ctx.document()?.pageCount ?? 0;
+    if (pageCount === 0) return;
+    const target = Math.max(0, Math.min(pageIndex, pageCount - 1));
     const positioned =
-      !!opts &&
-      // `rect: null` means "no rect", same as absent — so nullable sources
+      !!options &&
+      // `rect: null` means "no rect", the same as absent, so nullable sources
       // (`CommentThreadView.contentRect`) flow in without a `?? undefined`.
-      (opts.rect != null ||
-        opts.anchor !== undefined ||
-        (opts.zoom !== undefined && opts.zoom !== 'keep'));
+      (options.rect != null ||
+        options.anchor !== undefined ||
+        (options.zoom !== undefined && options.zoom !== 'keep'));
 
     if (!positioned) {
-      // Bare reveal — NOT navigation: minimal visibility, cursor untouched.
+      // A bare reveal is not navigation: minimal visibility, cursor untouched.
       if (paged()) {
-        // the page isn't in the one-item slice — revealing it IS navigating to it
-        goToTarget(target, opts);
+        // The page is not in the one-item slice: revealing it is navigating to it.
+        goToTarget(target, options);
         return;
       }
-      const sc = buildScene();
-      if (!sc.itemCount) return;
-      const page = pageRectOf(sc.items[itemIndexOfPage(target)], target);
-      // Reveal the OUTER box: pageFrame chrome (labels, buttons) belongs to the
-      // page, so "make the page visible" includes its reserved bands.
-      const m = worldPageFrame();
+      const current = buildScene();
+      if (!current.itemCount) return;
+      const page = pageRectOf(current.items[itemIndexOfPage(target)], target);
+      // Reveal the outer box: pageFrame chrome (labels, buttons) belongs to
+      // the page, so "make the page visible" includes its reserved bands.
+      const frame = worldPageFrame();
       const box = {
-        x: page.x - m.left,
-        y: page.y - m.top,
-        width: page.width + m.left + m.right,
-        height: page.height + m.top + m.bottom,
+        x: page.x - frame.left,
+        y: page.y - frame.top,
+        width: page.width + frame.left + frame.right,
+        height: page.height + frame.top + frame.bottom,
       };
-      const camera = S.revealCamera(cam(), box, vp(), pad());
-      const current = cam();
-      if (camera.x === current.x && camera.y === current.y) return; // already visible
-      cancelAnim();
-      if ((opts?.behavior ?? ctx.getState().scrollBehavior) === 'smooth') {
-        animateTo(camera, sceneRect());
+      const next = revealCamera(camera(), box, viewport(), padding());
+      const now = camera();
+      if (next.x === now.x && next.y === now.y) return; // already visible
+      cancelAnimation();
+      if ((options?.behavior ?? state().scrollBehavior) === 'smooth') {
+        animateTo(next, sceneRect());
       } else {
-        setCam(camera, sceneRect());
+        writeCamera(next, sceneRect());
       }
       return;
     }
 
-    // Positioned reveal: an ARRIVAL at a rect/point (search hit, PDF
-    // destination). Like navigation, the cursor is INTENT — set up front
-    // (paged: this also rebuilds the one-item slice), not derived from a
-    // possibly mid-tween camera.
-    cancelAnim();
-    if (target !== ctx.getState().cursor) {
-      ctx.dispatch({ type: 'CURSOR', cursor: target });
-    }
+    // A positioned reveal is an arrival at a rect or point (a search hit, a
+    // PDF destination). Like navigation, the cursor is intent, set up front
+    // (in paged flow this also rebuilds the one-item slice), never derived
+    // from a camera that may be mid-tween.
+    cancelAnimation();
+    ctx.state.update(setCursor, target);
 
-    const place = (): { camera: S.Camera; bounds: S.Rect; zoomChanged: boolean } | null => {
-      const sc = buildScene();
-      if (!sc.itemCount) return null;
-      const item = paged() ? sc.items[0] : sc.items[itemIndexOfPage(target)];
-      const world = opts.rect
-        ? worldRectForContent(item, target, opts.rect)
+    const place = (): { camera: Camera; bounds: StageRect; zoomChanged: boolean } | null => {
+      const current = buildScene();
+      if (!current.itemCount) return null;
+      const item = paged() ? current.items[0] : current.items[itemIndexOfPage(target)];
+      const world = options.rect
+        ? worldRectForContent(item, target, options.rect)
         : pageRectOf(item, target);
-      const zd = opts.zoom ?? 'keep';
-      const availW = Math.max(1, vp().width - 2 * pad());
-      const availH = Math.max(1, vp().height - 2 * pad());
+      const zoomDirective = options.zoom ?? 'keep';
+      const availableWidth = Math.max(1, viewport().width - 2 * padding());
+      const availableHeight = Math.max(1, viewport().height - 2 * padding());
       let zoom =
-        typeof zd === 'object'
-          ? zd.level
-          : zd === 'fit'
-            ? Math.min(availW / world.width, availH / world.height)
-            : zd === 'fit-width'
-              ? availW / world.width
-              : zd === 'fit-height'
-                ? availH / world.height
-                : cam().zoom;
-      // Degenerate target (a point with a fit directive) → pan only.
-      if (!Number.isFinite(zoom) || zoom <= 0) zoom = cam().zoom;
-      const zoomChanged = zd !== 'keep';
-      const a = opts.anchor ?? {};
+        typeof zoomDirective === 'object'
+          ? zoomDirective.level
+          : zoomDirective === 'fit'
+            ? Math.min(availableWidth / world.width, availableHeight / world.height)
+            : zoomDirective === 'fit-width'
+              ? availableWidth / world.width
+              : zoomDirective === 'fit-height'
+                ? availableHeight / world.height
+                : camera().zoom;
+      // A degenerate target (a point with a fit directive) only pans.
+      if (!Number.isFinite(zoom) || zoom <= 0) zoom = camera().zoom;
+      const zoomChanged = zoomDirective !== 'keep';
+      const anchor = options.anchor ?? {};
       return {
         camera: {
-          x: revealAxis(a.x, cam().x, world.x, world.width, vp().width, zoom, zoomChanged),
-          y: revealAxis(a.y, cam().y, world.y, world.height, vp().height, zoom, zoomChanged),
+          x: revealAxis(
+            anchor.x,
+            camera().x,
+            world.x,
+            world.width,
+            viewport().width,
+            zoom,
+            zoomChanged,
+          ),
+          y: revealAxis(
+            anchor.y,
+            camera().y,
+            world.y,
+            world.height,
+            viewport().height,
+            zoom,
+            zoomChanged,
+          ),
           zoom,
         },
         bounds: boundsFor(item),
@@ -161,32 +177,32 @@ export function createReveal(
     const first = place();
     if (!first) return;
     // A resolved zoom becomes the zoom intent (like zoomAround), so later
-    // resizes/refits keep the destination's magnification.
+    // resizes and refits keep the destination's magnification.
     if (first.zoomChanged) {
-      ctx.dispatch({ type: 'PATCH', patch: { zoom: { level: first.camera.zoom } } });
+      ctx.state.update(patchSettings, { zoom: { level: first.camera.zoom } });
     }
-    if ((opts.behavior ?? ctx.getState().scrollBehavior) === 'smooth') {
+    if ((options.behavior ?? state().scrollBehavior) === 'smooth') {
       // If the zoom patch re-wrapped the scene (zoom is a layout input in
       // wrapped mode), recompute once against the new geometry.
-      const p = place() ?? first;
-      animateTo(p.camera, p.bounds);
+      const landing = place() ?? first;
+      animateTo(landing.camera, landing.bounds);
     } else {
       stabilized(() => {
-        const p = place();
-        if (p) setCam(p.camera, p.bounds);
+        const landing = place();
+        if (landing) writeCamera(landing.camera, landing.bounds);
       });
     }
   };
 
-  const reveal = (page: PageRef, opts?: RevealOptions): void => {
+  const reveal = (page: PageRef, options?: RevealOptions): void => {
     const index = indexOfPage(page);
-    if (index >= 0) revealIndex(index, opts);
+    if (index >= 0) revealIndex(index, options);
   };
 
   return {
     api: {
       reveal,
-      revealRect: (page, rect, opts) => reveal(page, { ...opts, rect }),
+      revealRect: (page, rect, options) => reveal(page, { ...options, rect }),
       revealIndex,
     } satisfies Partial<StageHostCapability>,
   };

@@ -20,9 +20,9 @@ const NO_RELATIONSHIP: AnnotationRelationship = { inReplyTo: null, replyType: nu
  * Read the `/IRT` + `/RT` relationship edge of an annotation.
  *
  * `/IRT` is an indirect reference to the parent annotation, which (per ISO
- * 32000 §12.5.6.2) lives on the SAME page — so we surface the parent with
+ * 32000 §12.5.6.2) lives on the same page — so we surface the parent with
  * the same `pageObjectNumber` and the same identity precedence the rest of
- * the engine uses (objectNumber, then `/NM`). We do NOT fall back to an
+ * the engine uses (objectNumber, then `/NM`). We do not fall back to an
  * index ref: an `/IRT` target is by construction an indirect object, so its
  * object number is always available. In the pathological case where neither
  * an object number nor an `/NM` can be read (a malformed direct-object
@@ -48,6 +48,27 @@ export function readAnnotationRelationship(
     return { inReplyTo, replyType: replyTypeFromCode(fn.EPDFAnnot_GetReplyType(annotPtr)) };
   } finally {
     fn.FPDFPage_CloseAnnot(parentPtr);
+  }
+}
+
+/**
+ * Read the annotation that `key` (`/IRT`, `/Popup`, `/Parent`) refers to, as a
+ * ref on the same page, or `null` when the key is absent or its target can't
+ * be addressed.
+ */
+export function readLinkedAnnotationRef(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+  key: string,
+  pageObjectNumber: PageObjectNumber,
+): AnnotationRef | null {
+  const linkedPtr = fn.FPDFAnnot_GetLinkedAnnot(annotPtr, key);
+  if (!linkedPtr) return null;
+  try {
+    return readParentRef(fn, mem, linkedPtr, pageObjectNumber);
+  } finally {
+    fn.FPDFPage_CloseAnnot(linkedPtr);
   }
 }
 

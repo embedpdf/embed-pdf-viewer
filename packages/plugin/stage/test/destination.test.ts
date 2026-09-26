@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { toPageRef, type PageLayout } from '@embedpdf/core';
 import { destinationToReveal } from '../src/destination';
 
-/** US Letter, crop at origin — content space equals PDF space with y flipped. */
+/** A us-letter page, crop at the origin — content space equals PDF space with y flipped. */
 const letter: PageLayout = {
   index: 3,
   ref: toPageRef(12),
@@ -87,15 +87,19 @@ describe('destinationToReveal', () => {
   });
 
   test('/FitB* uses the bounding box when provided, crop fallback otherwise', () => {
-    const bbox = { x: 50, y: 60, width: 400, height: 500 };
-    const withBox = destinationToReveal({ kind: 'fitB', page: toPageRef(12) }, letter, bbox);
-    expect(withBox.options).toEqual({ rect: bbox, zoom: 'fit' });
+    const boundingBox = { x: 50, y: 60, width: 400, height: 500 };
+    const withBox = destinationToReveal({ kind: 'fitB', page: toPageRef(12) }, letter, boundingBox);
+    expect(withBox.options).toEqual({ rect: boundingBox, zoom: 'fit' });
     const fallback = destinationToReveal({ kind: 'fitB', page: toPageRef(12) }, letter);
     expect(fallback.options.rect).toEqual({ x: 0, y: 0, width: 612, height: 792 });
 
-    const bh = destinationToReveal({ kind: 'fitBH', page: toPageRef(12), top: 700 }, letter, bbox);
-    expect(bh.options.rect).toEqual({ x: 50, y: 92, width: 400, height: 0 });
-    expect(bh.options.zoom).toBe('fit-width');
+    const fitBH = destinationToReveal(
+      { kind: 'fitBH', page: toPageRef(12), top: 700 },
+      letter,
+      boundingBox,
+    );
+    expect(fitBH.options.rect).toEqual({ x: 50, y: 92, width: 400, height: 0 });
+    expect(fitBH.options.zoom).toBe('fit-width');
   });
 
   test('coordinates are crop-relative (offset crop box)', () => {

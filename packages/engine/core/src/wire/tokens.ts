@@ -7,6 +7,7 @@ import {
   AnnotationAppearancesRenderTokenSchema,
   AnnotationTokenSchema,
   AnnotationsAllTokenSchema,
+  AnnotationsExportTokenSchema,
   ActionsTokenSchema,
   AttachmentsTokenSchema,
   ContentTokenSchema,
@@ -18,8 +19,10 @@ import {
   SearchTokenSchema,
 } from './tokenSchemas';
 import type { PdfSaveMode } from '../dto/PdfSaveMode';
+import { toPageRef } from '../identity/PageRef';
+import type { AnnotationExportSelection } from '../transfer/exportSelection';
 import type { ModificationLevel } from '../signature/types';
-import type { SearchQuery, SearchSliceBudget } from '../search/types';
+import type { SearchLimit, SearchQuery } from '../search/types';
 
 export interface DownloadToken {
   docVersion: number;
@@ -124,6 +127,92 @@ export const decodeAnnotationsAllToken = (raw: string): number =>
     'annotationsVersion',
   );
 
+/** What a `doc.annotations.export` leaf is: two pins and a selection. */
+export interface AnnotationsExportToken {
+  annotationsVersion: number;
+  layoutVersion: number;
+  selection: AnnotationExportSelection;
+}
+
+// A selection as the token holds it: page object numbers, and refs as
+// [page, object number] or [page, name]. Weak index refs have no durable
+// address, so a versioned read can't carry them.
+interface TokenSelection {
+  p?: number[];
+  r?: Array<[number, number | string]>;
+}
+
+export const encodeAnnotationsExportToken = (token: AnnotationsExportToken): string => {
+  const { selection } = token;
+  const wire: TokenSelection = {};
+  if (selection.pages) {
+    wire.p = [...new Set(selection.pages.map((page) => page.pageObjectNumber))].sort(
+      (left, right) => left - right,
+    );
+  }
+  if (selection.refs) {
+    const refs = new Map<string, [number, number | string]>();
+    for (const ref of selection.refs) {
+      if (ref.kind === 'index') {
+        throw new Error('an export names annotations by object number or name, not by position');
+      }
+      const entry: [number, number | string] = [
+        ref.page.pageObjectNumber,
+        ref.kind === 'objectNumber' ? ref.annotObjectNumber : ref.nm,
+      ];
+      refs.set(JSON.stringify(entry), entry);
+    }
+    wire.r = [...refs.keys()].sort().map((key) => refs.get(key)!);
+  }
+  return encodeToken(AnnotationsExportTokenSchema, {
+    annotationsVersion: token.annotationsVersion,
+    layoutVersion: token.layoutVersion,
+    include: selection.include === 'references' ? 'references' : undefined,
+    selection: wire.p || wire.r ? encodeTokenText(JSON.stringify(wire)) : undefined,
+  });
+};
+
+export const decodeAnnotationsExportToken = (raw: string): AnnotationsExportToken => {
+  const query = decodeToken(AnnotationsExportTokenSchema, raw);
+  const selection: {
+    -readonly [K in keyof AnnotationExportSelection]: AnnotationExportSelection[K];
+  } = {};
+  if (query.include !== undefined) {
+    if (query.include !== 'references') throw new Error(`unknown include "${query.include}"`);
+    selection.include = 'references';
+  }
+  if (query.selection !== undefined) {
+    const wire = JSON.parse(decodeTokenText(query.selection)) as TokenSelection;
+    const isNumber = (value: unknown): value is number =>
+      Number.isInteger(value) && (value as number) > 0;
+    if (typeof wire !== 'object' || wire === null) throw new Error('malformed export selection');
+    if (wire.p !== undefined) {
+      if (!Array.isArray(wire.p) || !wire.p.every(isNumber)) {
+        throw new Error('malformed export pages');
+      }
+      selection.pages = wire.p.map((pageObjectNumber) => toPageRef(pageObjectNumber));
+    }
+    if (wire.r !== undefined) {
+      if (!Array.isArray(wire.r)) throw new Error('malformed export refs');
+      selection.refs = wire.r.map((entry) => {
+        if (!Array.isArray(entry) || entry.length !== 2 || !isNumber(entry[0])) {
+          throw new Error('malformed export ref');
+        }
+        const page = toPageRef(entry[0]);
+        const [, id] = entry;
+        if (isNumber(id)) return { kind: 'objectNumber', page, annotObjectNumber: id } as const;
+        if (typeof id === 'string' && id.length > 0) return { kind: 'nm', page, nm: id } as const;
+        throw new Error('malformed export ref');
+      });
+    }
+  }
+  return {
+    annotationsVersion: decodePositiveInteger(query.annotationsVersion, 'annotationsVersion'),
+    layoutVersion: decodePositiveInteger(query.layoutVersion, 'layoutVersion'),
+    selection,
+  };
+};
+
 export const encodeActionsToken = (actionsVersion: number): string =>
   encodeToken(ActionsTokenSchema, { actionsVersion });
 export const decodeActionsToken = (raw: string): number =>
@@ -151,7 +240,7 @@ export const decodeDownloadToken = (raw: string): DownloadToken => {
  * Encode a render token from a flat wire-shape input. The input is the
  * output of `flatten(...)` over an SDK `PageImageOptions`-shaped object plus
  * cache versions. Semantic invariants (viewport-kind XOR fields, per-family
- * pin grammar — annotatedness itself is PATH-expressed, never a token key —
+ * pin grammar — annotatedness itself is path-expressed, never a token key —
  * target rect coherence) live in the per-family render query schemas —
  * running them here would duplicate the spec.
  */
@@ -179,29 +268,30 @@ export const decodeAnnotationAppearancesRenderToken = (raw: string): TokenQuery 
   decodeToken(AnnotationAppearancesRenderTokenSchema, raw);
 
 /**
- * The decoded state of a versioned search URL — the WHOLE cache key.
- * `epoch` is `searchContentEpoch(manifest)`; `skip` is the number of
- * scan-order pages already consumed (0 = first slice). The server mints
- * continuation tokens (same epoch, advanced skip); the client decodes
- * them only to verify a resumed cursor still belongs to its query.
+ * The decoded state of a versioned search URL — the whole cache key.
+ * `epoch` is `searchContentEpoch(manifest)`; `from` the scan origin by page
+ * object number; `skip` the number of scan-order pages already searched
+ * (0 = first batch). The server mints continuation tokens (same epoch,
+ * advanced skip); the client decodes them only to verify a resumed cursor
+ * still belongs to its query.
  */
 export interface SearchToken {
   epoch: string;
   query: SearchQuery;
-  startPage?: number;
+  from?: number;
   skip: number;
-  budget?: SearchSliceBudget;
+  limit?: SearchLimit;
 }
 
 /**
- * The search RESULT representation this client speaks — part of the token
+ * The search result representation this client speaks — part of the token
  * (and therefore the versioned URL), so a response-shape change can never
  * serve a stale CDN body to a newer client: new tokens are new cache keys,
- * and old tokens fail decode on new servers. Deliberately ALWAYS encoded —
+ * and old tokens fail decode on new servers. Deliberately always encoded —
  * an exception to the omit-defaults rule, because its entire job is to
  * change the token bytes when the format changes.
  */
-export const SEARCH_RESULT_FORMAT = 'segments1';
+export const SEARCH_RESULT_FORMAT = 'ranges1';
 
 export const encodeSearchToken = (input: SearchToken): string => {
   const q = input.query;
@@ -209,16 +299,16 @@ export const encodeSearchToken = (input: SearchToken): string => {
     epoch: input.epoch,
     format: SEARCH_RESULT_FORMAT,
     q: encodeTokenText(q.text),
-    // Canonical keys: every default is OMITTED, never encoded as false/0.
+    // Canonical keys: every default is omitted, never encoded as false/0.
     regex: q.regex ? true : undefined,
     matchCase: q.matchCase ? true : undefined,
     matchDiacritics: q.matchDiacritics ? true : undefined,
     wholeWord: q.wholeWord ? true : undefined,
     ignoreWhitespace: q.ignoreWhitespace ? true : undefined,
-    startPage: input.startPage,
+    from: input.from,
     skip: input.skip > 0 ? input.skip : undefined,
-    maxPages: input.budget?.maxPages,
-    maxMatches: input.budget?.maxMatches,
+    limitPages: input.limit?.pages,
+    limitMatches: input.limit?.matches,
   });
 };
 
@@ -240,22 +330,22 @@ export const decodeSearchToken = (raw: string): SearchToken => {
     ...(t.wholeWord === 'true' ? { wholeWord: true } : {}),
     ...(t.ignoreWhitespace === 'true' ? { ignoreWhitespace: true } : {}),
   };
-  const maxPages =
-    t.maxPages === undefined ? undefined : decodePositiveInteger(t.maxPages, 'maxPages');
-  const maxMatches =
-    t.maxMatches === undefined ? undefined : decodePositiveInteger(t.maxMatches, 'maxMatches');
+  const pages =
+    t.limitPages === undefined ? undefined : decodePositiveInteger(t.limitPages, 'limitPages');
+  const matches =
+    t.limitMatches === undefined
+      ? undefined
+      : decodePositiveInteger(t.limitMatches, 'limitMatches');
   return {
     epoch: t.epoch,
     query,
-    ...(t.startPage === undefined
-      ? {}
-      : { startPage: decodePositiveInteger(t.startPage, 'startPage') }),
+    ...(t.from === undefined ? {} : { from: decodePositiveInteger(t.from, 'from') }),
     skip: t.skip === undefined ? 0 : decodePositiveInteger(t.skip, 'skip'),
-    ...(maxPages !== undefined || maxMatches !== undefined
+    ...(pages !== undefined || matches !== undefined
       ? {
-          budget: {
-            ...(maxPages !== undefined ? { maxPages } : {}),
-            ...(maxMatches !== undefined ? { maxMatches } : {}),
+          limit: {
+            ...(matches !== undefined ? { matches } : {}),
+            ...(pages !== undefined ? { pages } : {}),
           },
         }
       : {}),

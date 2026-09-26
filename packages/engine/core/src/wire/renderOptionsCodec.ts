@@ -19,11 +19,11 @@ export interface RenderVersions {
  * extending `PageImageOptions`, the render query schemas, and
  * `RenderTokenSchema.fields`; this function does not change.
  *
- * Token/path rule: tokens carry VERSION PINS and RENDER
- * PARAMETERS; anything that changes the artifact's plane-dependency set is
- * PATH-expressed. Annotatedness changes the planes (`content` vs
+ * Token/path rule: tokens carry version pins and render
+ * parameters; anything that changes the artifact's plane-dependency set is
+ * path-expressed. Annotatedness changes the planes (`content` vs
  * `content + annotations`), so the wire map never carries
- * `includeAnnotations` — the caller picks the path FAMILY
+ * `includeAnnotations` — the caller picks the path family
  * (`…/render/pages/` vs `…/render/annotated/pages/`) and passes
  * `annotationVersion` iff it chose the annotated one. Contradictory states
  * are unrepresentable; each family's query schema enforces its own pin
@@ -82,7 +82,7 @@ export function pageRenderOptionsFromImageOptions(
 /**
  * Cache version for the appearance render token. Appearances depend only on
  * the annotation `/AP` stream, so `annotationVersion` is the sole key —
- * deliberately NOT `contentVersion`.
+ * deliberately not `contentVersion`.
  */
 export interface AnnotationRenderVersion {
   annotationVersion: number;
@@ -123,7 +123,7 @@ export function annotationRenderOptionsFromImageOptions(
   options: AnnotationAppearanceImageOptions,
 ): AnnotationAppearanceRenderOptions {
   return {
-    ...(options.scale !== undefined ? { scale: options.scale } : {}),
+    ...(options.viewport ? { viewport: options.viewport } : {}),
     ...(options.rotation !== undefined ? { rotation: options.rotation } : {}),
     ...(options.modes ? { modes: options.modes } : {}),
   };

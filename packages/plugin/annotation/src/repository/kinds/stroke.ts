@@ -1,8 +1,8 @@
 /**
  * The stroke family — line, polygon, polyline, ink. Shared physics: their
- * `/Rect` is the VISUAL bounds (stroke radius included — and, for a cloudy
+ * `/Rect` is the visual bounds (stroke radius included — and, for a cloudy
  * polygon, the outward curl extent), so it derives from the point geometry
- * PLUS the stroke width, border, and line endings; and their
+ * plus the stroke width, border, and line endings; and their
  * `/EMBD_Metadata/Rotation` is an advisory scalar (the points are already
  * rotated; shape measurement captions use it to orient their text).
  */
@@ -13,7 +13,7 @@ import {
   geomPdfBounds,
   geomRotation,
   pdfToContentPoint,
-  type Annot,
+  type ModelAnnotation,
 } from '@embedpdf/core-annotation';
 import type { AnnotationDTO, PdfRect } from '@embedpdf/engine-core/runtime';
 
@@ -21,102 +21,130 @@ import type { KindProjection, Wire } from '../projection';
 import { borderSlice } from '../props';
 import { contentToPdfPoint, contentToPdfRect, rotFromDTO, toPdfRotation } from '../seam';
 
-/** Advisory rotation, TOTAL: rotation 0 states `null` (tri-state clear) —
+/** Advisory rotation, total: rotation 0 states `null` (tri-state clear) —
  *  omission would preserve a stale advisory angle. */
-const advisoryRotation = (g: Annot['geom']): { rotation: number | null } => {
-  const rot = geomRotation(g);
+const advisoryRotation = (geometry: ModelAnnotation['geometry']): { rotation: number | null } => {
+  const rot = geomRotation(geometry);
   return { rotation: rot ? toPdfRotation(rot) : null };
 };
 
 /** `/BE` intensity for a closed poly (polygon): the curls are generated from
  *  /Vertices + /BE alone — per ISO 32000 no /RD applies — and the /Rect
- *  (geomPdfBounds WITH the border) already includes the outward cloud extent. */
-const polyCloudy = (a: Annot): Wire =>
-  a.geom.t === 'poly' && a.geom.closed
-    ? { cloudyIntensity: a.style.border.kind === 'cloudy' ? a.style.border.intensity : null }
+ *  (geomPdfBounds with the border) already includes the outward cloud extent. */
+const polyCloudy = (annotation: ModelAnnotation): Wire =>
+  annotation.geometry.kind === 'poly' && annotation.geometry.closed
+    ? {
+        cloudyIntensity:
+          annotation.style.border.kind === 'cloudy' ? annotation.style.border.intensity : null,
+      }
     : {};
 
 /** The visual-bounds `/Rect` (stroke + border included) of a stroke geom. */
-const visualRect = (a: Annot, crop: PdfRect): Wire => {
-  const g = a.geom;
-  if (a.measure) {
-    const bounds = measurementLayout(g, a.measure, a.style)?.visualBounds;
+const visualRect = (annotation: ModelAnnotation, crop: PdfRect): Wire => {
+  const geometry = annotation.geometry;
+  if (annotation.measure) {
+    const bounds = measurementLayout(geometry, annotation.measure, annotation.style)?.visualBounds;
     if (bounds) {
       return { rect: contentToPdfRect(bounds, crop) };
     }
   }
-  if (g.t === 'line' || g.t === 'ink') return { rect: geomPdfBounds(g, a.style.strokeWidth, crop) };
-  if (g.t === 'poly') return { rect: geomPdfBounds(g, a.style.strokeWidth, crop, a.style.border) };
+  if (geometry.kind === 'line' || geometry.kind === 'ink')
+    return { rect: geomPdfBounds(geometry, annotation.style.strokeWidth, crop) };
+  if (geometry.kind === 'poly')
+    return {
+      rect: geomPdfBounds(geometry, annotation.style.strokeWidth, crop, annotation.style.border),
+    };
   return {};
 };
 
 /**
- * A lowering whose key is an INPUT of the derived /Rect: the visual bounds
+ * A lowering whose key is an input of the derived /Rect: the visual bounds
  * ride along with every emission, so a sparse patch can never change an input
  * without re-emitting the derivation. (The bug this kills: patch `lineEndings`
  * alone → the engine re-bakes the /AP inside the stale /Rect → the new
  * arrowhead is clipped in every viewer except the live vector one.)
  */
 const withRect =
-  (lower: (a: Annot, crop: PdfRect) => Wire) =>
-  (a: Annot, crop: PdfRect): Wire => ({ ...lower(a, crop), ...visualRect(a, crop) });
+  (lower: (annotation: ModelAnnotation, crop: PdfRect) => Wire) =>
+  (annotation: ModelAnnotation, crop: PdfRect): Wire => ({
+    ...lower(annotation, crop),
+    ...visualRect(annotation, crop),
+  });
 
-/** Stroke-family prop exceptions: width, border, AND line endings feed the
+/** Stroke-family prop exceptions: width, border, and line endings feed the
  *  derived /Rect — an ending's arrowhead reaches well past the endpoint, and
  *  ISO 32000 requires /Rect to enclose it. Where a key can't change the
  *  bounds (a line's border restyle), the re-emitted rect is an idempotent
  *  no-op — uniformity beats per-case reasoning here. */
 const strokeProps: KindProjection['prop'] = {
-  strokeWidth: withRect((a) => ({ strokeWidth: a.style.strokeWidth })),
-  border: withRect((a) => ({ ...borderSlice(a.style), ...polyCloudy(a) })),
-  lineEndings: withRect((a) =>
-    (a.geom.t === 'line' || a.geom.t === 'poly') && a.geom.ends ? { lineEndings: a.geom.ends } : {},
+  strokeWidth: withRect((annotation) => ({ strokeWidth: annotation.style.strokeWidth })),
+  border: withRect((annotation) => ({
+    ...borderSlice(annotation.style),
+    ...polyCloudy(annotation),
+  })),
+  lineEndings: withRect((annotation) =>
+    (annotation.geometry.kind === 'line' || annotation.geometry.kind === 'poly') &&
+    annotation.geometry.ends
+      ? { lineEndings: annotation.geometry.ends }
+      : {},
   ),
 };
 
 export const line: KindProjection = {
   ingest: (dto, crop) => {
-    const d = dto as Extract<AnnotationDTO, { subtype: 'line' }>;
+    const lineDto = dto as Extract<AnnotationDTO, { subtype: 'line' }>;
     return {
-      ...(d.intent === 'LineDimension'
+      ...(lineDto.intent === 'line-dimension'
         ? {
             measure: {
-              intent: d.intent,
-              measure: d.measure ?? null,
-              caption: d.caption ?? { enabled: false },
-              leader: d.leader ?? undefined,
+              intent: lineDto.intent,
+              measure: lineDto.measure ?? null,
+              caption: {
+                enabled: lineDto.captionEnabled ?? false,
+                position: lineDto.captionPosition,
+                ...(lineDto.captionOffset ? { offset: lineDto.captionOffset } : {}),
+              },
+              leader: lineDto.leader ?? undefined,
               crop,
-              text: d.contents ?? '',
+              text: lineDto.contents ?? '',
             },
           }
         : {}),
-      geom: {
-        t: 'line',
-        a: pdfToContentPoint(d.linePoints.start, crop),
-        b: pdfToContentPoint(d.linePoints.end, crop),
-        ends: d.lineEndings,
-        ...rotFromDTO(d.rotation),
+      geometry: {
+        kind: 'line',
+        a: pdfToContentPoint(lineDto.linePoints.start, crop),
+        b: pdfToContentPoint(lineDto.linePoints.end, crop),
+        ends: lineDto.lineEndings,
+        ...rotFromDTO(lineDto.rotation),
       },
     };
   },
-  geometry: (a, crop) => {
-    const g = a.geom;
-    if (g.t !== 'line') return null;
+  geometry: (annotation, crop) => {
+    const geometry = annotation.geometry;
+    if (geometry.kind !== 'line') return null;
     return {
-      ...(a.measure?.intent === 'LineDimension' ? { contents: distanceLabel(g, a.measure) } : {}),
-      linePoints: { start: contentToPdfPoint(g.a, crop), end: contentToPdfPoint(g.b, crop) },
-      ...visualRect(a, crop),
-      ...advisoryRotation(g),
+      ...(annotation.measure?.intent === 'line-dimension'
+        ? { contents: distanceLabel(geometry, annotation.measure) }
+        : {}),
+      linePoints: {
+        start: contentToPdfPoint(geometry.a, crop),
+        end: contentToPdfPoint(geometry.b, crop),
+      },
+      ...visualRect(annotation, crop),
+      ...advisoryRotation(geometry),
     };
   },
   prop: strokeProps,
-  draftExtras: (a) =>
-    a.measure?.intent === 'LineDimension'
+  draftExtras: (annotation) =>
+    annotation.measure?.intent === 'line-dimension'
       ? {
-          intent: a.measure.intent,
-          measure: a.measure.measure?.subtype === 'RL' ? a.measure.measure : null,
-          caption: a.measure.caption,
-          leader: a.measure.leader,
+          intent: annotation.measure.intent,
+          measure:
+            annotation.measure.measure?.subtype === 'rectilinear'
+              ? annotation.measure.measure
+              : null,
+          ...captionFieldsOf(annotation.measure),
+          leader: annotation.measure.leader,
           subject: 'Distance',
         }
       : {},
@@ -124,47 +152,56 @@ export const line: KindProjection = {
 
 const polyProjection = (closed: boolean): KindProjection => ({
   ingest: (dto, crop) => {
-    const d = dto as Extract<AnnotationDTO, { subtype: 'polygon' | 'polyline' }>;
+    const polyDto = dto as Extract<AnnotationDTO, { subtype: 'polygon' | 'polyline' }>;
     return {
-      ...(d.intent === 'PolygonDimension' || d.intent === 'PolyLineDimension'
+      ...(polyDto.intent === 'polygon-dimension' || polyDto.intent === 'polyline-dimension'
         ? {
             measure: {
-              intent: d.intent,
-              measure: d.measure ?? null,
-              caption: d.caption ?? { enabled: false },
+              intent: polyDto.intent,
+              measure: polyDto.measure ?? null,
+              caption: {
+                enabled: polyDto.captionEnabled ?? false,
+                ...(polyDto.captionCenter ? { center: polyDto.captionCenter } : {}),
+              },
               crop,
-              text: d.contents ?? '',
+              text: polyDto.contents ?? '',
             },
           }
         : {}),
-      geom: {
-        t: 'poly',
-        points: d.vertices.map((p) => pdfToContentPoint(p, crop)),
+      geometry: {
+        kind: 'poly',
+        points: polyDto.vertices.map((pdfPoint) => pdfToContentPoint(pdfPoint, crop)),
         closed,
-        ...('lineEndings' in d ? { ends: d.lineEndings } : {}),
-        ...rotFromDTO(d.rotation),
+        ...('lineEndings' in polyDto ? { ends: polyDto.lineEndings } : {}),
+        ...rotFromDTO(polyDto.rotation),
       },
     };
   },
-  geometry: (a, crop) => {
-    const g = a.geom;
-    if (g.t !== 'poly') return null;
+  geometry: (annotation, crop) => {
+    const geometry = annotation.geometry;
+    if (geometry.kind !== 'poly') return null;
     return {
-      ...(a.measure && a.measure.intent !== 'LineDimension'
-        ? { contents: shapeMeasurementLabel(g, a.measure), caption: a.measure.caption }
+      ...(annotation.measure && annotation.measure.intent !== 'line-dimension'
+        ? {
+            contents: shapeMeasurementLabel(geometry, annotation.measure),
+            ...captionFieldsOf(annotation.measure),
+          }
         : {}),
-      vertices: g.points.map((p) => contentToPdfPoint(p, crop)),
-      ...visualRect(a, crop),
-      ...advisoryRotation(g),
+      vertices: geometry.points.map((point) => contentToPdfPoint(point, crop)),
+      ...visualRect(annotation, crop),
+      ...advisoryRotation(geometry),
     };
   },
   prop: strokeProps,
-  draftExtras: (a) =>
-    a.measure && a.measure.intent !== 'LineDimension'
+  draftExtras: (annotation) =>
+    annotation.measure && annotation.measure.intent !== 'line-dimension'
       ? {
-          intent: a.measure.intent,
-          measure: a.measure.measure?.subtype === 'RL' ? a.measure.measure : null,
-          caption: a.measure.caption,
+          intent: annotation.measure.intent,
+          measure:
+            annotation.measure.measure?.subtype === 'rectilinear'
+              ? annotation.measure.measure
+              : null,
+          ...captionFieldsOf(annotation.measure),
           subject: closed ? 'Area' : 'Perimeter',
         }
       : {},
@@ -175,26 +212,50 @@ export const polyline: KindProjection = polyProjection(false);
 
 export const ink: KindProjection = {
   ingest: (dto, crop) => {
-    const d = dto as Extract<AnnotationDTO, { subtype: 'ink' }>;
+    const inkDto = dto as Extract<AnnotationDTO, { subtype: 'ink' }>;
     return {
-      geom: {
-        t: 'ink',
-        strokes: d.inkList.map((stroke) => stroke.map((p) => pdfToContentPoint(p, crop))),
-        ...rotFromDTO(d.rotation),
+      geometry: {
+        kind: 'ink',
+        strokes: inkDto.inkList.map((stroke) =>
+          stroke.map((pdfPoint) => pdfToContentPoint(pdfPoint, crop)),
+        ),
+        ...rotFromDTO(inkDto.rotation),
       },
-      ...(d.intent ? { intent: d.intent } : {}),
+      ...(inkDto.intent ? { intent: inkDto.intent } : {}),
     };
   },
-  geometry: (a, crop) => {
-    const g = a.geom;
-    if (g.t !== 'ink') return null;
+  geometry: (annotation, crop) => {
+    const geometry = annotation.geometry;
+    if (geometry.kind !== 'ink') return null;
     return {
-      inkList: g.strokes.map((stroke) => stroke.map((p) => contentToPdfPoint(p, crop))),
-      ...visualRect(a, crop),
-      ...advisoryRotation(g),
+      inkList: geometry.strokes.map((stroke) =>
+        stroke.map((point) => contentToPdfPoint(point, crop)),
+      ),
+      ...visualRect(annotation, crop),
+      ...advisoryRotation(geometry),
     };
   },
   prop: strokeProps,
   // `/IT` is set at create and never patched (the engine preserves it).
-  draftExtras: (a) => (a.intent === 'ink-highlight' ? { intent: a.intent } : {}),
+  draftExtras: (annotation) =>
+    annotation.intent === 'ink-highlight' ? { intent: annotation.intent } : {},
 };
+
+/**
+ * The model keeps a measurement's caption as one value; the engine takes its
+ * parts as separate fields. A line's caption has a position and an offset, a
+ * shape's a center.
+ */
+export function captionFieldsOf(measure: {
+  intent: string;
+  caption: { enabled: boolean; position?: 'inline' | 'top'; offset?: unknown; center?: unknown };
+}): Record<string, unknown> {
+  const { caption } = measure;
+  return measure.intent === 'line-dimension'
+    ? {
+        captionEnabled: caption.enabled,
+        captionPosition: caption.position ?? 'inline',
+        captionOffset: caption.offset ?? null,
+      }
+    : { captionEnabled: caption.enabled, captionCenter: caption.center ?? null };
+}

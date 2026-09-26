@@ -5,7 +5,7 @@
  * rendered inside. Light-DOM children are reserved for the slot system
  * (children-as-slots), which lands with the framework wrappers.
  *
- * Config is INIT-ONLY, like the chrome it delivers: set `.config` (or the
+ * Config is init-only, like the chrome it delivers: set `.config` (or the
  * declarative attributes) before/at connection; changing either on a live
  * element re-creates the viewer from scratch — documents and all — which is
  * the honest semantic for a workspace-owning embed.
@@ -30,7 +30,7 @@ import { configFromAttributes, initialDocumentsOf, type ElementConfig } from './
 
 /**
  * Turns a config's `engine` field — that door's options bag, or nothing — into
- * the delivery's default engine. A DOOR registers one (see ../local/register);
+ * the delivery's default engine. A door registers one (see ../local/register);
  * the engine-agnostic door registers none, which is precisely what makes its
  * `engine` field required.
  */
@@ -52,7 +52,7 @@ const adoptSheets = (): CSSStyleSheet[] => {
 
 /**
  * The theme-token sheet: `--ep-*` overrides from `theme.tokens`/`theme.dark`,
- * adopted AFTER the chrome sheet so same-specificity declarations win by
+ * adopted after the chrome sheet so same-specificity declarations win by
  * order. Base tokens are re-stated inside `.dark` (then dark overrides on
  * top), because the chrome's own `.dark` block would otherwise out-cascade a
  * host-level base token for every variable it defines.
@@ -110,13 +110,13 @@ function engineOf(config: ElementConfig): Engine | EngineFactory {
 /**
  * The CDN artifact compiles with NODE_ENV=production (no consumer bundler
  * will define it), which strips the chrome's dev-mode guardrails — so the
- * ELEMENT validates unconditionally. A config typo eating a button silently
+ * element validates unconditionally. A config typo eating a button silently
  * is worse for a snippet user than a console.warn is for anyone.
  */
 function warnInvalidConfig(config: ElementConfig): void {
   try {
-    const ids = new Set(defaultCommands.map((c) => c.id));
-    for (const c of config.commands ?? []) ids.add(c.id);
+    const ids = new Set(defaultCommands.map((command) => command.id));
+    for (const command of config.commands ?? []) ids.add(command.id);
     const chrome =
       typeof config.chrome === 'function'
         ? config.chrome(defaultChrome, chromeHelpers)
@@ -124,9 +124,13 @@ function warnInvalidConfig(config: ElementConfig): void {
     for (const problem of validateChrome(chrome, ids)) {
       console.warn(`[embedpdf] chrome: ${problem}`);
     }
-    for (const c of config.commands ?? []) {
-      if (c.icon && !(c.icon in defaultIcons) && !(config.icons && c.icon in config.icons)) {
-        console.warn(`[embedpdf] command "${c.id}": unknown icon "${c.icon}"`);
+    for (const command of config.commands ?? []) {
+      if (
+        command.icon &&
+        !(command.icon in defaultIcons) &&
+        !(config.icons && command.icon in config.icons)
+      ) {
+        console.warn(`[embedpdf] command "${command.id}": unknown icon "${command.icon}"`);
       }
     }
   } catch (error) {
@@ -135,7 +139,7 @@ function warnInvalidConfig(config: ElementConfig): void {
 }
 
 /**
- * The base class, resolved defensively so THIS MODULE IS IMPORT-SAFE IN NODE.
+ * The base class, resolved defensively so this module is import-safe in node.
  * `class … extends HTMLElement` evaluates `HTMLElement` at module scope, which
  * is a ReferenceError under SSR — the reason a Next/Nuxt/SvelteKit consumer
  * otherwise has to hide the entire viewer import behind a client-only dynamic
@@ -173,7 +177,7 @@ export class EmbedPdfViewerElement extends ElementBase {
   }
 
   /**
-   * The DRIVE surface: public capability lenses (`viewer.get(AnnotationToken)`),
+   * The drive surface: public capability lenses (`viewer.get(AnnotationToken)`),
    * one `watch` primitive, and the command trio. Null until `epdf:ready` fires
    * (once per (re)mount); re-minted if the viewer is rebuilt by a config set.
    */
@@ -183,7 +187,7 @@ export class EmbedPdfViewerElement extends ElementBase {
 
   connectedCallback(): void {
     // Deferred one microtask: a framework wrapper inserts the element and
-    // sets `.config` via ref/layout-effect in the SAME task — mounting eagerly
+    // sets `.config` via ref/layout-effect in the same task — mounting eagerly
     // here would boot the whole viewer once with attribute config and again
     // with the real one. The config setter mounts synchronously; this only
     // covers the purely-declarative path.

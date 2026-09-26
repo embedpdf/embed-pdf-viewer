@@ -1,5 +1,7 @@
-import type { CollabTarget, DocCapability, PdfBits } from '../auth/scope';
+import type { Identity } from '../auth/scope/types';
+import type { DocCapability, PdfBits } from '../auth/scope';
 import type { AbortablePromise } from '../promise/AbortablePromise';
+import type { AnnotationBundleLimits } from '../transfer/bundleLimits';
 
 export type DocumentOpenMode = 'none' | 'user' | 'owner';
 export type DocumentEncryptionState = 'unknown' | 'none' | 'encrypted' | 'unsupported';
@@ -14,8 +16,8 @@ export type DocumentAccessReason = 'password' | 'cdn' | 'permissions-unknown';
  *
  * Computed from {@link PdfBits} via the strict ISO 32000 rules:
  *   bit 12 only meaningful when bit 3 is also set
- *   form modification requires both bit 6 AND bit 4
- *   form fill is satisfied by bit 6 OR bit 9
+ *   form modification requires both bit 6 and bit 4
+ *   form fill is satisfied by bit 6 or bit 9
  */
 export interface PdfPermissionAdvisory {
   readonly canPrint: boolean;
@@ -131,12 +133,7 @@ export interface DocumentAccessInfo {
    * Sorted alphabetically for stable display.
    */
   readonly effectiveScope: string[];
-  readonly identity: {
-    readonly user_id?: string;
-    readonly group_id?: string;
-    readonly groups?: string[];
-    readonly display_name?: string;
-  };
+  readonly identity: Identity;
   readonly originPasswordPolicy: {
     readonly mode: 'not-needed' | 'client-retry' | 'server-session';
   };
@@ -146,7 +143,7 @@ export interface DocumentAccessInfo {
    * `viewport.width` points whose renders are durable, CDN-shared
    * artifacts, plus the reserved tile-pyramid block. Local engines report
    * nothing here (continuous rendering); cloud engines surface it so
-   * `snapFullPageViewport` can conform requests EXPLICITLY — the SDK
+   * `snapFullPageViewport` can conform requests explicitly — the SDK
    * never snaps implicitly (engine parity).
    */
   readonly renderPolicy?: {
@@ -161,6 +158,11 @@ export interface DocumentAccessInfo {
     readonly background: 'white';
     readonly enforced: boolean;
   };
+  /**
+   * The deployment's limits for an annotation import: the cloud client
+   * checks a bundle against these before its bytes move.
+   */
+  readonly annotationBundleLimits: AnnotationBundleLimits;
 }
 
 export interface DocumentUnlockInput {
@@ -174,70 +176,65 @@ export interface DocumentUnlockResult {
 }
 
 /**
- * Identity of the caller for the current session. Cloud derives this
- * from the JWT claims (and refreshes from /access when called); local
- * derives it from the identity supplied to `engine.open()`. Null when
- * no identity is known (anonymous session).
- *
- * Re-exported alias of `IdentityClaims` from `auth/scope/types.ts` —
- * the alias gives a security-flavored name to the same shape so the
- * dev-facing API reads naturally.
+ * Whose an annotation is: what `allowsAnnotation('update' | 'delete', …)`
+ * reads. An `AnnotationDTO` is one; so is `{ userId, groupId }`.
  */
-export type { IdentityClaims as DocumentIdentity } from '../auth/scope/types';
+export interface AnnotationOwner {
+  userId?: string | null;
+  groupId?: string | null;
+}
 
 export interface DocumentSecurityService {
   /**
    * Raw structured security probe. Stable across engines, refreshed
-   * after unlock/refresh. Power users and diagnostic tools read this;
-   * most dev code uses the higher-level accessors below.
+   * after an unlock. Power users and diagnostic tools read this; most
+   * code uses the higher-level accessors below.
    */
-  readonly current: DocumentSecurityState;
+  readonly state: DocumentSecurityState;
 
   /**
    * The caller's expanded capability set — raw scope + pdf bits +
-   * implication rules, enumerated for DISPLAY ("here's what you can
+   * implication rules, enumerated for display ("here's what you can
    * do"). Identical shape on local and cloud; cloud uses the
    * server-canonical value when available, else computes locally from
    * JWT scope + /head bits.
    *
-   * NOTE: this is an *enumeration*, not an authorization check. The `*`
-   * admin wildcard and unbounded parametric collab grants are NOT
+   * Note: this is an *enumeration*, not an authorization check. The `*`
+   * admin wildcard and unbounded parametric collab grants are not
    * listed here (they can't be). To gate UI, use {@link allows} — the
    * same wildcard-aware predicate the engine enforces with.
    */
-  readonly effectiveScope: ReadonlyArray<string>;
+  readonly scope: ReadonlyArray<string>;
 
   /**
-   * Wildcard-aware authorization check — the SAME predicate the engine
+   * Wildcard-aware authorization check — the same predicate the engine
    * enforces with (`checkCapability`). A shown control gated on this
    * mirrors exactly what the engine will allow: the `*` admin grant and
    * `pdf.permissions`-derived bits are both honored. Use this for edit
-   * gating (e.g. `allows('doc.pages.assemble')`); use `effectiveScope`
-   * only to *display* the concrete grants.
+   * gating (e.g. `allows('doc.pages.assemble')`); use `scope` only to
+   * *display* the concrete grants.
    */
   allows(capability: DocCapability): boolean;
 
   /**
-   * Per-record annotation authorization mirrors — the SAME resolver the
+   * Per-record annotation authorization mirrors — the same resolver the
    * engine enforces with (`checkCollab`'s narrowing rule: an applicable
-   * `annotations:<action>:<filter>` grant SHADOWS the coarse
+   * `annotations:<action>:<filter>` grant shadows the coarse
    * `doc.annotate.modify` fallback for that action), over the same
    * inputs (raw scope + identity claims + PDF bits). `allows()` cannot
    * answer these: it enumerates capabilities, and a filtered collab
    * grant is not a capability — whether "update" is allowed depends on
-   * WHOSE annotation you're touching.
+   * whose annotation you're touching.
    *
-   * Three surfaces because the questions genuinely differ:
-   *   - create derives its target from the caller's OWN identity
-   *     (`:self` trivially passes; `:group=X` matches the caller's
-   *     default group),
-   *   - update/delete are asked about the TARGET record's stamped
-   *     owner (`userId`/`groupId` from its EMBD metadata; pass `{}`
-   *     when unstamped — matching the engine, which denies unstamped
-   *     targets under any narrowed grant),
-   *   - group assignment is asked about the DESTINATION group
-   *     (`annotations:set-group:` ladder; the caller's own default
-   *     group is always assignable).
+   * The target depends on the action:
+   *   - `create` needs none: it derives the target from the caller's
+   *     own identity (`:self` trivially passes; `:group=X` matches the
+   *     caller's default group),
+   *   - `update`/`delete` take the annotation itself, asked about its
+   *     stamped owner (`userId`/`groupId`; an unstamped annotation is
+   *     denied under any narrowed grant, as the engine does),
+   *   - `set-group` takes the destination group (`annotations:set-group:`
+   *     ladder; the caller's own default group is always assignable).
    *
    * These are a courtesy for UI gating — the engine (and the server,
    * on cloud) independently enforces every mutation with the same
@@ -245,14 +242,15 @@ export interface DocumentSecurityService {
    * access. Returns false when no scope context exists (legacy local
    * open without `scope`, cloud open without a token before /access).
    */
-  allowsAnnotationCreate(): boolean;
-  allowsAnnotationMutation(action: 'update' | 'delete', target: CollabTarget): boolean;
-  allowsAnnotationGroupAssignment(groupId: string): boolean;
+  allowsAnnotation(action: 'create'): boolean;
+  allowsAnnotation(action: 'update' | 'delete', annotation: AnnotationOwner): boolean;
+  allowsAnnotation(action: 'set-group', target: { groupId: string }): boolean;
 
   /**
-   * Identity of the current caller, or null when anonymous.
+   * Who the session acts for: from the document token's `identity` claim on
+   * the cloud, from `engine.open()` locally. Null when anonymous.
    */
-  readonly identity: import('../auth/scope/types').IdentityClaims | null;
+  readonly identity: Identity | null;
 
   /**
    * "Should I prompt the user for a password?" — the single source

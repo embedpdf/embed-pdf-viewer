@@ -1,10 +1,10 @@
 /**
  * `<epdf-viewer>` — component-hosted kernel (framework parity with React's
  * `<Viewer>`). Provides `EpdfKernelHost` at its element injector, boots it, and
- * projects content UNCONDITIONALLY: it is NOT a gate. Angular instantiates
+ * projects content unconditionally: it is not a gate. Angular instantiates
  * projected content eagerly whether or not a slot renders it, so a conditional
  * `<ng-content>` cannot defer anything — real gating belongs to templates the
- * APP owns: `@if (ready())` for boot chrome, `*epdfDocumentGate` (or
+ * app owns: `@if (ready())` for boot chrome, `*epdfDocumentGate` (or
  * `@if (documentId())`) for document UI.
  *
  * Prefer `provideEmbedPdf(...)` at route/app level when chrome lives outside
@@ -24,7 +24,7 @@ import { EpdfKernelHost, type EpdfInitialDocument } from './kernel-host';
   template: `<ng-content />`,
 })
 export class EpdfViewer implements OnInit {
-  /** The engine, as an instance OR a thunk ({@link EngineFactory}). An
+  /** The engine, as an instance or a thunk ({@link EngineFactory}). An
    *  instance is borrowed (never destroyed here); a thunk is host-owned
    *  (constructed then destroyed with the viewer). See EmbedPdfConfig.
    *  Init-only: the kernel is built once from the first values; recreate the
@@ -38,7 +38,7 @@ export class EpdfViewer implements OnInit {
   readonly host = inject(EpdfKernelHost, { self: true });
 
   constructor() {
-    // Deferred config: inputs are READ on first kernel access, which happens
+    // Deferred config: inputs are read on first kernel access, which happens
     // after construction (a template binding or effect) — never here.
     this.host.connect(() => ({
       engine: this.engine(),

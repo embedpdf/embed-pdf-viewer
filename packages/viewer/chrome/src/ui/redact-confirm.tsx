@@ -6,7 +6,7 @@ import { useT } from '@embedpdf/react/i18n';
 /**
  * The apply-all confirm modal (`redact-confirm` shell surface, `exclusive:
  * 'modal'` via the command router). Shows the pending count and the
- * CLIENT-SIDE collateral estimate — other annotations the apply will destroy —
+ * client-side collateral estimate — other annotations the apply will destroy —
  * before anything irreversible happens. The authoritative collateral count
  * comes back on the result.
  */
@@ -28,8 +28,8 @@ export function RedactConfirmModal() {
     try {
       await redaction.applyAll();
       surface.close();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+    } catch (error) {
+      setError(error instanceof Error ? error.message : String(error));
     } finally {
       setBusy(false);
     }

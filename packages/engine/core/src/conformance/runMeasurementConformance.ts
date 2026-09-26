@@ -41,44 +41,47 @@ export function runMeasurementConformance(
         const created = (
           await page.annotations.create({
             subtype: 'line',
-            intent: 'LineDimension',
+            intent: 'line-dimension',
             rect,
             measure: scale,
             linePoints: { start: vertices[0], end: vertices[1] },
-            caption: { enabled: true, offset: { along: 10, perpendicular: 20 } },
+            captionEnabled: true,
+            captionOffset: { along: 10, perpendicular: 20 },
           })
-        ).created;
+        ).annotation;
         const inert = await page.annotations.update(created.ref, {
           subtype: 'line',
           contents: '999 m',
         });
-        expect(inert.updated.contents).toBe('3 m');
+        expect(inert.annotation.contents).toBe('3.00 m');
         expect(inert.appearance).toEqual({ action: 'preserved', changed: false });
         const changed = await page.annotations.update(created.ref, {
           subtype: 'line',
           linePoints: { start: vertices[0], end: { x: 200, y: 0 } },
         });
-        expect(changed.updated.contents).toBe('6 m');
+        expect(changed.annotation.contents).toBe('6.00 m');
         expect(changed.appearance.changed).toBe(true);
         const hidden = await page.annotations.update(created.ref, {
           subtype: 'line',
-          caption: { enabled: false },
+          captionEnabled: false,
         });
-        expect(hidden.updated).toMatchObject({
-          contents: '6 m',
-          caption: { enabled: false, offset: { along: 10, perpendicular: 20 } },
+        expect(hidden.annotation).toMatchObject({
+          contents: '6.00 m',
+          captionEnabled: false,
+          captionOffset: { along: 10, perpendicular: 20 },
         });
         expect(hidden.appearance.changed).toBe(true);
         const reset = await page.annotations.update(created.ref, {
           subtype: 'line',
-          caption: { enabled: true, offset: null },
+          captionEnabled: true,
+          captionOffset: null,
           measure: null,
         });
-        expect(reset.updated.contents).toBe('6 m');
-        expect(
-          reset.updated.subtype === 'line' && reset.updated.caption?.offset === undefined,
-        ).toBe(true);
-        expect(measurementReadout(reset.updated)).toEqual({ unavailable: 'no-measure' });
+        expect(reset.annotation.contents).toBe('6.00 m');
+        expect(reset.annotation.subtype === 'line' && reset.annotation.captionOffset === null).toBe(
+          true,
+        );
+        expect(measurementReadout(reset.annotation)).toEqual({ unavailable: 'no-measure' });
       } finally {
         await doc.close();
       }
@@ -87,41 +90,45 @@ export function runMeasurementConformance(
     test('all three kinds derive labels, save, reopen and retain captions', async () => {
       let doc = await open();
       try {
-        const pon = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
+        const pageObjectNumber = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
         const drafts: AnnotationDraft[] = [
           {
             subtype: 'line',
             rect,
-            intent: 'LineDimension',
+            intent: 'line-dimension',
             // Both coordinates and /C cross float32 rounding boundaries.
             measure: measureFromKnownLength(1, { value: 1.00000001, unit: 'm' }),
             contents: 'wrong',
             linePoints: { start: vertices[0], end: { x: 3.4450000001, y: 0 } },
-            caption: { enabled: true, offset: { along: 10, perpendicular: 20 } },
+            captionEnabled: true,
+            captionOffset: { along: 10, perpendicular: 20 },
           },
           {
             subtype: 'polyline',
             rect,
-            intent: 'PolyLineDimension',
+            intent: 'polyline-dimension',
             measure: scale,
             contents: 'wrong',
             vertices,
-            caption: { enabled: true, center: { x: 0, y: 0 } },
+            captionEnabled: true,
+            captionCenter: { x: 0, y: 0 },
           },
           {
             subtype: 'polygon',
             rect,
-            intent: 'PolygonDimension',
+            intent: 'polygon-dimension',
             measure: scale,
             contents: 'wrong',
             vertices,
-            caption: { enabled: true, center: { x: 50, y: 30 } },
+            captionEnabled: true,
+            captionCenter: { x: 50, y: 30 },
           },
         ];
         const saved = [];
         for (const draft of drafts) {
           const preview = measurementReadout(draft);
-          const a = (await doc.page(toPageRef(pon)).annotations.create(draft)).created;
+          const a = (await doc.page(toPageRef(pageObjectNumber)).annotations.create(draft))
+            .annotation;
           expect(a.contents).toBe('label' in preview ? preview.label : undefined);
           saved.push(a);
         }
@@ -137,12 +144,12 @@ export function runMeasurementConformance(
           expect(a.contents).toBe(before.contents);
           if (a.subtype !== 'line' && a.subtype !== 'polygon' && a.subtype !== 'polyline')
             throw new Error('Missing dimension');
-          expect(a.caption).toEqual('caption' in before ? before.caption : undefined);
+          expect(captionOf(a)).toEqual(captionOf(before));
           const result = await page.annotations.update(a.ref, {
             subtype: a.subtype,
             color: { r: 0, g: 0, b: 255 },
           });
-          expect(result.updated.contents).toBe(before.contents);
+          expect(result.annotation.contents).toBe(before.contents);
         }
       } finally {
         await doc.close();
@@ -152,23 +159,34 @@ export function runMeasurementConformance(
     test('calibration updates only viewports and emits one event per write', async () => {
       const doc = await open();
       try {
-        const pon = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
-        const page = doc.page(toPageRef(pon));
+        const pageObjectNumber = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
+        const page = doc.page(toPageRef(pageObjectNumber));
         if (!page.measure) throw new Error('Measurement service is required');
-        const foreign = (await page.measure.viewports()).filter((v) => !v.owned);
+        const listed = (await page.measure.listViewports()).viewports;
+        // A read never leaves a field out: no name or measure reads `null`.
+        for (const viewport of listed) {
+          expect('name' in viewport && 'measure' in viewport).toBe(true);
+        }
+        const foreign = listed.filter((v) => !v.owned);
         const annotations = (await page.annotations.list()).annotations;
         const events: DocumentEvent[] = [];
         const off = doc.events.subscribe((event) => events.push(event));
         try {
-          await page.measure.setScale(scale);
-          expect((await page.measure.viewports()).filter((v) => v.owned)).toHaveLength(1);
+          const set = await page.measure.setScale(scale);
+          expect(set.page).toEqual(page.ref);
+          expect(
+            (await page.measure.listViewports()).viewports.filter((v) => v.owned),
+          ).toHaveLength(1);
           expect((await page.annotations.list()).annotations).toEqual(annotations);
           await page.measure.setScale(null);
-          expect(await page.measure.viewports()).toEqual(foreign);
-          const changes = events.filter((e) => e.type === 'page.viewportsChanged');
+          expect((await page.measure.listViewports()).viewports).toEqual(foreign);
+          const changes = events.filter((e) => e.type === 'pages.scaleSet');
           expect(changes).toHaveLength(2);
           for (const event of changes)
-            expect(event).toMatchObject({ page: toPageRef(pon), meta: { affectedPages: [] } });
+            expect(event).toMatchObject({
+              page: toPageRef(pageObjectNumber),
+              meta: { affectedPages: [] },
+            });
         } finally {
           off();
         }
@@ -182,17 +200,26 @@ export function runMeasurementConformance(
       try {
         const page = doc.page((await doc.pages.list()).pages[0].ref);
         await page.measure!.setScale(scale);
-        const before = await page.measure!.viewports();
+        const before = await page.measure!.listViewports();
         await expect(
           page.measure!.setScale({ ...scale, x: [{ unit: 'm', conversion: 0 }] }),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
         const pending = page.measure!.setScale(null);
         pending.abort('conformance');
         await expect(pending).rejects.toBeInstanceOf(AbortError);
-        expect(await page.measure!.viewports()).toEqual(before);
+        expect(await page.measure!.listViewports()).toEqual(before);
       } finally {
         await doc.close();
       }
     });
   });
+}
+
+const CAPTION_FIELDS = ['captionEnabled', 'captionPosition', 'captionOffset', 'captionCenter'];
+
+/** The caption fields a dimension annotation reads, for comparing two reads. */
+function captionOf(annotation: object): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(annotation).filter(([name]) => CAPTION_FIELDS.includes(name)),
+  );
 }

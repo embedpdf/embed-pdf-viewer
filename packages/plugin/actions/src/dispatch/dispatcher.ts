@@ -1,9 +1,10 @@
 /**
  * The dispatcher: the one serialized queue every tree rides. `execute` runs
- * a resolved tree; `dispatch` resolves a trigger INSIDE the queued operation
+ * a resolved tree; `dispatch` resolves a trigger inside the queued operation
  * (submission order is execution order) and fans out through the lifecycle
- * areas. `runAndEmit` is the shared per-tree unit: run + store bump + event.
+ * areas. `runAndEmit` is the shared per-tree unit: run, then `onExecuted`.
  */
+import type { PluginContext } from '@embedpdf/core';
 import type { PdfActionTree } from '@embedpdf/engine-core/runtime';
 
 import { eventOf, triggerOriginOf } from '../contract';
@@ -23,16 +24,16 @@ import type {
 } from '../contract';
 import type { ActionsDocumentEvents } from '../lifecycle/document-events';
 import type { ActionsOpenSequence } from '../lifecycle/open-sequence';
-import type { ActionsContext, ActionsServices } from '../services';
+import type { ActionsServices } from '../services';
 import { foldSteps } from './fold';
 import type { ActionsRunner } from './run';
 import { sameRef, type ActionsTriggers } from './triggers';
 
 export function createDispatcher(
-  ctx: ActionsContext,
+  ctx: PluginContext<void>,
   services: Pick<ActionsServices, 'events' | 'policy' | 'queue' | 'catalog'>,
   { run }: ActionsRunner,
-  { triggerEnabled, lifecycleTreesFor, planPageSteps }: ActionsTriggers,
+  { triggerEnabled, lifecycleAnnotationsOf, planPageSteps }: ActionsTriggers,
   openSequence: Pick<ActionsOpenSequence, 'noteUserActivity' | 'claim' | 'run'>,
   { runDocumentEventOp }: Pick<ActionsDocumentEvents, 'runDocumentEventOp'>,
 ) {
@@ -42,35 +43,34 @@ export function createDispatcher(
   const { readDocumentActions, DOC_EVENT_TREES } = services.catalog;
   const { noteUserActivity } = openSequence;
 
-  /** run + seq + event — the shared per-tree unit (queued by execute; called
-   *  inline per step by the queued trigger resolver). */
+  /** Run one tree and announce it: the shared per-tree unit (queued by
+   *  `execute`; called inline per step by the queued trigger resolver). */
   const runAndEmit = async (
     tree: PdfActionTree,
-    actionCtx: ActionContext,
+    actionContext: ActionContext,
   ): Promise<ActionDispatchResult> => {
-    const result = await run(tree, actionCtx);
-    ctx.dispatch({ type: 'ACTIONS_DISPATCHED' });
-    actionHook.emit({ ctx: actionCtx, tree, result });
+    const result = await run(tree, actionContext);
+    actionHook.emit({ ctx: actionContext, tree, result });
     return result;
   };
 
   const execute = (
     tree: PdfActionTree,
-    actionCtx: ActionContext,
+    actionContext: ActionContext,
   ): Promise<ActionDispatchResult> => {
-    // BEFORE enqueueing: a real user gesture arms the open-sequence latch
-    // (its barrier op then lands ahead of this action in the queue) and
-    // resets the cascade budget.
-    if (actionCtx.origin === 'user') noteUserActivity();
+    // Before enqueueing: a real user gesture arms the open sequence (its
+    // operation then lands ahead of this action in the queue) and resets the
+    // cascade budget.
+    if (actionContext.origin === 'user') noteUserActivity();
     return enqueue(() => {
-      budget.scriptNodes = 0; // D11: one aggregate per dispatch
-      return runAndEmit(tree, actionCtx);
+      budget.scriptNodes = 0; // one script budget per dispatch
+      return runAndEmit(tree, actionContext);
     });
   };
 
-  const canExecute = (tree: PdfActionTree, actionCtx: ActionContext): boolean => {
+  const canExecute = (tree: PdfActionTree, actionContext: ActionContext): boolean => {
     if (tree.incomplete || !tree.root) return false;
-    const decision = decisionFor(tree.root, actionCtx.origin);
+    const decision = decisionFor(tree.root, actionContext.origin);
     return decision === 'allow' || decision === 'adapter';
   };
 
@@ -88,7 +88,7 @@ export function createDispatcher(
     return foldSteps(results, diagnostics);
   };
 
-  /** Everything a trigger needs — reads included — INSIDE the queued op:
+  /** Everything a trigger needs, reads included, inside the queued operation:
    *  submission order is execution order. Never throws. */
   const resolveAndRun = async (trigger: ActionTrigger): Promise<ActionTriggerResult> => {
     const diagnostics: ActionDiagnostic[] = [];
@@ -97,8 +97,6 @@ export function createDispatcher(
       diagnosticHook.emit(diagnostic);
     };
     try {
-      const doc = ctx.doc;
-      if (!doc) return { status: 'inert', steps: [], diagnostics };
       if (!triggerEnabled(trigger)) {
         diagnose({
           code: 'trigger-disabled',
@@ -111,11 +109,11 @@ export function createDispatcher(
         case 'activate':
         case 'annotation': {
           const event = trigger.scope === 'activate' ? 'activate' : trigger.event;
-          const { annotations } = await doc.page(trigger.page).annotations.list();
+          const { annotations } = await ctx.doc.page(trigger.page).annotations.list();
           const annotation = annotations.find((candidate) => sameRef(candidate.ref, trigger.ref));
-          // ISO Table 197 (verified 2026-09-02): "the A entry, if present,
-          // takes precedence over [the /AA U entry]" — a shadowed U tree is
-          // silently inert, exactly like an absent one.
+          // ISO 32000-2 Table 197: "the A entry, if present, takes precedence
+          // over [the /AA U entry]"; a shadowed U tree is silently inert,
+          // exactly like an absent one.
           if (event === 'mouseUp' && annotation?.actions?.activate) {
             return { status: 'inert', steps: [], diagnostics };
           }
@@ -129,10 +127,9 @@ export function createDispatcher(
           return await runSteps([{ source, tree }], origin, eventOf(trigger), diagnostics);
         }
         case 'page': {
-          const pon = trigger.page.pageObjectNumber;
-          const layout = ctx.document()?.pages.find((page) => page.ref.pageObjectNumber === pon);
-          const lifecycle = await lifecycleTreesFor(pon);
-          const steps = planPageSteps(trigger.event, pon, layout?.actions, lifecycle);
+          const lifecycle = await lifecycleAnnotationsOf(trigger.page);
+          const pageActions = ctx.getPage(trigger.page)?.actions;
+          const steps = planPageSteps(trigger.event, trigger.page, pageActions, lifecycle);
           return await runSteps(steps, origin, eventOf(trigger), diagnostics);
         }
         case 'document': {
@@ -159,11 +156,12 @@ export function createDispatcher(
   };
 
   const dispatch = (trigger: ActionTrigger): Promise<ActionTriggerResult> => {
-    // A user-origin trigger is user activity (latch + cascade reset) — noted
-    // BEFORE taking the queue slot, so an armed open sequence runs first.
+    // A user-origin trigger is user activity (it arms the open sequence and
+    // resets the cascade budget), noted before taking the queue slot, so an
+    // armed open sequence runs first.
     if (triggerOriginOf(trigger) === 'user') noteUserActivity();
     return enqueue(() => {
-      budget.scriptNodes = 0; // D11: one aggregate per dispatch
+      budget.scriptNodes = 0; // one script budget per dispatch
       return resolveAndRun(trigger);
     });
   };
@@ -182,21 +180,19 @@ export function createDispatcher(
       { origin: 'user', source: { kind: 'api' }, event: { scope: 'activate' }, ...context },
     );
 
-  /** The raw tree behind a source, read from the document — no dispatch
+  /** The raw tree behind a source, read from the document, with no dispatch
    *  rules applied (the /A-shadows-U rule lives in `resolveAndRun`). */
   const getActionTree = async (source: ActionTreeSource): Promise<PdfActionTree | null> => {
-    const doc = ctx.doc;
-    if (!doc) return null;
     switch (source.kind) {
       case 'annotation': {
-        const { annotations } = await doc.page(source.page).annotations.list();
+        const { annotations } = await ctx.doc.page(source.page).annotations.list();
         const annotation = annotations.find((candidate) =>
           sameRef(candidate.ref, source.annotation),
         );
         return annotation?.actions?.[source.event ?? 'activate'] ?? null;
       }
       case 'field': {
-        const { fields } = await doc.forms.list();
+        const { fields } = await ctx.doc.forms.list();
         const target = source.field;
         const field = fields.find((candidate) =>
           target.kind === 'objectNumber'
@@ -206,11 +202,8 @@ export function createDispatcher(
         );
         return field?.actions?.[source.event] ?? null;
       }
-      case 'page': {
-        const pon = source.page.pageObjectNumber;
-        const layout = ctx.document()?.pages.find((page) => page.ref.pageObjectNumber === pon);
-        return layout?.actions?.[source.event ?? 'open'] ?? null;
-      }
+      case 'page':
+        return ctx.getPage(source.page)?.actions?.[source.event ?? 'open'] ?? null;
       case 'document': {
         const snapshot = await readDocumentActions();
         if (!snapshot) return null;
@@ -229,9 +222,10 @@ export function createDispatcher(
       executeNamed,
       getActionTree,
       dispatch,
-      // Sync twin: family enabled ∧ document present (per-tree truth stays
-      // per-step in results — resolution is async and never previewed here).
-      canDispatch: (trigger) => triggerEnabled(trigger) && ctx.doc !== null,
+      // The synchronous twin: the trigger family is enabled. Per-tree truth
+      // stays per step in the results; resolution is async and never
+      // previewed here.
+      canDispatch: (trigger) => triggerEnabled(trigger),
       prepareClose: (): Promise<ActionTriggerResult> =>
         dispatch({ scope: 'document', event: 'will-close' }),
     } satisfies Partial<ActionsCapability>,

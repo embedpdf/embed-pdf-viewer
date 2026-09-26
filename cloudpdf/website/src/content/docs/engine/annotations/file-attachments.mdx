@@ -1,0 +1,159 @@
+---
+title: File attachments
+description: Pin a file to a spot on a page, read and download it, and replace it later.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# File attachments
+
+A file attachment pins a file to a spot on a page: a spreadsheet next to a table, a drawing next
+to a plan. PDF apps show an icon there and open the file from it.
+
+```ts
+await page.annotations.create(
+  {
+    subtype: 'file-attachment',
+    rect: { left: 40, bottom: 40, right: 60, top: 60 },
+    file: { name: 'figures.csv', mimeType: 'text/csv' },
+  },
+  { file: bytes },
+);
+```
+
+The first argument describes the file; its bytes go in the second, as the `file`. A `Uint8Array`,
+a `Blob` or a `File` works. A `File` the user picked brings its name and type, so it can go in as
+it is:
+
+```ts
+const picked = input.files![0];
+
+await page.annotations.create(
+  { subtype: 'file-attachment', rect: { left: 40, bottom: 40, right: 60, top: 60 } },
+  { file: picked },
+);
+```
+
+| Field              | What it is                                                                       | Default                                  |
+| :----------------- | :------------------------------------------------------------------------------- | :--------------------------------------- |
+| `rect`             | Where the icon goes: its bottom-left corner is the icon's.                       | required                                 |
+| `file.name`        | The file's name, which PDF apps show and save it under. Required for bare bytes. | the `File`'s name                        |
+| `file.mimeType`    | The file's type, such as `'text/csv'`.                                           | the `File`'s or `Blob`'s type, or `null` |
+| `file.description` | A short description of the file.                                                 | `null`                                   |
+| `icon`             | `'paperclip'`, `'push-pin'`, `'graph'` or `'tag'`                                | `'paperclip'`                            |
+| `color`            | The icon's color, `{ r, g, b }` from 0 to 255                                    | yellow                                   |
+| `opacity`          | From `0` (invisible) to `1` (solid)                                              | `1`                                      |
+
+The icon is always 20 × 20 points, placed at the bottom-left corner of `rect`. Any bytes are a
+valid file. The engine never guesses a type: without one, `mimeType` reads `null`.
+
+## Read and download the file
+
+A read describes the file; `downloadResource()` returns its bytes, exactly as they were attached:
+
+```ts
+const { annotations } = await page.annotations.list();
+const attachment = annotations.find((annotation) => annotation.subtype === 'file-attachment');
+
+if (attachment?.file) {
+  console.log(attachment.file.name, attachment.file.size);
+  const bytes = await page.annotations.downloadResource(attachment.ref, 'file');
+}
+```
+
+A read's `file` has the name, type and description you wrote. It also has these fields, which the
+engine fills in:
+
+| Field        | What it is                                     |
+| :----------- | :--------------------------------------------- |
+| `size`       | The file's size in bytes.                      |
+| `checksum`   | The MD5 of the file's bytes, in lowercase hex. |
+| `createdAt`  | When the file was attached, as an ISO date.    |
+| `modifiedAt` | When the file was last changed.                |
+
+The engine writes `size`, `checksum` and `createdAt` when it attaches a file. What the PDF doesn't
+record reads as `null`: `modifiedAt` for a file attached here, and any of the four for some files
+other apps attached. `file` itself is `null` for an attachment another app made without an
+embedded file.
+
+To let the user save it, wrap the bytes in a `Blob`:
+
+```ts
+const blob = new Blob([bytes], { type: attachment.file.mimeType ?? '' });
+```
+
+## Replace the file
+
+`file` in an update replaces the name, type and description together; new bytes replace the
+file itself:
+
+```ts
+await page.annotations.update(attachment.ref, {
+  file: { ...attachment.file, name: 'figures-2026.csv' },
+});
+
+await page.annotations.update(attachment.ref, {}, { file: newBytes });
+```
+
+A field of `file` you leave out is removed, so start from the one you read, as above. `size`,
+`checksum` and the dates in it are ignored: the engine writes those itself. An attachment can't
+lose its file (`file: null` is refused with `InvalidArg`); delete the annotation instead.
+
+The icon, its color and its opacity change like any field: `{ icon: 'tag' }`.
+
+## Copy an attachment
+
+The read and the bytes together make the same attachment again, on another page or in another
+document:
+
+```ts
+const bytes = await page.annotations.downloadResource(attachment.ref, 'file');
+
+await otherPage.annotations.create(attachment, { file: bytes });
+```
+
+## Files on a page and files of the document
+
+A PDF can also carry files that belong to the document as a whole rather than to a spot on a
+page. Those are [attachments](/docs/engine/documents/attachments), with their own calls. The two
+don't mix: `doc.attachments.list()` doesn't list the files pinned to pages, and the calls on this
+page don't see the document's files.
+
+## Limits
+
+- A name can't be empty, and a create without the `file` bytes is refused with `InvalidArg`.
+- To [export](/docs/engine/annotations/import-export) an attachment, its file must fit a bundle's
+  limit for one resource: 50 MB. A larger one refuses the export with `PayloadTooLarge`.
+
+<Engine cloud>
+
+- The bytes travel to the server with the create or the update, so a file can be at most the
+  server's upload limit: 50 MB unless your server sets another. A larger one is refused with
+  `PayloadTooLarge`.
+
+</Engine>
+
+## Permissions
+
+Creating, changing and deleting file attachment annotations (not `doc.attachments.modify`) needs
+the same permissions as any annotation (see
+[Permissions](/docs/engine/concepts/permissions#annotations)). Downloading the file sends document
+content out, so it needs `doc.download`.
+
+## Good to know
+
+### Dates
+
+`createdAt` is written when the file is attached, in UTC. An
+[import](/docs/engine/annotations/import-export#who-wrote-it) keeps the source file's dates,
+whichever attribution it uses: they're facts about the file, not about who wrote the annotation.
+
+### Icons from other apps
+
+In the PDF, `icon` is the annotation's `/Name`. A name other than the four standard ones reads as
+`'push-pin'`, which is also what PDF apps draw for it.
+
+### How a copy looks
+
+A copy's icon is the engine's own 20 × 20 icon at the same bottom-left corner, whatever icon
+another app drew for the original.

@@ -7,7 +7,7 @@ import type { HostCrashEvent } from '../runtime/EngineHostClient';
 
 /**
  * Refusal for a quarantined document: HTTP 422 — the request is
- * well-formed; the ENTITY is unprocessable, and monitoring must not
+ * well-formed; the entity is unprocessable, and monitoring must not
  * count these as server faults.
  */
 export class DocumentQuarantinedError extends Error {
@@ -26,7 +26,7 @@ export class DocumentQuarantinedError extends Error {
 export interface CrashJournalOptions {
   db: Kysely<Schema>;
   /**
-   * Observe-only by default: decisions are computed and PERSISTED (so
+   * Observe-only by default: decisions are computed and persisted (so
    * staging data validates attribution), but `assertNotQuarantined`
    * refuses nothing until enforcement is switched on.
    */
@@ -39,7 +39,7 @@ export interface CrashJournalOptions {
 
 /**
  * Env → quarantine config, with the failure modes an operator must hear
- * about at BOOT, not discover in an incident: a TTL that parses to
+ * about at boot, not discover in an incident: a TTL that parses to
  * NaN/zero/negative/infinite is a config error, and enforcement without
  * host isolation would be silently inert — both throw (the CLI turns
  * that into exit 2). TTL tuning without enforcement under inline
@@ -97,22 +97,22 @@ const MEMORY_COHORTS = 16;
 /**
  * Every engine-host death is recorded with
  * its attributable suspects (raw wire kinds — full forensic detail, no
- * taxonomy to maintain); quarantine happens ONLY on two independent
+ * taxonomy to maintain); quarantine happens only on two independent
  * sole-suspect crashes sharing `(base_sha, engine_build,
- * exit-signature)` inside the TTL window. The op deliberately does NOT
+ * exit-signature)` inside the TTL window. The op deliberately does not
  * key the pairing: a suspect's op is by definition whatever it was
  * running when the engine died, so op-equality only blocks pairs where
  * the same document was sole-in-flight twice doing different things —
  * a case where the document is overwhelmingly implicated anyway. The
  * exit signature does the incident-typing.
  *
- * Write ordering is load-bearing (review round 2): the crash + suspect
- * rows are inserted in ONE transaction FIRST, and the prior-evidence
- * read happens AFTER that commit — so of two replicas crashing
+ * Write ordering is load-bearing: the crash + suspect rows are
+ * inserted in one transaction first, and the prior-evidence read
+ * happens after that commit — so of two replicas crashing
  * simultaneously, whichever reads last sees the other's row and the
  * pair converges in every interleaving (the quarantine upsert is
- * idempotent when both see each other). Read-before-insert let
- * simultaneous crashes miss each other forever.
+ * idempotent when both see each other). Reading before inserting
+ * would let simultaneous crashes miss each other forever.
  *
  * Ambiguous cohorts are journal-only, with pairwise singleton-
  * intersection candidates stored as operator diagnostics — evidence,
@@ -171,7 +171,7 @@ export class CrashJournal {
     const shas = new Set(suspects.map((s) => s.baseSha));
     const sole = shas.size === 1;
 
-    // 1. INSERT FIRST, atomically — our evidence must be visible to a
+    // 1. INSERT first, atomically — our evidence must be visible to a
     //    concurrent replica's read before we do our own read.
     await this.db.transaction().execute(async (trx) => {
       await trx
@@ -203,7 +203,7 @@ export class CrashJournal {
     this.memory.unshift({ crashId, at, build, exitSig, shas, sole });
     if (this.memory.length > MEMORY_COHORTS) this.memory.length = MEMORY_COHORTS;
 
-    // 2. THEN read prior evidence.
+    // 2. Then read prior evidence.
     const priors = await this.recentCohorts(build, at - this.ttlMs, crashId);
 
     // Diagnostics only: pairwise singleton intersections against prior
@@ -221,7 +221,7 @@ export class CrashJournal {
         .execute();
     }
 
-    // 3. The decision rule: two INDEPENDENT sole-suspect crashes sharing
+    // 3. The decision rule: two independent sole-suspect crashes sharing
     //    (sha, build, exit signature) inside the TTL. Idempotent upsert —
     //    simultaneous replicas that both see each other both land here.
     let quarantined = false;
@@ -286,7 +286,7 @@ export class CrashJournal {
     if (staleCrashes.length > 0) {
       const ids = staleCrashes.map((c) => c.id);
       // Children first: sqlite foreign_keys enforcement is driver-config
-      // dependent, so never rely on ON DELETE CASCADE.
+      // dependent, so never rely on on DELETE cascade.
       await this.db.deleteFrom('engine_crash_suspects').where('crash_id', 'in', ids).execute();
       await this.db.deleteFrom('engine_crashes').where('id', 'in', ids).execute();
     }
@@ -353,9 +353,9 @@ export class CrashJournal {
 
   /**
    * The enforcement gate (QuarantiningEnginePool). Observe-only mode
-   * refuses nothing. Enforcement queries the table DIRECTLY — one
+   * refuses nothing. Enforcement queries the table directly — one
    * indexed PK lookup, noise next to any engine operation, and (unlike
-   * the earlier 5s cache) immediately authoritative ACROSS replicas: a
+   * the earlier 5s cache) immediately authoritative across replicas: a
    * quarantine written by replica A refuses on replica B on its very
    * next check. `activeBuild` narrows to the running binary — a
    * quarantine for a build this engine no longer runs must not block
@@ -395,7 +395,7 @@ export class CrashJournal {
   }
 
   /**
-   * Operator clear: removes the rows and writes the audit trail — ONE
+   * Operator clear: removes the rows and writes the audit trail — one
    * transaction, so a cleared quarantine can never exist without its
    * audit row.
    */

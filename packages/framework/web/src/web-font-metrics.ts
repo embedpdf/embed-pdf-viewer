@@ -90,16 +90,19 @@ export function webFontMetrics(
     CONTEXTS.set(doc, ctx);
   }
   ctx.font = `${face.style ?? 'normal'} ${face.weight ?? 400} 100px ${cssFamily}`;
-  const m = ctx.measureText('Hg') as TextMetrics & {
+  const metrics = ctx.measureText('Hg') as TextMetrics & {
     fontBoundingBoxAscent?: number;
     fontBoundingBoxDescent?: number;
   };
-  if (typeof m.fontBoundingBoxAscent !== 'number' || typeof m.fontBoundingBoxDescent !== 'number') {
+  if (
+    typeof metrics.fontBoundingBoxAscent !== 'number' ||
+    typeof metrics.fontBoundingBoxDescent !== 'number'
+  ) {
     return null;
   }
   return {
-    ascent: m.fontBoundingBoxAscent / 100,
-    descent: m.fontBoundingBoxDescent / 100,
+    ascent: metrics.fontBoundingBoxAscent / 100,
+    descent: metrics.fontBoundingBoxDescent / 100,
   };
 }
 

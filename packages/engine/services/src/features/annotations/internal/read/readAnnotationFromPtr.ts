@@ -8,7 +8,7 @@ import { readAnnotationBase } from './readAnnotationBase';
 /**
  * Materialise a single annotation DTO from a live `annotPtr`, reusing the
  * exact same code paths the list readers use. Caller owns the lifecycle of
- * `annotPtr` (this function does NOT close it) so the mutator can keep it
+ * `annotPtr` (this function does not close it) so the mutator can keep it
  * for follow-up writes.
  *
  * Used by:

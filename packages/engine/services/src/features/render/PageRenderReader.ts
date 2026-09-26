@@ -7,7 +7,7 @@ import type {
 import { EngineError, EngineErrorCode, normalizePdfRect } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
-import { FPDF_REVERSE_BYTE_ORDER, rasterize } from './deviceRaster';
+import { FPDF_REVERSE_BYTE_ORDER, rasterize, readPageBox } from './deviceRaster';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 
@@ -28,9 +28,8 @@ export class PageRenderReader {
     try {
       throwIfAborted(signal);
 
-      const pageWidth = fn.FPDF_GetPageWidthF(pagePtr);
-      const pageHeight = fn.FPDF_GetPageHeightF(pagePtr);
-      const target = resolveTarget(options.target, pageWidth, pageHeight);
+      const page = readPageBox(this.runtime, pagePtr);
+      const target = resolveTarget(options.target, page);
       const rotation = options.rotation ?? 0;
       const viewport = options.viewport ?? { kind: 'scale', scale: 1 };
 
@@ -39,7 +38,7 @@ export class PageRenderReader {
 
       const raster = rasterize(this.runtime, {
         rect: target,
-        page: { width: pageWidth, height: pageHeight },
+        page,
         rotation,
         viewport,
         ...(options.maxOutputPixels !== undefined
@@ -66,15 +65,12 @@ export class PageRenderReader {
   }
 }
 
-/** Resolve the render target to a normalized PDF-space rect (page box, or a sub-rect). */
-function resolveTarget(
-  target: PageRenderTarget | undefined,
-  pageWidth: number,
-  pageHeight: number,
-): PdfRect {
-  if (!target || target.kind === 'page') {
-    return { left: 0, bottom: 0, right: pageWidth, top: pageHeight };
-  }
+/**
+ * Resolve the render target to a normalized PDF-space rect: the page box, or
+ * a sub-rect in the page's own coordinates (as annotation rects are).
+ */
+function resolveTarget(target: PageRenderTarget | undefined, page: PdfRect): PdfRect {
+  if (!target || target.kind === 'page') return page;
   const rect = normalizePdfRect(target.rect);
   if (rect.right <= rect.left || rect.top <= rect.bottom) {
     throw new EngineError(EngineErrorCode.InvalidArg, 'render rect must have positive area');

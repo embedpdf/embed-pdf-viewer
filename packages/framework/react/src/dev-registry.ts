@@ -1,5 +1,5 @@
 /**
- * Development-time bookkeeping of WHICH layers a page surface mounts, so a
+ * Development-time bookkeeping of which layers a page surface mounts, so a
  * layer can notice a wrong neighbour: a `<RenderLayer>` still baking
  * annotations under an `<AnnotationLayer>` (drawn twice), or a `<FormLayer>`
  * beside the form widget renderer (controls doubled). Keyed by the page
@@ -21,9 +21,9 @@ export interface PageLayerFacts {
 const facts = new WeakMap<object, PageLayerFacts>();
 
 const check = (page: object): void => {
-  const f = facts.get(page);
-  if (!f) return;
-  if (f.renderBakesAnnotations && f.annotationRenderers !== undefined) {
+  const pageFacts = facts.get(page);
+  if (!pageFacts) return;
+  if (pageFacts.renderBakesAnnotations && pageFacts.annotationRenderers !== undefined) {
     devWarn(
       'render-layer-bakes-under-annotation-layer',
       '<RenderLayer> still bakes annotations into the page raster while an <AnnotationLayer> ' +
@@ -31,8 +31,10 @@ const check = (page: object): void => {
     );
   }
   if (
-    f.formLayer &&
-    f.annotationRenderers?.some((r) => 'behavior' in r && r.behavior === 'form-widgets')
+    pageFacts.formLayer &&
+    pageFacts.annotationRenderers?.some(
+      (renderer) => 'behavior' in renderer && renderer.behavior === 'form-widgets',
+    )
   ) {
     devWarn(
       'form-layer-beside-widget-renderer',

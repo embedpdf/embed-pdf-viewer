@@ -38,7 +38,10 @@ describe('devWarn', () => {
     devWarn('k', 'first');
     devWarn('k', 'second');
     devWarn('other', 'third');
-    expect(warn.mock.calls.map((c) => c[0])).toEqual(['[embedpdf] first', '[embedpdf] third']);
+    expect(warn.mock.calls.map((call) => call[0])).toEqual([
+      '[embedpdf] first',
+      '[embedpdf] third',
+    ]);
   });
 });
 

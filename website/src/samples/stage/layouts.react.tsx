@@ -17,7 +17,7 @@ const ebook = async (): Promise<OpenInput> => {
 
 function LayoutControls() {
   const { flow, layout, spread, setFlow, setLayout, setSpread } = useLayout();
-  const { next, prev } = usePages();
+  const { next, previous } = usePages();
   return (
     <Toolbar>
       <Select<FlowMode>
@@ -50,7 +50,7 @@ function LayoutControls() {
         ]}
       />
       <Spacer />
-      <Button icon onClick={() => prev()} title="Previous">
+      <Button icon onClick={() => previous()} title="Previous">
         ‹
       </Button>
       <Button icon onClick={() => next()} title="Next">

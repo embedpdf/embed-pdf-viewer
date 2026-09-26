@@ -14,7 +14,7 @@ A free-text annotation carries a rich document: a **body** style and
 (a bold word in a regular box is one run with `{ weight: 700 }`). The engine
 stores it the way Acrobat does (`/RC` + `/DS`), lays it out, and reads it
 back as `richText` on every free text — see
-[Annotation types](/docs/engine/core-concepts/annotation-types#rich-text)
+[Free text](/docs/engine/annotations/free-text#rich-text)
 for the model and the patch rules. This page is about _editing_ it in the
 browser.
 
@@ -99,9 +99,15 @@ const unmount = await mountWebFont('brand-sans', data);
 ```
 
 Standard PDF fonts use browser font stacks (Helvetica →
-`Helvetica, Arial, sans-serif`, and so on). The full viewer does the fetch,
-the registration and the mount from one `annotations.fonts` option — see
-[Custom fonts](/docs/engine/core-concepts/custom-fonts#show-the-font-in-the-browser-too).
+`Helvetica, Arial, sans-serif`, and so on).
+
+<Engine local>
+
+The full viewer does the fetch, the registration and the mount from one
+`annotations.fonts` option — see
+[Fonts](/docs/engine/documents/fonts#show-the-font-in-the-browser-too).
+
+</Engine>
 
 ## Writing the glue for another framework
 

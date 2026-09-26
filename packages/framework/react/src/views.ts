@@ -2,7 +2,7 @@
  * usePanes — the React view of @embedpdf/plugin-view-manager.
  *
  * Reactive pane list + intents. The adapter stays headless: it gives you the
- * panes; YOU lay them out (split, grid, stacked), render each pane's tab strip
+ * panes; you lay them out (split, grid, stacked), render each pane's tab strip
  * over `pane.documentIds`, and wrap the body in a <DocumentScope id={activeId}>
  * so its Stage binds to that pane's active document.
  */
@@ -19,9 +19,9 @@ export function useViewManager(): ViewManagerCapability {
   return useCapability(ViewManagerToken);
 }
 
-/** Subscribe to one view-manager event for the mounted lifetime: `useViewManagerEvent((c) => c.onDocumentMoved, handler)`. */
+/** Subscribe to one view-manager event for the mounted lifetime: `useViewManagerEvent((viewManager) => viewManager.onDocumentMoved, handler)`. */
 export function useViewManagerEvent<T>(
-  select: (cap: ViewManagerCapability) => EventHook<T>,
+  select: (viewManager: ViewManagerCapability) => EventHook<T>,
   handler: (event: T) => void,
 ): void {
   useCapabilityEvent(ViewManagerToken, select, handler);

@@ -10,26 +10,26 @@ import type { BuildPack, EnginePool, RunAdHocOptions } from './EnginePool';
  * across shards).
  *
  * Two lanes:
- *   - `interactive` (the DEFAULT for everything): work a caller is
+ *   - `interactive` (the default for everything): work a caller is
  *     waiting on — `run`/`runOpen`, and `runAdHoc` unless it says
- *     otherwise. May use EVERY slot.
+ *     otherwise. May use every slot.
  *   - `background` (explicit opt-in via `runAdHoc(..., { lane:
  *     'background' })`): known-disposable work — today exactly the
- *     thumbnail warm. BOUNDED OCCUPANCY with interactive-first
- *     admission — honest scope: already-DISPATCHED background work is
+ *     thumbnail warm. Bounded occupancy with interactive-first
+ *     admission — honest scope: already-dispatched background work is
  *     never preempted (a busy worker finishes its job), so at small
  *     pools one in-flight warm can still delay an arriving interactive
  *     request by up to one job. `backgroundMaxInFlight: 0` is the
  *     strict-disable for such deployments: background sheds instantly.
  *
  * Beyond the caps, callers queue (bounded, FIFO per lane); beyond the
- * queues or their wait deadlines, jobs SHED with {@link EngineBusyError}
+ * queues or their wait deadlines, jobs shed with {@link EngineBusyError}
  * — honest backpressure (503 at the route layer) instead of an unbounded
  * pile-up. A shed background warm is free by design ("the read-through
  * is the system"); a shed interactive job is the overload signal.
  *
  * `close`/`destroy` and the read-only surface pass through unthrottled:
- * close FREES resources — blocking it behind admission could deadlock a
+ * close frees resources — blocking it behind admission could deadlock a
  * full pool against its own relief valve.
  */
 
@@ -51,7 +51,7 @@ export type SchedulingLane = 'interactive' | 'background';
 export interface EngineSchedulingConfig {
   /** Hard cap on concurrently dispatched engine jobs. Default:
    *  slots × 2 — every worker busy plus one pipelined behind it; beyond
-   *  that, waiting happens HERE, where it is observable. */
+   *  that, waiting happens here, where it is observable. */
   maxInFlight?: number;
   /** Of maxInFlight, how many background may occupy.
    *  Default: max(1, floor(slots / 2)). `0` = strict disable: every
@@ -62,7 +62,7 @@ export interface EngineSchedulingConfig {
   interactiveMaxQueued?: number; // default 256
   backgroundQueueTimeoutMs?: number; // default 5_000
   interactiveQueueTimeoutMs?: number; // default 15_000
-  /** Observation hook: called once per DISPATCHED job that waited in
+  /** Observation hook: called once per dispatched job that waited in
    *  queue, with its wait. Feeds the /metrics queue-wait histogram;
    *  never called for sheds/aborts. */
   onQueueWait?: (lane: SchedulingLane, waitMs: number) => void;
@@ -129,7 +129,7 @@ export class SchedulingEnginePool implements EnginePool {
   private async admit(lane: SchedulingLane, signal?: AbortSignal): Promise<void> {
     if (signal?.aborted) throw new EngineError(EngineErrorCode.Aborted, 'aborted before dispatch');
     if (lane === 'background' && this.cfg.backgroundMaxInFlight === 0) {
-      // Strict disable: queueing would never drain — shed NOW.
+      // Strict disable: queueing would never drain — shed now.
       this.lanes.background.sheds += 1;
       throw new EngineBusyError('background', 'background lane disabled (backgroundMaxInFlight=0)');
     }

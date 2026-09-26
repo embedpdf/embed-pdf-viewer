@@ -1,0 +1,242 @@
+---
+title: Import & export
+description: Take annotations out of a document as one bundle, store it, and put it into the same document or another in one call.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Import & export
+
+Export takes annotations out of a document, with the bytes they carry, as one **bundle**. Import
+puts a bundle's annotations into a document. Each is one call:
+
+```ts
+const bundle = await source.annotations.export();
+
+const { annotations, dropped } = await target.annotations.import(bundle, { attribution: 'stamp' });
+```
+
+Use it to copy annotations to a new version of a document, to keep them in your own database
+apart from the PDF, or to move a review from one file to another.
+
+## Export
+
+```ts
+const everything = await doc.annotations.export();
+const thread = await doc.annotations.export({ refs: [comment.ref] }); // a comment and its replies
+const onPage = await doc.annotations.export({ pages: [pageRef] }); // everything on one page
+```
+
+| Option    | What it is                                                               | Default     |
+| :-------- | :----------------------------------------------------------------------- | :---------- |
+| `refs`    | The annotations to export.                                               | all         |
+| `pages`   | The pages whose annotations to export.                                   | all         |
+| `include` | `'threads'`: also every reply below what you chose. `'references'`: not. | `'threads'` |
+
+A selection brings what it needs, so nothing arrives broken:
+
+- a reply brings the comment it answers, up to the first comment of the thread;
+- an annotation brings its popup, and a popup brings its annotation;
+- with `include: 'threads'`, a comment brings every reply below it.
+
+A page or an annotation the document doesn't have refuses the export with `NotFound`.
+
+## Store it as a file
+
+`AnnotationTransfer` writes a bundle as one JSON text, with its resources in base64, and reads it
+back:
+
+```ts
+import { AnnotationTransfer } from '@cloudpdf/engine';
+
+const text = AnnotationTransfer.stringify(bundle);
+const again = await AnnotationTransfer.parse(text);
+```
+
+`parse()` checks the [limits](#limits) first, so a file that's too large is refused before it's
+decoded. Then it checks:
+
+- the format and version;
+- that every resource matches its id;
+- that every resource an item names is there;
+- that every resource is named by an item.
+
+Anything else is refused with `InvalidArg`. For what a bundle holds, see
+[What's in a bundle](#whats-in-a-bundle).
+
+## Import
+
+```ts
+const result = await doc.annotations.import(bundle, { attribution: 'stamp' });
+
+result.annotations; // the new annotations, in bundle order
+result.refMap; // [{ from, to }]: each annotation's ref in the bundle, and its ref here
+result.dropped; // what was left out, and why
+```
+
+| Option        | What it is                                                             | Default     |
+| :------------ | :--------------------------------------------------------------------- | :---------- |
+| `pages`       | Which page each bundle page goes to.                                   | `'same'`    |
+| `attribution` | `'restore'` keeps who wrote each annotation; `'stamp'` makes it yours. | `'restore'` |
+| `opId`        | A name for this import; its events carry it.                           | a new id    |
+
+Everything is checked before anything is written. The import is all or nothing: a failure while
+writing leaves the document exactly as it was, with no new annotations and no events.
+
+### Pages
+
+By default each annotation goes to the page with the same ref, which fits a bundle from the same
+document or a copy of it. For another document, place the pages by their position, or name the
+pairs:
+
+```ts
+await doc.annotations.import(bundle, { attribution: 'stamp', pages: 'by-position' });
+
+await doc.annotations.import(bundle, {
+  attribution: 'stamp',
+  pages: [{ from: bundlePage, to: pageRef }],
+});
+```
+
+A link's destination is placed the same way. Every page an annotation is on, or a link points to,
+needs a match; otherwise the import fails with `InvalidArg` and `err.details.pages` lists them. A
+`to` the document doesn't have is `NotFound`.
+
+### Who wrote it
+
+With `attribution: 'restore'`, the default, each annotation keeps its author, its creation and
+change dates, its owner (`userId`, `createdBy`, `modifiedBy`) and its `groupId`. The user who
+imports is recorded in `importedBy`. That writes annotations in other people's names, so it needs
+`doc.annotate.modify` and `doc.annotate.import`: give them to trusted jobs, such as a sync from
+your own database, not to end users.
+
+With `attribution: 'stamp'`, each annotation is made as `create` makes it: the user who imports
+is its author and owner, and the dates are now. It needs what creating each annotation needs and
+nothing more, so a user who may create their own annotations may paste them. It's the one to use
+for a user pasting annotations.
+
+In both modes an attached file keeps its own dates: they're facts about the file, not about who
+wrote the annotation.
+
+### What's left out
+
+What an import can't carry it leaves out, lists in `dropped`, and imports the rest. Each entry is
+`{ ref, reason }`, the `ref` as the bundle names it. An entry with a `field` means only that field
+was left out: the annotation itself was imported without it.
+
+| `reason`             | What was left out                                                                                                         |
+| :------------------- | :------------------------------------------------------------------------------------------------------------------------ |
+| `unsupported-kind`   | An annotation of a kind the engine doesn't model.                                                                         |
+| `form-field`         | A form field's widget: it travels with its field, through [forms](/docs/engine/forms).                                    |
+| `name-conflict`      | An annotation whose `nm` ([its unique name](/docs/engine/concepts/identity)) is taken on its page, or by an earlier item. |
+| `parent-missing`     | A reply or popup whose parent isn't in the bundle, on the same page.                                                      |
+| `parent-dropped`     | A reply or popup whose parent was left out.                                                                               |
+| `geospatial`         | Field `measure`: a map's scale, which the engine can't write.                                                             |
+| `unknown-measure`    | Field `measure`: a scale of a kind the engine doesn't know.                                                               |
+| `unsupported-action` | Field `target` or `actions`: what a link does, or actions, that the engine can't write.                                   |
+
+Because of `name-conflict`, importing the same bundle twice doesn't duplicate the annotations that
+have a name. A reply or popup whose parent is left out goes too, so a thread never arrives in
+pieces.
+
+### Events
+
+An import fires one `annotations.created` event per annotation, all with the same `origin.tx`, so
+you can update your interface once for the whole batch. See
+[Changes made together](/docs/engine/concepts/events#changes-made-together).
+
+## Limits
+
+One set of limits applies to making and reading bundles, so whatever an export makes, an import
+takes:
+
+| Limit                    | Default           |
+| :----------------------- | :---------------- |
+| The whole bundle         | 50 MB             |
+| Items and pages, as JSON | 16 MB             |
+| Annotations              | 10,000            |
+| Pages                    | 2,000             |
+| Resources                | 2,000             |
+| One resource             | 50 MB             |
+| One image, decoded       | 40 million pixels |
+
+Past a limit, the call fails with `PayloadTooLarge`, and `err.details.limit` names the limit.
+Export checks while it builds the bundle; export fewer pages at a time to stay under.
+
+<Engine cloud>
+
+The server holds the limits, with these defaults unless you set others. The client checks a
+bundle against the server's limits before it sends it, so a bundle past one fails before its bytes
+move.
+
+An import is one request, however many annotations and resources it carries. Its `opId`, made for
+you when you don't pass one, makes a retry safe: a second request with the same `opId` returns
+what the first one did and writes nothing.
+
+An export is cached until the document's annotations or pages change, so exporting again is cheap.
+
+</Engine>
+
+## Permissions
+
+Export reads the annotations and the bytes they carry, so it needs `doc.annotate.read` and
+`doc.download`.
+
+An import with `attribution: 'stamp'` needs what creating the annotations needs: a user who may
+create their own annotations (`annotations:create:self`) may paste a bundle. An import with
+`attribution: 'restore'` needs `doc.annotate.modify` and `doc.annotate.import`. See
+[Permissions](/docs/engine/concepts/permissions).
+
+## Good to know
+
+### What's in a bundle
+
+```ts
+bundle.items; // [{ data, resources: { appearance: 'sha256-…' } }, …]
+bundle.resources; // { 'sha256-…': Uint8Array }
+bundle.pages; // [{ page, position, box }, …]
+```
+
+- Each item's `data` is the annotation exactly as a read returns it, in page order and then in
+  the page's own order.
+- The bytes an annotation carries (a stamp's drawing, an attached file) are `resources`, each
+  stored once under the SHA-256 of its bytes. A hundred stamps of one logo carry the logo once.
+- `pages` lists every page the items are on or point at, with its position in the document
+  (from `0`) and its crop box, so the annotations can be placed on the right pages of another
+  document.
+
+A bundle is plain data. You can store each item as a row and each resource once under its id,
+and build a bundle again from your database without the engine.
+
+### A copy is drawn from its data
+
+An import redraws each annotation from its fields, as FDF and XFDF imports do. Only stamps keep
+their original drawing. So:
+
+- a highlight, a drawing or a text box that another app drew looks as the engine draws the same
+  data;
+- for lines, polygons, ink and highlights the engine computes `rect` from the points, so it can
+  differ slightly from the original;
+- a note's and a file's icon is the engine's own 20 × 20 icon, at the same bottom-left corner;
+- a measurement's label is worked out again from its scale.
+
+### The round trip
+
+Export a document, import the bundle into a copy of its pages, and export that: when nothing was
+dropped, you get the same bundle, with the same data and every resource the same bytes under the
+same id. Only the refs change, and the attribution: `importedBy` with `'restore'`, author and
+dates with `'stamp'`. The same document also exports to the same bundle on the local and the cloud
+engine.
+
+### What an import doesn't do
+
+- Link a reply to a comment that's already in the target document: replies and popups link only
+  to items of the same bundle.
+- Move or scale annotations, to paste them at an offset or onto a page of another size.
+- Carry what the engine doesn't model: those annotations and fields are in `dropped`.
+
+### Bundles you build
+
+Resource ids are `sha256-` and the SHA-256 of the bytes in lowercase hex. A stamp's appearance in
+a bundle you build may be PNG or JPEG bytes, as `create` takes; an export always gives a one-page
+PDF.

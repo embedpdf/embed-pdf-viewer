@@ -6,27 +6,21 @@ import { blankPagePdf } from '../blank-page';
 import type { Mark, SignatureCapability } from '../contract';
 import type { SignatureReads } from '../read/signatures';
 import type { SignatureContext, SignatureServices } from '../services';
-import { ORIGIN_API } from '../services/events';
+import { verb } from '../services/errors';
 
 export function createFills(
   ctx: SignatureContext,
-  {
-    events,
-    store,
-    siblings,
-    marks,
-  }: Pick<SignatureServices, 'events' | 'store' | 'siblings' | 'marks'>,
+  { events, store, marks }: Pick<SignatureServices, 'events' | 'store' | 'marks'>,
   { getSignature }: Pick<SignatureReads, 'getSignature'>,
   target: { clearIfTarget(field: FormFieldRef): void },
 ) {
   const { filled, cleared } = events;
-  const { withBusy, requireDoc } = store;
-  const { form } = siblings;
+  const { withBusy } = store;
   const { markBytes } = marks;
 
   const setAppearance = async (field: FormFieldRef, pdf: Uint8Array): Promise<void> => {
-    const doc = requireDoc();
-    if (!doc.forms.setSignatureAppearance) {
+    const forms = ctx.doc.forms;
+    if (!forms.setSignatureAppearance) {
       throw new PluginError(
         'unsupported',
         'signature',
@@ -37,23 +31,28 @@ export function createFills(
     if (signature?.signed) {
       throw new PluginError('conflict', 'signature', `'${signature.fieldName}' is signed`);
     }
-    await doc.forms.setSignatureAppearance(field, { pdf, pageIndex: 0 });
-    await form.refresh();
+    await forms.setSignatureAppearance(field, { pdf, pageIndex: 0 });
   };
 
   const fillField = (field: FormFieldRef, mark: Mark): Promise<void> =>
     withBusy(async () => {
       await setAppearance(field, await markBytes(mark));
       target.clearIfTarget(field);
-      filled.emit({ field, origin: ORIGIN_API });
+      filled.emit({ field });
     });
 
   const clearField = (field: FormFieldRef): Promise<void> =>
     withBusy(async () => {
       await setAppearance(field, blankPagePdf());
-      cleared.emit({ field, origin: ORIGIN_API });
+      cleared.emit({ field });
     });
 
-  return { fillField, api: { fillField, clearField } satisfies Partial<SignatureCapability> };
+  return {
+    fillField,
+    api: {
+      fillField: verb(fillField),
+      clearField: verb(clearField),
+    } satisfies Partial<SignatureCapability>,
+  };
 }
 export type SignatureFills = ReturnType<typeof createFills>;

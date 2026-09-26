@@ -19,7 +19,7 @@ export interface ActionsConformanceFixtures {
   annotation: ConformanceFixture;
   field: ConformanceFixture;
   /** `action_payloads.pdf` — every executable payload shape on one page of
-   *  /NM-keyed links. REQUIRED on both flavours: payload parity is a gate. */
+   *  /NM-keyed links. Required on both flavours: payload parity is a gate. */
   payloads: ConformanceFixture;
   /** `open_action_dest.pdf` — a destination-form catalog `/OpenAction`. */
   openDestination: ConformanceFixture;
@@ -56,7 +56,7 @@ export function runActionsConformance(
       const doc = await open(engine, opts, opts.fixtures.document);
       try {
         expect(Boolean(doc.actions)).toBe(true);
-        const snapshot = await doc.actions!.read();
+        const snapshot = await doc.actions!.get();
         expect(DocumentActionsSnapshotSchema.safeParse(snapshot).success).toBe(true);
         expect(snapshot.openAction).toBeNull();
         expect(snapshot.willSave?.root?.type).toBe('javascript');
@@ -99,7 +99,7 @@ export function runActionsConformance(
             annotation.ref.kind === 'objectNumber' && annotation.ref.annotObjectNumber === 8,
         );
         expect(button?.actions?.activate?.root?.type).toBe('uri');
-        // A link carries BOTH planes: the base-level scripting action model
+        // A link carries both planes: the base-level scripting action model
         // (chain shape, for the orchestrator) and its own normalized target
         // (payload, for navigation). They must agree on the action type.
         expect(link?.subtype).toBe('link');
@@ -126,7 +126,7 @@ export function runActionsConformance(
           // cannot — it has no JavaScript code)…
           expect(link.target).toEqual({ kind: 'javascript' });
         }
-        // …while the script text lives ONLY on the scripting plane's model.
+        // …while the script text lives only on the scripting plane's model.
         expect(link?.actions?.activate?.root?.type).toBe('javascript');
         expect(scriptOf(link?.actions?.activate?.root)).toMatch(/app\.alert/);
       } finally {
@@ -143,7 +143,7 @@ export function runActionsConformance(
         expect(scriptOf(form.fields[0].actions?.format?.root)).toMatch(/AFDate_FormatEx/);
         const page = (await doc.pages.list()).pages[0];
         const widget = (await doc.page(page.ref).annotations.list()).annotations[0];
-        expect(widget.actions).toBe(undefined);
+        expect(widget.actions).toBe(null);
       } finally {
         await doc.close();
       }
@@ -154,7 +154,7 @@ export function runActionsConformance(
       try {
         const page = (await doc.pages.list()).pages[0];
         const snapshot = await doc.page(page.ref).annotations.list();
-        const pon = page.ref.pageObjectNumber;
+        const pageObjectNumber = page.ref.pageObjectNumber;
         const rootOf = (nm: string) => {
           const annotation = snapshot.annotations.find((candidate) => candidate.nm === nm);
           expect(Boolean(annotation)).toBe(true);
@@ -169,15 +169,18 @@ export function runActionsConformance(
           type: 'goto',
           destination: {
             kind: 'fitR',
-            page: toPageRef(pon),
+            page: toPageRef(pageObjectNumber),
             left: 10,
             bottom: 20,
             right: 300,
             top: 400,
           },
         });
-        // Dual planes agree by construction: the target IS the tree's projection.
-        expect(targetOf('goto-fitr')).toMatchObject({ kind: 'goto', destination: { kind: 'fitR' } });
+        // Dual planes agree by construction: the target is the tree's projection.
+        expect(targetOf('goto-fitr')).toMatchObject({
+          kind: 'goto',
+          destination: { kind: 'fitR' },
+        });
 
         expect(rootOf('uri-map')).toMatchObject({
           type: 'uri',
@@ -191,9 +194,9 @@ export function runActionsConformance(
         const mixedTargets = mixed?.type === 'hide' ? mixed.targets : [];
         expect(mixedTargets).toHaveLength(2);
         expect(mixedTargets[0]).toEqual({ kind: 'name', name: 'note1' });
-        expect(
-          mixedTargets[1]?.kind === 'objectNumber' && mixedTargets[1].objectNumber > 0,
-        ).toBe(true);
+        expect(mixedTargets[1]?.kind === 'objectNumber' && mixedTargets[1].objectNumber > 0).toBe(
+          true,
+        );
         expect(rootOf('hide-scalar')).toMatchObject({
           type: 'hide',
           targets: [{ kind: 'name', name: 'fieldB' }],
@@ -206,10 +209,18 @@ export function runActionsConformance(
           fields: [{ kind: 'name', name: 'calc1' }],
           exclude: true,
         });
-        expect(rootOf('reset-absent')).toMatchObject({ type: 'reset-form', fields: null, exclude: true });
-        expect(rootOf('reset-empty')).toMatchObject({ type: 'reset-form', fields: [], exclude: false });
+        expect(rootOf('reset-absent')).toMatchObject({
+          type: 'reset-form',
+          fields: null,
+          exclude: true,
+        });
+        expect(rootOf('reset-empty')).toMatchObject({
+          type: 'reset-form',
+          fields: [],
+          exclude: false,
+        });
 
-        // SubmitForm's ATOMIC payload (Phase 4). /UF beats /F in a
+        // SubmitForm's atomic payload. /UF beats /F in a
         // conforming << /FS /URL >> spec; a bare-string /F is the
         // producer-compat extension; bit 9 dominates format with GetMethod
         // kept alive (ISO 32000-2 Table 240).
@@ -256,7 +267,13 @@ export function runActionsConformance(
         expect(chain).toMatchObject({ type: 'javascript', script: "app.alert('chain');" });
         expect(chain?.next[0]).toMatchObject({
           type: 'goto',
-          destination: { kind: 'xyz', page: toPageRef(pon), left: 5, top: 10, zoom: 1.25 },
+          destination: {
+            kind: 'xyz',
+            page: toPageRef(pageObjectNumber),
+            left: 5,
+            top: 10,
+            zoom: 1.25,
+          },
         });
         expect(chain?.next[0]?.next[0]).toMatchObject({
           type: 'hide',
@@ -276,8 +293,8 @@ export function runActionsConformance(
         for (const [nm, subtype] of [
           ['goto-malformed', 'GoTo'],
           ['hide-partial', 'Hide'], // a partial target list must never half-execute
-          // The atomic-payload law: a submit whose REQUIRED /F is not a URL
-          // (or is absent) degrades WHOLE — never a half payload.
+          // The atomic-payload law: a submit whose required /F is not a URL
+          // (or is absent) degrades whole — never a half payload.
           ['submit-not-url', 'SubmitForm'],
           ['submit-no-f', 'SubmitForm'],
         ] as const) {
@@ -300,13 +317,13 @@ export function runActionsConformance(
       const doc = await open(engine, opts, opts.fixtures.openDestination);
       try {
         expect(Boolean(doc.actions)).toBe(true);
-        const snapshot = await doc.actions!.read();
+        const snapshot = await doc.actions!.get();
         expect(DocumentActionsSnapshotSchema.safeParse(snapshot).success).toBe(true);
         expect(snapshot.openAction).toBeNull();
-        const pon = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
+        const pageObjectNumber = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
         expect(snapshot.openDestination).toEqual({
           kind: 'xyz',
-          page: toPageRef(pon),
+          page: toPageRef(pageObjectNumber),
           left: 10,
           top: 700,
           zoom: 1.5,

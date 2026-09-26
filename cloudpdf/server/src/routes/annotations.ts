@@ -1,19 +1,22 @@
 import { Buffer } from 'node:buffer';
-import { randomBytes } from 'node:crypto';
 
 import {
   EngineError,
   EngineErrorCode,
+  ANNOTATION_RESOURCE_ROLE_NAMES,
+  DEFAULT_ANNOTATION_BUNDLE_LIMITS,
   checkSetGroup,
-  sniffBinaryMetadata,
   wirePack,
   type AnnotationActor,
   type AnnotationAppearanceImageOptions,
+  type AnnotationBundleLimits,
   type AnnotationAppearanceManifest,
   type AnnotationAppearanceManifestEntry,
-  type WireAnnotationDraft,
-  type WireAnnotationPatch,
-  type WireResourceMap,
+  type AnnotationDeleteResult,
+  type AnnotationDraft,
+  type AnnotationPatch,
+  type AnnotationResourceRole,
+  type WireAnnotationResources,
   type AnnotationRef,
   type CollabTarget,
   type PageNetworkRenderFormat,
@@ -23,11 +26,14 @@ import {
   type AnnotationAppearanceExportInput,
   type AnnotationFlattenInput,
   toPageRef,
+  type AnnotationSubtype,
+  PermissionDenied,
 } from '@embedpdf/engine-core/runtime';
 import {
   AnnotationAppearancesQuerySchema,
   AnnotationDraftSchema,
   AnnotationPatchSchema,
+  annotationPatchSchemaOf,
   AnnotationAppearanceExportInputSchema,
   AnnotationFlattenInputSchema,
   AnnotationRefSchema,
@@ -35,7 +41,11 @@ import {
   decodeAnnotationAppearancesRenderToken,
   decodeAnnotationToken,
   decodeAnnotationsAllToken,
+  AnnotationsExportRequestSchema,
+  decodeAnnotationsExportToken,
+  type AnnotationsExportToken,
   PageNetworkRenderFormatSchema,
+  unflatten,
   WeakAnnotationSessionPagesRequestSchema,
   type ManifestPage,
 } from '@embedpdf/engine-core/wire';
@@ -52,12 +62,15 @@ import {
   toPageState,
   type SchemaLike,
 } from './_helpers';
-import { readMutationEnvelope } from './_mutationEnvelope';
+import { readAnnotationImportRequest } from './_annotationImportRequest';
+import { buildMultipart, type MultipartPart } from './_multipart';
+import { readMutationEnvelope, type MutationEnvelope } from './_mutationEnvelope';
 import { requireSharedDocRead } from './_planeGuard';
 import { assertRefMatchesPage, refFromKey } from './annotation-route-helpers';
 import {
   requireLayerCapability,
   requireLayerCollabAction,
+  requireLayerCollabActionEach,
   requireLayerDocAccessOnly,
   requireLayerResource,
   type RequestJwtContext,
@@ -80,6 +93,8 @@ interface AnnotationRouteDeps {
   weakAnnotationSessions?: WeakAnnotationSessionService;
   /** Render-lattice policy plane (absent = legacy compute-only). */
   derivedRenders?: DerivedRenderService;
+  /** How large an exported or imported annotation bundle may be; the defaults otherwise. */
+  bundleLimits?: AnnotationBundleLimits;
 }
 
 type ReadScope =
@@ -99,11 +114,12 @@ export async function registerAnnotationRoutes(
     derivedRenders,
   } = deps;
   const encodeInEngine = deps.encodeInEngine ?? true;
+  const bundleLimits = deps.bundleLimits ?? DEFAULT_ANNOTATION_BUNDLE_LIMITS;
 
   // ── Plane-scoped doc-level reads: a base's own annotations —
-  //    weak-identity ones included — are simply VISIBLE through every
+  //    weak-identity ones included — are simply visible through every
   //    annotations-inheriting layer, so the list and appearance batches are
-  //    ONE CDN object served from the BASE worker session. Guarded by the
+  //    one CDN object served from the base worker session. Guarded by the
   //    `annotations` plane (`requireSharedDocRead`); an annotation-writing
   //    layer 404s here into the SDK's manifest-refresh rail and reads its
   //    own layer-scoped view. ─────────────────────────────────────────────
@@ -213,7 +229,7 @@ export async function registerAnnotationRoutes(
     },
   );
 
-  // ── Whole-document BULK listing: one CDN-immutable object per
+  // ── Whole-document bulk listing: one CDN-immutable object per
   //    `annotationsVersion` pin, materialized by a single raw (no
   //    page-load) sweep. The doc-level twin serves annotations-inheriting
   //    layers from the base session; a diverged layer reads its own view.
@@ -261,6 +277,100 @@ export async function registerAnnotationRoutes(
       ),
     });
   });
+
+  // ── Annotation export: a bundle as multipart at an annotation and a layout
+  //    pin (the bundle carries its pages' positions and boxes). It egresses
+  //    content, so it needs `doc.download` beside the annotation read.
+  //    Immutable per token, so the CDN can cache it; the doc-level twin
+  //    serves layers that inherit both planes. ─
+
+  app.get(
+    '/v1/docs/:docId/annotations/export@:token',
+    { config: { compress: false } },
+    async (req, reply) => {
+      const { docId, token } = req.params as { docId: string; token: string };
+      const ctx = await requireSharedDocRead(req, documentService, docId, 'annotations-export', [
+        'annotations',
+        'layout',
+      ]);
+      return exportAnnotations({
+        documentService,
+        limits: bundleLimits,
+        reply,
+        signal: abortSignalFromRequest(req),
+        scope: { kind: 'base', ctx, docId },
+        token: parseTokenOrInvalidArg(
+          decodeAnnotationsExportToken,
+          token,
+          'annotation export token',
+        ),
+      });
+    },
+  );
+
+  app.get(
+    '/v1/docs/:docId/layers/:layerName/annotations/export@:token',
+    { config: { compress: false } },
+    async (req, reply) => {
+      const { docId, layerName, token } = req.params as {
+        docId: string;
+        layerName: string;
+        token: string;
+      };
+      const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const ctx = requireLayerResource(req, docId, layerName, 'layer-annotations-export', pdfBits);
+      return exportAnnotations({
+        documentService,
+        limits: bundleLimits,
+        reply,
+        signal: abortSignalFromRequest(req),
+        scope: { kind: 'layer', ctx, docId, layerName },
+        token: parseTokenOrInvalidArg(
+          decodeAnnotationsExportToken,
+          token,
+          'annotation export token',
+        ),
+      });
+    },
+  );
+
+  // An export whose selection a URL can't carry (position refs, long ref
+  // lists): the same pins and the selection in the body, answered uncached.
+  app.post(
+    '/v1/docs/:docId/layers/:layerName/annotations/export',
+    { config: { compress: false } },
+    async (req, reply) => {
+      const { docId, layerName } = req.params as { docId: string; layerName: string };
+      const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const ctx = requireLayerResource(req, docId, layerName, 'layer-annotations-export', pdfBits);
+      const request = parseOrInvalidArg<AnnotationsExportToken>(
+        AnnotationsExportRequestSchema as unknown as SchemaLike<AnnotationsExportToken>,
+        req.body,
+        'request body',
+      );
+      const signal = abortSignalFromRequest(req);
+      const refs = request.selection.refs
+        ? await layerService.workerRefsForRead(
+            accessCtx,
+            docId,
+            layerName,
+            request.selection.refs,
+            signal,
+          )
+        : undefined;
+      return exportAnnotations({
+        documentService,
+        limits: bundleLimits,
+        reply,
+        signal,
+        scope: { kind: 'layer', ctx, docId, layerName },
+        token: { ...request, selection: { ...request.selection, ...(refs ? { refs } : {}) } },
+        cache: 'no-store',
+      });
+    },
+  );
 
   app.get('/v1/docs/:docId/layers/:layerName/annotations/items', async (req, reply) => {
     const { docId, layerName } = req.params as {
@@ -432,6 +542,65 @@ export async function registerAnnotationRoutes(
     },
   );
 
+  // A bundle's annotations, created as one change. The parts stream in
+  // under the bundle limits; the `Idempotency-Key` header names the import,
+  // so a retry returns what the first request committed.
+  app.post('/v1/docs/:docId/layers/:layerName/annotations/import', async (req, reply) => {
+    const { docId, layerName } = req.params as { docId: string; layerName: string };
+    const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const idempotencyKey = idempotencyKeyOf(req.headers['idempotency-key']);
+    const limits = bundleLimits;
+    const { manifest, resources } = await readAnnotationImportRequest(req, limits);
+    const attribution = manifest.options.attribution ?? 'restore';
+
+    let ctx: ReturnType<typeof requireLayerCollabAction>;
+    if (attribution === 'restore') {
+      // Restoring writes attribution that isn't the caller's, groups
+      // included, so it takes the capabilities instead of per-group checks.
+      requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', pdfBits);
+      ctx = requireLayerCapability(req, docId, layerName, 'doc.annotate.import', pdfBits);
+    } else {
+      // Each annotation is made as a create makes it, so each group the
+      // items name takes the authority a create in it would, and nothing
+      // more: a user who may create their own annotations may paste them.
+      const groups = new Set<string | undefined>();
+      for (const item of manifest.bundle.items as unknown as Array<{
+        data?: { groupId?: unknown };
+      }>) {
+        const groupId = item?.data?.groupId;
+        groups.add(typeof groupId === 'string' ? groupId : undefined);
+      }
+      // An empty bundle still takes the authority to create.
+      if (groups.size === 0) groups.add(undefined);
+      let checked: ReturnType<typeof requireLayerCollabAction> | undefined;
+      for (const groupId of groups) {
+        const group = createGroupOf(accessCtx.jwt, { groupId } as AnnotationDraft, pdfBits);
+        const target = targetForSelfCreate(accessCtx.jwt, group);
+        checked = requireLayerCollabAction(req, docId, layerName, 'create', target, pdfBits);
+      }
+      ctx = checked!;
+    }
+    // The caller: whom `stamp` attributes to, whom `restore` records as `importedBy`.
+    const actor = actorFromJwt(ctx.jwt, accessCtx.jwt.identity.groupId);
+
+    setNoStore(reply);
+    return layerService.importAnnotations(
+      ctx,
+      {
+        docId,
+        layerName,
+        bundle: { ...manifest.bundle, resources },
+        ...(manifest.options.pages !== undefined ? { pages: manifest.options.pages } : {}),
+        attribution,
+        ...(actor ? { actor } : {}),
+        limits,
+        ...(idempotencyKey ? { idempotencyKey } : {}),
+      },
+      abortSignalFromRequest(req),
+    );
+  });
+
   app.post(
     '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items',
     async (req, reply) => {
@@ -443,20 +612,24 @@ export async function registerAnnotationRoutes(
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
       const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      // Creation is a collab check against the caller's own identity
-      // (no impersonation). `:self`/`:all` trivially pass; `:group=X`
-      // constrains creators to those whose default group is X. Under
-      // the narrowing model, `doc.annotate.modify` covers create when
-      // no create-collab filter is present.
-      const target = targetForSelfCreate(accessCtx.jwt);
-      const ctx = requireLayerCollabAction(req, docId, layerName, 'create', target, pdfBits);
-      const { body, resources } = await readMutationEnvelope(req, annotationBinaryPolicy);
-      const draft = parseOrInvalidArg<WireAnnotationDraft>(
-        AnnotationDraftSchema as unknown as SchemaLike<WireAnnotationDraft>,
-        body,
+      const envelope = await readMutationEnvelope(req, annotationBinaryPolicy);
+      const draft = parseOrInvalidArg<AnnotationDraft>(
+        AnnotationDraftSchema as unknown as SchemaLike<AnnotationDraft>,
+        envelope.body,
         'request body',
       );
-      const actor = actorFromJwt(ctx.jwt);
+      const resources = annotationResourcesOf(envelope);
+      // Creation is a collab check against the caller's own identity
+      // (no impersonation), in the group the annotation is created in:
+      // the draft's, when it names one the caller may set, else the
+      // caller's default. `:self`/`:all` trivially pass; `:group=X`
+      // constrains that group to X. Under the narrowing model,
+      // `doc.annotate.modify` covers create when no create-collab filter
+      // is present.
+      const groupId = createGroupOf(accessCtx.jwt, draft, pdfBits);
+      const target = targetForSelfCreate(accessCtx.jwt, groupId);
+      const ctx = requireLayerCollabAction(req, docId, layerName, 'create', target, pdfBits);
+      const actor = actorFromJwt(ctx.jwt, groupId);
 
       setNoStore(reply);
       return layerService.createAnnotation(
@@ -520,7 +693,7 @@ export async function registerAnnotationRoutes(
     },
   );
 
-  // Selective flatten: `pages.flatten` for a chosen set of THIS page's
+  // Selective flatten: `pages.flatten` for a chosen set of this page's
   // annotations — the whole-page verb's gates, one page's content and
   // annotation pins bumped, persisted like a page flatten.
   app.post(
@@ -553,7 +726,7 @@ export async function registerAnnotationRoutes(
     },
   );
 
-  // The chosen annotations' appearances as ONE single-page PDF: a derived
+  // The chosen annotations' appearances as one single-page PDF: a derived
   // read that egresses content, gated by `doc.download` like pages/extract.
   app.post(
     '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/appearance',
@@ -588,6 +761,36 @@ export async function registerAnnotationRoutes(
     },
   );
 
+  // An annotation's `appearance` resource: its drawing, as a one-page PDF. A
+  // read that egresses content, gated by `doc.download` like the export above.
+  // Durable keys only: a weak index ref needs a revision-validated body.
+  app.get(
+    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotKey/resources/appearance',
+    async (req, reply) => {
+      const { docId, layerName, pageKey, annotKey } = req.params as {
+        docId: string;
+        layerName: string;
+        pageKey: string;
+        annotKey: string;
+      };
+      const pageObjectNumber = resolvePageKeyParam(pageKey);
+      const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const ctx = requireLayerCapability(req, docId, layerName, 'doc.download', pdfBits);
+      const bytes = await documentService.readAnnotationAppearance(
+        ctx,
+        docId,
+        layerName,
+        pageObjectNumber,
+        refFromKey(annotKey, pageObjectNumber),
+        abortSignalFromRequest(req),
+      );
+      setNoStore(reply);
+      reply.type('application/pdf');
+      return reply.send(Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength));
+    },
+  );
+
   app.patch(
     '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotKey',
     async (req, reply) => {
@@ -600,9 +803,9 @@ export async function registerAnnotationRoutes(
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
       const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const envelope = await readMutationEnvelope(req);
+      const envelope = await readMutationEnvelope(req, annotationBinaryPolicy);
       const body = envelope.body as Record<string, unknown> | null | undefined;
-      const resources = envelope.resources;
+      const resources = annotationResourcesOf(envelope);
       const signal = abortSignalFromRequest(req);
 
       if (annotKey === 'index') {
@@ -619,6 +822,10 @@ export async function registerAnnotationRoutes(
           );
         }
         const action = body?.op === 'delete' ? 'delete' : 'update';
+        if (action === 'delete') {
+          setNoStore(reply);
+          return deleteWithThread(req, accessCtx, pdfBits, { docId, layerName, ref }, signal);
+        }
         // Use the outer accessCtx (already JWT-verified, no capability
         // check) for the layer open the target lookup needs to perform.
         const target = await layerService.getAnnotationCollabTarget(
@@ -630,13 +837,9 @@ export async function registerAnnotationRoutes(
           signal,
         );
         const ctx = requireLayerCollabAction(req, docId, layerName, action, target, pdfBits);
-        if (action === 'delete') {
-          setNoStore(reply);
-          return layerService.deleteAnnotation(ctx, { docId, layerName, ref }, signal);
-        }
 
-        const patch = parseOrInvalidArg<WireAnnotationPatch>(
-          AnnotationPatchSchema as unknown as SchemaLike<WireAnnotationPatch>,
+        const patch = parseOrInvalidArg<AnnotationPatch>(
+          patchSchemaFor(target.subtype),
           body?.patch,
           'body.patch',
         );
@@ -659,8 +862,8 @@ export async function registerAnnotationRoutes(
         signal,
       );
       const ctx = requireLayerCollabAction(req, docId, layerName, 'update', target, pdfBits);
-      const patch = parseOrInvalidArg<WireAnnotationPatch>(
-        AnnotationPatchSchema as unknown as SchemaLike<WireAnnotationPatch>,
+      const patch = parseOrInvalidArg<AnnotationPatch>(
+        patchSchemaFor(target.subtype),
         body?.patch,
         'body.patch',
       );
@@ -696,24 +899,44 @@ export async function registerAnnotationRoutes(
 
       const signal = abortSignalFromRequest(req);
       const ref = refFromKey(annotKey, pageObjectNumber);
-      const target = await layerService.getAnnotationCollabTarget(
-        accessCtx,
-        docId,
-        layerName,
-        pageObjectNumber,
-        ref,
-        signal,
-      );
-      const ctx = requireLayerCollabAction(req, docId, layerName, 'delete', target, pdfBits);
-
       setNoStore(reply);
-      return layerService.deleteAnnotation(
-        ctx,
-        { docId, layerName, ref: refFromKey(annotKey, pageObjectNumber) },
-        abortSignalFromRequest(req),
-      );
+      return deleteWithThread(req, accessCtx, pdfBits, { docId, layerName, ref }, signal);
     },
   );
+
+  /**
+   * Delete an annotation with its thread and popups: each is checked, all
+   * or nothing, and the worker deletes only what was.
+   */
+  async function deleteWithThread(
+    req: FastifyRequest,
+    accessCtx: ReturnType<typeof requireLayerDocAccessOnly>,
+    pdfBits: PdfBits,
+    input: { docId: string; layerName: string; ref: AnnotationRef },
+    signal: AbortSignal,
+  ): Promise<AnnotationDeleteResult> {
+    const members = await layerService.getAnnotationDeleteMembers(
+      accessCtx,
+      input.docId,
+      input.layerName,
+      input.ref.page.pageObjectNumber,
+      input.ref,
+      signal,
+    );
+    const ctx = requireLayerCollabActionEach(
+      req,
+      input.docId,
+      input.layerName,
+      'delete',
+      members,
+      pdfBits,
+    );
+    return layerService.deleteAnnotation(
+      ctx,
+      { ...input, checked: members.map((member) => member.ref) },
+      signal,
+    );
+  }
 }
 
 /**
@@ -740,7 +963,8 @@ function requireWeakAnnotationSessions(
 // ----------------------------------------------------------------------
 // Annotation identity helpers
 //
-// Three small pure helpers, one per mutation shape:
+// Small pure helpers for the identity a mutation carries:
+//   - createGroupOf:       the group a create lands in (set-group checked)
 //   - targetForSelfCreate: build the CollabTarget for create checks
 //                          from JWT identity (no impersonation).
 //   - actorFromJwt:        build the worker actor for create from JWT
@@ -753,17 +977,78 @@ function requireWeakAnnotationSessions(
 // ----------------------------------------------------------------------
 
 /**
- * Build the CollabTarget for a create check. Targets the caller's own
- * identity — no impersonation, no draft-side override. `:self`/`:all`
- * pass trivially; `:group=X` is the meaningful filter (matches only
- * when the caller's default group is X).
+ * The group a new annotation is created in: the draft's `groupId` when it
+ * names one, else the caller's default group. A group other than the
+ * caller's own needs `annotations:set-group` authority for it, as a
+ * reassignment on update does.
  */
-function targetForSelfCreate(jwt: RequestJwtContext): CollabTarget {
-  const id = jwt.identity;
+function createGroupOf(
+  jwt: RequestJwtContext,
+  draft: AnnotationDraft,
+  pdfBits: PdfBits,
+): string | undefined {
+  const groupId = (draft as { groupId?: string | null }).groupId ?? jwt.identity.groupId;
+  if (groupId !== undefined && groupId !== jwt.identity.groupId) {
+    if (!checkSetGroup(groupId, jwt.identity.groupId, jwt.scope, pdfBits)) {
+      throw new PermissionDenied('annotations:set-group', `group=${groupId}`);
+    }
+  }
+  return groupId;
+}
+
+/** The `Idempotency-Key` header: printable ASCII, 1 to 255 characters. */
+function idempotencyKeyOf(header: string | string[] | undefined): string | undefined {
+  if (header === undefined) return undefined;
+  if (typeof header !== 'string' || !/^[\x21-\x7e]{1,255}$/.test(header)) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      'Idempotency-Key must be 1 to 255 printable ASCII characters',
+    );
+  }
+  return header;
+}
+
+/**
+ * Build the CollabTarget for a create check. Targets the caller's own
+ * identity — no impersonation — in the group the annotation is created
+ * in. `:self`/`:all` pass trivially; `:group=X` is the meaningful filter.
+ */
+function targetForSelfCreate(jwt: RequestJwtContext, groupId: string | undefined): CollabTarget {
+  const { userId } = jwt.identity;
   return {
-    ...(id.user_id !== undefined ? { userId: id.user_id } : {}),
-    ...(id.group_id !== undefined ? { groupId: id.group_id } : {}),
+    ...(userId !== undefined ? { userId } : {}),
+    ...(groupId !== undefined ? { groupId } : {}),
   };
+}
+
+/**
+ * How an annotation's resource parts are checked: an `appearance` must be
+ * PNG, JPEG or PDF, and a `file` may be any bytes (attaching any format is
+ * the point). The parts are named by role: `resource:appearance`,
+ * `resource:file`.
+ */
+function annotationBinaryPolicy(_body: unknown, key: string): 'image-or-pdf' | 'any' {
+  return key === 'file' ? 'any' : 'image-or-pdf';
+}
+
+/**
+ * The resources of an annotation write, by role, from its multipart parts.
+ * Whether the kind takes them is the engine's check.
+ */
+function annotationResourcesOf(envelope: MutationEnvelope): WireAnnotationResources | undefined {
+  if (!envelope.resources) return undefined;
+  const resources: WireAnnotationResources = {};
+  for (const [role, { bytes }] of Object.entries(envelope.resources)) {
+    if ((ANNOTATION_RESOURCE_ROLE_NAMES as readonly string[]).includes(role)) {
+      resources[role as AnnotationResourceRole] = bytes;
+    } else {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `unknown annotation resource part 'resource:${role}'; expected 'resource:appearance' or 'resource:file'`,
+      );
+    }
+  }
+  return resources;
 }
 
 /**
@@ -778,27 +1063,15 @@ function targetForSelfCreate(jwt: RequestJwtContext): CollabTarget {
  * (anonymous tenant tokens) — the worker still stamps /M but skips /T
  * and /EMBD_Metadata.
  */
-
-/**
- * The per-kind binary policy the envelope doc long promised: a
- * file-attachment draft's `file` bytes are exempt from the PNG/JPEG/PDF
- * allowlist — attaching arbitrary formats is the point of the kind.
- * Every other resource (stamp `source`) stays strict. Patches carry no
- * binary fields, so update routes keep the strict default.
- */
-function annotationBinaryPolicy(body: unknown, key: string): 'image-or-pdf' | 'any' {
-  const draft = body as { subtype?: unknown; file?: { resource?: unknown } } | null;
-  return draft?.subtype === 'file-attachment' && draft.file?.resource === key
-    ? 'any'
-    : 'image-or-pdf';
-}
-
-function actorFromJwt(jwt: RequestJwtContext): AnnotationActor | undefined {
-  const id = jwt.identity;
+function actorFromJwt(
+  jwt: RequestJwtContext,
+  groupId: string | undefined,
+): AnnotationActor | undefined {
+  const { userId, displayName } = jwt.identity;
   const actor: AnnotationActor = {
-    ...(id.user_id !== undefined ? { userId: id.user_id } : {}),
-    ...(id.group_id !== undefined ? { groupId: id.group_id } : {}),
-    ...(id.display_name !== undefined ? { displayName: id.display_name } : {}),
+    ...(userId !== undefined ? { userId } : {}),
+    ...(groupId !== undefined ? { groupId } : {}),
+    ...(displayName !== undefined ? { displayName } : {}),
   };
   return actor.userId || actor.groupId || actor.displayName ? actor : undefined;
 }
@@ -806,12 +1079,12 @@ function actorFromJwt(jwt: RequestJwtContext): AnnotationActor | undefined {
 /**
  * Build the worker-side actor for UPDATE.
  *
- *   - `userId`      = caller's JWT user_id → stamped as
+ *   - `userId`      = the caller's `identity.userId` → stamped as
  *                     /EMBD_Metadata/UpdatedBy (modification trail).
- *   - `displayName` = caller's display_name → carried for the
+ *   - `displayName` = the caller's `identity.displayName` → carried for the
  *                     modification trail. The worker does not touch /T
  *                     on update; /T is bound at creation.
- *   - `groupId`     = `patch.groupId` ONLY when it reassigns the row
+ *   - `groupId`     = `patch.groupId` only when it reassigns the row
  *                     (differs from current groupId) → stamped as the
  *                     new /EMBD_Metadata/GroupID. Absent means "don't
  *                     touch."
@@ -823,25 +1096,27 @@ function actorFromJwt(jwt: RequestJwtContext): AnnotationActor | undefined {
 function buildUpdateActor(
   jwt: RequestJwtContext,
   currentTarget: CollabTarget,
-  patch: WireAnnotationPatch,
+  patch: AnnotationPatch,
   pdfBits: PdfBits,
 ): AnnotationActor | undefined {
-  const patchedGroupId = (patch as { groupId?: string }).groupId;
+  const patchedGroupId = (patch as { groupId?: string | null }).groupId;
+  // `null` sent back for an annotation without a group changes nothing;
+  // an existing group can only be reassigned, never removed.
+  if (patchedGroupId === null && currentTarget.groupId !== undefined) {
+    throw new EngineError(EngineErrorCode.InvalidArg, "an annotation's group can't be removed");
+  }
   const isReassigningGroup =
     typeof patchedGroupId === 'string' && patchedGroupId !== currentTarget.groupId;
 
   if (isReassigningGroup) {
-    if (!checkSetGroup(patchedGroupId, jwt.identity.group_id, jwt.scope, pdfBits)) {
-      throw new EngineError(
-        EngineErrorCode.Forbidden,
-        `annotations:set-group denied for group=${patchedGroupId}`,
-      );
+    if (!checkSetGroup(patchedGroupId, jwt.identity.groupId, jwt.scope, pdfBits)) {
+      throw new PermissionDenied('annotations:set-group', `group=${patchedGroupId}`);
     }
   }
 
   const actor: AnnotationActor = {
-    ...(jwt.identity.user_id !== undefined ? { userId: jwt.identity.user_id } : {}),
-    ...(jwt.identity.display_name !== undefined ? { displayName: jwt.identity.display_name } : {}),
+    ...(jwt.identity.userId !== undefined ? { userId: jwt.identity.userId } : {}),
+    ...(jwt.identity.displayName !== undefined ? { displayName: jwt.identity.displayName } : {}),
     ...(isReassigningGroup ? { groupId: patchedGroupId } : {}),
   };
   return actor.userId || actor.groupId || actor.displayName ? actor : undefined;
@@ -863,12 +1138,12 @@ async function renderAnnotationAppearances(input: {
   if (input.tokenQuery !== undefined) rejectQueryParamsOnTokenUrl(input.query);
 
   // Token (versioned) and query (unversioned) both arrive as flat string maps.
-  // The appearance query schema has no nested keys, so no `unflatten` is needed
-  // — z.coerce handles the string→number/enum coercions.
+  // `unflatten` turns the dotted `viewport.*` keys into the nested object the
+  // schema expects; z.coerce handles the string→number/enum coercions.
   const flatInput = (input.tokenQuery ?? input.query) as Record<string, unknown>;
   const parsedQuery = parseOrInvalidArg(
     AnnotationAppearancesQuerySchema,
-    flatInput,
+    unflatten(flatInput),
     input.tokenQuery === undefined ? 'appearance render query' : 'appearance render token',
   );
   const imageOptions: AnnotationAppearanceImageOptions = parsedQuery.options;
@@ -893,9 +1168,9 @@ async function renderAnnotationAppearances(input: {
   }
 
   // Appearance-scale enforcement: the appearance lattice
-  // bounds SCALE — appearances are sized by `rect × scale`, so a page-sized
+  // bounds scale — appearances are sized by `rect × scale`, so a page-sized
   // stamp at a high scale is a full-page memory bomb wearing a different
-  // token. Same scoping as pages: only VERSIONED (token) requests are
+  // token. Same scoping as pages: only versioned (token) requests are
   // enforced; the unversioned alias stays compute-only (no-store), which is
   // the escape hatch for off-canonical needs (rollover/down modes, quality).
   const derived = input.derivedRenders;
@@ -906,7 +1181,9 @@ async function renderAnnotationAppearances(input: {
     !derived.classifyAppearance({ imageOptions, format }).onLattice
   ) {
     setNoStore(input.reply);
-    derived.rejectOffLattice('use snapAppearanceScale(policy, scale)');
+    derived.rejectOffLattice(
+      "use a scale viewport: { kind: 'scale', scale: snapAppearanceScale(policy, scale) }",
+    );
   }
 
   if (input.scope.kind === 'layer') {
@@ -1063,59 +1340,6 @@ async function renderAnnotationAppearances(input: {
   return input.reply.send(body);
 }
 
-interface MultipartPart {
-  name: string;
-  filename: string;
-  contentType: string;
-  body: Buffer;
-}
-
-/**
- * Assemble a `multipart/form-data` body by hand. The first part is the JSON
- * manifest (`name="manifest"`); the rest are the encoded appearance images.
- * Fetch's `Response.formData()` parses this on the client — text parts (no
- * filename) come back as strings, image parts (with filename) as `Blob`s.
- */
-function buildMultipart(
-  manifest: AnnotationAppearanceManifest,
-  parts: MultipartPart[],
-): { contentType: string; body: Buffer } {
-  const boundary = `cloudpdf-${randomBytes(16).toString('hex')}`;
-  const CRLF = '\r\n';
-  const chunks: Buffer[] = [];
-
-  const manifestJson = Buffer.from(JSON.stringify(manifest), 'utf8');
-  chunks.push(
-    Buffer.from(
-      `--${boundary}${CRLF}` +
-        `Content-Disposition: form-data; name="manifest"${CRLF}` +
-        `Content-Type: application/json${CRLF}${CRLF}`,
-      'utf8',
-    ),
-  );
-  chunks.push(manifestJson);
-  chunks.push(Buffer.from(CRLF, 'utf8'));
-
-  for (const part of parts) {
-    chunks.push(
-      Buffer.from(
-        `--${boundary}${CRLF}` +
-          `Content-Disposition: form-data; name="${part.name}"; filename="${part.filename}"${CRLF}` +
-          `Content-Type: ${part.contentType}${CRLF}${CRLF}`,
-        'utf8',
-      ),
-    );
-    chunks.push(part.body);
-    chunks.push(Buffer.from(CRLF, 'utf8'));
-  }
-
-  chunks.push(Buffer.from(`--${boundary}--${CRLF}`, 'utf8'));
-  return {
-    contentType: `multipart/form-data; boundary=${boundary}`,
-    body: Buffer.concat(chunks),
-  };
-}
-
 function rejectQueryParamsOnTokenUrl(query: unknown): void {
   if (query && typeof query === 'object' && Object.keys(query).length > 0) {
     throw new EngineError(
@@ -1157,18 +1381,18 @@ async function readAnnotations(input: {
       input.scope.layerName,
     );
   }
-  // RAW read (docPtr dictionary walk, no FPDF_LoadPage): wire-identical to
+  // Raw read (docPtr dictionary walk, no FPDF_LoadPage): wire-identical to
   // the full path today — no dispatched subtype reader uses the pagePtr —
   // and ~1000x cheaper per cold leaf materialization. If a pagePtr-dependent
   // reader ever lands, the local-vs-cloud conformance parity diff fails and
   // forces this choice back onto the table (safe-by-conformance).
   const build = (jobId: WorkerJobId) =>
     wirePack({
-      kind: 'annotations.listRawPage' as const,
+      kind: 'annotations.list' as const,
       jobId,
       docId: input.scope.docId,
       ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
-      page: toPageRef(input.pageObjectNumber),
+      pages: [toPageRef(input.pageObjectNumber)],
     });
   const scope = input.scope;
   const result = await input.documentService.readOnPool(
@@ -1178,20 +1402,20 @@ async function readAnnotations(input: {
     build,
     input.signal,
   );
-  if (result.tag !== 'annotations.listRawPage') {
+  if (result.tag !== 'annotations.list') {
     throw new EngineError(
       EngineErrorCode.WireFormat,
       `unexpected ${
         input.scope.kind === 'layer' ? 'layer ' : ''
-      }annotations.listRawPage payload: ${result.tag}`,
+      }annotations.list payload: ${result.tag}`,
     );
   }
 
   if (input.requestedVersion !== undefined) {
-    // RE-validate the pin AFTER the worker read. The pre-check ran before
+    // Re-validate the pin after the worker read. The pre-check ran before
     // parking behind any in-flight write; if that write (or any remote
     // commit) landed while we read, the snapshot in hand belongs to a
-    // NEWER version and must not go out under this pin — the response
+    // newer version and must not go out under this pin — the response
     // carries `immutable`, so one slip poisons the CDN for every future
     // reader. Refusing costs the client one manifest refetch.
     const fresh = await resolvePageForRead(input);
@@ -1209,11 +1433,12 @@ async function readAnnotations(input: {
   }
 
   input.requestedVersion === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
-  return input.revisionBridge.decorateAnnotationSnapshot(toPageState(page), result.snapshot);
+  const pageState = toPageState(page);
+  return input.revisionBridge.decorateAnnotationList(result.list, () => pageState);
 }
 
 /**
- * Whole-document bulk read: ONE `annotations.listRawAll` worker job per
+ * Whole-document bulk read: One `annotations.list` worker job per
  * attempt (the raw docPtr sweep — no per-page loads). Version-addressed
  * reads double-check the manifest pin before serving a CDN-immutable body.
  * The public current-version read retries once if a mutation races the
@@ -1222,6 +1447,79 @@ async function readAnnotations(input: {
  * manifest's `auditHead`, so replaying events with `serverId > auditHead`
  * over this body is exact.
  */
+/**
+ * One export job at the token's pins, checked before and after the job so an
+ * immutable body never belongs to another version: a stale pin is a 404 the
+ * client answers by refreshing its manifest. The response is the bundle
+ * without its bytes as `manifest`, then one part per resource, named by id.
+ */
+async function exportAnnotations(input: {
+  documentService: DocumentService;
+  limits: AnnotationBundleLimits;
+  reply: FastifyReply;
+  signal: AbortSignal;
+  scope: ReadScope;
+  token: AnnotationsExportToken;
+  /** A GET at its token is immutable; a POST is answered uncached. */
+  cache?: 'immutable' | 'no-store';
+}) {
+  const { scope, token } = input;
+  const layerName = scope.kind === 'layer' ? scope.layerName : undefined;
+  const assertCurrent = async () => {
+    const manifest =
+      layerName !== undefined
+        ? await input.documentService.getLayerManifest(scope.ctx, scope.docId, layerName)
+        : await input.documentService.getManifest(scope.ctx, scope.docId);
+    const annotationsVersion = manifest.annotationsVersion ?? 1;
+    const layoutVersion = manifest.layoutVersion ?? 1;
+    if (token.annotationsVersion !== annotationsVersion || token.layoutVersion !== layoutVersion) {
+      setNoStore(input.reply);
+      throw new EngineError(
+        EngineErrorCode.NotFound,
+        `annotation export at annotationsVersion ${token.annotationsVersion}, layoutVersion ${token.layoutVersion} no longer current (current: ${annotationsVersion}, ${layoutVersion})`,
+      );
+    }
+  };
+
+  await assertCurrent();
+  const build = (jobId: WorkerJobId) =>
+    wirePack({
+      kind: 'annotations.export' as const,
+      jobId,
+      docId: scope.docId,
+      ...(layerName !== undefined ? { layerName } : {}),
+      selection: token.selection,
+      limits: input.limits,
+    });
+  const result = await input.documentService.readOnPool(
+    scope.ctx,
+    scope.docId,
+    layerName,
+    build,
+    input.signal,
+  );
+  if (result.tag !== 'annotations.export') {
+    throw new EngineError(
+      EngineErrorCode.WireFormat,
+      `unexpected annotations.export payload: ${result.tag}`,
+    );
+  }
+  await assertCurrent();
+
+  const { resources, ...manifest } = result.bundle;
+  const parts: MultipartPart[] = Object.entries(resources).map(([id, bytes]) => ({
+    name: `resource:${id}`,
+    filename: id,
+    contentType: 'application/octet-stream',
+    body: Buffer.from(bytes),
+  }));
+  if (input.cache === 'no-store') setNoStore(input.reply);
+  else setImmutableCache(input.reply);
+  const { contentType, body } = buildMultipart(manifest, parts);
+  input.reply.type(contentType);
+  return input.reply.send(body);
+}
+
 async function readAnnotationsAll(input: {
   documentService: DocumentService;
   revisionBridge: CloudRevisionBridge;
@@ -1256,7 +1554,7 @@ async function readAnnotationsAll(input: {
     }
     const build = (jobId: WorkerJobId) =>
       wirePack({
-        kind: 'annotations.listRawAll' as const,
+        kind: 'annotations.list' as const,
         jobId,
         docId: scope.docId,
         ...(scope.kind === 'layer' ? { layerName: scope.layerName } : {}),
@@ -1268,16 +1566,16 @@ async function readAnnotationsAll(input: {
       build,
       input.signal,
     );
-    if (result.tag !== 'annotations.listRawAll') {
+    if (result.tag !== 'annotations.list') {
       throw new EngineError(
         EngineErrorCode.WireFormat,
-        `unexpected ${scope.kind === 'layer' ? 'layer ' : ''}annotations.listRawAll payload: ${
+        `unexpected ${scope.kind === 'layer' ? 'layer ' : ''}annotations.list payload: ${
           result.tag
         }`,
       );
     }
 
-    // Re-validate the pin AFTER the worker read (see readAnnotations).
+    // Re-validate the pin after the worker read (see readAnnotations).
     const fresh = await getManifest();
     const freshCurrent = fresh.annotationsVersion ?? 1;
     if (pinnedVersion !== freshCurrent) {
@@ -1297,19 +1595,18 @@ async function readAnnotationsAll(input: {
       );
     }
 
-    // Decorate every page with its cloud-stable PageState from the SAME
+    // Decorate every page with its cloud-stable PageState from the same
     // manifest that certified the pin (toManifestPage already scope-stamped
     // the revision tokens).
-    const stateByPon = new Map(
+    const stateByPageObjectNumber = new Map(
       manifest.pages.map((page) => [page.state.page.pageObjectNumber, page.state]),
     );
-    const pages = result.snapshot.pages.map((page) => {
-      const state = stateByPon.get(page.pageState.page.pageObjectNumber);
-      return state ? input.revisionBridge.decorateAnnotationSnapshot(state, page) : page;
-    });
+    const list = input.revisionBridge.decorateAnnotationList(result.list, (page) =>
+      stateByPageObjectNumber.get(page.pageObjectNumber),
+    );
 
     input.requestedVersion === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
-    return { pages, auditHead: manifest.auditHead };
+    return { ...list, auditHead: manifest.auditHead };
   }
 
   throw new EngineError(
@@ -1341,4 +1638,15 @@ async function resolvePageForRead(input: {
       ? `no page with object number ${input.pageObjectNumber} in layer ${input.scope.layerName} for document ${input.scope.docId}`
       : `no page with object number ${input.pageObjectNumber} in document ${input.scope.docId}`,
   );
+}
+
+/**
+ * How a patch is checked: against its target's kind when the target was
+ * found, so a field that kind doesn't declare is refused here, otherwise
+ * against every kind. The engine refuses a subtype that doesn't match.
+ */
+function patchSchemaFor(subtype: AnnotationSubtype | undefined): SchemaLike<AnnotationPatch> {
+  return (subtype === undefined || subtype === 'unsupported'
+    ? AnnotationPatchSchema
+    : annotationPatchSchemaOf(subtype)) as unknown as SchemaLike<AnnotationPatch>;
 }

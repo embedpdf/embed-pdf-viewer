@@ -1,13 +1,13 @@
 /**
- * Annotation menus — thin anchor plumbing over the ONE `<Anchored>` primitive.
+ * Annotation menus — thin anchor plumbing over the one `<Anchored>` primitive.
  *
  * These work identically under `<Stage>` (mount in the overlay slot; the
  * camera projects, no DOM reads) and `<PageView>` (measured + portalled) —
- * the SURFACE provides the projector, the menu doesn't care.
+ * the surface provides the projector, the menu doesn't care.
  *
  * No action bags: actions come from the capability hooks (`useAnnotation()`,
  * `useAnnotationSelected()`, …), which subscribe properly and compose across
- * plugins. Render props carry only the ANCHOR'S DATA (the draft menu's
+ * plugins. Render props carry only the anchor'S data (the draft menu's
  * progress facts); the annotation-selection menu takes plain children.
  */
 import * as React from 'react';
@@ -33,18 +33,18 @@ export interface AnnotationMenuProps {
  */
 export function AnnotationMenu({ children, gap = 15, placement = 'top' }: AnnotationMenuProps) {
   // Reading the binding subscribes this component to projection changes
-  // (its identity IS the revision), so the anchor read below re-runs with
-  // fresh view facts in the SAME commit as the surface — the knob offset is
+  // (its identity is the revision), so the anchor read below re-runs with
+  // fresh view facts in the same commit as the surface — the knob offset is
   // screen-constant, so its content-space position depends on the page's
   // live view scale.
   const { projector } = useProjectorBinding();
   const anchor = useSelector(
     AnnotationToken,
-    (c) => {
-      const a = c.getSelectionAnchor();
-      if (!a) return null;
-      const env = projector.viewEnv(a.page);
-      return env ? c.getSelectionAnchor(env) : a;
+    (annotation) => {
+      const selectionAnchor = annotation.getSelectionAnchor();
+      if (!selectionAnchor) return null;
+      const env = projector.viewEnv(selectionAnchor.page);
+      return env ? annotation.getSelectionAnchor(env) : selectionAnchor;
     },
     sameAnchor,
   );
@@ -65,7 +65,7 @@ export function AnnotationMenu({ children, gap = 15, placement = 'top' }: Annota
 }
 
 export interface AnnotationDraftMenuProps {
-  /** Render prop receiving the DRAFT ANCHOR'S DATA (subtype, pointCount,
+  /** Render prop receiving the draft anchor'S data (subtype, pointCount,
    *  minPoints, canFinish, …). The verbs are capability calls:
    *  `useAnnotation().finishCreationDraft()` / `.cancelCreationDraft()`. */
   children: (anchor: CreationDraftAnchor) => React.ReactNode;
@@ -81,7 +81,11 @@ export function AnnotationDraftMenu({
   gap = 8,
   placement = 'top',
 }: AnnotationDraftMenuProps) {
-  const anchor = useSelector(AnnotationToken, (c) => c.getCreationDraft(), sameCreationDraftAnchor);
+  const anchor = useSelector(
+    AnnotationToken,
+    (annotation) => annotation.getCreationDraft(),
+    sameCreationDraftAnchor,
+  );
   if (!anchor) return null;
   return (
     <Anchored anchor={anchor} placement={placement} gap={gap}>

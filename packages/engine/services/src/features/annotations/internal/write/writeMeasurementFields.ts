@@ -1,4 +1,5 @@
 import type {
+  PdfMeasure,
   LineDraft,
   LinePatch,
   PolygonDraft,
@@ -7,13 +8,22 @@ import type {
   PolylinePatch,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
+
 import {
   requireMeasureWrite,
   withMeasurePoint,
   writeMeasure,
 } from '../../../measure/internal/measureCodec';
+import { measurementIntentToName } from '../measurementIntent';
 
-/** Receives normalized complete captions from the mutator, never partial state. */
+/** `EPDFMeasure_GetSubtype` of a rectilinear measure. */
+const MEASURE_SUBTYPE_RL = 1;
+
+/**
+ * Receives the caption complete, as {@link prepareMeasurementDraft} and
+ * {@link prepareMeasurementPatch} leave it: the native setters write the
+ * whole caption at once. A foreign measure never reaches here.
+ */
 export function writeMeasurementFields(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
@@ -22,11 +32,19 @@ export function writeMeasurementFields(
 ): void {
   if (value.intent !== undefined) {
     if (value.intent === null) fn.EPDFAnnot_RemoveKey(annot, 'IT');
-    else requireMeasureWrite(fn.EPDFAnnot_SetIntent(annot, value.intent));
+    else requireMeasureWrite(fn.EPDFAnnot_SetIntent(annot, measurementIntentToName(value.intent)));
   }
   if (value.measure !== undefined) {
     if (value.measure === null) requireMeasureWrite(fn.EPDFAnnot_RemoveMeasure(annot));
-    else writeMeasure(fn, mem, fn.EPDFAnnot_AddMeasure(annot), value.measure);
+    else {
+      // A foreign measure is only ever replaced on purpose, and the native
+      // setter never resets one in place, so it is removed first.
+      const existing = fn.EPDFAnnot_GetMeasure(annot);
+      if (existing && fn.EPDFMeasure_GetSubtype(existing) !== MEASURE_SUBTYPE_RL) {
+        requireMeasureWrite(fn.EPDFAnnot_RemoveMeasure(annot));
+      }
+      writeMeasure(fn, mem, fn.EPDFAnnot_AddMeasure(annot), value.measure as PdfMeasure);
+    }
   }
   if (value.subtype === 'line') {
     if (value.leader !== undefined) {
@@ -39,35 +57,35 @@ export function writeMeasurementFields(
         ),
       );
     }
-    if (value.caption !== undefined) {
-      if (value.caption === null) {
-        for (const key of ['Cap', 'CP', 'CO']) fn.EPDFAnnot_RemoveKey(annot, key);
-      } else {
-        const c = value.caption;
-        requireMeasureWrite(
-          withMeasurePoint(
-            mem,
-            c.offset ? { x: c.offset.along, y: c.offset.perpendicular } : undefined,
-            (p) =>
-              fn.EPDFAnnot_SetLineCaption(
-                annot,
-                c.enabled ?? false,
-                c.position === 'top' ? 1 : 0,
-                p,
-              ),
-          ),
-        );
-      }
+    if (value.captionEnabled === null) {
+      fn.EPDFAnnot_RemoveKey(annot, 'Cap');
+    } else if (value.captionEnabled !== undefined) {
+      const offset = value.captionOffset ?? null;
+      requireMeasureWrite(
+        withMeasurePoint(
+          mem,
+          offset ? { x: offset.along, y: offset.perpendicular } : undefined,
+          (p) =>
+            fn.EPDFAnnot_SetLineCaption(
+              annot,
+              value.captionEnabled ?? false,
+              value.captionPosition === 'top' ? 1 : 0,
+              p,
+            ),
+        ),
+      );
     }
-  } else if (value.caption !== undefined) {
-    if (value.caption === null) {
+  } else if (value.captionEnabled !== undefined) {
+    if (value.captionEnabled === null) {
       fn.EPDFAnnot_ClearEmbedMetadataKey(annot, 'MeasurementCaption');
       fn.EPDFAnnot_ClearEmbedMetadataKey(annot, 'MeasurementCaptionCenter');
     } else {
-      const c = value.caption;
+      const enabled = value.captionEnabled;
       requireMeasureWrite(
-        withMeasurePoint(mem, c.center ?? undefined, (p) =>
-          fn.EPDFAnnot_SetShapeCaption(annot, c.enabled ?? false, p),
+        withMeasurePoint(
+          mem,
+          ('captionCenter' in value ? value.captionCenter : null) ?? undefined,
+          (p) => fn.EPDFAnnot_SetShapeCaption(annot, enabled, p),
         ),
       );
     }

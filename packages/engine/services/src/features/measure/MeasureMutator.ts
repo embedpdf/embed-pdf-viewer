@@ -20,7 +20,11 @@ export class MeasureMutator {
     private readonly runtime: PdfRuntimeModule,
     private readonly session: DocumentSession,
   ) {}
-  setScale(pon: PageObjectNumber, measure: PdfMeasure | null, signal: AbortSignal): void {
+  setScale(
+    pageObjectNumber: PageObjectNumber,
+    measure: PdfMeasure | null,
+    signal: AbortSignal,
+  ): void {
     throwIfAborted(signal);
     if (measure !== null) {
       try {
@@ -31,7 +35,7 @@ export class MeasureMutator {
     }
     const { fn, mem } = this.runtime,
       pool = this.session.pagePool(),
-      page = pool.acquire(pon);
+      page = pool.acquire(pageObjectNumber);
     try {
       const owned: number[] = [];
       for (let i = 0; i < fn.EPDFPage_CountViewports(page); i++) {
@@ -45,7 +49,7 @@ export class MeasureMutator {
         if (!m || fn.EPDFMeasure_GetSubtype(m) === 1) owned.push(i);
       }
       const bbox = withScratch(mem, 16, (p) => {
-        const index = this.session.recordByObjectNumber(pon).pageIndex;
+        const index = this.session.recordByObjectNumber(pageObjectNumber).pageIndex;
         const doc = this.session.requireDocPtr();
         if (
           !fn.EPDF_GetPageBoxByIndex(doc, index, 1, p) &&
@@ -79,7 +83,7 @@ export class MeasureMutator {
         writeMeasure(fn, mem, fn.EPDFViewport_AddMeasure(vp), measure);
       });
     } finally {
-      pool.release(pon);
+      pool.release(pageObjectNumber);
     }
   }
 }

@@ -49,7 +49,7 @@ export const DOCS_ENGINE_FOUNDATION = {
   eyebrow: 'The foundation underneath both paths',
   description:
     'Open, inspect, render, edit, and save PDF documents without adopting a UI layer. The local engine runs PDFium through WebAssembly in a Web Worker.',
-  href: '/docs/engine/getting-started',
+  href: '/docs/engine/quick-start',
   cta: 'Use the Engine directly',
   apiHref: '/docs/engine',
   apiCta: 'Engine API reference',

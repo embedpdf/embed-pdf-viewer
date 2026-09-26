@@ -66,9 +66,9 @@ export function permissionInfoWithAdvisory(
 
 /**
  * Translate a {@link PdfBits} view into the capability-shaped
- * {@link PdfPermissionAdvisory}. The rules here MUST mirror the bit
+ * {@link PdfPermissionAdvisory}. The rules here must mirror the bit
  * combinations the scope resolver uses for `pdf.permissions`
- * expansion — `doc.print.high` requires bit 12 AND bit 3, etc.
+ * expansion — `doc.print.high` requires bit 12 and bit 3, etc.
  */
 export function advisoryFromPdfBits(b: PdfBits): PdfPermissionAdvisory {
   return {

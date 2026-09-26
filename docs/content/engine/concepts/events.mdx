@@ -1,0 +1,134 @@
+---
+title: Events
+description: Get told when a document changes, whoever changed it, and keep your own state in sync.
+---
+
+import { Callout } from '@/components/docs/callout';
+
+# Events
+
+Every change to a document produces an event: an annotation created, a page rotated, a field
+filled in. Listen to them to keep your interface in sync without reading the document again.
+
+```ts
+const stop = doc.events.on('annotations.created', (event) => {
+  addToSidebar(event.annotation);
+});
+
+// later
+stop();
+```
+
+`on()` returns a function that stops listening. To hear every event, use `subscribe()`:
+
+```ts
+const stop = doc.events.subscribe((event) => {
+  console.log(event.type);
+});
+```
+
+## What an event contains
+
+An event carries exactly what the call that made the change returned, plus its `type` and where
+it came from (`origin`). The event for `create()` has the same `annotation` that `create()`
+resolved with:
+
+```ts
+doc.events.on('annotations.updated', ({ annotation, origin }) => {
+  if (origin.kind === 'remote') showToast(`${annotation.author} changed a comment`);
+});
+```
+
+| Field         | What it is                                                                    |
+| :------------ | :---------------------------------------------------------------------------- |
+| `origin.kind` | `'local'` when this engine made the change, `'remote'` when someone else did. |
+| `origin.sub`  | The user who made it (on the cloud).                                          |
+| `origin.ts`   | When it happened, in milliseconds.                                            |
+| `origin.tx`   | Set when one call made several changes, such as an import (see below).        |
+
+An event fires after the change is saved, never before, and before the call's promise resolves.
+By the time `await page.annotations.create(…)` returns, your listeners have run.
+
+## Every event
+
+| Type                                                                      | When                                                                                      |
+| :------------------------------------------------------------------------ | :---------------------------------------------------------------------------------------- |
+| `annotations.created`, `.updated`, `.deleted`, `.moved`                   | An annotation changed.                                                                    |
+| `annotations.flattened`                                                   | Annotations were baked into a page.                                                       |
+| `pages.moved`, `.rotated`, `.deleted`, `.inserted`                        | The page order or rotation changed.                                                       |
+| `pages.named`                                                             | A page name was added or removed.                                                         |
+| `pages.flattened`                                                         | All annotations of pages were baked in.                                                   |
+| `pages.scaleSet`                                                          | A page's measurement scale changed.                                                       |
+| `forms.valueSet`                                                          | A field was filled in.                                                                    |
+| `forms.created`, `.updated`, `.deleted`, `.widgetAdded`, `.widgetRemoved` | A field's structure changed.                                                              |
+| `forms.imported`, `forms.repaired`, `forms.effectsApplied`                | Many values or fields changed at once.                                                    |
+| `attachments.created`, `.deleted`                                         | An attached file was added or removed.                                                    |
+| `metadata.updated`                                                        | The title, author or other metadata.                                                      |
+| `redaction.applied`                                                       | Redactions were applied.                                                                  |
+| `signatures.prepared`, `.completed`, `.cancelled`                         | A signature was started or finished.                                                      |
+| `document.versioned`                                                      | A new version of the document was saved, such as after signing. Read what you show again. |
+| `stream.desynced`                                                         | (cloud) Events were missed. Read what you show again.                                     |
+
+Changes that touch one page (annotations) carry that `page`, so you can update only what's on
+screen.
+
+## Changes made together
+
+Some calls make many changes at once. An [import](/docs/engine/annotations/import-export) of 50
+annotations fires 50 `annotations.created` events, one after the other, all with the same
+`origin.tx`:
+
+```ts
+doc.events.on('annotations.created', ({ annotation, origin }) => {
+  addToSidebar(annotation);
+  if (origin.tx && origin.tx.index === origin.tx.count - 1) redrawSidebar(); // the last of the batch
+});
+```
+
+`tx.id` is the same for the whole batch, and `tx.index` counts from `0` to `tx.count - 1`.
+
+<Engine local>
+
+## Who hears what
+
+The local engine tells you about changes made through this engine. Two tabs with the same file
+are two separate copies: a change in one doesn't reach the other.
+
+<CloudPdfCallout
+  title="Live changes from everyone"
+  href="https://www.cloudpdf.com/docs/engine/concepts/events"
+  cta="Collaborate with CloudPDF"
+>
+
+With CloudPDF, everyone who has the document open hears every change as it's saved, with
+`origin.kind: 'remote'` and the user who made it. Add a comment in one browser and it appears in
+the others, through the same `events.on()` you already use.
+
+</CloudPdfCallout>
+
+</Engine>
+
+<Engine cloud>
+
+## Other people's changes
+
+Everyone who has the document open hears every change as the server saves it. Changes made
+through this engine arrive with `origin.kind: 'local'`; everyone else's with `'remote'` and the
+user in `origin.sub`. The same user in a second tab is someone else here: their changes arrive as
+`'remote'`, with the same `sub`.
+
+The engine connects to the server when you add the first listener and disconnects after you
+remove the last, so listening is free until you need it.
+
+If the connection drops and the engine can't catch up with everything that happened in the
+meantime, you get a `stream.desynced` event. Read what you show again (`doc.annotations.list()`,
+`doc.pages.list()`); events continue from there.
+
+</Engine>
+
+## Good to know
+
+- **Each change arrives once.** Your own changes aren't sent back to you a second time.
+- **A listener that throws** doesn't stop the other listeners, and doesn't make the call fail.
+- **`origin.kind` is about the engine, not the user.** "Did I do this?" (undo, optimistic UI):
+  check `origin.kind`. "Did this user do it?": check `origin.sub`.

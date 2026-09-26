@@ -2,15 +2,12 @@
  * caption offsets through editing and a saved/reopened PDF. */
 import { readFile, writeFile } from 'node:fs/promises';
 import { describe, expect, test, vi } from 'vitest';
-import type { PluginContext } from '@embedpdf/core';
 import { measureFromKnownLength, toPageRef } from '@embedpdf/engine-core/runtime';
 import { annotationSelectionFrame } from '../../../core/annotation/src';
 import { createLocalEngine } from '../src/index';
-import { createAnnotationController } from '../../../plugin/annotation/src/controller';
-import { annotationReducer, initialAnnotationState } from '../../../plugin/annotation/src/model';
 import { fromDTO } from '../../../plugin/annotation/src/repository';
 import { annotationKey } from '@embedpdf/engine-core/runtime';
-import type { AnnotationAction, AnnotationState } from '../../../plugin/annotation/src/model';
+import { annotationShell } from './helpers/annotation-shell';
 
 describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)', (prefer) => {
   test('draw, edit, recalculate, save and reopen', async () => {
@@ -26,25 +23,14 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
     try {
       const pages = (await doc.pages.list()).pages;
       const page = pages[0];
-      const pon = page.ref.pageObjectNumber;
-      let state = initialAnnotationState();
-      const ctx = {
-        doc,
-        engine,
-        document: () => ({ pages }),
-        getState: () => state,
-        dispatch: (a: AnnotationAction) => {
-          state = annotationReducer(state, a);
-        },
-        cleanup: (cb: () => void) => cleanups.push(cb),
-        tryGet: () => null,
-      } as unknown as PluginContext<AnnotationState, AnnotationAction>;
-      const annotation = createAnnotationController(ctx);
+      const pageObjectNumber = page.ref.pageObjectNumber;
+      const { ctx, annotation } = await annotationShell(doc, pages);
+      cleanups.push(() => ctx.dispose());
       const scale = measureFromKnownLength(100, { value: 5, unit: 'm' });
-      await doc.page(toPageRef(pon)).measure!.setScale(scale);
+      await doc.page(toPageRef(pageObjectNumber)).measure!.setScale(scale);
       annotation.setPageViewports(
         page.ref,
-        await doc.page(toPageRef(pon)).measure!.viewports(),
+        (await doc.page(toPageRef(pageObjectNumber)).measure!.listViewports()).viewports,
         scale,
       );
       for (const tool of annotation.listResolvedTools()) {
@@ -74,8 +60,8 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       expectVector();
       expect(created).toMatchObject({
         subtype: 'line',
-        intent: 'LineDimension',
-        contents: '10 m',
+        intent: 'line-dimension',
+        contents: '10.00 m',
         linePoints: {
           start: { x: page.boxes.crop.left + 50, y: page.boxes.crop.top - 100 },
           end: { x: page.boxes.crop.left + 250, y: page.boxes.crop.top - 100 },
@@ -88,7 +74,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       annotation.editPointer('up', page.ref, { x: 250, y: 64 }, false);
       await vi.waitFor(() =>
         expect(annotation.getRaw(created.ref)).toMatchObject({
-          contents: '10 m',
+          contents: '10.00 m',
           linePoints: created.subtype === 'line' ? created.linePoints : undefined,
           leader: { length: 36 },
         }),
@@ -100,18 +86,18 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       annotation.editPointer('up', page.ref, { x: 165, y: 39 }, false);
       await vi.waitFor(() =>
         expect(annotation.getRaw(created.ref)).toMatchObject({
-          caption: { offset: { along: 15, perpendicular: 25 } },
+          captionOffset: { along: 15, perpendicular: 25 },
         }),
       );
       expectVector();
       const newScale = measureFromKnownLength(100, { value: 8, unit: 'ft' });
-      await doc.page(toPageRef(pon)).measure!.setScale(newScale);
+      await doc.page(toPageRef(pageObjectNumber)).measure!.setScale(newScale);
       const report = await annotation.remeasurePage(page.ref, newScale);
       expect(report.failed).toEqual([]);
       expect(report.error).toBeUndefined();
       expect(annotation.getRaw(created.ref)).toMatchObject({
-        contents: '16 ft',
-        caption: { offset: { along: 15, perpendicular: 25 } },
+        contents: '16.00 ft',
+        captionOffset: { along: 15, perpendicular: 25 },
       });
       expectVector();
 
@@ -169,16 +155,19 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
         { scope: ['*'] },
       );
       try {
-        const layeredAnnotations = (await layered.page(toPageRef(pon)).annotations.list())
-          .annotations;
+        const layeredAnnotations = (
+          await layered.page(toPageRef(pageObjectNumber)).annotations.list()
+        ).annotations;
         expect(layeredAnnotations.find((a) => a.nm === created.nm)).toMatchObject({
-          contents: '16 ft',
+          contents: '16.00 ft',
           leader: { length: 36 },
-          caption: { offset: { along: 15, perpendicular: 25 } },
+          captionOffset: { along: 15, perpendicular: 25 },
         });
-        expect((await layered.page(toPageRef(pon)).measure!.viewports()).some((v) => v.owned)).toBe(
-          true,
-        );
+        expect(
+          (await layered.page(toPageRef(pageObjectNumber)).measure!.listViewports()).viewports.some(
+            (v) => v.owned,
+          ),
+        ).toBe(true);
       } finally {
         await layered.close();
       }
@@ -187,23 +176,24 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
         { scope: ['*'] },
       );
       try {
-        const reopenedPon = (await reopened.pages.list()).pages[0].ref.pageObjectNumber;
-        const list = await reopened.page(toPageRef(reopenedPon)).annotations.list();
+        const reopenedPageObjectNumber = (await reopened.pages.list()).pages[0].ref
+          .pageObjectNumber;
+        const list = await reopened.page(toPageRef(reopenedPageObjectNumber)).annotations.list();
         const restored = list.annotations.find((a) => a.nm === created.nm)!;
         expect(restored).toMatchObject({
-          intent: 'LineDimension',
-          contents: '16 ft',
+          intent: 'line-dimension',
+          contents: '16.00 ft',
           leader: { length: 36 },
-          caption: { offset: { along: 15, perpendicular: 25 } },
+          captionOffset: { along: 15, perpendicular: 25 },
         });
         const restoredFrame = annotationSelectionFrame(fromDTO(restored, page.boxes.crop));
         expect(restoredFrame.center.x).toBeCloseTo(frame.center.x, 3);
         expect(restoredFrame.center.y).toBeCloseTo(frame.center.y, 3);
         expect(restoredFrame.angle).toBe(90);
         expect(
-          (await reopened.page(toPageRef(reopenedPon)).measure!.viewports()).some(
-            (v) => v.owned && v.measure?.subtype === 'RL',
-          ),
+          (
+            await reopened.page(toPageRef(reopenedPageObjectNumber)).measure!.listViewports()
+          ).viewports.some((v) => v.owned && v.measure?.subtype === 'rectilinear'),
         ).toBe(true);
       } finally {
         await reopened.close();

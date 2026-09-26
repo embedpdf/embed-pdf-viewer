@@ -48,16 +48,12 @@ export function readWidget(
     interiorColor: readMKColor(fn, mem, annotPtr, MK_BACKGROUND_COLOR),
     strokeWidth: border.strokeWidth,
     borderStyle: border.borderStyle,
-    ...(da
-      ? {
-          fontFamily: standardFontFromCode(da.fontCode),
-          fontSize: da.fontSize,
-          fontColor: da.color,
-        }
-      : {}),
+    fontFamily: da ? standardFontFromCode(da.fontCode) : null,
+    fontSize: da ? da.fontSize : null,
+    fontColor: da ? da.color : null,
     textAlign: textAlignmentFromCode(readTextAlignment(fn, annotPtr)),
     // Joined by the caller (joinWidgetFieldNumbers): the /Parent target is
-    // a FIELD dictionary, which annotation-plane primitives cannot follow.
+    // a field dictionary, which annotation-plane primitives cannot follow.
     fieldObjectNumber: 0,
     fieldFamily: 'unknown',
   };

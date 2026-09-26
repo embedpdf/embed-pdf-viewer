@@ -3,10 +3,10 @@ import type { ResolvedCommand } from '@embedpdf/plugin-commands';
 import { resolvedCommandsEqual } from '../src/commands';
 
 /**
- * The value-equality cache is what makes command state reactive WITHOUT
+ * The value-equality cache is what makes command state reactive without
  * events: useCommand re-resolves every store tick and only re-renders on a
  * value change. iconAccent is an object minted fresh by every resolve(), so
- * it MUST be compared by value — miss that and accents either go stale or
+ * it must be compared by value — miss that and accents either go stale or
  * re-render every button every tick.
  */
 const cmd = (over: Partial<ResolvedCommand> = {}): ResolvedCommand => ({
@@ -23,9 +23,9 @@ const cmd = (over: Partial<ResolvedCommand> = {}): ResolvedCommand => ({
 
 describe('resolvedCommandsEqual: iconAccent by value', () => {
   it('fresh-but-equal accent objects are equal (no spurious re-render)', () => {
-    const a = cmd({ iconAccent: { primary: '#e5484d' } });
-    const b = cmd({ iconAccent: { primary: '#e5484d' } });
-    expect(resolvedCommandsEqual(a, b)).toBe(true);
+    const left = cmd({ iconAccent: { primary: '#e5484d' } });
+    const right = cmd({ iconAccent: { primary: '#e5484d' } });
+    expect(resolvedCommandsEqual(left, right)).toBe(true);
   });
 
   it('a changed default recolors: primary, secondary, and appearing accents all differ', () => {

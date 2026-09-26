@@ -1,0 +1,75 @@
+---
+title: Setup
+description: Install the CloudPDF engine and point it at your CloudPDF server.
+---
+
+import { Callout } from '@/components/docs/callout';
+
+# Setup
+
+```sh npm2yarn
+npm install @cloudpdf/engine
+```
+
+The engine talks to a CloudPDF server over HTTPS: the managed CloudPDF service, or
+[your own server](/docs/server/getting-started). It runs in every modern browser and in Node 18 or newer.
+
+## Create the engine once
+
+Create one engine when your app starts and share it everywhere:
+
+```ts
+// pdf.ts
+import { cloudEngine } from '@cloudpdf/engine';
+
+export const engine = cloudEngine({ baseUrl: 'https://pdf.example.com' });
+```
+
+Creating the engine makes no request. One engine holds any number of open documents, each with
+its own token. Close each document when you're done with it (`doc.close()`), and keep the engine
+for the life of your app.
+
+## Tokens
+
+Every request carries a token that says who the user is and what they may do. Your backend
+creates it; the browser never sees your secret key. Most apps pass the token when they open a
+document:
+
+```ts
+const doc = await engine.open({ kind: 'token', token: () => fetchDocumentToken(documentId) });
+```
+
+Pass a function rather than a string: the engine calls it for every request, so when your
+backend hands out short-lived tokens, a long session keeps working. [Authentication](/docs/engine/authentication) covers the three ways
+to open a document and what goes in a token.
+
+## Options
+
+| Option    | What it does                                                                       |
+| :-------- | :--------------------------------------------------------------------------------- |
+| `baseUrl` | Your CloudPDF server.                                                              |
+| `token`   | A token for every document this engine opens, when you don't pass one to `open()`. |
+| `fetch`   | Your own `fetch`, for example to add headers or to test.                           |
+| `onRetry` | Called when the engine retries a request the server was too busy for (see below).  |
+
+## Busy servers
+
+When the server is busy or restarting, it tells the engine to try again. The engine waits as
+long as the server asks and retries, up to twice, before the call fails. You don't need to do
+anything; `onRetry` lets you see it happen:
+
+```ts
+const engine = cloudEngine({
+  baseUrl: 'https://pdf.example.com',
+  onRetry: ({ path, code, attempt, waitMs }) => {
+    console.debug(`retrying ${path} after ${code} (attempt ${attempt}, waited ${waitMs} ms)`);
+  },
+});
+```
+
+Only requests the server didn't apply are retried, so a retry never makes a change twice.
+
+<Callout type="info">
+  Building a viewer interface? The [headless documentation](/docs/headless/getting-started) wires
+  the engine to pages, selection and annotation tools for you.
+</Callout>

@@ -37,7 +37,7 @@ export class CloudMetadataService implements MetadataService {
    * manifest and retries once. `metadataVersion` bumps only on metadata
    * writes, so this leaf stays cached across page and annotation edits.
    */
-  read(): AbortablePromise<DocumentMetadata> {
+  get(): AbortablePromise<DocumentMetadata> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
@@ -79,7 +79,7 @@ export class CloudMetadataService implements MetadataService {
       // A metadata write only advances docVersion + metadataVersion (no
       // per-page pin changes, no layoutVersion), so the cached manifest can
       // be patched in place — no refetch.
-      if (result.cache) this.manifest.applyMetadata(result.cache);
+      this.manifest.apply(result.meta, ['metadata']);
       this.publisher.publishLocal({ type: 'metadata.updated', ...result });
       return result;
     });

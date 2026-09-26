@@ -5,7 +5,7 @@
  * mount the same bytes as a `@font-face` named by that key (what the plugin's
  * `cssFontFamily` emits for a registered font, so the live editor renders the
  * face the appearance stream will bake). The style panel lists a font only
- * once BOTH have happened — an offered key always resolves on write.
+ * once both have happened — an offered key always resolves on write.
  */
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useKernel } from '@embedpdf/react/runtime';
@@ -54,10 +54,10 @@ export function AnnotationFontsProvider({ children }: { children: ReactNode }) {
             return;
           }
           unmounts.push(unmount);
-          setLoaded((prev) =>
-            prev.some((f) => f.key === font.key)
-              ? prev
-              : [...prev, { key: font.key, label: font.label }],
+          setLoaded((previous) =>
+            previous.some((existing) => existing.key === font.key)
+              ? previous
+              : [...previous, { key: font.key, label: font.label }],
           );
         } catch (error) {
           console.warn(`[embedpdf] annotation font "${font.key}" was not loaded:`, error);
@@ -73,7 +73,7 @@ export function AnnotationFontsProvider({ children }: { children: ReactNode }) {
   return <LoadedFontsContext.Provider value={loaded}>{children}</LoadedFontsContext.Provider>;
 }
 
-/** The configured fonts that are registered AND mounted, in config order. */
+/** The configured fonts that are registered and mounted, in config order. */
 export function useAnnotationFonts(): readonly LoadedAnnotationFont[] {
   return useContext(LoadedFontsContext);
 }

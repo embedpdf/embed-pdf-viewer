@@ -2,10 +2,10 @@ import type { DocumentHandle, Engine, PageLayout } from '@embedpdf/engine-core/r
 
 /** Shared fakes for kernel tests: an engine that opens immediately. */
 const box = { left: 0, bottom: 0, right: 600, top: 800 } as const;
-export const page = (pon: number, index: number): PageLayout =>
+export const page = (pageObjectNumber: number, index: number): PageLayout =>
   ({
     index,
-    ref: { kind: 'objectNumber', pageObjectNumber: pon },
+    ref: { kind: 'objectNumber', pageObjectNumber },
     label: null,
     size: { width: 600, height: 800 },
     rotation: 0,
@@ -22,7 +22,7 @@ export function makeHandle(id: string, pages: PageLayout[] = [page(1, 0)]): Docu
         listeners.add(listener);
         return () => listeners.delete(listener);
       },
-      emit: (event: unknown) => listeners.forEach((l) => l(event)),
+      emit: (event: unknown) => listeners.forEach((listener) => listener(event)),
       lastServerId: () => null,
     },
     pages: { list: () => Promise.resolve({ pageCount: pages.length, pages }) },
@@ -42,4 +42,4 @@ export function immediateEngine(handles: Record<string, DocumentHandle> = {}): E
 }
 
 export const bytesInput = (id: string) => ({ kind: 'bytes' as const, id, bytes: new Uint8Array() });
-export const settle = () => new Promise((r) => setTimeout(r, 0));
+export const settle = () => new Promise((resolve) => setTimeout(resolve, 0));

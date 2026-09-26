@@ -2,8 +2,8 @@ import type { AnnotationBase, InkAnnotationDTO } from '@embedpdf/engine-core/run
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { readInkList, readIntent } from './annotationReadPrimitives';
-import { readGeometryStyleExtras } from './readStyle';
 import { readAnnotationRotation } from './readAnnotationTransformMetadata';
+import { readGeometryStyleExtras } from './readStyle';
 import { inkIntentFromName } from '../inkIntent';
 
 export function readInk(
@@ -20,6 +20,6 @@ export function readInk(
     ...readGeometryStyleExtras(fn, mem, annotPtr),
     intent,
     inkList: readInkList(fn, mem, annotPtr),
-    ...(rotation != null ? { rotation } : {}),
+    rotation: rotation ?? null,
   };
 }

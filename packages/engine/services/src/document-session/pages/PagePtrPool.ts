@@ -45,7 +45,7 @@ export class PagePtrPool {
   }
 
   /**
-   * True while at least one holder has the page open. Page-STRUCTURE
+   * True while at least one holder has the page open. Page-structure
    * mutations (delete) assert on this: thread confinement means no other
    * job can be mid-flight, so a held pagePtr during a structural mutation
    * is a leaked `acquire` (an internal bug) — the mutator fails loudly

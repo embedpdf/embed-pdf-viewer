@@ -5,13 +5,13 @@ import type { PageRef } from '../identity/PageRef';
  * and a magnification. Produced by outlines/bookmarks, link annotations,
  * `/OpenAction`, and GoTo actions; named destinations resolve to one of
  * these through the catalog's `/Dests` dictionary or name tree — the
- * ENGINE does that resolution, so the viewer only ever sees this explicit
+ * engine does that resolution, so the viewer only ever sees this explicit
  * form.
  *
- * Coordinates are PDF user space (y-up, points, absolute — NOT
+ * Coordinates are PDF user space (y-up, points, absolute — not
  * crop-relative). `null` means "retain the current value" (the spec's
  * meaning for null array entries); a `/XYZ` zoom of `0` is equivalent to
- * null. The `fitB*` kinds refer to the page's content BOUNDING box rather
+ * null. The `fitB*` kinds refer to the page's content bounding box rather
  * than the crop box.
  *
  * Viewers translate these onto the stage's reveal primitive — see

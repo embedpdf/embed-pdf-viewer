@@ -21,7 +21,7 @@ const sig = (over: Partial<SignatureDTO>): SignatureDTO => ({
   contentsSize: 8,
   coverage: 'whole-revision',
   revisionIndex: 1,
-  signer: { name: null, reason: null, location: null, contactInfo: null, claimedTime: null },
+  signer: { name: null, reason: null, location: null, contactInfo: null, signedAt: null },
   docMdp: null,
   catalogCertification: false,
   fieldMdp: null,
@@ -31,8 +31,8 @@ const sig = (over: Partial<SignatureDTO>): SignatureDTO => ({
 });
 
 /**
- * Two answers, not one: what a signer DECLARED (enforced) and what a
- * validator JUDGES later changes against. An approval signature declares
+ * Two answers, not one: what a signer declared (enforced) and what a
+ * validator judges later changes against. An approval signature declares
  * nothing and is judged at the baseline; a declaration governs both.
  */
 describe('deriveProtection: enforced vs judged', () => {
@@ -56,12 +56,15 @@ describe('deriveProtection: enforced vs judged', () => {
     const p3 = deriveProtection([sig({ catalogCertification: true, docMdp: 3 })]);
     expect(p3).toMatchObject({ enforced: 'annotate', judged: 'annotate' });
     expect(protectedCapabilities(p3).has('doc.annotate.modify')).toBe(false);
+    expect(protectedCapabilities(p3).has('doc.annotate.import')).toBe(false);
     // A declaration refuses everything outside what it permits: structure too.
     expect(protectedCapabilities(p3).has('doc.pages.assemble')).toBe(true);
     expect(protectedCapabilities(p3).has('doc.forms.modify')).toBe(true);
     const p2 = deriveProtection([sig({ catalogCertification: true, docMdp: 2 })]);
     expect(p2).toMatchObject({ enforced: 'fill', judged: 'fill' });
     expect(protectedCapabilities(p2).has('doc.annotate.modify')).toBe(true);
+    // Restoring someone else's annotations is still writing annotations.
+    expect(protectedCapabilities(p2).has('doc.annotate.import')).toBe(true);
     expect(protectedCapabilities(p2).has('doc.forms.fill')).toBe(false);
     const p1 = deriveProtection([sig({ catalogCertification: true, docMdp: 1 })]);
     expect(p1).toMatchObject({ enforced: 'lta', judged: 'lta' });

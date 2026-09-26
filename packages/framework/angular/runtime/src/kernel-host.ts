@@ -1,5 +1,5 @@
 /**
- * The kernel host — one service owns the kernel; ONE tick signal bridges the
+ * The kernel host — one service owns the kernel; one tick signal bridges the
  * kernel's single change stream into Angular's signal graph. Everything else in
  * this adapter is `computed()` over it (`value()` is Angular's `useKernelValue`).
  *
@@ -7,14 +7,14 @@
  *   component-hosted  `<epdf-viewer [engine] [plugins]>`  (framework parity)
  *   provider-hosted   `provideEmbedPdf({...})` at route/app level
  *
- * CONSTRUCTION RULE (library law): nothing may read `host.kernel` while a
- * component is being CONSTRUCTED. Component-hosted configs resolve their inputs
+ * Construction rule (library law): nothing may read `host.kernel` while a
+ * component is being constructed. Component-hosted configs resolve their inputs
  * lazily, so the kernel materializes on first real read (a template binding, an
  * effect) — after inputs are set. Every inject* primitive returns signals or
  * lazy methods and therefore respects this for free; only the raw
  * `injectKernel()` escape hatch can violate it (its doc says so).
  *
- * SSR CONTRACT: the EmbedPDF subtree is browser-only. On the server the host
+ * SSR contract: the EmbedPDF subtree is browser-only. On the server the host
  * never boots and any `kernel` read throws — wrap the viewer region in `@defer`
  * (which renders its placeholder on the server) or a platform-guarded `@if`.
  */
@@ -40,7 +40,7 @@ import type {
   Unsubscribe,
 } from '@embedpdf/core';
 
-/** One boot document — the KERNEL's shared `InitialDocument` shape (same as
+/** One boot document — the kernel's shared `InitialDocument` shape (same as
  *  the React adapter's), aliased under the package's Epdf naming. */
 export type EpdfInitialDocument = InitialDocument;
 
@@ -48,13 +48,13 @@ export interface EmbedPdfConfig {
   /**
    * The engine, as an instance or a thunk. Engines construct synchronously and
    * boot lazily (`localEngine()` allocates nothing until first use), so
-   * ownership follows the SHAPE of what you pass:
+   * ownership follows the shape of what you pass:
    *
-   *   - An **instance** is BORROWED: used as-is, never destroyed here. The
+   *   - An **instance** is borrowed: used as-is, never destroyed here. The
    *     common path — a module-scope `const engine = localEngine()` shared
    *     across viewers and route changes. The host calls `engine.warmup?.()`
    *     when the kernel materializes so the boot overlaps initialization.
-   *   - A **thunk** (`() => localEngine()`) is HOST-OWNED: the host calls it
+   *   - A **thunk** (`() => localEngine()`) is host-owned: the host calls it
    *     when the kernel materializes and `destroy()`s the result on teardown.
    *     Use it for per-host isolation.
    *
@@ -65,9 +65,9 @@ export interface EmbedPdfConfig {
   /** Init-only, like `engine`. */
   plugins: AnyPlugin[];
   /** Documents to open on startup (with optional tab names). They open in the
-   *  BACKGROUND after start and stream into the registry — `injectDocuments()`
+   *  Background after start and stream into the registry — `injectDocuments()`
    *  is reactive; per-document loading UI is the Stage's job. A source that
-   *  fails to open lands in `error` and does NOT block the ones after it. */
+   *  fails to open lands in `error` and does not block the ones after it. */
   initialDocuments?: EpdfInitialDocument[];
 }
 
@@ -80,7 +80,7 @@ export class EpdfKernelHost implements OnDestroy {
   private readonly browser = isPlatformBrowser(inject(PLATFORM_ID));
   private config: (() => EmbedPdfConfig) | null = null;
   private _kernel: Kernel | null = null;
-  /** The engine backing the kernel, and whether WE created it (a recipe) and
+  /** The engine backing the kernel, and whether we created it (a recipe) and
    *  therefore must destroy it. A borrowed instance is left untouched. */
   private _engine: Engine | null = null;
   private ownsEngine = false;
@@ -89,12 +89,12 @@ export class EpdfKernelHost implements OnDestroy {
   private booted = false;
   private destroyed = false;
 
-  /** Bumped on every kernel notification — THE bridge from kernel-world to signals. */
+  /** Bumped on every kernel notification — the bridge from kernel-world to signals. */
   private readonly tick = signal(0);
 
   /** Boot lifecycle. `ready`/`error` are derived sugar over it. */
   readonly status = signal<EpdfKernelStatus>('starting');
-  /** The STARTUP failure, if any. Per-document open failures are tab state
+  /** The startup failure, if any. Per-document open failures are tab state
    *  (`DocInfo.status === 'error'`), not host state. */
   readonly error = signal<unknown>(null);
   /** True once `kernel.start()` resolved — which never touches the engine, so
@@ -135,7 +135,7 @@ export class EpdfKernelHost implements OnDestroy {
         this._kernel = createKernel({ engine: this._engine, plugins });
       } catch (error) {
         // ngOnDestroy() only tears down via `_kernel`, which stays null on this
-        // path — so an owned engine must be destroyed HERE or it leaks.
+        // path — so an owned engine must be destroyed here or it leaks.
         if (this.ownsEngine) void this._engine.destroy();
         this._engine = null;
         this.ownsEngine = false;
@@ -146,7 +146,7 @@ export class EpdfKernelHost implements OnDestroy {
       // WASM/transport boot with the rest of initialization.
       this._engine.warmup?.();
       this.initialDocuments = initialDocuments;
-      this.unsubscribe = this._kernel.subscribe(() => this.tick.update((n) => n + 1));
+      this.unsubscribe = this._kernel.subscribe(() => this.tick.update((previous) => previous + 1));
     }
     return this._kernel;
   }
@@ -160,9 +160,9 @@ export class EpdfKernelHost implements OnDestroy {
     void (async () => {
       try {
         await kernel.start();
-      } catch (err) {
+      } catch (error) {
         if (!this.destroyed) {
-          this.error.set(err);
+          this.error.set(error);
           this.status.set('error');
         }
         return;
@@ -180,7 +180,10 @@ export class EpdfKernelHost implements OnDestroy {
   /** Read a value derived from the kernel, cached by equality — Angular's
    *  `useKernelValue`. The selector re-runs per kernel notification (cheap);
    *  `equal` decides whether dependents ever see it. */
-  value<R>(select: (kernel: Kernel) => R, equal: (a: R, b: R) => boolean = Object.is): Signal<R> {
+  value<R>(
+    select: (kernel: Kernel) => R,
+    equal: (left: R, right: R) => boolean = Object.is,
+  ): Signal<R> {
     return computed(
       () => {
         this.tick();
@@ -197,7 +200,7 @@ export class EpdfKernelHost implements OnDestroy {
     // destroy() owns the full teardown now: it joins an in-flight start, closes
     // every document (engine handles included), and unwinds workspace plugins.
     // Async + idempotent, so fire-and-forget is safe in a sync ngOnDestroy.
-    // Then destroy the engine IF we own it (a thunk) — kernel first so handles
+    // Then destroy the engine if we own it (a thunk) — kernel first so handles
     // close before the engine goes; `engine.destroy()` joins any in-flight
     // boot or no-ops if it never started.
     if (this._kernel) {
@@ -213,7 +216,7 @@ export class EpdfKernelHost implements OnDestroy {
 /**
  * Host the kernel in an environment injector (route or application providers).
  * The kernel's lifetime is the injector's — a route-level workspace tears down
- * when the route does. Unlocks chrome OUTSIDE any viewer subtree: a toolbar in
+ * when the route does. Unlocks chrome outside any viewer subtree: a toolbar in
  * the app header and the stage in the main outlet share this one kernel.
  */
 export function provideEmbedPdf(config: EmbedPdfConfig): EnvironmentProviders {

@@ -10,7 +10,12 @@ import {
   type PdfRect,
   type PdfRectDifferences,
 } from '@embedpdf/engine-core/runtime';
-import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
+import {
+  NULL_PTR,
+  type PdfFunctions,
+  type PdfRuntimeMemory,
+  type Ptr,
+} from '@embedpdf/engine-runtime';
 
 import { F32_BYTES, POINTF_BYTES, RECTF_BYTES } from '../../../../runtime/memory/structs';
 import { flagsToBits } from '../annotationFlagBits';
@@ -19,11 +24,10 @@ import { lineEndingToCode } from '../lineEnding';
 
 /**
  * Write-side twin of `annotationReadPrimitives.ts`. Every annotation
- * family (text-markup, shape, and upcoming polygon/polyline/line/free-text)
- * composes these low-level setters so the PDFium FFI surface lives in one
- * place. All colour/opacity/border writes go through the EmbedPDF
- * `EPDFAnnot_*` extensions — the same path v2 used and the read primitives
- * read back — so values survive native `EPDFAnnot_GenerateAppearance`.
+ * family composes these low-level setters so the PDFium ffi surface lives
+ * in one place. All colour/opacity/border writes go through the EmbedPDF
+ * `EPDFAnnot_*` extensions — the same path the read primitives read back —
+ * so values survive native `EPDFAnnot_GenerateAppearance`.
  */
 
 /**
@@ -57,14 +61,12 @@ export function clearAnnotColor(fn: PdfFunctions, annotPtr: Ptr, type: number): 
 }
 
 /**
- * Set annotation opacity (`/CA`) via the dedicated `EPDFAnnot_SetOpacity`
- * extension. Input is 0..1; the native alpha is 0..255. This is the path
- * that stores `/CA` in the form native appearance generation expects, so
- * opacity survives the bake.
+ * Set annotation opacity (`/CA`, 0..1, stored as given) via the dedicated
+ * `EPDFAnnot_SetOpacity` extension, the form native appearance generation
+ * reads, so opacity survives the bake.
  */
 export function setAnnotOpacity(fn: PdfFunctions, annotPtr: Ptr, opacity: number): void {
-  const alpha = Math.max(0, Math.min(255, Math.round(opacity * 255)));
-  if (!fn.EPDFAnnot_SetOpacity(annotPtr, alpha)) {
+  if (!fn.EPDFAnnot_SetOpacity(annotPtr, opacity)) {
     throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetOpacity returned false');
   }
 }
@@ -133,10 +135,10 @@ export function writeAnnotString(
 }
 
 /**
- * Three-state string write: `null` REMOVES the dictionary entry.
+ * Three-state string write: `null` removes the dictionary entry.
  *
  * Clearing goes through `EPDFAnnot_RemoveKey` because
- * `FPDFAnnot_SetStringValue` with a NULL value writes an EMPTY string —
+ * `FPDFAnnot_SetStringValue` with a null value writes an empty string —
  * it never removes. True removal is what keeps the read side honest:
  * `readAnnotString` returns `null` iff the key is absent, so a cleared
  * field reads back as `null`, not `''`.
@@ -195,6 +197,13 @@ export function setBorderDashPattern(
     }
   } finally {
     mem.free(buf);
+  }
+}
+
+/** Remove the `/BS` dash array, so the border is solid. */
+export function clearBorderDashPattern(fn: PdfFunctions, annotPtr: Ptr): void {
+  if (!fn.EPDFAnnot_SetBorderDashPattern(annotPtr, NULL_PTR, 0)) {
+    throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetBorderDashPattern returned false');
   }
 }
 
@@ -423,6 +432,12 @@ export function setIntent(fn: PdfFunctions, annotPtr: Ptr, name: string): void {
   if (!fn.EPDFAnnot_SetIntent(annotPtr, name)) {
     throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetIntent returned false');
   }
+}
+
+/** Write `/IT`, or remove it for `null`. */
+export function setIntentOrClear(fn: PdfFunctions, annotPtr: Ptr, name: string | null): void {
+  if (name === null) fn.EPDFAnnot_RemoveKey(annotPtr, 'IT');
+  else setIntent(fn, annotPtr, name);
 }
 
 /**

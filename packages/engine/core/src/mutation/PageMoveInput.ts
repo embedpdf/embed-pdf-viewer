@@ -1,4 +1,3 @@
-import type { PageObjectNumber } from '../identity/PageObjectNumber';
 import type { PageRef } from '../identity/PageRef';
 
 /**
@@ -9,18 +8,18 @@ import type { PageRef } from '../identity/PageRef';
  *
  * Semantics mirror PDFium's `FPDF_MovePages`: the supplied pages are
  * detached from their current positions and re-inserted as a contiguous
- * block starting at `destIndex` in the post-removal index space,
+ * block starting at `toIndex` in the post-removal index space,
  * preserving caller order.
  */
 export interface PageMoveInput {
   /**
    * Pages to move, in the order they should appear after the move.
-   * Duplicates and unknown PONs are rejected with `EngineError(InvalidArg)`.
+   * Duplicates and unknown page object numbers are rejected with `EngineError(InvalidArg)`.
    */
   pages: PageRef[];
   /**
    * Insertion point in the post-removal index space. Must be in
    * `[0, pageCount - pageObjectNumbers.length]`.
    */
-  destIndex: number;
+  toIndex: number;
 }

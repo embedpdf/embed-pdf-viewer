@@ -32,7 +32,7 @@ const PAGE_OBJECT_NUMBER = 3;
  * InlineTransport ignores `pack.transfer` (no thread boundary), which is
  * exactly why the ordinary stamp tests never noticed buffers being detached.
  * This transport reproduces what BrowserWorkerTransport's postMessage does:
- * structured-clone the payload and DETACH every buffer on the transfer list.
+ * structured-clone the payload and detach every buffer on the transfer list.
  */
 class DetachingInlineTransport implements Transport {
   constructor(private readonly inner: InlineTransport) {}
@@ -132,33 +132,37 @@ describe('stamp annotations: resource buffers survive a detaching transport', ()
 
   test('the same Uint8Array can be placed twice, and updated with, without being detached', async () => {
     const page = handle.page(toPageRef(PAGE_OBJECT_NUMBER));
-    // A full-span view — the case the resolver used to hand over by reference.
+    // A full-span view — the case a no-copy shortcut would hand over by reference.
     const png = makePng(8, 4, [0, 128, 255, 255]);
     const original = Array.from(png);
     expect(png.byteOffset).toBe(0);
     expect(png.byteLength).toBe(png.buffer.byteLength);
 
-    const first = await page.annotations.create({
-      subtype: 'stamp',
-      rect: { left: 100, bottom: 500, right: 260, top: 580 },
-      source: png,
-      name: 'Approved',
-    });
+    const first = await page.annotations.create(
+      {
+        subtype: 'stamp',
+        rect: { left: 100, bottom: 500, right: 260, top: 580 },
+        name: 'Approved',
+      },
+      { appearance: png },
+    );
     expect(png.byteLength).toBe(original.length);
     expect(Array.from(png)).toEqual(original);
 
     // Second placement from the very same bytes (a stamp library re-arming).
-    const second = await page.annotations.create({
-      subtype: 'stamp',
-      rect: { left: 100, bottom: 300, right: 260, top: 380 },
-      source: png,
-      name: 'Approved',
-    });
-    expect((second.created as StampAnnotationDTO).name).toBe('Approved');
+    const second = await page.annotations.create(
+      {
+        subtype: 'stamp',
+        rect: { left: 100, bottom: 300, right: 260, top: 380 },
+        name: 'Approved',
+      },
+      { appearance: png },
+    );
+    expect((second.annotation as StampAnnotationDTO).name).toBe('Approved');
     expect(png.byteLength).toBe(original.length);
 
     // Source update through the same path.
-    await page.annotations.update(first.created.ref, { subtype: 'stamp', source: png });
+    await page.annotations.update(first.annotation.ref, { subtype: 'stamp' }, { appearance: png });
     expect(png.byteLength).toBe(original.length);
     expect(Array.from(png)).toEqual(original);
 

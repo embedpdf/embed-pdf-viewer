@@ -61,7 +61,7 @@ const KIND_BY_CODE: Record<number, ObjectChangeKind> = {
 };
 const DIFF_OLD = 0;
 const DIFF_NEW = 1;
-/** EPDF_DIFF_READ_OK / FAILED / ABSENT. */
+/** EPDF_DIFF_READ_OK / failed / absent. */
 const READ_BY_CODE: Record<number, ObjectReadStatus> = { 0: 'ok', 1: 'failed', 2: 'absent' };
 
 /** The objects an edge may be anchored at: the trailer, the structure of the revision, and every changed object. */
@@ -219,7 +219,7 @@ export class SignatureAnalyzer {
 
       // The two revisions that decide the verdict: the sealed one and the
       // judged one, opened as their own prefix documents from the target's
-      // bytes (the judged one IS the target when it is the last revision).
+      // bytes (the judged one is the target when it is the last revision).
       // Nothing in between is opened for the net state.
       const pair = new CloseStack();
       let before: RevisionStructure;
@@ -362,7 +362,7 @@ export class SignatureAnalyzer {
    * the session's own document is the working copy. `working-copy`: a
    * layer session composes its immutable base with the cumulative delta
    * the pass emits (`EPDFDoc_OpenBaseOverlay`: no copy of the base, one
-   * cross-reference parse, the loaded delta's revision REPLACED, as an
+   * cross-reference parse, the loaded delta's revision replaced, as an
    * artifact is), or — when every edit brought the layer back to its base
    * — a fresh layer over that base; a plain session (unsigned by law 9, so
    * this is exploratory) materialises a standalone incremental save and
@@ -427,7 +427,7 @@ export class SignatureAnalyzer {
     return { target: opened.docPtr, source: 'working-copy' };
   }
 
-  /** Changed since load, nothing to write: the layer equals its base, and a fresh layer over it IS that document. */
+  /** Changed since load, nothing to write: the layer equals its base, and a fresh layer over it is that document. */
   private freshLayerOverBase(stack: CloseStack): { target: Ptr; source: 'working-copy' } {
     const { fn, mem } = this.runtime;
     const base = fn.EPDFLayer_GetBaseDocument(this.session.requireDocPtr());
@@ -604,7 +604,7 @@ export class SignatureAnalyzer {
     return withScratch(mem, 4, (truncPtr) => {
       mem.poke(truncPtr, 'i32', 0);
       const length = fn.EPDFObjectDiff_GetValue(diff, index, which, NULL_PTR, 0, truncPtr);
-      // A value past the fork's inspection cap reports length 0 WITH the flag set: read it first.
+      // A value past the fork's inspection cap reports length 0 with the flag set: read it first.
       const truncatedProbe = Number(mem.peek(truncPtr, 'i32')) !== 0;
       if (length <= 0) return { text: null, truncated: truncatedProbe };
       return withScratch(mem, length, (buf) => {

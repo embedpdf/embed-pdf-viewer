@@ -1,14 +1,17 @@
-import type { StrikeoutDraft } from './draft';
-import type { StrikeoutAnnotationDTO } from './dto';
-import type { StrikeoutPatch } from './patch';
-import { StrikeoutDTOSchema, StrikeoutDraftSchema, StrikeoutPatchSchema } from './schema';
+import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
+import { StrikeoutDeclaration } from './declaration';
 
-export type { StrikeoutAnnotationDTO } from './dto';
-export type { StrikeoutDraft } from './draft';
-export type { StrikeoutPatch } from './patch';
-export { StrikeoutDTOSchema, StrikeoutDraftSchema, StrikeoutPatchSchema } from './schema';
+export { StrikeoutDeclaration } from './declaration';
+
+export type StrikeoutAnnotationDTO = ReadOf<typeof StrikeoutDeclaration>;
+export type StrikeoutDraft = CreateOf<typeof StrikeoutDeclaration>;
+export type StrikeoutPatch = UpdateOf<typeof StrikeoutDeclaration>;
+
+export const StrikeoutDTOSchema = StrikeoutDeclaration.readSchema;
+export const StrikeoutDraftSchema = StrikeoutDeclaration.createSchema;
+export const StrikeoutPatchSchema = StrikeoutDeclaration.updateSchema;
 
 export const StrikeoutKind: AnnotationKindModule<
   'strikeout',
@@ -21,4 +24,5 @@ export const StrikeoutKind: AnnotationKindModule<
   dtoSchema: StrikeoutDTOSchema,
   draftSchema: StrikeoutDraftSchema,
   patchSchema: StrikeoutPatchSchema,
+  readBackWrites: StrikeoutDeclaration.readBackWrites,
 };

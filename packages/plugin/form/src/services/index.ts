@@ -1,38 +1,49 @@
 /**
- * Plugin-private services every area is built on (NOT the kernel): the
- * store, the event hooks, authority, the sibling planes, the scripting seam
- * and the one serial mutation queue.
+ * Plugin-private services every area is built on: the two mirrors (the field
+ * tree and per-page widget geometry), the events, authority, the sibling
+ * plugins, the scripting seam, and the one write queue.
  */
+import type { Mirror, PageMirror } from '@embedpdf/core';
+
 import type { FormConfig } from '../contract';
-import { createSerialMutationQueue } from '../mutationQueue';
+import { fieldKeyOfRef, type FieldIndex, type WidgetBoxes } from '../model';
+import { createFieldsMirror } from '../sync/fields';
+import { createWidgetBoxesMirror } from '../sync/widget-boxes';
 import { createAuthority, type FormAuthority } from './authority';
 import type { FormContext } from './context';
 import { createEvents, type FormEvents } from './events';
 import { createScriptingSeam, type FormScripting } from './scripting';
 import { resolveSiblings, type FormSiblings } from './siblings';
-import { createStore, type FormStore } from './store';
 
 export type { FormContext } from './context';
 
 export interface FormServices {
-  readonly store: FormStore;
+  readonly fields: Mirror<FieldIndex>;
+  readonly widgetBoxes: PageMirror<WidgetBoxes>;
   readonly events: FormEvents;
   readonly authority: FormAuthority;
   readonly siblings: FormSiblings;
   readonly scripting: FormScripting;
-  /** Every durable write rides ONE serial queue — an actions-driven form
-   *  mutation never interleaves with a user's in-flight commit. */
-  readonly enqueue: ReturnType<typeof createSerialMutationQueue>;
+  /**
+   * Every durable write rides one serial queue, so a write driven by the
+   * actions plugin never interleaves with a user's in-flight commit.
+   */
+  readonly enqueue: <T>(operation: () => Promise<T>) => Promise<T>;
+  readonly keyOf: typeof fieldKeyOfRef;
 }
 
 export function createServices(ctx: FormContext, config: FormConfig): FormServices {
   const siblings = resolveSiblings(ctx);
+  const events = createEvents(ctx);
+  const authority = createAuthority(ctx);
   return {
-    store: createStore(ctx),
-    events: createEvents(ctx),
-    authority: createAuthority(ctx),
+    fields: createFieldsMirror(ctx, events, authority),
+    widgetBoxes: createWidgetBoxesMirror(ctx),
+    events,
+    authority,
     siblings,
     scripting: createScriptingSeam(ctx, config, siblings),
-    enqueue: createSerialMutationQueue(),
+    enqueue: ctx.serialQueue('writes'),
+    keyOf: fieldKeyOfRef,
   };
 }

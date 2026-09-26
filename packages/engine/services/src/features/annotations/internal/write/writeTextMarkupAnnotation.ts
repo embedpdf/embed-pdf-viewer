@@ -19,6 +19,7 @@ import {
   setAnnotOpacity,
   setAnnotRect,
   setIntent,
+  setIntentOrClear,
 } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 import { strikeoutIntentToName } from '../textEditIntent';
@@ -59,13 +60,8 @@ export function applyTextMarkupDraft(
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
 
+  // The kind's schema requires at least one quad.
   const quadPoints = draft.quadPoints;
-  if (!Array.isArray(quadPoints) || quadPoints.length === 0) {
-    throw new EngineError(
-      EngineErrorCode.InvalidArg,
-      `text-markup draft (${draft.subtype}) requires at least one quadPoint`,
-    );
-  }
   appendQuadPoints(fn, mem, annotPtr, quadPoints);
   setRectFromQuadPoints(fn, mem, annotPtr, quadPoints);
 
@@ -73,7 +69,7 @@ export function applyTextMarkupDraft(
     draft.subtype === 'highlight' ? DEFAULT_HIGHLIGHT_COLOR : DEFAULT_TEXT_MARKUP_COLOR;
   setAnnotColor(fn, annotPtr, draft.color ?? fallback);
   setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULT_OPACITY);
-  if (draft.subtype === 'strikeout' && draft.intent !== undefined) {
+  if (draft.subtype === 'strikeout' && draft.intent != null) {
     setIntent(fn, annotPtr, strikeoutIntentToName(draft.intent));
   }
 }
@@ -83,10 +79,8 @@ export function applyTextMarkupDraft(
  *   1. base author-metadata (contents/author; never /NM)
  *   2. color (only if present)
  *   3. opacity (only if present)
- *   4. quadPoints (only if present, AND non-empty — the schema accepts an
- *      empty array but PDFium would treat it as a deletion of the
- *      attachment-point list, which is never the user's intent. We
- *      explicitly reject the empty-array case).
+ *   4. quadPoints (only if present; the schema requires at least one quad),
+ *      replacing the list whole.
  *
  * `rect` is recomputed only when quadPoints change, to keep /Rect in sync
  * with the smallest enclosing box.
@@ -106,15 +100,13 @@ export function applyTextMarkupPatch(
     setAnnotOpacity(fn, annotPtr, patch.opacity);
   }
   if (patch.subtype === 'strikeout' && patch.intent !== undefined) {
-    setIntent(fn, annotPtr, strikeoutIntentToName(patch.intent));
+    setIntentOrClear(
+      fn,
+      annotPtr,
+      patch.intent === null ? null : strikeoutIntentToName(patch.intent),
+    );
   }
   if (patch.quadPoints !== undefined) {
-    if (patch.quadPoints.length === 0) {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        `text-markup patch quadPoints, when present, must be non-empty`,
-      );
-    }
     replaceQuadPoints(fn, mem, annotPtr, patch.quadPoints);
     setRectFromQuadPoints(fn, mem, annotPtr, patch.quadPoints);
   }
@@ -160,13 +152,9 @@ export function appendQuadPoints(
 }
 
 /**
- * Replace the existing quadPoints with the supplied list. PDFium has
- * `FPDFAnnot_SetAttachmentPoints` which writes at index, but no truncate
- * helper, so we overwrite as many existing slots as we can and append
- * the rest. PDFium will GROW the list via append, but it cannot SHRINK
- * it; for that reason `applyTextMarkupPatch` rejects an empty patch and
- * the conformance suite covers the "patch must not shrink quadPoints"
- * rule (`patch.quadPoints.length >= existingCount`).
+ * Replace the quadPoints with the supplied list, whole: PDFium can append to
+ * the attachment-point list but not shrink it, so the list is removed and
+ * written again.
  */
 export function replaceQuadPoints(
   fn: PdfFunctions,
@@ -174,39 +162,8 @@ export function replaceQuadPoints(
   annotPtr: Ptr,
   quadPoints: PdfQuad[],
 ): void {
-  const existing = fn.FPDFAnnot_CountAttachmentPoints(annotPtr);
-  if (quadPoints.length < existing) {
-    throw new EngineError(
-      EngineErrorCode.InvalidArg,
-      `text-markup patch cannot shrink quadPoints (have ${existing}, patch supplies ${quadPoints.length})`,
-    );
-  }
-
-  const buf = mem.alloc(32);
-  try {
-    for (let i = 0; i < existing; i++) {
-      writeQuadPointStruct(mem, buf, quadPoints[i]!);
-      const ok = fn.FPDFAnnot_SetAttachmentPoints(annotPtr, i, buf);
-      if (!ok) {
-        throw new EngineError(
-          EngineErrorCode.Unknown,
-          `FPDFAnnot_SetAttachmentPoints failed at index ${i}`,
-        );
-      }
-    }
-    for (let i = existing; i < quadPoints.length; i++) {
-      writeQuadPointStruct(mem, buf, quadPoints[i]!);
-      const ok = fn.FPDFAnnot_AppendAttachmentPoints(annotPtr, buf);
-      if (!ok) {
-        throw new EngineError(
-          EngineErrorCode.Unknown,
-          `FPDFAnnot_AppendAttachmentPoints failed at index ${i}`,
-        );
-      }
-    }
-  } finally {
-    mem.free(buf);
-  }
+  fn.EPDFAnnot_RemoveKey(annotPtr, 'QuadPoints');
+  appendQuadPoints(fn, mem, annotPtr, quadPoints);
 }
 
 function writeQuadPointStruct(mem: PdfRuntimeMemory, buf: Ptr, qp: PdfQuad): void {

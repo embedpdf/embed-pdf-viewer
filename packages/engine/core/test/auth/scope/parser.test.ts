@@ -32,6 +32,7 @@ describe('parseScope — capabilities', () => {
     'doc.forms.modify',
     'doc.annotate.read',
     'doc.annotate.modify',
+    'doc.annotate.import',
     'doc.metadata.modify',
     'doc.redact',
   ] as const;

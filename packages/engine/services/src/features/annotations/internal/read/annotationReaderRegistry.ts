@@ -13,6 +13,7 @@ import { readFreeText } from './readFreeTextAnnotation';
 import { readInk } from './readInkAnnotation';
 import { readLine } from './readLineAnnotation';
 import { readLink } from './readLinkAnnotation';
+import { readPopup } from './readPopupAnnotation';
 import { readRedact } from './readRedactAnnotation';
 import { readCircle, readSquare } from './readShapeAnnotation';
 import { readStamp } from './readStampAnnotation';
@@ -67,6 +68,7 @@ const READER_BY_SUBTYPE: Partial<Record<AnnotationSubtype, AnnotationSubtypeRead
   'file-attachment': readFileAttachment,
   widget: readWidget,
   redact: readRedact,
+  popup: readPopup,
   unsupported: readUnsupported,
 };
 

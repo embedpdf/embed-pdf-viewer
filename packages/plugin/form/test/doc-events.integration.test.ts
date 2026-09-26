@@ -28,11 +28,11 @@ const fixturePath = resolve(
 );
 
 /**
- * THE Phase-4 lifecycle gate on a real engine + real VM: the catalog
+ * Document lifecycle actions on a real engine and a real script VM: the catalog
  * /AA trees (ISO 32000-2 Table 200) fire through the verb-owner doors,
- * every script effect is a DOCUMENT mutation, and the saved-byte boundary
- * is exact — the WillSave write is IN the bytes a save pulls, the DidSave
- * write is NOT (it lives in the document and rides the NEXT save).
+ * every script effect is a document mutation, and the saved-byte boundary
+ * is exact — the WillSave write is in the bytes a save pulls, the DidSave
+ * write is not (it lives in the document and rides the next save).
  */
 async function boot(options: { scope?: string[]; openSequence?: 'auto' | 'off' } = {}) {
   const engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
@@ -72,7 +72,7 @@ async function boot(options: { scope?: string[]; openSequence?: 'auto' | 'off' }
     kernel,
     form,
     actions,
-    valueOf,
+    valueOf: valueOf,
     diagnostics,
     async [Symbol.asyncDispose]() {
       await kernel.destroy();
@@ -81,7 +81,7 @@ async function boot(options: { scope?: string[]; openSequence?: 'auto' | 'off' }
   };
 }
 
-/** Inspect saved bytes with scripting fully OFF (no VM, no open sequence)
+/** Inspect saved bytes with scripting fully off (no VM, no open sequence)
  *  so inspection can never mutate what it measures. */
 async function readSavedFields(bytes: Uint8Array): Promise<Record<string, string>> {
   const engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
@@ -106,70 +106,75 @@ async function readSavedFields(bytes: Uint8Array): Promise<Record<string, string
   return out;
 }
 
-describe('the Phase-4 lifecycle gate: WS/DS/WP/DP/WC on a real document', () => {
+describe('document lifecycle actions (WS/DS/WP/DP/WC) on a real document', () => {
   it('the save proof: OpenAction-before-WS, WS in the bytes, DS not — DS rides the NEXT save', async () => {
-    // openSequence 'auto' with NO adapter installed: the open latch is still
-    // armed when the first save arrives — D1 must run OpenAction first.
-    await using t = await boot({ openSequence: 'auto' });
-    expect(t.valueOf('eventLog')).toBe(''); // nothing ran yet
+    // openSequence 'auto' with no adapter installed: the open latch is still
+    // armed when the first save arrives, so OpenAction must run first.
+    await using harness = await boot({ openSequence: 'auto' });
+    expect(harness.valueOf('eventLog')).toBe(''); // nothing ran yet
 
-    const bytes = await t.actions.runDocumentVerb('save', () =>
-      t.kernel.documents.save('doc-events'),
+    const bytes = await harness.actions.runDocumentVerb('save', () =>
+      harness.kernel.documents.save('doc-events'),
     );
 
-    // The saved bytes: the D1 ordering + the D5 name bridge + the
-    // event.target=doc proof — and NO DidSave (it fired after the pull).
+    // The saved bytes show OpenAction ran before WillSave, the document-level
+    // names resolve, event.target is the document, and DidSave is absent
+    // (it fired after the bytes were pulled).
     const saved = await readSavedFields(bytes);
     expect(saved.eventLog).toBe('Open WillSave');
     expect(saved.savedAt).toBe('saved-by-willsave');
 
-    // The LIVE document carries the DidSave write...
-    await t.form.refresh();
-    expect(t.valueOf('eventLog')).toBe('Open WillSave DidSave');
+    // The live document carries the DidSave write...
+    await harness.form.refresh();
+    expect(harness.valueOf('eventLog')).toBe('Open WillSave DidSave');
 
     // ...and the next save includes it (plus its own WillSave).
-    const bytes2 = await t.actions.runDocumentVerb('save', () =>
-      t.kernel.documents.save('doc-events'),
+    const bytes2 = await harness.actions.runDocumentVerb('save', () =>
+      harness.kernel.documents.save('doc-events'),
     );
     const saved2 = await readSavedFields(bytes2);
     expect(saved2.eventLog).toBe('Open WillSave DidSave WillSave');
   });
 
   it('the print proof: WP before the dialog, DP after; the WP script print() is reentrant-suppressed', async () => {
-    await using t = await boot({ openSequence: 'off' });
+    await using harness = await boot({ openSequence: 'off' });
     let duringOp = '';
-    await t.actions.runDocumentVerb('print', async () => {
+    await harness.actions.runDocumentVerb('print', async () => {
       // Mid-operation truth: WillPrint has run, DidPrint has not.
-      await t.form.refresh();
-      duringOp = t.valueOf('eventLog');
+      await harness.form.refresh();
+      duringOp = harness.valueOf('eventLog');
     });
     expect(duringOp).toBe('WillPrint');
-    await t.form.refresh();
-    expect(t.valueOf('eventLog')).toBe('WillPrint DidPrint');
+    await harness.form.refresh();
+    expect(harness.valueOf('eventLog')).toBe('WillPrint DidPrint');
     // The fixture's WP script calls this.print() — while the verb holds the
-    // latch that request is SUPPRESSED (one dialog per outer request).
-    expect(t.diagnostics.some((d) => d.code === 'reentrant-print')).toBe(true);
+    // latch that request is suppressed (one dialog per outer request).
+    expect(harness.diagnostics.some((diagnostic) => diagnostic.code === 'reentrant-print')).toBe(
+      true,
+    );
   });
 
   it('prepareClose runs WC as a document mutation, then closing works', async () => {
-    await using t = await boot({ openSequence: 'off' });
-    const result = await t.actions.prepareClose();
+    await using harness = await boot({ openSequence: 'off' });
+    const result = await harness.actions.prepareClose();
     expect(result.status).toBe('executed');
-    await t.form.refresh();
-    expect(t.valueOf('eventLog')).toBe('WillClose');
-    await t.kernel.documents.close('doc-events');
+    await harness.form.refresh();
+    expect(harness.valueOf('eventLog')).toBe('WillClose');
+    await harness.kernel.documents.close('doc-events');
   });
 
   it('unauthorized: the WS script runs, every write is refused, nothing changes', async () => {
-    await using t = await boot({
+    await using harness = await boot({
       openSequence: 'off',
       scope: ['doc.open', 'doc.render', 'doc.forms.read', 'doc.annotate.read'],
     });
-    const result = await t.actions.dispatch({ scope: 'document', event: 'will-save' });
+    const result = await harness.actions.dispatch({ scope: 'document', event: 'will-save' });
     expect(result.status).not.toBe('executed'); // the script's commit failed
-    await t.form.refresh();
-    expect(t.valueOf('eventLog')).toBe(''); // byte-stable
-    expect(t.valueOf('savedAt')).toBe('');
-    expect(t.diagnostics.some((d) => d.code === 'executor-failed')).toBe(true);
+    await harness.form.refresh();
+    expect(harness.valueOf('eventLog')).toBe(''); // byte-stable
+    expect(harness.valueOf('savedAt')).toBe('');
+    expect(harness.diagnostics.some((diagnostic) => diagnostic.code === 'executor-failed')).toBe(
+      true,
+    );
   });
 });

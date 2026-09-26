@@ -6,9 +6,9 @@
  * delete/deletePrefix/materializeLocal). One assertion set, run against
  * each adapter — FsObjectStore is the always-on correctness oracle in
  * CI; GcsObjectStore and AzureBlobObjectStore run against their
- * in-memory SDK fakes. If an adapter drifts, the SAME test fails.
+ * in-memory SDK fakes. If an adapter drifts, the same test fails.
  *
- * Presigning is intentionally NOT covered here — it legitimately
+ * Presigning is intentionally not covered here — it legitimately
  * differs per backend (FS returns null; clouds return signed
  * descriptors with backend-specific headers). Per-adapter tests pin
  * those shapes.
@@ -57,7 +57,7 @@ function failingReadable(prefix: Uint8Array, err: Error): Readable {
 
 /**
  * @param label  backend name, shown in the describe block.
- * @param makeStore  returns a FRESH, empty store each call (the impl
+ * @param makeStore  returns a fresh, empty store each call (the impl
  *   is responsible for resetting any in-memory fake state).
  */
 export function runObjectStoreConformance(

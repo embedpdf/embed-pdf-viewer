@@ -10,7 +10,7 @@ import type { PageState } from '../revision/PageState';
  * patch only when their cached manifest is exactly at that version. Otherwise
  * they must refresh instead of manufacturing a mixed-version manifest.
  *
- * Deliberately does NOT carry plane scopes: scopes only ever move
+ * Deliberately does not carry plane scopes: scopes only ever move
  * base → layer, and each mutation kind knows exactly which planes it owns, so
  * the client flips them locally when absorbing this delta (the monotone-flip
  * rule); the manifest is the authoritative source and the 404 → refresh rail
@@ -28,6 +28,16 @@ export interface CacheDelta {
    */
   annotationsVersion?: number;
   /**
+   * New plane pins, present when this mutation bumped them: `layoutVersion`
+   * for a page-structure write (move, rotate, delete, insert, names),
+   * `metadataVersion` for a metadata write, `attachmentsVersion` for an
+   * attachment write. Absorbing them re-points the cached manifest's leaf
+   * without a refetch.
+   */
+  layoutVersion?: number;
+  metadataVersion?: number;
+  attachmentsVersion?: number;
+  /**
    * The layer's write serial after this mutation and whether an artifact
    * now exists (cloud only). Absorbing them keeps the client's cached
    * manifest an honest `DocumentVersionRef` source between refreshes.
@@ -41,10 +51,12 @@ export interface CacheDelta {
 }
 
 /**
- * Base envelope for every layer-mutating operation.
+ * Base envelope for every layer-mutating operation: the `meta` of every
+ * write result.
  *
  * `affectedPages` is the state delta. `cacheDelta` is the cloud/CDN URL pin
- * delta and is `null` for local engines.
+ * delta and is `null` for local engines (and for a write that changed
+ * nothing).
  */
 export interface MutationMeta {
   affectedPages: PageState[];

@@ -13,6 +13,7 @@ import {
   type PageRenderOptions,
   type PageRenderService,
   type PageRef,
+  checkImageQuality,
 } from '@embedpdf/engine-core/runtime';
 
 import type { LocalImageEncoder } from '../render/BrowserImageEncoder';
@@ -87,6 +88,7 @@ export class LocalPageRenderService implements PageRenderService {
 
   image(options: PageImageOptions = {}): AbortablePromise<PageImageHandle> {
     return AbortablePromise.run<PageImageHandle>(async (signal) => {
+      checkImageQuality(options.quality);
       const raw = this.raw(options);
       const onAbort = () => raw.abort(signal.reason);
       if (signal.aborted) onAbort();

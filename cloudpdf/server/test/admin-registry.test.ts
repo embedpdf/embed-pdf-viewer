@@ -18,9 +18,9 @@ import { createValidTestLicenseGate } from '../src/licensing/testing';
  * Registry ⇔ route-table conformance, proven behaviorally: probe every
  * operation's method+path with a valid `*`-scope tenant token. A
  * mounted route reaches app code, which answers with the app's error
- * envelope (`error` is an OBJECT) or a success; an unmounted path falls
+ * envelope (`error` is an object) or a success; an unmounted path falls
  * through to Fastify's router 404, whose default body carries `error`
- * as the STRING "Not Found". That body-shape difference — not the
+ * as the string "Not Found". That body-shape difference — not the
  * status code — is the mounted/unmounted signal, because app handlers
  * legitimately 404 too (missing doc) and the auth hook runs even for
  * unmatched paths (so unauthenticated probes all 401).

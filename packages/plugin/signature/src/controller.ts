@@ -2,44 +2,52 @@
  * The signature controller: the composition root. It builds the plugin's
  * services once, wires each area with the services it declares, and
  * assembles the capability from the areas' API slices. No behavior lives
- * here — every verb and read has a home in `read/`, `write/` or `sync/`.
+ * here: every verb and read has a home in `read/`, `write/` or `sync/`.
  */
-import { composeApi } from '@embedpdf/core';
-import type { SignatureConfig } from './contract';
-import type { SignatureHostCapability } from './host-contract';
+import { composeApi, type PluginContext } from '@embedpdf/core';
+
+import { connectSiblings } from './connect';
+import type { SignatureCapability, SignatureConfig } from './contract';
+import type { SignatureState } from './model';
+import { createJudging } from './read/judging';
 import { createSignatureReads } from './read/signatures';
-import { createServices, type SignatureContext } from './services';
-import { subscribeDocumentEvents } from './sync/document-events';
-import { createHydration } from './sync/hydration';
+import { createServices } from './services';
+import { createSignaturesMirror } from './sync/signatures';
+import { createValidation } from './sync/validation';
 import { createFills } from './write/fill';
 import { createPlacement, createTarget } from './write/place';
 import { createSigning } from './write/sign';
 
-function build(ctx: SignatureContext, config: SignatureConfig) {
+export function createSignatureController(
+  ctx: PluginContext<SignatureState>,
+  config: SignatureConfig = {},
+) {
   const services = createServices(ctx, config);
   const { events, authority } = services;
 
-  // Reads: pure projections of the slice.
-  const reads = createSignatureReads(services);
+  // Sync: the engine's facts, mirrored, and the judgement that reacts to them.
+  const validation = createValidation(ctx, services, config);
+  const signatures = createSignaturesMirror(ctx, services, validation);
 
-  // Sync: the engine's facts into the slice.
-  const hydration = createHydration(ctx, services, config, reads);
+  // Reads: projections of the mirror and the session state.
+  const reads = createSignatureReads(ctx, services, signatures.mirror);
+  const judging = createJudging(services, validation, signatures.mirror, reads);
 
   // Writes: the sign-here target, sealing, visual fills, the destination rule.
   const target = createTarget(ctx, services);
-  const signing = createSigning(ctx, services, hydration, target);
+  const signing = createSigning(ctx, services, reads, target, signatures);
   const fills = createFills(ctx, services, reads, target);
-  const placement = createPlacement(services, config, signing, fills);
+  const placement = createPlacement(services, config, reads, signing, fills);
 
-  const api = composeApi('signature', [
+  const api: SignatureCapability = composeApi('signature', [
     reads.api,
-    hydration.api,
+    judging.api,
     target.api,
     signing.api,
     fills.api,
     placement.api,
     {
-      // Authority twins and the change hooks are services, not areas.
+      // Authority twins and the events are services, not areas.
       canSign: authority.canSign,
       canFill: authority.canFill,
       canCertify: authority.canCertify,
@@ -53,35 +61,13 @@ function build(ctx: SignatureContext, config: SignatureConfig) {
       onSignRequested: events.signRequested.on,
       onInspectionRequested: events.inspectionRequested.on,
     },
-  ]) satisfies SignatureHostCapability;
-  return { api, hydration };
-}
+  ]);
 
-export function createSignatureController(
-  ctx: SignatureContext,
-  config: SignatureConfig = {},
-): { api: SignatureHostCapability; connect(): void } {
-  const { api, hydration } = build(ctx, config);
   return {
     api,
-    connect() {
-      subscribeDocumentEvents(ctx, hydration);
-      void hydration
-        .refresh()
-        .then((snapshot) =>
-          snapshot?.signatures.some((s) => s.signed) ? hydration.validate() : null,
-        )
-        .catch((error) => globalThis.console?.error('[signature] initial read failed:', error));
+    connect(): void {
+      signatures.connect();
+      connectSiblings(ctx, api);
     },
   };
-}
-
-/** The capability with its document-event subscription and no initial read — the shape the unit tests build. */
-export function createSignatureCapability(
-  ctx: SignatureContext,
-  config: SignatureConfig = {},
-): SignatureHostCapability {
-  const { api, hydration } = build(ctx, config);
-  subscribeDocumentEvents(ctx, hydration);
-  return api;
 }

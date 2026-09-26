@@ -26,7 +26,7 @@ function makePng(
   width: number,
   height: number,
   rgba: [number, number, number, number],
-): Uint8Array {
+): Uint8Array<ArrayBuffer> {
   const crcTable = Array.from({ length: 256 }, (_, n) => {
     let c = n;
     for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
@@ -105,15 +105,17 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     const png = makePng(8, 4, [255, 0, 0, 255]);
     const rect = { left: 100, bottom: 500, right: 260, top: 580 };
 
-    const result = await page.annotations.create({
-      subtype: 'stamp',
-      rect,
-      source: png,
-      name: 'Approved',
-    });
+    const result = await page.annotations.create(
+      {
+        subtype: 'stamp',
+        rect,
+        name: 'Approved',
+      },
+      { appearance: png },
+    );
 
-    expect(result.created.subtype).toBe('stamp');
-    const created = result.created as StampAnnotationDTO;
+    expect(result.annotation.subtype).toBe('stamp');
+    const created = result.annotation as StampAnnotationDTO;
     expect(created.name).toBe('Approved');
     expect(created.rect.left).toBeCloseTo(rect.left, 0);
     expect(created.rect.top).toBeCloseTo(rect.top, 0);
@@ -122,7 +124,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     const stamps = snapshot.annotations.filter((a) => a.subtype === 'stamp');
     expect(stamps.length).toBeGreaterThan(0);
 
-    const rendered = await page.annotations.renderAppearances();
+    const rendered = await page.annotations.renderAppearancesRaw();
     const appearance = rendered.appearances.find(
       (a) =>
         a.ref.kind === 'objectNumber' &&
@@ -145,15 +147,17 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     expect(sawRed).toBe(true);
   });
 
-  test('Blob source resolves (browser-style input)', async () => {
+  test('a Blob appearance resolves (browser-style input)', async () => {
     const page = handle.page(toPageRef(PAGE_OBJECT_NUMBER));
     const png = makePng(2, 2, [0, 0, 255, 255]);
-    const result = await page.annotations.create({
-      subtype: 'stamp',
-      rect: { left: 50, bottom: 50, right: 90, top: 90 },
-      source: new Blob([png], { type: 'image/png' }),
-    });
-    expect(result.created.subtype).toBe('stamp');
+    const result = await page.annotations.create(
+      {
+        subtype: 'stamp',
+        rect: { left: 50, bottom: 50, right: 90, top: 90 },
+      },
+      { appearance: new Blob([png], { type: 'image/png' }) },
+    );
+    expect(result.annotation.subtype).toBe('stamp');
   });
 
   test('stamp survives save → reopen (bytes live in the PDF, not in engine state)', async () => {
@@ -169,7 +173,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
 
       const rendered = await reopened
         .page(toPageRef(PAGE_OBJECT_NUMBER))
-        .annotations.renderAppearances();
+        .annotations.renderAppearancesRaw();
       expect(rendered.appearances.length).toBeGreaterThan(0);
     } finally {
       await reopened.close();
@@ -179,17 +183,19 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
   test('update: geometry-only patch re-fits the existing appearance', async () => {
     const page = handle.page(toPageRef(PAGE_OBJECT_NUMBER));
     const png = makePng(4, 4, [0, 128, 0, 255]);
-    const { created } = await page.annotations.create({
-      subtype: 'stamp',
-      rect: { left: 10, bottom: 10, right: 50, top: 50 },
-      source: png,
-    });
+    const { annotation: created } = await page.annotations.create(
+      {
+        subtype: 'stamp',
+        rect: { left: 10, bottom: 10, right: 50, top: 50 },
+      },
+      { appearance: png },
+    );
     const updated = await page.annotations.update(created.ref, {
       subtype: 'stamp',
       rect: { left: 10, bottom: 10, right: 90, top: 50 },
     });
-    expect(updated.updated.subtype).toBe('stamp');
-    expect(updated.updated.rect.right).toBeCloseTo(90, 0);
+    expect(updated.annotation.subtype).toBe('stamp');
+    expect(updated.annotation.rect.right).toBeCloseTo(90, 0);
   });
 
   test('rotated stamp: appearance renders UNROTATED — rect is the logical box, content is flat', async () => {
@@ -198,17 +204,19 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     const unrotated = { left: 300, bottom: 300, right: 400, top: 350 }; // 100×50 landscape
     // 90° CW about the centre (350, 325) → the /Rect AABB is 50×100 portrait.
     const rect = { left: 325, bottom: 275, right: 375, top: 375 };
-    const { created } = await page.annotations.create({
-      subtype: 'stamp',
-      rect,
-      source: png,
-      fit: 'fill',
-      rotation: 90,
-      unrotatedRect: unrotated,
-    });
+    const { annotation: created } = await page.annotations.create(
+      {
+        subtype: 'stamp',
+        rect,
+        fit: 'fill',
+        rotation: 90,
+        unrotatedRect: unrotated,
+      },
+      { appearance: png },
+    );
     expect((created as StampAnnotationDTO).rotation).toBe(90);
 
-    const rendered = await page.annotations.renderAppearances();
+    const rendered = await page.annotations.renderAppearancesRaw();
     const entry = rendered.appearances.find(
       (a) =>
         a.ref.kind === 'objectNumber' &&
@@ -216,7 +224,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
         a.ref.annotObjectNumber === created.ref.annotObjectNumber,
     );
     expect(entry).toBeDefined();
-    // THE convention: the entry's rect is the UNROTATED logical box…
+    // The convention: the entry's rect is the unrotated logical box…
     expect(entry!.rect.left).toBeCloseTo(unrotated.left, 0);
     expect(entry!.rect.right).toBeCloseTo(unrotated.right, 0);
     expect(entry!.rect.top).toBeCloseTo(unrotated.top, 0);
@@ -236,27 +244,29 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
   });
 
   test('rotated CONTAIN stamp fills the box — no compound-shrink padding', async () => {
-    // Regression: the writer used to fit the image into the ROTATED AABB /Rect,
-    // then the native re-fit fit that (padded) box into the unrotated box — a
-    // SECOND aspect shrink, so the image landed at ~aspect² size in white
-    // padding. Only under rotation (at 0° the two frames coincide). 'fill' hid
-    // it; 'contain' (the default, and what the viewer uses) exposes it.
+    // Fitting the image into the rotated AABB /Rect and then natively
+    // re-fitting that padded box into the unrotated box shrinks the aspect
+    // twice, leaving the image at ~aspect² size in white padding. Only
+    // rotation shows it (at 0° the two frames coincide), and only 'contain'
+    // (the default, and what the viewer uses); 'fill' hides it.
     const page = handle.page(toPageRef(PAGE_OBJECT_NUMBER));
     const png = makePng(8, 4, [255, 0, 0, 255]); // 2:1 landscape
     const unrotated = { left: 300, bottom: 400, right: 400, top: 450 }; // 100×50, 2:1 — matches image
     // 90° CW about the centre (350, 425) → AABB 50×100 portrait.
     const rect = { left: 325, bottom: 375, right: 375, top: 475 };
-    const { created } = await page.annotations.create({
-      subtype: 'stamp',
-      rect,
-      source: png,
-      fit: 'contain',
-      rotation: 90,
-      unrotatedRect: unrotated,
-    });
+    const { annotation: created } = await page.annotations.create(
+      {
+        subtype: 'stamp',
+        rect,
+        fit: 'contain',
+        rotation: 90,
+        unrotatedRect: unrotated,
+      },
+      { appearance: png },
+    );
     expect((created as StampAnnotationDTO).rotation).toBe(90);
 
-    const rendered = await page.annotations.renderAppearances();
+    const rendered = await page.annotations.renderAppearancesRaw();
     const entry = rendered.appearances.find(
       (a) =>
         a.ref.kind === 'objectNumber' &&
@@ -269,8 +279,8 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     expect(width).toBeGreaterThan(height);
     expect(entry!.rect.left).toBeCloseTo(unrotated.left, 0);
     expect(entry!.rect.right).toBeCloseTo(unrotated.right, 0);
-    // The image aspect matches the box, so contain-fit FILLS it: BOTH the middle
-    // row AND the middle column are red edge-to-edge. Under the old double-shrink
+    // The image aspect matches the box, so contain-fit fills it: Both the middle
+    // row and the middle column are red edge-to-edge. Under the old double-shrink
     // the image was ~1/4 size, so neither would be. Sampling both catches a
     // shrink on either axis.
     const data = new Uint8Array(entry!.raster.data);
@@ -288,20 +298,22 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
   test('stamp rotation is tri-state: rect-only re-position preserves, null clears', async () => {
     // Transform metadata follows the tri-state law: a patch touches what it
     // states and preserves what it omits. A plain re-position (rect only)
-    // KEEPS the rotation; dropping the tilt is stated explicitly with
+    // keeps the rotation; dropping the tilt is stated explicitly with
     // `rotation: null` (the viewer's total projection emits exactly that).
     const page = handle.page(toPageRef(PAGE_OBJECT_NUMBER));
     const png = makePng(4, 4, [0, 0, 255, 255]);
     const unrotated = { left: 200, bottom: 200, right: 250, top: 250 };
     const rect = { left: 200, bottom: 200, right: 250, top: 250 }; // square: AABB == box
-    const { created } = await page.annotations.create({
-      subtype: 'stamp',
-      rect,
-      source: png,
-      fit: 'contain',
-      rotation: 90,
-      unrotatedRect: unrotated,
-    });
+    const { annotation: created } = await page.annotations.create(
+      {
+        subtype: 'stamp',
+        rect,
+        fit: 'contain',
+        rotation: 90,
+        unrotatedRect: unrotated,
+      },
+      { appearance: png },
+    );
     expect((created as StampAnnotationDTO).rotation).toBe(90);
 
     // A rect-only re-position preserves the omitted rotation…
@@ -309,7 +321,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
       subtype: 'stamp',
       rect: { left: 205, bottom: 205, right: 255, top: 255 },
     });
-    expect((moved.updated as StampAnnotationDTO).rotation).toBe(90);
+    expect((moved.annotation as StampAnnotationDTO).rotation).toBe(90);
 
     // …and dropping the tilt is an explicit tri-state clear.
     const flat = { left: 210, bottom: 210, right: 270, top: 260 };
@@ -319,7 +331,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
       rotation: null,
       unrotatedRect: null,
     });
-    expect((updated.updated as StampAnnotationDTO).rotation ?? 0).toBe(0);
+    expect((updated.annotation as StampAnnotationDTO).rotation ?? 0).toBe(0);
 
     // Re-read from the annot dict (not just the patch echo) to prove it persists.
     const list = await page.annotations.list();
@@ -334,14 +346,16 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     expect(re.rect.right).toBeCloseTo(flat.right, 0);
   });
 
-  test('unsupported source bytes reject with InvalidArg before any transport', async () => {
+  test('an appearance that is not an image or PDF is refused before any transport', async () => {
     const page = handle.page(toPageRef(PAGE_OBJECT_NUMBER));
     await expect(
-      page.annotations.create({
-        subtype: 'stamp',
-        rect: { left: 0, bottom: 0, right: 10, top: 10 },
-        source: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]),
-      }),
+      page.annotations.create(
+        {
+          subtype: 'stamp',
+          rect: { left: 0, bottom: 0, right: 10, top: 10 },
+        },
+        { appearance: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]) },
+      ),
     ).rejects.toMatchObject({ code: expect.anything() });
   });
 
@@ -352,25 +366,29 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     // `/Name` is the stamp's identifier, not an enum: a standard name or an
     // Acrobat library identifier. Only the empty name is invalid.
     await expect(
-      page.annotations.create({
-        subtype: 'stamp',
-        rect: { left: 20, bottom: 100, right: 80, top: 130 },
-        source: makePng(2, 1, [255, 0, 0, 255]),
-        name: '',
-      }),
+      page.annotations.create(
+        {
+          subtype: 'stamp',
+          rect: { left: 20, bottom: 100, right: 80, top: 130 },
+          name: '',
+        },
+        { appearance: makePng(2, 1, [255, 0, 0, 255]) },
+      ),
     ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
 
     const afterRejectedCreate = await page.annotations.list();
     expect(afterRejectedCreate.annotations).toHaveLength(beforeCreate.annotations.length);
 
     const customName = '#LBGiYhk8V_oAfmqAPENiwD';
-    const { created } = await page.annotations.create({
-      subtype: 'stamp',
-      rect: { left: 20, bottom: 100, right: 80, top: 130 },
-      source: makePng(2, 1, [0, 128, 0, 255]),
-      name: customName,
-      contents: 'before',
-    });
+    const { annotation: created } = await page.annotations.create(
+      {
+        subtype: 'stamp',
+        rect: { left: 20, bottom: 100, right: 80, top: 130 },
+        name: customName,
+        contents: 'before',
+      },
+      { appearance: makePng(2, 1, [0, 128, 0, 255]) },
+    );
     expect(created.subtype).toBe('stamp');
     if (created.subtype === 'stamp') expect(created.name).toBe(customName);
 

@@ -1,5 +1,5 @@
 /**
- * TEMPORARY PROBE — reproduces the user-reported "rotated circle shrinks
+ * Temporary probe — reproduces the user-reported "rotated circle shrinks
  * after two move+refresh cycles" bug. Mirrors the client's exact emission
  * (boxEmit): every geometry patch carries rect=AABB + unrotatedRect +
  * rotation. Deleted after diagnosis.
@@ -110,7 +110,7 @@ describe('rotated circle move drift probe', () => {
       borderStyle: 'solid',
       opacity: 1,
     });
-    const cd = created.created as { rect: R; unrotatedRect?: R; rotation?: number };
+    const cd = created.annotation as { rect: R; unrotatedRect?: R; rotation?: number };
     console.log(
       'CREATED   rect=' + fmt(cd.rect),
       'unrot=' + fmt(cd.unrotatedRect),
@@ -122,7 +122,7 @@ describe('rotated circle move drift probe', () => {
       const a = list.annotations.find(
         (x) => x.subtype === 'circle' && x.contents === 'drift probe',
       ) as unknown as { ref: unknown; rect: R; unrotatedRect?: R; rotation?: number };
-      const rendered = await d.page(toPageRef(PAGE)).annotations.renderAppearances();
+      const rendered = await d.page(toPageRef(PAGE)).annotations.renderAppearancesRaw();
       const ap = rendered.appearances.find(
         (p) => JSON.stringify((p as { ref: unknown }).ref) === JSON.stringify(a.ref),
       ) as unknown as { rect: R; raster: { width: number; height: number; data: ArrayBuffer } };
@@ -161,7 +161,8 @@ describe('rotated circle move drift probe', () => {
         } as never,
       );
       const outcome = (res as { appearance?: { action?: string } }).appearance;
-      const echo = (res as { updated: { rect: R; unrotatedRect?: R; rotation?: number } }).updated;
+      const echo = (res as { annotation: { rect: R; unrotatedRect?: R; rotation?: number } })
+        .annotation;
       console.log(
         `\nMOVE ${move}: sent rect=${fmt(aabb(U, rot))} unrot=${fmt(U)} rot=${rot}`,
         '→ appearance:',

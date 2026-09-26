@@ -25,7 +25,7 @@ export const FormFieldRefSchema: z.ZodType<FormFieldRef> = z.discriminatedUnion(
 ]);
 
 const FormWidgetShape = {
-  // The annotation address, present exactly when the widget is indirect AND placed.
+  // The annotation address, present exactly when the widget is indirect and placed.
   ref: AnnotationRefSchema.nullable(),
   // 0 = direct (unaddressable) widget; null page = unplaced widget.
   annotObjectNumber: z.number().int().nonnegative(),
@@ -225,37 +225,24 @@ const FormFieldPatchBaseShape = {
   mappingName: z.string().nullable().optional(),
 };
 
-export const FormFieldPatchSchema: z.ZodType<FormFieldPatch> = z.discriminatedUnion('family', [
-  z.object({
+/**
+ * One object on the wire: the family is optional (the engine knows it from
+ * the ref), so there is no discriminator, and the engine refuses members
+ * the field's family doesn't have.
+ */
+export const FormFieldPatchSchema: z.ZodType<FormFieldPatch> = z
+  .object({
     ...FormFieldPatchBaseShape,
-    family: z.literal('text'),
+    family: z.enum(['text', 'checkbox', 'radio', 'combobox', 'listbox']).optional(),
     defaultValue: z.string().nullable().optional(),
     maxLength: z.number().int().positive().nullable().optional(),
     multiline: z.boolean().optional(),
     password: z.boolean().optional(),
     comb: z.boolean().optional(),
-  }),
-  z.object({
-    ...FormFieldPatchBaseShape,
-    family: z.literal('checkbox'),
-  }),
-  z.object({
-    ...FormFieldPatchBaseShape,
-    family: z.literal('radio'),
     radiosInUnison: z.boolean().optional(),
     noToggleToOff: z.boolean().optional(),
-  }),
-  z.object({
-    ...FormFieldPatchBaseShape,
-    family: z.literal('combobox'),
     edit: z.boolean().optional(),
-    defaultValue: z.string().nullable().optional(),
-    options: z.array(FormFieldOptionInputSchema).optional(),
-  }),
-  z.object({
-    ...FormFieldPatchBaseShape,
-    family: z.literal('listbox'),
     multiSelect: z.boolean().optional(),
     options: z.array(FormFieldOptionInputSchema).optional(),
-  }),
-]) as unknown as z.ZodType<FormFieldPatch>;
+  })
+  .strict() as unknown as z.ZodType<FormFieldPatch>;

@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
+import { DEFAULT_ANNOTATION_BUNDLE_LIMITS } from '@embedpdf/engine-core/runtime';
 import {
   createSqliteDb,
   migrate,
@@ -105,7 +106,7 @@ describe('derived renders', () => {
     const headers = { Authorization: `Bearer ${docToken(tenantId, docId)}` };
 
     // Default fixture: enforce=false → width-kind renders still work. The
-    // token is ANNOTATED, so it lives under the annotated family (the prefix
+    // token is annotated, so it lives under the annotated family (the prefix
     // rule makes `/render/pages/` serve annotation-free tokens only).
     const res = await fetch(
       `${fx.baseUrl}/v1/docs/${docId}/render/annotated/pages/obj:1/data@${OFFLATTICE_TOKEN}`,
@@ -135,7 +136,7 @@ describe('derived renders', () => {
       };
       expect(body.error.details?.renderPolicy?.fullPage.widths).toEqual([320, 640, 1280, 2560]);
 
-      // Rect-target region renders are EXEMPT from full-page enforcement:
+      // Rect-target region renders are exempt from full-page enforcement:
       // they belong to the (future) tile policy, and rejecting them here
       // would kill tiling before it exists.
       const rectRender = await fetch(
@@ -185,6 +186,10 @@ describe('derived renders', () => {
       background: 'white',
       enforced: false,
     });
+    // The import limits ride the same response, so a client checks them first.
+    expect((body as { annotationBundleLimits?: unknown }).annotationBundleLimits).toEqual(
+      DEFAULT_ANNOTATION_BUNDLE_LIMITS,
+    );
   });
 
   test('appearance renders: scale lattice enforced on versioned tokens only', async () => {
@@ -197,7 +202,11 @@ describe('derived renders', () => {
 
     // Default fixture (enforce=false): an off-lattice scale still computes.
     const lax = await fetch(
-      appearancesUrl(fx.baseUrl, docId, 'annotationVersion=1,format=webp,scale=3'),
+      appearancesUrl(
+        fx.baseUrl,
+        docId,
+        'annotationVersion=1,format=webp,viewport.kind=scale,viewport.scale=3',
+      ),
       { headers },
     );
     expect(lax.status).toBe(200);
@@ -211,7 +220,11 @@ describe('derived renders', () => {
 
       // Versioned off-lattice scale → 400, policy attached.
       const rejected = await fetch(
-        appearancesUrl(strict.baseUrl, strictDoc, 'annotationVersion=1,format=webp,scale=3'),
+        appearancesUrl(
+          strict.baseUrl,
+          strictDoc,
+          'annotationVersion=1,format=webp,viewport.kind=scale,viewport.scale=3',
+        ),
         { headers: strictHeaders },
       );
       expect(rejected.status).toBe(400);
@@ -222,14 +235,29 @@ describe('derived renders', () => {
 
       // Versioned on-lattice scale → 200.
       const accepted = await fetch(
-        appearancesUrl(strict.baseUrl, strictDoc, 'annotationVersion=1,format=webp,scale=2'),
+        appearancesUrl(
+          strict.baseUrl,
+          strictDoc,
+          'annotationVersion=1,format=webp,viewport.kind=scale,viewport.scale=2',
+        ),
         { headers: strictHeaders },
       );
       expect(accepted.status).toBe(200);
 
-      // The UNVERSIONED alias is the escape hatch: never enforced (no-store).
+      // A width viewport's scale depends on the page, so it is never on the lattice.
+      const byWidth = await fetch(
+        appearancesUrl(
+          strict.baseUrl,
+          strictDoc,
+          'annotationVersion=1,format=webp,viewport.kind=width,viewport.width=1224',
+        ),
+        { headers: strictHeaders },
+      );
+      expect(byWidth.status).toBe(400);
+
+      // The unversioned alias is the escape hatch: never enforced (no-store).
       const unversioned = await fetch(
-        `${strict.baseUrl}/v1/docs/${strictDoc}/layers/default/annotations/pages/obj:1/appearances?scale=3`,
+        `${strict.baseUrl}/v1/docs/${strictDoc}/layers/default/annotations/pages/obj:1/appearances?viewport.kind=scale&viewport.scale=3`,
         { headers: strictHeaders },
       );
       expect(unversioned.status).toBe(200);
@@ -241,7 +269,7 @@ describe('derived renders', () => {
 
   test('appearance renders carry the output-pixel budget into the worker', async () => {
     // Tiny budget: the stub raster is (8×scale)² px, so scale=4 → 1024 px
-    // blows a 100 px budget even though 4 is ON the lattice — the budget is
+    // blows a 100 px budget even though 4 is on the lattice — the budget is
     // the memory guard, the lattice is the canonical-point guard.
     const tiny = await buildFixture({ renderLattice: { maxRenderPixels: 100 } });
     try {
@@ -251,7 +279,7 @@ describe('derived renders', () => {
       const headers = { Authorization: `Bearer ${docToken(tenantId, docId)}` };
 
       const blown = await fetch(
-        `${tiny.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/obj:1/appearances@annotationVersion=1,format=webp,scale=4`,
+        `${tiny.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/obj:1/appearances@annotationVersion=1,format=webp,viewport.kind=scale,viewport.scale=4`,
         { headers },
       );
       expect(blown.status).toBe(400);
@@ -259,7 +287,7 @@ describe('derived renders', () => {
       expect(body.error.message).toContain('budget');
 
       const fits = await fetch(
-        `${tiny.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/obj:1/appearances@annotationVersion=1,format=webp,scale=1`,
+        `${tiny.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/obj:1/appearances@annotationVersion=1,format=webp,viewport.kind=scale,viewport.scale=1`,
         { headers },
       );
       expect(fits.status).toBe(200);
@@ -293,7 +321,7 @@ describe('derived renders', () => {
     expect(tile.headers.get('content-type')).toBe('image/webp');
     expect((await tile.arrayBuffer()).byteLength).toBeGreaterThan(0);
 
-    // The warmed artifact is the SAME canonical object the doc-plane
+    // The warmed artifact is the same canonical object the doc-plane
     // read-through would produce — one door.
     const baseSha = createHash('sha256').update(bytes).digest('hex');
     expect(
@@ -363,8 +391,8 @@ describe('derived renders', () => {
     await seedDocument(fx, tenantId, docId, { pageCount: 1 });
     const headers = { Authorization: `Bearer ${docToken(tenantId, docId, 'alice')}` };
 
-    // Layer view at the base epoch. Annotatedness is PATH-only (token/path
-    // law): the annotated FAMILY pins both counters, its token carrying the
+    // Layer view at the base epoch. Annotatedness is path-only (token/path
+    // law): the annotated family pins both counters, its token carrying the
     // annotationVersion pin — never an includeAnnotations key.
     const token =
       'annotationVersion=1,background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=320';

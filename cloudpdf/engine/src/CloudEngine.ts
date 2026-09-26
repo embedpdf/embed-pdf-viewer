@@ -16,7 +16,11 @@ import { engineErrorFromShareExchange, ShareExchangeError, shareSessionSource } 
 import { decodeUnverifiedClaims } from './transport/decodeUnverifiedClaims';
 import { HttpClient, type HttpClientOptions } from './transport/HttpClient';
 
-export interface CloudEngineOptions extends HttpClientOptions {}
+/**
+ * `cloudEngine()`'s options: the HTTP client's, minus the session id the
+ * engine mints for itself (one per engine instance, for its events' origin).
+ */
+export interface CloudEngineOptions extends Omit<HttpClientOptions, 'sessionId'> {}
 
 /**
  * Cloud engine: speaks the same Engine interface as @embedpdf/engine
@@ -25,7 +29,7 @@ export interface CloudEngineOptions extends HttpClientOptions {}
  */
 export class CloudEngine implements Engine {
   static fromOptions(opts: CloudEngineOptions): CloudEngine {
-    // One identity per engine instance: it stamps local events' origins AND
+    // One identity per engine instance: it stamps local events' origins and
     // travels as X-Engine-Session-Id so the server can mark this instance's
     // audit rows — the SSE stream drops those echoes (exactly-once events).
     const sessionId = `cloud:${generateUuid()}`;
@@ -33,6 +37,8 @@ export class CloudEngine implements Engine {
   }
 
   private destroyed = false;
+  /** The documents this engine opened and nobody closed yet. */
+  private readonly handles = new Set<CloudDocumentHandle>();
 
   private constructor(
     private readonly http: HttpClient,
@@ -53,20 +59,17 @@ export class CloudEngine implements Engine {
     void options?.scope;
     void options?.identity;
 
-    // Presence-based precedence, same rule the local engine documents: an
-    // options.password key wins (even explicitly null), else input.password.
-    // For 'share' inputs `input.password` is still the PDF password — the
-    // grant passphrase travels separately as `input.sharePassword`.
-    const effectivePassword =
-      options && 'password' in options ? (options.password ?? null) : (input.password ?? null);
+    // The PDF's own password is an open option for every input kind, as on
+    // the local engine. A share's passphrase is `input.sharePassword`.
+    const effectivePassword = options?.password ?? null;
 
     if (input.kind === 'share') {
       // Open by public share token: exchange `shr_…` for a short-lived
       // doc-scoped session JWT, then delegate to the 'token' arm — the
-      // handle binds to a SELF-RENEWING source, so revoking or editing
+      // handle binds to a self-renewing source, so revoking or editing
       // the share retargets this open at the next renewal. The exchange
       // rides the engine's own transport config (baseUrl + fetch);
-      // exchange failures surface as EngineErrors on open AND on every
+      // exchange failures surface as EngineErrors on open and on every
       // later renewal (RPCs, SSE reconnects), never as raw
       // ShareExchangeErrors.
       const raw = shareSessionSource(this.http.baseUrl, input.shareToken, {
@@ -80,7 +83,7 @@ export class CloudEngine implements Engine {
           throw error instanceof ShareExchangeError ? engineErrorFromShareExchange(error) : error;
         }
       };
-      return this.open({ kind: 'token', token, password: input.password ?? null }, options);
+      return this.open({ kind: 'token', token }, options);
     }
 
     if (input.kind === 'token') {
@@ -89,7 +92,7 @@ export class CloudEngine implements Engine {
       // unsigned payload to learn `doc_id`, then route to /head with
       // the per-open bearer. The resulting handle owns its own
       // scoped HttpClient — every subsequent RPC carries this
-      // token, NOT the engine-level one, so one engine can hold
+      // token, not the engine-level one, so one engine can hold
       // many handles each with a different bearer.
       const tokenSource = input.token;
       return AbortablePromise.run<DocumentHandle>(async (signal) => {
@@ -119,8 +122,15 @@ export class CloudEngine implements Engine {
           head,
           token,
           this.sessionId,
+          () => this.handles.delete(handle),
         );
-        await maybeAutoEstablishAccess(handle, head, signal, effectivePassword);
+        this.handles.add(handle);
+        try {
+          await maybeAutoEstablishAccess(handle, head, signal, effectivePassword);
+        } catch (error) {
+          await handle.close();
+          throw error;
+        }
         return handle;
       });
     }
@@ -135,7 +145,7 @@ export class CloudEngine implements Engine {
       return AbortablePromise.run<DocumentHandle>(async (signal) => {
         let layerName = input.layerName ?? DEFAULT_LAYER_NAME;
         // Resolve the bearer once so we have it for the layer-name
-        // claim AND for the security service's local-fallback scope/
+        // claim and for the security service's local-fallback scope/
         // identity. May be null when the engine has no token at all
         // (caller invokes /head anonymously — server will reject).
         let resolvedToken: string | null = null;
@@ -162,8 +172,15 @@ export class CloudEngine implements Engine {
           head,
           resolvedToken,
           this.sessionId,
+          () => this.handles.delete(handle),
         );
-        await maybeAutoEstablishAccess(handle, head, signal, effectivePassword);
+        this.handles.add(handle);
+        try {
+          await maybeAutoEstablishAccess(handle, head, signal, effectivePassword);
+        } catch (error) {
+          await handle.close();
+          throw error;
+        }
         return handle;
       });
     }
@@ -177,34 +194,42 @@ export class CloudEngine implements Engine {
     );
   }
 
+  /**
+   * Close every document this engine opened (their event streams stop), then
+   * refuse new opens. As on the local engine, a handle is unusable after.
+   */
   destroy(): AbortablePromise<void> {
     if (this.destroyed) return AbortablePromise.resolveValue<void>(undefined);
     this.destroyed = true;
-    return AbortablePromise.resolveValue<void>(undefined);
+    const open = [...this.handles];
+    this.handles.clear();
+    return AbortablePromise.run<void>(async () => {
+      await Promise.all(open.map((handle) => handle.close()));
+    });
   }
 }
 
 /**
  * Post-/head access establishment, in two layers:
  *
- * 1. **Supplied password** — a password given at open is always TRIED
+ * 1. **Supplied password** — a password given at open is always tried
  *    (PDFium parity: the local engine feeds it to the loader no matter
  *    what). Two triggers, because `/head` only carries the `password`
- *    reason when a password is needed to READ:
+ *    reason when a password is needed to read:
  *      - `reasons` has `'password'` → required-to-read case
  *      - `head.permissions.canUpgradeToOwner` → permission-only encrypted
  *        doc; the password can still upgrade to owner. Skipping this arm
- *        would silently drop supplied OWNER passwords — and diverge from
+ *        would silently drop supplied owner passwords — and diverge from
  *        the local engine on identical input.
  *    Outcomes follow "a password failure may only block what the password
  *    was needed for": a rejection in the required case leaves the handle
- *    locked (the caller's prompt takes over, showing "incorrect"); in the
+ *    locked (the prompt says `incorrect`, as on the local engine); in the
  *    upgrade case the document stays readable and the failure is
  *    non-fatal. The one /access POST also installs the CDN binding, so a
  *    successful unlock covers the `password + cdn` combined case.
  *
  * 2. **CDN-only** — unchanged: `/access` without a password, transparently.
- *    A required password with NO supplied password never auto-calls; the
+ *    A required password with no supplied password never auto-calls; the
  *    dev prompts and `unlock()` runs the same POST.
  *
  * Non-password /access failures never break `open()` (the first real
@@ -234,9 +259,10 @@ async function maybeAutoEstablishAccess(
     const unlocked = await settleLinked(security.unlock({ password, mode: 'any' }), signal);
     if (unlocked) return; // /access succeeded — CDN binding installed too
     // Rejected or failed: in the required case the handle stays locked and
-    // the caller's password prompt takes over (retrying re-POSTs /access);
-    // in the upgrade case the document is readable regardless — fall
-    // through so a CDN-only establishment still happens.
+    // the caller's password prompt takes over (`incorrect` when the password
+    // was wrong; retrying re-POSTs /access); in the upgrade case the
+    // document is readable regardless — fall through so a CDN-only
+    // establishment still happens.
     if (reasons.has('password')) return;
   }
 

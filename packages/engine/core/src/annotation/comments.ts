@@ -6,21 +6,21 @@
  * one-level composer, `buildCommentThreads()` is the opinionated one a
  * comments sidebar wants:
  *
- *   - the WHOLE `/IRT` subtree of a root is walked (cycle-safe), and its
+ *   - the whole `/IRT` subtree of a root is walked (cycle-safe), and its
  *     non-state members flatten into one chronological reply list;
  *   - ISO 32000 §12.5.6.3 state annotations (review status) are extracted
  *     into `review` instead of appearing as replies;
- *   - widgets, links, and unsupported blobs (which includes `/Popup`
- *     dictionaries) are excluded entirely;
+ *   - widgets, links, popups (a note's window, not a comment) and
+ *     unsupported blobs are excluded entirely;
  *   - `/RT /Group` subordinates anywhere in the subtree fold into
  *     `groupedParts`, never into `replies`.
  *
  * Tolerant-reader rules (foreign files are messy; none of this throws):
  *   - empty-string `state` / `stateModel` count as absent — the engine
  *     DTO is faithful (`''` = present-but-empty), tolerance lives here;
- *   - a state annotation whose target cannot be resolved is DROPPED
+ *   - a state annotation whose target cannot be resolved is dropped
  *     (status metadata with no anchor has no meaning);
- *   - an orphaned non-state reply is PROMOTED to a thread root (matching
+ *   - an orphaned non-state reply is promoted to a thread root (matching
  *     `buildThreads`), as is the first input-order member of an `/IRT`
  *     cycle — the visited set breaks the loop, nothing is lost or hangs;
  *   - a `/State` with no `/StateModel` infers its model from the known
@@ -29,16 +29,17 @@
  * Ordering: threads appear in the input order of their roots; the
  * composer never sorts by page (display order is a layout concern —
  * callers join `pages.list()`). Replies sort chronologically by
- * `created ?? modified`, entries without a date last, page z-order
+ * `createdAt ?? modifiedAt`, entries without a date last, page z-order
  * (`index`) as the final deterministic tiebreak.
  */
 
 import type { AnnotationDTO } from './kinds';
-import type { KnownAnnotationState } from './primitives';
+import type { KnownAnnotationState, KnownAnnotationStateModel } from './primitives';
 import { classifyRelation } from './relationships';
 import { annotationKey } from '../identity/annotationKey';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { PageRef } from '../identity/PageRef';
+import { compareIsoDateTime, type IsoDateTime } from '../dto/IsoDateTime';
 
 /** One reviewer's status, derived from an ISO §12.5.6.3 state annotation. */
 export interface ReviewStatus {
@@ -48,28 +49,28 @@ export interface ReviewStatus {
   stateModel: string;
   /** Reviewer key: `/EMBD_Metadata` userId, else `/T`, else null. */
   by: string | null;
-  /** `/M` ?? `/CreationDate` of the state annotation (ISO 8601). */
-  at: string | null;
+  /** `/M` ?? `/CreationDate` of the state annotation. */
+  at: IsoDateTime | null;
   /** The state annotation itself — for auditing or deletion. */
   ref: AnnotationRef;
 }
 
 /**
  * Review state of one thread. The two ISO state models are independent
- * axes: `byReviewer` / `lastChange` cover the review axis (the standard
+ * axes: `byReviewer` / `lastChange` cover review status (the standard
  * `Review` model plus custom models), while the personal-checkmark
  * `Marked` axis lives solely in `markedBy`.
  */
 export interface CommentThreadReview {
   /** Latest review-axis status per reviewer key (unattributed skipped). */
   byReviewer: Record<string, ReviewStatus>;
-  /** Latest review-axis change overall — a convenience, NOT a verdict. */
+  /** Latest review-axis change overall — a convenience, not a verdict. */
   lastChange: ReviewStatus | null;
   /** Reviewer keys whose latest Marked-model status is `'marked'`. */
   markedBy: string[];
   /**
    * Every state annotation in the thread's subtree (both axes, all
-   * reviewers, chronological) — thread MEMBERSHIP, not status history:
+   * reviewers, chronological) — thread membership, not status history:
    * deleting a whole thread must delete its state annotations too, and
    * the classified summaries above deliberately drop superseded refs.
    */
@@ -93,10 +94,10 @@ export interface BuildCommentThreadsOptions {
   currentUserId?: string;
 }
 
-/** Subtypes that never participate in comment threads. `unsupported`
- *  covers `/Popup` dictionaries (raw code 16) and unreadable foreign
- *  blobs — neither makes a meaningful comment card. */
-const EXCLUDED_SUBTYPES: ReadonlySet<string> = new Set(['widget', 'link', 'unsupported']);
+/** Subtypes that never participate in comment threads: a popup is its
+ *  parent's window and an unsupported blob is unreadable, so neither makes
+ *  a comment card. */
+const EXCLUDED_SUBTYPES: ReadonlySet<string> = new Set(['widget', 'link', 'popup', 'unsupported']);
 
 const REVIEW_STATES: ReadonlySet<KnownAnnotationState> = new Set([
   'accepted',
@@ -106,6 +107,17 @@ const REVIEW_STATES: ReadonlySet<KnownAnnotationState> = new Set([
   'none',
 ]);
 const MARKED_STATES: ReadonlySet<KnownAnnotationState> = new Set(['marked', 'unmarked']);
+
+/**
+ * The model a standard state belongs to (ISO 32000 §12.5.6.3, Table 174):
+ * `'review'` for accepted, rejected, cancelled, completed and none,
+ * `'marked'` for marked and unmarked; `null` for a custom state.
+ */
+export function standardStateModelOf(state: string): KnownAnnotationStateModel | null {
+  if (REVIEW_STATES.has(state as KnownAnnotationState)) return 'review';
+  if (MARKED_STATES.has(state as KnownAnnotationState)) return 'marked';
+  return null;
+}
 
 const nonEmpty = (v: string | null | undefined): v is string => typeof v === 'string' && v !== '';
 
@@ -141,8 +153,8 @@ export function buildCommentThreads(
   // Children adjacency over resolvable /IRT edges.
   const children = new Map<string, AnnotationDTO[]>();
   for (const a of eligible) {
-    if (!a.inReplyTo) continue;
-    const parent = byKey.get(annotationKey(a.inReplyTo));
+    if (!a.reply) continue;
+    const parent = byKey.get(annotationKey(a.reply.to));
     if (!parent) continue; // orphan — handled in the promotion pass
     const parentKey = annotationKey(parent.ref);
     const list = children.get(parentKey);
@@ -186,7 +198,7 @@ export function buildCommentThreads(
 
   // Pass 1: real roots, in input order.
   for (const a of eligible) {
-    if (!a.inReplyTo && !isStateAnnotation(a)) walk(a);
+    if (!a.reply && !isStateAnnotation(a)) walk(a);
   }
 
   // Pass 2: promotion. Anything not reached from a root — an orphan whose
@@ -202,11 +214,12 @@ export function buildCommentThreads(
   return threads;
 }
 
-/** `created ?? modified` ascending; undated last; z-order tiebreak. */
+/** `createdAt ?? modifiedAt` ascending; undated last; z-order tiebreak. */
 function chronological(a: AnnotationDTO, b: AnnotationDTO): number {
-  const at = a.created ?? a.modified;
-  const bt = b.created ?? b.modified;
-  if (at !== null && bt !== null && at !== bt) return at < bt ? -1 : 1;
+  const at = a.createdAt ?? a.modifiedAt;
+  const bt = b.createdAt ?? b.modifiedAt;
+  const order = at !== null && bt !== null ? compareIsoDateTime(at, bt) : 0;
+  if (order !== 0) return order;
   if (at !== null && bt === null) return -1;
   if (at === null && bt !== null) return 1;
   return a.index - b.index;
@@ -253,7 +266,7 @@ function computeReview(
 
 /**
  * Derive a `ReviewStatus` from one state annotation, or null when nothing
- * classifiable can be derived. ISO defaulting happens HERE, not in the
+ * classifiable can be derived. ISO defaulting happens here, not in the
  * engine reader: a known model with an absent state means `none` /
  * `unmarked`; an absent model infers from a known state; a custom model
  * with no state has no derivable status.
@@ -265,9 +278,8 @@ function toReviewStatus(a: AnnotationDTO): ReviewStatus | null {
 
   let stateModel = rawModel;
   if (stateModel === null && rawState !== null) {
-    if (REVIEW_STATES.has(rawState as KnownAnnotationState)) stateModel = 'review';
-    else if (MARKED_STATES.has(rawState as KnownAnnotationState)) stateModel = 'marked';
-    else return null; // custom state without a model: unclassifiable
+    stateModel = standardStateModelOf(rawState);
+    if (stateModel === null) return null; // custom state without a model: unclassifiable
   }
   let state = rawState;
   if (state === null) {
@@ -281,7 +293,7 @@ function toReviewStatus(a: AnnotationDTO): ReviewStatus | null {
     state,
     stateModel,
     by: a.userId ?? (nonEmpty(a.author) ? a.author : null),
-    at: a.modified ?? a.created ?? null,
+    at: a.modifiedAt ?? a.createdAt ?? null,
     ref: a.ref,
   };
 }
@@ -291,7 +303,7 @@ function toReviewStatus(a: AnnotationDTO): ReviewStatus | null {
  *  equal or missing dates the later entry wins via `>=` / `true`. */
 function isNewer(a: ReviewStatus, b: ReviewStatus | null | undefined): boolean {
   if (!b) return true;
-  if (a.at !== null && b.at !== null) return a.at >= b.at;
+  if (a.at !== null && b.at !== null) return compareIsoDateTime(a.at, b.at) >= 0;
   if (a.at !== null) return true;
   if (b.at !== null) return false;
   return true; // both undated: input order — later entry wins

@@ -36,9 +36,9 @@ export function useStamp() {
   return useCapability(StampToken);
 }
 
-/** Subscribe to one stamp event for the mounted lifetime: `useStampEvent((c) => c.onAssetCreated, handler)`. */
+/** Subscribe to one stamp event for the mounted lifetime: `useStampEvent((stamp) => stamp.onAssetCreated, handler)`. */
 export function useStampEvent<T>(
-  select: (cap: StampCapability) => EventHook<T>,
+  select: (stamp: StampCapability) => EventHook<T>,
   handler: (event: T) => void,
 ): void {
   useCapabilityEvent(StampToken, select, handler);
@@ -50,7 +50,8 @@ export function useStampLibraries(query?: StampLibraryFilter): readonly StampLib
     query?.kind === undefined ? undefined : ([] as string[]).concat(query.kind).join('\u0000');
   return useSelector(
     StampToken,
-    (c) => c.listLibraries(kinds === undefined ? undefined : { kind: kinds.split('\u0000') }),
+    (stamp) =>
+      stamp.listLibraries(kinds === undefined ? undefined : { kind: kinds.split('\u0000') }),
     shallowArray,
   );
 }
@@ -59,14 +60,14 @@ export function useStampLibraries(query?: StampLibraryFilter): readonly StampLib
 export function useStampAssets(libraryId?: string): readonly StampAsset[] {
   return useSelector(
     StampToken,
-    (c) => c.listAssets(libraryId ? { libraryId } : undefined),
+    (stamp) => stamp.listAssets(libraryId ? { libraryId } : undefined),
     shallowArray,
   );
 }
 
 /**
  * Object URL for an asset's cached preview (gallery thumbnails). The plugin
- * holds the preview BYTES; the URL — a DOM resource — is created here and
+ * holds the preview bytes; the URL — a DOM resource — is created here and
  * revoked on unmount/asset change, mirroring `<AnnotationLayer>`'s rule that
  * object-URL lifetime belongs to the framework layer.
  */
@@ -79,7 +80,7 @@ export function useStampAssetPreviewUrl(assetId: string | null): string | null {
       setUrl(null);
       return;
     }
-    // Copy into an EXACT ArrayBuffer (the engine idiom) before Blob-wrapping.
+    // Copy into an exact ArrayBuffer (the engine idiom) before Blob-wrapping.
     const body = new ArrayBuffer(preview.bytes.byteLength);
     new Uint8Array(body).set(preview.bytes);
     const obj = URL.createObjectURL(new Blob([body], { type: preview.mimeType }));
@@ -97,15 +98,15 @@ export function useStampAssetPreviewUrl(assetId: string | null): string | null {
  * document) — the one-liner a gallery item's onClick needs.
  */
 export function useArmStampAsset(): {
-  armAsset: (assetId: string, opts?: { targetWidth?: number }) => Promise<void>;
+  armAsset: (assetId: string, options?: { targetWidth?: number }) => Promise<void>;
   disarm: () => void;
 } {
   const stamp = useCapability(StampToken);
   const documentId = useDocumentId();
   return {
-    armAsset: (assetId, opts) => {
+    armAsset: (assetId, options) => {
       if (!documentId) return Promise.reject(new Error('[stamp] no document in scope'));
-      return stamp.armAsset(documentId, assetId, opts);
+      return stamp.armAsset(documentId, assetId, options);
     },
     disarm: () => {
       if (documentId) stamp.disarm(documentId);

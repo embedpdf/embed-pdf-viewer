@@ -7,9 +7,9 @@ import { useCapability, useCapabilityEvent, useSelector } from './runtime';
 
 export * from '@embedpdf/plugin-measurement';
 
-/** Subscribe to one measurement event for the mounted lifetime: `useMeasurementEvent((c) => c.onScaleChanged, handler)`. */
+/** Subscribe to one measurement event for the mounted lifetime: `useMeasurementEvent((measurement) => measurement.onScaleChanged, handler)`. */
 export function useMeasurementEvent<T>(
-  select: (cap: MeasurementCapability) => EventHook<T>,
+  select: (measurement: MeasurementCapability) => EventHook<T>,
   handler: (event: T) => void,
 ): void {
   useCapabilityEvent(MeasurementToken, select, handler);
@@ -17,17 +17,18 @@ export function useMeasurementEvent<T>(
 
 /** The calibration the plugin is asking the chrome to complete, if any. */
 export function useCalibrationRequest() {
-  return useSelector(MeasurementToken, (c) => c.getCalibrationRequest());
+  return useSelector(MeasurementToken, (measurement) => measurement.getCalibrationRequest());
 }
 
-export function useMeasurement(): MeasurementCapability & {
-  busy: boolean;
-  canCalibratePage: boolean;
-} {
-  const cap = useCapability(MeasurementToken);
-  const busy = useSelector(MeasurementToken, (c) => c.isBusy());
-  const canCalibratePage = useSelector(MeasurementToken, (c) => c.canCalibrate());
-  return { ...cap, busy, canCalibratePage };
+/**
+ * The measurement capability plus `busy`, subscribed: true while a scale
+ * change runs. Read permissions with a selector, like every other plugin:
+ * `useSelector(MeasurementToken, (measurement) => measurement.canCalibrate())`.
+ */
+export function useMeasurement(): MeasurementCapability & { busy: boolean } {
+  const measurement = useCapability(MeasurementToken);
+  const busy = useSelector(MeasurementToken, (current) => current.isBusy());
+  return { ...measurement, busy };
 }
 
 /** The page's measurement scale, subscribed. Accepts `null` (no current
@@ -36,12 +37,14 @@ export function useMeasurement(): MeasurementCapability & {
 export function usePageScale(page: PageRef): PageScale;
 export function usePageScale(page: PageRef | null): PageScale | null;
 export function usePageScale(page: PageRef | null): PageScale | null {
-  return useSelector(MeasurementToken, (c) => (page ? c.getPageScale(page) : null));
+  return useSelector(MeasurementToken, (measurement) =>
+    page ? measurement.getPageScale(page) : null,
+  );
 }
 
 export const useMeasurementReadout = (ref: AnnotationRef) =>
   useSelector(
     MeasurementToken,
-    (c) => c.getReadout(ref),
-    (a, b) => JSON.stringify(a) === JSON.stringify(b),
+    (measurement) => measurement.getReadout(ref),
+    (left, right) => JSON.stringify(left) === JSON.stringify(right),
   );

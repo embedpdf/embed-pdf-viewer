@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-// SKIPPED: stale since the engine-core -> engine/core restructure broke the
+// Skipped: stale since the engine-core -> engine/core restructure broke the
 // import path and these stopped collecting; the render wire schema has since
 // drifted (9 assertions fail against current shapes). Revive against the
 // current wire contract in a dedicated pass.
@@ -24,7 +24,7 @@ describe.skip('wire token codec', () => {
       'viewport.width': 720,
       background: 'white',
       rotation: 90,
-      quality: 80,
+      quality: 0.8,
       'target.kind': 'rect',
       'target.rect.left': 10,
       'target.rect.bottom': 20,
@@ -32,7 +32,7 @@ describe.skip('wire token codec', () => {
       'target.rect.top': 60.25,
     });
     expect(token).toBe(
-      'annotationVersion=7,background=white,contentVersion=1,format=webp,includeAnnotations=true,quality=80,rotation=90,target.kind=rect,target.rect.bottom=20,target.rect.left=10,target.rect.right=40.5,target.rect.top=60.25,viewport.kind=width,viewport.width=720',
+      'annotationVersion=7,background=white,contentVersion=1,format=webp,includeAnnotations=true,quality=0.8,rotation=90,target.kind=rect,target.rect.bottom=20,target.rect.left=10,target.rect.right=40.5,target.rect.top=60.25,viewport.kind=width,viewport.width=720',
     );
     expect(decodeRenderToken(token)).toEqual({
       contentVersion: '1',
@@ -43,7 +43,7 @@ describe.skip('wire token codec', () => {
       'viewport.width': '720',
       background: 'white',
       rotation: '90',
-      quality: '80',
+      quality: '0.8',
       'target.kind': 'rect',
       'target.rect.left': '10',
       'target.rect.bottom': '20',
@@ -125,7 +125,7 @@ describe.skip('wire token codec', () => {
       },
       rotation: 90 as const,
       background: 'white' as const,
-      quality: 80,
+      quality: 0.8,
       includeAnnotations: true,
     };
     expect(renderImageOptionsToWire(options, { contentVersion: 3, annotationVersion: 9 })).toEqual({
@@ -142,7 +142,7 @@ describe.skip('wire token codec', () => {
       'target.rect.top': 60.25,
       rotation: 90,
       background: 'white',
-      quality: 80,
+      quality: 0.8,
     });
   });
 
@@ -156,7 +156,7 @@ describe.skip('wire token codec', () => {
       },
       rotation: 90 as const,
       background: 'white' as const,
-      quality: 80,
+      quality: 0.8,
       includeAnnotations: true,
     };
     const tokenString = renderImageOptionsToToken(options, {
@@ -173,7 +173,7 @@ describe.skip('wire token codec', () => {
       },
       rotation: 90,
       background: 'white',
-      quality: 80,
+      quality: 0.8,
     });
   });
 });

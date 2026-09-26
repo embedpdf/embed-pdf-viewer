@@ -21,17 +21,17 @@ const rect = { x: 10, y: 20, width: 30, height: 12 };
 
 describe('TextQuad', () => {
   test('rect round-trip: fromRect → positional → normalize is identity', () => {
-    const t = textQuadFromRect(rect);
-    expect(t.upperStart).toEqual({ x: 10, y: 20 });
-    expect(t.lowerEnd).toEqual({ x: 40, y: 32 });
-    const back = normalizeQuad(positionalQuad(t));
-    expect(back).toEqual(t);
+    const quad = textQuadFromRect(rect);
+    expect(quad.upperStart).toEqual({ x: 10, y: 20 });
+    expect(quad.lowerEnd).toEqual({ x: 40, y: 32 });
+    const back = normalizeQuad(positionalQuad(quad));
+    expect(back).toEqual(quad);
   });
 
   test('bounds and ring', () => {
-    const t = textQuadFromRect(rect);
-    expect(textQuadBounds(t)).toEqual(rect);
-    expect(textQuadRing(t)).toEqual([
+    const quad = textQuadFromRect(rect);
+    expect(textQuadBounds(quad)).toEqual(rect);
+    expect(textQuadRing(quad)).toEqual([
       { x: 10, y: 20 },
       { x: 40, y: 20 },
       { x: 40, y: 32 },
@@ -41,17 +41,17 @@ describe('TextQuad', () => {
 
   test('normalizeQuad passes well-formed rotated zigzag through untouched', () => {
     // 90°-rotated cell: baseline runs down-screen; upper edge on the +x side.
-    const q: Quad = {
+    const quad: Quad = {
       p1: { x: 50, y: 10 }, // upper-start
       p2: { x: 50, y: 40 }, // upper-end
       p3: { x: 38, y: 10 }, // lower-start
       p4: { x: 38, y: 40 }, // lower-end
     };
-    const t = normalizeQuad(q);
-    expect(t.upperStart).toEqual(q.p1);
-    expect(t.upperEnd).toEqual(q.p2);
-    expect(t.lowerStart).toEqual(q.p3);
-    expect(t.lowerEnd).toEqual(q.p4);
+    const normalized = normalizeQuad(quad);
+    expect(normalized.upperStart).toEqual(quad.p1);
+    expect(normalized.upperEnd).toEqual(quad.p2);
+    expect(normalized.lowerStart).toEqual(quad.p3);
+    expect(normalized.lowerEnd).toEqual(quad.p4);
   });
 
   test('normalizeQuad repairs ring-order producers (US, UE, LE, LS)', () => {
@@ -73,18 +73,18 @@ describe('TextQuad', () => {
       p3: { x: 10, y: 0 },
       p4: { x: 0, y: 12 },
     };
-    const t = normalizeQuad(garbage);
+    const quad = normalizeQuad(garbage);
     // Deterministic, and "upper" lands on the smaller-y edge.
-    const upperMidY = (t.upperStart.y + t.upperEnd.y) / 2;
-    const lowerMidY = (t.lowerStart.y + t.lowerEnd.y) / 2;
+    const upperMidY = (quad.upperStart.y + quad.upperEnd.y) / 2;
+    const lowerMidY = (quad.lowerStart.y + quad.lowerEnd.y) / 2;
     expect(upperMidY).toBeLessThan(lowerMidY);
-    expect(normalizeQuad(garbage)).toEqual(t);
+    expect(normalizeQuad(garbage)).toEqual(quad);
   });
 
   test('applyTextQuad carries corner semantics through a rotation', () => {
-    const t = textQuadFromRect({ x: 0, y: 0, width: 10, height: 4 }) as TextQuadIn<'content'>;
-    const turned = applyTextQuad(rotate<'content'>(Math.PI / 2), t);
-    // Corner NAMES stay attached to the same text corners regardless of
+    const upright = textQuadFromRect({ x: 0, y: 0, width: 10, height: 4 }) as TextQuadIn<'content'>;
+    const turned = applyTextQuad(rotate<'content'>(Math.PI / 2), upright);
+    // Corner names stay attached to the same text corners regardless of
     // where the transform puts them on screen.
     expect(turned.upperStart.x).toBeCloseTo(0, 6);
     expect(turned.upperStart.y).toBeCloseTo(0, 6);
@@ -111,7 +111,7 @@ describe('textQuadEdge', () => {
   });
 
   test('length is the INK height, invariant under rotation (the AABB is not)', () => {
-    const len = (e: [Point, Point]) => Math.hypot(e[1].x - e[0].x, e[1].y - e[0].y);
+    const len = (edge: [Point, Point]) => Math.hypot(edge[1].x - edge[0].x, edge[1].y - edge[0].y);
     expect(len(textQuadEdge(cell, 'start'))).toBeCloseTo(16, 9);
     for (const deg of [30, 45, 90, 180, 270]) {
       const turned = applyTextQuad(
@@ -127,8 +127,8 @@ describe('textQuadEdge', () => {
   });
 
   test('direction carries the text rotation', () => {
-    const angle = (e: [Point, Point]) =>
-      (Math.atan2(e[1].y - e[0].y, e[1].x - e[0].x) * 180) / Math.PI;
+    const angle = (edge: [Point, Point]) =>
+      (Math.atan2(edge[1].y - edge[0].y, edge[1].x - edge[0].x) * 180) / Math.PI;
     expect(angle(textQuadEdge(cell, 'start'))).toBeCloseTo(90, 9); // straight down
     const turned = applyTextQuad(rotate<'content'>(Math.PI / 4), cell as TextQuadIn<'content'>);
     expect(angle(textQuadEdge(turned, 'start'))).toBeCloseTo(135, 9);
@@ -139,8 +139,7 @@ describe('textQuadEdge', () => {
     const [us, ls] = textQuadEdge(turned, 'start');
     const [ue, le] = textQuadEdge(turned, 'end');
     // parallel: the cross product of the two edge vectors vanishes
-    const cross =
-      (ls.x - us.x) * (le.y - ue.y) - (ls.y - us.y) * (le.x - ue.x);
+    const cross = (ls.x - us.x) * (le.y - ue.y) - (ls.y - us.y) * (le.x - ue.x);
     expect(cross).toBeCloseTo(0, 9);
     // and they are the advance-width apart
     expect(Math.hypot(ue.x - us.x, ue.y - us.y)).toBeCloseTo(60, 9);
@@ -159,11 +158,11 @@ describe('textQuadEquals', () => {
 
   test('a rotation-in-place with a near-identical AABB still reads as a change', () => {
     // rotate about the cell centre: the AABB stays centred (and for a square
-    // cell would be IDENTICAL) while every corner moves — the case handle
+    // cell would be identical) while every corner moves — the case handle
     // re-rendering must catch
-    const c = { x: 130, y: 208 };
+    const center = { x: 130, y: 208 };
     const turned = applyTextQuad(
-      rotateAbout<'content'>(c as PointIn<'content'>, Math.PI / 6),
+      rotateAbout<'content'>(center as PointIn<'content'>, Math.PI / 6),
       cell as TextQuadIn<'content'>,
     );
     expect(textQuadEquals(cell, turned)).toBe(false);

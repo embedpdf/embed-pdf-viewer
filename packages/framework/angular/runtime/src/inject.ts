@@ -13,8 +13,8 @@ import type { CapabilityToken, DocInfo, EventHook, Kernel } from '@embedpdf/core
 import { EpdfKernelHost } from './kernel-host';
 import { EPDF_DOCUMENT_SCOPE } from './tokens';
 
-export const shallowArray = <T>(a: readonly T[], b: readonly T[]): boolean =>
-  a === b || (a.length === b.length && a.every((x, i) => x === b[i]));
+export const shallowArray = <T>(left: readonly T[], right: readonly T[]): boolean =>
+  left === right || (left.length === right.length && left.every((item, i) => item === right[i]));
 
 export function injectKernelHost(): EpdfKernelHost {
   const host = inject(EpdfKernelHost, { optional: true });
@@ -26,7 +26,7 @@ export function injectKernelHost(): EpdfKernelHost {
   return host;
 }
 
-/** The raw kernel — materializes it immediately. Do NOT call while a component
+/** The raw kernel — materializes it immediately. Do not call while a component
  *  is being constructed in component-hosted mode (inputs are not set yet);
  *  prefer the signal-returning primitives, which defer the first kernel read. */
 export function injectKernel(): Kernel {
@@ -36,13 +36,13 @@ export function injectKernel(): Kernel {
 /** Read a value derived from the kernel, cached by equality — `useKernelValue`. */
 export function injectKernelValue<R>(
   select: (kernel: Kernel) => R,
-  equal?: (a: R, b: R) => boolean,
+  equal?: (left: R, right: R) => boolean,
 ): Signal<R> {
   return injectKernelHost().value(select, equal);
 }
 
 export function injectActiveDocumentId(): Signal<string | null> {
-  return injectKernelValue((k) => k.documents.getActiveId());
+  return injectKernelValue((kernel) => kernel.documents.getActiveId());
 }
 
 /** The document id for this injector subtree: the nearest `[epdfDocumentScope]`,
@@ -54,9 +54,9 @@ export function injectDocumentId(): Signal<string | null> {
 }
 
 /**
- * Resolve a capability against a REACTIVE token — for components that take the
+ * Resolve a capability against a reactive token — for components that take the
  * token as an input (`injectCapability` is the fixed-token sugar). Resolution
- * is a REACTIVE read (`tryCapability` through the kernel's one change
+ * is a reactive read (`tryCapability` through the kernel's one change
  * stream), not a computed over the document id — under the request-time
  * lifecycle a document can become resolvable while its id stays the same, so
  * any id-keyed cache goes stale; subscribing makes staleness structurally
@@ -67,7 +67,7 @@ export function injectDocumentId(): Signal<string | null> {
 export function injectCapabilityFor<T>(token: () => CapabilityToken<T>): Signal<T> {
   const host = injectKernelHost();
   const scope = inject(EPDF_DOCUMENT_SCOPE, { optional: true });
-  const cap = host.value((k) => k.tryCapability(token(), scope?.id() ?? undefined));
+  const cap = host.value((kernel) => kernel.tryCapability(token(), scope?.id() ?? undefined));
   return computed(() => cap() ?? host.kernel.capability(token(), scope?.id() ?? undefined));
 }
 
@@ -80,7 +80,7 @@ export function injectCapability<T>(token: CapabilityToken<T>): Signal<T> {
 export function injectOptionalCapabilityFor<T>(token: () => CapabilityToken<T>): Signal<T | null> {
   const host = injectKernelHost();
   const scope = inject(EPDF_DOCUMENT_SCOPE, { optional: true });
-  return host.value((k) => k.tryCapability(token(), scope?.id() ?? undefined));
+  return host.value((kernel) => kernel.tryCapability(token(), scope?.id() ?? undefined));
 }
 
 export function injectOptionalCapability<T>(token: CapabilityToken<T>): Signal<T | null> {
@@ -91,7 +91,7 @@ export function injectOptionalCapability<T>(token: CapabilityToken<T>): Signal<T
 export function injectSelectorFor<C, R>(
   token: () => CapabilityToken<C>,
   select: (cap: C) => R,
-  equal?: (a: R, b: R) => boolean,
+  equal?: (left: R, right: R) => boolean,
 ): Signal<R> {
   const host = injectKernelHost();
   const cap = injectCapabilityFor(token);
@@ -101,7 +101,7 @@ export function injectSelectorFor<C, R>(
 export function injectSelector<C, R>(
   token: CapabilityToken<C>,
   select: (cap: C) => R,
-  equal?: (a: R, b: R) => boolean,
+  equal?: (left: R, right: R) => boolean,
 ): Signal<R> {
   return injectSelectorFor(() => token, select, equal);
 }
@@ -110,7 +110,7 @@ export function injectSelector<C, R>(
  * Null-safe `injectSelector`: `fallback` whenever the token can't resolve — no
  * provider, or a document-scoped token with no document. For chrome that stays
  * mounted across the empty-workspace state (a zoom readout, a mode band).
- * `injectSelector` stays strict (fail-fast) for code that KNOWS a document
+ * `injectSelector` stays strict (fail-fast) for code that knows a document
  * exists — e.g. anything behind the document gate.
  *
  * The `select` guard also swallows reads through a capability whose document
@@ -121,15 +121,15 @@ export function injectOptionalSelectorFor<C, R>(
   token: () => CapabilityToken<C>,
   select: (cap: C) => R,
   fallback: R,
-  equal?: (a: R, b: R) => boolean,
+  equal?: (left: R, right: R) => boolean,
 ): Signal<R> {
   const host = injectKernelHost();
   const cap = injectOptionalCapabilityFor(token);
   return host.value(() => {
-    const c = cap();
-    if (c === null) return fallback;
+    const capability = cap();
+    if (capability === null) return fallback;
     try {
-      return select(c);
+      return select(capability);
     } catch {
       return fallback;
     }
@@ -140,15 +140,15 @@ export function injectOptionalSelector<C, R>(
   token: CapabilityToken<C>,
   select: (cap: C) => R,
   fallback: R,
-  equal?: (a: R, b: R) => boolean,
+  equal?: (left: R, right: R) => boolean,
 ): Signal<R> {
   return injectOptionalSelectorFor(() => token, select, fallback, equal);
 }
 
 /**
  * Subscribe to a capability's {@link EventHook} for the injector's lifetime —
- * `injectCapabilityEvent(ActionsToken, (c) => c.onExecuted, handler)`; React's
- * `useCapabilityEvent`. Events carry occurrences, never state (a late
+ * `injectCapabilityEvent(ActionsToken, (actions) => actions.onExecuted, handler)`;
+ * React's `useCapabilityEvent`. Events carry occurrences, never state (a late
  * subscriber that needs the current value reads a selector). Null-safe: no
  * plugin/document → no subscription; the subscription follows the resolved
  * capability across document switches.
@@ -167,7 +167,7 @@ export function injectCapabilityEvent<C, T>(
 }
 
 /** Subscribe to one document lifecycle event for the injector's lifetime:
- *  `injectDocumentEvent((d) => d.onOpened, handler)` — React's `useDocumentEvent`. */
+ *  `injectDocumentEvent((documents) => documents.onOpened, handler)` — React's `useDocumentEvent`. */
 export function injectDocumentEvent<T>(
   select: (documents: Kernel['documents']) => EventHook<T>,
   handler: (event: T) => void,
@@ -201,14 +201,14 @@ export interface EpdfDocuments {
 export function injectDocuments(): EpdfDocuments {
   const host = injectKernelHost();
   return {
-    docs: host.value((k) => k.documents.list(), docInfoListEquals),
-    activeId: host.value((k) => k.documents.getActiveId()),
+    docs: host.value((kernel) => kernel.documents.list(), docInfoListEquals),
+    activeId: host.value((kernel) => kernel.documents.getActiveId()),
     open: (input, options) => host.kernel.documents.open(input, options),
     unlock: (id, input) => host.kernel.documents.unlock(id, input),
     close: (id) => host.kernel.documents.close(id),
     setActive: (id) => host.kernel.documents.setActive(id),
     move: (id, toIndex) => host.kernel.documents.move(id, toIndex),
-    swap: (a, b) => host.kernel.documents.swap(a, b),
+    swap: (left, right) => host.kernel.documents.swap(left, right),
     setOrder: (ids) => host.kernel.documents.setOrder(ids),
     retry: (id) => host.kernel.documents.retry(id),
     rename: (id, name) => host.kernel.documents.rename(id, name),

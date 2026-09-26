@@ -1,9 +1,9 @@
 /**
- * Wire-stable annotation primitives that are NOT pure geometry.
+ * Wire-stable annotation primitives that are not pure geometry.
  *
  * Geometry primitives (points, rects, sizes, quads, rotation) now live in
  * `../geometry` as the canonical `Pdf*` vocabulary. The aliases below are
- * TRANSITIONAL re-exports kept only so existing consumers keep compiling
+ * transitional re-exports kept only so existing consumers keep compiling
  * during the geometry consolidation; new code should import `Pdf*` directly
  * from `../geometry`.
  *
@@ -26,7 +26,7 @@ export type Rotation = PdfRotation;
  * sRGB color. Components are 0..255 integers. Engines normalize PDFium's
  * device color space into sRGB at read time.
  *
- * Colour carries NO alpha: annotation transparency is a separate concern
+ * Colour carries no alpha: annotation transparency is a separate concern
  * stored in `/CA` and surfaced as the `opacity` style field, so there is a
  * single source of truth for transparency. See `ColorStyleFields.opacity`.
  */
@@ -67,21 +67,24 @@ export interface LineEndings {
  * kebab-case so the wire format is stable across language ports; the engine
  * maps these onto PDFium's `FPDF_STANDARD_FONT` integer codes at write time.
  */
-export type StandardFont =
-  | 'courier'
-  | 'courier-bold'
-  | 'courier-bold-oblique'
-  | 'courier-oblique'
-  | 'helvetica'
-  | 'helvetica-bold'
-  | 'helvetica-bold-oblique'
-  | 'helvetica-oblique'
-  | 'times-roman'
-  | 'times-bold'
-  | 'times-bold-italic'
-  | 'times-italic'
-  | 'symbol'
-  | 'zapf-dingbats';
+export const STANDARD_FONTS = [
+  'courier',
+  'courier-bold',
+  'courier-bold-oblique',
+  'courier-oblique',
+  'helvetica',
+  'helvetica-bold',
+  'helvetica-bold-oblique',
+  'helvetica-oblique',
+  'times-roman',
+  'times-bold',
+  'times-bold-italic',
+  'times-italic',
+  'symbol',
+  'zapf-dingbats',
+] as const;
+
+export type StandardFont = (typeof STANDARD_FONTS)[number];
 
 /**
  * Font selector for a free-text annotation: either one of the 14 PDF
@@ -142,7 +145,7 @@ export type BlendMode =
 /**
  * Border/line style for shape annotations — the `/BS /S` (border style)
  * subset PDFium can author. Maps onto the ISO 32000 §8.4.3.3 border style
- * names. Cloudy borders are a SEPARATE concern (`/BE` border effect),
+ * names. Cloudy borders are a separate concern (`/BE` border effect),
  * surfaced as `cloudyIntensity` on the shape DTO, not as a border style.
  *
  * kebab-/lower-case so the wire format is stable across language ports;
@@ -173,7 +176,8 @@ export interface PdfRectDifferences {
  *   'reply' -> `/R`     a comment-thread reply (the ISO default when
  *                       `/IRT` is present but `/RT` is absent).
  *   'group' -> `/Group` a subordinate part of one logical annotation
- *                       group (e.g. the Caret of a text-edit pair).
+ *                       group (e.g. the StrikeOut of a replace-text pair,
+ *                       grouped under its Caret).
  */
 export type AnnotationReplyType = 'reply' | 'group';
 
@@ -181,8 +185,8 @@ export type AnnotationReplyType = 'reply' | 'group';
 export type KnownAnnotationStateModel = 'review' | 'marked';
 
 /**
- * The `/StateModel` of an annotation-state text annotation — ISO 32000
- * §12.5.6.3. The standard models are `'review'` and `'marked'`, but the
+ * The `/StateModel` of an annotation-state text annotation —
+ * ISO 32000 §12.5.6.3. The standard models are `'review'` and `'marked'`, but the
  * PDF stores the entry as a free text string and Acrobat supports
  * registering custom state models, so the type stays open. The
  * `(string & {})` arm keeps the standard literals auto-completing while
@@ -205,13 +209,13 @@ export type KnownAnnotationState =
   | 'unmarked';
 
 /**
- * The `/State` an annotation-state text annotation sets — ISO 32000
- * §12.5.6.3. `'accepted' | 'rejected' | 'cancelled' | 'completed' |
+ * The `/State` an annotation-state text annotation sets —
+ * ISO 32000 §12.5.6.3. `'accepted' | 'rejected' | 'cancelled' | 'completed' |
  * 'none'` belong to the `'review'` model; `'marked' | 'unmarked'` to the
  * `'marked'` model. Open for the same reason as
  * {@link AnnotationStateModel}: custom models bring custom states.
  *
- * States are PER USER and live on separate text annotations replying
+ * States are per user and live on separate text annotations replying
  * (`/IRT`) to their target — never on the target itself. The `/T` of the
  * state annotation names who set it; later changes by the same user
  * chain as replies to their previous state annotation, latest wins.

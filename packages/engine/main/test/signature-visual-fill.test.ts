@@ -19,12 +19,12 @@ type Engine = Awaited<ReturnType<typeof createLocalEngine>>;
 /** Opaque pixels of one widget's rendered normal appearance — zero means an empty or broken /AP. */
 async function opaquePixels(
   doc: Awaited<ReturnType<Engine['open']>>,
-  pon: number,
+  pageObjectNumber: number,
   annotObjectNumber: number,
 ): Promise<number> {
   const { appearances } = await doc
-    .page(toPageRef(pon))
-    .annotations.renderAppearances({ scale: 2 });
+    .page(toPageRef(pageObjectNumber))
+    .annotations.renderAppearancesRaw({ viewport: { kind: 'scale', scale: 2 } });
   const ap = appearances.find(
     (a) => a.ref.kind === 'objectNumber' && a.ref.annotObjectNumber === annotObjectNumber,
   );
@@ -55,7 +55,7 @@ describe('signature fields in the viewer phase', () => {
     );
     try {
       const page = (await doc.pages.list()).pages[0]!;
-      const created = await doc.forms.createField({
+      const created = await doc.forms.create({
         family: 'signature',
         name: 'sig2',
         widget: {
@@ -65,7 +65,7 @@ describe('signature fields in the viewer phase', () => {
       });
       expect(created.field.family).toBe('signature');
       expect(created.field.widgets).toHaveLength(1);
-      const before = await doc.signatures!.list();
+      const before = await doc.signatures.list();
       expect(before.signatures.map((s) => [s.fieldName, s.signed])).toEqual([
         ['sig', false],
         ['sig2', false],
@@ -80,7 +80,7 @@ describe('signature fields in the viewer phase', () => {
       expect(filled.meta.affectedPages.map((p) => p.page.pageObjectNumber)).toEqual([
         page.ref.pageObjectNumber,
       ]);
-      // The mark is actually DRAWN: the widget's appearance renders opaque pixels
+      // The mark is actually drawn: the widget's appearance renders opaque pixels
       // (the fork wraps the page into a child form; the outer stream must place it).
       expect(
         await opaquePixels(
@@ -90,19 +90,19 @@ describe('signature fields in the viewer phase', () => {
         ),
       ).toBeGreaterThan(50);
       expect(
-        (await doc.signatures!.list()).signatures.find((s) => s.fieldName === 'sig2')?.signed,
+        (await doc.signatures.list()).signatures.find((s) => s.fieldName === 'sig2')?.signed,
       ).toBe(false);
       await expect(
         doc.forms.setSignatureAppearance!({ kind: 'fqn', name: 'group.total' }, { pdf: artwork }),
       ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
 
-      // Sign the other field with attribution; the facts land in the dictionary.
-      const prepared = await doc.signatures!.prepare({
+      // Sign the other field with a signer; the facts land in the dictionary.
+      const prepared = await doc.signatures.prepare({
         field: { kind: 'fqn', name: 'sig' },
-        attribution: { name: 'Bob Singor', reason: 'approved', location: 'Amsterdam' },
+        signer: { name: 'Bob Singor', reason: 'approved', location: 'Amsterdam' },
         appearance: { pdf: artwork },
       });
-      const result = await doc.signatures!.complete({
+      const result = await doc.signatures.complete({
         signingId: prepared.signingId,
         cms: FAKE_CMS,
         expectedVersion: prepared.expectedVersion,
@@ -123,7 +123,7 @@ describe('signature fields in the viewer phase', () => {
       // A signed field's appearance is sealed with the signature.
       await expect(
         doc.forms.setSignatureAppearance!({ kind: 'fqn', name: 'sig' }, { pdf: artwork }),
-      ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+      ).rejects.toMatchObject({ code: EngineErrorCode.ProtectedDocument });
       // The unsigned field can still be redrawn after the document was versioned.
       const again = await doc.forms.setSignatureAppearance!(
         { kind: 'fqn', name: 'sig2' },

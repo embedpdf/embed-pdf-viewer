@@ -1,48 +1,35 @@
-import type { FileAttachmentWireDraft } from './draft';
-import type { FileAttachmentAnnotationDTO } from './dto';
-import type { FileAttachmentPatch } from './patch';
-import {
-  FileAttachmentDTOSchema,
-  FileAttachmentPatchSchema,
-  FileAttachmentWireDraftSchema,
-} from './schema';
+import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
+import { FileAttachmentDeclaration } from './declaration';
 
-export type { FileAttachmentAnnotationDTO } from './dto';
-export type {
-  FileAttachmentDraft,
-  FileAttachmentWireDraft,
-  FileAttachmentIcon,
-  WireAttachmentFile,
-} from './draft';
-export type { FileAttachmentPatch } from './patch';
-export {
-  FileAttachmentDTOSchema,
-  FileAttachmentWireDraftSchema,
-  FileAttachmentPatchSchema,
-  FileAttachmentIconSchema,
-  WireAttachmentFileSchema,
-} from './schema';
-export { normalizeFileAttachmentDraft, normalizeAttachmentFileSource } from './normalize';
+export { FileAttachmentDeclaration } from './declaration';
+export { FileAttachmentIconSchema } from './values';
+export type { FileAttachmentIcon } from './values';
 
+export type FileAttachmentAnnotationDTO = ReadOf<typeof FileAttachmentDeclaration>;
 /**
- * WIRE-typed like `StampKind`: the draft schema validates the
- * post-normalization form (`file` as metadata + resource ref). The
- * authoring `FileAttachmentDraft` (inline bytes) is swapped into the
- * public `AnnotationDraft` union in `kinds/index.ts`. The patch carries
- * no binary (`file` is create-only), so its authoring and wire forms are
- * the same type.
+ * `file` is the file's name, MIME type and description; its bytes travel
+ * beside the data, as the `file` resource. In an update, `file` replaces all
+ * three, and the `file` resource replaces the bytes.
  */
+export type FileAttachmentDraft = CreateOf<typeof FileAttachmentDeclaration>;
+export type FileAttachmentPatch = UpdateOf<typeof FileAttachmentDeclaration>;
+
+export const FileAttachmentDTOSchema = FileAttachmentDeclaration.readSchema;
+export const FileAttachmentDraftSchema = FileAttachmentDeclaration.createSchema;
+export const FileAttachmentPatchSchema = FileAttachmentDeclaration.updateSchema;
+
 export const FileAttachmentKind: AnnotationKindModule<
   'file-attachment',
   FileAttachmentAnnotationDTO,
-  FileAttachmentWireDraft,
+  FileAttachmentDraft,
   FileAttachmentPatch
 > = {
   subtype: 'file-attachment',
   pdfSubtypeCode: PdfAnnotationSubtypeCode.FILEATTACHMENT,
   dtoSchema: FileAttachmentDTOSchema,
-  draftSchema: FileAttachmentWireDraftSchema,
+  draftSchema: FileAttachmentDraftSchema,
   patchSchema: FileAttachmentPatchSchema,
+  readBackWrites: FileAttachmentDeclaration.readBackWrites,
 };

@@ -1,6 +1,6 @@
 /**
- * Plugin-private services every area is built on (NOT the kernel): the
- * event hooks, the binary sidecar, the asset engine port and the ghost
+ * Plugin-private services every area is built on (not the kernel): the
+ * events, the binaries resource, the asset engine port and the ghost
  * renderer.
  */
 import type { StampConfig } from '../contract';

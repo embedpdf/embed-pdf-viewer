@@ -11,7 +11,7 @@ import { resolveDocsTree } from './docs-markdown';
 
 /**
  * CloudPDF's binding of the kit search extractor. Sections resolve through
- * the SAME markdown pass that renders the `.md` export — which is how the
+ * the same markdown pass that renders the `.md` export — which is how the
  * API reference gets indexed for free: `<ApiOperation>` pages project their
  * real summaries, parameters, and responses through the same
  * `projectCloudPdfComponent` hook the `.md` route uses.

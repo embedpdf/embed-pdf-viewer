@@ -15,10 +15,9 @@ import {
   type DocumentRenderService,
   type DocumentSecurityProbeInfo,
   type EngineRenderPolicy,
-  type DocumentSecurityService,
   type MetadataService,
   type PageHandle,
-  type PageObjectNumber,
+  type DownloadOptions,
   type PdfSaveMode,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
@@ -46,7 +45,6 @@ import type { WorkerQueue } from '../worker/WorkerQueue';
 export class LocalDocumentHandle implements DocumentHandle {
   readonly capabilities = {
     weakAnnotationEditSessions: 'not-needed',
-    pageEditSessions: 'unsupported',
   } as const;
   readonly metadata: MetadataService;
   readonly pieceInfo: LocalPieceInfoService;
@@ -58,12 +56,12 @@ export class LocalDocumentHandle implements DocumentHandle {
   readonly search: LocalDocumentSearchService;
   readonly pages: DocumentPagesService;
   readonly redaction: DocumentRedactionService;
-  readonly security: DocumentSecurityService;
+  readonly security: LocalDocumentSecurityService;
   readonly signatures: LocalDocumentSignaturesService;
   /**
    * The engine's configured render policy, advertised through the same
    * `policy()` every engine exposes (engine parity: plugin code never
-   * branches on engine kind). Local DEFAULTS to `continuous` — rendering
+   * branches on engine kind). Local defaults to `continuous` — rendering
    * is in-process and exact — but an embedder can configure a lattice at
    * `localEngine({ renderPolicy })`, the same way permissions are
    * overridden, and the local engine then budgets/enforces exactly like
@@ -86,7 +84,7 @@ export class LocalDocumentHandle implements DocumentHandle {
   ) {
     const view = { isClosed: () => this.closed };
     this.renderPolicy = renderPolicy;
-    this.render = { policy: () => Promise.resolve(this.renderPolicy) };
+    this.render = { getPolicy: () => AbortablePromise.resolveValue(this.renderPolicy) };
     const hub = new EventHub();
     this.events = hub;
     // A single instance, so every event is `kind: 'local'` — the same
@@ -96,7 +94,7 @@ export class LocalDocumentHandle implements DocumentHandle {
     this.metadata = new LocalMetadataService(id, queue, view, guard, this.publisher);
     // Catalog-level /PieceInfo (no pon); page-level lives on each page handle.
     this.pieceInfo = new LocalPieceInfoService(id, queue, view, guard);
-    this.annotations = new LocalDocumentAnnotationsService(id, queue, view, guard);
+    this.annotations = new LocalDocumentAnnotationsService(id, queue, view, guard, this.publisher);
     this.attachments = new LocalDocumentAttachmentsService(id, queue, view, guard, this.publisher);
     this.actions = new LocalDocumentActionsService(id, queue, view, guard);
     this.forms = new LocalDocumentFormsService(id, queue, view, guard, this.publisher);
@@ -140,19 +138,15 @@ export class LocalDocumentHandle implements DocumentHandle {
   }
 
   /**
-   * Returns a `PageHandle` keyed on the page's address (object number or
-   * `/Names /Pages` key). We don't validate the page exists synchronously -
-   * the worker resolves the address on every call. This matches the cloud engine, which
-   * cannot validate without a round-trip either.
-   *
-   * `pageIndex` is advisory metadata, reported as `-1`. Display order is
-   * geometry, not liveness: clients read it from `pages.list()` (each
-   * `PageLayout.index`), joined to this handle by `ref`.
+   * Returns a `PageHandle` keyed on the page's address. We don't validate
+   * the page exists synchronously: the worker resolves the address on every
+   * call. This matches the cloud engine, which cannot validate without a
+   * round-trip either. Display order is geometry, not liveness: clients read
+   * it from `pages.list()` (each `PageLayout.index`), joined by `ref`.
    */
   page(ref: PageRef): PageHandle {
     return new LocalPageHandle(
       ref,
-      -1,
       this.id,
       this.queue,
       {
@@ -165,7 +159,7 @@ export class LocalDocumentHandle implements DocumentHandle {
     );
   }
 
-  download(opts: { mode?: PdfSaveMode } = {}): AbortablePromise<Uint8Array> {
+  download(options: DownloadOptions = {}): AbortablePromise<Uint8Array> {
     if (this.closed) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.id}`),
@@ -177,19 +171,9 @@ export class LocalDocumentHandle implements DocumentHandle {
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.id;
-    const mode = opts.mode ?? DEFAULT_PDF_SAVE_MODE;
-    // A rewrite drops every revision, and with them every signature. A
-    // signed document refuses it unless the engine runs with
-    // `signedDocumentPolicy: 'permit'`.
-    const protection = this.guard.currentProtection();
-    if (mode === 'rewrite' && protection && protection.judged !== null) {
-      return AbortablePromise.rejectReason(
-        new EngineError(
-          EngineErrorCode.ProtectedDocument,
-          'the document is signed: a rewrite save would void every signature (use an incremental save)',
-        ),
-      );
-    }
+    const mode = options.mode ?? DEFAULT_PDF_SAVE_MODE;
+    // A rewrite of a signed document is refused by the worker (one rule for
+    // both engines).
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
@@ -248,26 +232,17 @@ export class LocalDocumentHandle implements DocumentHandle {
   }
 
   /** Node runtimes only: the document written to a local file, never through JS (see `DocumentHandle`). */
-  downloadToFile(path: string, opts?: { mode?: PdfSaveMode }): AbortablePromise<void> {
+  downloadToFile(path: string, options?: DownloadOptions): AbortablePromise<void> {
     if (this.closed) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.id}`),
       );
     }
-    const mode: PdfSaveMode = opts?.mode ?? DEFAULT_PDF_SAVE_MODE;
+    const mode: PdfSaveMode = options?.mode ?? DEFAULT_PDF_SAVE_MODE;
     try {
       this.guard.assertCapability('doc.download');
     } catch (err) {
       return AbortablePromise.rejectReason(err);
-    }
-    const protection = this.guard.currentProtection();
-    if (mode === 'rewrite' && protection && protection.judged !== null) {
-      return AbortablePromise.rejectReason(
-        new EngineError(
-          EngineErrorCode.ProtectedDocument,
-          'the document is signed: a rewrite save would void every signature (use an incremental save)',
-        ),
-      );
     }
     const docId = this.id;
     const submission = this.queue.enqueue<WorkerResultPayload>(

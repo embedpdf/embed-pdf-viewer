@@ -1,0 +1,192 @@
+---
+title: Fonts
+description: Give the engine your own fonts, for text in any script or your brand typeface, and fill in characters a document's fonts don't have.
+engines: [local]
+---
+
+import { Callout } from '@/components/docs/callout';
+
+# Fonts
+
+Text the engine draws (a free text annotation, a filled-in form field, a redaction label) needs a
+font that has its characters. The 14 standard PDF fonts only cover Latin text. To write Chinese,
+Cyrillic, Arabic or your brand typeface, register a font with the engine and use it by a key you
+choose:
+
+```ts
+const response = await fetch('/fonts/NotoSansSC-Regular.otf');
+
+await engine.fonts.register({
+  key: 'noto-sc',
+  familyName: 'Noto Sans SC',
+  data: new Uint8Array(await response.arrayBuffer()),
+});
+```
+
+Registered fonts belong to the engine, not to one document: every document opened on the engine
+can use them, until you clear them or destroy the engine.
+
+## Register a font
+
+`register()` takes the font file (TTF or OTF) and a `key`:
+
+| Field        | What it is                                                   | Default            |
+| :----------- | :----------------------------------------------------------- | :----------------- |
+| `key`        | Your name for the font. You use it wherever you pick a font. | required           |
+| `data`       | The font file's bytes, a `Uint8Array` or an `ArrayBuffer`.   | required           |
+| `familyName` | The family the PDF names the font by.                        | read from the file |
+| `weight`     | `100` to `900`.                                              | read from the file |
+| `italic`     | Whether it's the italic style.                               | read from the file |
+
+Registering a key a second time does nothing and returns the first font, so it's safe to call on
+every page load. A file the engine can't read fails with `InvalidArg`. The 14 standard names
+(`'helvetica'`, `'times-roman'`, `'courier'`, …) are taken: registering one of them fails with
+`InvalidArg`.
+
+To load fonts while the engine starts, before the first document opens, pass them to
+`localEngine()` with a `url` or with `data`:
+
+```ts
+const engine = localEngine({
+  fonts: [{ key: 'brand-sans', url: '/fonts/BrandSans-Regular.ttf' }],
+  fallbackFonts: [{ key: 'noto-sc', url: '/fonts/NotoSansSC-Regular.otf' }],
+});
+```
+
+`fonts` are only used when you name them; `fallbackFonts` also [fill in missing
+characters](#automatic-fallback-for-missing-characters).
+
+## Use a font on free text
+
+A free text annotation's `fontFamily` takes a standard font name or a key you registered:
+
+```ts
+await page.annotations.create({
+  subtype: 'free-text',
+  rect: { left: 60, bottom: 600, right: 360, top: 660 },
+  contents: '这是一个测试',
+  fontFamily: 'noto-sc',
+});
+```
+
+A key you never registered fails with `InvalidArg`: the engine doesn't quietly swap in another
+font.
+
+When you save, the PDF carries only the characters the text uses, not the whole font. A CJK font
+of several megabytes adds only what those characters need, and the text shows the same in every
+PDF app.
+
+In [rich text](/docs/engine/annotations/free-text), a run names its font by family, the way the PDF
+does: `{ text: '世界', style: { family: 'Noto Sans SC' } }`. The engine finds a registered font by
+its family or its key. A family it can't find anywhere is drawn in Helvetica, so the text still
+shows.
+
+When you read the annotation back, its `fontFamily` is your key if the font is registered on the
+engine that reads it, and the font's family name otherwise. So a document you saved comes back
+with the same key, as long as the font is registered.
+
+## Show the font in the browser too
+
+The engine puts the font into the PDF; the browser doesn't know it. The text editor and any
+annotation the browser draws itself use the font's key as their CSS font family, so give the
+browser the same file under that name:
+
+```ts
+import { mountWebFont } from '@embedpdf/web';
+
+await engine.fonts.register({ key: 'noto-sc', familyName: 'Noto Sans SC', data });
+const unmount = await mountWebFont('noto-sc', data);
+
+// When you no longer need it:
+unmount();
+```
+
+Mounting a key twice is fine: the font stays until the last `unmount()`. The viewer does both
+steps for you from its `annotations.fonts` option; see
+[Fonts for text annotations](/docs/viewer/getting-started#fonts-for-text-annotations).
+
+## Document font settings
+
+Two settings per document shape the text the engine draws from then on. They're not saved in the
+file:
+
+```ts
+await doc.fonts.setEmbeddingPolicy('full');
+await doc.fonts.setTypographicFeatures(true);
+```
+
+| Setting                  | What it does                                                                                                            | Default     |
+| :----------------------- | :---------------------------------------------------------------------------------------------------------------------- | :---------- |
+| `setEmbeddingPolicy`     | How much of a font goes into the PDF: `'subset'` (only the characters used), `'full'` (the whole font), or `'default'`. | `'default'` |
+| `setTypographicFeatures` | Kerning and ligatures for Latin text in rich text.                                                                      | off         |
+
+`'default'` embeds only the characters used for annotation text, and the whole font for form
+fields. A font whose licence doesn't allow a partial copy is always embedded whole, and a font
+already in the document is never added again.
+
+Kerning and ligatures are off by default because Acrobat draws annotation text without them, and
+the engine matches what Acrobat draws.
+
+## Automatic fallback for missing characters
+
+A registered font is only used where you name it. Add it to the fallback list, and the engine
+also uses it for any character the chosen font doesn't have, in the text it draws and when it
+renders pages:
+
+```ts
+await engine.fonts.register({ key: 'noto-sc', familyName: 'Noto Sans SC', data });
+await engine.fonts.addFallback('noto-sc');
+
+// "Hello " is drawn in Helvetica (the default), "世界" in Noto Sans SC.
+await page.annotations.create({
+  subtype: 'free-text',
+  rect: { left: 60, bottom: 540, right: 360, top: 600 },
+  contents: 'Hello 世界',
+});
+```
+
+Fallback fonts are tried in the order you add them; the first one that has the character wins.
+
+## Manage fonts
+
+```ts
+engine.fonts.list(); // every registered font, in the order you registered them (no await: it's in memory)
+await engine.fonts.clearFallbacks(); // empty the fallback list; the fonts stay registered
+await engine.fonts.clear(); // unregister every font and empty the fallback list
+```
+
+<Callout type="info">
+  The engine keeps every registered font in memory, and a CJK font is several megabytes. Register
+  the few fonts you use rather than a whole library.
+</Callout>
+
+## Good to know
+
+### Font licences
+
+A font file says how it may be embedded, and the engine follows it. `register()` returns what it
+found:
+
+```ts
+const font = await engine.fonts.register({ key: 'brand-serif', data });
+font.embeddingPermission; // 'installable' | 'editable' | 'preview-and-print'
+font.editingAuthorized; // may new text be written with it?
+```
+
+A font whose licence forbids embedding is refused when you register it. A `'preview-and-print'`
+font shows text a document already has, but can't be used for new text: a free text annotation
+that names it fails, and the fallback list skips it. When your licence does allow editing, say so:
+
+```ts
+await engine.fonts.authorizeEditing('brand-serif');
+```
+
+### Variable fonts
+
+A variable font is fixed to one style when you register it: the `weight` you give, or the font's
+default. The PDF then carries an ordinary font of that style, and the font's `instanced` field is
+`true`.
+
+### Several fonts at once
+
+`registerAll([...])` registers a list of fonts in order and returns them in the same order.

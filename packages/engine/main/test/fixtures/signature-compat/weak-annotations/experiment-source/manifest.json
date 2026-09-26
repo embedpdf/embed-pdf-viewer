@@ -1,0 +1,97 @@
+[
+  {
+    "file": "generate-indirect-annotation-control.py.txt",
+    "originalName": "generate-indirect-annotation-control.py",
+    "sha256": "242aa151f852a25247af251017fea0325cebb362b63747797ea2792a7ac9fe9a"
+  },
+  {
+    "file": "generate-p3-matched.py.txt",
+    "originalName": "generate-p3-matched.py",
+    "sha256": "8125f94e853e5fed3633d929c5069d208490ae4cd952758d00f7995e40d4b83d"
+  },
+  {
+    "file": "generate-raw-rewrite-control.py.txt",
+    "originalName": "generate-raw-rewrite-control.py",
+    "sha256": "1b1b282ce53739d63b3afce10d081d037af9039c46c79ca2fb3629ca06d804eb"
+  },
+  {
+    "file": "generate-rewrite-control.py.txt",
+    "originalName": "generate-rewrite-control.py",
+    "sha256": "80ce821e105ed3b9f1d5f28b4bc7ca45413e0c048dc61576ab61baf21fe291e3"
+  },
+  {
+    "file": "generate-size-control.py.txt",
+    "originalName": "generate-size-control.py",
+    "sha256": "589edc428984f1f8c575342090500bb6cd633fedddb7b0b5a7f5833c21b81f78"
+  },
+  {
+    "file": "generate.py.txt",
+    "originalName": "generate.py",
+    "sha256": "c10f0d8c7fc082f3c34dd1aa5a7f8b5a1fe59e098d959f31a4f8893a84ada2b3"
+  },
+  {
+    "file": "indirect-annotations.config.mts.txt",
+    "originalName": "indirect-annotations.config.mts",
+    "sha256": "e164b5923273b1821b83cdd0385ec7f369f4ebacf992859fe8f22192414d2222"
+  },
+  {
+    "file": "indirect-annotations.test.ts.txt",
+    "originalName": "indirect-annotations.test.ts",
+    "sha256": "6573282b714860bbdec7ed1e79554fab8878c2a32022dff3d5665d77df250042"
+  },
+  {
+    "file": "p3-matched.config.mts.txt",
+    "originalName": "p3-matched.config.mts",
+    "sha256": "fc8d84bf1d32d6c5a29202285528e21d775d8f0fa62e9ae3f2c1e6d16ab49c66"
+  },
+  {
+    "file": "p3-matched.test.ts.txt",
+    "originalName": "p3-matched.test.ts",
+    "sha256": "05f76b09d78d6375beee94e5b4ffd5b8b6fb1ce5cbed09f81767b2a762d97965"
+  },
+  {
+    "file": "probe.test.ts.txt",
+    "originalName": "probe.test.ts",
+    "sha256": "b17f64842782d6571b28f3604012540cc050c866437fe7351a2ca27705dec45a"
+  },
+  {
+    "file": "rewrite-reference-writer.config.mts.txt",
+    "originalName": "rewrite-reference-writer.config.mts",
+    "sha256": "7d4ea7b0ff5514492ec879452883777188c733788f33a16a6adaaa4c4cc3b65d"
+  },
+  {
+    "file": "rewrite-reference-writer.test.ts.txt",
+    "originalName": "rewrite-reference-writer.test.ts",
+    "sha256": "249bbcfe2fca89a45234157e3b53068e9f806aeaa8942e14130217895e3df042"
+  },
+  {
+    "file": "rewrite-size.config.mts.txt",
+    "originalName": "rewrite-size.config.mts",
+    "sha256": "f4c5f4a133c10a877cd42df70d48131fe04a1e05ad85e8e019144dd3efbbac69"
+  },
+  {
+    "file": "rewrite-size.test.ts.txt",
+    "originalName": "rewrite-size.test.ts",
+    "sha256": "c012453adaf823037b2faba8b36c5b912b29442793fefdb1091fd9fc5f55aedf"
+  },
+  {
+    "file": "rewrite.config.mts.txt",
+    "originalName": "rewrite.config.mts",
+    "sha256": "eaa235e5318be5381b71e34821528a47eda614f120776df922704fbd96b73478"
+  },
+  {
+    "file": "rewrite.test.ts.txt",
+    "originalName": "rewrite.test.ts",
+    "sha256": "646bfd13b34d34af8e592bee965fd26f31c09a3eb75d4d30c2c120870f64735e"
+  },
+  {
+    "file": "verify-existing.py.txt",
+    "originalName": "verify-existing.py",
+    "sha256": "dcc174bb1548585258ff9c5e7790b616e20fd92dab5b94de6b47140301c83e5a"
+  },
+  {
+    "file": "vitest.config.mts.txt",
+    "originalName": "vitest.config.mts",
+    "sha256": "95e034db3ea15929a380658f625cbc3b5389ee030cf2531287a21800bcf4dd7e"
+  }
+]

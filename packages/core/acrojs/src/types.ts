@@ -63,7 +63,7 @@ export interface ScriptEventInput {
   /**
    * Explicit Acrobat `event.type` / `event.name` overrides for action-driven
    * runs (built from the dispatcher's trigger provenance — `Field` × `Mouse
-   * Enter`, `Page` × `Open`, …; the `Annot` type is an EmbedPDF EXTENSION,
+   * Enter`, `Page` × `Open`, …; the `Annot` type is an EmbedPDF extension,
    * Acrobat has no event type for plain-annotation events). When omitted the
    * prelude derives them from `kind` (the K/V/C/F pipeline path).
    */
@@ -93,7 +93,7 @@ export type ScriptColorArray =
 
 /**
  * One script-addressable annotation in the prefetched world — every subtype
- * EXCEPT link and widget (Acrobat serves those through `Link`/`Field`
+ * except link and widget (Acrobat serves those through `Link`/`Field`
  * objects; here they are separate event planes). Curated read surface only —
  * never a raw dictionary.
  */
@@ -130,10 +130,10 @@ export interface ScriptAnnotInput {
   opaqueBody: boolean;
 }
 
-/** The curated WRITE patch one script staged for one annotation — a
+/** The curated write patch one script staged for one annotation — a
  *  canonical per-annot diff (last-write-wins per key, derived at run end
  *  exactly like form effects). Visibility keys ride `flags` so the commit
- *  sink maps them onto ONE engine flags patch. */
+ *  sink maps them onto one engine flags patch. */
 export interface ScriptAnnotEffect {
   ref: AnnotationRef;
   patch: {
@@ -157,7 +157,7 @@ export interface ScriptAnnotEffect {
 }
 
 /**
- * The writable-property validity matrix, keyed by engine subtype — the ONE
+ * The writable-property validity matrix, keyed by engine subtype — the one
  * exported table (the prelude inlines an identical copy; a parity test pins
  * them together, and plugin-annotation drift-guards this against the kind
  * registry's PropSpecs). Flags + contents are writable everywhere
@@ -187,7 +187,8 @@ export interface ScriptInput {
   identity: ScriptIdentity;
   environment: ScriptEnvironment;
   fields: ScriptFieldInput[];
-  /** The prefetched annots plane (page-scoped — see the D6 deviation). */
+  /** The prefetched annots plane. It covers only the pages in `annotPages`;
+   *  `getAnnots` reports a compatibility deviation for any other page. */
   annots?: ScriptAnnotInput[];
   /** Zero-based page indexes the plane covers. */
   annotPages?: number[];
@@ -200,7 +201,7 @@ export type ScriptUiEffect =
   | { kind: 'alert'; message: string; icon: number; title?: string }
   | { kind: 'print' }
   | { kind: 'gotoPage'; page: number }
-  /** `doc.submitForm(...)` — a submit INTENT, resolved and sink-routed
+  /** `doc.submitForm(...)` — a submit intent, resolved and sink-routed
    *  outside the VM (never a network call from here). `fieldNames` are
    *  include-mode (Acrobat's aFields); `null` = the whole eligible form. */
   | {
@@ -229,7 +230,7 @@ export interface ScriptDiagnostic {
   message: string;
 }
 
-// ── the sandbox contract (owned HERE; implementations re-export) ──────────
+// ── the sandbox contract (owned here; implementations re-export) ──────────
 // core-js-sandbox depends on this package, so the structural interface must
 // live on this side of the edge — the reverse import would be a cycle.
 
@@ -264,9 +265,9 @@ export interface ScriptEventOutput {
 
 /**
  * Effects are committed only by the originating client's orchestrator, in
- * the DECLARED cross-plane order: `formEffects` first (field order — matching
+ * the declared cross-plane order: `formEffects` first (field order — matching
  * the derive-by-diff model), then `annotEffects` (annot order); the first
- * failing effect marks every later effect in BOTH streams skipped.
+ * failing effect marks every later effect in both streams skipped.
  */
 export interface ScriptOutput {
   event: ScriptEventOutput;
@@ -296,19 +297,19 @@ export const DEFAULT_SCRIPT_BUDGET: Readonly<ScriptBudget> = Object.freeze({
 /**
  * The shipped security posture (updated per phase — the live authority for
  * per-type × origin decisions is the actions plugin's policy; these
- * constants DOCUMENT the posture, they do not enforce it). The only
+ * constants document the posture, they do not enforce it). The only
  * configurable switch is explicit opt-in.
  */
 export interface ScriptSecurityPolicy {
   enabled: boolean;
   executionOwner: 'originating-client-only';
   nameTreeBoot: 'lazy-first-transaction';
-  /** Submit is a sink chain — embedder handler → the document's HOME
+  /** Submit is a sink chain — embedder handler → the document's home
    *  (`doc.forms.submit`, engine-asserted) → blocked. Never auto-network. */
   submitForm: 'sink-chain';
   openAction: 'execute-lifecycle';
   pageActions: 'execute-lifecycle';
-  /** WC/WS/DS/WP/DP run when the VERB OWNER dispatches them. */
+  /** WC/WS/DS/WP/DP run when the verb owner dispatches them. */
   catalogLifecycleActions: 'execute-on-verb';
   annotationActions: 'execute-full-matrix';
 }

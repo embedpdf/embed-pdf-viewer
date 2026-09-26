@@ -2,31 +2,32 @@ import type { Size } from '@embedpdf/core-stage';
 import type { BoxQuery, ResponsiveRule, StageBox, StageSettings } from './contract';
 
 /**
- * Container queries for the settings bag — the pure half. The capability owns
- * the driver (when to re-resolve, how to react); the LAWS live here: what a
- * box is, when a query matches, and what the effective settings are. No state,
- * no dispatch — property-testable in isolation (the `wheel.ts` convention).
+ * Container queries for the settings bag, the pure half. The capability owns
+ * the driver (when to re-resolve, how to react); the laws live here: what a
+ * box is, when a query matches, and what the effective settings are. No
+ * state, so they are property-testable in isolation.
  *
- * The query vocabulary is deliberately just the box: a headless, DOM-free
- * stage knows exactly one environmental fact — the viewport it was told.
- * Anything else (pointer coarseness, platform, app state) is either per-event
- * (`PointerSample.pointerType`) or the app's own business via `update()`.
+ * The query vocabulary is only the box: a headless, DOM-free stage knows
+ * exactly one environmental fact, the viewport it was told. Anything else
+ * (pointer coarseness, platform, app state) is either per event
+ * (`PointerSample.pointerType`) or the app's own business via
+ * `updateSettings()`.
  */
 
 /** The reported viewport as a queryable box. A square box is 'portrait' (CSS). */
-export const boxOf = (vp: Size): StageBox => ({
-  width: vp.width,
-  height: vp.height,
-  orientation: vp.height >= vp.width ? 'portrait' : 'landscape',
+export const boxOf = (size: Size): StageBox => ({
+  width: size.width,
+  height: size.height,
+  orientation: size.height >= size.width ? 'portrait' : 'landscape',
 });
 
-/** All bounds inclusive, all fields optional, conditions AND-ed (CSS ranges). */
-export const matchesQuery = (q: BoxQuery, box: StageBox): boolean =>
-  (q.minWidth === undefined || box.width >= q.minWidth) &&
-  (q.maxWidth === undefined || box.width <= q.maxWidth) &&
-  (q.minHeight === undefined || box.height >= q.minHeight) &&
-  (q.maxHeight === undefined || box.height <= q.maxHeight) &&
-  (q.orientation === undefined || box.orientation === q.orientation);
+/** All bounds inclusive, all fields optional, every condition must hold (CSS ranges). */
+export const matchesQuery = (query: BoxQuery, box: StageBox): boolean =>
+  (query.minWidth === undefined || box.width >= query.minWidth) &&
+  (query.maxWidth === undefined || box.width <= query.maxWidth) &&
+  (query.minHeight === undefined || box.height >= query.minHeight) &&
+  (query.maxHeight === undefined || box.height <= query.maxHeight) &&
+  (query.orientation === undefined || box.orientation === query.orientation);
 
 const ruleMatches = (rule: ResponsiveRule, box: StageBox): boolean =>
   typeof rule.when === 'function' ? !!rule.when(box) : matchesQuery(rule.when, box);
@@ -36,13 +37,13 @@ export const mergeSettings = (
   into: StageSettings,
   patch: Partial<StageSettings>,
 ): StageSettings => {
-  const out = { ...into };
+  const merged = { ...into };
   let key: keyof StageSettings;
   for (key in patch) {
     const value = patch[key];
-    if (value !== undefined) Object.assign(out, { [key]: value });
+    if (value !== undefined) Object.assign(merged, { [key]: value });
   }
-  return out;
+  return merged;
 };
 
 /**
@@ -50,19 +51,22 @@ export const mergeSettings = (
  * settings vocabulary uses (`{ px }`, `{ x, y }`, page frames, zoom specs) by
  * one level of own-key comparison. Settings values are never nested deeper.
  */
-export const eqSetting = (a: unknown, b: unknown): boolean => {
-  if (a === b) return true;
-  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
-  const ka = Object.keys(a);
-  const kb = Object.keys(b);
+export const eqSetting = (left: unknown, right: unknown): boolean => {
+  if (left === right) return true;
+  if (typeof left !== 'object' || typeof right !== 'object' || left === null || right === null) {
+    return false;
+  }
+  const leftKeys = Object.keys(left);
   return (
-    ka.length === kb.length &&
-    ka.every((k) => (a as Record<string, unknown>)[k] === (b as Record<string, unknown>)[k])
+    leftKeys.length === Object.keys(right).length &&
+    leftKeys.every(
+      (key) => (left as Record<string, unknown>)[key] === (right as Record<string, unknown>)[key],
+    )
   );
 };
 
 export interface ResolvedResponsive {
-  /** base ⊕ every matching rule's patch, in source order (later wins per key). */
+  /** The base merged with every matching rule's patch, in source order (later wins per key). */
   effective: StageSettings;
   /** Names of the matching rules, in source order. */
   active: string[];

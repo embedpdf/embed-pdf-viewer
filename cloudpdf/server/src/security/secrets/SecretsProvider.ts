@@ -19,7 +19,7 @@ export interface SecretValue {
  * Diagnostic identity for a SecretsProvider. `kind` is the discriminator
  * (matches the Zod config schema); other fields are public identifiers
  * that may be surfaced via `/v1/deployment/status` and similar — bucket
- * names, hostnames, project IDs, etc. NEVER include secret values.
+ * names, hostnames, project IDs, etc. Never include secret values.
  *
  * Decorator providers (e.g., `CachingSecretsProvider`) add fields like
  * `cached: true` rather than mutating `kind`.

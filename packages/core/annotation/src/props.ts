@@ -1,18 +1,18 @@
 /**
  * The flat property vocabulary over the model: read and apply
- * {@link AnnotationProps} keys on an `Annot`, routing each key to where it is
+ * {@link AnnotationProps} keys on an `ModelAnnotation`, routing each key to where it is
  * stored (`style`, `geom.ends`, or `text`) so callers never learn the storage.
- * Which keys a kind takes is declared in the KIND table (`propsFor`); keys a
- * kind doesn't declare are ignored — that's what lets ONE patch restyle a
+ * Which keys a kind takes is declared in the kind table (`propsFor`); keys a
+ * kind doesn't declare are ignored — that's what lets one patch restyle a
  * mixed selection.
  */
 import { propsFor, type PropSpec } from './kinds';
 import { annotTransformable } from './flags';
 import type {
-  Annot,
+  ModelAnnotation,
   AnnotationProps,
   AnnotationPropsPatch,
-  Geom,
+  ContentGeometry,
   LineEndings,
   PropKey,
   Style,
@@ -30,75 +30,82 @@ export const initialTextStyle: TextStyle = {
 };
 
 /** The `Style` slice of a resolved props bag (the create-time projection). */
-export const styleFromProps = (p: AnnotationProps): Style => ({
-  color: p.color,
-  interiorColor: p.interiorColor,
-  strokeWidth: p.strokeWidth,
-  opacity: p.opacity,
-  blendMode: p.blendMode,
-  border: p.border,
+export const styleFromProps = (props: AnnotationProps): Style => ({
+  color: props.color,
+  interiorColor: props.interiorColor,
+  strokeWidth: props.strokeWidth,
+  opacity: props.opacity,
+  blendMode: props.blendMode,
+  border: props.border,
 });
 
 /** The `TextStyle` slice of a resolved props bag (the create-time projection). */
-export const textStyleFromProps = (p: AnnotationProps): TextStyle => ({
-  fontFamily: p.fontFamily,
-  fontSize: p.fontSize,
-  fontColor: p.fontColor,
-  textAlign: p.textAlign,
-  ...(p.bold !== undefined ? { bold: p.bold } : {}),
-  ...(p.italic !== undefined ? { italic: p.italic } : {}),
-  ...(p.underline !== undefined ? { underline: p.underline } : {}),
+export const textStyleFromProps = (props: AnnotationProps): TextStyle => ({
+  fontFamily: props.fontFamily,
+  fontSize: props.fontSize,
+  fontColor: props.fontColor,
+  textAlign: props.textAlign,
+  ...(props.bold !== undefined ? { bold: props.bold } : {}),
+  ...(props.italic !== undefined ? { italic: props.italic } : {}),
+  ...(props.underline !== undefined ? { underline: props.underline } : {}),
 });
 
 /** Does this kind's prop table declare `link` (attachable link)? The link
- *  KIND itself also declares it, but stores its own `/A` instead. */
+ *  Kind itself also declares it, but stores its own `/A` instead. */
 export const kindTakesLink = (subtype: string): boolean =>
-  propsFor(subtype).some((s) => s.key === 'link');
+  propsFor(subtype).some((spec) => spec.key === 'link');
 
-/** A geom that carries `/LE` endings: a line, or an OPEN poly (polyline). */
-const endingsGeom = (g: Geom): g is Extract<Geom, { t: 'line' } | { t: 'poly' }> =>
-  g.t === 'line' || (g.t === 'poly' && !g.closed);
+/** A geom that carries `/LE` endings: a line, or an open poly (polyline). */
+const endingsGeom = (
+  geometry: ContentGeometry,
+): geometry is Extract<ContentGeometry, { kind: 'line' } | { kind: 'poly' }> =>
+  geometry.kind === 'line' || (geometry.kind === 'poly' && !geometry.closed);
 
 /**
  * Read one property off an annotation — from wherever it lives — or `undefined`
  * when the annotation's kind doesn't carry it (a `fontSize` on a square, endings
  * on a polygon). The read side of `applyProps`.
  */
-export function readProp<K extends PropKey>(a: Annot, key: K): AnnotationProps[K] | undefined {
+export function readProp<K extends PropKey>(
+  annotation: ModelAnnotation,
+  key: K,
+): AnnotationProps[K] | undefined {
   const out = ((): AnnotationProps[PropKey] | undefined => {
     switch (key) {
       case 'color':
-        return a.style.color;
+        return annotation.style.color;
       case 'interiorColor':
-        return a.style.interiorColor;
+        return annotation.style.interiorColor;
       case 'strokeWidth':
-        return a.style.strokeWidth;
+        return annotation.style.strokeWidth;
       case 'opacity':
-        return a.style.opacity;
+        return annotation.style.opacity;
       case 'blendMode':
-        return a.style.blendMode;
+        return annotation.style.blendMode;
       case 'border':
-        return a.style.border;
+        return annotation.style.border;
       case 'lineEndings':
-        return endingsGeom(a.geom) ? (a.geom.ends ?? NO_ENDINGS) : undefined;
+        return endingsGeom(annotation.geometry)
+          ? (annotation.geometry.ends ?? NO_ENDINGS)
+          : undefined;
       case 'fontFamily':
-        return a.text?.fontFamily;
+        return annotation.text?.fontFamily;
       case 'fontSize':
-        return a.text?.fontSize;
+        return annotation.text?.fontSize;
       case 'fontColor':
-        return a.text?.fontColor;
+        return annotation.text?.fontColor;
       case 'textAlign':
-        return a.text?.textAlign;
+        return annotation.text?.textAlign;
       case 'bold':
-        return a.text ? (a.text.bold ?? false) : undefined;
+        return annotation.text ? (annotation.text.bold ?? false) : undefined;
       case 'italic':
-        return a.text ? (a.text.italic ?? false) : undefined;
+        return annotation.text ? (annotation.text.italic ?? false) : undefined;
       case 'underline':
-        return a.text ? (a.text.underline ?? false) : undefined;
+        return annotation.text ? (annotation.text.underline ?? false) : undefined;
       case 'icon':
-        return a.icon;
+        return annotation.icon;
       case 'link':
-        return a.link;
+        return annotation.link;
     }
   })();
   return out as AnnotationProps[K] | undefined;
@@ -108,17 +115,20 @@ export function readProp<K extends PropKey>(a: Annot, key: K): AnnotationProps[K
  * Apply a property patch to one annotation, honouring its kind's declared keys.
  * Returns the changed annotation, or `null` when nothing applied (locked /
  * read-only per its `/F` flags, or no declared key in the patch) — so the
- * caller emits no spurious engine write. Flags themselves are NOT props: they
+ * caller emits no spurious engine write. Flags themselves are not props: they
  * write through the `setFlags` message, which is deliberately not gated here
  * (unlocking must work on a locked annotation).
  */
-export function applyProps(a: Annot, patch: AnnotationPropsPatch): Annot | null {
-  if (!annotTransformable(a)) return null;
-  const takes = new Set<PropKey>(propsFor(a.subtype).map((s) => s.key));
-  let next = a;
+export function applyProps(
+  annotation: ModelAnnotation,
+  patch: AnnotationPropsPatch,
+): ModelAnnotation | null {
+  if (!annotTransformable(annotation)) return null;
+  const takes = new Set<PropKey>(propsFor(annotation.subtype).map((spec) => spec.key));
+  let next = annotation;
 
-  // `!== undefined` (not truthiness): `interiorColor: null` means CLEAR the fill.
-  const style: Style = { ...a.style };
+  // `!== undefined` (not truthiness): `interiorColor: null` means clear the fill.
+  const style: Style = { ...annotation.style };
   let styleChanged = false;
   if (patch.color !== undefined && takes.has('color')) {
     style.color = patch.color;
@@ -146,20 +156,20 @@ export function applyProps(a: Annot, patch: AnnotationPropsPatch): Annot | null 
   }
   if (styleChanged) next = { ...next, style };
 
-  if (patch.lineEndings && takes.has('lineEndings') && endingsGeom(next.geom)) {
-    const ends: LineEndings = { ...(next.geom.ends ?? NO_ENDINGS), ...patch.lineEndings };
-    next = { ...next, geom: { ...next.geom, ends } };
+  if (patch.lineEndings && takes.has('lineEndings') && endingsGeom(next.geometry)) {
+    const ends: LineEndings = { ...(next.geometry.ends ?? NO_ENDINGS), ...patch.lineEndings };
+    next = { ...next, geometry: { ...next.geometry, ends } };
   }
 
   if (patch.icon !== undefined && takes.has('icon')) {
     next = { ...next, icon: patch.icon };
   }
 
-  // Only the link KIND stores `link` (its own /A, a real wire prop). On every
+  // Only the link kind stores `link` (its own /A, a real wire prop). On every
   // other kind the value lives in attached child annotations: `setProps`
   // emits the `syncLink` intent instead of touching the model, and reads
   // derive through the `linkOf` lens.
-  if (patch.link !== undefined && takes.has('link') && a.subtype === 'link') {
+  if (patch.link !== undefined && takes.has('link') && annotation.subtype === 'link') {
     next = { ...next, link: patch.link };
   }
 
@@ -192,18 +202,18 @@ export function applyProps(a: Annot, patch: AnnotationPropsPatch): Annot | null 
     if (textChanged) next = { ...next, text };
   }
 
-  return next === a ? null : next;
+  return next === annotation ? null : next;
 }
 
 /**
- * The ordered property specs EVERY given kind declares — the schema for a mixed
- * selection, in the FIRST kind's display order. One kind → its own list, verbatim.
+ * The ordered property specs every given kind declares — the schema for a mixed
+ * selection, in the first kind's display order. One kind → its own list, verbatim.
  */
 export function sharedProps(subtypes: readonly string[]): PropSpec[] {
   const unique = [...new Set(subtypes)];
   if (!unique.length) return [];
   const first = propsFor(unique[0]);
   if (unique.length === 1) return first;
-  const rest = unique.slice(1).map((s) => new Set(propsFor(s).map((p) => p.key)));
-  return first.filter((p) => rest.every((keys) => keys.has(p.key)));
+  const rest = unique.slice(1).map((subtype) => new Set(propsFor(subtype).map((spec) => spec.key)));
+  return first.filter((spec) => rest.every((keys) => keys.has(spec.key)));
 }

@@ -4,14 +4,13 @@ import { createTestContext } from '@embedpdf/core/testing';
 import { describe, expect, it } from 'vitest';
 
 import { createViewManagerController } from '../src/controller';
-import { initialViewManagerState, viewManagerReducer } from '../src/model';
+import { initialViewManagerState } from '../src/model';
 
 function harness(open: string[] = []) {
   const documents = { getOrder: () => open } as unknown as DocumentsCapability;
   const ctx = createTestContext({
     id: 'view-manager',
-    initialState: initialViewManagerState(),
-    reduce: viewManagerReducer,
+    state: initialViewManagerState(),
     capabilities: [[DocumentsToken, documents]],
     doc: null,
   });
@@ -23,11 +22,11 @@ describe('view-manager', () => {
     const open = ['a', 'b'];
     const { api, connect } = harness(open);
     const log: string[] = [];
-    api.onPaneCreated((e) => log.push(`+pane:${e.paneId}`));
-    api.onFocusChanged((e) => log.push(`focus:${e.paneId}`));
-    api.onDocumentMoved((e) => log.push(`doc:${e.documentId}:${e.fromPaneId}->${e.toPaneId}`));
+    api.onPaneCreated((event) => log.push(`+pane:${event.paneId}`));
+    api.onFocusChanged((event) => log.push(`focus:${event.paneId}`));
+    api.onDocumentMoved((event) => log.push(`doc:${event.documentId}:${event.fromPaneId}->${event.toPaneId}`));
     connect();
-    expect(api.listPanes().map((p) => p.id)).toEqual(['pane-1']);
+    expect(api.listPanes().map((pane) => pane.id)).toEqual(['pane-1']);
     expect(api.getPane('pane-1')?.documentIds).toEqual(['a', 'b']);
     expect(api.getPaneOfDocument('b')).toBe('pane-1');
     expect(api.getFocusedPaneId()).toBe('pane-1');
@@ -45,8 +44,8 @@ describe('view-manager', () => {
     const { api, connect } = harness(['a', 'b']);
     connect();
     const log: string[] = [];
-    api.onDocumentMoved((e) => log.push(`${e.documentId}:${e.fromPaneId}->${e.toPaneId}`));
-    api.onPaneRemoved((e) => log.push(`-pane:${e.paneId}`));
+    api.onDocumentMoved((event) => log.push(`${event.documentId}:${event.fromPaneId}->${event.toPaneId}`));
+    api.onPaneRemoved((event) => log.push(`-pane:${event.paneId}`));
     const split = api.splitPane('b');
     expect(split).toBe('pane-2');
     expect(api.getPane('pane-1')?.documentIds).toEqual(['a']);
@@ -59,7 +58,7 @@ describe('view-manager', () => {
     api.movePane('pane-2', 0);
     expect(api.getPaneOrder()).toEqual(['pane-2', 'pane-1']);
     api.removePane('pane-2');
-    expect(api.listPanes().map((p) => p.id)).toEqual(['pane-1']);
+    expect(api.listPanes().map((pane) => pane.id)).toEqual(['pane-1']);
     expect(api.getPane('pane-1')?.documentIds).toEqual(['b', 'a']);
     expect(log).toEqual([
       'b:pane-1->pane-2',

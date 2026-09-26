@@ -1,9 +1,9 @@
 /**
  * @embedpdf/core-ui — the structure-only schema vocabulary.
  *
- * The schema contains ONLY what a designer decides and the runtime cannot
+ * The schema contains only what a designer decides and the runtime cannot
  * compute: order, grouping, importance, and each item's degradation ladder.
- * Everything the runtime CAN compute is banned from it by construction:
+ * Everything the runtime can compute is banned from it by construction:
  * no breakpoints, no show/hide lists, no locale overrides, no dividers, no
  * spacers, no hand-written overflow menus. Fit is measured and solved at
  * runtime (see solver.ts); the overflow menu is derived (see projection.ts).
@@ -14,7 +14,7 @@ export type Variant = 'icon+label' | 'icon' | 'label';
 
 /**
  * Who yields space first. 1 = first to degrade/overflow · 3 = default ·
- * 5 = pinned: may still degrade variants, but NEVER leaves the bar.
+ * 5 = pinned: may still degrade variants, but never leaves the bar.
  */
 export type Importance = 1 | 2 | 3 | 4 | 5;
 
@@ -30,7 +30,7 @@ export interface BarItem {
 
 /**
  * An app-rendered slot (e.g. the inline zoom strip). Each named variant is
- * measured like any command button. The ladder MUST terminate in a command
+ * measured like any command button. The ladder must terminate in a command
  * (`terminal`) so the item always has a menu form when it overflows — this
  * is what makes the overflow projection total.
  */
@@ -52,16 +52,16 @@ export interface BarGroup {
   /** Presentation hint: 'tabs' renders as a tab strip and projects as radio rows. */
   readonly role?: 'buttons' | 'tabs';
   /**
-   * Stage 1 of the GROUP degradation ladder: under pressure, move trailing
-   * children (rightmost first, at the CHILD's importance) into a derived
+   * Stage 1 of the group degradation ladder: under pressure, move trailing
+   * children (rightmost first, at the child's importance) into a derived
    * group-local disclosure — a trigger rendered inside the group opening a
    * menu of the hidden children. Never sheds the last visible child: below
-   * that floor the group `collapse`s (stage 2) or overflows whole. This is
-   * v2's `overflow-tabs-button`, computed instead of authored.
+   * that floor the group `collapse`s (stage 2) or overflows whole. The
+   * disclosure is computed, never authored.
    */
   readonly shed?: boolean;
   /**
-   * Stage 2: what the WHOLE group degrades to once its children have
+   * Stage 2: what the whole group degrades to once its children have
    * exhausted their ladders (and shedding, if enabled, has hit its floor): a
    * single menu button or a select-style picker. Groups with neither `shed`
    * nor `collapse` send children to the global overflow menu one by one.
@@ -76,11 +76,11 @@ export interface BarGroup {
  * within a section — never across sections, never from schema data.
  *
  * The names are direction-aware (RTL flips start/end) and `center` is a
- * SOFT contract: "balance this segment in the space left over by start and
+ * soft contract: "balance this segment in the space left over by start and
  * end". With symmetric flanks that coincides with true centering; with a
  * heavy flank the segment drifts rather than fights — segments never
- * overlap, matching how every toolbar convention (including v2's
- * spacer-flanked tabs) treats its middle region. Strict geometric centering
+ * overlap, matching how every toolbar convention (including spacer-flanked
+ * tabs) treats its middle region. Strict geometric centering
  * would be a solver concern (a tighter budget: 2×max(start,end)+center),
  * deliberately not offered until a product needs it.
  */
@@ -108,20 +108,20 @@ export interface MenuSchema {
 }
 
 /**
- * The shell FRAME — region arrangement and visibility. Regions are a FIXED
+ * The shell frame — region arrangement and visibility. Regions are a fixed
  * vocabulary (each carries semantics the shell must own: the toolbar's
- * measurement physics, the document gate, aria landmarks); what's YOURS is
+ * measurement physics, the document gate, aria landmarks); what's yours is
  * where they sit, whether they show, and — through the region slots — what
  * fills them. Part of the chrome value because it is structure: owned, never
  * merged. Free-form layout is deliberately not offered — wanting a different
  * frame architecture is what headless is for.
  */
 export interface FrameSchema {
-  /** Where the main bar lives. Its mode band rides the CONTENT side (below a
+  /** Where the main bar lives. Its mode band rides the content side (below a
    *  top bar, above a bottom bar). Default: 'top'. */
   readonly toolbar?: 'top' | 'bottom';
   /** Document tab strip: 'multiple' shows it only with >1 tab. A hidden
-   *  region hides its SLOT too — visibility outranks slotted content.
+   *  region hides its slot too — visibility outranks slotted content.
    *  Default: 'always'. */
   readonly tabs?: 'always' | 'multiple' | 'never';
   /** The header row — a socket only: the chrome ships no header of its own,
@@ -133,7 +133,7 @@ export interface FrameSchema {
 export interface ChromeSchema {
   /** Standalone bars (e.g. the main toolbar). */
   readonly bars: Readonly<Record<string, BarSchema>>;
-  /** Secondary bars keyed by tool mode — WHICH one shows is derived from the
+  /** Secondary bars keyed by tool mode — which one shows is derived from the
    *  interaction hub's active tool, never stored. */
   readonly modeBars?: Readonly<Record<string, BarSchema>>;
   /** Named dropdown menus referenced by commands' `menu:` targets. */
@@ -146,18 +146,18 @@ export interface ChromeSchema {
 
 // ── authoring sugar ───────────────────────────────────────────────────────────
 
-export function item(command: string, opts?: Omit<BarItem, 'command'>): BarItem {
-  return { command, ...opts };
+export function item(command: string, options?: Omit<BarItem, 'command'>): BarItem {
+  return { command, ...options };
 }
 
-export function custom(slot: string, opts: Omit<CustomItem, 'slot'>): CustomItem {
-  return { slot, ...opts };
+export function custom(slot: string, options: Omit<CustomItem, 'slot'>): CustomItem {
+  return { slot, ...options };
 }
 
 export function group(id: string, items: readonly BarChild[]): BarGroup;
 export function group(
   id: string,
-  opts: Omit<BarGroup, 'id' | 'items'> & { items?: readonly BarChild[] },
+  options: Omit<BarGroup, 'id' | 'items'> & { items?: readonly BarChild[] },
   items?: readonly BarChild[],
 ): BarGroup;
 export function group(
@@ -168,10 +168,10 @@ export function group(
   items?: readonly BarChild[],
 ): BarGroup {
   if (Array.isArray(optsOrItems)) return { id, items: optsOrItems as readonly BarChild[] };
-  const { items: optItems, ...opts } = optsOrItems as Omit<BarGroup, 'id' | 'items'> & {
+  const { items: optItems, ...options } = optsOrItems as Omit<BarGroup, 'id' | 'items'> & {
     items?: readonly BarChild[];
   };
-  return { id, ...opts, items: items ?? optItems ?? [] };
+  return { id, ...options, items: items ?? optItems ?? [] };
 }
 
 // ── normalized form — what the solver and projection consume ─────────────────
@@ -253,17 +253,18 @@ export function normalizeBar(bar: BarSchema): NormalizedBar {
     if (!groups || groups.length === 0) continue;
     sections.push({
       name,
-      groups: groups.map((g) => {
-        if (groupIds.has(g.id)) throw new Error(`[ui-core] duplicate group in bar: ${g.id}`);
-        groupIds.add(g.id);
+      groups: groups.map((group) => {
+        if (groupIds.has(group.id))
+          throw new Error(`[ui-core] duplicate group in bar: ${group.id}`);
+        groupIds.add(group.id);
         return {
-          id: g.id,
-          labelKey: g.labelKey,
-          role: g.role ?? 'buttons',
-          shed: g.shed ?? false,
-          collapse: g.collapse,
-          importance: g.importance ?? DEFAULT_IMPORTANCE,
-          units: g.items.map((c) => normalizeChild(g.id, c, seen)),
+          id: group.id,
+          labelKey: group.labelKey,
+          role: group.role ?? 'buttons',
+          shed: group.shed ?? false,
+          collapse: group.collapse,
+          importance: group.importance ?? DEFAULT_IMPORTANCE,
+          units: group.items.map((child) => normalizeChild(group.id, child, seen)),
         };
       }),
     });
@@ -273,7 +274,7 @@ export function normalizeBar(bar: BarSchema): NormalizedBar {
 
 /**
  * Drop units whose command is currently invisible (permissions, disabled
- * categories, contextual visibility) BEFORE solving — an invisible unit must
+ * categories, contextual visibility) before solving — an invisible unit must
  * not consume budget or appear in the overflow. Groups that empty out vanish
  * naturally in the solver's separator math and in the projection.
  */
@@ -283,9 +284,9 @@ export function filterBar(
 ): NormalizedBar {
   return {
     id: bar.id,
-    sections: bar.sections.map((s) => ({
-      name: s.name,
-      groups: s.groups.map((g) => ({ ...g, units: g.units.filter(keep) })),
+    sections: bar.sections.map((section) => ({
+      name: section.name,
+      groups: section.groups.map((group) => ({ ...group, units: group.units.filter(keep) })),
     })),
   };
 }
@@ -307,11 +308,12 @@ export function validateChrome(chrome: ChromeSchema, knownCommands: ReadonlySet<
   const problems: string[] = [];
   const checkBar = (bar: BarSchema, where: string) => {
     for (const section of normalizeBar(bar).sections)
-      for (const g of section.groups)
-        for (const u of g.units) {
-          const refs = u.kind === 'command' ? [u.command] : [u.terminal];
-          for (const c of refs)
-            if (!knownCommands.has(c)) problems.push(`${where}: unknown command "${c}"`);
+      for (const group of section.groups)
+        for (const unit of group.units) {
+          const refs = unit.kind === 'command' ? [unit.command] : [unit.terminal];
+          for (const command of refs)
+            if (!knownCommands.has(command))
+              problems.push(`${where}: unknown command "${command}"`);
         }
   };
   for (const [id, bar] of Object.entries(chrome.bars)) checkBar(bar, `bars.${id}`);
@@ -319,7 +321,7 @@ export function validateChrome(chrome: ChromeSchema, knownCommands: ReadonlySet<
   for (const [id, strip] of Object.entries(chrome.strips ?? {})) checkBar(strip, `strips.${id}`);
   for (const [id, menu] of Object.entries(chrome.menus ?? {}))
     for (const section of menu.sections)
-      for (const c of section.items)
-        if (!knownCommands.has(c)) problems.push(`menus.${id}: unknown command "${c}"`);
+      for (const command of section.items)
+        if (!knownCommands.has(command)) problems.push(`menus.${id}: unknown command "${command}"`);
   return problems;
 }

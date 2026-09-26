@@ -1,0 +1,288 @@
+---
+title: Forms
+description: Read a PDF form's fields and values, fill them in, reset them, and move form data in and out as FDF or XFDF.
+---
+
+# Forms
+
+A PDF form is a set of fields: text boxes, checkboxes, radio buttons, dropdowns and lists. The
+engine reads every field with its value, fills fields in, and redraws them so the new value shows
+in every PDF app.
+
+```ts
+const { fields } = await doc.forms.list();
+
+const name = fields.find((field) => field.name === 'billing.name')!;
+await doc.forms.setValue(name.ref, { value: 'Ada Lovelace' });
+```
+
+## Read the form
+
+`list()` returns every field in the document:
+
+```ts
+const { fields } = await doc.forms.list();
+
+for (const field of fields) {
+  console.log(field.name, field.family);
+}
+```
+
+Every field has these:
+
+| Field           | What it is                                                                                                  |
+| :-------------- | :---------------------------------------------------------------------------------------------------------- |
+| `name`          | The full name, with the groups it's in: `billing.name`.                                                     |
+| `family`        | `'text'`, `'checkbox'`, `'radio'`, `'combobox'`, `'listbox'`, `'pushbutton'`, `'signature'` or `'unknown'`. |
+| `ref`           | Its address. Keep it: it's how you fill, reset or change the field.                                         |
+| `flags`         | `readOnly`, `required` and `noExport`, as `true`/`false`.                                                   |
+| `alternateName` | The tooltip PDF apps show, also read by screen readers, or `null`.                                          |
+| `widgets`       | Where the field shows on the pages (see [Widgets](#widgets)).                                               |
+
+A document without a form returns an empty `fields`. The list's `formKind` says what the document
+has: `'none'`, `'acroform'` (a regular PDF form) or `'xfa'` (see [Good to know](#xfa-forms)).
+
+The list also has `needsAppearances`, `true` when the form asks PDF apps to draw its fields
+themselves ([`repair()`](/docs/engine/forms/authoring#repair-a-broken-form) can clear it), and
+`calculationOrder` (see [Calculations](#calculations-formatting-and-validation)).
+
+### Values
+
+Each family has its own value fields. Check `family` first, and TypeScript knows which ones the
+field has:
+
+```ts
+if (field.family === 'text') console.log(field.value); // string
+if (field.family === 'checkbox') console.log(field.checked); // boolean
+if (field.family === 'listbox') console.log(field.selectedValues); // string[]
+```
+
+| Family       | Its value                                                          | Also                                                                            |
+| :----------- | :----------------------------------------------------------------- | :------------------------------------------------------------------------------ |
+| `text`       | `value`, a string                                                  | `defaultValue`, `maxLength` (`null`: no limit), `multiline`, `password`, `comb` |
+| `checkbox`   | `checked`                                                          | `exportValue`: what the form data holds while it's checked                      |
+| `radio`      | `value`: the export value of the chosen button, or `'Off'`         | `noToggleToOff`, `radiosInUnison`                                               |
+| `combobox`   | `value`                                                            | `options`, `edit` (free text allowed), `defaultValue`                           |
+| `listbox`    | `selectedValues`, in option order                                  | `options`, `multiSelect`                                                        |
+| `pushbutton` | none: a button only runs an action                                 |                                                                                 |
+| `signature`  | none here: see [Digital signatures](/docs/engine/forms/signatures) |                                                                                 |
+
+Each option of a dropdown (`combobox`) or list is `{ label, value, selected }`. `label` is what the
+user sees; `value` is what the form stores, and what you pass when you fill the field in.
+
+### Widgets
+
+A field shows on a page through a **widget**: the box you see and click. Most fields have one. A
+radio group is one field with a widget per button, and a field repeated on every page (a
+reference number in the header, say) has a widget per page, all showing the same value.
+
+Each widget in `field.widgets` has its `page`, its `rect` (in PDF points) and a `ref`, so one read
+is enough to draw your own form layer over a page:
+
+```ts
+const { fields } = await doc.forms.list();
+
+for (const field of fields) {
+  for (const widget of field.widgets) drawBox(widget.page, widget.rect, field);
+}
+```
+
+Checkbox and radio widgets also have their `exportValue` (what the form data holds when this
+widget is checked) and `checked`.
+
+Widgets are annotations of kind `'widget'`, so `page.annotations.list()` returns them too, with
+the same `ref`. A widget annotation's `field` is the ref of the field it belongs to.
+
+## Find a field
+
+The `ref` from `list()` is the best address: it keeps working when the field is renamed. When you
+know a field by its name instead (from your backend, or from FDF data), make a ref from the name:
+
+```ts
+import { toFieldRef } from '@embedpdf/engine';
+
+const field = await doc.forms.get(toFieldRef('billing.name'));
+```
+
+The name is the full name, with dots between the groups. A field that isn't there fails with
+`NotFound`.
+
+## Fill in a field
+
+`setValue()` takes the field's `ref` and its new value, in the same fields a read returns. What
+you read, you can write back:
+
+```ts
+await doc.forms.setValue(name.ref, { value: 'Ada Lovelace' }); // text
+await doc.forms.setValue(agree.ref, { checked: true }); // checkbox
+await doc.forms.setValue(plan.ref, { value: 'yearly' }); // radio group
+await doc.forms.setValue(country.ref, { value: 'NL' }); // dropdown
+await doc.forms.setValue(toppings.ref, { selectedValues: ['cheese', 'olives'] }); // list
+```
+
+| Family     | Value                                                                           |
+| :--------- | :------------------------------------------------------------------------------ |
+| `text`     | `{ value }`                                                                     |
+| `checkbox` | `{ checked }`                                                                   |
+| `radio`    | `{ value }`: the export value of the button to choose; `'Off'` or `null` clears |
+| `combobox` | `{ value }`: an option value                                                    |
+| `listbox`  | `{ selectedValues }`: option values; `[]` clears                                |
+
+`setValue()` returns the field as it is now:
+
+```ts
+const { field } = await doc.forms.setValue(name.ref, { value: 'Ada' });
+```
+
+The engine redraws the field's widgets, so the page shows the new value in every PDF app. Render
+the page again to see it.
+
+### What the engine checks
+
+The engine checks a value before it writes anything. A call that fails with `InvalidArg` leaves
+the field as it was:
+
+- The value must be the family's own: `{ checked: true }` on a text field fails.
+- A dropdown or list takes option values, not labels. A dropdown with `edit: true` also takes
+  free text. More than one value needs a list with `multiSelect`.
+- A radio group's `value` must be the export value of one of its buttons.
+- A radio group with `noToggleToOff` can't be cleared once a button is chosen.
+- Push buttons and signature fields hold no value you can set.
+
+Some things are fixed up rather than refused: text longer than `maxLength` is cut to fit, and
+in a radio group with `radiosInUnison`, the buttons that share an export value check together.
+
+`readOnly` is an instruction for PDF apps: they don't let the user change the field. The engine
+still accepts your own writes, for example a total your code calculates.
+
+## Reset
+
+`reset()` puts back each field's `defaultValue`, or empties it when it has none. Without an
+argument it resets the whole form; pass a ref, or a list of refs, to reset only those fields:
+
+```ts
+await doc.forms.reset(); // every field
+await doc.forms.reset(name.ref);
+await doc.forms.reset([name.ref, email.ref]);
+```
+
+Fields that hold no value, such as push buttons and signature fields, are skipped.
+
+## Import and export form data
+
+FDF and XFDF are the formats every PDF tool uses to move form data: the values without the PDF.
+`export()` returns the data as bytes, XFDF unless you ask for FDF:
+
+```ts
+const { bytes } = await doc.forms.export(); // XFDF, an XML file
+const { bytes: fdf } = await doc.forms.export('fdf');
+```
+
+`import()` fills the fields in from FDF or XFDF bytes. It tells the format from the bytes; pass
+`'fdf'` or `'xfdf'` as a second argument to name it yourself:
+
+```ts
+const { applied, skipped, form } = await other.forms.import(bytes);
+
+console.log(`${applied} filled, ${skipped} skipped`);
+```
+
+Fields are matched by their full name, and each value is checked like a `setValue()`. A field the
+document doesn't have, a value it can't take, or a field a signature locked is skipped and
+counted; the rest still land. `form` is the whole form after the import, the same thing `list()`
+returns. Bytes that aren't FDF or XFDF fail with `InvalidArg`.
+
+The data holds export values, the same `value` a radio group reads: a checked checkbox exports
+its `exportValue`, and importing that value checks it again.
+
+## Events
+
+`setValue()` and `reset()` fire `forms.valueSet`, one per field that changed; `import()` fires
+`forms.imported`. Each carries what the call returned for that field:
+
+```ts
+doc.events.on('forms.valueSet', ({ field }) => {
+  updateSummary(field);
+});
+```
+
+When one call changes several fields, such as `reset()`, their events share `origin.tx`, like an
+annotation import.
+
+<Engine cloud>
+
+Each value is saved on the server as you set it. Everyone with the document open gets the event,
+with `origin.kind: 'remote'` for other people's changes. See
+[Events](/docs/engine/concepts/events).
+
+</Engine>
+
+## Permissions
+
+Reading the form and exporting its data needs `doc.forms.read`. Filling in, resetting and
+importing needs `doc.forms.fill`, which includes `doc.forms.read`. See
+[Permissions](/docs/engine/concepts/permissions).
+
+A signed document can take filling away, for the whole form or for single fields. The call then
+fails with `ProtectedDocument`; see
+[Digital signatures](/docs/engine/forms/signatures#protection-what-signatures-allow).
+
+## More
+
+- [Creating form fields](/docs/engine/forms/authoring): add fields and widgets, change and delete
+  them, repair a broken form.
+- [Digital signatures](/docs/engine/forms/signatures): sign a signature field and check the
+  signatures in a document.
+
+## Good to know
+
+### Calculations, formatting and validation
+
+The engine doesn't run the form's JavaScript. `setValue()` stores the value you give it: it
+doesn't recalculate a total, format a date or an amount, or run a validation script. PDF apps run
+those scripts while a user types.
+
+A field's scripts are in `field.actions` (`keystroke`, `format`, `validate` and `calculate`), and
+the list's `calculationOrder` holds the fields whose totals are calculated, in order.
+
+The viewer's form plugin runs these scripts and writes their results in one call,
+`doc.forms.applyEffects(effects)`: an ordered list of changes, each a `setValue`, a `reset`, a
+`setDisplay` (whether the field shows and prints) or a `setAppearanceText` (the formatted text the
+field shows, while its value stays the same). Each effect reports whether it was `applied`,
+`unchanged`, `rejected`, `failed` or `skipped`; a failed effect doesn't undo the ones before it,
+and a field a signature locked is `rejected`. You only need `applyEffects()` when you run form
+scripts yourself.
+
+### Recovered fields
+
+Some PDFs have fields that show on the page but are missing from the form's list of fields, a
+bug in the tool that made them. The engine finds them anyway: they come back with
+`origin: 'recovered'` and fill in like any other field. Other PDF apps may not see them;
+[`repair()`](/docs/engine/forms/authoring#repair-a-broken-form) fixes the file.
+
+### A field on several pages
+
+A field's widgets can be on different pages. The `meta` of a `setValue()` or `reset()` result
+lists every widget whose look changed, with its page (`meta.changedWidgets`). For a radio group
+that's the button switched off and the one switched on. Use it to render only the pages that
+changed.
+
+### Checkboxes with several widgets
+
+A checkbox can have several widgets, each with its own `exportValue`: a "Yes / No" pair, for
+example. `{ checked: true }` checks the first widget; `{ value: 'No' }` checks the widget with
+that export value.
+
+In the file, each checkbox and radio widget also has an `onState`: the name of its checked look
+(PDF's appearance state). It's usually the same as the export value, and widgets the engine
+creates always use their `exportValue` for it. You never need it to fill a field in.
+
+### XFA forms
+
+`formKind` is `'xfa'` when the PDF also carries an XFA form, an older XML form format. The
+engine works with the document's regular fields and never runs XFA.
+
+### Fields stored inline
+
+A field that the file stores inside another object, rather than as an object of its own, can be
+read but not changed: writes fail with `InvalidArg`. PDF tools rarely write fields this way.

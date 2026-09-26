@@ -1,7 +1,7 @@
 /**
  * `<epdf-render-layer>` — the Angular view of @embedpdf/plugin-render.
  *
- * Paints a page to an `<img>` from the engine's ENCODED image() (identical for
+ * Paints a page to an `<img>` from the engine's encoded image() (identical for
  * local & cloud). Abortable (cancels when the camera moves / the layer is
  * destroyed) and leak-free (revokes the object URL). React's useEffect deps
  * become `effect()` auto-tracking: scale, the annotations input, and the
@@ -18,7 +18,7 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-// The layer is a HOST of the render plugin (conformed sources); same runtime token.
+// The layer is a host of the render plugin (conformed sources); same runtime token.
 import { RenderToken } from '@embedpdf/plugin-render/contract/host';
 import { injectCapability, injectPage, injectSelector } from '@embedpdf/angular/runtime';
 
@@ -44,16 +44,16 @@ export class EpdfRenderLayer {
 
   private readonly page = injectPage();
   private readonly render = injectCapability(RenderToken);
-  // ONE tracked dependency: the raster's canonical identity — conformed
+  // One tracked dependency: the raster's canonical identity — conformed
   // viewport + annotations flag + epoch.
   // Inside a lattice rung, zoom changes don't move it: no refetch, no DOM
   // churn — the stage's CSS transform does the scaling. It changes exactly at
-  // rung crossings and on CONFIRMED mutations (epoch bumps at commit, never
-  // mid-gesture). Under `continuous` it embeds the exact scale — v2 behavior
-  // byte-for-byte. The policy behind it is a document fact the kernel
+  // rung crossings and on confirmed mutations (epoch bumps at commit, never
+  // mid-gesture). Under `continuous` it embeds the exact scale, so it changes
+  // with every scale. The policy behind it is a document fact the kernel
   // materialized before publish, so the key is always computable.
-  private readonly sourceKey = injectSelector(RenderToken, (c) =>
-    c.getSourceKey(this.page.ref, {
+  private readonly sourceKey = injectSelector(RenderToken, (render) =>
+    render.getSourceKey(this.page.ref, {
       scale: this.page.transform().renderScale,
       includeAnnotations: this.annotations(),
     }),
@@ -90,7 +90,7 @@ export class EpdfRenderLayer {
               includeAnnotations,
               signal: controller.signal,
             });
-            const objectUrl = await image.objectUrl(controller.signal);
+            const objectUrl = await image.objectUrl().abortWith(controller.signal);
             if (controller.signal.aborted) {
               objectUrl.revoke();
               return;

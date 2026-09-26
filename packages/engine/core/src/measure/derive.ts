@@ -31,9 +31,9 @@ export interface MeasurementUnavailable {
 }
 export function isDimension(dto: { subtype: string; intent?: string | null }): boolean {
   return (
-    (dto.subtype === 'line' && dto.intent === 'LineDimension') ||
-    (dto.subtype === 'polyline' && dto.intent === 'PolyLineDimension') ||
-    (dto.subtype === 'polygon' && dto.intent === 'PolygonDimension')
+    (dto.subtype === 'line' && dto.intent === 'line-dimension') ||
+    (dto.subtype === 'polyline' && dto.intent === 'polyline-dimension') ||
+    (dto.subtype === 'polygon' && dto.intent === 'polygon-dimension')
   );
 }
 export const isReadout = (
@@ -45,7 +45,7 @@ export function measurementReadout(
 ): MeasurementReadout | MeasurementUnavailable {
   if (!isDimension(dto)) return { unavailable: 'not-dimension' };
   if (!dto.measure) return { unavailable: 'no-measure' };
-  if (dto.measure.subtype !== 'RL') return { unavailable: 'foreign-measure' };
+  if (dto.measure.subtype !== 'rectilinear') return { unavailable: 'foreign-measure' };
   const m = dto.measure,
     scale = scaleOf(m);
   if (!scale) return { unavailable: 'no-scale' };

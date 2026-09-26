@@ -26,9 +26,19 @@ LINUX_CLANG_VOLUME="pdf-runtime_linux-llvm-build"
 LINUX_CLANG_DIR="/workspace/packages/engine/runtime/runtime-src/third_party/llvm-build/Release+Asserts"
 LINUX_CLANG_URL="https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/clang-llvmorg-23-init-2224-g5bd8dadb-1.tar.xz"
 
+# The linux-test stage bakes Chromium's Linux build deps into the image from
+# runtime-src/build. Before the first dependency sync that script doesn't exist
+# yet; build the base stage and let test-target.sh install them in the container.
+image_target="linux-test"
+if [[ ! -f "$ROOT/runtime-src/build/install-build-deps.py" ]]; then
+  echo "note: runtime-src/build is not synced; Linux build deps will be installed in the container" >&2
+  image_target="base"
+fi
+
 echo "=== building pdf-runtime-linux-test image ==="
 docker build \
   --progress=plain \
+  --target "$image_target" \
   -t "$image_name" \
   -f "$ROOT/Dockerfile" \
   "$ROOT"

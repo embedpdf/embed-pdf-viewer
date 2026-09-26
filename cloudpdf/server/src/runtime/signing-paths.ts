@@ -6,7 +6,7 @@ import { join } from 'node:path';
  * Where a signing candidate lives between `prepare` and the upload of
  * its tail, and where a completion rebuilds it. The API process and the
  * engine workers (in-process threads or the supervised host's threads on
- * the same machine) derive the SAME path from the signing id, so nothing
+ * the same machine) derive the same path from the signing id, so nothing
  * but the id needs to cross the engine boundary: the server streams the
  * tail from here right after prepare, and the worker deletes the file on
  * abort. One directory per signing keeps concurrent attempts apart.

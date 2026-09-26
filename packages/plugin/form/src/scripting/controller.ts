@@ -40,7 +40,7 @@ import {
 import { pageNumberFor, scriptError, statusFromEffects, utf8Length } from './results';
 
 /**
- * The controller never owns a realm. It rides a realm PORT — this document's
+ * The controller never owns a realm. It rides a realm port — this document's
  * own (the actions plugin's per-document host) or a detached one minted by
  * the actions plugin for a document that is not displayed (stamp's
  * asset documents). Either way the owner disposes the realm; `dispose()`
@@ -48,9 +48,10 @@ import { pageNumberFor, scriptError, statusFromEffects, utf8Length } from './res
  */
 export interface FormScriptingControllerOptions {
   doc: DocumentHandle;
-  document(): DocumentMeta | null;
+  /** What the scripts read of the document: its name, page count and pages. */
+  document(): Pick<DocumentMeta, 'name' | 'pageCount' | 'pages'> | null;
   /** The realm's transaction port ({@link ScriptTransaction}). The K/V/C/F
-   *  pipeline runs WHOLLY inside one transaction: snapshot fetch, every
+   *  pipeline runs wholly inside one transaction: snapshot fetch, every
    *  pass, and the engine commit — the commit-inside-the-boundary law. */
   transaction<T>(body: (txn: ScriptTransaction) => Promise<T>): Promise<T>;
   /** The transaction aggregate (output bytes, wall-clock across passes);
@@ -68,7 +69,7 @@ export class FormScriptingController {
     this.transactionBudget = options.budget;
   }
 
-  /** The realm belongs to its OWNER (the actions plugin, or the caller that
+  /** The realm belongs to its owner (the actions plugin, or the caller that
    *  minted a detached one) — this only fences further transactions. */
   dispose(): void {
     this.disposed = true;
@@ -84,7 +85,7 @@ export class FormScriptingController {
   }
 
   /** Run lazy document boot plus the `/CO` chain without a user field change.
-   *  The anchor field resolves INSIDE the transaction (undefined ref). */
+   *  The anchor field resolves inside the transaction (undefined ref). */
   async recalculate(): Promise<FormCommitResult> {
     return this.transact(undefined);
   }
@@ -95,7 +96,7 @@ export class FormScriptingController {
     activation?: PdfActionTree,
   ): Promise<FormCommitResult> {
     if (this.disposed) throw new Error('Form scripting controller is disposed');
-    // EVERYTHING inside the realm transaction — snapshot fetch, every pass,
+    // Everything inside the realm transaction — snapshot fetch, every pass,
     // the engine commit — so the next transaction reads post-commit truth.
     return this.transaction((txn) => this.transactBody(txn, refInput, proposed, activation));
   }
@@ -107,7 +108,7 @@ export class FormScriptingController {
     activation?: PdfActionTree,
   ): Promise<FormCommitResult> {
     const snapshot = await this.options.doc.forms.list();
-    // Recalculate's anchor resolves HERE (first live /CO field, else the
+    // Recalculate's anchor resolves here (first live /CO field, else the
     // first field); a zero-field document is an honest no-op.
     const ref =
       refInput ??
@@ -159,7 +160,7 @@ export class FormScriptingController {
     const uiEffects: FormUiEffect[] = [];
     const diagnostics: ScriptDiagnostic[] = [];
     const meta = this.options.document();
-    // Document/identity/environment are HOST-owned now; the world carries the
+    // Document/identity/environment are host-owned now; the world carries the
     // per-field current page for `this.pageNum`.
     const pageNumber = pageNumberFor(meta, target);
     const budget = this.transactionBudget ?? DEFAULT_SCRIPT_BUDGET;
@@ -171,7 +172,7 @@ export class FormScriptingController {
       phase: FormUiEffect['phase'],
     ): ScriptExecutionError | null => {
       aggregateOutputSize += utf8Length(JSON.stringify(output));
-      // Tag every UI request with WHO asked — embedders suppress boot-phase
+      // Tag every UI request with who asked — embedders suppress boot-phase
       // nags (Adobe's version-check alert) but show user-phase validation.
       uiEffects.push(...output.uiEffects.map((effect) => ({ ...effect, phase })));
       diagnostics.push(...output.diagnostics);
@@ -218,7 +219,7 @@ export class FormScriptingController {
     };
 
     {
-      // Boot runs ONCE per realm (host-owned latch) and can only ever
+      // Boot runs once per realm (host-owned latch) and can only ever
       // degrade, never brick — a failure surfaces a diagnostic and this
       // transaction continues from pristine state.
       let boot: ScriptOutput | null = null;
@@ -283,7 +284,7 @@ export class FormScriptingController {
       }
       if (program) {
         // Acrobat fires per-typing keystroke events plus one final commit
-        // event. This pipeline compresses typing into ONE paste-shaped
+        // event. This pipeline compresses typing into one paste-shaped
         // replacement (Acrobat's own paste contract: the whole string rides
         // `event.change`, willCommit=false) so transform/filter scripts run,
         // then fires the Acrobat-faithful willCommit pass (the full value on

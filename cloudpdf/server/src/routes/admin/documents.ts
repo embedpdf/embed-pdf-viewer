@@ -30,7 +30,7 @@ export interface AdminDocumentsRouteDeps {
  *      body: { contentLength, contentSha256, metadata?, idempotencyKey?, dedupMode?, docId? }
  *      -> { id, state, tag: 'created'|'resumed'|'deduped', upload?: { ... } }
  *
- *   2. (If not deduped:) PUT the bytes to `upload.url` (presigned) OR
+ *   2. (If not deduped:) PUT the bytes to `upload.url` (presigned) or
  *      POST multipart to `.../documents/:id/upload-proxy` when the
  *      deployment selected the bounded origin fallback.
  *
@@ -183,7 +183,7 @@ export async function registerAdminDocumentsRoutes(
     const { limit, cursor, state } = parsed.data;
     const before = cursor === undefined ? undefined : decodeListCursor(cursor);
 
-    // limit+1 probes for a next page without a COUNT query.
+    // limit+1 probes for a next page without a count query.
     const rows = await lifecycle.list(ctx.tenantId, { limit: limit + 1, state, before });
     const page = rows.slice(0, limit);
     const last = page[page.length - 1];
@@ -219,7 +219,7 @@ export async function registerAdminDocumentsRoutes(
   });
 
   /**
-   * The dashboard-tile artifact: serves the WARMED base-tier render
+   * The dashboard-tile artifact: serves the warmed base-tier render
    * by its stored key — no token grammar, no page knowledge needed by the
    * dashboard. 404 with the state while `pending`/`locked`/`failed` (the
    * doc-plane render routes remain the read-through repair path).

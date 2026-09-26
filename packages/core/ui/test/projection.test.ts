@@ -19,8 +19,7 @@ const metrics: FitMetrics = {
 
 describe('projectOverflow', () => {
   /**
-   * The v2 regression: at tiny widths the snippet's hand-written
-   * 'left-action-menu' showed
+   * At tiny widths the main bar's overflow reads as the left action menu:
    *
    *   View controls  ▸
    *   Zoom controls  ▸
@@ -28,8 +27,7 @@ describe('projectOverflow', () => {
    *   Toggle pan mode
    *   Toggle pointer mode
    *
-   * ([viewers/snippet] ui-schema.ts 'left-action-menu'). Here the same menu
-   * DERIVES from the main-bar structure + the commands' menu targets.
+   * The menu derives from the main-bar structure + the commands' menu targets.
    */
   it('reproduces the v2 left-action-menu from the main bar schema', () => {
     const bar = normalizeBar({

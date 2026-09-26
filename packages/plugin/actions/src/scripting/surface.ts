@@ -1,10 +1,10 @@
 /**
- * The surface door (D9): the ONE UI/diagnostic port for script results.
- * Print and submitForm effects arriving from the ACTIONS plane never reach
- * this door (the js executor extracts them and routes through
- * `firePrintThroughAdapter` / `performSubmit` post-transaction — the WP/DP
- * wrap and the post-commit dataset need to run outside the host
- * transaction). Effects here come from the FORM pipeline's K/V/C/F path.
+ * The surface door: the one UI and diagnostic port for script results. Print
+ * and submitForm effects from the actions plane never reach it (the
+ * JavaScript executor extracts them and routes them through
+ * `firePrintThroughAdapter` and `performSubmit` after the transaction, since
+ * the /WP and /DP wrap and the post-commit dataset must run outside the host
+ * transaction). Such effects here come from the form pipeline's K/V/C/F path.
  */
 import type { ActionOrigin } from '../contract';
 import type {
@@ -29,10 +29,10 @@ export function createScriptSurface(
   const surfaceScriptResult = (result: ScriptSurfaceResult): void => {
     const uiContext = { origin: result.origin, phase: result.phase };
     for (const effect of result.uiEffects) {
-      // A DETACHED realm has no document surface: the document it scripted
-      // is not displayed, and this door's print/goto/submit act on THIS
+      // A detached realm has no document surface: the document it scripted
+      // is not displayed, and this door's print, goto and submit act on this
       // document. Only alerts have a valid target (the user); everything
-      // else is suppressed, observably — never routed to the wrong document.
+      // else is suppressed observably, never routed to the wrong document.
       if (result.realm === 'detached' && effect.kind !== 'alert') {
         scriptDiagnosticHook.emit({
           code: 'ui-effect-suppressed',
@@ -41,8 +41,8 @@ export function createScriptSurface(
         continue;
       }
       if (effect.kind === 'submitForm') {
-        // Form-pipeline scripted submit: same door, DETACHED (the form
-        // queue must not await into submit sinks). Policy + sinks +
+        // A form-pipeline scripted submit: the same door, not awaited (the
+        // form queue must not wait on submit sinks). Policy, sinks and
         // diagnostics all live inside performSubmit.
         void performSubmit(
           intentOfSubmitEffect(effect),
@@ -55,8 +55,8 @@ export function createScriptSurface(
         );
         continue;
       }
-      // PERMISSION, not preference: a print request without doc.print
-      // authority reaches no adapter — non-overridable, observable.
+      // Permission, not preference: a print request without doc.print
+      // authority reaches no adapter; not overridable, and observable.
       if (effect.kind === 'print' && !allowsPrint()) {
         scriptDiagnosticHook.emit({
           code: 'ui-effect-suppressed',
@@ -64,9 +64,9 @@ export function createScriptSurface(
         });
         continue;
       }
-      // D3's latch: a WillPrint/DidPrint script (or anything running while
-      // a print wrapper is active) printing again is suppressed — one
-      // dialog per outer request.
+      // The print latch: a /WP or /DP script (or anything running while a
+      // print wrapper is active) printing again is suppressed, so there is
+      // one dialog per outer request.
       if (effect.kind === 'print' && printLatch.active) {
         scriptDiagnosticHook.emit({
           code: 'ui-effect-suppressed',

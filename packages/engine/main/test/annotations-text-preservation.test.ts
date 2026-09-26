@@ -127,17 +127,17 @@ describe('FreeText and Callout partial updates preserve text (wasm)', () => {
             for (const patch of patches) {
               // Deliberately never re-attach contents or richText to these patches.
               const result = await doc.page(toPageRef(3)).annotations.update(ref, patch);
-              expectText(result.updated as FreeTextAnnotationDTO);
+              expectText(result.annotation as FreeTextAnnotationDTO);
               expectText(await annotation(doc));
             }
 
-            const before = (await doc.page(toPageRef(3)).annotations.renderAppearances())
+            const before = (await doc.page(toPageRef(3)).annotations.renderAppearancesRaw())
               .appearances[0]!.raster;
             const saved = await doc.download();
             await doc.close();
             doc = await open(saved);
             expectText(await annotation(doc));
-            const after = (await doc.page(toPageRef(3)).annotations.renderAppearances())
+            const after = (await doc.page(toPageRef(3)).annotations.renderAppearancesRaw())
               .appearances[0]!.raster;
             expect([after.width, after.height]).toEqual([before.width, before.height]);
             expect(new Uint8Array(after.data)).toEqual(new Uint8Array(before.data));
@@ -150,7 +150,7 @@ describe('FreeText and Callout partial updates preserve text (wasm)', () => {
             const appearance = await engine.open({ kind: 'bytes', id: 'text-appearance', bytes });
             try {
               const page = (await appearance.pages.list()).pages[0]!;
-              const text = await appearance.page(page.ref).text.read();
+              const text = await appearance.page(page.ref).text.get();
               expect(text.text).toContain(TEXT);
             } finally {
               await appearance.close();
@@ -175,7 +175,7 @@ describe('FreeText and Callout partial updates preserve text (wasm)', () => {
             subtype: 'free-text',
             contents: '',
           });
-        expect(result.updated.contents).toBe('');
+        expect(result.annotation.contents).toBe('');
         const bytes = await doc.download();
         await doc.close();
         doc = await engine.open({ kind: 'bytes', id: 'cleared-text', bytes });

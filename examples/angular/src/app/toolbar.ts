@@ -45,7 +45,7 @@ import { injectPages, injectZoom } from '@embedpdf/angular/stage';
     <button (click)="zoom.fitWidth()">Fit width</button>
     <button (click)="zoom.fitPage()">Fit page</button>
     <span class="spacer"></span>
-    <button (click)="pages.prev()">‹</button>
+    <button (click)="pages.previous()">‹</button>
     <span class="readout">{{ pages.currentPage() + 1 }} / {{ pages.pageCount() }}</span>
     <button (click)="pages.next()">›</button>
   `,

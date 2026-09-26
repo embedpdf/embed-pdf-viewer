@@ -1,5 +1,5 @@
-import { pageSpace } from '@embedpdf/core-geometry';
 import type { Rect, ViewEnv } from '@embedpdf/core-annotation';
+import { pageSpace } from '@embedpdf/core-geometry';
 import type { PdfRect } from '@embedpdf/engine-core/runtime';
 
 import type { AnnotationContext } from './context';
@@ -11,7 +11,7 @@ export const pageSizeOf = (crop: PdfRect): { width: number; height: number } => 
 };
 
 /** Fold `zoom`/`rotation` host args into the core's ViewEnv (or none).
- *  `zoom` is the page's RELATIVE zoom (`transform.zoom`) — never the
+ *  `zoom` is the page's relative zoom (`transform.zoom`) — never the
  *  px-per-point `scale` (that one only converts CSS-px chrome settings). */
 export const viewEnv = (zoom?: number, rotation?: number): ViewEnv | undefined =>
   zoom != null || rotation != null
@@ -21,12 +21,13 @@ export const viewEnv = (zoom?: number, rotation?: number): ViewEnv | undefined =
 /** The crop box per page, as the document registry reports it — the input to
  *  `pageSpace` wherever this plugin converts outside the kernel's `ctx.geometry`. */
 export function createCropLookup(ctx: Pick<AnnotationContext, 'document'>) {
-  const cropOf = (pon: number): PdfRect | null =>
-    ctx.document()?.pages.find((p) => p.ref.pageObjectNumber === pon)?.boxes.crop ?? null;
+  const cropOf = (pageObjectNumber: number): PdfRect | null =>
+    ctx.document()?.pages.find((pageInfo) => pageInfo.ref.pageObjectNumber === pageObjectNumber)
+      ?.boxes.crop ?? null;
   /** The page's box in content space (origin at the crop top-left) — the box
    *  pointer gestures clamp to, so annotations stay page-bound. */
-  const pageBoxOf = (pon: number): Rect | undefined => {
-    const crop = cropOf(pon);
+  const pageBoxOf = (pageObjectNumber: number): Rect | undefined => {
+    const crop = cropOf(pageObjectNumber);
     return crop ? { x: 0, y: 0, ...pageSizeOf(crop) } : undefined;
   };
   return { cropOf, pageBoxOf };

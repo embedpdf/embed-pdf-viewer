@@ -56,7 +56,7 @@ export class BrowserImageEncoder implements LocalImageEncoder {
   private nextId = 1;
   private disabledWorkerPath = false;
   /** True once the pool has completed one round-trip. Until then every post
-   *  COPIES the raster (no transfer) so a CSP-blocked or broken pool can fall
+   *  Copies the raster (no transfer) so a CSP-blocked or broken pool can fall
    *  back to main-thread encoding within the same call — the caller's buffer
    *  is still intact. */
   private poolVerified = false;
@@ -122,7 +122,7 @@ export class BrowserImageEncoder implements LocalImageEncoder {
           throw error;
         }
         // The pool never worked (e.g. a CSP without `worker-src blob:`
-        // rejected the blob worker). The raster was sent as a COPY, so the
+        // rejected the blob worker). The raster was sent as a copy, so the
         // buffer is intact — degrade to main-thread encoding in this call.
         this.disabledWorkerPath = true;
         this.destroy();
@@ -222,7 +222,7 @@ export class BrowserImageEncoder implements LocalImageEncoder {
   private createWorker(): Worker {
     const source = this.opts.worker ?? 'inline';
     if (typeof source === 'function') return source();
-    // Branch ORDER is load-bearing: the literal 'inline' IS a string, and it
+    // Branch order is load-bearing: the literal 'inline' is a string, and it
     // must resolve to the bundled blob worker — never be fetched as the URL
     // "/inline" (which returns HTML and kills the pool with a SyntaxError,
     // silently demoting every consumer to main-thread encoding).

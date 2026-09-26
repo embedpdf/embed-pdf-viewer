@@ -4,12 +4,12 @@ import type { AnnotationRef } from '@embedpdf/engine-core/runtime';
 
 import type { CreateMeasurementInput, MeasurementCapability } from '../contract';
 import type { MeasurementServices } from '../services';
+import type { MeasurementViewportSync } from '../sync/viewports';
 
-export function createMeasuring({
-  store,
-  siblings,
-}: Pick<MeasurementServices, 'store' | 'siblings'>) {
-  const { scaleOf } = store;
+export function createMeasuring(
+  { siblings }: Pick<MeasurementServices, 'siblings'>,
+  { scaleOf }: Pick<MeasurementViewportSync, 'scaleOf'>,
+) {
   const { annotation } = siblings;
 
   const createMeasurement = (input: CreateMeasurementInput): Promise<AnnotationRef> => {

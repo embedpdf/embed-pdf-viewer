@@ -1,14 +1,16 @@
-import type { FontIdentityInfo, WireResourceMap } from '@embedpdf/engine-core/runtime';
+import type { FontIdentityInfo, WireAnnotationResources } from '@embedpdf/engine-core/runtime';
 import type { Ptr } from '@embedpdf/engine-runtime';
+
+import type { DrawingIndex } from '../../../../document-session/DrawingIndex';
 
 /**
  * Optional capabilities threaded into per-subtype annotation writers.
  *
  * The registered-font resolver serves the FreeText writer (stable
  * `registeredFontKey` → this thread's volatile `CFX_FontRegistry::FontId`).
- * The document/page pointers and `resources` serve binary-carrying writers
- * (stamp today): image objects are created against the document, and the
- * wire draft's `{ resource }` refs are resolved out of `resources`. Every
+ * The document/page pointers and `resources` serve the writers that take
+ * bytes (stamp, file attachment): image objects and files are created
+ * against the document from the resources that came with the write. Every
  * member is optional end-to-end — writers that don't need one ignore it.
  */
 export interface AnnotationWriteContext {
@@ -29,6 +31,10 @@ export interface AnnotationWriteContext {
   docPtr?: Ptr;
   /** Page pointer of the annotation being written. */
   pagePtr?: Ptr;
-  /** Binary payloads that accompanied this mutation, keyed by resource key. */
-  resources?: WireResourceMap;
+  /** The bytes that came with this write, by role. */
+  resources?: WireAnnotationResources;
+  /** The document's stamp drawings, by content: where a stamp's drawing is found or added. */
+  drawings?: DrawingIndex;
+  /** The page count of PDF bytes, or `null` when they don't open: a stamp's drawing is one page. */
+  pdfPageCount?: (bytes: ArrayBuffer) => number | null;
 }

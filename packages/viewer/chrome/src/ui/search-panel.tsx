@@ -1,22 +1,21 @@
 /**
- * The search panel — the v2 snippet's search sidebar on the v3 plugin-search
- * capability. ONE shape end to end: the flat `SearchQuery` {text, regex,
- * matchCase, wholeWord} is what the engine matches, what the plugin stores
- * (document-scoped, survives the sidebar closing), and what this box renders.
- * The panel keeps only a DRAFT of it for keystroke/debounce echo.
+ * The search panel — the search sidebar on the plugin-search capability. One
+ * shape end to end: the flat `SearchQuery` {text, regex, matchCase, wholeWord}
+ * is what the engine matches, what the plugin stores (document-scoped,
+ * survives the sidebar closing), and what this box renders.
+ * The panel keeps only a draft of it for keystroke/debounce echo.
  *
  * Data flow:
  *   type / toggle → validateSearchQuery → (debounced) search(draftQuery)
  *   useSearchState() → query / status / hitCount / activeIndex (reactive)
- *   useSelector(SearchToken, c => c.listHits()) → the streamed hit list
+ *   useSelector(SearchToken, (search) => search.listHits()) → the streamed hit list
  *   click a hit / prev / next → goTo/prev/next (capability reveals it on-page)
  *
- * The look is ported 1:1 from viewers/snippet's search-sidebar (magnifier
- * input with clear button, option checkboxes, results-found counter with
- * prev/next, per-page grouped snippet list with the match bolded and the
- * active hit accented), retinted to this app's semantic tokens. The regex
- * toggle is new in v3 (v2 had no pattern search); matchDiacritics exists in
- * the engine but is deliberately not exposed here — v2 parity.
+ * The look: a magnifier input with a clear button, option checkboxes, a
+ * results-found counter with prev/next, and a per-page grouped snippet list
+ * with the match bolded and the active hit accented, in this app's semantic
+ * tokens. matchDiacritics exists in the engine but is deliberately not
+ * exposed here.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -34,14 +33,14 @@ import { buttonClass } from './toolbar';
 const DEBOUNCE_MS = 300;
 
 /** Field-wise equality on the flat query — the mount/echo no-op guard. */
-const sameQuery = (a: SearchQuery | null, b: SearchQuery) =>
-  a != null &&
-  a.text === b.text &&
-  !!a.regex === !!b.regex &&
-  !!a.matchCase === !!b.matchCase &&
-  !!a.wholeWord === !!b.wholeWord;
+const sameQuery = (left: SearchQuery | null, right: SearchQuery) =>
+  left != null &&
+  left.text === right.text &&
+  !!left.regex === !!right.regex &&
+  !!left.matchCase === !!right.matchCase &&
+  !!left.wholeWord === !!right.wholeWord;
 
-// ── option checkbox (v2's peer-checked custom box) ───────────────────────────
+// ── option checkbox (a peer-checked custom box) ───────────────────────────────
 function Checkbox({
   label,
   checked,
@@ -49,7 +48,7 @@ function Checkbox({
 }: {
   label: string;
   checked: boolean;
-  onChange: (v: boolean) => void;
+  onChange: (checked: boolean) => void;
 }) {
   return (
     <label className="text-fg-secondary flex cursor-pointer select-none items-center gap-2 text-xs font-medium">
@@ -57,7 +56,7 @@ function Checkbox({
         <input
           type="checkbox"
           checked={checked}
-          onChange={(e) => onChange(e.target.checked)}
+          onChange={(event) => onChange(event.target.checked)}
           className="border-border bg-surface checked:border-accent checked:bg-accent peer h-4 w-4 shrink-0 appearance-none rounded-[3px] border transition-colors"
         />
         <svg
@@ -78,14 +77,13 @@ function Checkbox({
 }
 
 // ── one result row: a snippet with the match bolded, active = accented ───────
-function renderSnippet(s: SearchSnippet | undefined) {
-  if (!s) return null;
-  const end = s.matchStart + s.matchLength;
+function renderSnippet(snippet: SearchSnippet | undefined) {
+  if (!snippet) return null;
   return (
     <>
-      {s.text.slice(0, s.matchStart)}
-      <span className="text-accent font-semibold">{s.text.slice(s.matchStart, end)}</span>
-      {s.text.slice(end)}
+      {snippet.before}
+      <span className="text-accent font-semibold">{snippet.match}</span>
+      {snippet.after}
     </>
   );
 }
@@ -125,10 +123,10 @@ export function SearchPanel() {
   const t = useT();
   const search = useSearch();
   const { query, status, hitCount, activeIndex } = useSearchState();
-  const hits = useSelector(SearchToken, (c) => c.listHits());
+  const hits = useSelector(SearchToken, (search) => search.listHits());
 
   // `query` is the document-scoped stored search (survives the sidebar
-  // closing). The box is a controlled draft that STARTS from it; the panel is
+  // closing). The box is a controlled draft that starts from it; the panel is
   // keyed on the document (see panels.tsx), so this one-time seed is always
   // the right document's query — switching tabs remounts and reseeds.
   const [draft, setDraft] = useState(() => query?.text ?? '');
@@ -137,7 +135,7 @@ export function SearchPanel() {
   const [regex, setRegex] = useState(() => query?.regex ?? false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // The draft IS a SearchQuery — same shape the engine matches on.
+  // The draft is a SearchQuery — same shape the engine matches on.
   const draftQuery: SearchQuery = { text: draft, regex, matchCase, wholeWord };
   // Early feedback on keystroke: the same validator the engine enforces
   // (regex dialect). Invalid patterns never fire a query.
@@ -164,7 +162,7 @@ export function SearchPanel() {
       if (arr) arr.push({ hit, index });
       else map.set(hit.pageIndex, [{ hit, index }]);
     });
-    return [...map.entries()].sort((a, b) => a[0] - b[0]);
+    return [...map.entries()].sort((left, right) => left[0] - right[0]);
   }, [hits]);
 
   const searching = status === 'searching';
@@ -182,7 +180,7 @@ export function SearchPanel() {
             type="text"
             value={draft}
             placeholder={t('demo.searchPlaceholder')}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(event) => setDraft(event.target.value)}
             className={`bg-surface text-fg w-full rounded-md border py-1.5 pl-8 pr-9 text-sm outline-none focus:ring-1 ${
               validation.ok
                 ? 'border-border focus:border-accent focus:ring-accent'

@@ -261,7 +261,7 @@ export class LayerPagesRepo {
 
   /**
    * First materialization of a layer's page rows from the immutable base.
-   * MUST be concurrency-safe across replicas: two replicas whose first-ever
+   * Must be concurrency-safe across replicas: two replicas whose first-ever
    * writes race both observe "no rows yet" and both snapshot — the values
    * are identical (derived from `document_pages`), so the loser's inserts
    * are simply ignored. A delete-then-insert here turns that benign race

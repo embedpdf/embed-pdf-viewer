@@ -1,0 +1,237 @@
+---
+title: Shapes & drawing
+description: Draw rectangles, ellipses, lines, arrows, polygons and freehand ink on a page.
+---
+
+# Shapes & drawing
+
+Shapes are drawings on top of the page: rectangles, ellipses, lines and arrows, polylines,
+polygons and freehand ink. You give the geometry in PDF points, and the engine draws the shape in
+the style you choose.
+
+```ts
+await page.annotations.create({
+  subtype: 'square',
+  rect: { left: 72, bottom: 600, right: 272, top: 700 },
+  color: { r: 220, g: 20, b: 60 },
+  strokeWidth: 2,
+});
+```
+
+Every shape takes the [style fields](/docs/engine/annotations#style): `color`, `opacity`,
+`strokeWidth`, `borderStyle`, `dashArray`, and `interiorColor` where the shape has an inside. Left
+out, a shape is a solid red line, 1 point wide, with no fill.
+
+## Rectangles and ellipses
+
+`square` draws a rectangle and `circle` an ellipse, inside `rect`:
+
+```ts
+await page.annotations.create({
+  subtype: 'circle',
+  rect: { left: 300, bottom: 600, right: 420, top: 680 },
+  interiorColor: { r: 255, g: 235, b: 150 },
+});
+```
+
+| Field                       | What it is                                                                        | Default |
+| :-------------------------- | :-------------------------------------------------------------------------------- | :------ |
+| `rect`                      | The box the shape fills. Required.                                                |         |
+| `interiorColor`             | The fill, or `null` for none.                                                     | none    |
+| `cloudyIntensity`           | A cloudy border instead of a straight one; see [Cloudy borders](#cloudy-borders). | none    |
+| `rotation`, `unrotatedRect` | A turned shape; see [Turned shapes](#turned-shapes).                              | none    |
+
+The line is drawn inside `rect`, so a thick border doesn't make the shape bigger.
+
+## Lines and arrows
+
+A `line` goes from one point to another, with an optional ending at each end:
+
+```ts
+await page.annotations.create({
+  subtype: 'line',
+  linePoints: { start: { x: 100, y: 400 }, end: { x: 320, y: 500 } },
+  lineEndings: { start: 'none', end: 'closed-arrow' },
+  strokeWidth: 2,
+});
+```
+
+| Field           | What it is                                                                     | Default                          |
+| :-------------- | :----------------------------------------------------------------------------- | :------------------------------- |
+| `linePoints`    | `{ start, end }`, two points `{ x, y }`. Required.                             |                                  |
+| `lineEndings`   | `{ start, end }`: what's drawn at each end; see [Line endings](#line-endings). | `{ start: 'none', end: 'none' }` |
+| `interiorColor` | The fill of closed endings, such as a solid arrowhead.                         | none                             |
+| `intent`        | `'line-arrow'` labels the line as an arrow. It changes nothing in the drawing. | none                             |
+
+You don't pass a `rect` for a line, a polyline, a polygon or ink: the engine works it out from
+the points, with room for the line width and the endings, and keeps it up to date when they
+change.
+
+A line with `intent: 'line-dimension'` and a `measure` is a distance measurement; see
+[Measurements](/docs/engine/annotations/measurements).
+
+## Polylines and polygons
+
+Both take a list of `vertices`. A `polygon` is closed and can be filled; a `polyline` stays open
+and can have endings, like a line:
+
+```ts
+await page.annotations.create({
+  subtype: 'polygon',
+  vertices: [
+    { x: 70, y: 460 },
+    { x: 170, y: 460 },
+    { x: 120, y: 540 },
+  ],
+  interiorColor: { r: 200, g: 230, b: 255 },
+});
+
+await page.annotations.create({
+  subtype: 'polyline',
+  vertices: [
+    { x: 230, y: 460 },
+    { x: 290, y: 540 },
+    { x: 350, y: 460 },
+  ],
+  lineEndings: { start: 'none', end: 'open-arrow' },
+});
+```
+
+| Field             | What it is                                                                               | Default                          |
+| :---------------- | :--------------------------------------------------------------------------------------- | :------------------------------- |
+| `vertices`        | The points, in order. Required: at least three for a polygon, two for a polyline.        |                                  |
+| `interiorColor`   | A polygon's fill. On a polyline, the fill of closed endings.                             | none                             |
+| `lineEndings`     | Polyline only: what's drawn at the first and the last point.                             | `{ start: 'none', end: 'none' }` |
+| `cloudyIntensity` | Polygon only: a cloudy border.                                                           | none                             |
+| `intent`          | Polygon only: `'polygon-cloud'` labels it as a cloud. It changes nothing in the drawing. | none                             |
+
+A polygon's last point joins its first by itself. Fewer points than a shape needs fail with
+`InvalidArg`. Polylines and polygons can also be perimeter and area measurements; see
+[Measurements](/docs/engine/annotations/measurements).
+
+## Freehand drawing
+
+An `ink` annotation is what a pen draws: one or more strokes, each a list of points.
+
+```ts
+await page.annotations.create({
+  subtype: 'ink',
+  inkList: [
+    [
+      { x: 70, y: 80 },
+      { x: 120, y: 180 },
+      { x: 180, y: 90 },
+    ],
+    [
+      { x: 200, y: 100 },
+      { x: 260, y: 160 },
+    ],
+  ],
+  strokeWidth: 3,
+});
+```
+
+| Field     | What it is                                                         | Default |
+| :-------- | :----------------------------------------------------------------- | :------ |
+| `inkList` | The strokes: one list of points per movement of the pen. Required. |         |
+| `intent`  | `'ink-highlight'` labels it as a freehand highlighter.             | none    |
+
+Ink has no fill, and its strokes have round ends. For a highlighter pen, combine
+`intent: 'ink-highlight'` with a wide `strokeWidth`, a light `color` and `blendMode: 'multiply'`,
+so the text under it stays readable.
+
+## Line endings
+
+`lineEndings` on lines and polylines, and `lineEnding` on [callouts](/docs/engine/annotations/free-text#callouts),
+take these values:
+
+| Value              | What's drawn at the end                          |
+| :----------------- | :----------------------------------------------- |
+| `'none'`           | Nothing.                                         |
+| `'open-arrow'`     | An arrowhead of two lines, pointing outward.     |
+| `'closed-arrow'`   | A triangle arrowhead, pointing outward.          |
+| `'r-open-arrow'`   | An open arrowhead, pointing back along the line. |
+| `'r-closed-arrow'` | A triangle arrowhead, pointing back.             |
+| `'square'`         | A square.                                        |
+| `'circle'`         | A circle.                                        |
+| `'diamond'`        | A diamond.                                       |
+| `'butt'`           | A short line across the end.                     |
+| `'slash'`          | A short slanted line across the end.             |
+
+The closed ones (`'closed-arrow'`, `'r-closed-arrow'`, `'square'`, `'circle'`, `'diamond'`) are
+filled with `interiorColor` when you set one, and outlined when you don't. Endings grow with the
+line: an arrowhead is 9 times the `strokeWidth` long.
+
+## Dashed lines
+
+Set `borderStyle: 'dashed'`, and the pattern in `dashArray` if you want your own: lengths in
+points, of line then gap.
+
+```ts
+await page.annotations.update(shape.ref, { borderStyle: 'dashed', dashArray: [6, 3] });
+```
+
+`[6, 3]` draws 6 points of line, then 3 points of gap. Without a `dashArray`, dashes are 3 points
+on, 3 off.
+
+## Cloudy borders
+
+Squares, circles and polygons can have a cloudy border instead of a straight one, the bumpy outline
+reviewers draw around a part of a drawing. `cloudyIntensity` sets how big the bumps are, usually
+`1` or `2`; `null` makes the border straight again.
+
+```ts
+await page.annotations.create({
+  subtype: 'square',
+  rect: { left: 100, bottom: 300, right: 220, top: 380 },
+  cloudyIntensity: 2,
+  strokeWidth: 2,
+});
+```
+
+The bumps stick out past the shape. The engine makes room for them, so `rect` stays the box of
+the shape itself.
+
+## Permissions
+
+Reading shapes needs `doc.annotate.read`. Creating, changing and deleting them needs the same
+permissions as any annotation; see [Permissions](/docs/engine/annotations#permissions).
+
+## Good to know
+
+### Turned shapes
+
+A rectangle or an ellipse can be turned by any angle. Give the shape's own box, before turning, as
+`unrotatedRect`, and the angle as `rotation`, in degrees clockwise (as a page turns, and as CSS
+`rotate()` turns):
+
+```ts
+await page.annotations.create({
+  subtype: 'square',
+  unrotatedRect: { left: 100, bottom: 300, right: 260, top: 380 },
+  rotation: 30,
+});
+```
+
+The shape turns about the middle of its box. The engine sets `rect` to the upright box around the
+turned shape, which is what a PDF app uses to find it. To move or resize a turned shape, change
+its `unrotatedRect`; to straighten it where it is, set `rotation: null`. A `rotation` without an
+`unrotatedRect` fails with `InvalidArg`. Free text boxes, carets and stamps turn the same way.
+
+Lines, polylines, polygons and ink turn by turning their points. Their `rotation` field only
+records the angle the points were turned by, so an editor can show a turned selection box; it
+changes nothing in the drawing.
+
+### Border styles
+
+`borderStyle` also takes `'beveled'` and `'inset'`, for PDF apps that draw them. The engine draws
+shapes with those styles as a solid line. A cloudy border is never dashed.
+
+### How it's stored
+
+For readers who know PDF: `linePoints` is `/L`, `vertices` is `/Vertices`, `inkList` is
+`/InkList`, `lineEndings` is `/LE`, `interiorColor` is `/IC` and `cloudyIntensity` is the
+intensity of a `/BE` cloudy border effect. For a cloudy shape the PDF's own `/Rect` takes in the
+bumps and `/RD` says where the shape is inside it; the engine keeps both, and `rect` is the
+shape's box. A turned shape's drawing is turned inside its `/Rect`, so every PDF app shows it
+turned.

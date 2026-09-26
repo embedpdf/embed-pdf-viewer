@@ -1,5 +1,5 @@
 /**
- * Zod schemas for engine PDF-document geometry. Exported from `wire.ts` ONLY
+ * Zod schemas for engine PDF-document geometry. Exported from `wire.ts` only
  * (never from `shared.ts`/`runtime`) so the zod-free runtime stays zod-free.
  */
 

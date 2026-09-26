@@ -14,7 +14,7 @@ import { sqliteMigrations } from '../src/db/migrations/sqlite/index';
  * Drift detection tests. Each test builds a fresh in-memory DB so the
  * scenarios are completely isolated.
  *
- * The detector is the single most important safety net in Phase 2:
+ * The detector is the most important safety net of the migrator:
  * if it misses a real drift, production starts on the wrong schema
  * and corrupts data. We test it harder than anything else here.
  */

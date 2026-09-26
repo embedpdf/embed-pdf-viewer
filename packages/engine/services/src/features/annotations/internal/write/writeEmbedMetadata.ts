@@ -4,7 +4,7 @@ import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runti
 /**
  * Write the EmbedPDF-namespaced /EMBD_Metadata annotation dictionary.
  *
- * This module owns ONLY the vendor-extension dictionary. Standard PDF
+ * This module owns only the vendor-extension dictionary. Standard PDF
  * base fields (/T, /M, /NM, /Contents) are handled by
  * `writers/annotations/base.ts` — /EMBD_Metadata is a separate
  * dictionary nested under the annotation that carries cloud-side
@@ -32,6 +32,7 @@ const KEY_USER_ID = 'UserID';
 const KEY_GROUP_ID = 'GroupID';
 const KEY_CREATED_BY = 'CreatedBy';
 const KEY_UPDATED_BY = 'UpdatedBy';
+const KEY_IMPORTED_BY = 'ImportedBy';
 
 /**
  * Current EmbedPDF metadata schema version. Bump if/when the field set
@@ -62,12 +63,12 @@ export function applyEmbedMetadataOnCreate(
   fn.EPDFAnnot_SetEmbedMetadataNumber(annotPtr, KEY_SCHEMA_VERSION, EMBD_METADATA_SCHEMA_VERSION);
 
   if (actor.userId) {
-    setMetadataString(fn, mem, annotPtr, KEY_USER_ID, actor.userId);
-    setMetadataString(fn, mem, annotPtr, KEY_CREATED_BY, actor.userId);
-    setMetadataString(fn, mem, annotPtr, KEY_UPDATED_BY, actor.userId);
+    writeEmbedMetadataString(fn, mem, annotPtr, KEY_USER_ID, actor.userId);
+    writeEmbedMetadataString(fn, mem, annotPtr, KEY_CREATED_BY, actor.userId);
+    writeEmbedMetadataString(fn, mem, annotPtr, KEY_UPDATED_BY, actor.userId);
   }
   if (actor.groupId) {
-    setMetadataString(fn, mem, annotPtr, KEY_GROUP_ID, actor.groupId);
+    writeEmbedMetadataString(fn, mem, annotPtr, KEY_GROUP_ID, actor.groupId);
   }
 }
 
@@ -99,14 +100,51 @@ export function applyEmbedMetadataOnUpdate(
     fn.EPDFAnnot_SetEmbedMetadataNumber(annotPtr, KEY_SCHEMA_VERSION, EMBD_METADATA_SCHEMA_VERSION);
   }
   if (actor.userId) {
-    setMetadataString(fn, mem, annotPtr, KEY_UPDATED_BY, actor.userId);
+    writeEmbedMetadataString(fn, mem, annotPtr, KEY_UPDATED_BY, actor.userId);
   }
   if (actor.groupId) {
-    setMetadataString(fn, mem, annotPtr, KEY_GROUP_ID, actor.groupId);
+    writeEmbedMetadataString(fn, mem, annotPtr, KEY_GROUP_ID, actor.groupId);
   }
 }
 
-function setMetadataString(
+/** The `/EMBD_Metadata` fields a restoring import writes as the bundle has them. */
+export interface RestoredEmbedMetadata {
+  readonly userId: string | null;
+  readonly createdBy: string | null;
+  readonly modifiedBy: string | null;
+  readonly groupId: string | null;
+}
+
+/**
+ * Write `/EMBD_Metadata` on an imported annotation as the bundle has it, and
+ * `/ImportedBy`, the importing session's user: what tells a reader the
+ * attribution was supplied by an authorized importer (convention §5.4).
+ * Nothing is written for an annotation without either, as another tool's
+ * annotation, imported by an anonymous session.
+ */
+export function applyEmbedMetadataOnRestore(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+  from: RestoredEmbedMetadata,
+  importedBy: string | undefined,
+): void {
+  const fields: Array<[string, string | null | undefined]> = [
+    [KEY_USER_ID, from.userId],
+    [KEY_CREATED_BY, from.createdBy],
+    [KEY_UPDATED_BY, from.modifiedBy],
+    [KEY_GROUP_ID, from.groupId],
+    [KEY_IMPORTED_BY, importedBy],
+  ];
+  if (fields.every(([, value]) => !value)) return;
+  fn.EPDFAnnot_SetEmbedMetadataNumber(annotPtr, KEY_SCHEMA_VERSION, EMBD_METADATA_SCHEMA_VERSION);
+  for (const [key, value] of fields) {
+    if (value) writeEmbedMetadataString(fn, mem, annotPtr, key, value);
+  }
+}
+
+/** Set a string under `/EMBD_Metadata`. */
+export function writeEmbedMetadataString(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,

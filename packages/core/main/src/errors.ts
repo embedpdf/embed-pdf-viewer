@@ -57,6 +57,7 @@ export function isPluginError(value: unknown, code?: PluginErrorCode): value is 
 const ENGINE_CODE_MAP: Readonly<Record<string, PluginErrorCode>> = {
   InvalidArg: 'invalid-input',
   MalformedPdf: 'invalid-input',
+  PayloadTooLarge: 'invalid-input',
   WireFormat: 'invalid-input',
   DocNotOpen: 'not-ready',
   DocPasswordRequired: 'permission-denied',
@@ -78,7 +79,7 @@ const ENGINE_CODE_MAP: Readonly<Record<string, PluginErrorCode>> = {
 };
 
 /**
- * The ONE boundary mapping from whatever an engine call threw to a
+ * The one boundary mapping from whatever an engine call threw to a
  * `PluginError`. Idempotent: an existing PluginError passes through.
  * Cancellation (the kernel's CancelledError, a DOM AbortError, or an engine
  * abort) is `operation-cancelled`, never `operation-failed`, so callers can
@@ -87,9 +88,10 @@ const ENGINE_CODE_MAP: Readonly<Record<string, PluginErrorCode>> = {
 export function toPluginError(capability: string, error: unknown): PluginError {
   if (error instanceof PluginError) return error;
   if (error instanceof PermissionDenied) {
+    // `details` carries `required` (and `anyOf`, `context`), as the engine sent it.
     return new PluginError('permission-denied', capability, error.message, {
       cause: error,
-      details: { required: error.required, context: error.context },
+      details: error.details,
     });
   }
   if (isCancelled(error) || (error instanceof Error && error.name === 'AbortError')) {

@@ -1,9 +1,9 @@
 /**
- * The ANNOTATION-selection floating strip:
+ * The annotation-selection floating strip:
  *
- *   config/chrome.ts `strips.annotation`  declares WHAT may appear
- *   each command's visible/enabled        decides WHICH items show
- *   <AnnotationMenu>                      solves WHERE (camera transform,
+ *   config/chrome.ts `strips.annotation`  declares what may appear
+ *   each command's visible/enabled        decides which items show
+ *   <AnnotationMenu>                      solves where (camera transform,
  *                                         rotate-knob dodging, pointer isolation)
  *
  * useStripView is the live intersection: hidden commands drop out, empty
@@ -23,8 +23,8 @@ import { StripBar } from './strip-bar';
 export function AnnotationStrip() {
   const t = useT();
   const view = useStripView(useStripSchema('annotation'));
-  // The link editor popover rides the SAME anchor and REPLACES the strip
-  // while open — one anchored card at a time (v2's popup, on the projector).
+  // The link editor popover rides the same anchor and replaces the strip
+  // while open — one anchored card at a time, on the projector.
   const editor = useSurface('link-editor');
   const selection = useAnnotationSelection();
   // A stale editor never outlives its selection.

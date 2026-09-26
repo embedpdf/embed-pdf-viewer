@@ -1,14 +1,17 @@
-import type { CircleDraft } from './draft';
-import type { CircleAnnotationDTO } from './dto';
-import type { CirclePatch } from './patch';
-import { CircleDTOSchema, CircleDraftSchema, CirclePatchSchema } from './schema';
+import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
+import { CircleDeclaration } from './declaration';
 
-export type { CircleAnnotationDTO } from './dto';
-export type { CircleDraft } from './draft';
-export type { CirclePatch } from './patch';
-export { CircleDTOSchema, CircleDraftSchema, CirclePatchSchema } from './schema';
+export { CircleDeclaration } from './declaration';
+
+export type CircleAnnotationDTO = ReadOf<typeof CircleDeclaration>;
+export type CircleDraft = CreateOf<typeof CircleDeclaration>;
+export type CirclePatch = UpdateOf<typeof CircleDeclaration>;
+
+export const CircleDTOSchema = CircleDeclaration.readSchema;
+export const CircleDraftSchema = CircleDeclaration.createSchema;
+export const CirclePatchSchema = CircleDeclaration.updateSchema;
 
 export const CircleKind: AnnotationKindModule<
   'circle',
@@ -21,4 +24,5 @@ export const CircleKind: AnnotationKindModule<
   dtoSchema: CircleDTOSchema,
   draftSchema: CircleDraftSchema,
   patchSchema: CirclePatchSchema,
+  readBackWrites: CircleDeclaration.readBackWrites,
 };

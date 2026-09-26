@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Shared docs machinery for embedpdf.com and cloudpdf.com \u2014 components behind the --dk-* token contract. See DOCS-PLATFORM-ARCHITECTURE.md.",
+  "description": "Shared docs machinery for embedpdf.com and cloudpdf.com \u2014 components behind the --dk-* token contract. See docs/conventions/docs-architecture.md.",
   "exports": {
     ".": "./src/index.ts",
     "./mdx": "./mdx/remark-engine-axis.mjs",

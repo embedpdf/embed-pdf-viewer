@@ -3,13 +3,13 @@ import {
   isPluginError,
   toPluginError,
   toPluginErrorInfo,
-  type ControllerContext,
+  type PluginContext,
   type LatestCancellation,
   type PageRef,
 } from '@embedpdf/core';
 import { boundsOfRects, textQuadBounds, type TextQuad } from '@embedpdf/core-geometry';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
-import type { PdfQuad, SearchMode, SearchQuery, SearchSlice } from '@embedpdf/engine-core/runtime';
+import type { PdfQuad, SearchQuery, SearchSlice } from '@embedpdf/engine-core/runtime';
 import type {
   SearchActiveHitChangedEvent,
   SearchCancelledEvent,
@@ -24,7 +24,17 @@ import type {
   SearchRevealOptions,
   SearchStartedEvent,
 } from './contract';
-import { pagesWithHits, type SearchAction, type SearchState } from './model';
+import {
+  appendHits,
+  cancelSession,
+  clearSession,
+  completeSession,
+  failSession,
+  pagesWithHits,
+  setActiveHit,
+  startSession,
+  type SearchState,
+} from './model';
 
 const EMPTY: readonly SearchHit[] = Object.freeze([]);
 const EMPTY_PAGES: readonly PageRef[] = Object.freeze([]);
@@ -39,11 +49,11 @@ interface AbortableSlice extends Promise<SearchSlice> {
   abort?(reason?: unknown): void;
 }
 
-/** How a `collect()` consumer observes the loop: the session dispatches, findAll accumulates. */
+/** How a `collect()` consumer observes the loop: the session updates state, findAll accumulates. */
 interface CollectSink {
-  /** Before the first slice AND again on a stale-cursor restart: reset any accumulation. */
+  /** Before the first slice, and again on a stale-cursor restart: reset any accumulation. */
   onStart(): void;
-  onSlice(hits: readonly SearchHit[], scanned: number, total: number): void;
+  onSlice(hits: readonly SearchHit[], pagesSearched: number, pageCount: number): void;
 }
 
 /**
@@ -51,11 +61,12 @@ interface CollectSink {
  * supersedes the older one, which can no longer publish); `findAll` runs on
  * its own signal and never touches the session. Both share `collect`, the
  * one cursor loop over the engine's budgeted slices.
+ *
+ * The scan's own events (started, progress, completed, cancelled, failed)
+ * fire where the scan reaches those points. The active-hit and cleared
+ * events are derived from state changes, so every verb announces them.
  */
-export function createSearchController(
-  ctx: ControllerContext<SearchState, SearchAction>,
-  config: SearchConfig = {},
-) {
+export function createSearchController(ctx: PluginContext<SearchState>, config: SearchConfig = {}) {
   const session = ctx.latest('session');
   const started = ctx.events.source<SearchStartedEvent>();
   const progress = ctx.events.source<SearchProgressEvent>();
@@ -65,7 +76,14 @@ export function createSearchController(
   const activeHitChanged = ctx.events.source<SearchActiveHitChangedEvent>();
   const cleared = ctx.events.source<SearchClearedEvent>();
 
-  const state = () => ctx.getState();
+  const state = () => ctx.state.get();
+
+  ctx.state.onChange(({ previous, next }) => {
+    if (previous.activeIndex !== next.activeIndex) {
+      activeHitChanged.emit({ index: next.activeIndex, hit: next.hits[next.activeIndex] ?? null });
+    }
+    if (previous.status !== 'idle' && next.status === 'idle') cleared.emit({});
+  });
 
   // ── projection: engine slice → page-space hits ───────────────────────────
 
@@ -78,9 +96,14 @@ export function createSearchController(
       const space = ctx.geometry.forPage(match.page);
       // Engine quads carry frame-geometric slot semantics (p1..p4 = upper-start,
       // upper-end, lower-start, lower-end): the y-flip maps corners onto their names.
-      const toQuad = (q: PdfQuad): TextQuad => {
-        const p = space.pdfQuadToPage(q);
-        return { upperStart: p.p1, upperEnd: p.p2, lowerStart: p.p3, lowerEnd: p.p4 };
+      const toQuad = (pdfQuad: PdfQuad): TextQuad => {
+        const corners = space.pdfQuadToPage(pdfQuad);
+        return {
+          upperStart: corners.p1,
+          upperEnd: corners.p2,
+          lowerStart: corners.p3,
+          lowerEnd: corners.p4,
+        };
       };
       const segments = match.segments.map((segment) => {
         const quad = toQuad(segment.quad);
@@ -89,11 +112,11 @@ export function createSearchController(
       hits.push({
         page: match.page,
         pageIndex: page.index,
-        charStart: match.charStart,
-        charCount: match.charCount,
+        start: match.start,
+        count: match.count,
         segments,
         ...(segments.length
-          ? { bounds: boundsOfRects(segments.map((s) => s.rect)) ?? undefined }
+          ? { bounds: boundsOfRects(segments.map((segment) => segment.rect)) ?? undefined }
           : {}),
         ...(match.snippet ? { snippet: match.snippet } : {}),
       });
@@ -104,33 +127,33 @@ export function createSearchController(
   // ── the mechanism ────────────────────────────────────────────────────────
 
   /**
-   * One cursor loop over budgeted slices: permission fallback ('full' → 'rects'
-   * when snippets are denied, unless pinned), restart-once on a stale cursor,
+   * One cursor loop over budgeted slices: permission fallback (snippets → none
+   * when they are denied, unless pinned), restart-once on a stale cursor,
    * projection per slice. Returns true on exhaustion, false when the signal
    * aborted; throws on a real error (already a PluginError: ctx.doc is guarded).
    */
   async function collect(
     query: SearchQuery,
-    options: { startPage?: PageRef; mode?: SearchMode; signal: AbortSignal },
+    options: { from?: PageRef; snippets?: boolean; signal: AbortSignal },
     sink: CollectSink,
   ): Promise<boolean> {
     const { signal } = options;
     sink.onStart();
 
-    let mode: SearchMode = options.mode ?? 'full';
-    const modePinned = options.mode !== undefined;
+    let snippets = options.snippets ?? true;
+    const snippetsPinned = options.snippets !== undefined;
     let cursor: string | undefined;
     let restarted = false;
     for (;;) {
       if (signal.aborted) return false;
       let slice: SearchSlice;
       const request = {
-        query,
-        mode,
+        ...query,
+        snippets,
         ...(cursor !== undefined
           ? { cursor }
-          : options.startPage !== undefined
-            ? { startPage: options.startPage }
+          : options.from !== undefined
+            ? { from: options.from }
             : {}),
       };
       const pending = ctx.doc.search.query(request) as AbortableSlice;
@@ -140,14 +163,14 @@ export function createSearchController(
         slice = await pending;
       } catch (error) {
         if (signal.aborted) return false;
-        // Snippets denied (no doc.text.copy)? Degrade to rect-only matches.
+        // Snippets denied (no doc.text.copy)? Degrade to matches without them.
         if (
-          !modePinned &&
-          mode === 'full' &&
+          !snippetsPinned &&
+          snippets &&
           cursor === undefined &&
           isPluginError(error, 'permission-denied')
         ) {
-          mode = 'rects';
+          snippets = false;
           continue;
         }
         // A stale cursor rejects with InvalidArg: the document changed under the
@@ -163,7 +186,7 @@ export function createSearchController(
         signal.removeEventListener('abort', onAbort);
       }
       if (signal.aborted) return false;
-      sink.onSlice(hitsFromSlice(slice), slice.scannedPages, slice.totalPages);
+      sink.onSlice(hitsFromSlice(slice), slice.pagesSearched, slice.pageCount);
       if (slice.nextCursor === null) return true;
       cursor = slice.nextCursor;
     }
@@ -178,7 +201,7 @@ export function createSearchController(
 
   function search(
     query: SearchQuery,
-    options: { startPage?: PageRef; signal?: AbortSignal } = {},
+    options: { from?: PageRef; signal?: AbortSignal } = {},
   ): Promise<SearchResult> {
     if (query.text.length === 0) {
       clear();
@@ -188,22 +211,22 @@ export function createSearchController(
     return session
       .run(async (run) => {
         operationId = run.id;
-        const startPage = options.startPage ?? viewportFirstPage();
+        const from = options.from ?? viewportFirstPage();
         const complete = await collect(
           query,
-          { startPage, signal: run.signal },
+          { from, signal: run.signal },
           {
             onStart: () =>
               run.commit(() => {
-                ctx.dispatch({ type: 'START', query, operationId: run.id });
+                ctx.state.update(startSession, query, run.id);
                 started.emit({ query, operationId: run.id });
               }),
-            onSlice: (hits, scanned, total) =>
+            onSlice: (hits, pagesSearched, pageCount) =>
               run.commit(() => {
-                ctx.dispatch({ type: 'APPEND', hits, scanned, total });
+                ctx.state.update(appendHits, hits, { pagesSearched, pageCount });
                 progress.emit({
-                  scanned,
-                  total,
+                  pagesSearched,
+                  pageCount,
                   hitCount: state().hits.length,
                   operationId: run.id,
                 });
@@ -212,7 +235,7 @@ export function createSearchController(
         );
         if (!complete) throw new PluginError('operation-cancelled', 'search', 'search aborted');
         run.commit(() => {
-          ctx.dispatch({ type: 'COMPLETE' });
+          ctx.state.update(completeSession);
           completed.emit({ hitCount: state().hits.length, operationId: run.id });
         });
         return { status: 'complete', hitCount: state().hits.length } as SearchResult;
@@ -224,8 +247,9 @@ export function createSearchController(
           const reason: SearchCancelledEvent['reason'] =
             why === 'superseded' ? 'superseded' : why === 'cleared' ? 'cleared' : 'cancelled';
           // A superseded or cleared run has already lost the session; a cancelled one keeps its hits.
-          if (reason === 'cancelled' && state().operationId === operationId)
-            ctx.dispatch({ type: 'CANCELLED' });
+          if (reason === 'cancelled' && state().operationId === operationId) {
+            ctx.state.update(cancelSession);
+          }
           cancelled.emit({ operationId, reason });
           return {
             status: reason === 'superseded' ? 'superseded' : 'cancelled',
@@ -233,7 +257,7 @@ export function createSearchController(
           };
         }
         const info = toPluginErrorInfo(toPluginError('search', error));
-        if (state().operationId === operationId) ctx.dispatch({ type: 'ERROR', error: info });
+        if (state().operationId === operationId) ctx.state.update(failSession, info);
         failed.emit({ error: info, operationId });
         throw error;
       });
@@ -241,25 +265,20 @@ export function createSearchController(
 
   function clear(): void {
     session.cancel('cleared');
-    if (state().status === 'idle') return;
-    ctx.dispatch({ type: 'CLEAR' });
-    cleared.emit({});
+    ctx.state.update(clearSession);
   }
 
   function goToHit(index: number, options?: SearchRevealOptions): SearchHit | null {
     const { hits } = state();
     if (hits.length === 0) return null;
     const wrapped = ((index % hits.length) + hits.length) % hits.length;
-    if (state().activeIndex !== wrapped) {
-      ctx.dispatch({ type: 'SET_ACTIVE', index: wrapped });
-      activeHitChanged.emit({ index: wrapped, hit: hits[wrapped] });
-    }
+    ctx.state.update(setActiveHit, wrapped);
     reveal(hits[wrapped], options);
     return hits[wrapped];
   }
 
   function reveal(hit: SearchHit, options?: SearchRevealOptions): void {
-    // Positioned reveal: the HIT (not just its page) arrives at the anchor —
+    // Positioned reveal: the hit (not just its page) arrives at the anchor —
     // per-call override > plugin config > find-bar default. Zoom never changes.
     const arrival = { ...DEFAULT_REVEAL, ...config.reveal, ...options };
     ctx.tryGet(StageToken)?.reveal(hit.page, {
@@ -272,10 +291,11 @@ export function createSearchController(
   const api: SearchCapability = {
     // The twin. Search is a pure request: the verbs carry no client gate (the
     // engine enforces; the error state reports); the twin hides affordances.
-    canSearch: (mode) => {
+    canSearch: (options) => {
       const security = ctx.doc.security;
       return (
-        security.allows('doc.text.search') && (mode !== 'full' || security.allows('doc.text.copy'))
+        security.allows('doc.text.search') &&
+        (!options?.snippets || security.allows('doc.text.copy'))
       );
     },
 
@@ -321,7 +341,10 @@ export function createSearchController(
       try {
         const complete = await collect(
           query,
-          { mode: options.mode, signal: controller.signal },
+          {
+            ...(options.snippets !== undefined ? { snippets: options.snippets } : {}),
+            signal: controller.signal,
+          },
           {
             onStart: () => {
               all.length = 0;

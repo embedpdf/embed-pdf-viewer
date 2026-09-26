@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-// SKIPPED: stale since the engine-core -> engine/core restructure broke the
+// Skipped: stale since the engine-core -> engine/core restructure broke the
 // import path and these stopped collecting; the render wire schema has since
 // drifted (9 assertions fail against current shapes). Revive against the
 // current wire contract in a dedicated pass.
@@ -66,7 +66,7 @@ describe.skip('render wire round trip', () => {
         viewport: { kind: 'width', width: 720 },
         rotation: 90,
         background: 'white',
-        quality: 80,
+        quality: 0.8,
         includeAnnotations: true,
       },
       versions: { contentVersion: 11, annotationVersion: 13 },
@@ -154,7 +154,7 @@ describe.skip('render wire round trip', () => {
       },
       background: 'white',
       rotation: 90,
-      quality: 80,
+      quality: 0.8,
     };
     expect(unflatten(flatten(nested))).toEqual(nested);
   });

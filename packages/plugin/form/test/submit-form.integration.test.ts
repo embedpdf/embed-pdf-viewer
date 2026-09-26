@@ -12,7 +12,6 @@ import type { ActionDiagnostic, ActionSubmitRequest } from '@embedpdf/plugin-act
 import { annotationPlugin } from '@embedpdf/plugin-annotation';
 import { interactionPlugin } from '@embedpdf/plugin-interaction';
 
-import { fieldKeyOf } from '../src/core/model';
 import { formPlugin } from '../src/form.plugin';
 import { FormToken } from '../src/host-contract';
 
@@ -30,7 +29,7 @@ const fixturePath = resolve(
 );
 
 /**
- * THE Phase-4 submit gate on a real engine: SubmitForm buttons (and a
+ * Form submission on a real engine: SubmitForm buttons (and a
  * scripted doc.submitForm) resolve ISO-exact datasets through the form
  * resolver and land in the embedder handler — the sink chain's consent
  * boundary. Nothing auto-networks; without a sink the node blocks with a
@@ -94,11 +93,11 @@ async function boot() {
 
 describe('the Phase-4 submit gate: ISO-exact datasets to the embedder handler', () => {
   it('btnParent: an included parent NAME submits its descendants (Table 239)', async () => {
-    await using t = await boot();
-    t.installHandler();
-    await t.press('btnParent');
-    expect(t.requests).toHaveLength(1);
-    const request = t.requests[0]!;
+    await using harness = await boot();
+    harness.installHandler();
+    await harness.press('btnParent');
+    expect(harness.requests).toHaveLength(1);
+    const request = harness.requests[0]!;
     expect(request).toMatchObject({
       url: 'https://home.test/parent',
       format: 'fdf',
@@ -113,10 +112,10 @@ describe('the Phase-4 submit gate: ISO-exact datasets to the embedder handler', 
   });
 
   it('btnAll: /Fields absent submits everything eligible — NoExport and push-buttons out, name-only entries in', async () => {
-    await using t = await boot();
-    t.installHandler();
-    await t.press('btnAll');
-    const request = t.requests[0]!;
+    await using harness = await boot();
+    harness.installHandler();
+    await harness.press('btnAll');
+    const request = harness.requests[0]!;
     // Flags 2 = IncludeNoValueFields: the valueless field submits by name.
     expect(request.entries).toEqual([
       { name: 'parent.c1', value: 'child-one' },
@@ -125,34 +124,40 @@ describe('the Phase-4 submit gate: ISO-exact datasets to the embedder handler', 
       { name: 'plain', value: 'visible' },
     ]);
     // Implicit sweeps stay quiet — the ISO defaults are not diagnostic noise.
-    expect(t.diagnostics.filter((d) => d.code === 'submit-entry-unsupported')).toHaveLength(0);
+    expect(
+      harness.diagnostics.filter((diagnostic) => diagnostic.code === 'submit-entry-unsupported'),
+    ).toHaveLength(0);
   });
 
   it('btnVeto: NoExport beats an explicit include; an explicit push-button is diagnosed', async () => {
-    await using t = await boot();
-    t.installHandler();
-    await t.press('btnVeto');
-    const request = t.requests[0]!;
+    await using harness = await boot();
+    harness.installHandler();
+    await harness.press('btnVeto');
+    const request = harness.requests[0]!;
     expect(request.entries).toEqual([{ name: 'plain', value: 'visible' }]);
-    const unsupported = t.diagnostics.filter((d) => d.code === 'submit-entry-unsupported');
-    expect(unsupported.some((d) => /NoExport/.test(d.message))).toBe(true);
-    expect(unsupported.some((d) => /pushbutton/.test(d.message))).toBe(true);
+    const unsupported = harness.diagnostics.filter(
+      (diagnostic) => diagnostic.code === 'submit-entry-unsupported',
+    );
+    expect(unsupported.some((diagnostic) => /NoExport/.test(diagnostic.message))).toBe(true);
+    expect(unsupported.some((diagnostic) => /pushbutton/.test(diagnostic.message))).toBe(true);
   });
 
   it('btnJs: doc.submitForm({...}) rides the SAME pipeline with include-mode names', async () => {
-    await using t = await boot();
-    t.installHandler();
-    await t.press('btnJs');
-    expect(t.requests).toHaveLength(1);
-    const request = t.requests[0]!;
+    await using harness = await boot();
+    harness.installHandler();
+    await harness.press('btnJs');
+    expect(harness.requests).toHaveLength(1);
+    const request = harness.requests[0]!;
     expect(request).toMatchObject({ url: 'https://home.test/js', format: 'xfdf' });
     expect(request.entries).toEqual([{ name: 'plain', value: 'visible' }]);
   });
 
   it('no sink installed: the node blocks with no-submit-sink — nothing ever leaves the viewer', async () => {
-    await using t = await boot();
-    await t.press('btnParent');
-    expect(t.requests).toHaveLength(0);
-    expect(t.diagnostics.some((d) => d.code === 'no-submit-sink')).toBe(true);
+    await using harness = await boot();
+    await harness.press('btnParent');
+    expect(harness.requests).toHaveLength(0);
+    expect(harness.diagnostics.some((diagnostic) => diagnostic.code === 'no-submit-sink')).toBe(
+      true,
+    );
   });
 });

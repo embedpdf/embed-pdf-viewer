@@ -1,22 +1,16 @@
 import type { PageScaleResult } from '../mutation/PageScaleResult';
 import type { PdfMeasure, PageMeasurementViewport } from '../dto/Measure';
 import type { FontIdentityInfo } from '../dto/FontSpec';
-import type {
-  AnnotationListPageSnapshot,
-  AnnotationListSnapshotAllPages,
-} from '../annotation/AnnotationListSnapshot';
-import type {
-  WireAnnotationDraft,
-  WireAnnotationPatch,
-  WireAttachmentFile,
-} from '../annotation/kinds';
+import type { AnnotationList } from '../annotation/AnnotationList';
+import type { AnnotationDraft, AnnotationPatch } from '../annotation/kinds';
+import type { WireAnnotationResources } from '../annotation/resources';
 import type { AnnotationActor } from '../auth/scope';
 import type {
   AnnotationAppearanceMode,
   AnnotationAppearanceRenderOptions,
   AnnotationAppearancesResult,
 } from '../dto/AnnotationRender';
-import type { EmbeddedFileItem, EmbeddedFileRef } from '../dto/Attachment';
+import type { Attachment, AttachmentRef, WireAttachmentFile } from '../dto/Attachment';
 import type { DocumentMetadata } from '../dto/DocumentMetadata';
 import type { MetadataPatch } from '../dto/MetadataPatch';
 import type { PageGeometrySnapshot } from '../dto/PageGeometrySnapshot';
@@ -27,6 +21,7 @@ import type { PageTextSnapshot } from '../dto/PageTextSnapshot';
 import type { DocumentActionsSnapshot } from '../dto/PdfAction';
 import type { PdfSaveMode } from '../dto/PdfSaveMode';
 import type { PieceInfoPatch, PieceInfoSnapshot } from '../dto/PieceInfo';
+import type { PieceInfoDeleteResult, PieceInfoUpdateResult } from '../engine/PieceInfoService';
 import type { SerializedEngineError } from '../errors/EngineError';
 import type { FormFieldDraft } from '../forms/draft';
 import type { FormEffect, FormEffectsResult } from '../forms/effects';
@@ -38,6 +33,10 @@ import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
 import type { PageRef } from '../identity/PageRef';
+import type { WireAnnotationBundle } from '../transfer/AnnotationBundle';
+import type { AnnotationImportPages, AnnotationImportResult } from '../transfer/annotationImport';
+import type { AnnotationBundleLimits } from '../transfer/bundleLimits';
+import type { AnnotationExportSelection } from '../transfer/exportSelection';
 import type {
   AnnotationCreateResult,
   AnnotationDeleteResult,
@@ -74,7 +73,7 @@ import type {
   BaseVersionInfo,
   DigestAlgorithm,
   DocumentProtection,
-  SignatureAbortResult,
+  SignatureCancelResult,
   SignatureCompleteInput,
   SignatureCompleteResult,
   SignatureDTO,
@@ -170,10 +169,10 @@ export interface SignaturesListWorkerRequest {
   docId: string;
   layerName?: string;
   /**
-   * Read the session's WORKING COPY (its unsaved state as one more revision
+   * Read the session's working copy (its unsaved state as one more revision
    * over the loaded bytes) instead of the loaded bytes. The cloud server
    * sets it: its layer sessions keep every committed edit in memory, so the
-   * layer's durable state IS the working copy. No-op without unsaved edits.
+   * layer's durable state is the working copy. No-op without unsaved edits.
    */
   workingCopy?: boolean;
 }
@@ -227,8 +226,8 @@ export interface SignaturesCompleteWorkerRequest {
   artifactPath?: string;
 }
 
-export interface SignaturesAbortWorkerRequest {
-  kind: 'signatures.abort';
+export interface SignaturesCancelWorkerRequest {
+  kind: 'signatures.cancel';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -244,7 +243,7 @@ export interface SignaturesAnalyzeWorkerRequest {
 }
 
 /**
- * Session-less: install a CMS into a signing candidate FILE and verify the
+ * Session-less: install a CMS into a signing candidate file and verify the
  * result. The server rebuilds the candidate (base ⊕ durable tail) on
  * whichever replica completes the signing, so this never addresses a
  * session: the file is patched in place, opened into a transient session
@@ -288,27 +287,17 @@ export interface ActionsReadWorkerRequest {
   layerName?: string;
 }
 
-export interface AnnotationsListRawAllWorkerRequest {
-  kind: 'annotations.listRawAll';
+/**
+ * The annotations of the given pages, or of every page: a raw read off the
+ * document (no page is loaded), one snapshot per page.
+ */
+export interface AnnotationsListWorkerRequest {
+  kind: 'annotations.list';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-}
-
-export interface AnnotationsListRawPageWorkerRequest {
-  kind: 'annotations.listRawPage';
-  jobId: WorkerJobId;
-  docId: string;
-  layerName?: string;
-  page: PageRef;
-}
-
-export interface AnnotationsListFullPageWorkerRequest {
-  kind: 'annotations.listFullPage';
-  jobId: WorkerJobId;
-  docId: string;
-  layerName?: string;
-  page: PageRef;
+  /** In the order to list them; every page when omitted. */
+  pages?: PageRef[];
 }
 
 /**
@@ -332,14 +321,12 @@ export interface AnnotationsCreateWorkerRequest {
   docId: string;
   layerName?: string;
   page: PageRef;
-  /** WIRE form — binary fields hold `{ resource }` refs into {@link resources}. */
-  draft: WireAnnotationDraft;
+  draft: AnnotationDraft;
   /**
-   * Binary payloads referenced by the draft, keyed by resource key. The
-   * producer puts each `bytes` buffer on the wirePack transfer list
-   * (zero-copy, same convention as `PageRaster`).
+   * The bytes beside the draft, by role. The producer puts each buffer on
+   * the wirePack transfer list (zero-copy, same convention as `PageRaster`).
    */
-  resources?: WireResourceMap;
+  resources?: WireAnnotationResources;
   artifactPath?: string;
   /**
    * Identity to stamp on the newly created annotation:
@@ -358,10 +345,9 @@ export interface AnnotationsUpdateWorkerRequest {
   docId: string;
   layerName?: string;
   ref: AnnotationRef;
-  /** WIRE form — see {@link AnnotationsCreateWorkerRequest.draft}. */
-  patch: WireAnnotationPatch;
-  /** Binary payloads referenced by the patch — see the create request. */
-  resources?: WireResourceMap;
+  patch: AnnotationPatch;
+  /** The bytes beside the patch, by role — see the create request. */
+  resources?: WireAnnotationResources;
   artifactPath?: string;
   /**
    * Identity of the editor. Drives /EMBD_Metadata/UpdatedBy refresh on
@@ -377,6 +363,12 @@ export interface AnnotationsDeleteWorkerRequest {
   docId: string;
   layerName?: string;
   ref: AnnotationRef;
+  /**
+   * What the caller's permission check covered: the annotation and
+   * everything deleted with it (`deletedWith`). A member it doesn't name
+   * (added since) is refused, so nothing is deleted unchecked.
+   */
+  checked: AnnotationRef[];
   artifactPath?: string;
 }
 
@@ -393,7 +385,7 @@ export interface AnnotationsFlattenWorkerRequest {
   artifactPath?: string;
 }
 
-/** Flatten a chosen set of one page's annotation appearances into a NEW
+/** Flatten a chosen set of one page's annotation appearances into a new
  *  single-page PDF (bytes). A read: no artifact, no revision. */
 export interface AnnotationsExportAppearanceWorkerRequest {
   kind: 'annotations.exportAppearance';
@@ -404,8 +396,51 @@ export interface AnnotationsExportAppearanceWorkerRequest {
   refs: AnnotationRef[];
 }
 
+/** Annotations and their resources as one bundle (`doc.annotations.export`). A read. */
+export interface AnnotationsExportWorkerRequest {
+  kind: 'annotations.export';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  selection: AnnotationExportSelection;
+  /** The limits the bundle must stay within; the defaults otherwise. */
+  limits?: AnnotationBundleLimits;
+}
+
 /**
- * Batch annotation reorder. Refs are resolved on the worker BEFORE the
+ * A bundle's annotations, created as one change (`doc.annotations.import`).
+ * The producer puts each resource's buffer on the transfer list.
+ */
+export interface AnnotationsImportWorkerRequest {
+  kind: 'annotations.import';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  bundle: WireAnnotationBundle;
+  pages?: AnnotationImportPages;
+  attribution: 'restore' | 'stamp';
+  /**
+   * The session: who `'stamp'` attributes each annotation to, as on create,
+   * and whose user `'restore'` records as `importedBy`.
+   */
+  actor?: AnnotationActor;
+  /** The limits the bundle must stay within; the defaults otherwise. */
+  limits?: AnnotationBundleLimits;
+  artifactPath?: string;
+}
+
+/** An annotation's `appearance` resource: its drawing, as a one-page PDF (bytes). A read. */
+export interface AnnotationsReadAppearanceWorkerRequest {
+  kind: 'annotations.readAppearance';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  page: PageRef;
+  ref: AnnotationRef;
+}
+
+/**
+ * Batch annotation reorder. Refs are resolved on the worker before the
  * move so the impact computation has a single before-state and one
  * revision bump per batch.
  */
@@ -559,9 +594,8 @@ export interface PagesListWorkerRequest {
 
 /**
  * Per-page plain-text extraction. Acquires a pagePtr and runs PDFium's
- * `FPDFText_LoadPage` → `FPDFText_GetText` chain. Identical to
- * `annotations.listFullPage` in shape; both are slow-path per-page
- * reads keyed by indirect object number.
+ * `FPDFText_LoadPage` → `FPDFText_GetText` chain: a slow-path per-page
+ * read keyed by indirect object number.
  */
 export interface PagesTextWorkerRequest {
   kind: 'pages.text';
@@ -580,16 +614,28 @@ export interface PagesGeometryWorkerRequest {
 }
 
 /**
- * One budgeted search slice (see `DocumentSearchService`). Read-only: the
+ * A search request as the worker runs it: the request plus `skip`, a trusted
+ * absolute resume position (scan-order pages already searched). For callers
+ * that pin content versions themselves — the cloud wire pins the search
+ * content epoch in the URL, so its routes resume by position alone.
+ * Everyone else uses `cursor`, which also guards against changes between
+ * batches; `cursor` takes precedence when both are set.
+ */
+export interface SearchScanRequest extends SearchRequest {
+  skip?: number;
+}
+
+/**
+ * One budgeted search batch (see `DocumentSearchService`). Read-only: the
  * worker's per-page corpus cache is version-keyed on the session mutation
- * counter, so repeated slices between mutations reuse extracted text.
+ * counter, so repeated batches between mutations reuse extracted text.
  */
 export interface SearchQueryWorkerRequest {
   kind: 'search.query';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  request: SearchRequest;
+  request: SearchScanRequest;
 }
 
 export interface PagesRenderWorkerRequest {
@@ -603,7 +649,7 @@ export interface PagesRenderWorkerRequest {
 
 /**
  * One-shot file render — open the base document from a file path, render
- * ONE page by display index, close. No session is bound (the ingestion
+ * one page by display index, close. No session is bound (the ingestion
  * `runAdHoc` pattern, like `document.probeSecurityFile`): this is the
  * derived-artifact warmer's producer, used when no live document session
  * exists yet. The payload reports the page's durable object number so the
@@ -620,10 +666,10 @@ export interface DocumentRenderPageFileWorkerRequest {
 }
 
 /**
- * Encode instruction for the `*.renderEncoded` request family. CLOUD-SERVER
+ * Encode instruction for the `*.renderEncoded` request family. Cloud-server
  * surface (like the file-path ops): the server worker injects an image
- * encoder into its `WorkerHost`, so the raster is encoded WHERE IT IS
- * PRODUCED and only the compressed image crosses the engine boundary —
+ * encoder into its `WorkerHost`, so the raster is encoded where IT is
+ * produced and only the compressed image crosses the engine boundary —
  * kilobytes over the host IPC pipe instead of a megabytes-scale rgba
  * copy. Engines without an injected encoder (browser/local workers, which
  * encode via canvas instead) reject these kinds with `NotImplemented`.
@@ -637,7 +683,7 @@ export interface RenderEncode {
 
 /** An encoded render result. `width`/`height` are the source raster's output
  *  dimensions (they feed the advisory image-dimension headers). `bytes` must
- *  OWN its buffer — it rides the transfer manifest zero-copy, so a pooled
+ *  own its buffer — it rides the transfer manifest zero-copy, so a pooled
  *  view (e.g. a Node `Buffer` slab slice) would detach unrelated data. */
 export interface EncodedImageWire {
   contentType: string;
@@ -699,7 +745,7 @@ export interface PagesMoveWorkerRequest {
   docId: string;
   layerName?: string;
   pages: PageRef[];
-  destIndex: number;
+  toIndex: number;
   artifactPath?: string;
 }
 
@@ -796,14 +842,14 @@ export interface AttachmentsReadFileWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  ref: EmbeddedFileRef;
+  ref: AttachmentRef;
   path?: string;
   /** Decompression-bomb cap forwarded to the runtime. Absent/0 = unlimited. */
   maxDecodedBytes?: number;
 }
 
 /**
- * Create a document-level embedded file (a MUTATION — layer sessions
+ * Create a document-level embedded file (a mutation — layer sessions
  * persist an artifact). `file` is the same post-normalization wire shape
  * the file-attachment annotation draft uses: metadata in JSON, bytes
  * out-of-band under the referenced resource key. `file.name` becomes the
@@ -820,13 +866,13 @@ export interface AttachmentsCreateWorkerRequest {
   artifactPath?: string;
 }
 
-/** Delete a document-level embedded file by key (a MUTATION). */
+/** Delete a document-level embedded file by key (a mutation). */
 export interface AttachmentsDeleteWorkerRequest {
   kind: 'attachments.delete';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  ref: EmbeddedFileRef;
+  ref: AttachmentRef;
   artifactPath?: string;
 }
 
@@ -845,7 +891,7 @@ export interface AnnotationsReadFileWorkerRequest {
 }
 
 /** Insert every page of a standalone PDF (transferable `bytes`) at
- *  `destIndex` (omitted → append). A structural MUTATION: layer sessions
+ *  `toIndex` (omitted → append). A structural mutation: layer sessions
  *  persist an artifact like move/rotate/delete. */
 export interface PagesInsertWorkerRequest {
   kind: 'pages.insert';
@@ -853,12 +899,12 @@ export interface PagesInsertWorkerRequest {
   docId: string;
   layerName?: string;
   bytes: ArrayBuffer;
-  destIndex?: number;
+  toIndex?: number;
   artifactPath?: string;
 }
 
 /** Create `count` (default 1) blank pages of `size` (PDF points) at
- *  `destIndex` (omitted → append). A structural MUTATION exactly like
+ *  `toIndex` (omitted → append). A structural mutation exactly like
  *  `pages.insert`, minus the bytes: pure parameters, so nothing transfers;
  *  layer sessions persist an artifact identically. */
 export interface PagesInsertBlankWorkerRequest {
@@ -868,7 +914,7 @@ export interface PagesInsertBlankWorkerRequest {
   layerName?: string;
   size: PdfSize;
   count?: number;
-  destIndex?: number;
+  toIndex?: number;
   artifactPath?: string;
 }
 
@@ -924,8 +970,8 @@ export interface PieceInfoApplicationsWorkerRequest {
   page?: PageRef;
 }
 
-export interface PieceInfoClearWorkerRequest {
-  kind: 'pieceInfo.clear';
+export interface PieceInfoDeleteWorkerRequest {
+  kind: 'pieceInfo.delete';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -951,7 +997,7 @@ export interface DocumentSaveFileWorkerRequest {
   path: string;
 }
 
-/** Export JUST the layer artifact (the overlay diff) to a transferable buffer.
+/** Export just the layer artifact (the overlay diff) to a transferable buffer.
  *  Layer sessions only; the host rejects a base-only session. */
 export interface DocumentSaveLayerBufferWorkerRequest {
   kind: 'document.saveLayerBuffer';
@@ -1050,7 +1096,7 @@ export interface CloseWorkerRequest {
 }
 
 /**
- * Close exactly ONE layer session, leaving the base document, sibling
+ * Close exactly one layer session, leaving the base document, sibling
  * layer sessions, and the caller's doc↔worker binding intact. Idempotent:
  * closing an absent session is a no-op ack.
  *
@@ -1104,9 +1150,7 @@ export type WorkerRequest =
   | MetadataReadWorkerRequest
   | MetadataUpdateWorkerRequest
   | ActionsReadWorkerRequest
-  | AnnotationsListRawAllWorkerRequest
-  | AnnotationsListRawPageWorkerRequest
-  | AnnotationsListFullPageWorkerRequest
+  | AnnotationsListWorkerRequest
   | AnnotationsRenderAppearancesWorkerRequest
   | AnnotationsRenderAppearancesEncodedWorkerRequest
   | AnnotationsCreateWorkerRequest
@@ -1144,12 +1188,15 @@ export type WorkerRequest =
   | AttachmentsCreateWorkerRequest
   | AttachmentsDeleteWorkerRequest
   | AnnotationsReadFileWorkerRequest
+  | AnnotationsReadAppearanceWorkerRequest
+  | AnnotationsExportWorkerRequest
+  | AnnotationsImportWorkerRequest
   | MeasureViewportsWorkerRequest
   | MeasureSetScaleWorkerRequest
   | PieceInfoReadWorkerRequest
   | PieceInfoUpdateWorkerRequest
   | PieceInfoApplicationsWorkerRequest
-  | PieceInfoClearWorkerRequest
+  | PieceInfoDeleteWorkerRequest
   | PagesTextWorkerRequest
   | PagesGeometryWorkerRequest
   | PagesRenderWorkerRequest
@@ -1169,7 +1216,7 @@ export type WorkerRequest =
   | DocumentVersionWorkerRequest
   | SignaturesPrepareWorkerRequest
   | SignaturesCompleteWorkerRequest
-  | SignaturesAbortWorkerRequest
+  | SignaturesCancelWorkerRequest
   | SignaturesAnalyzeWorkerRequest
   | SignaturesFinalizeCandidateWorkerRequest
   | FontsRegisterWorkerRequest
@@ -1190,6 +1237,8 @@ export type WorkerResultPayload =
       security: DocumentSecurityProbeInfo;
       /** What the document's signatures forbid; `null` when unsigned or not probed (a locked open). */
       protection?: DocumentProtection | null;
+      /** A locked open whose password was given and wrong. */
+      passwordRejected?: boolean;
     }
   | { tag: 'signatures.list'; snapshot: SignatureSnapshot }
   | { tag: 'signatures.contents'; bytes: ArrayBuffer }
@@ -1203,7 +1252,7 @@ export type WorkerResultPayload =
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
-  | { tag: 'signatures.abort'; result: SignatureAbortResult }
+  | { tag: 'signatures.cancel'; result: SignatureCancelResult }
   | { tag: 'signatures.analyze'; analysis: ChangeAnalysis }
   | {
       tag: 'signatures.finalizeCandidate';
@@ -1211,7 +1260,7 @@ export type WorkerResultPayload =
       signature: SignatureDTO;
       /** What the sealed file's signatures forbid from now on. */
       protection: DocumentProtection;
-      /** The version the sealed file IS (hash and length of the whole file). */
+      /** The version the sealed file is (hash and length of the whole file). */
       version: BaseVersionInfo;
     }
   | { tag: 'metadata.read'; metadata: DocumentMetadata }
@@ -1222,9 +1271,7 @@ export type WorkerResultPayload =
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
-  | { tag: 'annotations.listRawAll'; snapshot: AnnotationListSnapshotAllPages }
-  | { tag: 'annotations.listRawPage'; snapshot: AnnotationListPageSnapshot }
-  | { tag: 'annotations.listFullPage'; snapshot: AnnotationListPageSnapshot }
+  | { tag: 'annotations.list'; list: AnnotationList }
   | { tag: 'annotations.renderAppearances'; result: AnnotationAppearancesResult }
   | { tag: 'annotations.renderAppearancesEncoded'; result: AnnotationAppearancesEncodedResultWire }
   | {
@@ -1248,10 +1295,20 @@ export type WorkerResultPayload =
   | {
       tag: 'annotations.flatten';
       result: AnnotationFlattenResult;
+      /** False when nothing was applied: no artifact, event, or version bump. */
+      wrote: boolean;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | { tag: 'annotations.exportAppearance'; bytes: ArrayBuffer; size: number }
+  | { tag: 'annotations.readAppearance'; bytes: ArrayBuffer; size: number }
+  | { tag: 'annotations.export'; bundle: WireAnnotationBundle }
+  | {
+      tag: 'annotations.import';
+      result: AnnotationImportResult;
+      artifact?: LayerArtifactWorkerPayload;
+      artifactFile?: LayerArtifactFileWorkerPayload;
+    }
   | {
       tag: 'annotations.move';
       result: AnnotationMoveResult;
@@ -1274,6 +1331,8 @@ export type WorkerResultPayload =
   | {
       tag: 'forms.applyEffects';
       result: FormEffectsResult;
+      /** False when the batch wrote nothing: no artifact, event, or version bump. */
+      wrote: boolean;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
@@ -1360,17 +1419,21 @@ export type WorkerResultPayload =
   | {
       tag: 'pages.flatten';
       result: PageFlattenResult;
+      /** False when nothing was applied: no artifact, event, or version bump. */
+      wrote: boolean;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | {
       tag: 'redaction.apply';
       result: RedactionApplyResult;
+      /** False when nothing was applied: no artifact, event, or version bump. */
+      wrote: boolean;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | { tag: 'pages.extract'; bytes: ArrayBuffer; size: number }
-  | { tag: 'attachments.list'; items: EmbeddedFileItem[] }
+  | { tag: 'attachments.list'; attachments: Attachment[] }
   | { tag: 'attachments.readFile'; content: AttachmentFileWorkerPayload }
   | {
       tag: 'attachments.create';
@@ -1407,12 +1470,14 @@ export type WorkerResultPayload =
   | { tag: 'pieceInfo.read'; snapshot: PieceInfoSnapshot | null }
   | {
       tag: 'pieceInfo.update';
+      result: PieceInfoUpdateResult;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | { tag: 'pieceInfo.applications'; applications: string[] }
   | {
-      tag: 'pieceInfo.clear';
+      tag: 'pieceInfo.delete';
+      result: PieceInfoDeleteResult;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }

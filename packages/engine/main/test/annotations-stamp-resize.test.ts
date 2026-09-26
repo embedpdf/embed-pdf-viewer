@@ -59,7 +59,8 @@ function pixel(raster: PageRaster, x: number, y: number): number[] {
 }
 
 async function appearance(doc: DocumentHandle, index = 0): Promise<PageRaster> {
-  return (await doc.page(toPageRef(3)).annotations.renderAppearances()).appearances[index]!.raster;
+  return (await doc.page(toPageRef(3)).annotations.renderAppearancesRaw()).appearances[index]!
+    .raster;
 }
 
 describe('vector stamp resizing (wasm)', () => {

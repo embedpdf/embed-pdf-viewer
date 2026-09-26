@@ -1,13 +1,14 @@
 import type {
   AnnotationCreateResult,
   AnnotationDeleteResult,
-  AnnotationListPageSnapshot,
+  AnnotationList,
+  PageState,
   AnnotationMoveResult,
   AnnotationRef,
   AnnotationUpdateResult,
   HighlightDraft,
 } from '@embedpdf/engine-core';
-import type { Engine } from '@embedpdf/engine-core/runtime';
+import { deletedAnnotationOf, type Engine } from '@embedpdf/engine-core/runtime';
 
 /**
  * Engine-agnostic mutation walkthrough. Drives `update` (weak →
@@ -20,7 +21,7 @@ export interface MutationsDemoResult {
   label: string;
   docId: string;
   elapsedMs: number;
-  before: AnnotationListPageSnapshot;
+  before: AnnotationList;
   createdA: AnnotationCreateResult;
   createdB: AnnotationCreateResult;
   createdCircle: AnnotationCreateResult;
@@ -33,7 +34,7 @@ export interface MutationsDemoResult {
   movedBatch: AnnotationMoveResult;
   deletedA: AnnotationDeleteResult;
   deletedB: AnnotationDeleteResult;
-  after: AnnotationListPageSnapshot;
+  after: AnnotationList;
 }
 
 const QUAD: HighlightDraft['quadPoints'] = [
@@ -179,24 +180,27 @@ export async function runMutationsDemo(
     // 3) Single-annotation move: move B to position 0. This exercises
     //    `move([ref], toIndex)` as the single-as-batch case. Move is
     //    index-shifting, so this DOES bump the per-page revision.
-    const movedSingle = await page.annotations.move([createdB.created.ref], 0);
+    const movedSingle = await page.annotations.move([createdB.annotation.ref], 0);
 
     // 4) Multi-block move: move [A, B] to position 0 in caller order.
     //    Verifies that caller-supplied order is preserved at the
     //    destination, ONE revision bump per batch.
-    const movedBatch = await page.annotations.move([createdA.created.ref, createdB.created.ref], 0);
+    const movedBatch = await page.annotations.move(
+      [createdA.annotation.ref, createdB.annotation.ref],
+      0,
+    );
 
     // 5) Delete both annotations we created so the fixture is unchanged.
     //    Use the still-stable durable refs (objectNumber survives
     //    arbitrary moves; that's the whole point of stable identity).
-    const deletedA = await page.annotations.delete(createdA.created.ref);
-    const deletedB = await page.annotations.delete(createdB.created.ref);
+    const deletedA = await page.annotations.delete(createdA.annotation.ref);
+    const deletedB = await page.annotations.delete(createdB.annotation.ref);
     // Clean up the shapes too so the fixture is left as we found it.
-    await page.annotations.delete(createdCircle.created.ref);
-    await page.annotations.delete(createdSquare.created.ref);
-    await page.annotations.delete(createdPolygon.created.ref);
-    await page.annotations.delete(createdPolyline.created.ref);
-    await page.annotations.delete(createdLine.created.ref);
+    await page.annotations.delete(createdCircle.annotation.ref);
+    await page.annotations.delete(createdSquare.annotation.ref);
+    await page.annotations.delete(createdPolygon.annotation.ref);
+    await page.annotations.delete(createdPolyline.annotation.ref);
+    await page.annotations.delete(createdLine.annotation.ref);
 
     const after = await page.annotations.list();
 
@@ -236,78 +240,78 @@ export function summarizeMutations(result: MutationsDemoResult) {
     docId: result.docId,
     elapsedMs: result.elapsedMs,
     before: {
-      generation: result.before.pageState.revision.generation,
-      hasWeak: knownWeakFlag(result.before.pageState),
+      generation: result.before.pages[0]!.revision.generation,
+      hasWeak: knownWeakFlag(result.before.pages[0]!),
       count: result.before.annotations.length,
     },
     update: result.updated
       ? {
           inputRefKind: 'index',
-          outputRef: refSummary(result.updated.updated.ref),
-          outputNm: result.updated.updated.nm,
-          identityQuality: result.updated.updated.identityQuality,
+          outputRef: refSummary(result.updated.annotation.ref),
+          outputNm: result.updated.annotation.nm,
+          identityQuality: result.updated.annotation.identityQuality,
           meta: metaSummary(result.updated.meta),
         }
       : { skipped: 'no weak annotation on the page' },
     createA: {
-      ref: refSummary(result.createdA.created.ref),
-      identityQuality: result.createdA.created.identityQuality,
+      ref: refSummary(result.createdA.annotation.ref),
+      identityQuality: result.createdA.annotation.identityQuality,
       meta: metaSummary(result.createdA.meta),
     },
     createB: {
-      ref: refSummary(result.createdB.created.ref),
-      identityQuality: result.createdB.created.identityQuality,
+      ref: refSummary(result.createdB.annotation.ref),
+      identityQuality: result.createdB.annotation.identityQuality,
       meta: metaSummary(result.createdB.meta),
     },
     createCircle: {
-      ref: refSummary(result.createdCircle.created.ref),
-      subtype: result.createdCircle.created.subtype,
-      identityQuality: result.createdCircle.created.identityQuality,
+      ref: refSummary(result.createdCircle.annotation.ref),
+      subtype: result.createdCircle.annotation.subtype,
+      identityQuality: result.createdCircle.annotation.identityQuality,
       meta: metaSummary(result.createdCircle.meta),
     },
     createSquare: {
-      ref: refSummary(result.createdSquare.created.ref),
-      subtype: result.createdSquare.created.subtype,
-      identityQuality: result.createdSquare.created.identityQuality,
+      ref: refSummary(result.createdSquare.annotation.ref),
+      subtype: result.createdSquare.annotation.subtype,
+      identityQuality: result.createdSquare.annotation.identityQuality,
       meta: metaSummary(result.createdSquare.meta),
     },
     createPolygon: {
-      ref: refSummary(result.createdPolygon.created.ref),
-      subtype: result.createdPolygon.created.subtype,
-      identityQuality: result.createdPolygon.created.identityQuality,
+      ref: refSummary(result.createdPolygon.annotation.ref),
+      subtype: result.createdPolygon.annotation.subtype,
+      identityQuality: result.createdPolygon.annotation.identityQuality,
       meta: metaSummary(result.createdPolygon.meta),
     },
     createPolyline: {
-      ref: refSummary(result.createdPolyline.created.ref),
-      subtype: result.createdPolyline.created.subtype,
-      identityQuality: result.createdPolyline.created.identityQuality,
+      ref: refSummary(result.createdPolyline.annotation.ref),
+      subtype: result.createdPolyline.annotation.subtype,
+      identityQuality: result.createdPolyline.annotation.identityQuality,
       meta: metaSummary(result.createdPolyline.meta),
     },
     createLine: {
-      ref: refSummary(result.createdLine.created.ref),
-      subtype: result.createdLine.created.subtype,
-      identityQuality: result.createdLine.created.identityQuality,
+      ref: refSummary(result.createdLine.annotation.ref),
+      subtype: result.createdLine.annotation.subtype,
+      identityQuality: result.createdLine.annotation.identityQuality,
       meta: metaSummary(result.createdLine.meta),
     },
     moveSingle: {
-      moved: result.movedSingle.moved.map((d) => refSummary(d.ref)),
+      moved: result.movedSingle.annotations.map((d) => refSummary(d.ref)),
       meta: metaSummary(result.movedSingle.meta),
     },
     moveBatch: {
-      moved: result.movedBatch.moved.map((d) => refSummary(d.ref)),
+      moved: result.movedBatch.annotations.map((d) => refSummary(d.ref)),
       meta: metaSummary(result.movedBatch.meta),
     },
     deleteA: {
-      deleted: result.deletedA.deleted,
+      deleted: deletedAnnotationOf(result.deletedA),
       meta: metaSummary(result.deletedA.meta),
     },
     deleteB: {
-      deleted: result.deletedB.deleted,
+      deleted: deletedAnnotationOf(result.deletedB),
       meta: metaSummary(result.deletedB.meta),
     },
     after: {
-      generation: result.after.pageState.revision.generation,
-      hasWeak: knownWeakFlag(result.after.pageState),
+      generation: result.after.pages[0]!.revision.generation,
+      hasWeak: knownWeakFlag(result.after.pages[0]!),
       count: result.after.annotations.length,
     },
   };
@@ -347,7 +351,7 @@ function metaSummary(meta: AnnotationCreateResult['meta']) {
   };
 }
 
-function knownWeakFlag(pageState: AnnotationListPageSnapshot['pageState']): boolean | null {
+function knownWeakFlag(pageState: PageState): boolean | null {
   return pageState.weakAnnotationState.kind === 'known'
     ? pageState.weakAnnotationState.hasAnyWeakAnnotations
     : null;

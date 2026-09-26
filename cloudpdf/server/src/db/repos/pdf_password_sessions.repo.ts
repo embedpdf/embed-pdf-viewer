@@ -220,7 +220,7 @@ export class PdfPasswordSessionsRepo {
   }
 
   /**
-   * Move one active session to a new base version WITHOUT the password
+   * Move one active session to a new base version without the password
    * leaving the server. The AEAD binds the ciphertext to the binding —
    * the base sha among it — so rewriting the column would leave a row
    * that never decrypts again (`KmsAadMismatch`): decrypt under the old

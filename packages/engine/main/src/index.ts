@@ -1,12 +1,12 @@
 /**
- * @embedpdf/engine - Engine v3 local implementation.
+ * @embedpdf/engine - the local engine implementation.
  *
  * Public API:
  *   localEngine(options?)               -> LocalEngine (Web Worker; boots lazily on first use)
  *   createLocalEngine()                 -> LocalEngine using inline transport (Node, tests)
  *   createLocalEngineWithWorker(worker) -> LocalEngine using a caller-supplied Web Worker
  *
- * All three construct SYNCHRONOUSLY and allocate nothing until the first
+ * All three construct synchronously and allocate nothing until the first
  * operation (or `engine.warmup()`): readiness lives inside {@link LazyTransport},
  * so no caller ever awaits engine construction.
  */
@@ -45,22 +45,11 @@ import {
   type WorkerSource,
 } from './wasm-source';
 
-// Re-export the shared engine runtime surface so consumers (and code that
-// must stay engine-flavor-portable, like the docs samples) can name every
-// public document type from `@embedpdf/engine` itself — mirroring the
-// `@cloudpdf/engine` entrypoint — instead of reaching into the transitive
-// `@embedpdf/engine-core` dep.
-export type {
-  Engine,
-  EngineFactory,
-  DocumentHandle,
-  DocumentCapabilities,
-  PageHandle,
-  OpenInput,
-  OpenInputShare,
-  OpenOptions,
-  TokenSource,
-} from '@embedpdf/engine-core/runtime';
+// The developer-facing surface both engine packages share (errors, refs,
+// helpers, the document types), from one list in engine-core, so code names
+// everything from `@embedpdf/engine` exactly as it would from
+// `@cloudpdf/engine`.
+export * from '@embedpdf/engine-core/public';
 export { LocalEngine } from './LocalEngine';
 export type { LocalEngineOptions } from './LocalEngine';
 export type { Transport } from './transport/Transport';
@@ -75,9 +64,9 @@ export { LocalDocumentAnnotationsService } from './document/LocalDocumentAnnotat
 export { LocalDocumentPagesService } from './document/LocalDocumentPagesService';
 export { LocalPageHandle } from './document/LocalPageHandle';
 export { LocalPageAnnotationsService } from './document/LocalPageAnnotationsService';
-export { LocalPageGeometryService } from './document/LocalPageGeometryService';
 export { LocalPageRenderService } from './document/LocalPageRenderService';
 export { BrowserImageEncoder } from './render/BrowserImageEncoder';
+export { PortableImageEncoder, encodePng } from './render/PortableImageEncoder';
 export type {
   BrowserImageEncoderOptions,
   EncoderWorkerSource,
@@ -145,9 +134,9 @@ export function createLocalEngineWithWorker(opts: CreateLocalEngineWithWorkerOpt
  * Resolve a `worker` option into a boot-time transport factory plus
  * LazyTransport options — the one place the delivery asymmetries are handled:
  *
- *   - LIVE `Worker`: it began initializing at `new Worker()`, and its
+ *   - live `Worker`: it began initializing at `new Worker()`, and its
  *     `ready`/`init-error` message is dropped if nothing is listening when it
- *     fires. So the init message is posted and the handshake latched HERE,
+ *     fires. So the init message is posted and the handshake latched here,
  *     synchronously at engine construction, and the latch is what the
  *     deferred spawn awaits. The abandon hook terminates the worker if the
  *     engine is destroyed without ever booting (the boot factory never ran,
@@ -204,10 +193,10 @@ function workerBoot(
 
   return {
     spawn: async () => {
-      // Resolve BEFORE spawning: if the sibling-url module can't load, no
+      // Resolve before spawning: if the sibling-url module can't load, no
       // worker is left orphaned. Only the inline blob worker gets the default.
-      // No extra tick for explicit sources: a thunk/URL worker boots on the
-      // same schedule as before; only a lazy `wasmLoader` awaits its bytes.
+      // No extra tick for explicit sources: a thunk/URL source resolves
+      // synchronously; only a lazy `wasmLoader` awaits its bytes.
       const wasm =
         delivery === 'inline'
           ? await resolveInlineWasmSource(wasmOptions)
@@ -320,13 +309,13 @@ export interface LocalEngineRecipeOptions extends WasmSourceOptions {
    */
   encoderWorker?: EncoderWorkerSource;
   /**
-   * Fonts registered AND appended to the ordered glyph-fallback chain, in
-   * order — the ones used to substitute missing glyphs during rendering and
+   * Fonts registered and appended to the ordered glyph-fallback chain, in
+   * order — the ones that substitute missing glyphs during rendering and
    * appearance generation (e.g. a CJK fallback). This is the common case.
    */
   fallbackFonts?: RecipeFontSpec[];
   /**
-   * Fonts registered but NOT added to the fallback chain — available for
+   * Fonts registered but not added to the fallback chain — available for
    * explicit annotation authoring (a FreeText `fontFamily`) without affecting
    * automatic substitution.
    */
@@ -342,12 +331,24 @@ export interface LocalEngineRecipeOptions extends WasmSourceOptions {
    * {@link LocalEngineOptions.renderPolicy}. Default: `continuous`.
    */
   renderPolicy?: EngineRenderPolicy;
+  /** How a signed document's protection is applied. See {@link LocalEngineOptions.signedDocumentPolicy}. */
+  signedDocumentPolicy?: LocalEngineOptions['signedDocumentPolicy'];
+  /** Layer or plain sessions. See {@link LocalEngineOptions.sessionKind}. */
+  sessionKind?: LocalEngineOptions['sessionKind'];
+  /**
+   * Where there is no `Worker` (Node), PDFium runs in this thread: natively
+   * when this platform has a build, as WebAssembly otherwise. `runtime`
+   * chooses (`{ prefer: 'wasm' }`). Ignored where the engine runs a worker.
+   */
+  runtime?: CreatePdfRuntimeOptions;
 }
 
 /**
- * Create a local (PDFium-in-a-Worker) {@link LocalEngine}.
+ * Create a local {@link LocalEngine}: PDFium in a Web Worker in the browser,
+ * in this thread where there is no `Worker` (Node, natively when the
+ * platform has a build). One factory for every environment.
  *
- * SYNCHRONOUS AND CHEAP: the returned object is a fully usable {@link Engine},
+ * Synchronous and cheap: the returned object is a fully usable {@link Engine},
  * but it allocates nothing — no Worker, no WASM — until the first operation
  * (or an explicit `engine.warmup()`). That makes it safe to create at module
  * scope, including on a server (Next/Nuxt SSR): nothing browser-specific runs
@@ -372,7 +373,13 @@ export interface LocalEngineRecipeOptions extends WasmSourceOptions {
  * ```
  */
 export function localEngine(options: LocalEngineRecipeOptions = {}): LocalEngine {
-  const boot = workerBoot(options.worker, options);
+  const boot = runsInThisThread(options)
+    ? {
+        spawn: async (): Promise<Transport> =>
+          new InlineTransport(await createPdfRuntime(options.runtime ?? {})),
+        lazyOptions: {},
+      }
+    : workerBoot(options.worker, options);
   const transport = new LazyTransport(async () => {
     // Spawn and font fetches run in parallel; nothing queued by the caller can
     // reach the worker until this factory resolves.
@@ -404,8 +411,18 @@ export function localEngine(options: LocalEngineRecipeOptions = {}): LocalEngine
         ? new BrowserImageEncoder({ worker: options.encoderWorker })
         : undefined),
     renderPolicy: options.renderPolicy,
+    signedDocumentPolicy: options.signedDocumentPolicy,
+    sessionKind: options.sessionKind,
   });
   return engine;
+}
+
+/**
+ * No `Worker` global and none passed (Node, Deno, a test runner): PDFium
+ * runs in this thread instead of in a worker.
+ */
+function runsInThisThread(options: LocalEngineRecipeOptions): boolean {
+  return options.worker === undefined && typeof Worker === 'undefined';
 }
 
 interface ResolvedRecipeFont {
@@ -429,7 +446,7 @@ async function resolveRecipeFonts(
 }
 
 /**
- * Register boot-config fonts by RAW transport send, bypassing the WorkerQueue.
+ * Register boot-config fonts by raw transport send, bypassing the WorkerQueue.
  *
  * The bypass is load-bearing, not an optimization: during boot the queue's
  * concurrency slot may already be held by a buffered user `open()`, so a
@@ -445,7 +462,7 @@ async function registerBootFonts(
   fonts: ResolvedRecipeFont[],
 ): Promise<void> {
   for (const { spec, fallback } of fonts) {
-    // Seed BEFORE the raw send: seeding copies the bytes, and the wire buffer
+    // Seed before the raw send: seeding copies the bytes, and the wire buffer
     // is transferred (neutered) by the worker transport.
     fontService.seedRegistered(spec, { fallback });
     const bytes = toStandaloneArrayBuffer(spec.data);

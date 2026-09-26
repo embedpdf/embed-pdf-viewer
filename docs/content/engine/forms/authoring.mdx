@@ -1,0 +1,276 @@
+---
+title: Creating form fields
+description: Add text fields, checkboxes, radio groups, dropdowns, lists and signature fields to a PDF, change or delete them, and repair a broken form.
+---
+
+# Creating form fields
+
+`create()` adds a field to the document and places it on a page, in one call:
+
+```ts
+const { field } = await doc.forms.create({
+  family: 'text',
+  name: 'customer.email',
+  maxLength: 60,
+  widgets: [{ page: page.ref, rect: { left: 72, bottom: 600, right: 300, top: 624 } }],
+});
+
+await doc.forms.setValue(field.ref, { value: 'ada@example.com' });
+```
+
+The new field fills in, exports and shows like any other field; see
+[Reading & filling forms](/docs/engine/forms).
+
+## Fields and widgets
+
+A form has two parts. The **field** holds the value: it has a name, a family and a few settings,
+and it belongs to the document, not to a page. A **widget** is where the field shows: the box on
+a page that you see and click.
+
+A widget is an annotation of kind `'widget'`. It's listed with the page's annotations, and you
+move and style it like one. Most fields have one widget. A radio group has one per button, and a
+field can have widgets on several pages that all show the same value.
+
+## Create a field
+
+`create()` takes the family, the field's full name and its settings. `widgets` places it on the
+pages, one entry per place it shows; leave it out to create a field that isn't on any page yet,
+and [add a widget](#add-a-widget) later.
+
+| Field            | What it is                                                                                                          | Default    |
+| :--------------- | :------------------------------------------------------------------------------------------------------------------ | :--------- |
+| `family`         | `'text'`, `'checkbox'`, `'radio'`, `'combobox'`, `'listbox'` or `'signature'`                                       |            |
+| `name`           | The full name. Dots make groups: `customer.email` creates `customer` if it's new.                                   |            |
+| `widgets`        | Where it shows: a list of `{ page, rect }`, `rect` in PDF points, each with the [widget's look](#the-widgets-look). | not placed |
+| `flags.readOnly` | PDF apps don't let the user change it.                                                                              | `false`    |
+| `flags.required` | PDF apps ask for a value before the form is submitted.                                                              | `false`    |
+| `flags.noExport` | Left out when the form is submitted.                                                                                | `false`    |
+| `alternateName`  | The tooltip PDF apps show, also read by screen readers.                                                             | none       |
+| `mappingName`    | A second name, for other apps that export the form's data.                                                          | none       |
+
+`flags` is `{ readOnly, required, noExport }`, the same shape as a field's `flags` when you read
+it.
+
+`create()` is one change: when any part of the draft is invalid, it fails with `InvalidArg` (or
+`NotFound` for a page that isn't there) and creates nothing. A name that's already taken fails
+with `InvalidArg` too. Push buttons can't be created.
+
+Each family adds its own settings:
+
+| Family      | Settings                                                                                               |
+| :---------- | :----------------------------------------------------------------------------------------------------- |
+| `text`      | `defaultValue`, `maxLength`, `multiline`, `password`, `comb` (one character per box, with `maxLength`) |
+| `checkbox`  | Each widget's `exportValue`: what the form data holds when it's checked. Default `'Yes'`.              |
+| `radio`     | Each widget's `exportValue` (one widget per button), `noToggleToOff`, `radiosInUnison`                 |
+| `combobox`  | `options`, `defaultValue`, `edit` (the user may also type their own text)                              |
+| `listbox`   | `options`, `multiSelect`                                                                               |
+| `signature` | Only widgets. Signing it is on [Digital signatures](/docs/engine/forms/signatures).                    |
+
+### A radio group
+
+A radio group has one widget per button. Each button's `exportValue` is the value you choose it
+with, so it can't be `'Off'`:
+
+```ts
+const { field } = await doc.forms.create({
+  family: 'radio',
+  name: 'plan',
+  noToggleToOff: true,
+  widgets: [
+    {
+      page: page.ref,
+      rect: { left: 72, bottom: 640, right: 88, top: 656 },
+      exportValue: 'monthly',
+    },
+    { page: page.ref, rect: { left: 72, bottom: 610, right: 88, top: 626 }, exportValue: 'yearly' },
+  ],
+});
+
+await doc.forms.setValue(field.ref, { value: 'monthly' });
+```
+
+### A dropdown
+
+Options are `{ label, value }`: the user sees the `label`, the form stores the `value`.
+
+```ts
+await doc.forms.create({
+  family: 'combobox',
+  name: 'country',
+  options: [
+    { label: 'Netherlands', value: 'NL' },
+    { label: 'Belgium', value: 'BE' },
+  ],
+  defaultValue: 'NL',
+  widgets: [{ page: page.ref, rect: { left: 72, bottom: 520, right: 220, top: 540 } }],
+});
+```
+
+### The widget's look
+
+Next to `page` and `rect`, each entry of `widgets` takes the widget's style. These are the same
+fields you change later with `page.annotations.update()`:
+
+| Field           | What it is                                                          |
+| :-------------- | :------------------------------------------------------------------ |
+| `color`         | Border color, `{ r, g, b }` from 0 to 255                           |
+| `interiorColor` | Background color                                                    |
+| `strokeWidth`   | Border width in points                                              |
+| `borderStyle`   | `'solid'`, `'dashed'`, `'beveled'` or `'inset'`                     |
+| `fontFamily`    | One of the standard PDF fonts, such as `'helvetica'` or `'courier'` |
+| `fontSize`      | Text size in points                                                 |
+| `fontColor`     | Text color                                                          |
+| `textAlign`     | `'left'`, `'center'` or `'right'`                                   |
+
+```ts
+widgets: [
+  {
+    page: page.ref,
+    rect: { left: 72, bottom: 560, right: 300, top: 584 },
+    color: { r: 31, g: 111, b: 235 },
+    interiorColor: { r: 246, g: 248, b: 250 },
+    fontSize: 10,
+  },
+],
+```
+
+To change the look later, update the widget with the same fields (see
+[Move and style widgets](#move-and-style-widgets)).
+
+## Change a field
+
+`update()` takes the field's `ref` and only the settings you want to change:
+
+```ts
+await doc.forms.update(field.ref, { flags: { ...field.flags, required: true }, maxLength: 80 });
+```
+
+A setting you leave out keeps its value. `null` removes one: `{ maxLength: null }` for no limit,
+`{ defaultValue: null }` for no default, `{ alternateName: null }` for no tooltip.
+
+You can change the settings in the tables above, except the family and the widgets. Also:
+
+- `name` renames the last part of the name: `customer.email` renamed to `'contact'` becomes
+  `customer.contact`. A name with dots, or one a sibling already has, fails with `InvalidArg`. A
+  field can't move to another group.
+- `options` replaces the whole list of a dropdown or list.
+- `maxLength` fails with `InvalidArg` when the current text is longer.
+
+## Delete a field
+
+`delete()` removes the field and all of its widgets from their pages:
+
+```ts
+await doc.forms.delete(field.ref);
+```
+
+## Add a widget
+
+To show a field in one more place, give `addWidget()` the place, the same shape as an entry of
+`widgets` in `create()`:
+
+```ts
+const { field: updated } = await doc.forms.addWidget(field.ref, {
+  page: page.ref,
+  rect: { left: 300, bottom: 660, right: 450, top: 680 },
+});
+```
+
+The field now shows in both places, with the same value. For a radio group, pass the new
+button's `exportValue` in the same object; a checkbox widget gets `'Yes'` when you leave it out.
+
+## Remove a widget
+
+`removeWidget()` takes a widget out of its field. It stays on the page with the look it had, as a
+plain widget annotation (its `field` is `null`) that holds no value and that you can delete:
+
+```ts
+await doc.forms.removeWidget(field.ref, widget.ref);
+await page.annotations.delete(widget.ref);
+```
+
+The field stays. Without widgets it isn't on any page (`widgets` is empty), until you add one
+again.
+
+A widget that's in a field can't be deleted with `page.annotations.delete()`: that fails with
+`InvalidArg`. Remove it from its field first, or delete the field.
+
+## Move and style widgets
+
+Widgets change like every annotation: `page.annotations.update()` with the widget's `ref` and the
+fields to change. The engine redraws the widget:
+
+```ts
+await page.annotations.update(widget.ref, {
+  rect: { left: 300, bottom: 640, right: 480, top: 664 },
+  interiorColor: { r: 255, g: 247, b: 219 },
+});
+```
+
+The style fields are the ones in [The widget's look](#the-widgets-look). A widget's flags, such
+as `hidden` and `print`, work as for other annotations; see
+[Annotations](/docs/engine/annotations#flags).
+
+## Repair a broken form
+
+Some PDFs ship a form that other PDF apps read differently: fields that show on a page but are
+missing from the form's list of fields, or no form at all around them. The engine reads such
+fields anyway ([recovered fields](/docs/engine/forms#recovered-fields)); `repair()` fixes the
+file, so every PDF app sees the same form:
+
+```ts
+const report = await doc.forms.repair({ bakeAppearances: true });
+```
+
+| Field                     | What it counts                                                     |
+| :------------------------ | :----------------------------------------------------------------- |
+| `acroformCreated`         | `true` when the document had no form and now has one.              |
+| `fieldsLinked`            | Recovered fields added to the form's list of fields.               |
+| `widgetsLinked`           | Stray widgets reconnected to their field.                          |
+| `fieldsUnrepairable`      | Fields stored inside another object, which can't be linked.        |
+| `appearancesBaked`        | Widgets that got a freshly drawn look.                             |
+| `needsAppearancesCleared` | `true` when PDF apps no longer need to draw the fields themselves. |
+
+With `bakeAppearances: true` (default `false`), the engine also draws every widget that has no
+look of its own. When the form asks PDF apps to draw its fields themselves (`needsAppearances` on
+the [list](/docs/engine/forms#read-the-form)), it redraws every widget and clears that request,
+so the form looks the same everywhere.
+
+`repair()` only changes what needs fixing. Run it twice and the second report is all zeros.
+
+## Events
+
+| Event                                      | Fired by                                   |
+| :----------------------------------------- | :----------------------------------------- |
+| `forms.created`                            | `create()`                                 |
+| `forms.updated`                            | `update()`, and `setSignatureAppearance()` |
+| `forms.deleted`                            | `delete()`                                 |
+| `forms.widgetAdded`, `forms.widgetRemoved` | `addWidget()`, `removeWidget()`            |
+| `forms.repaired`                           | `repair()`                                 |
+
+Each event carries what the call returned. See [Events](/docs/engine/concepts/events).
+
+## Permissions
+
+Creating, changing and deleting fields, adding and removing widgets and repairing the form need
+`doc.forms.modify`, which includes `doc.forms.fill` and `doc.forms.read`. See
+[Permissions](/docs/engine/concepts/permissions).
+
+A certified document doesn't allow changes to its fields: these calls fail with
+`ProtectedDocument`. See
+[Digital signatures](/docs/engine/forms/signatures#protection-what-signatures-allow).
+
+## Good to know
+
+- **A document without a form.** The first `create()` gives the document a form. A document with
+  no form reports `formKind: 'none'`; after `create()` it's `'acroform'`.
+- **Field and widget in one object.** Many PDFs store a field with a single widget as one object.
+  Such a widget can't be removed from its field (`removeWidget()` fails with `InvalidArg`); delete
+  the field instead. Fields the engine creates always keep the two apart.
+- **Widgets in both lists.** `field.widgets` gives each widget's `page`, `rect` and `ref`, and
+  `page.annotations.list()` returns the same widgets as annotations, each with its `field`.
+- **Checked looks in the file.** How a checkbox or radio widget's `exportValue` relates to its
+  look in the file is in
+  [Checkboxes with several widgets](/docs/engine/forms#checkboxes-with-several-widgets).
+- **Names and groups.** `billing.name` and `billing.email` are two fields in a group `billing`.
+  `list()` returns the two fields, not the group; XFDF nests them under it.

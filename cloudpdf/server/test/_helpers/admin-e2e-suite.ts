@@ -40,11 +40,12 @@ export interface AdminE2eDialectFixture {
 }
 
 /**
- * Phase 1 admin E2E suite, dialect-parameterized.
+ * Admin E2E suite, dialect-parameterized.
  *
- * The original assertions live here unchanged from
- * `admin-documents.test.ts`; the goal is to **prove** Phase 1
- * works identically on Postgres without any source-code branch. If
+ * `admin-documents.test.ts` runs it on SQLite and
+ * `admin-documents-postgres.test.ts` on Postgres; the goal is to
+ * **prove** the admin surface works identically on Postgres without
+ * any source-code branch. If
  * the SQLite suite passes and the PG suite fails, the dialect
  * abstraction is broken.
  */
@@ -193,7 +194,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
         admin.documents.create({ bytes: fakePdf(30, 1024), docId }),
       ).rejects.toMatchObject({ status: 409 });
 
-      // The classic client mistake: a FRESH key per attempt. Still a
+      // The classic client mistake: a fresh key per attempt. Still a
       // clean 409 — the key lookup misses, the pkey collision must not
       // escape as a driver error.
       await expect(
@@ -617,13 +618,13 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
         sub: 'end-user-9',
         docId: doc.document.id,
         scope: ['doc.open', 'doc.render'],
-        displayName: 'Jane',
+        identity: { displayName: 'Jane', organization: 'Acme' },
         expiresIn: 900,
       });
       const claims = decodeJwtPayload(issued.token);
       expect(claims['doc_id']).toBe(doc.document.id);
       expect(claims['scope']).toEqual(['doc.open', 'doc.render']);
-      expect(claims['display_name']).toBe('Jane');
+      expect(claims['identity']).toEqual({ displayName: 'Jane', organization: 'Acme' });
       expect(claims['tenant_id']).toBe('mint-doc-t');
 
       // A doc-scoped token is rejected on the tenant surface — proof it

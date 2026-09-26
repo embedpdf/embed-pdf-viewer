@@ -2,18 +2,22 @@ import type { ConformanceTestRunner, ConformanceOptions } from './runMetadataCon
 import type { FileAttachmentAnnotationDTO, TextAnnotationDTO } from '../annotation/kinds';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
+import { toAttachmentRef } from '../dto/Attachment';
 import { EngineError } from '../errors/EngineError';
+import { EngineErrorCode } from '../errors/EngineErrorCode';
+import { deletedAttachmentOf } from '../mutation/AttachmentMutationResults';
+import { AttachmentCreateResultSchema, AttachmentListSchema } from '../wire/schemas';
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
 import { toPageRef } from '../identity/PageRef';
 
 /**
  * Attachment conformance suite. Fixture requirement: a document whose
- * `/EmbeddedFiles` name tree contains AT LEAST ONE embedded file.
+ * `/EmbeddedFiles` name tree contains at least one embedded file.
  *
- * Both attachment surfaces are OPTIONAL on the contract (the
+ * Both attachment surfaces are optional on the contract (the
  * `downloadLayer?` pattern), probed independently and skipped cleanly:
  *   - `doc.attachments?` — document-level EmbeddedFiles (list/download)
- *   - `page.annotations.downloadFile?` — annotation-level file bytes
+ *   - `page.annotations.downloadResource(ref, 'file')` — annotation-level file bytes
  *
  * Invariants:
  *   1. `list()` reflects the name tree: positional indices, non-empty
@@ -23,7 +27,7 @@ import { toPageRef } from '../identity/PageRef';
  *   3. Unknown indices reject with an `EngineError`.
  *   4. A created file-attachment annotation round-trips its file:
  *      metadata inline on the DTO (never bytes), bytes byte-identical
- *      through `downloadFile(ref)`.
+ *      as its `file` resource.
  *   5. A created text (sticky-note) annotation round-trips icon + color.
  */
 export function runAttachmentConformance(
@@ -36,15 +40,16 @@ export function runAttachmentConformance(
     let engine: Engine;
     let docSupported = false;
     let annotSupported = false;
-    let firstPon: PageObjectNumber;
+    let firstPageObjectNumber: PageObjectNumber;
 
     beforeAll(async () => {
       engine = await opts.makeEngine();
       const probe = await openFixture(engine, opts);
       docSupported = probe.attachments !== undefined;
       const pages = await probe.pages.list();
-      firstPon = pages.pages[0].ref.pageObjectNumber;
-      annotSupported = probe.page(toPageRef(firstPon)).annotations.downloadFile !== undefined;
+      firstPageObjectNumber = pages.pages[0].ref.pageObjectNumber;
+      annotSupported =
+        probe.page(toPageRef(firstPageObjectNumber)).annotations.downloadResource !== undefined;
       await probe.close();
     });
 
@@ -56,17 +61,19 @@ export function runAttachmentConformance(
       if (!docSupported) return;
       const doc = await openFixture(engine, opts);
       try {
-        const items = await doc.attachments!.list();
+        const list = await doc.attachments.list();
+        expect(AttachmentListSchema.safeParse(list).success).toBe(true);
+        const items = list.attachments;
         expect(items.length > 0).toBe(true);
         items.forEach((item, position) => {
           expect(item.index).toBe(position);
-          expect(item.key.length > 0).toBe(true);
+          expect(item.ref.key.length > 0).toBe(true);
           expect(item.name.length > 0).toBe(true);
         });
         // Keys are unique by construction — they are the durable refs.
-        expect(new Set(items.map((i) => i.key)).size).toBe(items.length);
+        expect(new Set(items.map((i) => i.ref.key)).size).toBe(items.length);
         // A read: calling again observes the identical snapshot.
-        expect(await doc.attachments!.list()).toEqual(items);
+        expect(await doc.attachments.list()).toEqual(list);
       } finally {
         await doc.close();
       }
@@ -76,14 +83,14 @@ export function runAttachmentConformance(
       if (!docSupported) return;
       const doc = await openFixture(engine, opts);
       try {
-        const items = await doc.attachments!.list();
-        for (const item of items) {
-          const content = await doc.attachments!.download({ kind: 'key', key: item.key });
+        const { attachments } = await doc.attachments.list();
+        for (const item of attachments) {
+          const content = await doc.attachments.download(item.ref);
           expect(content.name).toBe(item.name);
-          if (item.mimeType !== undefined) {
+          if (item.mimeType !== null) {
             expect(content.mimeType).toBe(item.mimeType);
           }
-          if (item.size !== undefined) {
+          if (item.size !== null) {
             expect(content.bytes.length).toBe(item.size);
           }
         }
@@ -97,8 +104,35 @@ export function runAttachmentConformance(
       const doc = await openFixture(engine, opts);
       try {
         await expect(
-          doc.attachments!.download({ kind: 'key', key: 'conformance-no-such-key.bin' }),
+          doc.attachments.download(toAttachmentRef('conformance-no-such-key.bin')),
         ).rejects.toBeInstanceOf(EngineError);
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('a File brings its name and type, and a file without a type has none', async () => {
+      if (!docSupported) return;
+      const doc = await openFixture(engine, opts);
+      try {
+        const picked = new File([new Uint8Array([1, 2, 3])], '0-picked.csv', { type: 'text/csv' });
+        const { attachment: fromFile } = await doc.attachments.create({ data: picked });
+        expect(fromFile.name).toBe('0-picked.csv');
+        expect(fromFile.mimeType).toBe('text/csv');
+
+        // Bytes with no type: the engine doesn't guess one.
+        const { attachment: untyped } = await doc.attachments.create({
+          data: new Uint8Array([4, 5, 6]),
+          name: '0-untyped.bin',
+        });
+        expect(untyped.mimeType).toBe(null);
+        expect((await doc.attachments.download(untyped.ref)).mimeType).toBe(null);
+        expect((await doc.attachments.download(fromFile.ref)).mimeType).toBe('text/csv');
+
+        // Bare bytes need a name.
+        await expect(doc.attachments.create({ data: new Uint8Array([7]) })).rejects.toMatchObject({
+          code: EngineErrorCode.InvalidArg,
+        });
       } finally {
         await doc.close();
       }
@@ -107,98 +141,131 @@ export function runAttachmentConformance(
     test('create() and delete() round-trip the name tree; keys survive index shifts', async () => {
       if (!docSupported) return;
       const doc = await openFixture(engine, opts);
-      if (doc.attachments!.create === undefined || doc.attachments!.delete === undefined) {
-        await doc.close();
-        return;
-      }
       try {
-        const before = await doc.attachments!.list();
+        const { attachments: before } = await doc.attachments.list();
         const data = new Uint8Array(512);
         for (let i = 0; i < data.length; i++) data[i] = (i * 7 + 3) & 0xff;
 
         // "0-…" sorts before the fixture's entries, shifting their indices —
         // the sharpest difference from append-only annotation creates.
-        const { created } = await doc.attachments!.create!({
-          data,
+        const createdResult = await doc.attachments.create({
+          data: data.buffer,
           name: '0-conformance.bin',
           mimeType: 'application/octet-stream',
           description: 'added by conformance',
         });
-        expect(created.key).toBe('0-conformance.bin');
+        expect(AttachmentCreateResultSchema.safeParse(createdResult).success).toBe(true);
+        const created = createdResult.attachment;
+        expect(created.ref).toEqual(toAttachmentRef('0-conformance.bin'));
+        expect(createdResult.meta.changed).toEqual([created.ref]);
         expect(created.name).toBe('0-conformance.bin');
         expect(created.mimeType).toBe('application/octet-stream');
         expect(created.description).toBe('added by conformance');
         expect(created.size).toBe(data.length);
 
-        const after = await doc.attachments!.list();
+        const { attachments: after } = await doc.attachments.list();
         expect(after.length).toBe(before.length + 1);
         // Pre-existing keys still resolve even though their indices shifted.
         for (const item of before) {
-          const match = after.find((i) => i.key === item.key);
+          const match = after.find((i) => i.ref.key === item.ref.key);
           expect(match !== undefined).toBe(true);
         }
 
         // Duplicate keys reject — keys are the identity.
         await expect(
-          doc.attachments!.create!({ data, name: '0-conformance.bin' }),
+          doc.attachments.create({ data, name: '0-conformance.bin' }),
         ).rejects.toBeInstanceOf(EngineError);
 
         // The created file round-trips byte-identically.
-        const content = await doc.attachments!.download({ kind: 'key', key: created.key });
+        const content = await doc.attachments.download(created.ref);
         expect(content.bytes.length).toBe(data.length);
         expect(content.bytes.every((byte, i) => byte === data[i])).toBe(true);
 
-        // Delete by key; the key stops resolving and the rest are intact.
-        const { deleted } = await doc.attachments!.delete!({ kind: 'key', key: created.key });
-        expect(deleted).toEqual({ kind: 'key', key: created.key });
-        const final = await doc.attachments!.list();
-        expect(final.map((i) => i.key)).toEqual(before.map((i) => i.key));
-        await expect(
-          doc.attachments!.delete!({ kind: 'key', key: created.key }),
-        ).rejects.toBeInstanceOf(EngineError);
+        // Delete by ref; the ref stops resolving and the rest are intact.
+        const removed = await doc.attachments.delete(created.ref);
+        expect(Object.keys(removed)).toEqual(['meta']);
+        expect(deletedAttachmentOf(removed)).toEqual(created.ref);
+        const { attachments: final } = await doc.attachments.list();
+        expect(final.map((i) => i.ref)).toEqual(before.map((i) => i.ref));
+        await expect(doc.attachments.delete(created.ref)).rejects.toBeInstanceOf(EngineError);
       } finally {
         await doc.close();
       }
     });
 
-    test('a created file-attachment annotation round-trips its file through downloadFile()', async () => {
+    test('a file-attachment annotation takes a File as it is, and never guesses a type', async () => {
       if (!annotSupported) return;
       const doc = await openFixture(engine, opts);
       try {
-        const annotations = doc.page(toPageRef(firstPon)).annotations;
+        const annotations = doc.page(toPageRef(firstPageObjectNumber)).annotations;
+        const rect = { left: 80, bottom: 40, right: 100, top: 60 };
+        const picked = new File([new Uint8Array([1, 2, 3])], 'figures.csv', { type: 'text/csv' });
+        const { annotation: fromFile } = await annotations.create(
+          { subtype: 'file-attachment', rect },
+          { file: picked },
+        );
+        const file = (fromFile as FileAttachmentAnnotationDTO).file!;
+        expect(file.name).toBe('figures.csv');
+        expect(file.mimeType).toBe('text/csv');
+
+        const { annotation: untyped } = await annotations.create(
+          { subtype: 'file-attachment', rect, file: { name: 'raw.bin' } },
+          { file: new Uint8Array([4, 5]) },
+        );
+        expect((untyped as FileAttachmentAnnotationDTO).file!.mimeType).toBe(null);
+
+        // Bare bytes need a name.
+        await expect(
+          annotations.create({ subtype: 'file-attachment', rect }, { file: new Uint8Array([6]) }),
+        ).rejects.toMatchObject({
+          code: EngineErrorCode.InvalidArg,
+          details: { field: 'file.name' },
+        });
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('a created file-attachment annotation round-trips its file as its file resource', async () => {
+      if (!annotSupported) return;
+      const doc = await openFixture(engine, opts);
+      try {
+        const annotations = doc.page(toPageRef(firstPageObjectNumber)).annotations;
         const data = new Uint8Array(2048);
         for (let i = 0; i < data.length; i++) data[i] = (i * 31 + 7) & 0xff;
 
-        const { created } = await annotations.create({
-          subtype: 'file-attachment',
-          rect: { left: 40, bottom: 40, right: 60, top: 60 },
-          file: {
-            data,
-            name: 'conformance.bin',
-            mimeType: 'application/octet-stream',
-            description: 'attachment conformance payload',
+        const { annotation: created } = await annotations.create(
+          {
+            subtype: 'file-attachment',
+            rect: { left: 40, bottom: 40, right: 60, top: 60 },
+            file: {
+              name: 'conformance.bin',
+              mimeType: 'application/octet-stream',
+              description: 'attachment conformance payload',
+            },
+            icon: 'paperclip',
+            color: { r: 220, g: 38, b: 38 },
+            contents: 'conformance attachment',
           },
-          icon: 'paperclip',
-          color: { r: 220, g: 38, b: 38 },
-          contents: 'conformance attachment',
-        });
+          { file: data },
+        );
 
         // Metadata rides the DTO; bytes never do.
         const dto = created as FileAttachmentAnnotationDTO;
         expect(dto.subtype).toBe('file-attachment');
         expect(dto.icon).toBe('paperclip');
         expect(dto.color).toEqual({ r: 220, g: 38, b: 38 });
-        expect(dto.file.name).toBe('conformance.bin');
-        expect(dto.file.mimeType).toBe('application/octet-stream');
-        expect(dto.file.description).toBe('attachment conformance payload');
-        expect(dto.file.size).toBe(data.length);
+        const file = dto.file!;
+        expect(file.name).toBe('conformance.bin');
+        expect(file.mimeType).toBe('application/octet-stream');
+        expect(file.description).toBe('attachment conformance payload');
+        expect(file.size).toBe(data.length);
 
-        // Bytes come back byte-identical through the explicit download.
-        const content = await annotations.downloadFile!(dto.ref);
-        expect(content.name).toBe('conformance.bin');
-        expect(content.bytes.length).toBe(data.length);
-        expect(Array.from(content.bytes.slice(0, 16))).toEqual(Array.from(data.slice(0, 16)));
-        expect(content.bytes.every((byte, i) => byte === data[i])).toBe(true);
+        // Bytes come back byte-identical as the `file` resource.
+        const bytes = await annotations.downloadResource(dto.ref, 'file');
+        expect(bytes.length).toBe(data.length);
+        expect(Array.from(bytes.slice(0, 16))).toEqual(Array.from(data.slice(0, 16)));
+        expect(bytes.every((byte, i) => byte === data[i])).toBe(true);
       } finally {
         await doc.close();
       }
@@ -208,8 +275,8 @@ export function runAttachmentConformance(
       if (!annotSupported) return;
       const doc = await openFixture(engine, opts);
       try {
-        const annotations = doc.page(toPageRef(firstPon)).annotations;
-        const { created } = await annotations.create({
+        const annotations = doc.page(toPageRef(firstPageObjectNumber)).annotations;
+        const { annotation: created } = await annotations.create({
           subtype: 'text',
           rect: { left: 100, bottom: 100, right: 120, top: 120 },
           icon: 'comment',
@@ -224,7 +291,7 @@ export function runAttachmentConformance(
 
         // Icon is patchable; the file half of an attachment is not, and
         // the same presentation-only patch path applies to notes.
-        const { updated } = await annotations.update(dto.ref, {
+        const { annotation: updated } = await annotations.update(dto.ref, {
           subtype: 'text',
           icon: 'help',
         });

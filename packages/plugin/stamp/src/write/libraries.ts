@@ -1,15 +1,10 @@
 /**
- * Library writes. A library IS a PDF: its `/Title` is the name, its
+ * Library writes. A library is a PDF: its `/Title` is the name, its
  * `/Names /Pages` registry the assets, its pages the artwork, PieceInfo only
  * what has no standard home. Every whole-PDF rewrite rides the per-library
  * mutation queue.
  */
-import {
-  EngineError,
-  EngineErrorCode,
-  resolveBinarySource,
-  sniffBinaryMetadata,
-} from '@embedpdf/engine-core/runtime';
+import { resolveBinarySource, sniffBinaryMetadata } from '@embedpdf/engine-core/runtime';
 import type { BinarySource, PageRef, PieceInfoEntry } from '@embedpdf/engine-core/runtime';
 
 import { blankLibraryPdf } from '../blank-library';
@@ -32,8 +27,10 @@ import {
   STAMP_LIBRARY_PIECEINFO_APP,
   STAMP_PIECEINFO_APP,
 } from '../convention';
+import { addAsset, addLibrary, removeLibrary, setLibrary } from '../model';
 import type { StampContext, StampServices } from '../services';
 import { uid } from '../services/asset-engine';
+import { notFound, stampError, verb } from '../services/errors';
 
 const entryString = (entries: Record<string, PieceInfoEntry>, key: string): string | undefined => {
   const entry = entries[key];
@@ -86,11 +83,11 @@ export function createLibraryWrites(
 
   const createLibrary = async (
     name: string,
-    opts?: { id?: string; kind?: string; categories?: string[] },
+    options?: { id?: string; kind?: string; categories?: string[] },
   ): Promise<string> => {
-    const kind = opts?.kind ?? DEFAULT_LIBRARY_KIND;
-    const taken = new Set(Object.keys(ctx.getState().libraries));
-    const id = allocateId(opts?.id, 'stamp-lib', taken);
+    const kind = options?.kind ?? DEFAULT_LIBRARY_KIND;
+    const taken = new Set(Object.keys(ctx.state.get().libraries));
+    const id = allocateId(options?.id, 'stamp-lib', taken);
     const doc = await openAssetDocument(blankLibraryPdf());
     let bytes: Uint8Array;
     try {
@@ -98,38 +95,35 @@ export function createLibraryWrites(
       await doc.metadata.update({ title: name });
       await doc.pieceInfo!.update(
         STAMP_LIBRARY_PIECEINFO_APP,
-        stampLibraryPieceInfo(id, { kind, categories: opts?.categories }),
+        stampLibraryPieceInfo(id, { kind, categories: options?.categories }),
       );
       bytes = await doc.download();
     } finally {
       await doc.close();
     }
     libraryBinaries.set(id, bytes);
-    ctx.dispatch({
-      type: 'LIBRARY_ADDED',
-      library: {
-        id,
-        name,
-        kind,
-        assetIds: [],
-        ...(opts?.categories ? { categories: opts.categories } : {}),
-      },
+    ctx.state.update(addLibrary, {
+      id,
+      name,
+      kind,
+      assetIds: [],
+      ...(options?.categories ? { categories: options.categories } : {}),
     });
     libraryChanged.emit({ libraryId: id, reason: 'created' });
-    libraryCreated.emit({ libraryId: id, library: ctx.getState().libraries[id] ?? null });
+    libraryCreated.emit({ libraryId: id, library: ctx.state.get().libraries[id] ?? null });
     return id;
   };
 
-  const importLibraryPdf = async (
+  const importLibrary = async (
     source: BinarySource,
-    opts?: ImportLibraryOptions,
+    options?: ImportLibraryOptions,
   ): Promise<string> => {
     const resolved = await resolveBinarySource(source);
     const meta = sniffBinaryMetadata(resolved.bytes);
     if (meta?.mimeType !== 'application/pdf') {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        '[stamp] importLibraryPdf needs PDF bytes (use addAsset for a raster image)',
+      throw stampError(
+        'invalid-input',
+        'importLibrary needs PDF bytes (use createAsset for a raster image)',
       );
     }
     const doc = await openAssetDocument(new Uint8Array(resolved.bytes));
@@ -148,33 +142,34 @@ export function createLibraryWrites(
       requireCanonicalServices(doc);
       const layout = await doc.pages.list();
       if (layout.pageCount === 0) {
-        throw new EngineError(
-          EngineErrorCode.InvalidArg,
-          '[stamp] a canonical stamp library PDF must contain at least one page',
+        throw stampError(
+          'invalid-input',
+          'a canonical stamp library PDF must contain at least one page',
         );
       }
-      const byPon = new Map(layout.pages.map((page) => [page.ref.pageObjectNumber, page]));
+      const pagesByObjectNumber = new Map(
+        layout.pages.map((page) => [page.ref.pageObjectNumber, page]),
+      );
 
-      // ── library identity: /Title (Acrobat) → v1 PieceInfo → caller fallback ──
-      const catalogEntries =
-        (await doc.pieceInfo!.read(STAMP_LIBRARY_PIECEINFO_APP))?.entries ?? {};
-      const state = ctx.getState();
-      const takenLibraryIds = new Set(Object.keys(state.libraries));
+      // Library identity: /Title (Acrobat), then format version 1 PieceInfo, then the caller's fallback.
+      const catalogEntries = (await doc.pieceInfo!.get(STAMP_LIBRARY_PIECEINFO_APP))?.entries ?? {};
+      const takenLibraryIds = new Set(Object.keys(ctx.state.get().libraries));
       const libraryId = allocateId(entryString(catalogEntries, 'Id'), 'stamp-lib', takenLibraryIds);
-      const docMeta = await doc.metadata.read();
+      const docMeta = await doc.metadata.get();
       const libraryName =
         (docMeta.title && docMeta.title.length > 0 ? docMeta.title : undefined) ??
         entryString(catalogEntries, 'Name') ??
-        opts?.name ??
+        options?.name ??
         'Stamps';
       if (!docMeta.title) await doc.metadata.update({ title: libraryName });
-      const libraryCategories = opts?.categories ?? entryStringArray(catalogEntries, 'Categories');
+      const libraryCategories =
+        options?.categories ?? entryStringArray(catalogEntries, 'Categories');
       const libraryLocale = entryString(catalogEntries, 'Locale');
       // What the file is for: the caller's word, else the file's, else a plain stamp library.
       const libraryKind =
-        opts?.libraryKind ?? libraryKindFromPdfName(entryName(catalogEntries, 'Kind'));
+        options?.libraryKind ?? libraryKindFromPdfName(entryName(catalogEntries, 'Kind'));
 
-      // ── the registry: /Names /Pages keys `identifier=label` → pages ──
+      // The registry: /Names /Pages keys `identifier=label` naming pages.
       const registry = (layout.namedPages ?? []).filter(
         (entry): entry is typeof entry & { target: { kind: 'page' } } =>
           entry.target.kind === 'page',
@@ -193,41 +188,49 @@ export function createLibraryWrites(
         descriptors = registry.map((entry) => {
           const { name, label } = parseStampKey(entry.name);
           if (!name) {
-            throw new EngineError(
-              EngineErrorCode.InvalidArg,
-              `[stamp] library '${libraryName}': empty stamp identifier in key '${entry.name}'`,
+            throw stampError(
+              'invalid-input',
+              `library '${libraryName}': empty stamp identifier in key '${entry.name}'`,
             );
           }
           if (seen.has(name)) {
-            throw new EngineError(
-              EngineErrorCode.InvalidArg,
-              `[stamp] library '${libraryName}': duplicate stamp identifier '${name}'`,
+            throw stampError(
+              'invalid-input',
+              `library '${libraryName}': duplicate stamp identifier '${name}'`,
             );
           }
           seen.add(name);
-          const page = byPon.get(entry.target.page.pageObjectNumber)!;
+          const page = pagesByObjectNumber.get(entry.target.page.pageObjectNumber)!;
           return { page: page.ref, index: page.index, name, label };
         });
-        // Display order is PAGE order, never the tree's key-sorted order.
-        descriptors.sort((a, b) => a.index - b.index);
+        // Display order is page order, never the tree's key-sorted order.
+        descriptors.sort((left, right) => left.index - right.index);
       } else if (layout.namedPages === undefined) {
-        throw new EngineError(
-          EngineErrorCode.NotImplemented,
-          '[stamp] the asset engine reports no named-page registry (an older engine); upgrade it to import libraries',
+        throw stampError(
+          'unsupported',
+          'the asset engine reports no named-page registry; an engine with named pages is needed to import libraries',
         );
       } else {
         // A plain PDF: every page is a stamp. Register it so the canonical
-        // copy is Acrobat-readable on export. v1 PieceInfo keys are honoured
-        // as a fallback for libraries written before the registry.
+        // copy is Acrobat-readable on export. Format version 1 PieceInfo keys
+        // (`Name`, `Subject`) name the stamps of a library without a registry.
         descriptors = [];
         for (const page of layout.pages) {
-          const v1 = (await doc.page(page.ref).pieceInfo?.read(STAMP_PIECEINFO_APP))?.entries;
-          const name = (v1 && entryString(v1, 'Name')) ?? `Stamp${page.index + 1}`;
-          const label = (v1 && entryString(v1, 'Subject')) ?? opts?.assetName?.(page.index) ?? name;
+          const version1Entries = (await doc.page(page.ref).pieceInfo?.get(STAMP_PIECEINFO_APP))
+            ?.entries;
+          const name =
+            (version1Entries && entryString(version1Entries, 'Name')) ?? `Stamp${page.index + 1}`;
+          const label =
+            (version1Entries && entryString(version1Entries, 'Subject')) ??
+            options?.assetName?.(page.index) ??
+            name;
           descriptors.push({ page: page.ref, index: page.index, name, label });
         }
-        for (const d of descriptors) {
-          await doc.pages.setName!({ name: stampKey(d.name, d.label), page: d.page });
+        for (const descriptor of descriptors) {
+          await doc.pages.setName!({
+            name: stampKey(descriptor.name, descriptor.label),
+            page: descriptor.page,
+          });
         }
       }
 
@@ -241,27 +244,24 @@ export function createLibraryWrites(
       );
 
       const assets: NonNullable<typeof imported>['assets'] = [];
-      for (const d of descriptors) {
-        const handle = doc.page(d.page);
+      for (const descriptor of descriptors) {
+        const handle = doc.page(descriptor.page);
         if (!handle.pieceInfo) {
-          throw new EngineError(
-            EngineErrorCode.NotImplemented,
-            '[stamp] canonical PDF libraries need page pieceInfo support',
-          );
+          throw stampError('unsupported', 'canonical PDF libraries need page pieceInfo support');
         }
-        const entries = (await handle.pieceInfo.read(STAMP_PIECEINFO_APP))?.entries ?? {};
-        const kind = opts?.kind ?? kindFromPdfName(entryName(entries, 'Kind')) ?? 'stamp';
+        const entries = (await handle.pieceInfo.get(STAMP_PIECEINFO_APP))?.entries ?? {};
+        const kind = options?.kind ?? kindFromPdfName(entryName(entries, 'Kind')) ?? 'stamp';
         const subject = entryString(entries, 'SubjectOverride');
         const categories = entryStringArray(entries, 'Categories');
-        const page = byPon.get(d.page.pageObjectNumber)!;
+        const page = pagesByObjectNumber.get(descriptor.page.pageObjectNumber)!;
         const asset: StampAsset = {
-          id: assetIdFor(libraryId, d.name),
+          id: assetIdFor(libraryId, descriptor.name),
           libraryId,
           kind,
-          name: d.name,
-          label: d.label,
+          name: descriptor.name,
+          label: descriptor.label,
           size: { width: page.size.width, height: page.size.height },
-          page: d.page,
+          page: descriptor.page,
           ...(subject !== undefined ? { subject } : {}),
           ...(categories !== undefined ? { categories } : {}),
         };
@@ -270,7 +270,7 @@ export function createLibraryWrites(
           stampPieceInfo(kind, { subject, categories }),
         );
         // One canonical page → one derived placement PDF plus a thumbnail.
-        const bytes = await doc.pages.extract([d.page]);
+        const bytes = await doc.pages.extract([descriptor.page]);
         assets.push({ asset, bytes, preview: await renderThumbnail(handle) });
       }
 
@@ -291,10 +291,10 @@ export function createLibraryWrites(
     }
 
     libraryBinaries.set(imported.library.id, imported.canonicalBytes);
-    ctx.dispatch({ type: 'LIBRARY_ADDED', library: imported.library });
+    ctx.state.update(addLibrary, imported.library);
     for (const { asset, bytes, preview } of imported.assets) {
       assetBinaries.set(asset.id, { bytes, preview });
-      ctx.dispatch({ type: 'ASSET_ADDED', asset });
+      ctx.state.update(addAsset, asset);
     }
     libraryChanged.emit({ libraryId: imported.library.id, reason: 'imported' });
     libraryCreated.emit({ libraryId: imported.library.id, library: imported.library });
@@ -305,7 +305,7 @@ export function createLibraryWrites(
   };
 
   const dropLibrary = (id: string): void => {
-    const library = ctx.getState().libraries[id];
+    const library = ctx.state.get().libraries[id];
     if (library) {
       for (const assetId of library.assetIds) {
         assetBinaries.delete(assetId);
@@ -313,12 +313,12 @@ export function createLibraryWrites(
       }
     }
     libraryBinaries.delete(id);
-    ctx.dispatch({ type: 'LIBRARY_REMOVED', libraryId: id });
+    ctx.state.update(removeLibrary, id);
   };
 
-  const removeLibrary = (id: string): Promise<void> =>
+  const deleteLibrary = (id: string): Promise<void> =>
     mutateLibrary(id, async () => {
-      const existed = ctx.getState().libraries[id] !== undefined;
+      const existed = ctx.state.get().libraries[id] !== undefined;
       dropLibrary(id);
       if (existed) {
         libraryChanged.emit({ libraryId: id, reason: 'removed' });
@@ -330,20 +330,13 @@ export function createLibraryWrites(
     id: string,
     patch: { name?: string; categories?: string[] },
   ): Promise<void> => {
-    if (!ctx.getState().libraries[id]) {
-      throw new EngineError(EngineErrorCode.NotFound, `[stamp] unknown library '${id}'`);
-    }
+    if (!ctx.state.get().libraries[id]) throw notFound('library', id);
     return mutateLibrary(id, async () => {
-      const library = ctx.getState().libraries[id];
-      if (!library) {
-        throw new EngineError(EngineErrorCode.NotFound, `[stamp] unknown library '${id}'`);
-      }
+      const library = ctx.state.get().libraries[id];
+      if (!library) throw notFound('library', id);
       const canonicalBytes = libraryBinaries.get(id);
       if (!canonicalBytes) {
-        throw new EngineError(
-          EngineErrorCode.Unknown,
-          `[stamp] canonical bytes are missing for library '${id}'`,
-        );
+        throw stampError('operation-failed', `canonical bytes are missing for library '${id}'`);
       }
       const next: StampLibrary = {
         ...library,
@@ -369,7 +362,7 @@ export function createLibraryWrites(
         await doc.close();
       }
       libraryBinaries.set(id, rewritten);
-      ctx.dispatch({ type: 'LIBRARY_UPDATED', library: next });
+      ctx.state.update(setLibrary, next);
       libraryChanged.emit({ libraryId: id, reason: 'updated' });
       libraryUpdated.emit({ libraryId: id, library: next });
     });
@@ -378,10 +371,10 @@ export function createLibraryWrites(
   return {
     createLibrary,
     api: {
-      createLibrary,
-      updateLibrary,
-      importLibrary: importLibraryPdf,
-      deleteLibrary: removeLibrary,
+      createLibrary: verb(createLibrary),
+      updateLibrary: verb(updateLibrary),
+      importLibrary: verb(importLibrary),
+      deleteLibrary: verb(deleteLibrary),
     } satisfies Partial<StampCapability>,
   };
 }

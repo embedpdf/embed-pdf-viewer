@@ -27,12 +27,12 @@ export interface RichTextRange {
 
 /** Length of the plain projection. */
 export function richTextLength(doc: { paragraphs: readonly RichTextParagraph[] }): number {
-  let n = 0;
-  doc.paragraphs.forEach((p, i) => {
-    if (i > 0) n += 1;
-    for (const r of p.runs) n += r.text.length;
+  let length = 0;
+  doc.paragraphs.forEach((paragraph, i) => {
+    if (i > 0) length += 1;
+    for (const run of paragraph.runs) length += run.text.length;
   });
-  return n;
+  return length;
 }
 
 const DELTA_KEYS: readonly (keyof RichTextRunStyle)[] = [
@@ -49,24 +49,24 @@ const DELTA_KEYS: readonly (keyof RichTextRunStyle)[] = [
 ];
 
 function sameDecoration(
-  a: readonly string[] | undefined,
-  b: readonly string[] | undefined,
+  left: readonly string[] | undefined,
+  right: readonly string[] | undefined,
 ): boolean {
-  if (a === b) return true;
-  if (!a || !b || a.length !== b.length) return false;
-  const sorted = (x: readonly string[]) => [...x].sort();
-  const sa = sorted(a);
-  const sb = sorted(b);
-  return sa.every((v, i) => v === sb[i]);
+  if (left === right) return true;
+  if (!left || !right || left.length !== right.length) return false;
+  const sorted = (values: readonly string[]) => [...values].sort();
+  const sa = sorted(left);
+  const sb = sorted(right);
+  return sa.every((value, i) => value === sb[i]);
 }
 
 /** Two deltas override the same properties with the same values. */
 export function sameStyleDelta(
-  a: RichTextStyleDelta | undefined,
-  b: RichTextStyleDelta | undefined,
+  left: RichTextStyleDelta | undefined,
+  right: RichTextStyleDelta | undefined,
 ): boolean {
-  const da = a ?? {};
-  const db = b ?? {};
+  const da = left ?? {};
+  const db = right ?? {};
   for (const key of DELTA_KEYS) {
     if (key === 'decoration') {
       if (!sameDecoration(da.decoration, db.decoration)) return false;
@@ -98,9 +98,9 @@ function cleanDelta(delta: RichTextStyleDelta | undefined): RichTextStyleDelta |
  * has somewhere to put the caret.
  */
 export function normalizeRuns<T extends { paragraphs: RichTextParagraph[] }>(doc: T): T {
-  const paragraphs = doc.paragraphs.map((p) => {
+  const paragraphs = doc.paragraphs.map((paragraph) => {
     const runs: RichTextRun[] = [];
-    for (const run of p.runs) {
+    for (const run of paragraph.runs) {
       if (run.text.length === 0) continue;
       const style = cleanDelta(run.style);
       const last = runs[runs.length - 1];
@@ -111,7 +111,7 @@ export function normalizeRuns<T extends { paragraphs: RichTextParagraph[] }>(doc
       }
     }
     if (runs.length === 0) runs.push({ text: '' });
-    return { ...p, runs };
+    return { ...paragraph, runs };
   });
   return { ...doc, paragraphs };
 }
@@ -124,7 +124,7 @@ export function locateOffset(
 ): { paragraph: number; offset: number } {
   let pos = 0;
   for (let i = 0; i < doc.paragraphs.length; i++) {
-    const length = doc.paragraphs[i]!.runs.reduce((n, r) => n + r.text.length, 0);
+    const length = doc.paragraphs[i]!.runs.reduce((sum, run) => sum + run.text.length, 0);
     if (offset <= pos + length || i === doc.paragraphs.length - 1) {
       return { paragraph: i, offset: Math.max(0, Math.min(length, offset - pos)) };
     }
@@ -173,7 +173,9 @@ export function applyStyleToRange<T extends { paragraphs: RichTextParagraph[] }>
     if (index < from.paragraph || index > to.paragraph) return paragraph;
     const localStart = index === from.paragraph ? from.offset : 0;
     const localEnd =
-      index === to.paragraph ? to.offset : paragraph.runs.reduce((n, r) => n + r.text.length, 0);
+      index === to.paragraph
+        ? to.offset
+        : paragraph.runs.reduce((sum, run) => sum + run.text.length, 0);
     if (localEnd <= localStart) return paragraph;
     const split = splitRunsAt(splitRunsAt(paragraph, localStart), localEnd);
     let pos = 0;
@@ -231,7 +233,9 @@ export function rangeHasStyle(
     const paragraph = doc.paragraphs[index]!;
     const localStart = index === from.paragraph ? from.offset : 0;
     const localEnd =
-      index === to.paragraph ? to.offset : paragraph.runs.reduce((n, r) => n + r.text.length, 0);
+      index === to.paragraph
+        ? to.offset
+        : paragraph.runs.reduce((sum, run) => sum + run.text.length, 0);
     let pos = 0;
     for (const run of paragraph.runs) {
       const runEnd = pos + run.text.length;
@@ -252,7 +256,9 @@ export function paragraphsFromPlainText(text: string): RichTextParagraph[] {
 
 /** The plain projection: paragraphs joined by `\r`, runs concatenated. */
 export function plainTextOf(doc: { paragraphs: readonly RichTextParagraph[] }): string {
-  return doc.paragraphs.map((p) => p.runs.map((r) => r.text).join('')).join('\r');
+  return doc.paragraphs
+    .map((paragraph) => paragraph.runs.map((run) => run.text).join(''))
+    .join('\r');
 }
 
 /** True when nothing in the document overrides the body: no run delta, no
@@ -260,13 +266,13 @@ export function plainTextOf(doc: { paragraphs: readonly RichTextParagraph[] }): 
 export function isPlainRichText(doc: RichTextDocumentInput): boolean {
   if (doc.body && Object.keys(doc.body).length > 0) return false;
   return doc.paragraphs.every(
-    (p) =>
-      p.align === undefined &&
-      p.dir === undefined &&
-      p.lineHeight === undefined &&
-      p.margins === undefined &&
-      p.textIndent === undefined &&
-      p.unknown === undefined &&
-      p.runs.every((r) => cleanDelta(r.style) === undefined),
+    (paragraph) =>
+      paragraph.align === undefined &&
+      paragraph.dir === undefined &&
+      paragraph.lineHeight === undefined &&
+      paragraph.margins === undefined &&
+      paragraph.textIndent === undefined &&
+      paragraph.unknown === undefined &&
+      paragraph.runs.every((run) => cleanDelta(run.style) === undefined),
   );
 }

@@ -49,8 +49,8 @@ export async function validateChain(
   let internal: ParsedCmsInternal;
   try {
     internal = cms instanceof Uint8Array ? parseCmsInternal(cms) : cms;
-  } catch (err) {
-    return { status: 'untrusted', reason: (err as Error).message };
+  } catch (error) {
+    return { status: 'untrusted', reason: (error as Error).message };
   }
   const trustedCerts = anchors.map((der) => pkijs.Certificate.fromBER(toArrayBuffer(der)));
   const chainEngine = new pkijs.CertificateChainValidationEngine({
@@ -61,13 +61,18 @@ export async function validateChain(
   try {
     const result = await chainEngine.verify();
     if (!result.result) {
-      return { status: 'untrusted', reason: result.resultMessage || `chain validation code ${result.resultCode}` };
+      return {
+        status: 'untrusted',
+        reason: result.resultMessage || `chain validation code ${result.resultCode}`,
+      };
     }
     return {
       status: 'trusted',
-      path: (result.certificatePath ?? []).map((c) => new Uint8Array(c.toSchema(true).toBER(false))),
+      path: (result.certificatePath ?? []).map(
+        (certificate) => new Uint8Array(certificate.toSchema(true).toBER(false)),
+      ),
     };
-  } catch (err) {
-    return { status: 'untrusted', reason: (err as Error).message };
+  } catch (error) {
+    return { status: 'untrusted', reason: (error as Error).message };
   }
 }

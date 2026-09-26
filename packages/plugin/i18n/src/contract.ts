@@ -1,13 +1,13 @@
 /**
  * @embedpdf/plugin-i18n/contract — translations and locale.
  *
- * Translation is pure data over pure state: locale packs live IN the store
- * (not in a side-table), so `t()` is a pure read, every consumer is reactive
- * through the one kernel change stream, and the whole thing serializes (SSR,
- * snapshots, persist). Workspace-scoped, `requires: []`, never touches the
- * engine or the DOM — the capability is alive from `createKernel()`, before
- * a single WASM byte is fetched. The plugin ships NO strings: mechanism here,
- * content (locale packs) in the product that embeds it.
+ * Translation is pure data over pure state: locale packs live in the plugin's
+ * state (not in a side-table), so `t()` is a pure read, every consumer is
+ * reactive through the one kernel change stream, and the whole thing
+ * serializes (SSR, snapshots, persist). Workspace-scoped, `requires: []`,
+ * never touches the engine or the DOM — the capability is alive from
+ * `createKernel()`, before a single WASM byte is fetched. The plugin ships no
+ * strings: mechanism here, content (locale packs) in the product that embeds it.
  */
 import type { EventHook, OperationOptions, PluginErrorInfo, Unsubscribe } from '@embedpdf/core';
 
@@ -19,7 +19,7 @@ export interface TranslationDictionary {
 }
 
 export interface Locale {
-  /** BCP-47 code: 'en', 'es', 'ar', 'zh-Hans'. */
+  /** Language tag (RFC 5646): 'en', 'es', 'ar', 'zh-Hans'. */
   readonly code: string;
   /** Native display name: 'Español' — what a locale switcher shows. */
   readonly name: string;
@@ -30,7 +30,7 @@ export interface Locale {
 
 export interface I18nConfig {
   /**
-   * Startup locale. Compute platform inputs OUTSIDE the plugin — it never
+   * Startup locale. Compute platform inputs outside the plugin — it never
    * touches the DOM:
    *
    * ```ts
@@ -38,7 +38,7 @@ export interface I18nConfig {
    * ```
    *
    * May name a `loaders` pack: the fallback locale shows until the pack
-   * arrives (effects fetch it at startup). Defaults to `fallbackLocale`.
+   * arrives (the plugin fetches it once connected). Defaults to `fallbackLocale`.
    */
   locale?: string;
   /** The pack tried when a key misses the current locale. Default 'en'. */
@@ -46,10 +46,10 @@ export interface I18nConfig {
   /** Eagerly available packs. */
   locales?: Locale[];
   /**
-   * Lazy packs: code → loader. `setLocale(code)` fetches on demand (in
-   * effects), registers the pack, then switches. Until a lazy pack loads, a
-   * locale switcher shows its code as the name — register eagerly (packs are
-   * small) when you want native names in the switcher up front.
+   * Lazy packs: code → loader. `setLocale(code)` fetches on demand, registers
+   * the pack, then switches. Until a lazy pack loads, a locale switcher shows
+   * its code as the name — register eagerly (packs are small) when you want
+   * native names in the switcher up front.
    */
   loaders?: Record<string, () => Promise<Locale>>;
 }
@@ -57,7 +57,7 @@ export interface I18nConfig {
 export interface TranslateOptions {
   /**
    * `{slot}` interpolation values. When `count` is a number and the key
-   * resolves to a branch object, the branch is picked by CLDR plural
+   * resolves to a branch object, the branch is picked by the locale's plural
    * category (`Intl.PluralRules`), falling back to `other`:
    *
    * ```ts
@@ -78,6 +78,7 @@ export interface LocaleInfo {
   readonly dir: 'ltr' | 'rtl';
   readonly loaded: boolean;
 }
+
 // ── events ──
 export interface LocaleChangedEvent {
   readonly locale: string;
@@ -91,10 +92,16 @@ export interface LocaleLoadFailedEvent {
 export interface I18nCapability {
   /** Translate a key: current locale → fallback locale → `options.fallback` → the key. The one bare-name read. */
   t(key: string, options?: TranslateOptions): string;
+  /**
+   * A translate function for render code. It calls `t`, and keeps its
+   * identity until the locale or the registered translations change, so a
+   * memoized consumer holding it re-renders exactly when its strings may differ.
+   */
+  getTranslator(): (key: string, options?: TranslateOptions) => string;
   /** Is a key translated in the current or fallback locale? Never warns. */
   hasKey(key: string): boolean;
   getLocale(): string;
-  /** Text direction of the CURRENT locale — wire to `dir=` on the shell. */
+  /** Text direction of the current locale — wire to `dir=` on the shell. */
   getDirection(): 'ltr' | 'rtl';
   /** Every known locale (registered + lazy), in registration order. Reference-stable. */
   listLocales(): readonly LocaleInfo[];
@@ -103,15 +110,16 @@ export interface I18nCapability {
   /**
    * Switch locale. Resolves once the locale is usable (a lazy pack is fetched
    * first); rejects `not-found` for an unknown code, `operation-failed` when
-   * the pack fails to load, and `operation-cancelled` when a newer call
-   * supersedes this one.
+   * the pack fails to load (firing `onLocaleLoadFailed`), and
+   * `operation-cancelled` when a newer call supersedes this one. Fires
+   * `onLocaleChanged` once the new locale is current.
    */
   setLocale(code: string, options?: OperationOptions): Promise<void>;
   /** Register a pack at runtime (customer-supplied translations). The remover drops it again. */
   registerLocale(locale: Locale): Unsubscribe;
-  /** Merge keys into a registered pack (later keys win). Rejects `not-found` for an unknown code. */
+  /** Merge keys into a registered pack (later keys win). Throws `not-found` for an unknown code. */
   addTranslations(code: string, dictionary: TranslationDictionary): void;
-  /** The current locale changed and is usable. */
+  /** The current locale changed and is usable; never fires while a lazy pack is still loading. */
   readonly onLocaleChanged: EventHook<LocaleChangedEvent>;
   /** A lazy pack failed to load; the previous locale stays. */
   readonly onLocaleLoadFailed: EventHook<LocaleLoadFailedEvent>;

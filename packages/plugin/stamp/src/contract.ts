@@ -1,4 +1,4 @@
-/** @embedpdf/plugin-stamp/contract — the PUBLIC stamp vocabulary. */
+/** @embedpdf/plugin-stamp/contract: the public stamp vocabulary. */
 import type { BatchResult, EventHook, OperationOptions } from '@embedpdf/core';
 import type { AnnotationRef, BinarySource, Engine, PageRef } from '@embedpdf/engine-core/runtime';
 import type { StampPlacement } from '@embedpdf/plugin-annotation/contract';
@@ -8,7 +8,7 @@ export { DEFAULT_LIBRARY_KIND } from './convention';
 export type { StampLibraryStore } from './persistence';
 
 /**
- * The stamp plugin: a workspace-scoped ASSET substrate.
+ * The stamp plugin: a workspace-scoped asset substrate.
  *
  * The design law ("documents have a home; assets ride the wire"): imported
  * PDF libraries retain one canonical PDF whose catalog/page `/PieceInfo`
@@ -20,7 +20,7 @@ export type { StampLibraryStore } from './persistence';
 export type StampAssetKind = 'stamp' | 'signature' | 'initials';
 
 /**
- * What a library file is FOR — the routing key a surface queries by. Open:
+ * What a library file is for: the routing key a surface queries by. Open:
  * the plugin defines `stamps` (the default) and `signatures`; an embedder
  * may define its own (`toolbar`, `legal-seals`). Persisted in the file.
  */
@@ -44,10 +44,10 @@ export type MarkSource =
   | { kind: 'pdf'; source: BinarySource; pageIndex?: number };
 
 /**
- * One asset's SERIALIZABLE descriptor. The bytes and the cached preview are
- * deliberately NOT here — the reducer state stays pure/serializable (kernel
- * rule 1); binary lives in the capability and crosses only as call
- * arguments/returns, mirroring the engine's own BinarySource rule.
+ * One asset's serializable descriptor. The bytes and the cached preview are
+ * deliberately not here: session state holds serializable data only, and
+ * binary lives in the capability and crosses only as call arguments and
+ * return values, mirroring the engine's own BinarySource rule.
  */
 export interface StampAsset {
   /** Derived and stable: `${libraryId}:${name}` (never allocated). */
@@ -55,17 +55,17 @@ export interface StampAsset {
   libraryId: string;
   kind: StampAssetKind;
   /**
-   * The stamp's IDENTIFIER — the text before the first `=` in its library
+   * The stamp's identifier: the text before the first `=` in its library
    * key, and the placed annotation's `/Name`: a standard name (`Approved`)
    * or a custom one (`#LBGiYhk8V_oAfmqAPENiwD`). Not display text.
    */
   name: string;
-  /** What the picker shows and the placed annotation's default `/Subj` —
+  /** What the picker shows and the placed annotation's default `/Subj`:
    *  the text after `=` in the library key (`Goedgekeurd`). */
   label: string;
   /** Intrinsic size in PDF points (the source page's crop box / image pixels 1:1). */
   size: { width: number; height: number };
-  /** The library page that IS this asset. Every asset is a page: a raster
+  /** The library page that is this asset. Every asset is a page: a raster
    *  added to a library becomes a page carrying the image. */
   page: PageRef;
   /** An explicit `/Subj` override (PieceInfo); placements use `label` otherwise. */
@@ -74,24 +74,24 @@ export interface StampAsset {
 }
 
 /**
- * A library IS a PDF: its `/Title` is the name, its `/Names /Pages` registry
+ * A library is a PDF: its `/Title` is the name, its `/Names /Pages` registry
  * the assets, its pages the artwork, PieceInfo only what has no standard
  * home. One imported PDF becomes one library; `exportLibrary` returns it.
  */
 export interface StampLibrary {
-  /** PieceInfo `Id` — stable while the title is editable. */
+  /** PieceInfo `Id`: stable while the title is editable. */
   id: string;
   name: string;
   /** PieceInfo `Kind`: `'stamps'`, `'signatures'`, or an embedder's own. */
   kind: StampLibraryKind;
-  /** PieceInfo `Locale` — the language of the labels, when the library says. */
+  /** PieceInfo `Locale`: the language of the labels, when the library says. */
   locale?: string;
   categories?: string[];
   /** Asset ids in display order. */
   assetIds: string[];
 }
 
-/** Why a library's canonical bytes changed — the persistence signal. */
+/** Why a library's canonical bytes changed: the persistence signal. */
 export interface StampLibraryChange {
   libraryId: string;
   reason:
@@ -106,18 +106,18 @@ export interface StampLibraryChange {
 
 export interface StampConfig {
   /**
-   * The ASSET ENGINE port: any `Engine` that can open `{ kind: 'bytes' }` —
+   * The asset engine port: any `Engine` that can open `{ kind: 'bytes' }`,
    * used only to slice an imported library PDF into per-page assets and
    * render their previews.
    *
-   * Omitted → the kernel's own engine is used, which is exactly right for a
-   * local deployment (same WASM instance, zero extra cost). In a CLOUD
-   * deployment the kernel engine cannot open local bytes, so pass a factory —
+   * Omitted: the kernel's own engine is used, which is exactly right for a
+   * local deployment (same WASM instance, zero extra cost). In a cloud
+   * deployment the kernel engine cannot open local bytes, so pass a factory;
    * it is called (and memoized) on the first import, never at viewer boot:
    *
    * ```ts
    * stampPlugin({
-   *   assetEngine: () => import('@embedpdf/engine').then((m) => m.createLocalEngine()),
+   *   assetEngine: () => import('@embedpdf/engine').then((module) => module.createLocalEngine()),
    * })
    * ```
    */
@@ -126,21 +126,21 @@ export interface StampConfig {
   previewWidth?: number;
   /**
    * Evaluate form-backed (dynamic) PDF stamp assets on arm. Default `true`.
-   * Scripting itself is the workspace's ONE JavaScript switch,
+   * Scripting itself is the workspace's one JavaScript switch,
    * `actionsPlugin({ javascript: { enabled } })`: stamp has no switch of its
-   * own — it asks the target document's actions plugin for a DETACHED realm
+   * own. It asks the target document's actions plugin for a detached realm
    * (same identity, clock, sandbox, and budget; isolated globals), and arms
    * the template unevaluated when scripting is off or actions is absent.
-   * `false` keeps templates static even with scripting on — a product
+   * `false` keeps templates static even with scripting on: a product
    * choice (a stamp's appearance must equal the reviewed template), not a
-   * trust boundary: a detached realm can only alert and spend budget.
+   * trust boundary, since a detached realm can only alert and spend budget.
    */
   dynamic?: boolean;
 }
 
 export interface ImportLibraryOptions {
   /**
-   * FALLBACK library name, applied only when the PDF carries no `/Title`
+   * Fallback library name, applied only when the PDF carries no `/Title`
    * (an Acrobat-authored or previously exported library names itself).
    * Default `'Stamps'`.
    */
@@ -152,7 +152,7 @@ export interface ImportLibraryOptions {
   /** What the file is for; overrides what the file says (an Acrobat-authored set imported for a toolbar). */
   libraryKind?: StampLibraryKind;
   /**
-   * FALLBACK per-page labels for a plain PDF (no `/Names /Pages` registry):
+   * Fallback per-page labels for a plain PDF (no `/Names /Pages` registry):
    * every page becomes a stamp named `Stamp<n>` with this label. Ignored
    * when the PDF registers its stamps itself.
    */
@@ -160,7 +160,7 @@ export interface ImportLibraryOptions {
 }
 
 export interface AddAssetInput {
-  /** Target library; omitted → a new single-asset library named after the asset. */
+  /** Target library; omitted, a new single-asset library named after the asset. */
   libraryId?: string;
   /** The identifier (placed `/Name`). Omit to mint an Acrobat-style `#…` one. */
   name?: string;
@@ -170,18 +170,17 @@ export interface AddAssetInput {
   subject?: string;
   categories?: string[];
   /**
-   * Single-page PDF (vector) or PNG/JPEG bytes. A raster becomes a PAGE of
-   * the library sized to `size` (default: its pixels as points, 1:1) with the
-   * image flattened into it — so every asset is a page and every library a
-   * complete PDF.
+   * PNG, JPEG, or single-page PDF bytes. Exactly one of `source` / `mark`. A
+   * raster becomes a page of the library sized to `size` (default: its
+   * pixels as points, 1:1) with the image flattened into it, so every asset
+   * is a page and every library a complete PDF.
    */
-  /** PNG, JPEG, or single-page PDF bytes. Exactly one of `source` / `mark`. */
   source?: BinarySource;
-  /** An authored mark — drawn, typed, an image, or a PDF page. Exactly one of `source` / `mark`. */
+  /** An authored mark: drawn, typed, an image, or a PDF page. Exactly one of `source` / `mark`. */
   mark?: MarkSource;
   /** Thumbnail override for pickers (PNG/JPEG); rendered from the page otherwise. */
   preview?: BinarySource;
-  /** Page size in PDF points for a RASTER source. Ignored for PDF sources (the page has one). */
+  /** Page size in PDF points for a raster source. Ignored for PDF sources (the page has one). */
   size?: { width: number; height: number };
 }
 
@@ -219,8 +218,9 @@ export interface StampArmChangedEvent {
 
 /**
  * Stamp libraries and their assets (workspace-scoped); placement targets a
- * document. A library IS a PDF (one page per asset) — `exportLibrary` returns
- * the persistence format, `importLibrary` reads it back.
+ * document. A library is a PDF (one page per asset): `exportLibrary` returns
+ * the persistence format, `importLibrary` reads it back. Every verb rejects
+ * with a `PluginError`.
  */
 export interface StampCapability {
   // ── reading ──

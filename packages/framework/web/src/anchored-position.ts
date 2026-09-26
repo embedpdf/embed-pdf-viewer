@@ -1,20 +1,20 @@
 /**
  * Anchored-overlay geometry for UI floating over page content (selection
- * menus, draft menus, popovers): the projector SNAPSHOT contract, the
+ * menus, draft menus, popovers): the projector snapshot contract, the
  * anchor shape, and the placement math. Pure values and pure functions over
  * structural rect/point shapes — no EmbedPDF types, no framework, no
  * reactive lifecycle — so every framework adapter (React, Vue, Svelte,
- * Angular) shares ONE implementation and binds it with its NATIVE
+ * Angular) shares one implementation and binds it with its native
  * reactivity (context revision, signals, computed, $derived).
  *
  * The boundary laws:
- *   - Placement policy lives HERE, above the projector seam: a projector
+ *   - Placement policy lives here, above the projector seam: a projector
  *     only knows geometry — never what is being positioned nor where it
  *     prefers to sit.
- *   - A projector describes the CURRENT projection; it never implements a
+ *   - A projector describes the current projection; it never implements a
  *     framework-style reactive lifecycle. State-driven changes (the Stage
  *     camera) must reach consumers through the framework's own render
- *     cycle so surface and overlay commit TOGETHER; only genuinely
+ *     cycle so surface and overlay commit together; only genuinely
  *     browser-driven changes (a PageView moving because the document
  *     scrolled) use an external listener ({@link observeClientGeometry}).
  */
@@ -45,7 +45,7 @@ export interface AnchoredPosition {
 /**
  * Place an upright element around `box` (screen px). `avoid` is a screen
  * point the element must clear (e.g. the rotate knob): the element extends
- * ONLY the edge it sits on, and ONLY when the point protrudes past that
+ * only the edge it sits on, and only when the point protrudes past that
  * edge — so it clears the obstacle without ever shifting off-centre on the
  * other axis. When the point is on another side (e.g. a 90° shape, knob at
  * mid-height for a `top` placement) the edge is untouched and the element
@@ -62,10 +62,10 @@ export interface AnchorTarget {
 }
 
 /**
- * A page surface's PROJECTION SNAPSHOT: how a content-space rect on a page
+ * A page surface's projection snapshot: how a content-space rect on a page
  * becomes screen coordinates, right now. Provided by `<Stage>`
  * (camera-driven, pure state, no DOM reads) and `<PageView>` (DOM-measured).
- * Deliberately NO subscribe here — when projection changes is a framework
+ * Deliberately no subscribe here — when projection changes is a framework
  * binding concern (see the module doc), not part of the snapshot.
  */
 export interface ViewProjector {
@@ -92,7 +92,7 @@ export interface ViewProjector {
 }
 
 /**
- * THE anchored projection: anchor → screen position, in one pure call —
+ * The anchored projection: anchor → screen position, in one pure call —
  * projection, avoid-point transform, and the shared placement policy.
  * Frameworks recompute this inside their native reactive primitive
  * (a React render, a Vue `computed`, an Angular signal, a Svelte
@@ -113,7 +113,7 @@ export function projectAnchoredTarget(
 }
 
 /**
- * The one genuinely BROWSER-driven invalidation: an element in normal
+ * The one genuinely browser-driven invalidation: an element in normal
  * document flow moves when the document scrolls or the window resizes —
  * no state change announces it. `<PageView>`'s binding registers this;
  * the Stage never does (its camera is state, delivered through render).

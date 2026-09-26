@@ -13,50 +13,37 @@ import type { CommentPermissions, CommentsApi, ThreadDeleteResult } from '../con
 import type { AnnotationContext, AnnotationServices } from '../services';
 import type { ThreadIndex } from './threads';
 import type { Crud } from '../write/crud';
+import { named } from '../write/named';
 
 // Screen-anchored like a sticky note; `print` for Acrobat parity.
 const REPLY_FLAGS = { print: true, noZoom: true, noRotate: true };
 // Status annotations are metadata: hidden everywhere (our paint plane
 // culls them regardless; `hidden` keeps foreign viewers from drawing an
-// icon). Phase 0 golden fixtures may refine this convention.
+// icon).
 const STATUS_FLAGS = { hidden: true, noZoom: true, noRotate: true };
 
 /**
  * The conversation plane's verbs: every one compiles down to plain
- * annotation creates / patches / deletes (one optimistic pipeline, no second
- * write path), and each announces the thread it touched (its root, as it
+ * annotation creates / patches / deletes (one write path), and each announces the thread it touched (its root, as it
  * was before the change).
  */
 export function createComments(
   ctx: Pick<AnnotationContext, 'doc'>,
-  {
-    store,
-    records,
-    authority,
-    events,
-  }: Pick<AnnotationServices, 'store' | 'records' | 'authority' | 'events'>,
+  { store, authority, events }: Pick<AnnotationServices, 'store' | 'authority' | 'events'>,
   threads: ThreadIndex,
   crud: Pick<Crud, 'updateRaw'>,
 ) {
-  /** Engine create + model sync for conversation-plane annotations (they
-   *  never paint, so the render source is immaterial — 'baked' avoids any
-   *  vector-scene work). */
+  /** Create a conversation annotation (a reply or a review state); the fold adds it to the model. */
   const createConversationAnnot = async (
-    pon: number,
+    pageObjectNumber: number,
     draft: AnnotationDraft,
   ): Promise<AnnotationDTO> => {
-    const doc = ctx.doc;
-    if (!doc) throw new Error('[annotation] no document bound');
-    const res = await doc.page(toPageRef(pon)).annotations.create(draft);
-    records.sync(res.created, 'baked');
-    return res.created;
+    const result = await ctx.doc.page(toPageRef(pageObjectNumber)).annotations.create(named(draft));
+    return result.annotation;
   };
 
   const deleteOne = async (ref: AnnotationRef): Promise<void> => {
-    const doc = ctx.doc;
-    if (!doc) throw new Error('[annotation] no document bound');
-    await doc.page(ref.page).annotations.delete(ref);
-    store.commit({ t: 'remove', ids: [annotationKey(ref)] });
+    await ctx.doc.page(ref.page).annotations.delete(ref);
   };
 
   const announce = (
@@ -71,14 +58,14 @@ export function createComments(
 
     reply: async (ref, text) => {
       const root = threads.rootRefOf(ref);
-      const t = threads.threadOf(ref);
-      const created = await createConversationAnnot(t.page.pageObjectNumber, {
+      const thread = threads.threadOf(ref);
+      const created = await createConversationAnnot(thread.page.pageObjectNumber, {
         subtype: 'text',
-        rect: t.root.rect,
+        rect: thread.root.rect,
         icon: 'comment',
         contents: text,
-        inReplyTo: t.root.ref,
-        flags: { ...REPLY_FLAGS },
+        reply: { to: thread.root.ref },
+        ...REPLY_FLAGS,
       } as AnnotationDraft);
       announce(root, 'reply');
       return created.ref;
@@ -97,33 +84,33 @@ export function createComments(
 
     setStatus: async (ref, state) => {
       const root = threads.rootRefOf(ref);
-      const t = threads.threadOf(ref);
+      const thread = threads.threadOf(ref);
       const userId = threads.currentUserId();
       // ISO chain: reply to the caller's previous state annotation when one
       // exists, else to the root. Readers everywhere (ours included) accept
       // both shapes.
-      const previous = userId ? t.review.byReviewer[userId] : undefined;
-      await createConversationAnnot(t.page.pageObjectNumber, {
+      const previous = userId ? thread.review.byReviewer[userId] : undefined;
+      await createConversationAnnot(thread.page.pageObjectNumber, {
         subtype: 'text',
-        rect: t.root.rect,
-        inReplyTo: previous?.ref ?? t.root.ref,
+        rect: thread.root.rect,
+        reply: { to: previous?.ref ?? thread.root.ref },
         state,
         stateModel: 'review',
-        flags: { ...STATUS_FLAGS },
+        ...STATUS_FLAGS,
       } as AnnotationDraft);
       announce(root, 'status');
     },
 
     setMarked: async (ref, marked) => {
       const root = threads.rootRefOf(ref);
-      const t = threads.threadOf(ref);
-      await createConversationAnnot(t.page.pageObjectNumber, {
+      const thread = threads.threadOf(ref);
+      await createConversationAnnot(thread.page.pageObjectNumber, {
         subtype: 'text',
-        rect: t.root.rect,
-        inReplyTo: t.root.ref,
+        rect: thread.root.rect,
+        reply: { to: thread.root.ref },
         state: marked ? 'marked' : 'unmarked',
         stateModel: 'marked',
-        flags: { ...STATUS_FLAGS },
+        ...STATUS_FLAGS,
       } as AnnotationDraft);
       announce(root, 'marked');
     },
@@ -136,48 +123,46 @@ export function createComments(
 
     deleteThread: async (ref): Promise<ThreadDeleteResult> => {
       const root = threads.rootRefOf(ref);
-      const t = threads.threadOf(ref);
-      const members = threads.memberRefsOf(t);
-      // Preflight: all-or-nothing. A blocked member means NOTHING deletes —
-      // a half-deleted thread orphans replies in every other viewer.
-      const blocked = members.filter((r) => !authority.canDelete(r));
+      const thread = threads.threadOf(ref);
+      const members = threads.memberRefsOf(thread);
+      // A courtesy preflight: all or nothing, as the engine decides it.
+      const blocked = members.filter((ref) => !authority.canDelete(ref));
       if (blocked.length > 0) {
         announce(root, 'deleted');
         return {
           deleted: [],
-          failed: blocked.map((r) => ({ ref: r, error: new Error('delete not permitted') })),
+          failed: blocked.map((ref) => ({ ref: ref, error: new Error('delete not permitted') })),
         };
       }
-      const deleted: AnnotationRef[] = [];
-      const failed: ThreadDeleteResult['failed'] = [];
-      for (const member of members) {
-        // A child failure (a race: someone else acted first) stops the
-        // cascade before the root, so nothing orphans.
-        if (failed.length > 0) break;
-        try {
-          await deleteOne(member);
-          deleted.push(member);
-        } catch (error) {
-          failed.push({ ref: member, error });
-        }
+      // Deleting the root deletes the thread, in one change: the engine
+      // checks every member again and deletes all of them or none.
+      try {
+        await deleteOne(root);
+        return { deleted: members, failed: [] };
+      } catch (error) {
+        return { deleted: [], failed: [{ ref: root, error }] };
+      } finally {
+        announce(root, 'deleted');
       }
-      announce(root, 'deleted');
-      return { deleted, failed };
     },
 
     getPermissions: (ref): CommentPermissions => {
-      const t = threads.index().byMember.get(annotationKey(ref)) ?? null;
+      const thread = threads.index().byMember.get(annotationKey(ref)) ?? null;
       return {
-        // Replying and setting status CREATE new annotations — gated on
+        // Replying and setting status create new annotations — gated on
         // the caller's own identity, not the target's owner.
         canReply: authority.canCreate(),
         canSetStatus: authority.canCreate(),
         canEditText: (() => {
-          const a = store.model().byId[annotationKey(ref)];
-          return !!a && !(a.data && isDimension(a.data)) && annotContentsEditable(a);
+          const annotation = store.model().byId[annotationKey(ref)];
+          return (
+            !!annotation &&
+            !(annotation.data && isDimension(annotation.data)) &&
+            annotContentsEditable(annotation)
+          );
         })(),
         canDelete: authority.canDelete(ref),
-        canDeleteThread: t !== null && threads.memberRefsOf(t).every(authority.canDelete),
+        canDeleteThread: thread !== null && threads.memberRefsOf(thread).every(authority.canDelete),
       };
     },
   };

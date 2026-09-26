@@ -224,7 +224,7 @@ function toJsResult(meta: PdfFunctionAbiSlot | null, value: unknown): unknown {
 }
 
 /**
- * The wasm artifact is built WITHOUT `WASM_BIGINT`, so Emscripten
+ * The wasm artifact is built without `WASM_BIGINT`, so Emscripten
  * legalizes every `i64` parameter at the JS boundary into an (i32 low,
  * i32 high) pair — the export wrapper takes one extra argument per i64
  * and rejects BigInt values outright. Expand each declared i64 argument
@@ -289,9 +289,9 @@ function buildEmscriptenOptions(opts: CreatePdfRuntimeOptions): Record<string, u
     moduleOptions.locateFile = (path: string, prefix: string) =>
       path.endsWith('.wasm') ? wasmUrl : prefix + path;
   }
-  // Bytes in hand must mean NO location is ever needed: without a locateFile,
+  // Bytes in hand must mean no location is ever needed: without a locateFile,
   // Emscripten still computes the wasm's URL via `new URL('embedpdf.wasm',
-  // import.meta.url)`, which THROWS inside a blob: worker (blob URLs can't be
+  // import.meta.url)`, which throws inside a blob: worker (blob URLs can't be
   // a base). The name is only used as a lookup key against wasmBinary — the
   // glue never fetches it.
   if (moduleOptions.wasmBinary !== undefined && moduleOptions.locateFile === undefined) {

@@ -1,0 +1,266 @@
+---
+title: Free text
+description: Put text boxes and callouts on a page, in any font, with bold, italic and colored words.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+import { Callout } from '@/components/docs/callout';
+
+# Free text
+
+A free text annotation writes text straight onto the page: a text box, or a callout with a line
+that points at something. The engine lays out the text and draws it, so it looks the same in
+every PDF app.
+
+```ts
+const { annotation } = await page.annotations.create({
+  subtype: 'free-text',
+  rect: { left: 72, bottom: 600, right: 272, top: 660 },
+  contents: 'Please check this section',
+  fontSize: 14,
+});
+```
+
+## Text boxes
+
+The text wraps inside `rect`. Start a new line with `\n` in `contents`; it reads back as `\r`,
+the line break PDF uses.
+
+| Field           | What it is                                                       | Default         |
+| :-------------- | :--------------------------------------------------------------- | :-------------- |
+| `rect`          | The text box. Required.                                          |                 |
+| `contents`      | The text, plain.                                                 | empty           |
+| `fontFamily`    | The font; see [Fonts](#fonts).                                   | `'helvetica'`   |
+| `fontSize`      | The text size in points.                                         | `12`            |
+| `textAlign`     | `'left'`, `'center'`, `'right'` or `'justify'`.                  | `'left'`        |
+| `color`         | The border color, and the text color unless you set `fontColor`. | black           |
+| `fontColor`     | The text color, or `null` to follow `color`.                     | follows `color` |
+| `interiorColor` | The background, or `null` for none.                              | none            |
+| `strokeWidth`   | The border width in points. `0` for no border.                   | `1`             |
+| `opacity`       | From `0` to `1`, for the whole box: border, background and text. | `1`             |
+
+A read also has `intent`: `'free-text-callout'` for a box with a [callout line](#callouts),
+`'free-text'` for the others. The engine sets it from the `calloutLine`; you don't need to.
+
+`borderStyle` and `dashArray` work as for every annotation; see the
+[overview](/docs/engine/annotations#style).
+
+## Colors
+
+A free text box has three colors, and one of them does two jobs:
+
+- `color` draws the border (and a callout's line). The text uses it too, unless you set a
+  `fontColor`.
+- `fontColor` colors only the text.
+- `interiorColor` fills the box. Leave it out for a transparent box.
+
+```ts
+await page.annotations.create({
+  subtype: 'free-text',
+  rect: { left: 72, bottom: 520, right: 272, top: 580 },
+  contents: 'Approved',
+  fontFamily: 'helvetica-bold',
+  fontSize: 18,
+  textAlign: 'center',
+  color: { r: 0, g: 100, b: 0 }, // green border
+  fontColor: { r: 0, g: 0, b: 0 }, // black text
+  interiorColor: { r: 230, g: 255, b: 230 }, // pale green background
+});
+```
+
+## Fonts
+
+`fontFamily` takes one of the 14 standard PDF fonts. Every PDF app has them, so nothing is
+embedded in the file:
+
+`helvetica`, `helvetica-bold`, `helvetica-oblique`, `helvetica-bold-oblique`, `times-roman`,
+`times-bold`, `times-italic`, `times-bold-italic`, `courier`, `courier-bold`, `courier-oblique`,
+`courier-bold-oblique`, `symbol`, `zapf-dingbats`.
+
+The standard fonts only cover Latin text.
+
+<Engine local>
+
+For other scripts (Chinese, Arabic, Cyrillic…) or your own typeface, register a font with the
+engine and pass its key as `fontFamily`:
+
+```ts
+await engine.fonts.register({ key: 'noto-sc', data: fontBytes });
+
+await page.annotations.create({
+  subtype: 'free-text',
+  rect: { left: 72, bottom: 600, right: 272, top: 660 },
+  contents: '请检查这一部分',
+  fontFamily: 'noto-sc',
+  fontSize: 14,
+});
+```
+
+When you save, the engine embeds only the characters the annotation uses. Reading the annotation
+back gives `fontFamily: 'noto-sc'` again. A key that isn't registered fails with `InvalidArg`. See
+[Fonts](/docs/engine/documents/fonts) for registering fonts and filling in missing characters.
+
+</Engine>
+
+<Engine cloud>
+
+For other scripts (Chinese, Arabic, Cyrillic…) or your own typeface, pass the key of a font your
+server is configured with as `fontFamily`. The server also uses those fonts to draw characters the
+chosen font doesn't have, so text in any script your server has a font for shows up. The fonts are
+the server's to choose, for every user and every document; see
+[Fallback fonts](/docs/server/configuration/fonts).
+
+</Engine>
+
+## Callouts
+
+A callout is a text box with a line that points at something on the page. Give the box a
+`calloutLine`:
+
+```ts
+await page.annotations.create({
+  subtype: 'free-text',
+  rect: { left: 300, bottom: 600, right: 480, top: 660 }, // the text box
+  calloutLine: [
+    { x: 200, y: 520 }, // the point it points at
+    { x: 250, y: 630 }, // a bend (optional)
+    { x: 300, y: 630 }, // where the line meets the box
+  ],
+  lineEnding: 'open-arrow',
+  contents: 'This total is wrong',
+});
+```
+
+| Field         | What it is                                                                                                                        | Default |
+| :------------ | :-------------------------------------------------------------------------------------------------------------------------------- | :------ |
+| `calloutLine` | Two points (straight) or three (with a bend). The first is what it points at, the last touches the box.                           | none    |
+| `lineEnding`  | What's drawn at the point it points at, such as `'open-arrow'`; see [Line endings](/docs/engine/annotations/shapes#line-endings). | none    |
+
+`rect` stays the text box; the engine makes room for the line and its arrow. To turn a callout
+back into a plain box, set `calloutLine: null`.
+
+## Rich text
+
+Every free text also has a `richText` document, for text with bold, italic or colored words. It
+has a `body`, the style of the whole box, and `paragraphs` of `runs`. A run is a piece of text
+with a `style` that holds only what it changes:
+
+```ts
+await page.annotations.create({
+  subtype: 'free-text',
+  rect: { left: 72, bottom: 600, right: 372, top: 660 },
+  fontSize: 14,
+  richText: {
+    paragraphs: [
+      {
+        runs: [
+          { text: 'Total is ' },
+          { text: 'wrong', style: { weight: 700, color: '#CC0000' } },
+          { text: ', see page 4.' },
+        ],
+      },
+    ],
+  },
+});
+```
+
+The `body` takes its style from `fontFamily`, `fontSize`, `textAlign` and the text color, so you
+rarely write one. `contents` always reads back as the plain text: `'Total is wrong, see page
+4.'`, with paragraphs joined by `\r`.
+
+A style can hold:
+
+| Property          | What it is                                                                                 |
+| :---------------- | :----------------------------------------------------------------------------------------- |
+| `family`          | The font, by family name: `'Helvetica'`, `'Times'`, `'Courier'`, or a font the engine has. |
+| `weight`          | From `100` to `900`: `400` is regular, `700` bold.                                         |
+| `italic`          | `true` for italic.                                                                         |
+| `size`            | The size in points.                                                                        |
+| `color`           | A hex color, `'#RRGGBB'`.                                                                  |
+| `decoration`      | `['underline']`, `['line-through']`, or both.                                              |
+| `script`          | `'normal'`, `'sub'` or `'super'`.                                                          |
+| `letterSpacing`   | Extra points after every character.                                                        |
+| `horizontalScale` | Character width, `1` for normal.                                                           |
+
+The `body`, and a paragraph that differs from it, also take `align` (`'left'`, `'center'`,
+`'right'` or `'justify'`) and `dir` (`'ltr'` or `'rtl'`).
+
+Runs change only what they name, so a change to the body moves every run that didn't set its
+own value: make the body red and a blue word stays blue.
+
+<Callout type="info">
+  Editing rich text in the browser? The [rich text editor](/docs/headless/concepts/rich-text) in the
+  annotation plugin does the typing, the selection and the formatting for you.
+</Callout>
+
+## Change the text
+
+What an update does depends on what you send:
+
+| You send                                           | What happens                                                                                                    |
+| :------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------- |
+| `contents`                                         | The text is replaced with plain paragraphs in the body style. Bold words and other run styles go.               |
+| `richText` without `body`                          | The text is replaced; the body style stays.                                                                     |
+| `richText` with `body`                             | The text is replaced, and the body style changes where the `body` says.                                         |
+| `fontFamily`, `fontSize`, `fontColor`, `textAlign` | The body style changes; runs keep their own styles.                                                             |
+| `contents` and `richText`                          | They must be the same text (`contents` is the plain text of `richText`), or the update fails with `InvalidArg`. |
+
+```ts
+// Make one word italic, keep everything else:
+await page.annotations.update(annotation.ref, {
+  richText: {
+    paragraphs: [
+      {
+        runs: [
+          { text: 'Please check ' },
+          { text: 'this', style: { italic: true } },
+          { text: ' section' },
+        ],
+      },
+    ],
+  },
+});
+```
+
+A `body` changes only the properties it names, like any other update: a body of `{ size: 18 }`
+makes the text bigger and keeps its font, color and alignment.
+
+## Permissions
+
+Reading free text needs `doc.annotate.read`. Creating, changing and deleting it needs the same
+permissions as any annotation; see [Permissions](/docs/engine/annotations#permissions).
+
+## Good to know
+
+### Where the text sits
+
+The text starts twice the border width inside the box, on every side, the way Acrobat lays it
+out: a 1-point border leaves 2 points around the text. Text that doesn't fit in that area is cut
+off. Text sits at the top of the box; there is no vertical alignment.
+
+### Justified text
+
+PDF's own alignment entry has no _justify_, so `'justify'` is saved in the rich text only. A PDF
+app that reads just the plain text shows a justified box left-aligned.
+
+### Fonts inside rich text
+
+A run names its font by family, the way the PDF does: `'Helvetica'`, `'Times'`, `'Courier'`, the
+family name of a font the engine has, or a font the document already embeds. A family the engine
+can't find is drawn in Helvetica; the run keeps the name you gave. `fontFamily` and `fontSize`
+always read back the body's font and size.
+
+### Turned boxes
+
+A free text box turns like a rectangle: set `unrotatedRect` and `rotation` (see
+[Shapes](/docs/engine/annotations/shapes#turned-shapes)). On a callout only the text box turns;
+the line stays where it is.
+
+### How it's stored
+
+For readers who know PDF: `color` is the color in `/DA`, `interiorColor` is `/C`, and `richText`
+is written as `/RC` (XHTML) and `/DS`, the form Acrobat reads and writes. `contents` is
+`/Contents`, `calloutLine` is `/CL` and `intent` is `/IT`. For a callout, the PDF's own `/Rect`
+takes in the line, and `/RD` says where the text box is inside it; the engine keeps both, and
+`rect` is always the text box.

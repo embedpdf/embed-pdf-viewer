@@ -23,7 +23,10 @@ export function utf8Length(value: string): number {
   return length;
 }
 
-export function pageNumberFor(meta: DocumentMeta | null, field: FormFieldDTO): number {
+export function pageNumberFor(
+  meta: Pick<DocumentMeta, 'pages'> | null,
+  field: FormFieldDTO,
+): number {
   const placed = field.widgets.find((widget) => widget.page !== null)?.page;
   if (!meta || !placed) return 0;
   const index = meta.pages.findIndex(

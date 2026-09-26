@@ -32,7 +32,7 @@ describe('resolveZoom', () => {
     expect(
       S.resolveZoom({ mode: S.ZoomMode.Automatic }, { width: 2000, height: 800 }, vp, GAP),
     ).toBeCloseTo((1000 - 2 * GAP) / 2000, 6);
-    // a tall page does NOT zoom out — automatic ignores height
+    // a tall page does not zoom out — automatic ignores height
     expect(
       S.resolveZoom({ mode: S.ZoomMode.Automatic }, { width: 400, height: 5000 }, vp, GAP),
     ).toBe(1);
@@ -70,8 +70,8 @@ describe('placeCamera — THE placement algorithm (pure align; the caller clamps
     S.groupPages(3, 'none'),
     { axis: 'y', gap: GAP },
   );
-  const rect = (i: number) => {
-    const it = scene.items[i];
+  const rect = (itemIndex: number) => {
+    const it = scene.items[itemIndex];
     return { x: it.x, y: it.y, width: it.width, height: it.height };
   };
 
@@ -84,41 +84,41 @@ describe('placeCamera — THE placement algorithm (pure align; the caller clamps
   });
 
   it("'end' = far edges flush (a padding in), at every zoom", () => {
-    const r = rect(1);
+    const subject = rect(1);
     for (const zoom of [0.5, 2]) {
-      const cam = S.placeCamera(r, vp, zoom, 24, { x: 'end', y: 'start' });
-      expect((r.x + r.width - cam.x) * cam.zoom).toBeCloseTo(vp.width - 24, 6);
-      expect((r.y - cam.y) * cam.zoom).toBeCloseTo(24, 6);
+      const cam = S.placeCamera(subject, vp, zoom, 24, { x: 'end', y: 'start' });
+      expect((subject.x + subject.width - cam.x) * cam.zoom).toBeCloseTo(vp.width - 24, 6);
+      expect((subject.y - cam.y) * cam.zoom).toBeCloseTo(24, 6);
     }
   });
 
   it("'center' centers the subject, fitting (presented) or overflowing (Drawboard)", () => {
-    const r = rect(1);
+    const subject = rect(1);
     for (const zoom of [0.5, 2]) {
-      const cam = S.placeCamera(r, vp, zoom, 24, { x: 'center', y: 'center' });
-      expect((r.x + r.width / 2 - cam.x) * cam.zoom).toBeCloseTo(vp.width / 2, 6);
-      expect((r.y + r.height / 2 - cam.y) * cam.zoom).toBeCloseTo(vp.height / 2, 6);
+      const cam = S.placeCamera(subject, vp, zoom, 24, { x: 'center', y: 'center' });
+      expect((subject.x + subject.width / 2 - cam.x) * cam.zoom).toBeCloseTo(vp.width / 2, 6);
+      expect((subject.y + subject.height / 2 - cam.y) * cam.zoom).toBeCloseTo(vp.height / 2, 6);
     }
   });
 
   it("a fraction puts the subject CENTER at that viewport line ('center' ≡ 0.5)", () => {
-    const r = rect(1);
-    const cam = S.placeCamera(r, vp, 1, 24, { x: 'center', y: 0.35 });
-    expect((r.y + r.height / 2 - cam.y) * cam.zoom).toBeCloseTo(vp.height * 0.35, 6);
-    const half = S.placeCamera(r, vp, 1, 24, { x: 'center', y: 0.5 });
-    expect(half).toEqual(S.placeCamera(r, vp, 1, 24, { x: 'center', y: 'center' }));
+    const subject = rect(1);
+    const cam = S.placeCamera(subject, vp, 1, 24, { x: 'center', y: 0.35 });
+    expect((subject.y + subject.height / 2 - cam.y) * cam.zoom).toBeCloseTo(vp.height * 0.35, 6);
+    const half = S.placeCamera(subject, vp, 1, 24, { x: 'center', y: 0.5 });
+    expect(half).toEqual(S.placeCamera(subject, vp, 1, 24, { x: 'center', y: 'center' }));
   });
 
   it('composed with clampCamera, a no-freedom axis collapses to the fitAlign rest (the old fit-case, from geometry)', () => {
-    // zoom 0.5: the page fits BOTH axes, but the true bounds (the scene) still
+    // zoom 0.5: the page fits both axes, but the true bounds (the scene) still
     // overflow y — so the start landing survives on y, while x (the scene fits)
     // is locked to the default center rest. Alignment is policy; rest is clamp.
-    const r = rect(1);
-    const placed = S.placeCamera(r, vp, 0.5, 24, { x: 'start', y: 'start' });
+    const subject = rect(1);
+    const placed = S.placeCamera(subject, vp, 0.5, 24, { x: 'start', y: 'start' });
     const bounds = { x: 0, y: 0, width: scene.size.width, height: scene.size.height };
     const clamped = S.clampCamera(placed, bounds, vp, { bounded: true, padding: 24 });
-    expect((r.x + r.width / 2 - clamped.x) * clamped.zoom).toBeCloseTo(vp.width / 2, 6); // x: rest
-    expect((r.y - clamped.y) * clamped.zoom).toBeCloseTo(24, 6); // y: the landing survives
+    expect((subject.x + subject.width / 2 - clamped.x) * clamped.zoom).toBeCloseTo(vp.width / 2, 6); // x: rest
+    expect((subject.y - clamped.y) * clamped.zoom).toBeCloseTo(24, 6); // y: the landing survives
   });
 });
 
@@ -150,10 +150,10 @@ describe('revealCamera — scrollIntoView as camera math', () => {
 
 describe('zoomAround', () => {
   it('keeps the world point under the cursor fixed (no drift)', () => {
-    const c = { x: 100, y: 50, zoom: 1 };
+    const camera = { x: 100, y: 50, zoom: 1 };
     const cursor = { x: 300, y: 200 };
-    const before = S.toWorld(c, cursor);
-    const after = S.toWorld(S.zoomAround(c, cursor, 2.3), cursor);
+    const before = S.toWorld(camera, cursor);
+    const after = S.toWorld(S.zoomAround(camera, cursor, 2.3), cursor);
     expect(after.x).toBeCloseTo(before.x, 6);
     expect(after.y).toBeCloseTo(before.y, 6);
   });
@@ -209,13 +209,13 @@ describe('clampCamera', () => {
   });
 
   it('passes through untouched when unbounded', () => {
-    const c = { x: 0, y: 99999, zoom: 1 };
+    const camera = { x: 0, y: 99999, zoom: 1 };
     expect(
-      S.clampCamera(c, { x: 0, y: 0, width: 10, height: 10 }, vp, {
+      S.clampCamera(camera, { x: 0, y: 0, width: 10, height: 10 }, vp, {
         bounded: false,
         padding: 0,
       }),
-    ).toEqual(c);
+    ).toEqual(camera);
   });
 
   it('confines to a NON-zero-origin rect (a single paged item)', () => {
@@ -230,120 +230,133 @@ describe('clampCamera', () => {
   it('centers a small item within its rect (fit-case respects origin)', () => {
     // item smaller than the viewport ⇒ centered around bounds.y, not 0
     const bounds = { x: 0, y: 4000, width: 300, height: 300 };
-    const c = S.clampCamera({ x: 0, y: 0, zoom: 1 }, bounds, vp, k0);
-    expect(c.y).toBeCloseTo(4000 + (300 - vp.height) / 2, 6); // centered within the item's rect
+    const camera = S.clampCamera({ x: 0, y: 0, zoom: 1 }, bounds, vp, k0);
+    expect(camera.y).toBeCloseTo(4000 + (300 - vp.height) / 2, 6); // centered within the item's rect
   });
 
   it('fitAlign picks the REST point of a fitting axis (start/end, logical x)', () => {
     const bounds = { x: 0, y: 0, width: 300, height: 300 }; // fits both axes
-    const k = (fa: S.Alignment, direction?: S.Direction) =>
+    const constraintOf = (fa: S.Alignment, direction?: S.Direction) =>
       ({ bounded: true, padding: 24, fitAlign: fa, direction }) as S.CameraConstraint;
     // y:'start' — content's top edge a padding below the viewport top
-    const top = S.clampCamera({ x: 0, y: 0, zoom: 1 }, bounds, vp, k({ x: 'center', y: 'start' }));
+    const top = S.clampCamera(
+      { x: 0, y: 0, zoom: 1 },
+      bounds,
+      vp,
+      constraintOf({ x: 'center', y: 'start' }),
+    );
     expect(top.y).toBeCloseTo(-24, 6); // camera above origin by the gutter
     // y:'end' — bottom edge a padding above the viewport bottom
-    const bot = S.clampCamera({ x: 0, y: 0, zoom: 1 }, bounds, vp, k({ x: 'center', y: 'end' }));
+    const bot = S.clampCamera(
+      { x: 0, y: 0, zoom: 1 },
+      bounds,
+      vp,
+      constraintOf({ x: 'center', y: 'end' }),
+    );
     expect(bot.y).toBeCloseTo(300 - (vp.height - 24), 6);
-    // logical x: RTL + 'start' rests at the RIGHT edge (mirrors to 'end')
+    // logical x: RTL + 'start' rests at the right edge (mirrors to 'end')
     const rtl = S.clampCamera(
       { x: 0, y: 0, zoom: 1 },
       bounds,
       vp,
-      k({ x: 'start', y: 'center' }, 'rtl'),
+      constraintOf({ x: 'start', y: 'center' }, 'rtl'),
     );
     expect(rtl.x).toBeCloseTo(300 - (vp.width - 24), 6);
   });
 
   it('padding = a constant breathing gutter the camera may reveal', () => {
-    const p = 24;
-    const k = { bounded: true, padding: p } as const;
+    const padding = 24;
+    const constraint = { bounded: true, padding } as const;
     const bounds = { x: 0, y: 0, width: 1000, height: 5000 };
     // may scroll up to `padding` beyond each content edge…
-    const top = S.clampCamera({ x: 0, y: -99999, zoom: 1 }, bounds, vp, k);
-    expect(top.y).toBeCloseTo(-p, 6);
-    const bottom = S.clampCamera({ x: 0, y: 99999, zoom: 1 }, bounds, vp, k);
-    expect(bottom.y).toBeCloseTo(5000 - vp.height + p, 6);
+    const top = S.clampCamera({ x: 0, y: -99999, zoom: 1 }, bounds, vp, constraint);
+    expect(top.y).toBeCloseTo(-padding, 6);
+    const bottom = S.clampCamera({ x: 0, y: 99999, zoom: 1 }, bounds, vp, constraint);
+    expect(bottom.y).toBeCloseTo(5000 - vp.height + padding, 6);
     // …and at exactly fit-width zoom, the lock leaves exactly `padding` per side.
-    const zFit = (vp.width - 2 * p) / 1000;
-    const fit = S.clampCamera({ x: -99999, y: 0, zoom: zFit }, bounds, vp, k);
-    expect(fit.x * zFit).toBeCloseTo(-p, 4); // padding of gutter on the left
+    const zFit = (vp.width - 2 * padding) / 1000;
+    const fit = S.clampCamera({ x: -99999, y: 0, zoom: zFit }, bounds, vp, constraint);
+    expect(fit.x * zFit).toBeCloseTo(-padding, 4); // padding of gutter on the left
   });
 });
 
 describe('scrollMetrics — the camera as a native scroller', () => {
-  const P = 24;
+  const padding = 24;
   const bounds = { x: 0, y: 0, width: 800, height: 5000 }; // y overflows vp, x fits
-  const k = { bounded: true, padding: P } as const;
+  const constraint = { bounded: true, padding } as const;
 
   it('bounded overflow: the DOM identities hold, aligned with the clamp', () => {
     // camera clamped to the very top → scrollTop 0
-    const top = S.clampCamera({ x: 0, y: -99999, zoom: 1 }, bounds, vp, k);
-    const mTop = S.scrollMetrics(top, bounds, vp, P);
+    const top = S.clampCamera({ x: 0, y: -99999, zoom: 1 }, bounds, vp, constraint);
+    const mTop = S.scrollMetrics(top, bounds, vp, padding);
     expect(mTop.scrollTop).toBeCloseTo(0, 6);
-    expect(mTop.scrollHeight).toBeCloseTo(5000 + 2 * P, 6); // padded content extent
+    expect(mTop.scrollHeight).toBeCloseTo(5000 + 2 * padding, 6); // padded content extent
     expect(mTop.clientHeight).toBe(vp.height);
     expect(mTop.scrollableY).toBe(true);
     // clamped to the very bottom → scrollTop === scrollHeight − clientHeight,
     // exactly the DOM's max — the clamp and the scroller share travelRange
-    const bot = S.clampCamera({ x: 0, y: 99999, zoom: 1 }, bounds, vp, k);
-    const mBot = S.scrollMetrics(bot, bounds, vp, P);
+    const bot = S.clampCamera({ x: 0, y: 99999, zoom: 1 }, bounds, vp, constraint);
+    const mBot = S.scrollMetrics(bot, bounds, vp, padding);
     expect(mBot.scrollTop).toBeCloseTo(mBot.scrollHeight - mBot.clientHeight, 6);
   });
 
   it('a fitting axis reports unscrollable with offset 0 (native: no bar)', () => {
-    const c = S.clampCamera({ x: 0, y: 0, zoom: 1 }, bounds, vp, k); // x fits, rests centered
-    const m = S.scrollMetrics(c, bounds, vp, P);
-    expect(m.scrollableX).toBe(false);
-    expect(m.scrollLeft).toBeCloseTo(0, 6);
-    expect(m.scrollWidth).toBeCloseTo(vp.width, 6); // DOM: scrollWidth = clientWidth when nothing overflows
+    const camera = S.clampCamera({ x: 0, y: 0, zoom: 1 }, bounds, vp, constraint); // x fits, rests centered
+    const metrics = S.scrollMetrics(camera, bounds, vp, padding);
+    expect(metrics.scrollableX).toBe(false);
+    expect(metrics.scrollLeft).toBeCloseTo(0, 6);
+    expect(metrics.scrollWidth).toBeCloseTo(vp.width, 6); // DOM: scrollWidth = clientWidth when nothing overflows
   });
 
   it('zoom scales the range: doubling zoom doubles the content extent', () => {
-    const c = S.clampCamera({ x: 0, y: 100, zoom: 2 }, bounds, vp, k);
-    const m = S.scrollMetrics(c, bounds, vp, P);
-    expect(m.scrollHeight).toBeCloseTo(5000 * 2 + 2 * P, 6);
-    expect(m.scrollableX).toBe(true); // 800 * 2 now overflows 1000 − it scrolls
+    const camera = S.clampCamera({ x: 0, y: 100, zoom: 2 }, bounds, vp, constraint);
+    const metrics = S.scrollMetrics(camera, bounds, vp, padding);
+    expect(metrics.scrollHeight).toBeCloseTo(5000 * 2 + 2 * padding, 6);
+    expect(metrics.scrollableX).toBe(true); // 800 * 2 now overflows 1000 − it scrolls
   });
 
   it('unbounded: the range is the union of content and window (the Figma bar)', () => {
-    // camera parked far LEFT of the content — thumb hugs the start
+    // camera parked far left of the content — thumb hugs the start
     const west = { x: -3000, y: 0, zoom: 1 };
-    const mW = S.scrollMetrics(west, bounds, vp, P);
+    const mW = S.scrollMetrics(west, bounds, vp, padding);
     expect(mW.scrollLeft).toBeCloseTo(0, 6);
-    expect(mW.scrollWidth).toBeCloseTo(800 + P - -3000, 6); // union: window lo → content hi (padded)
+    expect(mW.scrollWidth).toBeCloseTo(800 + padding - -3000, 6); // union: window lo → content hi (padded)
     expect(mW.scrollableX).toBe(true);
-    // camera far RIGHT — thumb hugs the end
+    // camera far right — thumb hugs the end
     const east = { x: 4000, y: 0, zoom: 1 };
-    const mE = S.scrollMetrics(east, bounds, vp, P);
+    const mE = S.scrollMetrics(east, bounds, vp, padding);
     expect(mE.scrollLeft).toBeCloseTo(mE.scrollWidth - mE.clientWidth, 6);
   });
 
   it('unbounded with everything in view: unscrollable, like a fitting native div', () => {
     // zoomed way out: the window ([-300, 9700] × [-300, 6700] world) covers the
     // whole padded content ([-240, 1040] × [-240, 5240])
-    const c = { x: -300, y: -300, zoom: 0.1 };
-    const m = S.scrollMetrics(c, bounds, vp, P);
-    expect(m.scrollableX).toBe(false);
-    expect(m.scrollableY).toBe(false);
+    const camera = { x: -300, y: -300, zoom: 0.1 };
+    const metrics = S.scrollMetrics(camera, bounds, vp, padding);
+    expect(metrics.scrollableX).toBe(false);
+    expect(metrics.scrollableY).toBe(false);
   });
 
   it('cameraFromScroll: Element.scrollTo semantics — absolute, clamped, per-axis', () => {
-    const c = S.clampCamera({ x: 0, y: 1000, zoom: 1 }, bounds, vp, k);
-    const m = S.scrollMetrics(c, bounds, vp, P);
+    const camera = S.clampCamera({ x: 0, y: 1000, zoom: 1 }, bounds, vp, constraint);
+    const metrics = S.scrollMetrics(camera, bounds, vp, padding);
     // round-trip: writing the current offsets back is the identity
-    const same = S.cameraFromScroll(c, bounds, vp, P, { left: m.scrollLeft, top: m.scrollTop });
-    expect(same.x).toBeCloseTo(c.x, 6);
-    expect(same.y).toBeCloseTo(c.y, 6);
+    const same = S.cameraFromScroll(camera, bounds, vp, padding, {
+      left: metrics.scrollLeft,
+      top: metrics.scrollTop,
+    });
+    expect(same.x).toBeCloseTo(camera.x, 6);
+    expect(same.y).toBeCloseTo(camera.y, 6);
     // an omitted axis does not move; a present one lands exactly
-    const moved = S.cameraFromScroll(c, bounds, vp, P, { top: 2000 });
-    expect(moved.x).toBeCloseTo(c.x, 6);
-    expect(S.scrollMetrics(moved, bounds, vp, P).scrollTop).toBeCloseTo(2000, 6);
+    const moved = S.cameraFromScroll(camera, bounds, vp, padding, { top: 2000 });
+    expect(moved.x).toBeCloseTo(camera.x, 6);
+    expect(S.scrollMetrics(moved, bounds, vp, padding).scrollTop).toBeCloseTo(2000, 6);
     // beyond the end clamps to max (scrollHeight − clientHeight), like the DOM
-    const over = S.cameraFromScroll(c, bounds, vp, P, { top: 1e9 });
-    const mo = S.scrollMetrics(over, bounds, vp, P);
+    const over = S.cameraFromScroll(camera, bounds, vp, padding, { top: 1e9 });
+    const mo = S.scrollMetrics(over, bounds, vp, padding);
     expect(mo.scrollTop).toBeCloseTo(mo.scrollHeight - mo.clientHeight, 6);
     // zoom is untouched — scrolling is a pan in scroller clothing
-    expect(over.zoom).toBe(c.zoom);
+    expect(over.zoom).toBe(camera.zoom);
   });
 });
 
@@ -415,14 +428,14 @@ describe('sizing: uniform (cross-axis equalize)', () => {
 });
 
 describe('viewUnitsPerPoint: physical unit factor folds into the layout', () => {
-  const f = 96 / 72;
+  const factor = 96 / 72;
   const page = [pg(612, 792)]; // US Letter (points)
 
   it('intrinsic: world size = points × factor, contentScale = factor', () => {
-    const scene = S.linearLayout(page, S.groupPages(1, 'none'), { viewUnitsPerPoint: f });
-    expect(scene.items[0].pages[0].contentScale).toBeCloseTo(f, 6);
-    expect(scene.items[0].width).toBeCloseTo(612 * f, 4); // 816 CSS px
-    expect(scene.items[0].height).toBeCloseTo(792 * f, 4);
+    const scene = S.linearLayout(page, S.groupPages(1, 'none'), { viewUnitsPerPoint: factor });
+    expect(scene.items[0].pages[0].contentScale).toBeCloseTo(factor, 6);
+    expect(scene.items[0].width).toBeCloseTo(612 * factor, 4); // 816 CSS px
+    expect(scene.items[0].height).toBeCloseTo(792 * factor, 4);
   });
 
   it('defaults to 1 (neutral): world = points', () => {
@@ -435,11 +448,11 @@ describe('viewUnitsPerPoint: physical unit factor folds into the layout', () => 
     const mixed = [pg(600, 800), pg(1000, 700)];
     const scene = S.linearLayout(mixed, S.groupPages(2, 'none'), {
       sizing: 'uniform',
-      viewUnitsPerPoint: f,
+      viewUnitsPerPoint: factor,
     });
     // every item equalized to the widest (1000pt) × factor
-    expect(scene.items.every((it) => Math.abs(it.width - 1000 * f) < 1e-4)).toBe(true);
-    expect(scene.items[0].pages[0].contentScale).toBeCloseTo((1000 / 600) * f, 6);
+    expect(scene.items.every((it) => Math.abs(it.width - 1000 * factor) < 1e-4)).toBe(true);
+    expect(scene.items[0].pages[0].contentScale).toBeCloseTo((1000 / 600) * factor, 6);
   });
 });
 
@@ -513,7 +526,7 @@ describe('direction: rtl (a layout property, not a navigation one)', () => {
     });
     expect(scene.items[0].y).toBe(0); // still top-down
     const [p0, p1] = scene.items[0].pages;
-    // reading-first page (0) takes the RIGHT slot of the spread
+    // reading-first page (0) takes the right slot of the spread
     expect(p0.pageIndex).toBe(0);
     expect(p0.x).toBeGreaterThan(p1.x);
   });
@@ -543,14 +556,14 @@ describe('direction: rtl (a layout property, not a navigation one)', () => {
 });
 
 describe('pageFrame: reserved chrome space around each PAGE', () => {
-  const P = pg(600, 800);
-  const m = { top: 10, right: 8, bottom: 20, left: 6 };
+  const pageGeom = pg(600, 800);
+  const frame = { top: 10, right: 8, bottom: 20, left: 6 };
 
   it('linear vertical: pages sit inside their slots; bands reserved between pages', () => {
-    const scene = S.linearLayout([P, P], S.groupPages(2, 'none'), {
+    const scene = S.linearLayout([pageGeom, pageGeom], S.groupPages(2, 'none'), {
       axis: 'y',
       gap: 16,
-      pageFrame: m,
+      pageFrame: frame,
     });
     const p0 = scene.items[0].pages[0];
     const p1 = scene.items[1].pages[0];
@@ -562,27 +575,27 @@ describe('pageFrame: reserved chrome space around each PAGE', () => {
   });
 
   it('SPREADS: each page keeps its OWN flanks — left/right chrome works (the fix)', () => {
-    const scene = S.linearLayout([P, P], S.groupPages(2, 'odd'), {
+    const scene = S.linearLayout([pageGeom, pageGeom], S.groupPages(2, 'odd'), {
       axis: 'y',
       gap: 16,
-      pageFrame: m,
+      pageFrame: frame,
     });
-    const [a, b] = scene.items[0].pages;
-    // between the spread halves: a's right band + gap + b's left band
-    expect(b.x - (a.x + a.width)).toBeCloseTo(8 + 16 + 6, 6);
-    expect(a.x - scene.items[0].x).toBeCloseTo(6, 6); // outer flank too
+    const [first, second] = scene.items[0].pages;
+    // between the spread halves: first's right band + gap + second's left band
+    expect(second.x - (first.x + first.width)).toBeCloseTo(8 + 16 + 6, 6);
+    expect(first.x - scene.items[0].x).toBeCloseTo(6, 6); // outer flank too
   });
 
   it('RTL spread: slots mirror but margins stay PHYSICAL (left room stays mL)', () => {
-    const scene = S.linearLayout([P, P], S.groupPages(2, 'odd'), {
+    const scene = S.linearLayout([pageGeom, pageGeom], S.groupPages(2, 'odd'), {
       axis: 'y',
       gap: 16,
-      pageFrame: m,
+      pageFrame: frame,
       direction: 'rtl',
     });
     const item = scene.items[0];
-    const left = item.pages.find((p) => p.pageIndex === 1)!; // reading-second sits left
-    const right = item.pages.find((p) => p.pageIndex === 0)!;
+    const left = item.pages.find((box) => box.pageIndex === 1)!; // reading-second sits left
+    const right = item.pages.find((box) => box.pageIndex === 0)!;
     expect(left.x - item.x).toBeCloseTo(6, 6); // mL preserved at the item edge
     expect(right.x - (left.x + left.width)).toBeCloseTo(8 + 16 + 6, 6);
   });
@@ -592,7 +605,7 @@ describe('pageFrame: reserved chrome space around each PAGE', () => {
       axis: 'y',
       gap: 16,
       sizing: 'uniform',
-      pageFrame: m,
+      pageFrame: frame,
     });
     // page 1 scaled up to 1200 wide; both outer widths equal 1200 + 14
     expect(scene.items[0].pages[0].width).toBeCloseTo(1200, 6);
@@ -606,14 +619,14 @@ describe('gridLayout per-row heights (mixed page sizes)', () => {
   it('a row is as tall as ITS tallest item, not the global max (no giant voids)', () => {
     const pages = [
       pg(600, 800), // row 0
-      pg(600, 400), // row 0 (short — centers within ROW height)
+      pg(600, 400), // row 0 (short — centers within row height)
       pg(600, 1200), // row 1 (the global max)
       pg(600, 600), // row 1
     ];
     const scene = S.gridLayout(pages, S.groupPages(4, 'none'), { gap: 12, columns: 2 });
-    // row 0 is 800 tall (NOT 1200): row 1 starts right below it + gap
+    // row 0 is 800 tall (not 1200): row 1 starts right below it + gap
     expect(scene.items[2].y).toBeCloseTo(800 + 12, 6);
-    // the short page centers within its OWN row's height
+    // the short page centers within its own row's height
     expect(scene.items[1].y).toBeCloseTo((800 - 400) / 2, 6);
     expect(scene.items[3].y).toBeCloseTo(800 + 12 + (1200 - 600) / 2, 6);
     // scene height = sum of row heights + gap, not rows × global max
@@ -627,20 +640,20 @@ describe('gridLayout per-row heights (mixed page sizes)', () => {
 
 describe('gridLayout lineWidth (wrapped)', () => {
   const pages = Array.from({ length: 7 }, () => pg(600, 800));
-  const g = () => S.groupPages(7, 'none');
+  const groupSingles = () => S.groupPages(7, 'none');
   // cell = 600 wide, gap 48 → a column costs 648 of (lineWidth + 48)
 
   it('derives the column count from the line width', () => {
-    expect(S.gridLayout(pages, g(), { gap: 48, lineWidth: 1300 }).items[1].y).toBe(0); // 2 cols: item 1 in row 0
-    const two = S.gridLayout(pages, g(), { gap: 48, lineWidth: 1300 });
+    expect(S.gridLayout(pages, groupSingles(), { gap: 48, lineWidth: 1300 }).items[1].y).toBe(0); // 2 cols: item 1 in row 0
+    const two = S.gridLayout(pages, groupSingles(), { gap: 48, lineWidth: 1300 });
     expect(two.items[2].y).toBeGreaterThan(0); // …and item 2 wrapped to row 1
-    const three = S.gridLayout(pages, g(), { gap: 48, lineWidth: 2000 });
+    const three = S.gridLayout(pages, groupSingles(), { gap: 48, lineWidth: 2000 });
     expect(three.items[2].y).toBe(0); // 3 columns now
     expect(three.items[3].y).toBeGreaterThan(0);
   });
 
   it('never fewer than 1 column, never more than the item count', () => {
-    const narrow = S.gridLayout(pages, g(), { gap: 48, lineWidth: 100 });
+    const narrow = S.gridLayout(pages, groupSingles(), { gap: 48, lineWidth: 100 });
     expect(narrow.items.every((it, i) => i === 0 || it.y > narrow.items[i - 1].y)).toBe(true); // 1 col
     const wide = S.gridLayout(pages.slice(0, 3), S.groupPages(3, 'none'), {
       gap: 48,
@@ -650,7 +663,11 @@ describe('gridLayout lineWidth (wrapped)', () => {
   });
 
   it('wrapped + RTL fills each derived row right→left', () => {
-    const scene = S.gridLayout(pages, g(), { gap: 48, lineWidth: 1300, direction: 'rtl' });
+    const scene = S.gridLayout(pages, groupSingles(), {
+      gap: 48,
+      lineWidth: 1300,
+      direction: 'rtl',
+    });
     expect(scene.items[0].x).toBeGreaterThan(scene.items[1].x); // row 0: 0 right of 1
     expect(scene.items[2].y).toBeGreaterThan(scene.items[0].y); // row 1 below
   });
@@ -668,8 +685,8 @@ describe('groupPages', () => {
 });
 
 /*
- * `/UserUnit` (§14.11.6): a userUnit-5 page is PHYSICALLY 5× its point size.
- * It folds into the page's measured layout size AND its per-page
+ * PDF `/UserUnit` (§14.11.6): a userUnit-5 page is physically 5× its point size.
+ * It folds into the page's measured layout size and its per-page
  * `contentScale`, so "world units per content point" stays true for every
  * page — the invariant every content→world mapping depends on.
  */
@@ -685,7 +702,7 @@ describe('userUnit folds into layout size and per-page contentScale', () => {
     expect(plain.contentScale).toBe(1);
     expect(big.width).toBe(500); // lays out 5× larger, like Acrobat
     expect(big.height).toBe(1000);
-    expect(big.contentScale).toBe(5); // world per content POINT — per page
+    expect(big.contentScale).toBe(5); // world per content point — per page
     // the invariant: box extent ÷ contentScale recovers the point size
     expect(big.width / big.contentScale).toBe(100);
   });

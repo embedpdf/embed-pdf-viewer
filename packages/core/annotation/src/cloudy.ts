@@ -6,17 +6,17 @@
  * keep it because it visually matches what PDFium bakes into the `/BE` appearance
  * stream, so our live SVG preview and the saved PDF agree.
  *
- * What's v3-specific: this is a PURE function. It takes a content-space box plus
- * the border `intensity`/`strokeWidth` and returns SVG path data in ABSOLUTE
+ * This is a pure function. It takes a content-space box plus
+ * the border `intensity`/`strokeWidth` and returns SVG path data in absolute
  * content coordinates (the same space `geomScene`'s rect/ellipse nodes use). There
  * is no stored `/RD`, no border-style enum, no bbox bookkeeping — the inset is
  * derived (`cloudyBorderExtent`) and the outer edge of the scallops lands exactly
  * on the box, so the box stays the annotation's outer boundary (its `/Rect`).
  *
- * The internal math runs in PDFBox's y-UP frame; `PathBuilder` flips back to
+ * The internal math runs in PDFBox's y-up frame; `PathBuilder` flips back to
  * y-down and translates into the box's content-space origin on the way out.
  */
-import type { Rect, Vec } from './types';
+import type { Rect, Point } from './types';
 
 const ANGLE_180 = Math.PI;
 const ANGLE_90 = Math.PI / 2;
@@ -29,7 +29,7 @@ interface P {
   y: number;
 }
 
-const r = (n: number): string => Number(n.toFixed(4)).toString();
+const formatNumber = (value: number): string => Number(value.toFixed(4)).toString();
 
 /**
  * Accumulates SVG path commands. Input is PDFBox's y-up frame; output is y-down
@@ -44,12 +44,12 @@ class PathBuilder {
     private oy: number,
   ) {}
   moveTo(x: number, y: number): void {
-    this.parts.push(`M ${r(x + this.ox)} ${r(-y + this.oy)}`);
+    this.parts.push(`M ${formatNumber(x + this.ox)} ${formatNumber(-y + this.oy)}`);
     this.started = true;
   }
   curveTo(x1: number, y1: number, x2: number, y2: number, x3: number, y3: number): void {
     this.parts.push(
-      `C ${r(x1 + this.ox)} ${r(-y1 + this.oy)}, ${r(x2 + this.ox)} ${r(-y2 + this.oy)}, ${r(x3 + this.ox)} ${r(-y3 + this.oy)}`,
+      `C ${formatNumber(x1 + this.ox)} ${formatNumber(-y1 + this.oy)}, ${formatNumber(x2 + this.ox)} ${formatNumber(-y2 + this.oy)}, ${formatNumber(x3 + this.ox)} ${formatNumber(-y3 + this.oy)}`,
     );
   }
   close(): void {
@@ -62,30 +62,31 @@ class PathBuilder {
 
 /* ── geometry helpers ─────────────────────────────────────────────────────── */
 
-const distance = (a: P, b: P): number => Math.hypot(b.x - a.x, b.y - a.y);
+const distance = (left: P, right: P): number => Math.hypot(right.x - left.x, right.y - left.y);
 const cosine = (dx: number, hyp: number): number => (hyp === 0 ? 0 : dx / hyp);
 const sine = (dy: number, hyp: number): number => (hyp === 0 ? 0 : dy / hyp);
 
 /** Signed area (shoelace): positive = counter-clockwise. */
-function polygonDirection(pts: P[]): number {
-  let a = 0;
-  for (let i = 0; i < pts.length; i++) {
-    const j = (i + 1) % pts.length;
-    a += pts[i].x * pts[j].y - pts[i].y * pts[j].x;
+function polygonDirection(points: P[]): number {
+  let area = 0;
+  for (let i = 0; i < points.length; i++) {
+    const j = (i + 1) % points.length;
+    area += points[i].x * points[j].y - points[i].y * points[j].x;
   }
-  return a;
+  return area;
 }
-function ensurePositiveWinding(pts: P[]): void {
-  if (polygonDirection(pts) < 0) pts.reverse();
+function ensurePositiveWinding(points: P[]): void {
+  if (polygonDirection(points) < 0) points.reverse();
 }
 function removeZeroLengthSegments(polygon: P[]): P[] {
   if (polygon.length <= 2) return polygon;
   const tol = 0.5;
   const out: P[] = [polygon[0]];
   for (let i = 1; i < polygon.length; i++) {
-    const prev = out[out.length - 1];
-    const cur = polygon[i];
-    if (Math.abs(cur.x - prev.x) >= tol || Math.abs(cur.y - prev.y) >= tol) out.push(cur);
+    const previous = out[out.length - 1];
+    const current = polygon[i];
+    if (Math.abs(current.x - previous.x) >= tol || Math.abs(current.y - previous.y) >= tol)
+      out.push(current);
   }
   return out;
 }
@@ -174,10 +175,10 @@ function addCornerCurl(
   out: PathBuilder,
   addMoveTo: boolean,
 ): void {
-  const a = anglePrev + ANGLE_180 + alphaPrev;
-  const b = a - (22 * Math.PI) / 180;
-  arcSegment(a, b, cx, cy, radius, radius, out, addMoveTo);
-  getArc(b, angleCur - alpha, radius, radius, cx, cy, out, false);
+  const startAngle = anglePrev + ANGLE_180 + alphaPrev;
+  const joinAngle = startAngle - (22 * Math.PI) / 180;
+  arcSegment(startAngle, joinAngle, cx, cy, radius, radius, out, addMoveTo);
+  getArc(joinAngle, angleCur - alpha, radius, radius, cx, cy, out, false);
 }
 
 function addFirstIntermediateCurl(
@@ -188,18 +189,18 @@ function addFirstIntermediateCurl(
   cy: number,
   out: PathBuilder,
 ): void {
-  const a = angleCur + ANGLE_180;
-  arcSegment(a + alpha, a + alpha - ANGLE_30, cx, cy, rad, rad, out, false);
-  arcSegment(a + alpha - ANGLE_30, a + ANGLE_90, cx, cy, rad, rad, out, false);
-  arcSegment(a + ANGLE_90, a + ANGLE_180 - ANGLE_34, cx, cy, rad, rad, out, false);
+  const backAngle = angleCur + ANGLE_180;
+  arcSegment(backAngle + alpha, backAngle + alpha - ANGLE_30, cx, cy, rad, rad, out, false);
+  arcSegment(backAngle + alpha - ANGLE_30, backAngle + ANGLE_90, cx, cy, rad, rad, out, false);
+  arcSegment(backAngle + ANGLE_90, backAngle + ANGLE_180 - ANGLE_34, cx, cy, rad, rad, out, false);
 }
 
 function intermediateCurlTemplate(angleCur: number, rad: number): P[] {
-  const a = angleCur + ANGLE_180;
+  const backAngle = angleCur + ANGLE_180;
   return [
-    ...arcSegmentToArray(a + ANGLE_34, a + ANGLE_12, rad, rad),
-    ...arcSegmentToArray(a + ANGLE_12, a + ANGLE_90, rad, rad),
-    ...arcSegmentToArray(a + ANGLE_90, a + ANGLE_180 - ANGLE_34, rad, rad),
+    ...arcSegmentToArray(backAngle + ANGLE_34, backAngle + ANGLE_12, rad, rad),
+    ...arcSegmentToArray(backAngle + ANGLE_12, backAngle + ANGLE_90, rad, rad),
+    ...arcSegmentToArray(backAngle + ANGLE_90, backAngle + ANGLE_180 - ANGLE_34, rad, rad),
   ];
 }
 function outputCurlTemplate(template: P[], x: number, y: number, out: PathBuilder): void {
@@ -226,14 +227,14 @@ const polygonCloudRadius = (intensity: number, lineWidth: number): number =>
 
 function computeParamsPolygon(
   idealRadius: number,
-  k: number,
+  curlFactor: number,
   length: number,
 ): { n: number; adjustedRadius: number } {
   if (length === 0) return { n: -1, adjustedRadius: idealRadius };
-  const remaining = length - 2 * k * idealRadius;
+  const remaining = length - 2 * curlFactor * idealRadius;
   if (remaining <= 0) return { n: 0, adjustedRadius: idealRadius };
-  const n = Math.max(1, Math.ceil(remaining / (2 * k * idealRadius)));
-  return { n, adjustedRadius: remaining / (n * 2 * k) };
+  const curlCount = Math.max(1, Math.ceil(remaining / (2 * curlFactor * idealRadius)));
+  return { n: curlCount, adjustedRadius: remaining / (curlCount * 2 * curlFactor) };
 }
 
 function cloudyPolygonImpl(
@@ -245,12 +246,12 @@ function cloudyPolygonImpl(
 ): void {
   const polygon = removeZeroLengthSegments(vertices);
   ensurePositiveWinding(polygon);
-  const n = polygon.length;
-  if (n < 2) return;
+  const vertexCount = polygon.length;
+  if (vertexCount < 2) return;
 
   if (intensity <= 0) {
     out.moveTo(polygon[0].x, polygon[0].y);
-    for (let i = 1; i < n; i++)
+    for (let i = 1; i < vertexCount; i++)
       out.curveTo(
         polygon[i].x,
         polygon[i].y,
@@ -266,13 +267,13 @@ function cloudyPolygonImpl(
     ? ellipseCloudRadius(intensity, lineWidth)
     : polygonCloudRadius(intensity, lineWidth);
   if (idealRadius < 0.5) idealRadius = 0.5;
-  const k = Math.cos(ANGLE_34);
+  const curlFactor = Math.cos(ANGLE_34);
 
   const edgeAlphas: number[] = [];
-  for (let j = 0; j + 1 < n; j++) {
+  for (let j = 0; j + 1 < vertexCount; j++) {
     const len = distance(polygon[j], polygon[j + 1]);
     edgeAlphas.push(
-      len <= 0 || len >= 2 * k * idealRadius
+      len <= 0 || len >= 2 * curlFactor * idealRadius
         ? ANGLE_34
         : Math.acos(Math.min(1, len / (2 * idealRadius))),
     );
@@ -280,13 +281,13 @@ function cloudyPolygonImpl(
 
   let anglePrev = 0;
   let started = false;
-  for (let j = 0; j + 1 < n; j++) {
+  for (let j = 0; j + 1 < vertexCount; j++) {
     const pt = polygon[j];
     const ptNext = polygon[j + 1];
     const len = distance(pt, ptNext);
     if (len === 0) continue;
 
-    const params = computeParamsPolygon(idealRadius, k, len);
+    const params = computeParamsPolygon(idealRadius, curlFactor, len);
     if (params.n < 0) {
       if (!started) {
         out.moveTo(pt.x, pt.y);
@@ -296,11 +297,11 @@ function cloudyPolygonImpl(
     }
 
     const edgeRadius = Math.max(0.5, params.adjustedRadius);
-    const intermAdvance = 2 * k * edgeRadius;
-    const firstAdvance = k * idealRadius + k * edgeRadius;
+    const intermAdvance = 2 * curlFactor * edgeRadius;
+    const firstAdvance = curlFactor * idealRadius + curlFactor * edgeRadius;
     const angleCur = Math.atan2(ptNext.y - pt.y, ptNext.x - pt.x);
     if (j === 0) {
-      const ptPrev = polygon[n - 2];
+      const ptPrev = polygon[vertexCount - 2];
       anglePrev = Math.atan2(pt.y - ptPrev.y, pt.x - ptPrev.x);
     }
     const cos = cosine(ptNext.x - pt.x, len);
@@ -308,7 +309,7 @@ function cloudyPolygonImpl(
     let x = pt.x;
     let y = pt.y;
     const alpha = edgeAlphas[j];
-    const alphaPrev = edgeAlphas[j === 0 ? n - 2 : j - 1] ?? ANGLE_34;
+    const alphaPrev = edgeAlphas[j === 0 ? vertexCount - 2 : j - 1] ?? ANGLE_34;
 
     addCornerCurl(anglePrev, angleCur, idealRadius, pt.x, pt.y, alpha, alphaPrev, out, !started);
     started = true;
@@ -346,12 +347,12 @@ function flattenEllipse(left: number, bottom: number, right: number, top: number
   const ry = (top - bottom) / 2;
   if (rx <= 0 || ry <= 0) return [];
   const segments = Math.max(32, Math.ceil(Math.max(rx, ry) * 2));
-  const pts: P[] = [];
+  const points: P[] = [];
   for (let i = 0; i <= segments; i++) {
     const angle = (2 * Math.PI * i) / segments;
-    pts.push({ x: cx + rx * Math.cos(angle), y: cy + ry * Math.sin(angle) });
+    points.push({ x: cx + rx * Math.cos(angle), y: cy + ry * Math.sin(angle) });
   }
-  return pts;
+  return points;
 }
 
 function computeParamsEllipse(pt: P, ptNext: P, rad: number, curlAdv: number): number {
@@ -429,15 +430,15 @@ function cloudyEllipseImpl(
   let totLen = 0;
   for (let i = 1; i < flat.length; i++) totLen += distance(flat[i - 1], flat[i]);
 
-  const k = Math.cos(ANGLE_34);
-  let n = Math.ceil(totLen / (2 * k * cloudRadius));
-  if (n < 2) return plainEllipse();
+  const curlFactor = Math.cos(ANGLE_34);
+  let curlCount = Math.ceil(totLen / (2 * curlFactor * cloudRadius));
+  if (curlCount < 2) return plainEllipse();
 
-  let curlAdvance = totLen / n;
-  cloudRadius = curlAdvance / (2 * k);
+  let curlAdvance = totLen / curlCount;
+  cloudRadius = curlAdvance / (2 * curlFactor);
   if (cloudRadius < 0.5) {
     cloudRadius = 0.5;
-    curlAdvance = 2 * k * cloudRadius;
+    curlAdvance = 2 * curlFactor * cloudRadius;
   } else if (cloudRadius < 3.0) {
     return plainEllipse();
   }
@@ -455,11 +456,11 @@ function cloudyEllipseImpl(
     if (todo >= curlAdvance - toler || i === flat.length - 2) {
       const cos = cosine(p2.x - p1.x, segLen);
       const sin = sine(p2.y - p1.y, segLen);
-      let d = curlAdvance - remain;
+      let offset = curlAdvance - remain;
       while (todo >= curlAdvance - toler) {
-        centers.push({ x: p1.x + d * cos, y: p1.y + d * sin });
+        centers.push({ x: p1.x + offset * cos, y: p1.y + offset * sin });
         todo -= curlAdvance;
-        d += curlAdvance;
+        offset += curlAdvance;
       }
       remain = Math.max(0, todo);
     } else {
@@ -467,14 +468,14 @@ function cloudyEllipseImpl(
     }
   }
 
-  const m = centers.length;
+  const centerCount = centers.length;
   let anglePrev = 0;
   let alphaPrev = 0;
-  for (let i = 0; i < m; i++) {
+  for (let i = 0; i < centerCount; i++) {
     const pt = centers[i];
-    const ptNext = centers[(i + 1) % m];
+    const ptNext = centers[(i + 1) % centerCount];
     if (i === 0) {
-      const ptPrev = centers[m - 1];
+      const ptPrev = centers[centerCount - 1];
       anglePrev = Math.atan2(pt.y - ptPrev.y, pt.x - ptPrev.x);
       alphaPrev = computeParamsEllipse(ptPrev, pt, cloudRadius, curlAdvance);
     }
@@ -490,7 +491,7 @@ function cloudyEllipseImpl(
 
 /**
  * The per-side inset (content units) from a shape's outer box to the cloud's
- * inner boundary — the scallop radius plus half the stroke. This IS the `/RD`
+ * inner boundary — the scallop radius plus half the stroke. This is the `/RD`
  * the engine stores, and it's sized so the scallop peaks reach back out to the
  * box edge: the box remains the annotation's outer boundary.
  */
@@ -506,25 +507,24 @@ export function cloudyBorderExtent(
 }
 
 /**
- * SVG path data for a cloudy POLYGON border, in ABSOLUTE content coordinates.
- * Unlike the box kinds (whose scallops inset back INTO the outer box), a
- * polygon's curls are centred ON the vertex path and reach OUTWARD by the cloud
+ * SVG path data for a cloudy polygon border, in absolute content coordinates.
+ * Unlike the box kinds (whose scallops inset back into the outer box), a
+ * polygon's curls are centred on the vertex path and reach outward by the cloud
  * radius — the same rule PDFium's `GenerateCloudyPolygonPath` bakes into the
  * /AP, so the live preview and the saved appearance agree. The visual therefore
  * extends `cloudyBorderExtent` beyond the vertices (see `geomVisualBounds`).
  *
- * The v3 counterpart of v2's `generateCloudyPolygonPath` (same steps: y-flip,
- * close the ring, run the polygon core). Stroke it with ROUND joins — the curl
+ * The steps: y-flip, close the ring, run the polygon core. Stroke it with round joins — the curl
  * tails reverse direction by design, and `scene()` sets `join: 'round'` to
  * match PDFium's `1 j`; a miter join turns every seam into a spike.
  */
-export function cloudyPolyPath(points: Vec[], intensity: number, strokeWidth: number): string {
+export function cloudyPolyPath(points: Point[], intensity: number, strokeWidth: number): string {
   const out = new PathBuilder(0, 0);
   // Content space is y-down; the PDFBox core runs y-up (PathBuilder flips back).
-  const ring = points.map((p) => ({ x: p.x, y: -p.y }));
+  const ring = points.map((point) => ({ x: point.x, y: -point.y }));
   const first = ring[0];
   const last = ring[ring.length - 1];
-  // The impl walks edges of a CLOSED ring (first vertex repeated at the end).
+  // The impl walks edges of a closed ring (first vertex repeated at the end).
   if (first && (first.x !== last.x || first.y !== last.y)) ring.push({ ...first });
   cloudyPolygonImpl(ring, false, intensity, strokeWidth, out);
   out.close();
@@ -532,7 +532,7 @@ export function cloudyPolyPath(points: Vec[], intensity: number, strokeWidth: nu
 }
 
 /**
- * SVG path data for a cloudy square (rect) or circle (ellipse), in ABSOLUTE
+ * SVG path data for a cloudy square (rect) or circle (ellipse), in absolute
  * content coordinates. The scallops are generated on the box inset by
  * `cloudyBorderExtent` and bulge back out to `box`'s edge.
  */

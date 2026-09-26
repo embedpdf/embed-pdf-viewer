@@ -6,9 +6,9 @@
  * EmbedPDF.init({ target: '#viewer', src: '/report.pdf' });
  * ```
  *
- * The kernel plus ONE side effect: the built-in local PDFium engine registered
+ * The kernel plus one side effect: the built-in local PDFium engine registered
  * as the element's default, so `init()` needs no `engine:`. Because that engine
- * IS in this graph, this door's `engine` field is optional and also accepts its
+ * is in this graph, this door's `engine` field is optional and also accepts its
  * plain-data options bag (self-hosted wasm, strict-CSP worker URLs). Builds
  * that always inject their own engine import `@embedpdf/viewer/core` instead
  * and never pull the local engine in.

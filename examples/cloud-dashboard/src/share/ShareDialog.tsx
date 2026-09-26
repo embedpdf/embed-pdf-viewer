@@ -1,7 +1,8 @@
+import type { Identity } from '@embedpdf/engine-core';
 import { useMemo, useState } from 'react';
 
 import { api } from '../api/client';
-import type { Share, ShareIdentity } from '../api/types';
+import type { Share } from '../api/types';
 import { useStore } from '../state/store';
 import { Badge, Button, Spinner, cx } from '../ui/primitives';
 import { CUSTOM_ROLE_ID, DEFAULT_ROLE_ID, ROLES, materializeScopes, roleById } from './roles';
@@ -35,11 +36,11 @@ export function ShareDialog({
   const { tenantId, addShare } = useStore();
   const [name, setName] = useState('Alice');
   const [roleId, setRoleId] = useState(DEFAULT_ROLE_ID);
-  const [identity, setIdentity] = useState<ShareIdentity>({
-    user_id: 'alice',
-    group_id: 'legal',
+  const [identity, setIdentity] = useState<Identity>({
+    userId: 'alice',
+    groupId: 'legal',
     groups: ['legal'],
-    display_name: 'Alice',
+    displayName: 'Alice',
   });
   const [sharedLayer, setSharedLayer] = useState(false);
   const [ttlMinutes, setTtlMinutes] = useState(60);
@@ -62,7 +63,7 @@ export function ShareDialog({
   // costs nothing (an unwritten layer inherits every plane, so it shares the
   // base's URLs and needs no worker session). A shared layer is how two people
   // collaborate — same annotations, live-synced.
-  const layerName = sharedLayer ? 'default' : identity.user_id || 'guest';
+  const layerName = sharedLayer ? 'default' : identity.userId || 'guest';
 
   const setScope = (scope: string, on: boolean) => {
     const next = new Set(scopes);
@@ -161,24 +162,24 @@ export function ShareDialog({
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="User ID" hint="Binds “own comments” grants">
                 <input
-                  value={identity.user_id ?? ''}
-                  onChange={(e) => setIdentity({ ...identity, user_id: e.target.value })}
+                  value={identity.userId ?? ''}
+                  onChange={(e) => setIdentity({ ...identity, userId: e.target.value })}
                   className={INPUT}
                 />
               </Field>
               <Field label="Group" hint="Acts as, and is a member of">
                 <input
-                  value={identity.group_id ?? ''}
+                  value={identity.groupId ?? ''}
                   onChange={(e) => {
-                    // Two different claims, one field: `group_id` is the group
+                    // Two different fields, one input: `groupId` is the group
                     // this person WRITES as, `groups` is the membership that
                     // grants authority over the group's rows. A group grant
                     // checks BOTH (see `filterMatches`), so setting only
-                    // `group_id` produces a role that can't edit anything.
+                    // `groupId` produces a role that can't edit anything.
                     const group = e.target.value.trim();
                     setIdentity({
                       ...identity,
-                      group_id: group,
+                      groupId: group,
                       ...(group ? { groups: [group] } : { groups: [] }),
                     });
                   }}

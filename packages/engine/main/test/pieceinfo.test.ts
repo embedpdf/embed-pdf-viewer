@@ -65,7 +65,7 @@ describe('pieceInfo update preflight: engine-local', () => {
         await expect(doc.pieceInfo!.update(application, patch)).rejects.toMatchObject({
           code: EngineErrorCode.InvalidArg,
         });
-        expect((await doc.pieceInfo!.read(application))!.entries).toEqual({
+        expect((await doc.pieceInfo!.get(application))!.entries).toEqual({
           seed: { type: 'string', value: 'before' },
         });
       }

@@ -1,8 +1,8 @@
 /**
- * <PageView> — a single page surface with NO Stage.
+ * <PageView> — a single page surface with no Stage.
  *
  * Same layers + rotation + chrome frame as a `<Stage>` page, but no
- * camera/scroll/zoom and, crucially, NO dependency on `@embedpdf/plugin-stage`.
+ * camera/scroll/zoom and, crucially, no dependency on `@embedpdf/plugin-stage`.
  * It builds its own `PageTransform` from a target content width and shares the
  * exact `PageContext` seam, so every layer (RenderLayer, AnnotationLayer, …)
  * works here identically — and it provides the measured `ViewProjector`, so
@@ -29,7 +29,7 @@ export type PageViewProps = {
   documentId?: string;
   /** Shown while the document or the page is not available yet (default: nothing). */
   fallback?: React.ReactNode;
-  /** Target width for the page CONTENT; the display box is the rotated footprint. */
+  /** Target width for the page content; the display box is the rotated footprint. */
   width?: number;
   /** Reserved chrome bands around the page (screen px) — same model as `<Stage>`. */
   pageFrame?: PageFrame;
@@ -51,7 +51,7 @@ export type PageViewProps = {
     }
 );
 
-/** A single page surface with NO Stage — same layers + rotation + chrome frame,
+/** A single page surface with no Stage — same layers + rotation + chrome frame,
  *  no camera/scroll/zoom. */
 export function PageView(props: PageViewProps) {
   const {
@@ -71,13 +71,13 @@ export function PageView(props: PageViewProps) {
   // The page-registry entry, subscribed: a rotate or a reorder re-renders
   // this surface like it re-renders a Stage page. Entries are reference-
   // stable per page in the registry, so identity is the right equality.
-  const wantedPon = wantedRef?.pageObjectNumber ?? null;
-  const base = useKernelValue((k) => {
+  const wantedPageObjectNumber = wantedRef?.pageObjectNumber ?? null;
+  const base = useKernelValue((kernel) => {
     if (!docId) return null;
-    const pages = k.documents.listPages(docId);
+    const pages = kernel.documents.listPages(docId);
     const found =
-      wantedPon !== null
-        ? pages.find((p) => p.ref.pageObjectNumber === wantedPon)
+      wantedPageObjectNumber !== null
+        ? pages.find((pageInfo) => pageInfo.ref.pageObjectNumber === wantedPageObjectNumber)
         : pages[wantedIndex ?? 0];
     return found ?? null;
   });
@@ -87,8 +87,8 @@ export function PageView(props: PageViewProps) {
   // surface renders the fallback before that anyway. Memoized by the number so
   // the context's `ref` stays identity-stable across re-renders (layers key
   // effects on it).
-  const pon = base?.ref.pageObjectNumber ?? wantedPon ?? page + 1;
-  const pageRef = useMemo(() => toPageRef(pon), [pon]);
+  const pageObjectNumber = base?.ref.pageObjectNumber ?? wantedPageObjectNumber ?? page + 1;
+  const pageRef = useMemo(() => toPageRef(pageObjectNumber), [pageObjectNumber]);
   const rotation = base?.rotation ?? 0;
   const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
   // Standalone (no Stage/camera): build the page's transform from the target
@@ -109,7 +109,7 @@ export function PageView(props: PageViewProps) {
       }),
     [base?.size.width, base?.size.height, base?.userUnit, rotation, width, dpr],
   );
-  // This instance's VIEW identity: two PageViews of the same page (a compare
+  // This instance's view identity: two PageViews of the same page (a compare
   // strip) must plan rasters independently, like two stage lenses do.
   const viewId = useId();
   const ctx = useMemo(
@@ -120,7 +120,7 @@ export function PageView(props: PageViewProps) {
     [docId, pageRef, page, pageFrame, transform, viewId],
   );
   // The PageView's ViewProjector: no camera, so anchored UI positions by
-  // MEASURING the DOM (client space → portal + position:fixed, immune to
+  // measuring the DOM (client space → portal + position:fixed, immune to
   // ancestor overflow clipping). `toScreen` answers null until the page
   // element has committed — <Anchored> forces one post-commit pass to pick
   // it up. The binding's revision covers state-driven changes (a new
@@ -130,12 +130,12 @@ export function PageView(props: PageViewProps) {
   const projector = useMemo<ViewProjector>(
     () => ({
       space: 'client',
-      toScreen: (p, rect) =>
-        pageRefsEqual(p, ctx.ref) && ref.current ? ctx.toClientRect(rect) : null,
-      toScreenPoint: (p, at) =>
-        pageRefsEqual(p, ctx.ref) && ref.current ? ctx.toClientPoint(at) : null,
-      viewEnv: (p) =>
-        pageRefsEqual(p, ctx.ref)
+      toScreen: (page, rect) =>
+        pageRefsEqual(page, ctx.ref) && ref.current ? ctx.toClientRect(rect) : null,
+      toScreenPoint: (page, at) =>
+        pageRefsEqual(page, ctx.ref) && ref.current ? ctx.toClientPoint(at) : null,
+      viewEnv: (page) =>
+        pageRefsEqual(page, ctx.ref)
           ? {
               scale: ctx.transform.viewScale,
               rotation: ctx.transform.rotation,
@@ -150,11 +150,10 @@ export function PageView(props: PageViewProps) {
     [projector, ctx],
   );
   if (!docId || !base) return <>{fallback}</>;
-  const t = transform;
-  const outerW = t.viewWidth + pageFrame.left + pageFrame.right;
-  const outerH = t.viewHeight + pageFrame.top + pageFrame.bottom;
-  const contentLeft = pageFrame.left + (t.viewWidth - t.contentWidth) / 2;
-  const contentTop = pageFrame.top + (t.viewHeight - t.contentHeight) / 2;
+  const outerW = transform.viewWidth + pageFrame.left + pageFrame.right;
+  const outerH = transform.viewHeight + pageFrame.top + pageFrame.bottom;
+  const contentLeft = pageFrame.left + (transform.viewWidth - transform.contentWidth) / 2;
+  const contentTop = pageFrame.top + (transform.viewHeight - transform.contentHeight) / 2;
   return (
     <DocumentScope id={docId}>
       <ProjectorProvider value={projectorBinding}>
@@ -166,8 +165,8 @@ export function PageView(props: PageViewProps) {
                 position: 'absolute',
                 left: pageFrame.left,
                 top: pageFrame.top,
-                width: t.viewWidth,
-                height: t.viewHeight,
+                width: transform.viewWidth,
+                height: transform.viewHeight,
                 boxShadow: 'var(--epdf-page-shadow, 0 6px 18px rgba(0,0,0,.18))',
               }}
             />
@@ -178,8 +177,8 @@ export function PageView(props: PageViewProps) {
                 position: 'absolute',
                 left: contentLeft,
                 top: contentTop,
-                width: t.contentWidth,
-                height: t.contentHeight,
+                width: transform.contentWidth,
+                height: transform.contentHeight,
                 background: '#fff',
                 transform: rotation ? `rotate(${rotation}deg)` : undefined,
                 userSelect: 'none',

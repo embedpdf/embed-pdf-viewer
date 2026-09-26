@@ -2,17 +2,20 @@
 import { anchoredGeom, anchoredStrokeWidth, anchorModeOf } from './anchor';
 import { geomRotation, isRotatableGeom, selectionQuad } from './geometry';
 import { measurementSelectionQuad } from './measurement-shape';
-import type { Annot, Quad, Vec, ViewEnv } from './types';
+import type { ModelAnnotation, Quad, Point, ViewEnv } from './types';
 
 export interface SelectionFrame {
   corners: Quad;
-  center: Vec;
+  center: Point;
   angle: number;
 }
 
-export function annotationSelectionFrame(annotation: Annot, view?: ViewEnv): SelectionFrame {
+export function annotationSelectionFrame(
+  annotation: ModelAnnotation,
+  view?: ViewEnv,
+): SelectionFrame {
   const mode = anchorModeOf(annotation);
-  const geometry = anchoredGeom(annotation.geom, mode, view);
+  const geometry = anchoredGeom(annotation.geometry, mode, view);
   const strokeWidth = anchoredStrokeWidth(annotation.style.strokeWidth, mode, view);
   const corners = annotation.measure
     ? measurementSelectionQuad(geometry, annotation.measure, { ...annotation.style, strokeWidth })

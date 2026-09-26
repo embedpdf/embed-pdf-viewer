@@ -44,19 +44,19 @@ describe('resolveFieldSelection — the shared ISO selection (Tables 239-242)', 
   const all = [
     field('parent.c1'),
     field('parent.c2'),
-    field('parentheses'), // the dot-prefix guard: NOT a descendant of `parent`
+    field('parentheses'), // the dot-prefix guard: Not a descendant of `parent`
     field('other'),
     field('byNumber', { fieldObjectNumber: 42 }),
   ];
 
   it('a parent NAME selects its descendants (the exact-match bug, fixed)', () => {
     const { selected } = resolveFieldSelection(all, [{ kind: 'name', name: 'parent' }], false);
-    expect(selected.map((f) => f.name)).toEqual(['parent.c1', 'parent.c2']);
+    expect(selected.map((field) => field.name)).toEqual(['parent.c1', 'parent.c2']);
   });
 
   it('exclude mode removes the same subtree', () => {
     const { selected } = resolveFieldSelection(all, [{ kind: 'name', name: 'parent' }], true);
-    expect(selected.map((f) => f.name)).toEqual(['parentheses', 'other', 'byNumber']);
+    expect(selected.map((field) => field.name)).toEqual(['parentheses', 'other', 'byNumber']);
   });
 
   it('objectNumber targets select the field dictionary', () => {
@@ -65,7 +65,7 @@ describe('resolveFieldSelection — the shared ISO selection (Tables 239-242)', 
       [{ kind: 'objectNumber', objectNumber: 42 }],
       false,
     );
-    expect(selected.map((f) => f.name)).toEqual(['byNumber']);
+    expect(selected.map((field) => field.name)).toEqual(['byNumber']);
   });
 
   it('null = key absent = everything, flag ignored; [] include = NOTHING; [] exclude = everything', () => {
@@ -76,9 +76,12 @@ describe('resolveFieldSelection — the shared ISO selection (Tables 239-242)', 
 });
 
 describe('buildSubmitEntries — the ISO dataset matrix', () => {
-  const diagnostics = (): { list: ActionDiagnostic[]; diagnose: (d: ActionDiagnostic) => void } => {
+  const diagnostics = (): {
+    list: ActionDiagnostic[];
+    diagnose: (diagnostic: ActionDiagnostic) => void;
+  } => {
     const list: ActionDiagnostic[] = [];
-    return { list, diagnose: (d) => list.push(d) };
+    return { list, diagnose: (diagnostic) => list.push(diagnostic) };
   };
 
   it('fields-absent submits everything eligible: NoExport and push-buttons SILENTLY out', () => {
@@ -112,7 +115,10 @@ describe('buildSubmitEntries — the ISO dataset matrix', () => {
     );
     expect(entries).toEqual([{ name: 'plain', value: 'plain-value' }]);
     expect(
-      list.some((d) => d.code === 'submit-entry-unsupported' && /NoExport/.test(d.message)),
+      list.some(
+        (diagnostic) =>
+          diagnostic.code === 'submit-entry-unsupported' && /NoExport/.test(diagnostic.message),
+      ),
     ).toBe(true);
   });
 
@@ -124,7 +130,7 @@ describe('buildSubmitEntries — the ISO dataset matrix', () => {
       diagnose,
     );
     expect(entries).toEqual([]);
-    expect(list.some((d) => d.code === 'submit-entry-unsupported')).toBe(true);
+    expect(list.some((diagnostic) => diagnostic.code === 'submit-entry-unsupported')).toBe(true);
   });
 
   it('an unsupported /V shape is ALWAYS diagnosed (silent omission = data loss)', () => {
@@ -135,7 +141,7 @@ describe('buildSubmitEntries — the ISO dataset matrix', () => {
       diagnose,
     );
     expect(entries).toEqual([{ name: 'plain', value: 'plain-value' }]);
-    expect(list.some((d) => d.code === 'submit-entry-unsupported')).toBe(true);
+    expect(list.some((diagnostic) => diagnostic.code === 'submit-entry-unsupported')).toBe(true);
   });
 
   it('IncludeNoValueFields turns valueless fields into name-only entries', () => {

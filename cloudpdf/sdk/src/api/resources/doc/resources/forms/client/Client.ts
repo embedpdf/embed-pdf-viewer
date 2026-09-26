@@ -23,7 +23,7 @@ export class FormsClient {
     }
 
     /**
-     * @param {CloudPDF.doc.GetFormsRequest} request
+     * @param {CloudPDF.doc.ListFormsRequest} request
      * @param {FormsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link CloudPDF.NotFoundError}
@@ -31,22 +31,22 @@ export class FormsClient {
      * @throws {@link errors.CloudPDFTimeoutError}
      *
      * @example
-     *     await client.doc.forms.get({
+     *     await client.doc.forms.list({
      *         docId: "docId",
      *         layerName: "layerName"
      *     })
      */
-    public get(
-        request: CloudPDF.doc.GetFormsRequest,
+    public list(
+        request: CloudPDF.doc.ListFormsRequest,
         requestOptions?: FormsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocFormsGet200Response> {
-        return core.HttpResponsePromise.fromPromise(this.__get(request, requestOptions));
+    ): core.HttpResponsePromise<CloudPDF.DocFormsList200Response> {
+        return core.HttpResponsePromise.fromPromise(this.__list(request, requestOptions));
     }
 
-    private async __get(
-        request: CloudPDF.doc.GetFormsRequest,
+    private async __list(
+        request: CloudPDF.doc.ListFormsRequest,
         requestOptions?: FormsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocFormsGet200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocFormsList200Response>> {
         const { docId, layerName, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -71,7 +71,7 @@ export class FormsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.DocFormsGet200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.DocFormsList200Response, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {

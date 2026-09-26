@@ -9,20 +9,20 @@ import { PAGE_INSERT_BLANK_MAX_COUNT } from '../mutation/PageInsertBlankInput';
 const SIZE = { width: 396, height: 612 };
 
 /**
- * Blank-page insert conformance. `pages.insertBlank` is a REQUIRED member —
+ * Blank-page insert conformance. `pages.insertBlank` is a required member —
  * the suite runs unconditionally on every engine (no fixture bytes are
  * needed at all, which is the point of the verb), so an implementation that
  * loses the verb fails loudly instead of being skipped past.
  *
  * Invariants:
- *   1. `count` blank pages of exactly `size` appear at `destIndex` (omitted
- *      → append), rotation 0; the result lists their fresh PONs in insertion
+ *   1. `count` blank pages of exactly `size` appear at `toIndex` (omitted
+ *      → append), rotation 0; the result lists their fresh page object numbers in insertion
  *      order and they agree with the returned layout.
- *   2. Pre-existing pages keep their identity: same PONs before and after,
+ *   2. Pre-existing pages keep their identity: same page object numbers before and after,
  *      in the expected positions (an insert never invalidates neighbours).
  *   3. The mutation persists through save → re-open (bytes engines only).
  *   4. Non-positive size / count outside [1, PAGE_INSERT_BLANK_MAX_COUNT] /
- *      out-of-range destIndex reject with InvalidArg, leaving the document
+ *      out-of-range toIndex reject with InvalidArg, leaving the document
  *      untouched.
  */
 export function runPageInsertBlankConformance(
@@ -46,7 +46,7 @@ export function runPageInsertBlankConformance(
       const doc = await openFixture(engine, opts);
       try {
         const before = await doc.pages.list();
-        const beforePons = before.pages.map((p) => p.ref.pageObjectNumber);
+        const beforePageObjectNumbers = before.pages.map((p) => p.ref.pageObjectNumber);
 
         const result = await doc.pages.insertBlank({ size: SIZE });
         expect(result.insertedPages.length).toBe(1);
@@ -54,12 +54,12 @@ export function runPageInsertBlankConformance(
         // Existing pages: same identity, same leading positions.
         expect(
           result.layout.pages.slice(0, before.pageCount).map((p) => p.ref.pageObjectNumber),
-        ).toEqual(beforePons);
-        // The appended page is a FRESH object number at the tail.
-        const newPon = result.insertedPages[0].pageObjectNumber;
-        expect(beforePons.includes(newPon)).toBe(false);
+        ).toEqual(beforePageObjectNumbers);
+        // The appended page is a fresh object number at the tail.
+        const newPageObjectNumber = result.insertedPages[0].pageObjectNumber;
+        expect(beforePageObjectNumbers.includes(newPageObjectNumber)).toBe(false);
         const appended = result.layout.pages[before.pageCount];
-        expect(appended.ref.pageObjectNumber).toBe(newPon);
+        expect(appended.ref.pageObjectNumber).toBe(newPageObjectNumber);
         expect(appended.size).toEqual(SIZE);
         expect(appended.rotation).toBe(0);
       } finally {
@@ -67,22 +67,24 @@ export function runPageInsertBlankConformance(
       }
     });
 
-    test('destIndex + count places the blank block mid-document', async () => {
+    test('toIndex + count places the blank block mid-document', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const before = await doc.pages.list();
         if (before.pages.length < 2) return;
-        const beforePons = before.pages.map((p) => p.ref.pageObjectNumber);
+        const beforePageObjectNumbers = before.pages.map((p) => p.ref.pageObjectNumber);
 
         const result = await doc.pages.insertBlank({ size: SIZE, count: 2 }, 1);
         expect(result.insertedPages.length).toBe(2);
         expect(
           result.insertedPages[0].pageObjectNumber === result.insertedPages[1].pageObjectNumber,
         ).toBe(false);
-        const pons = result.layout.pages.map((p) => p.ref.pageObjectNumber);
-        expect(pons[0]).toBe(beforePons[0]);
-        expect(pons.slice(1, 3)).toEqual(result.insertedPages.map((p) => p.pageObjectNumber));
-        expect(pons.slice(3)).toEqual(beforePons.slice(1));
+        const pageObjectNumbers = result.layout.pages.map((p) => p.ref.pageObjectNumber);
+        expect(pageObjectNumbers[0]).toBe(beforePageObjectNumbers[0]);
+        expect(pageObjectNumbers.slice(1, 3)).toEqual(
+          result.insertedPages.map((p) => p.pageObjectNumber),
+        );
+        expect(pageObjectNumbers.slice(3)).toEqual(beforePageObjectNumbers.slice(1));
         expect(result.layout.pages[1].size).toEqual(SIZE);
         expect(result.layout.pages[2].size).toEqual(SIZE);
       } finally {
@@ -115,7 +117,7 @@ export function runPageInsertBlankConformance(
       }
     });
 
-    test('non-positive size, bad count, and out-of-range destIndex reject with InvalidArg', async () => {
+    test('non-positive size, bad count, and out-of-range toIndex reject with InvalidArg', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const before = await doc.pages.list();

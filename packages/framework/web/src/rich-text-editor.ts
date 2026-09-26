@@ -1,5 +1,5 @@
 /**
- * Rich text editor binding — the ONE contentEditable mechanics module for a
+ * Rich text editor binding — the one contentEditable mechanics module for a
  * FreeText annotation, shared by every framework adapter (React, Angular,
  * Vue, Svelte…) so editing can never drift between them:
  *
@@ -12,7 +12,7 @@
  *   • hold re-renders during IME composition, paste as plain text, forward
  *     Cmd/Ctrl+B/I/U as commands
  *
- * The browser owns typing; this module only translates. The POLICY — what a
+ * The browser owns typing; this module only translates. The policy — what a
  * command does to the document, when to commit, what a family maps to —
  * belongs to the host (the annotation plugin), reached through the
  * structural {@link RichTextEditorHost}: @embedpdf/web imports no plugin,
@@ -23,9 +23,9 @@
  * runs concatenated, a hard break inside a run is a `\r` too. The same
  * arithmetic the core's run algebra uses.
  *
- * Known limits (by design, recorded in the plan): the browser's native undo
- * stack does not span a host-driven restyle; DOM line wrapping approximates
- * the engine's layout, the appearance stream is the truth.
+ * Known limits, by design: the browser's native undo stack does not span a
+ * host-driven restyle; DOM line wrapping approximates the engine's layout,
+ * the appearance stream is the truth.
  */
 
 import { observeWebFonts } from './web-font';
@@ -173,17 +173,17 @@ function lastChild(node: EditorNode): EditorNode | undefined {
  * Chrome does for a new styled line. Every other break is a hard line break.
  */
 function isTrailingBreak(node: EditorNode, root: EditorNode): boolean {
-  for (let n: EditorNode = node; ; ) {
-    const parent = n.parentNode;
+  for (let current: EditorNode = node; ; ) {
+    const parent = current.parentNode;
     if (!parent) return false;
-    if (lastChild(parent) !== n) return false;
+    if (lastChild(parent) !== current) return false;
     if (parent === root || isBlock(parent)) return true;
-    n = parent;
+    current = parent;
   }
 }
 
 function contains(root: EditorNode, node: EditorNode | null | undefined): boolean {
-  for (let n = node; n; n = n.parentNode) if (n === root) return true;
+  for (let current = node; current; current = current.parentNode) if (current === root) return true;
   return false;
 }
 
@@ -195,13 +195,13 @@ const RGB = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i;
 function cssColorToHex(css: string): string | undefined {
   const trimmed = css.trim();
   if (HEX.test(trimmed)) return trimmed.toUpperCase();
-  const m = RGB.exec(trimmed);
-  if (!m) return undefined;
-  const hex = (n: string) =>
-    Math.max(0, Math.min(255, Number(n)))
+  const match = RGB.exec(trimmed);
+  if (!match) return undefined;
+  const hex = (channel: string) =>
+    Math.max(0, Math.min(255, Number(channel)))
       .toString(16)
       .padStart(2, '0');
-  return `#${hex(m[1]!)}${hex(m[2]!)}${hex(m[3]!)}`.toUpperCase();
+  return `#${hex(match[1]!)}${hex(match[2]!)}${hex(match[3]!)}`.toUpperCase();
 }
 
 function firstFamily(css: string): string | undefined {
@@ -212,8 +212,8 @@ function firstFamily(css: string): string | undefined {
   return first ? first : undefined;
 }
 
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 /** The inline style declarations a span carries, as a style delta. Only what
@@ -231,7 +231,10 @@ export function styleDeltaOf(style: EditorStyle | undefined, scale: number): Ric
   if (decoration) {
     delta.decoration = decoration
       .split(/\s+/)
-      .filter((p): p is 'underline' | 'line-through' => p === 'underline' || p === 'line-through');
+      .filter(
+        (keyword): keyword is 'underline' | 'line-through' =>
+          keyword === 'underline' || keyword === 'line-through',
+      );
   }
   if (style.color) {
     const hex = cssColorToHex(style.color);
@@ -263,7 +266,9 @@ function applyStyleDelta(
   if (delta.weight !== undefined) style.fontWeight = String(delta.weight);
   if (delta.italic !== undefined) style.fontStyle = delta.italic ? 'italic' : 'normal';
   if (delta.decoration !== undefined) {
-    const lines = delta.decoration.map((d) => (d === 'word' ? 'underline' : d));
+    const lines = delta.decoration.map((decoration) =>
+      decoration === 'word' ? 'underline' : decoration,
+    );
     style.textDecoration = lines.length ? [...new Set(lines)].join(' ') : 'none';
   }
   if (delta.color !== undefined) style.color = delta.color;
@@ -283,11 +288,11 @@ function mergeDelta(base: RichTextEditorStyle, over: RichTextEditorStyle): RichT
 }
 
 function sameDelta(
-  a: RichTextEditorStyle | undefined,
-  b: RichTextEditorStyle | undefined,
+  left: RichTextEditorStyle | undefined,
+  right: RichTextEditorStyle | undefined,
 ): boolean {
-  const da = (a ?? {}) as Record<string, unknown>;
-  const db = (b ?? {}) as Record<string, unknown>;
+  const da = (left ?? {}) as Record<string, unknown>;
+  const db = (right ?? {}) as Record<string, unknown>;
   const keys = new Set([...Object.keys(da), ...Object.keys(db)]);
   for (const key of keys) {
     const va = da[key];
@@ -490,20 +495,22 @@ export function offsetOfPosition(root: EditorNode, position: EditorPosition): nu
   if (!contains(root, position.node)) return 0;
   const events = collectOffsets(root);
   if (position.node.nodeType === TEXT_NODE) {
-    const event = events.find((e) => e.kind === 'text' && e.node === position.node);
+    const event = events.find((event) => event.kind === 'text' && event.node === position.node);
     return event ? event.at + Math.min(position.offset, event.length) : 0;
   }
   if (isBreak(position.node)) {
-    const event = events.find((e) => e.kind === 'break' && e.node === position.node);
+    const event = events.find((event) => event.kind === 'break' && event.node === position.node);
     if (event) return event.at + (position.offset > 0 ? 1 : 0);
-    const exit = events.find((e) => e.kind === 'exit' && e.node === position.node.parentNode);
+    const exit = events.find(
+      (event) => event.kind === 'exit' && event.node === position.node.parentNode,
+    );
     return exit ? exit.at : 0;
   }
   // An element position: before its Nth child, or past its last child.
   const child = position.node.childNodes[position.offset];
   if (child) {
     const event = events.find(
-      (e) => e.node === child || (e.kind !== 'exit' && contains(child, e.node)),
+      (event) => event.node === child || (event.kind !== 'exit' && contains(child, event.node)),
     );
     if (event) return event.at;
   }
@@ -511,7 +518,7 @@ export function offsetOfPosition(root: EditorNode, position: EditorPosition): nu
     const last = events[events.length - 1];
     return last ? last.at + last.length : 0;
   }
-  const exit = events.find((e) => e.kind === 'exit' && e.node === position.node);
+  const exit = events.find((event) => event.kind === 'exit' && event.node === position.node);
   return exit ? exit.at : 0;
 }
 
@@ -524,17 +531,21 @@ function indexIn(parent: EditorNode, node: EditorNode): number {
  *  else the empty block / the slot after a hard break the offset names. */
 export function positionOfOffset(root: EditorNode, offset: number): EditorPosition | null {
   const events = collectOffsets(root);
-  const text = events.find((e) => e.kind === 'text' && offset >= e.at && offset <= e.at + e.length);
+  const text = events.find(
+    (event) => event.kind === 'text' && offset >= event.at && offset <= event.at + event.length,
+  );
   if (text) return { node: text.node, offset: offset - text.at };
-  const block = events.find((e) => e.kind === 'enter' && isBlock(e.node) && e.at === offset);
+  const block = events.find(
+    (event) => event.kind === 'enter' && isBlock(event.node) && event.at === offset,
+  );
   if (block) return { node: block.node, offset: 0 };
-  const after = events.find((e) => e.kind === 'break' && e.at + 1 === offset);
+  const after = events.find((event) => event.kind === 'break' && event.at + 1 === offset);
   if (after && after.node.parentNode) {
     return { node: after.node.parentNode, offset: indexIn(after.node.parentNode, after.node) + 1 };
   }
   for (let i = events.length - 1; i >= 0; i--) {
-    const e = events[i]!;
-    if (e.kind === 'text') return { node: e.node, offset: e.length };
+    const event = events[i]!;
+    if (event.kind === 'text') return { node: event.node, offset: event.length };
   }
   const first = root.childNodes[0];
   return first ? { node: first, offset: 0 } : null;
@@ -552,12 +563,14 @@ interface RangeLike {
 
 /** The selection's range as the shadow tree sees it: the standard
  *  `getComposedRanges` (options form, then the earlier positional form). */
-function composedRange(sel: Selection, shadowRoot: ShadowRoot): RangeLike | null {
-  const s = sel as Selection & { getComposedRanges?: (...args: unknown[]) => RangeLike[] };
-  if (typeof s.getComposedRanges !== 'function') return null;
+function composedRange(selection: Selection, shadowRoot: ShadowRoot): RangeLike | null {
+  const composable = selection as Selection & {
+    getComposedRanges?: (...args: unknown[]) => RangeLike[];
+  };
+  if (typeof composable.getComposedRanges !== 'function') return null;
   for (const args of [[{ shadowRoots: [shadowRoot] }], [shadowRoot]]) {
     try {
-      const ranges = s.getComposedRanges(...args);
+      const ranges = composable.getComposedRanges(...args);
       if (ranges.length) return ranges[0]!;
     } catch {
       // an engine with the other signature
@@ -566,11 +579,11 @@ function composedRange(sel: Selection, shadowRoot: ShadowRoot): RangeLike | null
   return null;
 }
 
-function documentsEqual(a: RichTextEditorDocument, b: RichTextEditorDocument): boolean {
-  if (a.paragraphs.length !== b.paragraphs.length) return false;
-  for (let i = 0; i < a.paragraphs.length; i++) {
-    const pa = a.paragraphs[i]!;
-    const pb = b.paragraphs[i]!;
+function documentsEqual(left: RichTextEditorDocument, right: RichTextEditorDocument): boolean {
+  if (left.paragraphs.length !== right.paragraphs.length) return false;
+  for (let i = 0; i < left.paragraphs.length; i++) {
+    const pa = left.paragraphs[i]!;
+    const pb = right.paragraphs[i]!;
     if ((pa.align ?? 'left') !== (pb.align ?? 'left') || (pa.dir ?? 'ltr') !== (pb.dir ?? 'ltr')) {
       return false;
     }
@@ -586,29 +599,29 @@ function documentsEqual(a: RichTextEditorDocument, b: RichTextEditorDocument): b
 
 /** Bind one contentEditable element. Returns the Svelte-action-shaped handle. */
 export function attachRichTextEditor(
-  el: HTMLElement,
+  element: HTMLElement,
   host: RichTextEditorHost,
   initial: RichTextEditorProps,
 ): RichTextEditorBinding {
-  const root = el as unknown as EditorRoot;
-  const doc = el.ownerDocument;
+  const root = element as unknown as EditorRoot;
+  const doc = element.ownerDocument;
   // Inside a shadow tree (a custom-element viewer) the document's own
-  // `activeElement` and selection are retargeted to the HOST: focus and the
+  // `activeElement` and selection are retargeted to the host: focus and the
   // selection have to be read from the shadow root instead.
-  const rootNode = el.getRootNode() as Document | ShadowRoot;
+  const rootNode = element.getRootNode() as Document | ShadowRoot;
   const activeElement = (): Element | null => rootNode.activeElement;
   const liveRange = (): RangeLike | null => {
-    const sel = doc.getSelection();
-    if (!sel) return null;
+    const selection = doc.getSelection();
+    if (!selection) return null;
     if (rootNode !== doc) {
-      const composed = composedRange(sel, rootNode as ShadowRoot);
+      const composed = composedRange(selection, rootNode as ShadowRoot);
       if (composed) return composed;
       const shadowSel = (
         rootNode as ShadowRoot & { getSelection?(): Selection | null }
       ).getSelection?.();
       if (shadowSel && shadowSel.rangeCount > 0) return shadowSel.getRangeAt(0);
     }
-    return sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+    return selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
   };
   let props = initial;
   let rendered: RichTextEditorDocument | null = null;
@@ -626,15 +639,15 @@ export function attachRichTextEditor(
   };
 
   const select = (range: RichTextEditorRange) => {
-    const sel = doc.getSelection();
-    if (!sel) return;
+    const selection = doc.getSelection();
+    if (!selection) return;
     const start = positionOfOffset(root, range.start);
     const end = positionOfOffset(root, range.end);
     if (!start || !end) return;
     // `setBaseAndExtent` places a selection inside a shadow tree in every
     // engine; a Range added from outside is retargeted to the host in some.
-    if (typeof sel.setBaseAndExtent === 'function') {
-      sel.setBaseAndExtent(
+    if (typeof selection.setBaseAndExtent === 'function') {
+      selection.setBaseAndExtent(
         start.node as unknown as Node,
         start.offset,
         end.node as unknown as Node,
@@ -645,14 +658,14 @@ export function attachRichTextEditor(
     const domRange = doc.createRange();
     domRange.setStart(start.node as unknown as Node, start.offset);
     domRange.setEnd(end.node as unknown as Node, end.offset);
-    sel.removeAllRanges();
-    sel.addRange(domRange);
+    selection.removeAllRanges();
+    selection.addRange(domRange);
   };
 
   // Read resolved faces in the element's own document (including iframe
   // fonts). Refresh styles without replacing nodes, selection or composition.
   const refreshLineModel = () => {
-    const bodyStyle = doc.defaultView?.getComputedStyle(el) ?? el.style;
+    const bodyStyle = doc.defaultView?.getComputedStyle(element) ?? element.style;
     const body = {
       family: bodyStyle.fontFamily || 'Helvetica',
       weight: bodyStyle.fontWeight || '400',
@@ -669,7 +682,7 @@ export function attachRichTextEditor(
     };
     // Read all computed styles before writing line heights to avoid forcing
     // a style recalculation for each run. Native editing may nest spans.
-    const runs = Array.from(el.querySelectorAll<HTMLElement>('span, b, strong, i, em')).map(
+    const runs = Array.from(element.querySelectorAll<HTMLElement>('span, b, strong, i, em')).map(
       (node) => {
         const style = doc.defaultView?.getComputedStyle(node) ?? node.style;
         const face = {
@@ -683,7 +696,7 @@ export function attachRichTextEditor(
     const measure = measureFor(body);
     const lineHeight = lineModelFor(body.family, measure).lineHeight;
     const shift = firstLineShiftFor(body.family, size, measure);
-    el.style.lineHeight = String(lineHeight);
+    element.style.lineHeight = String(lineHeight);
     for (const run of runs) run.node.style.lineHeight = String(run.lineHeight);
     applyFirstLineShift(root, shift);
   };
@@ -700,7 +713,7 @@ export function attachRichTextEditor(
   };
 
   const serialiseAndReport = () => {
-    // Enter splits a block by CLONING its style attribute, so the first
+    // Enter splits a block by cloning its style attribute, so the first
     // block's shift would ride onto the new paragraph: keep it on the first
     // block alone, whatever the browser produced.
     refreshLineModel();
@@ -719,32 +732,32 @@ export function attachRichTextEditor(
     composing = false;
     serialiseAndReport();
   };
-  const onKeyDown = (e: KeyboardEvent) => {
-    if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
-    const key = e.key.toLowerCase();
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+    const key = event.key.toLowerCase();
     const command: RichTextEditorCommand | null =
       key === 'b' ? 'bold' : key === 'i' ? 'italic' : key === 'u' ? 'underline' : null;
     if (!command) return;
-    e.preventDefault();
+    event.preventDefault();
     host.onCommand(command);
   };
-  const onPaste = (e: ClipboardEvent) => {
-    e.preventDefault();
-    const text = e.clipboardData?.getData('text/plain') ?? '';
+  const onPaste = (event: ClipboardEvent) => {
+    event.preventDefault();
+    const text = event.clipboardData?.getData('text/plain') ?? '';
     // execCommand keeps the browser's own undo stack and caret handling for
     // the insertion; the resulting `input` event serialises as usual.
     doc.execCommand('insertText', false, text);
   };
   const onSelectionChange = () => {
-    if (activeElement() !== el) return;
+    if (activeElement() !== element) return;
     host.onSelectionChange(currentSelection());
   };
 
-  el.addEventListener('input', onInput);
-  el.addEventListener('compositionstart', onCompositionStart);
-  el.addEventListener('compositionend', onCompositionEnd);
-  el.addEventListener('keydown', onKeyDown);
-  el.addEventListener('paste', onPaste);
+  element.addEventListener('input', onInput);
+  element.addEventListener('compositionstart', onCompositionStart);
+  element.addEventListener('compositionend', onCompositionEnd);
+  element.addEventListener('keydown', onKeyDown);
+  element.addEventListener('paste', onPaste);
   doc.addEventListener('selectionchange', onSelectionChange);
 
   render(initial.document, false);
@@ -759,7 +772,7 @@ export function attachRichTextEditor(
       // a remote edit, a scale change) re-renders and restores the caret.
       if (composing) return;
       if (!rendered || scaleChanged || !documentsEqual(next.document, rendered)) {
-        render(next.document, activeElement() === el);
+        render(next.document, activeElement() === element);
         return;
       }
       // The element's font may have changed under an unchanged document (a
@@ -770,11 +783,11 @@ export function attachRichTextEditor(
     select,
     detach() {
       stopObservingFonts();
-      el.removeEventListener('input', onInput);
-      el.removeEventListener('compositionstart', onCompositionStart);
-      el.removeEventListener('compositionend', onCompositionEnd);
-      el.removeEventListener('keydown', onKeyDown);
-      el.removeEventListener('paste', onPaste);
+      element.removeEventListener('input', onInput);
+      element.removeEventListener('compositionstart', onCompositionStart);
+      element.removeEventListener('compositionend', onCompositionEnd);
+      element.removeEventListener('keydown', onKeyDown);
+      element.removeEventListener('paste', onPaste);
       doc.removeEventListener('selectionchange', onSelectionChange);
     },
   };

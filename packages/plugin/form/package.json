@@ -11,7 +11,6 @@
     ".": "./src/index.ts",
     "./contract": "./src/contract.ts",
     "./contract/host": "./src/host-contract.ts",
-    "./internal": "./src/internal.ts",
     "./scripting": "./src/scripting/controller.ts",
     "./package.json": "./package.json"
   },
@@ -31,10 +30,6 @@
       "./contract/host": {
         "import": "./dist/contract/host.js",
         "require": "./dist/contract/host.cjs"
-      },
-      "./internal": {
-        "import": "./dist/internal.js",
-        "require": "./dist/internal.cjs"
       },
       "./scripting": {
         "import": "./dist/scripting.js",

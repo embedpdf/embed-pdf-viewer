@@ -38,11 +38,11 @@ export type MutationKind = AnnotationMutationKind;
 /**
  * Inputs that decide whether a mutation should make a client refetch.
  *
- *   `pageStateBefore` is captured BEFORE the mutation. Its known
+ *   `pageStateBefore` is captured before the mutation. Its known
  *   `weakAnnotationState` drives the locked rule:
  *     index-shifting mutation × any weak annotation on the page  ⇒  refetch.
  *
- *   `pageStateAfter` is captured AFTER the mutation. It carries the
+ *   `pageStateAfter` is captured after the mutation. It carries the
  *   bumped revision token (for index-shifting ops) and the recomputed
  *   weak-annotation state (for any op that might have changed it, e.g.
  *   opportunistic /NM stamping during update).
@@ -81,11 +81,11 @@ export interface ImpactInputs {
  *
  *        The "revisions exist solely for weak-ref authentication"
  *        doctrine (see `pages.move()`'s identical reasoning) means we
- *        deliberately do NOT bump on `create` — bumping a revision
+ *        deliberately do not bump on `create` — bumping a revision
  *        that nobody's weak ref depends on would erode the invariant
  *        and turn revisions into a generic "something changed" signal.
  *
- *   2. `delete` and `move` ARE index-shifting. They genuinely move
+ *   2. `delete` and `move` are index-shifting. They genuinely move
  *      pre-existing indices:
  *        - `delete` removes an annotation, shifting every later index
  *          down by one.
@@ -97,7 +97,7 @@ export interface ImpactInputs {
  *      index, and we keep `shouldRefetch = null`.
  *
  *      (`move` opportunistically stamps /NM on weak refs in the batch
- *      BEFORE the move, so the annotations actually being moved end up
+ *      before the move, so the annotations actually being moved end up
  *      durable on the way out; but other weak annotations on the page
  *      still need a refetch.)
  *
@@ -105,7 +105,7 @@ export interface ImpactInputs {
  *      `'pageRebuilt'` and `'externalChange'` are reserved for higher-
  *      level signals the engine doesn't emit yet (insert/delete-page
  *      that rebuilds /Annots, watch-based refresh). Page **reorder**
- *      explicitly does NOT bump per-page revisions and does NOT emit
+ *      explicitly does not bump per-page revisions and does not emit
  *      `pageRebuilt` — see `PagesMutator`.
  *
  *   Future note: when an explicit-position `createAt(index)` API

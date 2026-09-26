@@ -3,7 +3,7 @@
  *
  * The selection plugin is deliberately DOM-free: its public capability ends
  * at `readText()` (data). Everything that touches `navigator.clipboard` or
- * the native `copy` event lives HERE, structurally typed so this module
+ * the native `copy` event lives here, structurally typed so this module
  * stays a pure DOM utility with no EmbedPDF dependencies (the selection
  * capability satisfies {@link ClipboardSelectionSource} as-is).
  */
@@ -20,7 +20,7 @@ export interface ClipboardSelectionSource {
 export interface SelectionClipboardOptions {
   /**
    * Prefetch the selected text when the selection settles (default true).
-   * This is what makes the NATIVE copy path work: a `copy` event handler
+   * This is what makes the native copy path work: a `copy` event handler
    * must call `clipboardData.setData` synchronously — awaiting a page-text
    * read inside it is too late — and it also keeps the async path instant.
    * The fetch is one versioned, cached, permission-gated read per page;
@@ -39,7 +39,7 @@ const PREFETCH_DEBOUNCE_MS = 150;
  *
  *   - the native `copy` event (menu Edit→Copy, or ctrl/cmd+C while the page
  *     has a DOM selection or focused editable — e.g. the viewer shell's
- *     focus sink): answered SYNCHRONOUSLY from the cache;
+ *     focus sink): answered synchronously from the cache;
  *   - ctrl/cmd+C with no DOM selection (canvas-rendered viewers usually
  *     have none, and browsers don't dispatch `copy` then): a keydown
  *     fallback writes via the async Clipboard API inside the keystroke's
@@ -83,14 +83,19 @@ export function wireSelectionClipboard(
     timer = setTimeout(refresh, PREFETCH_DEBOUNCE_MS);
   });
 
-  const onCopy = (e: ClipboardEvent): void => {
+  const onCopy = (event: ClipboardEvent): void => {
     if (cached == null || cached === '' || !selection.hasSelection()) return;
-    e.clipboardData?.setData('text/plain', cached);
-    e.preventDefault();
+    event.clipboardData?.setData('text/plain', cached);
+    event.preventDefault();
   };
 
-  const onKeyDown = (e: KeyboardEvent): void => {
-    if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'c' || e.shiftKey || e.altKey) {
+  const onKeyDown = (event: KeyboardEvent): void => {
+    if (
+      !(event.metaKey || event.ctrlKey) ||
+      event.key.toLowerCase() !== 'c' ||
+      event.shiftKey ||
+      event.altKey
+    ) {
       return;
     }
     if (!selection.hasSelection() || !selection.canCopy()) return;

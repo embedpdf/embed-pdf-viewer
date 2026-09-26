@@ -1,0 +1,180 @@
+---
+title: Redaction
+description: Mark areas to remove, apply the redactions to take the content out of the document for good, and save a file without it.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Redaction
+
+Redaction removes content from a document for good: the text, images and drawings under an area
+are taken out of the file, not just covered. It takes two steps. First you mark what to remove,
+then you apply the marks:
+
+```ts
+// 1. Mark: a redact annotation over the area
+const { annotation } = await page.annotations.create({
+  subtype: 'redact',
+  rect: { left: 72, bottom: 640, right: 320, top: 660 },
+  interiorColor: { r: 0, g: 0, b: 0 },
+});
+
+// 2. Apply: remove what's under it
+await doc.redaction.apply({ annotations: [annotation.ref] });
+
+// 3. Save a file without the removed content
+const bytes = await doc.download({ mode: 'rewrite' });
+```
+
+## Mark what to remove
+
+A mark is a `redact` annotation. It removes nothing yet: it shows as an outline, the text under it
+can still be read and copied, and you can change or delete it like any other annotation. That
+lets someone review the marks before anything is gone.
+
+Mark an area with `rect`, in PDF points. To mark text exactly, as it runs across lines or at an
+angle, give its `quadPoints` instead, the same corners a highlight takes. Search results have
+them:
+
+```ts
+const { matches } = await doc.search.query({ text: 'Jane Doe', wholeWord: true });
+
+for (const match of matches) {
+  await doc.page(match.page).annotations.create({
+    subtype: 'redact',
+    quadPoints: match.segments.map((segment) => segment.quad),
+    interiorColor: { r: 0, g: 0, b: 0 },
+  });
+}
+```
+
+With `quadPoints`, the quads decide what's removed, and `rect` (the box around them) is worked out
+for you. A text selection gives you the same quads; see
+[Selection & geometry](/docs/engine/text/selection-and-geometry).
+
+## Choose what's left in its place
+
+After the content is removed, the engine paints the area. These fields say what it paints:
+
+| Field           | What it is                                                                                                | Default       |
+| :-------------- | :-------------------------------------------------------------------------------------------------------- | :------------ |
+| `interiorColor` | The fill, `{ r, g, b }` from 0 to 255                                                                     | no fill       |
+| `overlayText`   | Text on top of the fill, such as `'REDACTED'`                                                             | none          |
+| `repeat`        | Repeat `overlayText` to fill the whole area                                                               | `false`       |
+| `fontFamily`    | The font of `overlayText`, such as `'times-roman'`; see [Fonts](/docs/engine/annotations/free-text#fonts) | `'helvetica'` |
+| `fontSize`      | Its size in points; `0` fits the text to the area                                                         | `12`          |
+| `fontColor`     | Its color                                                                                                 | black         |
+| `textAlign`     | `'left'`, `'center'` or `'right'`                                                                         | `'left'`      |
+| `color`         | The outline shown while the area is only marked                                                           | red           |
+
+Without a fill or text, the area is left blank: the content is gone and the page shows through.
+In PDF apps that support it, hovering a mark previews the fill and text it will leave.
+
+## Apply
+
+`apply()` removes the content under marks. Pass the marks to apply:
+
+```ts
+await doc.redaction.apply({ annotations: [markA.ref, markB.ref] });
+```
+
+Or apply every mark on some pages:
+
+```ts
+const { pages } = await doc.pages.list();
+await doc.redaction.apply({ pages: pages.map((page) => page.ref) });
+```
+
+The result says what happened on each page:
+
+```ts
+const { results, removedAnnotationCount } = await doc.redaction.apply({ pages: [page.ref] });
+// results: [{ page, status: 'applied', removedAnnotationCount: 1 }]
+```
+
+A page's `status` is `'applied'`, or `'unchanged'` when it had no marks. The marks you applied are
+removed from the page. Other annotations that overlap a marked area are removed too, because they
+could reveal what was there; `removedAnnotationCount` counts those, so you can tell the user.
+
+Passing a ref that isn't a redact annotation fails with `InvalidArg` before anything changes.
+
+## What gets removed
+
+Under each marked area, applying removes:
+
+- **Text**: the characters themselves, so they can't be searched, selected or copied anymore.
+  Text next to the area stays.
+- **Images**: the pixels inside the area are erased from the image. For a slanted mark, that's
+  the box around it.
+- **Drawings**: the parts of lines, shapes and fills inside the area.
+- **Annotations and form fields** that overlap the area, even in part, with their popups. For a
+  mark with `quadPoints`, the quads count, not the box around them.
+
+This includes content the page draws from shared parts of the file, not only what the page draws
+itself. There's no undo: once applied, the content is gone from the document.
+
+## Save the redacted file
+
+Apply changes the document as it is now, but an incremental save still holds the version you
+opened, with everything you removed. Anyone with a PDF tool can recover it. For a file you share,
+save with `mode: 'rewrite'`:
+
+```ts
+const bytes = await doc.download({ mode: 'rewrite' });
+```
+
+A rewrite writes the document as it is now and nothing else. See
+[Saving](/docs/engine/documents/saving#incremental-or-rewrite).
+
+<Engine local>
+
+<CloudPdfCallout
+  title="Keep the original on your server"
+  href="https://www.cloudpdf.com/docs/engine"
+  cta="Redact with CloudPDF"
+>
+
+On the local engine, redaction runs in the browser, on a copy of the original the user already
+has. With CloudPDF it runs on your server, and the original never leaves it: people who may only
+see the redacted version get a token without `doc.download`, and receive the pages as images and
+the text that's left, never the file.
+
+</CloudPdfCallout>
+
+</Engine>
+
+<Engine cloud>
+
+The server keeps the file as it was uploaded, so an incremental download of a redacted document
+contains the original. Give `doc.download` only to people who may see the original. Everyone else
+sees the pages and the text as they are after the redaction, and never receives the file.
+
+</Engine>
+
+## Permissions
+
+Marking is annotation work: creating a redact annotation needs the permission to create
+annotations. Applying needs all three of `doc.redact`, `doc.pages.modify` and
+`doc.annotate.modify`, because it changes the page and removes annotations. Without them,
+`apply()` fails with `Forbidden`. See [Permissions](/docs/engine/concepts/permissions).
+
+Give `doc.redact` to the people who decide what goes; others can still mark areas for them.
+
+## Good to know
+
+### Marks from other apps
+
+A redact annotation made by another app (Acrobat, for example) applies the same way. When it
+carries its own finished overlay, the engine paints that; otherwise it paints the fill and text
+from the fields above.
+
+### When a page fails
+
+Pages are applied one after the other. When one fails, its `status` is `'failed'` with an
+`error`, the pages after it are `'skipped'`, and the pages before it keep their redactions. Apply
+again to retry the rest.
+
+### Events
+
+Other code can follow redactions with the `redaction.applied` event. See
+[Events](/docs/engine/concepts/events).

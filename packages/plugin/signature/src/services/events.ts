@@ -1,6 +1,8 @@
-/** The nine change hooks; disposed with the plugin. */
-import { createEventHook, type ChangeOrigin } from '@embedpdf/core';
-
+/**
+ * The capability's events, minted on the instance so they are disposed with
+ * it. The state-change events (`onTargetChanged`, `onInvalidating`) are
+ * derived here, in one place, from each committed state change.
+ */
 import type {
   SignatureFieldEvent,
   SignatureInspectionRequestedEvent,
@@ -11,52 +13,36 @@ import type {
   SignatureTargetChangedEvent,
   SignatureValidatedEvent,
 } from '../contract';
+import { newlyInvalidated } from '../model';
 import type { SignatureContext } from './context';
 
-/** A change this session made through the public API. */
-export const ORIGIN_API: ChangeOrigin = {
-  locality: 'local',
-  trigger: 'api',
-  sessionId: null,
-  actorId: null,
-};
-
 export function createEvents(ctx: SignatureContext) {
-  const report = (error: unknown) =>
-    globalThis.console?.error('[signature] listener failed:', error);
-  const signed = createEventHook<SignatureSignedEvent>(report);
-  const filled = createEventHook<SignatureFieldEvent>(report);
-  const cleared = createEventHook<SignatureFieldEvent>(report);
-  const validated = createEventHook<SignatureValidatedEvent>(report);
-  const protectionChanged = createEventHook<SignatureProtectionChangedEvent>(report);
-  const invalidating = createEventHook<SignatureInvalidatingEvent>(report);
-  const targetChanged = createEventHook<SignatureTargetChangedEvent>(report);
-  const signRequested = createEventHook<SignatureSignRequestedEvent>(report);
-  const inspectionRequested = createEventHook<SignatureInspectionRequestedEvent>(report);
-  ctx.cleanup(() => {
-    for (const hook of [
-      signed,
-      filled,
-      cleared,
-      validated,
-      protectionChanged,
-      invalidating,
-      targetChanged,
-      signRequested,
-      inspectionRequested,
-    ])
-      hook.dispose();
-  });
-  return {
-    signed,
-    filled,
-    cleared,
-    validated,
-    protectionChanged,
-    invalidating,
-    targetChanged,
-    signRequested,
-    inspectionRequested,
+  const events = {
+    signed: ctx.events.source<SignatureSignedEvent>(),
+    filled: ctx.events.source<SignatureFieldEvent>(),
+    cleared: ctx.events.source<SignatureFieldEvent>(),
+    validated: ctx.events.source<SignatureValidatedEvent>(),
+    protectionChanged: ctx.events.source<SignatureProtectionChangedEvent>(),
+    invalidating: ctx.events.source<SignatureInvalidatingEvent>(),
+    targetChanged: ctx.events.source<SignatureTargetChangedEvent>(),
+    signRequested: ctx.events.source<SignatureSignRequestedEvent>(),
+    inspectionRequested: ctx.events.source<SignatureInspectionRequestedEvent>(),
   };
+
+  ctx.state.onChange(({ previous, next }) => {
+    if (previous.target !== next.target) events.targetChanged.emit({ field: next.target });
+    if (previous.verdicts !== next.verdicts && next.verdicts) {
+      // Acrobat's warning, after the fact and only on the edge: a signature
+      // that held (or was never judged) now reads invalid because of unsaved edits.
+      for (const verdict of newlyInvalidated(previous.verdicts, next.verdicts)) {
+        events.invalidating.emit({
+          field: verdict.signature.field,
+          detail: verdict.modifications.detail ?? '',
+        });
+      }
+    }
+  });
+
+  return events;
 }
 export type SignatureEvents = ReturnType<typeof createEvents>;

@@ -1,16 +1,16 @@
 /**
  * Canonical PDF-document geometry primitives.
  *
- * These are the ONE geometry vocabulary the engine API speaks. They are
+ * These are the one geometry vocabulary the engine API speaks. They are
  * PDF user space:
- *   - y-UP (origin at the page box's bottom-left; `top > bottom`)
+ *   - y-up (origin at the page box's bottom-left; `top > bottom`)
  *   - edges, not x/y/width/height
- *   - page-box origin preserved (NOT origin-normalized)
+ *   - page-box origin preserved (not origin-normalized)
  *   - browser-free (no DOM, no device pixels) and portable to Rust/Swift/Kotlin
  *
  * They are the only geometry ever sent as engine wire data. Viewer-local
  * geometry (content/view/screen space, y-down, x/y/width/height) lives in the
- * v3 viewer layer and is always produced from these by an EXPLICIT transform.
+ * viewer layer and is always produced from these by an explicit transform.
  *
  * No dependency on PDFium or any browser/Node surface: this is the lingua
  * franca between local engine, cloud engine, and server.
@@ -23,7 +23,7 @@ export interface PdfPoint {
 }
 
 /**
- * A rectangle in the FILE's coordinates — PDF user space, expressed as edges
+ * A rectangle in the file's coordinates — PDF user space, expressed as edges
  * (y-up, so `top > bottom` and `right > left` once normalized). Page-box
  * origin is preserved, so `left`/`bottom` may be non-zero or negative.
  *
@@ -75,11 +75,11 @@ export type InkList = InkStroke[];
 export type CalloutLine = readonly [PdfPoint, PdfPoint] | readonly [PdfPoint, PdfPoint, PdfPoint];
 
 /**
- * A /QuadPoints quad. The four points are POSITIONAL, in PDFium
+ * A /QuadPoints quad. The four points are positional, in PDFium
  * `FS_QUADPOINTSF` order (PDF 32000 §12.5.6.10): `p1 p2 p3 p4`. Coordinates
  * are PDF user space, y-up.
  *
- * This type asserts NO corner semantics. Quads can be rotated or skewed
+ * This type asserts no corner semantics. Quads can be rotated or skewed
  * (e.g. text markup over rotated text), and PDF producers disagree on corner
  * order — so naming corners `topLeft`/... on the wire would be a false
  * guarantee. Derive named corners with `pdfQuadCorners` (valid only for

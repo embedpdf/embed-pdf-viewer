@@ -11,7 +11,7 @@ import { useCapability, useCapabilityEvent, useSelector } from './runtime';
 
 /**
  * The document's metadata, bound to the surrounding `DocumentScope`. Reactive:
- * `metadata` updates from your own edits AND from other sessions — the plugin
+ * `metadata` updates from your own edits and from other sessions — the plugin
  * keeps it live off the document event stream.
  *
  *   const { metadata, status, update } = useMetadata();
@@ -24,18 +24,24 @@ export function useMetadata(): {
   metadata: DocumentMetadata | null;
   status: ResourceStatus;
   update: (patch: MetadataPatch, options?: OperationOptions) => Promise<MetadataUpdateResult>;
-  refresh: (options?: OperationOptions) => Promise<void>;
+  refresh: () => Promise<void>;
   canEdit: () => boolean;
 } {
-  const cap = useCapability(MetadataToken);
-  const metadata = useSelector(MetadataToken, (c) => c.getSnapshot());
-  const status = useSelector(MetadataToken, (c) => c.getStatus());
-  return { metadata, status, update: cap.update, refresh: cap.refresh, canEdit: cap.canEdit };
+  const metadata = useCapability(MetadataToken);
+  const snapshot = useSelector(MetadataToken, (current) => current.getSnapshot());
+  const status = useSelector(MetadataToken, (current) => current.getStatus());
+  return {
+    metadata: snapshot,
+    status,
+    update: metadata.update,
+    refresh: metadata.refresh,
+    canEdit: metadata.canEdit,
+  };
 }
 
-/** Subscribe to one metadata event for the mounted lifetime: `useMetadataEvent((c) => c.onUpdated, handler)`. */
+/** Subscribe to one metadata event for the mounted lifetime: `useMetadataEvent((metadata) => metadata.onUpdated, handler)`. */
 export function useMetadataEvent<T>(
-  select: (cap: MetadataCapability) => EventHook<T>,
+  select: (metadata: MetadataCapability) => EventHook<T>,
   handler: (event: T) => void,
 ): void {
   useCapabilityEvent(MetadataToken, select, handler);

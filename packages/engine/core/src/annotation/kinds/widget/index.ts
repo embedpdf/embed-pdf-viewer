@@ -1,14 +1,17 @@
+import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
-import type { WidgetDraft } from './draft';
-import type { WidgetAnnotationDTO } from './dto';
-import type { WidgetPatch } from './patch';
-import { WidgetDTOSchema, WidgetDraftSchema, WidgetPatchSchema } from './schema';
+import { WidgetDeclaration } from './declaration';
 
-export type { WidgetAnnotationDTO } from './dto';
-export type { WidgetDraft } from './draft';
-export type { WidgetPatch } from './patch';
-export { WidgetDTOSchema, WidgetDraftSchema, WidgetPatchSchema } from './schema';
+export { WidgetDeclaration } from './declaration';
+
+export type WidgetAnnotationDTO = ReadOf<typeof WidgetDeclaration>;
+export type WidgetDraft = CreateOf<typeof WidgetDeclaration>;
+export type WidgetPatch = UpdateOf<typeof WidgetDeclaration>;
+
+export const WidgetDTOSchema = WidgetDeclaration.readSchema;
+export const WidgetDraftSchema = WidgetDeclaration.createSchema;
+export const WidgetPatchSchema = WidgetDeclaration.updateSchema;
 
 export const WidgetKind: AnnotationKindModule<
   'widget',
@@ -21,4 +24,5 @@ export const WidgetKind: AnnotationKindModule<
   dtoSchema: WidgetDTOSchema,
   draftSchema: WidgetDraftSchema,
   patchSchema: WidgetPatchSchema,
+  readBackWrites: WidgetDeclaration.readBackWrites,
 };

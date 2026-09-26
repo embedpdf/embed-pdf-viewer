@@ -5,11 +5,18 @@ import type {
   PageFlattenUsage,
   PageObjectNumber,
 } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode, toPageRef } from '@embedpdf/engine-core/runtime';
+import {
+  ANNOTATION_RESOURCE_ROLES,
+  EngineError,
+  EngineErrorCode,
+  subtypeFromCode,
+  toPageRef,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { AnnotationReader } from './AnnotationReader';
 import { resolveAnnotPtr } from './internal/identity/resolveAnnotationPointer';
+import { saveDocumentToBuffer } from './internal/saveDocumentToBuffer';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { withScratch } from '../../runtime/memory/scratch';
 import { throwIfAborted } from '../../shared/abort';
@@ -21,13 +28,12 @@ const FLATTEN_NOTHING_TO_DO = 2;
 const STATUS_APPLIED = 0;
 const STATUS_SKIPPED = 1;
 const STATUS_NOT_ON_PAGE = 2;
-const FPDF_NO_INCREMENTAL = 1 << 1;
 
 /**
  * The annotation-plane flatten verbs — `pages.flatten` for a chosen set:
  * in place (`flatten`) or into a new single-page document
  * (`exportAppearance`). Both resolve refs to native handles on the page,
- * hand the SET to the fork (one candidate plan, one placement writer — the
+ * hand the set to the fork (one candidate plan, one placement writer — the
  * same code whole-page flatten runs), and release every handle afterwards.
  */
 export class AnnotationFlattener {
@@ -73,7 +79,7 @@ export class AnnotationFlattener {
       }
 
       if (code === FLATTEN_FAIL) {
-        // Every ref resolved on THIS page (resolveAll), so a FAIL is the
+        // Every ref resolved on this page (resolveAll), so a fail is the
         // fork disagreeing with /Annots or a catalog write failing.
         const foreign = statuses.findIndex((status) => status === STATUS_NOT_ON_PAGE);
         throw new EngineError(
@@ -86,10 +92,11 @@ export class AnnotationFlattener {
 
       const results = refs.map((ref, i) => ({
         ref,
-        status: statuses[i] === STATUS_APPLIED ? ('applied' as const) : ('skipped' as const),
+        status: statuses[i] === STATUS_APPLIED ? ('applied' as const) : ('unchanged' as const),
       }));
       if (code === FLATTEN_NOTHING_TO_DO || code !== FLATTEN_SUCCESS) {
-        return { page: toPageRef(pageObjectNumber), usage, results, meta: null };
+        const meta: MutationMeta = { affectedPages: [], cacheDelta: null };
+        return { page: toPageRef(pageObjectNumber), usage, results, meta };
       }
 
       // Content + annotation liveness changed on this page — the same
@@ -119,11 +126,10 @@ export class AnnotationFlattener {
   ): { bytes: ArrayBuffer; size: number } {
     throwIfAborted(signal);
     this.requireRefs('annotations.exportAppearance', pageObjectNumber, refs);
-    const { fn, mem } = this.runtime;
+    const { fn } = this.runtime;
     const pool = this.session.pagePool();
     const pagePtr = pool.acquire(pageObjectNumber);
     let exportedPtr: Ptr | null = null;
-    let pdfPtr: Ptr | null = null;
     try {
       const annotPtrs = this.resolveAll(pagePtr, refs);
       try {
@@ -141,23 +147,56 @@ export class AnnotationFlattener {
           'annotations.exportAppearance: every ref must be a visible annotation of this page with a normal appearance',
         );
       }
-      return withScratch(mem, 4, (sizePtr) => {
-        mem.poke(sizePtr, 'i32', 0);
-        pdfPtr = fn.EPDF_SaveDocumentToOwnedBuffer(exportedPtr!, FPDF_NO_INCREMENTAL, sizePtr);
-        const size = Number(mem.peek(sizePtr, 'i32'));
-        if (!pdfPtr || size <= 0) {
+      return saveDocumentToBuffer(
+        this.runtime.fn,
+        this.runtime.mem,
+        exportedPtr,
+        'exported appearances',
+      );
+    } finally {
+      if (exportedPtr) fn.FPDF_CloseDocument(exportedPtr);
+      pool.release(pageObjectNumber);
+    }
+  }
+
+  /**
+   * An annotation's `appearance` resource: what its normal appearance draws
+   * apart from what its data describes, as a one-page PDF
+   * (`EPDFAnnot_ExportAppearance`). Only a kind that takes an appearance
+   * resource has one; a copy is created from these bytes and the data.
+   */
+  readAppearance(
+    pageObjectNumber: PageObjectNumber,
+    ref: AnnotationRef,
+    signal: AbortSignal,
+  ): { bytes: ArrayBuffer; size: number } {
+    throwIfAborted(signal);
+    const { fn } = this.runtime;
+    const pool = this.session.pagePool();
+    const pagePtr = pool.acquire(pageObjectNumber);
+    let exportedPtr: Ptr | null = null;
+    try {
+      const annotPtr = resolveAnnotPtr(this.runtime, this.session, pagePtr, ref);
+      try {
+        const subtype = subtypeFromCode(fn.FPDFAnnot_GetSubtype(annotPtr));
+        if (ANNOTATION_RESOURCE_ROLES[subtype]?.appearance === undefined) {
           throw new EngineError(
-            EngineErrorCode.DocOpenFailed,
-            'failed to save exported appearances',
+            EngineErrorCode.InvalidArg,
+            `a ${subtype} annotation has no 'appearance' resource`,
           );
         }
-        const bytes = mem.readBytes(pdfPtr, size);
-        const buffer = new ArrayBuffer(bytes.byteLength);
-        new Uint8Array(buffer).set(bytes);
-        return { bytes: buffer, size };
-      });
+        exportedPtr = fn.EPDFAnnot_ExportAppearance(annotPtr);
+      } finally {
+        fn.FPDFPage_CloseAnnot(annotPtr);
+      }
+      if (!exportedPtr) {
+        throw new EngineError(
+          EngineErrorCode.InvalidArg,
+          'the annotation has no normal appearance to read',
+        );
+      }
+      return saveDocumentToBuffer(this.runtime.fn, this.runtime.mem, exportedPtr, 'the appearance');
     } finally {
-      if (pdfPtr) fn.EPDF_FreeBuffer(pdfPtr);
       if (exportedPtr) fn.FPDF_CloseDocument(exportedPtr);
       pool.release(pageObjectNumber);
     }

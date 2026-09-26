@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { memoryStampStore, persistStampLibraries, restoreStampLibraries } from '../src/persistence';
-import type { StampCapability, StampLibraryChange } from '../src/host-contract';
+import type { StampCapability, StampLibraryChange } from '../src/contract';
 
 function fakeStamp() {
   const listeners = new Set<(change: StampLibraryChange) => void>();
@@ -12,9 +12,9 @@ function fakeStamp() {
       return () => listeners.delete(listener);
     },
     exportLibrary: async (id: string) => {
-      const b = bytes.get(id);
-      if (!b) throw new Error(`unknown library '${id}'`);
-      return b;
+      const stored = bytes.get(id);
+      if (!stored) throw new Error(`unknown library '${id}'`);
+      return stored;
     },
     importLibrary: vi.fn(async (source: Uint8Array) => {
       const id = new TextDecoder().decode(source).replace('%PDF-', '');
@@ -22,7 +22,7 @@ function fakeStamp() {
       return id;
     }),
   } as unknown as StampCapability;
-  const emit = (change: StampLibraryChange) => listeners.forEach((l) => l(change));
+  const emit = (change: StampLibraryChange) => listeners.forEach((listener) => listener(change));
   return { stamp, bytes, emit };
 }
 

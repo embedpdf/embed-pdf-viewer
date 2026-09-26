@@ -1,14 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import { appearanceImpactOf, semanticEqual } from '../../src/shared';
-import type { AnnotationDTO, WireAnnotationPatch } from '../../src/shared';
+import type { AnnotationDTO, AnnotationPatch } from '../../src/shared';
 
 /* Minimal DTO/patch fixtures: the classifier only reads the fields it
  * compares, so tests cast focused literals rather than materialise the full
  * AnnotationBase envelope. */
 const dto = (v: Record<string, unknown>): AnnotationDTO => v as unknown as AnnotationDTO;
-const patch = (v: Record<string, unknown>): WireAnnotationPatch =>
-  v as unknown as WireAnnotationPatch;
+const patch = (v: Record<string, unknown>): AnnotationPatch => v as unknown as AnnotationPatch;
 
 const rect = (left: number, bottom: number, right: number, top: number) => ({
   left,
@@ -23,10 +22,10 @@ describe('measurement appearance impact', () => {
     (subtype) => {
       const change = patch({ subtype, contents: '6 m' });
       expect(
-        appearanceImpactOf(dto({ subtype, contents: '3 m', caption: { enabled: true } }), change),
+        appearanceImpactOf(dto({ subtype, contents: '3 m', captionEnabled: true }), change),
       ).toBe('regenerate');
       expect(
-        appearanceImpactOf(dto({ subtype, contents: '3 m', caption: { enabled: false } }), change),
+        appearanceImpactOf(dto({ subtype, contents: '3 m', captionEnabled: false }), change),
       ).toBe('inert');
       expect(appearanceImpactOf(dto({ subtype, contents: '3 m' }), change)).toBe('inert');
     },
@@ -40,7 +39,8 @@ describe('measurement appearance impact', () => {
         { x: 100, y: 0 },
         { x: 100, y: 100 },
       ],
-      caption: { enabled: true, center: { x: 50, y: 20 } },
+      captionEnabled: true,
+      captionCenter: { x: 50, y: 20 },
     });
     const moved = {
       subtype: 'polygon',
@@ -52,16 +52,13 @@ describe('measurement appearance impact', () => {
       ],
     };
     expect(appearanceImpactOf(current, patch(moved))).toBe('regenerate');
+    expect(appearanceImpactOf(current, patch({ ...moved, captionCenter: { x: 60, y: 40 } }))).toBe(
+      'translation',
+    );
     expect(
       appearanceImpactOf(
         current,
-        patch({ ...moved, caption: { enabled: true, center: { x: 60, y: 40 } } }),
-      ),
-    ).toBe('translation');
-    expect(
-      appearanceImpactOf(
-        current,
-        patch({ ...moved, caption: { enabled: false, center: { x: 60, y: 40 } } }),
+        patch({ ...moved, captionEnabled: false, captionCenter: { x: 60, y: 40 } }),
       ),
     ).toBe('regenerate');
   });
@@ -128,12 +125,27 @@ describe('appearanceImpactOf — value diffing (inert)', () => {
     expect(appearanceImpactOf(squareDto(), p)).toBe('inert');
   });
 
+  it('fields a write accepts but never applies are inert, so a read can be sent back', () => {
+    const p = patch({
+      subtype: 'square',
+      page: { kind: 'objectNumber', pageObjectNumber: 3 },
+      index: 7,
+      identityQuality: 'durable',
+      author: 'Someone else',
+      modifiedAt: '2026-01-01T00:00:00Z',
+      userId: 'u_other',
+      importedBy: null,
+      popup: null,
+      actions: null,
+    });
+    expect(appearanceImpactOf(squareDto(), p)).toBe('inert');
+  });
+
   it('metadata-only keys are inert (flags, relationships, grouping)', () => {
     const p = patch({
       subtype: 'square',
-      flags: { hidden: true },
-      inReplyTo: null,
-      replyType: null,
+      hidden: true,
+      reply: null,
     });
     expect(appearanceImpactOf(squareDto(), p)).toBe('inert');
   });
@@ -307,7 +319,7 @@ describe('appearanceImpactOf — verified rigid translation', () => {
 
   it('rotated box: translation must carry the transform group unchanged + shifted', () => {
     const rotated = squareDto({ rotation: 90, unrotatedRect: rect(100, 100, 200, 200) });
-    // rect moved with rotation omitted: the tri-state writer PRESERVES the
+    // rect moved with rotation omitted: the tri-state writer preserves the
     // rotation, but the (also preserved) unrotatedRect did not ride the delta
     // — an unproven translation, so the safe path re-bakes.
     expect(

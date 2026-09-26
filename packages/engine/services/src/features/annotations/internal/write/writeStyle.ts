@@ -10,6 +10,7 @@ import { readBorderStyle } from '../read/annotationReadPrimitives';
 import { borderStyleFromCode, borderStyleToCode } from '../shapeBorderStyle';
 import {
   clearAnnotColor,
+  clearBorderDashPattern,
   setAnnotColor,
   setAnnotOpacity,
   setBorderDashPattern,
@@ -68,7 +69,7 @@ export function applyBorderDraft(
     borderStyleToCode(draft.borderStyle ?? 'solid'),
     draft.strokeWidth ?? DEFAULT_STROKE_WIDTH,
   );
-  if (draft.dashArray !== undefined && draft.dashArray.length > 0) {
+  if (draft.dashArray != null && draft.dashArray.length > 0) {
     setBorderDashPattern(fn, mem, annotPtr, draft.dashArray);
   }
 }
@@ -113,7 +114,9 @@ export function applyBorderPatch(
     const width = patch.strokeWidth ?? current.width;
     setBorderStyle(fn, annotPtr, borderStyleToCode(style), width);
   }
-  if (patch.dashArray !== undefined && patch.dashArray.length > 0) {
+  if (patch.dashArray === null || patch.dashArray?.length === 0) {
+    clearBorderDashPattern(fn, annotPtr);
+  } else if (patch.dashArray !== undefined) {
     setBorderDashPattern(fn, mem, annotPtr, patch.dashArray);
   }
 }

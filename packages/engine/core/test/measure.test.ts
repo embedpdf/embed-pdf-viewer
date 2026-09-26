@@ -9,9 +9,8 @@ import {
   polygonArea,
   viewportForPoint,
 } from '../src/measure';
-import type { PdfMeasure } from '../src/dto/Measure';
-import { LinePatchSchema } from '../src/annotation/kinds/line/schema';
-import { PolygonPatchSchema } from '../src/annotation/kinds/polygon/schema';
+import type { PdfMeasure, PdfViewport } from '../src/dto/Measure';
+import { LinePatchSchema, PolygonPatchSchema } from '../src/annotation/kinds';
 import { PdfMeasureSchema, PdfMeasureWriteSchema } from '../src/dto/Measure.schema';
 
 describe('measurement arithmetic and formatting', () => {
@@ -57,8 +56,14 @@ describe('measurement arithmetic and formatting', () => {
       ]),
     ).toBe('$1,234.50');
     expect(formatMeasurement(-1234.5, [{ unit: 'm', conversion: 1, thousands: '$' }])).toBe(
-      '-1$234.5 m',
+      '-1$234.50 m',
     );
+  });
+  test('decimals show every digit /RD asks for, with or without /FD, as Acrobat does', () => {
+    const metric = { unit: 'm ', conversion: 1, precision: 100 };
+    expect(formatMeasurement(1.5, [metric])).toBe('1.50 m ');
+    expect(formatMeasurement(2, [metric])).toBe('2.00 m ');
+    expect(formatMeasurement(2, [{ ...metric, precision: 1 }])).toBe('2 m ');
   });
   test('round and truncate modes', () => {
     expect(formatMeasurement(1.8, [{ unit: 'm', conversion: 1, fraction: 'round' }])).toBe('2 m');
@@ -70,16 +75,23 @@ describe('measurement arithmetic and formatting', () => {
     expect(measureFromKnownLength(100, { value: 3, unit: 'm' }).x[0].conversion).toBe(
       Math.fround(0.03),
     );
-    expect(measureFromRatio(1, 50, 'm', 2).x[0].conversion).toBe(
+    expect(measureFromRatio(1, 50, 'm', { userUnit: 2 }).x[0].conversion).toBe(
       Math.fround((2 / 72) * 0.0254 * 50),
     );
-    expect(() => measureFromKnownLength(0, { value: 1, unit: 'm' })).toThrow();
+    // A bad input is the engine's InvalidArg, and precision has a default.
+    expect(() => measureFromKnownLength(0, { value: 1, unit: 'm' })).toThrow(
+      expect.objectContaining({ code: 'InvalidArg' }),
+    );
+    expect(() => measureFromRatio(1, 100, 'm', { precision: 3 })).toThrow(
+      expect.objectContaining({ code: 'InvalidArg' }),
+    );
+    expect(measureFromRatio(1, 100, 'm', { fixed: true }).x[0].precision).toBe(100);
   });
   test('coordinates AND scale factors are normalized to PDF float32', () => {
     const m = measureFromKnownLength(1, { value: 1.00000001, unit: 'm' });
     const d = {
       subtype: 'line',
-      intent: 'LineDimension',
+      intent: 'line-dimension',
       measure: m,
       linePoints: { start: { x: 0, y: 0 }, end: { x: 3.4450000001, y: 0 } },
     };
@@ -93,7 +105,7 @@ describe('measurement arithmetic and formatting', () => {
   });
   test('anisotropic scale requires CYX; missing conversion is unavailable', () => {
     const m: PdfMeasure = {
-      subtype: 'RL',
+      subtype: 'rectilinear',
       x: [{ unit: 'm', conversion: 1 }],
       y: [{ unit: 'm', conversion: 2 }],
       distance: [{ unit: 'm', conversion: 1 }],
@@ -101,14 +113,14 @@ describe('measurement arithmetic and formatting', () => {
     };
     const d = {
       subtype: 'line',
-      intent: 'LineDimension',
+      intent: 'line-dimension',
       measure: m,
       linePoints: { start: { x: 0, y: 0 }, end: { x: 3, y: 2 } },
     };
     expect(measurementReadout(d)).toEqual({ unavailable: 'no-scale' });
     expect(measurementReadout({ ...d, measure: { ...m, cyx: 1 } })).toMatchObject({
       value: 5,
-      label: '5 m',
+      label: '5.00 m',
     });
     expect(measurementReadout({ ...d, measure: { ...m, x: [{ unit: 'm' }] } })).toEqual({
       unavailable: 'no-scale',
@@ -131,35 +143,38 @@ describe('measurement arithmetic and formatting', () => {
     );
     const r = measurementReadout({
       subtype: 'polygon',
-      intent: 'PolygonDimension',
+      intent: 'polygon-dimension',
       measure,
       vertices: points,
     });
     expect(isReadout(r) && r.value).toBeCloseTo(0.0012);
   });
   test('viewport selection is last-containing, foreign included', () => {
-    const a = {
+    const a: PdfViewport = {
       bbox: { left: -20, right: 100, bottom: -40, top: 100 },
-      measure: { subtype: 'GEO' as const },
+      name: null,
+      measure: { subtype: 'geospatial' },
     };
     expect(viewportForPoint([a, { ...a, name: 'last' }], { x: 0, y: 0 })?.name).toBe('last');
     expect(viewportForPoint([a], { x: -30, y: 0 })).toBeUndefined();
   });
   test('wire schemas distinguish line vectors, shape points, and caption resets', () => {
     expect(
-      LinePatchSchema.safeParse({ subtype: 'line', caption: { offset: { x: 1, y: 2 } } }).success,
+      LinePatchSchema.safeParse({ subtype: 'line', captionOffset: { x: 1, y: 2 } }).success,
     ).toBe(false);
-    expect(PolygonPatchSchema.parse({ subtype: 'polygon', caption: { center: null } })).toEqual({
+    expect(PolygonPatchSchema.parse({ subtype: 'polygon', captionCenter: null })).toEqual({
       subtype: 'polygon',
-      caption: { center: null },
+      captionCenter: null,
     });
+  });
+  test('an update may send back the marker of a scale the engine cannot model', () => {
     expect(
-      LinePatchSchema.safeParse({ subtype: 'line', measure: { subtype: 'GEO' } }).success,
-    ).toBe(false);
+      LinePatchSchema.safeParse({ subtype: 'line', measure: { subtype: 'geospatial' } }).success,
+    ).toBe(true);
   });
   test('malformed imported factors remain readable, but cannot be authored', () => {
     const imported = {
-      subtype: 'RL',
+      subtype: 'rectilinear',
       x: [{ unit: 'm', conversion: 0 }],
       distance: [{ unit: 'm' }],
       area: [],
@@ -179,7 +194,7 @@ describe('area boundary validity', () => {
   const read = (points: number[][]) =>
     measurementReadout({
       subtype: 'polygon',
-      intent: 'PolygonDimension',
+      intent: 'polygon-dimension',
       measure,
       vertices: points.map(([x, y]) => ({ x, y })),
     });
@@ -233,7 +248,7 @@ describe('area boundary validity', () => {
       [...points].reverse(),
       points.map(([x, y]) => [x + 10000, y - 20000]),
     ]) {
-      expect(read(ring)).toMatchObject({ label: '100 m²', perimeter: '40 m' });
+      expect(read(ring)).toMatchObject({ label: '100.00 m²', perimeter: '40.00 m' });
     }
   });
 });

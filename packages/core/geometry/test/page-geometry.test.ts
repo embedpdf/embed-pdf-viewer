@@ -48,8 +48,8 @@ describe('pdfToContent: crop-relative y-flip (origin preserved)', () => {
       y: 200,
     });
     // PDF rect as min-corner (bottom-left) + extent
-    const r: RectIn<'pdf'> = { x: -50, y: -30, width: 100, height: 200 };
-    expect(applyRect(pdfToContent, r)).toEqual({ x: 0, y: 0, width: 100, height: 200 });
+    const rect: RectIn<'pdf'> = { x: -50, y: -30, width: 100, height: 200 };
+    expect(applyRect(pdfToContent, rect)).toEqual({ x: 0, y: 0, width: 100, height: 200 });
   });
 });
 
@@ -84,9 +84,9 @@ describe('contentToView / pdfToView: one matrix per quarter-turn', () => {
   });
 
   it('pdfToView equals contentToView ∘ pdfToContent', () => {
-    const g = pageGeometry({ crop, rotation: 90, userUnit: 1 }, 1.7);
-    const composed = compose(g.contentToView, g.pdfToContent);
-    composed.forEach((v, i) => expect(v).toBeCloseTo(g.pdfToView[i], 9));
+    const geometry = pageGeometry({ crop, rotation: 90, userUnit: 1 }, 1.7);
+    const composed = compose(geometry.contentToView, geometry.pdfToContent);
+    composed.forEach((entry, i) => expect(entry).toBeCloseTo(geometry.pdfToView[i], 9));
   });
 });
 
@@ -95,14 +95,14 @@ describe('viewToPdf = invert(pdfToView): hit-testing round-trips', () => {
 
   it('round-trips a point for every rotation, with userUnit ≠ 1 and a crop offset', () => {
     for (const rotation of rotations) {
-      const g = pageGeometry(
+      const geometry = pageGeometry(
         { crop: { left: 12, bottom: -8, right: 312, top: 392 }, rotation, userUnit: 1.5 },
         1.25,
       );
-      const p = { x: 100, y: 120 } as PointIn<'pdf'>;
-      const back = applyPoint(g.viewToPdf, applyPoint(g.pdfToView, p));
-      expect(back.x).toBeCloseTo(p.x, 9);
-      expect(back.y).toBeCloseTo(p.y, 9);
+      const point = { x: 100, y: 120 } as PointIn<'pdf'>;
+      const back = applyPoint(geometry.viewToPdf, applyPoint(geometry.pdfToView, point));
+      expect(back.x).toBeCloseTo(point.x, 9);
+      expect(back.y).toBeCloseTo(point.y, 9);
     }
   });
 
@@ -119,12 +119,12 @@ describe('viewToPdf = invert(pdfToView): hit-testing round-trips', () => {
 
 describe('compose: associative, and screen falls out with zero new functions', () => {
   it('compose is associative', () => {
-    const m = [2, 0, 0, 2, 5, 7] as Mat2D<'view', 'screen'>;
-    const n = [0, 1, -1, 0, 3, 4] as Mat2D<'content', 'view'>;
-    const o = [1, 0, 0, -1, 10, 20] as Mat2D<'pdf', 'content'>;
-    const left = compose(compose(m, n), o);
-    const right = compose(m, compose(n, o));
-    left.forEach((v, i) => expect(v).toBeCloseTo(right[i], 9));
+    const matrix = [2, 0, 0, 2, 5, 7] as Mat2D<'view', 'screen'>;
+    const contentToView = [0, 1, -1, 0, 3, 4] as Mat2D<'content', 'view'>;
+    const pdfToContent = [1, 0, 0, -1, 10, 20] as Mat2D<'pdf', 'content'>;
+    const left = compose(compose(matrix, contentToView), pdfToContent);
+    const right = compose(matrix, compose(contentToView, pdfToContent));
+    left.forEach((entry, i) => expect(entry).toBeCloseTo(right[i], 9));
   });
 
   it('pdfToScreen / screenToPdf round-trip (scroll + dpr, only compose + invert)', () => {
@@ -141,10 +141,10 @@ describe('compose: associative, and screen falls out with zero new functions', (
     const pdfToScreen = compose(viewToScreen, pdfToView);
     const screenToPdf = invert(pdfToScreen);
 
-    const p = { x: 73, y: 211 } as PointIn<'pdf'>;
-    const back = applyPoint(screenToPdf, applyPoint(pdfToScreen, p));
-    expect(back.x).toBeCloseTo(p.x, 9);
-    expect(back.y).toBeCloseTo(p.y, 9);
+    const point = { x: 73, y: 211 } as PointIn<'pdf'>;
+    const back = applyPoint(screenToPdf, applyPoint(pdfToScreen, point));
+    expect(back.x).toBeCloseTo(point.x, 9);
+    expect(back.y).toBeCloseTo(point.y, 9);
   });
 });
 
@@ -183,10 +183,10 @@ describe('applyQuad vs applyRect: orientation preserved where a rect would clamp
     // AABB widens to 15 and forgets the slant
     expect(applyRect(shear, rect)).toEqual({ x: 0, y: 0, width: 15, height: 10 });
     // the quad keeps the slanted top edge (x offset by +5)
-    const q = applyQuad(shear, quad);
-    expect(q.p1).toEqual({ x: 0, y: 0 });
-    expect(q.p2).toEqual({ x: 10, y: 0 });
-    expect(q.p3).toEqual({ x: 15, y: 10 });
-    expect(q.p4).toEqual({ x: 5, y: 10 });
+    const sheared = applyQuad(shear, quad);
+    expect(sheared.p1).toEqual({ x: 0, y: 0 });
+    expect(sheared.p2).toEqual({ x: 10, y: 0 });
+    expect(sheared.p3).toEqual({ x: 15, y: 10 });
+    expect(sheared.p4).toEqual({ x: 5, y: 10 });
   });
 });

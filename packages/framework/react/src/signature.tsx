@@ -34,27 +34,27 @@ export function useSignature(): SignatureCapability {
 
 /** The last signature snapshot (null until the first read lands). */
 export function useSignatureSnapshot(): SignatureSnapshot | null {
-  return useSelector(SignatureToken, (c) => c.getSnapshot());
+  return useSelector(SignatureToken, (signature) => signature.getSnapshot());
 }
 
 /** The last validation (null until one ran). */
 export function useSignatureVerdicts(): readonly SignatureVerdict[] | null {
-  return useSelector(SignatureToken, (c) => c.listVerdicts());
+  return useSelector(SignatureToken, (signature) => signature.listVerdicts());
 }
 
 /** What the document's signatures forbid (null when nothing is signed or not yet read). */
 export function useDocumentProtection(): DocumentProtection | null {
-  return useSelector(SignatureToken, (c) => c.getProtection());
+  return useSelector(SignatureToken, (signature) => signature.getProtection());
 }
 
 /** The field the next picked mark goes to, and whether a sign/fill is in flight. */
 export function useSignatureTarget(): { target: FormFieldRef | null; busy: boolean } {
-  const target = useSelector(SignatureToken, (c) => c.getTarget());
-  const busy = useSelector(SignatureToken, (c) => c.isBusy());
+  const target = useSelector(SignatureToken, (signature) => signature.getTarget());
+  const busy = useSelector(SignatureToken, (signature) => signature.isBusy());
   return { target, busy };
 }
 
-/** Subscribe to one of the plugin's events for the mounted lifetime: `useSignatureEvent((c) => c.onSigned, handler)`. */
+/** Subscribe to one of the plugin's events for the mounted lifetime: `useSignatureEvent((signature) => signature.onSigned, handler)`. */
 export function useSignatureEvent<T>(
   select: (signature: SignatureCapability) => EventHook<T>,
   handler: (event: T) => void,
@@ -78,7 +78,7 @@ export interface SignerRow {
  */
 export function useSignerRows(): SignerRow[] {
   const libraries = useStampLibraries({ kind: SIGNATURES_LIBRARY_KIND });
-  const assets = useSelector(StampToken, (c) => c.listAssets(), shallowArray);
+  const assets = useSelector(StampToken, (stamp) => stamp.listAssets(), shallowArray);
   return useMemo(
     () =>
       libraries.map((library) => {

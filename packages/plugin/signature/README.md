@@ -1,6 +1,6 @@
 # @embedpdf/plugin-signature
 
-Document-scoped digital signing for EmbedPDF v3: sign a signature field with a
+Document-scoped digital signing for EmbedPDF: sign a signature field with a
 **mark** (a stamp-library asset — drawn, typed, uploaded — or bytes you bring)
 through a **signer port** you configure; fill a field visually without
 sealing; validate what is signed; and drop an armed mark onto a field.
@@ -16,7 +16,12 @@ The plugin owns the act and nothing else:
   publishes the new version.
 
 ```ts
-import { signaturePlugin, personalSigner, indexedDbKeyStore } from '@embedpdf/plugin-signature';
+import {
+  signaturePlugin,
+  SignatureToken,
+  personalSigner,
+  indexedDbKeyStore,
+} from '@embedpdf/plugin-signature';
 
 signaturePlugin({
   signer: () => personalSigner({ subject: 'Ada Lovelace', store: indexedDbKeyStore('keys') }),
@@ -26,7 +31,7 @@ signaturePlugin({
 
 const signature = ctx.get(SignatureToken);
 await signature.placeMark({ assetId }, { field: { kind: 'fqn', name: 'sig' } }); // sign / fill / ask, by mode
-await signature.placeMark({ assetId }, { pageObjectNumber, at: { x: 120, y: 90 } }); // elsewhere: a stamp
+await signature.placeMark({ assetId }, { page, at: { x: 120, y: 90 } }); // elsewhere: a stamp
 ```
 
 With the interaction hub and the stamp plugin present, a mark armed from a

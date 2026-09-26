@@ -2,7 +2,7 @@
  * The chrome — structure only. No breakpoints, no show/hide lists, no locale
  * overrides, no dividers/spacers, no hand-written overflow menus. What fits is
  * measured and solved at runtime (@embedpdf/core-ui); the overflow menu is
- * derived. Compare to the v2 snippet's 1,950-line ui-schema.ts.
+ * derived.
  *
  * `importance` (1 sheds first … 5 pinned) is the only responsive knob.
  */
@@ -24,9 +24,8 @@ const history = group('history', { importance: 3 }, ['history:undo', 'history:re
 const mainBar: BarSchema = {
   id: 'main',
   sections: {
-    // v2 layout: everything before the first spacer sits LEFT-aligned —
-    // document menu, workspace, zoom strip, pan/pointer. Only the mode tabs
-    // are truly centered.
+    // The start section sits left-aligned — document menu, workspace, zoom
+    // strip, pan/pointer. Only the mode tabs are truly centered.
     start: [
       group('document', { importance: 5 }, [item('document:menu')]),
       group('workspace', { importance: 4 }, [
@@ -44,9 +43,8 @@ const mainBar: BarSchema = {
       group('modes', {
         role: 'tabs',
         // The group ladder: full strip → trailing tabs shed behind a derived
-        // in-strip chevron (v2's overflow-tabs-button) → select (v2's
-        // mode-select-button) → global overflow. Tab items at importance 1 so
-        // the strip is the FIRST thing to compact; the group at 4 so its
+        // in-strip chevron → select → global overflow. Tab items at importance 1
+        // so the strip is the first thing to compact; the group at 4 so its
         // compact forms survive long.
         shed: true,
         collapse: 'select',
@@ -205,9 +203,9 @@ const pageSettingsMenu: MenuSchema = {
 };
 
 // ── contextual strips (anchored to selections; same BarSchema vocabulary) ────
-// WHICH commands actually show is each command's `visible` derivation (group
+// which commands actually show is each command's `visible` derivation (group
 // only when groupable, style only when the kind declares editable props…), so
-// one strip serves single AND multi selection — v2 needed two schemas for that.
+// one strip serves single and multi selection.
 const annotationStrip: BarSchema = {
   id: 'annotation-strip',
   sections: {
@@ -228,7 +226,7 @@ const annotationStrip: BarSchema = {
   },
 };
 
-// The text-selection strip: appears when a text selection SETTLES (the menu
+// The text-selection strip: appears when a text selection settles (the menu
 // component gates on `isSelecting()`). One command today; "Highlight" et al.
 // are one more id here + one command — no component changes.
 const selectionStrip: BarSchema = {
@@ -239,7 +237,7 @@ const selectionStrip: BarSchema = {
 };
 
 /**
- * The DEFAULT chrome — exported as a VALUE, which is the whole customization
+ * The default chrome — exported as a value, which is the whole customization
  * model: consumers pass nothing and track this, transform it, or write their
  * own. It is never merged with anything.
  */
@@ -257,7 +255,7 @@ export const defaultChrome = defineChrome({
   strips: { annotation: annotationStrip, selection: selectionStrip },
 });
 
-// Lookups take the RESOLVED schema (the host may have replaced the default) —
+// Lookups take the resolved schema (the host may have replaced the default) —
 // the typed literal widens to arbitrary string keys here, once.
 
 /** Menu lookup by id (arbitrary string). */

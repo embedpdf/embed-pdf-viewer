@@ -1,9 +1,9 @@
 /**
- * The viewer handle — `el.viewer`, the DRIVE door of the customization model.
+ * The viewer handle — `el.viewer`, the drive door of the customization model.
  *
- * Deliberately a THIN SKIN over the kernel: `get()` returns each plugin's
- * PUBLIC capability lens exactly as the plugin defined it (the internal/public
- * two-lens split in the plugins IS the curation — this file adds no facade,
+ * Deliberately a thin skin over the kernel: `get()` returns each plugin's
+ * public capability lens exactly as the plugin defined it (the internal/public
+ * two-lens split in the plugins is the curation — this file adds no facade,
  * no second vocabulary, no second write path). `watch()` is the kernel's one
  * change stream, selector-shaped — `useSelector` without React. The command
  * trio is the UI altitude of the same system, for anything button-shaped.
@@ -58,13 +58,13 @@ export interface ViewerHandle extends ScopedViewerHandle {
    * Re-run `select` on every kernel change; call `cb` when the selected value
    * really changed (`isEqual`, default `Object.is` — capability getters return
    * stable references between model changes, so identity works). Returns the
-   * unsubscribe. This is the ONLY reactivity primitive; DOM events on the
+   * unsubscribe. This is the only reactivity primitive; DOM events on the
    * element are sugar over it.
    */
   watch<T>(
     select: () => T,
-    cb: (value: T, previous: T) => void,
-    isEqual?: (a: T, b: T) => boolean,
+    callback: (value: T, previous: T) => void,
+    isEqual?: (left: T, right: T) => boolean,
   ): Unsubscribe;
 
   /** Subscribe to one document lifecycle event (`'opened'`, `'closed'`,
@@ -78,14 +78,14 @@ export interface ViewerHandle extends ScopedViewerHandle {
   execute(id: string, documentId?: string): void;
   resolve(id: string, documentId?: string): ResolvedCommand | null;
   /** `watch` sugar for one command's resolved state (label/icon/enabled/active). */
-  watchCommand(id: string, cb: (cmd: ResolvedCommand | null) => void): Unsubscribe;
+  watchCommand(id: string, callback: (cmd: ResolvedCommand | null) => void): Unsubscribe;
 }
 
 export function createViewerHandle(kernel: Kernel): ViewerHandle {
   const watch = <T>(
     select: () => T,
-    cb: (value: T, previous: T) => void,
-    isEqual: (a: T, b: T) => boolean = Object.is,
+    callback: (value: T, previous: T) => void,
+    isEqual: (left: T, right: T) => boolean = Object.is,
   ): Unsubscribe => {
     let previous = select();
     return kernel.subscribe(() => {
@@ -93,7 +93,7 @@ export function createViewerHandle(kernel: Kernel): ViewerHandle {
       if (isEqual(previous, next)) return;
       const before = previous;
       previous = next;
-      cb(next, before);
+      callback(next, before);
     });
   };
 
@@ -116,10 +116,11 @@ export function createViewerHandle(kernel: Kernel): ViewerHandle {
       tryGet: (token) => kernel.tryCapability(token, documentId),
     }),
     watch,
-    on: (event, listener) => hooks[event](listener as (e: ViewerEvents[typeof event]) => void),
+    on: (event, listener) =>
+      hooks[event](listener as (payload: ViewerEvents[typeof event]) => void),
     execute: (id, documentId) => void commands().execute(id, { documentId }),
     resolve: (id, documentId) => commands().resolveCommand(id, documentId) ?? null,
-    watchCommand: (id, cb) =>
-      watch(() => commands().resolveCommand(id) ?? null, cb, resolvedCommandsEqual),
+    watchCommand: (id, callback) =>
+      watch(() => commands().resolveCommand(id) ?? null, callback, resolvedCommandsEqual),
   };
 }

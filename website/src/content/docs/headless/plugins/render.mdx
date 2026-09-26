@@ -218,7 +218,7 @@ Set any of these at registration with `renderPlugin({ … })`:
 | `tiles.settleMs`    | Rest time before a moving zoom adopts a new render size                | `150`     |
 | `tiles.fadeMs`      | Tile arrival cross-fade, ms                                            | `0`       |
 | `format`            | Encode format for all rasters: `'png'`, `'webp'`, `'bmp'` (local-only) | engine default |
-| `quality`           | Encoder quality for webp/png                                           | engine default |
+| `quality`           | WebP quality, from `0` to `1`; PNG and BMP ignore it                   | engine default |
 | `debug`             | Log tile scheduling and fetch outcomes to the console                  | `false`   |
 
 On the cloud engine, the deployment's advertised policy overrides `quantize`
@@ -243,7 +243,7 @@ plugin's internals are not a public application contract.
   <Card
     title="Pages & rendering"
     description="The engine call underneath the plugin: page sizes, render options, and what a raster costs."
-    href="/docs/engine/core-concepts/pages-and-rendering"
+    href="/docs/engine/documents/rendering"
   />
   <Card
     title="All plugins"

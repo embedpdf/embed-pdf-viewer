@@ -1,5 +1,5 @@
 /**
- * @embedpdf/plugin-measurement/contract — the PUBLIC measurement vocabulary:
+ * @embedpdf/plugin-measurement/contract: the public measurement vocabulary:
  * page scale, calibration, scale-aware readouts, and measurement creation.
  * Creating a measurement annotation is `annotation.create` with a
  * measurement tool; this plugin adds the page-scale sugar around it.
@@ -61,6 +61,7 @@ export interface PageScale {
   ready: boolean;
   /** The engine can persist a scale into the document. */
   persistent: boolean;
+  /** Why the last read of the page's viewports failed; the last known viewports stay in effect. */
   error?: SerializedEngineError;
 }
 
@@ -75,6 +76,7 @@ export interface CalibrationRequest {
 
 export interface CalibrateInput {
   page: PageRef;
+  /** The two ends of the known length, in page space. */
   from: Point;
   to: Point;
   /** The real-world length between the two points. */
@@ -140,13 +142,13 @@ export interface MeasurementCapability {
   listAreaUnits(): readonly AreaUnit[];
   /** The formatted measurement of a measurement annotation. */
   getReadout(ref: AnnotationRef): MeasurementReadout | MeasurementUnavailable;
-  /** A distance in the page's scale — pure conversion, no annotation. */
+  /** A distance between two page-space points in the page's scale: a pure conversion, no annotation. */
   measureDistance(
     page: PageRef,
     from: Point,
     to: Point,
   ): MeasurementReadout | MeasurementUnavailable;
-  /** An area in the page's scale — pure conversion, no annotation. */
+  /** The area of a page-space polygon in the page's scale: a pure conversion, no annotation. */
   measureArea(
     page: PageRef,
     vertices: readonly Point[],

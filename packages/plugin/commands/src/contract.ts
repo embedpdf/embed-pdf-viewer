@@ -1,19 +1,18 @@
 /**
  * @embedpdf/plugin-commands/contract — the command registry that toolbars,
  * menus, contextual strips, shortcuts and the palette all project. The plugin
- * ships ZERO commands (mechanism here, definitions in the product — the same
+ * ships no commands (mechanism here, definitions in the product — the same
  * split as plugin-i18n's locale packs).
  *
- * Command state is a pure DERIVATION over the store: `resolveCommand` reads
- * other capabilities' selectors at call time, so any store change is
- * reflected on the next read and the framework binding's one change stream
- * makes every consumer reactive. Definitions hold functions, so they live in
- * the plugin's registry, never in the store; store state is only the
- * serializable `disabledCategories`.
+ * Command state is a derivation over live state: `resolveCommand` reads other
+ * capabilities at call time, so any store change is reflected on the next
+ * read and the framework binding's one change stream makes every consumer
+ * reactive. Definitions hold functions, so they live in the plugin's
+ * registry, never in the store; registering or removing one wakes readers.
+ * State is only the serializable `disabledCategories`.
  */
 import type {
   CapabilityToken,
-  CoreState,
   EventHook,
   OperationOptions,
   PluginErrorInfo,
@@ -31,19 +30,19 @@ export interface CommandContext {
   readonly documentId: string | null;
   /** Caller-supplied arguments (`execute(id, { args })`). */
   readonly args?: unknown;
-  core(): CoreState;
-  /** Resolve a capability; document-scoped tokens bind to the target document. */
+  /** Resolve a capability; document-scoped tokens bind to the target document
+   *  (`DocumentsToken` reads the document registry). */
   get<T>(token: CapabilityToken<T>): T;
   /** Like `get`, but null when unavailable (no provider / no document). */
   tryGet<T>(token: CapabilityToken<T>): T | null;
 }
 
 /**
- * Up to two theme colors accompanying a command's icon — typed FACTS any
+ * Up to two theme colors accompanying a command's icon — typed facts any
  * renderer can interpret (tint a glyph's slots, show a swatch), never
  * renderer props. The registry carries it the way it carries `icon`: as
- * data it doesn't interpret. Deliberately NOT v2's `iconProps` bag —
- * renderer-specific needs live app-side, joined by command id.
+ * data it doesn't interpret. Renderer-specific needs live app-side, joined
+ * by command id.
  */
 export interface IconAccent {
   /** The mark: stroke / markup / font color. */
@@ -60,14 +59,14 @@ export interface CommandDef {
   readonly icon?: string;
   /** Live color accent for the icon (a tool previewing its drawing defaults).
    *  A pure derivation over the store, exactly like `active`/`enabled`. */
-  readonly iconAccent?: (ctx: CommandContext) => IconAccent | null;
+  readonly iconAccent?: (context: CommandContext) => IconAccent | null;
   /** 'Mod+K' style (ui-core grammar). Multiple bindings allowed. */
   readonly shortcut?: string | readonly string[];
   /** Feature-gating tags: a disabled category hides its commands everywhere. */
   readonly categories?: readonly string[];
 
   // ── declarative surface targets ──────────────────────────────────────────
-  // A command that opens chrome DECLARES what it opens instead of doing it
+  // A command that opens chrome declares what it opens instead of doing it
   // imperatively. This is load-bearing: buttons render carets/aria-haspopup,
   // `active` derives automatically from the surface's open state, and the
   // overflow projection renders `menu` targets as nested submenus.
@@ -79,9 +78,9 @@ export interface CommandDef {
   readonly modal?: string;
 
   // ── pure derivations over the store ──────────────────────────────────────
-  readonly enabled?: (ctx: CommandContext) => boolean;
-  readonly active?: (ctx: CommandContext) => boolean;
-  readonly visible?: (ctx: CommandContext) => boolean;
+  readonly enabled?: (context: CommandContext) => boolean;
+  readonly active?: (context: CommandContext) => boolean;
+  readonly visible?: (context: CommandContext) => boolean;
 
   /** The verb. Optional for pure surface-target commands. Runs before the
    *  default target routing when both are present; `execute` settles after it. */
@@ -102,27 +101,29 @@ export interface ResolvedCommand {
   readonly categories: readonly string[];
 }
 
-/** Value equality over resolved commands — `resolve()` mints a fresh object
- *  per read, so reactive bindings memo by value to re-render on real change. */
+/**
+ * Value equality over resolved commands, for bindings that compare what a
+ * command looks like rather than which object holds it (a group of commands,
+ * or resolutions against different documents).
+ */
 export const resolvedCommandsEqual = (
-  a: ResolvedCommand | null,
-  b: ResolvedCommand | null,
+  left: ResolvedCommand | null,
+  right: ResolvedCommand | null,
 ): boolean => {
-  if (a === b) return true;
-  if (!a || !b) return false;
+  if (left === right) return true;
+  if (!left || !right) return false;
   return (
-    a.id === b.id &&
-    a.label === b.label &&
-    a.icon === b.icon &&
-    // by value: resolve() mints a fresh accent object each read
-    a.iconAccent?.primary === b.iconAccent?.primary &&
-    a.iconAccent?.secondary === b.iconAccent?.secondary &&
-    a.menu === b.menu &&
-    a.enabled === b.enabled &&
-    a.active === b.active &&
-    a.visible === b.visible &&
-    a.shortcuts.length === b.shortcuts.length &&
-    a.shortcuts.every((s, i) => s === b.shortcuts[i])
+    left.id === right.id &&
+    left.label === right.label &&
+    left.icon === right.icon &&
+    left.iconAccent?.primary === right.iconAccent?.primary &&
+    left.iconAccent?.secondary === right.iconAccent?.secondary &&
+    left.menu === right.menu &&
+    left.enabled === right.enabled &&
+    left.active === right.active &&
+    left.visible === right.visible &&
+    left.shortcuts.length === right.shortcuts.length &&
+    left.shortcuts.every((shortcut, index) => shortcut === right.shortcuts[index])
   );
 };
 
@@ -156,11 +157,19 @@ export interface CommandExecutionFailedEvent {
 
 export interface CommandsCapability {
   // ── registry ──
-  /** Add a command; the remover unregisters it. A duplicate id throws `conflict` unless `replace`. */
-  registerCommand(def: CommandDef, options?: RegisterCommandOptions): Unsubscribe;
-  registerCommands(defs: readonly CommandDef[], options?: RegisterCommandOptions): Unsubscribe;
+  /**
+   * Add a command and wake readers; the remover unregisters it (and wakes
+   * them again). A duplicate id throws `conflict` unless `replace`.
+   */
+  registerCommand(definition: CommandDef, options?: RegisterCommandOptions): Unsubscribe;
+  /** `registerCommand` for several definitions; the remover unregisters all of them. */
+  registerCommands(
+    definitions: readonly CommandDef[],
+    options?: RegisterCommandOptions,
+  ): Unsubscribe;
   hasCommand(id: CommandId): boolean;
   getCommand(id: CommandId): CommandDef | null;
+  /** Registered ids in registration order. Reference-stable until the registry changes. */
   listCommandIds(): readonly CommandId[];
 
   // ── resolution (pure reads; reactive through the store) ──
@@ -170,11 +179,15 @@ export interface CommandsCapability {
   listCommands(documentId?: string): readonly ResolvedCommand[];
   /** Palette query: visible commands whose resolved label or id matches. */
   searchCommands(query: string, documentId?: string): readonly ResolvedCommand[];
-  /** Every binding, for a keyboard help sheet. */
+  /** Every binding, for a keyboard help sheet. Reference-stable until the registry changes. */
   listShortcuts(): readonly { commandId: CommandId; shortcut: string }[];
 
-  // ── execution (the ONLY path; guarded by enabled/visible) ──
-  /** Run a command; settles after `run` does. A refused command resolves `rejected` with its reason. */
+  // ── execution (the only path; guarded by enabled/visible) ──
+  /**
+   * Run a command; settles after `run` does. A refused command resolves
+   * `rejected` with its reason. Fires `onExecuted` on success; a throwing
+   * `run` fires `onExecutionFailed` and rejects with its `PluginError`.
+   */
   execute(
     id: CommandId,
     options?: { documentId?: string; args?: unknown } & OperationOptions,
@@ -190,6 +203,8 @@ export interface CommandsCapability {
   setDisabledCategories(categories: readonly string[]): void;
 
   // ── events ──
+  /** A command's `run` (or its surface routing) completed. */
   readonly onExecuted: EventHook<CommandExecutedEvent>;
+  /** A command's `run` threw; `execute` rejects with the same error. */
   readonly onExecutionFailed: EventHook<CommandExecutionFailedEvent>;
 }

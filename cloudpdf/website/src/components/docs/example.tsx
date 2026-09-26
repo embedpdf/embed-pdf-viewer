@@ -14,10 +14,10 @@ import {
   isDocsIntegration,
 } from '@/lib/docs-integrations';
 
-/** Mounts a built demo module (public/demos/…) via a NATIVE dynamic import —
+/** Mounts a built demo module (public/demos/…) via a native dynamic import —
  * the module carries its own framework runtime, so Vue/Svelte/Angular demos
  * run inside the Next site with no bundler integration at all. Import cost is
- * deferred until the preview is open AND near the viewport; once mounted, a
+ * deferred until the preview is open and near the viewport; once mounted, a
  * collapse keeps the instance alive (state survives toggling). */
 function DemoMount({ url, active }: { url: string; active: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -82,7 +82,7 @@ function DemoMount({ url, active }: { url: string; active: boolean }) {
 }
 
 /**
- * The route-variant-resolved sample display. This site's job is RESOLUTION —
+ * The route-variant-resolved sample display. This site's job is resolution —
  * which framework's files, which built demo — and the honest not-yet-ported
  * fallback; the kit's CodeExampleCard owns every pixel of the shell, so the
  * "View code" chrome is identical on both docs sites.

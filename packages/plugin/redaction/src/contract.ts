@@ -1,6 +1,6 @@
 /**
- * @embedpdf/plugin-redaction/contract — the PUBLIC redaction vocabulary.
- * Marking is annotation authoring (a mark IS a `redact` annotation); applying
+ * @embedpdf/plugin-redaction/contract: the public redaction vocabulary.
+ * Marking is annotation authoring (a mark is a `redact` annotation); applying
  * is the destructive document mutation. The plugin owns no mark state: the
  * pending view is a live projection of the annotation plane.
  */
@@ -18,7 +18,11 @@ export type { RedactionApplyResult } from '@embedpdf/engine-core';
 
 /** `redactionPlugin(config)`. */
 export interface RedactionConfig {
-  /** Defaults for marks created through this plugin's verbs: the applied fill and the overlay label's look. */
+  /**
+   * The applied fill and the overlay label's look for marks made by
+   * `markArea`, `markPage` and `markMatches`. Selection marks take the
+   * annotation plugin's `redact` preset instead.
+   */
   overlay?: {
     /** CSS hex colour painted over the region on apply. Default black. */
     fill?: string;
@@ -59,13 +63,14 @@ export interface RedactionLabelPatch {
   repeat?: boolean;
 }
 
-/** Which OTHER annotations an apply would destroy (a client-side estimate; the result is authoritative). */
+/** Which other annotations an apply would destroy (a client-side estimate; the result is authoritative). */
 export interface RedactionCollateral {
   readonly count: number;
   readonly refs: readonly AnnotationRef[];
 }
 
 // ── events ──
+/** A confirmed apply, from this session or another. */
 export interface RedactionAppliedEvent {
   readonly result: RedactionApplyResult;
   readonly origin: ChangeOrigin;
@@ -77,19 +82,21 @@ export interface RedactionPendingChangedEvent {
 
 export interface RedactionCapability {
   /**
-   * The twins (permissions.md). Marking and applying are DIFFERENT powers:
-   * a mark is an ordinary `redact` annotation, so `canMark()` is annotation
-   * create authority (any reviewer who can annotate can propose redactions —
-   * Acrobat parity); `canApply()` is the destructive rewrite — engine support
-   * present AND every capability the engine's apply asserts (`doc.redact`,
-   * `doc.pages.modify`, `doc.annotate.modify`). The engine enforces both
-   * independently — these are the UI mirrors.
+   * Whether marking is allowed. Marking and applying are different powers: a
+   * mark is an ordinary `redact` annotation, so this is annotation create
+   * authority (matches Acrobat: any reviewer who can annotate can propose
+   * redactions). The engine enforces it; this is the UI mirror.
    */
   canMark(): boolean;
+  /**
+   * Whether applying is allowed: the engine has a redaction service and every
+   * capability its apply asserts is granted (`doc.redact`, `doc.pages.modify`,
+   * `doc.annotate.modify`). The engine enforces it; this is the UI mirror.
+   */
   canApply(): boolean;
-  /** An apply is in flight. */
+  /** An apply of this session is running at the engine. */
   isApplying(): boolean;
-  /** The last apply result seen (own or remote). */
+  /** The last confirmed apply result, from this session or another. */
   getLastResult(): RedactionApplyResult | null;
 
   // ── the pending view ──
@@ -101,13 +108,22 @@ export interface RedactionCapability {
   estimateCollateral(refs?: readonly AnnotationRef[]): RedactionCollateral;
 
   // ── marking ──
-  /** Mark the current text selection (one mark per page) and clear it. Empty without a selection. */
+  // Every marking verb rejects `permission-denied` without annotation create
+  // authority (see `canMark`).
+  /**
+   * Mark the current text selection (one mark per page) and clear it. Empty
+   * without a selection; rejects `unsupported` without the selection plugin.
+   */
   markSelection(options?: OperationOptions): Promise<readonly AnnotationRef[]>;
   /** Mark a page-space rectangle. */
   markArea(page: PageRef, bounds: Rect, options?: OperationOptions): Promise<AnnotationRef>;
-  /** Mark a whole page. */
+  /** Mark a whole page. Rejects `not-found` for a page of another document. */
   markPage(page: PageRef, options?: OperationOptions): Promise<AnnotationRef>;
-  /** Mark every match of a search (needs the search plugin). */
+  /**
+   * Mark every match of a search. Runs the query through the search plugin,
+   * so it replaces the user's current search; rejects `unsupported` without
+   * the search plugin.
+   */
   markMatches(
     query: SearchQuery,
     options?: { pages?: readonly PageRef[] } & OperationOptions,
@@ -127,15 +143,26 @@ export interface RedactionCapability {
   ): Promise<void>;
 
   // ── applying (irreversible) ──
-  /** Apply specific pending marks. Per-page outcomes ride the result. */
+  /**
+   * Apply specific pending marks. Per-page outcomes ride the result. Applies
+   * run one at a time in call order; when one resolves, `getLastResult()`
+   * holds its result and `onApplied` has fired. Rejects with `not-found` when
+   * none of the refs is a pending mark, `unsupported` without an engine
+   * redaction service, or the engine's `permission-denied`.
+   */
   apply(refs: readonly AnnotationRef[], options?: OperationOptions): Promise<RedactionApplyResult>;
-  /** Apply every redaction in the document (pages scope — including marks on pages this client never loaded). */
+  /**
+   * Apply every redaction in the document, in pages scope, including marks
+   * on pages this client never loaded. Rejects like `apply`, and with
+   * `not-ready` when the document has no pages.
+   */
   applyAll(options?: OperationOptions): Promise<RedactionApplyResult>;
-  /** Apply the marks on some pages. */
+  /** Apply the marks on some pages. Rejects like `apply`, and with `invalid-input` for no pages. */
   applyPages(pages: readonly PageRef[], options?: OperationOptions): Promise<RedactionApplyResult>;
 
   // ── events ──
-  /** After ANY confirmed apply — own or a remote collaborator's. */
+  /** A confirmed apply, from this session or another; fires after `getLastResult()` changed. */
   readonly onApplied: EventHook<RedactionAppliedEvent>;
+  /** Marks were created, changed or removed on some pages. */
   readonly onPendingChanged: EventHook<RedactionPendingChangedEvent>;
 }

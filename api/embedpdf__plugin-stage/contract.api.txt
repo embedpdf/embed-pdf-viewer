@@ -33,6 +33,7 @@ StageCapability [InterfaceDeclaration]: export interface StageCapability{ getCam
 StageConfig [InterfaceDeclaration]: export interface StageConfig extends Partial<StageSettings>{ scheduler?: Scheduler; responsive?: readonly ResponsiveRule[]; }
 StageMotionEndedEvent [InterfaceDeclaration]: export interface StageMotionEndedEvent{ readonly camera: Camera; }
 StagePageChangedEvent [InterfaceDeclaration]: export interface StagePageChangedEvent{ readonly page: PageInfo | null; readonly pageIndex: number; readonly previousPageIndex: number; }
+StagePluginOptions [InterfaceDeclaration]: export interface StagePluginOptions extends StageConfig{ id?: string; token?: CapabilityToken<StageCapability>; }
 StageScrollToOptions [InterfaceDeclaration]: export interface StageScrollToOptions{ left?: number; top?: number; behavior?: ScrollBehaviorKind; }
 StageSettings [InterfaceDeclaration]: export interface StageSettings{ flow: FlowMode; layout: LayoutKind; spread: SpreadMode; sizing: SizingMode; columns: GridColumns; bounded: boolean; padding: number; gap: Gap; pageFrame: PageFrame; direction: Direction; fitAlign: Alignment; arrivalAlign: ArrivalAlignment; zoomAlign: AlignmentValue; anchorAlign: AlignmentValue; viewRotation: PageRotation; zoom: ZoomSpec; scrollBehavior: ScrollBehaviorKind; viewUnitsPerPoint: number; }
 StageSettingsChangedEvent [InterfaceDeclaration]: export interface StageSettingsChangedEvent{ readonly settings: StageSettings; readonly changed: readonly (keyof StageSettings)[]; }

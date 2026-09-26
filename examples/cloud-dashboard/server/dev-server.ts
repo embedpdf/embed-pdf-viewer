@@ -4,6 +4,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { adminWirePaths } from '@cloudpdf/contract';
+import type { Identity } from '@embedpdf/engine-core';
 import { CloudPDFClient } from '@cloudpdf/sdk';
 import {
   AzureFrontDoorCdnSigner,
@@ -387,7 +388,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       tenantId,
       docId,
       layerName,
-      sub: identity.user_id ?? name.toLowerCase().replace(/\s+/g, '-'),
+      sub: identity.userId ?? name.toLowerCase().replace(/\s+/g, '-'),
       ttlSeconds,
       scope,
       identity,
@@ -543,12 +544,7 @@ function mintDocToken(input: {
   sub: string;
   ttlSeconds?: number;
   scope?: ReadonlyArray<string>;
-  identity?: {
-    user_id?: string;
-    group_id?: string;
-    groups?: string[];
-    display_name?: string;
-  };
+  identity?: Identity;
 }): string {
   return signDevToken(jwtSigningSecret, {
     sub: input.sub,
@@ -559,7 +555,9 @@ function mintDocToken(input: {
     ttlSeconds: input.ttlSeconds ?? 60 * 60,
     jti: randomUUID(),
     extras: {
-      ...(input.identity ?? {}),
+      ...(input.identity && Object.keys(input.identity).length > 0
+        ? { identity: input.identity }
+        : {}),
       embedpdf: {
         unlock_key: randomBytes(32).toString('base64url'),
       },
@@ -600,38 +598,29 @@ function readStringArray(body: unknown, key: string, fallback: string[] = []): s
   return fallback;
 }
 
-function readIdentityFromBody(body: unknown): {
-  user_id?: string;
-  group_id?: string;
-  groups?: string[];
-  display_name?: string;
-} {
-  return {
-    ...readOptionalString(body, 'user_id', 'user_id'),
-    ...readOptionalString(body, 'group_id', 'group_id'),
-    ...readOptionalString(body, 'display_name', 'display_name'),
-    ...readOptionalStringArray(body, 'groups', 'groups'),
-  };
-}
+const IDENTITY_STRING_FIELDS = [
+  'userId',
+  'displayName',
+  'email',
+  'title',
+  'organization',
+  'organizationalUnit',
+  'groupId',
+] as const;
 
-function readOptionalString<T extends string>(
-  body: unknown,
-  key: string,
-  outKey: T,
-): Partial<Record<T, string>> {
-  const value = body && typeof body === 'object' ? (body as Record<string, unknown>)[key] : null;
-  return typeof value === 'string' && value.trim()
-    ? ({ [outKey]: value.trim() } as Partial<Record<T, string>>)
-    : {};
-}
-
-function readOptionalStringArray<T extends string>(
-  body: unknown,
-  key: string,
-  outKey: T,
-): Partial<Record<T, string[]>> {
-  const values = readStringArray(body, key);
-  return values.length > 0 ? ({ [outKey]: values } as Partial<Record<T, string[]>>) : {};
+/** The request's `identity` object: its known string fields and `groups`, blanks dropped. */
+function readIdentityFromBody(body: unknown): Identity {
+  const value =
+    body && typeof body === 'object' ? (body as Record<string, unknown>)['identity'] : null;
+  if (!value || typeof value !== 'object') return {};
+  const identity: { -readonly [K in keyof Identity]: Identity[K] } = {};
+  for (const key of IDENTITY_STRING_FIELDS) {
+    const field = (value as Record<string, unknown>)[key];
+    if (typeof field === 'string' && field.trim()) identity[key] = field.trim();
+  }
+  const groups = readStringArray(value, 'groups');
+  if (groups.length > 0) identity.groups = groups;
+  return identity;
 }
 
 function splitScopeList(raw: string): string[] {

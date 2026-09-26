@@ -9,7 +9,7 @@
  *     POST   …/signatures/:signingId/complete     JSON { cms: base64, expectedVersion }
  *     DELETE …/signatures/:signingId
  *   Version-scoped reads (content-addressed by base sha; immutable; the
- *   RESOURCE comes before the sha so each family keeps its own CDN prefix):
+ *   resource comes before the sha so each family keeps its own CDN prefix):
  *     GET  /v1/docs/:docId/versions                                   the catalog (no-store)
  *     GET  /v1/docs/:docId/versions/signatures/:sha
  *     GET  /v1/docs/:docId/versions/signatures/:sha/:fieldKey/contents
@@ -98,7 +98,7 @@ export async function registerSignatureRoutes(
   ) => service.readLayerSignatures(ctx, docId, layerName, signal);
   // The layer session was opened on base + artifact and has applied every
   // later write in memory (each one persisted as a new artifact): the
-  // layer's state IS the session's working copy, so the analysis
+  // layer's state is the session's working copy, so the analysis
   // snapshots it as one more revision over the loaded bytes.
   const analyzeLayer = (
     ctx: OpenContext,
@@ -217,9 +217,8 @@ export async function registerSignatureRoutes(
     if (parsed.certify) {
       requireLayerCapability(req, docId, layerName, 'doc.sign.certify', pdfBits);
     }
-    const { appearance, signer, ...rest } = parsed;
+    const { appearance, ...rest } = parsed;
     const input: SignaturePrepareInput = { ...rest };
-    if (!input.attribution && signer) input.attribution = signer;
     if (appearance) {
       const resource = resources?.[appearance.resource];
       if (!resource) {
@@ -288,7 +287,7 @@ export async function registerSignatureRoutes(
     const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
     const ctx = requireLayerCapability(req, docId, layerName, 'doc.sign', pdfBits);
     setNoStore(reply);
-    return layerService.abortSignature(ctx, { docId, layerName, signingId });
+    return layerService.cancelSignature(ctx, { docId, layerName, signingId });
   });
 
   // ---- version-scoped reads -----------------------------------------------
@@ -338,7 +337,12 @@ export async function registerSignatureRoutes(
     const accessCtx = requireDocAccessOnly(req, docId);
     const pdfBits = await bitsForDoc(accessCtx, docId);
     const ctx = requireResource(req, docId, 'version-signatures', pdfBits);
-    const snapshot = await versionSignatures(ctx, docId, requireSha(sha), abortSignalFromRequest(req));
+    const snapshot = await versionSignatures(
+      ctx,
+      docId,
+      requireSha(sha),
+      abortSignalFromRequest(req),
+    );
     setImmutableCache(reply);
     return snapshot;
   });

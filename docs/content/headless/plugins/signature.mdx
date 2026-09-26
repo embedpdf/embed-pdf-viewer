@@ -24,12 +24,12 @@ the capability with `useSignature()`:
 import { signaturePlugin, personalSigner, indexedDbKeyStore } from '@embedpdf/react/signature';
 
 signaturePlugin({
-  // The key holder. A thunk resolves per signing (prompt a PIN, fetch a token…).
-  signer: () =>
+  // The key. A thunk resolves per signing (prompt a PIN, fetch a token…).
+  key: () =>
     personalSigner({ subject: 'Ada Lovelace', store: indexedDbKeyStore('my-app-keys') }),
   // Anchors for validation; without them every verdict tops out at "valid, signer unknown".
   trust: { anchors: async () => [rootCertificateDer] },
-  // 'sign' (default with a signer) | 'visual' (default without) | 'ask'
+  // 'sign' (default with a key) | 'visual' (default without) | 'ask'
   mode: 'sign',
 });
 ```
@@ -65,11 +65,11 @@ type Mark = { assetId: string } | { source: BinarySource }; // PNG, JPEG, or a o
 ## Sign, fill, clear
 
 ```ts
-// Seal: the mark becomes the widget's appearance, the signer signs the digest.
-const result = await signature.signField({
+// Seal: the mark becomes the widget's appearance, the key signs the digest.
+const result = await signature.sign({
   field: { kind: 'fqn', name: 'sig' },
   mark: { assetId },
-  attribution: { reason: 'Approved', location: 'Amsterdam' }, // /Name defaults to the certificate's subject
+  signer: { reason: 'Approved', location: 'Amsterdam' }, // the name defaults to the certificate's subject
   certify: { permission: 2 }, // optional: the certification signature (needs doc.sign.certify)
 });
 result.version; // the new saved version the sealed bytes became
@@ -79,9 +79,10 @@ await signature.fillField(field, { source: pngBytes });
 await signature.clearField(field);
 ```
 
-`signField` runs the engine's two-phase signing (`prepare` → your signer →
-`complete`) through `@embedpdf/core-signature`; any failure aborts the
-candidate, so a document is never left with a pending signing. A signed
+`sign` runs the engine's two-phase signing (`prepare` → your key →
+`complete`) through `@embedpdf/core-signature`; any failure cancels the
+candidate, so a document is never left with a pending signing. A call can
+bring its own `key`; the configured one is used otherwise. A signed
 field refuses both `fillField` and `clearField`: its appearance is part of
 what was signed.
 

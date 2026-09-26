@@ -1,48 +1,34 @@
-/** Reads of the slice, the busy bracket, and the engine doors every area needs. */
-import { PluginError, type ResourceStatus } from '@embedpdf/core';
-import type { FormFieldRef } from '@embedpdf/engine-core/runtime';
+/** The busy bracket and the engine doors every area needs. */
+import { PluginError } from '@embedpdf/core';
 
+import { setBusy } from '../model';
 import type { SignatureContext } from './context';
 
-export const sameRef = (a: FormFieldRef, b: FormFieldRef): boolean =>
-  a.kind === 'objectNumber' && b.kind === 'objectNumber'
-    ? a.fieldObjectNumber === b.fieldObjectNumber
-    : a.kind === 'fqn' && b.kind === 'fqn'
-      ? a.name === b.name
-      : false;
-
 export function createStore(ctx: SignatureContext) {
-  const state = () => ctx.getState();
-  const setStatus = (status: ResourceStatus): void => ctx.dispatch({ type: 'STATUS', status });
   const withBusy = async <T>(work: () => Promise<T>): Promise<T> => {
-    ctx.dispatch({ type: 'BUSY', busy: true });
+    ctx.state.update(setBusy, true);
     try {
       return await work();
     } finally {
-      ctx.dispatch({ type: 'BUSY', busy: false });
+      ctx.state.update(setBusy, false);
     }
   };
-  const requireDoc = () => {
-    const doc = ctx.doc;
-    if (!doc) throw new PluginError('not-ready', 'signature', 'no document bound');
-    return doc;
-  };
   const requireSignatures = () => {
-    const doc = requireDoc();
-    if (!doc.signatures) {
+    const signatures = ctx.doc.signatures;
+    if (!signatures) {
       throw new PluginError(
         'unsupported',
         'signature',
         'this engine does not implement signatures',
       );
     }
-    return { doc, signatures: doc.signatures };
+    return signatures;
   };
   const documentId = () => {
     const id = ctx.documentId;
     if (!id) throw new PluginError('not-ready', 'signature', 'no document id');
     return id;
   };
-  return { state, setStatus, withBusy, requireDoc, requireSignatures, documentId };
+  return { withBusy, requireSignatures, documentId };
 }
 export type SignatureStore = ReturnType<typeof createStore>;

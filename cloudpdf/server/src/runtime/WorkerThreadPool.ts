@@ -185,7 +185,7 @@ export function resolvePoolSize(explicit: number | undefined): number {
  *      PDFium document handle lives on that worker, so we'd otherwise
  *      need to re-parse the PDF on every call.
  *
- *   2. **Sticky-by-base_sha** (Phase 3) — when opening a *new* doc,
+ *   2. **Sticky-by-base_sha** — when opening a *new* doc,
  *      we prefer a slot that already serves a doc with the same
  *      `base_sha`. Reuses OS page cache + any worker-local caches
  *      keyed by the base bytes. The "same handbook across 1000
@@ -333,7 +333,7 @@ export class WorkerThreadPool implements EnginePool {
       throw new EngineError(EngineErrorCode.InvalidArg, `docId already open: ${docId}`);
     }
     const slot = baseSha ? this.pickSlotForBase(baseSha) : this.pickLeastLoaded();
-    // Capacity check BEFORE binding the new doc — eviction may close
+    // Capacity check before binding the new doc — eviction may close
     // a doc on this slot, which we want to settle before the new
     // openassignment lands.
     if (this.maxDocsPerSlot > 0 && slot.docIds.size >= this.maxDocsPerSlot) {

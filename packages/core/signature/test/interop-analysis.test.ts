@@ -1,7 +1,7 @@
 /**
  * Interoperability fixtures for the revision analysis: the adversarial
  * probes of `engine/main/test/signature-adversarial.test.ts`, signed with a
- * REAL test certificate so an external validator (pyHanko) can reach its
+ * real test certificate so an external validator (pyHanko) can reach its
  * modification analysis. Set `EPDF_INTEROP_DIR=<dir>` to write every
  * fixture, the trust anchor and a manifest of our verdicts there; the
  * scratchpad script `pyh_validate.py` then compares. Skipped otherwise.
@@ -36,11 +36,11 @@ const CATALOG = '/Type /Catalog /Pages 2 0 R /AcroForm 10 0 R';
 const sigField = (num: number, name: string, rect: string) =>
   `<< /Type /Annot /Subtype /Widget /FT /Sig /T (${name}) /Rect [${rect}] /P 3 0 R >>`;
 const page = (annots: number[]) =>
-  `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 600 800] /Annots [${annots.map((n) => `${n} 0 R`).join(' ')}] /Resources <<>> >>`;
+  `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 600 800] /Annots [${annots.map((objectNumber) => `${objectNumber} 0 R`).join(' ')}] /Resources <<>> >>`;
 const acroForm = (fields: number[]) =>
-  `<< /Fields [${fields.map((n) => `${n} 0 R`).join(' ')}] /DA (/Helv 0 Tf 0 g) >>`;
-const textField = (v: string, extra = '') =>
-  `<< /Type /Annot /Subtype /Widget /FT /Tx /T (text) /V (${v}) /Rect [20 60 180 80] /P 3 0 R${extra} >>`;
+  `<< /Fields [${fields.map((objectNumber) => `${objectNumber} 0 R`).join(' ')}] /DA (/Helv 0 Tf 0 g) >>`;
+const textField = (value: string, extra = '') =>
+  `<< /Type /Annot /Subtype /Widget /FT /Tx /T (text) /V (${value}) /Rect [20 60 180 80] /P 3 0 R${extra} >>`;
 const formStream = (content: string) =>
   `<< /Type /XObject /Subtype /Form /BBox [0 0 160 20] /Resources <<>> /Length ${content.length} >>\nstream\n${content}\nendstream`;
 
@@ -77,7 +77,11 @@ describe.skipIf(!OUT)('interop fixtures for the revision analysis (pyHanko)', ()
   ): Promise<Uint8Array> {
     const doc = await open(bytes);
     try {
-      await sign(doc, { field: { kind: 'fqn', name: fieldName }, signer, certify: { permission } });
+      await sign(doc, {
+        field: { kind: 'fqn', name: fieldName },
+        key: signer,
+        certify: { permission },
+      });
       return new Uint8Array(await doc.download());
     } finally {
       await doc.close();
@@ -87,7 +91,7 @@ describe.skipIf(!OUT)('interop fixtures for the revision analysis (pyHanko)', ()
   async function ourVerdict(bytes: Uint8Array): Promise<Verdict> {
     const doc = await open(bytes);
     try {
-      return (await doc.signatures!.analyze({ since: { signatureIndex: 0 } })).verdict;
+      return (await doc.signatures.analyze({ since: { signatureIndex: 0 } })).verdict;
     } finally {
       await doc.close();
     }
@@ -188,8 +192,8 @@ describe.skipIf(!OUT)('interop fixtures for the revision analysis (pyHanko)', ()
       name: 'shared_ap_one_fill_p2',
       expected: 'forbidden',
       build: async () => {
-        const other = (v: string) =>
-          `<< /Type /Annot /Subtype /Widget /FT /Tx /T (other) /V (${v}) /Rect [20 90 180 110] /P 3 0 R /AP 22 0 R >>`;
+        const other = (value: string) =>
+          `<< /Type /Annot /Subtype /Widget /FT /Tx /T (other) /V (${value}) /Rect [20 90 180 110] /P 3 0 R /AP 22 0 R >>`;
         const base = document({
           3: page([20, 40, 30]),
           10: acroForm([20, 40, 30]),
@@ -246,7 +250,7 @@ describe.skipIf(!OUT)('interop fixtures for the revision analysis (pyHanko)', ()
         try {
           await sign(doc, {
             field: { kind: 'fqn', name: 'sig2' },
-            signer,
+            key: signer,
             lock: { action: 'include', fields: ['text'] },
           });
           return new Uint8Array(await doc.download());
@@ -279,7 +283,7 @@ describe.skipIf(!OUT)('interop fixtures for the revision analysis (pyHanko)', ()
       },
     },
     {
-      // Certified by us; pyHanko adds and signs a new field in ONE revision (its default flow).
+      // Certified by us; pyHanko adds and signs a new field in one revision (its default flow).
       // The scratchpad script `pyh_sign_new_field.py` completes this one; here we only write the input.
       name: 'certified_p2_input_for_pyhanko_new_field',
       expected: 'unchanged',
@@ -297,15 +301,15 @@ describe.skipIf(!OUT)('interop fixtures for the revision analysis (pyHanko)', ()
     const { readFile } = await import('node:fs/promises');
     const doc = await open(new Uint8Array(await readFile(process.env.EPDF_INTEROP_ANALYZE!)));
     try {
-      const a = await doc.signatures!.analyze({ since: { signatureIndex: 0 } });
+      const analysis = await doc.signatures.analyze({ since: { signatureIndex: 0 } });
       console.log(
         JSON.stringify({
-          verdict: a.verdict,
-          steps: a.steps.map((s) => ({
-            level: s.levelInForce,
-            verdict: s.verdict,
-            objects: s.changes.map((c) => c.objectNumber),
-            findings: s.findings,
+          verdict: analysis.verdict,
+          steps: analysis.steps.map((step) => ({
+            level: step.levelInForce,
+            verdict: step.verdict,
+            objects: step.changes.map((change) => change.objectNumber),
+            findings: step.findings,
           })),
         }),
       );
@@ -315,7 +319,7 @@ describe.skipIf(!OUT)('interop fixtures for the revision analysis (pyHanko)', ()
   });
 
   // `EPDF_INTEROP_NATIVE=1`: a file-backed session on the native runtime signs
-  // through a file candidate (C2–C4); the sealed FILE is what pyHanko checks.
+  // through a file candidate (C2–C4); the sealed file is what pyHanko checks.
   test.skipIf(!process.env.EPDF_INTEROP_NATIVE)(
     'file-backed signing on the native runtime',
     async () => {
@@ -344,14 +348,14 @@ describe.skipIf(!OUT)('interop fixtures for the revision analysis (pyHanko)', ()
           );
           const result = await sign(doc, {
             field: { kind: 'fqn', name: 'sig' },
-            signer,
+            key: signer,
             certify: { permission: 2 },
           });
           expect(result.status).toBe('completed');
           // The session's base is now the sealed candidate file beside the base.
           const { readdir } = await import('node:fs/promises');
-          const files = (await readdir(OUT!)).filter((f) =>
-            f.startsWith('native_base.pdf.signing-'),
+          const files = (await readdir(OUT!)).filter((fileName) =>
+            fileName.startsWith('native_base.pdf.signing-'),
           );
           expect(files).toHaveLength(1);
           sealedPath = resolve(OUT!, files[0]);
@@ -369,17 +373,17 @@ describe.skipIf(!OUT)('interop fixtures for the revision analysis (pyHanko)', ()
 
   test('write fixtures and manifest', async () => {
     const manifest: Array<{ name: string; expected: Verdict; ours: Verdict; note?: string }> = [];
-    for (const s of scenarios) {
-      const bytes = await s.build();
-      await writeFile(resolve(OUT!, `${s.name}.pdf`), bytes);
+    for (const scenario of scenarios) {
+      const bytes = await scenario.build();
+      await writeFile(resolve(OUT!, `${scenario.name}.pdf`), bytes);
       const ours = await ourVerdict(bytes);
       manifest.push({
-        name: s.name,
-        expected: s.expected,
+        name: scenario.name,
+        expected: scenario.expected,
         ours,
-        ...(s.note ? { note: s.note } : {}),
+        ...(scenario.note ? { note: scenario.note } : {}),
       });
-      expect(ours, s.name).toBe(s.expected);
+      expect(ours, scenario.name).toBe(scenario.expected);
     }
     await writeFile(resolve(OUT!, 'manifest.json'), JSON.stringify(manifest, null, 2));
   });

@@ -51,13 +51,6 @@ async function rejection(p: PromiseLike<unknown>): Promise<{ code?: string }> {
 const latin1 = (bytes: Uint8Array): string =>
   Array.from(bytes, (b) => String.fromCharCode(b)).join('');
 
-async function readBack(doc: Awaited<ReturnType<LocalEngine['open']>>, id: string) {
-  const snapshot = await doc.page(toPageRef(PAGE)).annotations.list();
-  const dto = snapshot.annotations.find((a) => a.subtype === 'free-text' && a.id === id);
-  if (!dto) throw new Error(`free-text ${id} not found`);
-  return dto as FreeTextAnnotationDTO;
-}
-
 describe('rich text FreeText (local engine)', () => {
   let engine: LocalEngine;
 
@@ -77,7 +70,7 @@ describe('rich text FreeText (local engine)', () => {
       contents: 'Plain\rtext',
       rect: RECT,
     });
-    const dto = created.created as FreeTextAnnotationDTO;
+    const dto = created.annotation as FreeTextAnnotationDTO;
     expect(dto.fontFamily).toBe('helvetica-bold');
     expect(dto.richText.body.family).toBe('Helvetica');
     expect(dto.richText.body.weight).toBe(700);
@@ -118,7 +111,7 @@ describe('rich text FreeText (local engine)', () => {
         ],
       },
     });
-    const dto = created.created as FreeTextAnnotationDTO;
+    const dto = created.annotation as FreeTextAnnotationDTO;
     expect(dto.contents).toBe('Hello bold red\rH2');
     // The body became the /DA font and size; the /DA colour stayed the draft's.
     expect(dto.fontFamily).toBe('helvetica');
@@ -151,8 +144,8 @@ describe('rich text FreeText (local engine)', () => {
       contents: 'centred',
       rect: RECT,
     });
-    const ref = created.created.ref;
-    const plain = created.created as FreeTextAnnotationDTO;
+    const ref = created.annotation.ref;
+    const plain = created.annotation as FreeTextAnnotationDTO;
     expect(plain.textAlign).toBe('center');
     expect(plain.richText.body.align).toBe('center');
     // The first bold: paragraphs only, no body, no alignment (the editor's commit).
@@ -163,7 +156,7 @@ describe('rich text FreeText (local engine)', () => {
           paragraphs: [{ runs: [{ text: 'cen' }, { text: 'tred', style: { weight: 700 } }] }],
         },
       })
-    ).updated as FreeTextAnnotationDTO;
+    ).annotation as FreeTextAnnotationDTO;
     expect(rich.textAlign).toBe('center');
     expect(rich.richText.body.align).toBe('center');
     expect(rich.richText.paragraphs[0]!.align).toBeUndefined();
@@ -172,7 +165,7 @@ describe('rich text FreeText (local engine)', () => {
       await doc
         .page(toPageRef(PAGE))
         .annotations.update(ref, { subtype: 'free-text', textAlign: 'right' })
-    ).updated as FreeTextAnnotationDTO;
+    ).annotation as FreeTextAnnotationDTO;
     expect(right.textAlign).toBe('right');
     expect(right.richText.body.align).toBe('right');
     expect(right.richText.paragraphs[0]!.align).toBeUndefined();
@@ -196,12 +189,12 @@ describe('rich text FreeText (local engine)', () => {
         paragraphs: [{ runs: [{ text: 'a' }, { text: 'b', style: { weight: 700 } }] }],
       },
     });
-    const ref = created.created.ref;
+    const ref = created.annotation.ref;
     const updated = await doc.page(toPageRef(PAGE)).annotations.update(ref, {
       subtype: 'free-text',
       contents: 'one\rtwo',
     });
-    const dto = updated.updated as FreeTextAnnotationDTO;
+    const dto = updated.annotation as FreeTextAnnotationDTO;
     expect(dto.contents).toBe('one\rtwo');
     // A paragraph names alignment/direction only where it differs from the body.
     expect(dto.richText.paragraphs).toEqual([
@@ -227,14 +220,14 @@ describe('rich text FreeText (local engine)', () => {
         paragraphs: [{ runs: [{ text: 'a' }, { text: 'b', style: { size: 30 } }] }],
       },
     });
-    const ref = created.created.ref;
+    const ref = created.annotation.ref;
     const updated = await doc.page(toPageRef(PAGE)).annotations.update(ref, {
       subtype: 'free-text',
       fontSize: 20,
       fontColor: { r: 255, g: 0, b: 0 },
       fontFamily: 'times-bold',
     });
-    const dto = updated.updated as FreeTextAnnotationDTO;
+    const dto = updated.annotation as FreeTextAnnotationDTO;
     expect(dto.fontSize).toBe(20);
     expect(dto.fontFamily).toBe('times-bold');
     expect(dto.richText.body.color).toBe('#FF0000');
@@ -256,7 +249,7 @@ describe('rich text FreeText (local engine)', () => {
       contents: 'x',
       rect: RECT,
     });
-    const ref = created.created.ref;
+    const ref = created.annotation.ref;
     const err = await rejection(
       doc.page(toPageRef(PAGE)).annotations.update(ref, {
         subtype: 'free-text',
@@ -271,7 +264,7 @@ describe('rich text FreeText (local engine)', () => {
       contents: 'fresh',
       richText: { paragraphs: [{ runs: [{ text: 'fresh' }] }] },
     });
-    expect((updated.updated as FreeTextAnnotationDTO).contents).toBe('fresh');
+    expect((updated.annotation as FreeTextAnnotationDTO).contents).toBe('fresh');
     await doc.close();
   });
 
@@ -302,7 +295,7 @@ describe('rich text FreeText (local engine)', () => {
         paragraphs: [{ runs: [{ text: 'Key ' }, { text: 'family', style: { family: 'Roboto' } }] }],
       },
     });
-    const richDto = rich.created as FreeTextAnnotationDTO;
+    const richDto = rich.annotation as FreeTextAnnotationDTO;
     expect(richDto.fontFamily).toBe('my-roboto');
     expect(richDto.richText.body.family).toBe('Roboto');
 
@@ -315,7 +308,7 @@ describe('rich text FreeText (local engine)', () => {
       contents: 'Plain',
       rect: { left: 50, bottom: 150, right: 350, top: 220 },
     });
-    expect((plain.created as FreeTextAnnotationDTO).fontFamily).toBe('my-roboto');
+    expect((plain.annotation as FreeTextAnnotationDTO).fontFamily).toBe('my-roboto');
     await doc.close();
   });
 
@@ -333,12 +326,12 @@ describe('rich text FreeText (local engine)', () => {
       contents: 'Whole',
       rect: RECT,
     });
-    // DEFAULT subsets: five glyphs of Roboto. FULL re-embeds the whole
+    // Default subsets: five glyphs of Roboto. Full re-embeds the whole
     // program on the next regeneration (streams are compressed on save, so
     // the two saves are compared, not the raw font size).
     const subsetSave = await doc.download();
     await doc.fonts!.setEmbeddingPolicy('full');
-    await doc.page(toPageRef(PAGE)).annotations.update(created.created.ref, {
+    await doc.page(toPageRef(PAGE)).annotations.update(created.annotation.ref, {
       subtype: 'free-text',
       contents: 'Whole program',
     });
@@ -350,10 +343,10 @@ describe('rich text FreeText (local engine)', () => {
   });
 
   test('Helvetica on a document carrying a cmap-less Helvetica subset stays visible', async () => {
-    // The subset (glyf/loca/hmtx only, renumbered) used to be borrowed for the
-    // family: every glyph became glyph 0 and the appearance ended up naming a
-    // font it did not carry, so the saved box was blank. The standard face is
-    // the answer, and the text draws.
+    // Borrowing the subset (glyf/loca/hmtx only, renumbered) for the family
+    // would turn every glyph into glyph 0 and name a font the appearance does
+    // not carry, leaving the saved box blank. The standard face must be used,
+    // so the text draws.
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
     const bytes = new Uint8Array(await readFile(subsetHelveticaPath));
     const doc = await engine.open({ kind: 'bytes', id: 'rt-subset', bytes });
@@ -371,17 +364,19 @@ describe('rich text FreeText (local engine)', () => {
         paragraphs: [{ runs: [{ text: 'Hello world' }] }],
       },
     });
-    const dto = created.created as FreeTextAnnotationDTO;
+    const dto = created.annotation as FreeTextAnnotationDTO;
     expect(dto.fontFamily).toBe('helvetica');
     expect(dto.richText.paragraphs[0]!.runs).toEqual([{ text: 'Hello world' }]);
 
     // The appearance draws ink: a border-less box, so every dark pixel is text.
-    const appearances = await page.annotations.renderAppearances({ scale: 1 });
+    const appearances = await page.annotations.renderAppearancesRaw({
+      viewport: { kind: 'scale', scale: 1 },
+    });
     const match = appearances.appearances.find(
       (a) =>
         a.ref.kind === 'objectNumber' &&
-        created.created.ref.kind === 'objectNumber' &&
-        a.ref.annotObjectNumber === created.created.ref.annotObjectNumber,
+        created.annotation.ref.kind === 'objectNumber' &&
+        a.ref.annotObjectNumber === created.annotation.ref.annotObjectNumber,
     );
     expect(match).toBeDefined();
     const raster = match!.raster;

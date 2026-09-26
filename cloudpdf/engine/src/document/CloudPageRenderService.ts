@@ -6,11 +6,15 @@ import {
   type PageImageHandle,
   type PageImageOptions,
   type PageImageResult,
+  type PageLayout,
   type PageNetworkRenderFormat,
   type PageRaster,
   type PageRef,
   type PageRenderOptions,
   type PageRenderService,
+  normalizePdfRect,
+  renderSize,
+  checkImageQuality,
 } from '@embedpdf/engine-core/runtime';
 import { renderImageOptionsToWire, wirePaths } from '@embedpdf/engine-core/wire';
 
@@ -26,6 +30,7 @@ export class CloudPageRenderService implements PageRenderService {
     private readonly pageRef: PageRef,
     private readonly isClosed: () => boolean,
     private readonly manifest: ManifestAccessor,
+    private readonly layout: (signal: AbortSignal) => Promise<PageLayout>,
   ) {}
 
   image(options: PageImageOptions = {}): AbortablePromise<PageImageHandle> {
@@ -35,23 +40,24 @@ export class CloudPageRenderService implements PageRenderService {
       );
     }
     return AbortablePromise.run<PageImageHandle>(async (signal) => {
+      checkImageQuality(options.quality);
       const format = normalizeFormat(options.format);
       const includeAnnotations = options.includeAnnotations ?? true;
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        const pon = this.pageRef.pageObjectNumber;
-        const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pon);
+        const pageObjectNumber = this.pageRef.pageObjectNumber;
+        const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pageObjectNumber);
         if (!page) {
           throw new EngineError(
             EngineErrorCode.NotFound,
-            `no page with object number ${pon} in document ${this.docId}`,
+            `no page with object number ${pageObjectNumber} in document ${this.docId}`,
           );
         }
         // `format` flows through `options` and ends up in the token like
         // every other render option — the wire format treats it uniformly.
         // Normalized above so the URL always carries an explicit,
         // network-supported format (PNG or WebP; default WebP).
-        // Annotatedness itself is PATH-expressed (the token/path law): the
+        // Annotatedness itself is path-expressed (the token/path law): the
         // token never carries it; the annotated family's token carries the
         // `annotationVersion` pin instead.
         const wireToken = renderImageOptionsToWire(
@@ -61,11 +67,11 @@ export class CloudPageRenderService implements PageRenderService {
             ...(includeAnnotations ? { annotationVersion: page.cache.annotationVersion } : {}),
           },
         );
-        // Plane-scope rule: a render resolves at the DOC-LEVEL (shared base)
+        // Plane-scope rule: a render resolves at the doc-level (shared base)
         // path iff every plane it depends on is inherited — annotation-free
-        // renders (full pages AND tiles; the rect target rides the same
+        // renders (full pages and tiles; the rect target rides the same
         // token) depend on `content`, annotated ones on
-        // `content + annotations`. Each is its OWN family at BOTH tiers
+        // `content + annotations`. Each is its own family at both tiers
         // (prefix law: edge grants see only prefixes). 1,000 inheriting
         // visitors → one URL set, one origin render, no layer session.
         if (includeAnnotations) {
@@ -82,13 +88,17 @@ export class CloudPageRenderService implements PageRenderService {
           ? wirePaths.docPageRender(this.docId, this.pageRef, wireToken)
           : wirePaths.layerPageRender(this.docId, this.layerName, this.pageRef, wireToken);
       };
-      // The advertised URL reflects the CURRENT manifest; the blob loader
+      // The advertised URL reflects the current manifest; the blob loader
       // re-resolves per fetch through the 404 → manifest-refresh rail, so a
       // scope flip (e.g. this layer's first annotation write) self-heals
       // instead of failing on a stale path family.
-      const requestPath = await buildPath(signal);
+      const [requestPath, size] = await Promise.all([
+        buildPath(signal),
+        this.imageSize(options, signal),
+      ]);
       return createCloudPageImageHandle(
         {
+          ...size,
           format,
           contentType: `image/${format}`,
           source: { kind: 'url', url: this.http.absoluteUrl(requestPath) },
@@ -100,6 +110,26 @@ export class CloudPageRenderService implements PageRenderService {
         },
       );
     });
+  }
+
+  /**
+   * The image's pixel size, computed like the server's render (the same
+   * `renderSize`) from the page's layout, so the handle knows it before
+   * any pixels are fetched.
+   */
+  private async imageSize(
+    options: PageImageOptions,
+    signal: AbortSignal,
+  ): Promise<{ width: number; height: number }> {
+    const target = options.target ?? { kind: 'page' };
+    let area;
+    if (target.kind === 'rect') {
+      const rect = normalizePdfRect(target.rect);
+      area = { width: rect.right - rect.left, height: rect.top - rect.bottom };
+    } else {
+      area = (await this.layout(signal)).size;
+    }
+    return renderSize(area, options.rotation ?? 0, options.viewport ?? { kind: 'scale' });
   }
 
   raw(_options?: PageRenderOptions): AbortablePromise<PageRaster> {

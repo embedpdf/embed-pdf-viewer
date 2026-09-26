@@ -6,10 +6,10 @@
  * it into a native-feeling bar: thumb drag with pointer capture and a preserved
  * grab point, track paging with press-and-hold repeat that stops at the
  * pointer, a minimum thumb length on long documents, and macOS-style overlay
- * auto-hide. On an UNBOUNDED stage the metrics already carry the Figma
+ * auto-hide. On an unbounded stage the metrics already carry the Figma
  * semantics (the range is the union of content and view), so the same bar
  * shrinks toward the edge as you pan away and rides you back — the mapping is
- * FROZEN for the duration of a thumb drag so the thumb never chases itself
+ * frozen for the duration of a thumb drag so the thumb never chases itself
  * while the union re-collapses.
  *
  * Headless styling contract: geometry and behavior live here; looks live in
@@ -36,7 +36,7 @@ export type ScrollbarAxis = 'x' | 'y';
 /** Live scroll metrics for a stage lens (reference-stable; see
  *  `StageHostCapability.getScrollMetrics`). The raw material for custom scroll UI. */
 export function useScrollMetrics(token?: CapabilityToken<StageCapability>): ScrollMetrics {
-  return useSelector(asHost(useStageToken(token)), (c) => c.getScrollMetrics());
+  return useSelector(asHost(useStageToken(token)), (stage) => stage.getScrollMetrics());
 }
 
 // Scroll metrics live on the host lens (the same runtime token, typed wider):
@@ -75,14 +75,14 @@ export interface ScrollbarProps {
   thumbStyle?: React.CSSProperties;
 }
 
-const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
 /** Best-effort pointer capture: an already-released pointer (pen/touch races,
  *  synthetic events in tests) throws NotFoundError — the press must still work,
  *  just without capture (moves keep arriving while the pointer stays on us). */
-const capturePointer = (el: Element, pointerId: number) => {
+const capturePointer = (element: Element, pointerId: number) => {
   try {
-    el.setPointerCapture(pointerId);
+    element.setPointerCapture(pointerId);
   } catch {
     /* uncaptured is fine */
   }
@@ -90,10 +90,15 @@ const capturePointer = (el: Element, pointerId: number) => {
 
 /** Thumb geometry from metrics + a measured track. One formula for render,
  *  drag capture, and paging — they can never disagree. */
-const geometry = (m: ScrollMetrics, vertical: boolean, trackPx: number, minThumbSize: number) => {
-  const client = vertical ? m.clientHeight : m.clientWidth;
-  const total = vertical ? m.scrollHeight : m.scrollWidth;
-  const offset = vertical ? m.scrollTop : m.scrollLeft;
+const geometry = (
+  metrics: ScrollMetrics,
+  vertical: boolean,
+  trackPx: number,
+  minThumbSize: number,
+) => {
+  const client = vertical ? metrics.clientHeight : metrics.clientWidth;
+  const total = vertical ? metrics.scrollHeight : metrics.scrollWidth;
+  const offset = vertical ? metrics.scrollTop : metrics.scrollLeft;
   const maxOffset = Math.max(0, total - client);
   const thumbLen = Math.min(
     trackPx,
@@ -117,9 +122,9 @@ export function Scrollbar({
 }: ScrollbarProps) {
   const token = useStageToken(explicitToken);
   const stage = useCapability(asHost(token));
-  const m = useScrollMetrics(token);
+  const metrics = useScrollMetrics(token);
   const vertical = axis === 'y';
-  const scrollable = vertical ? m.scrollableY : m.scrollableX;
+  const scrollable = vertical ? metrics.scrollableY : metrics.scrollableX;
 
   const trackRef = useRef<HTMLDivElement>(null);
   const [trackPx, setTrackPx] = useState(0);
@@ -127,30 +132,30 @@ export function Scrollbar({
   const [hovered, setHovered] = useState(false);
   const [active, setActive] = useState(true); // camera moved recently
 
-  const g = geometry(m, vertical, trackPx, minThumbSize);
+  const layout = geometry(metrics, vertical, trackPx, minThumbSize);
 
   // ── overlay auto-hide: any metrics change re-arms the fade timer ──────────
   const hideAfter = autoHide === false ? 0 : autoHide;
   useEffect(() => {
     if (!hideAfter) return;
     setActive(true);
-    const t = setTimeout(() => setActive(false), hideAfter);
-    return () => clearTimeout(t);
-  }, [m, hideAfter]);
+    const timer = setTimeout(() => setActive(false), hideAfter);
+    return () => clearTimeout(timer);
+  }, [metrics, hideAfter]);
   const shown = !hideAfter || active || hovered || dragging;
 
   // ── track measurement (px mapping needs real geometry) ────────────────────
   useEffect(() => {
-    const el = trackRef.current;
-    if (!el) return;
-    const measure = () => setTrackPx(vertical ? el.clientHeight : el.clientWidth);
+    const element = trackRef.current;
+    if (!element) return;
+    const measure = () => setTrackPx(vertical ? element.clientHeight : element.clientWidth);
     const ro = new ResizeObserver(measure);
-    ro.observe(el);
+    ro.observe(element);
     measure();
     return () => ro.disconnect();
   }, [vertical, scrollable]);
 
-  // ── interactions. Drag state is FROZEN at pointer-down (grab point, travel,
+  // ── interactions. Drag state is frozen at pointer-down (grab point, travel,
   //    max offset) and applied as relative pans — absolute-feeling in bounded
   //    mode (the range is static there) and stable in unbounded mode, where
   //    the live union would otherwise shift under the pointer mid-drag. ──────
@@ -160,9 +165,9 @@ export function Scrollbar({
   const pageRef = useRef<{ dir: 1 | -1; timer: number } | null>(null);
   const lastPtr = useRef(0);
 
-  const ptrPos = (e: React.PointerEvent) => {
-    const r = trackRef.current!.getBoundingClientRect();
-    return vertical ? e.clientY - r.top : e.clientX - r.left;
+  const ptrPos = (event: React.PointerEvent) => {
+    const rect = trackRef.current!.getBoundingClientRect();
+    return vertical ? event.clientY - rect.top : event.clientX - rect.left;
   };
   /** Fresh geometry for paging steps — read from the capability, never a stale render. */
   const liveGeometry = () => geometry(stage.getScrollMetrics(), vertical, trackPx, minThumbSize);
@@ -181,34 +186,37 @@ export function Scrollbar({
   };
 
   const beginDrag = (grab: number, applied: number) => {
-    dragRef.current = { grab, applied, max: g.maxOffset, travel: g.travel };
+    dragRef.current = { grab, applied, max: layout.maxOffset, travel: layout.travel };
     setDragging(true);
   };
 
-  const onThumbDown = (e: React.PointerEvent) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    e.stopPropagation();
-    capturePointer(e.target as Element, e.pointerId);
-    beginDrag(ptrPos(e) - g.thumbPos, g.offset);
+  const onThumbDown = (event: React.PointerEvent) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    capturePointer(event.target as Element, event.pointerId);
+    beginDrag(ptrPos(event) - layout.thumbPos, layout.offset);
   };
 
-  const onTrackDown = (e: React.PointerEvent) => {
-    if (e.button !== 0 || e.target !== e.currentTarget) return; // thumb handles its own
-    e.preventDefault();
-    capturePointer(e.currentTarget as Element, e.pointerId);
-    const p = (lastPtr.current = ptrPos(e));
+  const onTrackDown = (event: React.PointerEvent) => {
+    if (event.button !== 0 || event.target !== event.currentTarget) return; // thumb handles its own
+    event.preventDefault();
+    capturePointer(event.currentTarget as Element, event.pointerId);
+    const position = (lastPtr.current = ptrPos(event));
 
     if (trackPress === 'jump') {
       // land the thumb centered at the pointer, then it's an ordinary drag
-      const want = g.travel > 0 ? clamp01((p - g.thumbLen / 2) / g.travel) * g.maxOffset : 0;
+      const want =
+        layout.travel > 0
+          ? clamp01((position - layout.thumbLen / 2) / layout.travel) * layout.maxOffset
+          : 0;
       stage.scrollTo(vertical ? { top: want } : { left: want });
-      beginDrag(g.thumbLen / 2, want);
+      beginDrag(layout.thumbLen / 2, want);
       return;
     }
 
     // 'page': step toward the pointer, repeat while held, stop at the pointer
-    const dir: 1 | -1 = p < g.thumbPos ? -1 : 1;
+    const dir: 1 | -1 = position < layout.thumbPos ? -1 : 1;
     const step = () => {
       const live = liveGeometry();
       const reached =
@@ -231,18 +239,18 @@ export function Scrollbar({
 
   // Pointer capture retargets to the pressed element and bubbles here — one
   // move/up pair serves thumb drags, jump-drags, and paging alike.
-  const onMove = (e: React.PointerEvent) => {
-    const d = dragRef.current;
-    if (d) {
-      if (d.travel <= 0) return;
-      const want = clamp01((ptrPos(e) - d.grab) / d.travel) * d.max;
-      const delta = want - d.applied;
+  const onMove = (event: React.PointerEvent) => {
+    const drag = dragRef.current;
+    if (drag) {
+      if (drag.travel <= 0) return;
+      const want = clamp01((ptrPos(event) - drag.grab) / drag.travel) * drag.max;
+      const delta = want - drag.applied;
       if (delta) {
         stage.panBy(vertical ? 0 : -delta, vertical ? -delta : 0);
-        d.applied = want;
+        drag.applied = want;
       }
     } else if (pageRef.current) {
-      lastPtr.current = ptrPos(e);
+      lastPtr.current = ptrPos(event);
     }
   };
 
@@ -254,8 +262,8 @@ export function Scrollbar({
     ? { position: 'absolute', top: 0, right: 0, bottom: 0, width: 12 }
     : { position: 'absolute', left: 0, right: 0, bottom: 0, height: 12 };
   const thumbDefaults: React.CSSProperties = vertical
-    ? { position: 'absolute', left: 2, right: 2, top: g.thumbPos, height: g.thumbLen }
-    : { position: 'absolute', top: 2, bottom: 2, left: g.thumbPos, width: g.thumbLen };
+    ? { position: 'absolute', left: 2, right: 2, top: layout.thumbPos, height: layout.thumbLen }
+    : { position: 'absolute', top: 2, bottom: 2, left: layout.thumbPos, width: layout.thumbLen };
 
   return (
     <div
@@ -263,8 +271,8 @@ export function Scrollbar({
       role="scrollbar"
       aria-orientation={vertical ? 'vertical' : 'horizontal'}
       aria-valuemin={0}
-      aria-valuemax={Math.round(g.maxOffset)}
-      aria-valuenow={Math.round(g.offset)}
+      aria-valuemax={Math.round(layout.maxOffset)}
+      aria-valuenow={Math.round(layout.offset)}
       data-embedpdf-scrollbar=""
       data-axis={axis}
       data-state={shown ? 'visible' : 'hidden'}

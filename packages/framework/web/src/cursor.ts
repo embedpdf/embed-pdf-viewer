@@ -1,5 +1,5 @@
 /**
- * SVG → CSS cursor string. The armed-tool indicator is the CURSOR itself (the
+ * SVG → CSS cursor string. The armed-tool indicator is the cursor itself (the
  * only zero-latency pointer-locked pixel the web has — the OS composites it),
  * so an app hands its toolbar icon here and assigns the result via the
  * interaction hub's `setToolCursor`.
