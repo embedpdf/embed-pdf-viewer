@@ -1,4 +1,4 @@
-import { fitStampBox, type Rect, type Vec } from '@embedpdf/core-annotation';
+import { defaultsFor, fitStampBox, type Rect, type Vec } from '@embedpdf/core-annotation';
 import {
   annotationKey,
   resolveBinarySource,
@@ -141,7 +141,7 @@ export function createStamps(
     source: BinarySource,
     desired: { width: number; height: number },
     rotCW = 0,
-    identity: { name?: string; subject?: string } = {},
+    identity: { name?: string; subject?: string; opacity?: number } = {},
   ): Promise<AnnotationRef> | null => {
     const doc = ctx.doc;
     const crop = geometry.cropOf(pon);
@@ -156,6 +156,7 @@ export function createStamps(
         fit: 'contain',
         ...(identity.name !== undefined ? { name: identity.name } : {}),
         ...(identity.subject !== undefined ? { subject: identity.subject } : {}),
+        ...(identity.opacity !== undefined ? { opacity: identity.opacity } : {}),
       })
       .then((res) => {
         // A stamp has no vector render — the engine-baked /AP IS the visual.
@@ -174,7 +175,7 @@ export function createStamps(
     source: BinarySource,
     desired: { width: number; height: number },
     rotCW = 0,
-    identity: { name?: string; subject?: string } = {},
+    identity: { name?: string; subject?: string; opacity?: number } = {},
   ): boolean => {
     const placed = createStampAt(pon, point, source, desired, rotCW, identity);
     if (!placed) return false;
@@ -201,6 +202,7 @@ export function createStamps(
       {
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.subject !== undefined ? { subject: input.subject } : {}),
+        opacity: defaultsFor(store.model(), ARMED_STAMP_TOOL_ID).opacity,
       },
     );
     if (!placed) {
@@ -214,6 +216,7 @@ export function createStamps(
   const placeArmedStamp = (pon: number, point: Vec, displayRotation?: number): boolean => {
     const payload = armed;
     if (!payload) return false;
+    const tool = tools.activeTool();
     return stageStampAt(
       pon,
       point,
@@ -223,6 +226,7 @@ export function createStamps(
       {
         ...(payload.name !== undefined ? { name: payload.name } : {}),
         ...(payload.subject !== undefined ? { subject: payload.subject } : {}),
+        opacity: defaultsFor(store.model(), tool?.preset ?? ARMED_STAMP_TOOL_ID).opacity,
       },
     );
   };
@@ -236,6 +240,7 @@ export function createStamps(
     source: BinarySource,
     rotCW: number,
     targetWidth?: number,
+    opacity?: number,
   ): Promise<void> => {
     const resolved = await resolveBinarySource(source);
     const meta = sniffBinaryMetadata(resolved.bytes);
@@ -243,7 +248,7 @@ export function createStamps(
       console.error('[annotation] stamp source must be PNG, JPEG, or single-page PDF bytes');
       return;
     }
-    stageStampAt(pon, point, source, desiredStampSize(meta, targetWidth), rotCW);
+    stageStampAt(pon, point, source, desiredStampSize(meta, targetWidth), rotCW, { opacity });
   };
 
   /**
@@ -260,8 +265,9 @@ export function createStamps(
     // belongs to the moment the author picked the spot, even when a 'prompt'
     // source resolves the bytes later.
     const rotCW = tools.uprightRotFor(tool.upright ? displayRotation : undefined);
+    const opacity = defaultsFor(store.model(), tool.preset).opacity;
     if (spec.kind === 'bytes') {
-      void placeStampSource(pon, point, spec.source, rotCW);
+      void placeStampSource(pon, point, spec.source, rotCW, undefined, opacity);
       return true;
     }
     // kind === 'prompt' — needs the environment: the ONE file-picker port.
@@ -269,7 +275,7 @@ export function createStamps(
       tool,
       pon,
       point,
-      (picked) => void placeStampSource(pon, point, picked.data, rotCW),
+      (picked) => void placeStampSource(pon, point, picked.data, rotCW, undefined, opacity),
     );
   };
 

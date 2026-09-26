@@ -239,6 +239,17 @@ export function styleFromDTO(dto: AnnotationDTO): Style {
       border: { kind: 'solid' },
     };
   }
+  if (dto.subtype === 'stamp') {
+    const d = dto as Extract<AnnotationDTO, { subtype: 'stamp' }>;
+    return {
+      color: '#444444',
+      interiorColor: null,
+      strokeWidth: 1,
+      opacity: d.opacity,
+      blendMode: dto.blendMode,
+      border: { kind: 'solid' },
+    };
+  }
   return {
     color: '#444444',
     interiorColor: null,

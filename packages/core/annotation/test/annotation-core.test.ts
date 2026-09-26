@@ -23,7 +23,8 @@ import {
 import { cursorAt, groupUnionBounds, hitTest, paintOrder } from '../src/hit';
 import { isAttachedLink, isConversationOnly, isSubstrateOnly } from '../src/plane';
 import { linkChildrenOf, linkOf } from '../src/links';
-import { capsFor } from '../src/kinds';
+import { capsFor, propsFor } from '../src/kinds';
+import { applyProps, readProp } from '../src/props';
 import { annotDeletable, annotTransformable, DRAWN_FLAGS } from '../src/flags';
 import {
   chordThrough,
@@ -2675,6 +2676,20 @@ describe('annotation-core opaqueBody (stamp) gestures', () => {
     apBox: { ...STAMP_RECT },
   });
   const loadStamp = (): Model => update(initialModel, { t: 'loaded', annots: [stamp()] })[0];
+
+  it('declares opacity as an editable prop, unlike color/stroke/border', () => {
+    const keys = propsFor('stamp').map((s) => s.key);
+    expect(keys).toContain('opacity');
+    expect(keys).not.toContain('color');
+    expect(keys).not.toContain('strokeWidth');
+  });
+
+  it('reads and applies opacity like every other kind', () => {
+    const a = stamp();
+    expect(readProp(a, 'opacity')).toBe(1);
+    const patched = applyProps(a, { opacity: 0.5 });
+    expect(patched?.style.opacity).toBe(0.5);
+  });
 
   it('stays baked MID-resize with the raster box following the live geometry', () => {
     // select (body click — opaqueBody hits anywhere inside), then grab the SE

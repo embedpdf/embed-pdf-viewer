@@ -13,6 +13,8 @@ export interface StampPatch extends AnnotationPatchBase {
   source?: BinarySource;
   /** `/Name`; `null` removes it (the reader then reports the default). */
   name?: string | null;
+  /** `/CA` constant opacity, 0..1. */
+  opacity?: number;
   fit?: StampFit;
   rotation?: number | null;
   unrotatedRect?: PdfRect | null;
@@ -24,6 +26,7 @@ export interface StampWirePatch extends AnnotationPatchBase {
   rect?: PdfRect;
   source?: ResourceRef;
   name?: string | null;
+  opacity?: number;
   fit?: StampFit;
   rotation?: number | null;
   unrotatedRect?: PdfRect | null;

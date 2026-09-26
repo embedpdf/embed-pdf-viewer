@@ -117,6 +117,14 @@ describe('normalizeAnnotationDraft', () => {
     );
   });
 
+  test('stamp: opacity passes through untouched and validates against the wire schema', async () => {
+    const png = makePng(2, 2);
+    const draft: StampDraft = { subtype: 'stamp', rect: RECT, source: png, opacity: 0.6 };
+    const { wire } = await normalizeAnnotationDraft(draft);
+    expect((wire as StampWireDraft).opacity).toBe(0.6);
+    expect(() => AnnotationDraftSchema.parse(wire)).not.toThrow();
+  });
+
   test('non-binary kinds pass through untouched with an empty resource map', async () => {
     const draft: InkDraft = {
       subtype: 'ink',
