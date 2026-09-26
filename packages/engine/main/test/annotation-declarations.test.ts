@@ -46,5 +46,6 @@ runAnnotationDeclarationConformance(runner, {
     ),
     fixture('measure-acrobat-metric', resolve(here, 'fixtures', 'measure-acrobat-metric.pdf')),
   ],
+  readOnlyLink: fixture('link-javascript', resolve(here, 'fixtures', 'link_javascript.pdf')),
   makeEngine: () => createLocalEngine({ runtime: { prefer: 'wasm' } }),
 });

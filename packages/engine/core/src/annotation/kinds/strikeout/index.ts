@@ -24,4 +24,5 @@ export const StrikeoutKind: AnnotationKindModule<
   dtoSchema: StrikeoutDTOSchema,
   draftSchema: StrikeoutDraftSchema,
   patchSchema: StrikeoutPatchSchema,
+  readBackWrites: StrikeoutDeclaration.readBackWrites,
 };

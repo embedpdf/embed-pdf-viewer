@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import type { LinkDraft, LinkPatch, PdfLinkTarget } from '../../src/shared';
+import type { AnnotationDTO, LinkDraft, LinkPatch, PdfLinkTarget } from '../../src/shared';
+import { checkAnnotationPatch } from '../../src/shared';
 import {
   AnnotationDraftSchema,
   AnnotationPatchSchema,
@@ -125,5 +126,38 @@ describe('link kind schemas', () => {
       expect(LinkPatchSchema.safeParse(patch).success).toBe(true);
       expect(AnnotationPatchSchema.safeParse(patch).success).toBe(true);
     }
+  });
+
+  test('a read-only target sent back unchanged is kept; a changed one is refused', () => {
+    const current = {
+      subtype: 'link',
+      rect: RECT,
+      target: { kind: 'named', name: 'NextPage' },
+    } as unknown as AnnotationDTO;
+    // The patch schema takes what a read returns, so a read DTO passes.
+    expect(LinkPatchSchema.safeParse({ target: { kind: 'named', name: 'NextPage' } }).success).toBe(
+      true,
+    );
+    const kept = checkAnnotationPatch(current, {
+      subtype: 'link',
+      contents: 'Next',
+      target: { name: 'NextPage', kind: 'named' },
+    });
+    expect(kept).toEqual({ subtype: 'link', contents: 'Next' });
+    expect(() =>
+      checkAnnotationPatch(current, {
+        subtype: 'link',
+        target: { kind: 'named', name: 'PrevPage' },
+      }),
+    ).toThrow(expect.objectContaining({ code: 'InvalidArg', details: { field: 'target' } }));
+    expect(() =>
+      checkAnnotationPatch(current, { subtype: 'link', target: { kind: 'javascript' } }),
+    ).toThrow(expect.objectContaining({ code: 'InvalidArg' }));
+    // A writable target replaces it.
+    const uri = checkAnnotationPatch(current, {
+      subtype: 'link',
+      target: { kind: 'uri', uri: 'https://embedpdf.com' },
+    });
+    expect(uri).toEqual({ subtype: 'link', target: { kind: 'uri', uri: 'https://embedpdf.com' } });
   });
 });

@@ -23,4 +23,5 @@ export const StampKind: AnnotationKindModule<'stamp', StampAnnotationDTO, StampD
     dtoSchema: StampDTOSchema,
     draftSchema: StampDraftSchema,
     patchSchema: StampPatchSchema,
+    readBackWrites: StampDeclaration.readBackWrites,
   };

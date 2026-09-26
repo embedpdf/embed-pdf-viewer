@@ -212,6 +212,11 @@ export function planAnnotationImport(input: {
       drops.set(index, 'form-field');
       return;
     }
+    // A popup shows another annotation; one that names none can't be made.
+    if (data.subtype === 'popup' && data.parent === null) {
+      drops.set(index, 'parent-missing');
+      return;
+    }
     const markers = fieldMarkersOf(data);
     if (markers.length > 0) fieldDrops.set(index, markers);
     drafts.set(index, draftOf(data, markers, mapPage, index));
@@ -379,10 +384,11 @@ function draftOf(
 ): AnnotationDraft {
   const fields = { ...data } as Record<string, unknown>;
   delete fields.reply;
-  if (data.subtype === 'popup') delete fields.parent;
   // `null` is absent: the field is not written.
   for (const { field } of markers) fields[field] = null;
+  // Checked with the popup's `parent`, which the import then links itself.
   const checked = AnnotationDraftSchema.safeParse(fields);
+  if (data.subtype === 'popup') delete fields.parent;
   if (!checked.success) {
     const issue = checked.error.issues[0]!;
     const path = issue.path.join('.');

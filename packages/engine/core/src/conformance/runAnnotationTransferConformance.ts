@@ -387,10 +387,11 @@ function normalized(bundle: AnnotationBundle, attribution: Attribution) {
       if (data.subtype === 'file-attachment' && data.file) {
         const { size: _size, checksum: _checksum, ...file } = data.file;
         if (attribution === 'stamp') {
-          delete file.createdAt;
-          delete file.modifiedAt;
+          const { createdAt: _createdAt, modifiedAt: _modifiedAt, ...undated } = file;
+          fields.file = undated;
+        } else {
+          fields.file = file;
         }
-        fields.file = file;
       }
       return { data: pages(fields), resources };
     }),

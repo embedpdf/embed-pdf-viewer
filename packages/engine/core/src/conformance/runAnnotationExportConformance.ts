@@ -125,7 +125,7 @@ export function runAnnotationExportConformance(
     // or to the canonical drawing, changes these on purpose: update them here.
     test('exports a document to the same file on every engine', async () => {
       const expected = {
-        'acrobat-stamps': 'c1426d667a20d4332bef113e7439dd1e0df00aa8a60a688f514e41d7603874cd',
+        'acrobat-stamps': '5409fed730c9d752dcdd7bb587784b94db589ba0c0adcea1331ffa062b75d55c',
         'acrobat-rewrapped': '506f91e033cbb314d46a4f2fe482a63497d34e725880c68a99c031e73076fcd3',
       } as const;
       for (const [fixture, hash] of Object.entries(expected)) {

@@ -100,7 +100,7 @@ export const line: KindProjection = {
               intent: lineDto.intent,
               measure: lineDto.measure ?? null,
               caption: {
-                enabled: lineDto.captionEnabled,
+                enabled: lineDto.captionEnabled ?? false,
                 position: lineDto.captionPosition,
                 ...(lineDto.captionOffset ? { offset: lineDto.captionOffset } : {}),
               },

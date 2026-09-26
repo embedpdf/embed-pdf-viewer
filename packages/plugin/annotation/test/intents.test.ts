@@ -536,7 +536,7 @@ describe('what stays as it is', () => {
     harness.emit({
       type: 'annotations.deleted',
       page: PAGE,
-      deleted: { kind: 'objectNumber', value: 20 },
+      deleted: [{ kind: 'objectNumber', value: 20 }],
       origin: { kind: 'remote', sessionId: 'cloud:bob', sub: 'bob', ts: 0, serverId: 51 },
       meta: {
         affectedPages: [],
@@ -748,7 +748,7 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     harness.emit({
       type: 'annotations.deleted',
       page: PAGE,
-      deleted: { kind: 'objectNumber', value: 60 },
+      deleted: [{ kind: 'objectNumber', value: 60 }],
       origin: { kind: 'remote', sessionId: 'cloud:bob', sub: 'bob', ts: 0, serverId: 50 },
       meta,
     } as unknown as DocumentEvent);

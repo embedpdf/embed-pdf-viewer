@@ -82,7 +82,13 @@ export class AttachmentReader {
       );
     }
     const info = readAttachmentFileInfo(fn, mem, attachmentPtr);
-    return this.extract(attachmentPtr, info.name, info.mimeType, path, maxDecodedBytes);
+    return this.extract(
+      attachmentPtr,
+      info.name,
+      info.mimeType ?? undefined,
+      path,
+      maxDecodedBytes,
+    );
   }
 
   /** Decode the file embedded in a FileAttachment annotation's `/FS`. */
@@ -108,7 +114,13 @@ export class AttachmentReader {
         );
       }
       const info = readAttachmentFileInfo(fn, mem, attachmentPtr);
-      return this.extract(attachmentPtr, info.name, info.mimeType, path, maxDecodedBytes);
+      return this.extract(
+        attachmentPtr,
+        info.name,
+        info.mimeType ?? undefined,
+        path,
+        maxDecodedBytes,
+      );
     } finally {
       if (annotPtr !== null) fn.FPDFPage_CloseAnnot(annotPtr);
       pool.release(pageObjectNumber);

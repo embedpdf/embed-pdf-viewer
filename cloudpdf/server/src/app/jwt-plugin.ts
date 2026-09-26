@@ -4,6 +4,9 @@ import {
   checkAnyCapability,
   checkCapability,
   checkCollab,
+  collabTargetOf,
+  type AnnotationOwner,
+  type AnnotationRef,
   type CollabAction,
   type CollabTarget,
   type DocCapability,
@@ -644,6 +647,37 @@ export function requireLayerCollabAction(
 } {
   const ctx = requireCollabAction(req, docId, action, target, pdfBits);
   enforceLayerPin(req, layerName);
+  return { ...ctx, originSessionId: originSessionIdFromRequest(req) };
+}
+
+/**
+ * {@link requireLayerCollabAction} over annotations one write changes
+ * together (a thread's delete): all or nothing, `PermissionDenied` naming
+ * every one refused.
+ */
+export function requireLayerCollabActionEach(
+  req: FastifyRequest,
+  docId: string,
+  layerName: string,
+  action: CollabAction,
+  annotations: readonly (AnnotationOwner & { ref: AnnotationRef })[],
+  pdfBits: PdfBits,
+): ReturnType<typeof requireLayerCollabAction> {
+  const ctx = requireLayerDocAccessOnly(req, docId, layerName);
+  if (ctx.mode !== 'tenant') {
+    const refused = annotations.filter(
+      (annotation) =>
+        !checkCollab(action, collabTargetOf(annotation), ctx.jwt.scope, ctx.jwt.identity, pdfBits),
+    );
+    if (refused.length > 0) {
+      throw new PermissionDenied(
+        `annotations:${action}`,
+        'target',
+        undefined,
+        refused.map((annotation) => annotation.ref),
+      );
+    }
+  }
   return { ...ctx, originSessionId: originSessionIdFromRequest(req) };
 }
 

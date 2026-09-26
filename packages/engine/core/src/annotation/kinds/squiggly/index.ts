@@ -24,4 +24,5 @@ export const SquigglyKind: AnnotationKindModule<
   dtoSchema: SquigglyDTOSchema,
   draftSchema: SquigglyDraftSchema,
   patchSchema: SquigglyPatchSchema,
+  readBackWrites: SquigglyDeclaration.readBackWrites,
 };

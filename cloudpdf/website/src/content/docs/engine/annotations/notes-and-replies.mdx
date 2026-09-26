@@ -174,26 +174,19 @@ window goes, or whether it starts open.
 
 ## Delete a note
 
-Deleting an annotation deletes its popup with it. Its replies stay in the document, as
-annotations of their own. Their `reply` may still name the deleted note; `buildCommentThreads()`
-shows each of them as a thread of its own. To delete a whole thread, delete the replies first and
-the note last:
+Deleting a note deletes its whole thread, in one change: its replies (and their replies), its
+grouped parts, its review states and every popup. Deleting a reply deletes that reply and the
+replies under it. This is how Acrobat treats a thread too, and it keeps other viewers from
+showing a reply without its note.
 
 ```ts
-import { annotationKey, buildCommentThreads } from '@cloudpdf/engine';
-
-const { annotations } = await page.annotations.list();
-const thread = buildCommentThreads(annotations).find(
-  (t) => annotationKey(t.root.ref) === annotationKey(note.ref),
-)!;
-
-for (const part of [...thread.replies, ...thread.groupedParts]) {
-  await page.annotations.delete(part.ref);
-}
-for (const ref of thread.review.statusRefs) await page.annotations.delete(ref);
-
-await page.annotations.delete(note.ref);
+const { meta } = await page.annotations.delete(note.ref);
+// meta.changed names everything that went, the note first
 ```
+
+It's all or nothing: when the user may not delete one of them (someone else's reply, for a user who
+may only change their own annotations), nothing is deleted and the call fails with `Forbidden`.
+`error.details.refs` names the ones in the way.
 
 ## Permissions
 

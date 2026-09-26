@@ -24,4 +24,5 @@ export const PolygonKind: AnnotationKindModule<
   dtoSchema: PolygonDTOSchema,
   draftSchema: PolygonDraftSchema,
   patchSchema: PolygonPatchSchema,
+  readBackWrites: PolygonDeclaration.readBackWrites,
 };

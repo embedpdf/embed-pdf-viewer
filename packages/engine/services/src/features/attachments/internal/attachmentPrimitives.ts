@@ -126,12 +126,12 @@ export function readAttachmentFileInfo(
 
   return {
     name,
-    ...(mimeType ? { mimeType } : {}),
-    ...(description ? { description } : {}),
-    ...(size !== null ? { size } : {}),
-    ...(checksum ? { checksum } : {}),
-    ...(createdAt ? { createdAt } : {}),
-    ...(modifiedAt ? { modifiedAt } : {}),
+    mimeType: mimeType || null,
+    description: description || null,
+    size,
+    checksum: checksum || null,
+    createdAt: createdAt || null,
+    modifiedAt: modifiedAt || null,
   };
 }
 

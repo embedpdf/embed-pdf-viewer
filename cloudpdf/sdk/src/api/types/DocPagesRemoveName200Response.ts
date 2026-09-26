@@ -11,7 +11,7 @@ export namespace DocPagesRemoveName200Response {
     export interface Layout {
         pageCount: number;
         pages: Layout.Pages.Item[];
-        namedPages?: Layout.NamedPages.Item[] | undefined;
+        namedPages: Layout.NamedPages.Item[];
     }
 
     export namespace Layout {

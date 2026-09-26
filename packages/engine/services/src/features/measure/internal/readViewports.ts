@@ -24,8 +24,8 @@ export function readViewports(
     viewports.push({
       bbox,
       owned: name === CALIBRATION_NAME && (!measure || measure.subtype === 'rectilinear'),
-      ...(name !== null ? { name } : {}),
-      ...(measure ? { measure } : {}),
+      name,
+      measure: measure ?? null,
     });
   }
   return viewports;

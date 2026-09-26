@@ -878,8 +878,8 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
-    const mutator = new AnnotationMutator(this.runtime, session);
-    const result = mutator.delete(req.ref, signal);
+    const mutator = new AnnotationMutator(this.runtime, session, this.fonts);
+    const result = mutator.delete(req.ref, req.checked, signal);
     return this.finishMutation(session, { tag: 'annotations.delete', result }, req.artifactPath);
   }
 

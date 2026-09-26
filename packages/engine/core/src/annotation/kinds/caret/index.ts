@@ -20,4 +20,5 @@ export const CaretKind: AnnotationKindModule<'caret', CaretAnnotationDTO, CaretD
     dtoSchema: CaretDTOSchema,
     draftSchema: CaretDraftSchema,
     patchSchema: CaretPatchSchema,
+    readBackWrites: CaretDeclaration.readBackWrites,
   };

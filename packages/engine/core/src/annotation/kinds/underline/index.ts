@@ -24,4 +24,5 @@ export const UnderlineKind: AnnotationKindModule<
   dtoSchema: UnderlineDTOSchema,
   draftSchema: UnderlineDraftSchema,
   patchSchema: UnderlinePatchSchema,
+  readBackWrites: UnderlineDeclaration.readBackWrites,
 };

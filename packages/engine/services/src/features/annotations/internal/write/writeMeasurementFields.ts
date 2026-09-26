@@ -57,7 +57,9 @@ export function writeMeasurementFields(
         ),
       );
     }
-    if (value.captionEnabled != null) {
+    if (value.captionEnabled === null) {
+      fn.EPDFAnnot_RemoveKey(annot, 'Cap');
+    } else if (value.captionEnabled !== undefined) {
       const offset = value.captionOffset ?? null;
       requireMeasureWrite(
         withMeasurePoint(

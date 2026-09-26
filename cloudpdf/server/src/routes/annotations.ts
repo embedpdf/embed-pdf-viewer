@@ -12,6 +12,7 @@ import {
   type AnnotationBundleLimits,
   type AnnotationAppearanceManifest,
   type AnnotationAppearanceManifestEntry,
+  type AnnotationDeleteResult,
   type AnnotationDraft,
   type AnnotationPatch,
   type AnnotationResourceRole,
@@ -47,7 +48,7 @@ import {
   WeakAnnotationSessionPagesRequestSchema,
   type ManifestPage,
 } from '@embedpdf/engine-core/wire';
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import {
   abortSignalFromRequest,
@@ -68,6 +69,7 @@ import { assertRefMatchesPage, refFromKey } from './annotation-route-helpers';
 import {
   requireLayerCapability,
   requireLayerCollabAction,
+  requireLayerCollabActionEach,
   requireLayerDocAccessOnly,
   requireLayerResource,
   type RequestJwtContext,
@@ -776,6 +778,10 @@ export async function registerAnnotationRoutes(
           );
         }
         const action = body?.op === 'delete' ? 'delete' : 'update';
+        if (action === 'delete') {
+          setNoStore(reply);
+          return deleteWithThread(req, accessCtx, pdfBits, { docId, layerName, ref }, signal);
+        }
         // Use the outer accessCtx (already JWT-verified, no capability
         // check) for the layer open the target lookup needs to perform.
         const target = await layerService.getAnnotationCollabTarget(
@@ -787,10 +793,6 @@ export async function registerAnnotationRoutes(
           signal,
         );
         const ctx = requireLayerCollabAction(req, docId, layerName, action, target, pdfBits);
-        if (action === 'delete') {
-          setNoStore(reply);
-          return layerService.deleteAnnotation(ctx, { docId, layerName, ref }, signal);
-        }
 
         const patch = parseOrInvalidArg<AnnotationPatch>(
           patchSchemaFor(target.subtype),
@@ -853,24 +855,44 @@ export async function registerAnnotationRoutes(
 
       const signal = abortSignalFromRequest(req);
       const ref = refFromKey(annotKey, pageObjectNumber);
-      const target = await layerService.getAnnotationCollabTarget(
-        accessCtx,
-        docId,
-        layerName,
-        pageObjectNumber,
-        ref,
-        signal,
-      );
-      const ctx = requireLayerCollabAction(req, docId, layerName, 'delete', target, pdfBits);
-
       setNoStore(reply);
-      return layerService.deleteAnnotation(
-        ctx,
-        { docId, layerName, ref: refFromKey(annotKey, pageObjectNumber) },
-        abortSignalFromRequest(req),
-      );
+      return deleteWithThread(req, accessCtx, pdfBits, { docId, layerName, ref }, signal);
     },
   );
+
+  /**
+   * Delete an annotation with its thread and popups: each is checked, all
+   * or nothing, and the worker deletes only what was.
+   */
+  async function deleteWithThread(
+    req: FastifyRequest,
+    accessCtx: ReturnType<typeof requireLayerDocAccessOnly>,
+    pdfBits: PdfBits,
+    input: { docId: string; layerName: string; ref: AnnotationRef },
+    signal: AbortSignal,
+  ): Promise<AnnotationDeleteResult> {
+    const members = await layerService.getAnnotationDeleteMembers(
+      accessCtx,
+      input.docId,
+      input.layerName,
+      input.ref.page.pageObjectNumber,
+      input.ref,
+      signal,
+    );
+    const ctx = requireLayerCollabActionEach(
+      req,
+      input.docId,
+      input.layerName,
+      'delete',
+      members,
+      pdfBits,
+    );
+    return layerService.deleteAnnotation(
+      ctx,
+      { ...input, checked: members.map((member) => member.ref) },
+      signal,
+    );
+  }
 }
 
 /**

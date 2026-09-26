@@ -348,9 +348,9 @@ export interface CommentsApi {
   setStatus(ref: AnnotationRef, state: string, options?: OperationOptions): Promise<void>;
   /** This session's checkmark. */
   setMarked(ref: AnnotationRef, marked: boolean, options?: OperationOptions): Promise<void>;
-  /** Delete one comment. */
+  /** Delete a comment with the replies under it (a thread's root deletes the thread). */
   delete(ref: AnnotationRef, options?: OperationOptions): Promise<void>;
-  /** Delete a thread, children first. */
+  /** Delete a thread, all of it or none, in one change. */
   deleteThread(ref: AnnotationRef, options?: OperationOptions): Promise<ThreadDeleteResult>;
   /** Per-thread action gates for this session. */
   getPermissions(ref: AnnotationRef): CommentPermissions;

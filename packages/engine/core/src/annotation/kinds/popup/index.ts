@@ -20,4 +20,5 @@ export const PopupKind: AnnotationKindModule<'popup', PopupAnnotationDTO, PopupD
     dtoSchema: PopupDTOSchema,
     draftSchema: PopupDraftSchema,
     patchSchema: PopupPatchSchema,
+    readBackWrites: PopupDeclaration.readBackWrites,
   };

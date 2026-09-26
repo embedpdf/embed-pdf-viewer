@@ -336,7 +336,7 @@ const deletedEvent = (annotObjectNumber: number, serverId: number): DocumentEven
     type: 'annotations.deleted',
     page: PAGE,
     origin: remoteOrigin(serverId),
-    deleted: { kind: 'objectNumber', value: annotObjectNumber },
+    deleted: [{ kind: 'objectNumber', value: annotObjectNumber }],
     meta: META,
   }) as unknown as DocumentEvent;
 
@@ -489,7 +489,7 @@ describe('links lens — substrate children, no ledger', () => {
     harness.emit({
       type: 'annotations.deleted',
       page: PAGE,
-      deleted: { kind: 'objectNumber', value: 21 },
+      deleted: [{ kind: 'objectNumber', value: 21 }],
       meta: META,
       origin: { kind: 'remote', sub: 'alice' },
       ts: Date.now(),
@@ -768,13 +768,14 @@ describe('the comments lens', () => {
     );
   });
 
-  it('removeThread deletes children first, root last', async () => {
+  it('removeThread deletes the thread with one delete of its root', async () => {
     const harness = createHarness();
     await seed(harness);
     const result = await harness.capability.comments.deleteThread(ref(20));
     expect(result.failed).toEqual([]);
     expect(result.deleted).toEqual([ref(21), ref(22), ref(20)]);
-    expect(harness.remove.mock.calls.map((call) => call[0])).toEqual([ref(21), ref(22), ref(20)]);
+    // The engine deletes the replies with the root, in one change.
+    expect(harness.remove.mock.calls.map((call) => call[0])).toEqual([ref(20)]);
     expect(harness.capability.comments.getThread(ref(20))).toBe(null);
   });
 
@@ -1113,7 +1114,14 @@ describe('distance authoring and recalibration', () => {
     const region = measureFromKnownLength(100, { value: 10, unit: 'ft' });
     harness.capability.setPageViewports(
       PAGE,
-      [{ owned: false, bbox: { left: 0, right: 60, bottom: 700, top: 800 }, measure: region }],
+      [
+        {
+          name: null,
+          owned: false,
+          bbox: { left: 0, right: 60, bottom: 700, top: 800 },
+          measure: region,
+        },
+      ],
       fallback,
     );
     const dto = {
@@ -1162,8 +1170,8 @@ describe('distance authoring and recalibration', () => {
     harness.capability.setPageViewports(
       PAGE,
       [
-        { owned: true, bbox: CROP, measure: measureFromRatio(1, 1, 'm') },
-        { owned: false, bbox: CROP, measure: { subtype: 'geospatial' } },
+        { name: null, owned: true, bbox: CROP, measure: measureFromRatio(1, 1, 'm') },
+        { name: null, owned: false, bbox: CROP, measure: { subtype: 'geospatial' } },
       ],
       measureFromRatio(1, 1, 'm'),
     );
@@ -1240,7 +1248,14 @@ describe.each(['area', 'perimeter'])('%s scale resolution', (tool) => {
     const fallback = measureFromKnownLength(100, { value: 1, unit: 'm' });
     harness.capability.setPageViewports(
       PAGE,
-      [{ owned: false, bbox: { left: 0, right: 60, bottom: 700, top: 800 }, measure: region }],
+      [
+        {
+          name: null,
+          owned: false,
+          bbox: { left: 0, right: 60, bottom: 700, top: 800 },
+          measure: region,
+        },
+      ],
       fallback,
     );
     const subtype = tool === 'area' ? 'polygon' : 'polyline';
@@ -1287,7 +1302,7 @@ describe.each(['area', 'perimeter'])('%s scale resolution', (tool) => {
     expect(harness.model().draft).toBeNull();
     harness.capability.setPageViewports(
       PAGE,
-      [{ owned: false, bbox: CROP, measure: { subtype: 'geospatial' } }],
+      [{ name: null, owned: false, bbox: CROP, measure: { subtype: 'geospatial' } }],
       measureFromRatio(1, 1, 'm'),
     );
     harness.capability.createPointer(tool, 'down', PAGE, { x: 20, y: 20 });

@@ -348,6 +348,62 @@ export function runAnnotationAttributionConformance(
         },
       );
     });
+
+    test("a note with someone else's reply is deleted whole or not at all", async () => {
+      const rect = { left: 200, bottom: 40, right: 220, top: 60 };
+      const alice = await opts.openAs(engine, { scope: SCOPE, identity: ALICE });
+      let note: AnnotationDTO;
+      try {
+        ({ annotation: note } = await (
+          await firstPage(alice)
+        ).annotations.create({ subtype: 'text', rect, nm: 'attribution-conformance-thread' }));
+      } catch (error) {
+        await alice.close();
+        throw error;
+      }
+      const bob = await opts.openAs(engine, { scope: SCOPE, identity: BOB }, alice);
+      await alice.close();
+      let reply: AnnotationDTO;
+      try {
+        const page = await firstPage(bob);
+        const current = await findByNm(page, 'attribution-conformance-thread');
+        ({ annotation: reply } = await page.annotations.create({
+          subtype: 'text',
+          rect,
+          contents: 'Seen',
+          reply: { to: current.ref },
+        }));
+      } catch (error) {
+        await bob.close();
+        throw error;
+      }
+      // Alice may delete only her own: the note goes with Bob's reply, so
+      // nothing goes, and the refusal names the reply.
+      const own = [
+        'doc.open',
+        'doc.render',
+        'doc.download',
+        'doc.annotate.modify',
+        'annotations:delete:self',
+      ];
+      const aliceAgain = await opts.openAs(engine, { scope: own, identity: ALICE }, bob);
+      await bob.close();
+      try {
+        const page = await firstPage(aliceAgain);
+        const current = await findByNm(page, 'attribution-conformance-thread');
+        const error = await page.annotations.delete(current.ref).then(
+          () => null,
+          (caught: unknown) => caught,
+        );
+        expect(isPermissionRefusal(error)).toBe(true);
+        const refs = (error as EngineError).details?.['refs'] as AnnotationRef[];
+        expect(refs.map(annotationKey)).toEqual([annotationKey(reply.ref)]);
+        expect((await readBack(page, current.ref)).nm).toBe(note.nm);
+        expect((await readBack(page, reply.ref)).contents).toBe('Seen');
+      } finally {
+        await aliceAgain.close();
+      }
+    });
   });
 }
 

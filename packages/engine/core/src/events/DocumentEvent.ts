@@ -113,8 +113,12 @@ export type DocumentEvent =
       type: 'annotations.deleted';
       page: PageRef;
       origin: EventOrigin;
-      /** What was deleted: its stable id, or `null` for a weak annotation (see `deletedAnnotationOf`). */
-      deleted: AnnotationStableId | null;
+      /**
+       * What was deleted: the annotation and what went with it (replies,
+       * grouped parts, review states, popups), by stable id, the annotation
+       * first; see `deletedAnnotationsOf`.
+       */
+      deleted: AnnotationStableId[];
     } & AnnotationDeleteResult)
   | ({
       type: 'annotations.moved';

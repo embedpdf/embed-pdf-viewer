@@ -1,8 +1,11 @@
 import { isDimension } from '@embedpdf/engine-core/runtime';
 import {
   annotationKey,
+  annotationKeysOf,
   assertAnnotationResources,
   appearanceImpactOf,
+  checkAnnotationPatch,
+  deletedWith,
   EngineError,
   EngineErrorCode,
   type AnnotationActor,
@@ -21,10 +24,12 @@ import {
   type AnnotationUpdateResult,
   type PageObjectNumber,
   PdfAnnotationSubtypeCode,
+  PermissionDenied,
   toPageRef,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
+import { pdfPageCountOf } from './internal/write/stampDrawing';
 import { AnnotationBatchApplier } from './AnnotationBatchApplier';
 import { blendModeFromCode } from './internal/blendMode';
 import { assertDeclaredFields } from './internal/mutations/prepareCreate';
@@ -45,6 +50,8 @@ import { readAnnotationFromPtr } from './internal/read/readAnnotationFromPtr';
 import { assertRichTextAgreement } from './internal/richTextWire';
 import type { AnnotationWriteContext } from './internal/write/annotationWriteContext';
 import { applyPatch, preflightPatch } from './internal/write/annotationWriterRegistry';
+import { RawAnnotationReader } from './RawAnnotationReader';
+import { prepareTextStatePatch } from './internal/write/writeTextAnnotation';
 import { generateAppearance } from './internal/write/generateAppearance';
 import { writeAnnotationModified } from './internal/write/writeAnnotationBase';
 import {
@@ -112,6 +119,7 @@ export class AnnotationMutator {
       docPtr: this.session.requireDocPtr(),
       pagePtr,
       drawings: this.session.drawingIndex(),
+      pdfPageCount: (bytes) => pdfPageCountOf(this.runtime.fn, this.runtime.mem, bytes),
       ...(resources ? { resources } : {}),
     };
   }
@@ -199,7 +207,7 @@ export class AnnotationMutator {
         readContextFor(this.session, this.fonts),
       );
 
-      patch = patchForTarget(currentDto, patch);
+      patch = prepareTextStatePatch(currentDto, patchForTarget(currentDto, patch));
       assertAnnotationResources(currentDto.subtype, resources, 'update');
       preflightPatch(patch, writeCtx);
       assertRichTextAgreement(patch);
@@ -374,9 +382,117 @@ export class AnnotationMutator {
     );
   }
 
-  delete(ref: AnnotationRef, signal: AbortSignal): AnnotationDeleteResult {
+  /**
+   * Delete an annotation with everything that goes with it
+   * ({@link deletedWith}): its replies and theirs, grouped parts, review
+   * states and every popup, in one change. `checked` names what the caller's
+   * permission check covered; a member it doesn't name (one added since) is
+   * refused, so nothing is deleted unchecked. Every check runs before the
+   * first write: a deleted object can't be rolled back.
+   */
+  delete(
+    ref: AnnotationRef,
+    checked: readonly AnnotationRef[],
+    signal: AbortSignal,
+  ): AnnotationDeleteResult {
     throwIfAborted(signal);
-    return this.removeAnnotation(ref, signal, 0);
+    const { fn } = this.runtime;
+    const docPtr = this.session.requireDocPtr();
+    const pageObjectNumber = ref.page.pageObjectNumber;
+    const { pageIndex } = this.session.resolvePageRef(ref.page);
+    if (ref.kind === 'index') this.session.validateRevision(ref.revision);
+    // Raw handles off the document, never a loaded page: a page loaded
+    // before this change's writes (a layer's copy-on-write) could miss them.
+    const { annotations } = new RawAnnotationReader(this.runtime, this.session, this.fonts).listOne(
+      pageObjectNumber,
+      signal,
+    );
+    const hasWeak = (list: readonly AnnotationDTO[]) =>
+      list.some((annotation) => annotation.ref.kind === 'index');
+    if (this.session.weakAnnotationState(pageObjectNumber).kind !== 'known') {
+      this.session.recordWeakFlag(pageObjectNumber, hasWeak(annotations));
+    }
+    const pageStateBefore = this.session.pageState(pageObjectNumber);
+
+    const members = deletedWith(annotations, ref);
+    if (members.length === 0) throw missingAnnotation(ref);
+    const checkedKeys = new Set(checked.map(annotationKey));
+    const unchecked = members.filter(
+      (member) => !annotationKeysOf(member).some((key) => checkedKeys.has(key)),
+    );
+    if (unchecked.length > 0) {
+      throw new PermissionDenied(
+        'annotations:delete',
+        'the thread changed while it was checked',
+        undefined,
+        unchecked.map((member) => member.ref),
+      );
+    }
+    const withRaw = <T>(index: number, body: (annotPtr: Ptr) => T): T => {
+      const annotPtr = fn.EPDFPage_GetAnnotRaw(docPtr, pageIndex, index);
+      if (!annotPtr) {
+        throw new EngineError(
+          EngineErrorCode.Unknown,
+          `annotation ${index} on page ${pageObjectNumber} could not be opened`,
+        );
+      }
+      try {
+        return body(annotPtr);
+      } finally {
+        fn.FPDFPage_CloseAnnot(annotPtr);
+      }
+    };
+    for (const member of members) {
+      withRaw(member.index, (annotPtr) => this.assertNotAttachedWidget(annotPtr, 0));
+    }
+    // A popup deleted without the annotation it shows leaves that
+    // annotation, which stops naming it.
+    const going = new Set(members.flatMap(annotationKeysOf));
+    const keptParents = members.flatMap((member) => {
+      if (member.subtype !== 'popup' || !member.parent) return [];
+      const parent = annotations.find((annotation) =>
+        annotationKeysOf(annotation).includes(annotationKey(member.parent!)),
+      );
+      return parent && !going.has(annotationKey(parent.ref)) ? [parent] : [];
+    });
+
+    // Apply boundary. The highest position first, so the positions still to
+    // go hold; the raw remove also deletes the indirect object.
+    throwIfAborted(signal);
+    let bumpRequested = true;
+    try {
+      for (const member of [...members].sort((a, b) => b.index - a.index)) {
+        if (!fn.EPDFPage_RemoveAnnotRaw(docPtr, pageIndex, member.index)) {
+          throw new EngineError(
+            EngineErrorCode.Unknown,
+            `failed to remove annotation ${member.index} on page ${pageObjectNumber}`,
+          );
+        }
+      }
+      // After the removals, at the position each kept parent now has.
+      for (const parent of keptParents) {
+        const before = members.filter((member) => member.index < parent.index).length;
+        withRaw(parent.index - before, (annotPtr) => fn.EPDFAnnot_RemoveKey(annotPtr, 'Popup'));
+      }
+      // Structural change; bump the local index-space epoch now and stop
+      // the finally-bump (see move()).
+      this.session.bumpRevision(pageObjectNumber);
+      bumpRequested = false;
+      this.session.recordWeakFlag(
+        pageObjectNumber,
+        hasWeak(annotations.filter((annotation) => !members.includes(annotation))),
+      );
+      const meta = computeMutationImpact({
+        mutation: 'delete',
+        pageStateBefore,
+        pageStateAfter: this.session.pageState(pageObjectNumber),
+        // The annotation first, then what went with it.
+        changed: [...members].reverse().flatMap((member) => stableIdOf(member.ref)),
+      });
+      return { meta };
+    } finally {
+      if (bumpRequested) this.session.bumpRevision(pageObjectNumber);
+    }
   }
 
   /**
@@ -389,14 +505,6 @@ export class AnnotationMutator {
     ref: AnnotationRef,
     releasedFieldObjectNumber: number,
   ): AnnotationDeleteResult {
-    return this.removeAnnotation(ref, null, releasedFieldObjectNumber);
-  }
-
-  private removeAnnotation(
-    ref: AnnotationRef,
-    signal: AbortSignal | null,
-    releasedFieldObjectNumber: number,
-  ): AnnotationDeleteResult {
     const { fn, mem } = this.runtime;
     const pool = this.session.pagePool();
     const pagePtr = pool.acquire(ref.page.pageObjectNumber);
@@ -404,7 +512,6 @@ export class AnnotationMutator {
     try {
       this.ensureKnownWeakStateFromPage(ref.page.pageObjectNumber, pagePtr);
       const pageStateBefore = this.session.pageState(ref.page.pageObjectNumber);
-      if (signal) throwIfAborted(signal);
 
       let deleted: AnnotationStableId | null;
       let ok = false;
@@ -773,7 +880,36 @@ function patchForTarget(current: AnnotationDTO, patch: AnnotationPatch): Annotat
     );
   }
   assertDeclaredFields(current.subtype, patch);
-  return { ...patch, subtype: current.subtype } as AnnotationPatch;
+  return checkAnnotationPatch(current, { ...patch, subtype: current.subtype } as AnnotationPatch);
+}
+
+/** `NotFound` for a ref by number or name, `InvalidReference` for a position out of range. */
+function missingAnnotation(ref: AnnotationRef): EngineError {
+  const page = ref.page.pageObjectNumber;
+  switch (ref.kind) {
+    case 'objectNumber':
+      return new EngineError(
+        EngineErrorCode.NotFound,
+        `no annotation with object number ${ref.annotObjectNumber} on page ${page}`,
+      );
+    case 'nm':
+      return new EngineError(
+        EngineErrorCode.NotFound,
+        `no annotation with /NM '${ref.nm}' on page ${page}`,
+      );
+    case 'index':
+      return new EngineError(
+        EngineErrorCode.InvalidReference,
+        `index ${ref.index} out of range on page ${page}`,
+      );
+  }
+}
+
+/** What `meta.changed` names an annotation by; a weak one has no stable id. */
+function stableIdOf(ref: AnnotationRef): AnnotationStableId[] {
+  if (ref.kind === 'objectNumber') return [{ kind: 'objectNumber', value: ref.annotObjectNumber }];
+  if (ref.kind === 'nm') return [{ kind: 'nm', value: ref.nm }];
+  return [];
 }
 
 const sameRef = (left: AnnotationRef | null, right: AnnotationRef | null): boolean =>

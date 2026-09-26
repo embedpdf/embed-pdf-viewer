@@ -19,4 +19,5 @@ export const InkKind: AnnotationKindModule<'ink', InkAnnotationDTO, InkDraft, In
   dtoSchema: InkDTOSchema,
   draftSchema: InkDraftSchema,
   patchSchema: InkPatchSchema,
+  readBackWrites: InkDeclaration.readBackWrites,
 };

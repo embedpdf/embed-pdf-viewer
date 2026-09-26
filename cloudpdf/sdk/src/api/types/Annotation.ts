@@ -1221,7 +1221,7 @@ export namespace Annotation {
         rotation: number | null;
         intent: AnnotationLine.Intent | null;
         measure: CloudPDF.AnnotationLineMeasure | null;
-        captionEnabled: boolean;
+        captionEnabled: boolean | null;
         captionPosition: AnnotationLine.CaptionPosition;
         captionOffset: AnnotationLine.CaptionOffset | null;
         leader: AnnotationLine.Leader | null;
@@ -2392,12 +2392,12 @@ export namespace Annotation {
 
         export interface File_ {
             name: string;
-            mimeType?: string | undefined;
-            description?: string | undefined;
-            size?: number | undefined;
-            checksum?: string | undefined;
-            createdAt?: (string | null) | undefined;
-            modifiedAt?: (string | null) | undefined;
+            mimeType: string | null;
+            description: string | null;
+            size: number | null;
+            checksum: string | null;
+            createdAt: string | null;
+            modifiedAt: string | null;
         }
     }
 
@@ -2604,7 +2604,7 @@ export namespace Annotation {
         interiorColor: AnnotationRedact.InteriorColor | null;
         overlayText: string | null;
         repeat: boolean;
-        fontFamily: AnnotationRedact.FontFamily | null;
+        fontFamily: string;
         fontSize: number;
         fontColor: AnnotationRedact.FontColor;
         textAlign: AnnotationRedact.TextAlign;
@@ -2713,24 +2713,6 @@ export namespace Annotation {
             g: number;
             b: number;
         }
-
-        export const FontFamily = {
-            Courier: "courier",
-            CourierBold: "courier-bold",
-            CourierBoldOblique: "courier-bold-oblique",
-            CourierOblique: "courier-oblique",
-            Helvetica: "helvetica",
-            HelveticaBold: "helvetica-bold",
-            HelveticaBoldOblique: "helvetica-bold-oblique",
-            HelveticaOblique: "helvetica-oblique",
-            TimesRoman: "times-roman",
-            TimesBold: "times-bold",
-            TimesBoldItalic: "times-bold-italic",
-            TimesItalic: "times-italic",
-            Symbol: "symbol",
-            ZapfDingbats: "zapf-dingbats",
-        } as const;
-        export type FontFamily = (typeof FontFamily)[keyof typeof FontFamily];
 
         export interface FontColor {
             r: number;

@@ -48,7 +48,7 @@ export function runNamedPagesConformance(
         PageListSnapshotSchema.parse(layout);
         expect(Array.isArray(layout.namedPages)).toBe(true);
         const pageObjectNumbers = new Set(layout.pages.map((page) => page.ref.pageObjectNumber));
-        for (const entry of layout.namedPages ?? []) {
+        for (const entry of layout.namedPages) {
           expect(entry.name.length > 0).toBe(true);
           if (entry.target.kind === 'page') {
             expect(pageObjectNumbers.has(entry.target.page.pageObjectNumber)).toBe(true);
@@ -65,7 +65,7 @@ export function runNamedPagesConformance(
         if (!doc.pages.setName) return;
         const before = await doc.pages.list();
         const [first, second] = before.pages;
-        const baseline = (before.namedPages ?? []).length;
+        const baseline = before.namedPages.length;
 
         // Create.
         const created = await doc.pages.setName({
@@ -78,7 +78,7 @@ export function runNamedPagesConformance(
           kind: 'page',
           page: toPageRef(first.ref.pageObjectNumber),
         });
-        expect((created.layout.namedPages ?? []).length).toBe(baseline + 1);
+        expect(created.layout.namedPages.length).toBe(baseline + 1);
         const delta = created.meta.cacheDelta;
         if (delta) {
           expect(delta.docVersion > delta.previousDocVersion).toBe(true);
@@ -98,7 +98,7 @@ export function runNamedPagesConformance(
           kind: 'page',
           page: toPageRef(second.ref.pageObjectNumber),
         });
-        expect((replaced.layout.namedPages ?? []).length).toBe(baseline + 1);
+        expect(replaced.layout.namedPages.length).toBe(baseline + 1);
 
         // Rename in one job.
         const renamed = await doc.pages.setName({
@@ -111,7 +111,7 @@ export function runNamedPagesConformance(
           kind: 'page',
           page: toPageRef(second.ref.pageObjectNumber),
         });
-        expect((renamed.layout.namedPages ?? []).length).toBe(baseline + 1);
+        expect(renamed.layout.namedPages.length).toBe(baseline + 1);
       } finally {
         await doc.close();
       }
@@ -132,7 +132,7 @@ export function runNamedPagesConformance(
           page: toPageRef(before.pages[0].ref.pageObjectNumber),
         });
         const listed = await doc.pages.list();
-        expect((listed.namedPages ?? []).some((entry) => entry.name === key)).toBe(true);
+        expect(listed.namedPages.some((entry) => entry.name === key)).toBe(true);
       } finally {
         await doc.close();
       }
@@ -196,14 +196,14 @@ export function runNamedPagesConformance(
         await doc.pages.setName({ name: 'Survivor', page: survivor });
 
         const deleted = await doc.pages.delete([victim]);
-        const names = (deleted.layout.namedPages ?? []).map((entry) => entry.name);
+        const names = deleted.layout.namedPages.map((entry) => entry.name);
         expect(names.includes('Victim=One')).toBe(false);
         expect(names.includes('Victim=Two')).toBe(false);
         expect(names).toContain('Survivor');
         // Nothing dangling was left behind by the delete.
-        expect(
-          (deleted.layout.namedPages ?? []).some((entry) => entry.target.kind === 'dangling'),
-        ).toBe(false);
+        expect(deleted.layout.namedPages.some((entry) => entry.target.kind === 'dangling')).toBe(
+          false,
+        );
       } finally {
         await doc.close();
       }
@@ -228,10 +228,10 @@ export function runNamedPagesConformance(
 }
 
 function find(
-  result: { layout: { namedPages?: { name: string; target: unknown }[] } },
+  result: { layout: { namedPages: { name: string; target: unknown }[] } },
   name: string,
 ) {
-  return (result.layout.namedPages ?? []).find((entry) => entry.name === name)?.target;
+  return result.layout.namedPages.find((entry) => entry.name === name)?.target;
 }
 
 async function openFixture(engine: Engine, opts: ConformanceOptions): Promise<DocumentHandle> {

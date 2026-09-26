@@ -173,7 +173,8 @@ export interface PdfRectDifferences {
  *   'reply' -> `/R`     a comment-thread reply (the ISO default when
  *                       `/IRT` is present but `/RT` is absent).
  *   'group' -> `/Group` a subordinate part of one logical annotation
- *                       group (e.g. the Caret of a text-edit pair).
+ *                       group (e.g. the StrikeOut of a replace-text pair,
+ *                       grouped under its Caret).
  */
 export type AnnotationReplyType = 'reply' | 'group';
 

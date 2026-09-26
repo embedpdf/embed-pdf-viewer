@@ -25,4 +25,5 @@ export const FreeTextKind: AnnotationKindModule<
   dtoSchema: FreeTextDTOSchema,
   draftSchema: FreeTextDraftSchema,
   patchSchema: FreeTextPatchSchema,
+  readBackWrites: FreeTextDeclaration.readBackWrites,
 };

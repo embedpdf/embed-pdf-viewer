@@ -1,6 +1,6 @@
 import {
   annotationImportFacts,
-  deletedAnnotationOf,
+  deletedAnnotationsOf,
   deletedAttachmentOf,
   deletedFieldOf,
   toPageRef,
@@ -131,7 +131,7 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
         type: 'annotations.deleted',
         page: rowPage(),
         origin,
-        deleted: deletedAnnotationOf(row.payload as AnnotationDeleteResult),
+        deleted: deletedAnnotationsOf(row.payload as AnnotationDeleteResult),
         ...(row.payload as AnnotationDeleteResult),
       };
     case 'annot.move':

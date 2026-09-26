@@ -125,8 +125,7 @@ export function createComments(
       const root = threads.rootRefOf(ref);
       const thread = threads.threadOf(ref);
       const members = threads.memberRefsOf(thread);
-      // Preflight: all-or-nothing. A blocked member means nothing deletes —
-      // a half-deleted thread orphans replies in every other viewer.
+      // A courtesy preflight: all or nothing, as the engine decides it.
       const blocked = members.filter((ref) => !authority.canDelete(ref));
       if (blocked.length > 0) {
         announce(root, 'deleted');
@@ -135,21 +134,16 @@ export function createComments(
           failed: blocked.map((ref) => ({ ref: ref, error: new Error('delete not permitted') })),
         };
       }
-      const deleted: AnnotationRef[] = [];
-      const failed: ThreadDeleteResult['failed'] = [];
-      for (const member of members) {
-        // A child failure (a race: someone else acted first) stops the
-        // cascade before the root, so nothing orphans.
-        if (failed.length > 0) break;
-        try {
-          await deleteOne(member);
-          deleted.push(member);
-        } catch (error) {
-          failed.push({ ref: member, error });
-        }
+      // Deleting the root deletes the thread, in one change: the engine
+      // checks every member again and deletes all of them or none.
+      try {
+        await deleteOne(root);
+        return { deleted: members, failed: [] };
+      } catch (error) {
+        return { deleted: [], failed: [{ ref: root, error }] };
+      } finally {
+        announce(root, 'deleted');
       }
-      announce(root, 'deleted');
-      return { deleted, failed };
     },
 
     getPermissions: (ref): CommentPermissions => {

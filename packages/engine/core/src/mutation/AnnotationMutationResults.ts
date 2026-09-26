@@ -50,19 +50,24 @@ export interface AnnotationUpdateResult {
   meta: AnnotationListMutationMeta;
 }
 
-/** A delete: nothing exists after it, so only `meta`. */
+/**
+ * A delete: nothing exists after it, so only `meta`. Deleting an annotation
+ * deletes its replies, grouped parts, review states and popups with it;
+ * `meta.changed` names them all, the annotation first.
+ */
 export interface AnnotationDeleteResult {
   meta: AnnotationListMutationMeta;
 }
 
 /**
  * What a delete removed, as its `annotations.deleted` event names it for
- * listeners that didn't make the call: the stable id in `meta.changed`, or
- * `null` for a weak annotation (no objectNumber, no /NM), for which the
- * engine refuses to fabricate one — those listeners refetch the page list.
+ * listeners that didn't make the call: the stable ids in `meta.changed`, the
+ * annotation first. A weak annotation (no objectNumber, no /NM) has none —
+ * the engine refuses to fabricate one — and `meta.shouldRefetch` tells those
+ * listeners to read the page again.
  */
-export function deletedAnnotationOf(result: AnnotationDeleteResult): AnnotationStableId | null {
-  return result.meta.changed[0] ?? null;
+export function deletedAnnotationsOf(result: AnnotationDeleteResult): AnnotationStableId[] {
+  return result.meta.changed;
 }
 
 /**

@@ -1,6 +1,8 @@
 import { annotationReadDriftOf } from './annotationReadDrift';
 import { creatables, PNG_1X1 } from './creatables';
 import type { ConformanceTestRunner } from './runMetadataConformance';
+import { TWO_PAGE_PDF } from './stampFixtures';
+import type { AnnotationDTO } from '../annotation/kinds';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { PageHandle } from '../engine/PageHandle';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
@@ -31,6 +33,8 @@ export interface AnnotationDeclarationConformanceOptions {
   authoring: AnnotationDeclarationFixture;
   /** Documents whose annotations are read as they are. */
   documents: readonly AnnotationDeclarationFixture[];
+  /** A document with a link whose target a write can't make (a script, a viewer command). */
+  readOnlyLink: AnnotationDeclarationFixture;
 }
 
 /**
@@ -83,11 +87,13 @@ export function runAnnotationDeclarationConformance(
     });
 
     /** Open the authoring document and hand its first page to `run`. */
-    const onAuthoringPage = async (run: (page: PageHandle) => Promise<void>): Promise<void> => {
+    const onAuthoringPage = async (
+      run: (page: PageHandle, doc: DocumentHandle) => Promise<void>,
+    ): Promise<void> => {
       const doc = await openFixture(engine, opts, opts.authoring);
       try {
         const first = (await doc.annotations.list()).pages[0]!;
-        await run(doc.page(first.page));
+        await run(doc.page(first.page), doc);
       } finally {
         await doc.close();
       }
@@ -183,8 +189,15 @@ export function runAnnotationDeclarationConformance(
           )!;
         expect(popup.subtype === 'popup' && popup.parent !== null).toBe(true);
         expect(annotationKey((await find(note.ref)).popup!)).toBe(annotationKey(popup.ref));
-        const unlinked = await page.annotations.update(popup.ref, { parent: null });
-        expect(unlinked.annotation.subtype === 'popup' && unlinked.annotation.parent).toBe(null);
+        // A popup shows an annotation: it can't be created or left without one.
+        await expect(
+          page.annotations.create({ subtype: 'popup', rect } as never),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg, details: { field: 'parent' } });
+        await expect(
+          page.annotations.update(popup.ref, { parent: null } as never),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+        // Deleting it on its own leaves the note, which stops naming it.
+        await page.annotations.delete(popup.ref);
         expect((await find(note.ref)).popup).toBe(null);
       });
     });
@@ -203,6 +216,282 @@ export function runAnnotationDeclarationConformance(
           await page.annotations.create({ subtype: 'popup', rect, parent: note.ref, open: true })
         ).annotation;
         expect(created.subtype === 'popup' && created.open).toBe(true);
+      });
+    });
+
+    test('values are checked, not only names, with the field named', async () => {
+      await onAuthoringPage(async (page) => {
+        const rect: PdfRect = { left: 300, bottom: 520, right: 360, top: 560 };
+        const refused = (field: string) => ({
+          code: EngineErrorCode.InvalidArg,
+          details: { field },
+        });
+        await expect(
+          page.annotations.create({ subtype: 'square', rect, color: { r: 300, g: 0, b: 0 } }),
+        ).rejects.toMatchObject(refused('color.r'));
+        await expect(
+          page.annotations.create({ subtype: 'square', rect, opacity: 1.5 }),
+        ).rejects.toMatchObject(refused('opacity'));
+        await expect(
+          page.annotations.create({ subtype: 'square', rect, cloudyIntensity: 0 }),
+        ).rejects.toMatchObject(refused('cloudyIntensity'));
+        await expect(
+          page.annotations.create({ subtype: 'text', rect, icon: 'dragon' } as never),
+        ).rejects.toMatchObject(refused('icon'));
+        await expect(
+          page.annotations.create({
+            subtype: 'free-text',
+            rect,
+            contents: 'x',
+            intent: 'free-text',
+            fontSize: 12,
+            textAlign: 'left',
+          } as never),
+        ).rejects.toMatchObject(refused('fontFamily'));
+        await expect(
+          page.annotations.create({
+            subtype: 'link',
+            rect,
+            target: { kind: 'javascript' },
+          } as never),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+        await expect(
+          page.annotations.create(
+            { subtype: 'file-attachment', rect, file: { name: '' } },
+            { file: new Uint8Array([1]) },
+          ),
+        ).rejects.toMatchObject(refused('file.name'));
+        const { annotation } = await page.annotations.create({ subtype: 'square', rect });
+        await expect(
+          page.annotations.update(annotation.ref, { opacity: -1 }),
+        ).rejects.toMatchObject(refused('opacity'));
+        // A refused value changes nothing.
+        const after = (await page.annotations.list()).annotations.find(
+          (read) => annotationKey(read.ref) === annotationKey(annotation.ref),
+        );
+        expect(after?.subtype === 'square' && after.opacity).toBe(1);
+      });
+    });
+
+    test('opacity reads back as written', async () => {
+      await onAuthoringPage(async (page) => {
+        const rect: PdfRect = { left: 300, bottom: 580, right: 360, top: 620 };
+        const { annotation } = await page.annotations.create({
+          subtype: 'square',
+          rect,
+          opacity: 0.5,
+        });
+        expect(annotation.subtype === 'square' && annotation.opacity).toBe(0.5);
+        // Not only values a float holds exactly.
+        const { annotation: updated } = await page.annotations.update(annotation.ref, {
+          opacity: 0.3,
+        });
+        expect(updated.subtype === 'square' && updated.opacity).toBe(0.3);
+        const { annotation: stamp } = await page.annotations.create(
+          { subtype: 'stamp', rect, opacity: 0.75 },
+          { appearance: PNG_1X1 },
+        );
+        expect(stamp.subtype === 'stamp' && stamp.opacity).toBe(0.75);
+      });
+    });
+
+    test('a new quad list replaces the old one, shorter or longer', async () => {
+      await onAuthoringPage(async (page) => {
+        const quad = (bottom: number) => ({
+          p1: { x: 40, y: bottom + 10 },
+          p2: { x: 140, y: bottom + 10 },
+          p3: { x: 40, y: bottom },
+          p4: { x: 140, y: bottom },
+        });
+        for (const subtype of ['highlight', 'redact'] as const) {
+          const { annotation } = await page.annotations.create({
+            subtype,
+            quadPoints: [quad(600), quad(620)],
+          } as never);
+          const { annotation: fewer } = await page.annotations.update(annotation.ref, {
+            quadPoints: [quad(640)],
+          });
+          const quads = (fewer as { quadPoints: unknown[] }).quadPoints;
+          expect(quads.length).toBe(1);
+          expect(fewer.rect).toMatchObject({ bottom: 640, top: 650 });
+        }
+        const { annotation } = await page.annotations.create({
+          subtype: 'highlight',
+          quadPoints: [quad(600)],
+        });
+        await expect(
+          page.annotations.update(annotation.ref, { quadPoints: [] }),
+        ).rejects.toMatchObject({
+          code: EngineErrorCode.InvalidArg,
+          details: { field: 'quadPoints' },
+        });
+      });
+    });
+
+    test("a redaction's box comes from its quads, and a mark needs one or the other", async () => {
+      await onAuthoringPage(async (page) => {
+        const { annotation } = await page.annotations.create({
+          subtype: 'redact',
+          quadPoints: [
+            {
+              p1: { x: 50, y: 520 },
+              p2: { x: 150, y: 520 },
+              p3: { x: 50, y: 500 },
+              p4: { x: 150, y: 500 },
+            },
+          ],
+        });
+        expect(annotation.rect).toMatchObject({ left: 50, bottom: 500, right: 150, top: 520 });
+        await expect(page.annotations.create({ subtype: 'redact' } as never)).rejects.toMatchObject(
+          {
+            code: EngineErrorCode.InvalidArg,
+            details: { field: 'rect' },
+          },
+        );
+      });
+    });
+
+    test('a review state brings its model; a custom state needs one', async () => {
+      await onAuthoringPage(async (page) => {
+        const rect: PdfRect = { left: 420, bottom: 520, right: 440, top: 540 };
+        const { annotation } = await page.annotations.create({
+          subtype: 'text',
+          rect,
+          state: 'accepted',
+        });
+        expect(annotation.subtype === 'text' && annotation.stateModel).toBe('review');
+        const { annotation: marked } = await page.annotations.update(annotation.ref, {
+          state: 'marked',
+        });
+        expect(marked.subtype === 'text' && marked.stateModel).toBe('marked');
+        await expect(
+          page.annotations.create({ subtype: 'text', rect, state: 'escalated' }),
+        ).rejects.toMatchObject({
+          code: EngineErrorCode.InvalidArg,
+          details: { field: 'stateModel' },
+        });
+        const { annotation: custom } = await page.annotations.create({
+          subtype: 'text',
+          rect,
+          state: 'escalated',
+          stateModel: 'triage',
+        });
+        const { annotation: moved } = await page.annotations.update(custom.ref, {
+          state: 'closed',
+        });
+        expect(moved.subtype === 'text' && moved.stateModel).toBe('triage');
+      });
+    });
+
+    test('a line without a caption flag reads captionEnabled: null', async () => {
+      await onAuthoringPage(async (page) => {
+        const { annotation } = await page.annotations.create({
+          subtype: 'line',
+          rect: { left: 40, bottom: 470, right: 140, top: 490 },
+          linePoints: { start: { x: 40, y: 480 }, end: { x: 140, y: 480 } },
+        } as never);
+        expect(annotation.subtype === 'line' && annotation.captionEnabled).toBe(null);
+        const { annotation: flagged } = await page.annotations.update(annotation.ref, {
+          captionEnabled: true,
+        });
+        expect(flagged.subtype === 'line' && flagged.captionEnabled).toBe(true);
+        const { annotation: cleared } = await page.annotations.update(annotation.ref, {
+          captionEnabled: null,
+        });
+        expect(cleared.subtype === 'line' && cleared.captionEnabled).toBe(null);
+      });
+    });
+
+    test('a stamp takes a one-page PDF', async () => {
+      await onAuthoringPage(async (page) => {
+        const rect: PdfRect = { left: 420, bottom: 460, right: 480, top: 500 };
+        await expect(
+          page.annotations.create({ subtype: 'stamp', rect }, { appearance: TWO_PAGE_PDF }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+      });
+    });
+
+    test('a link read back can be sent back; its read-only target is kept', async () => {
+      const doc = await openFixture(engine, opts, opts.readOnlyLink);
+      try {
+        const link = (await doc.annotations.list()).annotations.find(
+          (annotation) =>
+            annotation.subtype === 'link' &&
+            annotation.target !== null &&
+            annotation.target.kind !== 'goto' &&
+            annotation.target.kind !== 'uri',
+        ) as Extract<AnnotationDTO, { subtype: 'link' }> | undefined;
+        expect(link !== undefined).toBe(true);
+        const page = doc.page(link!.ref.page);
+        const sentBack = await page.annotations.update(link!.ref, {
+          ...link!,
+          contents: 'Sent back',
+        } as never);
+        expect(sentBack.annotation.subtype === 'link' && sentBack.annotation.target).toEqual(
+          link!.target,
+        );
+        await expect(
+          page.annotations.update(link!.ref, { target: { kind: 'named', name: 'PrevPage' } }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg, details: { field: 'target' } });
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('deleting a note deletes its thread and popups, in one change', async () => {
+      await onAuthoringPage(async (page, doc) => {
+        const rect: PdfRect = { left: 460, bottom: 300, right: 480, top: 320 };
+        const find = async (ref: AnnotationRef) =>
+          (await page.annotations.list()).annotations.find(
+            (annotation) => annotationKey(annotation.ref) === annotationKey(ref),
+          );
+        const create = async (data: object) =>
+          (await page.annotations.create(data as never)).annotation;
+        const note = await create({ subtype: 'text', rect, contents: 'Note' });
+        const notePopup = await create({ subtype: 'popup', rect, parent: note.ref });
+        const reply = await create({
+          subtype: 'text',
+          rect,
+          contents: 'Reply',
+          reply: { to: note.ref },
+        });
+        const replyPopup = await create({ subtype: 'popup', rect, parent: reply.ref });
+        const nested = await create({
+          subtype: 'text',
+          rect,
+          contents: 'Nested',
+          reply: { to: reply.ref },
+        });
+        const status = await create({
+          subtype: 'text',
+          rect,
+          state: 'accepted',
+          reply: { to: note.ref },
+        });
+        const bystander = await create({ subtype: 'text', rect, contents: 'Unrelated' });
+
+        // A reply takes the replies under it, and its popup; the note stays.
+        const replyDelete = await page.annotations.delete(reply.ref);
+        expect(replyDelete.meta.changed.length).toBe(3);
+        expect(await find(reply.ref)).toBe(undefined);
+        expect(await find(nested.ref)).toBe(undefined);
+        expect(await find(replyPopup.ref)).toBe(undefined);
+        expect((await find(note.ref)) !== undefined).toBe(true);
+
+        const deleted: unknown[][] = [];
+        const stop = doc.events.on('annotations.deleted', (event) => {
+          deleted.push(event.deleted);
+        });
+        try {
+          const { meta } = await page.annotations.delete(note.ref);
+          expect(meta.changed.length).toBe(3);
+          expect(meta.changed[0]).toMatchObject({ kind: 'objectNumber' });
+          expect(deleted).toEqual([meta.changed]);
+        } finally {
+          stop();
+        }
+        for (const gone of [note, notePopup, status]) expect(await find(gone.ref)).toBe(undefined);
+        expect((await find(bystander.ref)) !== undefined).toBe(true);
       });
     });
 
@@ -295,6 +584,7 @@ export function runAnnotationDeclarationConformance(
         expect(fileOf(renamed.annotation)).toEqual({
           name: 'renamed.txt',
           mimeType: 'text/plain',
+          description: null,
           size: original.size,
           checksum: original.checksum,
           createdAt: (original as { createdAt?: string }).createdAt,

@@ -24,4 +24,5 @@ export const RedactKind: AnnotationKindModule<
   dtoSchema: RedactDTOSchema,
   draftSchema: RedactDraftSchema,
   patchSchema: RedactPatchSchema,
+  readBackWrites: RedactDeclaration.readBackWrites,
 };

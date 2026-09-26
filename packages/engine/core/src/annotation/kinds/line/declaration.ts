@@ -15,7 +15,7 @@ export const LineDeclaration = defineKind('line', {
   intent: field.data(LineIntentSchema).nullable().optional(),
   measure: measureField,
   /** `/Cap`: paint `/Contents` on the line. */
-  captionEnabled: field.data(z.boolean()).optional(),
+  captionEnabled: field.data(z.boolean()).nullable().optional(),
   /** `/CP`. */
   captionPosition: field.data(z.enum(['inline', 'top'])).optional(),
   /** `/CO`, along the line and its normal; `null` is the normal position. */

@@ -21,4 +21,5 @@ export const TextKind: AnnotationKindModule<'text', TextAnnotationDTO, TextDraft
   dtoSchema: TextDTOSchema,
   draftSchema: TextDraftSchema,
   patchSchema: TextPatchSchema,
+  readBackWrites: TextDeclaration.readBackWrites,
 };

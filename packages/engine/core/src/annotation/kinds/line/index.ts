@@ -19,4 +19,5 @@ export const LineKind: AnnotationKindModule<'line', LineAnnotationDTO, LineDraft
   dtoSchema: LineDTOSchema,
   draftSchema: LineDraftSchema,
   patchSchema: LinePatchSchema,
+  readBackWrites: LineDeclaration.readBackWrites,
 };

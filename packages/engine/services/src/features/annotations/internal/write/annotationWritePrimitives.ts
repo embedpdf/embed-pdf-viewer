@@ -60,19 +60,13 @@ export function clearAnnotColor(fn: PdfFunctions, annotPtr: Ptr, type: number): 
   fn.EPDFAnnot_ClearColor(annotPtr, type);
 }
 
-/** An opacity 0..1 as the native 0..255 alpha `/CA` is written from. */
-export function opacityToAlpha(opacity: number): number {
-  return Math.max(0, Math.min(255, Math.round(opacity * 255)));
-}
-
 /**
- * Set annotation opacity (`/CA`) via the dedicated `EPDFAnnot_SetOpacity`
- * extension. Input is 0..1; the native alpha is 0..255. This is the path
- * that stores `/CA` in the form native appearance generation expects, so
- * opacity survives the bake.
+ * Set annotation opacity (`/CA`, 0..1, stored as given) via the dedicated
+ * `EPDFAnnot_SetOpacity` extension, the form native appearance generation
+ * reads, so opacity survives the bake.
  */
 export function setAnnotOpacity(fn: PdfFunctions, annotPtr: Ptr, opacity: number): void {
-  if (!fn.EPDFAnnot_SetOpacity(annotPtr, opacityToAlpha(opacity))) {
+  if (!fn.EPDFAnnot_SetOpacity(annotPtr, opacity)) {
     throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetOpacity returned false');
   }
 }

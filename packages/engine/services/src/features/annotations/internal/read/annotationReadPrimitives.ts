@@ -16,6 +16,7 @@ import {
   type Ptr,
 } from '@embedpdf/engine-runtime';
 
+import { float32Decimal } from '../../../../runtime/memory/float32';
 import { withScratch, withScratchN } from '../../../../runtime/memory/scratch';
 import { readUtf8String, readUtf16String } from '../../../../runtime/memory/strings';
 import {
@@ -106,20 +107,18 @@ export function readAnnotBoolean(
 }
 
 /**
- * Read annotation opacity via the EmbedPDF `EPDFAnnot_GetOpacity`
- * extension. Returns a 0..1 value (the native alpha is 0..255). Returns
- * `null` when the annotation has no opacity entry. This is the path that
- * stays consistent across native `EPDFAnnot_GenerateAppearance`, unlike a
- * raw `/CA` number read.
+ * Read annotation opacity (`/CA` as stored, 0..1; 1 when absent) via the
+ * EmbedPDF `EPDFAnnot_GetOpacity` extension, as the decimal it was written
+ * as. `null` only when the annotation can't be read.
  */
 export function readAnnotOpacity(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
 ): number | null {
-  return withScratch(mem, I32_BYTES, (buf) => {
+  return withScratch(mem, F32_BYTES, (buf) => {
     if (!fn.EPDFAnnot_GetOpacity(annotPtr, buf)) return null;
-    return (readI32(mem, buf) & 0xff) / 255;
+    return float32Decimal(readF32(mem, buf));
   });
 }
 

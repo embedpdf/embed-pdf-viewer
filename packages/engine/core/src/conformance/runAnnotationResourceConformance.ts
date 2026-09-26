@@ -169,9 +169,8 @@ export function runAnnotationResourceConformance(
         for (const stamp of await acrobatStamps(page)) {
           for (const opacity of [1, 0.5]) {
             const { annotation: updated } = await page.annotations.update(stamp.ref, { opacity });
-            expect(updated.subtype === 'stamp' && updated.opacity).toBe(
-              opacity === 1 ? 1 : 128 / 255,
-            );
+            // Stored as given, not as an 8-bit alpha.
+            expect(updated.subtype === 'stamp' && updated.opacity).toBe(opacity);
             expectPaintedOnce(await rasterOf(page, updated.ref), opacity);
           }
         }

@@ -156,6 +156,7 @@ function layoutSnapshot() {
         boxes: { media: { ...box }, crop: { ...box } },
       },
     ],
+    namedPages: [],
   };
 }
 

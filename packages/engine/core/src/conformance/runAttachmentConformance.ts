@@ -86,10 +86,10 @@ export function runAttachmentConformance(
         for (const item of attachments) {
           const content = await doc.attachments.download(item.ref);
           expect(content.name).toBe(item.name);
-          if (item.mimeType !== undefined) {
+          if (item.mimeType !== null) {
             expect(content.mimeType).toBe(item.mimeType);
           }
-          if (item.size !== undefined) {
+          if (item.size !== null) {
             expect(content.bytes.length).toBe(item.size);
           }
         }

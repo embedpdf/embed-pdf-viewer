@@ -65,6 +65,12 @@ export function runRedactionApplyConformance(
           fontColor: { r: 255, g: 255, b: 255 },
         } satisfies RedactDraft);
         expect(marked.annotation.subtype).toBe('redact');
+        // The mark's own popup, away from the region: it goes with the mark.
+        await page.annotations.create({
+          subtype: 'popup',
+          rect: { left: 300, bottom: 300, right: 400, top: 360 },
+          parent: marked.annotation.ref,
+        });
 
         const before = await page.annotations.list();
         const events: DocumentEvent[] = [];
@@ -77,17 +83,17 @@ export function runRedactionApplyConformance(
         expect(result.results).toHaveLength(1);
         expect(result.results[0].page.pageObjectNumber).toBe(pageObjectNumber);
         expect(result.results[0].status).toBe('applied');
-        // Exactly the highlight counts: the consumed redact never does.
-        expect(result.results[0].removedAnnotationCount).toBe(1);
-        expect(result.removedAnnotationCount).toBe(1);
+        // The highlight and the mark's popup count: the consumed redact never does.
+        expect(result.results[0].removedAnnotationCount).toBe(2);
+        expect(result.removedAnnotationCount).toBe(2);
         expect(result.meta.affectedPages.map((state) => state.page)).toEqual([page.ref]);
         expect(events).toHaveLength(1);
         unsubscribe();
 
-        // Both the redaction and its collateral are gone; layout is not a
-        // casualty; the page revision advanced (weak refs invalidated).
+        // The redaction, its popup and its collateral are gone; layout is
+        // not a casualty; the page revision advanced (weak refs invalidated).
         const after = await page.annotations.list();
-        expect(after.annotations.length).toBe(before.annotations.length - 2);
+        expect(after.annotations.length).toBe(before.annotations.length - 3);
         expect(after.pages[0].revision.generation > before.pages[0].revision.generation).toBe(true);
         expect(await doc.pages.list()).toEqual(layoutBefore);
       } finally {

@@ -39,6 +39,7 @@ const paths = {
   ),
   'measure-acrobat-metric': resolve(engineFixtures, 'measure-acrobat-metric.pdf'),
   'measure-acrobat-imperial': resolve(engineFixtures, 'measure-acrobat-imperial.pdf'),
+  'link-javascript': resolve(engineFixtures, 'link_javascript.pdf'),
 };
 
 const runner: ConformanceTestRunner = {
@@ -70,6 +71,7 @@ runAnnotationDeclarationConformance(runner, {
   openKind: 'id',
   authoring: cloudFixture('measure-acrobat-imperial'),
   documents: [cloudFixture('annotations-pdf'), cloudFixture('measure-acrobat-metric')],
+  readOnlyLink: cloudFixture('link-javascript'),
   makeEngine: () => {
     if (!fx) throw new Error('fixture not initialised');
     return cloudEngine({ baseUrl: fx.baseUrl, token: tenantToken(fx, TENANT_ID) });

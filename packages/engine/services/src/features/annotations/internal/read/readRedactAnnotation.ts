@@ -2,8 +2,10 @@ import type { AnnotationBase, Color, RedactAnnotationDTO } from '@embedpdf/engin
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { FPDFANNOT_COLORTYPE } from '../colorType';
+import { freeTextFontForFace, readEngineRichText } from '../richTextWire';
 import { DEFAULT_STANDARD_FONT, standardFontFromCode } from '../standardFont';
 import { textAlignmentFromCode } from '../textAlignment';
+import type { AnnotationReadContext } from './annotationReadContext';
 import {
   readAnnotColor,
   readAnnotOpacity,
@@ -31,6 +33,8 @@ export function readRedact(
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
   base: AnnotationBase,
+  _subtypeCode?: number,
+  ctx?: AnnotationReadContext,
 ): RedactAnnotationDTO {
   const color = readAnnotColor(fn, mem, annotPtr, FPDFANNOT_COLORTYPE.Color) ?? {
     ...DEFAULT_REDACT_COLOR,
@@ -41,7 +45,19 @@ export function readRedact(
     readAnnotColor(fn, mem, annotPtr, FPDFANNOT_COLORTYPE.InteriorColor) ?? null;
 
   const da = readDefaultAppearance(fn, mem, annotPtr);
-  const fontFamily = da ? standardFontFromCode(da.fontCode) : DEFAULT_STANDARD_FONT;
+  // The face the /DA names, resolved by identity as free text does, so a
+  // registered font reads back as its key (`standardFontFromCode` only
+  // knows the 14).
+  const face = da ? readEngineRichText(fn, mem, annotPtr)?.body : undefined;
+  const fonts = ctx?.fonts;
+  const fontFamily = face?.family
+    ? freeTextFontForFace(
+        face,
+        fonts ? (family, weight, italic) => fonts.keyForFace(family, weight, italic) : undefined,
+      )
+    : da
+      ? standardFontFromCode(da.fontCode)
+      : DEFAULT_STANDARD_FONT;
   const fontSize = da ? da.fontSize : DEFAULT_FONT_SIZE;
   const fontColor = da?.color ?? { ...DEFAULT_LABEL_COLOR };
 

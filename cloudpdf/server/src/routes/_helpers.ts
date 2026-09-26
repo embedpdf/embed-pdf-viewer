@@ -25,7 +25,10 @@ import type { ManifestPage } from '@embedpdf/engine-core/wire';
  */
 export type SafeParseLike<T> =
   | { success: true; data: T }
-  | { success: false; error: { issues: Array<{ message: string }> } };
+  | {
+      success: false;
+      error: { issues: Array<{ message: string; path?: ReadonlyArray<string | number> }> };
+    };
 
 export interface SchemaLike<T> {
   safeParse(raw: unknown): SafeParseLike<T>;
@@ -132,13 +135,18 @@ export function abortSignalFromRequest(req: {
  * argument is interpolated into the message so the caller doesn't
  * have to compose a path manually.
  */
+/**
+ * `raw` checked against `schema`. A value it refuses is `InvalidArg` naming
+ * the field (the first issue's path, as the engines' own checks name it).
+ */
 export function parseOrInvalidArg<T>(schema: SchemaLike<T>, raw: unknown, where: string): T {
   const result = schema.safeParse(raw);
   if (!result.success) {
+    const field = result.error.issues[0]?.path?.join('.') ?? '';
     throw new EngineError(
       EngineErrorCode.InvalidArg,
       `${where}: ${result.error.issues.map((i) => i.message).join('; ')}`,
-      { details: { issues: result.error.issues } },
+      { details: { ...(field ? { field } : {}), issues: result.error.issues } },
     );
   }
   return result.data;

@@ -17,7 +17,7 @@
 import type { AnnotationBase } from './base';
 import type { AnnotationDTO } from './kinds';
 import type { AnnotationRef } from '../identity/AnnotationRef';
-import { annotationKey } from '../identity/annotationKey';
+import { annotationKey, annotationKeysOf } from '../identity/annotationKey';
 
 /**
  * Where a single annotation sits in the reply/group taxonomy.
@@ -50,8 +50,8 @@ export function classifyRelation(a: Pick<AnnotationBase, 'reply'>): AnnotationRe
  *   - `replies` (`/RT /R`) are real comment-thread entries shown threaded
  *     under the primary.
  *
- * A primary may legitimately have both (e.g. a StrikeOut with a Caret
- * group part and a Text reply).
+ * A primary may legitimately have both (e.g. a replace-text Caret with its
+ * StrikeOut group part and a Text reply).
  */
 export interface AnnotationThread<T extends AnnotationDTO = AnnotationDTO> {
   primary: T;
@@ -126,4 +126,64 @@ export function buildThreads(annotations: readonly AnnotationDTO[]): AnnotationT
   }
 
   return threads;
+}
+
+/**
+ * An annotation and everything deleted with it: every annotation whose
+ * `reply.to` leads to it (replies, their replies, grouped parts, review
+ * states) and every popup of these. A reply left behind would point at
+ * nothing and show as a note of its own in other viewers; a popup left
+ * behind would show nobody's text. Children come before their parent and a
+ * popup before the annotation it shows, so the annotation itself is last.
+ * Empty when `ref` names nothing in `annotations`.
+ */
+export function deletedWith(
+  annotations: readonly AnnotationDTO[],
+  ref: AnnotationRef,
+): AnnotationDTO[] {
+  const byKey = new Map<string, AnnotationDTO>();
+  for (const annotation of annotations) {
+    for (const key of annotationKeysOf(annotation)) {
+      if (!byKey.has(key)) byKey.set(key, annotation);
+    }
+  }
+  const target = byKey.get(annotationKey(ref));
+  if (!target) return [];
+
+  const children = new Map<AnnotationDTO, AnnotationDTO[]>();
+  const popups = new Map<AnnotationDTO, AnnotationDTO[]>();
+  const add = (
+    map: Map<AnnotationDTO, AnnotationDTO[]>,
+    key: AnnotationDTO,
+    value: AnnotationDTO,
+  ) => map.set(key, [...(map.get(key) ?? []), value]);
+  for (const annotation of annotations) {
+    const parent = annotation.reply ? byKey.get(annotationKey(annotation.reply.to)) : undefined;
+    if (parent && parent !== annotation) add(children, parent, annotation);
+    // A popup belongs to the annotation it shows, by its `/Parent` or by
+    // that annotation's `/Popup`.
+    const shows =
+      annotation.subtype === 'popup' && annotation.parent
+        ? byKey.get(annotationKey(annotation.parent))
+        : undefined;
+    if (shows && shows !== annotation) add(popups, shows, annotation);
+    const own = annotation.popup ? byKey.get(annotationKey(annotation.popup)) : undefined;
+    if (own && own !== annotation && own.subtype === 'popup') add(popups, annotation, own);
+  }
+
+  const members: AnnotationDTO[] = [];
+  const seen = new Set<AnnotationDTO>();
+  const visit = (annotation: AnnotationDTO): void => {
+    if (seen.has(annotation)) return;
+    seen.add(annotation);
+    for (const child of children.get(annotation) ?? []) visit(child);
+    for (const popup of popups.get(annotation) ?? []) {
+      if (seen.has(popup)) continue;
+      seen.add(popup);
+      members.push(popup);
+    }
+    members.push(annotation);
+  };
+  visit(target);
+  return members;
 }

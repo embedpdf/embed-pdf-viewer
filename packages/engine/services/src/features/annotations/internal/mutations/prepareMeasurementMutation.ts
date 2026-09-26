@@ -132,7 +132,8 @@ export function prepareMeasurementDraft(draft: AnnotationDraft): AnnotationDraft
     if (draft.subtype === 'line') {
       prepared = {
         ...draft,
-        captionEnabled: draft.captionEnabled ?? false,
+        // `null` is a line without a caption flag, as a read says.
+        captionEnabled: draft.captionEnabled === undefined ? false : draft.captionEnabled,
         captionPosition: draft.captionPosition ?? 'inline',
         captionOffset: draft.captionOffset ?? null,
       };
@@ -184,7 +185,8 @@ export function prepareMeasurementPatch(
     if (touchesCaption(next)) {
       next = {
         ...next,
-        captionEnabled: next.captionEnabled ?? current.captionEnabled,
+        captionEnabled:
+          next.captionEnabled === undefined ? current.captionEnabled : next.captionEnabled,
         captionPosition: next.captionPosition ?? current.captionPosition,
         captionOffset:
           next.captionOffset === undefined ? current.captionOffset : next.captionOffset,

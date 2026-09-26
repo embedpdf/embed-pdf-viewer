@@ -112,7 +112,7 @@ export const textMarkupFields = {
   ...colorStyleFields,
   /** Derived from the quads. */
   rect: field.engine(PdfRectSchema),
-  quadPoints: field.data(z.array(PdfQuadSchema)),
+  quadPoints: field.data(z.array(PdfQuadSchema).min(1)),
 };
 
 export const shapeFields = {

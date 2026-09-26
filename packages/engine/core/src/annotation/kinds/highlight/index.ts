@@ -24,4 +24,5 @@ export const HighlightKind: AnnotationKindModule<
   dtoSchema: HighlightDTOSchema,
   draftSchema: HighlightDraftSchema,
   patchSchema: HighlightPatchSchema,
+  readBackWrites: HighlightDeclaration.readBackWrites,
 };

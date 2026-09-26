@@ -75,7 +75,9 @@ import {
   type SignatureCompleteResult,
   type SignaturePrepareInput,
   type SignaturePrepared,
+  deletedWith,
   formWidget,
+  type AnnotationDTO,
   type AnnotationSubtype,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -569,6 +571,25 @@ export class LayerService {
    * Tracked as a follow-up optimisation: a dedicated worker job that
    * resolves ref → /EMBD_Metadata without serialising the whole page.
    */
+  /**
+   * What deleting `ref` deletes (`deletedWith`): the annotation, its thread
+   * and its popups, for the route to check each one. Empty when `ref` names
+   * nothing; the delete then says so.
+   */
+  async getAnnotationDeleteMembers(
+    ctx: LayerWriteContext,
+    docId: string,
+    layerName: string,
+    pageObjectNumber: PageObjectNumber,
+    ref: AnnotationRef,
+    signal?: AbortSignal,
+  ): Promise<AnnotationDTO[]> {
+    return deletedWith(
+      await this.pageAnnotations(ctx, docId, layerName, pageObjectNumber, signal),
+      ref,
+    );
+  }
+
   async getAnnotationCollabTarget(
     ctx: LayerWriteContext,
     docId: string,
@@ -577,28 +598,8 @@ export class LayerService {
     ref: AnnotationRef,
     signal?: AbortSignal,
   ): Promise<{ userId?: string; groupId?: string; subtype?: AnnotationSubtype }> {
-    // The worker job below assumes the layer is already attached to the
-    // pool's session for `docId`. Most read paths already do this via
-    // `documentService.ensureLayerOnPool`; collab gating runs before any
-    // mutation, so we have to open it ourselves.
-    await this.requireDocumentService().ensureLayerOnPool(ctx, docId, layerName);
+    const annotations = await this.pageAnnotations(ctx, docId, layerName, pageObjectNumber, signal);
 
-    const build = (jobId: WorkerJobId) =>
-      wirePack({
-        kind: 'annotations.list' as const,
-        jobId,
-        docId,
-        layerName,
-        pages: [toPageRef(pageObjectNumber)],
-      });
-    const payload = await this.requirePool().run(docId, build, signal);
-    if (payload.tag !== 'annotations.list') {
-      throw new EngineError(
-        EngineErrorCode.WireFormat,
-        `unexpected annotations.list payload while resolving collab target: ${payload.tag}`,
-      );
-    }
-    const annotations = payload.list.annotations;
     const match = annotations.find((a) => {
       // Refs match in three shapes; objectNumber and nm are durable
       // identities and the safest. Index is positional and resolved
@@ -623,12 +624,46 @@ export class LayerService {
     };
   }
 
+  /** The page's annotations on the layer, as the worker reads them, for a check before a write. */
+  private async pageAnnotations(
+    ctx: LayerWriteContext,
+    docId: string,
+    layerName: string,
+    pageObjectNumber: PageObjectNumber,
+    signal?: AbortSignal,
+  ): Promise<AnnotationDTO[]> {
+    // The worker job below assumes the layer is already attached to the
+    // pool's session for `docId`. Most read paths already do this via
+    // `documentService.ensureLayerOnPool`; collab gating runs before any
+    // mutation, so we have to open it ourselves.
+    await this.requireDocumentService().ensureLayerOnPool(ctx, docId, layerName);
+
+    const build = (jobId: WorkerJobId) =>
+      wirePack({
+        kind: 'annotations.list' as const,
+        jobId,
+        docId,
+        layerName,
+        pages: [toPageRef(pageObjectNumber)],
+      });
+    const payload = await this.requirePool().run(docId, build, signal);
+    if (payload.tag !== 'annotations.list') {
+      throw new EngineError(
+        EngineErrorCode.WireFormat,
+        `unexpected annotations.list payload while resolving collab target: ${payload.tag}`,
+      );
+    }
+    return payload.list.annotations;
+  }
+
   async deleteAnnotation(
     ctx: LayerWriteContext,
     input: {
       docId: string;
       layerName: string;
       ref: AnnotationRef;
+      /** What the route's permission check covered (see `getAnnotationDeleteMembers`). */
+      checked: AnnotationRef[];
     },
     signal?: AbortSignal,
   ): Promise<AnnotationDeleteResult> {
@@ -655,6 +690,7 @@ export class LayerService {
             docId: input.docId,
             layerName: input.layerName,
             ref,
+            checked: input.checked,
             artifactPath,
           });
         const payload = await this.requirePool().run(input.docId, build, signal);

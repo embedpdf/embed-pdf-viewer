@@ -50,10 +50,11 @@ export interface PdfForeignMeasure {
   subtype: 'geospatial' | 'unknown';
 }
 export type PdfMeasurement = PdfMeasure | PdfForeignMeasure;
+/** A page's `/VP` entry. `name` and `measure` are `null` when the PDF has none. */
 export interface PdfViewport {
   bbox: PdfRect;
-  name?: string;
-  measure?: PdfMeasurement;
+  name: string | null;
+  measure: PdfMeasurement | null;
 }
 export interface PageMeasurementViewport extends PdfViewport {
   owned: boolean;

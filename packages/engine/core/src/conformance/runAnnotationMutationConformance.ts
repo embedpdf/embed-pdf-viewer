@@ -1562,7 +1562,7 @@ export function runAnnotationMutationConformance(
         const before = await page.annotations.list();
 
         const weakSession = await beginEditIfRequired(doc, fix.pageObjectNumber, fix);
-        const deletions: Array<AnnotationStableId | null> = [];
+        const deletions: AnnotationStableId[][] = [];
         const stop = doc.events.subscribe((event) => {
           if (event.type === 'annotations.deleted') deletions.push(event.deleted);
         });
@@ -1573,10 +1573,12 @@ export function runAnnotationMutationConformance(
           // the event names what went, for listeners that didn't delete it.
           expect(Object.keys(result)).toEqual(['meta']);
           expect(deletions).toEqual([
-            {
-              kind: 'objectNumber',
-              value: (created.annotation.ref as { annotObjectNumber: number }).annotObjectNumber,
-            },
+            [
+              {
+                kind: 'objectNumber',
+                value: (created.annotation.ref as { annotObjectNumber: number }).annotObjectNumber,
+              },
+            ],
           ]);
           expect(result.meta.affectedPages.length).toBe(1);
           expect(result.meta.affectedPages[0].page.pageObjectNumber).toBe(fix.pageObjectNumber);
@@ -2550,16 +2552,22 @@ export function runAnnotationMutationConformance(
       }
     });
 
-    test('a draft /State without /StateModel is rejected with InvalidArg', async () => {
+    test('a draft /State without /StateModel takes its standard model, or is refused', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
+        const { annotation } = await page.annotations.create({
+          subtype: 'text',
+          rect: shapeRect,
+          state: 'accepted',
+        } satisfies TextDraft);
+        expect(annotation.subtype === 'text' && annotation.stateModel).toBe('review');
         let caught: unknown;
         try {
           await page.annotations.create({
             subtype: 'text',
             rect: shapeRect,
-            state: 'accepted',
+            state: 'escalated',
           } satisfies TextDraft);
         } catch (err) {
           caught = err;

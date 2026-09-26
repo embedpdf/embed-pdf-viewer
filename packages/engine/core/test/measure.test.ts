@@ -145,6 +145,7 @@ describe('measurement arithmetic and formatting', () => {
   test('viewport selection is last-containing, foreign included', () => {
     const a: PdfViewport = {
       bbox: { left: -20, right: 100, bottom: -40, top: 100 },
+      name: null,
       measure: { subtype: 'geospatial' },
     };
     expect(viewportForPoint([a, { ...a, name: 'last' }], { x: 0, y: 0 })?.name).toBe('last');

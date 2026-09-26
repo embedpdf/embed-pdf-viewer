@@ -11,7 +11,7 @@ import {
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import type { AnnotationWriteContext } from './annotationWriteContext';
-import { opacityToAlpha, setAnnotOpacity, setAnnotRect } from './annotationWritePrimitives';
+import { setAnnotOpacity, setAnnotRect } from './annotationWritePrimitives';
 import { drawingFor } from './stampDrawing';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 import { writeBoxTransformMetadata } from './writeAnnotationTransformMetadata';
@@ -213,11 +213,27 @@ function requireStampContent(
   ctx: AnnotationWriteContext | undefined,
 ): void {
   if (!appearance) requireStampAppearance(ctx);
-  if (!(appearance instanceof ArrayBuffer) || !sniffBinaryMetadata(appearance)) {
+  const meta = appearance instanceof ArrayBuffer ? sniffBinaryMetadata(appearance) : null;
+  if (!meta) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
       'the appearance resource must be PNG, JPEG or one-page PDF bytes',
     );
+  }
+  if (meta.mimeType === 'application/pdf') {
+    const pages = ctx?.pdfPageCount?.(appearance as ArrayBuffer);
+    if (pages === null) {
+      throw new EngineError(
+        EngineErrorCode.MalformedPdf,
+        "the stamp's appearance PDF could not be opened",
+      );
+    }
+    if (pages !== undefined && pages !== 1) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `the appearance PDF has ${pages} pages; a stamp takes a one-page PDF`,
+      );
+    }
   }
   requireDrawingTarget(ctx);
 }
@@ -320,7 +336,7 @@ function setStampContent(
 }
 
 function setStampOpacity(fn: PdfFunctions, annotPtr: Ptr, fit: StampFit, opacity: number): void {
-  if (!fn.EPDFAnnot_SetStampOpacity(annotPtr, STAMP_FIT_TO_CODE[fit], opacityToAlpha(opacity))) {
+  if (!fn.EPDFAnnot_SetStampOpacity(annotPtr, STAMP_FIT_TO_CODE[fit], opacity)) {
     throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetStampOpacity returned false');
   }
 }

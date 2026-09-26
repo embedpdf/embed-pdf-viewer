@@ -10,8 +10,8 @@
  *     non-state members flatten into one chronological reply list;
  *   - ISO 32000 §12.5.6.3 state annotations (review status) are extracted
  *     into `review` instead of appearing as replies;
- *   - widgets, links, and unsupported blobs (which includes `/Popup`
- *     dictionaries) are excluded entirely;
+ *   - widgets, links, popups (a note's window, not a comment) and
+ *     unsupported blobs are excluded entirely;
  *   - `/RT /Group` subordinates anywhere in the subtree fold into
  *     `groupedParts`, never into `replies`.
  *
@@ -34,7 +34,7 @@
  */
 
 import type { AnnotationDTO } from './kinds';
-import type { KnownAnnotationState } from './primitives';
+import type { KnownAnnotationState, KnownAnnotationStateModel } from './primitives';
 import { classifyRelation } from './relationships';
 import { annotationKey } from '../identity/annotationKey';
 import type { AnnotationRef } from '../identity/AnnotationRef';
@@ -94,10 +94,10 @@ export interface BuildCommentThreadsOptions {
   currentUserId?: string;
 }
 
-/** Subtypes that never participate in comment threads. `unsupported`
- *  covers `/Popup` dictionaries (raw code 16) and unreadable foreign
- *  blobs — neither makes a meaningful comment card. */
-const EXCLUDED_SUBTYPES: ReadonlySet<string> = new Set(['widget', 'link', 'unsupported']);
+/** Subtypes that never participate in comment threads: a popup is its
+ *  parent's window and an unsupported blob is unreadable, so neither makes
+ *  a comment card. */
+const EXCLUDED_SUBTYPES: ReadonlySet<string> = new Set(['widget', 'link', 'popup', 'unsupported']);
 
 const REVIEW_STATES: ReadonlySet<KnownAnnotationState> = new Set([
   'accepted',
@@ -107,6 +107,17 @@ const REVIEW_STATES: ReadonlySet<KnownAnnotationState> = new Set([
   'none',
 ]);
 const MARKED_STATES: ReadonlySet<KnownAnnotationState> = new Set(['marked', 'unmarked']);
+
+/**
+ * The model a standard state belongs to (ISO 32000 §12.5.6.3, Table 174):
+ * `'review'` for accepted, rejected, cancelled, completed and none,
+ * `'marked'` for marked and unmarked; `null` for a custom state.
+ */
+export function standardStateModelOf(state: string): KnownAnnotationStateModel | null {
+  if (REVIEW_STATES.has(state as KnownAnnotationState)) return 'review';
+  if (MARKED_STATES.has(state as KnownAnnotationState)) return 'marked';
+  return null;
+}
 
 const nonEmpty = (v: string | null | undefined): v is string => typeof v === 'string' && v !== '';
 
@@ -267,9 +278,8 @@ function toReviewStatus(a: AnnotationDTO): ReviewStatus | null {
 
   let stateModel = rawModel;
   if (stateModel === null && rawState !== null) {
-    if (REVIEW_STATES.has(rawState as KnownAnnotationState)) stateModel = 'review';
-    else if (MARKED_STATES.has(rawState as KnownAnnotationState)) stateModel = 'marked';
-    else return null; // custom state without a model: unclassifiable
+    stateModel = standardStateModelOf(rawState);
+    if (stateModel === null) return null; // custom state without a model: unclassifiable
   }
   let state = rawState;
   if (state === null) {

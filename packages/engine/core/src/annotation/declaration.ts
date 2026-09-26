@@ -13,7 +13,9 @@ import type { AnnotationResourceRole } from './resources';
  * - An update takes any data field; a field left out is unchanged, `null`
  *   removes it, and a value replaces it whole.
  * - Attribution, engine and preserved fields are accepted on every write, so
- *   a read DTO can be passed straight back.
+ *   a read DTO can be passed straight back. A data field whose read has more
+ *   values than a write can make (`readBack()`) takes them in an update too:
+ *   sent back unchanged it is kept, any other such value is refused.
  */
 
 /**
@@ -39,6 +41,8 @@ export interface FieldTraits {
   readonly required: boolean;
   /** The field can't change after create. */
   readonly createOnly: boolean;
+  /** An update also takes what a read returns (kept only when unchanged). */
+  readonly readBack: boolean;
 }
 
 export type Override<Traits, Changed> = Omit<Traits, keyof Changed> & Changed;
@@ -57,6 +61,12 @@ export interface Field<Read, Write, Traits> {
   createOnly(): Field<Read, Write, Override<Traits, { createOnly: true }>>;
   /** A write accepts a different schema than a read returns. */
   writes<NextWrite>(schema: z.ZodType<NextWrite>): Field<Read, NextWrite, Traits>;
+  /**
+   * An update also takes the values only a read returns, so a read DTO can
+   * be sent back: such a value is kept when it's unchanged and refused
+   * otherwise. A create still takes only what `writes` accepts.
+   */
+  readBack(): Field<Read, Write, Override<Traits, { readBack: true }>>;
 }
 
 export type AnyField = Field<any, any, any>;
@@ -78,6 +88,7 @@ function createField<Read, Write, Traits>(
     nullableOnRead: () => next({ readNullable: true }),
     optional: () => next({ required: false }),
     createOnly: () => next({ createOnly: true }),
+    readBack: () => next({ readBack: true }),
     writes: (schema) => createField(read, schema, traits),
   };
 }
@@ -88,6 +99,7 @@ export interface OwnerTraits<Owner extends FieldOwner, Required extends boolean>
   writeNullable: false;
   required: Required;
   createOnly: false;
+  readBack: false;
 }
 
 const ownedBy = <Owner extends FieldOwner, Required extends boolean>(
@@ -99,6 +111,7 @@ const ownedBy = <Owner extends FieldOwner, Required extends boolean>(
   writeNullable: false,
   required,
   createOnly: false,
+  readBack: false,
 });
 
 /** Field builders for {@link defineKind}. */
@@ -134,6 +147,14 @@ type WriteValue<F> =
       : Write
     : never;
 
+/** What an update takes: the write, and for a `readBack()` field the read too. */
+type UpdateValue<F> =
+  F extends Field<infer Read, infer _Write, infer Traits>
+    ? Traits extends { readBack: true }
+      ? WriteValue<F> | (Traits extends { readNullable: true } ? Read | null : Read)
+      : WriteValue<F>
+    : never;
+
 type NamesWhere<Fields extends KindFields, Condition> = {
   [Name in keyof Fields]: Fields[Name]['traits'] extends Condition ? Name : never;
 }[keyof Fields];
@@ -156,7 +177,7 @@ export type CreateShape<Fields extends KindFields> = {
 };
 
 export type UpdateShape<Fields extends KindFields> = {
-  [Name in NamesWhere<Fields, { owner: 'data' }>]?: WriteValue<Fields[Name]>;
+  [Name in NamesWhere<Fields, { owner: 'data' }>]?: UpdateValue<Fields[Name]>;
 } & {
   [Name in AcceptedNames<Fields>]?: ReadValue<Fields[Name]>;
 };
@@ -193,6 +214,11 @@ export interface KindDeclaration<
   readonly createSchema: z.ZodType<KindCreate<Subtype, Fields>>;
   /** Validates the data of an update. */
   readonly updateSchema: z.ZodType<KindUpdate<Subtype, Fields>>;
+  /**
+   * The write schema of each `readBack()` field: an update's value outside
+   * it is a read-only value, kept only when unchanged.
+   */
+  readonly readBackWrites: Readonly<Record<string, z.ZodTypeAny>>;
   /** The zod shapes behind the three schemas, to build variants from. */
   readonly shapes: {
     readonly read: z.ZodRawShape;
@@ -237,13 +263,15 @@ export function defineKind<
   const read: Record<string, z.ZodTypeAny> = { subtype: z.literal(subtype) };
   const create: Record<string, z.ZodTypeAny> = { subtype: z.literal(subtype) };
   const update: Record<string, z.ZodTypeAny> = { subtype: z.literal(subtype).optional() };
+  const readBackWrites: Record<string, z.ZodTypeAny> = {};
   for (const [name, spec] of Object.entries(fields)) {
-    const { owner, readNullable, writeNullable, required } = spec.traits;
+    const { owner, readNullable, writeNullable, required, readBack } = spec.traits;
     read[name] = readNullable ? spec.read.nullable() : spec.read;
     if (owner === 'data') {
       const write = writeNullable ? spec.write.nullable() : spec.write;
       create[name] = required ? write : write.optional();
-      update[name] = write.optional();
+      update[name] = (readBack ? z.union([write, read[name]!]) : write).optional();
+      if (readBack) readBackWrites[name] = write;
     } else {
       // Accepted so a read DTO can be sent back; the engine decides what happens to it.
       create[name] = z.unknown().optional();
@@ -257,6 +285,7 @@ export function defineKind<
     readSchema: z.object(read) as never,
     createSchema: z.object(create).strict() as never,
     updateSchema: z.object(update).strict() as never,
+    readBackWrites,
     shapes: { read, create, update },
   };
 }

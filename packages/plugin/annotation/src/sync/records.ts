@@ -216,9 +216,10 @@ export function foldRecords(
     case 'annotations.deleted':
       return (
         positionsReload(records, event) ??
-        (event.deleted
-          ? drop(records, [annotationKey(refFromStableId(event.page, event.deleted))])
-          : records)
+        drop(
+          records,
+          event.deleted.map((id) => annotationKey(refFromStableId(event.page, id))),
+        )
       );
     case 'pages.deleted':
       return drop(records, keysOnPages(records, event.pages));

@@ -3,7 +3,9 @@ import {
   CONTINUOUS_RENDER_POLICY,
   EngineError,
   EngineErrorCode,
-  deletedAnnotationOf,
+  collabTargetOf,
+  deletedAnnotationsOf,
+  deletedWith,
   createPageImageHandle,
   hasAnnotationResources,
   resolveAnnotationResources,
@@ -15,6 +17,7 @@ import {
   type AnnotationAppearanceRenderOptions,
   type AnnotationAppearancesResult,
   type AnnotationDraft,
+  type AnnotationDTO,
   type AnnotationList,
   type AnnotationPatch,
   type AnnotationRef,
@@ -375,8 +378,12 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
       );
     }
     return AbortablePromise.run<AnnotationDeleteResult>(async (signal) => {
-      const target = await this.collabTargetForRef(ref, signal);
-      this.guard.assertCollab('delete', target);
+      // The annotation goes with its thread and popups: each is checked,
+      // and the worker deletes only what was.
+      const members = deletedWith(await this.pageAnnotations(ref.page, signal), ref);
+      if (members.length === 0) this.guard.assertCollab('delete', {});
+      else this.guard.assertCollabEach('delete', members);
+      const checked = members.map((member) => member.ref);
 
       const docId = this.docId;
       const submission = this.queue.enqueue<WorkerResultPayload>(
@@ -387,6 +394,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
               jobId,
               docId,
               ref,
+              checked,
             }),
         },
         { priority: Priority.HIGH },
@@ -401,7 +409,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
       this.publisher.publishLocal({
         type: 'annotations.deleted',
         page: this.ref,
-        deleted: deletedAnnotationOf(payload.result),
+        deleted: deletedAnnotationsOf(payload.result),
         ...payload.result,
       });
       return payload.result;
@@ -554,10 +562,25 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
    * surfaces the real error.
    */
   private async collabTargetForRef(ref: AnnotationRef, signal: AbortSignal): Promise<CollabTarget> {
+    const match = (await this.pageAnnotations(ref.page, signal)).find((a) => {
+      switch (ref.kind) {
+        case 'objectNumber':
+          return a.ref.kind === 'objectNumber' && a.ref.annotObjectNumber === ref.annotObjectNumber;
+        case 'nm':
+          return a.nm === ref.nm;
+        case 'index':
+          return a.index === ref.index;
+      }
+    });
+    return match ? collabTargetOf(match) : {};
+  }
+
+  /** The page's annotations as the worker reads them, for a check before a write. */
+  private async pageAnnotations(page: PageRef, signal: AbortSignal): Promise<AnnotationDTO[]> {
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'annotations.list', jobId, docId: this.docId, pages: [ref.page] }),
+          wirePack({ kind: 'annotations.list', jobId, docId: this.docId, pages: [page] }),
       },
       { priority: Priority.MEDIUM },
     );
@@ -572,21 +595,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
         `unexpected payload tag while resolving collab target: ${payload.tag}`,
       );
     }
-    const match = payload.list.annotations.find((a) => {
-      switch (ref.kind) {
-        case 'objectNumber':
-          return a.ref.kind === 'objectNumber' && a.ref.annotObjectNumber === ref.annotObjectNumber;
-        case 'nm':
-          return a.nm === ref.nm;
-        case 'index':
-          return a.index === ref.index;
-      }
-    });
-    if (!match) return {};
-    return {
-      ...(match.userId != null ? { userId: match.userId } : {}),
-      ...(match.groupId != null ? { groupId: match.groupId } : {}),
-    };
+    return payload.list.annotations;
   }
 }
 

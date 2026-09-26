@@ -12,8 +12,8 @@ export namespace DocPagesViewports200Response {
     export namespace Viewports {
         export interface Item {
             bbox: Item.Bbox;
-            name?: string | undefined;
-            measure?: CloudPDF.DocPagesViewports200ResponseViewportsItemMeasure | undefined;
+            name: string | null;
+            measure: CloudPDF.DocPagesViewports200ResponseViewportsItemMeasure | null;
             owned: boolean;
         }
 

@@ -31,4 +31,5 @@ export const FileAttachmentKind: AnnotationKindModule<
   dtoSchema: FileAttachmentDTOSchema,
   draftSchema: FileAttachmentDraftSchema,
   patchSchema: FileAttachmentPatchSchema,
+  readBackWrites: FileAttachmentDeclaration.readBackWrites,
 };

@@ -2,7 +2,7 @@ import {
   AbortablePromise,
   EngineError,
   EngineErrorCode,
-  deletedAnnotationOf,
+  deletedAnnotationsOf,
   createPageImageHandle,
   encodeStableIdKey,
   hasAnnotationResources,
@@ -500,7 +500,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     this.publisher.publishLocal({
       type: 'annotations.deleted',
       page: this.pageRef,
-      deleted: deletedAnnotationOf(result),
+      deleted: deletedAnnotationsOf(result),
       ...result,
     });
     return result;

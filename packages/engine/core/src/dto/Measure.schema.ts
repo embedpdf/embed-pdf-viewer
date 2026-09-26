@@ -56,8 +56,8 @@ export const PdfMeasurementSchema = z.discriminatedUnion('subtype', [
 ]);
 export const PageMeasurementViewportSchema = z.object({
   bbox: PdfRectSchema,
-  name: z.string().optional(),
-  measure: PdfMeasurementSchema.optional(),
+  name: z.string().nullable(),
+  measure: PdfMeasurementSchema.nullable(),
   owned: z.boolean(),
 });
 /** See `PageMeasurementViewportList`. */

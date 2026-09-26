@@ -20,4 +20,5 @@ export const LinkKind: AnnotationKindModule<'link', LinkAnnotationDTO, LinkDraft
   dtoSchema: LinkDTOSchema,
   draftSchema: LinkDraftSchema,
   patchSchema: LinkPatchSchema,
+  readBackWrites: LinkDeclaration.readBackWrites,
 };

@@ -24,12 +24,12 @@ export const WireAttachmentFileSchema: z.ZodType<WireAttachmentFile> = z.object(
 
 export const AttachmentFileInfoSchema: z.ZodType<AttachmentFileInfo> = z.object({
   name: z.string(),
-  mimeType: z.string().optional(),
-  description: z.string().optional(),
-  size: z.number().int().nonnegative().optional(),
-  checksum: z.string().optional(),
-  createdAt: IsoDateTimeSchema.optional(),
-  modifiedAt: IsoDateTimeSchema.optional(),
+  mimeType: z.string().nullable(),
+  description: z.string().nullable(),
+  size: z.number().int().nonnegative().nullable(),
+  checksum: z.string().nullable(),
+  createdAt: IsoDateTimeSchema.nullable(),
+  modifiedAt: IsoDateTimeSchema.nullable(),
 });
 
 export const AttachmentRefSchema: z.ZodType<AttachmentRef> = z.object({
@@ -41,11 +41,11 @@ export const AttachmentSchema: z.ZodType<Attachment> = z.object({
   // A foreign tree entry whose key can't be read lists with an empty key.
   ref: z.object({ kind: z.literal('key'), key: z.string() }),
   name: z.string(),
-  mimeType: z.string().optional(),
-  description: z.string().optional(),
-  size: z.number().int().nonnegative().optional(),
-  checksum: z.string().optional(),
-  createdAt: IsoDateTimeSchema.optional(),
-  modifiedAt: IsoDateTimeSchema.optional(),
+  mimeType: z.string().nullable(),
+  description: z.string().nullable(),
+  size: z.number().int().nonnegative().nullable(),
+  checksum: z.string().nullable(),
+  createdAt: IsoDateTimeSchema.nullable(),
+  modifiedAt: IsoDateTimeSchema.nullable(),
   index: z.number().int().nonnegative(),
 });

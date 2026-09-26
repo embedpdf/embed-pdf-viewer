@@ -177,7 +177,8 @@ await page.annotations.delete(annotation.ref);
 await page.annotations.move([annotation.ref], 0); // to the back
 ```
 
-Deleting an annotation also deletes its popup, if it has one.
+Deleting an annotation also deletes its popup, if it has one, and its replies; see
+[Delete a note](/docs/engine/annotations/notes-and-replies#delete-a-note).
 
 Annotations on a page are drawn in order, so the last one is on top. `move(refs, toIndex)`
 moves one annotation (or several next to each other) to a new position in that order.

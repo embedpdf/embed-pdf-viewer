@@ -35,4 +35,6 @@ export interface AnnotationWriteContext {
   resources?: WireAnnotationResources;
   /** The document's stamp drawings, by content: where a stamp's drawing is found or added. */
   drawings?: DrawingIndex;
+  /** The page count of PDF bytes, or `null` when they don't open: a stamp's drawing is one page. */
+  pdfPageCount?: (bytes: ArrayBuffer) => number | null;
 }

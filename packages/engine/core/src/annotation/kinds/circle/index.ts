@@ -24,4 +24,5 @@ export const CircleKind: AnnotationKindModule<
   dtoSchema: CircleDTOSchema,
   draftSchema: CircleDraftSchema,
   patchSchema: CirclePatchSchema,
+  readBackWrites: CircleDeclaration.readBackWrites,
 };

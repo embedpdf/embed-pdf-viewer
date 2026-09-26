@@ -53,8 +53,9 @@ export function followConfirmedChanges(
         announce.updated(event.annotation, origin);
         return;
       case 'annotations.deleted':
-        if (event.deleted) {
-          announce.deleted(refFromStableId(event.page, event.deleted), event.page, origin);
+        // A note goes with its thread and popups: each is announced.
+        for (const id of event.deleted) {
+          announce.deleted(refFromStableId(event.page, id), event.page, origin);
         }
         return;
       default:

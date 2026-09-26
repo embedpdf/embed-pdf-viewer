@@ -17,15 +17,8 @@ export function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
 
 export const BANDS_PDF_CONTENT = '1 0 0 rg 0 0 120 100 re f 0 0 1 rg 120 0 80 100 re f';
 
-/** A one-page PDF, 200 × 100: a red band and a blue band, so a wrong fit or crop shows. */
-export const BANDS_PDF = (() => {
-  const content = BANDS_PDF_CONTENT;
-  const objects = [
-    '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] /Contents 4 0 R /Resources << >> >>',
-    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
-  ];
+/** A PDF file of `objects`, numbered from 1, with its cross-reference table. */
+function pdfOf(objects: readonly string[]): Uint8Array {
   let text = '%PDF-1.7\n';
   const offsets: number[] = [];
   objects.forEach((object, index) => {
@@ -37,4 +30,20 @@ export const BANDS_PDF = (() => {
   for (const offset of offsets) text += `${String(offset).padStart(10, '0')} 00000 n \n`;
   text += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${start}\n%%EOF\n`;
   return new TextEncoder().encode(text);
-})();
+}
+
+/** A one-page PDF, 200 × 100: a red band and a blue band, so a wrong fit or crop shows. */
+export const BANDS_PDF = pdfOf([
+  '<< /Type /Catalog /Pages 2 0 R >>',
+  '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+  '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] /Contents 4 0 R /Resources << >> >>',
+  `<< /Length ${BANDS_PDF_CONTENT.length} >>\nstream\n${BANDS_PDF_CONTENT}\nendstream`,
+]);
+
+/** Two empty pages: not a stamp's drawing, which is one page. */
+export const TWO_PAGE_PDF = pdfOf([
+  '<< /Type /Catalog /Pages 2 0 R >>',
+  '<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>',
+  '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] /Resources << >> >>',
+  '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] /Resources << >> >>',
+]);

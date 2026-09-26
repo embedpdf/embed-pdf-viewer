@@ -24,4 +24,5 @@ export const WidgetKind: AnnotationKindModule<
   dtoSchema: WidgetDTOSchema,
   draftSchema: WidgetDraftSchema,
   patchSchema: WidgetPatchSchema,
+  readBackWrites: WidgetDeclaration.readBackWrites,
 };

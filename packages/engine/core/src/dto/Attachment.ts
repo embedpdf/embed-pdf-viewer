@@ -19,7 +19,7 @@ import type { IsoDateTime } from './IsoDateTime';
  * FileAttachment annotation's `/FS` (addressed by the annotation ref).
  */
 
-/** Metadata fields shared by the write and read forms. */
+/** The metadata fields a write takes. */
 export interface AttachmentFileBase {
   /** File name — `/UF` (and `/F`) on the filespec. */
   name: string;
@@ -52,16 +52,25 @@ export interface WireAttachmentFile {
   description?: string;
 }
 
-/** Read-side projection of an embedded file stream (`/EF` + `/Params`). */
-export interface AttachmentFileInfo extends AttachmentFileBase {
+/**
+ * Read-side projection of an embedded file stream (`/EF` + `/Params`). Every
+ * field is present, `null` when the PDF has no value for it.
+ */
+export interface AttachmentFileInfo {
+  /** File name — `/UF` (and `/F`) on the filespec. */
+  name: string;
+  /** MIME type — `/Subtype` of the embedded file stream. */
+  mimeType: string | null;
+  /** Human-readable description — `/Desc` on the filespec. */
+  description: string | null;
   /** `/Params /Size` — decoded size in bytes. */
-  size?: number;
+  size: number | null;
   /** `/Params /CheckSum` — MD5 of the decoded bytes, lowercase hex. */
-  checksum?: string;
+  checksum: string | null;
   /** `/Params /CreationDate`. */
-  createdAt?: IsoDateTime;
+  createdAt: IsoDateTime | null;
   /** `/Params /ModDate`. */
-  modifiedAt?: IsoDateTime;
+  modifiedAt: IsoDateTime | null;
 }
 
 /**

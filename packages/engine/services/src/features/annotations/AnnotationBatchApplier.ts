@@ -16,6 +16,7 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
+import { pdfPageCountOf } from './internal/write/stampDrawing';
 import { captureOrStampStableId } from './internal/identity/captureOrStampStableId';
 import { resolveAnnotIndexRaw } from './internal/identity/resolveAnnotIndexRaw';
 import { prepareCreate } from './internal/mutations/prepareCreate';
@@ -135,6 +136,13 @@ export class AnnotationBatchApplier {
           this.linkTarget(create.replyTo!.to, create.page, creates.length, 'reply'),
         ),
       };
+      if (draft.subtype === 'popup' && !create.parent) {
+        throw new EngineError(
+          EngineErrorCode.InvalidArg,
+          `${create.label ?? 'create'}: a popup needs the annotation it shows (parent)`,
+          { details: { field: 'parent' } },
+        );
+      }
       const parent =
         create.parent &&
         labelled(create.label, () =>
@@ -351,6 +359,7 @@ export class AnnotationBatchApplier {
         : {}),
       docPtr: this.session.requireDocPtr(),
       drawings: this.session.drawingIndex(),
+      pdfPageCount: (bytes) => pdfPageCountOf(this.runtime.fn, this.runtime.mem, bytes),
       ...(resources ? { resources } : {}),
     };
   }

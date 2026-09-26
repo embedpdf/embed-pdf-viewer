@@ -109,11 +109,12 @@ describe('buildCommentThreads — threading', () => {
     expect(threads[0]!.replies.map((r) => num(r.ref))).toEqual([3]);
   });
 
-  it('excludes widgets, links, and unsupported (incl. popups) entirely', () => {
+  it('excludes widgets, links, popups and unsupported entirely', () => {
     const threads = buildCommentThreads([
       annot(1, { subtype: 'widget' }),
       annot(2, { subtype: 'link' }),
-      annot(3, { subtype: 'unsupported', rawSubtypeCode: 16 }),
+      annot(3, { subtype: 'unsupported', rawSubtypeCode: 99 }),
+      annot(5, { subtype: 'popup', parent: ref(4) }),
       annot(4),
     ]);
     expect(threads).toHaveLength(1);

@@ -63,7 +63,7 @@ describe('foldRecords', () => {
       event({
         type: 'annotations.deleted',
         page: one.page,
-        deleted: { kind: 'objectNumber', value: 1 },
+        deleted: [{ kind: 'objectNumber', value: 1 }],
       }),
     );
     expect(records).toEqual(NO_RECORDS);
@@ -256,7 +256,7 @@ describe('weak annotations (addressed by position)', () => {
     const deleted = event({
       type: 'annotations.deleted',
       page,
-      deleted: null,
+      deleted: [],
       meta: { changed: [], shouldRefetch: { reason: 'weakRefsInvalidated' } },
     });
     expect(foldRecords(records, deleted)).toEqual(reload({ pages: [page] }));

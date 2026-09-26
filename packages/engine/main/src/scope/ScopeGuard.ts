@@ -8,9 +8,12 @@ import {
   checkCapability,
   checkCollab,
   checkSetGroup,
+  collabTargetOf,
   decodePdfBits,
   expandRawScope,
   type AnnotationActor,
+  type AnnotationOwner,
+  type AnnotationRef,
   type CollabAction,
   type CollabTarget,
   type DocCapability,
@@ -149,14 +152,41 @@ export class ScopeGuard {
   }
 
   assertCollab(action: CollabAction, target: CollabTarget): void {
+    this.assertAnnotationsUnprotected();
+    if (!this.canCollab(action, target)) {
+      throw new PermissionDenied(`annotations:${action}`, 'engine-local');
+    }
+  }
+
+  /**
+   * {@link assertCollab} over annotations one write changes together (a
+   * thread's delete): all or nothing, `PermissionDenied` naming every one
+   * refused.
+   */
+  assertCollabEach(
+    action: CollabAction,
+    annotations: readonly (AnnotationOwner & { ref: AnnotationRef })[],
+  ): void {
+    this.assertAnnotationsUnprotected();
+    const refused = annotations.filter(
+      (annotation) => !this.canCollab(action, collabTargetOf(annotation)),
+    );
+    if (refused.length > 0) {
+      throw new PermissionDenied(
+        `annotations:${action}`,
+        'engine-local',
+        undefined,
+        refused.map((annotation) => annotation.ref),
+      );
+    }
+  }
+
+  private assertAnnotationsUnprotected(): void {
     if (protectedCapabilities(this.protection).has('doc.annotate.modify')) {
       throw new EngineError(
         EngineErrorCode.ProtectedDocument,
         describeProtection('doc.annotate.modify', this.protection!),
       );
-    }
-    if (!this.canCollab(action, target)) {
-      throw new PermissionDenied(`annotations:${action}`, 'engine-local');
     }
   }
 

@@ -120,10 +120,10 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
               origin: localOrigin,
               deleted:
                 ref.kind === 'objectNumber'
-                  ? { kind: 'objectNumber', value: ref.annotObjectNumber }
+                  ? [{ kind: 'objectNumber', value: ref.annotObjectNumber }]
                   : ref.kind === 'nm'
-                    ? { kind: 'nm', value: ref.nm }
-                    : null,
+                    ? [{ kind: 'nm', value: ref.nm }]
+                    : [],
               meta: metaOf(weak),
             } as unknown as DocumentEvent);
             return result;

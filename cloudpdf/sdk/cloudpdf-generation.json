@@ -5,7 +5,7 @@
   "source": {
     "repository": "embedpdf/embed-pdf-viewer",
     "openapi": "cloudpdf/contract/openapi.json",
-    "openapiSha256": "ab58c81b4df8c971344ad63b0e52aa027441d6fff544b33ef0a565ab2259a81d",
+    "openapiSha256": "d6c716112a2cf89455301ccdfbd233ce340f5e20748acc91bcdc8506f4e7e30a",
     "gitCommit": null,
     "gitCommitIsDirty": null
   },

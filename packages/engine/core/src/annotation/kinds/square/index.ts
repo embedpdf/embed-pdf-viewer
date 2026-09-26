@@ -24,4 +24,5 @@ export const SquareKind: AnnotationKindModule<
   dtoSchema: SquareDTOSchema,
   draftSchema: SquareDraftSchema,
   patchSchema: SquarePatchSchema,
+  readBackWrites: SquareDeclaration.readBackWrites,
 };

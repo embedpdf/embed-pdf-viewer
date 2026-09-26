@@ -1,4 +1,10 @@
-import type { Color, RedactDraft, RedactPatch } from '@embedpdf/engine-core/runtime';
+import {
+  EngineError,
+  EngineErrorCode,
+  type Color,
+  type RedactDraft,
+  type RedactPatch,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { FPDFANNOT_COLORTYPE } from '../colorType';
@@ -54,6 +60,17 @@ function touchesLabelStyle(p: {
   );
 }
 
+/** A redaction marks an area: a create gives its `rect`, or quads it is worked out from. */
+export function preflightRedactDraft(draft: RedactDraft): void {
+  if (draft.rect === undefined && (draft.quadPoints ?? []).length === 0) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      'redact create needs a rect or at least one of quadPoints',
+      { details: { field: 'rect' } },
+    );
+  }
+}
+
 /**
  * Apply a redact draft to a freshly-created annotation. Colour model:
  *   - `color` -> `/C` marking-stage outline.
@@ -63,7 +80,7 @@ function touchesLabelStyle(p: {
  *
  * Order:
  *   1. base author-metadata (contents/nm/flags)
- *   2. `/Rect` (required — supplied by the caller; never derived)
+ *   2. `/Rect` (the caller's, else the quads' bounds)
  *   3. `/QuadPoints` (text redactions only)
  *   4. `/C` outline + `/CA` opacity + `/IC` fill
  *   5. `/OverlayText` + `/Repeat`
@@ -78,10 +95,11 @@ export function applyRedactDraft(
   ctx?: AnnotationWriteContext,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
-  setAnnotRect(fn, mem, annotPtr, draft.rect);
-  if (draft.quadPoints && draft.quadPoints.length > 0) {
-    appendQuadPoints(fn, mem, annotPtr, draft.quadPoints);
-  }
+  const quads = draft.quadPoints ?? [];
+  if (quads.length > 0) appendQuadPoints(fn, mem, annotPtr, quads);
+  // `preflightRedactDraft` refused a draft with neither.
+  if (draft.rect) setAnnotRect(fn, mem, annotPtr, draft.rect);
+  else setRectFromQuadPoints(fn, mem, annotPtr, quads);
 
   setAnnotColor(fn, annotPtr, draft.color ?? DEFAULT_REDACT_COLOR, FPDFANNOT_COLORTYPE.Color);
   setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULT_OPACITY);
@@ -115,9 +133,8 @@ export function applyRedactDraft(
  * Apply a redact patch to an existing annotation. Only present fields are
  * touched. `/DA` follows the free-text triple rule: send `fontFamily` +
  * `fontSize` + `fontColor` together when changing any of them. `quadPoints`
- * shares the text-markup no-shrink constraint (PDFium can grow but not
- * shrink the attachment-points list); patching quads re-derives `/Rect` from
- * their bounds unless the patch also carries an explicit `rect`.
+ * replace the list whole; patching quads re-derives `/Rect` from their
+ * bounds unless the patch also carries an explicit `rect`.
  */
 export function applyRedactPatch(
   fn: PdfFunctions,

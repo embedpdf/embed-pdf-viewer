@@ -7349,7 +7349,8 @@
                   },
                   "required": ["p1", "p2", "p3", "p4"],
                   "additionalProperties": false
-                }
+                },
+                "minItems": 1
               }
             },
             "required": [
@@ -9275,7 +9276,8 @@
                 "nullable": true
               },
               "captionEnabled": {
-                "type": "boolean"
+                "type": "boolean",
+                "nullable": true
               },
               "captionPosition": {
                 "type": "string",
@@ -11093,26 +11095,48 @@
                     "type": "string"
                   },
                   "mimeType": {
-                    "type": "string"
+                    "type": "string",
+                    "nullable": true
                   },
                   "description": {
-                    "type": "string"
+                    "type": "string",
+                    "nullable": true
                   },
                   "size": {
                     "type": "integer",
-                    "minimum": 0
+                    "minimum": 0,
+                    "nullable": true
                   },
                   "checksum": {
-                    "type": "string"
+                    "type": "string",
+                    "nullable": true
                   },
                   "createdAt": {
-                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/createdAt"
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/Annotation/anyOf/0/properties/createdAt"
+                      }
+                    ],
+                    "nullable": true
                   },
                   "modifiedAt": {
-                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/createdAt"
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/Annotation/anyOf/0/properties/createdAt"
+                      }
+                    ],
+                    "nullable": true
                   }
                 },
-                "required": ["name"],
+                "required": [
+                  "name",
+                  "mimeType",
+                  "description",
+                  "size",
+                  "checksum",
+                  "createdAt",
+                  "modifiedAt"
+                ],
                 "additionalProperties": false,
                 "nullable": true
               }
@@ -11576,7 +11600,7 @@
                 "type": "boolean"
               },
               "fontFamily": {
-                "$ref": "#/components/schemas/Annotation/anyOf/16/properties/fontFamily"
+                "$ref": "#/components/schemas/Annotation/anyOf/11/properties/fontFamily"
               },
               "fontSize": {
                 "type": "number",
@@ -23095,7 +23119,8 @@
                   "additionalProperties": false
                 },
                 "name": {
-                  "type": "string"
+                  "type": "string",
+                  "nullable": true
                 },
                 "measure": {
                   "anyOf": [
@@ -23223,13 +23248,14 @@
                       "required": ["subtype"],
                       "additionalProperties": false
                     }
-                  ]
+                  ],
+                  "nullable": true
                 },
                 "owned": {
                   "type": "boolean"
                 }
               },
-              "required": ["bbox", "owned"],
+              "required": ["bbox", "name", "measure", "owned"],
               "additionalProperties": false
             }
           }
@@ -23794,7 +23820,7 @@
                 }
               }
             },
-            "required": ["pageCount", "pages"],
+            "required": ["pageCount", "pages", "namedPages"],
             "additionalProperties": false
           },
           "meta": {
@@ -24174,7 +24200,7 @@
                 }
               }
             },
-            "required": ["pageCount", "pages"],
+            "required": ["pageCount", "pages", "namedPages"],
             "additionalProperties": false
           },
           "meta": {
@@ -24554,7 +24580,7 @@
                 }
               }
             },
-            "required": ["pageCount", "pages"],
+            "required": ["pageCount", "pages", "namedPages"],
             "additionalProperties": false
           },
           "meta": {
@@ -24934,7 +24960,7 @@
                 }
               }
             },
-            "required": ["pageCount", "pages"],
+            "required": ["pageCount", "pages", "namedPages"],
             "additionalProperties": false
           },
           "meta": {
@@ -25314,7 +25340,7 @@
                 }
               }
             },
-            "required": ["pageCount", "pages"],
+            "required": ["pageCount", "pages", "namedPages"],
             "additionalProperties": false
           },
           "meta": {
@@ -25981,7 +26007,7 @@
                 }
               }
             },
-            "required": ["pageCount", "pages"],
+            "required": ["pageCount", "pages", "namedPages"],
             "additionalProperties": false
           },
           "meta": {
@@ -26367,7 +26393,7 @@
                 }
               }
             },
-            "required": ["pageCount", "pages"],
+            "required": ["pageCount", "pages", "namedPages"],
             "additionalProperties": false
           },
           "meta": {

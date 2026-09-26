@@ -377,7 +377,7 @@ export type {
 export { concatAnnotationLists } from './annotation/AnnotationList';
 export type { AnnotationList, AnnotationListOptions } from './annotation/AnnotationList';
 
-export { classifyRelation, buildThreads } from './annotation/relationships';
+export { classifyRelation, buildThreads, deletedWith } from './annotation/relationships';
 export {
   annotationKey,
   annotationKeysOf,
@@ -386,7 +386,11 @@ export {
 } from './identity/annotationKey';
 export type { AnnotationRelationKind, AnnotationThread } from './annotation/relationships';
 
-export { buildCommentThreads, isStateAnnotation } from './annotation/comments';
+export {
+  buildCommentThreads,
+  isStateAnnotation,
+  standardStateModelOf,
+} from './annotation/comments';
 export type {
   BuildCommentThreadsOptions,
   CommentThread,
@@ -413,13 +417,14 @@ export type {
   AnnotationDeleteResult,
   AnnotationMoveResult,
 } from './mutation/AnnotationMutationResults';
-export { deletedAnnotationOf } from './mutation/AnnotationMutationResults';
+export { deletedAnnotationsOf } from './mutation/AnnotationMutationResults';
 export type {
   AppearanceAction,
   AppearanceImpact,
   AppearanceOutcome,
 } from './annotation/appearance';
 export { appearanceImpactOf, semanticEqual } from './annotation/appearance';
+export { assertAnnotationDraft, checkAnnotationPatch } from './annotation/checkWrite';
 export type { FormFieldRef, FormWidget } from './identity/FormFieldRef';
 export { formWidget, toFieldRef } from './identity/FormFieldRef';
 export { encodeFieldRefKey, decodeFieldRefKey } from './identity/FormFieldRef';

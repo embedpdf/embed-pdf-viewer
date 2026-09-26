@@ -134,6 +134,27 @@ function savedDigest(fn: PdfFunctions, mem: PdfRuntimeMemory, docPtr: Ptr): stri
   });
 }
 
+/** The page count of PDF bytes, or `null` when they don't open. */
+export function pdfPageCountOf(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  bytes: ArrayBuffer,
+): number | null {
+  const dataPtr = mem.alloc(bytes.byteLength);
+  try {
+    mem.writeBytes(dataPtr, new Uint8Array(bytes));
+    const docPtr = fn.FPDF_LoadMemDocument(dataPtr, bytes.byteLength, '');
+    if (!docPtr) return null;
+    try {
+      return fn.FPDF_GetPageCount(docPtr);
+    } finally {
+      fn.FPDF_CloseDocument(docPtr);
+    }
+  } finally {
+    mem.free(dataPtr);
+  }
+}
+
 /**
  * Run `body` with a document holding the bytes as one page: the PDF itself,
  * or the image at its own size. `dataPtr` must stay alive until then.

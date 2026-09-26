@@ -162,7 +162,12 @@ export function runMeasurementConformance(
         const pageObjectNumber = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
         const page = doc.page(toPageRef(pageObjectNumber));
         if (!page.measure) throw new Error('Measurement service is required');
-        const foreign = (await page.measure.listViewports()).viewports.filter((v) => !v.owned);
+        const listed = (await page.measure.listViewports()).viewports;
+        // A read never leaves a field out: no name or measure reads `null`.
+        for (const viewport of listed) {
+          expect('name' in viewport && 'measure' in viewport).toBe(true);
+        }
+        const foreign = listed.filter((v) => !v.owned);
         const annotations = (await page.annotations.list()).annotations;
         const events: DocumentEvent[] = [];
         const off = doc.events.subscribe((event) => events.push(event));

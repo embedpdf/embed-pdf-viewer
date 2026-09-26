@@ -1,5 +1,6 @@
 import {
   ANNOTATION_FIELD_NAMES,
+  assertAnnotationDraft,
   assertAnnotationResources,
   EngineError,
   EngineErrorCode,
@@ -24,6 +25,8 @@ export function prepareCreate(
   ctx: AnnotationWriteContext,
 ): AnnotationDraft {
   assertDeclaredFields(draft.subtype, draft);
+  // A change set carries `reply` and a popup's `parent` beside the draft.
+  assertAnnotationDraft(draft, { linked: ['reply', 'parent'] });
   assertAnnotationResources(draft.subtype, resources, 'create');
   preflightDraft(draft, ctx);
   assertRichTextAgreement(draft);

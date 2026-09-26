@@ -27,4 +27,5 @@ export const UnsupportedKind: AnnotationKindModule<
   dtoSchema: UnsupportedDTOSchema,
   draftSchema: UnsupportedDraftSchema,
   patchSchema: UnsupportedPatchSchema,
+  readBackWrites: UnsupportedDeclaration.readBackWrites,
 };

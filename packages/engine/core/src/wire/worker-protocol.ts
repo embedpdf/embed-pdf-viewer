@@ -363,6 +363,12 @@ export interface AnnotationsDeleteWorkerRequest {
   docId: string;
   layerName?: string;
   ref: AnnotationRef;
+  /**
+   * What the caller's permission check covered: the annotation and
+   * everything deleted with it (`deletedWith`). A member it doesn't name
+   * (added since) is refused, so nothing is deleted unchecked.
+   */
+  checked: AnnotationRef[];
   artifactPath?: string;
 }
 

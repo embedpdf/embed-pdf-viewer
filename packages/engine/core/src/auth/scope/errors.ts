@@ -1,5 +1,6 @@
 import { EngineError } from '../../errors/EngineError';
 import { EngineErrorCode } from '../../errors/EngineErrorCode';
+import type { AnnotationRef } from '../../identity/AnnotationRef';
 
 /**
  * Thrown by {@link parseScope} / {@link validateScopeArray} when a scope
@@ -39,15 +40,18 @@ export class PermissionDenied extends EngineError {
     public readonly required: string,
     public readonly context?: string,
     public readonly anyOf?: readonly string[],
+    /** The annotations it was refused for, when one write covers several (a thread's delete). */
+    public readonly refs?: readonly AnnotationRef[],
   ) {
     super(
       EngineErrorCode.Forbidden,
-      `permission denied${context ? ` (${context})` : ''}: ${anyOf ? `one of ${anyOf.join(', ')}` : required}`,
+      `permission denied${context ? ` (${context})` : ''}: ${anyOf ? `one of ${anyOf.join(', ')}` : required}${refs ? ` for ${refs.length} annotation${refs.length === 1 ? '' : 's'}` : ''}`,
       {
         details: {
           required,
           ...(context === undefined ? {} : { context }),
           ...(anyOf === undefined ? {} : { anyOf: [...anyOf] }),
+          ...(refs === undefined ? {} : { refs: [...refs] }),
         },
       },
     );

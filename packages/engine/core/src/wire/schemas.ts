@@ -1186,7 +1186,7 @@ export const NamedPageEntrySchema: z.ZodType<NamedPageEntry> = z.object({
 export const PageListSnapshotSchema: z.ZodType<PageListSnapshot> = z.object({
   pageCount: z.number().int().nonnegative(),
   pages: z.array(PageLayoutSchema),
-  namedPages: z.array(NamedPageEntrySchema).optional(),
+  namedPages: z.array(NamedPageEntrySchema),
 });
 
 /** `pages.setName` input — see `PageNameInput`. */

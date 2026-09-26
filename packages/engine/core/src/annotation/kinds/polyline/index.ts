@@ -24,4 +24,5 @@ export const PolylineKind: AnnotationKindModule<
   dtoSchema: PolylineDTOSchema,
   draftSchema: PolylineDraftSchema,
   patchSchema: PolylinePatchSchema,
+  readBackWrites: PolylineDeclaration.readBackWrites,
 };
