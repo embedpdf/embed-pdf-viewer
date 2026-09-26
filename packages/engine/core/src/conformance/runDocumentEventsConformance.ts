@@ -16,18 +16,21 @@ const QUAD: HighlightDraft['quadPoints'] = [
 
 /**
  * Document event stream conformance suite. Verifies the invariants the
- * collaboration design rests on — do NOT loosen these without re-reading
+ * collaboration design rests on — do not loosen these without re-reading
  * `DocumentEvent`:
  *
- *   1. EXACTLY ONCE: every confirmed mutation produces exactly one event,
+ *   1. Exactly once: every confirmed mutation produces exactly one event,
  *      in mutation order, regardless of engine (local worker or cloud HTTP).
- *   2. GROUND TRUTH: a failed mutation publishes nothing; events fire only
+ *   2. Ground truth: a failed mutation publishes nothing; events fire only
  *      after confirmation.
- *   3. RESULTS RIDE VERBATIM: each event embeds the result the caller
+ *   3. Results ride verbatim: each event embeds the result the caller
  *      received, deep-equal field for field.
- *   4. PROVENANCE: own mutations are `origin.kind: 'local'` with a stable
+ *   4. Provenance: own mutations are `origin.kind: 'local'` with a stable
  *      per-engine-instance `sessionId`.
- *   5. Unsubscribe stops delivery.
+ *   5. Unsubscribe stops delivery; `on(type)` hears only its type.
+ *   6. Published before settlement: the event for a session's own mutation
+ *      reaches subscribers before the mutation's promise settles, so a
+ *      caller that awaits the mutation already sees state derived from it.
  *
  * Both local (worker host + WASM) and cloud (HTTP + @cloudpdf/server)
  * implementations must pass identically.
@@ -57,8 +60,8 @@ export function runDocumentEventsConformance(
 
         const list = await doc.pages.list();
         if (list.pages.length < 3) return;
-        const pon = list.pages[0].ref.pageObjectNumber;
-        const page = doc.page(toPageRef(pon));
+        const pageObjectNumber = list.pages[0].ref.pageObjectNumber;
+        const page = doc.page(toPageRef(pageObjectNumber));
 
         const draft: HighlightDraft = {
           subtype: 'highlight',
@@ -66,18 +69,18 @@ export function runDocumentEventsConformance(
           quadPoints: QUAD,
         };
         const created = await page.annotations.create(draft);
-        const updated = await page.annotations.update(created.created.ref, {
+        const updated = await page.annotations.update(created.annotation.ref, {
           subtype: 'highlight',
           contents: 'updated',
         });
-        const rotated = await doc.pages.rotate([toPageRef(pon)], 90);
+        const rotated = await doc.pages.rotate([toPageRef(pageObjectNumber)], 90);
         const victim = list.pages[2].ref.pageObjectNumber;
         const deleted = await doc.pages.delete([toPageRef(victim)]);
         const meta = await doc.metadata.update({ title: 'events conformance' });
 
         expect(events.map((event) => event.type)).toEqual([
-          'annotation.created',
-          'annotation.updated',
+          'annotations.created',
+          'annotations.updated',
           'pages.rotated',
           'pages.deleted',
           'metadata.updated',
@@ -85,19 +88,19 @@ export function runDocumentEventsConformance(
 
         // The embedded results are the returned results, field for field.
         const [evCreated, evUpdated, evRotated, evDeleted, evMeta] = events;
-        if (evCreated.type === 'annotation.created') {
-          expect(evCreated.page).toEqual(toPageRef(pon));
-          expect(evCreated.created).toEqual(created.created);
+        if (evCreated.type === 'annotations.created') {
+          expect(evCreated.page).toEqual(toPageRef(pageObjectNumber));
+          expect(evCreated.annotation).toEqual(created.annotation);
           expect(evCreated.meta).toEqual(created.meta);
         }
-        if (evUpdated.type === 'annotation.updated') {
-          expect(evUpdated.updated).toEqual(updated.updated);
+        if (evUpdated.type === 'annotations.updated') {
+          expect(evUpdated.annotation).toEqual(updated.annotation);
         }
         if (evRotated.type === 'pages.rotated') {
-          expect(evRotated.pages).toEqual([toPageRef(pon)]);
+          expect(evRotated.pages).toEqual([toPageRef(pageObjectNumber)]);
           expect(evRotated.rotation).toBe(90);
           expect(evRotated.layout).toEqual(rotated.layout);
-          expect(evRotated.cache).toEqual(rotated.cache);
+          expect(evRotated.meta).toEqual(rotated.meta);
         }
         if (evDeleted.type === 'pages.deleted') {
           expect(evDeleted.pages).toEqual([toPageRef(victim)]);
@@ -143,8 +146,8 @@ export function runDocumentEventsConformance(
         if (evInserted.type === 'pages.inserted') {
           expect(evInserted.insertedPages).toEqual(inserted.insertedPages);
           expect(evInserted.layout).toEqual(inserted.layout);
-          expect(evInserted.cache).toEqual(inserted.cache);
-          expect(evInserted.destIndex).toBe(0);
+          expect(evInserted.meta).toEqual(inserted.meta);
+          expect(evInserted.toIndex).toBe(0);
           expect(evInserted.origin.kind).toBe('local');
         }
       } finally {
@@ -167,6 +170,43 @@ export function runDocumentEventsConformance(
         }
         expect(caught !== undefined).toBe(true);
         expect(events.length).toBe(0);
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('own mutations are published before their promise settles', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const events: DocumentEvent[] = [];
+        doc.events.subscribe((event) => events.push(event));
+        const seenAtSettlement: number[] = [];
+        await doc.metadata
+          .update({ title: 'published before settlement' })
+          .then(() => seenAtSettlement.push(events.length));
+        const list = await doc.pages.list();
+        await doc
+          .page(list.pages[0].ref)
+          .annotations.create({ subtype: 'highlight', contents: 'ordering', quadPoints: QUAD })
+          .then(() => seenAtSettlement.push(events.length));
+        expect(seenAtSettlement).toEqual([1, 2]);
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('on(type) hears only that type, typed by it; its unsubscriber stops it', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const rotated: number[] = [];
+        const stop = doc.events.on('pages.rotated', (event) => rotated.push(event.rotation));
+        const list = await doc.pages.list();
+        await doc.metadata.update({ title: 'on(type)' });
+        await doc.pages.rotate([list.pages[0].ref], 90);
+        expect(rotated).toEqual([90]);
+        stop();
+        await doc.pages.rotate([list.pages[0].ref], 180);
+        expect(rotated).toEqual([90]);
       } finally {
         await doc.close();
       }

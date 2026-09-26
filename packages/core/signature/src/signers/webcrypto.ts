@@ -1,6 +1,8 @@
 import type { DigestAlgorithm } from '@embedpdf/engine-core/runtime';
 import type { RawSigner, RawSignatureAlgorithm } from '../cms/build';
 import { ensureEngine } from '../cms/engine';
+import { buildTimestampToken } from '../cms/timestamp';
+import type { CmsSigner } from '../sign';
 import { WEBCRYPTO_HASH } from '../cms/oids';
 import { selfSignedCertificate } from './self-signed';
 
@@ -78,19 +80,19 @@ export interface TestSigner extends RawSigner {
  * `{ anchors: async () => [signer.certificate] }`.
  */
 export async function createTestSigner(
-  opts: {
+  options: {
     commonName?: string;
     algorithm?: 'RSA-PKCS1-v1_5' | 'RSA-PSS' | 'ECDSA';
     hash?: 'sha256' | 'sha384' | 'sha512';
   } = {},
 ): Promise<TestSigner> {
   ensureEngine();
-  const hash = opts.hash ?? 'sha256';
-  const keys = await generateSigningKeyPair(opts.algorithm ?? 'RSA-PKCS1-v1_5', hash, true);
+  const hash = options.hash ?? 'sha256';
+  const keys = await generateSigningKeyPair(options.algorithm ?? 'RSA-PKCS1-v1_5', hash, true);
   const certificate = await selfSignedCertificate({
     publicKey: keys.publicKey,
     privateKey: keys.privateKey,
-    commonName: opts.commonName ?? 'EmbedPDF test signer',
+    commonName: options.commonName ?? 'EmbedPDF test signer',
     hash,
   });
   const signer = webCryptoSigner({
@@ -99,6 +101,30 @@ export async function createTestSigner(
     hash,
   });
   return { ...signer, certificate, privateKey: keys.privateKey };
+}
+
+export interface TestTimestampAuthority extends CmsSigner {
+  /** DER of the authority's self-signed certificate. */
+  readonly certificate: Uint8Array;
+}
+
+/**
+ * A throwaway RFC 3161 timestamp authority for tests and demos: it stamps
+ * whatever digest it is given with the current time, signed by a fresh
+ * self-signed key. The key for `sign(doc, { kind: 'timestamp', key })`;
+ * never use it to stamp a real document.
+ */
+export async function createTestTimestampAuthority(
+  options: { commonName?: string } = {},
+): Promise<TestTimestampAuthority> {
+  const authority = await createTestSigner({
+    commonName: options.commonName ?? 'EmbedPDF test timestamp authority',
+  });
+  return {
+    kind: 'cms',
+    certificate: authority.certificate,
+    sign: ({ digest, algorithm }) => buildTimestampToken({ digest, hash: algorithm, authority }),
+  };
 }
 
 /** A WebCrypto signing key pair; `extractable: false` keeps the private key inside the runtime for good. */

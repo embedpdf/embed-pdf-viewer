@@ -1,5 +1,5 @@
 /**
- * The public surface COMMON to both entries (`index.browser.ts` /
+ * The public surface common to both entries (`index.browser.ts` /
  * `index.node.ts`). One package name, one API, two physical graphs — the
  * entries add only `createPdfRuntime` + `resolveRuntimeTarget`, each from
  * their own environment's implementation.

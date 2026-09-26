@@ -29,9 +29,9 @@ import {
   setTextAlignment,
 } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
+import { writeBoxTransformMetadata } from './writeAnnotationTransformMetadata';
 import { applyDefaultAppearance } from './writeDefaultAppearance';
 import { applyBorderDraft, applyBorderPatch, DEFAULT_OPACITY } from './writeStyle';
-import { writeBoxTransformMetadata } from './writeAnnotationTransformMetadata';
 
 /**
  * Default `/DA` colour for free text: black (border + default text). Unlike
@@ -73,7 +73,7 @@ function hexColor(color: Color): string {
  * Apply a free-text draft to a freshly-created annotation. Colour model:
  *   - `color` -> `/DA` colour = border + default text colour.
  *   - `fontColor` (optional) -> `TextColor` channel, overriding text only;
- *     written AFTER `/DA` so the override wins.
+ *     written after `/DA` so the override wins.
  *   - `interiorColor` -> `/C` box background (`null`/omitted clears it).
  *
  * Order:
@@ -110,7 +110,7 @@ export function applyFreeTextDraft(
 
   const daColor = draft.color ?? DEFAULT_FREETEXT_COLOR;
   applyDefaultAppearance(fn, annotPtr, draft.fontFamily, draft.fontSize, daColor, ctx);
-  if (draft.fontColor !== undefined) {
+  if (draft.fontColor != null) {
     setAnnotColor(fn, annotPtr, draft.fontColor, FPDFANNOT_COLORTYPE.TextColor);
   }
 
@@ -121,14 +121,14 @@ export function applyFreeTextDraft(
     setRectangleDifferences(fn, annotPtr, draft.rectDifferences);
   }
 
-  if (draft.calloutLine !== undefined) {
+  if (draft.calloutLine != null) {
     setCalloutLine(fn, mem, annotPtr, draft.calloutLine);
   }
-  if (draft.lineEnding !== undefined) {
+  if (draft.lineEnding != null) {
     setLineEndings(fn, annotPtr, { start: 'none', end: draft.lineEnding });
   }
   // A plain text box rotates like square/circle (box model). A callout's
-  // rotation applies to its text BOX only (`unrotatedRect` = the logical text
+  // rotation applies to its text box only (`unrotatedRect` = the logical text
   // box; the /CL leader stays page-space) — the AP generator bakes it as an
   // inline matrix, not the form /Matrix. Absent fields simply clear the keys.
   writeBoxTransformMetadata(fn, mem, annotPtr, {
@@ -152,12 +152,12 @@ export function applyFreeTextDraft(
 
 /**
  * Apply a free-text patch to an existing annotation. Only present fields are
- * touched. `/DA` packs the font, size, and `color` into ONE string, so a
- * partial patch preserves the unpatched members by READING the current triple
+ * touched. `/DA` packs the font, size, and `color` into one string, so a
+ * partial patch preserves the unpatched members by reading the current triple
  * first (the same read-modify-write as {@link applyBorderPatch}'s shared
  * `/BS` call) — a `{fontSize}` patch must never reset the font or colour.
  * Registered (embedded) fonts are the one caveat: the current `/DA` reads
- * back as a font CODE, so preserving a registered family requires the patch
+ * back as a font code, so preserving a registered family requires the patch
  * to restate `fontFamily` (an unknown code falls back to the standard-font
  * default).
  *
@@ -197,11 +197,10 @@ export function applyFreeTextPatch(
 
   applyBorderPatch(fn, mem, annotPtr, patch);
 
-  // The patch table (plan §4.7, one engine since D4): every text write goes
-  // through the rich document — the body style lives there and the engine
-  // derives /DA from it — so the legacy /DA read-modify-write only carries
-  // the DA COLOUR (the border and leader), and the font, size, text colour
-  // and alignment are body-style changes.
+  // Every text write goes through the rich document — the body style lives
+  // there and the engine derives /DA from it — so the /DA read-modify-write
+  // only carries the DA colour (the border and leader), and the font, size,
+  // text colour and alignment are body-style changes.
   const current = readEngineRichText(fn, mem, annotPtr);
   if (patch.color !== undefined) {
     const cur = readDefaultAppearance(fn, mem, annotPtr);
@@ -214,7 +213,9 @@ export function applyFreeTextPatch(
       ctx,
     );
   }
-  if (patch.fontColor !== undefined) {
+  if (patch.fontColor === null) {
+    clearAnnotColor(fn, annotPtr, FPDFANNOT_COLORTYPE.TextColor);
+  } else if (patch.fontColor !== undefined) {
     setAnnotColor(fn, annotPtr, patch.fontColor, FPDFANNOT_COLORTYPE.TextColor);
   }
   {
@@ -251,7 +252,7 @@ export function applyFreeTextPatch(
         if (face.italic !== undefined) body.italic = face.italic;
       }
       if (patch.fontSize !== undefined) body.size = patch.fontSize;
-      if (patch.fontColor !== undefined) body.color = hexColor(patch.fontColor);
+      if (patch.fontColor != null) body.color = hexColor(patch.fontColor);
       if (patch.textAlign !== undefined) body.align = patch.textAlign;
       writeRichText(fn, annotPtr, { body, paragraphs: current.paragraphs }, ctx);
     }
@@ -270,10 +271,14 @@ export function applyFreeTextPatch(
     setRectangleDifferences(fn, annotPtr, patch.rectDifferences);
   }
 
-  if (patch.calloutLine !== undefined) {
+  if (patch.calloutLine === null) {
+    fn.EPDFAnnot_RemoveKey(annotPtr, 'CL');
+  } else if (patch.calloutLine !== undefined) {
     setCalloutLine(fn, mem, annotPtr, patch.calloutLine);
   }
-  if (patch.lineEnding !== undefined) {
+  if (patch.lineEnding === null) {
+    fn.EPDFAnnot_RemoveKey(annotPtr, 'LE');
+  } else if (patch.lineEnding !== undefined) {
     setLineEndings(fn, annotPtr, { start: 'none', end: patch.lineEnding });
   }
 }

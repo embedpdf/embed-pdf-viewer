@@ -1,5 +1,5 @@
 /**
- * Shared types for the docs search stack (DOCS-PLATFORM-ARCHITECTURE.md):
+ * Shared types for the docs search stack (docs/conventions/docs-architecture.md):
  * the index is a per-site build artifact over post-resolution content, the
  * machinery is the kit's, and the corpus/URL rules are each site's binding.
  *

@@ -1,7 +1,7 @@
 import type { AuditDocKey } from '../db/repos/audit_log.repo';
 
 /**
- * Cross-replica mutation signaling — a DOORBELL, never a data channel.
+ * Cross-replica mutation signaling — a doorbell, never a data channel.
  *
  * The audit log in the shared database is the data plane: every replica
  * reads the same table, with one global monotonic id sequence. The bus only
@@ -11,7 +11,7 @@ import type { AuditDocKey } from '../db/repos/audit_log.repo';
  * events, because delivery truth lives in the per-connection cursor and the
  * reconnect/backfill query.
  *
- * Listeners take NO payload by design — the only correct reaction to a ring
+ * Listeners take no payload by design — the only correct reaction to a ring
  * is "drain from my own cursor", so handing them an id would just invite a
  * stale-cursor bug. The id still travels in the wire payload for debugging.
  *
@@ -19,13 +19,13 @@ import type { AuditDocKey } from '../db/repos/audit_log.repo';
  *   - `InProcessRealtimeBus` — single process (SQLite profile, tests).
  *     SQLite deployments are pinned to one replica (single writer), so
  *     in-process delivery is complete by construction.
- *   - `PostgresRealtimeBus` — LISTEN/NOTIFY. REQUIRED whenever more than
+ *   - `PostgresRealtimeBus` — LISTEN/NOTIFY. Required whenever more than
  *     one replica runs: a mutation committed on replica B must ring the
  *     doorbell on replica A's SSE connections. Postgres is the rendezvous;
  *     replicas never talk to each other.
  */
 export interface RealtimeBus {
-  /** Ring the doorbell for a document — call strictly AFTER commit, so a
+  /** Ring the doorbell for a document — call strictly after commit, so a
    *  reacting subscriber is guaranteed to see the row. */
   publishMutation(key: AuditDocKey, lastAuditId: number): Promise<void>;
   /**
@@ -36,18 +36,18 @@ export interface RealtimeBus {
    */
   subscribeMutation(key: AuditDocKey, listener: () => void): () => void;
   /**
-   * Revocation channel — GLOBAL, unlike the per-doc mutation channel: a
+   * Revocation channel — global, unlike the per-doc mutation channel: a
    * revoked `jti` may hold SSE streams on any document, on any replica.
    * Two consumers: open SSE handlers close their stream when their jti
    * matches, and `RevokedJtisGuard` instances fill their LRU so the
-   * REQUEST path stops accepting the token immediately too (instead of
+   * request path stops accepting the token immediately too (instead of
    * after the 60s negative-cache TTL). `expiresAt` (token exp, epoch ms)
    * lets caches self-prune.
    */
   publishRevocation(jti: string, expiresAt: number): Promise<void>;
   subscribeRevocation(listener: (jti: string, expiresAt: number) => void): () => void;
   /**
-   * Base-version channel — GLOBAL like revocation: a completed signature
+   * Base-version channel — global like revocation: a completed signature
    * published a new base for the document, and every replica holding
    * sessions over the old base must forget them
    * (`DocumentService.onBaseVersionPublished`). Correctness never depends

@@ -13,14 +13,14 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
-import { readUtf8String } from '../../../runtime/memory/strings';
 import { isStandardFont } from './standardFont';
+import { readUtf8String } from '../../../runtime/memory/strings';
 
 /**
  * The rich text wire: the engine's `EPDFAnnot_GetRichTextJSON` /
  * `EPDFAnnot_SetRichTextJSON` JSON shape is the DTO shape plus `source` and
  * `diagnostics`, so reading is a parse and writing is a stringify — except
- * for FACES. The DTO names a face the way the host does (a registered
+ * for faces. The DTO names a face the way the host does (a registered
  * font's `key`, a standard font's kebab name); the engine names it the way
  * a PDF does (family, weight, italic). Both directions map here.
  */
@@ -200,11 +200,11 @@ export function readEngineRichText(
 
 /**
  * A draft or patch that carries both `contents` and `richText` must agree:
- * `contents` is the plain projection of the rich text (plan §4.7). A stale
+ * `contents` is the plain projection of the rich text. A stale
  * DTO echo fails loud here instead of quietly restoring old text.
  */
 export function assertRichTextAgreement(input: {
-  subtype: string;
+  subtype?: string;
   contents?: string | null;
   richText?: RichTextDocumentInput;
 }): void {

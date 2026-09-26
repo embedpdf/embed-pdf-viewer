@@ -68,7 +68,7 @@ describe('engine operational counters over /metrics', () => {
       const body = await res.text();
       expect(body).toMatch(/cloudpdf_engine_doc_opens_total [1-9]/);
       expect(body).toContain('cloudpdf_layer_write_conflicts_total 0');
-      // The Prometheus TYPE contract: monotonic totals are counters, the
+      // The Prometheus type contract: monotonic totals are counters, the
       // queue wait is a real seconds histogram (percentile-capable).
       expect(body).toContain('# TYPE cloudpdf_engine_doc_opens_total counter');
       expect(body).toContain('# TYPE cloudpdf_layer_write_conflicts_total counter');

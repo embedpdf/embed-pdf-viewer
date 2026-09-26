@@ -3,6 +3,7 @@ import {
   EngineError,
   EngineErrorCode,
   type SerializedEngineError,
+  type TokenSource,
 } from '@embedpdf/engine-core/runtime';
 import {
   applyCdnAccess,
@@ -20,7 +21,7 @@ export interface HttpClientOptions {
    * scenario where the doc-scoped token is provided per-`open` and
    * the engine itself has no engine-level credentials.
    */
-  token?: string | (() => string | Promise<string>);
+  token?: TokenSource;
   /**
    * Engine-instance session id, sent as `X-Engine-Session-Id` on every
    * request. The server stores it on mutation audit rows so this
@@ -30,16 +31,16 @@ export interface HttpClientOptions {
   /** Replace the global fetch (e.g. in Node tests with undici). */
   fetch?: typeof globalThis.fetch;
   /**
-   * Document affinity key: `X-CloudPDF-Doc` is sent BY DEFAULT on
+   * Document affinity key: `X-CloudPDF-Doc` is sent by default on
    * origin-bound doc requests so consistent-hash load balancers can pin
    * a document's traffic to one warm replica. Routing hints are
-   * unconditional client behavior — whether they are USED is the
+   * unconditional client behavior — whether they are used is the
    * operator's choice at the load balancer, never the app's. Derived
    * from the request path (`/v1/docs/:docId/…` — the same extraction
    * the Helm chart's uri-mode fallback uses); never sent on
    * CDN-rewritten requests.
    *
-   * `false` is an ESCAPE HATCH, not a feature toggle: use it only
+   * `false` is an escape hatch, not a feature toggle: use it only
    * against a stale server whose CORS allowlist predates the header
    * (browser preflights would fail) or behind a proxy that rejects
    * unknown request headers.
@@ -152,13 +153,13 @@ export class HttpClient {
    * route everything to origin again — useful on session close or
    * when an adapter swap happens mid-session (rare).
    *
-   * The HttpClient stays dumb about WHEN to do this; the cloud
+   * The HttpClient stays dumb about when to do this; the cloud
    * document handle pushes the binding in after /access succeeds.
    *
    * Side effect: in the browser, signedCookies are written to
    * `document.cookie` once per setCdnAccess call so the CDN edge
-   * receives them on subsequent fetches. Node side ignores cookies
-   * for now (cookie jar wiring deferred until needed for tests).
+   * receives them on subsequent fetches. Outside the browser signed
+   * cookies are ignored: this client keeps no cookie jar.
    */
   setCdnAccess(binding: CdnBinding | null): void {
     this.cdnBinding = binding;
@@ -340,8 +341,14 @@ export class HttpClient {
     body: FormData,
     parser: (raw: unknown) => T,
     signal: AbortSignal,
+    headers?: Record<string, string>,
   ): Promise<T> {
-    const res = await this.request(path, { method: 'POST', body, signal });
+    const res = await this.request(path, {
+      method: 'POST',
+      body,
+      signal,
+      ...(headers ? { headers } : {}),
+    });
     return await this.parseJsonResponse(res, parser);
   }
 
@@ -373,6 +380,21 @@ export class HttpClient {
     signal: AbortSignal,
   ): Promise<T> {
     return this.parseJsonResponse(await this.requestJson(path, 'PUT', body, signal), parser);
+  }
+
+  /** POST a JSON body and parse a `multipart/form-data` response (a large annotation export). */
+  async postJsonFormData(path: string, body: unknown, signal: AbortSignal): Promise<FormData> {
+    const res = await this.request(path, {
+      method: 'POST',
+      body: JSON.stringify(body),
+      headers: new Headers({
+        'Content-Type': 'application/json',
+        Accept: 'multipart/form-data',
+      }),
+      signal,
+    });
+    if (!res.ok) await this.throwFromBody(res);
+    return await res.formData();
   }
 
   /** POST a JSON body and return the raw binary response (pages.extract). */
@@ -458,10 +480,10 @@ export class HttpClient {
       const doc = /^\/v1\/docs\/([^/]+)\//.exec(path);
       if (doc) headers.set('X-CloudPDF-Doc', decodeURIComponent(doc[1]!));
     }
-    // Code-keyed backpressure retry: ONLY our own 503s (`EngineBusy` =
+    // Code-keyed backpressure retry: Only our own 503s (`EngineBusy` =
     // shed before dispatch, `EngineRestarting` = the apply never landed)
-    // — both mean NOTHING HAPPENED, so retrying is method-agnostic-safe,
-    // mutations included. A foreign 503 keeps today's semantics.
+    // — both mean nothing happened, so retrying is method-agnostic-safe,
+    // mutations included. A foreign 503 is returned without a retry.
     for (let attempt = 0; ; attempt++) {
       const res = await this.execute(url, { ...init, headers });
       if (
@@ -578,6 +600,8 @@ function mapStatusToCode(status: number): EngineErrorCode {
   if (status === 403) return EngineErrorCode.Forbidden;
   if (status === 409) return EngineErrorCode.WeakAnnotationSessionConflict;
   if (status === 404) return EngineErrorCode.NotFound;
+  // A request body past the server's limit, refused before any route runs.
+  if (status === 413) return EngineErrorCode.PayloadTooLarge;
   if (status === 422) return EngineErrorCode.DocOpenFailed;
   if (status === 499) return EngineErrorCode.Aborted;
   if (status === 400) return EngineErrorCode.InvalidArg;

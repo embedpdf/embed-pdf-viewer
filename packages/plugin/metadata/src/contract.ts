@@ -9,17 +9,20 @@ import {
 } from '@embedpdf/core';
 
 /**
- * The document's Info-dict metadata as REACTIVE state. It changes from local
- * edits, from other plugins and scripts, and from other sessions (a remote edit
- * arrives over the document event stream), and every one of those reaches
- * the same confirmed `metadata.updated` event, which is the one path that
- * updates the snapshot and fires `onUpdated`.
+ * A confirmed change of the Info dict. Local edits, other plugins, scripts and
+ * other sessions all reach the same confirmed `metadata.updated` document
+ * event, which is the one path that updates the snapshot and fires this.
  */
 export interface MetadataUpdatedEvent {
   readonly metadata: DocumentMetadata;
   readonly previous: DocumentMetadata | null;
   readonly changedKeys: readonly (keyof DocumentMetadata)[];
   readonly origin: ChangeOrigin;
+}
+
+/** The metadata was (re)loaded from the engine. */
+export interface MetadataResyncedEvent {
+  readonly metadata: DocumentMetadata;
 }
 
 export interface MetadataCapability {
@@ -37,15 +40,17 @@ export interface MetadataCapability {
   canEdit(): boolean;
   /**
    * Patch the Info dict: `undefined` leaves a key, `null` clears it, a value
-   * sets it. Writes to the layer. Resolves with the engine result after the
+   * sets it. Writes to the layer. Resolves with the engine result; by then the
    * snapshot reflects the write and `onUpdated` has fired. Rejects with
    * `permission-denied`, `instance-closed` or `operation-cancelled`.
    */
   update(patch: MetadataPatch, options?: OperationOptions): Promise<MetadataUpdateResult>;
   /** Re-read from the engine. Rarely needed: the event stream keeps the snapshot fresh. */
-  refresh(options?: OperationOptions): Promise<void>;
+  refresh(): Promise<void>;
   /** A confirmed change, whoever caused it. Fires after the snapshot changed. */
   readonly onUpdated: EventHook<MetadataUpdatedEvent>;
+  /** The metadata was loaded or reloaded from the engine. */
+  readonly onResynced: EventHook<MetadataResyncedEvent>;
 }
 
 export { MetadataToken } from './token';

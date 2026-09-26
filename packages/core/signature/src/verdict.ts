@@ -63,14 +63,14 @@ export interface ValidateSignaturesOptions {
  */
 export async function validateSignatures(
   doc: DocumentHandle,
-  opts: ValidateSignaturesOptions = {},
+  options: ValidateSignaturesOptions = {},
 ): Promise<SignatureVerdict[]> {
   if (!doc.signatures) throw new Error('this engine does not implement signatures');
   const snapshot = await doc.signatures.list();
   const verdicts: SignatureVerdict[] = [];
   for (const signature of snapshot.signatures) {
     if (!signature.signed) continue;
-    verdicts.push(await validateOne(doc, snapshot, signature, opts));
+    verdicts.push(await validateOne(doc, snapshot, signature, options));
   }
   return verdicts;
 }
@@ -79,9 +79,9 @@ async function validateOne(
   doc: DocumentHandle,
   snapshot: SignatureSnapshot,
   signature: SignatureDTO,
-  opts: ValidateSignaturesOptions,
+  options: ValidateSignaturesOptions,
 ): Promise<SignatureVerdict> {
-  const at = opts.at ?? { kind: 'now' };
+  const at = options.at ?? { kind: 'now' };
   let integrity: IntegrityVerdict = 'indeterminate';
   let cryptography: CryptographyVerdict = 'unsupported';
   let trust: TrustStatus = 'unknown';
@@ -93,28 +93,33 @@ async function validateOne(
     integrity = snapshot.chainValid ? 'invalid' : 'indeterminate';
   } else {
     try {
-      const contents = await doc.signatures!.contents(signature.field);
+      const contents = await doc.signatures.getContents(signature.field);
       internal = parseCmsInternal(contents);
       cms = internal.parsed;
-      const digest = await doc.signatures!.digest(signature.field, cms.digestAlgorithm);
+      const digest = await doc.signatures.getDigest(signature.field, cms.digestAlgorithm);
       const digestMatches = bytesEqual(digest, cms.messageDigest);
       integrity = signature.coverage === 'whole-revision' && digestMatches ? 'valid' : 'invalid';
-    } catch (err) {
+    } catch (error) {
       // A CMS this engine cannot read is not evidence of tampering.
       integrity =
-        err instanceof CmsError && err.reason === 'unsupported' ? 'indeterminate' : 'invalid';
-      if (!(err instanceof CmsError)) integrity = 'indeterminate';
+        error instanceof CmsError && error.reason === 'unsupported' ? 'indeterminate' : 'invalid';
+      if (!(error instanceof CmsError)) integrity = 'indeterminate';
     }
   }
 
   if (internal) {
     cryptography = await verifyCmsSignature(internal);
-    const chain = await validateChain(internal, opts.trust, at);
+    const chain = await validateChain(internal, options.trust, at);
     trust = chain.status;
     trustReason = chain.reason;
   }
 
-  const modifications = await modificationsOf(doc, snapshot, signature, opts.until ?? 'persisted');
+  const modifications = await modificationsOf(
+    doc,
+    snapshot,
+    signature,
+    options.until ?? 'persisted',
+  );
 
   let summary: SignatureVerdict['summary'];
   if (
@@ -173,7 +178,7 @@ async function modificationsOf(
   try {
     // The analysis reports its own basis: `persisted` when there were no
     // unsaved edits to include, even when the working copy was asked for.
-    const analysis = await doc.signatures!.analyze({
+    const analysis = await doc.signatures.analyze({
       since: { signatureIndex: signature.index },
       until,
     });
@@ -193,10 +198,10 @@ async function modificationsOf(
       ...(analysis.later.revisionCount > 0 ? { laterRevisions: analysis.later.revisionCount } : {}),
       ...(analysis.later.undoneObjectNumbers.length > 0 ? { undone: true } : {}),
     };
-  } catch (err) {
+  } catch (error) {
     return {
       verdict: 'indeterminate',
-      detail: `analysis failed: ${(err as Error).message}`,
+      detail: `analysis failed: ${(error as Error).message}`,
       basis: 'persisted',
     };
   }

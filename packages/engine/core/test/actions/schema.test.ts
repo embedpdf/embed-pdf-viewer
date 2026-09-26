@@ -141,7 +141,7 @@ describe('PDF action schemas', () => {
     expect(decodeSubmitFormFlags(bit(3)).format).toBe('html');
 
     // GetMethod (bit 4) is meaningful only for HTML — and stays alive under
-    // SubmitPDF per the bit-9 "all other flags ignored EXCEPT GetMethod"
+    // SubmitPDF per the bit-9 "all other flags ignored except GetMethod"
     // rule. For FDF/XFDF it decodes to post.
     expect(decodeSubmitFormFlags(bit(4) | bit(3)).method).toBe('get');
     expect(decodeSubmitFormFlags(bit(4) | bit(9)).method).toBe('get');
@@ -156,7 +156,7 @@ describe('PDF action schemas', () => {
     expect(decodeSubmitFormFlags(bit(14)).embedForm).toBe(true);
     expect(decodeSubmitFormFlags(8192).embedForm).toBe(true);
 
-    // Exclude is DERIVED from bit 1 — the raw word is the single source.
+    // Exclude is derived from bit 1 — the raw word is the single source.
     const excluding = decodeSubmitFormFlags(
       bit(1) | bit(2) | bit(5) | bit(7) | bit(8) | bit(10) | bit(11),
     );

@@ -27,7 +27,7 @@ const ebook = async (): Promise<OpenInput> => {
 // [!/doc-source]
 
 function PageToolbar() {
-  const { currentPage, pageCount, goToPage, next, prev } = usePages();
+  const { currentPage, pageCount, goToPage, next, previous } = usePages();
   const [typed, setTyped] = useState('');
   const jump = () => {
     const n = Number(typed);
@@ -36,7 +36,7 @@ function PageToolbar() {
   };
   return (
     <Toolbar>
-      <Button onClick={() => prev()}>‹ Previous</Button>
+      <Button onClick={() => previous()}>‹ Previous</Button>
       <Badge>
         Page{' '}
         <strong>

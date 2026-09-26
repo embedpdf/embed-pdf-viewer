@@ -101,7 +101,7 @@ export class SignaturesClient {
     }
 
     /**
-     * @param {CloudPDF.doc.AbortSignaturesRequest} request
+     * @param {CloudPDF.doc.CancelSignaturesRequest} request
      * @param {SignaturesClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link CloudPDF.NotFoundError}
@@ -109,23 +109,23 @@ export class SignaturesClient {
      * @throws {@link errors.CloudPDFTimeoutError}
      *
      * @example
-     *     await client.doc.signatures.abort({
+     *     await client.doc.signatures.cancel({
      *         docId: "docId",
      *         layerName: "layerName",
      *         signingId: "signingId"
      *     })
      */
-    public abort(
-        request: CloudPDF.doc.AbortSignaturesRequest,
+    public cancel(
+        request: CloudPDF.doc.CancelSignaturesRequest,
         requestOptions?: SignaturesClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocSignaturesAbort200Response> {
-        return core.HttpResponsePromise.fromPromise(this.__abort(request, requestOptions));
+    ): core.HttpResponsePromise<CloudPDF.DocSignaturesCancel200Response> {
+        return core.HttpResponsePromise.fromPromise(this.__cancel(request, requestOptions));
     }
 
-    private async __abort(
-        request: CloudPDF.doc.AbortSignaturesRequest,
+    private async __cancel(
+        request: CloudPDF.doc.CancelSignaturesRequest,
         requestOptions?: SignaturesClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocSignaturesAbort200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocSignaturesCancel200Response>> {
         const { docId, layerName, signingId, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -151,7 +151,7 @@ export class SignaturesClient {
         });
         if (_response.ok) {
             return {
-                data: _response.body as CloudPDF.DocSignaturesAbort200Response,
+                data: _response.body as CloudPDF.DocSignaturesCancel200Response,
                 rawResponse: _response.rawResponse,
             };
         }
@@ -368,7 +368,7 @@ export class SignaturesClient {
     }
 
     /**
-     * The multipart envelope: a JSON `body` part (field, subFilter, digest, contentsSize, signer, certify, lock, appearance) and an optional `resource:<key>` PDF part the body's `appearance.resource` names. A certification (`certify.permission`) additionally requires `doc.sign.certify`. The layer is read-only until the signing completes, is aborted, or expires (15 minutes). A layer behind the document head cannot sign (StaleBase).
+     * The multipart envelope: a JSON `body` part (field, subFilter, digest, contentsSize, signer, certify, lock, appearance) and an optional `resource:<key>` PDF part the body's `appearance.resource` names. A certification (`certify.permission`) additionally requires `doc.sign.certify`. The layer is read-only until the signing completes, is cancelled, or expires (15 minutes). A layer behind the document head cannot sign (StaleBase).
      *
      * @param {CloudPDF.doc.PrepareSignaturesRequest} request
      * @param {SignaturesClient.RequestOptions} requestOptions - Request-specific configuration.

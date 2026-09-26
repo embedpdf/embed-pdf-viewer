@@ -20,7 +20,9 @@ export interface EmbedMetadata {
   userId?: string;
   groupId?: string;
   createdBy?: string;
-  updatedBy?: string;
+  /** `/UpdatedBy`. */
+  modifiedBy?: string;
+  importedBy?: string;
 }
 
 /**
@@ -41,21 +43,24 @@ export function readEmbedMetadata(
   if (!fn.EPDFAnnot_HasEmbedMetadata(annotPtr)) return null;
 
   const schemaVersion = readMetaNumber(fn, mem, annotPtr, 'SchemaVersion');
-  const userId = readMetaString(fn, mem, annotPtr, 'UserID');
-  const groupId = readMetaString(fn, mem, annotPtr, 'GroupID');
-  const createdBy = readMetaString(fn, mem, annotPtr, 'CreatedBy');
-  const updatedBy = readMetaString(fn, mem, annotPtr, 'UpdatedBy');
+  const userId = readEmbedMetadataString(fn, mem, annotPtr, 'UserID');
+  const groupId = readEmbedMetadataString(fn, mem, annotPtr, 'GroupID');
+  const createdBy = readEmbedMetadataString(fn, mem, annotPtr, 'CreatedBy');
+  const modifiedBy = readEmbedMetadataString(fn, mem, annotPtr, 'UpdatedBy');
+  const importedBy = readEmbedMetadataString(fn, mem, annotPtr, 'ImportedBy');
 
   const out: EmbedMetadata = {};
   if (schemaVersion !== undefined) out.schemaVersion = schemaVersion;
   if (userId !== undefined) out.userId = userId;
   if (groupId !== undefined) out.groupId = groupId;
   if (createdBy !== undefined) out.createdBy = createdBy;
-  if (updatedBy !== undefined) out.updatedBy = updatedBy;
+  if (modifiedBy !== undefined) out.modifiedBy = modifiedBy;
+  if (importedBy !== undefined) out.importedBy = importedBy;
   return out;
 }
 
-function readMetaString(
+/** A string under `/EMBD_Metadata`, `undefined` when it is absent or empty. */
+export function readEmbedMetadataString(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
@@ -66,8 +71,9 @@ function readMetaString(
   //           terminator, so an empty string returns 2)
   //   pass 2: alloc buf, fill it, decode
   const len = fn.EPDFAnnot_GetEmbedMetadataString(annotPtr, key, NULL_PTR, 0);
-  if (len <= 0) return undefined;
-  if (len === 2) return '';
+  // Every key read here is an id, and an empty id is no id. The native runtime
+  // also reports a missing key as empty whenever the dictionary exists.
+  if (len <= 2) return undefined;
 
   const buf = mem.alloc(len);
   try {

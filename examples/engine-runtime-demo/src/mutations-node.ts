@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createLocalEngine } from '@embedpdf/engine';
-import { createCloudEngine } from '@cloudpdf/engine';
+import { cloudEngine } from '@cloudpdf/engine';
 import { signDevToken, defaultWorkerEntryUrl, type AppBundle } from '@cloudpdf/server';
 import { buildAppForTesting } from '../../../cloudpdf/server/src/app/buildApp.ts';
 import { createValidTestLicenseGate } from '../../../cloudpdf/server/src/licensing/testing.ts';
@@ -29,7 +29,7 @@ try {
   const baseUrl = `http://127.0.0.1:${address.port}`;
 
   const local = await createLocalEngine({ runtime: { prefer: 'auto' } });
-  const cloud = createCloudEngine({
+  const cloud = cloudEngine({
     baseUrl,
     token: signDevToken(SECRET, { sub: 'mutations-demo', tenant_id: 'mutations-demo-tenant' }),
   });
@@ -114,20 +114,20 @@ try {
   );
   diffStr(
     'updated.identityQuality',
-    localResult.updated?.updated.identityQuality ?? '<skipped>',
-    cloudResult.updated?.updated.identityQuality ?? '<skipped>',
+    localResult.updated?.annotation.identityQuality ?? '<skipped>',
+    cloudResult.updated?.annotation.identityQuality ?? '<skipped>',
     errs,
   );
   diffStr(
     'updated.ref.kind',
-    localResult.updated?.updated.ref.kind ?? '<skipped>',
-    cloudResult.updated?.updated.ref.kind ?? '<skipped>',
+    localResult.updated?.annotation.ref.kind ?? '<skipped>',
+    cloudResult.updated?.annotation.ref.kind ?? '<skipped>',
     errs,
   );
   diffNum(
     'moveBatch.moved.length',
-    localResult.movedBatch.moved.length,
-    cloudResult.movedBatch.moved.length,
+    localResult.movedBatch.annotations.length,
+    cloudResult.movedBatch.annotations.length,
     errs,
   );
 

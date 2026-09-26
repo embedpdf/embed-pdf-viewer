@@ -74,9 +74,9 @@ const ALL_BASE_SCOPES: LayerScopes = {
 };
 
 /**
- * Per-page plane comparison: inherited iff the page SET matches the base
- * exactly AND every page's pin equals its base counterpart's. Set inequality
- * (insert/delete) reads as owned for BOTH per-page planes at the call sites.
+ * Per-page plane comparison: inherited iff the page set matches the base
+ * exactly and every page's pin equals its base counterpart's. Set inequality
+ * (insert/delete) reads as owned for both per-page planes at the call sites.
  */
 function pagePlaneScope(
   layerPages: DurablePageRow[],
@@ -84,9 +84,9 @@ function pagePlaneScope(
   pin: 'contentVersion' | 'annotationVersion',
 ): 'base' | 'layer' {
   if (layerPages.length !== basePages.length) return 'layer';
-  const baseByPon = new Map(basePages.map((p) => [p.pageObjectNumber, p[pin]]));
+  const baseByPageObjectNumber = new Map(basePages.map((p) => [p.pageObjectNumber, p[pin]]));
   for (const page of layerPages) {
-    if (baseByPon.get(page.pageObjectNumber) !== page[pin]) return 'layer';
+    if (baseByPageObjectNumber.get(page.pageObjectNumber) !== page[pin]) return 'layer';
   }
   return 'base';
 }
@@ -175,15 +175,15 @@ export class LayerStateService {
   }
 
   /**
-   * Plane scopes, the PURE half. A layer is a set of per-plane DELTAS
+   * Plane scopes, the pure half. A layer is a set of per-plane deltas
    * over the immutable base; each plane is `'base'` (inherited — no delta,
-   * the layer's view of that plane IS the base's view) or `'layer'` (owned —
+   * the layer's view of that plane is the base's view) or `'layer'` (owned —
    * the first write to that plane transferred ownership).
    *
    * Per-page planes (content, annotations) compare against the base
-   * counterpart AND require page-SET equality: insert/delete own both — a
+   * counterpart and require page-set equality: insert/delete own both — a
    * view that removed content must never resolve base artifacts. Structural
-   * ops that PRESERVE the set (move, rotate) own only `layout`:
+   * ops that preserve the set (move, rotate) own only `layout`:
    * render/text/geometry artifacts are normalized (rotation is presentation
    * metadata applied client-side — see `PageRotateResult`), so content and
    * annotation sharing survive them. Doc-level planes compare their pin
@@ -208,7 +208,7 @@ export class LayerStateService {
   ): LayerScopes {
     if (!layer) return { ...ALL_BASE_SCOPES };
     // Law 9: a layer whose base is not the head (a sibling published a
-    // version since) is diverged for EVERY plane — the head's layout,
+    // version since) is diverged for every plane — the head's layout,
     // metadata and attachments are another version's. Its reads resolve
     // at layer URLs over its own base until it is rebased.
     if (head && layer.baseSha !== null && layer.baseSha !== head.sha256) {
@@ -228,7 +228,7 @@ export class LayerStateService {
     return {
       content: pagesKnown ? pagePlaneScope(layerPages, basePages, 'contentVersion') : 'base',
       annotations: pagesKnown ? pagePlaneScope(layerPages, basePages, 'annotationVersion') : 'base',
-      // Doc-level planes compare against the BASE VERSION's pointers (law
+      // Doc-level planes compare against the base version's pointers (law
       // 9c): a layer seeded over a published version whose metadata sits
       // at epoch 2 is inherited at 2, not owned because 2 ≠ 1.
       layout: layer.layoutVersion === base.layoutVersion ? 'base' : 'layer',
@@ -239,7 +239,7 @@ export class LayerStateService {
   }
 
   /**
-   * Plane scopes, the DURABLE half — the ONE condition behind the
+   * Plane scopes, the durable half — the one condition behind the
    * manifest `scopes` block, the `/v1/access` edge grant, and every origin
    * guard on the doc-level shared routes (the guard is the truth; the grant
    * is the TTL-bounded optimization). A layer with no row has never been
@@ -264,7 +264,7 @@ export class LayerStateService {
   ): DocumentManifest {
     return {
       docVersion: head.docVersion,
-      // The base view's pointers are its VERSION's: the initial epochs for
+      // The base view's pointers are its version's: the initial epochs for
       // an upload, the signing layer's pointers for a published version.
       layoutVersion: version.layoutVersion,
       metadataVersion: version.metadataVersion,
@@ -284,7 +284,7 @@ export class LayerStateService {
 
   buildLayerManifest(
     docId: string,
-    /** The LAYER's base version (behind the head after a sibling published). */
+    /** The layer's base version (behind the head after a sibling published). */
     base: Pick<BaseVersionFacts, 'sha256' | 'byteLength'>,
     layerName: string,
     layer: Pick<
@@ -338,7 +338,7 @@ export class LayerStateService {
     /**
      * The new bulk-annotations pin when this mutation bumped it. Stamped
      * by the annotation CRUD, flatten, and redaction paths; the form and
-     * page-structure paths bump the COLUMN but omit it here — their
+     * page-structure paths bump the column but omit it here — their
      * clients recover through the 404-refresh rail, which is correct,
      * just one round trip slower.
      */
@@ -366,7 +366,7 @@ export class LayerStateService {
    * Law 9: a published version contains everything the signing layer's
    * artifact carried — every page it touched, its page order, metadata,
    * attachments, annotations — so the head's catalog becomes the layer's
-   * COMPLETE surviving page set: rows the layer has replace the base's,
+   * complete surviving page set: rows the layer has replace the base's,
    * pages it inserted are added, pages it deleted (seeded on first write,
    * removed by pages.delete) disappear; the signed page gets one more
    * annotation bump for the signature widget. The layer's rows are then
@@ -456,7 +456,7 @@ export class LayerStateService {
     return `cloud:layer:${docId}:${layerName}`;
   }
 
-  /** The BASE view's revision scope — the `docSessionId` every SHARED
+  /** The base view's revision scope — the `docSessionId` every shared
    *  (doc-level) annotation read stamps on its tokens. */
   baseRevisionScopeId(docId: string): string {
     return `cloud:base:${docId}`;

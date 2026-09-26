@@ -1,4 +1,5 @@
 import type { DocumentMetadataTrapped } from './DocumentMetadata';
+import type { DateInput } from './IsoDateTime';
 
 /**
  * Three-state metadata patch, consistent with annotation patches
@@ -9,16 +10,18 @@ import type { DocumentMetadataTrapped } from './DocumentMetadata';
  *   "..."     -> set the field to this value
  *
  * Standard Info-dict fields map to PDF keys (`title` -> /Title,
- * `created` -> /CreationDate, `modified` -> /ModDate, ...). `created` and
- * `modified` accept ISO 8601 strings; the engine formats them into PDF
- * date syntax (`D:YYYYMMDD...`) on write.
+ * `createdAt` -> /CreationDate, `modifiedAt` -> /ModDate, ...). The dates
+ * take an ISO 8601 string or a `Date`; the engine writes them as PDF dates
+ * (`D:YYYYMMDD...`), keeping a string's offset.
  *
  * `trapped` has no clear-form (it is a tri-valued enum, always present);
  * omit it to leave it untouched.
  *
  * `custom` is a per-key three-state map over non-standard Info entries:
  * a string sets the key, `null` removes it, an absent key leaves it
- * untouched. Reserved standard keys are rejected by the engine.
+ * untouched. A standard key (`Title`, …) or one a PDF name can't hold is
+ * `InvalidArg` naming it, and nothing is written. `''` is a value
+ * everywhere: it reads back `''`, not `null`.
  */
 export interface MetadataPatch {
   title?: string | null;
@@ -27,10 +30,10 @@ export interface MetadataPatch {
   keywords?: string | null;
   producer?: string | null;
   creator?: string | null;
-  /** ISO 8601 string for /CreationDate; engine formats to PDF date syntax. */
-  created?: string | null;
-  /** ISO 8601 string for /ModDate; engine formats to PDF date syntax. */
-  modified?: string | null;
+  /** `/CreationDate`. */
+  createdAt?: DateInput | null;
+  /** `/ModDate`. */
+  modifiedAt?: DateInput | null;
   trapped?: DocumentMetadataTrapped;
   custom?: Record<string, string | null>;
 }

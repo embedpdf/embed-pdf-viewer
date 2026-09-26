@@ -5,12 +5,14 @@ import type {
   AnnotationAppearancesResult,
   PageObjectNumber,
   PageRaster,
+  PageRenderViewport,
   PdfRect,
   PdfRotation,
 } from '@embedpdf/engine-core/runtime';
-import { normalizePdfRect } from '@embedpdf/engine-core/runtime';
+import { EngineError, EngineErrorCode, normalizePdfRect } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
+import { freeTextIntentFromName } from './internal/freeTextIntent';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import { FPDF_REVERSE_BYTE_ORDER, rasterize } from '../render/deviceRaster';
@@ -20,7 +22,6 @@ import {
   readAnnotationRotation,
   readAnnotationUnrotatedRect,
 } from './internal/read/readAnnotationTransformMetadata';
-import { freeTextIntentFromName } from './internal/freeTextIntent';
 
 /** `FPDF_ANNOT_WIDGET` — form-field annotation subtype code. */
 const ANNOT_SUBTYPE_WIDGET = 20;
@@ -29,12 +30,12 @@ const ANNOT_SUBTYPE_WIDGET = 20;
 const ANNOT_SUBTYPE_FREETEXT = 3;
 
 /**
- * BOX-family subtypes (free-text 3, square 5, circle 6, stamp 13, caret 14):
- * the kinds whose v3 writers put rotation in the AP `/Matrix` +
+ * Box-family subtypes (free-text 3, square 5, circle 6, stamp 13, caret 14):
+ * the kinds whose writers put rotation in the AP `/Matrix` +
  * `/EMBD_Metadata` `/UnrotatedRect`. Only these are eligible for
  * rotation-stripped appearance rendering — vertex kinds
  * (line/polyline/polygon/ink) pre-rotate their geometry, so their rasters must
- * stay on the classic path. This set MUST cover every kind whose reader
+ * stay on the classic path. This set must cover every kind whose reader
  * surfaces the rotation pair: `fromDTO` (plugin-annotation repository) mirrors
  * this exact condition to re-apply the stripped rotation as `apRot`.
  */
@@ -66,12 +67,11 @@ const APPEARANCE_MODES: ReadonlyArray<{
 
 /**
  * Batch-renders the appearance streams (`/AP`) of every annotation on a page,
- * one bitmap per requested mode. Ported from the v2 PDFium engine's
- * `renderPageAnnotationsRaw` / `renderSingleAnnotAppearance`, but expressed in
- * PDF user space and against the `PdfRuntimeModule` (`fn` + `mem`).
+ * one bitmap per requested mode, in PDF user space and against the
+ * `PdfRuntimeModule` (`fn` + `mem`).
  *
- * Each appearance bitmap is sized to its annotation's `/Rect` scaled by
- * `options.scale`. The shared raster helper handles PDFium's display matrix
+ * Each appearance bitmap is sized to its annotation's `/Rect` at the scale
+ * the page has at `options.viewport`. The shared raster helper handles PDFium's display matrix
  * convention, so this reader stays in normalized PDF page coordinates.
  */
 export class AnnotationAppearanceReader {
@@ -90,7 +90,6 @@ export class AnnotationAppearanceReader {
     const pool = this.session.pagePool();
     const pagePtr = pool.acquire(pageObjectNumber);
 
-    const scale = normalizeScale(options.scale);
     const rotation = (options.rotation ?? 0) as PdfRotation;
     const modes = resolveModes(options.modes);
     const revision = this.session.pageState(pageObjectNumber).revision;
@@ -102,6 +101,7 @@ export class AnnotationAppearanceReader {
         width: fn.FPDF_GetPageWidthF(pagePtr),
         height: fn.FPDF_GetPageHeightF(pagePtr),
       };
+      const scale = viewportScale(options.viewport, page, rotation);
       const count = fn.FPDFPage_GetAnnotCount(pagePtr);
       for (let i = 0; i < count; i++) {
         throwIfAborted(signal);
@@ -110,21 +110,21 @@ export class AnnotationAppearanceReader {
 
         try {
           const available = fn.EPDFAnnot_GetAvailableAppearanceModes(annotPtr);
-          // Skip annotations without any /AP sub-dictionary. Mirrors v2.
+          // Skip annotations without any /AP sub-dictionary.
           if (!available) continue;
 
           const identity = readAnnotationIdentity(fn, mem, annotPtr, pageObjectNumber, i, revision);
-          // Rotation-stripped rendering (see AnnotationRender.ts) applies ONLY
-          // where the rotation demonstrably lives in the AP Matrix: a BOX-family
-          // kind carrying BOTH `/EMBD_Metadata` `/Rotation` and `/UnrotatedRect`.
+          // Rotation-stripped rendering (see AnnotationRender.ts) applies only
+          // where the rotation demonstrably lives in the AP Matrix: a box-family
+          // kind carrying both `/EMBD_Metadata` `/Rotation` and `/UnrotatedRect`.
           // There the raster renders flat, `rect` is the logical unrotated box,
           // and the DTO's `rotation` (same two fields, surfaced by the box
           // readers) is the consumer's view transform. Everything else — vertex
           // kinds (rotation pre-baked into their geometry), foreign PDFs with
           // arbitrary AP matrices — renders on the classic path, placed by
           // `/Rect`, bit-identical to before.
-          // A free-text CALLOUT is excluded even with both fields present: only
-          // its text box tilts, via an INLINE `cm` mid-stream (the leader stays
+          // A free-text callout is excluded even with both fields present: only
+          // its text box tilts, via an inline `cm` mid-stream (the leader stays
           // page-space), so the form `/Matrix` is identity — nothing to strip.
           const subtypeCode = fn.FPDFAnnot_GetSubtype(annotPtr);
           const isCallout =
@@ -193,7 +193,7 @@ export class AnnotationAppearanceReader {
 
     if (!fn.EPDFAnnot_HasAppearanceStream(annotPtr, modeInt)) {
       // Form widgets frequently ship without a baked /AP. Generate one on the
-      // fly (same fallback as the v2 engine), then re-check.
+      // fly, then re-check.
       const subtype = fn.FPDFAnnot_GetSubtype(annotPtr);
       if (subtype === ANNOT_SUBTYPE_WIDGET && !fn.FPDFAnnot_HasKey(annotPtr, 'AP')) {
         fn.EPDFAnnot_GenerateFormFieldAP(annotPtr);
@@ -203,12 +203,12 @@ export class AnnotationAppearanceReader {
       }
     }
 
-    // SAFETY CLAMP — an engine invariant, not an option: no single appearance
+    // Safety clamp — an engine invariant, not an option: no single appearance
     // raster exceeds APPEARANCE_PIXEL_CLAMP output pixels. Appearance size is
     // `rect × scale`, and rects span orders of magnitude — a page-sized stamp
     // at a deep-zoom scale would ask for gigabytes and OOM the wasm heap
     // (observed: a ~600pt annotation at scale ~47 → 3.3 GB malloc). The clamp
-    // REDUCES the effective scale for that appearance instead of rejecting:
+    // reduces the effective scale for that appearance instead of rejecting:
     // the raster still covers the same rect, so the consumer's box-stretch
     // shows it slightly soft rather than missing — bounded memory with
     // graceful degradation. `options.maxOutputPixels` (the deployment budget,
@@ -228,7 +228,7 @@ export class AnnotationAppearanceReader {
       ...(maxOutputPixels !== undefined ? { maxOutputPixels } : {}),
       background: 'transparent',
       // `stripRotation` (EmbedPDF box-kind rotation only): render the AP form
-      // content WITHOUT its rotation Matrix, MatchRect-mapped to the unrotated
+      // content without its rotation Matrix, MatchRect-mapped to the unrotated
       // box — the consumer re-applies the DTO's `rotation` as a view transform.
       draw: (bitmapPtr, matrixPtr) =>
         (stripRotation ? fn.EPDF_RenderAnnotBitmapUnrotated : fn.EPDF_RenderAnnotBitmap)(
@@ -251,6 +251,24 @@ function resolveModes(
   }
   const wanted = new Set(requested);
   return APPEARANCE_MODES.filter((m) => wanted.has(m.name));
+}
+
+/**
+ * The scale the page has at `viewport`, as a full-page render would use it:
+ * a `scale` viewport's own, or a `width` viewport's width over the width of
+ * the page as `rotation` turns it.
+ */
+function viewportScale(
+  viewport: PageRenderViewport | undefined,
+  page: { width: number; height: number },
+  rotation: PdfRotation,
+): number {
+  if (viewport === undefined || viewport.kind === 'scale') return normalizeScale(viewport?.scale);
+  const pageWidth = rotation === 90 || rotation === 270 ? page.height : page.width;
+  if (!Number.isFinite(viewport.width) || viewport.width <= 0 || !(pageWidth > 0)) {
+    throw new EngineError(EngineErrorCode.InvalidArg, 'render viewport width must be positive');
+  }
+  return viewport.width / pageWidth;
 }
 
 function normalizeScale(scale: number | undefined): number {

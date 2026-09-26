@@ -17,6 +17,29 @@ export type {
   AnnotationConformanceOptions,
 } from './conformance/runAnnotationReadConformance';
 export { runAnnotationMutationConformance } from './conformance/runAnnotationMutationConformance';
+export { runAnnotationAttributionConformance } from './conformance/runAnnotationAttributionConformance';
+export type {
+  AnnotationAttributionConformanceOptions,
+  AttributionSession,
+} from './conformance/runAnnotationAttributionConformance';
+export { runAnnotationResourceConformance } from './conformance/runAnnotationResourceConformance';
+export { runAnnotationExportConformance } from './conformance/runAnnotationExportConformance';
+export { runAnnotationImportConformance } from './conformance/runAnnotationImportConformance';
+export { runAnnotationTransferConformance } from './conformance/runAnnotationTransferConformance';
+export type { AnnotationTransferConformanceOptions } from './conformance/runAnnotationTransferConformance';
+export { creatables, type Creatable } from './conformance/creatables';
+export type {
+  AnnotationResourceConformanceOptions,
+  AnnotationResourceFixture,
+} from './conformance/runAnnotationResourceConformance';
+export { runDateConformance } from './conformance/runDateConformance';
+export type { DateConformanceOptions } from './conformance/runDateConformance';
+export { runAnnotationDeclarationConformance } from './conformance/runAnnotationDeclarationConformance';
+export type {
+  AnnotationDeclarationConformanceOptions,
+  AnnotationDeclarationFixture,
+} from './conformance/runAnnotationDeclarationConformance';
+export { annotationReadDriftOf } from './conformance/annotationReadDrift';
 export { runFormConformance } from './conformance/runFormConformance';
 export type {
   FormConformanceFixtures,
@@ -73,10 +96,7 @@ export type {
   SearchConformanceFixture,
   SearchConformanceOptions,
 } from './conformance/runSearchConformance';
-export {
-  diffAnnotationListSnapshot,
-  diffAnnotationListSnapshotAll,
-} from './conformance/diffAnnotationListSnapshot';
+export { diffAnnotationList } from './conformance/diffAnnotationList';
 export { runSignatureConformance } from './conformance/runSignatureConformance';
 export type {
   SignatureConformanceFixtures,

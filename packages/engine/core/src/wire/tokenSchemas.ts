@@ -26,6 +26,16 @@ export const AnnotationsAllTokenSchema = {
   fields: ['annotationsVersion'],
 } as const satisfies TokenSchema;
 
+/**
+ * `doc.annotations.export` leaf: the annotation and layout pins (the bundle
+ * carries each page's position and box, which only the layout pin covers)
+ * and the selection, canonical so one selection is one URL.
+ */
+export const AnnotationsExportTokenSchema = {
+  fields: ['annotationsVersion', 'include', 'layoutVersion', 'selection'],
+  maxLength: 4096,
+} as const satisfies TokenSchema;
+
 export const ActionsTokenSchema = {
   fields: ['actionsVersion'],
 } as const satisfies TokenSchema;
@@ -41,7 +51,8 @@ export const AttachmentsTokenSchema = {
  */
 export const AnalysisTokenSchema = {
   // `policy`: the judging policy version the caller expects — part of the
-  // cache key, so a policy bump never serves a verdict judged the old way.
+  // cache key, so a policy bump never serves a verdict judged under another
+  // policy.
   fields: ['docVersion', 'since.signature', 'since.revision', 'level', 'policy', 'detail'],
 } as const;
 
@@ -57,9 +68,9 @@ export const DownloadTokenSchema = {
  * dotted path here and a matching branch in `PageImageOptionsWireSchema`.
  * No encoder/decoder code changes.
  *
- * `includeAnnotations` is deliberately NOT a token field: annotatedness
+ * `includeAnnotations` is deliberately not a token field: annotatedness
  * changes the artifact's plane-dependency
- * set, so it is expressed by the path FAMILY (`…/render/pages/` vs
+ * set, so it is expressed by the path family (`…/render/pages/` vs
  * `…/render/annotated/pages/`), never inside the token. `annotationVersion`
  * belongs to the annotated family's tokens only — each family's query
  * schema enforces its own pin grammar.
@@ -91,22 +102,22 @@ export const RenderTokenSchema = {
  * charset excludes free text), and the resume position. Canonical by
  * construction: the codec sorts fields and the encoder omits every
  * default, so equal searches produce byte-equal tokens — the property CDN
- * cache hits live on. Mode is NOT a field; it is the endpoint (separate
+ * cache hits live on. Mode is not a field; it is the endpoint (separate
  * permission tiers must never share cache entries).
  */
 export const SearchTokenSchema = {
   fields: [
     'epoch',
     'format',
+    'from',
     'ignoreWhitespace',
+    'limitMatches',
+    'limitPages',
     'matchCase',
     'matchDiacritics',
-    'maxMatches',
-    'maxPages',
     'q',
     'regex',
     'skip',
-    'startPage',
     'wholeWord',
   ],
   maxLength: 2048,
@@ -115,12 +126,19 @@ export const SearchTokenSchema = {
 /**
  * Token for the batch annotation-appearance render endpoint. Narrower than
  * the page render token: appearance bitmaps are sized per annotation `/Rect`
- * so there is no target/viewport — only a uniform `scale` and page
- * `rotation`. Keyed by `annotationVersion` only (appearances do not depend on
+ * so there is no target — only the page's `viewport` and `rotation`. Keyed by `annotationVersion` only (appearances do not depend on
  * page base content). The cloud endpoint renders the Normal appearance only,
  * so `modes` is intentionally absent here (it is a worker/local-only option).
  */
 export const AnnotationAppearancesRenderTokenSchema = {
-  fields: ['annotationVersion', 'format', 'quality', 'rotation', 'scale'],
+  fields: [
+    'annotationVersion',
+    'format',
+    'quality',
+    'rotation',
+    'viewport.kind',
+    'viewport.scale',
+    'viewport.width',
+  ],
   maxLength: 256,
 } as const satisfies TokenSchema;

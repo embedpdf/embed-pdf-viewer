@@ -1,7 +1,7 @@
 /**
  * Runtime font registration DTOs.
  *
- * Registered fonts are a RUNTIME-global resource (per PDFium thread), not a
+ * Registered fonts are a runtime-global resource (per PDFium thread), not a
  * document-scoped one: a registered font outlives any single open document and
  * is shared by every page render and annotation-authoring call on its thread.
  * The engine surfaces them through {@link FontService} (`engine.fonts`), not on
@@ -9,7 +9,7 @@
  *
  * The numeric `CFX_FontRegistry::FontId` returned by the native registry is
  * thread-local and volatile (a per-thread `next_font_id++`). It is deliberately
- * NOT exposed here. Callers key fonts by the stable {@link FontKey} they choose
+ * not exposed here. Callers key fonts by the stable {@link FontKey} they choose
  * at registration, so a worker respawn (or a future worker pool) can replay the
  * same registration order and rebind keys to whatever ids come back.
  */
@@ -53,7 +53,7 @@ export interface FontSpec {
 /**
  * The OS/2 `fsType` embedding permission of a registered font. Registration
  * refuses restricted and bitmap-only fonts outright. A preview-and-print font
- * renders existing text and may be embedded, but may not author NEW text
+ * renders existing text and may be embedded, but may not author new text
  * (a FreeText naming it fails, and missing-glyph fallback skips it) until
  * the application asserts a licence with {@link FontService.authorizeEditing}.
  */

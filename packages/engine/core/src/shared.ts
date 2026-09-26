@@ -15,6 +15,8 @@ export type {
   OpenInputById,
   OpenInputToken,
   OpenInputShare,
+  OpenInputLayerFile,
+  OpenInputLayerFileSource,
   OpenOptions,
   TokenSource,
 } from './dto/OpenInput';
@@ -108,7 +110,7 @@ export type {
 export type { CachePins } from './dto/CachePins';
 export { DEFAULT_PDF_SAVE_MODE } from './dto/PdfSaveMode';
 export type { SessionKind } from './dto/SessionKind';
-export type { PdfSaveMode } from './dto/PdfSaveMode';
+export type { DownloadOptions, PdfSaveMode } from './dto/PdfSaveMode';
 export type {
   FontEmbeddingPermission,
   FontHandle,
@@ -140,6 +142,7 @@ export { isValidPageObjectNumber } from './identity/PageObjectNumber';
 export type { PageObjectNumber } from './identity/PageObjectNumber';
 export type { PageRef } from './identity/PageRef';
 export { toPageRef, pageRefsEqual, encodePageKey, decodePageKey } from './identity/PageRef';
+export { generateUuid } from './identity/uuid';
 export type { AnnotationStableId } from './identity/AnnotationStableId';
 export { encodeStableIdKey, decodeStableIdKey } from './identity/AnnotationStableId';
 export type { AnnotationRef } from './identity/AnnotationRef';
@@ -175,7 +178,9 @@ export type {
   InkIntent,
   BlendMode,
 } from './annotation/primitives';
+export { STANDARD_FONTS } from './annotation/primitives';
 export { NO_ANNOTATION_FLAGS } from './annotation/primitives';
+export { ANNOTATION_FIELD_NAMES, ANNOTATION_RESOURCE_ROLES } from './annotation/field-names';
 
 export type { AnnotationBase } from './annotation/base';
 export type { AnnotationDraftBase } from './annotation/draft-base';
@@ -189,37 +194,90 @@ export {
 } from './annotation/subtype';
 export type { AnnotationSubtype } from './annotation/subtype';
 
-// Inline binary payloads (stamp images, future embedded files) — zod-free.
+// Binary payloads — zod-free.
 export type {
   BinarySource,
   BinaryPayload,
   WireResource,
   WireResourceMap,
-  ResourceRef,
 } from './resource/BinarySource';
 export { resolveBinarySource } from './resource/BinarySource';
+export type { DateInput, IsoDateTime } from './dto/IsoDateTime';
+export { compareIsoDateTime } from './dto/IsoDateTime';
 export type { BinaryMetadata, BinaryMimeType } from './resource/binaryMetadata';
 export { sniffBinaryMetadata } from './resource/binaryMetadata';
-export { normalizeAnnotationDraft, normalizeAnnotationPatch } from './annotation/normalize';
-// Deep import keeps `shared` zod-free (the kind barrel pulls schemas).
-export { normalizeAttachmentFileSource } from './annotation/kinds/file-attachment/normalize';
-export type { NormalizedDraft, NormalizedPatch } from './annotation/normalize';
+export type {
+  AnnotationResources,
+  AnnotationResourceRole,
+  ResourceBytes,
+  WireAnnotationResources,
+} from './annotation/resources';
+export {
+  ANNOTATION_RESOURCE_ROLE_NAMES,
+  assertAnnotationResources,
+  hasAnnotationResources,
+  withFileFromResource,
+  resolveAnnotationResources,
+} from './annotation/resources';
+export { normalizeAttachmentFileSource } from './dto/normalizeAttachmentFileSource';
+
+// Annotation bundles: annotations and their resources, to move between
+// documents in one call, and the JSON file that holds one.
+export type {
+  AnnotationBundle,
+  AnnotationBundleItem,
+  AnnotationBundlePage,
+  ResourceId,
+  WireAnnotationBundle,
+} from './transfer/AnnotationBundle';
+export type { AnnotationExportSelection } from './transfer/exportSelection';
+export type {
+  AnnotationDropReason,
+  AnnotationImportDrop,
+  AnnotationImportOptions,
+  AnnotationImportManifest,
+  AnnotationImportPages,
+  AnnotationImportPlan,
+  AnnotationImportResult,
+  AnnotationImportTarget,
+  PlannedAnnotation,
+} from './transfer/annotationImport';
+export { annotationImportFacts, planAnnotationImport } from './transfer/annotationImport';
+export { closeExportSelection } from './transfer/exportSelection';
+export { mapPageRefs, pageRefsIn } from './transfer/pageRefs';
+export {
+  assertAnnotationBundle,
+  assertBundleManifest,
+  resourceIdOf,
+} from './transfer/AnnotationBundle';
+export type { AnnotationBundleLimits } from './transfer/bundleLimits';
+export {
+  assertWithinLimit,
+  DEFAULT_ANNOTATION_BUNDLE_LIMITS,
+  manifestBytesOf,
+} from './transfer/bundleLimits';
+export type { AnnotationTransferOptions } from './transfer/AnnotationTransfer';
+export { AnnotationTransfer } from './transfer/AnnotationTransfer';
 
 // Attachment vocabulary — one set of file metadata fields shared by the
-// file-attachment kind and the document-level EmbeddedFiles service.
+// file-attachment kind and the document-level attachments service.
 export type {
   AttachmentFileBase,
   AttachmentFileSource,
   AttachmentFileInfo,
-  EmbeddedFileItem,
-  EmbeddedFileRef,
+  Attachment,
+  AttachmentList,
+  AttachmentRef,
   AttachmentContent,
+  WireAttachmentFile,
 } from './dto/Attachment';
+export { toAttachmentRef } from './dto/Attachment';
 export type {
   AttachmentCreateResult,
   AttachmentDeleteResult,
-  AttachmentsCache,
+  AttachmentMutationMeta,
 } from './mutation/AttachmentMutationResults';
+export { deletedAttachmentOf } from './mutation/AttachmentMutationResults';
 
 export type {
   AnnotationKindModule,
@@ -233,8 +291,6 @@ export type {
   AnnotationDTO,
   AnnotationDraft,
   AnnotationPatch,
-  WireAnnotationDraft,
-  WireAnnotationPatch,
   HighlightAnnotationDTO,
   HighlightDraft,
   HighlightPatch,
@@ -284,15 +340,11 @@ export type {
   StampAnnotationDTO,
   StampDraft,
   StampPatch,
-  StampWireDraft,
-  StampWirePatch,
   StampFit,
   FileAttachmentAnnotationDTO,
   FileAttachmentDraft,
-  FileAttachmentWireDraft,
   FileAttachmentPatch,
   FileAttachmentIcon,
-  WireAttachmentFile,
   ShapeAnnotationFields,
   ShapeDraftFields,
   ShapePatchFields,
@@ -314,18 +366,33 @@ export type {
   WidgetAnnotationDTO,
   WidgetDraft,
   WidgetPatch,
+  PopupAnnotationDTO,
+  PopupDraft,
+  PopupPatch,
+  AnnotationDeclaration,
+  AnnotationRead,
+  CreateOf,
+  ReadOf,
+  UpdateOf,
 } from './annotation/kinds';
 
-export type {
-  AnnotationListPageSnapshot,
-  AnnotationListSnapshotAllPages,
-} from './annotation/AnnotationListSnapshot';
+export { concatAnnotationLists } from './annotation/AnnotationList';
+export type { AnnotationList, AnnotationListOptions } from './annotation/AnnotationList';
 
-export { classifyRelation, buildThreads } from './annotation/relationships';
-export { annotationKey, refFromStableId } from './identity/annotationKey';
+export { classifyRelation, buildThreads, deletedWith } from './annotation/relationships';
+export {
+  annotationKey,
+  annotationKeysOf,
+  positionKey,
+  refFromStableId,
+} from './identity/annotationKey';
 export type { AnnotationRelationKind, AnnotationThread } from './annotation/relationships';
 
-export { buildCommentThreads, isStateAnnotation } from './annotation/comments';
+export {
+  buildCommentThreads,
+  isStateAnnotation,
+  standardStateModelOf,
+} from './annotation/comments';
 export type {
   BuildCommentThreadsOptions,
   CommentThread,
@@ -352,14 +419,16 @@ export type {
   AnnotationDeleteResult,
   AnnotationMoveResult,
 } from './mutation/AnnotationMutationResults';
+export { deletedAnnotationsOf } from './mutation/AnnotationMutationResults';
 export type {
   AppearanceAction,
   AppearanceImpact,
   AppearanceOutcome,
 } from './annotation/appearance';
 export { appearanceImpactOf, semanticEqual } from './annotation/appearance';
+export { assertAnnotationDraft, checkAnnotationPatch } from './annotation/checkWrite';
 export type { FormFieldRef, FormWidget } from './identity/FormFieldRef';
-export { formWidget } from './identity/FormFieldRef';
+export { formWidget, toFieldRef } from './identity/FormFieldRef';
 export { encodeFieldRefKey, decodeFieldRefKey } from './identity/FormFieldRef';
 export type {
   FormFieldFamily,
@@ -428,7 +497,8 @@ export type {
   FieldLockSpec,
   ModificationLevel,
   PdfRevision,
-  SignatureAbortResult,
+  SignatureCancelResult,
+  SignatureSignerInput,
   SignatureAppearanceInput,
   SignatureCompleteInput,
   SignatureCompleteResult,
@@ -494,7 +564,9 @@ export {
   minLevel,
   protectedCapabilities,
 } from './signature/protection';
+export { deletedFieldOf } from './mutation/FormMutationResults';
 export type {
+  FormMutationMeta,
   FormSetValueResult,
   FormImportResult,
   FormDataExport,
@@ -506,19 +578,19 @@ export type {
 } from './mutation/FormMutationResults';
 // Search: contract types + the pure match/anchor stages. The matcher and
 // line-merge are exported (not just types) because the local worker, the
-// server, and the conformance suite all run the SAME code — parity between
+// server, and the conformance suite all run the same code — parity between
 // engines is a design invariant, not a test hope.
+export { searchQueryOf } from './search/types';
 export type {
   SearchQuery,
-  SearchMode,
-  SearchSliceBudget,
+  SearchLimit,
   SearchRequest,
   SearchSnippet,
   SearchMatch,
   SearchSlice,
 } from './search/types';
 export { SEARCH_FOLD_VERSION, foldText, toOriginalRange } from './search/fold';
-export type { FoldOptions, FoldedText, SearchMatchRange } from './search/fold';
+export type { FoldOptions, FoldedText } from './search/fold';
 export { foldOptionsFor, matchLiteral, wordAt, wordBefore } from './search/literal';
 export {
   SEARCH_REGEX_MAX_LENGTH,
@@ -534,35 +606,21 @@ export type {
 } from './search/regex';
 export { matchPageText } from './search/matcher';
 export { SEARCH_SNIPPET_CONTEXT, buildSnippet } from './search/snippet';
-export { searchRectsForRange, searchSegmentsForRange } from './search/rects';
-export {
-  buildPageTextLayout,
-  expandTextRangeToLine,
-  expandTextRangeToWord,
-  textGlyphAt,
-  textGlyphQuad,
-  textSegmentsForRange,
-} from './text/layout';
-export type {
-  PageTextLayout,
-  PdfTextSegment,
-  TextLayoutFrame,
-  TextLayoutGlyph,
-  TextLayoutRun,
-} from './text/layout';
+export { createTextLayout } from './text/layout';
+export type { PdfTextSegment, TextLayout } from './text/layout';
+export type { PageTextRange, TextRange } from './text/TextRange';
 export {
   boundaryTextOffset,
   charBoundaryAtTextOffset,
   charMapViolation,
   charRangeForTextOffsets,
-  sliceTextByChars,
+  sliceText,
 } from './text/charmap';
 export type { CharBoundaryBias, CharMapAnchor } from './text/charmap';
 export { searchContentEpoch, canonicalSearchQuery } from './search/epoch';
 
 export type { PageMoveInput } from './mutation/PageMoveInput';
-export type { PageMoveResult, PageMoveCache } from './mutation/PageMoveResult';
-export type { PageStructureCache } from './mutation/PageStructureCache';
+export type { PageMoveResult } from './mutation/PageMoveResult';
 export type { PageNameInput, PageRemoveNameInput } from './mutation/PageNameInput';
 export type { PageNameResult } from './mutation/PageNameResult';
 export type {
@@ -579,6 +637,7 @@ export type { PageInsertResult } from './mutation/PageInsertResult';
 export type { PageInsertBlankSpec } from './mutation/PageInsertBlankInput';
 export { PAGE_INSERT_BLANK_MAX_COUNT } from './mutation/PageInsertBlankInput';
 export type {
+  FlattenOptions,
   PageFlattenInput,
   PageFlattenUsage,
   PageFlattenStatus,
@@ -591,7 +650,7 @@ export type {
   RedactionApplyItemResult,
   RedactionApplyResult,
 } from './mutation/RedactionApplyResult';
-export type { MetadataUpdateResult, MetadataCache } from './mutation/MetadataUpdateResult';
+export type { MetadataUpdateResult } from './mutation/MetadataUpdateResult';
 
 export type {
   AnnotationActor,
@@ -599,7 +658,7 @@ export type {
   CollabEntity,
   CollabFilter,
   DocCapability,
-  IdentityClaims,
+  Identity,
   ParsedCapability,
   ParsedCollab,
   ParsedScope,
@@ -611,6 +670,7 @@ export { PDF_BITS, decodePdfBits } from './auth/scope';
 export { parseScope, validateScopeArray } from './auth/scope';
 export { InvalidScope, MissingIdentity, PermissionDenied } from './auth/scope';
 export type { CollabTarget } from './auth/scope';
+export { collabTargetOf } from './auth/scope';
 export {
   checkAnyCapability,
   checkCapability,
@@ -622,12 +682,11 @@ export {
 } from './auth/scope';
 export { caps, collab, materializePdfPermissions, pdfPermissions } from './auth/scope';
 
-// NOTE: CDN-shaped surface (DOC_RESOURCES, cdnCoverageForScope, applyCdnAccess,
-// CdnCoverageEntry, etc.) is deliberately NOT re-exported here. It lives under
+// Note: CDN-shaped surface (DOC_RESOURCES, cdnCoverageForScope, applyCdnAccess,
+// CdnCoverageEntry, etc.) is deliberately not re-exported here. It lives under
 // `@embedpdf/engine-core/wire` only, because it is HTTP-wire territory: server
 // route guards and the cloud SDK consume it, and engine-local must not pull it
-// into its bundle. See ENGINE_CORE_BOUNDARIES.md (or wire/cdn/README.md) for
-// the rationale and where to import from.
+// into its bundle.
 
 export * from './dto/Measure';
 export * from './measure';

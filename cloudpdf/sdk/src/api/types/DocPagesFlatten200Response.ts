@@ -3,66 +3,122 @@
 import type * as CloudPDF from "../index.js";
 
 export interface DocPagesFlatten200Response {
+    pages: DocPagesFlatten200Response.Pages.Item[];
+    usage: DocPagesFlatten200Response.Usage;
+    results: DocPagesFlatten200Response.Results.Item[];
     meta: DocPagesFlatten200Response.Meta;
-    /** Accepts any additional properties */
-    [key: string]: any;
 }
 
 export namespace DocPagesFlatten200Response {
+    export type Pages = Pages.Item[];
+
+    export namespace Pages {
+        export interface Item {
+            kind: Item.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Item {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+    }
+
+    export const Usage = {
+        Display: "display",
+        Print: "print",
+    } as const;
+    export type Usage = (typeof Usage)[keyof typeof Usage];
+    export type Results = Results.Item[];
+
+    export namespace Results {
+        export interface Item {
+            page: Item.Page;
+            status: Item.Status;
+            error?: Item.Error_ | undefined;
+        }
+
+        export namespace Item {
+            export interface Page {
+                kind: Page.Kind;
+                pageObjectNumber: number;
+            }
+
+            export namespace Page {
+                export const Kind = {
+                    ObjectNumber: "objectNumber",
+                } as const;
+                export type Kind = (typeof Kind)[keyof typeof Kind];
+            }
+
+            export const Status = {
+                Applied: "applied",
+                Unchanged: "unchanged",
+                Failed: "failed",
+                Skipped: "skipped",
+            } as const;
+            export type Status = (typeof Status)[keyof typeof Status];
+
+            export interface Error_ {
+                name: Error_.Name;
+                code: Error_.Code;
+                message: string;
+                details?: Record<string, unknown> | undefined;
+            }
+
+            export namespace Error_ {
+                export const Name = {
+                    EngineError: "EngineError",
+                } as const;
+                export type Name = (typeof Name)[keyof typeof Name];
+                export const Code = {
+                    Unknown: "Unknown",
+                    InvalidArg: "InvalidArg",
+                    DocNotOpen: "DocNotOpen",
+                    DocOpenFailed: "DocOpenFailed",
+                    DocPasswordRequired: "DocPasswordRequired",
+                    DocPasswordIncorrect: "DocPasswordIncorrect",
+                    SharePasswordRequired: "SharePasswordRequired",
+                    Aborted: "Aborted",
+                    Network: "Network",
+                    Unauthenticated: "Unauthenticated",
+                    Forbidden: "Forbidden",
+                    NotFound: "NotFound",
+                    WireFormat: "WireFormat",
+                    RuntimeUnavailable: "RuntimeUnavailable",
+                    InvalidReference: "InvalidReference",
+                    WeakAnnotationSessionConflict: "WeakAnnotationSessionConflict",
+                    LayerVersionConflict: "LayerVersionConflict",
+                    NotImplemented: "NotImplemented",
+                    MalformedPdf: "MalformedPdf",
+                    SigningPending: "SigningPending",
+                    SigningExpired: "SigningExpired",
+                    SigningVersionMismatch: "SigningVersionMismatch",
+                    SignatureRefused: "SignatureRefused",
+                    ProtectedDocument: "ProtectedDocument",
+                    StaleBase: "StaleBase",
+                    PayloadTooLarge: "PayloadTooLarge",
+                } as const;
+                export type Code = (typeof Code)[keyof typeof Code];
+            }
+        }
+    }
+
     export interface Meta {
-        affectedPages: Meta.AffectedPages.Item[];
+        affectedPages: CloudPDF.PageState[];
         cacheDelta: Meta.CacheDelta | null;
     }
 
     export namespace Meta {
-        export type AffectedPages = AffectedPages.Item[];
-
-        export namespace AffectedPages {
-            export interface Item {
-                page: Item.Page;
-                revision: Item.Revision;
-                weakAnnotationState: CloudPDF.DocPagesFlatten200ResponseMetaAffectedPagesItemWeakAnnotationState;
-            }
-
-            export namespace Item {
-                export interface Page {
-                    kind: Page.Kind;
-                    pageObjectNumber: number;
-                }
-
-                export namespace Page {
-                    export const Kind = {
-                        ObjectNumber: "objectNumber",
-                    } as const;
-                    export type Kind = (typeof Kind)[keyof typeof Kind];
-                }
-
-                export interface Revision {
-                    docSessionId: string;
-                    page: Revision.Page;
-                    generation: number;
-                }
-
-                export namespace Revision {
-                    export interface Page {
-                        kind: Page.Kind;
-                        pageObjectNumber: number;
-                    }
-
-                    export namespace Page {
-                        export const Kind = {
-                            ObjectNumber: "objectNumber",
-                        } as const;
-                        export type Kind = (typeof Kind)[keyof typeof Kind];
-                    }
-                }
-            }
-        }
-
         export interface CacheDelta {
             previousDocVersion: number;
             docVersion: number;
             annotationsVersion?: number | undefined;
+            layoutVersion?: number | undefined;
+            metadataVersion?: number | undefined;
+            attachmentsVersion?: number | undefined;
             layerVersion?: number | undefined;
             working?: boolean | undefined;
             pages: CacheDelta.Pages.Item[];

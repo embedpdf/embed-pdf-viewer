@@ -1,4 +1,5 @@
 import { EngineError } from '../errors/EngineError';
+import { AbortablePromise } from '../promise/AbortablePromise';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { PdfRect, PdfRotation } from '../geometry/primitives';
 
@@ -51,11 +52,11 @@ export interface PageRenderOptions {
   includeAnnotations?: boolean;
   /**
    * Output-pixel budget: the renderer rejects (InvalidArg) instead of
-   * allocating when `outputWidth × outputHeight` exceeds it. A WIDTH
+   * allocating when `outputWidth × outputHeight` exceeds it. A width
    * lattice bounds width but not height — a 1×14,400pt page still
    * explodes vertically — so the guard lives where the allocation
-   * happens (the decode-bomb-guard pattern). SERVER requests carry it
-   * from the deployment's render policy; LOCAL engines inject it only
+   * happens (the decode-bomb-guard pattern). Server requests carry it
+   * from the deployment's render policy; local engines inject it only
    * when `localEngine({ renderPolicy })` configured a budget — the
    * default local policy stays continuous and unbudgeted (exactness is
    * the local product promise).
@@ -104,7 +105,11 @@ export interface PageImageObjectUrl {
 }
 
 export interface PageImageHandle extends PageImageResult {
-  objectUrl(signal?: AbortSignal): Promise<PageImageObjectUrl>;
+  /**
+   * A `blob:` URL for the image, and `revoke()` to free it. Cancel with
+   * `.abort()`: a URL made after the cancel is revoked, never leaked.
+   */
+  objectUrl(): AbortablePromise<PageImageObjectUrl>;
 }
 
 export interface PageImageBlobSource {
@@ -117,17 +122,24 @@ export function createPageImageHandle(
 ): PageImageHandle {
   return {
     ...result,
-    async objectUrl(signal?: AbortSignal) {
-      if (typeof Blob === 'undefined' || typeof URL === 'undefined' || !URL.createObjectURL) {
-        throw new EngineError(
-          EngineErrorCode.RuntimeUnavailable,
-          'Object URLs are not available in this environment',
-        );
-      }
+    objectUrl() {
+      return AbortablePromise.run(async (signal) => {
+        if (typeof Blob === 'undefined' || typeof URL === 'undefined' || !URL.createObjectURL) {
+          throw new EngineError(
+            EngineErrorCode.RuntimeUnavailable,
+            'Object URLs are not available in this environment',
+          );
+        }
 
-      const blob = await blobSource.blob(signal);
-      const url = URL.createObjectURL(blob);
-      return { url, revoke: () => URL.revokeObjectURL(url) };
+        const blob = await blobSource.blob(signal);
+        const url = URL.createObjectURL(blob);
+        // Cancelled while the blob arrived: nobody will revoke it but us.
+        if (signal.aborted) {
+          URL.revokeObjectURL(url);
+          throw signal.reason;
+        }
+        return { url, revoke: () => URL.revokeObjectURL(url) };
+      });
     },
   };
 }

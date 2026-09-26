@@ -1,9 +1,9 @@
-import type { PageStructureCache } from './PageStructureCache';
+import type { MutationMeta } from './MutationMeta';
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
 import type { PageRef } from '../identity/PageRef';
 
 /**
- * Result of a `pages.insert()`. The inserted pages are COPIES of the source
+ * Result of a `pages.insert()`. The inserted pages are copies of the source
  * document's pages: they get fresh, never-recycled object numbers in the
  * destination, listed here in insertion order. Every pre-existing page keeps
  * its identity and `RevisionToken` — an insert never invalidates refs on its
@@ -14,6 +14,5 @@ export interface PageInsertResult {
   insertedPages: PageRef[];
   /** The new layout — every page in display order. */
   layout: PageListSnapshot;
-  /** Cloud-only manifest coherence pins; `null` for local engines. */
-  cache: PageStructureCache | null;
+  meta: MutationMeta;
 }

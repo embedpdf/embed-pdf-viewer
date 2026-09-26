@@ -1,11 +1,11 @@
 import type { Ptr } from '@embedpdf/engine-runtime';
 
-import type { FontRegistrar } from '../../../fonts/FontRegistrar';
 import type { DocumentSession } from '../../../../document-session/DocumentSession';
+import type { FontRegistrar } from '../../../fonts/FontRegistrar';
 
 /**
  * Document-scoped capabilities threaded into per-subtype annotation
- * READERS — the read-side mirror of `AnnotationWriteContext`. Most kinds
+ * readers — the read-side mirror of `AnnotationWriteContext`. Most kinds
  * materialise from the `annotPtr` alone and ignore it; the link reader
  * needs the document because destination, action, and URI resolution are
  * document-scoped PDFium operations.

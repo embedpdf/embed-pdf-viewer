@@ -1,11 +1,15 @@
 /**
- * The actions plane's seams into the form owner: the form-effects commit
- * sink (script `setValue` / `setDisplay` / reset effects land through the
- * owner, so the engine write and the visible model can never diverge) and
- * the submit dataset resolver (D7: a FRESH engine read, then the pure ISO
- * builder).
+ * The actions plugin's seams into the form plugin: the form-effects commit
+ * sink (script `setValue`, `setDisplay` and reset effects are written through
+ * the plugin that owns the fields) and the submit dataset resolver.
  */
-import type { FormEffectsResult } from '@embedpdf/engine-core/runtime';
+import {
+  EngineError,
+  EngineErrorCode,
+  serializeError,
+  type FormEffectsResult,
+  type FormMutationMeta,
+} from '@embedpdf/engine-core/runtime';
 import type {
   ActionContext,
   ActionDiagnostic,
@@ -15,31 +19,21 @@ import type {
 
 import { buildSubmitEntries } from '../field-selection';
 import type { FormHostCapability } from '../host-contract';
-import type { FormContext, FormServices } from '../services';
-import type { FormHydration } from '../sync/hydration';
+import type { FormContext } from '../services';
 
-export function createScriptEffects(
-  ctx: FormContext,
-  { siblings }: Pick<FormServices, 'siblings'>,
-  hydration: FormHydration,
-) {
-  const annotationHost = siblings.annotation;
-  const { refresh } = hydration;
-
+export function createScriptEffects(ctx: FormContext) {
   /**
-   * The submit dataset resolver (Phase 4, D7): a FRESH engine read — never
-   * the cached model, so no staleness class exists — then the pure ISO
-   * builder. Selection/veto/value semantics live in `field-selection.ts`;
-   * this door only supplies the live fields and assembles the request.
+   * The submit dataset: the field tree read from the engine at submit time,
+   * then the pure ISO builder. Selection, veto and value semantics live in
+   * `field-selection.ts`; this only supplies the fields and assembles the
+   * request.
    */
   const resolveSubmitDataset = async (
     intent: SubmitIntent,
-    actionCtx: ActionContext,
+    actionContext: ActionContext,
     diagnose: (diagnostic: ActionDiagnostic) => void,
   ): Promise<ActionSubmitRequest> => {
-    const doc = ctx.doc;
-    if (!doc) throw new Error('no document');
-    const snapshot = await doc.forms.list();
+    const snapshot = await ctx.doc.forms.list();
     return {
       url: intent.url,
       method: intent.method,
@@ -47,8 +41,8 @@ export function createScriptEffects(
       flagsRaw: intent.flagsRaw,
       ...(intent.charSet === undefined ? {} : { charSet: intent.charSet }),
       entries: buildSubmitEntries(snapshot.fields, intent, diagnose),
-      origin: actionCtx.origin,
-      event: actionCtx.event,
+      origin: actionContext.origin,
+      event: actionContext.event,
     };
   };
 
@@ -57,54 +51,48 @@ export function createScriptEffects(
       resolveSubmitDataset,
       commitScriptFormEffects: async (effects) => {
         const doc = ctx.doc;
-        if (!doc?.forms.applyEffects) {
-          // Sink contract: never throw — shape an all-failed batch honestly.
+        if (!doc.forms.applyEffects) {
+          // The sink never throws: report every effect as failed instead.
           return {
             results: effects.map((_, index) => ({
               index,
               status: 'failed' as const,
               fields: [],
               changedWidgets: [],
-              error: { code: 'NotSupported', message: 'no form-effects batch door' } as never,
+              error: serializeError(
+                new EngineError(EngineErrorCode.NotImplemented, 'no form-effects batch door'),
+              ),
             })),
-            changedWidgets: [],
-            meta: null,
+            meta: nothingChanged(),
           };
         }
         let result: FormEffectsResult;
         try {
           result = await doc.forms.applyEffects(effects);
         } catch (error) {
-          // Sink contract: never throw. An authority pre-check rejection
-          // (PermissionDenied) becomes an all-failed batch, honestly.
-          const message = error instanceof Error ? error.message : String(error);
+          // The sink never throws: a refused batch (for example a permission
+          // refusal) reports every effect as failed.
+          const refusal = serializeError(error);
           return {
             results: effects.map((_, index) => ({
               index,
               status: 'failed' as const,
               fields: [],
               changedWidgets: [],
-              error: { code: 'Refused', message } as never,
+              error: refusal,
             })),
-            changedWidgets: [],
-            meta: null,
+            meta: nothingChanged(),
           };
         }
-        // Reconcile OUR model — the owner folds its own writes (the effects
-        // listener deliberately ignores local events) — and the ANNOTATION
-        // plane's view of any changed widgets (setDisplay flips widget /F
-        // bits, and widget pixels live on that plane).
-        await refresh();
-        if (annotationHost) {
-          const seen = new Set<number>();
-          for (const widget of result.changedWidgets) {
-            if (!widget.page || seen.has(widget.page.pageObjectNumber)) continue;
-            seen.add(widget.page.pageObjectNumber);
-            await annotationHost.reloadPage(widget.page);
-          }
-        }
+        // The fields mirror and the annotation plugin apply the confirmed
+        // effects from the `forms.effectsApplied` event.
         return result;
       },
     } satisfies Partial<FormHostCapability>,
   };
+}
+
+/** The meta of a batch that wrote nothing. */
+function nothingChanged(): FormMutationMeta {
+  return { affectedPages: [], cacheDelta: null, changedFields: [], changedWidgets: [] };
 }

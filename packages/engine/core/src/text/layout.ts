@@ -1,16 +1,18 @@
+import type { TextRange } from './TextRange';
 import {
   isRotatedGeometryRun,
+  type PageGeometryRun,
   type PageGeometrySnapshot,
   type RotatedGeometryRun,
 } from '../dto/PageGeometrySnapshot';
 import type { PdfPoint, PdfQuad, PdfRect } from '../geometry/primitives';
 
 /**
- * The canonical text-interaction layout — the ONE place glyph geometry
+ * The canonical text-interaction layout — the one place glyph geometry
  * becomes hit targets, word/line ranges, and visual-line segments.
  *
  * Selection owns gestures and state; search owns matching and cursors;
- * NEITHER owns segmentation. Both consume this module, so a text range has
+ * neither owns segmentation. Both consume this module, so a text range has
  * exactly one canonical segmentation regardless of how it was produced, and
  * coordinate conversion (PDF → content/view) happens strictly afterward at
  * the plugin seam.
@@ -21,18 +23,18 @@ import type { PdfPoint, PdfQuad, PdfRect } from '../geometry/primitives';
  * 2010 The Chromium Authors); hit-testing mirrors PDFium `GetIndexAtPos`
  * (exact tight box first, then a tolerance pass).
  *
- * ORIENTATION MODEL — frames. Every run belongs to a FRAME: frame 0 is page
+ * Orientation model — frames. Every run belongs to a frame: frame 0 is page
  * space itself (all upright runs — the dominant case takes a byte-identical
  * fast path), and each rotated orientation cluster gets an orthonormal frame
  * in which its text reads upright (baseline +x, ascent +y). Frames are
- * derived from the SEMANTIC EDGES of the first classifiable glyph's quad —
+ * derived from the semantic edges of the first classifiable glyph's quad —
  * never from advisory wire fields — and keyed by (baseline direction,
  * ascent handedness):
  *
  *   - Rotated and mirrored text become upright inside their frame.
- *   - Shear (fake italic) is deliberately NOT part of the frame key or the
+ *   - Shear (fake italic) is deliberately not part of the frame key or the
  *     basis: a sheared run shares the frame of its unsheared neighbours, so
- *     a mixed roman/italic line merges into ONE segment (Acrobat parity),
+ *     a mixed roman/italic line merges into one segment (Acrobat parity),
  *     and the shear is absorbed as a small in-frame AABB residue. This is
  *     the deterministic, order-independent contract — an affine
  *     (shear-preserving) basis would either fragment mixed lines or make
@@ -40,15 +42,14 @@ import type { PdfPoint, PdfQuad, PdfRect } from '../geometry/primitives';
  *   - Runs of different frames never merge into one line.
  *
  * All algorithms run on frame-local boxes; every participating run of a
- * cluster is transformed through the SAME frame, so merged coordinates are
+ * cluster is transformed through the same frame, so merged coordinates are
  * always commensurable. Only the output maps back to page space, as
  * oriented quads.
  */
 
-const FLAG_SPACE = 1;
-const FLAG_EMPTY = 2;
-const isBoundary = (flags: number): boolean => (flags & (FLAG_SPACE | FLAG_EMPTY)) !== 0;
-const isEmpty = (flags: number): boolean => (flags & FLAG_EMPTY) !== 0;
+/** A space or a character with no box ends a word. */
+const isBoundary = (g: { space?: boolean; empty?: boolean }): boolean => !!(g.space || g.empty);
+const isEmpty = (g: { empty?: boolean }): boolean => !!g.empty;
 
 const CHAR_DISTANCE_FACTOR = 2.5;
 const FONT_SIZE_RATIO_THRESHOLD = 1.5;
@@ -61,10 +62,10 @@ const EDGE_EPSILON = 1e-6;
 /**
  * One merged visual line of a text range, in PDF user space. `quad` is the
  * geometric authority (frame-geometric slot order: `p1..p4` = upper-start,
- * upper-end, lower-start, lower-end — visual semantics, NOT reading order);
+ * upper-end, lower-start, lower-end — visual semantics, not reading order);
  * `rect` is its axis-aligned bounds, produced by the same constructor.
- * `advance` is the READING direction along the baseline, derived from the
- * glyph SEQUENCE (+1 = the frame's +x), never inferred from geometry.
+ * `advance` is the reading direction along the baseline, derived from the
+ * glyph sequence (+1 = the frame's +x), never inferred from geometry.
  */
 export interface PdfTextSegment {
   quad: PdfQuad;
@@ -73,16 +74,17 @@ export interface PdfTextSegment {
 }
 
 /** One glyph in its frame's space. `loose` builds segments; `tight` hit-tests. */
-export interface TextLayoutGlyph {
+interface TextLayoutGlyph {
   loose: PdfRect;
   tight?: PdfRect;
-  flags: number;
+  space?: boolean;
+  empty?: boolean;
 }
 
 /** A contiguous run of glyphs (a text object) in one frame. */
-export interface TextLayoutRun {
+interface TextLayoutRun {
   /** First char index — identical to the flat glyph index (runs tile the page). */
-  charStart: number;
+  start: number;
   count: number;
   /** Frame-local loose box (page space itself in frame 0). */
   rect: PdfRect;
@@ -92,7 +94,7 @@ export interface TextLayoutRun {
 }
 
 /** An orientation cluster's orthonormal basis in page space. */
-export interface TextLayoutFrame {
+interface TextLayoutFrame {
   /** Unit vector along the reading baseline (+x of the frame). */
   baseline: PdfPoint;
   /** Unit vector toward the ascent side (+y of the frame), ⟂ baseline. */
@@ -103,10 +105,66 @@ export interface TextLayoutFrame {
  * A page's text laid out per-frame: a flat glyph list (index = text-page
  * char index), the run structure, and the orientation frames.
  */
-export interface PageTextLayout {
+interface PageTextLayout {
   glyphs: TextLayoutGlyph[];
   runs: TextLayoutRun[];
   frames: TextLayoutFrame[];
+}
+
+/**
+ * Where a page's text is, as `page.text.layout()` returns it: read it once
+ * per page and keep it, every method answers right away. Positions are PDF
+ * points, y up. Characters are numbered as the page's character space, the
+ * space every {@link TextRange} is in.
+ */
+export interface TextLayout {
+  /** How many characters the page has: they are numbered 0 to `charCount - 1`. */
+  readonly charCount: number;
+  /** The raw geometry: characters grouped by line and font, with their boxes. */
+  readonly runs: readonly PageGeometryRun[];
+  /**
+   * The character at a point, or `null` when there's no text near it. The
+   * tight box is tried first, then a near miss within 1.5 times the average
+   * line height.
+   */
+  charAt(point: PdfPoint): number | null;
+  /** The word at a point or around a character, or `null` when there is none. */
+  wordAt(at: PdfPoint | number): TextRange | null;
+  /** The visual line at a point or around a character, or `null` when there is none. */
+  lineAt(at: PdfPoint | number): TextRange | null;
+  /** One segment per visual line the range covers: what to draw, or to highlight. */
+  segments(range: TextRange): PdfTextSegment[];
+  /** One character's loose cell, as a quad, or `null` for a character with no box. */
+  charQuad(index: number): PdfQuad | null;
+}
+
+/** The layout of a page's geometry. */
+export function createTextLayout(snapshot: PageGeometrySnapshot): TextLayout {
+  const layout = buildPageTextLayout(snapshot);
+  const charCount = layout.glyphs.length;
+  const indexOf = (at: PdfPoint | number): number | null => {
+    if (typeof at !== 'number') return textGlyphAt(layout, at);
+    return Number.isInteger(at) && at >= 0 && at < charCount ? at : null;
+  };
+  const rangeOf = ([from, to]: [number, number]): TextRange => ({
+    start: from,
+    count: to - from + 1,
+  });
+  return {
+    charCount,
+    runs: snapshot.runs,
+    charAt: (point) => textGlyphAt(layout, point),
+    wordAt: (at) => {
+      const index = indexOf(at);
+      return index === null ? null : rangeOf(expandTextRangeToWord(layout, index));
+    },
+    lineAt: (at) => {
+      const index = indexOf(at);
+      return index === null ? null : rangeOf(expandTextRangeToLine(layout, index));
+    },
+    segments: (range) => textSegmentsForRange(layout, range.start, range.count),
+    charQuad: (index) => textGlyphQuad(layout, index),
+  };
 }
 
 const IDENTITY_FRAME: TextLayoutFrame = { baseline: { x: 1, y: 0 }, ascent: { x: 0, y: 1 } };
@@ -140,9 +198,9 @@ function frameBoxOfQuad(f: TextLayoutFrame, q: PdfQuad): PdfRect {
 /** Find-or-create the frame for a rotated run, keyed by the baseline
  *  direction + ascent handedness of its first classifiable glyph's edges. */
 function frameForRun(frames: TextLayoutFrame[], run: RotatedGeometryRun): number {
-  const seed = run.glyphs.find((g) => !isEmpty(g.flags));
+  const seed = run.glyphs.find((g) => !isEmpty(g));
   if (!seed) return 0;
-  const q = seed.looseQuad;
+  const q = seed.loose;
   const bx = q.p2.x - q.p1.x;
   const by = q.p2.y - q.p1.y;
   const len = Math.hypot(bx, by);
@@ -167,11 +225,10 @@ function frameForRun(frames: TextLayoutFrame[], run: RotatedGeometryRun): number
 
 /**
  * Flatten a page's geometry snapshot into the canonical layout. Upright runs
- * copy their wire boxes verbatim (frame 0 — byte-identical to the
- * pre-orientation behavior, wire run rects included); rotated runs project
- * their glyph cells into their cluster's frame.
+ * copy their wire boxes verbatim (frame 0, wire run rects included); rotated
+ * runs project their glyph cells into their cluster's frame.
  */
-export function buildPageTextLayout(snapshot: PageGeometrySnapshot): PageTextLayout {
+function buildPageTextLayout(snapshot: PageGeometrySnapshot): PageTextLayout {
   const glyphs: TextLayoutGlyph[] = [];
   const runs: TextLayoutRun[] = [];
   const frames: TextLayoutFrame[] = [IDENTITY_FRAME];
@@ -179,10 +236,10 @@ export function buildPageTextLayout(snapshot: PageGeometrySnapshot): PageTextLay
   for (const run of snapshot.runs) {
     if (!isRotatedGeometryRun(run)) {
       for (const g of run.glyphs) {
-        glyphs.push({ loose: g.looseBox, tight: g.tightBox, flags: g.flags });
+        glyphs.push({ loose: g.loose, tight: g.tight, space: g.space, empty: g.empty });
       }
       runs.push({
-        charStart: run.charStart,
+        start: run.start,
         count: run.glyphs.length,
         rect: run.rect,
         fontSize: run.fontSize,
@@ -195,13 +252,13 @@ export function buildPageTextLayout(snapshot: PageGeometrySnapshot): PageTextLay
     const f = frames[frame];
     let runBox: PdfRect | null = null;
     for (const g of run.glyphs) {
-      if (isEmpty(g.flags)) {
-        glyphs.push({ loose: ZERO_RECT, flags: g.flags });
+      if (isEmpty(g)) {
+        glyphs.push({ loose: ZERO_RECT, space: g.space, empty: true });
         continue;
       }
-      const loose = frameBoxOfQuad(f, g.looseQuad);
-      const tight = g.tightQuad ? frameBoxOfQuad(f, g.tightQuad) : undefined;
-      glyphs.push({ loose, tight, flags: g.flags });
+      const loose = frameBoxOfQuad(f, g.loose);
+      const tight = g.tight ? frameBoxOfQuad(f, g.tight) : undefined;
+      glyphs.push({ loose, tight, space: g.space });
       runBox = runBox
         ? {
             left: Math.min(runBox.left, loose.left),
@@ -212,7 +269,7 @@ export function buildPageTextLayout(snapshot: PageGeometrySnapshot): PageTextLay
         : loose;
     }
     runs.push({
-      charStart: run.charStart,
+      start: run.start,
       count: run.glyphs.length,
       rect: runBox ?? ZERO_RECT,
       fontSize: run.fontSize,
@@ -229,7 +286,7 @@ function avgGlyphHeight(layout: PageTextLayout): number {
   let total = 0;
   let count = 0;
   for (const g of layout.glyphs) {
-    if (isEmpty(g.flags)) continue;
+    if (isEmpty(g)) continue;
     total += g.loose.top - g.loose.bottom;
     count++;
   }
@@ -247,9 +304,9 @@ function pointPerFrame(layout: PageTextLayout, p: PdfPoint): PdfPoint[] {
  * (so callers can show the pointer cursor off-text). PDFium `GetIndexAtPos`:
  * exact tight-box containment first, then a tolerance pass (closest by
  * Manhattan distance within `toleranceFactor × average glyph height`). Each
- * run tests the point in ITS OWN frame, so rotated text hit-tests exactly.
+ * run tests the point in its own frame, so rotated text hit-tests exactly.
  */
-export function textGlyphAt(
+function textGlyphAt(
   layout: PageTextLayout,
   point: PdfPoint,
   toleranceFactor = 1.5,
@@ -259,8 +316,8 @@ export function textGlyphAt(
     const q = pts[run.frame];
     if (!inRect(run.rect, q)) continue;
     for (let i = 0; i < run.count; i++) {
-      const g = layout.glyphs[run.charStart + i];
-      if (inRect(g.tight ?? g.loose, q)) return run.charStart + i;
+      const g = layout.glyphs[run.start + i];
+      if (inRect(g.tight ?? g.loose, q)) return run.start + i;
     }
   }
   if (toleranceFactor <= 0) return null;
@@ -280,8 +337,8 @@ export function textGlyphAt(
       continue;
     }
     for (let i = 0; i < run.count; i++) {
-      const g = layout.glyphs[run.charStart + i];
-      if (isEmpty(g.flags)) continue;
+      const g = layout.glyphs[run.start + i];
+      if (isEmpty(g)) continue;
       const b = g.tight ?? g.loose;
       if (
         q.x < b.left - half ||
@@ -295,7 +352,7 @@ export function textGlyphAt(
       const dy = Math.min(Math.abs(q.y - b.bottom), Math.abs(q.y - b.top));
       if (dx + dy < bestDist) {
         bestDist = dx + dy;
-        best = run.charStart + i;
+        best = run.start + i;
       }
     }
   }
@@ -303,39 +360,39 @@ export function textGlyphAt(
 }
 
 /** Double-click: the word around `glyph` (walk to space/empty glyphs both ways). */
-export function expandTextRangeToWord(layout: PageTextLayout, glyph: number): [number, number] {
+function expandTextRangeToWord(layout: PageTextLayout, glyph: number): [number, number] {
   const n = layout.glyphs.length;
   if (glyph < 0 || glyph >= n) return [glyph, glyph];
   let from = glyph;
-  while (from > 0 && !isBoundary(layout.glyphs[from - 1].flags)) from--;
+  while (from > 0 && !isBoundary(layout.glyphs[from - 1])) from--;
   let to = glyph;
-  while (to < n - 1 && !isBoundary(layout.glyphs[to + 1].flags)) to++;
+  while (to < n - 1 && !isBoundary(layout.glyphs[to + 1])) to++;
   return [from, to];
 }
 
-/** Triple-click: the full visual line — SAME-FRAME runs whose vertical extent
+/** Triple-click: the full visual line — same-frame runs whose vertical extent
  *  overlaps the anchor run's. A differently-oriented run is a line boundary. */
-export function expandTextRangeToLine(layout: PageTextLayout, glyph: number): [number, number] {
-  const ri = layout.runs.findIndex((r) => glyph >= r.charStart && glyph < r.charStart + r.count);
+function expandTextRangeToLine(layout: PageTextLayout, glyph: number): [number, number] {
+  const ri = layout.runs.findIndex((r) => glyph >= r.start && glyph < r.start + r.count);
   if (ri < 0) return [glyph, glyph];
   const anchor = layout.runs[ri];
   const bottom = anchor.rect.bottom;
   const top = anchor.rect.top;
-  let from = anchor.charStart;
-  let to = anchor.charStart + anchor.count - 1;
+  let from = anchor.start;
+  let to = anchor.start + anchor.count - 1;
   for (let r = ri - 1; r >= 0; r--) {
     const run = layout.runs[r];
     if (isZero(run.rect)) continue;
     if (run.frame !== anchor.frame) break;
     if (!overlapV(run.rect.bottom, run.rect.top, bottom, top)) break;
-    from = run.charStart;
+    from = run.start;
   }
   for (let r = ri + 1; r < layout.runs.length; r++) {
     const run = layout.runs[r];
     if (isZero(run.rect)) continue;
     if (run.frame !== anchor.frame) break;
     if (!overlapV(run.rect.bottom, run.rect.top, bottom, top)) break;
-    to = run.charStart + run.count - 1;
+    to = run.start + run.count - 1;
   }
   return [from, to];
 }
@@ -344,12 +401,12 @@ export function expandTextRangeToLine(layout: PageTextLayout, glyph: number): [n
  * A single glyph's oriented cell in page space, or null for degenerate
  * glyphs — the anchor for caret placement at a selection boundary.
  */
-export function textGlyphQuad(layout: PageTextLayout, glyph: number): PdfQuad | null {
+function textGlyphQuad(layout: PageTextLayout, glyph: number): PdfQuad | null {
   const g = layout.glyphs[glyph];
-  if (!g || isEmpty(g.flags)) return null;
+  if (!g || isEmpty(g)) return null;
   const b = g.loose;
   if (b.right <= b.left || b.top <= b.bottom) return null;
-  const run = layout.runs.find((r) => glyph >= r.charStart && glyph < r.charStart + r.count);
+  const run = layout.runs.find((r) => glyph >= r.start && glyph < r.start + r.count);
   const f = layout.frames[run?.frame ?? 0];
   return quadOfFrameRect(f, run?.frame ?? 0, b);
 }
@@ -359,7 +416,7 @@ interface SubRun {
   charCount: number;
   fontSize?: number;
   frame: number;
-  /** Baseline x of the FIRST/LAST glyph in sequence order (frame space) —
+  /** Baseline x of the first/last glyph in sequence order (frame space) —
    *  the reading-direction signal. */
   firstX: number;
   lastX: number;
@@ -367,24 +424,24 @@ interface SubRun {
 
 /**
  * Merged visual-line segments for the half-open char range
- * `[charStart, charStart + charCount)` — THE canonical segmentation. Chars
+ * `[start, start + count)` — the canonical segmentation. Chars
  * outside the layout are ignored.
  */
-export function textSegmentsForRange(
+function textSegmentsForRange(
   layout: PageTextLayout,
-  charStart: number,
-  charCount: number,
+  start: number,
+  count: number,
 ): PdfTextSegment[] {
-  if (charCount <= 0 || layout.glyphs.length === 0) return [];
-  const lo = Math.max(0, charStart);
-  const hi = Math.min(layout.glyphs.length - 1, charStart + charCount - 1);
+  if (count <= 0 || layout.glyphs.length === 0) return [];
+  const lo = Math.max(0, start);
+  const hi = Math.min(layout.glyphs.length - 1, start + count - 1);
   if (hi < lo) return [];
   const subRuns: SubRun[] = [];
 
   for (const run of layout.runs) {
-    const runEnd = run.charStart + run.count - 1;
-    if (runEnd < lo || run.charStart > hi) continue;
-    const s = Math.max(lo, run.charStart);
+    const runEnd = run.start + run.count - 1;
+    if (runEnd < lo || run.start > hi) continue;
+    const s = Math.max(lo, run.start);
     const e = Math.min(hi, runEnd);
 
     let left = Infinity;
@@ -418,7 +475,7 @@ export function textSegmentsForRange(
 
     for (let ci = s; ci <= e; ci++) {
       const g = layout.glyphs[ci];
-      if (isEmpty(g.flags)) continue;
+      if (isEmpty(g)) continue;
       const b = g.loose;
       if (charCountAcc > 0 && prevRight > -Infinity) {
         const avg = widthSum / charCountAcc;
@@ -453,8 +510,8 @@ function mergeAdjacentSubRuns(runs: SubRun[]): MergedSubRun[] {
   let prev: SubRun | null = null;
   let cur: MergedSubRun | null = null;
   for (const run of runs) {
-    // Frames are canonical per cluster, so index equality IS the "same
-    // orientation" test — every participant was projected through the SAME
+    // Frames are canonical per cluster, so index equality is the "same
+    // orientation" test — every participant was projected through the same
     // frame, keeping merged coordinates commensurable.
     if (prev && cur && prev.frame === run.frame && shouldMerge(prev, run)) {
       cur = {
@@ -480,7 +537,7 @@ function mergeAdjacentSubRuns(runs: SubRun[]): MergedSubRun[] {
 
 /** Segment quad for a frame-local rect (frame 0: the rect's own corners,
  *  no float round-trip). Slot order US, UE, LS, LE; frame is y-up, so the
- *  upper corners sit at the frame TOP. */
+ *  upper corners sit at the frame top. */
 function quadOfFrameRect(f: TextLayoutFrame, frameIndex: number, r: PdfRect): PdfQuad {
   if (frameIndex === 0) {
     return {

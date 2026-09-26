@@ -2,6 +2,7 @@ import type { MDXComponents } from 'mdx/types';
 import Link from 'next/link';
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
 
+import { CloudPdfCallout } from './cloudpdf-callout';
 import { DocsOverview } from './docs-overview';
 import { DocsPage } from './docs-page';
 import { Example } from './example';
@@ -88,6 +89,7 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
       <td className="border-ep-borderSoft text-ep-ink border-b px-3 py-2" {...props} />
     ),
     pre: Pre,
+    CloudPdfCallout,
     CodeExample,
     DocsOverview,
     Example,

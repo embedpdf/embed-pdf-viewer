@@ -18,7 +18,7 @@ export interface SealExpectation {
  * version — the in-session complete and the server's session-less
  * finalize. Reading the result back through the ordinary signature model
  * proves the bytes, not the writer: the field is signed, its signature
- * covers the whole LAST revision (the candidate's own, never an earlier
+ * covers the whole last revision (the candidate's own, never an earlier
  * one), its /ByteRange is the one the digest was computed over, and the
  * /Contents decode to exactly the CMS installed. Anything else is refused
  * and the bytes are never installed.

@@ -1,0 +1,53 @@
+%PDF-1.7
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /Names << /EmbeddedFiles << /Names [(a.txt) 8 0 R] >> >> >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Annots [4 0 R 5 0 R 6 0 R 7 0 R] >>
+endobj
+4 0 obj
+<< /Type /Annot /Subtype /Square /Rect [10 10 50 50] /NM (dates-offset) /T (Alice) /CreationDate (D:20170712214438-07'00') /M (D:20170713091500+05'30') >>
+endobj
+5 0 obj
+<< /Type /Annot /Subtype /Square /Rect [60 10 100 50] /NM (dates-local) /CreationDate (D:20170712214438) /M (D:20170712214438Z) >>
+endobj
+6 0 obj
+<< /Type /Annot /Subtype /Square /Rect [110 10 150 50] /NM (dates-odd) /CreationDate (not a date) /M (D:2017) >>
+endobj
+7 0 obj
+<< /Type /Annot /Subtype /FileAttachment /Rect [160 10 180 30] /NM (dates-file) /Name /Paperclip /FS 8 0 R >>
+endobj
+8 0 obj
+<< /Type /Filespec /F (a.txt) /UF (a.txt) /EF << /F 9 0 R >> >>
+endobj
+9 0 obj
+<< /Type /EmbeddedFile /Length 4 /Params << /Size 4 /CreationDate (D:20170712214438-07'00') /ModDate (D:20180101120000+01'00') >> >>
+stream
+test
+endstream
+endobj
+10 0 obj
+<< /Title (Dates) /CreationDate (D:20170712214438-07'00') /ModDate (D:20190203040506+09'00') >>
+endobj
+xref
+0 11
+0000000000 65535 f 
+0000000015 00000 n 
+0000000121 00000 n 
+0000000178 00000 n 
+0000000283 00000 n 
+0000000453 00000 n 
+0000000599 00000 n 
+0000000727 00000 n 
+0000000852 00000 n 
+0000000931 00000 n 
+0000001101 00000 n 
+trailer
+<< /Size 11 /Root 1 0 R /Info 10 0 R >>
+startxref
+1213
+%%EOF

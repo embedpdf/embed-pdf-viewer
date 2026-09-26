@@ -1,6 +1,6 @@
 /**
- * TEMPORARY PROBE #2 — same rotated-circle move sequence as probe #1, but
- * persisted through the LAYER pipeline (downloadLayer → reopen base+artifact),
+ * Temporary probe #2 — same rotated-circle move sequence as probe #1, but
+ * persisted through the layer pipeline (downloadLayer → reopen base+artifact),
  * which is what the dashboard's refresh actually does. Deleted after diagnosis.
  */
 import { readFile } from 'node:fs/promises';
@@ -98,7 +98,7 @@ describe('rotated circle move drift probe — LAYER pipeline', () => {
       const a = list.annotations.find(
         (x) => x.subtype === 'circle' && x.contents === 'drift probe',
       ) as unknown as { ref: unknown; rect: R; unrotatedRect?: R; rotation?: number };
-      const rendered = await d.page(toPageRef(PAGE)).annotations.renderAppearances();
+      const rendered = await d.page(toPageRef(PAGE)).annotations.renderAppearancesRaw();
       const ap = rendered.appearances.find(
         (p) => JSON.stringify((p as { ref: unknown }).ref) === JSON.stringify(a.ref),
       ) as unknown as { rect: R; raster: { width: number; height: number; data: ArrayBuffer } };

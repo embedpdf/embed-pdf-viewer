@@ -1,9 +1,9 @@
 /**
- * The LOCAL door's public surface, shared by the two deliveries that have the
+ * The local door's public surface, shared by the two deliveries that have the
  * built-in engine: the npm door (`doors/local.ts`) and the CDN snippet
  * (`doors/snippet.ts`). They differ only in the wasm default they register, so
- * everything they EXPORT lives here rather than one importing the other —
- * doors never import doors (see ../../DOORS.md).
+ * everything they export lives here rather than one importing the other —
+ * doors never import doors (see docs/conventions/viewer-doors.md).
  *
  * Not a build entry itself: importing this does not register an engine.
  */

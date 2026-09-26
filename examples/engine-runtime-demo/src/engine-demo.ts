@@ -22,7 +22,7 @@ export async function runEngineDemo(
   const started = Date.now();
   const doc = await engine.open({ kind: 'bytes', id: docId, bytes: pdfBytes });
   try {
-    const metadata = await doc.metadata.read();
+    const metadata = await doc.metadata.get();
     return { label, docId: doc.id, metadata, elapsedMs: Date.now() - started };
   } finally {
     await doc.close();
@@ -42,8 +42,8 @@ export function diffMetadata(a: DocumentMetadata, b: DocumentMetadata): string[]
     'keywords',
     'producer',
     'creator',
-    'created',
-    'modified',
+    'createdAt',
+    'modifiedAt',
     'trapped',
   ];
   const diffs: string[] = [];

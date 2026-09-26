@@ -6,8 +6,8 @@ describe('createEventHook', () => {
   it('fans out synchronously in subscription order', () => {
     const hook = createEventHook<number>();
     const seen: string[] = [];
-    hook.on((n) => seen.push(`a${n}`));
-    hook.on((n) => seen.push(`b${n}`));
+    hook.on((value) => seen.push(`a${value}`));
+    hook.on((value) => seen.push(`b${value}`));
     hook.emit(1);
     expect(seen).toEqual(['a1', 'b1']);
   });

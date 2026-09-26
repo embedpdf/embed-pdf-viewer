@@ -1,54 +1,56 @@
-/** Reads over the last snapshot and validation. Memoized per snapshot so
- *  the lists stay reference-stable for selectors. */
+/** Reads over the signature facts and the last validation. The lists are
+ *  memoized per snapshot so they stay reference-stable for selectors. */
+import { memo, type Mirror } from '@embedpdf/core';
 import type { SignatureVerdict } from '@embedpdf/core-signature';
-import type { FormFieldRef, SignatureDTO, SignatureSnapshot } from '@embedpdf/engine-core/runtime';
+import type { FormFieldRef, SignatureDTO } from '@embedpdf/engine-core/runtime';
 
 import type { SignatureCapability, SignatureFieldAddress } from '../contract';
-import type { SignatureServices } from '../services';
-import { sameRef } from '../services/store';
+import { sameFieldRef, type SignatureRecord } from '../model';
+import type { SignatureContext, SignatureServices } from '../services';
 
 const EMPTY_SIGNATURES: readonly SignatureDTO[] = [];
 const EMPTY_FIELDS: readonly FormFieldRef[] = [];
 
-export function createSignatureReads({
-  store,
-  authority,
-  siblings,
-}: Pick<SignatureServices, 'store' | 'authority' | 'siblings'>) {
-  const { state } = store;
+/** The widget object number an address names, or null for a field ref. */
+const widgetObjectOf = (field: SignatureFieldAddress): number | null => {
+  if (!('kind' in field)) return field.annotObjectNumber;
+  if (field.kind === 'objectNumber' && 'annotObjectNumber' in field) {
+    return field.annotObjectNumber;
+  }
+  return null;
+};
+
+const isFieldRef = (field: SignatureFieldAddress): field is FormFieldRef =>
+  'kind' in field && (field.kind === 'fqn' || 'fieldObjectNumber' in field);
+
+export function createSignatureReads(
+  ctx: SignatureContext,
+  { authority, siblings }: Pick<SignatureServices, 'authority' | 'siblings'>,
+  signatures: Mirror<SignatureRecord>,
+) {
   const { form } = siblings;
+  const snapshot = () => signatures.get().snapshot;
 
-  let listsFor: SignatureSnapshot | null = null;
-  let signed: readonly SignatureDTO[] = EMPTY_SIGNATURES;
-  let unsigned: readonly FormFieldRef[] = EMPTY_FIELDS;
-  const lists = () => {
-    const snapshot = state().snapshot;
-    if (!snapshot) return { signed: EMPTY_SIGNATURES, unsigned: EMPTY_FIELDS };
-    if (listsFor !== snapshot) {
-      listsFor = snapshot;
-      signed = snapshot.signatures.filter((s) => s.signed);
-      unsigned = snapshot.signatures.filter((s) => !s.signed).map((s) => s.field);
-    }
-    return { signed, unsigned };
-  };
-
-  /** The widget object number an address names, or null for a field ref. */
-  const widgetObjectOf = (field: SignatureFieldAddress): number | null => {
-    if (!('kind' in field)) return field.annotObjectNumber;
-    if (field.kind === 'objectNumber' && 'annotObjectNumber' in field)
-      return field.annotObjectNumber;
-    return null;
-  };
-  const isFieldRef = (field: SignatureFieldAddress): field is FormFieldRef =>
-    'kind' in field && (field.kind === 'fqn' || 'fieldObjectNumber' in field);
+  const lists = memo(
+    () => [snapshot()],
+    (current) =>
+      current
+        ? {
+            signed: current.signatures.filter((signature) => signature.signed),
+            unsigned: current.signatures
+              .filter((signature) => !signature.signed)
+              .map((signature) => signature.field),
+          }
+        : { signed: EMPTY_SIGNATURES, unsigned: EMPTY_FIELDS },
+  );
 
   const getSignature = (field: SignatureFieldAddress): SignatureDTO | null => {
-    const snapshot = state().snapshot;
-    if (!snapshot) return null;
+    const current = snapshot();
+    if (!current) return null;
     const widgetObject = widgetObjectOf(field);
     if (widgetObject !== null) {
-      const byWidget = snapshot.signatures.find(
-        (s) => s.widget?.annotObjectNumber === widgetObject,
+      const byWidget = current.signatures.find(
+        (signature) => signature.widget?.annotObjectNumber === widgetObject,
       );
       if (byWidget) return byWidget;
       const owner = form.getFieldForWidget({ annotObjectNumber: widgetObject });
@@ -56,33 +58,39 @@ export function createSignatureReads({
     }
     if (!isFieldRef(field)) return null;
     return (
-      snapshot.signatures.find((s) =>
-        field.kind === 'fqn' ? s.fieldName === field.name : sameRef(s.field, field),
+      current.signatures.find((signature) =>
+        field.kind === 'fqn'
+          ? signature.fieldName === field.name
+          : sameFieldRef(signature.field, field),
       ) ?? null
     );
   };
   const getVerdict = (field: SignatureFieldAddress): SignatureVerdict | null => {
     const signature = getSignature(field);
     if (!signature) return null;
-    return state().verdicts?.find((v) => v.signature.index === signature.index) ?? null;
+    return (
+      ctx.state.get().verdicts?.find((verdict) => verdict.signature.index === signature.index) ??
+      null
+    );
   };
 
   return {
+    snapshot,
     getSignature,
     getVerdict,
     api: {
-      getSnapshot: () => state().snapshot,
-      getStatus: () => state().status,
+      getSnapshot: snapshot,
+      getStatus: signatures.getStatus,
       listSignatures: () => lists().signed,
       listUnsignedFields: () => lists().unsigned,
       getSignature,
-      listVerdicts: () => state().verdicts,
+      listVerdicts: () => ctx.state.get().verdicts,
       getVerdict,
-      getProtection: () => state().snapshot?.protection ?? null,
-      getPending: () => state().pending,
-      isBusy: () => state().busy,
+      getProtection: () => snapshot()?.protection ?? null,
+      getPending: () => signatures.get().pending,
+      isBusy: () => ctx.state.get().busy,
       getMode: authority.mode,
-      getTarget: () => state().target,
+      getTarget: () => ctx.state.get().target,
     } satisfies Partial<SignatureCapability>,
   };
 }

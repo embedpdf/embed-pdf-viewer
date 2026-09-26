@@ -2,9 +2,10 @@ import type { FormFieldOptionInput } from './draft';
 
 /**
  * Patch-field semantics follow the annotation patches: `undefined` leaves
- * a member untouched, `null` clears it, a value sets it. Repeat the
- * `family` so the engine knows which members are valid (`InvalidArg` on a
- * mismatch with the target field).
+ * a member untouched, `null` clears it, a value sets it. The engine knows
+ * the field's family from its ref, so `family` is optional; when given it
+ * must match. A member the field's family doesn't have (`multiline` on a
+ * checkbox) fails with `InvalidArg`.
  */
 interface FormFieldPatchBase {
   /**
@@ -20,7 +21,7 @@ interface FormFieldPatchBase {
 }
 
 export interface TextFieldPatch extends FormFieldPatchBase {
-  family: 'text';
+  family?: 'text';
   defaultValue?: string | null;
   /** `null` clears the limit. Fails when the current value exceeds it. */
   maxLength?: number | null;
@@ -30,17 +31,17 @@ export interface TextFieldPatch extends FormFieldPatchBase {
 }
 
 export interface CheckboxFieldPatch extends FormFieldPatchBase {
-  family: 'checkbox';
+  family?: 'checkbox';
 }
 
 export interface RadioFieldPatch extends FormFieldPatchBase {
-  family: 'radio';
+  family?: 'radio';
   radiosInUnison?: boolean;
   noToggleToOff?: boolean;
 }
 
 export interface ComboBoxFieldPatch extends FormFieldPatchBase {
-  family: 'combobox';
+  family?: 'combobox';
   edit?: boolean;
   defaultValue?: string | null;
   /**
@@ -51,12 +52,12 @@ export interface ComboBoxFieldPatch extends FormFieldPatchBase {
 }
 
 export interface ListBoxFieldPatch extends FormFieldPatchBase {
-  family: 'listbox';
+  family?: 'listbox';
   multiSelect?: boolean;
   options?: FormFieldOptionInput[];
 }
 
-/** What `doc.forms.updateField` takes. */
+/** What `doc.forms.update` takes. */
 export type FormFieldPatch =
   | TextFieldPatch
   | CheckboxFieldPatch

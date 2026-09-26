@@ -1,0 +1,145 @@
+%PDF-1.7
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 5 0 R /Resources << /Font << /F1 4 0 R >> >> /Annots [13 0 R 17 0 R 21 0 R] >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+5 0 obj
+<<  /Length 73 >>
+stream
+BT /F1 12 Tf 72 740 Td (EmbedPDF stamps, as other tools saved them) Tj ET
+endstream
+endobj
+6 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 200 100] /Resources << /Font << /F1 4 0 R >> >> /Length 111 >>
+stream
+0.1 0.5 0.2 rg 0 0 200 100 re f
+1 1 1 rg 8 8 184 84 re f
+0.1 0.5 0.2 rg BT /F1 28 Tf 22 38 Td (REWRAPPED) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 300 120] /Matrix [0.866025 0.5 -0.5 0.866025 60 0] /Group << /S /Transparency >> /EPDFOrigContentRect [0 0 200 100] /Resources << /XObject << /EPDFWRAP 6 0 R >> >> /Length 36 >>
+stream
+q 1.2 0 0 1.2 30 0 cm /EPDFWRAP Do Q
+endstream
+endobj
+8 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 319.8076 253.923] /Resources << /ProcSet [/PDF] /XObject << /Form 7 0 R >> >> /Length 8 >>
+stream
+/Form Do
+endstream
+endobj
+9 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 319.8076 253.923] /Group << /S /Transparency >> /Resources << /ProcSet [/PDF] /XObject << /Form 8 0 R >> >> /Length 8 >>
+stream
+/Form Do
+endstream
+endobj
+10 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 319.8076 253.923] /Resources << /ProcSet [/PDF] /XObject << /Form 9 0 R >> >> /Length 8 >>
+stream
+/Form Do
+endstream
+endobj
+11 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 319.8076 253.923] /Group << /S /Transparency >> /Resources << /ProcSet [/PDF] /XObject << /Form 10 0 R >> >> /Length 8 >>
+stream
+/Form Do
+endstream
+endobj
+12 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 319.8076 253.923] /Matrix [1 0 0 1 0 0] /Resources << /ExtGState << /R0 << /AIS false /CA 0.6 /Type /ExtGState /ca 0.6 >> >> /ProcSet [/PDF] /XObject << /MWFOForm 11 0 R >> >> /Length 20 >>
+stream
+/R0 gs
+/MWFOForm Do
+
+endstream
+endobj
+13 0 obj
+<< /Type /Annot /Subtype /Stamp /Rect [90.0962 398.0385 409.9038 651.9615] /CA 0.6 /F 4 /Name /EPDFRewrapped /NM (rewrapped-a) /T (EmbedPDF test) /P 3 0 R /AP << /N 12 0 R >> /EMBD_Metadata << /AppearanceFit (contain) /Rotation 30 /SchemaVersion 1 /UnrotatedRect [100 465 400 585] >> >>
+endobj
+14 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 200 100] /Resources << /Font << /F1 4 0 R >> >> /Length 111 >>
+stream
+0.1 0.5 0.2 rg 0 0 200 100 re f
+1 1 1 rg 8 8 184 84 re f
+0.1 0.5 0.2 rg BT /F1 28 Tf 22 38 Td (REWRAPPED) Tj ET
+endstream
+endobj
+15 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 300 120] /Group << /S /Transparency >> /EPDFOrigContentRect [0 0 200 100] /Resources << /XObject << /EPDFWRAP 14 0 R >> >> /Length 36 >>
+stream
+q 1.2 0 0 1.2 30 0 cm /EPDFWRAP Do Q
+endstream
+endobj
+16 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 300 120] /Resources << /ProcSet [/PDF] /XObject << /Form 15 0 R >> >> /Length 8 >>
+stream
+/Form Do
+endstream
+endobj
+17 0 obj
+<< /Type /Annot /Subtype /Stamp /Rect [150 200 450 320] /F 4 /Name /EPDFRewrapped /NM (rewrapped-b) /T (EmbedPDF test) /P 3 0 R /AP << /N 16 0 R >> /EMBD_Metadata << /AppearanceFit (contain) /SchemaVersion 1 >> >>
+endobj
+18 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 200 100] /Resources << /Font << /F1 4 0 R >> >> /Length 111 >>
+stream
+0.1 0.5 0.2 rg 0 0 200 100 re f
+1 1 1 rg 8 8 184 84 re f
+0.1 0.5 0.2 rg BT /F1 28 Tf 22 38 Td (REWRAPPED) Tj ET
+endstream
+endobj
+19 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 300 120] /Group << /S /Transparency >> /EPDFOrigContentRect [0 0 200 100] /Resources << /XObject << /EPDFWRAP 18 0 R >> >> /Length 36 >>
+stream
+q 1.2 0 0 1.2 30 0 cm /EPDFWRAP Do Q
+endstream
+endobj
+20 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 300 120] /Resources << /ExtGState << /R0 << /AIS false /CA 0.35 /Type /ExtGState /ca 0.35 >> >> /XObject << /MWFOForm 19 0 R >> >> /Length 20 >>
+stream
+/R0 gs
+/MWFOForm Do
+
+endstream
+endobj
+21 0 obj
+<< /Type /Annot /Subtype /Stamp /Rect [150 40 450 160] /F 4 /Name /EPDFRewrapped /NM (rewrapped-c) /T (EmbedPDF test) /P 3 0 R /AP << /N 20 0 R >> /EMBD_Metadata << /AppearanceFit (contain) /SchemaVersion 1 >> >>
+endobj
+xref
+0 22
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000272 00000 n 
+0000000347 00000 n 
+0000000471 00000 n 
+0000000722 00000 n 
+0000001013 00000 n 
+0000001189 00000 n 
+0000001395 00000 n 
+0000001572 00000 n 
+0000001780 00000 n 
+0000002068 00000 n 
+0000002371 00000 n 
+0000002623 00000 n 
+0000002874 00000 n 
+0000003043 00000 n 
+0000003273 00000 n 
+0000003525 00000 n 
+0000003776 00000 n 
+0000004019 00000 n 
+trailer
+<< /Size 22 /Root 1 0 R >>
+startxref
+4248
+%%EOF

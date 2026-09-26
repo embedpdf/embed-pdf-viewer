@@ -54,7 +54,7 @@ export function readMeasure(
 ): PdfMeasurement | undefined {
   if (!handle) return undefined;
   const subtype = fn.EPDFMeasure_GetSubtype(handle);
-  if (subtype !== 1) return { subtype: subtype === 2 ? 'GEO' : 'unknown' };
+  if (subtype !== 1) return { subtype: subtype === 2 ? 'geospatial' : 'unknown' };
   const formats = (axis: number): PdfNumberFormat[] =>
     Array.from({ length: fn.EPDFMeasure_CountFormats(handle, axis) }, (_, i) => {
       const f = fn.EPDFMeasure_GetFormat(handle, axis, i);
@@ -96,7 +96,7 @@ export function readMeasure(
   );
   const cyx = readMeasureNumber(mem, (p) => fn.EPDFMeasure_GetCYX(handle, p));
   const result: PdfMeasure = {
-    subtype: 'RL',
+    subtype: 'rectilinear',
     x: formats(0),
     distance: formats(2),
     area: formats(3),

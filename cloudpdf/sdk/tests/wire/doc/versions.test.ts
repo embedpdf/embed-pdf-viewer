@@ -171,7 +171,7 @@ describe("VersionsClient", () => {
                     contentsSize: 1,
                     coverage: "whole-revision",
                     revisionIndex: 1,
-                    signer: { name: null, reason: null, location: null, contactInfo: null, claimedTime: null },
+                    signer: { name: null, reason: null, location: null, contactInfo: null, signedAt: null },
                     docMdp: 1.1,
                     catalogCertification: true,
                     fieldMdp: { action: "all", fields: ["fields"] },

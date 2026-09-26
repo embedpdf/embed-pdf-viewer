@@ -1,9 +1,21 @@
 import type { PieceInfoPatch, PieceInfoSnapshot } from '../dto/PieceInfo';
+import type { MutationMeta } from '../mutation/MutationMeta';
 import { AbortablePromise } from '../promise/AbortablePromise';
+
+/** Result of `pieceInfo.update()`: the application's data after the write. */
+export interface PieceInfoUpdateResult {
+  pieceInfo: PieceInfoSnapshot | null;
+  meta: MutationMeta;
+}
+
+/** Result of `pieceInfo.delete()`: nothing exists after it, so only `meta`. */
+export interface PieceInfoDeleteResult {
+  meta: MutationMeta;
+}
 
 /**
  * Access to `/PieceInfo` private application data (ISO 32000 §14.5). The
- * SAME interface serves both levels — `DocumentHandle.pieceInfo?` reads and
+ * same interface serves both levels — `DocumentHandle.pieceInfo?` reads and
  * writes the catalog's `/PieceInfo`, `PageHandle.pieceInfo?` the page's —
  * mirroring the native API's doc/page symmetry.
  *
@@ -25,7 +37,7 @@ export interface PieceInfoService {
    * entry for it. Unknown value types arrive as `{ type: 'unknown' }` and
    * survive sibling writes untouched.
    */
-  read(application: string): AbortablePromise<PieceInfoSnapshot | null>;
+  get(application: string): AbortablePromise<PieceInfoSnapshot | null>;
   /**
    * Merge-write entries into the application's `/Private` dictionary:
    * strings/numbers/booleans/string-arrays write as the corresponding PDF
@@ -33,9 +45,9 @@ export interface PieceInfoService {
    * is one worker job — atomic with respect to every other engine
    * operation on this document.
    */
-  update(application: string, patch: PieceInfoPatch): AbortablePromise<void>;
+  update(application: string, patch: PieceInfoPatch): AbortablePromise<PieceInfoUpdateResult>;
   /** Application names present under this holder's `/PieceInfo`. */
-  applications(): AbortablePromise<string[]>;
+  list(): AbortablePromise<string[]>;
   /** Remove the application's entire entry (sibling applications survive). */
-  clear(application: string): AbortablePromise<void>;
+  delete(application: string): AbortablePromise<PieceInfoDeleteResult>;
 }

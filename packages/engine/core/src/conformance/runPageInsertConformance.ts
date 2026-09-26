@@ -6,18 +6,18 @@ import { EngineErrorCode } from '../errors/EngineErrorCode';
 import { toPageRef } from '../identity/PageRef';
 
 /**
- * Page insert conformance. `pages.insert` is a REQUIRED member — this suite
+ * Page insert conformance. `pages.insert` is a required member — this suite
  * runs unconditionally on every engine, so an implementation that loses the
  * verb fails loudly instead of being skipped past.
  *
  * Invariants:
- *   1. Every page of the source bytes is COPIED in at `destIndex` (omitted →
- *      append), in source order; the result lists the fresh PONs in
+ *   1. Every page of the source bytes is copied in at `toIndex` (omitted →
+ *      append), in source order; the result lists the fresh page object numbers in
  *      insertion order and they agree with the returned layout.
- *   2. Pre-existing pages keep their identity: same PONs before and after,
+ *   2. Pre-existing pages keep their identity: same page object numbers before and after,
  *      in the expected positions (an insert never invalidates neighbours).
  *   3. The mutation persists through save → re-open (bytes engines only).
- *   4. Empty bytes / malformed bytes / out-of-range destIndex reject with
+ *   4. Empty bytes / malformed bytes / out-of-range toIndex reject with
  *      InvalidArg / MalformedPdf, leaving the document untouched.
  */
 export function runPageInsertConformance(
@@ -41,9 +41,9 @@ export function runPageInsertConformance(
       const doc = await openFixture(engine, opts);
       try {
         const before = await doc.pages.list();
-        const beforePons = before.pages.map((p) => p.ref.pageObjectNumber);
+        const beforePageObjectNumbers = before.pages.map((p) => p.ref.pageObjectNumber);
         // Self-source: extract the first page, insert it back (append).
-        const single = await doc.pages.extract([toPageRef(beforePons[0])]);
+        const single = await doc.pages.extract([toPageRef(beforePageObjectNumbers[0])]);
 
         const result = await doc.pages.insert(single);
         expect(result.insertedPages.length).toBe(1);
@@ -51,11 +51,13 @@ export function runPageInsertConformance(
         // Existing pages: same identity, same leading positions.
         expect(
           result.layout.pages.slice(0, before.pageCount).map((p) => p.ref.pageObjectNumber),
-        ).toEqual(beforePons);
-        // The appended copy is a FRESH object number at the tail.
-        const newPon = result.insertedPages[0].pageObjectNumber;
-        expect(beforePons.includes(newPon)).toBe(false);
-        expect(result.layout.pages[before.pageCount].ref.pageObjectNumber).toBe(newPon);
+        ).toEqual(beforePageObjectNumbers);
+        // The appended copy is a fresh object number at the tail.
+        const newPageObjectNumber = result.insertedPages[0].pageObjectNumber;
+        expect(beforePageObjectNumbers.includes(newPageObjectNumber)).toBe(false);
+        expect(result.layout.pages[before.pageCount].ref.pageObjectNumber).toBe(
+          newPageObjectNumber,
+        );
         // The copy inherits the source page's geometry.
         expect(result.layout.pages[before.pageCount].size).toEqual(before.pages[0].size);
       } finally {
@@ -63,20 +65,25 @@ export function runPageInsertConformance(
       }
     });
 
-    test('destIndex places the block mid-document, in source order', async () => {
+    test('toIndex places the block mid-document, in source order', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const before = await doc.pages.list();
         if (before.pages.length < 2) return;
-        const beforePons = before.pages.map((p) => p.ref.pageObjectNumber);
-        const two = await doc.pages.extract([toPageRef(beforePons[0]), toPageRef(beforePons[1])]);
+        const beforePageObjectNumbers = before.pages.map((p) => p.ref.pageObjectNumber);
+        const two = await doc.pages.extract([
+          toPageRef(beforePageObjectNumbers[0]),
+          toPageRef(beforePageObjectNumbers[1]),
+        ]);
 
         const result = await doc.pages.insert(two, 1);
         expect(result.insertedPages.length).toBe(2);
-        const pons = result.layout.pages.map((p) => p.ref.pageObjectNumber);
-        expect(pons[0]).toBe(beforePons[0]);
-        expect(pons.slice(1, 3)).toEqual(result.insertedPages.map((p) => p.pageObjectNumber));
-        expect(pons.slice(3)).toEqual(beforePons.slice(1));
+        const pageObjectNumbers = result.layout.pages.map((p) => p.ref.pageObjectNumber);
+        expect(pageObjectNumbers[0]).toBe(beforePageObjectNumbers[0]);
+        expect(pageObjectNumbers.slice(1, 3)).toEqual(
+          result.insertedPages.map((p) => p.pageObjectNumber),
+        );
+        expect(pageObjectNumbers.slice(3)).toEqual(beforePageObjectNumbers.slice(1));
       } finally {
         await doc.close();
       }
@@ -132,7 +139,7 @@ export function runPageInsertConformance(
       }
     });
 
-    test('out-of-range destIndex rejects with InvalidArg', async () => {
+    test('out-of-range toIndex rejects with InvalidArg', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const before = await doc.pages.list();

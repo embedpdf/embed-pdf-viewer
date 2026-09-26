@@ -8,16 +8,16 @@ import type { PageMoveResult } from '../mutation/PageMoveResult';
 import type { PageNameInput, PageRemoveNameInput } from '../mutation/PageNameInput';
 import type { PageNameResult } from '../mutation/PageNameResult';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
-import type { PageFlattenResult, PageFlattenUsage } from '../mutation/PageFlattenResult';
+import type { FlattenOptions, PageFlattenResult } from '../mutation/PageFlattenResult';
 import { AbortablePromise } from '../promise/AbortablePromise';
 
 /**
  * Document-scoped page service exposed via `DocumentHandle.pages`.
  *
  * Mirrors the shape of `DocumentAnnotationsService` so that anything
- * touching "many things at the document level" lives in one place. The
- * structure verbs are `move`, `rotate`, and `delete`; the surface is
- * designed for `insert` to slot in without API churn.
+ * touching "many things at the document level" lives in one place: the
+ * structure verbs (`move`, `rotate`, `delete`, `insert`, `insertBlank`),
+ * `extract`, `flatten` and the page names.
  *
  * Identity rule: pages are addressed by `PageRef` (the durable object
  * number) everywhere except `list()`, which exposes display order through
@@ -34,19 +34,19 @@ export interface DocumentPagesService {
 
   /**
    * Reorder pages. The supplied pages are detached and re-inserted as
-   * a contiguous block starting at `destIndex` in the post-removal
+   * a contiguous block starting at `toIndex` in the post-removal
    * index space, preserving caller order. Per-page `RevisionToken`s
    * survive — index-based annotation refs the caller is holding remain
    * valid across a page reorder.
    *
    * @param pages Pages to move, in the order they should appear after
    *              the move.
-   * @param destIndex Insertion point in `[0, pageCount - len]`.
+   * @param toIndex Insertion point in `[0, pageCount - len]`.
    */
-  move(pages: PageRef[], destIndex: number): AbortablePromise<PageMoveResult>;
+  move(pages: PageRef[], toIndex: number): AbortablePromise<PageMoveResult>;
 
   /**
-   * Set the ABSOLUTE display rotation of the supplied pages (one value
+   * Set the absolute display rotation of the supplied pages (one value
    * for all — the multi-select thumbnail gesture). Pure presentation
    * metadata: content coordinates are normalized, so cached renders,
    * annotation refs, and `RevisionToken`s all survive untouched. See
@@ -56,7 +56,7 @@ export interface DocumentPagesService {
 
   /**
    * Delete pages. Deleting every page is rejected (`InvalidArg`) — a
-   * document must keep at least one. Deleted PONs are retired, never
+   * document must keep at least one. Deleted page object numbers are retired, never
    * recycled; surviving pages keep their identity and revisions.
    */
   delete(pages: PageRef[]): AbortablePromise<PageDeleteResult>;
@@ -64,62 +64,61 @@ export interface DocumentPagesService {
   /**
    * Register `name` → page in the catalog's `/Names /Pages` tree (create,
    * or replace what an existing key points at); with `replace`, drop that
-   * other key in the same job (rename). Named pages are LAYOUT — read them
+   * other key in the same job (rename). Named pages are layout — read them
    * back from `list().namedPages` — so this is a page-structure mutation:
    * `docVersion` + `layoutVersion` advance, per-page pins do not. Gated like
-   * `move` (`doc.pages.assemble`). Optional while transports ship;
-   * feature-detect with `pages.setName !== undefined`.
+   * `move` (`doc.pages.assemble`).
    *
    * Rejects with `InvalidArg` for an empty name and `NotFound` for a page
    * that is not in the page tree (hidden templates included).
    */
-  setName?(input: PageNameInput): AbortablePromise<PageNameResult>;
+  setName(input: PageNameInput): AbortablePromise<PageNameResult>;
 
   /**
    * Remove one `/Names /Pages` registration; the page itself is untouched.
-   * `NotFound` when no registration has that decoded key. Page DELETION
+   * `NotFound` when no registration has that decoded key. Page deletion
    * removes registrations by itself — callers never need to pair the two.
    */
-  removeName?(input: PageRemoveNameInput): AbortablePromise<PageNameResult>;
+  removeName(input: PageRemoveNameInput): AbortablePromise<PageNameResult>;
 
   /**
    * Paint eligible annotation appearances into page content and remove only
    * those annotations that were painted. This changes content and annotation
    * liveness, not layout. The default usage is normal display.
    */
-  flatten?(pages: PageRef[], usage?: PageFlattenUsage): AbortablePromise<PageFlattenResult>;
+  flatten(pages: PageRef[], options?: FlattenOptions): AbortablePromise<PageFlattenResult>;
 
   /**
    * Export the given pages, in the supplied order, as a standalone PDF
-   * (bytes of a new document containing copies of those pages). A READ:
+   * (bytes of a new document containing copies of those pages). A read:
    * the source document is untouched — no revisions bump, no event is
    * published. This is how a page becomes a portable asset (a vector
-   * stamp, a signature) that re-enters a document as a stamp draft's
-   * `source` bytes. Gated by `doc.download` (it egresses content), not
+   * stamp, a signature) that re-enters a document as a stamp's `appearance`
+   * resource. Gated by `doc.download` (it egresses content), not
    * `doc.pages.assemble`.
    *
-   * REQUIRED-parity, delivered: the local engine runs it in the worker,
+   * Required-parity, delivered: the local engine runs it in the worker,
    * the cloud engine as POST /pages/extract.
    */
   extract(pages: PageRef[]): AbortablePromise<Uint8Array>;
 
   /**
-   * Insert every page of a standalone PDF (`bytes`) at `destIndex`
-   * (omitted → append). The pages are COPIED in; the inserted copies get
+   * Insert every page of a standalone PDF (`bytes`) at `toIndex`
+   * (omitted → append). The pages are copied in; the inserted copies get
    * fresh object numbers, returned in insertion order. Bytes are a call
-   * ARGUMENT (the same law as annotation binaries): the local engine
+   * argument (the same law as annotation binaries): the local engine
    * transfers them to its worker, the cloud engine ships them as a
    * multipart mutation (POST /pages/insert).
    *
-   * REQUIRED-parity, delivered — a cloud viewer must be able to add pages,
+   * Required-parity, delivered — a cloud viewer must be able to add pages,
    * so this is a mandatory member: any engine implements it or is not a
    * conforming engine.
    */
-  insert(bytes: Uint8Array | ArrayBuffer, destIndex?: number): AbortablePromise<PageInsertResult>;
+  insert(bytes: Uint8Array | ArrayBuffer, toIndex?: number): AbortablePromise<PageInsertResult>;
 
   /**
    * Create `spec.count` (default 1) blank pages of `spec.size` (PDF points)
-   * at `destIndex` (omitted → append). The blank-page sibling of `insert`:
+   * at `toIndex` (omitted → append). The blank-page sibling of `insert`:
    * same gate (`doc.pages.assemble`), same result shape, same
    * `pages.inserted` event — it is a separate verb because its wire is pure
    * parameters where `insert`'s is a binary payload (cloud: JSON
@@ -127,5 +126,5 @@ export interface DocumentPagesService {
    * object numbers; every pre-existing page keeps its identity and
    * revisions. Mandatory, like `insert`.
    */
-  insertBlank(spec: PageInsertBlankSpec, destIndex?: number): AbortablePromise<PageInsertResult>;
+  insertBlank(spec: PageInsertBlankSpec, toIndex?: number): AbortablePromise<PageInsertResult>;
 }

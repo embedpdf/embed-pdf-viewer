@@ -1,14 +1,17 @@
 /**
  * @embedpdf/core-annotation — the pure annotation brain.
  *
- * model · update(msg)→[model,effects] · view (pageItems + chrome). Per-kind
- * content-space geometry (rect/ellipse · line · poly · quads), stroke+fill
- * hit-testing, cursors, the select + create tools. No DOM, no engine, no
- * framework — the part that ports to Rust/Crux.
+ * `update(model, message)` → { session, change, effects } · view (pageItems +
+ * chrome). Per-kind content-space geometry (rect/ellipse · line · poly ·
+ * quads), stroke+fill hit-testing, cursors, the select + create tools. No DOM,
+ * no engine, no framework — the part that ports to Rust/Crux. See README.md.
  */
 export {
   update,
   initialModel,
+  initialSession,
+  sameSession,
+  EMPTY_CHANGE,
   initialStyle,
   defaultsFor,
   rotateDraftDelta,
@@ -53,7 +56,7 @@ export {
 export { groupKeyOf, groupMembers, expandGroups, groupCaps, type GroupCaps } from './group';
 export { isAttachedLink, isConversationOnly, isSubstrateOnly } from './plane';
 export { linkChildrenOf, linkOf } from './links';
-// `/F` annotation flags: the predicates are the ONE spec interpretation.
+// `/F` annotation flags: the predicates are the one spec interpretation.
 export {
   DRAWN_FLAGS,
   FLAG_KEYS,
@@ -137,7 +140,7 @@ export {
   rotateKnob,
   placeRotateKnob,
   rotatedAabb,
-  DEFAULT_CHROME_GEOM,
+  DEFAULT_CHROME_GEOMETRY,
   normalizeDeg,
   isRotatableGeom,
   // upright placement
@@ -161,24 +164,26 @@ export { scene } from './scene';
 export { straightenInkStroke } from './ink';
 export type { BlendMode } from '@embedpdf/engine-core/runtime';
 export type {
-  Annot,
+  AnnotationView,
+  ChangeSet,
+  ModelAnnotation,
   AnnotationProps,
   AnnotationPropsPatch,
   Border,
   Callout,
-  ChromeGeom,
+  ChromeGeometry,
   ChromeNode,
   Cursor,
   CreationDraftAnchor,
   Draft,
   Effect,
-  Geom,
+  ContentGeometry,
   Guide,
   Handle,
   Id,
   InkStraightenOptions,
   Model,
-  Msg,
+  Message,
   ClickCreate,
   PointerInput,
   PatchScope,
@@ -188,6 +193,8 @@ export type {
   LineEnding,
   LineEndings,
   Paint,
+  Session,
+  UpdateResult,
   RenderItem,
   RenderNode,
   SceneNode,
@@ -198,5 +205,5 @@ export type {
   TextEndAnchor,
   TextQuad,
   TextStyle,
-  Vec,
+  Point,
 } from './types';

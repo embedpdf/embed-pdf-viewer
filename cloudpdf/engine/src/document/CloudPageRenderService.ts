@@ -39,19 +39,19 @@ export class CloudPageRenderService implements PageRenderService {
       const includeAnnotations = options.includeAnnotations ?? true;
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        const pon = this.pageRef.pageObjectNumber;
-        const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pon);
+        const pageObjectNumber = this.pageRef.pageObjectNumber;
+        const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pageObjectNumber);
         if (!page) {
           throw new EngineError(
             EngineErrorCode.NotFound,
-            `no page with object number ${pon} in document ${this.docId}`,
+            `no page with object number ${pageObjectNumber} in document ${this.docId}`,
           );
         }
         // `format` flows through `options` and ends up in the token like
         // every other render option — the wire format treats it uniformly.
         // Normalized above so the URL always carries an explicit,
         // network-supported format (PNG or WebP; default WebP).
-        // Annotatedness itself is PATH-expressed (the token/path law): the
+        // Annotatedness itself is path-expressed (the token/path law): the
         // token never carries it; the annotated family's token carries the
         // `annotationVersion` pin instead.
         const wireToken = renderImageOptionsToWire(
@@ -61,11 +61,11 @@ export class CloudPageRenderService implements PageRenderService {
             ...(includeAnnotations ? { annotationVersion: page.cache.annotationVersion } : {}),
           },
         );
-        // Plane-scope rule: a render resolves at the DOC-LEVEL (shared base)
+        // Plane-scope rule: a render resolves at the doc-level (shared base)
         // path iff every plane it depends on is inherited — annotation-free
-        // renders (full pages AND tiles; the rect target rides the same
+        // renders (full pages and tiles; the rect target rides the same
         // token) depend on `content`, annotated ones on
-        // `content + annotations`. Each is its OWN family at BOTH tiers
+        // `content + annotations`. Each is its own family at both tiers
         // (prefix law: edge grants see only prefixes). 1,000 inheriting
         // visitors → one URL set, one origin render, no layer session.
         if (includeAnnotations) {
@@ -82,7 +82,7 @@ export class CloudPageRenderService implements PageRenderService {
           ? wirePaths.docPageRender(this.docId, this.pageRef, wireToken)
           : wirePaths.layerPageRender(this.docId, this.layerName, this.pageRef, wireToken);
       };
-      // The advertised URL reflects the CURRENT manifest; the blob loader
+      // The advertised URL reflects the current manifest; the blob loader
       // re-resolves per fetch through the 404 → manifest-refresh rail, so a
       // scope flip (e.g. this layer's first annotation write) self-heals
       // instead of failing on a stale path family.

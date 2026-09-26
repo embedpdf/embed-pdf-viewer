@@ -3,12 +3,12 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { createLocalEngine } from '@embedpdf/engine';
-import type { Engine } from '@embedpdf/engine-core/runtime';
+import { EngineErrorCode, type Engine } from '@embedpdf/engine-core/runtime';
 import {
   createTestSigner,
+  createTestTimestampAuthority,
   sign,
   validateSignatures,
-  SigningError,
   type TestSigner,
 } from '../src/index';
 
@@ -41,7 +41,7 @@ describe('sign() and validateSignatures() over the local engine', () => {
       );
       const result = await sign(doc, {
         field: { kind: 'fqn', name: 'sig' },
-        signer,
+        key: signer,
         lock: { action: 'include', fields: ['group.total'] },
       });
       expect(result.status).toBe('completed');
@@ -83,7 +83,7 @@ describe('sign() and validateSignatures() over the local engine', () => {
     try {
       const result = await sign(doc, {
         field: { kind: 'fqn', name: 'sig' },
-        signer,
+        key: signer,
         subFilter: 'adbe.pkcs7.detached',
         certify: { permission: 2 },
       });
@@ -137,7 +137,7 @@ describe('sign() and validateSignatures() over the local engine', () => {
       const alt = await createTestSigner({ commonName: `EmbedPDF ${algorithm} signer`, algorithm });
       const doc = await engine.open({ kind: 'bytes', id: `alg-${algorithm}`, bytes });
       try {
-        const result = await sign(doc, { field: { kind: 'fqn', name: 'sig' }, signer: alt });
+        const result = await sign(doc, { field: { kind: 'fqn', name: 'sig' }, key: alt });
         expect(result.status).toBe('completed');
         const [verdict] = await validateSignatures(doc, {
           trust: { anchors: async () => [alt.certificate] },
@@ -156,6 +156,53 @@ describe('sign() and validateSignatures() over the local engine', () => {
     });
   }
 
+  test('a document timestamp comes from a timestamp authority, and the gate checks its imprint', async () => {
+    const doc = await engine.open({ kind: 'bytes', id: 'timestamp', bytes });
+    try {
+      const authority = await createTestTimestampAuthority();
+      const result = await sign(doc, {
+        field: { kind: 'fqn', name: 'sig' },
+        kind: 'timestamp',
+        key: authority,
+      });
+      expect(result.status).toBe('completed');
+      expect(result.signature.kind).toBe('timestamp');
+      expect(result.signature.subFilter).toBe('ETSI.RFC3161');
+
+      // A raw key can't make a timestamp token, and an unknown subFilter is refused.
+      const other = await engine.open({ kind: 'bytes', id: 'timestamp-refusals', bytes });
+      try {
+        await expect(
+          sign(other, { field: { kind: 'fqn', name: 'sig' }, kind: 'timestamp', key: signer }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+        await expect(
+          sign(other, {
+            field: { kind: 'fqn', name: 'sig' },
+            subFilter: 'adbe.x509.rsa_sha1' as never,
+            key: signer,
+          }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+        // A token stamping another digest never reaches the document.
+        const wrong = await createTestTimestampAuthority();
+        await expect(
+          sign(other, {
+            field: { kind: 'fqn', name: 'sig' },
+            kind: 'timestamp',
+            key: { kind: 'cms', sign: (req) => wrong.sign({ ...req, digest: new Uint8Array(32) }) },
+          }),
+        ).rejects.toMatchObject({
+          code: EngineErrorCode.SignatureRefused,
+          details: { reason: 'digest-mismatch' },
+        });
+        expect((await other.signatures.list()).signatures[0].signed).toBe(false);
+      } finally {
+        await other.close();
+      }
+    } finally {
+      await doc.close();
+    }
+  });
+
   test('a signer that returns the wrong CMS never reaches the document', async () => {
     const doc = await engine.open({ kind: 'bytes', id: 'bad-signer', bytes });
     try {
@@ -163,7 +210,7 @@ describe('sign() and validateSignatures() over the local engine', () => {
       await expect(
         sign(doc, {
           field: { kind: 'fqn', name: 'sig' },
-          signer: {
+          key: {
             kind: 'cms',
             sign: async () => {
               const { buildDetachedCms } = await import('../src/index');
@@ -176,10 +223,13 @@ describe('sign() and validateSignatures() over the local engine', () => {
             },
           },
         }),
-      ).rejects.toBeInstanceOf(SigningError);
-      const snapshot = await doc.signatures!.list();
+      ).rejects.toMatchObject({
+        code: EngineErrorCode.SignatureRefused,
+        details: { reason: 'digest-mismatch' },
+      });
+      const snapshot = await doc.signatures.list();
       expect(snapshot.signatures[0].signed).toBe(false);
-      // The candidate was aborted: the document is writable again.
+      // The candidate was cancelled: the document is writable again.
       await doc.forms.setValue(
         { kind: 'fqn', name: 'group.total' },
         { type: 'text', value: 'still free' },

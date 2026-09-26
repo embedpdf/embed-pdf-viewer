@@ -5,28 +5,24 @@ import { SelectionToken as SelectionPublicToken } from '@embedpdf/plugin-selecti
 
 import type { MarkupSubtype } from '../contract';
 import type { AnnotationContext, AnnotationServices } from '../services';
+import { createdRefOf } from './outcomes';
 
 /**
  * Text markup, carets and replace-text pairs: the selection plugin's commit
- * path (optimistic creates over text quads) and the programmatic
+ * path (creates over text quads, shown at once) and the programmatic
  * `createFromSelection`.
  */
 export function createMarkupWrites(
   ctx: Pick<AnnotationContext, 'tryGet'>,
-  {
-    store,
-    authority,
-    writes,
-    tools,
-  }: Pick<AnnotationServices, 'store' | 'authority' | 'writes' | 'tools'>,
+  { store, authority, tools }: Pick<AnnotationServices, 'store' | 'authority' | 'tools'>,
 ) {
   const api = {
     createMarkup: (subtype: Subtype, page: PageRef, quads: TextQuad[], preset?: string) => {
       // Optimistic create — the same self-refusal `createPointer` has.
       if (!authority.canCreate()) return;
-      // A markup tool's `/F` seed rides along (the preset IS the tool id).
+      // A markup tool's `/F` seed rides along (the preset is the tool id).
       store.commit({
-        t: 'createMarkup',
+        type: 'createMarkup',
         subtype,
         page,
         quads,
@@ -36,7 +32,7 @@ export function createMarkupWrites(
     },
     createCaret: (page: PageRef, anchor: TextEndAnchor) => {
       if (!authority.canCreate()) return;
-      store.commit({ t: 'createCaret', page, anchor });
+      store.commit({ type: 'createCaret', page, anchor });
     },
     createReplaceText: (
       page: PageRef,
@@ -45,13 +41,13 @@ export function createMarkupWrites(
       preset?: string,
     ) => {
       if (!authority.canCreate()) return;
-      store.commit({ t: 'createReplaceText', page, quads, anchor, preset });
+      store.commit({ type: 'createReplaceText', page, quads, anchor, preset });
     },
     previewMarkup: (subtype: Subtype, quadsByPage: Record<number, TextQuad[]>, preset?: string) => {
-      store.commit({ t: 'setMarkupPreview', subtype, quadsByPage, preset });
+      store.commit({ type: 'setMarkupPreview', subtype, quadsByPage, preset });
     },
     clearMarkupPreview: () => {
-      store.commit({ t: 'clearMarkupPreview' });
+      store.commit({ type: 'clearMarkupPreview' });
     },
     createFromSelection: async (
       subtype: MarkupSubtype | 'insert-text' | 'replace-text' | 'redact',
@@ -65,41 +61,41 @@ export function createMarkupWrites(
       const pending: Promise<AnnotationRef>[] = [];
       if (subtype === 'insert-text') {
         if (snapshot.end) {
-          const effects = store.commit({
-            t: 'createCaret',
+          const commit = store.commit({
+            type: 'createCaret',
             page: snapshot.end.page,
             anchor: { glyphQuad: snapshot.end.glyphQuad, advance: snapshot.end.advance },
           });
-          pending.push(writes.awaitCreate(writes.createEffectsOf(effects)[0]?.id));
+          pending.push(createdRefOf(commit));
         }
       } else {
         for (const entry of snapshot.pages) {
           if (!entry.segments.length) continue;
-          const quads = entry.segments.map((s) => s.quad);
+          const quads = entry.segments.map((segment) => segment.quad);
           if (subtype === 'replace-text') {
             const last = entry.segments[entry.segments.length - 1]!;
             const anchor =
               snapshot.end && pageRefsEqual(snapshot.end.page, entry.page)
                 ? { glyphQuad: snapshot.end.glyphQuad, advance: snapshot.end.advance }
                 : { glyphQuad: last.quad, advance: last.advance };
-            const effects = store.commit({
-              t: 'createReplaceText',
+            const commit = store.commit({
+              type: 'createReplaceText',
               page: entry.page,
               quads,
               anchor,
               preset,
             });
-            pending.push(writes.awaitCreate(writes.groupEffectsOf(effects)[0]?.primary));
+            pending.push(createdRefOf(commit));
           } else {
-            const effects = store.commit({
-              t: 'createMarkup',
+            const commit = store.commit({
+              type: 'createMarkup',
               subtype,
               page: entry.page,
               quads,
               preset,
               flags: preset ? tools.get(preset)?.flags : undefined,
             });
-            pending.push(...writes.createEffectsOf(effects).map((fx) => writes.awaitCreate(fx.id)));
+            if (commit.effects.length) pending.push(createdRefOf(commit));
           }
         }
       }

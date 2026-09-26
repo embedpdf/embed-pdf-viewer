@@ -16,7 +16,7 @@ interface RedactionRouteDeps {
  * engine-core for the model). Marking rides the normal annotation routes;
  * this route is only the apply.
  *
- * Authorization is a strict NARROWING of flatten's dual gate: apply rewrites
+ * Authorization is a strict narrowing of flatten's dual gate: apply rewrites
  * page content and deletes annotations (so both broad authorities are
  * required), and information destruction is additionally its own granted
  * power — `doc.redact`. Wildcard/admin tokens and PDF-permission-bit-derived
@@ -24,7 +24,7 @@ interface RedactionRouteDeps {
  * grant it explicitly, which is the separation-of-duties feature: annotate
  * authority marks, `doc.redact` authority applies.
  *
- * Trust boundary: applying rewrites THIS LAYER's artifact. The immutable
+ * Trust boundary: applying rewrites this layer's artifact. The immutable
  * base document keeps the original bytes; redacted content is truly
  * destroyed only in exported artifacts (layer download).
  */
@@ -42,11 +42,11 @@ export async function registerRedactionRoutes(
     requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', pdfBits);
     requireLayerCapability(req, docId, layerName, 'doc.redact', pdfBits);
 
-    const raw = (req.body ?? {}) as { scope?: unknown };
+    // The body is what `redaction.apply()` takes: `{ pages }` or `{ annotations }`.
     const scope = parseOrInvalidArg<RedactionApplyScope>(
       RedactionApplyScopeSchema as unknown as SchemaLike<RedactionApplyScope>,
-      raw.scope,
-      'request body scope',
+      req.body ?? {},
+      'request body',
     );
 
     setNoStore(reply);

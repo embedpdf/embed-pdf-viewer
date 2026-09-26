@@ -1,7 +1,7 @@
 /**
  * Overflow projection — pure. The overflow menu is never authored: it is the
  * complement of the visible set, projected into menu form. The projection is
- * TOTAL because every unit has a canonical menu form by construction:
+ * total because every unit has a canonical menu form by construction:
  *
  *   command                      → command row (label/icon/active resolve live)
  *   command with a `menu` target → submenu row pointing at that menu
@@ -12,8 +12,8 @@
  *   `role: 'tabs'` group         → section marked radio
  *
  * Groups project in bar order; a partially-overflowed group projects only its
- * overflowed units; empty sections vanish. This is what replaces every
- * hand-written overflow/action menu in v2 — same information, one source.
+ * overflowed units; empty sections vanish. Overflow and action menus are
+ * projected here rather than hand-written — same information, one source.
  */
 import type { NormalizedBar, NormalizedGroup, NormalizedUnit } from './schema';
 import type { FitResult } from './solver';
@@ -54,11 +54,11 @@ export function projectOverflow(
   const sections: OverflowSection[] = [];
   for (const section of bar.sections) {
     for (const group of section.groups) {
-      // Shed units are NOT here: they're reachable through the group's own
+      // Shed units are not here: they're reachable through the group's own
       // disclosure trigger (projectShed). Only true overflow leaves the group.
       const rows = group.units
-        .filter((u) => fit.units.get(u.key)?.kind === 'overflow')
-        .map((u) => projectUnit(u, resolve));
+        .filter((unit) => fit.units.get(unit.key)?.kind === 'overflow')
+        .map((unit) => projectUnit(unit, resolve));
       if (rows.length === 0) continue;
       sections.push({
         labelKey: group.labelKey,
@@ -72,8 +72,7 @@ export function projectOverflow(
 
 /**
  * The content of a group's disclosure trigger: its shed units, in bar order,
- * in menu form — same totality rules as the global overflow. This is v2's
- * hand-written `mode-tabs-overflow-menu`, derived.
+ * in menu form — same totality rules as the global overflow.
  */
 export function projectShed(
   group: NormalizedGroup,
@@ -81,8 +80,8 @@ export function projectShed(
   resolve: ResolveMenuTarget,
 ): OverflowRow[] {
   return group.units
-    .filter((u) => fit.units.get(u.key)?.kind === 'shed')
-    .map((u) => projectUnit(u, resolve));
+    .filter((unit) => fit.units.get(unit.key)?.kind === 'shed')
+    .map((unit) => projectUnit(unit, resolve));
 }
 
 /** One strip group: a separator boundary, its visible commands in bar order. */
@@ -93,10 +92,10 @@ export interface StripGroup {
 }
 
 /**
- * Strip projection — a bar projected for UN-measured rendering (a contextual
+ * Strip projection — a bar projected for un-measured rendering (a contextual
  * strip anchored to a selection has no fit pressure to solve). The schema
- * declares what COULD appear; `visible` (the command registry's runtime truth)
- * decides what DOES: hidden commands drop out, groups that empty out vanish,
+ * declares what could appear; `visible` (the command registry's runtime truth)
+ * decides what does: hidden commands drop out, groups that empty out vanish,
  * and an all-hidden bar projects to [] — "render nothing" falls out. Custom
  * units project through their `terminal` command, same totality rule as the
  * overflow. Upgrading a strip to measured/overflowing rendering later is a
@@ -110,7 +109,7 @@ export function projectStrip(
   for (const section of bar.sections) {
     for (const group of section.groups) {
       const commands = group.units
-        .map((u) => (u.kind === 'custom' ? u.terminal : u.command))
+        .map((unit) => (unit.kind === 'custom' ? unit.terminal : unit.command))
         .filter(visible);
       if (commands.length === 0) continue;
       groups.push({ id: group.id, labelKey: group.labelKey, commands });

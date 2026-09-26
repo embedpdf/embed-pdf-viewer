@@ -13,7 +13,6 @@ import type { Engine } from '../engine/Engine';
 import { toPageRef } from '../identity/PageRef';
 import { PageGeometrySnapshotSchema } from '../wire/schemas';
 
-const FLAG_EMPTY = 2;
 /** Absolute tolerance for coordinate assertions (PDF points). */
 const COORD_TOLERANCE = 1e-3;
 /** Tolerance for baseline-angle assertions (radians). */
@@ -39,10 +38,10 @@ export interface PageGeometryOrientationFixture extends ConformanceFixture {
     | {
         kind: 'rotated';
         /** Baseline angles (radians, CCW, PDF y-up) rotated runs may carry. */
-        rotations: number[];
+        baselineAngles: number[];
         ascentFlip: boolean;
         /**
-         * Assert sheared cells: with `rotations` ≈ [0], a non-zero start-edge
+         * Assert sheared cells: with `baselineAngles` ≈ [0], a non-zero start-edge
          * x-offset proves the parallelogram (an AABB could not express it).
          */
         sheared?: boolean;
@@ -77,8 +76,8 @@ export function runPageGeometryOrientationConformance(
       close: () => Promise<void>;
     }> => {
       const doc = await openFixture(engine, opts);
-      const snapshot = await doc.page(toPageRef(opts.fixture.pageObjectNumber)).geometry.read();
-      return { snapshot, close: () => doc.close() };
+      const layout = await doc.page(toPageRef(opts.fixture.pageObjectNumber)).text.layout();
+      return { snapshot: { runs: [...layout.runs] }, close: () => doc.close() };
     };
 
     test('snapshot round-trips the wire schema', async () => {
@@ -96,12 +95,12 @@ export function runPageGeometryOrientationConformance(
       }
     });
 
-    test('run charStart indices tile the page glyph sequence', async () => {
+    test('run starts tile the page character sequence', async () => {
       const { snapshot, close } = await readSnapshot();
       try {
         let next = 0;
         for (const run of snapshot.runs) {
-          expect(run.charStart).toBe(next);
+          expect(run.start).toBe(next);
           next += run.glyphs.length;
         }
       } finally {
@@ -118,10 +117,10 @@ export function runPageGeometryOrientationConformance(
             expect(isRotatedGeometryRun(run)).toBe(false);
             if (isRotatedGeometryRun(run)) continue;
             for (const glyph of run.glyphs) {
-              expect('looseQuad' in glyph).toBe(false);
-              if (glyph.flags & FLAG_EMPTY) {
-                // Degenerate glyphs keep the legacy zeroed-box convention.
-                expect(glyph.looseBox).toEqual({ left: 0, bottom: 0, right: 0, top: 0 });
+              expect('left' in glyph.loose).toBe(true); // a box, not a quad
+              if (glyph.empty) {
+                // Degenerate glyphs keep the zeroed-box convention.
+                expect(glyph.loose).toEqual({ left: 0, bottom: 0, right: 0, top: 0 });
               }
             }
           }
@@ -133,8 +132,8 @@ export function runPageGeometryOrientationConformance(
             expect(isRotatedGeometryRun(run)).toBe(false);
             if (isRotatedGeometryRun(run)) continue;
             for (const glyph of run.glyphs) {
-              expect(glyph.flags & FLAG_EMPTY).toBe(FLAG_EMPTY);
-              expect(glyph.looseBox).toEqual({ left: 0, bottom: 0, right: 0, top: 0 });
+              expect(glyph.empty).toBe(true);
+              expect(glyph.loose).toEqual({ left: 0, bottom: 0, right: 0, top: 0 });
             }
           }
           return;
@@ -145,8 +144,8 @@ export function runPageGeometryOrientationConformance(
 
         for (const run of rotatedRuns) {
           expect(
-            expectation.rotations.some((angle) =>
-              angleClose(run.rotation, angle, ANGLE_TOLERANCE),
+            expectation.baselineAngles.some((angle) =>
+              angleClose(run.baselineAngle, angle, ANGLE_TOLERANCE),
             ),
           ).toBe(true);
           expect(run.ascentFlip).toBe(expectation.ascentFlip);
@@ -156,11 +155,7 @@ export function runPageGeometryOrientationConformance(
         if (expectation.sheared) {
           const shearedGlyphs = rotatedRuns
             .flatMap((run) => run.glyphs)
-            .filter(
-              (glyph) =>
-                (glyph.flags & FLAG_EMPTY) === 0 &&
-                Math.abs(glyph.looseQuad.p3.x - glyph.looseQuad.p1.x) > 1,
-            );
+            .filter((glyph) => !glyph.empty && Math.abs(glyph.loose.p3.x - glyph.loose.p1.x) > 1);
           expect(shearedGlyphs.length > 0).toBe(true);
         }
       } finally {
@@ -170,8 +165,8 @@ export function runPageGeometryOrientationConformance(
 
     function assertRotatedRunGeometry(run: RotatedGeometryRun): void {
       for (const glyph of run.glyphs) {
-        if (glyph.flags & FLAG_EMPTY) {
-          expect(glyph.looseQuad).toEqual({
+        if (glyph.empty) {
+          expect(glyph.loose).toEqual({
             p1: { x: 0, y: 0 },
             p2: { x: 0, y: 0 },
             p3: { x: 0, y: 0 },
@@ -179,7 +174,7 @@ export function runPageGeometryOrientationConformance(
           });
           continue;
         }
-        const q = glyph.looseQuad;
+        const q = glyph.loose;
         // The cell is a parallelogram: both baseline-direction edges match,
         // and both side edges match (slots: p1 US, p2 UE, p3 LS, p4 LE).
         expect(Math.abs(q.p2.x - q.p1.x - (q.p4.x - q.p3.x)) <= COORD_TOLERANCE).toBe(true);

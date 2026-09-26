@@ -1,8 +1,8 @@
 /**
  * The interaction-hub priorities of the annotation plugin's handlers — the
- * public contract a sibling plugin builds on when it needs to sit ABOVE or
- * BELOW one of them for the same gesture. Priority only breaks ties between
- * simultaneously-ELIGIBLE handlers (the tool's tags decide eligibility).
+ * public contract a sibling plugin builds on when it needs to sit above or
+ * below one of them for the same gesture. Priority only breaks ties between
+ * simultaneously-eligible handlers (the tool's tags decide eligibility).
  *
  *   1000 annotation-ghost   never captures; hides the footprint ghost on every down
  *    100 annotation-edit    select/move/resize over an existing annotation

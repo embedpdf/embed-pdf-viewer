@@ -42,7 +42,7 @@ const plugins = [
   formPlugin(),
   stampPlugin({ assetEngine: engine }),
   signaturePlugin({
-    signer: () => signer,
+    key: () => signer,
     // Trust the demo key itself, so its signatures validate as 'valid'.
     trust: { anchors: async () => [(await signer).certificate] },
   }),
@@ -59,8 +59,8 @@ function useSignatureField() {
   const form = useForm();
   const fields = useFormSnapshot()?.fields ?? null;
   const documentId = useDocumentId();
-  const firstPage = useKernelValue((k) =>
-    documentId ? (k.getState().core.documents[documentId]?.pages[0]?.ref ?? null) : null,
+  const firstPage = useKernelValue((kernel) =>
+    documentId ? (kernel.documents.getPageAt(0, documentId)?.ref ?? null) : null,
   );
   useEffect(() => {
     if (!fields || firstPage === null || fields.some((f) => f.family === 'signature')) return;

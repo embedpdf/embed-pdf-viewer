@@ -1,0 +1,160 @@
+{
+  "cases": [
+    {
+      "id": "approval-inline-rewrite-unchanged",
+      "file": "approval-inline-rewrite-unchanged.pdf",
+      "profile": "approval",
+      "layout": "inline",
+      "action": "rewrite-unchanged",
+      "facts": {
+        "sha256": "eeae59c97273d478dd907ab9683b0f355ec272387ea35865ab9b63bafa697b36",
+        "byteLength": 22368,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4002,
+              20388,
+              1107
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "pageObjectNumber": 6,
+      "pageBodyByteIdentical": true,
+      "cmsVerified": true,
+      "acrobat": "unobserved"
+    },
+    {
+      "id": "approval-inline-rewrite-size-preserved",
+      "file": "approval-inline-rewrite-size-preserved.pdf",
+      "profile": "approval",
+      "layout": "inline",
+      "action": "rewrite-size-preserved",
+      "facts": {
+        "sha256": "9700fc7d16c1a5899f1d6e120829c0ba204be099243ec22b1f5dd8166ed78f2d",
+        "byteLength": 22368,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4002,
+              20388,
+              1107
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "pageObjectNumber": 6,
+      "pageBodyByteIdentical": true,
+      "cmsVerified": true,
+      "acrobat": "unobserved",
+      "differenceFrom": "approval-inline-rewrite-unchanged",
+      "difference": "Exactly one unsigned byte changed: incremental trailer /Size 25 -> /Size 24, matching baseline. Offsets and all other bytes unchanged."
+    },
+    {
+      "id": "approval-inline-rewrite-reference-writer",
+      "file": "approval-inline-rewrite-reference-writer.pdf",
+      "profile": "approval",
+      "layout": "inline",
+      "action": "rewrite-reference-writer",
+      "facts": {
+        "sha256": "041f93ec7bd679c7f3b52911dfc8cb706682b8bc50473da562c153ada781e5a6",
+        "byteLength": 22328,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4002,
+              20388,
+              1107
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "pageObjectNumber": 6,
+      "pageBodyByteIdentical": true,
+      "cmsVerified": true,
+      "acrobat": "unobserved",
+      "differenceFrom": "approval-inline-rewrite-size-preserved",
+      "difference": "Same signed baseline and byte-identical page rewrite; use corpus v3 append_revision writer. Only removes xref object zero free entry and encodes identical document ID bytes as literal strings rather than hex strings. Size, object offsets, and startxref remain the same. Does not rewrite the signature widget."
+    },
+    {
+      "id": "approval-indirect-annotations-control",
+      "file": "approval-indirect-annotations-control.pdf",
+      "profile": "approval",
+      "layout": "inline-array-indirect-annotations",
+      "action": "control",
+      "facts": {
+        "sha256": "fc1211ef4d5ee07f7cd874052e813b4f5ae95998223ea6b9295d06fa2a108d2a",
+        "byteLength": 21667,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4094,
+              20480,
+              1187
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "cmsVerified": true,
+      "acrobat": "unobserved",
+      "comparison": "Direct generation exactly reproduced frozen approval-inline-control bytes. Only intentional change before signing is moving the four identical markup dictionaries into indirect objects; appearance object numbers and bytes unchanged. Annots array stays inline; no NM added. Signature object numbers/bytes and offsets necessarily differ between separately signed baselines.",
+      "pageBodyByteIdentical": false,
+      "originalDirectControlSha256": "6ca67fa9b008d4d0e3fb142b57122b871367c163f805ac07f1a611f9a839d940"
+    },
+    {
+      "id": "approval-indirect-annotations-rewrite-reference-writer",
+      "file": "approval-indirect-annotations-rewrite-reference-writer.pdf",
+      "profile": "approval",
+      "layout": "inline-array-indirect-annotations",
+      "action": "rewrite-reference-writer",
+      "facts": {
+        "sha256": "4877c44fef6699c2517ae5205bb2695532fa1b2d7205ab7d673979ec575828c2",
+        "byteLength": 22040,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              4094,
+              20480,
+              1187
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "cmsVerified": true,
+      "acrobat": "unobserved",
+      "comparison": "Direct generation exactly reproduced frozen approval-inline-control bytes. Only intentional change before signing is moving the four identical markup dictionaries into indirect objects; appearance object numbers and bytes unchanged. Annots array stays inline; no NM added. Signature object numbers/bytes and offsets necessarily differ between separately signed baselines.",
+      "pageBodyByteIdentical": true,
+      "originalDirectControlSha256": "6ca67fa9b008d4d0e3fb142b57122b871367c163f805ac07f1a611f9a839d940"
+    }
+  ]
+}

@@ -4,7 +4,7 @@ import {
   EngineErrorCode,
   type DocumentPagesService,
   type PageFlattenResult,
-  type PageFlattenUsage,
+  type FlattenOptions,
   type PageDeleteResult,
   type PageInsertBlankSpec,
   type PageInsertResult,
@@ -53,7 +53,7 @@ function copyToExactBuffer(view: Uint8Array): ArrayBuffer {
  *     multi-call client logic from having to account for index drift
  *     between requests.
  *   - Successful `move()` returns the new `layout` (order + geometry) plus
- *     cloud coherence pins. The server does NOT bump per-page revisions on a
+ *     cloud coherence pins. The server does not bump per-page revisions on a
  *     page move (page reorder is intentionally outside the weak-ref staleness
  *     model), only `docVersion` + `layoutVersion`.
  */
@@ -88,7 +88,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
         const manifest = await this.manifest.get(s);
         // Plane-scope rule: the layout leaf depends on the `layout` plane —
         // while inherited (no move/rotate/insert/delete ever ran), every
-        // visitor's page list is ONE doc-level URL served from the base
+        // visitor's page list is one doc-level URL served from the base
         // session; the SDK open sequence creates no layer session.
         return planesInherited(manifest, ['layout'])
           ? wirePaths.docLayout(this.docId, manifest.layoutVersion)
@@ -105,7 +105,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     });
   }
 
-  move(pages: PageRef[], destIndex: number): AbortablePromise<PageMoveResult> {
+  move(pages: PageRef[], toIndex: number): AbortablePromise<PageMoveResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
@@ -114,16 +114,16 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     return AbortablePromise.run<PageMoveResult>(async (signal) => {
       const result = await this.http.postJson(
         wirePaths.layerPagesMove(this.docId, this.layerName),
-        { pages, destIndex },
+        { pages, toIndex },
         (raw) => PageMoveResultSchema.parse(raw),
         signal,
       );
       // A move only advances docVersion + layoutVersion (no per-page pin
       // changes), so the cached manifest can be patched in place — no refetch.
-      if (result.cache) this.manifest.applyPageStructure(result.cache);
-      // Publish AFTER absorb: listeners reading the manifest in their
+      this.manifest.apply(result.meta, ['layout']);
+      // Publish after absorb: listeners reading the manifest in their
       // callback must see post-mutation state.
-      this.publisher.publishLocal({ type: 'pages.moved', pages, destIndex, ...result });
+      this.publisher.publishLocal({ type: 'pages.moved', pages, toIndex, ...result });
       return result;
     });
   }
@@ -147,7 +147,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
   }
 
   /**
-   * Named pages are LAYOUT: both verbs share the page-move patch exactly —
+   * Named pages are layout: both verbs share the page-move patch exactly —
    * docVersion + layoutVersion advance, no per-page pin changes, so the
    * cached manifest is patched in place and the fresh layout is published.
    */
@@ -169,7 +169,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
         (raw) => PageNameResultSchema.parse(raw),
         signal,
       );
-      if (result.cache) this.manifest.applyPageStructure(result.cache);
+      this.manifest.apply(result.meta, ['layout']);
       this.publisher.publishLocal({ type: 'pages.named', name, page, ...result });
       return result;
     });
@@ -190,7 +190,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
       );
       // Rotation shares the move patch exactly: docVersion + layoutVersion
       // advance, every per-page pin (and its cached render) stays warm.
-      if (result.cache) this.manifest.applyPageStructure(result.cache);
+      this.manifest.apply(result.meta, ['layout']);
       this.publisher.publishLocal({ type: 'pages.rotated', pages, rotation, ...result });
       return result;
     });
@@ -210,14 +210,14 @@ export class CloudDocumentPagesService implements DocumentPagesService {
         signal,
       );
       // The structural advance plus dropping the deleted pages' manifest
-      // rows — a retired PON must not be buildable from the local cache.
-      if (result.cache) this.manifest.applyPageDelete(result.cache, pages);
+      // rows — a retired page object number must not be buildable from the local cache.
+      this.manifest.applyPageDelete(result.meta, pages);
       this.publisher.publishLocal({ type: 'pages.deleted', pages, ...result });
       return result;
     });
   }
 
-  insert(bytes: Uint8Array | ArrayBuffer, destIndex?: number): AbortablePromise<PageInsertResult> {
+  insert(bytes: Uint8Array | ArrayBuffer, toIndex?: number): AbortablePromise<PageInsertResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
@@ -227,7 +227,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
       // The multipart mutation envelope: the JSON the plain request would
       // have been rides the `body` part; the source PDF is `resource:source`.
       const buffer = bytes instanceof ArrayBuffer ? bytes : copyToExactBuffer(bytes);
-      const form = buildMutationForm(destIndex !== undefined ? { destIndex } : {}, {
+      const form = buildMutationForm(toIndex !== undefined ? { toIndex } : {}, {
         source: { bytes: buffer, mimeType: 'application/pdf', name: 'source.pdf' },
       });
       const result = await this.http.postMultipartJson(
@@ -236,16 +236,16 @@ export class CloudDocumentPagesService implements DocumentPagesService {
         (raw) => PageInsertResultSchema.parse(raw),
         signal,
       );
-      // Insert changes the page SET: the cached manifest has no rows for
-      // the fresh PONs, so the absorb drops it for a lazy refetch (the
+      // Insert changes the page set: the cached manifest has no rows for
+      // the fresh page object numbers, so the absorb drops it for a lazy refetch (the
       // result already carries the full new layout — nothing waits).
-      if (result.cache) this.manifest.applyPageInsert(result.cache);
-      this.publisher.publishLocal({ type: 'pages.inserted', destIndex, ...result });
+      this.manifest.applyPageInsert(result.meta);
+      this.publisher.publishLocal({ type: 'pages.inserted', toIndex, ...result });
       return result;
     });
   }
 
-  insertBlank(spec: PageInsertBlankSpec, destIndex?: number): AbortablePromise<PageInsertResult> {
+  insertBlank(spec: PageInsertBlankSpec, toIndex?: number): AbortablePromise<PageInsertResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
@@ -257,13 +257,13 @@ export class CloudDocumentPagesService implements DocumentPagesService {
         {
           size: spec.size,
           ...(spec.count !== undefined ? { count: spec.count } : {}),
-          ...(destIndex !== undefined ? { destIndex } : {}),
+          ...(toIndex !== undefined ? { toIndex } : {}),
         },
         (raw) => PageInsertResultSchema.parse(raw),
         signal,
       );
-      if (result.cache) this.manifest.applyPageInsert(result.cache);
-      this.publisher.publishLocal({ type: 'pages.inserted', destIndex, ...result });
+      this.manifest.applyPageInsert(result.meta);
+      this.publisher.publishLocal({ type: 'pages.inserted', toIndex, ...result });
       return result;
     });
   }
@@ -285,10 +285,8 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     );
   }
 
-  flatten(
-    pages: PageRef[],
-    usage: PageFlattenUsage = 'display',
-  ): AbortablePromise<PageFlattenResult> {
+  flatten(pages: PageRef[], options?: FlattenOptions): AbortablePromise<PageFlattenResult> {
+    const usage = options?.usage ?? 'display';
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
@@ -301,8 +299,9 @@ export class CloudDocumentPagesService implements DocumentPagesService {
         (raw) => PageFlattenResultSchema.parse(raw),
         signal,
       );
-      // Nothing flattened means no artifact and therefore no coherence bump.
-      if (result.meta === null) return result;
+      // Nothing flattened comes back without a cache delta: no artifact, no
+      // coherence bump, no event.
+      if (result.meta.cacheDelta === null) return result;
       // Flatten bakes annotations into page content, so both planes flip.
       this.manifest.apply(result.meta, ['content', 'annotations']);
       this.publisher.publishLocal({

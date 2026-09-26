@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 
 /**
  * Session probe for the header CTA ("Start building" vs "Open
- * dashboard"). Deliberately NOT a general platform proxy: it forwards
+ * dashboard"). Deliberately not a general platform proxy: it forwards
  * only GET /v1/me with the caller's cookie and returns only the
  * signed-in status, so the marketing site never becomes an API relay.
  */

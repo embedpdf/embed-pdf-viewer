@@ -1,19 +1,19 @@
 /**
- * `composeApi` — the composition root's one primitive. A controller builds
- * its capability from AREA slices (each `satisfies Partial<Capability>`)
+ * `composeApi`: the composition root's one primitive. A controller builds
+ * its capability from area slices (each `satisfies Partial<Capability>`)
  * plus the service-owned members (authority twins, event hooks); this spreads
  * them into one object and refuses a key that two slices both define, so a
  * new verb can never silently shadow an old one.
  *
- *   const api = composeApi('form', [
+ *   const api: FormHostCapability = composeApi('form', [
  *     fields.api,
  *     values.api,
  *     { canFill: () => authority.can('doc.forms.fill'), onValueChanged: events.valueChanged.on },
- *   ]) satisfies FormHostCapability;
+ *   ]);
  */
 
-type UnionToIntersection<U> = (U extends unknown ? (x: U) => void : never) extends (
-  x: infer I,
+type UnionToIntersection<U> = (U extends unknown ? (value: U) => void : never) extends (
+  value: infer I,
 ) => void
   ? I
   : never;

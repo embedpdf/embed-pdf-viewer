@@ -3,7 +3,7 @@ import { createKernel } from '../src/kernel';
 import { bytesInput, immediateEngine, makeHandle, page } from './helpers';
 import type { DocumentHandle, Engine } from '@embedpdf/engine-core/runtime';
 
-/** Phase 3 step 1: the documents capability's events and its new verbs. */
+/** The documents capability's lifecycle events and verbs. */
 describe('documents · lifecycle events', () => {
   it('emits opened, activeChanged, pagesChanged and closed in order', async () => {
     const handle = makeHandle('a', [page(1, 0), page(2, 1)]);
@@ -14,16 +14,18 @@ describe('documents · lifecycle events', () => {
     await kernel.start();
     const log: string[] = [];
     const { documents } = kernel;
-    documents.onOpened((e) => log.push(`opened:${e.documentId}:${e.info.pageCount}`));
-    documents.onActiveChanged((e) => log.push(`active:${e.previousDocumentId}->${e.documentId}`));
-    documents.onPagesChanged((e) =>
-      log.push(`pages:${e.documentId}:${e.revision}:${e.pages.length}`),
+    documents.onOpened((event) => log.push(`opened:${event.documentId}:${event.info.pageCount}`));
+    documents.onActiveChanged((event) =>
+      log.push(`active:${event.previousDocumentId}->${event.documentId}`),
     );
-    documents.onClosed((e) => log.push(`closed:${e.documentId}`));
+    documents.onPagesChanged((event) =>
+      log.push(`pages:${event.documentId}:${event.revision}:${event.pages.length}`),
+    );
+    documents.onClosed((event) => log.push(`closed:${event.documentId}`));
 
     await documents.open(bytesInput('a'));
     await documents.open(bytesInput('b'));
-    (handle.events as unknown as { emit(e: unknown): void }).emit({
+    (handle.events as unknown as { emit(error: unknown): void }).emit({
       type: 'pages.rotated',
       layout: { pageCount: 2, pages: [page(1, 0), page(2, 1)] },
     });
@@ -96,7 +98,7 @@ describe('documents · lifecycle events', () => {
       { source: bytesInput('y'), active: true },
     ]);
     expect(ids).toEqual(['x', 'y']);
-    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(kernel.documents.getActiveId()).toBe('y');
     await kernel.destroy();
   });
@@ -104,7 +106,7 @@ describe('documents · lifecycle events', () => {
   it('emits locked when a document parks on a password', async () => {
     const lockedHandle = {
       ...makeHandle('l'),
-      security: { passwordPrompt: { state: 'required' }, allows: () => true },
+      security: { passwordPrompt: { state: 'required', incorrect: false }, allows: () => true },
     } as unknown as DocumentHandle;
     const kernel = createKernel({ engine: immediateEngine({ l: lockedHandle }), plugins: [] });
     await kernel.start();

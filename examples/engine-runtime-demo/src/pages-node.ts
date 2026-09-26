@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createLocalEngine } from '@embedpdf/engine';
-import { createCloudEngine } from '@cloudpdf/engine';
+import { cloudEngine } from '@cloudpdf/engine';
 import { signDevToken, defaultWorkerEntryUrl, type AppBundle } from '@cloudpdf/server';
 import { buildAppForTesting } from '../../../cloudpdf/server/src/app/buildApp.ts';
 import { createValidTestLicenseGate } from '../../../cloudpdf/server/src/licensing/testing.ts';
@@ -29,7 +29,7 @@ try {
   const baseUrl = `http://127.0.0.1:${address.port}`;
 
   const local = await createLocalEngine({ runtime: { prefer: 'auto' } });
-  const cloud = createCloudEngine({
+  const cloud = cloudEngine({
     baseUrl,
     token: signDevToken(SECRET, { sub: 'pages-demo', tenant_id: 'pages-demo-tenant' }),
   });
@@ -60,8 +60,8 @@ try {
   const errs: string[] = [];
   diffBool(
     'invariants.ponSetPreserved',
-    localResult.invariants.ponSetPreserved,
-    cloudResult.invariants.ponSetPreserved,
+    localResult.invariants.pageObjectNumberSetPreserved,
+    cloudResult.invariants.pageObjectNumberSetPreserved,
     errs,
   );
   diffBool(

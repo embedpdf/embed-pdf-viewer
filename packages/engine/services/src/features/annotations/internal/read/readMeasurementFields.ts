@@ -5,6 +5,7 @@ import type {
   PdfMeasurement,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
+
 import { withScratchN } from '../../../../runtime/memory/scratch';
 import { readMeasure } from '../../../measure/internal/measureCodec';
 
@@ -12,9 +13,8 @@ export function readAnnotationMeasure(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annot: Ptr,
-): { measure?: PdfMeasurement } {
-  const measure = readMeasure(fn, mem, fn.EPDFAnnot_GetMeasure(annot));
-  return measure ? { measure } : {};
+): { measure: PdfMeasurement | null } {
+  return { measure: readMeasure(fn, mem, fn.EPDFAnnot_GetMeasure(annot)) ?? null };
 }
 
 export function readLineCaption(

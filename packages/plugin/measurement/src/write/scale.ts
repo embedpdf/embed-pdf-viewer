@@ -22,6 +22,13 @@ import type {
   ScaleChangeOptions,
   ScaleChangeReport,
 } from '../contract';
+import {
+  beginScaleChange,
+  endScaleChange,
+  setCalibration,
+  setLocalViewports,
+  setReports,
+} from '../model';
 import type { MeasurementScaleReads } from '../read/scale';
 import { defaultMeasure, withAreaUnit, withPrecision, withUnit } from '../scale';
 import type { MeasurementContext, MeasurementServices } from '../services';
@@ -33,64 +40,49 @@ export function createScaleWrites(
   config: MeasurementConfig,
   { presets }: Pick<MeasurementScaleReads, 'presets'>,
   {
-    publish,
-    refresh,
     ensureLoaded,
-  }: Pick<MeasurementViewportSync, 'publish' | 'refresh' | 'ensureLoaded'>,
+    refresh,
+    scaleOf,
+  }: Pick<MeasurementViewportSync, 'ensureLoaded' | 'refresh' | 'scaleOf'>,
 ) {
   const { scaleChanged, calibrationCompleted } = events;
-  const { state, meta, requireMeta, isDisposed, live, assertAllowed, targets, toPdf } = store;
+  const { requirePage, assertAllowed, targets, toPdf } = store;
   const { annotation } = siblings;
-  const queues = new Map<number, Promise<unknown>>();
-  ctx.cleanup(() => {
-    queues.clear();
-  });
-
-  const enqueue = (
-    pon: number,
-    action: () => Promise<ScaleChangeReport>,
-  ): Promise<ScaleChangeReport> => {
-    const result = (queues.get(pon) ?? Promise.resolve()).catch(() => {}).then(action);
-    queues.set(pon, result);
-    void result
-      .finally(() => {
-        if (queues.get(pon) === result) queues.delete(pon);
-      })
-      .catch(() => {});
-    return result;
-  };
 
   /** Write one page's scale (`null` = back to the default) and re-measure. */
   const save = async (
     page: PageRef,
     scale: PdfMeasure | null,
-    opts: ScaleChangeOptions,
+    options: ScaleChangeOptions,
   ): Promise<ScaleChangeReport> => {
     assertAllowed();
     await ensureLoaded(page);
     assertAllowed();
-    const service = live().page(page).measure;
+    const service = ctx.doc.page(page).measure;
     if (service) {
       await service.setScale(scale);
-      live();
-      await refresh(page);
+      // The engine published `pages.scaleSet` before resolving, so the
+      // mirror is already re-reading this page: join that read, never start another.
+      await ensureLoaded(page);
     } else {
-      const layout = requireMeta(page);
-      const old = state().pages[page.pageObjectNumber]?.viewports ?? [];
-      publish(page, [
-        ...old.filter((v) => !v.owned),
+      // A session-only scale: no engine event announces it, so re-read the page.
+      const layout = requirePage(page);
+      const kept = (ctx.state.get().localViewports[page.pageObjectNumber] ?? []).filter(
+        (viewport) => !viewport.owned,
+      );
+      ctx.state.update(setLocalViewports, page.pageObjectNumber, [
+        ...kept,
         ...(scale
           ? [{ bbox: layout.boxes.crop, name: 'EmbedPDF', owned: true, measure: scale }]
           : []),
       ]);
+      await refresh(page);
     }
-    live();
-    const effective = scale ?? defaultMeasure(config, requireMeta(page).userUnit);
+    const effective = scale ?? defaultMeasure(config, requirePage(page).userUnit);
     const report =
-      opts.recalculate === false
+      options.recalculate === false
         ? { page, scale: effective, updated: [], skipped: [], failed: [] }
         : await annotation.remeasurePage(page, effective);
-    live();
     scaleChanged.emit({ page, report });
     return report;
   };
@@ -98,47 +90,48 @@ export function createScaleWrites(
   const change = async (
     pages: PageTarget,
     measure: (page: PageRef) => PdfMeasure | null,
-    opts: ScaleChangeOptions = {},
+    options: ScaleChangeOptions = {},
   ): Promise<readonly ScaleChangeReport[]> => {
     assertAllowed();
     const target = targets(pages);
     // One page: a failure rejects. Several: each page reports its own outcome.
     const tolerant = pages === 'all' || target.length > 1;
-    ctx.dispatch({ type: 'PENDING', delta: 1 });
+    ctx.state.update(beginScaleChange);
     try {
       const reports = await Promise.all(
         target.map((page) =>
-          enqueue(page.pageObjectNumber, async () => {
-            try {
-              await ensureLoaded(page);
-              const scale = measure(page);
-              if (scale) assertWritableMeasure(scale);
-              return await save(page, scale, opts);
-            } catch (error) {
-              if (!tolerant) throw toPluginError('measurement', error);
-              return {
-                page,
-                updated: [],
-                skipped: [],
-                failed: [],
-                scaleError: serializeError(error),
-              };
-            }
-          }),
+          ctx.serialQueue(`scale:${page.pageObjectNumber}`)(
+            async (): Promise<ScaleChangeReport> => {
+              try {
+                await ensureLoaded(page);
+                const scale = measure(page);
+                if (scale) assertWritableMeasure(scale);
+                return await save(page, scale, options);
+              } catch (error) {
+                if (!tolerant) throw toPluginError('measurement', error);
+                return {
+                  page,
+                  updated: [],
+                  skipped: [],
+                  failed: [],
+                  scaleError: serializeError(error),
+                };
+              }
+            },
+          ),
         ),
       );
-      live();
-      ctx.dispatch({ type: 'REPORTS', reports });
+      ctx.state.update(setReports, reports);
       return reports;
     } finally {
-      if (!isDisposed()) ctx.dispatch({ type: 'PENDING', delta: -1 });
+      ctx.state.update(endScaleChange);
     }
   };
 
   /** The page's current rectilinear scale, for unit and precision edits. */
   const rectilinearOf = (page: PageRef): PdfMeasure => {
-    const scale = state().pages[page.pageObjectNumber]?.scale.measure;
-    if (!scale || scale.subtype !== 'RL') {
+    const scale = scaleOf(page).measure;
+    if (!scale || scale.subtype !== 'rectilinear') {
       throw new PluginError(
         'not-ready',
         'measurement',
@@ -150,13 +143,13 @@ export function createScaleWrites(
 
   const calibrate = async (
     input: CalibrateInput,
-    opts: ScaleChangeOptions & { applyTo?: PageTarget } = {},
+    options: ScaleChangeOptions & { applyTo?: PageTarget } = {},
   ): Promise<readonly ScaleChangeReport[]> => {
-    const a = measurementPoint(toPdf(input.page, input.from));
-    const b = measurementPoint(toPdf(input.page, input.to));
+    const start = measurementPoint(toPdf(input.page, input.from));
+    const end = measurementPoint(toPdf(input.page, input.to));
     let scale: PdfMeasure;
     try {
-      scale = measureFromKnownLength(Math.hypot(b.x - a.x, b.y - a.y), input.distance);
+      scale = measureFromKnownLength(Math.hypot(end.x - start.x, end.y - start.y), input.distance);
     } catch (error) {
       throw new PluginError(
         'invalid-input',
@@ -164,11 +157,11 @@ export function createScaleWrites(
         String((error as Error).message ?? error),
       );
     }
-    const { applyTo, ...rest } = opts;
+    const { applyTo, ...rest } = options;
     const reports = await change(applyTo ?? input.page, () => scale, rest);
-    const request = state().calibration;
+    const request = ctx.state.get().calibration;
     if (request && pageRefsEqual(request.page, input.page)) {
-      ctx.dispatch({ type: 'CALIBRATION', request: null });
+      ctx.state.update(setCalibration, null);
     }
     calibrationCompleted.emit({ page: input.page });
     return reports;
@@ -176,15 +169,16 @@ export function createScaleWrites(
 
   return {
     api: {
-      setScale: (pages, measure, opts) => change(pages, () => measure, opts),
+      setScale: (pages, measure, options) => change(pages, () => measure, options),
       calibrate,
-      setUnit: (pages, unit, opts) => change(pages, (p) => withUnit(rectilinearOf(p), unit), opts),
-      setAreaUnit: (pages, unit, opts) =>
-        change(pages, (p) => withAreaUnit(rectilinearOf(p), unit), opts),
-      setPrecision: (pages, precision, opts) =>
-        change(pages, (p) => withPrecision(rectilinearOf(p), precision), opts),
-      setPreset: (pages, presetId, opts) => {
-        const preset = presets.find((p) => p.id === presetId);
+      setUnit: (pages, unit, options) =>
+        change(pages, (page) => withUnit(rectilinearOf(page), unit), options),
+      setAreaUnit: (pages, unit, options) =>
+        change(pages, (page) => withAreaUnit(rectilinearOf(page), unit), options),
+      setPrecision: (pages, precision, options) =>
+        change(pages, (page) => withPrecision(rectilinearOf(page), precision), options),
+      setPreset: (pages, presetId, options) => {
+        const preset = presets.find((candidate) => candidate.id === presetId);
         if (!preset) {
           return Promise.reject(
             new PluginError('not-found', 'measurement', `unknown scale preset '${presetId}'`),
@@ -192,11 +186,14 @@ export function createScaleWrites(
         }
         return change(
           pages,
-          (p) => measureFromRatio(preset.paper, preset.real, preset.unit, meta(p)?.userUnit ?? 1),
-          opts,
+          (page) =>
+            measureFromRatio(preset.paper, preset.real, preset.unit, {
+              userUnit: ctx.getPage(page)?.userUnit ?? 1,
+            }),
+          options,
         );
       },
-      clearScale: (pages, opts) => change(pages, () => null, opts),
+      clearScale: (pages, options) => change(pages, () => null, options),
     } satisfies Partial<MeasurementCapability>,
   };
 }

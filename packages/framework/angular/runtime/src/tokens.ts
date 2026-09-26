@@ -5,7 +5,7 @@
 import { InjectionToken, type Signal } from '@angular/core';
 
 /** The document a subtree is bound to (provided by `[epdfDocumentScope]`).
- *  Absent => the subtree follows the ACTIVE document. */
+ *  Absent => the subtree follows the active document. */
 export interface EpdfDocumentScopeRef {
   readonly id: Signal<string>;
 }

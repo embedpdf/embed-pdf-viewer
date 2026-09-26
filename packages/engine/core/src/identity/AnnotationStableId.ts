@@ -7,7 +7,7 @@
  * PDFs). When the engine sees `0` it falls back to `nm` if present, or
  * promotes the annotation to a weak ref (`AnnotationRef.kind === 'index'`).
  *
- * `nm` is the value of the annotation's `/NM` entry. The v3 engine never
+ * `nm` is the value of the annotation's `/NM` entry. The engine never
  * writes `/NM` on read — clients can opt into symbolic IDs by passing one to
  * `create()`, but reads never mutate the document.
  */

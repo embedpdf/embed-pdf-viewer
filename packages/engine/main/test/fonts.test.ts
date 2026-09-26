@@ -88,6 +88,18 @@ describe('engine.fonts (local engine)', () => {
     expect(engine.fonts.list()).toEqual([]);
   });
 
+  test("register() refuses a standard font's name or no key", async () => {
+    engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
+    for (const key of ['helvetica', 'times-roman', '']) {
+      const err = await rejection(engine.fonts.register({ key, data: roboto }));
+      expect(err.code).toBe(EngineErrorCode.InvalidArg);
+    }
+    expect(engine.fonts.list()).toEqual([]);
+    // Only the exact standard names are taken.
+    await engine.fonts.register({ key: 'Helvetica', data: roboto });
+    expect(engine.fonts.list()).toHaveLength(1);
+  });
+
   test('addFallback() rejects an unregistered key', async () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
     const err = await rejection(engine.fonts.addFallback('never-registered'));
@@ -108,7 +120,7 @@ describe('engine.fonts (local engine)', () => {
       contents: 'Hello',
       rect: RECT,
     });
-    expect(created.created.subtype).toBe('free-text');
+    expect(created.annotation.subtype).toBe('free-text');
 
     const saved = await doc.download();
     const text = latin1(saved);
@@ -116,7 +128,7 @@ describe('engine.fonts (local engine)', () => {
     // The registered font reached the embedded appearance...
     expect(text).toContain('FontFile2');
     expect(text).toContain('Roboto');
-    // ...as a SUBSET, not the whole 305 KB face. A full embed would dwarf this.
+    // ...as a subset, not the whole 305 KB face. A full embed would dwarf this.
     expect(saved.byteLength).toBeLessThan(roboto.byteLength / 2);
 
     await doc.close();
@@ -152,7 +164,7 @@ describe('engine.fonts (local engine)', () => {
       contents: 'Hello',
       rect: RECT,
     });
-    expect(created.created.subtype).toBe('free-text');
+    expect(created.annotation.subtype).toBe('free-text');
     const saved = await doc.download();
     // A standard font is never embedded; the doc stays tiny.
     expect(saved.byteLength).toBeLessThan(roboto.byteLength / 2);

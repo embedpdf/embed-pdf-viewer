@@ -1,0 +1,328 @@
+---
+title: Rendering
+description: Render a page, or part of one, as an image at the size you need, and map points between the image and the page.
+---
+
+# Rendering
+
+`page.render.image()` draws a page as an image you can show in an `<img>`:
+
+```ts
+const image = await page.render.image({ viewport: { kind: 'width', width: 800 } });
+const { url, revoke } = await image.objectUrl();
+
+img.src = url;
+// When the image is no longer shown:
+revoke();
+```
+
+## Choose the size
+
+`viewport` sets how big the image is. Give a width in pixels, and the height follows the page's
+shape:
+
+```ts
+await page.render.image({ viewport: { kind: 'width', width: 1200 } });
+```
+
+Or give a scale, in pixels per PDF point. At scale `1`, a US Letter page (612 × 792 points) is 612
+× 792 pixels:
+
+```ts
+await page.render.image({ viewport: { kind: 'scale', scale: 2 } });
+```
+
+Without `viewport`, the scale is `1`.
+
+### Sharp images on high-density screens
+
+A screen with a `devicePixelRatio` of 2 shows two pixels for every CSS pixel. Render that many
+more pixels and show the image at its CSS size:
+
+```ts
+const cssWidth = 800;
+const image = await page.render.image({
+  viewport: { kind: 'width', width: Math.round(cssWidth * devicePixelRatio) },
+});
+
+img.style.width = `${cssWidth}px`;
+```
+
+## Turn the page
+
+An image shows the page as it's stored, unturned, whatever the page's own `rotation`. That way
+one image works for every way you show the page: a viewer turns the view, not the image. To get
+the page the way PDF apps show it, pass the page's own rotation from `doc.pages.list()`:
+
+```ts
+const { pages } = await doc.pages.list();
+
+await doc.page(pages[0].ref).render.image({
+  viewport: { kind: 'width', width: 800 },
+  rotation: pages[0].rotation,
+});
+```
+
+`rotation` is `0` (the default), `90`, `180` or `270` degrees clockwise, from the page as it's
+stored. At `90` and `270`, the image's width and height swap, and `viewport.width` is the width
+of the turned image.
+
+## Format and quality
+
+<Engine local>
+
+`format` is `'png'` (the default), `'webp'`, or `'bmp'`. BMP is uncompressed: the fastest to make
+and the largest, for images you only keep in memory. A BMP image's `format` reads `'bmp'`.
+
+In Node there is no canvas, so the engine encodes PNG and BMP itself. WebP fails with
+`NotImplemented` there unless you give the engine your own `imageEncoder`; see
+[Setup](/docs/engine/setup#nodejs).
+
+</Engine>
+
+<Engine cloud>
+
+`format` is `'webp'` (the default) or `'png'`. The server keeps WebP renders at the widths it
+shares between users (see [Render policy](#render-policy)), so WebP is usually the fastest to load.
+
+</Engine>
+
+`quality` goes from `0` to `1` and applies to WebP:
+
+```ts
+await page.render.image({ viewport: { kind: 'width', width: 800 }, format: 'webp', quality: 0.8 });
+```
+
+The image tells you what you got:
+
+| Field             | What it is                                         |
+| :---------------- | :------------------------------------------------- |
+| `format`          | `'png'` or `'webp'`                                |
+| `contentType`     | The MIME type, such as `'image/webp'`              |
+| `width`, `height` | The image's size in pixels                         |
+| `objectUrl()`     | A URL for `<img>`, and `revoke()` to free it       |
+| `transform`       | Converts between its pixels and PDF points (below) |
+
+## Background and annotations
+
+The page is drawn on white. For a transparent background, pass `background: 'transparent'` with
+PNG or WebP.
+
+Annotations are drawn on the page. To draw the page without them, when you draw annotations
+yourself, pass `includeAnnotations: false`:
+
+```ts
+await page.render.image({ includeAnnotations: false, background: 'transparent', format: 'png' });
+```
+
+## Part of a page
+
+`target` renders one area instead of the whole page. The rect is in PDF points, in the same
+coordinates as annotation rects and text positions, so you can render exactly the area of an
+annotation:
+
+```ts
+const closeUp = await page.render.image({
+  target: { kind: 'rect', rect: annotation.rect },
+  viewport: { kind: 'scale', scale: 4 },
+});
+```
+
+`viewport` then sizes the area: a `width` is the width of the area's image.
+
+<Engine local>
+
+## Raw pixels
+
+`render.raw()` takes the same options (except `format` and `quality`) and returns the pixels
+themselves, for a canvas or your own image pipeline:
+
+```ts
+const raster = await page.render.raw({ viewport: { kind: 'width', width: 800 } });
+
+const imageData = new ImageData(new Uint8ClampedArray(raster.data), raster.width, raster.height);
+canvas.width = raster.width;
+canvas.height = raster.height;
+canvas.getContext('2d')!.putImageData(imageData, 0, 0);
+```
+
+`raster.data` is RGBA, four bytes per pixel, not premultiplied, row after row (`raster.stride`
+bytes per row). It skips encoding, so it's the fastest way to get a page onto a canvas.
+
+</Engine>
+
+## From image pixels to PDF points
+
+The engine gives every position in PDF points: text, search matches, annotations. The pointer and
+the screen work in pixels. A page transform converts between the two, and every image has the one
+it was rendered with:
+
+```ts
+const image = await page.render.image({ viewport: { kind: 'width', width: 800 } });
+
+img.addEventListener('click', (event) => {
+  const scale = image.width / img.clientWidth; // image pixels per CSS pixel
+  const point = image.transform.pixelsToPdf({ x: event.offsetX * scale, y: event.offsetY * scale });
+  // point is { x, y } in PDF points, ready for layout.charAt() or an annotation
+});
+
+const box = image.transform.pdfToPixels(match.segments[0].rect); // { x, y, width, height }
+```
+
+`pdfToPixels()` takes a point, a rect or a quad; `pixelsToPdf()` takes a point or a rect. Both
+take the page's crop box, the rotation, the size and the `target` into account, so you never do
+that math yourself.
+
+<Engine local>
+
+A raw raster has a `transform` too.
+
+</Engine>
+
+### Without an image
+
+You don't need an image to get a transform. `pageTransform()` computes the same one from the
+page's layout and the settings you would render with:
+
+```ts
+import { pageTransform } from '@embedpdf/engine';
+
+const { pages } = await doc.pages.list();
+const view = pageTransform(pages[0], { viewport: { kind: 'width', width: 800 } });
+
+view.width; // 800: the size an image with these settings has
+view.height; // 1035 for a US Letter page
+```
+
+It takes the same settings as `render.image()` (`viewport`, `rotation`, `target`) and gives the
+exact numbers of the image those settings render, rounding included. Use it to place boxes before
+the image arrives, to keep an overlay in place while you zoom, for a page drawn as several tiles
+(one transform for the whole page), or for a page you draw yourself.
+
+### With CSS or a canvas
+
+`view.matrix` is the conversion from PDF points to pixels as the six numbers of a CSS `matrix()`
+or a canvas `setTransform()`. Draw an overlay in PDF points and let the browser place it:
+
+```tsx
+<svg width={view.width} height={view.height}>
+  <g transform={`matrix(${view.matrix.join(' ')})`}>
+    {match.segments.map(({ rect }, i) => (
+      <rect
+        key={i}
+        x={rect.left}
+        y={rect.bottom}
+        width={rect.right - rect.left}
+        height={rect.top - rect.bottom}
+        fill="rgba(255, 215, 0, 0.4)"
+      />
+    ))}
+  </g>
+</svg>
+```
+
+### Turned pages
+
+Rotation is one of the settings, `0` by default as for a render: at `90` the page turns
+clockwise, the width and height swap, and the transform turns with it. Positions in PDF points don't change when a page turns, so a
+selection or a search result keeps the same numbers; only the transform is different.
+
+## Cancel a render
+
+Rendering a large page takes time. When the user scrolls away before the image arrives, cancel
+it:
+
+```ts
+const pending = page.render.image({ viewport: { kind: 'width', width: 1600 } });
+
+// Later, when the page is no longer visible:
+pending.abort();
+```
+
+The promise then fails with `Aborted`. See
+[Errors & cancelling](/docs/engine/concepts/errors-and-cancelling).
+
+## Options
+
+| Option               | What it does                                                        | Default         |
+| :------------------- | :------------------------------------------------------------------ | :-------------- |
+| `viewport`           | `{ kind: 'width', width }` in pixels, or `{ kind: 'scale', scale }` | scale `1`       |
+| `rotation`           | Turns the image clockwise: `0`, `90`, `180` or `270`                | `0`             |
+| `format`             | `'png'` or `'webp'` (see [Format and quality](#format-and-quality)) | see above       |
+| `quality`            | WebP quality, from `0` to `1`                                       | encoder default |
+| `background`         | `'white'` or `'transparent'`                                        | `'white'`       |
+| `includeAnnotations` | Draw the page's annotations                                         | `true`          |
+| `target`             | `{ kind: 'page' }`, or `{ kind: 'rect', rect }` for one area        | the whole page  |
+
+## Permissions
+
+Rendering needs the `doc.render` permission. Without it, the call fails with `Forbidden`.
+
+## Good to know
+
+### Render policy
+
+`doc.render.getPolicy()` says which render sizes this document renders best at:
+
+```ts
+const policy = await doc.render.getPolicy();
+```
+
+<Engine local>
+
+The local engine answers `{ kind: 'continuous' }`: it renders any size exactly as you ask.
+
+To test a lattice policy locally, pass `localEngine({ renderPolicy })`.
+
+</Engine>
+
+<Engine cloud>
+
+A CloudPDF server answers a **lattice**: a short list of page widths it renders once, stores and
+shares with every user of the document (for example `[320, 640, 1280, 2560]`). Other widths
+render too; they just aren't stored and shared.
+
+```ts
+{
+  kind: 'lattice',
+  fullPage: { widths: [320, 640, 1280, 2560] },
+  formats: ['webp'],
+  background: 'white',
+  enforced: false,
+}
+```
+
+With `enforced: true`, the server refuses full-page renders at other widths with `InvalidArg`.
+
+</Engine>
+
+The engine never changes the size you ask for. To pick the lattice width for the size you want,
+use `snapFullPageViewport()`. It returns the smallest width on the lattice that's at least as
+large (or the largest one), and your viewport unchanged under a continuous policy:
+
+```ts
+import { snapFullPageViewport } from '@embedpdf/engine';
+
+const { pages } = await doc.pages.list();
+const viewport = snapFullPageViewport(
+  policy,
+  { kind: 'scale', scale: 2 },
+  {
+    pageWidth: pages[0].size.width,
+  },
+);
+await doc.page(pages[0].ref).render.image({ viewport });
+```
+
+The [render plugin](/docs/headless/plugins/render) does all of this for you, and adds tiles when
+the user zooms in far.
+
+<Engine cloud>
+
+### When the image downloads
+
+`render.image()` resolves as soon as the engine knows the image's address. The image itself
+downloads when you call `objectUrl()`, so an image you never show costs nothing. Renders are cached
+on the server with the page, and change only when the page or its annotations do.
+
+</Engine>

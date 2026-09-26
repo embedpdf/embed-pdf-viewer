@@ -7,17 +7,17 @@ import type {
 import type { ActionDiagnostic, SubmitIntent } from '@embedpdf/plugin-actions/contract';
 
 /**
- * ISO field selection, written ONCE for ResetForm (Tables 241/242) and
- * SubmitForm (Tables 239/240): a NAME target selects the field AND its
+ * ISO field selection, written once for ResetForm (Tables 241/242) and
+ * SubmitForm (Tables 239/240): a name target selects the field and its
  * descendants (FQN dot-prefix — `parent` selects `parent.c1`, the rule the
  * old exact-match resolution violated); an objectNumber target selects that
  * field dictionary. Include mode keeps the selection; exclude mode keeps
  * the complement (a name excludes its subtree the same way it includes
- * it). `targets === null` (the key ABSENT) selects everything and the flag
- * is ignored; `[]` + include selects NOTHING while `[]` + exclude selects
+ * it). `targets === null` (the key absent) selects everything and the flag
+ * is ignored; `[]` + include selects nothing while `[]` + exclude selects
  * everything — presence and emptiness are different states.
  *
- * `listed` reports whether a field was ADDRESSED by the target list
+ * `listed` reports whether a field was addressed by the target list
  * (directly or through its subtree) — the "explicitly listed" predicate the
  * submit honesty diagnostics key on.
  */
@@ -27,20 +27,24 @@ export const resolveFieldSelection = <F extends { name: string; ref: FormFieldRe
   exclude: boolean,
 ): { selected: F[]; listed: (field: F) => boolean } => {
   if (targets === null) return { selected: [...all], listed: () => false };
-  const names = targets.filter((t) => t.kind === 'name').map((t) => t.name);
+  const names = targets
+    .filter((target) => target.kind === 'name')
+    .map((target) => target.name);
   const objectNumbers = new Set(
-    targets.filter((t) => t.kind === 'objectNumber').map((t) => t.objectNumber),
+    targets
+      .filter((target) => target.kind === 'objectNumber')
+      .map((target) => target.objectNumber),
   );
   const listed = (field: F): boolean =>
     (field.ref.kind === 'objectNumber' && objectNumbers.has(field.ref.fieldObjectNumber)) ||
     names.some((name) => field.name === name || field.name.startsWith(`${name}.`));
-  const selected = exclude ? all.filter((f) => !listed(f)) : all.filter(listed);
+  const selected = exclude ? all.filter((field) => !listed(field)) : all.filter(listed);
   return { selected, listed };
 };
 
 /**
  * Build the resolved submission dataset from a live field list (Tables
- * 239/240 semantics; pure — the capability supplies a FRESH engine read so
+ * 239/240 semantics; pure — the capability supplies a fresh engine read so
  * no model-lag class exists):
  *
  * - the unconditional **NoExport veto** — even an explicit include cannot
@@ -48,11 +52,11 @@ export const resolveFieldSelection = <F extends { name: string; ref: FormFieldRe
  *   observable, silent when swept in implicitly);
  * - **push-buttons and signatures** never contribute entries in v1 —
  *   ISO's explicit-pushbutton-`/AP`-in-FDF rule is unrepresentable in the
- *   current DTO, so an EXPLICITLY listed one is diagnosed
+ *   current DTO, so an explicitly listed one is diagnosed
  *   (`submit-entry-unsupported`), never silently dropped;
  * - an **unsupported `/V` shape** is always diagnosed (silent omission
  *   would be data loss);
- * - a valueless field becomes a NAME-ONLY entry (`value: null`) only under
+ * - a valueless field becomes a name-only entry (`value: null`) only under
  *   IncludeNoValueFields, else it is skipped (the ISO default);
  * - values are entry-faithful: scalar → string, array (multi-select list
  *   box) → string[]; the submitted name is the fully qualified name.

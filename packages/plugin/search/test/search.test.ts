@@ -12,16 +12,16 @@ import type { SearchRequest, SearchSlice } from '@embedpdf/engine-core/runtime';
 import { searchPlugin, SearchToken } from '../src';
 
 /**
- * Pilot B of the road-to-3.0 plan, through the real kernel: a `latest` lane
- * for the session (G4), an awaitable `search` with typed events, `cancel`
- * versus `clear`, the permission fallback, and a session-free `findAll`.
+ * The search plugin through the real kernel: a newest-wins lane for the
+ * session, an awaitable `search` with typed events, `cancel` versus `clear`,
+ * the permission fallback, and a session-free `findAll`.
  */
 
 const box = { left: 10, bottom: 20, right: 210, top: 320 } as const;
-const page = (pon: number, index: number): PageLayout =>
+const page = (pageObjectNumber: number, index: number): PageLayout =>
   ({
     index,
-    ref: toPageRef(pon),
+    ref: toPageRef(pageObjectNumber),
     label: null,
     size: { width: 200, height: 300 },
     rotation: 0,
@@ -29,10 +29,10 @@ const page = (pon: number, index: number): PageLayout =>
     boxes: { media: { ...box }, crop: { ...box } },
   }) as PageLayout;
 
-const match = (pon: number, charStart: number) => ({
-  page: toPageRef(pon),
-  charStart,
-  charCount: 4,
+const match = (pageObjectNumber: number, start: number) => ({
+  page: toPageRef(pageObjectNumber),
+  start,
+  count: 4,
   segments: [
     {
       quad: {
@@ -61,9 +61,9 @@ function fakeDocument(script: Answer[]) {
   const handle = {
     id: 'doc',
     events: {
-      subscribe: (l: (event: unknown) => void) => {
-        listeners.add(l);
-        return () => listeners.delete(l);
+      subscribe: (listener: (event: unknown) => void) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
       },
       lastServerId: () => null,
     },
@@ -93,16 +93,20 @@ function fakeDocument(script: Answer[]) {
     open: () => Promise.resolve(handle),
     destroy: () => Promise.resolve(),
   } as unknown as Engine;
-  return { engine, requests, held, emit: (e: unknown) => listeners.forEach((l) => l(e)) };
+  return {
+    engine,
+    requests,
+    held,
+    emit: (error: unknown) => listeners.forEach((listener) => listener(error)),
+  };
 }
 
 const slice = (
   matches: ReturnType<typeof match>[],
   next: string | null,
-  scanned: number,
-  total = 2,
-): SearchSlice =>
-  ({ matches, nextCursor: next, scannedPages: scanned, totalPages: total }) as SearchSlice;
+  pagesSearched: number,
+  pageCount = 2,
+): SearchSlice => ({ matches, nextCursor: next, pagesSearched, pageCount }) as SearchSlice;
 
 async function boot(script: Answer[]) {
   const doc = fakeDocument(script);
@@ -112,7 +116,7 @@ async function boot(script: Answer[]) {
   return { ...doc, kernel, api: kernel.capability(SearchToken, 'doc') };
 }
 
-const tick = () => new Promise((r) => setTimeout(r));
+const tick = () => new Promise((resolve) => setTimeout(resolve));
 
 describe('search session', () => {
   afterEach(() => vi.useRealTimers());
@@ -123,9 +127,11 @@ describe('search session', () => {
       slice([match(7, 2)], null, 2),
     ]);
     const log: string[] = [];
-    api.onStarted((e) => log.push(`started:${e.query.text}`));
-    api.onProgress((e) => log.push(`progress:${e.scanned}/${e.total}:${e.hitCount}`));
-    api.onCompleted((e) => log.push(`completed:${e.hitCount}`));
+    api.onStarted((event) => log.push(`started:${event.query.text}`));
+    api.onProgress((event) =>
+      log.push(`progress:${event.pagesSearched}/${event.pageCount}:${event.hitCount}`),
+    );
+    api.onCompleted((event) => log.push(`completed:${event.hitCount}`));
 
     const result = await api.search({ text: 'test' });
     expect(result).toEqual({ status: 'complete', hitCount: 3 });
@@ -137,7 +143,7 @@ describe('search session', () => {
     expect(first.segments[0].rect).toEqual({ x: 30, y: 40, width: 20, height: 10 }); // crop offset applied
     expect(api.listHits({ page: toPageRef(5) })).toBe(api.listHits({ page: toPageRef(5) }));
     expect(api.getHitCount(toPageRef(5))).toBe(2);
-    expect(api.listPagesWithHits().map((p) => p.pageObjectNumber)).toEqual([5, 7]);
+    expect(api.listPagesWithHits().map((page) => page.pageObjectNumber)).toEqual([5, 7]);
     expect(api.getActiveHitIndex()).toBe(0);
     await kernel.destroy();
   });
@@ -145,7 +151,7 @@ describe('search session', () => {
   it('G4: a superseded search cannot publish; its promise resolves superseded', async () => {
     const { kernel, api, held } = await boot(['hold', slice([match(7, 2)], null, 2)]);
     const cancelledEvents: string[] = [];
-    api.onCancelled((e) => cancelledEvents.push(e.reason));
+    api.onCancelled((event) => cancelledEvents.push(event.reason));
 
     const first = api.search({ text: 'first' });
     await tick();
@@ -156,7 +162,7 @@ describe('search session', () => {
     await expect(first).resolves.toEqual({ status: 'superseded', hitCount: expect.any(Number) });
     await expect(second).resolves.toEqual({ status: 'complete', hitCount: 1 });
     expect(api.getQuery()?.text).toBe('second');
-    expect(api.listHits().map((h) => h.page.pageObjectNumber)).toEqual([7]);
+    expect(api.listHits().map((hit) => hit.page.pageObjectNumber)).toEqual([7]);
     expect(cancelledEvents).toEqual(['superseded']);
     await kernel.destroy();
   });
@@ -185,8 +191,8 @@ describe('search session', () => {
     const { kernel, api } = await boot([new EngineError('Unknown', 'worker died')]);
     const failed = vi.fn();
     api.onFailed(failed);
-    await expect(api.search({ text: 'x' })).rejects.toSatisfy((e) =>
-      isPluginError(e, 'operation-failed'),
+    await expect(api.search({ text: 'x' })).rejects.toSatisfy((error) =>
+      isPluginError(error, 'operation-failed'),
     );
     expect(api.getStatus()).toBe('error');
     expect(api.getError()).toMatchObject({ code: 'operation-failed', message: 'worker died' });
@@ -194,16 +200,16 @@ describe('search session', () => {
     await kernel.destroy();
   });
 
-  it('degrades full → rects when snippets are denied, unless the mode is pinned', async () => {
+  it('drops snippets when they are denied, unless snippets are pinned', async () => {
     const { kernel, api, requests } = await boot([
       new PermissionDenied('doc.text.copy'),
       slice([], null, 2),
       slice([], null, 2),
     ]);
     await api.search({ text: 'x' });
-    expect(requests.map((r) => r.mode)).toEqual(['full', 'rects']);
-    await api.findAll({ text: 'x' }, { mode: 'rects' });
-    expect(requests[2].mode).toBe('rects');
+    expect(requests.map((request) => request.snippets)).toEqual([true, false]);
+    await api.findAll({ text: 'x' }, { snippets: false });
+    expect(requests[2].snippets).toBe(false);
     await kernel.destroy();
   });
 
@@ -211,12 +217,12 @@ describe('search session', () => {
     const { kernel, api } = await boot([slice([match(5, 0), match(5, 9), match(7, 2)], null, 2)]);
     await api.search({ text: 'x' });
     const changes: number[] = [];
-    api.onActiveHitChanged((e) => changes.push(e.index));
-    expect(api.nextHit()?.charStart).toBe(9);
-    expect(api.nextHit()?.charStart).toBe(2);
-    expect(api.nextHit()?.charStart).toBe(0); // wrapped
-    expect(api.previousHit()?.charStart).toBe(2);
-    expect(api.goToHit(1)?.charStart).toBe(9);
+    api.onActiveHitChanged((event) => changes.push(event.index));
+    expect(api.nextHit()?.start).toBe(9);
+    expect(api.nextHit()?.start).toBe(2);
+    expect(api.nextHit()?.start).toBe(0); // wrapped
+    expect(api.previousHit()?.start).toBe(2);
+    expect(api.goToHit(1)?.start).toBe(9);
     api.goToHit(1); // no change, no event
     expect(changes).toEqual([1, 2, 0, 2, 1]);
     await kernel.destroy();
@@ -232,7 +238,7 @@ describe('search session', () => {
     const pending = api.findAll({ text: 'y' }, { signal: controller.signal });
     await tick();
     controller.abort();
-    await expect(pending).rejects.toSatisfy((e) => isPluginError(e, 'operation-cancelled'));
+    await expect(pending).rejects.toSatisfy((error) => isPluginError(error, 'operation-cancelled'));
     expect(held[0].aborted).toBe(true);
     await kernel.destroy();
   });
@@ -242,17 +248,17 @@ describe('search session', () => {
     const { kernel, api, requests, emit } = await boot([slice([], null, 2), slice([], null, 2)]);
     await api.search({ text: 'x' });
     expect(requests.length).toBe(1);
-    emit({ type: 'annotation.created' });
-    emit({ type: 'annotation.updated' });
+    emit({ type: 'annotations.created' });
+    emit({ type: 'annotations.updated' });
     await vi.advanceTimersByTimeAsync(300);
     expect(requests.length).toBe(2);
     await kernel.destroy();
   });
 
-  it('canSearch composes text.search and, for full, text.copy', async () => {
+  it('canSearch composes text.search and, for snippets, text.copy', async () => {
     const { kernel, api } = await boot([]);
     expect(api.canSearch()).toBe(true);
-    expect(api.canSearch('full')).toBe(true);
+    expect(api.canSearch({ snippets: true })).toBe(true);
     await kernel.destroy();
   });
 });

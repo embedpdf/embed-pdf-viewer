@@ -1,23 +1,23 @@
 /**
- * The ONE place React becomes Preact. Everything above this build — the
+ * The one place React becomes Preact. Everything above this build — the
  * chrome, the React adapter — is written against react/react-dom; this
  * config aliases the whole family to preact/compat, so the shipped artifact
  * carries no React and peers with nothing. Consumers (CDN scripts, framework
  * wrappers) load dist — they never compile the chrome themselves.
  *
- * TWO BUILD PASSES (see package.json's build script):
+ * Two build passes (see package.json's build script):
  *
  *   1. `vite build` — the npm entry (`dist/index.js`). The engine is
- *      EXTERNALIZED: it is pure TS (no react aliasing needed), and consumers'
+ *      externalized: it is pure TS (no react aliasing needed), and consumers'
  *      bundlers must process it themselves so the engine's bundler-resolved
  *      wasm default (`new URL('./lib/embedpdf.wasm', import.meta.url)` inside
- *      @embedpdf/engine-runtime-wasm32/wasm-url) lands in THEIR asset
+ *      @embedpdf/engine-runtime-wasm32/wasm-url) lands in their asset
  *      pipeline — that is what makes <PDFViewer> zero-config in Next/Vite.
  *      Prebundling the engine would freeze that URL against this package
  *      instead, and Vite lib mode would inline the 6 MB binary as base64.
  *
  *   2. `vite build --mode snippet` — the CDN artifact (`dist/embedpdf.js`),
- *      fully self-contained: engine bundled, `embedpdf.wasm` EMITTED into
+ *      fully self-contained: engine bundled, `embedpdf.wasm` emitted into
  *      dist by Vite from an explicit `?url&no-inline` asset import (the
  *      snippet door's own, and the engine's default via the alias below), so
  *      every chunk references it by a correct relative URL — the folder is
@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 
-// Absolute file paths, resolved from THIS package: the react imports being
+// Absolute file paths, resolved from this package: the react imports being
 // aliased live in @embedpdf/viewer-chrome and @embedpdf/react, whose own
 // node_modules have no preact (pnpm is strict) — a bare-specifier replacement
 // would re-resolve from the importer and fail.
@@ -36,7 +36,7 @@ const preact = (specifier: string) => fileURLToPath(import.meta.resolve(specifie
 
 export default defineConfig(({ mode }) => {
   const snippet = mode === 'snippet';
-  // One entry per DOOR (src/doors/*), keeping the historical output names:
+  // One entry per door (src/doors/*), keeping the historical output names:
   // the local door ships as index.js, the engine-agnostic one as core.js.
   const entry: Record<string, string> = snippet
     ? { embedpdf: 'src/doors/snippet.ts' }
@@ -53,7 +53,7 @@ export default defineConfig(({ mode }) => {
         ...(snippet
           ? [
               {
-                // The engine's default wasm location becomes an EMITTED asset
+                // The engine's default wasm location becomes an emitted asset
                 // (build/wasm-url-asset.js) instead of 6 MB of base64.
                 // Anchored on the package dir: vite executes this config from
                 // a .vite-temp copy, so import.meta-relative paths break.
@@ -77,7 +77,7 @@ export default defineConfig(({ mode }) => {
     build: {
       target: 'es2020',
       sourcemap: true,
-      // public/ is the DEV harness's demo PDF — not part of the artifact.
+      // public/ is the dev harness's demo PDF — not part of the artifact.
       copyPublicDir: false,
       // The snippet pass adds to the npm pass's dist (the build script cleans
       // dist first; chunk names are content-hashed, so no collisions).
@@ -91,7 +91,7 @@ export default defineConfig(({ mode }) => {
         // npm pass only: the engine (and its lazily-imported worker-source
         // module) stays a bare import for the consumer's bundler to process —
         // and so does `@embedpdf/default-stamps/library`, whose lazy locale
-        // modules then become chunks of THE CONSUMER's build (one copy, next
+        // modules then become chunks of the consumer's build (one copy, next
         // to their other code) instead of being duplicated into this dist.
         // The snippet pass bundles them: its folder is the unit of delivery.
         external: snippet
@@ -100,7 +100,7 @@ export default defineConfig(({ mode }) => {
               id === '@embedpdf/engine' ||
               id.startsWith('@embedpdf/engine/') ||
               id.startsWith('@embedpdf/default-stamps/'),
-        // Chunks land in chunks/, imported RELATIVELY from the entry —
+        // Chunks land in chunks/, imported relatively from the entry —
         // relocatable as a folder. The snippet's one emitted asset keeps its
         // plain name: `dist/embedpdf.wasm`, the documented sibling.
         output: {

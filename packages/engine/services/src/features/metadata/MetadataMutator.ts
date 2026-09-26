@@ -32,9 +32,9 @@ export class MetadataMutator {
     throwIfAborted(signal);
 
     // Re-read the canonical metadata off the mutated session via the
-    // shared reader (identical output local + cloud). `cache` is null —
-    // local engines have no manifest/CDN.
+    // shared reader (identical output local + cloud). No cache delta:
+    // local engines have no manifest/CDN; the server adds its own.
     const metadata = new MetadataReader(this.runtime, this.session).read(signal);
-    return { metadata, cache: null };
+    return { metadata, meta: { affectedPages: [], cacheDelta: null } };
   }
 }

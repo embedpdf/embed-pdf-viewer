@@ -1,0 +1,112 @@
+---
+title: Setup
+description: Install the local engine, create it once for your app, and run it in any bundler, with server-side rendering, or in Node.
+---
+
+import { Callout } from '@/components/docs/callout';
+
+# Setup
+
+```sh npm2yarn
+npm install @embedpdf/engine
+```
+
+## Create the engine once
+
+Create one engine when your app starts and share it everywhere:
+
+```ts
+// pdf.ts
+import { localEngine } from '@embedpdf/engine';
+
+export const engine = localEngine();
+```
+
+`localEngine()` returns right away and does no work yet. The first `open()` starts PDFium in a
+Web Worker; calls you make while it starts wait for it, so you never check whether it's ready.
+To start it early, for example while the rest of your app loads, call `engine.warmup()`.
+
+One engine holds any number of open documents. Close each document when you're done with it
+(`doc.close()`), and keep the engine for the life of your app.
+
+## Bundlers
+
+The engine's worker and its WebAssembly file ship inside the package. Vite, webpack 5 (and
+Next.js), Rollup and Parcel pick them up without any configuration: there's nothing to copy and
+nothing is fetched from a CDN.
+
+If your setup can't bundle a worker (a strict Content Security Policy, an older bundler), host
+the files yourself: [Self-hosting](/docs/viewer/self-hosting) lists every option.
+
+## Server-side rendering
+
+A module-level `localEngine()` is safe in Next.js, Nuxt and SvelteKit: it does nothing until you
+open a document, and that only happens in the browser. In the Next.js App Router, mark the
+component that opens documents with `'use client'`.
+
+## Node.js
+
+The same call works in Node. There the engine runs PDFium in the same process, natively when
+your platform has a build and as WebAssembly otherwise:
+
+```ts
+import { readFile, writeFile } from 'node:fs/promises';
+import { localEngine } from '@embedpdf/engine';
+
+const engine = localEngine();
+const doc = await engine.open({ kind: 'bytes', bytes: await readFile('in.pdf') });
+
+// …change the document…
+
+await writeFile('out.pdf', await doc.download());
+await doc.close();
+await engine.destroy();
+```
+
+In a script, destroy the engine at the end so the process can exit.
+
+Rendering works in Node without a canvas: `render.image()` gives you PNG or BMP bytes. WebP needs a
+canvas, so in Node pass your own `imageEncoder` (for example one built on `sharp`) if you need it.
+To pick the runtime yourself, pass `runtime: { prefer: 'wasm' }` or `{ prefer: 'native' }`.
+
+## Fonts
+
+Text the engine draws (a free text annotation, a filled form field) needs a font that has its
+characters. For languages the built-in fonts don't cover, give the engine a fallback font when you
+create it:
+
+```ts
+const engine = localEngine({
+  fallbackFonts: [{ key: 'noto-cjk', familyName: 'Noto Sans CJK', url: '/fonts/NotoSansCJK.ttf' }],
+});
+```
+
+The font is loaded while the engine starts, so it's ready before the first document opens.
+[Fonts](/docs/engine/documents/fonts) covers registering fonts later and using them by name.
+
+## With a viewer
+
+The viewer can use your engine or create its own:
+
+- `<Viewer engine={engine} />` uses your engine and never destroys it. Share one engine across
+  every viewer in your app.
+- `<Viewer engine={() => localEngine()} />` lets the viewer create an engine when it mounts and
+  destroy it when it unmounts.
+
+<Callout type="info">
+  Building your own viewer interface? The [headless documentation](/docs/headless/getting-started)
+  wires the engine to pages, selection and annotation tools for you.
+</Callout>
+
+## Options
+
+| Option                 | What it does                                                                                                                                     |
+| :--------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fallbackFonts`        | Fonts used for characters the document's own fonts don't have.                                                                                   |
+| `fonts`                | Fonts you use by name only (a free text `fontFamily`), not as fallback.                                                                          |
+| `worker`               | Your own worker: a `Worker`, a function returning one, a URL, or `'inline'`.                                                                     |
+| `wasmUrl`              | Where to load the WebAssembly file from, when you host it yourself.                                                                              |
+| `renderPolicy`         | The render sizes documents answer with; see [Render policy](/docs/engine/documents/rendering#render-policy).                                     |
+| `imageEncoder`         | Your own image encoder, for formats the engine can't encode where it runs (WebP in Node).                                                        |
+| `signedDocumentPolicy` | `'permit'` stops the engine refusing what signatures forbid; see [Turning protection off](/docs/engine/forms/signatures#turning-protection-off). |
+| `runtime`              | In Node: `{ prefer: 'native' }` or `{ prefer: 'wasm' }`. The engine picks native when it can.                                                    |

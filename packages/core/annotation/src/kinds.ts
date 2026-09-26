@@ -1,32 +1,32 @@
 /**
- * The annotation KIND table — the single declarative source for "what an
- * annotation of this subtype IS and what you can do to it". Pure DATA (no
+ * The annotation kind table — the single declarative source for "what an
+ * annotation of this subtype is and what you can do to it". Pure data (no
  * closures), keyed by subtype, so it ports to Rust as a static table and replaces
  * the scattered `subtype`/`geom.t` switches and the old binary `EDITABLE_SUBTYPES`.
  *
  * Two layers meet here:
- *   • `variant` — which {@link Geom} primitive the kind renders/hit-tests as.
+ *   • `variant` — which {@link ContentGeometry} primitive the kind renders/hit-tests as.
  *     Several subtypes share one (square+circle → `rect`, the markups → `quads`).
- *   • `caps` — ORTHOGONAL capability flags. "Editable" was one boolean that
+ *   • `caps` — orthogonal capability flags. "Editable" was one boolean that
  *     conflated selectable / movable / resizable / vertex-editable; splitting it
  *     is what lets text-markup be *selectable but not movable*, a note icon be
  *     *movable but not resizable*, and so on — without new code paths.
  *
- * Creation lives on TOOLS (a later layer), not here: many tools can target one
+ * Creation lives on tools (a later layer), not here: many tools can target one
  * kind (ink vs ink-highlight, line vs arrow). A kind is the editing/identity
  * surface; a tool is the authoring surface.
  */
-import type { Geom, Subtype } from './types';
+import type { ContentGeometry, Subtype } from './types';
 
 /**
  * One editable property of a kind, as a UI contract: which {@link AnnotationProps}
  * key, rendered how (the union arm fixes the control + its constraints), labelled
  * what by default. A property sidebar is a `switch (spec.key)` over these — the
- * per-kind lists below are the v2 snippet's hand-rolled `TOOL_PROPERTIES` schema,
- * promoted into the library so every consumer gets it for free.
+ * per-kind lists below are the property schema, kept in the library so every
+ * consumer gets it for free.
  *
  * `label` is a default (English) display name — apps with i18n map `key`s to
- * their own strings and ignore it. Array ORDER is display order.
+ * their own strings and ignore it. Array order is display order.
  */
 export type PropSpec =
   | { key: 'color'; label: string }
@@ -49,7 +49,7 @@ export type PropSpec =
   /** `/Name` icon picker for icon kinds; `options` are the legal names. */
   | { key: 'icon'; label: string; options: readonly string[] }
   /** Link-target editor (URL / page destination). Declared by the link kind
-   *  (its own target) and by every kind that may carry an ATTACHED link;
+   *  (its own target) and by every kind that may carry an attached link;
    *  kinds that omit it (widgets, caret, redact…) simply cannot be links —
    *  `applyProps` drops the key and menus never show the control. */
   | { key: 'link'; label: string };
@@ -68,13 +68,13 @@ export interface KindCaps {
   vertexEditable: boolean;
   /** Can be rotated (shapes, free text, lines/polys/ink). */
   rotatable: boolean;
-  /** Can be MOVED as part of a multi-target (group) transform. */
+  /** Can be moved as part of a multi-target (group) transform. */
   groupMovable: boolean;
-  /** Can be uniformly SCALED as part of a multi-target (group) transform — ON
+  /** Can be uniformly scaled as part of a multi-target (group) transform — on
    *  even for vertex kinds that have no single-shape box resize (their handles
-   *  ARE the vertices; in a group they scale fine). */
+   *  are the vertices; in a group they scale fine). */
   groupResizable: boolean;
-  /** Can be ROTATED as part of a multi-target (group) transform. */
+  /** Can be rotated as part of a multi-target (group) transform. */
   groupRotatable: boolean;
   /** Carries editable text content (free text, the comment popup). */
   textEditable: boolean;
@@ -91,10 +91,10 @@ export interface KindCaps {
   /** Can take a cloudy border effect (`/BE` — shapes). */
   hasCloudy: boolean;
   /** The whole body is visible content, so hit-testing grabs anywhere inside
-   *  the box (stamp images) — NOT just the stroke/fill like outline shapes. */
+   *  the box (stamp images) — not just the stroke/fill like outline shapes. */
   opaqueBody: boolean;
-  /** The `/F` ReadOnly flag is IGNORED for this kind (ISO 32000: widgets — a
-   *  ReadOnly form FIELD must still be movable by a form designer; the
+  /** The `/F` ReadOnly flag is ignored for this kind (ISO 32000: widgets — a
+   *  ReadOnly form field must still be movable by a form designer; the
    *  form-filling layer enforces field ReadOnly itself). */
   ignoresReadOnly: boolean;
   /** Behaves as if `/F` NoZoom is always set (screen-constant size — the
@@ -109,9 +109,9 @@ export interface AnnotationKind {
   subtype: Subtype;
   /** Future: PDF `/IT` intent (free-text vs callout, caret insert vs replace). */
   intent?: string;
-  variant: Geom['t'];
+  variant: ContentGeometry['kind'];
   caps: KindCaps;
-  /** The kind's editable properties, in DISPLAY ORDER — the contract a property
+  /** The kind's editable properties, in display order — the contract a property
    *  sidebar renders from (see {@link PropSpec}). Empty = nothing to edit. */
   props: PropSpec[];
 }
@@ -160,8 +160,8 @@ const SHAPE_PROPS: PropSpec[] = [STROKE, FILL, OPACITY, STROKE_WIDTH, BORDER_CLO
 
 // Widget-plane styling: every family has a box; text-bearing families add
 // the /DA vocabulary. Same flat keys as every other kind — the writer maps
-// them onto /MK//BS//DA//Q underneath. One PDF subtype, several CLIENT
-// kinds (the free-text/callout precedent): the field FAMILY picks the kind,
+// them onto /MK//BS//DA//Q underneath. One PDF subtype, several client
+// kinds (the free-text/callout precedent): the field family picks the kind,
 // so a radio never offers a font and the schema-driven sidebar needs no
 // widget-specific code.
 const WIDGET_BOX_PROPS: PropSpec[] = [
@@ -178,7 +178,7 @@ const WIDGET_TEXT_PROPS: PropSpec[] = [
   { key: 'textAlign', label: 'Alignment' },
 ];
 /** Stroked vertex kinds with `/LE` endings: line / polyline. The fill colours a
- *  CLOSED ending (closed arrow / circle / square / diamond). */
+ *  Closed ending (closed arrow / circle / square / diamond). */
 const LINE_PROPS: PropSpec[] = [
   STROKE,
   FILL,
@@ -227,7 +227,7 @@ const TEXT_PROPS: PropSpec[] = [
 ];
 
 /** Build caps from a sparse override — everything not named is `false`. */
-const caps = (c: Partial<KindCaps>): KindCaps => ({
+const caps = (overrides: Partial<KindCaps>): KindCaps => ({
   selectable: false,
   movable: false,
   resizable: false,
@@ -247,7 +247,7 @@ const caps = (c: Partial<KindCaps>): KindCaps => ({
   ignoresReadOnly: false,
   noZoom: false,
   noRotate: false,
-  ...c,
+  ...overrides,
 });
 
 /** Read-only fallback for unknown/unsupported subtypes (render baked, no editing). */
@@ -470,7 +470,7 @@ export const KINDS: Record<string, AnnotationKind> = {
     props: MARK_PROPS,
   },
   // Redaction mark (the non-destructive stage of the two-stage model): created
-  // from a text selection (per-line quads) OR an area drag (rect-only geometry).
+  // from a text selection (per-line quads) or an area drag (rect-only geometry).
   // Text marks are anchored like markup; area marks move/resize — the
   // anchored+quads transform gate in hit.ts lets one caps set serve both
   // geometries.
@@ -513,7 +513,7 @@ export const KINDS: Record<string, AnnotationKind> = {
     props: [{ key: 'icon', label: 'Icon', options: NOTE_ICONS }, ICON_COLOR, OPACITY, LINKABLE],
   },
   // File attachment: the same fixed-icon shape as the note, but its primary
-  // surface is the embedded FILE (open/download), not a popup.
+  // surface is the embedded file (open/download), not a popup.
   'file-attachment': {
     subtype: 'file-attachment',
     variant: 'rect',
@@ -528,10 +528,11 @@ export const KINDS: Record<string, AnnotationKind> = {
     }),
     props: [{ key: 'icon', label: 'Icon', options: FILE_ATTACHMENT_ICONS }, ICON_COLOR, OPACITY],
   },
-  // Stamp: a rect-variant kind whose visual is ALWAYS the engine-baked /AP
+  // Stamp: a rect-variant kind whose visual is always the engine-baked /AP
   // (image or vector appearance authored at create time) — never a vector
-  // re-render, so it declares no editable style props. Geometry edits
-  // (move/resize/rotate) re-fit the appearance natively on the engine side.
+  // re-render. Its one style prop is opacity (/CA), which the engine paints
+  // over the whole drawing. Geometry edits (move/resize/rotate) and a new
+  // opacity re-bake the appearance natively on the engine side.
   stamp: {
     subtype: 'stamp',
     variant: 'rect',
@@ -546,13 +547,13 @@ export const KINDS: Record<string, AnnotationKind> = {
       commentable: true,
       opaqueBody: true,
     }),
-    props: [LINKABLE],
+    props: [OPACITY, LINKABLE],
   },
   // Link: an invisible hit rectangle that navigates somewhere. Paints nothing
   // of its own (scene() skips it; any /AP a PDF baked shows via the page
   // raster); `opaqueBody` gives whole-box hit-testing so the invisible rect
   // is grabbable when the link tool makes it editable. Its `link` prop is
-  // its OWN target (`/A`) — the one kind where the key doesn't route to an
+  // its own target (`/A`) — the one kind where the key doesn't route to an
   // attached child. No rotate: a link has no reading orientation.
   link: {
     subtype: 'link',

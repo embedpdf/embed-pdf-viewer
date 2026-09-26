@@ -1,20 +1,18 @@
 /**
- * The command vocabulary — the semantic layer. Ported in spirit from the v2
- * snippet's commands.ts, but every command is a pure value: label key, icon,
- * shortcut, derivations, and a `run` (or a declarative surface target). The
- * v2 `registry.getPlugin<T>(id)?.provides()` string-and-cast dance becomes a
- * typed `ctx.get(Token)`.
+ * The command vocabulary — the semantic layer. Every command is a pure value:
+ * label key, icon, shortcut, derivations, and a `run` (or a declarative
+ * surface target). Commands reach plugins through a typed
+ * `commandContext.tryGet(Token)`, never by string id and cast.
  *
- * Wiring reality (chrome-parity scope):
+ * Wiring:
  *   zoom/pan/pointer/spread/scroll/rotate  → real Stage / Interaction / PageEdit
  *   modes                                  → shell exclusive surfaces ('mode')
  *   panels / menus / modals                → declarative shell targets
  *   annotate + shape tools                 → real interaction tools
  *   form tools                             → real form plugin palette (draw-to-place)
- *   insert tools                           → real stamp library panel + image/
- *                                            attachment click-then-pick (signature
- *                                            still inert, via demo-tools)
- *   history undo/redo                      → disabled (no history plugin in v3 yet)
+ *   insert tools                           → real stamp and signature panels +
+ *                                            image/attachment click-then-pick
+ *   history undo/redo                      → disabled (there is no history plugin)
  */
 import type { CommandDef, IconAccent } from '@embedpdf/react/commands';
 import { DocumentsToken } from '@embedpdf/react/runtime';
@@ -40,37 +38,39 @@ type Ctx = Parameters<NonNullable<CommandDef['run']>>[0];
 /** Where selection-made stamps go: the user's own library, persisted. */
 const CUSTOM_LIBRARY_ID = 'embedpdf-custom';
 
-const stage = (c: Ctx) => c.tryGet(StageToken);
-const interaction = (c: Ctx) => c.tryGet(InteractionToken);
-const anno = (c: Ctx) => c.tryGet(AnnotationToken);
-const textSelection = (c: Ctx) => c.tryGet(SelectionToken);
-const sameTextRange = (a: TextRange | null, b: TextRange | null): boolean =>
-  a === b ||
-  (!!a &&
-    !!b &&
-    a.start.page.pageObjectNumber === b.start.page.pageObjectNumber &&
-    a.start.index === b.start.index &&
-    a.end.page.pageObjectNumber === b.end.page.pageObjectNumber &&
-    a.end.index === b.end.index);
+const stage = (commandContext: Ctx) => commandContext.tryGet(StageToken);
+const interaction = (commandContext: Ctx) => commandContext.tryGet(InteractionToken);
+const anno = (commandContext: Ctx) => commandContext.tryGet(AnnotationToken);
+const textSelection = (commandContext: Ctx) => commandContext.tryGet(SelectionToken);
+const sameTextRange = (left: TextRange | null, right: TextRange | null): boolean =>
+  left === right ||
+  (!!left &&
+    !!right &&
+    left.start.page.pageObjectNumber === right.start.page.pageObjectNumber &&
+    left.start.index === right.start.index &&
+    left.end.page.pageObjectNumber === right.end.page.pageObjectNumber &&
+    left.end.index === right.end.index);
 
 // ── annotation-selection predicates (drive the floating strip's contents) ────
-const hasAnnotationSelection = (c: Ctx) => (anno(c)?.getSelection().length ?? 0) > 0;
-/** v2 gated strip items per subtype (comment hidden on links/widgets) — here
- *  it's one derivation over the selected DTOs instead of per-command lookups. */
-const selectionSubtypes = (c: Ctx) =>
-  new Set((anno(c)?.listSelected() ?? []).map((a) => a.subtype));
+const hasAnnotationSelection = (commandContext: Ctx) =>
+  (anno(commandContext)?.getSelection().length ?? 0) > 0;
+/** Strip items gate per subtype (comment hidden on links/widgets) through
+ *  one derivation over the selected DTOs, not per-command lookups. */
+const selectionSubtypes = (commandContext: Ctx) =>
+  new Set((anno(commandContext)?.listSelected() ?? []).map((annotation) => annotation.subtype));
 /**
  * The selection's `link` value: a target, `null` (linkable but none set), or
  * `undefined` when the selection cannot carry a link at all (widgets, mixed
  * link states) — the schema decides, never a subtype blocklist.
  */
-const selectionLink = (c: Ctx): PdfLinkTarget | null | undefined => {
-  const p = anno(c)?.getSelectionProps();
-  if (!p || !p.specs.some((s) => s.key === 'link') || p.mixed.includes('link')) return undefined;
-  return (p.values.link ?? null) as PdfLinkTarget | null;
+const selectionLink = (commandContext: Ctx): PdfLinkTarget | null | undefined => {
+  const props = anno(commandContext)?.getSelectionProps();
+  if (!props || !props.specs.some((spec) => spec.key === 'link') || props.mixed.includes('link'))
+    return undefined;
+  return (props.values.link ?? null) as PdfLinkTarget | null;
 };
 
-// ── tool icon accents: THIS viewer's design decision ─────────────────────────
+// ── tool icon accents: This viewer's design decision ─────────────────────────
 // A tool declares which drawing default each colored part of its glyph previews.
 // This is intentionally explicit at the command definition: property-panel order
 // does not determine icon meaning, and another viewer may make a different choice.
@@ -81,35 +81,35 @@ export interface ToolAccentDefinition {
 }
 
 /**
- * toolId → the SAME icon + accent definition its toolbar button uses, recorded
- * as a side effect of the `tool()` command definitions below — ONE source of
+ * toolId → the same icon + accent definition its toolbar button uses, recorded
+ * as a side effect of the `tool()` command definitions below — one source of
  * truth, so the tool cursor (ui/tool-cursor.tsx) and the button can never
  * drift apart.
  */
 export const TOOL_ICONS: Record<string, { icon: string; accent?: ToolAccentDefinition }> = {};
 
-// The `stamp` tool has no toolbar button of its own: it is ARMED by the stamps
+// The `stamp` tool has no toolbar button of its own: it is armed by the stamps
 // panel (picking a library asset), never activated directly — so its cursor
 // skin is recorded here rather than as a side effect of a `tool()` definition.
 TOOL_ICONS['stamp'] = { icon: 'rubberStamp' };
 
 const toolAccent = (
-  c: Ctx,
+  commandContext: Ctx,
   toolId: string,
   accent: ToolAccentDefinition | undefined,
 ): IconAccent | null => {
   if (!accent) return null;
-  const anno = c.tryGet(AnnotationToken);
+  const anno = commandContext.tryGet(AnnotationToken);
   if (!anno) return null;
-  const d = anno.getToolDefaults(toolId);
+  const props = anno.getToolDefaults(toolId);
   return {
-    primary: d[accent.primary] ?? undefined,
-    secondary: accent.secondary ? (d[accent.secondary] ?? undefined) : undefined,
+    primary: props[accent.primary] ?? undefined,
+    secondary: accent.secondary ? (props[accent.secondary] ?? undefined) : undefined,
   };
 };
 
 /** A tool command: activates a real interaction tool; active = it's the tool.
- *  The icon previews the tool's current defaults — keyed by the SAME toolId
+ *  The icon previews the tool's current defaults — keyed by the same toolId
  *  as run/active, so the accent can't drift to another tool's colors. */
 const tool = (
   id: string,
@@ -119,29 +119,30 @@ const tool = (
   accent?: ToolAccentDefinition,
 ): CommandDef => {
   TOOL_ICONS[toolId] = { icon, ...(accent ? { accent } : {}) };
-  // Authoring tools grey out without their family's authority — the SAME
+  // Authoring tools grey out without their family's authority — the same
   // twin the owning plugin's gesture gate consults (permissions.md), so a
   // button can never offer a doomed paint: annotation/insert tools ask
   // annotation create authority, form-design tools ask `form.canDesign()`,
   // the redact marker asks `redaction.canMark()`. Absent plugin → ungated
   // (a build without the plugin has no authority question to ask).
-  const authority: ((c: Ctx) => boolean) | null =
+  const authority: ((commandContext: Ctx) => boolean) | null =
     id.startsWith('annotation:add') || id.startsWith('insert:add')
-      ? (c) => anno(c)?.canCreate() ?? true
+      ? (commandContext) => anno(commandContext)?.canCreate() ?? true
       : id.startsWith('form:add')
-        ? (c) => c.tryGet(FormToken)?.canDesign() ?? true
+        ? (commandContext) => commandContext.tryGet(FormToken)?.canDesign() ?? true
         : id === 'redaction:redact'
-          ? (c) => c.tryGet(RedactionToken)?.canMark() ?? true
+          ? (commandContext) => commandContext.tryGet(RedactionToken)?.canMark() ?? true
           : null;
   return {
     id,
     labelKey,
     icon,
     categories: ['tool'],
-    run: (c) => interaction(c)?.activateTool(toolId),
-    active: (c) => interaction(c)?.getActiveToolId() === toolId,
-    enabled: (c) => interaction(c) != null && (authority?.(c) ?? true),
-    iconAccent: (c) => toolAccent(c, toolId, accent),
+    run: (commandContext) => interaction(commandContext)?.activateTool(toolId),
+    active: (commandContext) => interaction(commandContext)?.getActiveToolId() === toolId,
+    enabled: (commandContext) =>
+      interaction(commandContext) != null && (authority?.(commandContext) ?? true),
+    iconAccent: (commandContext) => toolAccent(commandContext, toolId, accent),
   };
 };
 
@@ -150,8 +151,8 @@ const zoomLevel = (id: string, level: number, label: string): CommandDef => ({
   id,
   labelKey: label,
   categories: ['zoom', 'zoom-level'],
-  run: (c) => stage(c)?.zoomTo({ level }),
-  enabled: (c) => stage(c) != null,
+  run: (commandContext) => stage(commandContext)?.zoomTo({ level }),
+  enabled: (commandContext) => stage(commandContext) != null,
 });
 
 const spread = (id: string, mode: SpreadMode, labelKey: string, icon: string): CommandDef => ({
@@ -159,9 +160,9 @@ const spread = (id: string, mode: SpreadMode, labelKey: string, icon: string): C
   labelKey,
   icon,
   categories: ['page', 'spread'],
-  run: (c) => stage(c)?.setSpread(mode),
-  active: (c) => stage(c)?.getSettings().spread === mode,
-  enabled: (c) => stage(c) != null,
+  run: (commandContext) => stage(commandContext)?.setSpread(mode),
+  active: (commandContext) => stage(commandContext)?.getSettings().spread === mode,
+  enabled: (commandContext) => stage(commandContext) != null,
 });
 
 export const defaultCommands: CommandDef[] = [
@@ -172,8 +173,8 @@ export const defaultCommands: CommandDef[] = [
     icon: 'zoomIn',
     shortcut: ['Mod+=', 'Mod+NumpadAdd'],
     categories: ['zoom'],
-    run: (c) => stage(c)?.zoomIn(),
-    enabled: (c) => stage(c) != null,
+    run: (commandContext) => stage(commandContext)?.zoomIn(),
+    enabled: (commandContext) => stage(commandContext) != null,
   },
   {
     id: 'zoom:out',
@@ -181,8 +182,8 @@ export const defaultCommands: CommandDef[] = [
     icon: 'zoomOut',
     shortcut: ['Mod+-', 'Mod+NumpadSubtract'],
     categories: ['zoom'],
-    run: (c) => stage(c)?.zoomOut(),
-    enabled: (c) => stage(c) != null,
+    run: (commandContext) => stage(commandContext)?.zoomOut(),
+    enabled: (commandContext) => stage(commandContext) != null,
   },
   {
     id: 'zoom:fit-page',
@@ -190,9 +191,9 @@ export const defaultCommands: CommandDef[] = [
     icon: 'fitToPage',
     shortcut: 'Mod+0',
     categories: ['zoom'],
-    run: (c) => stage(c)?.fitPage(),
-    active: (c) => stage(c)?.getZoomMode() === ZoomMode.FitPage,
-    enabled: (c) => stage(c) != null,
+    run: (commandContext) => stage(commandContext)?.fitPage(),
+    active: (commandContext) => stage(commandContext)?.getZoomMode() === ZoomMode.FitPage,
+    enabled: (commandContext) => stage(commandContext) != null,
   },
   {
     id: 'zoom:fit-width',
@@ -200,17 +201,17 @@ export const defaultCommands: CommandDef[] = [
     icon: 'fitToWidth',
     shortcut: 'Mod+1',
     categories: ['zoom'],
-    run: (c) => stage(c)?.fitWidth(),
-    active: (c) => stage(c)?.getZoomMode() === ZoomMode.FitWidth,
-    enabled: (c) => stage(c) != null,
+    run: (commandContext) => stage(commandContext)?.fitWidth(),
+    active: (commandContext) => stage(commandContext)?.getZoomMode() === ZoomMode.FitWidth,
+    enabled: (commandContext) => stage(commandContext) != null,
   },
   {
     id: 'zoom:automatic',
     labelKey: 'commands.zoom.automatic',
     categories: ['zoom'],
-    run: (c) => stage(c)?.fitAutomatic(),
-    active: (c) => stage(c)?.getZoomMode() === ZoomMode.Automatic,
-    enabled: (c) => stage(c) != null,
+    run: (commandContext) => stage(commandContext)?.fitAutomatic(),
+    active: (commandContext) => stage(commandContext)?.getZoomMode() === ZoomMode.Automatic,
+    enabled: (commandContext) => stage(commandContext) != null,
   },
   zoomLevel('zoom:50', 0.5, 'commands.zoom.p50'),
   zoomLevel('zoom:100', 1, 'commands.zoom.p100'),
@@ -231,18 +232,18 @@ export const defaultCommands: CommandDef[] = [
     labelKey: 'commands.pan',
     icon: 'hand',
     categories: ['tools'],
-    run: (c) => interaction(c)?.activateTool('pan'),
-    active: (c) => interaction(c)?.getActiveToolId() === 'pan',
-    enabled: (c) => interaction(c) != null,
+    run: (commandContext) => interaction(commandContext)?.activateTool('pan'),
+    active: (commandContext) => interaction(commandContext)?.getActiveToolId() === 'pan',
+    enabled: (commandContext) => interaction(commandContext) != null,
   },
   {
     id: 'pointer:toggle',
     labelKey: 'commands.pointer',
     icon: 'pointer',
     categories: ['tools'],
-    run: (c) => interaction(c)?.activateTool('pointer'),
-    active: (c) => interaction(c)?.getActiveToolId() === 'pointer',
-    enabled: (c) => interaction(c) != null,
+    run: (commandContext) => interaction(commandContext)?.activateTool('pointer'),
+    active: (commandContext) => interaction(commandContext)?.getActiveToolId() === 'pointer',
+    enabled: (commandContext) => interaction(commandContext) != null,
   },
 
   // ── panels (declarative shell targets) ──────────────────────────────────
@@ -258,7 +259,7 @@ export const defaultCommands: CommandDef[] = [
     labelKey: 'commands.search',
     icon: 'search',
     // No doc.text.search → every query would 403; the panel has no job.
-    visible: (c) => c.tryGet(SearchToken)?.canSearch() ?? true,
+    visible: (commandContext) => commandContext.tryGet(SearchToken)?.canSearch() ?? true,
     categories: ['panel'],
     panel: { id: 'search', exclusive: 'right' },
   },
@@ -267,7 +268,7 @@ export const defaultCommands: CommandDef[] = [
     labelKey: 'commands.comment',
     icon: 'comment',
     // No doc.annotate.read → there is nothing this panel could show.
-    visible: (c) => anno(c)?.canRead() ?? true,
+    visible: (commandContext) => anno(commandContext)?.canRead() ?? true,
     categories: ['panel'],
     panel: { id: 'comment', exclusive: 'right' },
   },
@@ -301,32 +302,33 @@ export const defaultCommands: CommandDef[] = [
     labelKey: 'commands.download',
     icon: 'download',
     categories: ['document'],
-    run: (c) => {
-      const id = c.documentId ?? undefined;
-      const documents = c.tryGet(DocumentsToken);
+    run: (commandContext) => {
+      const id = commandContext.documentId ?? undefined;
+      const documents = commandContext.tryGet(DocumentsToken);
       if (!documents) return;
       const pull = () => documents.save(id);
-      // The Phase-4 verb-owner contract: WS → serialize → DS as ONE queued
-      // operation, so the WillSave mutations are IN the downloaded bytes
-      // and two rapid saves can never interleave. Without the actions
-      // plugin this degrades to a plain download.
-      const actions = c.tryGet(ActionsToken);
+      // The actions plugin owns the save verb: WillSave → serialize → DidSave
+      // run as one queued operation, so the WillSave mutations are in the
+      // downloaded bytes and two rapid saves can never interleave. Without the
+      // actions plugin this degrades to a plain download.
+      const actions = commandContext.tryGet(ActionsToken);
       (actions ? actions.runDocumentVerb('save', pull) : pull())
         .then((bytes) => {
           const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' });
           const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = 'document.pdf';
-          a.click();
+          const anchor = document.createElement('a');
+          anchor.href = url;
+          anchor.download = 'document.pdf';
+          anchor.click();
           URL.revokeObjectURL(url);
         })
-        .catch((e) => console.warn('[snippet-react] download failed', e));
+        .catch((error) => console.warn('[snippet-react] download failed', error));
     },
     // The permissions.md chrome exception: a kernel verb with a 1:1
     // capability reads the kernel's `allows` directly — no owning plugin.
-    enabled: (c) =>
-      c.documentId != null && (c.tryGet(DocumentsToken)?.allows('doc.download') ?? false),
+    enabled: (commandContext) =>
+      commandContext.documentId != null &&
+      (commandContext.tryGet(DocumentsToken)?.allows('doc.download') ?? false),
   },
   {
     id: 'document:print',
@@ -337,14 +339,17 @@ export const defaultCommands: CommandDef[] = [
     // WP → window.print() → DP through the one serialized verb op (the
     // latch suppresses any nested script print); documentless chrome (or
     // no actions plugin) keeps today's direct dialog.
-    run: (c) => {
-      const actions = c.documentId != null ? c.tryGet(ActionsToken) : null;
+    run: (commandContext) => {
+      const actions =
+        commandContext.documentId != null ? commandContext.tryGet(ActionsToken) : null;
       if (actions) void actions.runDocumentVerb('print', () => window.print());
       else window.print();
     },
     // Same exception; documentless chrome (no doc open) keeps print enabled
     // for whatever the host page shows.
-    enabled: (c) => c.documentId == null || (c.tryGet(DocumentsToken)?.allows('doc.print') ?? true),
+    enabled: (commandContext) =>
+      commandContext.documentId == null ||
+      (commandContext.tryGet(DocumentsToken)?.allows('doc.print') ?? true),
   },
   {
     id: 'document:fullscreen',
@@ -367,38 +372,38 @@ export const defaultCommands: CommandDef[] = [
     labelKey: 'commands.scroll.vertical',
     icon: 'vertical',
     categories: ['page', 'scroll'],
-    run: (c) => stage(c)?.setLayout('vertical'),
-    active: (c) => stage(c)?.getSettings().layout === 'vertical',
-    enabled: (c) => stage(c) != null,
+    run: (commandContext) => stage(commandContext)?.setLayout('vertical'),
+    active: (commandContext) => stage(commandContext)?.getSettings().layout === 'vertical',
+    enabled: (commandContext) => stage(commandContext) != null,
   },
   {
     id: 'scroll:horizontal',
     labelKey: 'commands.scroll.horizontal',
     icon: 'horizontal',
     categories: ['page', 'scroll'],
-    run: (c) => stage(c)?.setLayout('horizontal'),
-    active: (c) => stage(c)?.getSettings().layout === 'horizontal',
-    enabled: (c) => stage(c) != null,
+    run: (commandContext) => stage(commandContext)?.setLayout('horizontal'),
+    active: (commandContext) => stage(commandContext)?.getSettings().layout === 'horizontal',
+    enabled: (commandContext) => stage(commandContext) != null,
   },
-  // VIEW rotation (Adobe's "Rotate View"): rotates how every page displays in
+  // View rotation (Adobe's "Rotate View"): rotates how every page displays in
   // the main stage lens — non-persistent, nothing written to the PDF. The
-  // PERMANENT per-page rotation (PageEditToken.rotateBy) belongs in a
+  // permanent per-page rotation (PageEditToken.rotateBy) belongs in a
   // page-organize surface, not behind the view-settings buttons.
   {
     id: 'rotate:clockwise',
     labelKey: 'commands.rotate.clockwise',
     icon: 'rotateClockwise',
     categories: ['page', 'rotate'],
-    run: (c) => stage(c)?.rotateViewBy(90),
-    enabled: (c) => stage(c) != null,
+    run: (commandContext) => stage(commandContext)?.rotateViewBy(90),
+    enabled: (commandContext) => stage(commandContext) != null,
   },
   {
     id: 'rotate:counter-clockwise',
     labelKey: 'commands.rotate.counterclockwise',
     icon: 'rotateCounterClockwise',
     categories: ['page', 'rotate'],
-    run: (c) => stage(c)?.rotateViewBy(-90),
-    enabled: (c) => stage(c) != null,
+    run: (commandContext) => stage(commandContext)?.rotateViewBy(-90),
+    enabled: (commandContext) => stage(commandContext) != null,
   },
 
   // ── modes (shell exclusive surfaces, tag 'mode') ────────────────────────
@@ -407,14 +412,14 @@ export const defaultCommands: CommandDef[] = [
     labelKey: 'commands.mode.view',
     categories: ['mode'],
     // View = no mode band. Close any open mode surface and drop to pointer.
-    run: (c) => {
-      const shell = c.tryGet(ShellToken);
-      for (const m of MODE_SURFACES) shell?.close(m);
-      interaction(c)?.activateTool('pointer');
+    run: (commandContext) => {
+      const shell = commandContext.tryGet(ShellToken);
+      for (const surface of MODE_SURFACES) shell?.close(surface);
+      interaction(commandContext)?.activateTool('pointer');
     },
-    active: (c) => {
-      const shell = c.tryGet(ShellToken);
-      return shell ? MODE_SURFACES.every((m) => !shell.isOpen(m)) : true;
+    active: (commandContext) => {
+      const shell = commandContext.tryGet(ShellToken);
+      return shell ? MODE_SURFACES.every((surface) => !shell.isOpen(surface)) : true;
     },
   },
   modeCommand('mode:annotate', 'commands.mode.annotate'),
@@ -496,7 +501,7 @@ export const defaultCommands: CommandDef[] = [
   }),
 
   // ── insert tools (stamp/image/attachment real; signature inert) ─────────
-  // Stamps open a LIBRARY, they are not a file dialog: the panel lists the
+  // Stamps open a library, they are not a file dialog: the panel lists the
   // reusable named assets the stamp plugin holds, and picking one arms the
   // annotation plugin's stamp tool with that asset's bytes (stamps-panel.tsx).
   // Arbitrary image bytes are `insert:add-image` below — a different gesture,
@@ -507,22 +512,23 @@ export const defaultCommands: CommandDef[] = [
     icon: 'rubberStamp',
     // No stamp plugin → no library to show. No create authority → nothing the
     // picker could place (the same twin every insert tool's button asks).
-    visible: (c) => c.tryGet(StampToken) != null,
-    enabled: (c) => anno(c)?.canCreate() ?? true,
+    visible: (commandContext) => commandContext.tryGet(StampToken) != null,
+    enabled: (commandContext) => anno(commandContext)?.canCreate() ?? true,
     categories: ['panel'],
     panel: { id: 'stamps', exclusive: 'right' },
   },
   // File attachment — click the spot, pick the file (the attachment provider).
   tool('insert:add-attachment', 'attachment', 'commands.insert.attachment', 'paperclip'),
-  // Signatures open the PEOPLE panel (libraries of kind 'signatures'): pick a
+  // Signatures open the people panel (libraries of kind 'signatures'): pick a
   // mark → with a target field it signs (or fills) it, else it arms — a click
   // on a signature field signs, anywhere else drops a stamp (Preview).
   {
     id: 'insert:add-signature',
     labelKey: 'commands.insert.signature',
     icon: 'signature',
-    visible: (c) => c.tryGet(StampToken) != null && c.tryGet(SignatureToken) != null,
-    enabled: (c) => anno(c)?.canCreate() ?? true,
+    visible: (commandContext) =>
+      commandContext.tryGet(StampToken) != null && commandContext.tryGet(SignatureToken) != null,
+    enabled: (commandContext) => anno(commandContext)?.canCreate() ?? true,
     categories: ['panel'],
     panel: { id: 'signatures', exclusive: 'right' },
   },
@@ -539,18 +545,18 @@ export const defaultCommands: CommandDef[] = [
   tool('form:add-listbox', 'form-listbox', 'commands.form.listbox', 'formListbox'),
   tool('form:add-signature', 'form-signature', 'commands.form.signature', 'signature'),
 
-  // ── redaction (v2 parity: the toolbar arms the tool; the panel owns the
-  // destructive verbs — Apply All / Clear live in the redaction sidebar) ────
+  // ── redaction (the toolbar arms the tool; the panel owns the destructive
+  // verbs — Apply All / Clear live in the redaction sidebar) ─────────────────
   tool('redaction:redact', 'redact', 'commands.redact.mark', 'redactArea'),
   {
     id: 'panel:redaction',
     labelKey: 'commands.redact.panel',
     icon: 'redactionSidebar',
-    // Useful to a session that can propose marks OR apply them; with neither
+    // Useful to a session that can propose marks or apply them; with neither
     // power the panel could only display other people's pending marks.
-    visible: (c) => {
-      const r = c.tryGet(RedactionToken);
-      return r ? r.canMark() || r.canApply() : true;
+    visible: (commandContext) => {
+      const redaction = commandContext.tryGet(RedactionToken);
+      return redaction ? redaction.canMark() || redaction.canApply() : true;
     },
     categories: ['panel'],
     panel: { id: 'redaction', exclusive: 'right' },
@@ -560,30 +566,27 @@ export const defaultCommands: CommandDef[] = [
     ...tool('measurement:distance', 'distance', 'measurement.distance', 'distance', {
       primary: 'color',
     }),
-    enabled: (c) => {
-      const s = stage(c);
-      const page = s?.getCurrentPage()?.ref;
-      return page != null && (c.tryGet(MeasurementToken)?.canMeasure(page) ?? false);
+    enabled: (commandContext) => {
+      const page = stage(commandContext)?.getCurrentPage()?.ref;
+      return page != null && (commandContext.tryGet(MeasurementToken)?.canMeasure(page) ?? false);
     },
   },
   {
     ...tool('measurement:perimeter', 'perimeter', 'measurement.perimeter', 'perimeter', {
       primary: 'color',
     }),
-    enabled: (c) => {
-      const s = stage(c);
-      const page = s?.getCurrentPage()?.ref;
-      return page != null && (c.tryGet(MeasurementToken)?.canMeasure(page) ?? false);
+    enabled: (commandContext) => {
+      const page = stage(commandContext)?.getCurrentPage()?.ref;
+      return page != null && (commandContext.tryGet(MeasurementToken)?.canMeasure(page) ?? false);
     },
   },
   {
     ...tool('measurement:area', 'area', 'measurement.area', 'area', {
       primary: 'color',
     }),
-    enabled: (c) => {
-      const s = stage(c);
-      const page = s?.getCurrentPage()?.ref;
-      return page != null && (c.tryGet(MeasurementToken)?.canMeasure(page) ?? false);
+    enabled: (commandContext) => {
+      const page = stage(commandContext)?.getCurrentPage()?.ref;
+      return page != null && (commandContext.tryGet(MeasurementToken)?.canMeasure(page) ?? false);
     },
   },
   {
@@ -591,9 +594,9 @@ export const defaultCommands: CommandDef[] = [
     labelKey: 'measurement.calibrate',
     icon: 'calibrate',
     categories: ['tool'],
-    enabled: (c) => c.tryGet(MeasurementToken)?.canCalibrate() ?? false,
-    active: (c) => interaction(c)?.getActiveToolId() === 'calibrate',
-    run: (c) => c.tryGet(MeasurementToken)?.startCalibration(),
+    enabled: (commandContext) => commandContext.tryGet(MeasurementToken)?.canCalibrate() ?? false,
+    active: (commandContext) => interaction(commandContext)?.getActiveToolId() === 'calibrate',
+    run: (commandContext) => commandContext.tryGet(MeasurementToken)?.startCalibration(),
   },
   {
     id: 'panel:measurement',
@@ -609,44 +612,44 @@ export const defaultCommands: CommandDef[] = [
     labelKey: 'commands.annotate.cancelCreation',
     categories: ['annotation'],
     shortcut: 'Escape',
-    enabled: (c) => anno(c)?.hasCreationDraft() ?? false,
-    run: (c) => anno(c)?.cancelCreationDraft(),
+    enabled: (commandContext) => anno(commandContext)?.hasCreationDraft() ?? false,
+    run: (commandContext) => anno(commandContext)?.cancelCreationDraft(),
   },
   {
     id: 'annotation:delete',
     labelKey: 'commands.annotate.delete',
     icon: 'trash',
     categories: ['annotation'],
-    run: (c) => {
-      const a = anno(c);
-      if (!a) return;
-      const form = c.tryGet(FormToken);
-      const dtos = a.listSelected();
+    run: (commandContext) => {
+      const annotation = anno(commandContext);
+      if (!annotation) return;
+      const form = commandContext.tryGet(FormToken);
+      const dtos = annotation.listSelected();
       const isWidget = (subtype: string) => subtype.startsWith('widget');
-      const widgets = form ? dtos.filter((d) => isWidget(d.subtype)) : [];
+      const widgets = form ? dtos.filter((annotation) => isWidget(annotation.subtype)) : [];
       if (widgets.length === 0) {
-        void a.deleteSelection();
+        void annotation.deleteSelection();
         return;
       }
-      // Widgets are FIELD-plane citizens: deleting one goes through doc.forms
+      // Widgets are field-plane citizens: deleting one goes through doc.forms
       // (the field and every widget of it cascade), never the raw annotation —
       // otherwise the /AcroForm entry would be orphaned.
       const fields = new Map<number, FormFieldRef>();
-      for (const w of widgets) {
-        const field = form!.getFieldForWidget(w.ref);
+      for (const annotation of widgets) {
+        const field = form!.getFieldForWidget(annotation.ref);
         if (field) fields.set(field.fieldObjectNumber, field.ref);
       }
       for (const ref of fields.values()) void form!.deleteField(ref);
-      for (const d of dtos) if (!isWidget(d.subtype)) void a.delete(d.ref);
-      a.clearSelection();
+      for (const dto of dtos) if (!isWidget(dto.subtype)) void annotation.delete(dto.ref);
+      annotation.clearSelection();
     },
     visible: hasAnnotationSelection,
     // Mirrors the engine's own authorization: locked/unauthorized annotations
     // keep the button visible but disabled (the engine still enforces).
-    enabled: (c) => {
-      const a = anno(c);
-      const refs = a?.getSelection() ?? [];
-      return refs.length > 0 && refs.every((r) => a!.canDelete(r));
+    enabled: (commandContext) => {
+      const annotation = anno(commandContext);
+      const refs = annotation?.getSelection() ?? [];
+      return refs.length > 0 && refs.every((ref) => annotation!.canDelete(ref));
     },
   },
   {
@@ -656,7 +659,8 @@ export const defaultCommands: CommandDef[] = [
     categories: ['annotation'],
     // Same 'comment' surface panel:comment toggles — `active` derives from it.
     panel: { id: 'comment', exclusive: 'right' },
-    visible: (c) => hasAnnotationSelection(c) && !selectionSubtypes(c).has('widget'),
+    visible: (commandContext) =>
+      hasAnnotationSelection(commandContext) && !selectionSubtypes(commandContext).has('widget'),
   },
   {
     id: 'annotation:style',
@@ -664,9 +668,8 @@ export const defaultCommands: CommandDef[] = [
     icon: 'palette',
     categories: ['annotation'],
     panel: { id: 'annotation-style', exclusive: 'right' },
-    // The kind table decides: no declared editable props → no style button
-    // (v2 hardcoded a subtype blocklist for this).
-    visible: (c) => (anno(c)?.getSelectionProps().specs.length ?? 0) > 0,
+    // The kind table decides: no declared editable props → no style button.
+    visible: (commandContext) => (anno(commandContext)?.getSelectionProps().specs.length ?? 0) > 0,
   },
   {
     // The selection becomes a reusable stamp: the engine flattens the
@@ -677,15 +680,15 @@ export const defaultCommands: CommandDef[] = [
     labelKey: 'commands.annotate.stampFromSelection',
     icon: 'rubberStampPlus',
     categories: ['annotation'],
-    run: (c) => {
-      const a = anno(c);
-      const stamp = c.tryGet(StampToken);
-      const documentId = c.documentId;
-      if (!a || !stamp || documentId == null) return;
-      const dtos = a.listSelected();
+    run: (commandContext) => {
+      const annotation = anno(commandContext);
+      const stamp = commandContext.tryGet(StampToken);
+      const documentId = commandContext.documentId;
+      if (!annotation || !stamp || documentId == null) return;
+      const dtos = annotation.listSelected();
       const page = dtos[0]?.ref.page;
       if (page === undefined) return;
-      const i18n = c.tryGet(I18nToken);
+      const i18n = commandContext.tryGet(I18nToken);
       const label = i18n?.t('demo.stampsCustomLabel') ?? 'Custom stamp';
       const libraryName = i18n?.t('demo.stampsCustomLibrary') ?? 'My stamps';
       const libraryId = CUSTOM_LIBRARY_ID;
@@ -697,47 +700,52 @@ export const defaultCommands: CommandDef[] = [
           stamp.createAssetFromAnnotations(
             documentId,
             page,
-            dtos.map((d) => d.ref),
+            dtos.map((annotation) => annotation.ref),
             { libraryId: id, label: `${label} ${stamp.listAssets({ libraryId: id }).length + 1}` },
           ),
         )
-        // v2 jumped the sidebar to the custom library; the panel reads the
+        // Open the stamps sidebar on the custom library; the panel reads the
         // surface's open props for its picker.
         .then(() =>
-          c.tryGet(ShellToken)?.open('stamps', {
+          commandContext.tryGet(ShellToken)?.open('stamps', {
             exclusive: 'right',
             props: { libraryId },
           }),
         )
-        .catch((e) => console.warn('[embedpdf] stamp from selection failed', e));
+        .catch((error) => console.warn('[embedpdf] stamp from selection failed', error));
     },
     // One page, no widgets (a form field is not artwork), no pending
     // redaction marks, and a library to put it in. The engine refuses hidden
     // or appearance-less annotations itself — all-or-nothing, never a stamp
     // missing a part.
-    visible: (c) =>
-      c.tryGet(StampToken) != null &&
-      hasAnnotationSelection(c) &&
-      !selectionSubtypes(c).has('widget') &&
-      !selectionSubtypes(c).has('redact') &&
-      new Set((anno(c)?.listSelected() ?? []).map((d) => d.ref.page.pageObjectNumber)).size === 1,
-    enabled: (c) => c.tryGet(DocumentsToken)?.allows('doc.download') ?? true,
+    visible: (commandContext) =>
+      commandContext.tryGet(StampToken) != null &&
+      hasAnnotationSelection(commandContext) &&
+      !selectionSubtypes(commandContext).has('widget') &&
+      !selectionSubtypes(commandContext).has('redact') &&
+      new Set(
+        (anno(commandContext)?.listSelected() ?? []).map(
+          (annotation) => annotation.ref.page.pageObjectNumber,
+        ),
+      ).size === 1,
+    enabled: (commandContext) =>
+      commandContext.tryGet(DocumentsToken)?.allows('doc.download') ?? true,
   },
   {
     id: 'annotation:group',
     labelKey: 'commands.annotate.group',
     icon: 'group',
     categories: ['annotation'],
-    run: (c) => void anno(c)?.group(),
-    visible: (c) => anno(c)?.canGroup() ?? false,
+    run: (commandContext) => void anno(commandContext)?.group(),
+    visible: (commandContext) => anno(commandContext)?.canGroup() ?? false,
   },
   {
     id: 'annotation:ungroup',
     labelKey: 'commands.annotate.ungroup',
     icon: 'ungroup',
     categories: ['annotation'],
-    run: (c) => void anno(c)?.ungroup(),
-    visible: (c) => anno(c)?.canUngroup() ?? false,
+    run: (commandContext) => void anno(commandContext)?.ungroup(),
+    visible: (commandContext) => anno(commandContext)?.canUngroup() ?? false,
   },
 
   // ── text selection (the selection strip's verbs) ────────────────────────
@@ -749,63 +757,63 @@ export const defaultCommands: CommandDef[] = [
     // The permission story rides `visible`: a deployment denying
     // doc.text.copy shows no Copy at all — and with zero visible commands
     // the strip renders nothing, so there is never an empty bubble.
-    visible: (c) => {
-      const s = textSelection(c);
-      return !!s && s.hasSelection() && s.canCopy();
+    visible: (commandContext) => {
+      const selection = textSelection(commandContext);
+      return !!selection && selection.hasSelection() && selection.canCopy();
     },
     // Async Clipboard write inside the click's activation window; instant
     // when <SelectionClipboard>'s commit prefetch already fetched the text.
     // A successful copy consumes the selection, which also dismisses its strip.
-    run: (c) => {
-      const s = textSelection(c);
-      if (!s) return;
-      const copiedRange = s.getRange();
-      void copySelection(s).then(
+    run: (commandContext) => {
+      const selection = textSelection(commandContext);
+      if (!selection) return;
+      const copiedRange = selection.getRange();
+      void copySelection(selection).then(
         (text) => {
           // Clipboard writes can outlive the click. Never let an older copy
           // completion clear a newer selection the user made in the meantime.
-          if (text !== '' && sameTextRange(s.getRange(), copiedRange)) s.clear();
+          if (text !== '' && sameTextRange(selection.getRange(), copiedRange)) selection.clear();
         },
         () => {}, // Copy failed: preserve the selection so the user can retry.
       );
     },
   },
 
-  // ── link strip items (v2's "Link / Go to link / Remove link") ───────────
+  // ── link strip items: Link / Go to link / Remove link ────────────────────
   {
-    // Make the selection a link: opens the anchored POPOVER (v2's popup —
-    // a link is a verb on the selection, not a style), whose editor sets
+    // Make the selection a link: opens the anchored popover (a link is a
+    // verb on the selection, not a style), whose editor sets
     // the target through `updateSelection({ link })`; the plugin's
     // reconciler materializes the attached child annotations.
     id: 'annotation:link',
     labelKey: 'commands.annotate.link',
     icon: 'link',
     categories: ['annotation'],
-    run: (c) => c.tryGet(ShellToken)?.toggle('link-editor'),
-    active: (c) => c.tryGet(ShellToken)?.isOpen('link-editor') ?? false,
-    visible: (c) => selectionLink(c) === null,
+    run: (commandContext) => commandContext.tryGet(ShellToken)?.toggle('link-editor'),
+    active: (commandContext) => commandContext.tryGet(ShellToken)?.isOpen('link-editor') ?? false,
+    visible: (commandContext) => selectionLink(commandContext) === null,
   },
   {
     id: 'annotation:goto-link',
     labelKey: 'commands.annotate.gotoLink',
     icon: 'externalLink',
     categories: ['annotation'],
-    run: (c) => {
-      const target = selectionLink(c);
-      const link = c.tryGet(LinkToken);
-      // The opener PERFORMS the uri outcome (window.open) — bare `activate`
+    run: (commandContext) => {
+      const target = selectionLink(commandContext);
+      const link = commandContext.tryGet(LinkToken);
+      // The opener performs the uri outcome (window.open) — bare `activate`
       // resolves but opens nothing for URL targets.
       if (target && link) openLinkTarget(link, target);
     },
-    visible: (c) => selectionLink(c) != null,
+    visible: (commandContext) => selectionLink(commandContext) != null,
   },
   {
     id: 'annotation:remove-link',
     labelKey: 'commands.annotate.removeLink',
     icon: 'linkOff',
     categories: ['annotation'],
-    run: (c) => anno(c)?.updateSelection({ link: null }),
-    visible: (c) => selectionLink(c) != null,
+    run: (commandContext) => anno(commandContext)?.updateSelection({ link: null }),
+    visible: (commandContext) => selectionLink(commandContext) != null,
   },
 
   // ── history (no plugin yet → disabled, shows the disabled styling) ──────
@@ -848,15 +856,15 @@ function modeCommand(
     id,
     labelKey,
     categories: ['mode'],
-    // A mode tab is a shell surface AND a tool policy: the Form tab flips the
+    // A mode tab is a shell surface and a tool policy: the Form tab flips the
     // pointer into form design ('form-edit' — widgets select/move/resize like
     // annotations); every other tab (and closing one) drops back to the
     // default pointer, where widgets are fill controls again.
-    run: (c) => {
-      const shell = c.tryGet(ShellToken);
+    run: (commandContext) => {
+      const shell = commandContext.tryGet(ShellToken);
       shell?.toggle(id, { exclusive: 'mode' });
-      interaction(c)?.activateTool(shell?.isOpen(id) ? toolId : 'pointer');
+      interaction(commandContext)?.activateTool(shell?.isOpen(id) ? toolId : 'pointer');
     },
-    active: (c) => c.tryGet(ShellToken)?.isOpen(id) ?? false,
+    active: (commandContext) => commandContext.tryGet(ShellToken)?.isOpen(id) ?? false,
   };
 }

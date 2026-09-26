@@ -6,14 +6,14 @@
  * Browsers attach `Origin` to every cross-origin request and it cannot
  * be forged or suppressed from page JavaScript, so matching it is the
  * whole enforcement. Non-browser callers (no Origin header) are
- * governed by the token itself — a valid short-lived credential IS the
+ * governed by the token itself — a valid short-lived credential is the
  * authority there, which is why enforcement is presence-conditional
  * rather than mandatory. Hotlink prevention, not DRM.
  *
  * Pattern grammar (validated at mint/create time by the contract):
  *   scheme://host[:port]        exact match, case-insensitive host
- *   scheme://*.host[:port]      one leading wildcard label matching ONE
- *                               OR MORE subdomain labels — `*.acme.com`
+ *   scheme://*.host[:port]      one leading wildcard label matching one
+ *                               or more subdomain labels — `*.acme.com`
  *                               covers `docs.acme.com` and
  *                               `a.b.acme.com`, never bare `acme.com`
  *                               and never `evilacme.com`

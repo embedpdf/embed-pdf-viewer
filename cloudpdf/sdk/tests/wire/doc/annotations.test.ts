@@ -10,62 +10,75 @@ describe("AnnotationsClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
         const rawResponseBody = {
-            pages: [
+            annotations: [
                 {
-                    pageState: {
+                    subtype: "highlight",
+                    ref: {
+                        kind: "objectNumber",
                         page: { kind: "objectNumber", pageObjectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
+                        annotObjectNumber: 1,
                     },
-                    annotations: [
-                        {
-                            subtype: "highlight",
-                            ref: {
-                                kind: "objectNumber",
-                                page: { kind: "objectNumber", pageObjectNumber: 1 },
-                                annotObjectNumber: 1,
-                            },
+                    page: { kind: "objectNumber", pageObjectNumber: 1 },
+                    index: 1,
+                    identityQuality: "durable",
+                    nm: "nm",
+                    rect: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                    contents: "contents",
+                    subject: "subject",
+                    blendMode: "normal",
+                    invisible: true,
+                    hidden: true,
+                    print: true,
+                    noZoom: true,
+                    noRotate: true,
+                    noView: true,
+                    readOnly: true,
+                    locked: true,
+                    toggleNoView: true,
+                    lockedContents: true,
+                    reply: {
+                        to: {
+                            kind: "objectNumber",
                             page: { kind: "objectNumber", pageObjectNumber: 1 },
-                            index: 1,
-                            identityQuality: "durable",
-                            nm: null,
-                            flags: {
-                                invisible: true,
-                                hidden: true,
-                                print: true,
-                                noZoom: true,
-                                noRotate: true,
-                                noView: true,
-                                readOnly: true,
-                                locked: true,
-                                toggleNoView: true,
-                                lockedContents: true,
-                            },
-                            rect: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
-                            contents: null,
-                            subject: null,
-                            author: null,
-                            created: null,
-                            modified: null,
-                            blendMode: "normal",
-                            inReplyTo: null,
-                            replyType: null,
-                            color: { r: 1, g: 1, b: 1 },
-                            opacity: 1.1,
-                            quadPoints: [
-                                {
-                                    p1: { x: 1.1, y: 1.1 },
-                                    p2: { x: 1.1, y: 1.1 },
-                                    p3: { x: 1.1, y: 1.1 },
-                                    p4: { x: 1.1, y: 1.1 },
-                                },
-                            ],
+                            annotObjectNumber: 1,
+                        },
+                        type: "reply",
+                    },
+                    popup: {
+                        kind: "objectNumber",
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        annotObjectNumber: 1,
+                    },
+                    groupId: "groupId",
+                    author: "author",
+                    createdAt: "2024-01-15T09:30:00Z",
+                    modifiedAt: "2024-01-15T09:30:00Z",
+                    userId: "userId",
+                    createdBy: "createdBy",
+                    modifiedBy: "modifiedBy",
+                    importedBy: "importedBy",
+                    actions: {},
+                    color: { r: 1, g: 1, b: 1 },
+                    opacity: 1.1,
+                    quadPoints: [
+                        {
+                            p1: { x: 1.1, y: 1.1 },
+                            p2: { x: 1.1, y: 1.1 },
+                            p3: { x: 1.1, y: 1.1 },
+                            p4: { x: 1.1, y: 1.1 },
                         },
                     ],
+                },
+            ],
+            pages: [
+                {
+                    page: { kind: "objectNumber", pageObjectNumber: 1 },
+                    revision: {
+                        docSessionId: "docSessionId",
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        generation: 1,
+                    },
+                    weakAnnotationState: { kind: "unknown" },
                 },
             ],
             auditHead: 1,
@@ -135,15 +148,6 @@ describe("AnnotationsClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
         const rawResponseBody = {
-            pageState: {
-                page: { kind: "objectNumber", pageObjectNumber: 1 },
-                revision: {
-                    docSessionId: "docSessionId",
-                    page: { kind: "objectNumber", pageObjectNumber: 1 },
-                    generation: 1,
-                },
-                weakAnnotationState: { kind: "unknown" },
-            },
             annotations: [
                 {
                     subtype: "highlight",
@@ -156,35 +160,42 @@ describe("AnnotationsClient", () => {
                     index: 1,
                     identityQuality: "durable",
                     nm: "nm",
-                    flags: {
-                        invisible: true,
-                        hidden: true,
-                        print: true,
-                        noZoom: true,
-                        noRotate: true,
-                        noView: true,
-                        readOnly: true,
-                        locked: true,
-                        toggleNoView: true,
-                        lockedContents: true,
-                    },
                     rect: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
                     contents: "contents",
                     subject: "subject",
-                    author: "author",
-                    created: "2024-01-15T09:30:00Z",
-                    modified: "2024-01-15T09:30:00Z",
                     blendMode: "normal",
-                    inReplyTo: {
+                    invisible: true,
+                    hidden: true,
+                    print: true,
+                    noZoom: true,
+                    noRotate: true,
+                    noView: true,
+                    readOnly: true,
+                    locked: true,
+                    toggleNoView: true,
+                    lockedContents: true,
+                    reply: {
+                        to: {
+                            kind: "objectNumber",
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            annotObjectNumber: 1,
+                        },
+                        type: "reply",
+                    },
+                    popup: {
                         kind: "objectNumber",
                         page: { kind: "objectNumber", pageObjectNumber: 1 },
                         annotObjectNumber: 1,
                     },
-                    replyType: "reply",
-                    userId: "userId",
                     groupId: "groupId",
+                    author: "author",
+                    createdAt: "2024-01-15T09:30:00Z",
+                    modifiedAt: "2024-01-15T09:30:00Z",
+                    userId: "userId",
                     createdBy: "createdBy",
-                    updatedBy: "updatedBy",
+                    modifiedBy: "modifiedBy",
+                    importedBy: "importedBy",
+                    actions: {},
                     color: { r: 1, g: 1, b: 1 },
                     opacity: 1.1,
                     quadPoints: [
@@ -197,6 +208,18 @@ describe("AnnotationsClient", () => {
                     ],
                 },
             ],
+            pages: [
+                {
+                    page: { kind: "objectNumber", pageObjectNumber: 1 },
+                    revision: {
+                        docSessionId: "docSessionId",
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        generation: 1,
+                    },
+                    weakAnnotationState: { kind: "unknown" },
+                },
+            ],
+            auditHead: 1,
         };
 
         server
@@ -243,6 +266,71 @@ describe("AnnotationsClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { key: "value" };
         const rawResponseBody = {
+            annotation: {
+                subtype: "highlight",
+                ref: {
+                    kind: "objectNumber",
+                    page: { kind: "objectNumber", pageObjectNumber: 1 },
+                    annotObjectNumber: 1,
+                },
+                page: { kind: "objectNumber", pageObjectNumber: 1 },
+                index: 1,
+                identityQuality: "durable",
+                nm: "nm",
+                rect: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                contents: "contents",
+                subject: "subject",
+                blendMode: "normal",
+                invisible: true,
+                hidden: true,
+                print: true,
+                noZoom: true,
+                noRotate: true,
+                noView: true,
+                readOnly: true,
+                locked: true,
+                toggleNoView: true,
+                lockedContents: true,
+                reply: {
+                    to: {
+                        kind: "objectNumber",
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        annotObjectNumber: 1,
+                    },
+                    type: "reply",
+                },
+                popup: {
+                    kind: "objectNumber",
+                    page: { kind: "objectNumber", pageObjectNumber: 1 },
+                    annotObjectNumber: 1,
+                },
+                groupId: "groupId",
+                author: "author",
+                createdAt: "2024-01-15T09:30:00Z",
+                modifiedAt: "2024-01-15T09:30:00Z",
+                userId: "userId",
+                createdBy: "createdBy",
+                modifiedBy: "modifiedBy",
+                importedBy: "importedBy",
+                actions: {
+                    activate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    cursorEnter: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    cursorExit: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    mouseDown: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    mouseUp: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    focus: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    blur: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    pageOpen: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    pageClose: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    pageVisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    pageInvisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                },
+                color: { r: 1, g: 1, b: 1 },
+                opacity: 1.1,
+                quadPoints: [
+                    { p1: { x: 1.1, y: 1.1 }, p2: { x: 1.1, y: 1.1 }, p3: { x: 1.1, y: 1.1 }, p4: { x: 1.1, y: 1.1 } },
+                ],
+            },
             meta: {
                 affectedPages: [
                     {
@@ -259,6 +347,9 @@ describe("AnnotationsClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -268,6 +359,9 @@ describe("AnnotationsClient", () => {
                         },
                     ],
                 },
+                changed: [{ kind: "objectNumber", value: 1 }],
+                weakRefsInvalidated: true,
+                shouldRefetch: { reason: "weakRefsInvalidated" },
             },
         };
 
@@ -370,6 +464,9 @@ describe("AnnotationsClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -379,6 +476,9 @@ describe("AnnotationsClient", () => {
                         },
                     ],
                 },
+                changed: [{ kind: "objectNumber", value: 1 }],
+                weakRefsInvalidated: true,
+                shouldRefetch: { reason: "weakRefsInvalidated" },
             },
         };
 
@@ -428,6 +528,72 @@ describe("AnnotationsClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { key: "value" };
         const rawResponseBody = {
+            annotation: {
+                subtype: "highlight",
+                ref: {
+                    kind: "objectNumber",
+                    page: { kind: "objectNumber", pageObjectNumber: 1 },
+                    annotObjectNumber: 1,
+                },
+                page: { kind: "objectNumber", pageObjectNumber: 1 },
+                index: 1,
+                identityQuality: "durable",
+                nm: "nm",
+                rect: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                contents: "contents",
+                subject: "subject",
+                blendMode: "normal",
+                invisible: true,
+                hidden: true,
+                print: true,
+                noZoom: true,
+                noRotate: true,
+                noView: true,
+                readOnly: true,
+                locked: true,
+                toggleNoView: true,
+                lockedContents: true,
+                reply: {
+                    to: {
+                        kind: "objectNumber",
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        annotObjectNumber: 1,
+                    },
+                    type: "reply",
+                },
+                popup: {
+                    kind: "objectNumber",
+                    page: { kind: "objectNumber", pageObjectNumber: 1 },
+                    annotObjectNumber: 1,
+                },
+                groupId: "groupId",
+                author: "author",
+                createdAt: "2024-01-15T09:30:00Z",
+                modifiedAt: "2024-01-15T09:30:00Z",
+                userId: "userId",
+                createdBy: "createdBy",
+                modifiedBy: "modifiedBy",
+                importedBy: "importedBy",
+                actions: {
+                    activate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    cursorEnter: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    cursorExit: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    mouseDown: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    mouseUp: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    focus: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    blur: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    pageOpen: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    pageClose: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    pageVisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    pageInvisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                },
+                color: { r: 1, g: 1, b: 1 },
+                opacity: 1.1,
+                quadPoints: [
+                    { p1: { x: 1.1, y: 1.1 }, p2: { x: 1.1, y: 1.1 }, p3: { x: 1.1, y: 1.1 }, p4: { x: 1.1, y: 1.1 } },
+                ],
+            },
+            appearance: { action: "preserved", changed: true },
             meta: {
                 affectedPages: [
                     {
@@ -444,6 +610,9 @@ describe("AnnotationsClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -453,6 +622,9 @@ describe("AnnotationsClient", () => {
                         },
                     ],
                 },
+                changed: [{ kind: "objectNumber", value: 1 }],
+                weakRefsInvalidated: true,
+                shouldRefetch: { reason: "weakRefsInvalidated" },
             },
         };
 
@@ -542,6 +714,18 @@ describe("AnnotationsClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { key: "value" };
         const rawResponseBody = {
+            page: { kind: "objectNumber", pageObjectNumber: 1 },
+            usage: "display",
+            results: [
+                {
+                    ref: {
+                        kind: "objectNumber",
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        annotObjectNumber: 1,
+                    },
+                    status: "applied",
+                },
+            ],
             meta: {
                 affectedPages: [
                     {
@@ -558,6 +742,9 @@ describe("AnnotationsClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [

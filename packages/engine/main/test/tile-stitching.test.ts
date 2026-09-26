@@ -1,6 +1,6 @@
 /**
  * Tile stitching ground truth — the engine's rect-target renders must
- * REGISTER: a tile equals the same region of a wider render, adjacent
+ * register: a tile equals the same region of a wider render, adjacent
  * tiles butt seamlessly, and bled (overlapping) tiles agree bit-for-bit in
  * their overlap. This is the contract the render plugin's tile plane
  * composites on; if it drifts, on-screen seams follow. Mock-free: real
@@ -29,7 +29,7 @@ const pdfPath = resolve(
 
 let engine: LocalEngine;
 let doc: DocumentHandle;
-let pon: number;
+let pageObjectNumber: number;
 let pageW = 0;
 let pageH = 0;
 
@@ -38,7 +38,7 @@ beforeAll(async () => {
   engine = createLocalEngine({ runtime: { prefer: 'wasm' } });
   doc = await engine.open({ kind: 'bytes', id: 'stitch-doc', bytes });
   const pages = (await doc.pages.list()).pages;
-  pon = pages[0]!.ref.pageObjectNumber;
+  pageObjectNumber = pages[0]!.ref.pageObjectNumber;
   pageW = pages[0]!.size.width;
   pageH = pages[0]!.size.height;
 }, 60_000);
@@ -58,7 +58,7 @@ const eng = (x: number, y: number, w: number, h: number) => ({
 
 const raw = (rect: ReturnType<typeof eng>, scale: number): Promise<PageRaster> =>
   doc
-    .page(toPageRef(pon))
+    .page(toPageRef(pageObjectNumber))
     .render.raw({ target: { kind: 'rect', rect }, viewport: { kind: 'scale', scale } });
 
 /** Max |RGB diff| over an aligned sub-rectangle of two rasters. */
@@ -119,7 +119,7 @@ describe('tile stitching (wasm engine, real document)', () => {
     expect(unionH.width).toBe(1024);
     expect(bledA.width).toBe(514);
 
-    // A tile IS the same region of a wider render (both axes).
+    // A tile is the same region of a wider render (both axes).
     expect(maxDiff(tileA, 0, 0, unionH, 0, 0, 512, 512)).toBeLessThanOrEqual(1);
     expect(maxDiff(tileB, 0, 0, unionH, 512, 0, 512, 512)).toBeLessThanOrEqual(1);
     expect(maxDiff(tileC, 0, 0, unionV, 0, 512, 512, 512)).toBeLessThanOrEqual(1);

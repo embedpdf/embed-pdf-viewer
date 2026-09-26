@@ -19,6 +19,7 @@ import {
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
+import { DrawingIndex } from './DrawingIndex';
 import {
   openFatMemoryDocument,
   type DocumentSource,
@@ -30,7 +31,7 @@ import type { PageRecord } from './pages/PageRecord';
 import { LocalRevisionAuthority, type RevisionAuthority } from './revisions/RevisionAuthority';
 
 /**
- * Owns the lifecycle of a single open PDFium document and the v3
+ * Owns the lifecycle of a single open PDFium document and the
  * identity machinery: page registry (pageObjectNumber <-> pageIndex),
  * `RevisionAuthority` (per-page generation counters), and `PagePtrPool`
  * (refcounted pagePtr access).
@@ -116,6 +117,8 @@ export class DocumentSession {
   pendingSigning: PendingSigning | null = null;
   /** The last completed signing, so a replayed `complete` answers `already-completed`. */
   lastCompletion: SigningCompletion | null = null;
+  /** The stamp drawings of the open document, by content; dropped with it. */
+  private drawings: DrawingIndex | null = null;
 
   constructor(
     private readonly runtime: PdfRuntimeModule,
@@ -163,13 +166,14 @@ export class DocumentSession {
     this._source = handle.source;
     this.revisions = new LocalRevisionAuthority(this._sessionId);
     this.pages = new PagePtrPool(this.runtime, handle.docPtr);
-    this.parkedBytes = null;
+    this.parkedLoad = null;
+    this.drawings = null;
     this.loadedSeq = this.mutationSeqCounter;
   }
 
   /**
    * Whether anything was mutated since the current bytes were loaded. When
-   * false, the loaded bytes ARE the document: a save returns them verbatim
+   * false, the loaded bytes are the document: a save returns them verbatim
    * and a signing candidate is built straight on them.
    */
   hasUnsavedEdits(): boolean {
@@ -221,10 +225,11 @@ export class DocumentSession {
     this.recordsByIndex.clear();
     this.recordsByObjectNumber.clear();
     this.fullyEnumerated = false;
-    for (const pon of previousPages) this.requireRevisions().bump(pon);
+    for (const pageObjectNumber of previousPages) this.requireRevisions().bump(pageObjectNumber);
     this.mutationSeqCounter++;
     this.loadedSeq = this.mutationSeqCounter;
     this.pendingSigning = null;
+    this.drawings = null;
     if (firstError) throw firstError;
   }
 
@@ -236,30 +241,35 @@ export class DocumentSession {
   /**
    * Park this session in the password-locked state: the document could not
    * be loaded because a (correct) password is missing, so the session keeps
-   * the already-transferred bytes and waits for an unlock attempt to load
-   * them. A locked session occupies its docId key like an open one — every
-   * operation except the password check rejects with DocPasswordRequired.
+   * how to load it (the already-transferred bytes, a base's path, the layer
+   * to open) and waits for an unlock attempt. A locked session occupies its
+   * docId key like an open one — every operation except the password check
+   * rejects with DocPasswordRequired.
    */
-  parkLocked(bytes: Uint8Array): void {
+  parkLocked(load: (password: string | null) => void): void {
     if (this.docPtr) {
       throw new EngineError(EngineErrorCode.InvalidArg, 'document already open');
     }
-    this.parkedBytes = bytes;
+    this.parkedLoad = load;
   }
 
   isLocked(): boolean {
-    return this.docPtr === null && this.parkedBytes !== null;
+    return this.docPtr === null && this.parkedLoad !== null;
   }
 
-  /** The bytes retained for a later unlock attempt. Locked sessions only. */
-  lockedBytes(): Uint8Array {
-    if (!this.parkedBytes) {
+  /**
+   * Load a locked session with `password`. A wrong one throws
+   * `DocPasswordIncorrect` and leaves the session parked for another try.
+   */
+  unlockWith(password: string | null): void {
+    if (!this.parkedLoad) {
       throw new EngineError(EngineErrorCode.DocNotOpen, 'document session is not locked');
     }
-    return this.parkedBytes;
+    this.parkedLoad(password);
+    this.parkedLoad = null;
   }
 
-  private parkedBytes: Uint8Array | null = null;
+  private parkedLoad: ((password: string | null) => void) | null = null;
 
   /** Number of pages in the document. */
   pageCount(): number {
@@ -268,7 +278,7 @@ export class DocumentSession {
 
   /**
    * Lazily enumerate every page and cache (pageObjectNumber, pageIndex).
-   * Necessary before `listRawAll()` and any pon -> pageIndex resolution.
+   * Necessary before a whole-document list and any pon -> pageIndex resolution.
    */
   ensureFullPageRegistry(): void {
     if (this.fullyEnumerated) return;
@@ -277,8 +287,8 @@ export class DocumentSession {
     const count = fn.FPDF_GetPageCount(docPtr);
     for (let i = 0; i < count; i++) {
       if (this.recordsByIndex.has(i)) continue;
-      const pon = fn.EPDFDoc_GetPageObjectNumberByIndex(docPtr, i);
-      if (!isValidPageObjectNumber(pon)) {
+      const pageObjectNumber = fn.EPDFDoc_GetPageObjectNumberByIndex(docPtr, i);
+      if (!isValidPageObjectNumber(pageObjectNumber)) {
         // Spec violation: ISO 32000-1 §7.7.3.3 requires every
         // /Page to be referenced indirectly from the /Pages tree.
         // PDFium's loader is permissive enough to surface direct
@@ -290,12 +300,12 @@ export class DocumentSession {
         throw new EngineError(
           EngineErrorCode.MalformedPdf,
           `page at index ${i} is a direct (non-indirect) PDF object; the engine requires every page to have a stable indirect object number`,
-          { details: { pageIndex: i, pon } },
+          { details: { pageIndex: i, pageObjectNumber } },
         );
       }
-      const record: PageRecord = { pageObjectNumber: pon, pageIndex: i };
+      const record: PageRecord = { pageObjectNumber, pageIndex: i };
       this.recordsByIndex.set(i, record);
-      this.recordsByObjectNumber.set(pon, record);
+      this.recordsByObjectNumber.set(pageObjectNumber, record);
     }
     this.fullyEnumerated = true;
   }
@@ -332,7 +342,7 @@ export class DocumentSession {
   }
 
   /**
-   * Resolve a page ADDRESS to its registry record — the one boundary where
+   * Resolve a page address to its registry record — the one boundary where
    * a `PageRef` becomes a page object number. Throws `NotFound` for an
    * unknown page.
    */
@@ -403,7 +413,7 @@ export class DocumentSession {
    * Version key for detached-snapshot caches (e.g. the forms model):
    * a cache entry built at sequence N is exactly valid while the
    * sequence is still N. Coarse on purpose — widgets are annotations
-   * and page ops move widgets, so ANY mutation may affect derived
+   * and page ops move widgets, so any mutation may affect derived
    * form state; per-domain counters are a later optimization.
    */
   mutationSeq(): number {
@@ -418,7 +428,7 @@ export class DocumentSession {
   /**
    * Forget a page's per-session state (revision generation + weak-annotation
    * flag). Called by `pages.delete` after the page object is retired; the
-   * PON is never recycled, so this is hygiene, not correctness.
+   * page object number is never recycled, so this is hygiene, not correctness.
    */
   dropPageState(pageObjectNumber: PageObjectNumber): void {
     this.requireRevisions().drop(pageObjectNumber);
@@ -435,6 +445,15 @@ export class DocumentSession {
     return this.pages;
   }
 
+  /** The open document's stamp drawings, by content (see {@link DrawingIndex}). */
+  drawingIndex(): DrawingIndex {
+    if (!this.docPtr) {
+      throw new EngineError(EngineErrorCode.DocNotOpen, 'document is not open');
+    }
+    this.drawings ??= new DrawingIndex();
+    return this.drawings;
+  }
+
   requireDocPtr(): Ptr {
     if (!this.docPtr) {
       throw new EngineError(EngineErrorCode.DocNotOpen, 'document is not open');
@@ -443,7 +462,7 @@ export class DocumentSession {
   }
 
   /**
-   * Park a disposer to run when THIS session closes. Used by operations
+   * Park a disposer to run when this session closes. Used by operations
    * whose native side leaves the session document referencing another
    * resource — e.g. `pages.insert`: `FPDF_ImportPagesByIndex` does not
    * fully detach imported objects from their source document, so the
@@ -484,9 +503,10 @@ export class DocumentSession {
       this.docPtr = null;
       this._kind = null;
       this._source = null;
-      this.parkedBytes = null;
+      this.parkedLoad = null;
       this.pendingSigning = null;
       this.lastCompletion = null;
+      this.drawings = null;
       this.revisions?.clear();
       this.revisions = null;
       this.recordsByIndex.clear();
@@ -494,7 +514,7 @@ export class DocumentSession {
       this.fullyEnumerated = false;
     }
 
-    // Retained resources go LAST (reverse order): the session doc that
+    // Retained resources go last (reverse order): the session doc that
     // referenced them is closed above, so they are safe to release now.
     for (let i = this.retained.length - 1; i >= 0; i--) {
       try {

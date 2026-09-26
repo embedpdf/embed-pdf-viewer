@@ -12,7 +12,12 @@ export {
   type RawSigner,
   type SignatureProfile,
 } from './cms/build';
-export { verifyForCompletion, type CompletionGate, type CompletionRefusal } from './gate';
+export {
+  verifyForCompletion,
+  type CompletionGate,
+  type CompletionProfile,
+  type CompletionRefusal,
+} from './gate';
 export {
   validateChain,
   type TrustPort,
@@ -20,14 +25,7 @@ export {
   type TrustVerdict,
   type ValidationTime,
 } from './trust';
-export {
-  sign,
-  SigningError,
-  profileFor,
-  type CmsSigner,
-  type SignInput,
-  type SignerPort,
-} from './sign';
+export { sign, profileFor, type CmsSigner, type SignInput, type SignerPort } from './sign';
 export {
   validateSignatures,
   type IntegrityVerdict,
@@ -37,9 +35,11 @@ export {
 } from './verdict';
 export {
   createTestSigner,
+  createTestTimestampAuthority,
   generateSigningKeyPair,
   webCryptoSigner,
   type TestSigner,
+  type TestTimestampAuthority,
 } from './signers/webcrypto';
 export { remoteSigner } from './signers/remote';
 export {

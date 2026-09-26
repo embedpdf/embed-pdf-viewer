@@ -28,7 +28,7 @@ export class LocalMetadataService implements MetadataService {
     private readonly publisher: SessionEventPublisher,
   ) {}
 
-  read(): AbortablePromise<DocumentMetadata> {
+  get(): AbortablePromise<DocumentMetadata> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),

@@ -13,7 +13,7 @@ export type {
   CollabEntity,
   CollabFilter,
   DocCapability,
-  IdentityClaims,
+  Identity,
   ParsedCapability,
   ParsedCollab,
   ParsedScope,
@@ -29,6 +29,7 @@ export { parseScope, validateScopeArray } from './parser';
 export { InvalidScope, MissingIdentity, PermissionDenied } from './errors';
 
 export type { CollabTarget } from './resolver';
+export { collabTargetOf } from './resolver';
 export {
   checkAnyCapability,
   checkCapability,

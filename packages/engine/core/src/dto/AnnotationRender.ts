@@ -1,4 +1,9 @@
-import type { PageImageHandle, PageNetworkRenderFormat, PageRaster } from './PageRender';
+import type {
+  PageImageHandle,
+  PageNetworkRenderFormat,
+  PageRaster,
+  PageRenderViewport,
+} from './PageRender';
 import type { PdfRect, PdfRotation } from '../geometry/primitives';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { PageState } from '../revision/PageState';
@@ -11,17 +16,18 @@ import type { PageState } from '../revision/PageState';
 export type AnnotationAppearanceMode = 'normal' | 'rollover' | 'down';
 
 /**
- * Worker-side options for batch-rendering a page's annotation appearance
- * streams. Deliberately narrower than `PageRenderOptions`: appearance
- * bitmaps are sized to each annotation's own `/Rect`, so there is no
- * page target/viewport — only a uniform device scale and page rotation.
+ * Options for batch-rendering a page's annotation appearance streams.
+ * Narrower than `PageRenderOptions`: each bitmap is sized to its
+ * annotation's own `/Rect`, so there is no target.
  */
 export interface AnnotationAppearanceRenderOptions {
   /**
-   * Device pixels per PDF user-space unit. Callers that care about
-   * devicePixelRatio should fold it into this value. Default `1`.
+   * The size, as for a page render: the appearances come out at the scale
+   * the page would have at this viewport, so passing a page image's
+   * viewport makes them match it. `{ kind: 'width' }` is the width of the
+   * whole (turned) page. Default `{ kind: 'scale', scale: 1 }`.
    */
-  scale?: number;
+  viewport?: PageRenderViewport;
   /** Page rotation in degrees clockwise. Default `0`. */
   rotation?: PdfRotation;
   /**
@@ -30,9 +36,9 @@ export interface AnnotationAppearanceRenderOptions {
    */
   modes?: AnnotationAppearanceMode[];
   /**
-   * Output-pixel budget PER APPEARANCE — same semantics as
+   * Output-pixel budget per appearance — same semantics as
    * `PageRenderOptions.maxOutputPixels`: appearances are sized by
-   * `rect × scale`, and a page-sized stamp at a high scale is the same
+   * `rect × scale` (the viewport's scale), and a page-sized stamp at a high scale is the same
    * memory bomb a full-page render is. Server requests carry the
    * deployment policy's budget; local callers omit it unless configured.
    */
@@ -50,13 +56,13 @@ export interface AnnotationAppearanceImageOptions extends AnnotationAppearanceRe
 }
 
 /**
- * HTTP/token shape: encoded options plus the version field used to make the
+ * HTTP/token shape: encoded options plus the version field that makes the
  * response content-addressed and CDN-cacheable.
  *
  * Only `annotationVersion` matters here: an appearance bitmap is rendered
  * purely from the annotation's own `/AP` stream, so it changes iff the
  * annotation changes. Page base content (`contentVersion`/`docVersion`) does
- * not affect appearances and is deliberately NOT part of the cache key —
+ * not affect appearances and is deliberately not part of the cache key —
  * same as the annotation list endpoint.
  */
 export interface AnnotationAppearancesQuery {
@@ -71,8 +77,8 @@ export interface AnnotationAppearancesQuery {
  *
  * Rotation convention: for annotations whose rotation lives in the AP
  * `/Matrix` — box-family kinds (square/circle/free-text/stamp/caret) whose
- * DTO carries BOTH `rotation` and `unrotatedRect` — the raster renders
- * ROTATION-STRIPPED and `rect` is the logical `unrotatedRect`; the consumer
+ * DTO carries both `rotation` and `unrotatedRect` — the raster renders
+ * rotation-stripped and `rect` is the logical `unrotatedRect`; the consumer
  * re-applies the DTO's `rotation` as a view transform about the box centre
  * (e.g. CSS `rotate`), which makes the raster rotation-invariant (rotating
  * never re-renders). Everything else — vertex kinds, whose rotation is
@@ -100,7 +106,7 @@ export interface AnnotationAppearancesResult {
  * Encoded counterpart of {@link AnnotationAppearanceRaster}: the same
  * identity/placement metadata, but the RGBA raster has been run through an
  * image encoder into a lazily-fetched `PageImageHandle` (PNG/WebP). This is
- * what both the local engine's `renderAppearanceImages()` and the cloud
+ * what both the local engine's `renderAppearances()` and the cloud
  * client (decoding the multipart parts) produce.
  */
 export interface AnnotationAppearanceImage {

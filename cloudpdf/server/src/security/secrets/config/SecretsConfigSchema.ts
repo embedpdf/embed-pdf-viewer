@@ -35,7 +35,7 @@ export type SecretProviderConfig = z.infer<typeof SecretProviderConfigSchema>;
  * optional cache policy.
  *
  * `cache` is intentionally optional — omitting it means
- * `createSecretsProviderRegistry` returns RAW providers (no decoration).
+ * `createSecretsProviderRegistry` returns raw providers (no decoration).
  * Set `cache: { ttlSec }` to apply uniform TTL caching across every
  * provider. For per-provider caching policies or custom decorators,
  * skip the registry helper and compose providers manually with

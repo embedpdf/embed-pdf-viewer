@@ -5,6 +5,7 @@
  * contract.ts · host-contract.ts · model.ts · controller.ts · interaction.plugin.ts.
  * Zero framework code.
  */
-export { interactionPlugin, builtinTools } from './interaction.plugin';
+export { interactionPlugin } from './interaction.plugin';
+export { builtinTools } from './model';
 export * from './contract';
 export { feedbackPlugin } from './feedback';

@@ -7,7 +7,7 @@
  *     stage plugin's job)
  *   • device-pixel-ratio observation → `setDevicePixelRatio` (dppx changes
  *     re-subscribe, since the media query's value itself moves)
- *   • pointer-sample normalization — the ONE place a PointerEvent becomes a
+ *   • pointer-sample normalization — the one place a PointerEvent becomes a
  *     page-resolved, source-stamped sample for the interaction hub
  *   • the gesture controller (wheel, Safari trackpad gestures, synthesized
  *     touch physics) from `./stage-gestures`
@@ -16,7 +16,7 @@
  * surfaces, cursor-style subscription, overlay slots.
  *
  * Dependency note: like the gesture controller, this module speaks to the
- * stage and the hub through STRUCTURAL interfaces ({@link StageSurfaceHost},
+ * stage and the hub through structural interfaces ({@link StageSurfaceHost},
  * {@link StageSurfaceHub}) — satisfied by `StageCapability` and
  * `InteractionHostCapability`, imported by neither. @embedpdf/web stays free of
  * plugin imports, per the layering law.
@@ -45,7 +45,7 @@ export interface StageSurfaceHost extends StageGestureHost {
     rotation?: 0 | 90 | 180 | 270;
     zoom?: number;
   } | null;
-  /** Viewport point → a SPECIFIC page's content space, unclamped (frame-stable projection). */
+  /** Viewport point → a specific page's content space, unclamped (frame-stable projection). */
   viewportToPage(page: PageRef, screen: SurfacePoint): SurfacePoint | null;
 }
 
@@ -95,7 +95,7 @@ export interface StageSurfaceOptions {
 
 /** Attach the full surface binding. Returns the detach fn. */
 export function createStageSurface(
-  el: HTMLElement,
+  element: HTMLElement,
   stage: StageSurfaceHost,
   options: StageSurfaceOptions = {},
 ): () => void {
@@ -106,9 +106,9 @@ export function createStageSurface(
   // plugin's job — it places when it first learns a real size (and a
   // higher-priority initial-view provider can override). The shell stays dumb.
   const setViewport = () =>
-    stage.setViewportSize({ width: el.clientWidth, height: el.clientHeight });
+    stage.setViewportSize({ width: element.clientWidth, height: element.clientHeight });
   const ro = new ResizeObserver(setViewport);
-  ro.observe(el);
+  ro.observe(element);
   setViewport();
   cleanups.push(() => ro.disconnect());
 
@@ -129,12 +129,12 @@ export function createStageSurface(
   // (`pageAt` per event, so a drag can cross pages) and stamps the lens source.
   const sampleOf = (
     phase: StageSurfaceSample['phase'],
-    e: PointerEvent,
+    event: PointerEvent,
     clickCount = 1,
     gesture?: StageSurfaceSample['gesture'],
   ): StageSurfaceSample => {
-    const r = el.getBoundingClientRect();
-    const viewport = { x: e.clientX - r.left, y: e.clientY - r.top };
+    const rect = element.getBoundingClientRect();
+    const viewport = { x: event.clientX - rect.left, y: event.clientY - rect.top };
     return {
       phase,
       viewport,
@@ -142,41 +142,46 @@ export function createStageSurface(
       // Page-anchored gestures (annotation move/resize) track the origin
       // page's frame through this even when the cursor is off that page.
       project: (page) => stage.viewportToPage(page, viewport),
-      modifiers: { shift: e.shiftKey, alt: e.altKey, ctrl: e.ctrlKey, meta: e.metaKey },
+      modifiers: {
+        shift: event.shiftKey,
+        alt: event.altKey,
+        ctrl: event.ctrlKey,
+        meta: event.metaKey,
+      },
       clickCount,
-      pointerType: (e.pointerType || 'mouse') as StageSurfaceSample['pointerType'],
+      pointerType: (event.pointerType || 'mouse') as StageSurfaceSample['pointerType'],
       ...(gesture ? { gesture } : {}),
       ...(options.source ? { source: options.source } : {}),
     };
   };
   const forward = (
     phase: StageSurfaceSample['phase'],
-    e: PointerEvent,
+    event: PointerEvent,
     clickCount = 1,
     gesture?: StageSurfaceSample['gesture'],
   ) => {
-    hub?.dispatchPointer(sampleOf(phase, e, clickCount, gesture));
+    hub?.dispatchPointer(sampleOf(phase, event, clickCount, gesture));
   };
   const sink: StageGestureSink | null = hub
     ? {
-        down: (e, clickCount) => forward('down', e, clickCount),
-        move: (e) => forward('move', e),
-        up: (e) => forward('up', e),
-        cancel: (e) => forward('cancel', e),
-        hover: (e) => forward('move', e), // no owner → the hub routes to onHover
+        down: (event, clickCount) => forward('down', event, clickCount),
+        move: (event) => forward('move', event),
+        up: (event) => forward('up', event),
+        cancel: (event) => forward('cancel', event),
+        hover: (event) => forward('move', event), // no owner → the hub routes to onHover
         // Touch long-press = a word-select down (clickCount 2 keeps the
         // word-selection contract; the `gesture` marker is the honest
         // long-press signal for haptics/pickup handlers).
-        longPress: (e) => forward('down', e, 2, 'long-press'),
+        longPress: (event) => forward('down', event, 2, 'long-press'),
         // Touch consent: an armed drawing/markup tool takes fingers wholesale;
         // otherwise per-point claims (a selected annotation's body or handles)
         // decide. A pure pre-flight — nothing captures.
-        claimsPoint: (e) =>
-          !!hub.getActiveTool().touchDirect || hub.wouldClaimTouch(sampleOf('down', e)),
+        claimsPoint: (event) =>
+          !!hub.getActiveTool().touchDirect || hub.wouldClaimTouch(sampleOf('down', event)),
       }
     : null;
   cleanups.push(
-    createStageGestureController(el, stage, {
+    createStageGestureController(element, stage, {
       zoomGestures: options.zoomGestures,
       wheelZoomFactor: options.wheelZoomFactor,
       sink,

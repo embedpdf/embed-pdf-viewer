@@ -2,7 +2,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { encodePageKey, toPageRef } from '@embedpdf/engine-core/runtime';
-import { createCloudEngine } from '../src/index';
+import { cloudEngine } from '../src/index';
 import {
   buildDbSeededFixture,
   docScopedToken,
@@ -39,7 +39,7 @@ afterAll(async () => {
 
 /** Open a handle on one visitor's layer, the layer-per-visitor shape. */
 async function openLayer(layer: string) {
-  const engine = createCloudEngine({
+  const engine = cloudEngine({
     baseUrl: fx!.baseUrl,
     token: docScopedToken(fx!, TENANT_ID, DOC_ID, ['*'], layer),
   });
@@ -50,46 +50,49 @@ async function openLayer(layer: string) {
 const urlOf = (h: { source: { kind: string; url?: string } }) =>
   h.source.kind === 'url' ? h.source.url! : '';
 /** The `:pageKey` path segment a page is addressed by (`obj%3A42`). */
-const pageKey = (pon: number) => encodeURIComponent(encodePageKey(toPageRef(pon)));
+const pageKey = (pageObjectNumber: number) =>
+  encodeURIComponent(encodePageKey(toPageRef(pageObjectNumber)));
 
 describe('plane-scoped view sharing (cloud SDK, real runtime)', () => {
   test('pristine layers share EVERY plane — the base HAS annotations and they are visible', async () => {
     const alice = await openLayer('alice');
     const bob = await openLayer('bob');
     try {
-      const pon = (await alice.doc.pages.list()).pages[0]!.ref.pageObjectNumber;
+      const pageObjectNumber = (await alice.doc.pages.list()).pages[0]!.ref.pageObjectNumber;
 
       // Annotation-free renders: one doc-level URL for both visitors.
       const [a, b] = await Promise.all([
-        alice.doc.page(toPageRef(pon)).render.image({ includeAnnotations: false }),
-        bob.doc.page(toPageRef(pon)).render.image({ includeAnnotations: false }),
+        alice.doc.page(toPageRef(pageObjectNumber)).render.image({ includeAnnotations: false }),
+        bob.doc.page(toPageRef(pageObjectNumber)).render.image({ includeAnnotations: false }),
       ]);
       expect(urlOf(a)).toBe(urlOf(b));
-      expect(urlOf(a)).toContain(`/v1/docs/${DOC_ID}/render/pages/${pageKey(pon)}/data@`);
+      expect(urlOf(a)).toContain(
+        `/v1/docs/${DOC_ID}/render/pages/${pageKey(pageObjectNumber)}/data@`,
+      );
       expect(urlOf(a)).not.toContain('/layers/');
       expect((await a.objectUrl()).url).toBeTruthy();
 
-      // ANNOTATED renders share too — this base carries real annotations
-      // and a pristine layer's annotation view IS the base's (the axiom the
+      // Annotated renders share too — this base carries real annotations
+      // and a pristine layer's annotation view is the base's (the axiom the
       // first cut got wrong). Own path family: /render/annotated/.
       const [aa, ba] = await Promise.all([
-        alice.doc.page(toPageRef(pon)).render.image({ includeAnnotations: true }),
-        bob.doc.page(toPageRef(pon)).render.image({ includeAnnotations: true }),
+        alice.doc.page(toPageRef(pageObjectNumber)).render.image({ includeAnnotations: true }),
+        bob.doc.page(toPageRef(pageObjectNumber)).render.image({ includeAnnotations: true }),
       ]);
       expect(urlOf(aa)).toBe(urlOf(ba));
       expect(urlOf(aa)).toContain(
-        `/v1/docs/${DOC_ID}/render/annotated/pages/${pageKey(pon)}/data@`,
+        `/v1/docs/${DOC_ID}/render/annotated/pages/${pageKey(pageObjectNumber)}/data@`,
       );
       expect(urlOf(aa)).not.toContain('/layers/');
       expect((await aa.objectUrl()).url).toBeTruthy();
 
-      // The annotation LIST is the base's list — non-empty, identical
+      // The annotation list is the base's list — non-empty, identical
       // across visitors, served from the shared doc-level URL (a wrong
       // path family would 404 through the real runtime here). Weak-identity
       // annotations ride along untouched.
       const [listA, listB] = await Promise.all([
-        alice.doc.page(toPageRef(pon)).annotations.list(),
-        bob.doc.page(toPageRef(pon)).annotations.list(),
+        alice.doc.page(toPageRef(pageObjectNumber)).annotations.list(),
+        bob.doc.page(toPageRef(pageObjectNumber)).annotations.list(),
       ]);
       expect(listA.annotations.length).toBeGreaterThan(0);
       expect(listA.annotations).toEqual(listB.annotations);
@@ -109,11 +112,11 @@ describe('plane-scoped view sharing (cloud SDK, real runtime)', () => {
     const carol = await openLayer('carol');
     const dave = await openLayer('dave');
     try {
-      const pon = (await carol.doc.pages.list()).pages[0]!.ref.pageObjectNumber;
-      const page = carol.doc.page(toPageRef(pon));
+      const pageObjectNumber = (await carol.doc.pages.list()).pages[0]!.ref.pageObjectNumber;
+      const page = carol.doc.page(toPageRef(pageObjectNumber));
 
       // Pre-write: everything doc-level, including an annotated handle we
-      // deliberately KEEP to prove the blob rail self-heals after the flip.
+      // deliberately keep to prove the blob rail self-heals after the flip.
       const preAnnotated = await page.render.image({ includeAnnotations: true });
       expect(urlOf(preAnnotated)).toContain('/render/annotated/');
 
@@ -131,18 +134,20 @@ describe('plane-scoped view sharing (cloud SDK, real runtime)', () => {
           },
         ],
       });
-      expect(created.created).toBeTruthy();
+      expect(created.annotation).toBeTruthy();
 
-      // SAME handle, no reopen — the monotone flip did its job:
-      // content-plane reads STILL resolve doc-level (the first cut's
+      // Same handle, no reopen — the monotone flip did its job:
+      // content-plane reads still resolve doc-level (the first cut's
       // delta-drops-scope bug made these fall back to layer paths)…
       const free = await page.render.image({ includeAnnotations: false });
-      expect(urlOf(free)).toContain(`/v1/docs/${DOC_ID}/render/pages/${pageKey(pon)}/data@`);
+      expect(urlOf(free)).toContain(
+        `/v1/docs/${DOC_ID}/render/pages/${pageKey(pageObjectNumber)}/data@`,
+      );
       expect(urlOf(free)).not.toContain('/layers/');
       expect((await free.objectUrl()).url).toBeTruthy();
 
       // …while annotation-plane reads flipped to carol's own layer view,
-      // which contains the base annotations PLUS her new one.
+      // which contains the base annotations plus her new one.
       const annotated = await page.render.image({ includeAnnotations: true });
       expect(urlOf(annotated)).toContain('/layers/carol/');
       const list = await page.annotations.list();
@@ -150,14 +155,14 @@ describe('plane-scoped view sharing (cloud SDK, real runtime)', () => {
         true,
       );
 
-      // The PRE-write annotated handle self-heals through the blob rail:
+      // The pre-write annotated handle self-heals through the blob rail:
       // its remembered URL is stale (old family, old annotationVersion),
       // but blob() re-resolves via the manifest and serves.
       expect((await preAnnotated.objectUrl()).url).toBeTruthy();
 
       // Dave's pristine layer is untouched: still fully shared.
       const daveAnnotated = await dave.doc
-        .page(toPageRef(pon))
+        .page(toPageRef(pageObjectNumber))
         .render.image({ includeAnnotations: true });
       expect(urlOf(daveAnnotated)).toContain('/render/annotated/');
       expect(urlOf(daveAnnotated)).not.toContain('/layers/');
@@ -172,22 +177,28 @@ describe('plane-scoped view sharing (cloud SDK, real runtime)', () => {
   test('LIVE handle: rotate owns LAYOUT only — normalized renders keep sharing', async () => {
     const erin = await openLayer('erin');
     try {
-      const pon = (await erin.doc.pages.list()).pages[0]!.ref.pageObjectNumber;
-      await erin.doc.pages.rotate([toPageRef(pon)], 90);
+      const pageObjectNumber = (await erin.doc.pages.list()).pages[0]!.ref.pageObjectNumber;
+      await erin.doc.pages.rotate([toPageRef(pageObjectNumber)], 90);
 
-      // SAME handle: rotation flipped layout, not content — the
-      // annotation-free render STILL rides the shared doc-level URL (the
+      // Same handle: rotation flipped layout, not content — the
+      // annotation-free render still rides the shared doc-level URL (the
       // first cut flipped content on any layoutVersion bump, contradicting
       // its own normalized-artifact model).
-      const free = await erin.doc.page(toPageRef(pon)).render.image({ includeAnnotations: false });
-      expect(urlOf(free)).toContain(`/v1/docs/${DOC_ID}/render/pages/${pageKey(pon)}/data@`);
+      const free = await erin.doc
+        .page(toPageRef(pageObjectNumber))
+        .render.image({ includeAnnotations: false });
+      expect(urlOf(free)).toContain(
+        `/v1/docs/${DOC_ID}/render/pages/${pageKey(pageObjectNumber)}/data@`,
+      );
       expect(urlOf(free)).not.toContain('/layers/');
       expect((await free.objectUrl()).url).toBeTruthy();
 
       // The layout leaf itself is layer-scoped now — list() must re-route
       // and still serve (rotation visible in the snapshot).
       const layout = await erin.doc.pages.list();
-      expect(layout.pages.find((p) => p.ref.pageObjectNumber === pon)?.rotation).toBe(90);
+      expect(layout.pages.find((p) => p.ref.pageObjectNumber === pageObjectNumber)?.rotation).toBe(
+        90,
+      );
     } finally {
       await erin.doc.close();
       await erin.engine.destroy();

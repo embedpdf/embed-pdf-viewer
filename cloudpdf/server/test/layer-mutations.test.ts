@@ -525,7 +525,7 @@ describe('Phase 5 layer mutation pipeline', () => {
         Authorization: `Bearer ${docToken(tenantId, docId, layerName)}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ pages: [3].map(toPageRef), destIndex: 0 }),
+      body: JSON.stringify({ pages: [3].map(toPageRef), toIndex: 0 }),
     });
 
     expect(res.status).toBe(200);
@@ -535,11 +535,13 @@ describe('Phase 5 layer mutation pipeline', () => {
         pageCount: number;
         pages: Array<{ ref: { pageObjectNumber: number }; index: number }>;
       };
-      cache: {
-        previousDocVersion: number;
-        docVersion: number;
-        layoutVersion: number;
-      } | null;
+      meta: {
+        cacheDelta: {
+          previousDocVersion: number;
+          docVersion: number;
+          layoutVersion: number;
+        } | null;
+      };
     };
     // A move returns the new geometry (order), not liveness.
     expect(body.layout.pageCount).toBe(3);
@@ -547,7 +549,12 @@ describe('Phase 5 layer mutation pipeline', () => {
     expect(body.layout.pages.map((page) => page.index)).toEqual([0, 1, 2]);
     // Cloud coherence pins: docVersion + layoutVersion both advance by one,
     // no per-page pin changes.
-    expect(body.cache).toEqual({ previousDocVersion: 1, docVersion: 2, layoutVersion: 2 });
+    expect(body.meta.cacheDelta).toEqual({
+      previousDocVersion: 1,
+      docVersion: 2,
+      layoutVersion: 2,
+      pages: [],
+    });
 
     const layer = await fx.db
       .selectFrom('layers')
@@ -598,11 +605,13 @@ describe('Phase 5 layer mutation pipeline', () => {
         pageCount: number;
         pages: Array<{ ref: { pageObjectNumber: number }; rotation: number }>;
       };
-      cache: {
-        previousDocVersion: number;
-        docVersion: number;
-        layoutVersion: number;
-      } | null;
+      meta: {
+        cacheDelta: {
+          previousDocVersion: number;
+          docVersion: number;
+          layoutVersion: number;
+        } | null;
+      };
     };
     // Rotation is presentation metadata: same pages, same order, new values.
     expect(body.layout.pageCount).toBe(3);
@@ -611,9 +620,14 @@ describe('Phase 5 layer mutation pipeline', () => {
       [2, 90],
       [3, 0],
     ]);
-    expect(body.cache).toEqual({ previousDocVersion: 1, docVersion: 2, layoutVersion: 2 });
+    expect(body.meta.cacheDelta).toEqual({
+      previousDocVersion: 1,
+      docVersion: 2,
+      layoutVersion: 2,
+      pages: [],
+    });
 
-    // The audit trail records the rotate against the AFFECTED pages only.
+    // The audit trail records the rotate against the affected pages only.
     const audit = await fx.db
       .selectFrom('audit_log')
       .select(['kind', 'affected_pages_json'])
@@ -662,16 +676,23 @@ describe('Phase 5 layer mutation pipeline', () => {
         pageCount: number;
         pages: Array<{ ref: { pageObjectNumber: number }; index: number }>;
       };
-      cache: {
-        previousDocVersion: number;
-        docVersion: number;
-        layoutVersion: number;
-      } | null;
+      meta: {
+        cacheDelta: {
+          previousDocVersion: number;
+          docVersion: number;
+          layoutVersion: number;
+        } | null;
+      };
     };
     expect(body.layout.pageCount).toBe(2);
     expect(body.layout.pages.map((page) => page.ref.pageObjectNumber)).toEqual([1, 3]);
     expect(body.layout.pages.map((page) => page.index)).toEqual([0, 1]);
-    expect(body.cache).toEqual({ previousDocVersion: 1, docVersion: 2, layoutVersion: 2 });
+    expect(body.meta.cacheDelta).toEqual({
+      previousDocVersion: 1,
+      docVersion: 2,
+      layoutVersion: 2,
+      pages: [],
+    });
 
     const audit = await fx.db
       .selectFrom('audit_log')
@@ -701,7 +722,7 @@ describe('Phase 5 layer mutation pipeline', () => {
 
   test('the audited payload is byte-identical to the HTTP response (event-stream invariant)', async () => {
     // What we tell the caller is what we tell history: the audit row must
-    // store the FINALIZED result (cloud-stable revision tokens, real
+    // store the finalized result (cloud-stable revision tokens, real
     // cacheDelta / coherence pins), never the worker's session-relative
     // draft. A remote event subscriber replays exactly these payloads.
     const tenantId = 'tenant-layer-pages';
@@ -725,7 +746,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     const moved = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/move`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ pages: [3].map(toPageRef), destIndex: 0 }),
+      body: JSON.stringify({ pages: [3].map(toPageRef), toIndex: 0 }),
     });
     expect(moved.status).toBe(200);
     mutations.push({ kind: 'pages.move', response: await moved.json() });
@@ -758,7 +779,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     }
   });
 
-  test('multipart stamp create: body part + resource part → parsed, persisted, version bumped', async () => {
+  test('multipart stamp create: the data as `body`, its drawing as `resource:appearance` → persisted, version bumped', async () => {
     const tenantId = 'tenant-layer-multipart';
     const docId = 'doclayermut010';
     const layerName = 'alice';
@@ -770,11 +791,10 @@ describe('Phase 5 layer mutation pipeline', () => {
       JSON.stringify({
         subtype: 'stamp',
         rect: { left: 100, bottom: 500, right: 260, top: 580 },
-        source: { resource: 'r0' },
         fit: 'contain',
       }),
     );
-    form.append('resource:r0', new Blob([tinyPng()], { type: 'image/png' }), 'stamp.png');
+    form.append('resource:appearance', new Blob([tinyPng()], { type: 'image/png' }), 'stamp.png');
 
     const res = await fetch(
       `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items`,
@@ -811,11 +831,10 @@ describe('Phase 5 layer mutation pipeline', () => {
       JSON.stringify({
         subtype: 'stamp',
         rect: { left: 0, bottom: 0, right: 10, top: 10 },
-        source: { resource: 'r0' },
       }),
     );
     form.append(
-      'resource:r0',
+      'resource:appearance',
       new Blob([new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8])], { type: 'image/png' }),
       'not-a-png.png',
     );
@@ -839,6 +858,33 @@ describe('Phase 5 layer mutation pipeline', () => {
     expect(layer?.doc_version ?? 1).toBe(1); // nothing advanced
   });
 
+  test('multipart create: a resource part named by no role → 400, nothing committed', async () => {
+    const tenantId = 'tenant-layer-multipart';
+    const docId = 'doclayermut013';
+    const layerName = 'alice';
+    await seedDocument(fx, tenantId, docId, { pageCount: 1 });
+
+    const form = new FormData();
+    form.append(
+      'body',
+      JSON.stringify({ subtype: 'stamp', rect: { left: 0, bottom: 0, right: 10, top: 10 } }),
+    );
+    form.append('resource:r0', new Blob([tinyPng()], { type: 'image/png' }), 'stamp.png');
+
+    const res = await fetch(
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${docToken(tenantId, docId, layerName)}` },
+        body: form,
+      },
+    );
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: { message: string } }).error.message).toMatch(
+      /resource:r0/,
+    );
+  });
+
   test('multipart create without a body part → 400', async () => {
     const tenantId = 'tenant-layer-multipart';
     const docId = 'doclayermut012';
@@ -846,7 +892,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     await seedDocument(fx, tenantId, docId, { pageCount: 1 });
 
     const form = new FormData();
-    form.append('resource:r0', new Blob([tinyPng()], { type: 'image/png' }), 'stamp.png');
+    form.append('resource:appearance', new Blob([tinyPng()], { type: 'image/png' }), 'stamp.png');
 
     const res = await fetch(
       `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items`,
@@ -1105,7 +1151,7 @@ function tinyPng(): Uint8Array {
 }
 
 /**
- * Assert an artifact key is a per-ATTEMPT variant of the expected
+ * Assert an artifact key is a per-attempt variant of the expected
  * versioned key: `v{version}-{nonce}.layer` (see LayerService.nextArtifactKey
  * — racing replicas must never share an upload target).
  */
@@ -1116,7 +1162,7 @@ function expectAttemptKey(actual: string | null, versionedKey: string): void {
   );
 }
 
-/** Parse the stub worker's v2 layer artifact ([0x4c, 0x02, ...JSON]). */
+/** Parse the stub worker's layer artifact, format 2 ([0x4c, 0x02, ...JSON]). */
 function parseStubArtifact(bytes: Uint8Array): Array<Record<string, unknown>> {
   const buf = Buffer.from(bytes);
   if (buf.byteLength < 2 || buf[0] !== 0x4c || buf[1] !== 0x02) return [];

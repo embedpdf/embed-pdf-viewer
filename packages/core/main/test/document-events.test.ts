@@ -1,3 +1,4 @@
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it, vi } from 'vitest';
 import { AbortablePromise } from '@embedpdf/engine-core/runtime';
 import type {
@@ -11,7 +12,8 @@ import { createKernel } from '../src/kernel';
 import type { DocumentMeta, PluginContext } from '../src/types';
 
 /**
- * Phase 1: document mutation events replace the in-kernel page registry.
+ * Document mutation events drive the kernel's page list; there is no separate
+ * in-kernel page registry.
  *
  * A fake engine whose handle exposes a controllable event stream lets us
  * emit a `pages.rotated` (or move/delete) event and assert the kernel swaps
@@ -20,10 +22,10 @@ import type { DocumentMeta, PluginContext } from '../src/types';
  */
 
 const box = { left: 0, bottom: 0, right: 600, top: 800 } as const;
-function page(pon: number, index: number, rotation: PageRotation = 0): PageLayout {
+function page(pageObjectNumber: number, index: number, rotation: PageRotation = 0): PageLayout {
   return {
     index,
-    pageObjectNumber: pon,
+    ref: toPageRef(pageObjectNumber),
     label: null,
     size: { width: 600, height: 800 },
     rotation,
@@ -34,8 +36,8 @@ function page(pon: number, index: number, rotation: PageRotation = 0): PageLayou
 
 /** A hand-driven event stream — `emit` pushes to every subscriber. */
 class FakeEvents {
-  private readonly listeners = new Set<(e: DocumentEvent) => void>();
-  subscribe(listener: (e: DocumentEvent) => void): () => void {
+  private readonly listeners = new Set<(event: DocumentEvent) => void>();
+  subscribe(listener: (event: DocumentEvent) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
@@ -43,7 +45,7 @@ class FakeEvents {
     return null;
   }
   emit(event: DocumentEvent): void {
-    for (const l of [...this.listeners]) l(event);
+    for (const listener of [...this.listeners]) listener(event);
   }
   get subscriberCount(): number {
     return this.listeners.size;
@@ -78,26 +80,31 @@ function captureDoc(): {
   const plugin = {
     id: 'capture',
     scope: 'document' as const,
-    init: (ctx: PluginContext<unknown>) => {
+    create: (ctx: PluginContext<unknown>) => {
       captured = ctx;
+      return { api: {} };
     },
   };
   return {
     plugin,
     ctx: () => {
-      if (!captured) throw new Error('plugin not initialized');
+      if (!captured) throw new Error('plugin not created');
       return captured;
     },
   };
 }
 
-function rotatedEvent(pons: number[], rotation: PageRotation, pages: PageLayout[]): DocumentEvent {
+function rotatedEvent(
+  pageObjectNumbers: number[],
+  rotation: PageRotation,
+  pages: PageLayout[],
+): DocumentEvent {
   return {
     type: 'pages.rotated',
-    pageObjectNumbers: pons,
+    pages: pageObjectNumbers.map((pageObjectNumber) => toPageRef(pageObjectNumber)),
     rotation,
-    layout: { pageCount: pages.length, pages },
-    cache: null,
+    layout: { pageCount: pages.length, pages, namedPages: [] },
+    meta: { affectedPages: [], cacheDelta: null },
     origin: { kind: 'local', sessionId: 's', sub: null, ts: 1, serverId: null },
   };
 }
@@ -111,17 +118,17 @@ describe('kernel: document events → page registry', () => {
 
     const before = capture.ctx().document()!;
     expect(before.revision).toBe(0);
-    expect(before.pages.map((p) => p.rotation)).toEqual([0, 0, 0]);
+    expect(before.pages.map((pageInfo) => pageInfo.rotation)).toEqual([0, 0, 0]);
 
     // The engine confirmed a rotate; the event carries the new layout.
     events.emit(rotatedEvent([1], 90, [page(1, 0, 90), page(2, 1), page(3, 2)]));
 
     const after = capture.ctx().document()!;
     expect(after.revision).toBe(1); // registry version advanced
-    expect(after.pages.find((p) => p.pageObjectNumber === 1)!.rotation).toBe(90);
+    expect(after.pages.find((pageInfo) => pageInfo.ref.pageObjectNumber === 1)!.rotation).toBe(90);
     expect(after.pageCount).toBe(3); // rotate keeps the page set
-    // Identity preserved: same pons, same order.
-    expect(after.pages.map((p) => p.pageObjectNumber)).toEqual([1, 2, 3]);
+    // Identity preserved: same pages, same order.
+    expect(after.pages.map((pageInfo) => pageInfo.ref.pageObjectNumber)).toEqual([1, 2, 3]);
   });
 
   it('a pages.deleted event shrinks the registry', async () => {
@@ -132,16 +139,16 @@ describe('kernel: document events → page registry', () => {
 
     events.emit({
       type: 'pages.deleted',
-      pageObjectNumbers: [2],
-      layout: { pageCount: 2, pages: [page(1, 0), page(3, 1)] },
-      cache: null,
+      pages: [toPageRef(2)],
+      layout: { pageCount: 2, pages: [page(1, 0), page(3, 1)], namedPages: [] },
+      meta: { affectedPages: [], cacheDelta: null },
       origin: { kind: 'remote', sessionId: 'other', sub: 'alice', ts: 1, serverId: 7 },
     } as DocumentEvent);
 
     const after = capture.ctx().document()!;
     expect(after.revision).toBe(1);
     expect(after.pageCount).toBe(2);
-    expect(after.pages.map((p) => p.pageObjectNumber)).toEqual([1, 3]);
+    expect(after.pages.map((pageInfo) => pageInfo.ref.pageObjectNumber)).toEqual([1, 3]);
   });
 
   it('an annotation event does NOT touch the registry (origin-agnostic, structure-only)', async () => {
@@ -151,9 +158,9 @@ describe('kernel: document events → page registry', () => {
     await kernel.documents.open({ kind: 'bytes', id: 'doc-1', bytes: new Uint8Array() });
 
     events.emit({
-      type: 'annotation.created',
-      pageObjectNumber: 1,
-      created: {} as never,
+      type: 'annotations.created',
+      page: toPageRef(1),
+      annotation: {} as never,
       meta: {} as never,
       origin: { kind: 'local', sessionId: 's', sub: null, ts: 1, serverId: null },
     } as DocumentEvent);
@@ -188,9 +195,9 @@ describe('kernel: document events → page registry', () => {
       id: 'resource',
       scope: 'document' as const,
       token,
-      capability: (ctx: PluginContext<unknown>) => {
+      create: (ctx: PluginContext<unknown>) => {
         ctx.cleanup(teardown);
-        return {};
+        return { api: {} };
       },
     };
     const kernel = createKernel({ engine, plugins: [plugin] });
@@ -213,9 +220,9 @@ describe('kernel: document events → page registry', () => {
     const plugin = {
       id: 'workspace-resource',
       token,
-      capability: (ctx: PluginContext<unknown>) => {
+      create: (ctx: PluginContext<unknown>) => {
         ctx.cleanup(teardown);
-        return {};
+        return { api: {} };
       },
     };
     const kernel = createKernel({ engine, plugins: [plugin] });

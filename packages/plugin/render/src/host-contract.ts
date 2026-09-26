@@ -1,18 +1,18 @@
 /**
- * @embedpdf/plugin-render/contract/host — the HOST lens.
+ * @embedpdf/plugin-render/contract/host — the host lens.
  *
  * What view layers need to paint: the conforming render door and its source
  * keys, the resolved paint settings, and a per-view tile surface whose reads
  * are pure. Same runtime token as the public one, typed wider. Never use
  * this from application code.
  */
-import type {
-  CapabilityToken,
-  EventHook,
-  OperationOptions,
-  PageRef,
-  PageRenderViewport,
-  PluginErrorInfo,
+import {
+  createHostToken,
+  type EventHook,
+  type OperationOptions,
+  type PageRef,
+  type PageRenderViewport,
+  type PluginErrorInfo,
 } from '@embedpdf/core';
 import {
   RenderToken as PublicRenderToken,
@@ -46,7 +46,7 @@ export interface RenderSourceOptions {
  * never-engaging demand cannot disturb the main view's tiles.
  *
  * Reads are pure: `setDemand` is the one call that schedules fetches and
- * re-plans; `getPlan` returns the plan that demand produced (memoized — the
+ * re-plans; `getPlan` returns the paint plan that demand produced (memoized: the
  * same object until the demand, an epoch, or a tile arrival changes it, so
  * layers subscribe with plain `Object.is`). Handles are reference-stable per
  * view id and reference-counted: every `createViewDemand` pairs with one
@@ -66,7 +66,7 @@ export interface ViewDemand {
   /** The inverse report: this plan key's element left the DOM. */
   markUnpainted(page: PageRef, key: string): void;
   /** This view unmounted its tile plane for the page: abort in-flight tile
-   *  fetches, drop ITS bookkeeping (resolved bytes stay cached). */
+   *  fetches, drop its own bookkeeping (resolved bytes stay cached). */
   release(page: PageRef): void;
   /** Release every page of this view and drop the handle's reference. */
   dispose(): void;
@@ -85,8 +85,8 @@ export interface RenderFailedEvent {
 
 export interface RenderHostCapability extends RenderCapability {
   /**
-   * The VIEWER door: render a page at the scale a view shows it, CONFORMED
-   * through the resolved render points (STRATEGY ∧ POLICY) — the exact
+   * The viewer door: render a page at the scale a view shows it, conformed
+   * through the resolved render points (strategy ∧ policy): the exact
    * demand capped at the pixel budget under `continuous`, the advertised
    * ladder under a lattice — with same-key asks collapsing in the raster
    * store. Layers key their fetch on {@link getSourceKey}.
@@ -109,4 +109,4 @@ export interface RenderHostCapability extends RenderCapability {
   readonly onRenderFailed: EventHook<RenderFailedEvent>;
 }
 
-export const RenderToken = PublicRenderToken as unknown as CapabilityToken<RenderHostCapability>;
+export const RenderToken = createHostToken<RenderHostCapability>(PublicRenderToken);

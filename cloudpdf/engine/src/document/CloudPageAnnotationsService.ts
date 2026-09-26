@@ -2,27 +2,30 @@ import {
   AbortablePromise,
   EngineError,
   EngineErrorCode,
+  deletedAnnotationsOf,
   createPageImageHandle,
   encodeStableIdKey,
-  normalizeAnnotationDraft,
-  normalizeAnnotationPatch,
-  type WireResourceMap,
+  hasAnnotationResources,
+  resolveAnnotationResources,
+  withFileFromResource,
+  type AnnotationResourceRole,
+  type AnnotationResources,
+  type WireAnnotationResources,
   type AnnotationAppearanceImage,
   type AnnotationAppearanceImageOptions,
   type AnnotationAppearanceImagesResult,
   type AnnotationAppearanceRenderOptions,
   type AnnotationAppearancesResult,
   type AnnotationDraft,
-  type AnnotationListPageSnapshot,
+  type AnnotationList,
   type AnnotationPatch,
   type AnnotationRef,
   type AnnotationCreateResult,
   type AnnotationDeleteResult,
   type AnnotationFlattenResult,
   type AnnotationMoveResult,
-  type PageFlattenUsage,
+  type FlattenOptions,
   type AnnotationUpdateResult,
-  type AttachmentContent,
   type DocumentEventInit,
   type MutationMeta,
   type PageAnnotationsService,
@@ -33,7 +36,7 @@ import {
 import {
   AnnotationCreateResultSchema,
   AnnotationDeleteResultSchema,
-  AnnotationListPageSnapshotSchema,
+  AnnotationListSchema,
   AnnotationAppearanceManifestSchema,
   AnnotationFlattenResultSchema,
   AnnotationMoveResultSchema,
@@ -43,10 +46,9 @@ import {
 } from '@embedpdf/engine-core/wire';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
-import { buildMutationForm, hasResources } from './buildMutationForm';
+import { buildAnnotationMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import { planesInherited } from './planes';
-import { parseAttachmentContent } from './parseAttachmentContent';
 import type { HttpClient } from '../transport/HttpClient';
 
 /**
@@ -69,26 +71,26 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     private readonly publisher: SessionEventPublisher,
   ) {}
 
-  list(): AbortablePromise<AnnotationListPageSnapshot> {
+  list(): AbortablePromise<AnnotationList> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
-    return AbortablePromise.run<AnnotationListPageSnapshot>(async (signal) => {
+    return AbortablePromise.run<AnnotationList>(async (signal) => {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        const pon = this.pageRef.pageObjectNumber;
-        const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pon);
+        const pageObjectNumber = this.pageRef.pageObjectNumber;
+        const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pageObjectNumber);
         if (!page) {
           throw new EngineError(
             EngineErrorCode.NotFound,
-            `no page with object number ${pon} in document ${this.docId}`,
+            `no page with object number ${pageObjectNumber} in document ${this.docId}`,
           );
         }
         // Plane-scope rule: the list depends on the `annotations` plane. A
         // base's own annotations (weak-identity ones included) are simply
-        // VISIBLE through an inheriting layer, so every visitor reads ONE
+        // visible through an inheriting layer, so every visitor reads one
         // doc-level URL served from the base session.
         return planesInherited(manifest, ['annotations'])
           ? wirePaths.docPageAnnotations(this.docId, this.pageRef, page.cache.annotationVersion)
@@ -101,7 +103,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       };
       return this.http.getJsonWithRefresh(
         buildPath,
-        (raw) => AnnotationListPageSnapshotSchema.parse(raw),
+        (raw) => AnnotationListSchema.parse(raw),
         async (s) => {
           await this.manifest.refresh(s);
         },
@@ -110,18 +112,18 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     });
   }
 
-  renderAppearances(
+  renderAppearancesRaw(
     _options?: AnnotationAppearanceRenderOptions,
   ): AbortablePromise<AnnotationAppearancesResult> {
     return AbortablePromise.rejectReason(
       new EngineError(
         EngineErrorCode.NotImplemented,
-        'annotations.renderAppearances() raw rasters are not available in the cloud engine; use renderAppearanceImages()',
+        'annotations.renderAppearancesRaw() raw rasters are not available in the cloud engine; use renderAppearances()',
       ),
     );
   }
 
-  renderAppearanceImages(
+  renderAppearances(
     options: AnnotationAppearanceImageOptions = {},
   ): AbortablePromise<AnnotationAppearanceImagesResult> {
     if (this.isClosed()) {
@@ -136,12 +138,12 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       const format: PageNetworkRenderFormat = options.format ?? 'webp';
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        const pon = this.pageRef.pageObjectNumber;
-        const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pon);
+        const pageObjectNumber = this.pageRef.pageObjectNumber;
+        const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pageObjectNumber);
         if (!page) {
           throw new EngineError(
             EngineErrorCode.NotFound,
-            `no page with object number ${pon} in document ${this.docId}`,
+            `no page with object number ${pageObjectNumber} in document ${this.docId}`,
           );
         }
         const wireToken = annotationAppearancesImageOptionsToWire(
@@ -171,15 +173,15 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
   }
 
   /**
-   * Decode and return the file embedded in a FileAttachment annotation.
-   * A read over the immutable `attachment-files` leaf, pinned by the
-   * manifest's `attachmentsVersion` (annotation-level files re-key on the
-   * same pin as document-level ones), with the same stale-404 refresh
-   * retry as {@link list}. Weak `index` refs cannot be spliced into a GET
-   * URL (no body to carry the revision), so bytes reads require a stable
-   * id — the same `:annotKey` routing update()/delete() use.
+   * One of the annotation's resources. `file` is a read over the immutable
+   * `attachment-files` leaf, pinned by the manifest's `attachmentsVersion`
+   * (annotation-level files re-key on the same pin as document-level ones),
+   * with the same stale-404 refresh retry as {@link list}. `appearance` is a
+   * derived read (no-store), like {@link exportAppearance}. Weak `index` refs
+   * cannot be spliced into a GET URL (no body to carry the revision), so both
+   * require a stable id — the same `:annotKey` routing update()/delete() use.
    */
-  downloadFile(ref: AnnotationRef): AbortablePromise<AttachmentContent> {
+  downloadResource(ref: AnnotationRef, role: AnnotationResourceRole): AbortablePromise<Uint8Array> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
@@ -197,15 +199,28 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       return AbortablePromise.rejectReason(
         new EngineError(
           EngineErrorCode.InvalidArg,
-          'downloadFile requires a stable ref (objectNumber or nm); index refs cannot address the content-addressed file leaf',
+          'downloadResource requires a stable ref (objectNumber or nm); index refs cannot address a resource URL',
         ),
       );
     }
     const annotKey = encodeStableIdKey(refToStableId(ref));
-    return AbortablePromise.run<AttachmentContent>(async (signal) => {
+    if (role === 'appearance') {
+      return AbortablePromise.run<Uint8Array>(async (signal) =>
+        this.http.getBytes(
+          wirePaths.layerAnnotationAppearanceResource(
+            this.docId,
+            this.layerName,
+            this.pageRef,
+            annotKey,
+          ),
+          signal,
+        ),
+      );
+    }
+    return AbortablePromise.run<Uint8Array>(async (signal) => {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        // A FileAttachment annotation's bytes depend on BOTH planes —
+        // A FileAttachment annotation's bytes depend on both planes —
         // the annotation must exist in this view (`annotations`) and the
         // byte pin is `attachmentsVersion` (`attachments`).
         return planesInherited(manifest, ['annotations', 'attachments'])
@@ -230,33 +245,44 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         },
         signal,
       );
-      return parseAttachmentContent(file);
+      return file.bytes;
     });
   }
 
-  create(draft: AnnotationDraft): AbortablePromise<AnnotationCreateResult> {
+  create(
+    draft: AnnotationDraft,
+    resources?: AnnotationResources,
+  ): AbortablePromise<AnnotationCreateResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
+    // A `File` brings its name and type; the bytes travel without them.
+    const data = withFileFromResource(draft, resources);
     return AbortablePromise.run<AnnotationCreateResult>(async (signal) => {
-      // Split inline BinarySource fields (stamp images, …) into the wire
-      // draft + binary resources. Without resources the request is the
-      // plain JSON POST it has always been; with resources it becomes
-      // multipart: a `body` JSON part + one `resource:{key}` part each —
-      // the mirror image of the appearance-render response.
-      const { wire, resources } = await normalizeAnnotationDraft(draft);
+      // Without resources the request is the plain JSON POST of the data;
+      // with them it is multipart (see `buildAnnotationMutationForm`).
+      const wireResources = await resolveAnnotationResources(resources);
       const path = wirePaths.layerPageAnnotationsCreate(this.docId, this.layerName, this.pageRef);
       const parse = (raw: unknown) => AnnotationCreateResultSchema.parse(raw);
-      const result = hasResources(resources)
-        ? await this.http.postMultipartJson(path, buildMutationForm(wire, resources), parse, signal)
-        : await this.http.postJson(path, wire, parse, signal);
-      return this.absorbMutation(result, 'annotation.created');
+      const result = hasAnnotationResources(wireResources)
+        ? await this.http.postMultipartJson(
+            path,
+            buildAnnotationMutationForm(data, wireResources),
+            parse,
+            signal,
+          )
+        : await this.http.postJson(path, data, parse, signal);
+      return this.absorbMutation(result, 'annotations.created');
     });
   }
 
-  update(ref: AnnotationRef, patch: AnnotationPatch): AbortablePromise<AnnotationUpdateResult> {
+  update(
+    ref: AnnotationRef,
+    patch: AnnotationPatch,
+    resources?: AnnotationResources,
+  ): AbortablePromise<AnnotationUpdateResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
@@ -281,9 +307,9 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         'index',
       );
       return AbortablePromise.run<AnnotationUpdateResult>(async (signal) => {
-        const { wire, resources } = await normalizeAnnotationPatch(patch);
-        const result = await this.patchMutation(path, { ref, patch: wire }, resources, signal);
-        return this.absorbMutation(result, 'annotation.updated');
+        const wireResources = await resolveAnnotationResources(resources);
+        const result = await this.patchMutation(path, { ref, patch }, wireResources, signal);
+        return this.absorbMutation(result, 'annotations.updated');
       });
     }
     const stableKey = encodeStableIdKey(refToStableId(ref));
@@ -294,22 +320,27 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       stableKey,
     );
     return AbortablePromise.run<AnnotationUpdateResult>(async (signal) => {
-      const { wire, resources } = await normalizeAnnotationPatch(patch);
-      const result = await this.patchMutation(path, { patch: wire }, resources, signal);
-      return this.absorbMutation(result, 'annotation.updated');
+      const wireResources = await resolveAnnotationResources(resources);
+      const result = await this.patchMutation(path, { patch }, wireResources, signal);
+      return this.absorbMutation(result, 'annotations.updated');
     });
   }
 
-  /** PATCH as plain JSON, or as multipart when the patch carried binaries. */
+  /** PATCH as plain JSON, or as multipart when resources came with the patch. */
   private patchMutation(
     path: string,
     body: unknown,
-    resources: WireResourceMap,
+    resources: WireAnnotationResources,
     signal: AbortSignal,
   ): Promise<AnnotationUpdateResult> {
     const parse = (raw: unknown) => AnnotationUpdateResultSchema.parse(raw);
-    if (hasResources(resources)) {
-      return this.http.patchMultipartJson(path, buildMutationForm(body, resources), parse, signal);
+    if (hasAnnotationResources(resources)) {
+      return this.http.patchMultipartJson(
+        path,
+        buildAnnotationMutationForm(body, resources),
+        parse,
+        signal,
+      );
     }
     return this.http.patchJson(path, body, parse, signal);
   }
@@ -345,7 +376,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
           (raw) => AnnotationDeleteResultSchema.parse(raw),
           signal,
         );
-        return this.absorbMutation(result, 'annotation.deleted');
+        return this.absorbDelete(result);
       });
     }
     const stableKey = encodeStableIdKey(refToStableId(ref));
@@ -361,7 +392,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         (raw) => AnnotationDeleteResultSchema.parse(raw),
         signal,
       );
-      return this.absorbMutation(result, 'annotation.deleted');
+      return this.absorbDelete(result);
     });
   }
 
@@ -391,14 +422,15 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         (raw) => AnnotationMoveResultSchema.parse(raw),
         signal,
       );
-      return this.absorbMutation(result, 'annotation.moved');
+      return this.absorbMutation(result, 'annotations.moved');
     });
   }
 
   flatten(
     refs: AnnotationRef[],
-    usage: PageFlattenUsage = 'display',
+    options?: FlattenOptions,
   ): AbortablePromise<AnnotationFlattenResult> {
+    const usage = options?.usage ?? 'display';
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
@@ -422,8 +454,9 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         (raw) => AnnotationFlattenResultSchema.parse(raw),
         signal,
       );
-      // Nothing applied means no artifact and no coherence bump.
-      if (result.meta === null) return result;
+      // Nothing applied comes back without a cache delta: no artifact, no
+      // coherence bump, no event.
+      if (result.meta.cacheDelta === null) return result;
       // Flatten bakes annotations into page content, so both planes flip.
       this.manifest.apply(result.meta, ['content', 'annotations']);
       this.publisher.publishLocal({ type: 'annotations.flattened', ...result });
@@ -464,9 +497,21 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
    * `type` with the matching result by construction; the cast localizes that
    * pairing here instead of widening every site.
    */
+  /** A delete's event names what went, for listeners that didn't delete it. */
+  private absorbDelete(result: AnnotationDeleteResult): AnnotationDeleteResult {
+    this.manifest.apply(result.meta, ['annotations']);
+    this.publisher.publishLocal({
+      type: 'annotations.deleted',
+      page: this.pageRef,
+      deleted: deletedAnnotationsOf(result),
+      ...result,
+    });
+    return result;
+  }
+
   private absorbMutation<T extends { meta: MutationMeta }>(
     result: T,
-    type: 'annotation.created' | 'annotation.updated' | 'annotation.deleted' | 'annotation.moved',
+    type: 'annotations.created' | 'annotations.updated' | 'annotations.moved',
   ): T {
     this.manifest.apply(result.meta, ['annotations']);
     this.publisher.publishLocal({

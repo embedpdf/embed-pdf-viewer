@@ -7,13 +7,13 @@ import { defineConfig, type Plugin } from 'vite';
 import { discoverSampleVariants } from './src/lib/sample-discovery';
 
 /**
- * The Angular half of the live-demo pipeline — a SEPARATE Vite pass because
+ * The Angular half of the live-demo pipeline — a separate Vite pass because
  * Angular needs its own esbuild dialect (experimentalDecorators +
  * useDefineForClassFields:false) that must not leak into the react/vue/svelte
  * pass (vite.demos.config.ts runs first with emptyOutDir; this pass appends
  * into the same public/demos).
  *
- * Demos bootstrap ZONELESS (the design rule that makes iframe-free Angular
+ * Demos bootstrap zoneless (the design rule that makes iframe-free Angular
  * demos safe: zone.js patches globals and would infect the whole docs app).
  * Convention: every Angular sample's component uses selector 'demo-root'.
  */
@@ -81,7 +81,7 @@ function demoEntriesPlugin(): Plugin {
 export default defineConfig({
   // Runtime JIT, no compiler plugin: esbuild emits the decorators and
   // '@angular/compiler' (imported by the mount wrapper) compiles templates at
-  // mount time. Template CORRECTNESS is enforced by the embedpdf site's `ngc`
+  // mount time. Template correctness is enforced by the embedpdf site's `ngc`
   // pass over the same corpus sources — the build pass only bundles.
   plugins: [demoEntriesPlugin()],
   esbuild: {

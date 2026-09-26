@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { AnnotationBundleLimits, Identity } from '@embedpdf/engine-core';
 import type { Kysely } from 'kysely';
 import {
   createSqliteDb,
@@ -18,16 +19,14 @@ import { buildAppForTesting } from '../../../server/src/app/buildApp';
 import { createValidTestLicenseGate } from '../../../server/src/licensing/testing';
 
 /**
- * Shared cloud-test scaffolding for the Phase 4 versioned read
- * pipeline. The cloud SDK's `annotations.list()` and `text.read()`
- * now require the doc to be visible to `DocumentService` (which
- * reads from the SQL `documents` table), so cloud tests that used
- * to seed via the legacy `kind: 'bytes'` open path now boot a
- * full DB-backed `buildApp` and seed via direct INSERT.
+ * Shared cloud-test scaffolding for the versioned read pipeline. The
+ * cloud SDK's `annotations.list()` and `text.get()` require the doc to
+ * be visible to `DocumentService` (which reads from the SQL `documents`
+ * table), so these tests boot a full DB-backed `buildApp` and seed the
+ * document via direct insert.
  *
- * `defaultWorkerEntryUrl` keeps the real PDFium worker pool so we
- * preserve the original tests' end-to-end depth — we're only
- * changing the open path, not the engine surface under test.
+ * `defaultWorkerEntryUrl` keeps the real PDFium worker pool, so the
+ * tests exercise the engine end to end; only the open path is seeded.
  */
 export interface DbSeededFixture {
   bundle: AppBundle;
@@ -39,7 +38,9 @@ export interface DbSeededFixture {
 }
 
 export async function buildDbSeededFixture(
-  opts: { secret: string } = { secret: 'cloud-test-secret' },
+  opts: { secret: string; annotationBundleLimits?: AnnotationBundleLimits } = {
+    secret: 'cloud-test-secret',
+  },
 ): Promise<DbSeededFixture> {
   const storageRoot = await mkdtemp(join(tmpdir(), 'cloud-test-store-'));
   const cacheRoot = await mkdtemp(join(tmpdir(), 'cloud-test-cache-'));
@@ -57,6 +58,7 @@ export async function buildDbSeededFixture(
     sweepIntervalMs: 0,
     cacheRoot,
     cacheMaxBytes: 4 * 1024 * 1024,
+    ...(opts.annotationBundleLimits ? { annotationBundleLimits: opts.annotationBundleLimits } : {}),
   });
   const addr = await bundle.app.listen({ host: '127.0.0.1', port: 0 });
   const baseUrl = typeof addr === 'string' ? addr : `http://127.0.0.1:${addr}`;
@@ -126,6 +128,7 @@ export function docScopedToken(
   docId: string,
   scope: ReadonlyArray<string> = ['*'],
   layerName?: string,
+  identity?: Identity,
 ): string {
   return signDevToken(fx.secret, {
     sub: layerName ? `cloud-test-${layerName}` : 'cloud-test',
@@ -133,6 +136,7 @@ export function docScopedToken(
     doc_id: docId,
     scope,
     ...(layerName ? { layer_name: layerName } : {}),
+    ...(identity ? { extras: { identity } } : {}),
   });
 }
 

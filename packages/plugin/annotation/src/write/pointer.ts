@@ -1,4 +1,4 @@
-import type { MeasurementAppearance, Subtype, Vec } from '@embedpdf/core-annotation';
+import type { MeasurementAppearance, Subtype, Point } from '@embedpdf/core-annotation';
 import { pageSpace, type PageRotation } from '@embedpdf/core-geometry';
 import {
   isDimension,
@@ -33,7 +33,7 @@ export function createPointer(
   chrome: Pick<ChromeReads, 'chromeGeomAt' | 'grabBoost' | 'hitAt'>,
   measurement: Pick<Measurement, 'viewportsOf'>,
 ) {
-  // The E/X trigger feed (actions plugin present): driven ONLY from the
+  // The E/X trigger feed (actions plugin present): driven only from the
   // pointer-driven hoverAt diff below — see hover-feed.ts for the law.
   const actionsForHover = ctx.tryGet(PublicActionsToken);
   const hoverFeed = actionsForHover
@@ -44,7 +44,7 @@ export function createPointer(
     editPointer: (
       phase: Phase,
       page: PageRef,
-      point: Vec,
+      point: Point,
       shift: boolean,
       scale?: number,
       rotation?: PageRotation,
@@ -52,7 +52,7 @@ export function createPointer(
       touch?: boolean,
     ) => {
       store.commit({
-        t: 'editPointer',
+        type: 'editPointer',
         phase,
         in: {
           page,
@@ -72,14 +72,14 @@ export function createPointer(
     marqueePointer: (
       phase: Phase,
       page: PageRef,
-      point: Vec,
+      point: Point,
       shift: boolean,
       _scale?: number,
       rotation?: PageRotation,
       zoom?: number,
     ) => {
       store.commit({
-        t: 'marqueePointer',
+        type: 'marqueePointer',
         phase,
         in: {
           page,
@@ -96,33 +96,33 @@ export function createPointer(
       tool: string,
       phase: Phase,
       page: PageRef,
-      point: Vec,
+      point: Point,
       finish = false,
       displayRotation?: PageRotation,
     ) => {
-      const pon = page.pageObjectNumber;
+      const pageObjectNumber = page.pageObjectNumber;
       // No create authority → creation gestures are inert: no ghost, no
       // draft, no doomed 403. The engine enforces; this keeps pixels honest.
-      const t = tools.get(tool);
+      const resolvedTool = tools.get(tool);
       if (
-        t?.meta?.capture === true
+        resolvedTool?.meta?.capture === true
           ? !ctx.doc?.security.allows('doc.annotate.modify')
           : !authority.canCreate()
       )
         return;
-      // Resolve the authoring TOOL to its routing subtype + defaults key. Two
+      // Resolve the authoring tool to its routing subtype + defaults key. Two
       // tools can share a subtype (line / arrow); `preset` keeps their defaults
       // apart. Unknown id → treat it as a bare subtype (headless/programmatic).
       // The tool's `upright` policy + the sample's display rotation ride the
-      // input bag; the core captures them on the draft at DOWN.
-      const crop = geometry.cropOf(pon);
-      const cache = measurement.viewportsOf(pon);
+      // input bag; the core captures them on the draft at down.
+      const crop = geometry.cropOf(pageObjectNumber);
+      const cache = measurement.viewportsOf(pageObjectNumber);
       const draft = store.model().draft;
       const continuingMeasurement =
-        (draft?.g === 'create-distance' || draft?.g === 'create-poly') &&
-        draft.page.pageObjectNumber === pon &&
-        draft.preset === (t?.preset ?? tool);
-      const dimension = t && isDimension(t);
+        (draft?.kind === 'create-distance' || draft?.kind === 'create-poly') &&
+        draft.page.pageObjectNumber === pageObjectNumber &&
+        draft.preset === (resolvedTool?.preset ?? tool);
+      const dimension = resolvedTool && isDimension(resolvedTool);
       if (dimension && phase === 'down' && !continuingMeasurement && (!crop || !cache?.viewports)) {
         return;
       }
@@ -133,10 +133,12 @@ export function createPointer(
       const measure: MeasurementAppearance | undefined =
         dimension && crop && cache
           ? {
-              intent: t.intent as MeasurementAppearance['intent'],
+              intent: resolvedTool.intent as MeasurementAppearance['intent'],
               measure: viewport ? (viewport.measure ?? null) : cache.fallback,
-              caption: t.measurement?.caption ?? { enabled: true },
-              ...(t.intent === 'LineDimension' ? { leader: t.measurement?.leader } : {}),
+              caption: resolvedTool.measurement?.caption ?? { enabled: true },
+              ...(resolvedTool.intent === 'line-dimension'
+                ? { leader: resolvedTool.measurement?.leader }
+                : {}),
               crop,
               text: '',
             }
@@ -149,7 +151,7 @@ export function createPointer(
         !continuingMeasurement &&
         !isReadout(
           measurementReadout({
-            subtype: t!.subtype,
+            subtype: resolvedTool!.subtype,
             intent: measure.intent,
             measure: measure.measure,
             linePoints: { start: { x: 0, y: 0 }, end: { x: 1, y: 0 } },
@@ -163,48 +165,48 @@ export function createPointer(
       )
         return;
       store.commit({
-        t: 'createPointer',
+        type: 'createPointer',
         measure,
-        capture: t?.meta?.capture === true ? tool : undefined,
+        capture: resolvedTool?.meta?.capture === true ? tool : undefined,
         phase,
-        subtype: t?.subtype ?? (tool as Subtype),
-        preset: t?.preset ?? tool,
-        intent: t?.intent === 'ink-highlight' ? t.intent : undefined,
-        clickCreate: t?.clickCreate,
-        flags: t?.flags,
-        deferInkCommit: (t?.ink?.groupStrokesMs ?? 0) > 0,
-        straightenInk: t?.ink?.straighten,
+        subtype: resolvedTool?.subtype ?? (tool as Subtype),
+        preset: resolvedTool?.preset ?? tool,
+        intent: resolvedTool?.intent === 'ink-highlight' ? resolvedTool.intent : undefined,
+        clickCreate: resolvedTool?.clickCreate,
+        flags: resolvedTool?.flags,
+        deferInkCommit: (resolvedTool?.ink?.groupStrokesMs ?? 0) > 0,
+        straightenInk: resolvedTool?.ink?.straighten,
         in: {
           page,
           point,
           shift: false,
           finish,
-          pageBox: geometry.pageBoxOf(pon),
+          pageBox: geometry.pageBoxOf(pageObjectNumber),
           displayRotation,
-          upright: t?.upright,
+          upright: resolvedTool?.upright,
         },
       });
     },
     hoverAt: (
-      at: { page: PageRef; point: Vec; scale?: number; rotation?: number; zoom?: number } | null,
+      at: { page: PageRef; point: Point; scale?: number; rotation?: number; zoom?: number } | null,
     ) => {
-      const m = store.model();
+      const model = store.model();
       let id: string | null = null;
       if (at) {
-        const h = chrome.hitAt(at.page, at.point, {
+        const target = chrome.hitAt(at.page, at.point, {
           scale: at.scale,
           rotation: at.rotation,
           zoom: at.zoom,
         });
-        if (h.t === 'annot') id = h.id;
+        if (target.kind === 'annot') id = target.id;
       }
-      // Diff HERE so the reducer sees enter/leave transitions only. The E/X
-      // feed hangs off THIS seam alone: reducer-side hover clears
+      // Diff here so the reducer sees enter/leave transitions only. The E/X
+      // feed hangs off this seam alone: reducer-side hover clears
       // (session-hide, remove, reload) bypass it, so effect-induced hover
       // loss never fires a cursor exit (the anti-cascade law).
-      if (m.hovered !== id) {
+      if (model.hovered !== id) {
         hoverFeed?.hover(id);
-        store.commit({ t: 'hover', id });
+        store.commit({ type: 'hover', id });
       }
     },
   };

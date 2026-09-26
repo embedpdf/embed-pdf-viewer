@@ -4,7 +4,7 @@ import {
   EngineErrorCode,
   toPageRef,
   type AnnotationDTO,
-  type AnnotationListPageSnapshot,
+  type AnnotationList,
   type AnnotationRef,
   type PageState,
 } from '@embedpdf/engine-core/runtime';
@@ -13,22 +13,21 @@ import { CloudRevisionBridge } from '../src/index';
 describe('CloudRevisionBridge', () => {
   const bridge = new CloudRevisionBridge();
 
-  test('decorates annotation snapshots with durable cloud revision tokens', () => {
-    const snapshot: AnnotationListPageSnapshot = {
-      pageState: pageState('sess_worker', 0),
+  test('decorates annotation lists with durable cloud revision tokens', () => {
+    const list: AnnotationList = {
       annotations: [
         annotation(indexRef('sess_worker', 0)),
         annotation({ kind: 'objectNumber', page: toPageRef(3), annotObjectNumber: 10 }),
       ],
+      pages: [pageState('sess_worker', 0)],
     };
 
-    const decorated = bridge.decorateAnnotationSnapshot(
+    const decorated = bridge.decorateAnnotationList(list, () =>
       pageState('cloud:layer:doc:alice', 7),
-      snapshot,
     );
 
-    expect(decorated.pageState.revision.docSessionId).toBe('cloud:layer:doc:alice');
-    expect(decorated.pageState.revision.generation).toBe(7);
+    expect(decorated.pages[0]?.revision.docSessionId).toBe('cloud:layer:doc:alice');
+    expect(decorated.pages[0]?.revision.generation).toBe(7);
     expect(decorated.annotations[0]?.ref).toMatchObject({
       kind: 'index',
       revision: {
@@ -114,22 +113,20 @@ function annotation(ref: AnnotationRef): AnnotationDTO {
     index: ref.kind === 'index' ? ref.index : 0,
     identityQuality: ref.kind === 'index' ? 'weak' : 'durable',
     nm: null,
-    flags: {
-      invisible: false,
-      hidden: false,
-      print: false,
-      noZoom: false,
-      noRotate: false,
-      noView: false,
-      readOnly: false,
-      locked: false,
-      toggleNoView: false,
-      lockedContents: false,
-    },
+    invisible: false,
+    hidden: false,
+    print: false,
+    noZoom: false,
+    noRotate: false,
+    noView: false,
+    readOnly: false,
+    locked: false,
+    toggleNoView: false,
+    lockedContents: false,
     rect: { left: 0, top: 0, right: 1, bottom: 1 },
     contents: null,
     author: null,
-    created: null,
-    modified: null,
+    createdAt: null,
+    modifiedAt: null,
   };
 }

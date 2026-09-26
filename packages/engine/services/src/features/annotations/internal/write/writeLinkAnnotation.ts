@@ -9,22 +9,22 @@ import {
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 import { NULL_PTR } from '@embedpdf/engine-runtime';
 
+import type { AnnotationWriteContext } from './annotationWriteContext';
+import { setAnnotRect } from './annotationWritePrimitives';
+import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 import { withScratch } from '../../../../runtime/memory/scratch';
 import { F32_BYTES } from '../../../../runtime/memory/structs';
 import { VIEW_CODE_BY_KIND } from '../../../destinations/destinationViewCodes';
-import { setAnnotRect } from './annotationWritePrimitives';
-import type { AnnotationWriteContext } from './annotationWriteContext';
-import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 
 /**
  * Link writer: rect + the `/A` action. Only `goto`/`uri` targets are
  * writable (the draft/patch types enforce it; `goto-remote`/`launch` are
- * read-only by design). Relationship (`/IRT` + `/RT` — v2's grouped links)
+ * read-only by design). Relationship (`/IRT` + `/RT`, for grouped links)
  * is written by the mutator's kind-agnostic relationship pass, never here.
  *
- * A retarget REPLACES `/A`; it cannot remove a pre-existing direct `/Dest`
+ * A retarget replaces `/A`; it cannot remove a pre-existing direct `/Dest`
  * (no dict-entry removal primitive in the runtime), which is why the link
- * READER gives `/A` precedence — see readLinkAnnotation.ts.
+ * reader gives `/A` precedence — see readLinkAnnotation.ts.
  */
 export function applyLinkDraft(
   fn: PdfFunctions,
@@ -50,12 +50,23 @@ export function applyLinkPatch(
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);
   if (patch.rect !== undefined) setAnnotRect(fn, mem, annotPtr, patch.rect);
   if (patch.target === null) clearLinkTarget(fn, annotPtr);
-  else if (patch.target !== undefined) applyLinkTarget(fn, mem, annotPtr, patch.target, ctx);
+  else if (patch.target !== undefined) {
+    // A read-only target sent back unchanged was dropped before the write
+    // (`checkAnnotationPatch`); any other one was refused there.
+    if (patch.target.kind !== 'goto' && patch.target.kind !== 'uri') {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `a '${patch.target.kind}' link target can't be written`,
+        { details: { field: 'target' } },
+      );
+    }
+    applyLinkTarget(fn, mem, annotPtr, patch.target, ctx);
+  }
 }
 
 /**
- * `target: null` → a dead link. The model treats the target as ONE concept
- * with two spellings, so THIS layer composes the two single-purpose
+ * `target: null` → a dead link. The model treats the target as one concept
+ * with two spellings, so this layer composes the two single-purpose
  * removal primitives — removing only `/A` would resurrect a stale direct
  * `/Dest` as the live target.
  */
@@ -97,9 +108,9 @@ function applyLinkTarget(
 }
 
 /**
- * Build an INDIRECT explicit-destination array for `dest`. The target page
- * is loaded just to reference its dictionary and closed immediately —
- * destinations routinely point at pages the mutator's pool never touches.
+ * Build an indirect explicit-destination array for `dest`. The target page
+ * is named by its object number and never loaded: a destination only refers
+ * to the page's dictionary.
  */
 function createDestination(
   fn: PdfFunctions,
@@ -107,45 +118,40 @@ function createDestination(
   docPtr: Ptr,
   dest: PdfDestination,
 ): Ptr {
-  const pagePtr = fn.EPDFDoc_LoadPageByObjectNumber(docPtr, dest.page.pageObjectNumber);
-  if (!pagePtr) {
+  const page = dest.page.pageObjectNumber;
+  const destPtr =
+    dest.kind === 'xyz'
+      ? // Absent axes write PDF nulls (spec: "retain current value").
+        fn.EPDFDest_CreateXYZByObjectNumber(
+          docPtr,
+          page,
+          dest.left != null,
+          dest.left ?? 0,
+          dest.top != null,
+          dest.top ?? 0,
+          dest.zoom != null,
+          dest.zoom ?? 0,
+        )
+      : createViewDestination(fn, mem, docPtr, page, dest);
+  if (!destPtr) {
     throw new EngineError(
       EngineErrorCode.NotFound,
-      `link destination page not found: pageObjectNumber=${dest.page.pageObjectNumber}`,
+      `link destination page not found: pageObjectNumber=${page}`,
     );
   }
-  try {
-    const destPtr =
-      dest.kind === 'xyz'
-        ? // Absent axes write PDF nulls (spec: "retain current value").
-          fn.EPDFDest_CreateXYZ(
-            pagePtr,
-            dest.left != null,
-            dest.left ?? 0,
-            dest.top != null,
-            dest.top ?? 0,
-            dest.zoom != null,
-            dest.zoom ?? 0,
-          )
-        : createViewDestination(fn, mem, pagePtr, dest);
-    if (!destPtr) {
-      throw new EngineError(EngineErrorCode.Unknown, `failed to create '${dest.kind}' destination`);
-    }
-    return destPtr;
-  } finally {
-    fn.FPDF_ClosePage(pagePtr);
-  }
+  return destPtr;
 }
 
 function createViewDestination(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
-  pagePtr: Ptr,
+  docPtr: Ptr,
+  page: number,
   dest: Exclude<PdfDestination, { kind: 'xyz' }>,
 ): Ptr {
   // The runtime pads missing params with 0 up to the fit type's arity —
-  // a null top/left therefore writes as 0 (v2 parity; the array form has
-  // no per-param null encoding through this API).
+  // a null top/left therefore writes as 0 (the array form has no
+  // per-param null encoding through this API).
   const params: number[] = (() => {
     switch (dest.kind) {
       case 'fitH':
@@ -162,9 +168,11 @@ function createViewDestination(
   })();
 
   const view = VIEW_CODE_BY_KIND[dest.kind];
-  if (!params.length) return fn.EPDFDest_CreateView(pagePtr, view, NULL_PTR, 0);
+  if (!params.length) {
+    return fn.EPDFDest_CreateViewByObjectNumber(docPtr, page, view, NULL_PTR, 0);
+  }
   return withScratch(mem, params.length * F32_BYTES, (buf) => {
     for (let i = 0; i < params.length; i++) mem.poke(buf, 'f32', params[i]!, i * F32_BYTES);
-    return fn.EPDFDest_CreateView(pagePtr, view, buf, params.length);
+    return fn.EPDFDest_CreateViewByObjectNumber(docPtr, page, view, buf, params.length);
   });
 }

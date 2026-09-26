@@ -1,7 +1,7 @@
 import { visit } from 'unist-util-visit';
 
 /**
- * The release-channel axis for install commands (DOCS-PLATFORM-ARCHITECTURE.md).
+ * The release-channel axis for install commands (docs/conventions/docs-architecture.md).
  *
  * Authors always write bare specs — `npm install @embedpdf/react` — and the
  * machinery stamps the active npm dist-tag at build time, exactly like the

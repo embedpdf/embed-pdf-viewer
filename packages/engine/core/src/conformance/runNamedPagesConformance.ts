@@ -8,7 +8,7 @@ import { AbortError } from '../promise/AbortError';
 import { PageListSnapshotSchema, PageNameResultSchema } from '../wire/schemas';
 
 /**
- * Named-pages conformance: the catalog's `/Names /Pages` registry as LAYOUT
+ * Named-pages conformance: the catalog's `/Names /Pages` registry as layout
  * data. Locks the invariants both engines must share — do not loosen
  * without re-reading `NamedPageEntry` and `PageNameResult`:
  *
@@ -16,7 +16,7 @@ import { PageListSnapshotSchema, PageNameResultSchema } from '../wire/schemas';
  *      registration resolves to a page in `pages`, a template, or is
  *      reported dangling — never silently dropped.
  *   2. `pages.setName()` creates or replaces by decoded key (idempotent),
- *      `replace` renames in one job, and the result IS the new layout.
+ *      `replace` renames in one job, and the result is the new layout.
  *   3. `pages.removeName()` drops the registration and nothing else.
  *   4. Deleting a page removes every registration pointing at it — inside
  *      the delete, with no plugin in the loop.
@@ -47,11 +47,11 @@ export function runNamedPagesConformance(
         const layout = await doc.pages.list();
         PageListSnapshotSchema.parse(layout);
         expect(Array.isArray(layout.namedPages)).toBe(true);
-        const pons = new Set(layout.pages.map((page) => page.ref.pageObjectNumber));
-        for (const entry of layout.namedPages ?? []) {
+        const pageObjectNumbers = new Set(layout.pages.map((page) => page.ref.pageObjectNumber));
+        for (const entry of layout.namedPages) {
           expect(entry.name.length > 0).toBe(true);
           if (entry.target.kind === 'page') {
-            expect(pons.has(entry.target.page.pageObjectNumber)).toBe(true);
+            expect(pageObjectNumbers.has(entry.target.page.pageObjectNumber)).toBe(true);
           }
         }
       } finally {
@@ -65,7 +65,7 @@ export function runNamedPagesConformance(
         if (!doc.pages.setName) return;
         const before = await doc.pages.list();
         const [first, second] = before.pages;
-        const baseline = (before.namedPages ?? []).length;
+        const baseline = before.namedPages.length;
 
         // Create.
         const created = await doc.pages.setName({
@@ -78,13 +78,14 @@ export function runNamedPagesConformance(
           kind: 'page',
           page: toPageRef(first.ref.pageObjectNumber),
         });
-        expect((created.layout.namedPages ?? []).length).toBe(baseline + 1);
-        if (created.cache) {
-          expect(created.cache.docVersion > created.cache.previousDocVersion).toBe(true);
-          expect(created.cache.layoutVersion > 0).toBe(true);
+        expect(created.layout.namedPages.length).toBe(baseline + 1);
+        const delta = created.meta.cacheDelta;
+        if (delta) {
+          expect(delta.docVersion > delta.previousDocVersion).toBe(true);
+          expect((delta.layoutVersion ?? 0) > 0).toBe(true);
         }
 
-        // The result IS the new layout.
+        // The result is the new layout.
         const listed = await doc.pages.list();
         expect(listed.namedPages).toEqual(created.layout.namedPages);
 
@@ -97,7 +98,7 @@ export function runNamedPagesConformance(
           kind: 'page',
           page: toPageRef(second.ref.pageObjectNumber),
         });
-        expect((replaced.layout.namedPages ?? []).length).toBe(baseline + 1);
+        expect(replaced.layout.namedPages.length).toBe(baseline + 1);
 
         // Rename in one job.
         const renamed = await doc.pages.setName({
@@ -110,7 +111,7 @@ export function runNamedPagesConformance(
           kind: 'page',
           page: toPageRef(second.ref.pageObjectNumber),
         });
-        expect((renamed.layout.namedPages ?? []).length).toBe(baseline + 1);
+        expect(renamed.layout.namedPages.length).toBe(baseline + 1);
       } finally {
         await doc.close();
       }
@@ -131,7 +132,7 @@ export function runNamedPagesConformance(
           page: toPageRef(before.pages[0].ref.pageObjectNumber),
         });
         const listed = await doc.pages.list();
-        expect((listed.namedPages ?? []).some((entry) => entry.name === key)).toBe(true);
+        expect(listed.namedPages.some((entry) => entry.name === key)).toBe(true);
       } finally {
         await doc.close();
       }
@@ -195,14 +196,14 @@ export function runNamedPagesConformance(
         await doc.pages.setName({ name: 'Survivor', page: survivor });
 
         const deleted = await doc.pages.delete([victim]);
-        const names = (deleted.layout.namedPages ?? []).map((entry) => entry.name);
+        const names = deleted.layout.namedPages.map((entry) => entry.name);
         expect(names.includes('Victim=One')).toBe(false);
         expect(names.includes('Victim=Two')).toBe(false);
         expect(names).toContain('Survivor');
         // Nothing dangling was left behind by the delete.
-        expect(
-          (deleted.layout.namedPages ?? []).some((entry) => entry.target.kind === 'dangling'),
-        ).toBe(false);
+        expect(deleted.layout.namedPages.some((entry) => entry.target.kind === 'dangling')).toBe(
+          false,
+        );
       } finally {
         await doc.close();
       }
@@ -227,10 +228,10 @@ export function runNamedPagesConformance(
 }
 
 function find(
-  result: { layout: { namedPages?: { name: string; target: unknown }[] } },
+  result: { layout: { namedPages: { name: string; target: unknown }[] } },
   name: string,
 ) {
-  return (result.layout.namedPages ?? []).find((entry) => entry.name === name)?.target;
+  return result.layout.namedPages.find((entry) => entry.name === name)?.target;
 }
 
 async function openFixture(engine: Engine, opts: ConformanceOptions): Promise<DocumentHandle> {

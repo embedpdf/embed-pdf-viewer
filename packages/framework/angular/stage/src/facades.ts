@@ -3,14 +3,14 @@
  * name-for-name with the React hooks (`useZoom` → `injectZoom`), values
  * replaced by signals.
  *
- * STRICT like their React counterparts: they resolve a document-scoped
+ * Strict like their React counterparts: they resolve a document-scoped
  * capability, so call them in document UI (behind `*epdfDocumentGate` /
  * `@if (documentId())`). For always-mounted chrome, read through
  * `injectOptionalSelector` with a fallback instead.
  *
- * Methods LATE-BIND the current capability (`() => cap().zoomIn()`), so a
+ * Methods late-bind the current capability (`() => cap().zoomIn()`), so a
  * facade captured before a document switch drives the document that is active
- * at CALL time, never a stale one.
+ * at call time, never a stale one.
  */
 import type { Signal } from '@angular/core';
 import { settingsEqual } from '@embedpdf/plugin-stage';
@@ -26,13 +26,13 @@ import {
 } from '@embedpdf/angular/runtime';
 import { injectStageToken, type StageTokenProp } from './scope';
 
-// Every facade takes an OPTIONAL token; without one it binds to the nearest
+// Every facade takes an optional token; without one it binds to the nearest
 // `<epdf-stage>` / `[epdfStageScope]`, else the main lens.
 const injectCapability = (token: Signal<StageTokenProp>) => injectCapabilityFor(() => token());
 const injectSelector = <R>(
   token: Signal<StageTokenProp>,
-  select: (cap: StageCapability) => R,
-  equal?: (a: R, b: R) => boolean,
+  select: (stage: StageCapability) => R,
+  equal?: (left: R, right: R) => boolean,
 ) => injectSelectorFor(() => token(), select, equal);
 
 type AnyFn = (...args: never[]) => unknown;
@@ -42,7 +42,7 @@ const lazy = <K extends keyof StageCapability>(
   key: K,
 ): StageCapability[K] =>
   ((...args: unknown[]) =>
-    (cap()[key] as unknown as (...a: unknown[]) => unknown)(...args)) as StageCapability[K] &
+    (cap()[key] as unknown as (...args: unknown[]) => unknown)(...args)) as StageCapability[K] &
     AnyFn as StageCapability[K];
 
 export function injectStage(explicit?: StageTokenProp): Signal<StageCapability> {
@@ -50,9 +50,9 @@ export function injectStage(explicit?: StageTokenProp): Signal<StageCapability> 
 }
 
 /** Subscribe to one stage event for the injector's lifetime:
- *  `injectStageEvent((c) => c.onZoomChanged, handler)` — React's `useStageEvent`. */
+ *  `injectStageEvent((stage) => stage.onZoomChanged, handler)` — React's `useStageEvent`. */
 export function injectStageEvent<T>(
-  select: (cap: StageCapability) => EventHook<T>,
+  select: (stage: StageCapability) => EventHook<T>,
   handler: (event: T) => void,
   explicit?: StageTokenProp,
 ): void {
@@ -62,49 +62,51 @@ export function injectStageEvent<T>(
 
 export function injectZoom(explicit?: StageTokenProp) {
   const token = injectStageToken(explicit);
-  const s = injectCapability(token);
+  const signal = injectCapability(token);
   return {
-    zoom: injectSelector(token, (c) => c.getZoomLevel()),
+    zoom: injectSelector(token, (stage) => stage.getZoomLevel()),
     /** Active zoom intent: 'automatic' | 'fit-page' | 'fit-width' | 'fit-all' | 'custom'. */
-    mode: injectSelector(token, (c) => c.getZoomMode()),
-    zoomIn: lazy(s, 'zoomIn'),
-    zoomOut: lazy(s, 'zoomOut'),
-    fitWidth: lazy(s, 'fitWidth'),
-    fitPage: lazy(s, 'fitPage'),
-    fitAll: lazy(s, 'fitAll'),
-    automatic: lazy(s, 'fitAutomatic'),
-    zoomTo: lazy(s, 'zoomTo'),
+    mode: injectSelector(token, (stage) => stage.getZoomMode()),
+    zoomIn: lazy(signal, 'zoomIn'),
+    zoomOut: lazy(signal, 'zoomOut'),
+    fitWidth: lazy(signal, 'fitWidth'),
+    fitPage: lazy(signal, 'fitPage'),
+    fitAll: lazy(signal, 'fitAll'),
+    automatic: lazy(signal, 'fitAutomatic'),
+    zoomTo: lazy(signal, 'zoomTo'),
   };
 }
 
 export function injectPages(explicit?: StageTokenProp) {
   const token = injectStageToken(explicit);
-  const s = injectCapability(token);
+  const signal = injectCapability(token);
   const documentId = injectDocumentId();
   return {
-    currentPage: injectSelector(token, (c) => c.getCurrentPageIndex()),
-    pageCount: injectKernelValue((k) => k.documents.listPages(documentId() ?? undefined).length),
-    goToPage: lazy(s, 'goToPageIndex'),
-    next: lazy(s, 'nextPage'),
-    prev: lazy(s, 'previousPage'),
-    reveal: lazy(s, 'revealIndex'),
+    currentPage: injectSelector(token, (stage) => stage.getCurrentPageIndex()),
+    pageCount: injectKernelValue(
+      (kernel) => kernel.documents.listPages(documentId() ?? undefined).length,
+    ),
+    goToPage: lazy(signal, 'goToPageIndex'),
+    next: lazy(signal, 'nextPage'),
+    previous: lazy(signal, 'previousPage'),
+    reveal: lazy(signal, 'revealIndex'),
   };
 }
 
 export function injectLayout(explicit?: StageTokenProp) {
   const token = injectStageToken(explicit);
-  const s = injectCapability(token);
+  const signal = injectCapability(token);
   return {
-    flow: injectSelector(token, (c) => c.getSettings().flow),
-    layout: injectSelector(token, (c) => c.getSettings().layout),
-    spread: injectSelector(token, (c) => c.getSettings().spread),
-    sizing: injectSelector(token, (c) => c.getSettings().sizing),
-    bounded: injectSelector(token, (c) => c.getSettings().bounded),
-    setFlow: lazy(s, 'setFlow'),
-    setLayout: lazy(s, 'setLayout'),
-    setSpread: lazy(s, 'setSpread'),
-    setSizing: lazy(s, 'setSizing'),
-    setBounded: (bounded: boolean) => s().updateSettings({ bounded }),
+    flow: injectSelector(token, (stage) => stage.getSettings().flow),
+    layout: injectSelector(token, (stage) => stage.getSettings().layout),
+    spread: injectSelector(token, (stage) => stage.getSettings().spread),
+    sizing: injectSelector(token, (stage) => stage.getSettings().sizing),
+    bounded: injectSelector(token, (stage) => stage.getSettings().bounded),
+    setFlow: lazy(signal, 'setFlow'),
+    setLayout: lazy(signal, 'setLayout'),
+    setSpread: lazy(signal, 'setSpread'),
+    setSizing: lazy(signal, 'setSizing'),
+    setBounded: (bounded: boolean) => signal().updateSettings({ bounded }),
   };
 }
 
@@ -117,16 +119,18 @@ export function injectPageList(explicit?: StageTokenProp) {
     // The page list is document truth (order, labels, sizes) from the kernel's
     // page registry; Stage only knows which of those pages it is showing.
     pages: injectKernelValue(
-      (k) => k.documents.listPages(documentId() ?? undefined),
-      (a, b) =>
-        a.length === b.length &&
-        a.every(
-          (p, i) => p.ref.pageObjectNumber === b[i].ref.pageObjectNumber && p.label === b[i].label,
+      (kernel) => kernel.documents.listPages(documentId() ?? undefined),
+      (left, right) =>
+        left.length === right.length &&
+        left.every(
+          (pageInfo, i) =>
+            pageInfo.ref.pageObjectNumber === right[i].ref.pageObjectNumber &&
+            pageInfo.label === right[i].label,
         ),
     ),
     currentItemPages: injectSelector(
       token,
-      (c) => c.listCurrentItemPages().map((p) => p.index),
+      (stage) => stage.listCurrentItemPages().map((pageInfo) => pageInfo.index),
       shallowArray,
     ),
   };
@@ -139,12 +143,12 @@ export function injectPageList(explicit?: StageTokenProp) {
  */
 export function injectStageSettings(explicit?: StageTokenProp) {
   const token = injectStageToken(explicit);
-  const s = injectCapability(token);
+  const signal = injectCapability(token);
   return {
     // settingsEqual derives from the plugin's settings registry — a new setting
     // is covered automatically, without this package spelling out the shape.
-    settings: injectSelector(token, (c) => c.getSettings(), settingsEqual),
-    update: lazy(s, 'updateSettings'),
-    reset: lazy(s, 'resetSettings'),
+    settings: injectSelector(token, (stage) => stage.getSettings(), settingsEqual),
+    update: lazy(signal, 'updateSettings'),
+    reset: lazy(signal, 'resetSettings'),
   };
 }

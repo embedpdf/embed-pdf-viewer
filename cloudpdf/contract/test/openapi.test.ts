@@ -29,7 +29,7 @@ describe('operation registry', () => {
         op.path,
       ).toBe(true);
       if (op.credentials.length === 0) {
-        // The PUBLIC surface is exactly the share-session exchange: the
+        // The public surface is exactly the share-session exchange: the
         // grant row is the authorization, so no bearer credential
         // exists. Any new unauthenticated operation must be added here
         // deliberately — an empty credential list anywhere else is a
@@ -240,16 +240,26 @@ describe('openapi document', () => {
       allOf: [{ $ref: '#/components/schemas/PdfActionNode' }],
       nullable: true,
     });
+    // An annotation read carries `actions: null` when it has none.
+    const nullableAnnotationActions = {
+      allOf: [{ $ref: '#/components/schemas/PdfAnnotationActions' }],
+      nullable: true,
+    };
+    expect(schemas.Annotation.anyOf[0].properties.actions).toEqual(nullableAnnotationActions);
+    // Both annotation lists, and every write that returns annotations, name
+    // the one `Annotation` component.
+    const annotationRef = { $ref: '#/components/schemas/Annotation' };
+    expect(schemas.AnnotationList.properties.annotations.items).toEqual(annotationRef);
+    expect(schemas.DocAnnotationsList200Response).toEqual({
+      $ref: '#/components/schemas/AnnotationList',
+    });
+    expect(schemas.DocAnnotationsListAll200Response).toEqual({
+      $ref: '#/components/schemas/AnnotationList',
+    });
+    expect(schemas.DocAnnotationsCreate200Response.properties.annotation).toEqual(annotationRef);
+    expect(schemas.DocAnnotationsUpdate200Response.properties.annotation).toEqual(annotationRef);
     expect(
-      schemas.DocAnnotationsList200Response.properties.annotations.items.anyOf[0].properties
-        .actions,
-    ).toEqual({ $ref: '#/components/schemas/PdfAnnotationActions' });
-    expect(
-      schemas.DocAnnotationsListAll200Response.properties.pages.items.properties.annotations.items
-        .anyOf[0].properties.actions,
-    ).toEqual({ $ref: '#/components/schemas/PdfAnnotationActions' });
-    expect(
-      schemas.DocFormsGet200Response.properties.fields.items.anyOf[0].properties.actions,
+      schemas.DocFormsList200Response.properties.fields.items.anyOf[0].properties.actions,
     ).toEqual({ $ref: '#/components/schemas/PdfFieldActions' });
 
     const refs: string[] = [];

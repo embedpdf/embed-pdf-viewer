@@ -25,14 +25,14 @@ import type { HttpClient } from '../transport/HttpClient';
  *
  * Every slice URL is a canonical cache key — the search token pins the
  * layer's content epoch (computed from the cached manifest), the
- * CANONICAL query (default-fold literals collapse case/diacritic
+ * canonical query (default-fold literals collapse case/diacritic
  * variants into one entry), and the resume position. Identical searches
  * from any reader of the document hit the same CDN entry; matches are
  * all that ever crosses the trust boundary, and the rects/full endpoint
  * split keeps permission tiers in disjoint cache namespaces.
  *
  * Staleness rides the standard versioned-read signal: a first slice
- * answered `NotFound` means OUR manifest is stale → refresh and retry
+ * answered `NotFound` means our manifest is stale → refresh and retry
  * once; a continuation answered `NotFound` means the document changed
  * mid-search → `InvalidArg`, same contract as the local engine's cursor.
  */
@@ -52,18 +52,18 @@ export class CloudDocumentSearchService implements DocumentSearchService {
       );
     }
     return AbortablePromise.run<SearchSlice>(async (signal) => {
-      const mode = request.mode ?? 'full';
-      const path = mode === 'rects' ? wirePaths.layerSearchRects : wirePaths.layerSearchFull;
+      // Snippets are their own resource (and CDN prefix): they need `doc.text.copy`.
+      const path = request.snippets ? wirePaths.layerSearchFull : wirePaths.layerSearchRects;
       const get = (token: string) =>
         this.http.getJson(
           path(this.docId, this.layerName, token),
           (raw) => SearchSliceSchema.parse(raw),
           signal,
         );
-      const query = canonicalSearchQuery(request.query);
+      const query = canonicalSearchQuery(request);
       // The search token (the URL, the cache key) pins the scan origin by
       // the page's object number.
-      const startPage = request.startPage?.pageObjectNumber;
+      const from = request.from?.pageObjectNumber;
 
       if (request.cursor !== undefined) {
         let token: SearchToken;
@@ -80,10 +80,10 @@ export class CloudDocumentSearchService implements DocumentSearchService {
             'search cursor belongs to a different query — restart the search',
           );
         }
-        if (startPage !== undefined && startPage !== token.startPage) {
+        if (from !== undefined && from !== token.from) {
           throw new EngineError(
             EngineErrorCode.InvalidArg,
-            'startPage conflicts with the cursor — omit startPage when resuming',
+            '`from` conflicts with the cursor — omit it when resuming',
           );
         }
         try {
@@ -103,9 +103,9 @@ export class CloudDocumentSearchService implements DocumentSearchService {
         encodeSearchToken({
           epoch,
           query,
-          ...(startPage !== undefined ? { startPage } : {}),
+          ...(from !== undefined ? { from } : {}),
           skip: 0,
-          ...(request.budget !== undefined ? { budget: request.budget } : {}),
+          ...(request.limit !== undefined ? { limit: request.limit } : {}),
         });
       try {
         const manifest = await this.manifest.get(signal);

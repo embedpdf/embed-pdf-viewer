@@ -1,6 +1,7 @@
 import type {
   FormDataFormat,
   FormFieldDraft,
+  FormFieldFamily,
   FormFieldDTO,
   FormFieldPatch,
   FormFieldRef,
@@ -11,23 +12,24 @@ import type {
   FormWidget,
   MutationMeta,
   WidgetPlacement,
-  PageObjectNumber,
 } from '@embedpdf/engine-core/runtime';
-import {
-  EngineError,
-  EngineErrorCode,
-  fieldLockFor,
-  formWidget,
-} from '@embedpdf/engine-core/runtime';
+import { EngineError, EngineErrorCode, formWidget } from '@embedpdf/engine-core/runtime';
 import type { AnnotationRef } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import { withScratch, withScratchN } from '../../runtime/memory/scratch';
+import { U64_BYTES, pokeU64 } from '../../runtime/memory/u64';
 import { createUnattachedWidget } from './internal/authorWidget';
 import { flagMasks } from './internal/fieldFlagBits';
 import { acquireFormModel } from './internal/formModelCache';
+import {
+  assertFieldNotLocked,
+  lockedFieldObjectNumbers,
+  readFieldLocks,
+} from './internal/signatureLocks';
+import { formMutationMeta } from './internal/formMutationMeta';
 import { bakeWidgetAppearance } from '../signature/internal/appearance';
 import {
   readSignaturesFromModel,
@@ -36,7 +38,8 @@ import {
 import { withWideStringArray } from './internal/wideStringArray';
 import { readFieldAt, readFormSnapshot } from './internal/readFormSnapshot';
 import { resolveFieldRef, type ResolvedField } from './internal/resolveFieldRef';
-import { SignatureReader } from '../signature/SignatureReader';
+import { AnnotationMutator } from '../annotations/AnnotationMutator';
+import { DocumentCheckpoint } from '../../document-session/DocumentCheckpoint';
 import { readUtf16String } from '../../runtime/memory/strings';
 
 // Mirrors EPDF_FORMFIELD_FAMILY_* in public/epdf_form.h.
@@ -139,30 +142,33 @@ export class FormMutator {
     const call = resolvedFormat === 'fdf' ? fn.EPDFForm_ImportFDF : fn.EPDFForm_ImportXFDF;
     const docPtr = this.session.requireDocPtr();
 
-    const counters = withScratchN(mem, [bytes.byteLength, 16], ([dataPtr, resultPtr]) => {
+    // A field a signature locked is never written: the import skips it.
+    const locked = lockedFieldObjectNumbers(this.runtime, this.session);
+    const scratch = [bytes.byteLength, 16, Math.max(locked.length, 1) * 4];
+    const counts = withScratchN(mem, scratch, ([dataPtr, resultPtr, skipPtr]) => {
       mem.writeBytes(dataPtr, bytes);
-      const ok = call(docPtr, dataPtr, bytes.byteLength, resultPtr);
+      locked.forEach((objectNumber, at) => mem.poke(skipPtr, 'i32', objectNumber, at * 4));
+      const ok = call(docPtr, dataPtr, bytes.byteLength, skipPtr, locked.length, resultPtr);
       if (!ok) {
         throw new EngineError(
           EngineErrorCode.InvalidArg,
           `payload is not valid ${resolvedFormat.toUpperCase()}`,
         );
       }
+      // The report also counts all fields (offset 0) and changed widgets (12).
       return {
-        fieldsTotal: Number(mem.peek(resultPtr, 'i32', 0)),
-        fieldsApplied: Number(mem.peek(resultPtr, 'i32', 4)),
-        fieldsSkipped: Number(mem.peek(resultPtr, 'i32', 8)),
-        widgetsChanged: Number(mem.peek(resultPtr, 'i32', 12)),
+        applied: Number(mem.peek(resultPtr, 'i32', 4)),
+        skipped: Number(mem.peek(resultPtr, 'i32', 8)),
       };
     });
 
     this.session.noteMutation();
     const fresh = acquireFormModel(this.runtime, this.session);
-    return {
-      ...counters,
-      snapshot: readFormSnapshot(this.runtime, fresh, this.session.requireDocPtr()),
-      meta: EMPTY_META,
-    };
+    const form = readFormSnapshot(this.runtime, fresh, this.session.requireDocPtr());
+    // The import names no widgets, so every page with a widget may have repainted.
+    const widgets = counts.applied > 0 ? form.fields.flatMap((field) => field.widgets) : [];
+    const { affectedPages, cacheDelta } = formMutationMeta(this.session, [], widgets);
+    return { form, ...counts, meta: { affectedPages, cacheDelta } };
   }
 
   repair(bakeAppearances: boolean, signal: AbortSignal): FormRepairResult {
@@ -181,7 +187,7 @@ export class FormMutator {
         widgetsLinked: Number(mem.peek(reportPtr, 'i32', 8)),
         fieldsUnrepairable: Number(mem.peek(reportPtr, 'i32', 12)),
         appearancesBaked: Number(mem.peek(reportPtr, 'i32', 16)),
-        needAppearancesCleared: Number(mem.peek(reportPtr, 'i32', 20)) !== 0,
+        needsAppearancesCleared: Number(mem.peek(reportPtr, 'i32', 20)) !== 0,
       };
     });
 
@@ -190,18 +196,20 @@ export class FormMutator {
   }
 
   /**
-   * Create a field and (optionally) its widgets in one composed
-   * transaction: native field creation, widget birth through the
-   * annotation plane, adoption, then field-plane setters. A failure
-   * mid-composition throws; earlier steps stay applied (the document is
-   * never inconsistent - at worst a partially configured field exists).
+   * Create a field and (optionally) its widgets as one change: native
+   * field creation, widget birth through the annotation plane, adoption,
+   * then field-plane setters. Everything a caller can get wrong is checked
+   * before the first write; any failure after it undoes the whole create
+   * (the field is unlinked from an existing parent, then a checkpoint rolls
+   * back the rest), so a rejected draft creates nothing.
    */
   createField(draft: FormFieldDraft, signal: AbortSignal): { field: FormFieldDTO } {
     throwIfAborted(signal);
-    const { fn, mem } = this.runtime;
+    const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();
 
     const placements = this.placementsOf(draft);
+    const pageIndexes = placements.map((placement) => this.preflightPlacement(placement));
     if (draft.family === 'radio') {
       for (const placement of placements) {
         if (!placement.onState || placement.onState === 'Off') {
@@ -212,12 +220,96 @@ export class FormMutator {
         }
       }
     }
+    if ('maxLength' in draft && draft.maxLength !== undefined) {
+      if (!Number.isInteger(draft.maxLength) || draft.maxLength <= 0) {
+        throw new EngineError(
+          EngineErrorCode.InvalidArg,
+          `maxLength must be a positive integer, got ${draft.maxLength}`,
+          { details: { field: 'maxLength' } },
+        );
+      }
+    }
+    throwIfAborted(signal);
 
-    const familyCode = FAMILY_CODE[draft.family];
+    const checkpoint = DocumentCheckpoint.begin(fn, docPtr);
+    let fieldObjectNumber = 0;
+    try {
+      fieldObjectNumber = this.createFieldNode(draft);
+      this.configureNewField(draft, fieldObjectNumber);
+      placements.forEach((placement, at) => {
+        const pageIndex = pageIndexes[at]!;
+        checkpoint.page(pageIndex);
+        const widgetObjectNumber = createUnattachedWidget(
+          this.runtime,
+          docPtr,
+          pageIndex,
+          placement,
+        );
+        const onState =
+          draft.family === 'radio'
+            ? placement.onState!
+            : draft.family === 'checkbox'
+              ? (placement.onState ?? 'Yes')
+              : '';
+        if (!fn.EPDFForm_AttachWidget(docPtr, fieldObjectNumber, widgetObjectNumber, onState)) {
+          throw new EngineError(EngineErrorCode.Unknown, 'widget adoption failed');
+        }
+      });
+      this.session.noteMutation();
+      return { field: this.readBackField(fieldObjectNumber) };
+    } catch (error) {
+      // The checkpoint records the form dictionary and the pages, not an
+      // existing parent field whose /Kids gained the new one: unlink the
+      // field first, then roll back everything else.
+      if (fieldObjectNumber > 0) this.nativeDeleteField(fieldObjectNumber);
+      checkpoint.rollback();
+      throw error;
+    } finally {
+      checkpoint.end();
+      // Written or rolled back, the form model must be read again.
+      this.session.noteMutation();
+    }
+  }
+
+  /** EPDFForm_DeleteField: unlink the field and detach its kid widgets. */
+  private nativeDeleteField(fieldObjectNumber: number): boolean {
+    const { fn, mem } = this.runtime;
+    return withScratchN(mem, [256 * 4, U64_BYTES], ([buf, countPtr]) => {
+      // `unsigned long*`: 8 bytes on native, 4 on wasm32 — zero the whole slot.
+      pokeU64(mem, countPtr, 0);
+      return fn.EPDFForm_DeleteField(
+        this.session.requireDocPtr(),
+        fieldObjectNumber,
+        buf,
+        256,
+        countPtr,
+      );
+    });
+  }
+
+  /** Check a widget placement before anything is written; returns its page index. */
+  private preflightPlacement(placement: WidgetPlacement): number {
+    const record = this.session.resolvePageRef(placement.page);
+    const { left, bottom, right, top } = placement.rect;
+    if (![left, bottom, right, top].every(Number.isFinite)) {
+      throw new EngineError(EngineErrorCode.InvalidArg, 'widget rect must be finite numbers', {
+        details: { field: 'rect' },
+      });
+    }
+    return record.pageIndex;
+  }
+
+  /** The native field node, linked into the tree. */
+  private createFieldNode(draft: FormFieldDraft): number {
+    const { fn, mem } = this.runtime;
     const namePtr = mem.writeU16String(draft.name);
     let fieldObjectNumber: number;
     try {
-      fieldObjectNumber = fn.EPDFForm_CreateField(docPtr, familyCode, namePtr);
+      fieldObjectNumber = fn.EPDFForm_CreateField(
+        this.session.requireDocPtr(),
+        FAMILY_CODE[draft.family],
+        namePtr,
+      );
     } finally {
       mem.free(namePtr);
     }
@@ -227,6 +319,13 @@ export class FormMutator {
         `cannot create field "${draft.name}" (name conflict or invalid)`,
       );
     }
+    return fieldObjectNumber;
+  }
+
+  /** The draft's field-plane settings, on a field just created. */
+  private configureNewField(draft: FormFieldDraft, fieldObjectNumber: number): void {
+    const { fn } = this.runtime;
+    const docPtr = this.session.requireDocPtr();
 
     const { setBits, clearBits } = flagMasks(
       draft as unknown as Record<string, boolean | undefined>,
@@ -261,37 +360,21 @@ export class FormMutator {
         'mapping name rejected',
       );
     }
-
-    for (const placement of placements) {
-      const widgetObjectNumber = createUnattachedWidget(this.runtime, this.session, placement);
-      const onState =
-        draft.family === 'radio'
-          ? placement.onState!
-          : draft.family === 'checkbox'
-            ? (placement.onState ?? 'Yes')
-            : '';
-      if (!fn.EPDFForm_AttachWidget(docPtr, fieldObjectNumber, widgetObjectNumber, onState)) {
-        throw new EngineError(EngineErrorCode.Unknown, 'widget adoption failed');
-      }
-    }
-
-    this.session.noteMutation();
-    return { field: this.readBackField(fieldObjectNumber) };
   }
 
   /**
-   * Draw a PDF page into every widget of an UNSIGNED signature field: the
+   * Draw a PDF page into every widget of an unsigned signature field: the
    * visual "sign" of a viewer without a signer. The field's value stays
    * empty and nothing is sealed; a signed field is refused (its appearance
-   * is part of what the signature covers). Pages whose widgets changed are
-   * reported so their renders re-pin.
+   * is part of what the signature covers). The pages of its widgets get a
+   * new revision so their renders re-pin.
    */
   setSignatureAppearance(
     ref: FormFieldRef,
     pdf: Uint8Array,
     pageIndex: number,
     signal: AbortSignal,
-  ): { field: FormFieldDTO; pages: PageObjectNumber[] } {
+  ): { field: FormFieldDTO } {
     throwIfAborted(signal);
     const docPtr = this.session.requireDocPtr();
     const model = acquireFormModel(this.runtime, this.session);
@@ -314,7 +397,7 @@ export class FormMutator {
     );
     if (signed) {
       throw new EngineError(
-        EngineErrorCode.InvalidArg,
+        EngineErrorCode.ProtectedDocument,
         `'${before.name}' is signed; its appearance is sealed with the signature`,
       );
     }
@@ -331,8 +414,8 @@ export class FormMutator {
     const pages = [
       ...new Set(before.widgets.flatMap((w) => (w.page ? [w.page.pageObjectNumber] : []))),
     ];
-    for (const pon of pages) this.session.bumpRevision(pon);
-    return { field: this.readBackField(resolved.fieldObjectNumber), pages };
+    for (const pageObjectNumber of pages) this.session.bumpRevision(pageObjectNumber);
+    return { field: this.readBackField(resolved.fieldObjectNumber) };
   }
 
   updateField(
@@ -352,12 +435,7 @@ export class FormMutator {
       resolved.fieldIndex,
       this.session.requireDocPtr(),
     );
-    if (before.family !== patch.family) {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        `patch family '${patch.family}' does not match field family '${before.family}'`,
-      );
-    }
+    assertPatchFitsFamily(patch, before.family);
     const fieldObjectNumber = resolved.fieldObjectNumber;
 
     if (patch.name !== undefined) {
@@ -418,16 +496,18 @@ export class FormMutator {
   }
 
   /**
-   * Delete a terminal field. Widgets are DETACHED here (they become inert
-   * annotations); the worker host cascades their annotation deletion so
-   * page /Annots bookkeeping flows through the annotation feature.
+   * Delete a terminal field and its widgets in one mutation. The native
+   * write detaches kid widgets and unlinks the field from /Fields or its
+   * parent's /Kids; the cascade then removes every placed widget from its
+   * page through the annotation feature, which owns /Annots bookkeeping,
+   * weak-ref invalidation and page revisions. A merged field/widget has no
+   * kid to detach: its own dictionary leaves its page in the same cascade.
    */
   deleteField(
     ref: FormFieldRef,
     signal: AbortSignal,
-  ): { deletedFieldObjectNumber: number; detachedWidgets: FormWidget[] } {
+  ): { deleted: FormFieldRef; removedWidgets: FormWidget[] } {
     throwIfAborted(signal);
-    const { fn, mem } = this.runtime;
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
     this.assertWritable(resolved);
@@ -437,26 +517,27 @@ export class FormMutator {
       resolved.fieldIndex,
       this.session.requireDocPtr(),
     );
+    const removedWidgets = before.widgets.map((w) => formWidget(w.annotObjectNumber, w.page));
 
-    const ok = withScratchN(mem, [256 * 4, 4], ([buf, countPtr]) => {
-      mem.poke(countPtr, 'i32', 0);
-      return fn.EPDFForm_DeleteField(
-        this.session.requireDocPtr(),
-        resolved.fieldObjectNumber,
-        buf,
-        256,
-        countPtr,
-      );
-    });
-    if (!ok) {
+    // Apply boundary. EPDFForm_DeleteField validates before it writes, so a
+    // refusal leaves the document untouched; nothing after it may throw for
+    // caller input or cancellation.
+    throwIfAborted(signal);
+    if (!this.nativeDeleteField(resolved.fieldObjectNumber)) {
       throw new EngineError(EngineErrorCode.InvalidArg, 'field cannot be deleted');
     }
-
+    // Rebuild the form model before the cascade's attachment guard reads it.
     this.session.noteMutation();
-    return {
-      deletedFieldObjectNumber: resolved.fieldObjectNumber,
-      detachedWidgets: before.widgets.map((w) => formWidget(w.annotObjectNumber, w.page)),
-    };
+
+    const annotations = new AnnotationMutator(this.runtime, this.session);
+    for (const widget of removedWidgets) {
+      if (!widget.ref) continue; // direct or unplaced: no /Annots entry to remove
+      annotations.deleteReleasedWidget(widget.ref, resolved.fieldObjectNumber);
+    }
+    // The cascade edited /Annots after the bump above; bump again so the
+    // form model rebuilds.
+    this.session.noteMutation();
+    return { deleted: before.ref, removedWidgets };
   }
 
   attachWidget(
@@ -464,7 +545,7 @@ export class FormMutator {
     widget: AnnotationRef,
     onState: string | undefined,
     signal: AbortSignal,
-  ): { field: FormFieldDTO } {
+  ): { field: FormFieldDTO; widget: FormWidget } {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const model = acquireFormModel(this.runtime, this.session);
@@ -498,30 +579,46 @@ export class FormMutator {
       );
     }
     this.session.noteMutation();
-    return { field: this.readBackField(resolved.fieldObjectNumber) };
+    return {
+      field: this.readBackField(resolved.fieldObjectNumber),
+      widget: formWidget(widgetObjectNumber(widget), widget.page),
+    };
   }
 
   detachWidget(
     ref: FormFieldRef,
     widget: AnnotationRef,
     signal: AbortSignal,
-  ): { field: FormFieldDTO } {
+  ): { field: FormFieldDTO; widget: FormWidget } {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
     this.assertWritable(resolved);
+    // A merged field/widget is refused: the widget is the field's own
+    // dictionary, and separating the two gives one of them a new object
+    // number, so a ref the caller holds would stop naming what it named.
+    const widgetNumber = widgetObjectNumber(widget);
+    if (widgetNumber === resolved.fieldObjectNumber) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `widget ${widgetNumber} is the field's own dictionary (a merged field/widget) and cannot be removed from it - delete the field with doc.forms.delete`,
+      );
+    }
     if (
       !fn.EPDFForm_DetachWidget(
         this.session.requireDocPtr(),
         resolved.fieldObjectNumber,
-        widgetObjectNumber(widget),
+        widgetNumber,
       )
     ) {
       throw new EngineError(EngineErrorCode.InvalidArg, 'widget is not attached to this field');
     }
     this.session.noteMutation();
-    return { field: this.readBackField(resolved.fieldObjectNumber) };
+    return {
+      field: this.readBackField(resolved.fieldObjectNumber),
+      widget: formWidget(widgetObjectNumber(widget), widget.page),
+    };
   }
 
   private placementsOf(draft: FormFieldDraft): WidgetPlacement[] {
@@ -601,34 +698,16 @@ export class FormMutator {
     this.assertNotLockedBySignature(resolved);
   }
 
-  /**
-   * A field an earlier signature froze (its FieldMDP, or the /Lock of a
-   * signed field) refuses every write: document-derived authority, the
-   * same way encryption bits are. Off under `signedDocumentPolicy:
-   * 'permit'`. A document whose signature model cannot be built is not
-   * known to be locked.
-   */
+  /** A field an earlier signature locked refuses every write (see `readFieldLocks`). */
   private assertNotLockedBySignature(resolved: ResolvedField): void {
-    if (this.session.signedDocumentPolicy !== 'protect') return;
-    let protection;
-    try {
-      protection = new SignatureReader(this.runtime, this.session).readProtection();
-    } catch {
-      return;
-    }
-    if (protection.fieldLocks.length === 0) return;
+    const locks = readFieldLocks(this.runtime, this.session);
+    if (!locks) return;
     const model = acquireFormModel(this.runtime, this.session);
     const name =
       readUtf16String(this.runtime.mem, (buf, cap) =>
         this.runtime.fn.EPDFForm_GetFieldName(model, resolved.fieldIndex, buf, cap),
       ) ?? '';
-    const lock = fieldLockFor(protection, name);
-    if (lock) {
-      throw new EngineError(
-        EngineErrorCode.ProtectedDocument,
-        `form field "${name}" is locked by signature ${lock.signatureIndex} (${lock.source === 'fieldmdp' ? 'FieldMDP' : '/Lock'})`,
-      );
-    }
+    assertFieldNotLocked(name, locks);
   }
 
   /** Dispatch the typed native write. Returns the changed widget objnums. */
@@ -649,7 +728,7 @@ export class FormMutator {
           }
         }
         case 'toggle':
-          // Empty string clears the group, same as the C API's NULL.
+          // Empty string clears the group, same as the C API's null.
           return fn.EPDFForm_SetToggle(
             docPtr,
             fieldObjectNumber,
@@ -687,8 +766,9 @@ export class FormMutator {
     call: (buf: Ptr, cap: number, countPtr: Ptr) => boolean,
   ): number[] | null {
     const { mem } = this.runtime;
-    return withScratchN(mem, [CHANGED_WIDGETS_CAPACITY * 4, 4], ([buf, countPtr]) => {
-      mem.poke(countPtr, 'i32', 0);
+    return withScratchN(mem, [CHANGED_WIDGETS_CAPACITY * 4, U64_BYTES], ([buf, countPtr]) => {
+      // `unsigned long*`: 8 bytes on native, 4 on wasm32 — zero the whole slot.
+      pokeU64(mem, countPtr, 0);
       if (!call(buf, CHANGED_WIDGETS_CAPACITY, countPtr)) {
         return null;
       }
@@ -720,7 +800,50 @@ export class FormMutator {
     const changedWidgets: FormWidget[] = field.widgets
       .filter((w) => changedSet.has(w.annotObjectNumber))
       .map((w) => formWidget(w.annotObjectNumber, w.page));
-    return { field, changedWidgets, meta: EMPTY_META };
+    return { field, meta: formMutationMeta(this.session, [field.ref], changedWidgets) };
+  }
+}
+
+/** The patch members every family has. */
+const PATCH_BASE_MEMBERS = [
+  'family',
+  'name',
+  'readOnly',
+  'required',
+  'noExport',
+  'alternateName',
+  'mappingName',
+];
+
+/** The members each family's patch adds; a family not listed takes the base only. */
+const PATCH_FAMILY_MEMBERS: Partial<Record<FormFieldFamily, readonly string[]>> = {
+  text: ['defaultValue', 'maxLength', 'multiline', 'password', 'comb'],
+  radio: ['radiosInUnison', 'noToggleToOff'],
+  combobox: ['edit', 'defaultValue', 'options'],
+  listbox: ['multiSelect', 'options'],
+};
+
+/**
+ * A patch names no family (the ref says it) or the field's own, and sets
+ * only members that family has.
+ */
+function assertPatchFitsFamily(patch: FormFieldPatch, family: FormFieldFamily): void {
+  if (patch.family !== undefined && patch.family !== family) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      `patch family '${patch.family}' does not match field family '${family}'`,
+      { details: { field: 'family' } },
+    );
+  }
+  const allowed = new Set([...PATCH_BASE_MEMBERS, ...(PATCH_FAMILY_MEMBERS[family] ?? [])]);
+  for (const [member, value] of Object.entries(patch)) {
+    if (value !== undefined && !allowed.has(member)) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `'${member}' does not apply to a ${family} field`,
+        { details: { field: member } },
+      );
+    }
   }
 }
 

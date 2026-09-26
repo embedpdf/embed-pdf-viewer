@@ -20,17 +20,17 @@ const QUAD: HighlightDraft['quadPoints'] = [
 
 /**
  * Page rotate conformance suite. Verifies the architectural invariants —
- * do NOT loosen these without re-reading `PageRotateResult`:
+ * do not loosen these without re-reading `PageRotateResult`:
  *
- *   1. Rotation is ABSOLUTE and idempotent: `rotate(pons, 90)` twice is
+ *   1. Rotation is absolute and idempotent: `rotate(pons, 90)` twice is
  *      `rotate(pons, 90)` once. The wire never speaks "turn by".
- *   2. Rotation is presentation metadata over NORMALIZED content: the
+ *   2. Rotation is presentation metadata over normalized content: the
  *      layout's `width`/`height` stay un-rotated, order and identity are
  *      untouched, and per-page `RevisionToken`s survive (an index-based
  *      annotation ref captured before the rotate works after it).
  *   3. The result returns the full new `layout`; a subsequent `list()`
  *      agrees with it.
- *   4. Invalid inputs (bad rotation value, duplicate PONs, unknown PONs)
+ *   4. Invalid inputs (bad rotation value, duplicate page object numbers, unknown page object numbers)
  *      reject with `InvalidArg` / `NotFound`.
  *   5. Abort propagates as `AbortError`.
  *
@@ -69,7 +69,7 @@ export function runPageRotateConformance(
         );
         expect(rotated?.rotation).toBe(90);
 
-        // Presentation metadata only: un-rotated dims, order, and the PON
+        // Presentation metadata only: un-rotated dims, order, and the page object number
         // set are all untouched.
         expect(rotated?.size.width).toBe(target.size.width);
         expect(rotated?.size.height).toBe(target.size.height);
@@ -92,9 +92,9 @@ export function runPageRotateConformance(
       const doc = await openFixture(engine, opts);
       try {
         const list = await doc.pages.list();
-        const pon = list.pages[0].ref.pageObjectNumber;
-        const first = await doc.pages.rotate([toPageRef(pon)], 180);
-        const second = await doc.pages.rotate([toPageRef(pon)], 180);
+        const pageObjectNumber = list.pages[0].ref.pageObjectNumber;
+        const first = await doc.pages.rotate([toPageRef(pageObjectNumber)], 180);
+        const second = await doc.pages.rotate([toPageRef(pageObjectNumber)], 180);
         expect(second.layout.pages.map((p) => [p.ref.pageObjectNumber, p.rotation])).toEqual(
           first.layout.pages.map((p) => [p.ref.pageObjectNumber, p.rotation]),
         );
@@ -108,12 +108,12 @@ export function runPageRotateConformance(
       try {
         const list = await doc.pages.list();
         if (list.pages.length < 2) return;
-        const pons = list.pages.slice(0, 2).map((p) => p.ref.pageObjectNumber);
-        const result = await doc.pages.rotate(pons.map(toPageRef), 270);
-        for (const pon of pons) {
-          expect(result.layout.pages.find((p) => p.ref.pageObjectNumber === pon)?.rotation).toBe(
-            270,
-          );
+        const pageObjectNumbers = list.pages.slice(0, 2).map((p) => p.ref.pageObjectNumber);
+        const result = await doc.pages.rotate(pageObjectNumbers.map(toPageRef), 270);
+        for (const pageObjectNumber of pageObjectNumbers) {
+          expect(
+            result.layout.pages.find((p) => p.ref.pageObjectNumber === pageObjectNumber)?.rotation,
+          ).toBe(270);
         }
       } finally {
         await doc.close();
@@ -124,8 +124,8 @@ export function runPageRotateConformance(
       const doc = await openFixture(engine, opts);
       try {
         const list = await doc.pages.list();
-        const hostPon = list.pages[0].ref.pageObjectNumber;
-        const hostPage = doc.page(toPageRef(hostPon));
+        const hostPageObjectNumber = list.pages[0].ref.pageObjectNumber;
+        const hostPage = doc.page(toPageRef(hostPageObjectNumber));
 
         const draft: HighlightDraft = {
           subtype: 'highlight',
@@ -137,25 +137,25 @@ export function runPageRotateConformance(
         const targetIndex = afterCreate.annotations.findIndex(
           (a) =>
             a.ref.kind === 'objectNumber' &&
-            created.created.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === created.created.ref.annotObjectNumber,
+            created.annotation.ref.kind === 'objectNumber' &&
+            a.ref.annotObjectNumber === created.annotation.ref.annotObjectNumber,
         );
         expect(targetIndex >= 0).toBe(true);
 
         const indexRef: AnnotationRef = {
           kind: 'index',
-          page: toPageRef(hostPon),
+          page: toPageRef(hostPageObjectNumber),
           index: targetIndex,
-          revision: afterCreate.pageState.revision,
+          revision: afterCreate.pages[0].revision,
         };
 
-        // Rotate the HOST page itself — the strongest version of the
+        // Rotate the host page itself — the strongest version of the
         // invariant: even the rotated page's revision stays put.
-        await doc.pages.rotate([toPageRef(hostPon)], 90);
+        await doc.pages.rotate([toPageRef(hostPageObjectNumber)], 90);
 
         const patch: AnnotationPatch = { subtype: 'highlight', contents: 'still alive' };
         const update = await hostPage.annotations.update(indexRef, patch);
-        expect(update.updated.contents).toBe('still alive');
+        expect(update.annotation.contents).toBe('still alive');
       } finally {
         await doc.close();
       }
@@ -165,12 +165,12 @@ export function runPageRotateConformance(
       const doc = await openFixture(engine, opts);
       try {
         const list = await doc.pages.list();
-        const pon = list.pages[0].ref.pageObjectNumber;
+        const pageObjectNumber = list.pages[0].ref.pageObjectNumber;
         let caught: unknown;
         try {
           // 45 is not a legal /Rotate value; the type forbids it, the wire
           // must too.
-          await doc.pages.rotate([toPageRef(pon)], 45 as never);
+          await doc.pages.rotate([toPageRef(pageObjectNumber)], 45 as never);
         } catch (err) {
           caught = err;
         }
@@ -184,10 +184,10 @@ export function runPageRotateConformance(
       const doc = await openFixture(engine, opts);
       try {
         const list = await doc.pages.list();
-        const pon = list.pages[0].ref.pageObjectNumber;
+        const pageObjectNumber = list.pages[0].ref.pageObjectNumber;
         let caught: unknown;
         try {
-          await doc.pages.rotate([toPageRef(pon), toPageRef(pon)], 90);
+          await doc.pages.rotate([toPageRef(pageObjectNumber), toPageRef(pageObjectNumber)], 90);
         } catch (err) {
           caught = err;
         }
@@ -224,8 +224,8 @@ export function runPageRotateConformance(
       const doc = await openFixture(engine, opts);
       try {
         const list = await doc.pages.list();
-        const pon = list.pages[0].ref.pageObjectNumber;
-        const p = doc.pages.rotate([toPageRef(pon)], 90);
+        const pageObjectNumber = list.pages[0].ref.pageObjectNumber;
+        const p = doc.pages.rotate([toPageRef(pageObjectNumber)], 90);
         p.abort('test');
         await expect(p).rejects.toBeInstanceOf(AbortError);
       } finally {

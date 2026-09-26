@@ -3,7 +3,7 @@ import type {
   AnnotationFlags,
   AnnotationPropsPatch,
   Callout,
-  Geom,
+  ContentGeometry,
   Subtype,
 } from '@embedpdf/core-annotation';
 import type { Point, Rect, TextQuad } from '@embedpdf/core-geometry';
@@ -36,31 +36,38 @@ export type CreateAnnotationGeometry =
       readonly subtype: 'highlight' | 'underline' | 'strikeout' | 'squiggly' | 'redact';
       readonly quads: readonly TextQuad[];
     }
-  /** An AREA redaction: `/Rect` IS the removal region (ISO 32000-2), so it moves and resizes like a shape. */
+  /** An area redaction: `/Rect` is the removal region (ISO 32000-2), so it moves and resizes like a shape. */
   | { readonly subtype: 'redact'; readonly bounds: Rect }
   | { readonly subtype: 'free-text'; readonly bounds: Rect; readonly callout?: Callout };
 
 const finite = (value: number): boolean => Number.isFinite(value);
-const finitePoint = (p: Point): boolean => finite(p.x) && finite(p.y);
+const finitePoint = (point: Point): boolean => finite(point.x) && finite(point.y);
 
 function invalid(message: string): PluginError {
   return new PluginError('invalid-input', 'annotation', message);
 }
 
-/** Page-space input → the core's content-space `Geom`. Validates finiteness and arity. */
-export function geometryFromInput(input: CreateAnnotationInput): { subtype: Subtype; geom: Geom } {
+/** Page-space input → the core's content-space `ContentGeometry`. Validates finiteness and arity. */
+export function geometryFromInput(input: CreateAnnotationInput): {
+  subtype: Subtype;
+  geometry: ContentGeometry;
+} {
   switch (input.subtype) {
     case 'square':
     case 'circle': {
-      const r = input.bounds;
-      if (![r.x, r.y, r.width, r.height].every(finite) || r.width < 0 || r.height < 0) {
+      const rect = input.bounds;
+      if (
+        ![rect.x, rect.y, rect.width, rect.height].every(finite) ||
+        rect.width < 0 ||
+        rect.height < 0
+      ) {
         throw invalid('bounds must be a finite, non-negative rectangle');
       }
       return {
         subtype: input.subtype,
-        geom: {
-          t: 'rect',
-          rect: { x: r.x, y: r.y, width: r.width, height: r.height },
+        geometry: {
+          kind: 'rect',
+          rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
           ellipse: input.subtype === 'circle',
           ...(input.rotation ? { rot: input.rotation } : {}),
         },
@@ -69,7 +76,10 @@ export function geometryFromInput(input: CreateAnnotationInput): { subtype: Subt
     case 'line':
       if (!finitePoint(input.from) || !finitePoint(input.to))
         throw invalid('from and to must be finite points');
-      return { subtype: 'line', geom: { t: 'line', a: { ...input.from }, b: { ...input.to } } };
+      return {
+        subtype: 'line',
+        geometry: { kind: 'line', a: { ...input.from }, b: { ...input.to } },
+      };
     case 'polygon':
     case 'polyline': {
       const min = input.subtype === 'polygon' ? 3 : 2;
@@ -78,21 +88,24 @@ export function geometryFromInput(input: CreateAnnotationInput): { subtype: Subt
       }
       return {
         subtype: input.subtype,
-        geom: {
-          t: 'poly',
-          points: input.vertices.map((v) => ({ ...v })),
+        geometry: {
+          kind: 'poly',
+          points: input.vertices.map((point) => ({ ...point })),
           closed: input.subtype === 'polygon',
         },
       };
     }
     case 'ink': {
-      const strokes = input.strokes.filter((s) => s.length >= 2);
-      if (strokes.length === 0 || !strokes.every((s) => s.every(finitePoint))) {
+      const strokes = input.strokes.filter((stroke) => stroke.length >= 2);
+      if (strokes.length === 0 || !strokes.every((stroke) => stroke.every(finitePoint))) {
         throw invalid('ink needs at least one stroke of two or more finite points');
       }
       return {
         subtype: 'ink',
-        geom: { t: 'ink', strokes: strokes.map((s) => s.map((p) => ({ ...p }))) },
+        geometry: {
+          kind: 'ink',
+          strokes: strokes.map((stroke) => stroke.map((point) => ({ ...point }))),
+        },
       };
     }
     case 'highlight':
@@ -101,15 +114,19 @@ export function geometryFromInput(input: CreateAnnotationInput): { subtype: Subt
     case 'squiggly':
     case 'redact': {
       if (!('quads' in input)) {
-        const r = input.bounds;
-        if (![r.x, r.y, r.width, r.height].every(finite) || r.width <= 0 || r.height <= 0) {
+        const rect = input.bounds;
+        if (
+          ![rect.x, rect.y, rect.width, rect.height].every(finite) ||
+          rect.width <= 0 ||
+          rect.height <= 0
+        ) {
           throw invalid('bounds must be a finite rectangle with positive size');
         }
         return {
           subtype: 'redact',
-          geom: {
-            t: 'rect',
-            rect: { x: r.x, y: r.y, width: r.width, height: r.height },
+          geometry: {
+            kind: 'rect',
+            rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
             ellipse: false,
           },
         };
@@ -117,19 +134,23 @@ export function geometryFromInput(input: CreateAnnotationInput): { subtype: Subt
       if (input.quads.length === 0) throw invalid(`${input.subtype} needs at least one quad`);
       return {
         subtype: input.subtype,
-        geom: { t: 'quads', quads: input.quads.map((q) => ({ ...q })) },
+        geometry: { kind: 'quads', quads: input.quads.map((quad) => ({ ...quad })) },
       };
     }
     case 'free-text': {
-      const r = input.bounds;
-      if (![r.x, r.y, r.width, r.height].every(finite) || r.width <= 0 || r.height <= 0) {
+      const rect = input.bounds;
+      if (
+        ![rect.x, rect.y, rect.width, rect.height].every(finite) ||
+        rect.width <= 0 ||
+        rect.height <= 0
+      ) {
         throw invalid('bounds must be a finite rectangle with positive size');
       }
       return {
         subtype: 'free-text',
-        geom: {
-          t: 'text',
-          rect: { x: r.x, y: r.y, width: r.width, height: r.height },
+        geometry: {
+          kind: 'text',
+          rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
           ...(input.callout ? { callout: input.callout } : {}),
         },
       };

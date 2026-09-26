@@ -23,9 +23,9 @@ import { createValidTestLicenseGate } from '../src/licensing/testing';
 
 /**
  * Plane-scoped view sharing. The rule under test: a layer is a set of
- * per-plane DELTAS over the immutable base; every read resolves at the
- * doc-level (shared) URL iff EVERY plane it depends on is inherited, executes
- * on the BASE worker session while it does, and each mutation kind flips
+ * per-plane deltas over the immutable base; every read resolves at the
+ * doc-level (shared) URL iff every plane it depends on is inherited, executes
+ * on the base worker session while it does, and each mutation kind flips
  * exactly the planes it owns. The manifest advertises `scopes`; the origin
  * guards are the truth; the `/v1/access` grant is the TTL-bounded edge
  * optimization.
@@ -111,7 +111,7 @@ describe('plane-scoped view sharing', () => {
       expect(b.status, path).toBe(200);
       const bytesA = Buffer.from(await a.arrayBuffer());
       const bytesB = Buffer.from(await b.arrayBuffer());
-      // Identical views → identical bytes at ONE URL: the CDN cache line.
+      // Identical views → identical bytes at one URL: the CDN cache line.
       expect(bytesA.equals(bytesB), path).toBe(true);
     }
 
@@ -126,7 +126,7 @@ describe('plane-scoped view sharing', () => {
     ).toBe(200);
 
     // The key sharing property: 1,000 pristine visitors are
-    // this test's two — ZERO layer worker sessions were ever created, and
+    // this test's two — zero layer worker sessions were ever created, and
     // the durable read-through collapsed the annotation-free render into a
     // single worker render.
     expect(spy.count('open.layerFileBase')).toBe(0);
@@ -205,7 +205,7 @@ describe('plane-scoped view sharing', () => {
     });
     expect(rotated.status).toBe(200);
 
-    // Rotation is presentation metadata over NORMALIZED artifacts (the
+    // Rotation is presentation metadata over normalized artifacts (the
     // SDK's own absorbPageStructure law): only the layout plane flips.
     const alice = await fetchLayerManifest(fx, tenantId, docId, 'alice');
     expect(alice.scopes).toEqual({ ...ALL_BASE, layout: 'layer' });
@@ -383,7 +383,7 @@ describe('plane-scoped view sharing', () => {
     const aliceAuth = auth(docToken(tenantId, docId, 'alice'));
     const shared = `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1`;
 
-    // Locked: the shared read refuses until alice unlocks HER layer.
+    // Locked: the shared read refuses until alice unlocks her layer.
     const blocked = await fetch(shared, { headers: aliceAuth });
     expect(blocked.status, await blocked.clone().text()).toBe(422);
 
@@ -469,12 +469,12 @@ describe('attachments plane (independent axis)', () => {
       .execute();
 
     // The attachments plane flips (annotations flipped by the minting
-    // write); the CONTENT plane is untouched.
+    // write); the content plane is untouched.
     const alice = await fetchLayerManifest(fx, tenantId, docId, 'alice');
     expect(alice.scopes).toEqual({ ...ALL_BASE, annotations: 'layer', attachments: 'layer' });
 
     // Origin: base attachments refused for alice, granted for bob; base
-    // CONTENT still fine for alice (the guards are per-plane).
+    // content still fine for alice (the guards are per-plane).
     const attUrl = `${fx.baseUrl}/v1/docs/${docId}/attachments@${ATT_TOKEN}`;
     expect(
       (await fetch(attUrl, { headers: auth(docToken(tenantId, docId, 'alice')) })).status,
@@ -514,7 +514,7 @@ describe('attachments plane (independent axis)', () => {
     expect(deleted.status).toBe(200);
 
     const alice = await fetchLayerManifest(fx, tenantId, docId, 'alice');
-    // Content flipped, attachments did NOT — a redacted/edited layer still
+    // Content flipped, attachments did not — a redacted/edited layer still
     // shares the base attachments it never touched.
     expect(alice.scopes?.content).toBe('layer');
     expect(alice.scopes?.attachments).toBe('base');

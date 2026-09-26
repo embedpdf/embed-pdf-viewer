@@ -1,7 +1,8 @@
 /**
  * Factory for CdnSigner instances. Matches the unified adapter
- * pattern (see ADAPTERS.md) — switch on `config.kind`, accept a
- * SecretResolver via `opts.resolver` for SecretRef-bearing variants.
+ * pattern (see `docs/conventions/server-adapters.md`) — switch on
+ * `config.kind`, accept a SecretResolver via `opts.resolver` for
+ * SecretRef-bearing variants.
  *
  * Secret-bearing fields in CdnConfig are typed `string | SecretRef`.
  * Plain strings pass through verbatim; SecretRefs are resolved through

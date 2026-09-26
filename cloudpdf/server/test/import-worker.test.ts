@@ -1,5 +1,5 @@
 /**
- * Async import worker (phase 3b): deterministic single-poll tests of
+ * Async import worker: deterministic single-poll tests of
  * the claim loop against a real sqlite + FsObjectStore lifecycle.
  * Covers the six correctness requirements — fenced transitions,
  * reconcile-on-claim, exhausted-retryable document failure, atomic
@@ -61,7 +61,7 @@ beforeEach(async () => {
     importPolicy: policy,
     importConnections: new ImportConnectionRegistry([
       ImportConnectionSchema.parse({ kind: 'fs', id: 'drop', root: dropRoot }),
-      // A connection whose root does not exist: opens fail RETRYABLY.
+      // A connection whose root does not exist: opens fail retryably.
       ImportConnectionSchema.parse({ kind: 'fs', id: 'ghost', root: join(dropRoot, 'not-there') }),
     ]),
     documentImports: jobs,
@@ -195,7 +195,7 @@ describe('worker poll', () => {
       source: { kind: 'connection', connectionId: 'drop', key: 'inbox/a.pdf' },
     });
     expect(sync.tag).toBe('imported');
-    // …then a queued job appears pointing at a MISSING file: only the
+    // …then a queued job appears pointing at a missing file: only the
     // reconcile path (no transfer) can succeed it.
     await jobs.enqueue({
       docId: sync.doc.id,

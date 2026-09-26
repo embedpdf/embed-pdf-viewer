@@ -128,7 +128,7 @@ function readBox(
   return normalizePdfRect(readRectF(mem, rectPtr));
 }
 
-function readBoxes(
+export function readBoxes(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   docPtr: Ptr,

@@ -9,7 +9,7 @@ import { createLocalEngine } from '@embedpdf/engine';
 import { toPageRef, type PdfActionNode, type PdfActionTree } from '@embedpdf/engine-core/runtime';
 
 import { actionsPlugin } from '../src/actions.plugin';
-import { ActionsToken } from '../src/internal';
+import { ActionsToken } from '../src/host-contract';
 import type { ActionsHostCapability, AnnotCommitEntry } from '../src/host-contract';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -31,10 +31,10 @@ const tree = (root: PdfActionNode): PdfActionTree => ({
   warningFlags: 0,
   warnings: [],
 });
-const js = (script: string, next: PdfActionNode[] = []): PdfActionNode => ({
+const script = (source: string, next: PdfActionNode[] = []): PdfActionNode => ({
   type: 'javascript',
   subtype: 'JavaScript',
-  script,
+  script: source,
   next,
 });
 
@@ -79,7 +79,7 @@ async function boot() {
   };
 }
 
-const hoverCtx = {
+const hoverContext = {
   origin: 'hover' as const,
   source: {
     kind: 'annotation' as const,
@@ -91,19 +91,19 @@ const hoverCtx = {
 
 describe('the ScriptHost executor (real VM, real engine world)', () => {
   it("runs 02's shape end-to-end: getAnnot → recolor → the annotation commit sink", async () => {
-    await using t = await boot();
-    const result = await t.actions.execute(
+    await using booted = await boot();
+    const result = await booted.actions.execute(
       tree(
-        js(
+        script(
           `var a = this.getAnnot(0, 'tip');
            if (a) { a.strokeColor = ['RGB', 0.14, 0.43, 0.89]; a.contents = event.type + ':' + event.name; }`,
         ),
       ),
-      hoverCtx,
+      hoverContext,
     );
     expect(result.nodes[0]?.status).toBe('executed');
-    expect(t.committed).toHaveLength(1);
-    expect(t.committed[0]).toMatchObject({
+    expect(booted.committed).toHaveLength(1);
+    expect(booted.committed[0]).toMatchObject({
       annotObjectNumber: 6, // the `tip` square
       page: toPageRef(3),
       patch: {
@@ -114,34 +114,40 @@ describe('the ScriptHost executor (real VM, real engine world)', () => {
     });
   });
 
-  it('reports refused commits as failed nodes (authority-shaped honesty)', async () => {
-    await using t = await boot();
-    t.actions.registerAnnotCommitSink(async (entries) => ({
+  it('reports refused commits as failed nodes', async () => {
+    await using booted = await boot();
+    booted.actions.registerAnnotCommitSink(async (entries) => ({
       results: entries.map((entry) => ({
         annotObjectNumber: entry.annotObjectNumber,
         status: 'failed' as const,
         error: 'PermissionDenied: doc.annotate.modify',
       })),
     }));
-    const result = await t.actions.execute(
-      tree(js(`var a = this.getAnnot(0, 'tip'); if (a) a.opacity = 0.5;`)),
-      hoverCtx,
+    const result = await booted.actions.execute(
+      tree(script(`var a = this.getAnnot(0, 'tip'); if (a) a.opacity = 0.5;`)),
+      hoverContext,
     );
     expect(result.nodes[0]?.status).toBe('failed');
-    expect(result.diagnostics.some((d) => d.message.includes('PermissionDenied'))).toBe(true);
+    expect(
+      result.diagnostics.some((diagnostic) => diagnostic.message.includes('PermissionDenied')),
+    ).toBe(true);
   });
 
-  it('caps JS nodes per dispatch deterministically (D11)', async () => {
-    await using t = await boot();
+  it('caps JS nodes per dispatch deterministically', async () => {
+    await using booted = await boot();
     const chain = tree(
-      js('void 0;', [js('void 0;', [js('void 0;', [js('void 0;', [js('void 0;')])])])]),
+      script('void 0;', [
+        script('void 0;', [script('void 0;', [script('void 0;', [script('void 0;')])])]),
+      ]),
     );
-    const result = await t.actions.execute(chain, hoverCtx);
-    const statuses = result.nodes.map((n) => n.status);
+    const result = await booted.actions.execute(chain, hoverContext);
+    const statuses = result.nodes.map((node) => node.status);
     expect(statuses.slice(0, 3)).toEqual(['executed', 'executed', 'executed']);
     expect(statuses.slice(3)).toEqual(['inert', 'inert']); // budget exhausted
     expect(
-      result.diagnostics.some((d) => d.message.includes('dispatch script budget exhausted')),
+      result.diagnostics.some((diagnostic) =>
+        diagnostic.message.includes('dispatch script budget exhausted'),
+      ),
     ).toBe(true);
   });
 });

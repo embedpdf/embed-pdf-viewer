@@ -1,36 +1,27 @@
-import type { StampDraft, StampWireDraft } from './draft';
-import type { StampAnnotationDTO } from './dto';
-import type { StampPatch, StampWirePatch } from './patch';
-import { StampDTOSchema, StampWireDraftSchema, StampWirePatchSchema } from './schema';
+import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
+import { StampDeclaration } from './declaration';
 
-export type { StampAnnotationDTO } from './dto';
-export type { StampDraft, StampWireDraft, StampFit } from './draft';
-export type { StampPatch, StampWirePatch } from './patch';
-export {
-  StampDTOSchema,
-  StampWireDraftSchema,
-  StampWirePatchSchema,
-  ResourceRefSchema,
-} from './schema';
-export { normalizeStampDraft, normalizeStampPatch } from './normalize';
+export { StampDeclaration } from './declaration';
+export { StampFitSchema } from './values';
+export type { StampFit } from './values';
 
-/**
- * The kind module is WIRE-typed (schemas validate the post-normalization
- * form). The authoring types with inline bytes (`StampDraft`, `StampPatch`)
- * are swapped into the public `AnnotationDraft`/`AnnotationPatch` unions in
- * `kinds/index.ts`; `annotation/normalize.ts` bridges the two.
- */
-export const StampKind: AnnotationKindModule<
-  'stamp',
-  StampAnnotationDTO,
-  StampWireDraft,
-  StampWirePatch
-> = {
-  subtype: 'stamp',
-  pdfSubtypeCode: PdfAnnotationSubtypeCode.STAMP,
-  dtoSchema: StampDTOSchema,
-  draftSchema: StampWireDraftSchema,
-  patchSchema: StampWirePatchSchema,
-};
+export type StampAnnotationDTO = ReadOf<typeof StampDeclaration>;
+/** The drawing travels beside the data, as the `appearance` resource; `fit` says how it fills the box. */
+export type StampDraft = CreateOf<typeof StampDeclaration>;
+export type StampPatch = UpdateOf<typeof StampDeclaration>;
+
+export const StampDTOSchema = StampDeclaration.readSchema;
+export const StampDraftSchema = StampDeclaration.createSchema;
+export const StampPatchSchema = StampDeclaration.updateSchema;
+
+export const StampKind: AnnotationKindModule<'stamp', StampAnnotationDTO, StampDraft, StampPatch> =
+  {
+    subtype: 'stamp',
+    pdfSubtypeCode: PdfAnnotationSubtypeCode.STAMP,
+    dtoSchema: StampDTOSchema,
+    draftSchema: StampDraftSchema,
+    patchSchema: StampPatchSchema,
+    readBackWrites: StampDeclaration.readBackWrites,
+  };

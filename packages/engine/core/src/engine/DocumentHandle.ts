@@ -12,7 +12,7 @@ import type { DocumentSignaturesService } from './DocumentSignaturesService';
 import type { MetadataService } from './MetadataService';
 import type { PageHandle } from './PageHandle';
 import type { PieceInfoService } from './PieceInfoService';
-import type { PdfSaveMode } from '../dto/PdfSaveMode';
+import type { DownloadOptions } from '../dto/PdfSaveMode';
 import type { DocumentEventStream } from '../events/DocumentEventStream';
 import type { PageRef } from '../identity/PageRef';
 import type { BaseVersionInfo } from '../signature/types';
@@ -20,7 +20,6 @@ import { AbortablePromise } from '../promise/AbortablePromise';
 
 export interface DocumentCapabilities {
   readonly weakAnnotationEditSessions: 'not-needed' | 'required';
-  readonly pageEditSessions: 'unsupported' | 'supported';
 }
 
 export interface DocumentHandle {
@@ -30,14 +29,13 @@ export interface DocumentHandle {
   readonly metadata: MetadataService;
   readonly annotations: DocumentAnnotationsService;
   /** Lazy catalog-owned action extraction. The engine never executes scripts. */
-  readonly actions?: DocumentActionsService;
+  readonly actions: DocumentActionsService;
   /**
    * Document-level attachments (the catalog's `/EmbeddedFiles` name tree).
-   * Optional while transports ship (the `downloadLayer?` pattern) —
-   * feature-detect with `doc.attachments !== undefined`. Files attached to
-   * annotations are downloaded via `page(pon).annotations.downloadFile`.
+   * Files attached to annotations are read via
+   * `page(ref).annotations.downloadResource(ref, 'file')`.
    */
-  readonly attachments?: DocumentAttachmentsService;
+  readonly attachments: DocumentAttachmentsService;
   /** The document's interactive form (AcroForm): fields, values, interchange. */
   readonly forms: DocumentFormsService;
   /**
@@ -48,7 +46,7 @@ export interface DocumentHandle {
    */
   readonly fonts?: DocumentFontSettings;
   /**
-   * CATALOG-level `/PieceInfo` private application data (ISO 32000 §14.5)
+   * Catalog-level `/PieceInfo` private application data (ISO 32000 §14.5)
    * — e.g. a stamp library's display name. Optional: the local engine
    * implements it; the cloud engine omits it until a cloud consumer ships
    * (the `downloadLayer?` pattern). Per-page piece data lives on
@@ -58,35 +56,31 @@ export interface DocumentHandle {
   /** Document text search: budgeted, cursor-resumable slices. */
   readonly search: DocumentSearchService;
   /**
-   * Render POLICY surface (`doc.render.policy()`): the engine's render
+   * Render policy surface (`doc.render.getPolicy()`): the engine's render
    * lattice, or `continuous` on engines that render any viewport exactly
-   * (the local engine). Pixels stay on `page(pon).render` — this carries
+   * (the local engine). Pixels stay on `page(ref).render` — this carries
    * policy only. Conformance is explicit via `snapFullPageViewport`; no
-   * engine ever snaps a render call implicitly. Optional while engines
-   * ship it — feature-detect with `doc.render !== undefined`.
+   * engine ever snaps a render call implicitly.
    */
-  readonly render?: DocumentRenderService;
+  readonly render: DocumentRenderService;
   /**
    * Document-scoped page service. Use for cross-page operations:
    *   - `pages.list()` for the current display order.
-   *   - `pages.move(pons, destIndex)` for reorder.
+   *   - `pages.move(refs, toIndex)` for reorder.
    *
-   * Per-page reads/writes still live on `page(pon).annotations`.
+   * Per-page reads/writes still live on `page(ref).annotations`.
    */
   readonly pages: DocumentPagesService;
   /**
    * Destructive redaction apply (the second stage of the two-stage model;
-   * marking rides the normal annotation verbs). Optional while engines
-   * ship it — feature-detect with `doc.redaction !== undefined`.
+   * marking rides the normal annotation verbs).
    */
-  readonly redaction?: DocumentRedactionService;
+  readonly redaction: DocumentRedactionService;
   /**
    * Digital signatures: the read side (revisions, signed fields, the
-   * protection they impose) and the two-phase signing protocol. Optional
-   * while engines ship it — feature-detect with
-   * `doc.signatures !== undefined`.
+   * protection they impose) and the two-phase signing protocol.
    */
-  readonly signatures?: DocumentSignaturesService;
+  readonly signatures: DocumentSignaturesService;
   /**
    * The document's event stream — every confirmed mutation, exactly once,
    * identical shape on local and cloud engines (see `DocumentEvent`). The
@@ -94,19 +88,20 @@ export interface DocumentHandle {
    */
   readonly events: DocumentEventStream;
   /**
-   * Returns a handle scoped to a page by its `PageRef`. Throws
-   * `EngineError(NotFound)` when the document has no such page. Synchronous
-   * because page records are cached on `DocumentSession`.
+   * A handle for the page `ref` names: an address with the page's verbs,
+   * made without asking the engine anything (so synchronous). The page is
+   * looked up when a call runs; a page the document doesn't have fails that
+   * call with `NotFound`. It carries no page data: `pages.list()` does.
    */
   page(ref: PageRef): PageHandle;
-  download(opts?: { mode?: PdfSaveMode }): AbortablePromise<Uint8Array>;
+  download(options?: DownloadOptions): AbortablePromise<Uint8Array>;
   /**
    * Local Node engines only: write the document to a local file without
    * moving its bytes through JS. An untouched session (no unsaved edits,
    * incremental mode) is streamed out verbatim — for a signed document,
    * exactly as sealed. Absent on engines that cannot reach a filesystem.
    */
-  downloadToFile?(path: string, opts?: { mode?: PdfSaveMode }): AbortablePromise<void>;
+  downloadToFile?(path: string, options?: DownloadOptions): AbortablePromise<void>;
   /**
    * The saved version this session is on: SHA-256 and length of the
    * loaded bytes (for a layer session, of its base). Changes only when
@@ -114,7 +109,7 @@ export interface DocumentHandle {
    */
   version?(): AbortablePromise<BaseVersionInfo>;
   /**
-   * Export JUST this document's LAYER as a self-contained artifact (the small
+   * Export just this document's layer as a self-contained artifact (the small
    * overlay diff over the immutable base) — re-openable later via
    * `OpenInputLayerBytes` with `{ kind: 'artifact', bytes }`. Optional: the
    * local engine supports it for every session it opens as a layer (the

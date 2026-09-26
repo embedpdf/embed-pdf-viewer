@@ -1,10 +1,11 @@
 /**
- * The six change hooks and the ONE place they fire: every state write goes
- * through the diffing `ctx.dispatch` built here, so page, zoom, camera,
- * settings and viewport changes are observed before/after each write and an
- * event can never be forgotten by a new verb.
+ * The stage's six events. Five of them are derived in one `ctx.state.onChange`
+ * listener, from the state before and after each committed change, so a new
+ * verb can never forget to announce a page, zoom, camera, settings or viewport
+ * change. `motionEnded` is an occurrence: the camera animation emits it where a
+ * tween or fling ends.
  */
-import { createEventHook } from '@embedpdf/core';
+import type { PluginContext } from '@embedpdf/core';
 
 import type {
   StageCameraChangedEvent,
@@ -15,69 +16,40 @@ import type {
   StageZoomChangedEvent,
 } from '../contract';
 import type { StageState } from '../model';
-import { pickSettings, SETTING_KEYS } from '../settings';
 import { eqSetting } from '../responsive';
-import type { StageContext } from './context';
+import { pickSettings, SETTING_KEYS } from '../settings';
 
-export function createEvents(rawCtx: StageContext) {
-  const pageChanged = createEventHook<StagePageChangedEvent>();
-  const zoomChanged = createEventHook<StageZoomChangedEvent>();
-  const cameraChanged = createEventHook<StageCameraChangedEvent>();
-  const motionEnded = createEventHook<StageMotionEndedEvent>();
-  const settingsChanged = createEventHook<StageSettingsChangedEvent>();
-  const viewportChanged = createEventHook<StageViewportChangedEvent>();
-  rawCtx.cleanup?.(() => {
-    for (const hook of [
-      pageChanged,
-      zoomChanged,
-      cameraChanged,
-      motionEnded,
-      settingsChanged,
-      viewportChanged,
-    ]) {
-      hook.dispose();
-    }
-  });
-  const emitDiffs = (before: StageState, after: StageState): void => {
-    if (before === after) return;
-    if (before.camera !== after.camera) {
-      cameraChanged.emit({ camera: after.camera });
-      if (before.camera.zoom !== after.camera.zoom) {
+export function createEvents(ctx: PluginContext<StageState>) {
+  const pageChanged = ctx.events.source<StagePageChangedEvent>();
+  const zoomChanged = ctx.events.source<StageZoomChangedEvent>();
+  const cameraChanged = ctx.events.source<StageCameraChangedEvent>();
+  const motionEnded = ctx.events.source<StageMotionEndedEvent>();
+  const settingsChanged = ctx.events.source<StageSettingsChangedEvent>();
+  const viewportChanged = ctx.events.source<StageViewportChangedEvent>();
+
+  ctx.state.onChange(({ previous, next }) => {
+    if (previous.camera !== next.camera) {
+      cameraChanged.emit({ camera: next.camera });
+      if (previous.camera.zoom !== next.camera.zoom) {
         zoomChanged.emit({
-          level: after.camera.zoom,
-          previousLevel: before.camera.zoom,
-          mode: 'mode' in after.zoom ? after.zoom.mode : 'custom',
+          level: next.camera.zoom,
+          previousLevel: previous.camera.zoom,
+          mode: 'mode' in next.zoom ? next.zoom.mode : 'custom',
         });
       }
     }
-    if (before.cursor !== after.cursor) {
+    if (previous.cursor !== next.cursor) {
       pageChanged.emit({
-        page: rawCtx.document()?.pages[after.cursor] ?? null,
-        pageIndex: after.cursor,
-        previousPageIndex: before.cursor,
+        page: ctx.document()?.pages[next.cursor] ?? null,
+        pageIndex: next.cursor,
+        previousPageIndex: previous.cursor,
       });
     }
-    if (before.vp !== after.vp) viewportChanged.emit({ size: after.vp });
-    const changed = SETTING_KEYS.filter((key) => !eqSetting(before[key], after[key]));
-    if (changed.length) settingsChanged.emit({ settings: pickSettings(after), changed });
-  };
-  const ctx: StageContext = {
-    ...rawCtx,
-    dispatch: (action) => {
-      const before = rawCtx.getState();
-      rawCtx.dispatch(action);
-      emitDiffs(before, rawCtx.getState());
-    },
-  };
-  return {
-    /** The diffing context — the one every area writes through. */
-    ctx,
-    pageChanged,
-    zoomChanged,
-    cameraChanged,
-    motionEnded,
-    settingsChanged,
-    viewportChanged,
-  };
+    if (previous.viewport !== next.viewport) viewportChanged.emit({ size: next.viewport });
+    const changed = SETTING_KEYS.filter((key) => !eqSetting(previous[key], next[key]));
+    if (changed.length) settingsChanged.emit({ settings: pickSettings(next), changed });
+  });
+
+  return { pageChanged, zoomChanged, cameraChanged, motionEnded, settingsChanged, viewportChanged };
 }
 export type StageEvents = ReturnType<typeof createEvents>;

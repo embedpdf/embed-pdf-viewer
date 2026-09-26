@@ -121,10 +121,18 @@ jobs:
         run: pnpm --filter @embedpdf/tooling-build test
       - name: Plugin boundaries
         run: pnpm check:plugin-boundaries
+      # Plugin shape (docs/conventions/plugins.md): manifests hold only the
+      # factory, events are subscribed through the context, no `as never`.
+      - name: Plugin architecture
+        run: pnpm check:architecture
       # No public-CDN or other off-origin URL literal ships in viewer or engine
       # source — the code half of docs/viewer/self-hosting's guarantee.
       - name: No off-origin URL literals in shipped source
         run: pnpm check:network-literals
+      # Comments follow docs/conventions/comments.md: nothing a reader cannot
+      # follow (plans, decisions, history, missing docs), no capitals for emphasis.
+      - name: Comment conventions
+        run: pnpm check:comments
       # The public API of every published entry is snapshotted in api/; a PR
       # that changes a surface regenerates the snapshot (`pnpm api:snapshot`)
       # so the review sees the diff, and a drift here is a PR that forgot.

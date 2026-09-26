@@ -1,306 +1,332 @@
 /**
  * The scene model: the document's item grouping, the layout, the memoized
- * scene (continuous = the whole document; paged = a one-item slice at the
- * origin), and the pure geometry reads every area builds on — fit, alignment
- * points, clamp bounds, anchors. Reads only; nothing here dispatches.
+ * scene (continuous flow lays out the whole document; paged flow a one-item
+ * slice at the origin), and the pure geometry reads every area builds on:
+ * fit, alignment points, clamp bounds and anchors. Reads only; nothing here
+ * changes state.
  */
-import * as S from '@embedpdf/core-stage';
+import {
+  anchorFromCamera,
+  gridLayout,
+  groupPages,
+  linearLayout,
+  ZoomMode,
+  type AlignmentValue,
+  type AlignValue,
+  type Anchor,
+  type CameraConstraint,
+  type PageFrame,
+  type Point,
+  type Rect as StageRect,
+  type Scene,
+  type SceneItem,
+  type Size,
+} from '@embedpdf/core-stage';
 import { addRotations, applyRect, displaySize, rotateScaleMatrix } from '@embedpdf/core-geometry';
 import type { Rect } from '@embedpdf/core-geometry';
-import type { PageRef } from '@embedpdf/core';
+import { memo, type PluginContext, type PageRef } from '@embedpdf/core';
 
 import type { StageSettings } from '../contract';
+import type { StageState } from '../model';
 import { SETTINGS_EFFECT, SETTING_KEYS } from '../settings';
-import type { StageContext } from './context';
 
-export function createScene(ctx: StageContext) {
-  const cam = () => ctx.getState().camera;
-  const vp = () => ctx.getState().vp;
-  const dpr = () => ctx.getState().dpr;
-  const pad = () => ctx.getState().padding;
-  const paged = () => ctx.getState().flow === 'paged';
+export function createScene(ctx: PluginContext<StageState>) {
+  const state = () => ctx.state.get();
+  const camera = () => state().camera;
+  const viewport = () => state().viewport;
+  const dpr = () => state().dpr;
+  const padding = () => state().padding;
+  const paged = () => state().flow === 'paged';
   const isFitAll = () => {
-    const z = ctx.getState().zoom;
-    return 'mode' in z && z.mode === S.ZoomMode.FitAll;
+    const zoom = state().zoom;
+    return 'mode' in zoom && zoom.mode === ZoomMode.FitAll;
   };
 
-  // ── the document's item model (spread grouping) — independent of the rendered
-  //    scene, so navigation can reason about ALL items while a paged SCENE holds
-  //    only one. The cursor is a page; itemIndexOfPage maps it (survives regrouping).
-  let groupingCache: { key: string; grouping: number[][]; firstPages: number[] } | null = null;
-  const grouping = (): { grouping: number[][]; firstPages: number[] } => {
-    const doc = ctx.document();
-    const st = ctx.getState();
-    const key = `${doc ? doc.pageCount : 0}|${st.spread}`;
-    if (groupingCache && groupingCache.key === key) return groupingCache;
-    const g = S.groupPages(doc ? doc.pageCount : 0, st.spread);
-    groupingCache = { key, grouping: g, firstPages: g.map((item) => item[0]) };
-    return groupingCache;
-  };
+  // The document's item model (spread grouping) is independent of the
+  // rendered scene, so navigation can reason about every item while a paged
+  // scene holds only one. The cursor is a page; `itemIndexOfPage` maps it,
+  // which survives regrouping.
+  const grouping = memo(
+    () => [ctx.document()?.pageCount ?? 0, state().spread] as const,
+    (pageCount, spread): { grouping: number[][]; firstPages: number[] } => {
+      const groups = groupPages(pageCount, spread);
+      return { grouping: groups, firstPages: groups.map((item) => item[0]) };
+    },
+  );
   const itemCountFull = (): number => grouping().grouping.length;
   const itemIndexOfPage = (pageIndex: number): number => {
-    const fp = grouping().firstPages;
-    let lo = 0;
-    let hi = fp.length;
-    while (lo < hi) {
-      const mid = (lo + hi) >> 1;
-      if (fp[mid] <= pageIndex) lo = mid + 1;
-      else hi = mid;
+    const firstPages = grouping().firstPages;
+    let low = 0;
+    let high = firstPages.length;
+    while (low < high) {
+      const middle = (low + high) >> 1;
+      if (firstPages[middle] <= pageIndex) low = middle + 1;
+      else high = middle;
     }
-    return Math.max(0, lo - 1);
+    return Math.max(0, low - 1);
   };
 
-  // The effective zoom for converting SCREEN px settings into world units — a
-  // fixed zoom intent gives an exact, stable value (the thumbnail case); other
-  // intents fall back to the camera's current zoom (`stabilized` converges it).
-  // Screen-px settings (wrapped lineWidth, pageFrame) are the ONLY way a scene
-  // depends on the viewport/zoom.
+  // The zoom that converts screen-px settings into world units. A fixed zoom
+  // intent gives an exact, stable value (the thumbnail case); other intents
+  // use the camera's current zoom, which `stabilized` converges. Screen-px
+  // settings (the wrapped line width, pageFrame, `{ px }` gaps) are the only
+  // way a scene depends on the viewport or the zoom.
   const effectiveZoom = (): number => {
-    const z = ctx.getState().zoom;
-    return 'level' in z ? z.level : Math.max(ctx.getState().camera.zoom, 0.0001);
+    const zoom = state().zoom;
+    return 'level' in zoom ? zoom.level : Math.max(state().camera.zoom, 0.0001);
   };
 
   // Wrapped grid: the line width (world units) the columns must fit.
-  const wrapLineWidth = (): number => Math.max(1, (vp().width - 2 * pad()) / effectiveZoom());
+  const wrapLineWidth = (): number =>
+    Math.max(1, (viewport().width - 2 * padding()) / effectiveZoom());
 
   // pageFrame (screen px) → world units at the effective zoom.
-  const worldPageFrame = (): S.PageFrame => {
-    const m = ctx.getState().pageFrame;
-    if (!m.top && !m.right && !m.bottom && !m.left) return m;
-    const ez = effectiveZoom();
-    return { top: m.top / ez, right: m.right / ez, bottom: m.bottom / ez, left: m.left / ez };
+  const worldPageFrame = (): PageFrame => {
+    const frame = state().pageFrame;
+    if (!frame.top && !frame.right && !frame.bottom && !frame.left) return frame;
+    const zoom = effectiveZoom();
+    return {
+      top: frame.top / zoom,
+      right: frame.right / zoom,
+      bottom: frame.bottom / zoom,
+      left: frame.left / zoom,
+    };
   };
   const frameKey = (): string => {
-    const m = ctx.getState().pageFrame;
-    if (!m.top && !m.right && !m.bottom && !m.left) return '-';
-    const w = worldPageFrame();
-    return `${Math.round(w.top)},${Math.round(w.right)},${Math.round(w.bottom)},${Math.round(w.left)}`;
+    const frame = state().pageFrame;
+    if (!frame.top && !frame.right && !frame.bottom && !frame.left) return '-';
+    const world = worldPageFrame();
+    return `${Math.round(world.top)},${Math.round(world.right)},${Math.round(world.bottom)},${Math.round(world.left)}`;
   };
 
-  // gap → world units. A plain number IS world (the scene stays zoom-invariant —
-  // the rigid-canvas default); { px } converts at the effective zoom, exactly
-  // like pageFrame (UI-stable spacing for browser-style lenses).
+  // gap → world units. A plain number is world units (the scene stays
+  // zoom-invariant, the rigid-canvas default); `{ px }` converts at the
+  // effective zoom like pageFrame (UI-stable spacing for browser-style lenses).
   const worldGap = (): number => {
-    const g = ctx.getState().gap;
-    return typeof g === 'number' ? g : g.px ? g.px / effectiveZoom() : 0;
+    const gap = state().gap;
+    return typeof gap === 'number' ? gap : gap.px ? gap.px / effectiveZoom() : 0;
   };
   const gapKey = (): string => {
-    const g = ctx.getState().gap;
-    return typeof g === 'number' ? String(g) : `px:${Math.round(worldGap())}`;
+    const gap = state().gap;
+    return typeof gap === 'number' ? String(gap) : `px:${Math.round(worldGap())}`;
   };
 
-  const layoutFor = (groups: number[][]): S.Scene => {
-    const st = ctx.getState();
-    // Engine PageLayout (PDF document geometry) structurally satisfies stage-core's
-    // viewer-local PageGeom (`size` + `rotation`): intrinsic page size needs no
-    // transform, so it flows straight into the layout with no conversion.
+  const layoutFor = (groups: number[][]): Scene => {
+    const settings = state();
+    // Engine page layouts structurally satisfy stage-core's page geometry
+    // (`size` + `rotation`): the intrinsic page size flows straight in.
     //
-    // THE view-rotation injection point: each page's display rotation is its
-    // /Rotate + this lens's viewRotation, composed HERE — the one spot where
-    // the "TOTAL = document /Rotate + view rotation" of geometry's PageRotation
-    // doc is resolved. Everything downstream (displaySize w↔h swap, the page
-    // transform + CSS rotate, hit-testing, fit zoom, content overlays) reads the
-    // composed `PageBox.rotation` and needs no other change. `size` stays the
-    // page's own un-rotated points, so content space is view-rotation-invariant.
-    const raw = ctx.document()?.pages ?? [];
-    const vr = st.viewRotation;
+    // The view rotation is composed here, and only here: each page's display
+    // rotation is its /Rotate plus this lens's viewRotation. Everything
+    // downstream (the display-size swap, the page transform, hit-testing, fit
+    // zoom, overlays) reads the composed rotation. `size` stays the page's
+    // own un-rotated points, so content space is view-rotation-invariant.
+    const registryPages = ctx.document()?.pages ?? [];
+    const viewRotation = settings.viewRotation;
     const pages =
-      vr === 0 ? raw : raw.map((p) => ({ ...p, rotation: addRotations(p.rotation, vr) }));
+      viewRotation === 0
+        ? registryPages
+        : registryPages.map((page) => ({
+            ...page,
+            rotation: addRotations(page.rotation, viewRotation),
+          }));
     const pageFrame = worldPageFrame();
     const gap = worldGap();
-    const vupp = st.viewUnitsPerPoint;
-    if (st.layout === 'grid') {
-      return S.gridLayout(pages, groups, {
+    const viewUnitsPerPoint = settings.viewUnitsPerPoint;
+    if (settings.layout === 'grid') {
+      return gridLayout(pages, groups, {
         gap,
-        sizing: st.sizing,
-        direction: st.direction,
+        sizing: settings.sizing,
+        direction: settings.direction,
         pageFrame,
-        viewUnitsPerPoint: vupp,
-        columns: typeof st.columns === 'number' ? st.columns : undefined,
-        lineWidth: st.columns === 'auto' ? wrapLineWidth() : undefined,
+        viewUnitsPerPoint,
+        columns: typeof settings.columns === 'number' ? settings.columns : undefined,
+        lineWidth: settings.columns === 'auto' ? wrapLineWidth() : undefined,
       });
     }
-    return st.layout === 'horizontal'
-      ? S.linearLayout(pages, groups, {
-          axis: 'x',
-          gap,
-          sizing: st.sizing,
-          direction: st.direction,
-          pageFrame,
-          viewUnitsPerPoint: vupp,
-        })
-      : S.linearLayout(pages, groups, {
-          axis: 'y',
-          gap,
-          sizing: st.sizing,
-          direction: st.direction,
-          pageFrame,
-          viewUnitsPerPoint: vupp,
-        });
+    return linearLayout(pages, groups, {
+      axis: settings.layout === 'horizontal' ? 'x' : 'y',
+      gap,
+      sizing: settings.sizing,
+      direction: settings.direction,
+      pageFrame,
+      viewUnitsPerPoint,
+    });
   };
 
-  // Scene-cache key fragment for the column policy ('auto' quantizes the line width
-  // so sub-pixel resizes don't churn the cache).
+  // The column policy's part of the scene key; 'auto' quantizes the line
+  // width so sub-pixel resizes do not rebuild the scene.
   const columnsKey = (): string => {
-    const st = ctx.getState();
-    if (st.layout !== 'grid') return '-';
-    return st.columns === 'auto' ? `auto:${Math.round(wrapLineWidth())}` : String(st.columns);
+    const settings = state();
+    if (settings.layout !== 'grid') return '-';
+    return settings.columns === 'auto'
+      ? `auto:${Math.round(wrapLineWidth())}`
+      : String(settings.columns);
   };
 
-  // The scene's settings signature — DERIVED from the registry: every 'scene'
-  // setting contributes automatically, so a new layout-affecting setting only
-  // needs its SETTINGS_EFFECT row — it can't be forgotten here, which is what
-  // makes stale-scene bugs unrepresentable. The default keys by VALUE (objects
-  // via JSON); the custom fns aren't for correctness, they QUANTIZE px-derived
-  // values so sub-pixel zoom/resize churn doesn't rebuild the scene.
-  const SCENE_KEY_FNS: Partial<Record<keyof StageSettings, () => string>> = {
+  // The scene's settings signature, derived from the settings registry: every
+  // 'scene' setting contributes automatically, so a new layout-affecting
+  // setting only needs its SETTINGS_EFFECT row and a stale scene cannot be
+  // forgotten here. Values key by value (objects via JSON); the custom
+  // functions quantize px-derived values so sub-pixel zoom and resize churn
+  // does not rebuild the scene.
+  const SCENE_KEY_FUNCTIONS: Partial<Record<keyof StageSettings, () => string>> = {
     columns: columnsKey,
     gap: gapKey,
     pageFrame: frameKey,
   };
-  const SCENE_KEYS = SETTING_KEYS.filter((k) => SETTINGS_EFFECT[k] === 'scene');
+  const SCENE_KEYS = SETTING_KEYS.filter((key) => SETTINGS_EFFECT[key] === 'scene');
   const settingsKey = (): string =>
-    SCENE_KEYS.map((k) => {
-      const fn = SCENE_KEY_FNS[k];
-      if (fn) return fn();
-      const v = ctx.getState()[k];
-      return typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v);
+    SCENE_KEYS.map((key) => {
+      const keyFunction = SCENE_KEY_FUNCTIONS[key];
+      if (keyFunction) return keyFunction();
+      const value = state()[key];
+      return typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value);
     }).join('|');
 
-  // Scene cache. Continuous = the whole document. Paged = a ONE-ITEM SLICE at the
-  // origin containing only the cursor's item — so isolation is STRUCTURAL (no other
-  // page exists to leak), unbounded pan is free, and coordinates stay local.
-  let sceneCache: { key: string; scene: S.Scene } | null = null;
-  // Registry signature: page count + the kernel's monotonic `revision`. The
-  // revision bumps on every page-mutation event (rotate/move/delete), so a
-  // change that leaves pageCount the same — a rotation — still re-keys the
-  // scene. Without it a rotated page would render in its stale box.
-  const docKey = (): string => {
-    const doc = ctx.document();
-    return doc ? `${doc.pageCount}.${doc.revision}` : '0.0';
+  // The scene cache. Continuous flow lays out the whole document. Paged flow
+  // is a one-item slice at the origin holding only the cursor's item, so
+  // isolation is structural (no other page exists to leak into view),
+  // unbounded pan is free, and coordinates stay local.
+  let sceneCache: { key: string; scene: Scene } | null = null;
+  // The registry signature: page count plus the kernel's monotonic
+  // `revision`. The revision changes on every page mutation (rotate, move,
+  // delete), so a change that keeps the page count (a rotation) still re-keys
+  // the scene instead of rendering the page in its stale box.
+  const documentKey = (): string => {
+    const document = ctx.document();
+    return document ? `${document.pageCount}.${document.revision}` : '0.0';
   };
-  const buildScene = (): S.Scene => {
-    const st = ctx.getState();
-    const { grouping: g } = grouping();
-    if (st.flow === 'paged') {
-      const idx = g.length ? Math.min(itemIndexOfPage(st.cursor), g.length - 1) : 0;
-      const key = `paged|${docKey()}|${settingsKey()}|${idx}`;
+  const buildScene = (): Scene => {
+    const { grouping: groups } = grouping();
+    if (state().flow === 'paged') {
+      const index = groups.length
+        ? Math.min(itemIndexOfPage(state().cursor), groups.length - 1)
+        : 0;
+      const key = `paged|${documentKey()}|${settingsKey()}|${index}`;
       if (sceneCache && sceneCache.key === key) return sceneCache.scene;
-      const scene = layoutFor(g.length ? [g[idx]] : []);
+      const scene = layoutFor(groups.length ? [groups[index]] : []);
       sceneCache = { key, scene };
       return scene;
     }
-    const key = `cont|${docKey()}|${settingsKey()}`;
+    const key = `continuous|${documentKey()}|${settingsKey()}`;
     if (sceneCache && sceneCache.key === key) return sceneCache.scene;
-    const scene = layoutFor(g);
+    const scene = layoutFor(groups);
     sceneCache = { key, scene };
     return scene;
   };
-  /** Drop the memoized scene (a 'scene'/'reflow' setting changed or a view was restored). */
+  /** Drop the memoized scene (a 'scene' or 'reflow' setting changed, or a view was restored). */
   const invalidate = (): void => {
     sceneCache = null;
   };
-  /** The current scene's cache key — part of the visible-pages signature. */
+  /** The current scene's cache key, part of the visible-pages signature. */
   const cacheKey = (): string => sceneCache!.key;
 
-  // ── geometry helpers ──────────────────────────────────────────────────────────
-  const sceneRect = (): S.Rect => {
+  // ── geometry helpers ──
+  const sceneRect = (): StageRect => {
     const { width, height } = buildScene().size;
     return { x: 0, y: 0, width, height };
   };
-  const itemRect = (it: S.SceneItem): S.Rect => ({
-    x: it.x,
-    y: it.y,
-    width: it.width,
-    height: it.height,
+  const itemRect = (item: SceneItem): StageRect => ({
+    x: item.x,
+    y: item.y,
+    width: item.width,
+    height: item.height,
   });
-  const pageRectOf = (it: S.SceneItem, pageIndex: number): S.Rect => {
-    const box = it.pages.find((p) => p.pageIndex === pageIndex) ?? it.pages[0];
+  const pageRectOf = (item: SceneItem, pageIndex: number): StageRect => {
+    const box = item.pages.find((page) => page.pageIndex === pageIndex) ?? item.pages[0];
     return { x: box.x, y: box.y, width: box.width, height: box.height };
   };
-  /** The item shown for the cursor: the slice's only item (paged) / the full-scene item. */
-  const cursorItem = (): S.SceneItem => {
-    const sc = buildScene();
-    return paged() ? sc.items[0] : sc.items[itemIndexOfPage(ctx.getState().cursor)];
+  /** The item shown for the cursor: the slice's only item (paged) or the full-scene item. */
+  const cursorItem = (): SceneItem => {
+    const scene = buildScene();
+    return paged() ? scene.items[0] : scene.items[itemIndexOfPage(state().cursor)];
   };
 
   /**
-   * CONTENT-space rect on a page → WORLD rect: the same quarter-turn matrix
-   * `pageRectToScreen` uses, minus the camera — so a positioned reveal and
-   * the rendered overlay can never disagree about where a rect is.
+   * A content-space rect on a page → a world rect: the same quarter-turn
+   * matrix `pageRectToViewport` uses, minus the camera, so a positioned
+   * reveal and the rendered overlay never disagree about where a rect is.
    */
-  const worldRectForContent = (it: S.SceneItem, pageIndex: number, rect: Rect): S.Rect => {
-    const box = it.pages.find((p) => p.pageIndex === pageIndex) ?? it.pages[0];
+  const worldRectForContent = (item: SceneItem, pageIndex: number, rect: Rect): StageRect => {
+    const box = item.pages.find((page) => page.pageIndex === pageIndex) ?? item.pages[0];
     const content = displaySize({ width: box.width, height: box.height }, box.rotation);
-    const m = rotateScaleMatrix(box.contentScale, content.width, content.height, box.rotation);
-    const wr = applyRect(m, rect);
-    return { x: box.x + wr.x, y: box.y + wr.y, width: wr.width, height: wr.height };
+    const matrix = rotateScaleMatrix(box.contentScale, content.width, content.height, box.rotation);
+    const world = applyRect(matrix, rect);
+    return { x: box.x + world.x, y: box.y + world.y, width: world.width, height: world.height };
   };
 
-  // THE predicate. "Does this rect fit the padded viewport at this zoom?" decides
-  // the navigation step size and the arrival subject — never alignment.
-  const fits = (rect: S.Rect, zoom: number): boolean => {
-    const v = vp();
-    const p = pad();
-    const eps = 0.5;
+  // Does this rect fit the padded viewport at this zoom? It decides the
+  // navigation step size and the arrival subject, never the alignment.
+  const fits = (rect: StageRect, zoom: number): boolean => {
+    const size = viewport();
+    const inset = padding();
+    const tolerance = 0.5;
     return (
-      rect.width * zoom <= v.width - 2 * p + eps && rect.height * zoom <= v.height - 2 * p + eps
+      rect.width * zoom <= size.width - 2 * inset + tolerance &&
+      rect.height * zoom <= size.height - 2 * inset + tolerance
     );
   };
-  // An alignment policy → a concrete viewport point (a fraction per axis:
-  // start=0, center=½, end=1; named x stops are LOGICAL under RTL). Both
-  // zoomAlign (the focal point of pointer-less zooms) and anchorAlign (the
-  // reframe reference point) resolve through this. The fraction interpolates
-  // the PADDED range: 'start' is the first visible content line (just inside
-  // the gutter), not the absolute corner — an arrival puts the page edge
-  // exactly there, so the reference pins to the page, never to the gap above.
-  const alignFraction = (a: S.AlignValue): number =>
-    a === 'start' ? 0 : a === 'center' ? 0.5 : a === 'end' ? 1 : Math.min(1, Math.max(0, a));
-  const alignPoint = (al: S.AlignmentValue, v: S.Size): S.Point => {
-    const rtl = ctx.getState().direction === 'rtl';
-    const ax = rtl && al.x === 'start' ? 'end' : rtl && al.x === 'end' ? 'start' : al.x;
-    const p = pad();
+  // An alignment policy → a concrete viewport point: a fraction per axis
+  // (start = 0, center = ½, end = 1; named x stops are logical under RTL).
+  // zoomAlign and anchorAlign both resolve through this. The fraction spans
+  // the padded range: 'start' is the first visible content line just inside
+  // the gutter, where an arrival puts the page edge, so the reference pins
+  // to the page and never to the gap above it.
+  const alignFraction = (value: AlignValue): number =>
+    value === 'start'
+      ? 0
+      : value === 'center'
+        ? 0.5
+        : value === 'end'
+          ? 1
+          : Math.min(1, Math.max(0, value));
+  const alignPoint = (alignment: AlignmentValue, size: Size): Point => {
+    const rtl = state().direction === 'rtl';
+    const alignX =
+      rtl && alignment.x === 'start' ? 'end' : rtl && alignment.x === 'end' ? 'start' : alignment.x;
+    const inset = padding();
     return {
-      x: p + (v.width - 2 * p) * alignFraction(ax),
-      y: p + (v.height - 2 * p) * alignFraction(al.y),
+      x: inset + (size.width - 2 * inset) * alignFraction(alignX),
+      y: inset + (size.height - 2 * inset) * alignFraction(alignment.y),
     };
   };
-  const anchorPoint = (): S.Point => alignPoint(ctx.getState().anchorAlign, vp());
+  const anchorPoint = (): Point => alignPoint(state().anchorAlign, viewport());
 
-  /** Fit-box for resolving the zoom intent: whole scene (fit-all), the current item
-   *  (paged — per-page fit), or the document max (continuous — doc-stable zoom). */
-  const fitBox = (item: S.SceneItem): S.Size => {
+  /** The box the zoom intent fits: the whole scene (fit-all), the current
+   *  item (paged: per-page fit), or the document maximum (continuous: a
+   *  document-stable zoom). */
+  const fitBox = (item: SceneItem): Size => {
     if (isFitAll()) return buildScene().size;
     return paged() ? { width: item.width, height: item.height } : buildScene().maxItemSize;
   };
-  /** Clamp rect for a camera write targeting this item (scene-wide in continuous). */
-  const boundsFor = (it: S.SceneItem): S.Rect => (paged() ? itemRect(it) : sceneRect());
-  /** Clamp rect for a "stay" write (pan/zoom): the slice item (paged) / the scene. */
-  const stayBounds = (): S.Rect => (paged() ? itemRect(buildScene().items[0]) : sceneRect());
+  /** The clamp rect for a camera write targeting this item (the scene in continuous flow). */
+  const boundsFor = (item: SceneItem): StageRect => (paged() ? itemRect(item) : sceneRect());
+  /** The clamp rect for a write that stays put (pan, zoom): the slice item (paged) or the scene. */
+  const stayBounds = (): StageRect => (paged() ? itemRect(buildScene().items[0]) : sceneRect());
 
-  const constraint = (): S.CameraConstraint => ({
-    bounded: ctx.getState().bounded,
-    padding: pad(),
-    fitAlign: ctx.getState().fitAlign,
-    direction: ctx.getState().direction,
+  const constraint = (): CameraConstraint => ({
+    bounded: state().bounded,
+    padding: padding(),
+    fitAlign: state().fitAlign,
+    direction: state().direction,
   });
 
-  const anchorAt = (at: S.Point): S.Anchor => {
-    const sc = buildScene();
-    return sc.itemCount
-      ? S.anchorFromCamera(cam(), sc, vp(), at)
-      : { pageIndex: ctx.getState().cursor, fx: 0.5, fy: 0 };
+  const anchorAt = (at: Point): Anchor => {
+    const scene = buildScene();
+    return scene.itemCount
+      ? anchorFromCamera(camera(), scene, viewport(), at)
+      : { pageIndex: state().cursor, fx: 0.5, fy: 0 };
   };
-  const currentAnchor = (): S.Anchor => anchorAt(anchorPoint());
+  const currentAnchor = (): Anchor => anchorAt(anchorPoint());
 
-  const indexOfPage = (page: PageRef): number =>
-    ctx.document()?.pages.findIndex((p) => p.ref.pageObjectNumber === page.pageObjectNumber) ?? -1;
+  const indexOfPage = (page: PageRef): number => ctx.getPage(page)?.index ?? -1;
 
   return {
-    cam,
-    vp,
+    camera,
+    viewport,
     dpr,
-    pad,
+    padding,
     paged,
     isFitAll,
     grouping,

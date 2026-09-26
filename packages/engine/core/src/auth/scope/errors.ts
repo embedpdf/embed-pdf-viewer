@@ -1,36 +1,60 @@
+import { EngineError } from '../../errors/EngineError';
+import { EngineErrorCode } from '../../errors/EngineErrorCode';
+import type { AnnotationRef } from '../../identity/AnnotationRef';
+
 /**
  * Thrown by {@link parseScope} / {@link validateScopeArray} when a scope
  * string does not match any known grammar (capability, collab, virtual,
- * or wildcard).
+ * or wildcard). An `EngineError` with code `InvalidArg`.
  *
  * Carries the offending scope verbatim so route/JWT-layer error
  * handlers can echo it to the customer.
  */
-export class InvalidScope extends Error {
+export class InvalidScope extends EngineError {
+  override readonly name: string = 'InvalidScope';
+
   constructor(
     public readonly scope: string,
     reason: string,
   ) {
-    super(`invalid scope "${scope}": ${reason}`);
-    this.name = 'InvalidScope';
+    super(EngineErrorCode.InvalidArg, `invalid scope "${scope}": ${reason}`, {
+      details: { scope, reason },
+    });
   }
 }
 
 /**
  * Thrown by route guards and engine-local enforcement when a capability
- * or collab action is denied for the current request/handle.
+ * or collab action is denied for the current request/handle. An
+ * `EngineError` with code `Forbidden`, on both engines.
  *
- * `required` names what the caller needed (e.g., "doc.render" or
- * "annotations:update"). `context` is an optional label such as "local"
- * or "/v1/docs/.../pages/2/render".
+ * `required` (also `details.required`) names what the caller needed (e.g.
+ * "doc.render" or "annotations:update"). When any of several would have
+ * done, `anyOf` (also `details.anyOf`) lists them and `required` is the
+ * first. `context` is an optional label such as "engine-local" or a route.
  */
-export class PermissionDenied extends Error {
+export class PermissionDenied extends EngineError {
+  override readonly name: string = 'PermissionDenied';
+
   constructor(
     public readonly required: string,
     public readonly context?: string,
+    public readonly anyOf?: readonly string[],
+    /** The annotations it was refused for, when one write covers several (a thread's delete). */
+    public readonly refs?: readonly AnnotationRef[],
   ) {
-    super(`permission denied${context ? ` (${context})` : ''}: ${required}`);
-    this.name = 'PermissionDenied';
+    super(
+      EngineErrorCode.Forbidden,
+      `permission denied${context ? ` (${context})` : ''}: ${anyOf ? `one of ${anyOf.join(', ')}` : required}${refs ? ` for ${refs.length} annotation${refs.length === 1 ? '' : 's'}` : ''}`,
+      {
+        details: {
+          required,
+          ...(context === undefined ? {} : { context }),
+          ...(anyOf === undefined ? {} : { anyOf: [...anyOf] }),
+          ...(refs === undefined ? {} : { refs: [...refs] }),
+        },
+      },
+    );
   }
 }
 
@@ -39,11 +63,18 @@ export class PermissionDenied extends Error {
  * collab filters (`:self`, `:group=...`) but the identity claims needed
  * to resolve them are missing. Fails loudly at open so the configuration
  * mistake is visible immediately instead of producing silent denies at
- * every annotation mutation.
+ * every annotation mutation. An `EngineError` with code `InvalidArg`.
  */
-export class MissingIdentity extends Error {
-  constructor(scope: string) {
-    super(`scope "${scope}" requires identity claims (user_id and/or groups)`);
-    this.name = 'MissingIdentity';
+export class MissingIdentity extends EngineError {
+  override readonly name: string = 'MissingIdentity';
+
+  constructor(public readonly scope: string) {
+    super(
+      EngineErrorCode.InvalidArg,
+      `scope "${scope}" requires an identity (userId and/or groups)`,
+      {
+        details: { scope },
+      },
+    );
   }
 }

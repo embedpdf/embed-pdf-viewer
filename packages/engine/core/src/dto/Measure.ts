@@ -28,7 +28,7 @@ export interface PdfNumberFormat {
 
 /** Rectilinear /Measure. Empty arrays faithfully represent missing formats on import. */
 export interface PdfMeasure {
-  subtype: 'RL';
+  subtype: 'rectilinear';
   ratio?: string;
   /** X-axis conversion from PDF user-space units. */
   x: PdfNumberFormat[];
@@ -47,21 +47,27 @@ export interface PdfMeasure {
 
 /** Read-only presence marker. Foreign dictionaries are preserved in the PDF. */
 export interface PdfForeignMeasure {
-  subtype: 'GEO' | 'unknown';
+  subtype: 'geospatial' | 'unknown';
 }
 export type PdfMeasurement = PdfMeasure | PdfForeignMeasure;
+/** A page's `/VP` entry. `name` and `measure` are `null` when the PDF has none. */
 export interface PdfViewport {
   bbox: PdfRect;
-  name?: string;
-  measure?: PdfMeasurement;
+  name: string | null;
+  measure: PdfMeasurement | null;
 }
 export interface PageMeasurementViewport extends PdfViewport {
   owned: boolean;
 }
 
-export type LineIntent = 'LineArrow' | 'LineDimension';
-export type PolygonIntent = 'PolygonCloud' | 'PolygonDimension';
-export type PolylineIntent = 'PolyLineDimension';
+/** What `page.measure.listViewports()` returns: the viewports in drawing order. */
+export interface PageMeasurementViewportList {
+  viewports: PageMeasurementViewport[];
+}
+
+export type LineIntent = 'line-arrow' | 'line-dimension';
+export type PolygonIntent = 'polygon-cloud' | 'polygon-dimension';
+export type PolylineIntent = 'polyline-dimension';
 export interface LineDimensionCaption {
   enabled: boolean;
   position?: 'inline' | 'top';

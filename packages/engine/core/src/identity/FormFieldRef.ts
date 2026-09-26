@@ -18,6 +18,11 @@ export type FormFieldRef =
   | { kind: 'objectNumber'; fieldObjectNumber: number }
   | { kind: 'fqn'; name: string };
 
+/** A ref to a field by its full name (`'billing.name'`), for a name you already know. */
+export function toFieldRef(name: string): FormFieldRef {
+  return { kind: 'fqn', name };
+}
+
 /**
  * URL-safe encoding of a `FormFieldRef`, used by the cloud HTTP surface as
  * the `:fieldKey` route parameter. Decoded by the server back into a
@@ -68,7 +73,7 @@ export function decodeFieldRefKey(key: string): FormFieldRef | null {
 }
 
 /**
- * A widget annotation of a field, as the FIELD TREE sees it. The forms reader
+ * A widget annotation of a field, as the field tree sees it. The forms reader
  * learns widgets from the field's `/Kids`, not from a page's `/Annots`, so it
  * must be able to report widgets the annotation subsystem cannot reach.
  *
@@ -94,7 +99,7 @@ export interface FormWidget {
   page: PageRef | null;
 }
 
-/** The ONE place a widget record is built: computes `ref` from the raw facts. */
+/** The one place a widget record is built: computes `ref` from the raw facts. */
 export function formWidget(annotObjectNumber: number, page: PageRef | null): FormWidget {
   return {
     ref: annotObjectNumber > 0 && page ? { kind: 'objectNumber', page, annotObjectNumber } : null,

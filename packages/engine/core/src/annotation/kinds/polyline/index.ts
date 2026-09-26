@@ -1,14 +1,17 @@
-import type { PolylineDraft } from './draft';
-import type { PolylineAnnotationDTO } from './dto';
-import type { PolylinePatch } from './patch';
-import { PolylineDTOSchema, PolylineDraftSchema, PolylinePatchSchema } from './schema';
+import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
+import { PolylineDeclaration } from './declaration';
 
-export type { PolylineAnnotationDTO } from './dto';
-export type { PolylineDraft } from './draft';
-export type { PolylinePatch } from './patch';
-export { PolylineDTOSchema, PolylineDraftSchema, PolylinePatchSchema } from './schema';
+export { PolylineDeclaration } from './declaration';
+
+export type PolylineAnnotationDTO = ReadOf<typeof PolylineDeclaration>;
+export type PolylineDraft = CreateOf<typeof PolylineDeclaration>;
+export type PolylinePatch = UpdateOf<typeof PolylineDeclaration>;
+
+export const PolylineDTOSchema = PolylineDeclaration.readSchema;
+export const PolylineDraftSchema = PolylineDeclaration.createSchema;
+export const PolylinePatchSchema = PolylineDeclaration.updateSchema;
 
 export const PolylineKind: AnnotationKindModule<
   'polyline',
@@ -21,4 +24,5 @@ export const PolylineKind: AnnotationKindModule<
   dtoSchema: PolylineDTOSchema,
   draftSchema: PolylineDraftSchema,
   patchSchema: PolylinePatchSchema,
+  readBackWrites: PolylineDeclaration.readBackWrites,
 };

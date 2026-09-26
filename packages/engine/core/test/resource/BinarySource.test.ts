@@ -5,9 +5,9 @@ import { resolveBinarySource } from '../../src/resource/BinarySource';
  * Ownership contract: a resolved WireResource is a private copy of the
  * caller's bytes. The local engine puts `bytes` on a postMessage transfer
  * list, which detaches the buffer; a BinarySource argument is borrowed and
- * must survive that. A full-span Uint8Array used to be returned by
- * reference (the "no copy when the view spans its buffer" optimization),
- * which made a stamp library's bytes single-use.
+ * must survive that. Returning a full-span Uint8Array by reference (skipping
+ * the copy when the view spans its buffer) would make a stamp library's
+ * bytes single-use.
  */
 describe('resolveBinarySource — resolved bytes are always an owned copy', () => {
   const sample = () => new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4, 5, 6, 7, 8]);

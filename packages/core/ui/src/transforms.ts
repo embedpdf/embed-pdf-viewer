@@ -5,7 +5,7 @@
  * order sensitivity beyond function composition. Anything they can't express
  * is a sign the caller should write the schema value instead.
  *
- * Addressing is by BAR ID across all three bar collections (bars, modeBars,
+ * Addressing is by bar ID across all three bar collections (bars, modeBars,
  * strips). Mode bars may also be addressed by their surface key
  * ('mode:annotate') since that is what appears in `chrome.modeBars`.
  */
@@ -24,7 +24,7 @@ export interface AddItemSpec {
   readonly bar: string;
   readonly section: keyof BarSections;
   /** Target group id. Unknown in the bar → a new group is created at the end
-   *  of `section`; known but in a DIFFERENT section → error (group ids are
+   *  of `section`; known but in a different section → error (group ids are
    *  bar-unique, so that is a contradiction, not a request). */
   readonly group: string;
   readonly item: BarChild;
@@ -67,29 +67,29 @@ export function addItem(schema: ChromeSchema, spec: AddItemSpec): ChromeSchema {
     throw new Error(`[ui-core] addItem: no bar "${spec.bar}" in bars/modeBars/strips`);
   if (hits.length > 1)
     throw new Error(
-      `[ui-core] addItem: bar id "${spec.bar}" is ambiguous (${hits.map(([c]) => c).join(', ')})`,
+      `[ui-core] addItem: bar id "${spec.bar}" is ambiguous (${hits.map(([collection]) => collection).join(', ')})`,
     );
   const [coll, key] = hits[0];
   const bar = schema[coll]![key];
 
   for (const name of SECTION_NAMES) {
     if (name === spec.section) continue;
-    if (bar.sections[name]?.some((g) => g.id === spec.group))
+    if (bar.sections[name]?.some((group) => group.id === spec.group))
       throw new Error(
         `[ui-core] addItem: group "${spec.group}" lives in section "${name}", not "${spec.section}"`,
       );
   }
 
   const groups = bar.sections[spec.section] ?? [];
-  const idx = groups.findIndex((g) => g.id === spec.group);
+  const index = groups.findIndex((group) => group.id === spec.group);
   const nextGroups =
-    idx === -1
+    index === -1
       ? [...groups, makeGroup(spec.group, [spec.item])]
-      : groups.map((g, i) => {
-          if (i !== idx) return g;
-          const items = [...g.items];
+      : groups.map((group, i) => {
+          if (i !== index) return group;
+          const items = [...group.items];
           items.splice(spec.at ?? items.length, 0, spec.item);
-          return { ...g, items };
+          return { ...group, items };
         });
 
   return withBar(schema, coll, key, {
@@ -111,7 +111,9 @@ export function removeItems(schema: ChromeSchema, ids: readonly string[]): Chrom
   };
 
   const filterGroups = (groups: readonly BarGroup[] | undefined) =>
-    groups?.map((g) => ({ ...g, items: g.items.filter(keep) })).filter((g) => g.items.length > 0);
+    groups
+      ?.map((group) => ({ ...group, items: group.items.filter(keep) }))
+      .filter((group) => group.items.length > 0);
 
   const filterBarSchema = (bar: BarSchema): BarSchema => ({
     ...bar,
@@ -125,7 +127,9 @@ export function removeItems(schema: ChromeSchema, ids: readonly string[]): Chrom
 
   const filterColl = <T extends Readonly<Record<string, BarSchema>> | undefined>(coll: T): T =>
     coll &&
-    (Object.fromEntries(Object.entries(coll).map(([k, b]) => [k, filterBarSchema(b)])) as T);
+    (Object.fromEntries(
+      Object.entries(coll).map(([key, bar]) => [key, filterBarSchema(bar)]),
+    ) as T);
 
   return {
     ...schema,
@@ -135,13 +139,16 @@ export function removeItems(schema: ChromeSchema, ids: readonly string[]): Chrom
     menus:
       schema.menus &&
       Object.fromEntries(
-        Object.entries(schema.menus).map(([k, menu]) => [
-          k,
+        Object.entries(schema.menus).map(([key, menu]) => [
+          key,
           {
             ...menu,
             sections: menu.sections
-              .map((s) => ({ ...s, items: s.items.filter((c) => !gone.has(c)) }))
-              .filter((s) => s.items.length > 0),
+              .map((section) => ({
+                ...section,
+                items: section.items.filter((command) => !gone.has(command)),
+              }))
+              .filter((section) => section.items.length > 0),
           },
         ]),
       ),
@@ -161,13 +168,15 @@ export function replaceItem(schema: ChromeSchema, id: string, item: BarChild): C
     sections: Object.fromEntries(
       SECTION_NAMES.flatMap((name) => {
         const groups = bar.sections[name];
-        return groups ? [[name, groups.map((g) => ({ ...g, items: g.items.map(swap) }))]] : [];
+        return groups
+          ? [[name, groups.map((group) => ({ ...group, items: group.items.map(swap) }))]]
+          : [];
       }),
     ),
   });
 
   const mapColl = <T extends Readonly<Record<string, BarSchema>> | undefined>(coll: T): T =>
-    coll && (Object.fromEntries(Object.entries(coll).map(([k, b]) => [k, mapBar(b)])) as T);
+    coll && (Object.fromEntries(Object.entries(coll).map(([key, bar]) => [key, mapBar(bar)])) as T);
 
   return {
     ...schema,
@@ -179,13 +188,15 @@ export function replaceItem(schema: ChromeSchema, id: string, item: BarChild): C
         ? schema.menus
         : schema.menus &&
           Object.fromEntries(
-            Object.entries(schema.menus).map(([k, menu]) => [
-              k,
+            Object.entries(schema.menus).map(([key, menu]) => [
+              key,
               {
                 ...menu,
-                sections: menu.sections.map((s) => ({
-                  ...s,
-                  items: s.items.map((c) => (c === id ? replacementCommand : c)),
+                sections: menu.sections.map((section) => ({
+                  ...section,
+                  items: section.items.map((command) =>
+                    command === id ? replacementCommand : command,
+                  ),
                 })),
               },
             ]),

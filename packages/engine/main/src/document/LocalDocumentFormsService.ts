@@ -2,6 +2,7 @@ import {
   AbortablePromise,
   EngineError,
   EngineErrorCode,
+  deletedFieldOf,
   wirePack,
   type DocumentFormsService,
   type FormDataExport,
@@ -15,7 +16,6 @@ import {
   type FormFieldUpdateResult,
   type SignatureAppearanceInput,
   type FormWidgetLinkResult,
-  type FormWidget,
   type AnnotationRef,
   type FormFieldValue,
   type FormImportResult,
@@ -99,7 +99,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
       { priority: Priority.HIGH },
     );
     return this.await(submission, 'forms.setValue', (payload) => {
-      this.publisher.publishLocal({ type: 'form.valueChanged', ...payload.result });
+      this.publisher.publishLocal({ type: 'forms.valueSet', ...payload.result });
       return payload.result;
     });
   }
@@ -115,7 +115,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
       { priority: Priority.HIGH },
     );
     return this.await(submission, 'forms.reset', (payload) => {
-      this.publisher.publishLocal({ type: 'form.valueChanged', ...payload.result });
+      this.publisher.publishLocal({ type: 'forms.valueSet', ...payload.result });
       return payload.result;
     });
   }
@@ -132,14 +132,14 @@ export class LocalDocumentFormsService implements DocumentFormsService {
       { priority: Priority.HIGH },
     );
     return this.await(submission, 'forms.applyEffects', (payload) => {
-      if (payload.result.meta !== null) {
-        this.publisher.publishLocal({ type: 'form.effectsApplied', ...payload.result });
+      if (payload.wrote) {
+        this.publisher.publishLocal({ type: 'forms.effectsApplied', ...payload.result });
       }
       return payload.result;
     });
   }
 
-  exportData(format: FormDataFormat = 'xfdf'): AbortablePromise<FormDataExport> {
+  export(format: FormDataFormat = 'xfdf'): AbortablePromise<FormDataExport> {
     const rejected = this.gate('doc.forms.read');
     if (rejected) return rejected;
     const docId = this.docId;
@@ -155,7 +155,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     }));
   }
 
-  importData(
+  import(
     data: Uint8Array | ArrayBuffer,
     format?: FormDataFormat,
   ): AbortablePromise<FormImportResult> {
@@ -174,12 +174,12 @@ export class LocalDocumentFormsService implements DocumentFormsService {
       { priority: Priority.HIGH },
     );
     return this.await(submission, 'forms.import', (payload) => {
-      this.publisher.publishLocal({ type: 'form.imported', ...payload.result });
+      this.publisher.publishLocal({ type: 'forms.imported', ...payload.result });
       return payload.result;
     });
   }
 
-  createField(draft: FormFieldDraft): AbortablePromise<FormFieldCreateResult> {
+  create(draft: FormFieldDraft): AbortablePromise<FormFieldCreateResult> {
     const rejected = this.gate('doc.forms.modify');
     if (rejected) return rejected;
     const docId = this.docId;
@@ -190,7 +190,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
       { priority: Priority.HIGH },
     );
     return this.await(submission, 'forms.createField', (payload) => {
-      this.publisher.publishLocal({ type: 'form.fieldCreated', ...payload.result });
+      this.publisher.publishLocal({ type: 'forms.created', ...payload.result });
       return payload.result;
     });
   }
@@ -214,12 +214,12 @@ export class LocalDocumentFormsService implements DocumentFormsService {
       { priority: Priority.HIGH },
     );
     return this.await(submission, 'forms.setSignatureAppearance', (payload) => {
-      this.publisher.publishLocal({ type: 'form.fieldUpdated', ...payload.result });
+      this.publisher.publishLocal({ type: 'forms.updated', ...payload.result });
       return payload.result;
     });
   }
 
-  updateField(ref: FormFieldRef, patch: FormFieldPatch): AbortablePromise<FormFieldUpdateResult> {
+  update(ref: FormFieldRef, patch: FormFieldPatch): AbortablePromise<FormFieldUpdateResult> {
     const rejected = this.gate('doc.forms.modify');
     if (rejected) return rejected;
     const docId = this.docId;
@@ -231,12 +231,12 @@ export class LocalDocumentFormsService implements DocumentFormsService {
       { priority: Priority.HIGH },
     );
     return this.await(submission, 'forms.updateField', (payload) => {
-      this.publisher.publishLocal({ type: 'form.fieldUpdated', ...payload.result });
+      this.publisher.publishLocal({ type: 'forms.updated', ...payload.result });
       return payload.result;
     });
   }
 
-  deleteField(ref: FormFieldRef): AbortablePromise<FormFieldDeleteResult> {
+  delete(ref: FormFieldRef): AbortablePromise<FormFieldDeleteResult> {
     const rejected = this.gate('doc.forms.modify');
     if (rejected) return rejected;
     const docId = this.docId;
@@ -247,12 +247,16 @@ export class LocalDocumentFormsService implements DocumentFormsService {
       { priority: Priority.HIGH },
     );
     return this.await(submission, 'forms.deleteField', (payload) => {
-      this.publisher.publishLocal({ type: 'form.fieldDeleted', ...payload.result });
+      this.publisher.publishLocal({
+        type: 'forms.deleted',
+        deleted: deletedFieldOf(payload.result),
+        ...payload.result,
+      });
       return payload.result;
     });
   }
 
-  attachWidget(
+  addWidget(
     ref: FormFieldRef,
     widget: AnnotationRef,
     options?: { onState?: string },
@@ -276,12 +280,12 @@ export class LocalDocumentFormsService implements DocumentFormsService {
       { priority: Priority.HIGH },
     );
     return this.await(submission, 'forms.attachWidget', (payload) => {
-      this.publisher.publishLocal({ type: 'form.widgetAttached', ...payload.result });
+      this.publisher.publishLocal({ type: 'forms.widgetAdded', ...payload.result });
       return payload.result;
     });
   }
 
-  detachWidget(ref: FormFieldRef, widget: AnnotationRef): AbortablePromise<FormWidgetLinkResult> {
+  removeWidget(ref: FormFieldRef, widget: AnnotationRef): AbortablePromise<FormWidgetLinkResult> {
     const rejected = this.gate('doc.forms.modify');
     if (rejected) return rejected;
     const docId = this.docId;
@@ -293,7 +297,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
       { priority: Priority.HIGH },
     );
     return this.await(submission, 'forms.detachWidget', (payload) => {
-      this.publisher.publishLocal({ type: 'form.widgetDetached', ...payload.result });
+      this.publisher.publishLocal({ type: 'forms.widgetRemoved', ...payload.result });
       return payload.result;
     });
   }
@@ -311,7 +315,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
       { priority: Priority.HIGH },
     );
     return this.await(submission, 'forms.repair', (payload) => {
-      this.publisher.publishLocal({ type: 'form.repaired', ...payload.result });
+      this.publisher.publishLocal({ type: 'forms.repaired', ...payload.result });
       return payload.result;
     });
   }

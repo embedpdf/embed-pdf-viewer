@@ -1,6 +1,10 @@
-import { caps, checkCapability, checkCollab, type PdfBits } from '@embedpdf/engine-core';
-
-import type { ShareIdentity } from '../api/types';
+import {
+  caps,
+  checkCapability,
+  checkCollab,
+  type Identity,
+  type PdfBits,
+} from '@embedpdf/engine-core';
 
 /**
  * Human labels for the scope vocabulary, and the capability preview.
@@ -143,25 +147,21 @@ const STRANGER = { userId: '__someone-else__', groupId: '__another-group__' };
  * (own row vs a stranger's row) is what produces "own comments only" without
  * this file re-deriving a single rule.
  */
-export function previewCapabilities(
-  scopes: readonly string[],
-  identity: ShareIdentity,
-): PreviewRow[] {
-  const claims = identity as Parameters<typeof checkCollab>[3];
+export function previewCapabilities(scopes: readonly string[], identity: Identity): PreviewRow[] {
   const can = (capability: Parameters<typeof checkCapability>[0]) =>
     checkCapability(capability, scopes, ASSUMED_BITS);
   const collabCan = (
     action: Parameters<typeof checkCollab>[0],
     target: { userId?: string; groupId?: string },
-  ) => checkCollab(action, target, scopes, claims, ASSUMED_BITS);
+  ) => checkCollab(action, target, scopes, identity, ASSUMED_BITS);
 
   const ownTarget = {
-    ...(identity.user_id ? { userId: identity.user_id } : {}),
-    ...(identity.group_id ? { groupId: identity.group_id } : {}),
+    ...(identity.userId ? { userId: identity.userId } : {}),
+    ...(identity.groupId ? { groupId: identity.groupId } : {}),
   };
   const teammate = {
     userId: '__teammate__',
-    ...(identity.group_id ? { groupId: identity.group_id } : {}),
+    ...(identity.groupId ? { groupId: identity.groupId } : {}),
   };
   const createsOwn = collabCan('create', ownTarget);
   const editsOwn = collabCan('update', ownTarget);
@@ -177,8 +177,8 @@ export function previewCapabilities(
     {
       label: "Edit other people's comments",
       granted: editsTeammate || editsAnyone,
-      ...(editsTeammate && !editsAnyone && identity.group_id
-        ? { note: `group “${identity.group_id}” only` }
+      ...(editsTeammate && !editsAnyone && identity.groupId
+        ? { note: `group “${identity.groupId}” only` }
         : {}),
     },
     { label: 'See form fields', granted: can('doc.forms.read') },

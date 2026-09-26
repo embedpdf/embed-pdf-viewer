@@ -24,8 +24,8 @@ export interface AnnotationAppearanceConformanceFixture extends ConformanceFixtu
   minAppearanceCount: number;
   /**
    * `true` when the page has at least one weak (index-only) annotation that
-   * carries an appearance stream. The whole point of this suite: that weak
-   * appearance must still be emitted (it used to be dropped on the wire).
+   * carries an appearance stream. The point of this suite: that weak
+   * appearance must still be emitted on the wire.
    */
   expectsWeakAppearance: boolean;
 }
@@ -36,10 +36,10 @@ export interface AnnotationAppearanceConformanceOptions extends Omit<
 > {
   fixture: AnnotationAppearanceConformanceFixture;
   /**
-   * `true` for engines that expose the raw RGBA rasters (`renderAppearances`).
+   * `true` for engines that expose the raw RGBA rasters (`renderAppearancesRaw`).
    * The local engine's encoder needs a browser Canvas, so under node it can
    * only be exercised via the raw rasters; the cloud engine ships encoded
-   * images (`renderAppearanceImages`) and leaves this `false`.
+   * images (`renderAppearances`) and leaves this `false`.
    */
   supportsRawRasters?: boolean;
 }
@@ -134,8 +134,11 @@ export function runAnnotationAppearanceConformance(
       try {
         const page = doc.page(toPageRef(opts.fixture.pageObjectNumber));
         const p = useRaw
-          ? page.annotations.renderAppearances({ scale: 1 })
-          : page.annotations.renderAppearanceImages({ format: 'png', scale: 1 });
+          ? page.annotations.renderAppearancesRaw({ viewport: { kind: 'scale', scale: 1 } })
+          : page.annotations.renderAppearances({
+              format: 'png',
+              viewport: { kind: 'scale', scale: 1 },
+            });
         p.abort('test');
         await expect(p).rejects.toBeInstanceOf(AbortError);
       } finally {
@@ -152,7 +155,9 @@ async function collect(
 ): Promise<{ pageState: PageState; appearances: NormalizedAppearance[] }> {
   const page = doc.page(toPageRef(opts.fixture.pageObjectNumber));
   if (useRaw) {
-    const result = await page.annotations.renderAppearances({ scale: 1 });
+    const result = await page.annotations.renderAppearancesRaw({
+      viewport: { kind: 'scale', scale: 1 },
+    });
     return {
       pageState: result.pageState,
       appearances: result.appearances.map((a) => ({
@@ -165,7 +170,10 @@ async function collect(
       })),
     };
   }
-  const result = await page.annotations.renderAppearanceImages({ format: 'png', scale: 1 });
+  const result = await page.annotations.renderAppearances({
+    format: 'png',
+    viewport: { kind: 'scale', scale: 1 },
+  });
   return {
     pageState: result.pageState,
     appearances: result.appearances.map((a) => ({

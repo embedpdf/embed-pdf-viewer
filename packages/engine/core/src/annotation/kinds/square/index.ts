@@ -1,14 +1,17 @@
-import type { SquareDraft } from './draft';
-import type { SquareAnnotationDTO } from './dto';
-import type { SquarePatch } from './patch';
-import { SquareDTOSchema, SquareDraftSchema, SquarePatchSchema } from './schema';
+import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
+import { SquareDeclaration } from './declaration';
 
-export type { SquareAnnotationDTO } from './dto';
-export type { SquareDraft } from './draft';
-export type { SquarePatch } from './patch';
-export { SquareDTOSchema, SquareDraftSchema, SquarePatchSchema } from './schema';
+export { SquareDeclaration } from './declaration';
+
+export type SquareAnnotationDTO = ReadOf<typeof SquareDeclaration>;
+export type SquareDraft = CreateOf<typeof SquareDeclaration>;
+export type SquarePatch = UpdateOf<typeof SquareDeclaration>;
+
+export const SquareDTOSchema = SquareDeclaration.readSchema;
+export const SquareDraftSchema = SquareDeclaration.createSchema;
+export const SquarePatchSchema = SquareDeclaration.updateSchema;
 
 export const SquareKind: AnnotationKindModule<
   'square',
@@ -21,4 +24,5 @@ export const SquareKind: AnnotationKindModule<
   dtoSchema: SquareDTOSchema,
   draftSchema: SquareDraftSchema,
   patchSchema: SquarePatchSchema,
+  readBackWrites: SquareDeclaration.readBackWrites,
 };

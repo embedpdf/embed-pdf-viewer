@@ -1,5 +1,5 @@
 /**
- * A document boot script failing must NEVER disable interactive filling —
+ * A document boot script failing must never disable interactive filling —
  * the invariant behind the i-140 class of bugs (Adobe's `!ADBE::…VersChk…`
  * boilerplate calling APIs we don't emulate). A boot error degrades to a
  * `script-error` diagnostic; the user's own commit still applies. Boot-phase
@@ -29,12 +29,13 @@ const okEvent = (value: unknown = '') => ({
 const output = (over: Partial<ScriptOutput> = {}): ScriptOutput => ({
   event: okEvent(),
   formEffects: [],
+  annotEffects: [],
   uiEffects: [],
   diagnostics: [],
   ...over,
 });
 
-/** A sandbox whose BOOT throws (script called an API we don't emulate). */
+/** A sandbox whose boot throws (script called an API we don't emulate). */
 function failingBootSandbox(): ScriptSandbox {
   return {
     disposed: false,
@@ -76,7 +77,7 @@ function makeDoc(applied: FormEffect[][]) {
     id: 'diag-doc',
     security: { identity: null },
     actions: {
-      read: async () => ({
+      get: async () => ({
         nameTreeScripts: [
           {
             name: '!ADBE::VersChk',
@@ -137,8 +138,8 @@ describe('FormScriptingController — boot failures degrade, never brick', () =>
         value: { type: 'text', value: 'HELLO' },
       },
     ]);
-    // The failure is SURFACED, not swallowed — and not fatal.
-    expect(first.diagnostics.some((d) => d.code === 'script-error')).toBe(true);
+    // The failure is surfaced, not swallowed — and not fatal.
+    expect(first.diagnostics.some((diagnostic) => diagnostic.code === 'script-error')).toBe(true);
     // The bogus doc-open alert is tagged as boot-phase (suppressible).
     expect(first.uiEffects).toEqual([expect.objectContaining({ kind: 'alert', phase: 'boot' })]);
 
@@ -148,14 +149,15 @@ describe('FormScriptingController — boot failures degrade, never brick', () =>
       { type: 'text', value: 'WORLD' },
     );
     expect(second.status).toBe('applied');
-    expect(second.diagnostics.some((d) => d.code === 'script-error')).toBe(false);
+    expect(second.diagnostics.some((diagnostic) => diagnostic.code === 'script-error')).toBe(false);
     controller.dispose();
   });
 
-  it('a failing doc.actions.read also degrades to a diagnostic', async () => {
+  it('a failing doc.actions.get also degrades to a diagnostic', async () => {
     const applied: FormEffect[][] = [];
     const doc = makeDoc(applied);
-    (doc.actions as { read: () => Promise<never> }).read = async () => {
+    // The fake's `read` is a plain async function, not an AbortablePromise.
+    (doc.actions as unknown as { get: () => Promise<never> }).get = async () => {
       throw new Error('actions unavailable');
     };
     const realm = standaloneRealm(doc, () => null, {
@@ -172,7 +174,7 @@ describe('FormScriptingController — boot failures degrade, never brick', () =>
       { type: 'text', value: 'HELLO' },
     );
     expect(result.status).toBe('applied');
-    expect(result.diagnostics.some((d) => d.code === 'script-error')).toBe(true);
+    expect(result.diagnostics.some((diagnostic) => diagnostic.code === 'script-error')).toBe(true);
     controller.dispose();
   });
 });

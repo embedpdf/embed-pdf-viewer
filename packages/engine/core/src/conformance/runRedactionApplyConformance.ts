@@ -9,7 +9,7 @@ import type { ConformanceOptions, ConformanceTestRunner } from './runMetadataCon
 
 /**
  * Transport-neutral coverage for the destructive redaction-apply rail.
- * Runs against a fixture page with NO pre-existing annotations so the
+ * Runs against a fixture page with no pre-existing annotations so the
  * collateral counts are exact. Content-removal fidelity itself is pinned by
  * the native embeddertests; this suite pins the transport contract: scopes,
  * statuses, counts, revision bumps, events, and preflight rejection.
@@ -55,7 +55,7 @@ export function runRedactionApplyConformance(
           subtype: 'highlight',
           quadPoints: COLLATERAL_QUAD,
         } satisfies HighlightDraft);
-        expect(collateral.created.subtype).toBe('highlight');
+        expect(collateral.annotation.subtype).toBe('highlight');
 
         const marked = await page.annotations.create({
           subtype: 'redact',
@@ -64,7 +64,13 @@ export function runRedactionApplyConformance(
           overlayText: 'REDACTED',
           fontColor: { r: 255, g: 255, b: 255 },
         } satisfies RedactDraft);
-        expect(marked.created.subtype).toBe('redact');
+        expect(marked.annotation.subtype).toBe('redact');
+        // The mark's own popup, away from the region: it goes with the mark.
+        await page.annotations.create({
+          subtype: 'popup',
+          rect: { left: 300, bottom: 300, right: 400, top: 360 },
+          parent: marked.annotation.ref,
+        });
 
         const before = await page.annotations.list();
         const events: DocumentEvent[] = [];
@@ -72,28 +78,23 @@ export function runRedactionApplyConformance(
           if (event.type === 'redaction.applied') events.push(event);
         });
 
-        const result = await doc.redaction.apply({
-          kind: 'annotations',
-          refs: [marked.created.ref],
-        });
+        const result = await doc.redaction.apply({ annotations: [marked.annotation.ref] });
         expect(RedactionApplyResultSchema.safeParse(result).success).toBe(true);
         expect(result.results).toHaveLength(1);
         expect(result.results[0].page.pageObjectNumber).toBe(pageObjectNumber);
         expect(result.results[0].status).toBe('applied');
-        // Exactly the highlight counts: the consumed REDACT never does.
-        expect(result.results[0].removedAnnotationCount).toBe(1);
-        expect(result.removedAnnotationCount).toBe(1);
-        expect(result.meta === null).toBe(false);
+        // The highlight and the mark's popup count: the consumed redact never does.
+        expect(result.results[0].removedAnnotationCount).toBe(2);
+        expect(result.removedAnnotationCount).toBe(2);
+        expect(result.meta.affectedPages.map((state) => state.page)).toEqual([page.ref]);
         expect(events).toHaveLength(1);
         unsubscribe();
 
-        // Both the redaction and its collateral are gone; layout is not a
-        // casualty; the page revision advanced (weak refs invalidated).
+        // The redaction, its popup and its collateral are gone; layout is
+        // not a casualty; the page revision advanced (weak refs invalidated).
         const after = await page.annotations.list();
-        expect(after.annotations.length).toBe(before.annotations.length - 2);
-        expect(after.pageState.revision.generation > before.pageState.revision.generation).toBe(
-          true,
-        );
+        expect(after.annotations.length).toBe(before.annotations.length - 3);
+        expect(after.pages[0].revision.generation > before.pages[0].revision.generation).toBe(true);
         expect(await doc.pages.list()).toEqual(layoutBefore);
       } finally {
         await doc.close();
@@ -119,39 +120,32 @@ export function runRedactionApplyConformance(
           if (event.type === 'redaction.applied') events.push(event);
         });
 
-        const applied = await doc.redaction.apply({
-          kind: 'pages',
-          pages: [toPageRef(pageObjectNumber)],
-        });
+        const applied = await doc.redaction.apply({ pages: [toPageRef(pageObjectNumber)] });
         expect(applied.results.map((item) => item.status)).toEqual(['applied']);
         expect(applied.removedAnnotationCount).toBe(0);
         expect(events).toHaveLength(1);
 
         // A page with no redactions left is unchanged: no artifact, no event.
-        const noOp = await doc.redaction.apply({
-          kind: 'pages',
-          pages: [toPageRef(pageObjectNumber)],
-        });
+        const noOp = await doc.redaction.apply({ pages: [toPageRef(pageObjectNumber)] });
         expect(noOp.results.map((item) => item.status)).toEqual(['unchanged']);
-        expect(noOp.meta).toBeNull();
+        expect(noOp.meta).toEqual({ affectedPages: [], cacheDelta: null });
         expect(events).toHaveLength(1);
         unsubscribe();
 
         await expect(
           doc.redaction.apply({
-            kind: 'pages',
             pages: [toPageRef(pageObjectNumber), toPageRef(pageObjectNumber)],
           }),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
 
-        // Preflight rejects a ref that is not a REDACT annotation before
+        // Preflight rejects a ref that is not a redact annotation before
         // anything is written.
         const notRedact = await page.annotations.create({
           subtype: 'highlight',
           quadPoints: COLLATERAL_QUAD,
         } satisfies HighlightDraft);
         await expect(
-          doc.redaction.apply({ kind: 'annotations', refs: [notRedact.created.ref] }),
+          doc.redaction.apply({ annotations: [notRedact.annotation.ref] }),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
       } finally {
         await doc.close();

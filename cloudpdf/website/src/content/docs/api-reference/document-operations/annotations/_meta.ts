@@ -5,6 +5,7 @@ export default {
   create: 'Create',
   update: 'Update',
   delete: 'Delete',
+  'read-appearance': 'Read Appearance',
   'export-appearance': 'Export Appearance',
   flatten: 'Flatten',
 };

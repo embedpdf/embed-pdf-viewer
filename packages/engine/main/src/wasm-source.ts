@@ -1,24 +1,24 @@
 /**
  * Where does `embedpdf.wasm` come from?
  *
- * The wasm binary is the ONE runtime-fetched asset of the local engine.
+ * The wasm binary is the one runtime-fetched asset of the local engine.
  * Everything else (the worker code) travels through the module graph, so it
  * never needs bundler asset handling — but the 6 MB binary is fetched at
- * runtime from a plain URL, resolved here on the MAIN THREAD (the worker
+ * runtime from a plain URL, resolved here on the main thread (the worker
  * never guesses) in a fixed precedence order:
  *
  *   1. `wasmBinary`  — caller-supplied bytes, zero network (air-gapped).
  *   2. `wasmUrl`     — exact URL.
  *   3. `assetsUrl`   — base directory; `embedpdf.wasm` is appended.
  *   4. the default   — depends on how the worker itself is delivered:
- *      - inline blob worker (the zero-config path): SIBLING-FIRST. The
+ *      - inline blob worker (the zero-config path): Sibling-first. The
  *        bundler-resolved URL from `@embedpdf/engine-runtime-wasm32/wasm-url`
  *        (the wasm ships inside the consumer's own build), with the
  *        version-pinned jsDelivr URL as a fetch-failure-only fallback. A blob
  *        worker has no meaningful location, so both URLs are resolved here on
  *        the main thread and must be absolute.
  *      - a real worker URL / caller-built worker: nothing is sent, and the
- *        Emscripten glue resolves `embedpdf.wasm` as a SIBLING of the worker
+ *        Emscripten glue resolves `embedpdf.wasm` as a sibling of the worker
  *        script (`import.meta.url`). Copying `embedpdf-worker.js` and
  *        `embedpdf.wasm` into one directory is a complete self-host setup, and
  *        bundler-emitted workers (Vite `?worker`) keep their bundler-managed
@@ -94,14 +94,14 @@ export async function resolveWasmSourceAsync(
 /**
  * Resolve the wasm source for the inline blob worker, which cannot
  * self-resolve (a blob URL has no meaningful location). Explicit options
- * win; otherwise the default is the SIBLING the consumer's bundler emitted:
+ * win; otherwise the default is the sibling the consumer's bundler emitted:
  * `@embedpdf/engine-runtime-wasm32/wasm-url`, a static
  * `new URL('./lib/embedpdf.wasm', import.meta.url)` that webpack, Vite,
  * Rspack, Parcel, and Turbopack resolve at build time, shipping the wasm
  * inside the consumer's own build — served from their origin, compiled
  * streaming by the worker.
  *
- * There is deliberately NOTHING after that. A toolchain that cannot carry
+ * There is deliberately nothing after that. A toolchain that cannot carry
  * the asset (Angular's application builder, plain esbuild) fails here with
  * the two fixes named: `@embedpdf/engine/portable`, which carries the wasm
  * through the module graph instead, or `assetsUrl` to a self-hosted copy.
@@ -131,8 +131,8 @@ const NO_SIBLING_MESSAGE =
 
 /**
  * The bundler-resolved sibling URL, or null when this build has none. The
- * module cannot fail to RESOLVE under a bundler (that is a build-time error,
- * as it should be); it can fail to EVALUATE — an output format where
+ * module cannot fail to resolve under a bundler (that is a build-time error,
+ * as it should be); it can fail to evaluate — an output format where
  * `import.meta.url` is undefined makes its `new URL()` throw — or export a
  * non-string where a bundled artifact aliased it away. Both mean "no
  * sibling", never "crash the engine".
@@ -147,7 +147,7 @@ async function siblingWasmUrl(): Promise<string | null> {
 }
 
 /**
- * Resolve against the page NOW: a relative URL like `/assets/embedpdf.wasm`
+ * Resolve against the page now: a relative URL like `/assets/embedpdf.wasm`
  * cannot be resolved inside a `blob:` worker (blob URLs are not hierarchical),
  * so the absolute form must cross the postMessage boundary.
  */
@@ -158,7 +158,7 @@ export function toAbsoluteUrl(url: string): string {
 }
 
 /**
- * Copy to a standalone ArrayBuffer: the init message TRANSFERS the buffer to
+ * Copy to a standalone ArrayBuffer: the init message transfers the buffer to
  * the worker, and neutering the caller's copy would break a second engine
  * created from the same options (or a larger buffer the caller still owns).
  */

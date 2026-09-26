@@ -1,4 +1,4 @@
-import { createEventHook, type ChangeOrigin } from '@embedpdf/core';
+import type { MirrorChange } from '@embedpdf/core';
 
 import type {
   AnnotationCreatedEvent,
@@ -8,66 +8,34 @@ import type {
   AnnotationResyncedEvent,
   AnnotationSelectionChangedEvent,
   AnnotationUpdatedEvent,
+  AnnotationWriteFailedEvent,
   CommentThreadChangedEvent,
 } from '../contract';
 import type { CapturedAnnotationDraft } from '../host-contract';
 import type { AnnotationContext } from './context';
-
-/** A change this session made through the public API. */
-export const ORIGIN_API: ChangeOrigin = {
-  locality: 'local',
-  trigger: 'api',
-  sessionId: null,
-  actorId: null,
-};
-/** A change this session made through a gesture or an internal path. */
-export const ORIGIN_UNKNOWN: ChangeOrigin = {
-  locality: 'local',
-  trigger: 'unknown',
-  sessionId: null,
-  actorId: null,
-};
+import type { AnnotationRecords } from '../sync/records';
 
 /**
- * The plugin's confirmed-change events (kernel primitive; one emit per
- * confirmed fact). Created once; every area emits through these hooks and the
- * public `on…` members are their `on` doors.
+ * The plugin's events. Record events (created, updated, deleted, resynced)
+ * fire when the records mirror confirms a change (sync/confirmed.ts);
+ * selection, draft and editing events are derived from state changes in the
+ * store service; `writeFailed` fires when the engine refuses a change the
+ * user made; the rest fire where their operation completes. `recordsChanged`
+ * is internal: every change the records mirror applied.
  */
-export function createAnnotationEvents(ctx: Pick<AnnotationContext, 'cleanup'>) {
-  const report = (error: unknown) => console.error('[annotation] event listener failed:', error);
-  const created = createEventHook<AnnotationCreatedEvent>(report);
-  const updated = createEventHook<AnnotationUpdatedEvent>(report);
-  const deleted = createEventHook<AnnotationDeletedEvent>(report);
-  const resynced = createEventHook<AnnotationResyncedEvent>(report);
-  const selectionChanged = createEventHook<AnnotationSelectionChangedEvent>(report);
-  const draftChanged = createEventHook<AnnotationDraftChangedEvent>(report);
-  const editingChanged = createEventHook<AnnotationEditingChangedEvent>(report);
-  const threadChanged = createEventHook<CommentThreadChangedEvent>(report);
-  const draftCaptured = createEventHook<CapturedAnnotationDraft>(report);
-  const all = [
-    created,
-    updated,
-    deleted,
-    resynced,
-    selectionChanged,
-    draftChanged,
-    editingChanged,
-    threadChanged,
-    draftCaptured,
-  ];
-  ctx.cleanup(() => {
-    for (const hook of all) hook.dispose();
-  });
+export function createAnnotationEvents(ctx: Pick<AnnotationContext, 'events'>) {
   return {
-    created,
-    updated,
-    deleted,
-    resynced,
-    selectionChanged,
-    draftChanged,
-    editingChanged,
-    threadChanged,
-    draftCaptured,
+    created: ctx.events.source<AnnotationCreatedEvent>(),
+    updated: ctx.events.source<AnnotationUpdatedEvent>(),
+    deleted: ctx.events.source<AnnotationDeletedEvent>(),
+    resynced: ctx.events.source<AnnotationResyncedEvent>(),
+    selectionChanged: ctx.events.source<AnnotationSelectionChangedEvent>(),
+    draftChanged: ctx.events.source<AnnotationDraftChangedEvent>(),
+    editingChanged: ctx.events.source<AnnotationEditingChangedEvent>(),
+    threadChanged: ctx.events.source<CommentThreadChangedEvent>(),
+    draftCaptured: ctx.events.source<CapturedAnnotationDraft>(),
+    writeFailed: ctx.events.source<AnnotationWriteFailedEvent>(),
+    recordsChanged: ctx.events.source<MirrorChange<AnnotationRecords>>(),
   };
 }
 

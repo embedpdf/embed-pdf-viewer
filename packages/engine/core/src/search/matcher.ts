@@ -1,5 +1,5 @@
 import { foldText } from './fold';
-import type { SearchMatchRange } from './fold';
+import type { TextRange } from '../text/TextRange';
 import { foldOptionsFor, matchLiteral } from './literal';
 import { matchRegex } from './regex';
 import type { SearchQuery } from './types';
@@ -11,7 +11,7 @@ import type { SearchQuery } from './types';
  * everything else (non-default fold options, regex, tests) comes through
  * here.
  */
-export function matchPageText(text: string, query: SearchQuery): SearchMatchRange[] {
+export function matchPageText(text: string, query: SearchQuery): TextRange[] {
   if (query.regex) return matchRegex(text, query);
   return matchLiteral(foldText(text, foldOptionsFor(query)), query);
 }

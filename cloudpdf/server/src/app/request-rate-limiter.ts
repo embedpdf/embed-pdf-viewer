@@ -1,5 +1,5 @@
 /**
- * Per-key throttle on request ATTEMPTS — the volume tier in front of
+ * Per-key throttle on request attempts — the volume tier in front of
  * public endpoints that do real work before any credential can be
  * checked (grant lookups, scrypt verification).
  *
@@ -7,7 +7,7 @@
  * difference: where the failure limiter separates the read-only block
  * check from failure recording (right for "count only outcomes the
  * handler has already classified"), `consume()` counts and decides in
- * ONE synchronous step. Placed before a handler's first `await` it is
+ * one synchronous step. Placed before a handler's first `await` it is
  * atomic under concurrent bursts — no interleaving can let N requests
  * pass the check before any of them is counted.
  *

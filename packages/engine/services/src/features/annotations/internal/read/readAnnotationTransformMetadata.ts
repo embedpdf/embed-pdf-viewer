@@ -8,10 +8,10 @@ import { F32_BYTES, RECTF_BYTES, readF32, readRectF } from '../../../../runtime/
  * Read-side twin of `writers/.../writeAnnotationTransformMetadata.ts`. Decodes
  * the EmbedPDF rotation keys from /EMBD_Metadata back onto the DTO:
  *
- *   - `Rotation`      — degrees, PDF convention. Returned for EVERY rotatable
- *     kind (box AND vertex); the plugin converts it back to its CW-content
+ *   - `Rotation`      — degrees, PDF convention. Returned for every rotatable
+ *     kind (box and vertex); the plugin converts it back to its CW-content
  *     `rot` once at the repository seam.
- *   - `UnrotatedRect` — the logical box. BOX kinds only (square/circle/
+ *   - `UnrotatedRect` — the logical box. Box kinds only (square/circle/
  *     free-text); a vertex annotation never carries one (its points are the
  *     visual), so vertex readers don't ask for it.
  *
@@ -38,7 +38,7 @@ export function readAnnotationRotation(
   });
 }
 
-/** The logical (unrotated) box of a rotated BOX annotation, or `undefined`. */
+/** The logical (unrotated) box of a rotated box annotation, or `undefined`. */
 export function readAnnotationUnrotatedRect(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,

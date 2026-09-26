@@ -131,9 +131,9 @@ Your frontend uses [`@cloudpdf/engine`](/docs/engine), pointed at the server
 you just started:
 
 ```ts
-import { createCloudEngine } from '@cloudpdf/engine';
+import { cloudEngine } from '@cloudpdf/engine';
 
-const engine = createCloudEngine({
+const engine = cloudEngine({
   baseUrl: 'http://localhost:3000',
   token: () => getDocToken(), // doc-scoped JWT minted by your backend
 });
@@ -146,7 +146,7 @@ const image = await page.render.image({ viewport: { kind: 'width', width: 1200 }
 Your backend mints the `getDocToken()` JWT — see
 [Authentication](/docs/server/configuration/authentication) for the token
 shape (and the `signDevToken` helper for local experiments), and the
-[engine docs](/docs/engine/getting-started/quick-start) for rendering a page
+[engine docs](/docs/engine/quick-start) for rendering a page
 into the DOM.
 
 ## 6. Stop it

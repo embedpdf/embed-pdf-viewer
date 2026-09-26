@@ -1,9 +1,9 @@
-import type { PageObjectNumber } from '../identity/PageObjectNumber';
 import type { PageRef } from '../identity/PageRef';
 import type { PdfTextSegment } from '../text/layout';
+import type { PageTextRange } from '../text/TextRange';
 
 /**
- * What to search for — THE one shape, engine → wire → plugin state →
+ * What to search for — the one shape, engine → wire → plugin state →
  * search box. One flat object; the flags define behavior per mode instead
  * of the mode changing the shape:
  *
@@ -11,11 +11,11 @@ import type { PdfTextSegment } from '../text/layout';
  * |-------------------|------------------|--------------------------------|
  * | `matchCase`       | fold case        | `i` flag                       |
  * | `wholeWord`       | boundary check   | pattern is `\b(?:…)\b`-wrapped |
- * | `matchDiacritics` | mark fold        | REJECTED (`InvalidArg`)        |
- * | `ignoreWhitespace`| whitespace drop  | REJECTED (`InvalidArg`)        |
+ * | `matchDiacritics` | mark fold        | rejected (`InvalidArg`)        |
+ * | `ignoreWhitespace`| whitespace drop  | rejected (`InvalidArg`)        |
  *
- * Literal queries match over FOLDED text; regex queries run the portable
- * dialect against the RAW page text — which is why `matchDiacritics` and
+ * Literal queries match over folded text; regex queries run the portable
+ * dialect against the raw page text — which is why `matchDiacritics` and
  * `ignoreWhitespace` cannot apply to them (diacritic folding and whitespace
  * dropping are properties of the folded text plane; a pattern spells its
  * own `\s*`). Validate with `validateSearchQuery` for early UI feedback;
@@ -24,7 +24,7 @@ import type { PdfTextSegment } from '../text/layout';
 export interface SearchQuery {
   /**
    * The literal text — or, when `regex`, a pattern in the portable
-   * search-regex dialect: JavaScript `u`-mode syntax MINUS backreferences
+   * search-regex dialect: JavaScript `u`-mode syntax minus backreferences
    * and lookaround, so every valid pattern also runs on RE2 (the
    * server-side engine).
    */
@@ -38,7 +38,7 @@ export interface SearchQuery {
   /**
    * Treat diacritics as significant ("café" ≠ "cafe"). Default false —
    * marks are stripped on both sides, which is what viewers ship.
-   * LITERAL ONLY: combined with `regex` the query is rejected.
+   * Literal only: combined with `regex` the query is rejected.
    */
   matchDiacritics?: boolean;
   /**
@@ -48,119 +48,102 @@ export interface SearchQuery {
    * fold collapses whitespace runs to one space, so a needle still has to
    * carry a space wherever the page does. A hit spans the original text
    * including the dropped whitespace; with `wholeWord` the boundaries are
-   * checked on the ORIGINAL text (the folded plane has no word gaps left).
-   * LITERAL ONLY: combined with `regex` the query is rejected.
+   * checked on the original text (the folded plane has no word gaps left).
+   * Literal only: combined with `regex` the query is rejected.
    */
   ignoreWhitespace?: boolean;
 }
 
-/**
- * How much of a match leaves the engine — the permission story:
- *
- * - `'rects'` — page + highlight geometry only, no text. Needs
- *   `doc.text.search`. This is the mode for documents whose owners deny
- *   text extraction: the user can *find*, but nothing readable crosses
- *   the boundary.
- * - `'full'` — rects plus a context snippet per match. Needs
- *   `doc.text.search` AND `doc.text.copy` (a snippet IS extracted text).
- *
- * Engines reject a `'full'` request without the copy scope rather than
- * silently downgrading — the caller chooses the mode it renders.
- */
-export type SearchMode = 'rects' | 'full';
-
-/**
- * Per-slice spending caps. A slice ends as soon as EITHER cap is hit (or
- * the search space is exhausted). Engines clamp requested caps to their
- * own ceilings — the server never lets one request scan 40K pages.
- */
-export interface SearchSliceBudget {
-  /** Stop after this many matches (default: engine's ceiling). */
-  maxMatches?: number;
-  /** Stop after scanning this many pages (default: engine's ceiling). */
-  maxPages?: number;
+/** The query part of a request (or of any object that carries one): its text and flags, set flags only. */
+export function searchQueryOf(query: SearchQuery): SearchQuery {
+  return {
+    text: query.text,
+    ...(query.regex ? { regex: true } : {}),
+    ...(query.matchCase ? { matchCase: true } : {}),
+    ...(query.wholeWord ? { wholeWord: true } : {}),
+    ...(query.matchDiacritics ? { matchDiacritics: true } : {}),
+    ...(query.ignoreWhitespace ? { ignoreWhitespace: true } : {}),
+  };
 }
 
 /**
- * One `query()` call = one bounded slice of work. Search over a large
- * document is a client-driven cursor loop — there is no server-side job
- * to start, poll, or cancel. Cancelling is simply not asking for the
- * next slice.
+ * How much one `query()` call may do. A call ends as soon as either limit is
+ * hit (or the document is exhausted). Engines clamp both to their own
+ * ceilings — the server never lets one request scan 40K pages.
  */
-export interface SearchRequest {
-  query: SearchQuery;
-  /** Default `'full'` (viewer UX); see {@link SearchMode} for gating. */
-  mode?: SearchMode;
+export interface SearchLimit {
+  /** Stop after this many matches (default: engine's ceiling). */
+  matches?: number;
+  /** Stop after searching this many pages (default: engine's ceiling). */
+  pages?: number;
+}
+
+/**
+ * One `query()` call = one bounded batch of work: the query, plus how to
+ * run it. Search over a large document is a client-driven cursor loop —
+ * there is no server-side job to start, poll, or cancel. Cancelling is
+ * simply not asking for the next batch.
+ */
+export interface SearchRequest extends SearchQuery {
   /**
-   * Resume token from the previous slice's `nextCursor`. Opaque — it
-   * pins the query and position; the engine rejects a cursor replayed
-   * against a different query or a mutated document with
-   * `EngineErrorCode.InvalidArg` (re-issue from scratch).
+   * Include the text around each match. A snippet is text from the
+   * document, so this also needs `doc.text.copy`; without it the call is
+   * refused rather than leaving the snippets out. Default false: a search
+   * needs only `doc.text.search`, and nothing readable leaves the engine.
+   */
+  snippets?: boolean;
+  /**
+   * Viewport-first ordering: start searching at this page and wrap around
+   * the document, so the matches the user is looking at arrive in the
+   * first batch. Ignored when `cursor` is set (the cursor owns position).
+   */
+  from?: PageRef;
+  /**
+   * Resume token from the previous batch's `nextCursor`. Opaque — it pins
+   * the query and position; the engine rejects a cursor replayed against a
+   * different query or a changed document with `EngineErrorCode.InvalidArg`
+   * (start the search again).
    */
   cursor?: string;
-  /**
-   * Viewport-first ordering: start scanning at this page and wrap around
-   * the document, so the matches the user is looking at arrive in the
-   * first slice. Ignored when `cursor` is set (the cursor owns position).
-   */
-  startPage?: PageRef;
-  /**
-   * Trusted absolute resume position: pages of the scan order already
-   * consumed. For callers that pin content versions EXTERNALLY — the
-   * cloud wire pins the search content epoch in the URL, so its GET
-   * routes resume by position alone. Everyone else should use `cursor`,
-   * which also guards against mutations between slices; `cursor` takes
-   * precedence when both are set.
-   */
-  skip?: number;
-  budget?: SearchSliceBudget;
+  limit?: SearchLimit;
 }
 
 /**
- * Context around one match, `'full'` mode only. `text` is a short excerpt
- * of the page text with whitespace flattened 1:1 (offsets are preserved);
- * the match sits at `[matchStart, matchStart + matchLength)` within it —
- * highlight that range, never re-search the snippet.
+ * The text around one match, ready to render: `match` between `before` and
+ * `after`, whitespace flattened to spaces.
  */
 export interface SearchSnippet {
-  text: string;
-  matchStart: number;
-  matchLength: number;
+  before: string;
+  match: string;
+  after: string;
 }
 
 /**
- * One hit. `charStart`/`charCount` are a half-open range in the page's
- * CHARACTER space — the space `PageGeometryRun.charStart` tiles and
- * selection ranges live in, NOT string offsets into `PageTextSnapshot.text`
- * (engines convert match string-ranges through the snapshot's `charMap`
+ * One hit: a range of the page's characters — the space selection ranges
+ * and geometry live in, not string offsets into `PageTextSnapshot.text`
+ * (engines convert match string ranges through the snapshot's `charMap`
  * before building the hit; see engine-core `text/charmap.ts`). That is what
- * lets a match join the selection subsystem — select-this-match, markup
- * creation — with no re-mapping, and it means zero-width characters
- * adjacent to the matched text are never inside the range. Snippet offsets
- * are the one exception: they are string offsets INTERNAL to the snippet's
- * own `text`. `segments` are the CANONICAL visual-line segments (the same
- * engine-core text layout selection uses) — a match highlights exactly like
- * a selection of the same characters, one oriented segment per visual line,
- * never per glyph. Each segment carries the exact quad, its AABB `rect`,
- * and the reading `advance`.
+ * lets a match go straight to selection, `text.slice()` and markup
+ * creation, and it means zero-width characters adjacent to the matched text
+ * are never inside the range. `segments` are the canonical visual-line
+ * segments (the same text layout selection uses) — a match highlights
+ * exactly like a selection of the same characters, one oriented segment per
+ * visual line, never per glyph.
  */
-export interface SearchMatch {
-  page: PageRef;
-  charStart: number;
-  charCount: number;
+export interface SearchMatch extends PageTextRange {
   segments: PdfTextSegment[];
   snippet?: SearchSnippet;
 }
 
 /**
- * The result of one bounded slice. `nextCursor === null` means the search
- * space is exhausted — everything findable has been returned. Progress UI:
- * `scannedPages / totalPages` (scannedPages is cumulative across the
- * cursor chain, not per-slice).
+ * The result of one bounded batch. `nextCursor === null` means the search
+ * is done — everything findable has been returned. Progress UI:
+ * `pagesSearched / pageCount` (`pagesSearched` is cumulative across the
+ * cursor chain, not per batch).
  */
 export interface SearchSlice {
   matches: SearchMatch[];
   nextCursor: string | null;
-  scannedPages: number;
-  totalPages: number;
+  pagesSearched: number;
+  pageCount: number;
 }

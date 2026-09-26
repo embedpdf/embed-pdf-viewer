@@ -19,13 +19,15 @@ export interface AnnotationKindModule<
   readonly subtype: S;
   /**
    * The PDFium subtype code(s) this module handles. Most kinds claim a single
-   * code; text-markup kinds map a single PDFium code each (HIGHLIGHT,
-   * UNDERLINE, SQUIGGLY, STRIKEOUT) but share an internal reader.
+   * code; text-markup kinds map a single PDFium code each (highlight,
+   * underline, squiggly, strikeout) but share an internal reader.
    */
   readonly pdfSubtypeCode: number;
   readonly dtoSchema: z.ZodType<DTO>;
   readonly draftSchema: z.ZodType<Draft>;
   readonly patchSchema: z.ZodType<Patch>;
+  /** The write schema of each field an update may send back as read (`readBack()`). */
+  readonly readBackWrites: Readonly<Record<string, z.ZodTypeAny>>;
 }
 
 /**

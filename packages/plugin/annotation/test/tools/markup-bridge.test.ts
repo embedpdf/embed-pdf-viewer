@@ -4,14 +4,14 @@ import type { InteractionHostCapability } from '@embedpdf/plugin-interaction/con
 import type { SelectionHostCapability } from '@embedpdf/plugin-selection/contract/host';
 import { describe, expect, it, vi } from 'vitest';
 
-import { wireMarkup } from '../../src/tools/markup-bridge';
 import type { AnnotationHostCapability } from '../../src/host-contract';
+import { wireMarkup } from '../../src/tools/markup-bridge';
 
 describe('selection authoring bridge', () => {
   it('previews and commits Replace Text from its declarative tool recipe', () => {
-    const seg = (r: { x: number; y: number; width: number; height: number }) => ({
-      quad: textQuadFromRect(r),
-      rect: r,
+    const seg = (rect: { x: number; y: number; width: number; height: number }) => ({
+      quad: textQuadFromRect(rect),
+      rect,
       advance: 1 as const,
     });
     const page1 = [seg({ x: 10, y: 20, width: 50, height: 12 })];
@@ -36,8 +36,8 @@ describe('selection authoring bridge', () => {
       hasSelection: () => true,
       getSnapshot: () => ({
         pages: [
-          { page: toPageRef(1), segments: page1, rects: page1.map((s) => s.rect) },
-          { page: toPageRef(2), segments: page2, rects: page2.map((s) => s.rect) },
+          { page: toPageRef(1), segments: page1, rects: page1.map((segment) => segment.rect) },
+          { page: toPageRef(2), segments: page2, rects: page2.map((segment) => segment.rect) },
         ],
         start: {
           page: toPageRef(1),
@@ -56,12 +56,12 @@ describe('selection authoring bridge', () => {
       listSegments: (page: PageRef) => (page.pageObjectNumber === 1 ? page1 : page2),
       setHighlightVisible: vi.fn(),
       clear: vi.fn(),
-      onChanged: (cb: () => void) => {
-        onChange = cb;
+      onChanged: (callback: () => void) => {
+        onChange = callback;
         return () => {};
       },
-      onCommitted: (cb: () => void) => {
-        onCommit = cb;
+      onCommitted: (callback: () => void) => {
+        onCommit = callback;
         return () => {};
       },
     } as unknown as SelectionHostCapability;
@@ -75,7 +75,7 @@ describe('selection authoring bridge', () => {
     expect(selection.setHighlightVisible).toHaveBeenCalledWith(false);
     expect(annotation.previewMarkup).toHaveBeenCalledWith(
       'strikeout',
-      { 1: page1.map((s) => s.quad), 2: page2.map((s) => s.quad) },
+      { 1: page1.map((segment) => segment.quad), 2: page2.map((segment) => segment.quad) },
       'replace-text',
     );
 
@@ -83,14 +83,14 @@ describe('selection authoring bridge', () => {
     expect(annotation.createReplaceText).toHaveBeenNthCalledWith(
       1,
       toPageRef(1),
-      page1.map((s) => s.quad),
+      page1.map((segment) => segment.quad),
       { glyphQuad: page1[0].quad, advance: 1 },
       'replace-text',
     );
     expect(annotation.createReplaceText).toHaveBeenNthCalledWith(
       2,
       toPageRef(2),
-      page2.map((s) => s.quad),
+      page2.map((segment) => segment.quad),
       { glyphQuad: page2[1].quad, advance: 1 },
       'replace-text',
     );

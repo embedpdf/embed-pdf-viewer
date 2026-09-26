@@ -1,0 +1,124 @@
+---
+title: Engine
+description: Open, read, change and save PDF files from JavaScript, with one typed API.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+import { Cards, Card } from '@/components/docs/cards';
+
+# The PDF engine
+
+<Engine local>
+
+The EmbedPDF engine opens PDF files in the browser and lets you render their pages, read and
+search their text, add annotations, fill forms, edit pages and save the result. It runs PDFium,
+the PDF library inside Chrome, in a Web Worker, so your page stays responsive. Nothing is
+uploaded: the file never leaves the device.
+
+The ready-made viewer and the headless components are built on this engine. Use it directly
+when you want PDF features without a viewer: a thumbnail job, a form filler, an export script.
+
+</Engine>
+
+<Engine cloud>
+
+The CloudPDF engine gives your app a full PDF engine over HTTPS. Your files stay on your
+CloudPDF server. The engine renders their pages, reads and searches their text, stores
+annotations and form values, and checks every call against the permissions in the user's
+token.
+
+The CloudPDF viewer and the headless components are built on this engine. Use it directly when
+you want PDF features without a viewer: a thumbnail job, a form filler, an export script.
+
+</Engine>
+
+<Engine local>
+
+```ts
+import { localEngine } from '@cloudpdf/engine';
+
+const engine = localEngine();
+const doc = await engine.open({ kind: 'bytes', bytes });
+
+const { pages } = await doc.pages.list();
+const image = await doc.page(pages[0].ref).render.image();
+```
+
+</Engine>
+
+<Engine cloud>
+
+```ts
+import { cloudEngine } from '@cloudpdf/engine';
+
+const engine = cloudEngine({ baseUrl: 'https://pdf.example.com' });
+const doc = await engine.open({ kind: 'token', token: () => fetchDocumentToken(documentId) });
+
+const { pages } = await doc.pages.list();
+const image = await doc.page(pages[0].ref).render.image();
+```
+
+</Engine>
+
+## What you can do
+
+- **[Render pages](/docs/engine/documents/rendering)** as images, at any size.
+- **[Read](/docs/engine/text/extraction), [search](/docs/engine/text/search) and
+  [select](/docs/engine/text/selection-and-geometry)** the text on a page, and find out where
+  each character is.
+- **[Add and edit annotations](/docs/engine/annotations)**: highlights, notes, shapes, stamps,
+  measurements. Copy them to another document with
+  [import & export](/docs/engine/annotations/import-export).
+- **[Fill forms](/docs/engine/forms)**, create form fields and
+  [sign](/docs/engine/forms/signatures) documents.
+- **[Change pages](/docs/engine/documents/pages)**: rotate, reorder, delete, insert, merge and
+  split.
+- **[Redact](/docs/engine/documents/redaction)** content for good, and
+  **[save](/docs/engine/documents/saving)** the result.
+
+Every call is async, can be cancelled, and fails with a typed error you can branch on. The same
+code runs on the local engine and on the CloudPDF engine: only how you create the engine and
+open a file differs.
+
+<Engine local>
+
+## Local or cloud
+
+This engine runs in the browser: no server, no upload, and it works offline. That makes it the
+right choice when the user already has the file, or when the file may not leave their device.
+
+<CloudPdfCallout
+  title="Keep the file on your server"
+  href="https://www.cloudpdf.com/docs/engine"
+  cta="Read about the CloudPDF engine"
+>
+
+When the file lives on your server, the CloudPDF engine runs the same API there and checks every
+call. A user sees the first page as an image, without downloading the whole PDF or the engine
+(about 3 MB compressed), and a user who may not download the file never receives it. Your code
+stays the same: swap `localEngine()` for `cloudEngine()`.
+
+</CloudPdfCallout>
+
+</Engine>
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Quick start"
+    description="Open a PDF, render a page, search it and add a highlight."
+    href="/docs/engine/quick-start"
+  />
+  <Card
+    title="Setup"
+    description="Install the engine and create it once for your app."
+    href="/docs/engine/setup"
+  />
+  <Card
+    title="Annotations"
+    description="Read, add and change annotations of every kind."
+    href="/docs/engine/annotations"
+  />
+</Cards>

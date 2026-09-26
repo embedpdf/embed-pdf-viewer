@@ -19,14 +19,14 @@ export interface ManifestPage {
  *
  * `layoutVersion` is the doc-level version pointer for the page-geometry
  * resource (`/layout@layoutVersion`). It bumps only on structural page ops
- * (move/insert/delete/rotate), NOT on annotation or content edits — a
- * different cadence than `docVersion`. The layout bytes themselves are NOT
+ * (move/insert/delete/rotate), not on annotation or content edits — a
+ * different cadence than `docVersion`. The layout bytes themselves are not
  * in the manifest; only this pointer is, mirroring how per-page
  * `cache.contentVersion` points at the immutable text/render leaves.
  *
  * `metadataVersion` is the doc-level version pointer for the document
  * metadata resource (`/metadata@metadataVersion`). It bumps only on
- * metadata writes (Info-dict edits), NOT on page or annotation edits —
+ * metadata writes (Info-dict edits), not on page or annotation edits —
  * the same independent-cadence design as `layoutVersion`, so each CDN
  * leaf only invalidates when its own bytes change.
  */
@@ -46,10 +46,10 @@ export interface DocumentManifest {
   /**
    * Doc-level pin for the immutable whole-document annotation listing
    * (`/annotations/items@annotationsVersion=N`) — the cloud's one-request
-   * hydration read. Bumps ONLY when annotation list BODIES change —
+   * hydration read. Bumps only when annotation list bodies change —
    * annotation create/update/delete/move, page insert/delete,
    * redaction-apply, flatten, and form field/widget structure — and
-   * deliberately NOT on form value writes (widget DTOs carry no value;
+   * deliberately not on form value writes (widget DTOs carry no value;
    * only `/AP` rasters change, which the per-page `annotationVersion`
    * covers), metadata, attachments, or page move/rotate (bulk page order
    * is unspecified by contract). The same independent-cadence design as
@@ -81,7 +81,7 @@ export interface DocumentManifest {
   /**
    * Plane scopes (layer manifests only; absent on base manifests and
    * on pre-plane servers = all-`'layer'`). Whole-layer by design — edge
-   * grants are prefix-level — and DERIVED from the version counters at
+   * grants are prefix-level — and derived from the version counters at
    * every emission point, never stored. See {@link LayerScopes}.
    */
   scopes?: LayerScopes;

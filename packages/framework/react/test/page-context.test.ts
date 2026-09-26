@@ -4,22 +4,22 @@ import { makePageContext, toPageRef } from '../src/runtime';
 
 /**
  * The rotation/scale math is exhaustively covered in @embedpdf/core-geometry's
- * pageTransform tests. Here we only verify the adapter WIRING: `makePageContext`
+ * pageTransform tests. Here we only verify the adapter wiring: `makePageContext`
  * turns a client point into a box-local point (client − the surface rect's
  * top-left) and feeds it to `transform.viewToContent`, and carries `transform` +
  * `frame` through.
  */
 describe('makePageContext wiring', () => {
   const rectAt =
-    (left: number, top: number, w: number, h: number): (() => DOMRect) =>
+    (left: number, top: number, width: number, height: number): (() => DOMRect) =>
     () =>
       ({
         left,
         top,
-        right: left + w,
-        bottom: top + h,
-        width: w,
-        height: h,
+        right: left + width,
+        bottom: top + height,
+        width,
+        height,
         x: left,
         y: top,
         toJSON() {},
@@ -27,41 +27,65 @@ describe('makePageContext wiring', () => {
   const NO_FRAME = { top: 0, right: 0, bottom: 0, left: 0 };
 
   it('toContentPoint = transform.viewToContent(client − rect top-left), scale 2', () => {
-    const t = pageTransform({
+    const transform = pageTransform({
       pageSize: { width: 100, height: 200 },
       rotation: 0,
       scale: 2,
       dpr: 1,
     });
-    const ctx = makePageContext('d', 'test-view', toPageRef(1), 0, NO_FRAME, t, rectAt(10, 20, t.viewWidth, t.viewHeight));
+    const ctx = makePageContext(
+      'd',
+      'test-view',
+      toPageRef(1),
+      0,
+      NO_FRAME,
+      transform,
+      rectAt(10, 20, transform.viewWidth, transform.viewHeight),
+    );
     expect(ctx.toContentPoint(10, 20)).toEqual({ x: 0, y: 0 }); // box top-left → page origin
     expect(ctx.toContentPoint(110, 220)).toEqual({ x: 50, y: 100 }); // (100,200) view px ÷ scale 2
   });
 
   it('inverts a 90° rotation through the transform', () => {
-    const t = pageTransform({
+    const transform = pageTransform({
       pageSize: { width: 100, height: 200 },
       rotation: 90,
       scale: 1,
       dpr: 1,
     });
-    // footprint is 200×100; content top-left sits at the box top-RIGHT (x = 200)
-    const ctx = makePageContext('d', 'test-view', toPageRef(1), 0, NO_FRAME, t, rectAt(0, 0, t.viewWidth, t.viewHeight));
+    // footprint is 200×100; content top-left sits at the box top-right (x = 200)
+    const ctx = makePageContext(
+      'd',
+      'test-view',
+      toPageRef(1),
+      0,
+      NO_FRAME,
+      transform,
+      rectAt(0, 0, transform.viewWidth, transform.viewHeight),
+    );
     const back = ctx.toContentPoint(200, 0);
     expect(back.x).toBeCloseTo(0, 4);
     expect(back.y).toBeCloseTo(0, 4);
   });
 
   it('toClientRect offsets the transform rect by the live client rect origin', () => {
-    const t = pageTransform({
+    const transform = pageTransform({
       pageSize: { width: 100, height: 200 },
       rotation: 90,
       scale: 1,
       dpr: 1,
     });
-    const ctx = makePageContext('d', 'test-view', toPageRef(1), 0, NO_FRAME, t, rectAt(30, 40, t.viewWidth, t.viewHeight));
+    const ctx = makePageContext(
+      'd',
+      'test-view',
+      toPageRef(1),
+      0,
+      NO_FRAME,
+      transform,
+      rectAt(30, 40, transform.viewWidth, transform.viewHeight),
+    );
     const rect = { x: 10, y: 20, width: 30, height: 40 };
-    const view = t.contentToViewRect(rect);
+    const view = transform.contentToViewRect(rect);
 
     expect(ctx.toClientRect(rect)).toEqual({
       x: 30 + view.x,
@@ -73,9 +97,22 @@ describe('makePageContext wiring', () => {
 
   it('carries transform + frame through', () => {
     const frame = { top: 0, right: 0, bottom: 16, left: 0 };
-    const t = pageTransform({ pageSize: { width: 10, height: 10 }, rotation: 0, scale: 1, dpr: 1 });
-    const ctx = makePageContext('d', 'test-view', toPageRef(1), 0, frame, t, rectAt(0, 0, 10, 10));
+    const transform = pageTransform({
+      pageSize: { width: 10, height: 10 },
+      rotation: 0,
+      scale: 1,
+      dpr: 1,
+    });
+    const ctx = makePageContext(
+      'd',
+      'test-view',
+      toPageRef(1),
+      0,
+      frame,
+      transform,
+      rectAt(0, 0, 10, 10),
+    );
     expect(ctx.frame).toEqual(frame);
-    expect(ctx.transform).toBe(t);
+    expect(ctx.transform).toBe(transform);
   });
 });

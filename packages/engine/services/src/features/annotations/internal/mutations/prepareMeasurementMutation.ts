@@ -7,63 +7,69 @@ import {
   isReadout,
   measurementReadout,
   type AnnotationDTO,
-  type WireAnnotationDraft,
-  type WireAnnotationPatch,
+  type AnnotationDraft,
+  type AnnotationPatch,
   type PdfPoint,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, Ptr } from '@embedpdf/engine-runtime';
 
-const kinds = new Set(['line', 'polygon', 'polyline']);
+type DimensionKind = 'line' | 'polygon' | 'polyline';
+type DimensionWrite = Extract<AnnotationDraft | AnnotationPatch, { subtype?: DimensionKind }>;
+
 const inputs = ['linePoints', 'vertices', 'measure', 'intent', 'contents'] as const;
 
-function validate(value: WireAnnotationDraft | WireAnnotationPatch): void {
-  if (!kinds.has(value.subtype)) return;
-  const v = value as Extract<WireAnnotationPatch, { subtype: 'line' | 'polygon' | 'polyline' }>;
+const isDimensionKind = (subtype: string | undefined): subtype is DimensionKind =>
+  subtype === 'line' || subtype === 'polygon' || subtype === 'polyline';
+
+function validate(subtype: DimensionKind, v: DimensionWrite): void {
   try {
-    if (v.measure !== undefined && v.measure !== null) assertWritableMeasure(v.measure);
-    if (v.caption != null && (typeof v.caption !== 'object' || Array.isArray(v.caption)))
-      throw new RangeError('Invalid caption');
+    if (v.measure != null && v.measure.subtype === 'rectilinear') assertWritableMeasure(v.measure);
     if (
-      v.subtype === 'line' &&
+      subtype === 'line' &&
+      'leader' in v &&
       v.leader != null &&
       (typeof v.leader !== 'object' || Array.isArray(v.leader))
     )
-      throw new RangeError('Invalid line leader');
+      throw new EngineError(EngineErrorCode.InvalidArg, 'Invalid line leader');
     const intents =
-      v.subtype === 'line'
-        ? ['LineDimension', 'LineArrow']
-        : v.subtype === 'polygon'
-          ? ['PolygonDimension', 'PolygonCloud']
-          : ['PolyLineDimension'];
+      subtype === 'line'
+        ? ['line-dimension', 'line-arrow']
+        : subtype === 'polygon'
+          ? ['polygon-dimension', 'polygon-cloud']
+          : ['polyline-dimension'];
     if (v.intent != null && !intents.includes(v.intent))
-      throw new RangeError('Invalid measurement intent');
-    if (v.caption) {
-      if (v.caption.enabled !== undefined && typeof v.caption.enabled !== 'boolean')
-        throw new RangeError('Invalid caption visibility');
-      if (v.subtype === 'line') {
-        if (v.caption.position != null && !['inline', 'top'].includes(v.caption.position))
-          throw new RangeError('Invalid caption position');
-        if (v.caption.offset) {
-          assertPdfFloat(v.caption.offset.along);
-          assertPdfFloat(v.caption.offset.perpendicular);
-        }
-      } else if (v.caption.center) {
-        assertPdfFloat(v.caption.center.x);
-        assertPdfFloat(v.caption.center.y);
-      }
+      throw new EngineError(EngineErrorCode.InvalidArg, 'Invalid measurement intent');
+    if (v.captionEnabled != null && typeof v.captionEnabled !== 'boolean')
+      throw new EngineError(EngineErrorCode.InvalidArg, 'Invalid caption visibility');
+    if ('captionPosition' in v && v.captionPosition != null) {
+      if (!['inline', 'top'].includes(v.captionPosition))
+        throw new EngineError(EngineErrorCode.InvalidArg, 'Invalid caption position');
     }
-    if (v.subtype === 'line' && v.leader) {
+    if ('captionOffset' in v && v.captionOffset) {
+      assertPdfFloat(v.captionOffset.along);
+      assertPdfFloat(v.captionOffset.perpendicular);
+    }
+    if ('captionCenter' in v && v.captionCenter) {
+      assertPdfFloat(v.captionCenter.x);
+      assertPdfFloat(v.captionCenter.y);
+    }
+    if ('leader' in v && v.leader) {
       for (const n of [v.leader.length, v.leader.extension ?? 0, v.leader.offset ?? 0])
         assertPdfFloat(n);
       if ((v.leader.extension ?? 0) < 0 || (v.leader.offset ?? 0) < 0)
-        throw new RangeError('Leader extension and offset must be nonnegative');
+        throw new EngineError(
+          EngineErrorCode.InvalidArg,
+          'Leader extension and offset must be nonnegative',
+        );
     }
     const points =
-      v.subtype === 'line'
+      'linePoints' in v
         ? v.linePoints
           ? [v.linePoints.start, v.linePoints.end]
           : []
-        : (v.vertices ?? []);
+        : 'vertices' in v
+          ? (v.vertices ?? [])
+          : [];
     for (const p of points) {
       assertPdfFloat(p.x);
       assertPdfFloat(p.y);
@@ -73,7 +79,7 @@ function validate(value: WireAnnotationDraft | WireAnnotationPatch): void {
   }
 }
 
-/** Infer a rigid transform only when ALL corresponding vertices agree. Vertex edits leave a manual center fixed. */
+/** Infer a rigid transform only when all corresponding vertices agree. Vertex edits leave a manual center fixed. */
 function moveCenter(
   before: readonly PdfPoint[],
   after: readonly PdfPoint[],
@@ -104,83 +110,129 @@ function moveCenter(
   return transform(center);
 }
 
-export function prepareMeasurementDraft(draft: WireAnnotationDraft): WireAnnotationDraft {
-  validate(draft);
-  if (
-    (draft.subtype === 'line' || draft.subtype === 'polygon' || draft.subtype === 'polyline') &&
-    draft.caption &&
-    draft.caption.enabled === undefined
-  ) {
-    throw new EngineError(EngineErrorCode.InvalidArg, 'A new caption requires enabled');
+const CAPTION_FIELDS = ['captionEnabled', 'captionPosition', 'captionOffset', 'captionCenter'];
+
+const touchesCaption = (value: object): boolean =>
+  CAPTION_FIELDS.some((name) => (value as Record<string, unknown>)[name] !== undefined);
+
+/**
+ * Prepare a dimension draft for the writer: validate it, derive its label,
+ * and complete its caption fields, since the native caption setters write the
+ * whole caption at once.
+ */
+export function prepareMeasurementDraft(draft: AnnotationDraft): AnnotationDraft {
+  if (!isDimensionKind(draft.subtype)) return draft;
+  const dimension = draft as DimensionWrite;
+  validate(draft.subtype, dimension);
+  if (dimension.measure != null && dimension.measure.subtype !== 'rectilinear') {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      `A ${dimension.measure.subtype === 'geospatial' ? 'geospatial' : 'foreign'} measure can't be written; leave measure out`,
+    );
   }
-  return deriveMeasurementLabel(draft);
+  let prepared = draft;
+  if (touchesCaption(draft)) {
+    if (draft.subtype === 'line') {
+      prepared = {
+        ...draft,
+        // `null` is a line without a caption flag, as a read says.
+        captionEnabled: draft.captionEnabled === undefined ? false : draft.captionEnabled,
+        captionPosition: draft.captionPosition ?? 'inline',
+        captionOffset: draft.captionOffset ?? null,
+      };
+    } else if (draft.subtype === 'polygon' || draft.subtype === 'polyline') {
+      prepared = {
+        ...draft,
+        captionEnabled: draft.captionEnabled ?? (draft.captionCenter != null ? false : null),
+        captionCenter: draft.captionCenter ?? null,
+      };
+    }
+  }
+  return deriveMeasurementLabel(prepared as never) as AnnotationDraft;
 }
 
+/**
+ * Prepare a dimension patch for the writer. The patch's subtype is the
+ * target's. Caption fields merge with the current caption into a complete
+ * caption; a whole-shape move carries a manual caption center along; a
+ * foreign measure marker sent back keeps the measure as it is; and the label
+ * is derived from the resulting geometry and scale.
+ */
 export function prepareMeasurementPatch(
   fn: PdfFunctions,
   annot: Ptr,
   current: AnnotationDTO,
-  patch: WireAnnotationPatch,
-): WireAnnotationPatch {
-  if (patch.subtype !== current.subtype)
+  patch: AnnotationPatch,
+): AnnotationPatch {
+  if (patch.subtype !== undefined && patch.subtype !== current.subtype)
     throw new EngineError(EngineErrorCode.InvalidArg, 'Annotation subtype cannot change');
-  validate(patch);
-  if (
-    (patch.subtype !== 'line' && patch.subtype !== 'polygon' && patch.subtype !== 'polyline') ||
-    (current.subtype !== 'line' && current.subtype !== 'polygon' && current.subtype !== 'polyline')
-  )
+  if (!isDimensionKind(current.subtype)) return patch;
+  if (current.subtype !== 'line' && current.subtype !== 'polygon' && current.subtype !== 'polyline')
     return patch;
-  if (patch.measure && current.measure && current.measure.subtype !== 'RL') {
-    throw new EngineError(
-      EngineErrorCode.InvalidArg,
-      'Remove the foreign measure explicitly before replacing it',
-    );
+  const subtype = current.subtype;
+  let next = { ...patch, subtype } as DimensionWrite & { subtype: DimensionKind };
+  validate(subtype, next);
+
+  if (next.measure != null && next.measure.subtype !== 'rectilinear') {
+    if (current.measure?.subtype !== next.measure.subtype) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `A ${next.measure.subtype === 'geospatial' ? 'geospatial' : 'foreign'} measure can't be written; leave measure out`,
+      );
+    }
+    // The marker a read returned, sent back: the measure stays as it is.
+    next = { ...next, measure: undefined };
   }
-  if (
-    patch.subtype !== 'line' &&
-    patch.caption &&
-    fn.FPDFAnnot_HasKey(annot, 'EMBD_Metadata') &&
-    fn.FPDFAnnot_GetValueType(annot, 'EMBD_Metadata') !== 6
-  ) {
-    throw new EngineError(
-      EngineErrorCode.InvalidArg,
-      'Malformed annotation metadata cannot store a caption',
-    );
-  }
-  if (
-    patch.subtype !== 'line' &&
-    current.subtype !== 'line' &&
-    patch.vertices &&
-    patch.caption !== null &&
-    patch.caption?.center === undefined &&
-    current.caption?.center
-  ) {
-    const center = moveCenter(current.vertices, patch.vertices, current.caption.center);
-    if (center) patch = { ...patch, caption: { ...current.caption, ...patch.caption, center } };
-  }
-  if (patch.caption) {
-    if (patch.subtype === 'line' && current.subtype === 'line') {
-      const c = { enabled: false, ...current.caption, ...patch.caption };
-      patch = {
-        ...patch,
-        caption: {
-          enabled: c.enabled,
-          position: c.position ?? 'inline',
-          ...(c.offset ? { offset: c.offset } : {}),
-        },
-      };
-    } else if (patch.subtype !== 'line' && current.subtype !== 'line') {
-      const c = { enabled: false, ...current.caption, ...patch.caption };
-      patch = {
-        ...patch,
-        caption: { enabled: c.enabled, ...(c.center ? { center: c.center } : {}) },
+
+  if (current.subtype === 'line' && next.subtype === 'line') {
+    if (touchesCaption(next)) {
+      next = {
+        ...next,
+        captionEnabled:
+          next.captionEnabled === undefined ? current.captionEnabled : next.captionEnabled,
+        captionPosition: next.captionPosition ?? current.captionPosition,
+        captionOffset:
+          next.captionOffset === undefined ? current.captionOffset : next.captionOffset,
       };
     }
+  } else if (current.subtype !== 'line' && next.subtype !== 'line') {
+    if (
+      touchesCaption(next) &&
+      fn.FPDFAnnot_HasKey(annot, 'EMBD_Metadata') &&
+      fn.FPDFAnnot_GetValueType(annot, 'EMBD_Metadata') !== 6
+    ) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        'Malformed annotation metadata cannot store a caption',
+      );
+    }
+    if (
+      next.vertices &&
+      next.captionEnabled !== null &&
+      next.captionCenter === undefined &&
+      current.captionCenter
+    ) {
+      const center = moveCenter(current.vertices, next.vertices, current.captionCenter);
+      if (center) next = { ...next, captionCenter: center };
+    }
+    if (touchesCaption(next)) {
+      next =
+        next.captionEnabled === null
+          ? // No caption flag: the caption and its placement go together.
+            { ...next, captionEnabled: null, captionCenter: null }
+          : {
+              ...next,
+              captionEnabled: next.captionEnabled ?? current.captionEnabled ?? false,
+              captionCenter:
+                next.captionCenter === undefined ? current.captionCenter : next.captionCenter,
+            };
+    }
   }
-  if (inputs.some((key) => (patch as unknown as Record<string, unknown>)[key] !== undefined)) {
-    const readout = measurementReadout({ ...current, ...patch });
-    if (isReadout(readout)) patch = { ...patch, contents: readout.label };
+
+  if (inputs.some((key) => (next as Record<string, unknown>)[key] !== undefined)) {
+    const readout = measurementReadout({ ...current, ...next } as never);
+    if (isReadout(readout)) next = { ...next, contents: readout.label };
   }
-  validate(patch);
-  return patch;
+  validate(subtype, next);
+  return next as AnnotationPatch;
 }

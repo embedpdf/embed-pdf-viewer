@@ -26,7 +26,7 @@ describe("SignaturesClient", () => {
                     contentsSize: 1,
                     coverage: "whole-revision",
                     revisionIndex: 1,
-                    signer: { name: null, reason: null, location: null, contactInfo: null, claimedTime: null },
+                    signer: { name: null, reason: null, location: null, contactInfo: null, signedAt: null },
                     docMdp: 1.1,
                     catalogCertification: true,
                     fieldMdp: { action: "all", fields: ["fields"] },
@@ -90,11 +90,11 @@ describe("SignaturesClient", () => {
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });
 
-    test("abort (1)", async () => {
+    test("cancel (1)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { status: "aborted" };
+        const rawResponseBody = { status: "cancelled" };
 
         server
             .mockEndpoint()
@@ -104,7 +104,7 @@ describe("SignaturesClient", () => {
             .jsonBody(rawResponseBody)
             .build();
 
-        const response = await client.doc.signatures.abort({
+        const response = await client.doc.signatures.cancel({
             docId: "docId",
             layerName: "layerName",
             signingId: "signingId",
@@ -112,7 +112,7 @@ describe("SignaturesClient", () => {
         expect(response).toEqual(rawResponseBody);
     });
 
-    test("abort (2)", async () => {
+    test("cancel (2)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
@@ -127,7 +127,7 @@ describe("SignaturesClient", () => {
             .build();
 
         await expect(async () => {
-            return await client.doc.signatures.abort({
+            return await client.doc.signatures.cancel({
                 docId: "docId",
                 layerName: "layerName",
                 signingId: "signingId",
@@ -167,7 +167,7 @@ describe("SignaturesClient", () => {
                     reason: "reason",
                     location: "location",
                     contactInfo: "contactInfo",
-                    claimedTime: "claimedTime",
+                    signedAt: "2024-01-15T09:30:00Z",
                 },
                 docMdp: 1.1,
                 catalogCertification: true,
@@ -210,6 +210,9 @@ describe("SignaturesClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [

@@ -1,6 +1,6 @@
-import type { ControllerContext } from '@embedpdf/core';
+import type { PluginContext } from '@embedpdf/core';
 
-import type { RedactionAction, RedactionState } from '../model';
+import type { RedactionState } from '../model';
 
-/** The plugin context every area receives — the kernel's, typed to this slice. */
-export type RedactionContext = ControllerContext<RedactionState, RedactionAction>;
+/** The plugin context every area receives: the kernel's, typed to this plugin's state. */
+export type RedactionContext = PluginContext<RedactionState>;

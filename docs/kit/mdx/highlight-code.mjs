@@ -1,6 +1,6 @@
 /**
  * The ONE code-highlighting pipeline for both docs sites
- * (DOCS-PLATFORM-ARCHITECTURE.md: code display is kit machinery — a
+ * (docs/conventions/docs-architecture.md: code display is kit machinery — a
  * rendering fix lands exactly once, or it will be rediscovered as a bug
  * report on the other site).
  *

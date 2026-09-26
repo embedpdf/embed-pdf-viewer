@@ -1,6 +1,7 @@
 import type {
   AttachmentFileInfo,
-  EmbeddedFileRef,
+  AttachmentRef,
+  IsoDateTime,
   WireResource,
 } from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
@@ -13,16 +14,17 @@ import type {
 } from '@embedpdf/engine-runtime';
 
 import { readUtf16String, writeUtf16String } from '../../../runtime/memory/strings';
+import { formatPdfDate, pdfDateToIso } from '../../../shared/pdf-date';
 
 /**
  * Shared primitives over an `FPDF_ATTACHMENT` handle (an unretained
  * filespec pointer — no close call exists or is needed). Used by both
  * homes an embedded file can have: the document-level `/EmbeddedFiles`
  * name tree (`AttachmentReader`) and a FileAttachment annotation's `/FS`
- * (the annotation reader + `downloadFile`).
+ * (the annotation reader + `downloadResource(ref, 'file')`).
  */
 
-/** Read the name-tree KEY at |index| — the durable EmbeddedFileRef address. */
+/** Read the name-tree key at |index| — the durable AttachmentRef address. */
 export function readAttachmentKey(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
@@ -32,12 +34,12 @@ export function readAttachmentKey(
   return readUtf16String(mem, (buf, cap) => fn.EPDFDoc_GetAttachmentKey(docPtr, index, buf, cap));
 }
 
-/** Resolve an EmbeddedFileRef to its CURRENT name-tree index, or -1. */
+/** Resolve an AttachmentRef to its current name-tree index, or -1. */
 export function resolveAttachmentIndex(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   docPtr: Ptr,
-  ref: EmbeddedFileRef,
+  ref: AttachmentRef,
 ): number {
   const keyPtr = mem.writeU16String(ref.key);
   try {
@@ -61,12 +63,12 @@ export function writeAttachmentFilePayload(
   mem: PdfRuntimeMemory,
   attachmentPtr: Ptr,
   docPtr: Ptr,
-  file: { mimeType?: string; description?: string },
+  file: { mimeType?: string | null; description?: string },
   resource: WireResource,
 ): void {
   const byteLength = resource.bytes.byteLength;
   if (byteLength === 0) {
-    // Valid zero-byte attachment: PDFium accepts (NULL, 0).
+    // Valid zero-byte attachment: PDFium accepts (null, 0).
     if (!fn.FPDFAttachment_SetFile(attachmentPtr, docPtr, NULL_PTR, 0)) {
       throw new EngineError(EngineErrorCode.Unknown, 'FPDFAttachment_SetFile returned false');
     }
@@ -82,7 +84,13 @@ export function writeAttachmentFilePayload(
     }
   }
 
-  if (!fn.EPDFAttachment_SetSubtype(attachmentPtr, file.mimeType ?? 'application/octet-stream')) {
+  // `FPDFAttachment_SetFile` dates the file in local time without an offset;
+  // a date the engine makes is UTC (convention §2.14).
+  writeUtf16String(mem, formatPdfDate(new Date()), (ptr) =>
+    fn.FPDFAttachment_SetStringValue(attachmentPtr, 'CreationDate', ptr),
+  );
+  // A file without a declared type has none: the engine never guesses one.
+  if (file.mimeType && !fn.EPDFAttachment_SetSubtype(attachmentPtr, file.mimeType)) {
     throw new EngineError(EngineErrorCode.Unknown, 'EPDFAttachment_SetSubtype returned false');
   }
   if (file.description !== undefined) {
@@ -112,17 +120,19 @@ export function readAttachmentFileInfo(
   const description = readUtf16String(mem, (buf, cap) =>
     fn.EPDFAttachment_GetDescription(attachmentPtr, buf, cap),
   );
-  const creationDate = readAttachmentString(fn, mem, attachmentPtr, 'CreationDate');
+  const createdAt = readAttachmentDate(fn, mem, attachmentPtr, 'CreationDate');
+  const modifiedAt = readAttachmentDate(fn, mem, attachmentPtr, 'ModDate');
   const checksum = normalizeChecksum(readAttachmentString(fn, mem, attachmentPtr, 'CheckSum'));
   const size = readAttachmentSize(fn, mem, attachmentPtr);
 
   return {
     name,
-    ...(mimeType ? { mimeType } : {}),
-    ...(description ? { description } : {}),
-    ...(size !== null ? { size } : {}),
-    ...(checksum ? { checksum } : {}),
-    ...(creationDate ? { creationDate } : {}),
+    mimeType: mimeType || null,
+    description: description || null,
+    size,
+    checksum: checksum || null,
+    createdAt: createdAt || null,
+    modifiedAt: modifiedAt || null,
   };
 }
 
@@ -224,7 +234,7 @@ function extractStatusError(status: number): EngineError {
       return new EngineError(EngineErrorCode.MalformedPdf, 'embedded file stream failed to decode');
     case 3: // kSizeLimitExceeded
       return new EngineError(
-        EngineErrorCode.InvalidArg,
+        EngineErrorCode.PayloadTooLarge,
         'embedded file exceeds the configured decoded-size limit',
       );
     case 4: // kWriteFailed
@@ -249,6 +259,17 @@ function readAttachmentString(
     (buf, cap) => fn.FPDFAttachment_GetStringValue(attachmentPtr, key, buf, cap),
     null,
   );
+}
+
+/** A `/Params` date as `IsoDateTime`; absent when missing or not a date. */
+function readAttachmentDate(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  attachmentPtr: Ptr,
+  key: 'CreationDate' | 'ModDate',
+): IsoDateTime | null {
+  const raw = readAttachmentString(fn, mem, attachmentPtr, key);
+  return raw ? pdfDateToIso(raw) : null;
 }
 
 function readAttachmentSize(

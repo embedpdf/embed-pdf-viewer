@@ -1,7 +1,7 @@
 import type {
   DigestAlgorithm,
   DocumentVersionRef,
-  SignatureAbortResult,
+  SignatureCancelResult,
   SignatureCompleteInput,
   SignatureCompleteResult,
   SignaturePrepareInput,
@@ -29,6 +29,7 @@ import {
   type OpenedPdfDocument,
 } from '../../document-session/lifecycle/PdfDocumentOpener';
 import { withScratch } from '../../runtime/memory/scratch';
+import { formatPdfDate } from '../../shared/pdf-date';
 import { generateUuid } from '../../shared/uuid';
 import { disposeFormModel } from '../forms/internal/formModelCache';
 import { withWideStringArray } from '../forms/internal/wideStringArray';
@@ -106,14 +107,14 @@ const PREPARE_LP64: PrepareLayout = {
 /**
  * The two-phase signing protocol on a session, local and native alike.
  *
- * `prepare` never touches the live document: it builds a CANDIDATE — a
+ * `prepare` never touches the live document: it builds a candidate — a
  * fresh layer over the session's own immutable base (see `openCandidate`)
  * — writes the signature there, saves it through a `CandidateStore`
  * (memory locally, a file beside the base on file-backed sessions), seals
  * it, and parks the saved candidate on the session. `complete` writes the
  * CMS into it, opens it as a new base with a fresh layer, proves the new
  * signature seals a whole revision, and installs it as the session's
- * document. `abort` discards the candidate.
+ * document. `cancel` discards the candidate.
  */
 export class SignatureMutator {
   constructor(
@@ -128,7 +129,7 @@ export class SignatureMutator {
     if (this.session.pendingSigning) {
       throw new EngineError(
         EngineErrorCode.SigningPending,
-        `a signing is pending (${this.session.pendingSigning.prepared.signingId}); complete or abort it first`,
+        `a signing is pending (${this.session.pendingSigning.prepared.signingId}); complete or cancel it first`,
       );
     }
     const reader = new SignatureReader(this.runtime, this.session);
@@ -180,19 +181,16 @@ export class SignatureMutator {
       const candidate = this.openCandidate(signingId, stack);
       stack.push(() => candidate.close());
 
-      // `signer` is the pre-rename wire spelling: older clients still send it.
-      const attribution =
-        input.attribution ??
-        (input as { signer?: SignaturePrepareInput['attribution'] }).signer;
+      const signer = input.signer;
       const valueObjNum = this.callPrepare(candidate.docPtr, field.fieldObjectNumber, {
         subfilter: SUBFILTER_CODE[subFilter],
         digest: DIGEST_CODE[algorithm],
         contentsSize,
-        name: attribution?.name ?? null,
-        reason: attribution?.reason ?? null,
-        location: attribution?.location ?? null,
-        contactInfo: attribution?.contactInfo ?? null,
-        signingTime: input.signingTime ?? null,
+        name: signer?.name ?? null,
+        reason: signer?.reason ?? null,
+        location: signer?.location ?? null,
+        contactInfo: signer?.contactInfo ?? null,
+        signingTime: signer?.signedAt !== undefined ? formatPdfDate(signer.signedAt) : null,
         docmdpPermission: input.certify?.permission ?? 0,
         fieldmdpAction: input.lock ? FIELD_ACTION_CODE[input.lock.action] : 0,
         fieldmdpFields: input.lock?.action === 'all' ? [] : (input.lock?.fields ?? []),
@@ -205,7 +203,8 @@ export class SignatureMutator {
         );
       }
       if (input.appearance && field.widget) {
-        bakeWidgetAppearance(this.runtime, 
+        bakeWidgetAppearance(
+          this.runtime,
           candidate.docPtr,
           field.widget,
           input.appearance.pdf,
@@ -325,12 +324,12 @@ export class SignatureMutator {
     return result;
   }
 
-  abort(signingId: string): SignatureAbortResult {
+  cancel(signingId: string): SignatureCancelResult {
     const pending = this.session.pendingSigning;
     if (pending && pending.prepared.signingId === signingId) {
       this.session.pendingSigning = null;
       this.storeFor().discard(pending.saved);
-      return { status: 'aborted' };
+      return { status: 'cancelled' };
     }
     if (this.session.lastCompletion?.signingId === signingId) {
       return { status: 'already-completed' };
@@ -408,7 +407,7 @@ export class SignatureMutator {
   /**
    * File-backed sessions (a file base in the registry: the server) persist
    * the candidate as a file beside the base; everything else keeps it in
-   * memory. The choice follows the SESSION's base, not the candidate's.
+   * memory. The choice follows the session's base, not the candidate's.
    */
   private storeFor(): CandidateStore {
     const base = this.session.source.base;
@@ -456,7 +455,7 @@ export class SignatureMutator {
 
   /**
    * The candidate the signature is authored on. A layer session reopens a
-   * fresh layer over ITS OWN immutable base (a registry retain, no copy of
+   * fresh layer over its own immutable base (a registry retain, no copy of
    * the file), fed the layer it was opened with — or, with unsaved edits,
    * the artifact a save would write, which is cumulative: the edits and
    * the signature then share one revision, as Acrobat saves a
@@ -473,14 +472,15 @@ export class SignatureMutator {
     // layer-sized goes through scratch files beside the base (the signing
     // root the file candidate store owns); the wasm client keeps buffers —
     // its bytes are in memory anyway.
-    const scratch = saver.canWriteScratchFiles() && source.base?.kind === 'file' ? source.base.path : null;
+    const scratch =
+      saver.canWriteScratchFiles() && source.base?.kind === 'file' ? source.base.path : null;
     if (this.session.kind === 'layer' && source.base && !this.loadedDeltaHoldsSignedBytes()) {
       const base = this.baseDocuments.retainByKey(source.base.key);
       if (base) {
         // With unsaved edits, the artifact a save would write — unless the
         // save pass finds nothing reachable changed since load (an
         // annotation added and removed again): then the layer the session
-        // was opened with IS the document, and the candidate seals it.
+        // was opened with is the document, and the candidate seals it.
         let layer: LayerSource = source.layer ?? { kind: 'fresh' };
         if (this.session.hasUnsavedEdits()) {
           if (scratch) {

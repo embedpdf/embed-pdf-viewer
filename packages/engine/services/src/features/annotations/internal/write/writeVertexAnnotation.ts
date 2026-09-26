@@ -1,4 +1,3 @@
-import { writeMeasurementFields } from './writeMeasurementFields';
 import type {
   PolygonDraft,
   PolygonPatch,
@@ -15,8 +14,9 @@ import {
   setVertices,
 } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
-import { applyFilledStyleDraft, applyFilledStylePatch } from './writeStyle';
 import { writeVertexTransformMetadata } from './writeAnnotationTransformMetadata';
+import { writeMeasurementFields } from './writeMeasurementFields';
+import { applyFilledStyleDraft, applyFilledStylePatch } from './writeStyle';
 
 export type VertexDraft = PolygonDraft | PolylineDraft;
 export type VertexPatch = PolygonPatch | PolylinePatch;
@@ -32,7 +32,7 @@ const DEFAULT_LINE_ENDINGS = { start: 'none', end: 'none' } as const;
  *   4. /Vertices geometry
  *   5. optional cloudy (/BE)
  *
- * Note: polygon does NOT use /RD (rectangle differences) — its geometry is
+ * Note: polygon does not use /RD (rectangle differences) — its geometry is
  * fully described by /Vertices + /Rect, so /RD is redundant. Per ISO 32000
  * /RD applies to Square/Circle (and FreeText/Caret), not Polygon.
  */

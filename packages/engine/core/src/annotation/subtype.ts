@@ -1,11 +1,11 @@
 /**
- * Closed-world string catalog of annotation subtypes the v3 wire format knows
+ * Closed-world string catalog of annotation subtypes the wire format knows
  * about. The TypeScript discriminated union `AnnotationDTO` is keyed on this
  * literal type. PDFium's integer subtype code is mapped onto these strings
  * by the reader registry.
  *
- * `unsupported` is the forward-compat fallback for any PDF subtype that
- * the engine has not implemented a reader for yet. Unknown subtypes never
+ * `unsupported` is the forward-compat fallback for any PDF subtype the
+ * engine has no reader for. Unknown subtypes never
  * silently disappear from the wire — they round-trip as
  * `{ subtype: 'unsupported', rawSubtypeCode }`.
  */
@@ -76,8 +76,8 @@ export type PdfAnnotationSubtypeCode =
   (typeof PdfAnnotationSubtypeCode)[keyof typeof PdfAnnotationSubtypeCode];
 
 /**
- * Map from PDFium codes to wire-stable string subtypes. Codes the engine
- * recognises as a v3 subtype (or maps to 'unsupported' if not yet wired).
+ * Map from PDFium codes to wire-stable string subtypes. A code missing here
+ * reads as 'unsupported'.
  */
 export const PDF_CODE_TO_SUBTYPE: Readonly<Record<number, AnnotationSubtype>> = Object.freeze({
   [PdfAnnotationSubtypeCode.TEXT]: 'text',

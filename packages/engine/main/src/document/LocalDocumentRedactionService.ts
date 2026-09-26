@@ -64,11 +64,8 @@ export class LocalDocumentRedactionService implements DocumentRedactionService {
       if (payload.tag !== 'redaction.apply') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      if (payload.result.meta !== null) {
-        this.publisher.publishLocal({
-          type: 'redaction.applied',
-          ...payload.result,
-        });
+      if (payload.wrote) {
+        this.publisher.publishLocal({ type: 'redaction.applied', ...payload.result });
       }
       return payload.result;
     });

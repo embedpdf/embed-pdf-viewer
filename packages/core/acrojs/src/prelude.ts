@@ -5,7 +5,7 @@
  * values. The sandbox ships `installAcroJs.toString()` into QuickJS, while
  * tests execute the same source in a Node VM. Types disappear at build time.
  */
-export function installAcroJs(g: Record<string, unknown>): void {
+export function installAcroJs(globalObject: Record<string, unknown>): void {
   type AnyRecord = Record<string, unknown>;
   type FieldRecord = {
     input: AnyRecord;
@@ -40,17 +40,17 @@ export function installAcroJs(g: Record<string, unknown>): void {
     maxEffects: number;
   };
 
-  const host = g as AnyRecord;
+  const host = globalObject as AnyRecord;
   const NativeDate = Date;
   let state: RunState | null = null;
 
   const cloneValue = (value: unknown): unknown =>
     Array.isArray(value) ? value.map((item) => String(item)) : value;
-  const sameValue = (a: unknown, b: unknown): boolean => {
-    if (Array.isArray(a) && Array.isArray(b)) {
-      return a.length === b.length && a.every((item, index) => item === b[index]);
+  const sameValue = (left: unknown, right: unknown): boolean => {
+    if (Array.isArray(left) && Array.isArray(right)) {
+      return left.length === right.length && left.every((item, index) => item === right[index]);
     }
-    return a === b;
+    return left === right;
   };
   const refKey = (ref: unknown): string => {
     const value = ref as AnyRecord | null | undefined;
@@ -197,17 +197,21 @@ export function installAcroJs(g: Record<string, unknown>): void {
     if (space === 'T') return null;
     if (space === 'G') return [Number(color[1]), Number(color[1]), Number(color[1])];
     if (space === 'RGB') return [Number(color[1]), Number(color[2]), Number(color[3])];
-    const c = Number(color[1]);
-    const m = Number(color[2]);
-    const y = Number(color[3]);
-    const k = Number(color[4]);
-    return [1 - Math.min(1, c + k), 1 - Math.min(1, m + k), 1 - Math.min(1, y + k)];
+    const cyan = Number(color[1]);
+    const magenta = Number(color[2]);
+    const yellow = Number(color[3]);
+    const black = Number(color[4]);
+    return [
+      1 - Math.min(1, cyan + black),
+      1 - Math.min(1, magenta + black),
+      1 - Math.min(1, yellow + black),
+    ];
   };
-  const sameAnnotValue = (a: unknown, b: unknown): boolean => {
-    if (Array.isArray(a) && Array.isArray(b)) {
-      return a.length === b.length && a.every((item, index) => item === b[index]);
+  const sameAnnotValue = (left: unknown, right: unknown): boolean => {
+    if (Array.isArray(left) && Array.isArray(right)) {
+      return left.length === right.length && left.every((item, index) => item === right[index]);
     }
-    return a === b;
+    return left === right;
   };
   const cloneAnnotValue = (value: unknown): unknown => (Array.isArray(value) ? [...value] : value);
 
@@ -216,7 +220,7 @@ export function installAcroJs(g: Record<string, unknown>): void {
     const subtype = String(input.subtype);
     const writable = ANNOT_WRITABLE[subtype] ?? [];
     const wrapper: AnyRecord = {};
-    const stage = (key: string, value: unknown, validate: (v: unknown) => boolean): void => {
+    const stage = (key: string, value: unknown, validate: (value: unknown) => boolean): void => {
       // Flags and contents are writable on every script-addressable subtype;
       // appearance keys follow the per-subtype matrix.
       if (key !== 'contents' && ANNOT_FLAG_KEYS.indexOf(key) < 0 && writable.indexOf(key) < 0) {
@@ -239,13 +243,13 @@ export function installAcroJs(g: Record<string, unknown>): void {
       }
       record.current[key] = cloneAnnotValue(value);
     };
-    const prop = (key: string, validate: (v: unknown) => boolean): PropertyDescriptor => ({
+    const prop = (key: string, validate: (value: unknown) => boolean): PropertyDescriptor => ({
       enumerable: true,
       get: () => cloneAnnotValue(record.current[key]),
       set: (value: unknown) => stage(key, value, validate),
     });
-    const isNum = (v: unknown) => typeof v === 'number' && isFinite(v);
-    const isBool = (v: unknown) => typeof v === 'boolean';
+    const isNum = (value: unknown) => typeof value === 'number' && isFinite(value);
+    const isBool = (value: unknown) => typeof value === 'boolean';
     Object.defineProperties(wrapper, {
       name: { enumerable: true, get: () => String(input.name ?? '') },
       type: { enumerable: true, get: () => ACROBAT_TYPE[subtype] ?? subtype },
@@ -254,12 +258,15 @@ export function installAcroJs(g: Record<string, unknown>): void {
       subject: { enumerable: true, get: () => String(input.subject ?? '') },
       strokeColor: prop('strokeColor', isColorArray),
       fillColor: prop('fillColor', isColorArray),
-      opacity: prop('opacity', (v) => isNum(v) && Number(v) >= 0 && Number(v) <= 1),
-      width: prop('width', (v) => isNum(v) && Number(v) >= 0),
-      style: prop('borderStyle', (v) => v === 'S' || v === 'D'),
-      dash: prop('dash', (v) => Array.isArray(v) && v.every(isNum)),
-      rect: prop('rect', (v) => Array.isArray(v) && v.length === 4 && v.every(isNum)),
-      contents: prop('contents', (v) => typeof v === 'string'),
+      opacity: prop('opacity', (value) => isNum(value) && Number(value) >= 0 && Number(value) <= 1),
+      width: prop('width', (value) => isNum(value) && Number(value) >= 0),
+      style: prop('borderStyle', (value) => value === 'S' || value === 'D'),
+      dash: prop('dash', (value) => Array.isArray(value) && value.every(isNum)),
+      rect: prop(
+        'rect',
+        (value) => Array.isArray(value) && value.length === 4 && value.every(isNum),
+      ),
+      contents: prop('contents', (value) => typeof value === 'string'),
       hidden: prop('hidden', isBool),
       print: prop('print', isBool),
       readOnly: prop('readOnly', isBool),
@@ -270,7 +277,8 @@ export function installAcroJs(g: Record<string, unknown>): void {
     });
     wrapper.getProps = () => {
       const out: AnyRecord = {};
-      for (const key of Object.keys(record.current)) out[key] = cloneAnnotValue(record.current[key]);
+      for (const key of Object.keys(record.current))
+        out[key] = cloneAnnotValue(record.current[key]);
       return out;
     };
     wrapper.setProps = (props: unknown) => {
@@ -356,7 +364,7 @@ export function installAcroJs(g: Record<string, unknown>): void {
   doc.print = () => state?.uiEffects.push({ kind: 'print' });
   // Acrobat's doc.submitForm: positional (cURL, bFDF, bEmpty, aFields) or a
   // single argument object ({cURL, aFields, bEmpty, cSubmitAs, bGet}). It
-  // emits a submit INTENT — resolution (Table 239/240 semantics) and the
+  // emits a submit intent — resolution (Table 239/240 semantics) and the
   // sink chain (embedder handler → the document's home → blocked) live
   // outside the VM; nothing here touches a network.
   doc.submitForm = (cUrlOrArgs?: unknown, bFDF?: unknown, bEmpty?: unknown, aFields?: unknown) => {
@@ -364,11 +372,12 @@ export function installAcroJs(g: Record<string, unknown>): void {
     const args: AnyRecord =
       cUrlOrArgs !== null && typeof cUrlOrArgs === 'object'
         ? (cUrlOrArgs as AnyRecord)
-        : { cURL: cUrlOrArgs, bFDF: bFDF, bEmpty: bEmpty, aFields: aFields };
+        : { cURL: cUrlOrArgs, bFDF, bEmpty, aFields };
     const names = Array.isArray(args.aFields)
       ? (args.aFields as unknown[]).map((name) => String(name))
       : null;
-    const submitAs = args.cSubmitAs === undefined ? undefined : String(args.cSubmitAs).toUpperCase();
+    const submitAs =
+      args.cSubmitAs === undefined ? undefined : String(args.cSubmitAs).toUpperCase();
     const format =
       submitAs === 'FDF'
         ? 'fdf'
@@ -398,7 +407,7 @@ export function installAcroJs(g: Record<string, unknown>): void {
     // boilerplate (`!ADBE::…VersChk…` name-tree scripts) branches on. Honest
     // values for an emulated modern-Reader-level environment, so those
     // scripts take their "viewer is current" paths instead of tripping over
-    // `undefined`. Deliberately NO `xfa_installed`: we never claim XFA.
+    // `undefined`. Deliberately no `xfa_installed`: we never claim XFA.
     platform: 'WIN',
     language: 'ENU',
     viewerType: 'Reader',
@@ -421,7 +430,7 @@ export function installAcroJs(g: Record<string, unknown>): void {
     },
     launchURL: () => blocked('app.launchURL'),
     // Acrobat's contract when a viewer component (e.g. the XFA plugin) is not
-    // available is `undefined` — NEVER a throw. A web viewer has no
+    // available is `undefined` — never a throw. A web viewer has no
     // installable components, so "not available" is always the truthful
     // answer; Adobe's XFA-check boilerplate calls this after its upgrade nag.
     findComponent: (): undefined => {
@@ -530,25 +539,25 @@ export function installAcroJs(g: Record<string, unknown>): void {
     const fieldsByName = new Map(fields.map((field) => [String(field.input.name), field]));
     const fieldsByRef = new Map(fields.map((field) => [refKey(field.input.ref), field]));
     const annots: AnnotRecord[] = ((input.annots as AnyRecord[] | undefined) ?? []).map(
-      (annot) => {
+      (annotation) => {
         const writableSnapshot = (): AnyRecord => ({
-          strokeColor: cloneAnnotValue(annot.strokeColor ?? ['T']),
-          fillColor: cloneAnnotValue(annot.fillColor ?? ['T']),
-          opacity: Number(annot.opacity ?? 1),
-          width: Number(annot.width ?? 1),
-          borderStyle: String(annot.borderStyle ?? 'S'),
-          dash: cloneAnnotValue(annot.dash ?? []),
-          rect: cloneAnnotValue(annot.rect ?? [0, 0, 0, 0]),
-          contents: String(annot.contents ?? ''),
-          hidden: Boolean(annot.hidden),
-          print: Boolean(annot.print),
-          readOnly: Boolean(annot.readOnly),
-          locked: Boolean(annot.locked),
-          noView: Boolean(annot.noView),
-          toggleNoView: Boolean(annot.toggleNoView),
+          strokeColor: cloneAnnotValue(annotation.strokeColor ?? ['T']),
+          fillColor: cloneAnnotValue(annotation.fillColor ?? ['T']),
+          opacity: Number(annotation.opacity ?? 1),
+          width: Number(annotation.width ?? 1),
+          borderStyle: String(annotation.borderStyle ?? 'S'),
+          dash: cloneAnnotValue(annotation.dash ?? []),
+          rect: cloneAnnotValue(annotation.rect ?? [0, 0, 0, 0]),
+          contents: String(annotation.contents ?? ''),
+          hidden: Boolean(annotation.hidden),
+          print: Boolean(annotation.print),
+          readOnly: Boolean(annotation.readOnly),
+          locked: Boolean(annotation.locked),
+          noView: Boolean(annotation.noView),
+          toggleNoView: Boolean(annotation.toggleNoView),
         });
         const record: AnnotRecord = {
-          input: annot,
+          input: annotation,
           original: writableSnapshot(),
           current: writableSnapshot(),
           wrapper: {},
@@ -580,9 +589,10 @@ export function installAcroJs(g: Record<string, unknown>): void {
     const event: AnyRecord = {
       // Explicit type/name (action-driven runs, from trigger provenance)
       // beat the kind-derived defaults (the K/V/C/F pipeline path).
-      name: eventInput.name !== undefined
-        ? String(eventInput.name)
-        : eventName(String(eventInput.kind ?? '')),
+      name:
+        eventInput.name !== undefined
+          ? String(eventInput.name)
+          : eventName(String(eventInput.kind ?? '')),
       type: eventType,
       // Doc-typed events target the Doc object (Acrobat's WillSave
       // boilerplate does `event.target.getField(...)`); field targets win
@@ -796,17 +806,17 @@ export function installAcroJs(g: Record<string, unknown>): void {
       if (target === 'G') return ['G', 0.3 * rgb[0] + 0.59 * rgb[1] + 0.11 * rgb[2]];
       if (target === 'RGB') return ['RGB', rgb[0], rgb[1], rgb[2]];
       if (target === 'CMYK') {
-        const k = 1 - Math.max(rgb[0], rgb[1], rgb[2]);
-        return ['CMYK', 1 - rgb[0] - k, 1 - rgb[1] - k, 1 - rgb[2] - k, k];
+        const black = 1 - Math.max(rgb[0], rgb[1], rgb[2]);
+        return ['CMYK', 1 - rgb[0] - black, 1 - rgb[1] - black, 1 - rgb[2] - black, black];
       }
       return ['T'];
     },
-    equal: (a: unknown, b: unknown): boolean => {
-      if (!isColorArray(a) || !isColorArray(b)) return false;
-      const left = colorToRgbTriple(a);
-      const right = colorToRgbTriple(b);
-      if (left === null || right === null) return left === right;
-      return left.every((component, index) => Math.abs(component - right[index]) < 1e-6);
+    equal: (left: unknown, right: unknown): boolean => {
+      if (!isColorArray(left) || !isColorArray(right)) return false;
+      const leftRgb = colorToRgbTriple(left);
+      const rightRgb = colorToRgbTriple(right);
+      if (leftRgb === null || rightRgb === null) return leftRgb === rightRgb;
+      return leftRgb.every((component, index) => Math.abs(component - rightRgb[index]) < 1e-6);
     },
   });
   host.getField = getField;
@@ -870,14 +880,14 @@ export function installAcroJs(g: Record<string, unknown>): void {
       values.length === 0
         ? 0
         : op === 'PRD'
-          ? values.reduce((a, b) => a * b, 1)
+          ? values.reduce((left, right) => left * right, 1)
           : op === 'AVG'
-            ? values.reduce((a, b) => a + b, 0) / values.length
+            ? values.reduce((left, right) => left + right, 0) / values.length
             : op === 'MIN'
               ? Math.min(...values)
               : op === 'MAX'
                 ? Math.max(...values)
-                : values.reduce((a, b) => a + b, 0);
+                : values.reduce((left, right) => left + right, 0);
     if (state) state.event.value = value;
   };
   host.AFNumber_Format = (
@@ -945,12 +955,12 @@ export function installAcroJs(g: Record<string, unknown>): void {
     );
 
   const mergeChange = (eventObject?: unknown): string => {
-    const e = (eventObject ?? state?.event ?? {}) as AnyRecord;
-    const value = String(e.value ?? '');
-    if (e.willCommit) return value;
-    const start = Math.max(0, Math.trunc(Number(e.selStart ?? 0)));
-    const end = Math.max(start, Math.trunc(Number(e.selEnd ?? 0)));
-    return value.slice(0, start) + String(e.change ?? '') + value.slice(end);
+    const event = (eventObject ?? state?.event ?? {}) as AnyRecord;
+    const value = String(event.value ?? '');
+    if (event.willCommit) return value;
+    const start = Math.max(0, Math.trunc(Number(event.selStart ?? 0)));
+    const end = Math.max(start, Math.trunc(Number(event.selEnd ?? 0)));
+    return value.slice(0, start) + String(event.change ?? '') + value.slice(end);
   };
   host.AFMergeChange = mergeChange;
 
@@ -967,7 +977,8 @@ export function installAcroJs(g: Record<string, unknown>): void {
           : text.replace(/,/g, '');
     } else if (text.includes(',')) {
       // A single comma reads as the decimal separator; several are thousands.
-      text = (text.match(/,/g) ?? []).length === 1 ? text.replace(',', '.') : text.replace(/,/g, '');
+      text =
+        (text.match(/,/g) ?? []).length === 1 ? text.replace(',', '.') : text.replace(/,/g, '');
     }
     const parsed = Number(text);
     return text !== '' && Number.isFinite(parsed) ? parsed : null;
@@ -1019,7 +1030,8 @@ export function installAcroJs(g: Record<string, unknown>): void {
         digits.length >= 10
           ? `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`
           : `${digits.slice(0, 3)}-${digits.slice(3, 7)}`;
-    else if (kind === 3) formatted = `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5, 9)}`;
+    else if (kind === 3)
+      formatted = `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5, 9)}`;
     state.event.value = formatted;
   };
   host.AFSpecial_Format = afSpecialFormat;
@@ -1108,17 +1120,17 @@ export function installAcroJs(g: Record<string, unknown>): void {
       }
     }
     const timeMatch = /(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?/i.exec(text);
-    let H = 0;
-    let M = 0;
-    let S = 0;
+    let hours = 0;
+    let minutes = 0;
+    let seconds = 0;
     if (timeMatch) {
-      H = Number(timeMatch[1]);
-      M = Number(timeMatch[2]);
-      S = Number(timeMatch[3] ?? 0);
+      hours = Number(timeMatch[1]);
+      minutes = Number(timeMatch[2]);
+      seconds = Number(timeMatch[3] ?? 0);
       const marker = String(timeMatch[4] ?? '').toLowerCase();
-      if (marker === 'pm' && H < 12) H += 12;
-      if (marker === 'am' && H === 12) H = 0;
-      if (H > 23 || M > 59 || S > 59) return null;
+      if (marker === 'pm' && hours < 12) hours += 12;
+      if (marker === 'am' && hours === 12) hours = 0;
+      if (hours > 23 || minutes > 59 || seconds > 59) return null;
     }
     const dateText = timeMatch
       ? text.slice(0, timeMatch.index) + text.slice(timeMatch.index + timeMatch[0].length)
@@ -1129,35 +1141,35 @@ export function installAcroJs(g: Record<string, unknown>): void {
       const kind = (token[0] === 'y' ? 'y' : token[0] === 'm' ? 'm' : 'd') as 'y' | 'm' | 'd';
       if (order.indexOf(kind) < 0) order.push(kind);
     }
-    let y: number | null = null;
-    let m: number | null = namedMonth;
-    let d: number | null = null;
+    let year: number | null = null;
+    let month: number | null = namedMonth;
+    let day: number | null = null;
     let cursor = 0;
     for (const kind of order) {
       if (kind === 'm' && namedMonth !== null) continue;
       if (cursor >= numbers.length) break;
       const value = numbers[cursor];
       cursor += 1;
-      if (kind === 'y') y = value;
-      else if (kind === 'm') m = value;
-      else d = value;
+      if (kind === 'y') year = value;
+      else if (kind === 'm') month = value;
+      else day = value;
     }
-    if (y === null && m === null && d === null && !timeMatch) return null;
+    if (year === null && month === null && day === null && !timeMatch) return null;
     const today = nowWall();
-    if (y === null) y = today.y;
-    else if (y < 100) y = y < 50 ? 2000 + y : 1900 + y;
-    if (m === null) m = today.m;
-    if (d === null) d = 1;
-    if (m < 1 || m > 12 || d < 1 || d > 31) return null;
-    const probe = new NativeDate(NativeDate.UTC(y, m - 1, d));
+    if (year === null) year = today.y;
+    else if (year < 100) year = year < 50 ? 2000 + year : 1900 + year;
+    if (month === null) month = today.m;
+    if (day === null) day = 1;
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+    const probe = new NativeDate(NativeDate.UTC(year, month - 1, day));
     if (
-      probe.getUTCFullYear() !== y ||
-      probe.getUTCMonth() !== m - 1 ||
-      probe.getUTCDate() !== d
+      probe.getUTCFullYear() !== year ||
+      probe.getUTCMonth() !== month - 1 ||
+      probe.getUTCDate() !== day
     ) {
       return null;
     }
-    return { y, m, d, H, M, S };
+    return { y: year, m: month, d: day, H: hours, M: minutes, S: seconds };
   };
 
   const afDateFormatEx = (format: unknown): void => {

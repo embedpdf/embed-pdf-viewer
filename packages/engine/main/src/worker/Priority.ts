@@ -1,7 +1,7 @@
 /**
  * Priority levels for the WorkerQueue. Higher number = served first.
- * Wider range than v2 to leave room for future additions (idle, foreground,
- * critical) without re-indexing.
+ * Levels are spaced 100 apart so new ones can slot in between without
+ * re-indexing.
  */
 export const Priority = {
   LOW: 0,

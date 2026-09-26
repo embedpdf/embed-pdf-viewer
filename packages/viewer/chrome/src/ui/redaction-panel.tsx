@@ -7,7 +7,7 @@ import { useT } from '@embedpdf/react/i18n';
 import { Icon } from './icons';
 
 /**
- * The pending-redactions review panel (right sidebar). The list is a LIVE view
+ * The pending-redactions review panel (right sidebar). The list is a live view
  * over the annotation plane — deleting a mark here is deleting the annotation.
  * "Apply all" routes through the confirm modal: the apply is irreversible.
  */
@@ -34,7 +34,7 @@ export function RedactionPanel() {
                   role="button"
                   tabIndex={0}
                   onClick={() => anno.select(item.ref)}
-                  onKeyDown={(e) => e.key === 'Enter' && anno.select(item.ref)}
+                  onKeyDown={(event) => event.key === 'Enter' && anno.select(item.ref)}
                   className="hover:bg-hover group flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left"
                 >
                   <Icon
@@ -53,8 +53,8 @@ export function RedactionPanel() {
                   </span>
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
+                    onClick={(event) => {
+                      event.stopPropagation();
                       void anno.delete(item.ref);
                     }}
                     className="text-fg-muted hover:text-fg grid h-6 w-6 shrink-0 place-items-center rounded opacity-0 group-hover:opacity-100"

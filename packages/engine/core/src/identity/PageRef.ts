@@ -12,7 +12,7 @@ import { isValidPageObjectNumber } from './PageObjectNumber';
  * is the durable identity for the lifetime of a document. It is what every
  * `PageLayout.ref` and `PageHandle.ref` carries.
  *
- * It is deliberately the ONLY kind. Pages are durable by construction (see
+ * It is deliberately the only kind. Pages are durable by construction (see
  * `PagesMutator`): a display index is never an identity, a page without an
  * object number is refused at open (`MalformedPdf`), and a `/Names /Pages`
  * key is a registry entry the layout already maps to a number, not a second
@@ -20,10 +20,9 @@ import { isValidPageObjectNumber } from './PageObjectNumber';
  * address consistent with the other refs and leaves room for an additive
  * kind should a real one ever appear.
  *
- * Records that MENTION a page — `AnnotationRef.pageObjectNumber`, event
- * payloads, per-page results, destinations, search matches — keep the
- * scalar `pageObjectNumber` foreign key; `toPageRef()` turns one into an
- * address.
+ * Records that mention a page (an annotation ref, event payloads, per-page
+ * results, destinations, search matches) carry the same `page: PageRef`;
+ * `toPageRef()` builds one from a page number you already hold.
  */
 export type PageRef = { kind: 'objectNumber'; pageObjectNumber: PageObjectNumber };
 

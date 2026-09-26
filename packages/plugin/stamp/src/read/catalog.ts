@@ -1,5 +1,6 @@
-/** Reads over the store and the binary sidecar: libraries, assets, previews,
- *  the library's PDF, and the two twins. */
+/** Reads over the state and the binaries resource: libraries, assets,
+ *  previews, the library's PDF, and the two twins. */
+import { DocumentsToken } from '@embedpdf/core';
 import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
 
 import type {
@@ -10,7 +11,7 @@ import type {
   StampLibraryFilter,
 } from '../contract';
 import type { StampContext, StampServices } from '../services';
-import { notFound } from '../services/errors';
+import { notFound, verb } from '../services/errors';
 
 export function createCatalog(
   ctx: StampContext,
@@ -20,19 +21,21 @@ export function createCatalog(
   const { ghostProvider } = ghosts;
 
   const listAssets = (filter?: StampAssetFilter): readonly StampAsset[] => {
-    const s = ctx.getState();
-    const scope = filter?.libraryId ? [filter.libraryId] : s.libraryOrder;
-    return scope
-      .flatMap((lid) => (s.libraries[lid]?.assetIds ?? []).map((id) => s.assets[id]))
+    const state = ctx.state.get();
+    const libraryIds = filter?.libraryId ? [filter.libraryId] : state.libraryOrder;
+    return libraryIds
+      .flatMap((libraryId) =>
+        (state.libraries[libraryId]?.assetIds ?? []).map((id) => state.assets[id]),
+      )
       .filter(
-        (a): a is StampAsset =>
-          a != null &&
-          (!filter?.kind || a.kind === filter.kind) &&
-          (!filter?.category || (a.categories ?? []).includes(filter.category)),
+        (asset): asset is StampAsset =>
+          asset != null &&
+          (!filter?.kind || asset.kind === filter.kind) &&
+          (!filter?.category || (asset.categories ?? []).includes(filter.category)),
       );
   };
   const canPlace = (documentId?: string): boolean => {
-    const id = documentId ?? ctx.core().activeId;
+    const id = documentId ?? ctx.get(DocumentsToken).getActiveId();
     if (!id) return false;
     return ctx.tryForDocument(AnnotationToken, id)?.canCreate() ?? false;
   };
@@ -40,30 +43,28 @@ export function createCatalog(
   return {
     api: {
       listLibraries: (filter?: StampLibraryFilter) => {
-        const s = ctx.getState();
+        const state = ctx.state.get();
         const kinds =
           filter?.kind === undefined
             ? null
             : new Set(typeof filter.kind === 'string' ? [filter.kind] : filter.kind);
-        return s.libraryOrder
-          .map((id) => s.libraries[id])
-          .filter((l): l is StampLibrary => l != null && (kinds === null || kinds.has(l.kind)));
+        return state.libraryOrder
+          .map((id) => state.libraries[id])
+          .filter(
+            (library): library is StampLibrary =>
+              library != null && (kinds === null || kinds.has(library.kind)),
+          );
       },
-      getLibrary: (id) => ctx.getState().libraries[id] ?? null,
+      getLibrary: (id) => ctx.state.get().libraries[id] ?? null,
       listAssets,
-      getAsset: (id) => ctx.getState().assets[id] ?? null,
+      getAsset: (id) => ctx.state.get().assets[id] ?? null,
       getAssetPreview: (id) => assetBinaries.get(id)?.preview ?? null,
-      renderAssetPreview: (id, { width }) => {
-        const bin = assetBinaries.get(id);
-        if (!bin) return Promise.reject(notFound('asset', id));
-        return ghostProvider(
-          bin.bytes,
-          bin.preview,
-          id,
-        )(width).then((preview) =>
-          preview ? { bytes: preview.bytes, mimeType: preview.mimeType ?? 'image/png' } : null,
-        );
-      },
+      renderAssetPreview: verb(async (id: string, { width }: { width: number }) => {
+        const binary = assetBinaries.get(id);
+        if (!binary) throw notFound('asset', id);
+        const preview = await ghostProvider(binary.bytes, binary.preview, id)(width);
+        return preview ? { bytes: preview.bytes, mimeType: preview.mimeType ?? 'image/png' } : null;
+      }),
       readAssetBytes: (id) => {
         const bytes = assetBinaries.get(id)?.bytes;
         return bytes ? new Uint8Array(bytes) : null;

@@ -1,5 +1,5 @@
 /**
- * @cloudpdf/viewer — the CLOUD snippet, built as `dist/cloudpdf.js`.
+ * @cloudpdf/viewer — the cloud snippet, built as `dist/cloudpdf.js`.
  *
  * ```html
  * <div id="viewer" style="height:100vh"></div>
@@ -13,7 +13,7 @@
  * </script>
  * ```
  *
- * A cloud DOOR over the open-source viewer's ENGINE-AGNOSTIC door
+ * A cloud door over the open-source viewer's engine-agnostic door
  * (`@embedpdf/viewer/core`): it maps the cloud vocabulary to an injected engine
  * factory (see ./config) and hands everything else straight to `EmbedPDF.init()`.
  * Because the core door registers no default engine, the local PDFium engine —
@@ -28,7 +28,7 @@ import type { EmbedPdfViewerElement, InitOptions } from '@embedpdf/viewer/core';
 import { resolveCloudConfig, type CloudSource } from './config';
 
 // The whole customization vocabulary rides along, so cloud snippet users
-// import ONE file — same ladder as the open snippet.
+// import one file — same ladder as the open snippet.
 export * from '@embedpdf/viewer/core';
 export { cloudEngine } from '@cloudpdf/engine';
 export type { CloudEngineOptions } from '@cloudpdf/engine';

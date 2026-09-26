@@ -3,9 +3,10 @@ import {
   EngineError,
   EngineErrorCode,
   wirePack,
-  type PageObjectNumber,
+  type PieceInfoDeleteResult,
   type PieceInfoPatch,
   type PieceInfoService,
+  type PieceInfoUpdateResult,
   type PieceInfoSnapshot,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
@@ -20,7 +21,7 @@ interface DocClosedView {
 }
 
 /**
- * `/PieceInfo` access for the local engine. ONE class serves both levels —
+ * `/PieceInfo` access for the local engine. One class serves both levels —
  * `page` undefined targets the document catalog, set targets a
  * page — mirroring the wire protocol's single job family.
  *
@@ -39,7 +40,7 @@ export class LocalPieceInfoService implements PieceInfoService {
     private readonly page?: PageRef,
   ) {}
 
-  read(application: string): AbortablePromise<PieceInfoSnapshot | null> {
+  get(application: string): AbortablePromise<PieceInfoSnapshot | null> {
     const rejected = this.gate('doc.open');
     if (rejected) return rejected as AbortablePromise<PieceInfoSnapshot | null>;
     const { docId, page } = this;
@@ -59,9 +60,9 @@ export class LocalPieceInfoService implements PieceInfoService {
     });
   }
 
-  update(application: string, patch: PieceInfoPatch): AbortablePromise<void> {
+  update(application: string, patch: PieceInfoPatch): AbortablePromise<PieceInfoUpdateResult> {
     const rejected = this.gate('doc.metadata.modify');
-    if (rejected) return rejected as AbortablePromise<void>;
+    if (rejected) return rejected;
     const { docId, page } = this;
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
@@ -77,15 +78,16 @@ export class LocalPieceInfoService implements PieceInfoService {
       },
       { priority: Priority.HIGH },
     );
-    return AbortablePromise.run<void>(async (signal) => {
+    return AbortablePromise.run<PieceInfoUpdateResult>(async (signal) => {
       const payload = await this.await(submission, signal);
       if (payload.tag !== 'pieceInfo.update') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
+      return payload.result;
     });
   }
 
-  applications(): AbortablePromise<string[]> {
+  list(): AbortablePromise<string[]> {
     const rejected = this.gate('doc.open');
     if (rejected) return rejected as AbortablePromise<string[]>;
     const { docId, page } = this;
@@ -105,22 +107,23 @@ export class LocalPieceInfoService implements PieceInfoService {
     });
   }
 
-  clear(application: string): AbortablePromise<void> {
+  delete(application: string): AbortablePromise<PieceInfoDeleteResult> {
     const rejected = this.gate('doc.metadata.modify');
-    if (rejected) return rejected as AbortablePromise<void>;
+    if (rejected) return rejected;
     const { docId, page } = this;
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'pieceInfo.clear', jobId, docId, page, application }),
+          wirePack({ kind: 'pieceInfo.delete', jobId, docId, page, application }),
       },
       { priority: Priority.HIGH },
     );
-    return AbortablePromise.run<void>(async (signal) => {
+    return AbortablePromise.run<PieceInfoDeleteResult>(async (signal) => {
       const payload = await this.await(submission, signal);
-      if (payload.tag !== 'pieceInfo.clear') {
+      if (payload.tag !== 'pieceInfo.delete') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
+      return payload.result;
     });
   }
 

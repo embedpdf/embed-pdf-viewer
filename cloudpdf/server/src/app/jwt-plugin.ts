@@ -4,12 +4,17 @@ import {
   checkAnyCapability,
   checkCapability,
   checkCollab,
+  collabTargetOf,
+  type AnnotationOwner,
+  type AnnotationRef,
   type CollabAction,
   type CollabTarget,
   type DocCapability,
+  type Identity,
   type PdfBits,
+  PermissionDenied,
 } from '@embedpdf/engine-core/runtime';
-import { checkResourceAccess, type DocResourceId } from '@embedpdf/engine-core/wire';
+import { checkResourceAccess, DOC_RESOURCES, type DocResourceId } from '@embedpdf/engine-core/wire';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 // checkResourceAccess + DocResourceId live in /wire (resource descriptor
 // table is HTTP-wire surface, used by route guards on every read endpoint).
@@ -22,7 +27,6 @@ import {
   isDocUserClaims,
   isTenantClaims,
   type DocScope,
-  type IdentityClaims,
   type JwtClaims,
   type JwtVerifier,
   type JwtVerifierConfig,
@@ -68,7 +72,7 @@ export interface JwtPluginOptions {
    */
   apiAuthTokens?: ReadonlyArray<string>;
   /**
-   * Throttle on authentication FAILURES per client IP (never on
+   * Throttle on authentication failures per client IP (never on
    * successful traffic — valid tokens are not counted). A source over
    * budget gets `429` + `Retry-After` until its window expires; note this
    * covers every request from that IP for the remainder of the window,
@@ -301,7 +305,7 @@ export type DocAccessMode = 'doc' | 'tenant';
  * authorised to perform at least one of `needed` doc-scopes on the
  * URL's `docId`. Two legal paths:
  *
- *   1. **Doc-scoped token**: `doc_id` claim matches the URL, AND
+ *   1. **Doc-scoped token**: `doc_id` claim matches the URL, and
  *      the token's `DocScope[]` contains one of `needed` (or `*`).
  *   2. **Tenant token**: `scope` contains `docs.read` (or `*`).
  *      The doc-tenant binding is enforced one layer down by
@@ -319,7 +323,7 @@ export interface RequestJwtContext {
   exp: number | null;
   unlockKey: string | null;
   scope: ReadonlyArray<string>;
-  identity: IdentityClaims;
+  identity: Identity;
   /**
    * Per-request document password (decoded `X-Document-Password`),
    * present only on API-token requests — backends supply the password
@@ -398,7 +402,7 @@ export function requireLayerDocAccess(
 // Route handlers migrate to them in two stages:
 //   1. Read routes call `requireResource(req, docId, '<id>', pdfBits)` — the
 //      DOC_RESOURCES table is the source of truth for capability checks
-//      AND CDN coverage.
+//      and CDN coverage.
 //   2. Mutation routes that have collab semantics call `requireCollab(...)`
 //      with the target row's userId/groupId.
 //
@@ -408,14 +412,14 @@ export function requireLayerDocAccess(
 // for the tenant branch.
 
 /**
- * Doc-scope-only preHandler that performs NO capability check. Verifies
+ * Doc-scope-only preHandler that performs no capability check. Verifies
  * the JWT is doc-scoped to this `docId` (or that the bearer is a tenant
  * token with `docs.read`). Used by the next-layer capability/collab
  * helpers; the tenant branch they exit through is the same as the legacy
  * `requireDocAccess`.
  *
  * Reading is implicit only in the sense that having a valid doc-scoped
- * token gets you THIS far — the capability/collab/resource helper layered
+ * token gets you this far — the capability/collab/resource helper layered
  * on top then decides whether the actual operation is allowed.
  */
 export function requireDocAccessOnly(
@@ -477,13 +481,13 @@ export function requireCapability(
   const ctx = requireDocAccessOnly(req, docId);
   if (ctx.mode === 'tenant') return ctx;
   if (!checkCapability(capability, ctx.jwt.scope, pdfBits)) {
-    throwForbidden(`capability required: ${capability}`);
+    throw new PermissionDenied(capability);
   }
   return ctx;
 }
 
 /**
- * Assert the bearer's scope grants AT LEAST ONE of the listed capabilities.
+ * Assert the bearer's scope grants at least one of the listed capabilities.
  * Currently unused by the resource table (every entry maps to a single cap),
  * but kept available for routes that need the disjunction directly.
  */
@@ -496,7 +500,7 @@ export function requireAnyCapability(
   const ctx = requireDocAccessOnly(req, docId);
   if (ctx.mode === 'tenant') return ctx;
   if (!checkAnyCapability(capabilities, ctx.jwt.scope, pdfBits)) {
-    throwForbidden(`one of: ${capabilities.join(', ')}`);
+    throw new PermissionDenied(capabilities[0] ?? 'doc.open', undefined, capabilities);
   }
   return ctx;
 }
@@ -516,7 +520,7 @@ export function requireResource(
   const ctx = requireDocAccessOnly(req, docId);
   if (ctx.mode === 'tenant') return ctx;
   if (!checkResourceAccess(resourceId, ctx.jwt.scope, pdfBits)) {
-    throwForbidden(`resource access denied: ${resourceId}`);
+    throwResourceDenied(resourceId, ctx.jwt.scope, pdfBits);
   }
   return ctx;
 }
@@ -537,7 +541,7 @@ export function requireCollabAction(
   const ctx = requireDocAccessOnly(req, docId);
   if (ctx.mode === 'tenant') return ctx;
   if (!checkCollab(action, target, ctx.jwt.scope, ctx.jwt.identity, pdfBits)) {
-    throwForbidden(`annotations:${action} denied for target`);
+    throw new PermissionDenied(`annotations:${action}`, 'target');
   }
   return ctx;
 }
@@ -548,9 +552,9 @@ export function requireCollabAction(
 
 /**
  * Layer-scoped equivalent of `requireDocAccessOnly`. Verifies the JWT
- * is doc-scoped to this `docId` AND that its `layer_name` claim (if
+ * is doc-scoped to this `docId` and that its `layer_name` claim (if
  * present, defaulting to 'default') matches the URL layer. Performs
- * NO capability check — used by /access and other endpoints where
+ * no capability check — used by /access and other endpoints where
  * the work itself defines what's authorized.
  */
 export function requireLayerDocAccessOnly(
@@ -647,8 +651,39 @@ export function requireLayerCollabAction(
 }
 
 /**
+ * {@link requireLayerCollabAction} over annotations one write changes
+ * together (a thread's delete): all or nothing, `PermissionDenied` naming
+ * every one refused.
+ */
+export function requireLayerCollabActionEach(
+  req: FastifyRequest,
+  docId: string,
+  layerName: string,
+  action: CollabAction,
+  annotations: readonly (AnnotationOwner & { ref: AnnotationRef })[],
+  pdfBits: PdfBits,
+): ReturnType<typeof requireLayerCollabAction> {
+  const ctx = requireLayerDocAccessOnly(req, docId, layerName);
+  if (ctx.mode !== 'tenant') {
+    const refused = annotations.filter(
+      (annotation) =>
+        !checkCollab(action, collabTargetOf(annotation), ctx.jwt.scope, ctx.jwt.identity, pdfBits),
+    );
+    if (refused.length > 0) {
+      throw new PermissionDenied(
+        `annotations:${action}`,
+        'target',
+        undefined,
+        refused.map((annotation) => annotation.ref),
+      );
+    }
+  }
+  return { ...ctx, originSessionId: originSessionIdFromRequest(req) };
+}
+
+/**
  * The layer a doc-user token is pinned to (`layer_name`, default
- * `'default'`). THE one reader of the claim: origin plane guards, password
+ * `'default'`). The one reader of the claim: origin plane guards, password
  * bindings, and the `/v1/access` scope computation all route through here so
  * "which layer does this caller claim to be" has exactly one answer.
  * Tenant/admin contexts are not layer-pinned — callers branch on `mode`
@@ -679,11 +714,21 @@ function enforceLayerPin(req: FastifyRequest, layerName: string): void {
   }
 }
 
-function throwForbidden(message: string): never {
-  const err = new Error(message) as Error & { code: string; status: number };
-  err.code = 'Forbidden';
-  err.status = 403;
-  throw err;
+/** A resource the scope doesn't grant, naming what it needs as a local refusal does. */
+function throwResourceDenied(
+  resourceId: DocResourceId,
+  scope: ReadonlyArray<string>,
+  pdfBits: PdfBits,
+): never {
+  const { requirement } = DOC_RESOURCES[resourceId];
+  if (requirement.kind === 'single') throw new PermissionDenied(requirement.capability, resourceId);
+  const capabilities = requirement.capabilities;
+  if (requirement.kind === 'any') {
+    throw new PermissionDenied(capabilities[0] ?? 'doc.open', resourceId, capabilities);
+  }
+  // All of them: name the first one the scope lacks.
+  const missing = capabilities.find((cap) => !checkCapability(cap, scope, pdfBits));
+  throw new PermissionDenied(missing ?? capabilities[0] ?? 'doc.open', resourceId);
 }
 
 /**
@@ -703,12 +748,12 @@ function jwtContext(claims: JwtClaims): RequestJwtContext {
     exp: typeof claims.exp === 'number' ? claims.exp : null,
     unlockKey: readUnlockKey(claims),
     scope: claims.scope,
-    identity: {
-      ...(claims.user_id ? { user_id: claims.user_id } : {}),
-      ...(claims.group_id ? { group_id: claims.group_id } : {}),
-      ...(claims.display_name ? { display_name: claims.display_name } : {}),
-      ...(claims.groups ? { groups: [...claims.groups] } : {}),
-    },
+    identity: claims.identity
+      ? {
+          ...claims.identity,
+          ...(claims.identity.groups ? { groups: [...claims.identity.groups] } : {}),
+        }
+      : {},
   };
 }
 

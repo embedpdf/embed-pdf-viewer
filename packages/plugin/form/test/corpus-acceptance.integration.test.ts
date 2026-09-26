@@ -8,9 +8,9 @@ import { createKernel, toPageRef } from '@embedpdf/core';
 import { createQuickJsSandbox } from '@embedpdf/core-js-sandbox';
 import { createLocalEngine } from '@embedpdf/engine';
 import { actionsPlugin } from '@embedpdf/plugin-actions';
-import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/internal';
+import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/contract/host';
 import { annotationPlugin } from '@embedpdf/plugin-annotation';
-import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/internal';
+import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
 import { interactionPlugin } from '@embedpdf/plugin-interaction';
 
 import { formPlugin } from '../src/form.plugin';
@@ -18,7 +18,7 @@ import { FormToken } from '../src/host-contract';
 import type { FormUiEffect } from '../src/host-contract';
 
 /**
- * SUPPLEMENTARY real-world acceptance over the local `JS tests/` corpus —
+ * Supplementary real-world acceptance over the local `JS tests/` corpus —
  * the synthetic fixtures are the committed CI truth; these runs prove the
  * same wiring against documents authored elsewhere. The corpus is not
  * committed (repo-root `JS tests/`, owner's call), so every test here skips
@@ -30,7 +30,7 @@ const DOC_01 = corpus('01_document_and_page_events.pdf');
 const DOC_02 = corpus('02_widget_annotation_events (1).pdf');
 const DOC_03 = corpus('03_visibility_controls_js_and_hide_action_fixed.pdf');
 
-const settle = () => new Promise((r) => setTimeout(r, 25));
+const settle = () => new Promise((resolve) => setTimeout(resolve, 25));
 
 describe('corpus acceptance (skips without the local JS tests folder)', () => {
   it.skipIf(!existsSync(DOC_01))(
@@ -63,15 +63,15 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
         actions.setUiAdapter({
           openUri: () => {},
           print: () => {},
-          // Script alerts flow through the ONE adapter now (D9), origin
-          // attached — an embedder handler sees everything.
-          alert: (message, opts) =>
+          // Script alerts reach the embedder through the one adapter,
+          // with their origin.
+          alert: (message, options) =>
             uiEffects.push({
               kind: 'alert',
               message,
-              icon: opts.icon,
-              phase: opts.phase,
-              origin: opts.origin,
+              icon: options.icon,
+              phase: options.phase,
+              origin: options.origin,
             } as FormUiEffect),
         }); // fires the latch
         // Drain the open sequence (the queued script transaction included).
@@ -83,7 +83,7 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
         });
         await settle();
         await form.refresh();
-        const docStatus = form.getSnapshot()?.fields.find((f) => f.name === 'docStatus');
+        const docStatus = form.getSnapshot()?.fields.find((field) => field.name === 'docStatus');
         // The script wrote through the ScriptHost executor + the form
         // commit sink (lifecycle origin).
         expect(docStatus?.valueEntry.kind === 'scalar' ? docStatus.valueEntry.value : '').toContain(
@@ -91,7 +91,7 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
         );
         // Its app.alert carries the origin axis — the provider's default
         // matrix suppresses it; embedder handlers (like this one) see it.
-        const alert = uiEffects.find((e) => e.kind === 'alert');
+        const alert = uiEffects.find((effect) => effect.kind === 'alert');
         expect(alert?.origin).toBe('lifecycle');
       } finally {
         await kernel.destroy();
@@ -129,10 +129,10 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
         const annotation = kernel.capability(AnnotationHostToken);
         const actions = kernel.capability(ActionsHostToken);
         await form.refresh();
-        const trigger = form.getSnapshot()?.fields.find((f) => f.widgets.length > 0);
+        const trigger = form.getSnapshot()?.fields.find((field) => field.widgets.length > 0);
         if (!trigger) throw new Error('no widget field in 02');
         const page = trigger.widgets[0]!.page!;
-        await annotation.reloadPage(page);
+        await annotation.whenSynced();
         const hoverSquare = () =>
           annotation.listPageItems(page).find((item) => item.subtype === 'square');
         const before = hoverSquare()?.style.color;
@@ -185,16 +185,16 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
         const actions = kernel.capability(ActionsHostToken);
         await form.refresh();
         const field = (name: string) => {
-          const f = form.getSnapshot()?.fields.find((c) => c.name === name);
-          if (!f) throw new Error(`missing field ${name}`);
-          return f;
+          const namedField = form.getSnapshot()?.fields.find((field) => field.name === name);
+          if (!namedField) throw new Error(`missing field ${name}`);
+          return namedField;
         };
         const trigger = field('nativeTrigger');
         const target = field('nativeTarget');
         const page = trigger.widgets[0]!.page!;
-        await annotation.reloadPage(page);
+        await annotation.whenSynced();
         const targetId = `obj:${target.widgets[0]!.annotObjectNumber}`;
-        const painted = () => annotation.listPageItems(page).map((i) => i.id);
+        const painted = () => annotation.listPageItems(page).map((item) => item.id);
         const drain = () =>
           actions.dispatch({
             scope: 'annotation',

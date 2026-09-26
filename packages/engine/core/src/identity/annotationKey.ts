@@ -3,7 +3,7 @@ import type { AnnotationStableId } from './AnnotationStableId';
 import type { PageRef } from './PageRef';
 
 /**
- * THE string key for an annotation address — for maps, sets and React keys.
+ * The string key for an annotation address — for maps, sets and React keys.
  * A ref is an object, and JavaScript keys objects by identity, so two refs
  * that name the same annotation need one canonical value form; this is it.
  * The ref stays the thing you pass to the engine; this is only how you index.
@@ -13,10 +13,10 @@ import type { PageRef } from './PageRef';
  *   objectNumber  →  `obj:42`              an indirect object number is unique
  *                                           across the whole document
  *   nm            →  `nm:<page>:<name>`     ISO 32000 §12.5.2: /NM is unique per
- *                                           PAGE, not per document
+ *                                           page, not per document
  *   index         →  `idx:<page>:<i>`       a weak ref is page-relative by definition
  *
- * For the durable kinds this agrees with the wire: `obj:42` IS the route's
+ * For the durable kinds this agrees with the wire: `obj:42` is the route's
  * `:annotKey` (`encodeStableIdKey`), and an `nm` key is the route's
  * `:pageKey` + `:annotKey` folded into one string because a client-side map
  * has no path segment to keep the page in.
@@ -28,8 +28,33 @@ export function annotationKey(ref: AnnotationRef): string {
     case 'nm':
       return `nm:${ref.page.pageObjectNumber}:${ref.nm}`;
     case 'index':
-      return `idx:${ref.page.pageObjectNumber}:${ref.index}`;
+      return positionKey(ref.page, ref.index);
   }
+}
+
+/**
+ * The key of the annotation at this position of a page's `/Annots` array, as
+ * a weak ref addresses it. A record carries its position (`dto.index`), so a
+ * reader can find the key a weak record had before the engine named it.
+ */
+export function positionKey(page: PageRef, index: number): string {
+  return `idx:${page.pageObjectNumber}:${index}`;
+}
+
+/**
+ * Every key a ref to this annotation can have: its own ref's, its position's
+ * and, when it has one, its name's. A ref another annotation holds (`/IRT`,
+ * `/Parent`) may use any of them.
+ */
+export function annotationKeysOf(annotation: {
+  readonly ref: AnnotationRef;
+  readonly index: number;
+  readonly nm: string | null;
+}): string[] {
+  const { ref } = annotation;
+  const keys = [annotationKey(ref), positionKey(ref.page, annotation.index)];
+  if (annotation.nm) keys.push(annotationKey({ kind: 'nm', page: ref.page, nm: annotation.nm }));
+  return keys;
 }
 
 /**

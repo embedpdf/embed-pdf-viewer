@@ -1,11 +1,11 @@
-import type { SearchMatchRange } from './fold';
+import type { TextRange } from '../text/TextRange';
 import { wordAt, wordBefore } from './literal';
 import type { SearchQuery } from './types';
 
 /**
- * The portable search-regex dialect: JavaScript `u`-mode syntax MINUS the
+ * The portable search-regex dialect: JavaScript `u`-mode syntax minus the
  * features RE2 refuses (backreferences, lookaround). The local engine
- * executes patterns with JS `RegExp`; the server executes the SAME
+ * executes patterns with JS `RegExp`; the server executes the same
  * pattern with RE2, whose linear-time guarantee is the ReDoS defense.
  * Restricting both sides to the common subset keeps one query string
  * valid — and equally powerful — everywhere.
@@ -76,7 +76,7 @@ export function validateSearchRegex(pattern: string): SearchRegexValidation {
           message: 'Lookahead ((?=…), (?!…)) is not supported.',
         };
       }
-      // "(?<" is lookbehind when followed by = or !, a named GROUP otherwise.
+      // "(?<" is lookbehind when followed by = or !, a named group otherwise.
       if (tag === '<' && (pattern[i + 3] === '=' || pattern[i + 3] === '!')) {
         return {
           ok: false,
@@ -98,7 +98,7 @@ export function validateSearchRegex(pattern: string): SearchRegexValidation {
 }
 
 /**
- * Every flag combination has DEFINED semantics — most by behavior, one by
+ * Every flag combination has defined semantics — most by behavior, one by
  * loud rejection (see the {@link SearchQuery} table). The single validator
  * a UI needs: call it on keystroke to grey out the diacritics toggle in
  * regex mode and flag bad patterns early; engines run the same check and
@@ -136,9 +136,9 @@ export function validateSearchQuery(query: SearchQuery): SearchQueryValidation {
 }
 
 /**
- * All matches of a dialect-valid pattern over the RAW page text (regex
+ * All matches of a dialect-valid pattern over the raw page text (regex
  * does not run against folded text — case handling is the `i` flag, and
- * diacritic folding never applies). `wholeWord` is a boundary POST-FILTER
+ * diacritic folding never applies). `wholeWord` is a boundary POST-filter
  * using the same Unicode word test as the literal path — never `\b`,
  * whose ASCII word set would give the toggle different semantics in regex
  * mode ("caf" whole-word matching inside "café"). Filtering after the
@@ -146,12 +146,12 @@ export function validateSearchQuery(query: SearchQuery): SearchQueryValidation {
  * are skipped: search UI cannot highlight nothing, and skipping them is
  * also the infinite-loop guard for patterns like `a*`.
  */
-export function matchRegex(text: string, query: SearchQuery): SearchMatchRange[] {
+export function matchRegex(text: string, query: SearchQuery): TextRange[] {
   const valid = validateSearchQuery({ ...query, regex: true });
   if (!valid.ok) throw new Error(`Invalid search query (${valid.issue}): ${valid.message}`);
 
   const re = new RegExp(query.text, query.matchCase ? 'gmu' : 'gimu');
-  const out: SearchMatchRange[] = [];
+  const out: TextRange[] = [];
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
     if (m[0].length === 0) {
@@ -163,7 +163,7 @@ export function matchRegex(text: string, query: SearchQuery): SearchMatchRange[]
     if (query.wholeWord && (wordBefore(text, m.index) || wordAt(text, m.index + m[0].length))) {
       continue;
     }
-    out.push({ start: m.index, length: m[0].length });
+    out.push({ start: m.index, count: m[0].length });
   }
   return out;
 }

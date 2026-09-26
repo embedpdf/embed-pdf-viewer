@@ -1,0 +1,179 @@
+---
+title: Highlights & text markup
+description: Highlight, underline, squiggly-underline or strike out text on a page, from a search match or a selection.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Highlights & text markup
+
+Text markup marks text that is already on the page: a highlight, an underline, a squiggly
+underline or a strikeout. You tell the engine where the text is, and it draws the mark over it.
+
+```ts
+const { matches } = await doc.search.query({ text: 'total amount' });
+
+for (const match of matches) {
+  await doc.page(match.page).annotations.create({
+    subtype: 'highlight',
+    quadPoints: match.segments.map((segment) => segment.quad),
+  });
+}
+```
+
+## The four kinds
+
+| `subtype`     | What it draws                  | Default color |
+| :------------ | :----------------------------- | :------------ |
+| `'highlight'` | A marker over the text         | yellow        |
+| `'underline'` | A straight line under the text | black         |
+| `'squiggly'`  | A wavy line under the text     | black         |
+| `'strikeout'` | A line through the text        | black         |
+
+All four take the same fields. To underline instead of highlight, change only the `subtype`.
+
+## Mark a search match
+
+A search match has one segment per line it covers, and each segment has a `quad`: the four
+corners of that piece of text. `quadPoints` takes exactly those quads, so a match becomes a
+highlight in one call, as above. See [Search](/docs/engine/text/search).
+
+## Mark a selection
+
+For text the user selects, get the quads from the page's text layout:
+
+```ts
+const layout = await page.text.layout();
+const range = layout.wordAt(point); // { start, count }, or null
+
+if (range) {
+  await page.annotations.create({
+    subtype: 'underline',
+    quadPoints: layout.segments(range).map((segment) => segment.quad),
+  });
+}
+```
+
+Any range works: a word, a line, or everything between two characters of a drag. See
+[Selection & geometry](/docs/engine/text/selection-and-geometry) for how to get one.
+
+A markup sits on one page. When a selection runs over two pages, create one markup on each page,
+each from that page's range.
+
+## Fields
+
+| Field        | What it is                                                          | Default                                             |
+| :----------- | :------------------------------------------------------------------ | :-------------------------------------------------- |
+| `quadPoints` | Where the text is: one quad per line piece. Required, at least one. |                                                     |
+| `color`      | The mark's color, `{ r, g, b }` from 0 to 255.                      | yellow for a highlight, black for the others        |
+| `opacity`    | From `0` (invisible) to `1` (solid).                                | `1`                                                 |
+| `blendMode`  | How the color mixes with the page under it.                         | `'multiply'` for a highlight, `'normal'` for others |
+| `contents`   | A comment, which PDF apps show with the mark.                       | none                                                |
+
+You don't pass a `rect`: the engine works it out from the quads, as the box around all of them.
+The fields every annotation has (flags, `subject`, who wrote it) are on the
+[overview](/docs/engine/annotations).
+
+## Color
+
+```ts
+await page.annotations.update(highlight.ref, { color: { r: 144, g: 238, b: 144 } });
+```
+
+A highlight multiplies its color with the page, like a real marker: the text under it stays dark
+and readable, whatever the color. Pass `blendMode: 'normal'` to paint the color over the text
+instead, and lower `opacity` to let the text show through.
+
+## Change what it covers
+
+Send new quads to move a mark to other text. They replace the old ones:
+
+```ts
+await page.annotations.update(highlight.ref, {
+  quadPoints: layout.segments(newRange).map((segment) => segment.quad),
+});
+```
+
+## Keep the text it marks
+
+A markup stores where the text is, not which characters it covers. If you need the text later,
+for a list of highlights or an export, read it when you create the mark and keep it in
+`contents`:
+
+```ts
+const text = await page.text.slice(range);
+
+await page.annotations.create({
+  subtype: 'highlight',
+  quadPoints: layout.segments(range).map((segment) => segment.quad),
+  contents: text,
+});
+```
+
+PDF apps show `contents` as the highlight's comment, so the quoted text shows up there too.
+
+## Suggest an insertion or a replacement
+
+Reviewers mark a change to the text with a caret: `subtype: 'caret'` at the spot where text
+should go, with the new text in `contents`. Its `rect` is the box the caret symbol is drawn in.
+
+```ts
+await page.annotations.create({
+  subtype: 'caret',
+  rect: { left: 208, bottom: 698, right: 216, top: 710 },
+  contents: 'not ',
+});
+```
+
+To suggest replacing text, strike out the old text and put a caret right after it. Link the two,
+so PDF apps treat them as one suggestion:
+
+```ts
+const { annotation: caret } = await page.annotations.create({
+  subtype: 'caret',
+  intent: 'replace',
+  rect: { left: 208, bottom: 698, right: 216, top: 710 },
+  contents: 'invoice',
+});
+
+await page.annotations.create({
+  subtype: 'strikeout',
+  intent: 'strikeout-text-edit',
+  quadPoints: layout.segments(range).map((segment) => segment.quad),
+  reply: { to: caret.ref, type: 'group' },
+});
+```
+
+The caret holds the suggestion: its `contents`, its author and its replies. The strikeout is a
+part of it. A caret is red by default and takes `color` and `opacity` like a markup.
+
+## Permissions
+
+Creating a markup needs permission to create annotations; see
+[Permissions](/docs/engine/concepts/permissions#annotations). Finding the text needs less than
+reading it: the layout needs `doc.text.select` and a search needs `doc.text.search`. Only
+`page.text.slice()` needs `doc.text.copy`. So a user may highlight text they aren't allowed to
+copy.
+
+## Good to know
+
+### Quads
+
+A quad is four corners, `{ p1, p2, p3, p4 }`: the two ends of the top edge, then the two ends of
+the bottom edge, each from the side where the line starts. Segments from a search and from the
+layout come in this order, for upright, rotated and vertical text alike, so pass them unchanged.
+
+Markups made by other PDF apps don't always keep this order. To find where one is, use its
+`rect`, or the box around each quad, rather than naming its corners.
+
+### One mark, many lines
+
+A highlight over three lines is one annotation with three quads, not three annotations. PDF apps
+select, move and delete it as one.
+
+### Replies and popups
+
+A markup can have replies and a popup, just like a note: see
+[Notes & replies](/docs/engine/annotations/notes-and-replies). For readers who know PDF: the
+suggestion link is `/IRT` with `/RT /Group`, and the two intents are `/IT /Replace` and
+`/IT /StrikeOutTextEdit`.

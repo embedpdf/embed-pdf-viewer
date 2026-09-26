@@ -21,7 +21,7 @@ import { createValidTestLicenseGate } from '../src/licensing/testing';
 
 /**
  * Step 4 of the auth model: the API token on the doc plane. The hook
- * synthesizes a tenant-mode principal from the DOCUMENT'S OWN tenant,
+ * synthesizes a tenant-mode principal from the document'S own tenant,
  * so every existing guard passes unchanged; mutations flow through the
  * same routes viewers use (audit → SSE → version bumps); encrypted
  * documents unlock per-request via X-Document-Password (base64,
@@ -199,9 +199,11 @@ describe('API token on the doc plane', () => {
     expect(annotations.status, await annotations.clone().text()).toBe(200);
     expect(annotations.headers.get('cache-control')).toContain('no-store');
     const annotationBody = (await annotations.json()) as {
+      annotations?: unknown[];
       pages?: unknown[];
       auditHead?: number;
     };
+    expect(Array.isArray(annotationBody.annotations)).toBe(true);
     expect(annotationBody.pages).toHaveLength(3);
     expect(annotationBody.auditHead).toEqual(expect.any(Number));
   });
@@ -318,13 +320,13 @@ describe('X-Document-Password (API token only)', () => {
     const first = await fetch(`${fx.baseUrl}/v1/docs/${docId}/manifest`, { headers });
     expect(first.status, await first.clone().text()).toBe(200);
 
-    // Regression: the old warm-head path switched back to the JWT-bound
+    // The warm-head path must not switch back to the JWT-bound
     // password-session table, which an API token can never populate.
     const second = await fetch(`${fx.baseUrl}/v1/docs/${docId}/manifest`, { headers });
     expect(second.status, await second.clone().text()).toBe(200);
 
-    // Layer paths used to assert a JWT session before they reached the
-    // per-request API password.
+    // Layer paths must reach the per-request API password without
+    // asserting a JWT session first.
     const layer = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/reviews/manifest`, {
       headers,
     });

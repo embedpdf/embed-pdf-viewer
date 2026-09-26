@@ -1,5 +1,5 @@
 /**
- * The seed of a new library: a one-page PDF whose page is UNREGISTERED — the
+ * The seed of a new library: a one-page PDF whose page is unregistered, the
  * shape Acrobat itself gives a fresh stamp library (its first page is a
  * blank starter that no `/Names /Pages` key points at). A library must be a
  * PDF from the moment it exists, and a PDF must have a page; the unregistered

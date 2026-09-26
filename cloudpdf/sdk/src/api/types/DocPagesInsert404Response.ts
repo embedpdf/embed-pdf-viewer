@@ -38,6 +38,7 @@ export namespace DocPagesInsert404Response {
         SignatureRefused: "SignatureRefused",
         ProtectedDocument: "ProtectedDocument",
         StaleBase: "StaleBase",
+        PayloadTooLarge: "PayloadTooLarge",
     } as const;
     export type Code = (typeof Code)[keyof typeof Code];
 }

@@ -5,7 +5,7 @@ import { CloudPDFClient } from "../../../src/Client";
 import { mockServerPool } from "../../mock-server/MockServerPool";
 
 describe("FormsClient", () => {
-    test("get (1)", async () => {
+    test("list (1)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
@@ -44,14 +44,14 @@ describe("FormsClient", () => {
             .jsonBody(rawResponseBody)
             .build();
 
-        const response = await client.doc.forms.get({
+        const response = await client.doc.forms.list({
             docId: "docId",
             layerName: "layerName",
         });
         expect(response).toEqual(rawResponseBody);
     });
 
-    test("get (2)", async () => {
+    test("list (2)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
@@ -66,7 +66,7 @@ describe("FormsClient", () => {
             .build();
 
         await expect(async () => {
-            return await client.doc.forms.get({
+            return await client.doc.forms.list({
                 docId: "docId",
                 layerName: "layerName",
             });
@@ -78,6 +78,34 @@ describe("FormsClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { key: "value" };
         const rawResponseBody = {
+            form: {
+                formKind: "none",
+                needsAppearances: true,
+                fields: [
+                    {
+                        family: "text",
+                        ref: { kind: "objectNumber", fieldObjectNumber: 1 },
+                        fieldObjectNumber: 1,
+                        name: "name",
+                        origin: "acroform",
+                        flags: { readOnly: true, required: true, noExport: true, raw: 1 },
+                        alternateName: null,
+                        mappingName: null,
+                        valueEntry: { kind: "none" },
+                        defaultValueEntry: { kind: "none" },
+                        widgets: [{ ref: null, annotObjectNumber: 1, page: null }],
+                        value: "value",
+                        defaultValue: "defaultValue",
+                        maxLength: null,
+                        multiline: true,
+                        password: true,
+                        comb: true,
+                    },
+                ],
+                calculationOrder: [{ kind: "objectNumber", fieldObjectNumber: 1 }],
+            },
+            applied: 1,
+            skipped: 1,
             meta: {
                 affectedPages: [
                     {
@@ -94,6 +122,9 @@ describe("FormsClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -186,6 +217,31 @@ describe("FormsClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
         const rawResponseBody = {
+            field: {
+                family: "text",
+                ref: { kind: "objectNumber", fieldObjectNumber: 1 },
+                fieldObjectNumber: 1,
+                name: "name",
+                origin: "acroform",
+                flags: { readOnly: true, required: true, noExport: true, raw: 1 },
+                alternateName: "alternateName",
+                mappingName: "mappingName",
+                valueEntry: { kind: "none" },
+                defaultValueEntry: { kind: "none" },
+                actions: {
+                    keystroke: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    format: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    validate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    calculate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                },
+                widgets: [{ ref: null, annotObjectNumber: 1, page: null }],
+                value: "value",
+                defaultValue: "defaultValue",
+                maxLength: 1,
+                multiline: true,
+                password: true,
+                comb: true,
+            },
             meta: {
                 affectedPages: [
                     {
@@ -202,6 +258,9 @@ describe("FormsClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -211,6 +270,8 @@ describe("FormsClient", () => {
                         },
                     ],
                 },
+                changedFields: [{ kind: "objectNumber", fieldObjectNumber: 1 }],
+                changedWidgets: [{ ref: null, annotObjectNumber: 1, page: null }],
             },
         };
 
@@ -258,6 +319,31 @@ describe("FormsClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { key: "value" };
         const rawResponseBody = {
+            field: {
+                family: "text",
+                ref: { kind: "objectNumber", fieldObjectNumber: 1 },
+                fieldObjectNumber: 1,
+                name: "name",
+                origin: "acroform",
+                flags: { readOnly: true, required: true, noExport: true, raw: 1 },
+                alternateName: "alternateName",
+                mappingName: "mappingName",
+                valueEntry: { kind: "none" },
+                defaultValueEntry: { kind: "none" },
+                actions: {
+                    keystroke: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    format: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    validate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    calculate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                },
+                widgets: [{ ref: null, annotObjectNumber: 1, page: null }],
+                value: "value",
+                defaultValue: "defaultValue",
+                maxLength: 1,
+                multiline: true,
+                password: true,
+                comb: true,
+            },
             meta: {
                 affectedPages: [
                     {
@@ -274,6 +360,9 @@ describe("FormsClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -283,6 +372,8 @@ describe("FormsClient", () => {
                         },
                     ],
                 },
+                changedFields: [{ kind: "objectNumber", fieldObjectNumber: 1 }],
+                changedWidgets: [{ ref: null, annotObjectNumber: 1, page: null }],
             },
         };
 

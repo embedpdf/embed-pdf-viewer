@@ -1,22 +1,35 @@
 import {
   PageScaleInputSchema,
   PageScaleResultSchema,
-  PageMeasurementViewportSchema,
+  PageMeasurementViewportListSchema,
 } from '@embedpdf/engine-core/wire';
 import type { DocCapability } from '@embedpdf/engine-core/runtime';
 import {
-  AnnotationListPageSnapshotSchema,
-  AnnotationListSnapshotAllPagesSchema,
+  AnnotationCreateResultSchema,
+  AnnotationDeleteResultSchema,
+  AnnotationFlattenResultSchema,
+  AnnotationListSchema,
+  AnnotationUpdateResultSchema,
   DocumentHeadSchema,
   DocumentManifestSchema,
   DocumentMetadataSchema,
   EngineErrorPayloadSchema,
+  FormImportResultSchema,
+  FormSetValueResultSchema,
   FormSnapshotSchema,
-  MutationMetaSchema,
+  IdentitySchema,
+  PageDeleteResultSchema,
+  PageFlattenResultSchema,
+  PageInsertResultSchema,
+  PageMoveResultSchema,
+  PageNameResultSchema,
+  PageRotateResultSchema,
+  RedactionApplyResultSchema,
+  RedactionApplyScopeSchema,
   PageTextSnapshotSchema,
   ChangeAnalysisSchema,
   DocumentVersionsSchema,
-  SignatureAbortResultSchema,
+  SignatureCancelResultSchema,
   SignatureCompleteBodySchema,
   SignatureCompleteResultSchema,
   SignaturePreparedWireSchema,
@@ -197,14 +210,14 @@ const utf8ByteLength = (s: string): number => new TextEncoder().encode(s).length
 
 /**
  * A server-side pull source for `documents.importFrom`. The discriminator
- * distinguishes AUTHORIZATION MODELS, not storage vendors:
+ * distinguishes authorization models, not storage vendors:
  *
- *   - `url`        — the CALLER supplies authority: a presigned
+ *   - `url`        — the caller supplies authority: a presigned
  *     S3/GCS/Azure/R2/MinIO GET, or any HTTPS endpoint the
  *     deployment's import policy allows. The URL is a capability:
  *     treat it as a secret. Servers never echo its query string back
  *     in errors, logs, or stored failure reasons.
- *   - `connection` — the OPERATOR pre-registered authority: the
+ *   - `connection` — the operator pre-registered authority: the
  *     request names a connection and a key; which provider backs it
  *     (S3, GCS, Azure Blob, filesystem, ...) is deployment
  *     configuration, never wire surface. `revision` is opaque here
@@ -272,7 +285,7 @@ export const AdminDocumentImportRequestSchema = z.object({
    * against the source's declared Content-Length before the transfer,
    * `sha256` against the server-observed digest after it. When absent
    * the server-observed values become authoritative.
-   * `dedupMode=reuse-existing` REQUIRES `sha256` — without a declared
+   * `dedupMode=reuse-existing` requires `sha256` — without a declared
    * hash the server cannot know what content to reuse.
    */
   expected: z
@@ -345,7 +358,7 @@ export const ADMIN_DOCUMENT_LIST_MAX_LIMIT = 200;
 
 /**
  * Query parameters for `documents.list`. `limit` arrives as a string on
- * the wire, hence the coercion; values outside [1, MAX] are a validation
+ * the wire, hence the coercion; values outside [1, max] are a validation
  * error, not a silent clamp. `cursor` is an opaque continuation token
  * from a previous page's `nextCursor` — clients must not parse it.
  */
@@ -422,7 +435,7 @@ export const AdminTokenRevokeRequestSchema = z.object({
   /** Optional human reason, written to the audit row. */
   reason: z.string().max(1024).optional(),
   /**
-   * The token's `exp` (unix seconds), used to GC the revocation row
+   * The token's `exp` (unix seconds); the revocation row is garbage-collected
    * once the token would have expired anyway. Defaults server-side to
    * now + 30 days.
    */
@@ -532,10 +545,12 @@ export const AdminTokenIssueDocRequestSchema = z.object({
    * vocabulary — an unknown string rejects the whole request.
    */
   scope: z.array(z.string().min(1).max(128)).min(1).max(64),
-  userId: z.string().max(256).optional(),
-  displayName: z.string().max(256).optional(),
-  groupId: z.string().max(256).optional(),
-  groups: z.array(z.string().max(256)).max(64).optional(),
+  /**
+   * Who the token acts for: the same `Identity` the local engine takes at
+   * open time. `displayName` becomes the author of the annotations the token
+   * creates, `userId` and `groupId` their owner and group.
+   */
+  identity: IdentitySchema.optional(),
   /**
    * Origin lock: web origins (scheme + host, optional port; one leading
    * `*.` wildcard label allowed) the minted token may be presented
@@ -589,7 +604,7 @@ export type AdminTokenIssueResponse = z.infer<typeof AdminTokenIssueResponseSche
 //
 // The registry is the admin surface's contract: one entry per operation
 // carrying method, path template, required tenant scope, and the request/
-// response schemas. The server mounts its routes FROM these entries (so the
+// response schemas. The server mounts its routes from these entries (so the
 // registry is executed, not merely described), and the OpenAPI document is
 // generated from the same entries in CI. Migration status: `documents.list`
 // is registered; the remaining admin operations move in as they are touched.
@@ -608,7 +623,7 @@ export type AdminTokenIssueResponse = z.infer<typeof AdminTokenIssueResponseSche
 // A share grant is a standing, revocable authorization decision stored
 // with the documents: "anyone presenting this reference, from these
 // origins, gets exactly these capabilities on this document". The grant
-// id doubles as the public share token — it is a REFERENCE whose power
+// id doubles as the public share token — it is a reference whose power
 // is evaluated at exchange time, never a bearer credential, which is
 // what lets it live in public HTML while staying editable and
 // revocable. The only credential it ever produces is an ordinary
@@ -720,7 +735,7 @@ export const AdminTenantShareParamsSchema = z.object({
 export type AdminTenantShareParams = z.infer<typeof AdminTenantShareParamsSchema>;
 
 /**
- * The share token travels in the BODY, never the path — URLs land in
+ * The share token travels in the body, never the path — URLs land in
  * access logs and proxy logs, and the token is the whole credential.
  */
 export const ShareExchangeRequestSchema = z.object({
@@ -754,7 +769,7 @@ export const TenantUsageQuerySchema = z.object({
 export type TenantUsageQuery = z.infer<typeof TenantUsageQuerySchema>;
 
 /**
- * Per-tenant usage FACTS for one UTC month. Deliberately opinion-free:
+ * Per-tenant usage facts for one UTC month. Deliberately opinion-free:
  * no limits, no plans, no billing state — those belong to whoever
  * operates the deployment. `pdf.views` counts share exchanges plus
  * authorized `/v1/access` grants, deduplicated (a share session that
@@ -1336,13 +1351,6 @@ export const documentPasswordHeader: AdminOperationHeader = {
 const looseJson = z.record(z.string(), z.unknown());
 const docCredentials = ['api-token', 'doc-jwt'] as const;
 
-/**
- * Every doc-plane mutation responds with the shared meta envelope — the
- * cache/version deltas SDKs use to re-point immutable reads — plus
- * operation-specific fields that tighten per-op as they are ported.
- */
-const MutationResponseSchema = z.object({ meta: MutationMetaSchema }).passthrough();
-
 export const DocSigningParamsSchema = DocLayerParamsSchema.extend({
   signingId: z.string().min(1),
 });
@@ -1485,7 +1493,7 @@ export const docOperations = {
     notes:
       'The multipart envelope: a JSON `body` part (field, subFilter, digest, contentsSize, signer, certify, lock, appearance) ' +
       "and an optional `resource:<key>` PDF part the body's `appearance.resource` names. A certification (`certify.permission`) " +
-      'additionally requires `doc.sign.certify`. The layer is read-only until the signing completes, is aborted, or expires (15 minutes). ' +
+      'additionally requires `doc.sign.certify`. The layer is read-only until the signing completes, is cancelled, or expires (15 minutes). ' +
       'A layer behind the document head cannot sign (StaleBase).',
   },
   'doc.signatures.complete': {
@@ -1512,19 +1520,19 @@ export const docOperations = {
       'Idempotent by signing id: the same CMS again answers `already-completed`. Every layer of the document then sits over the new version; ' +
       'refetch the manifest after a completion.',
   },
-  'doc.signatures.abort': {
-    operationId: 'doc.signatures.abort',
-    title: 'Abort a signature',
+  'doc.signatures.cancel': {
+    operationId: 'doc.signatures.cancel',
+    title: 'Cancel a signature',
     summary: 'Discard a pending signing candidate.',
     method: 'DELETE',
-    path: wireTemplates.layerSignatureAbort,
+    path: wireTemplates.layerSignatureCancel,
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.sign'],
     requestHeaders: [documentPasswordHeader],
     params: DocSigningParamsSchema,
     responses: {
-      200: { contentType: 'application/json', schema: SignatureAbortResultSchema },
+      200: { contentType: 'application/json', schema: SignatureCancelResultSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
   },
@@ -1697,7 +1705,7 @@ export const docOperations = {
     requestHeaders: [documentPasswordHeader],
     params: DocPageParamsSchema,
     responses: {
-      200: { contentType: 'application/json', schema: AnnotationListPageSnapshotSchema },
+      200: { contentType: 'application/json', schema: AnnotationListSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
   },
@@ -1715,7 +1723,7 @@ export const docOperations = {
     notes:
       'Returns one entry per page plus the audit-log cursor for reconciling subsequent document events. Page order is unspecified; join by `pageState.pageObjectNumber` when display order matters.',
     responses: {
-      200: { contentType: 'application/json', schema: AnnotationListSnapshotAllPagesSchema },
+      200: { contentType: 'application/json', schema: AnnotationListSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       409: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
@@ -1736,7 +1744,7 @@ export const docOperations = {
       'Doc JWTs may instead carry collab scopes (annotations:create:self, …) that refine ' +
       'per-annotation authorship rules; the API token is exempt from both.',
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: AnnotationCreateResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
@@ -1754,7 +1762,7 @@ export const docOperations = {
     params: DocAnnotationParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: AnnotationUpdateResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
@@ -1771,7 +1779,7 @@ export const docOperations = {
     requestHeaders: [documentPasswordHeader],
     params: DocAnnotationParamsSchema,
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: AnnotationDeleteResultSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
   },
@@ -1779,7 +1787,7 @@ export const docOperations = {
     operationId: 'doc.annotations.flatten',
     title: 'Flatten annotations',
     summary:
-      "Flatten a chosen set of one page's annotations into its content — pages.flatten for a selection. Painted annotations are removed; ineligible ones report skipped.",
+      "Flatten a chosen set of one page's annotations into its content — pages.flatten for a selection. Painted annotations are removed; ineligible ones report unchanged.",
     method: 'POST',
     path: wireTemplates.layerAnnotationItemsFlatten,
     credentials: docCredentials,
@@ -1789,7 +1797,7 @@ export const docOperations = {
     params: DocPageParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: AnnotationFlattenResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
@@ -1813,9 +1821,27 @@ export const docOperations = {
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
   },
-  'doc.forms.get': {
-    operationId: 'doc.forms.get',
-    title: 'Get form snapshot',
+  'doc.annotations.readAppearance': {
+    operationId: 'doc.annotations.readAppearance',
+    title: 'Read an annotation appearance',
+    summary:
+      "A stamp's drawing as a one-page PDF, before the fit, rotation and opacity its data describes: with the data, the bytes to create the same stamp again. A read; the source is untouched.",
+    method: 'GET',
+    path: wireTemplates.layerAnnotationItemAppearanceResource,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.download'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocAnnotationParamsSchema,
+    responses: {
+      200: { contentType: 'application/pdf' },
+      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+  },
+  'doc.forms.list': {
+    operationId: 'doc.forms.list',
+    title: 'List form fields',
     summary: 'Reconciled form snapshot: fields, widgets, values.',
     method: 'GET',
     path: wireTemplates.layerForm,
@@ -1842,7 +1868,7 @@ export const docOperations = {
     params: DocFieldParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: FormSetValueResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
@@ -1859,7 +1885,7 @@ export const docOperations = {
     requestHeaders: [documentPasswordHeader],
     params: DocFieldParamsSchema,
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: FormSetValueResultSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
   },
@@ -1893,7 +1919,7 @@ export const docOperations = {
     params: DocLayerParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: FormImportResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
@@ -1910,7 +1936,7 @@ export const docOperations = {
     requestHeaders: [documentPasswordHeader],
     params: DocPageParamsSchema,
     responses: {
-      200: { contentType: 'application/json', schema: z.array(PageMeasurementViewportSchema) },
+      200: { contentType: 'application/json', schema: PageMeasurementViewportListSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
   },
@@ -1946,7 +1972,7 @@ export const docOperations = {
     params: DocLayerParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: PageMoveResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
@@ -1964,7 +1990,7 @@ export const docOperations = {
     params: DocLayerParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: PageRotateResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
@@ -1982,7 +2008,7 @@ export const docOperations = {
     params: DocLayerParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: PageDeleteResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
@@ -2001,7 +2027,7 @@ export const docOperations = {
     params: DocLayerParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: PageNameResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
@@ -2019,7 +2045,7 @@ export const docOperations = {
     params: DocLayerParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: PageNameResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
@@ -2037,7 +2063,7 @@ export const docOperations = {
     params: DocLayerParamsSchema,
     body: { contentType: 'application/json', schema: looseJson, required: false },
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: PageFlattenResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
@@ -2057,12 +2083,12 @@ export const docOperations = {
       contentType: 'multipart/form-data',
     },
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: PageInsertResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
     notes:
-      'Multipart mutation envelope: a `body` field holding `{"destIndex"?: number}` (omitted → append) plus a `resource:source` file part carrying the standalone PDF whose pages are copied in. The inserted copies get fresh page object numbers, returned in insertion order.',
+      'Multipart mutation envelope: a `body` field holding `{"toIndex"?: number}` (omitted → append) plus a `resource:source` file part carrying the standalone PDF whose pages are copied in. The inserted copies get fresh page object numbers, returned in insertion order.',
   },
   'doc.pages.insertBlank': {
     operationId: 'doc.pages.insertBlank',
@@ -2077,12 +2103,12 @@ export const docOperations = {
     params: DocLayerParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: PageInsertResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
     notes:
-      'Body is `{"size": {"width", "height"}, "count"?, "destIndex"?}` — size in PDF points, count in [1, 100], destIndex omitted → append.',
+      'Body is `{"size": {"width", "height"}, "count"?, "toIndex"?}` — size in PDF points, count in [1, 100], toIndex omitted → append.',
   },
   'doc.pages.extract': {
     operationId: 'doc.pages.extract',
@@ -2115,9 +2141,9 @@ export const docOperations = {
     docCapabilities: ['doc.pages.modify', 'doc.annotate.modify', 'doc.redact'],
     requestHeaders: [documentPasswordHeader],
     params: DocLayerParamsSchema,
-    body: { contentType: 'application/json', schema: looseJson, required: false },
+    body: { contentType: 'application/json', schema: RedactionApplyScopeSchema },
     responses: {
-      200: { contentType: 'application/json', schema: MutationResponseSchema },
+      200: { contentType: 'application/json', schema: RedactionApplyResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },

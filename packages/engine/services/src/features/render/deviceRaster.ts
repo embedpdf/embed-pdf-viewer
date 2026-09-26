@@ -9,7 +9,7 @@ import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 /**
- * The ONE place a PDF user-space region becomes a device raster.
+ * The one place a PDF user-space region becomes a device raster.
  *
  * Every PDFium rasterizer — `PageRenderReader`, `AnnotationAppearanceReader`,
  * and any future one (thumbnails, stamps, flatten) — composes these three
@@ -95,19 +95,19 @@ export function deviceSize(
 }
 
 export interface RasterizeOptions {
-  /** The region to render, in PDF user space — ALREADY normalized by the caller. */
+  /** The region to render, in PDF user space — already normalized by the caller. */
   rect: PdfRect;
-  /** Page dimensions in PDF user space, used to mirror PDFium's display matrix. */
+  /** Page dimensions in PDF user space, for mirroring PDFium's display matrix. */
   page: { width: number; height: number };
   rotation: PdfRotation;
   viewport: PageRenderViewport;
   background: PageRenderBackground;
   /**
-   * Output-pixel budget: reject BEFORE allocating when the computed device
+   * Output-pixel budget: reject before allocating when the computed device
    * size exceeds it (the decode-bomb-guard pattern — the check lives where
    * the allocation happens). PDF page space is effectively unbounded, so a
    * width-bounded request can still explode vertically on degenerate
-   * geometry. Optional: LOCAL renders omit it (exactness is the local
+   * geometry. Optional: Local renders omit it (exactness is the local
    * product promise); server renders carry the deployment policy's budget.
    */
   maxOutputPixels?: number;

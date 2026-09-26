@@ -165,7 +165,7 @@ vi.mock('@google-cloud/storage', () => {
   };
 });
 
-// Import AFTER the mock is registered.
+// Import after the mock is registered.
 const { GcsObjectStore } = await import('../src/storage/adapters/GcsObjectStore');
 const { runObjectStoreConformance } = await import('./_helpers/object-store-conformance');
 

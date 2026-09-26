@@ -2,4 +2,28 @@
 
 import type * as CloudPDF from "../index.js";
 
-export type DocPagesViewports200Response = CloudPDF.DocPagesViewports200ResponseItem[];
+export interface DocPagesViewports200Response {
+    viewports: DocPagesViewports200Response.Viewports.Item[];
+}
+
+export namespace DocPagesViewports200Response {
+    export type Viewports = Viewports.Item[];
+
+    export namespace Viewports {
+        export interface Item {
+            bbox: Item.Bbox;
+            name: string | null;
+            measure: CloudPDF.DocPagesViewports200ResponseViewportsItemMeasure | null;
+            owned: boolean;
+        }
+
+        export namespace Item {
+            export interface Bbox {
+                left: number;
+                bottom: number;
+                right: number;
+                top: number;
+            }
+        }
+    }
+}

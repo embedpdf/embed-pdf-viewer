@@ -19,10 +19,12 @@ export type { DocumentHandle } from './engine/DocumentHandle';
 export type {
   DocumentEvent,
   DocumentEventInit,
+  DocumentEventOf,
   DocumentEventType,
   EventOrigin,
 } from './events/DocumentEvent';
 export type { DocumentEventStream } from './events/DocumentEventStream';
+export { subscribeToType } from './events/DocumentEventStream';
 export {
   advisoryFromPdfBits,
   permissionInfoFromProbe,
@@ -31,12 +33,12 @@ export {
   securityStateFromProbe,
 } from './engine/document-security-state';
 export type {
+  AnnotationOwner,
   CdnAccessInfo,
   CdnAdapter,
   DocumentAccessInfo,
   DocumentAccessReason,
   DocumentEncryptionState,
-  DocumentIdentity,
   DocumentOpenMode,
   DocumentSecurityService,
   DocumentSecurityState,
@@ -47,6 +49,7 @@ export type {
 } from './engine/DocumentSecurityService';
 export {
   CONTINUOUS_RENDER_POLICY,
+  appearanceLatticeScale,
   snapAppearanceScale,
   snapFullPageViewport,
   snapTileScale,
@@ -72,7 +75,11 @@ export type { DocumentRedactionService } from './engine/DocumentRedactionService
 export type { DocumentSignaturesService } from './engine/DocumentSignaturesService';
 export type { PageAnnotationsService } from './engine/PageAnnotationsService';
 export type { DocumentAttachmentsService } from './engine/DocumentAttachmentsService';
-export type { PieceInfoService } from './engine/PieceInfoService';
+export type {
+  PieceInfoDeleteResult,
+  PieceInfoService,
+  PieceInfoUpdateResult,
+} from './engine/PieceInfoService';
 export type {
   PieceInfoEntry,
   PieceInfoPatch,
@@ -80,7 +87,6 @@ export type {
   PieceInfoSnapshot,
 } from './dto/PieceInfo';
 export type { PageTextService } from './engine/PageTextService';
-export type { PageGeometryService } from './engine/PageGeometryService';
 export type { PageRenderService } from './engine/PageRenderService';
 
 export { wirePack, EMPTY_TRANSFER } from './wire/WirePack';
@@ -100,9 +106,7 @@ export type {
   MetadataReadWorkerRequest,
   MetadataUpdateWorkerRequest,
   ActionsReadWorkerRequest,
-  AnnotationsListRawAllWorkerRequest,
-  AnnotationsListRawPageWorkerRequest,
-  AnnotationsListFullPageWorkerRequest,
+  AnnotationsListWorkerRequest,
   AnnotationsRenderAppearancesWorkerRequest,
   AnnotationsRenderAppearancesEncodedWorkerRequest,
   AnnotationAppearancesEncodedResultWire,
@@ -129,7 +133,7 @@ export type {
   DocumentVersionWorkerRequest,
   SignaturesPrepareWorkerRequest,
   SignaturesCompleteWorkerRequest,
-  SignaturesAbortWorkerRequest,
+  SignaturesCancelWorkerRequest,
   SignaturesAnalyzeWorkerRequest,
   SignaturesFinalizeCandidateWorkerRequest,
   PagesMoveWorkerRequest,
@@ -147,12 +151,13 @@ export type {
   PieceInfoReadWorkerRequest,
   PieceInfoUpdateWorkerRequest,
   PieceInfoApplicationsWorkerRequest,
-  PieceInfoClearWorkerRequest,
+  PieceInfoDeleteWorkerRequest,
   PagesTextWorkerRequest,
   PagesGeometryWorkerRequest,
   PagesRenderWorkerRequest,
   PagesRenderEncodedWorkerRequest,
   SearchQueryWorkerRequest,
+  SearchScanRequest,
   FormsListWorkerRequest,
   FormsSetValueWorkerRequest,
   FormsResetWorkerRequest,
@@ -181,6 +186,9 @@ export type {
   AttachmentsCreateWorkerRequest,
   AttachmentsDeleteWorkerRequest,
   AnnotationsReadFileWorkerRequest,
+  AnnotationsReadAppearanceWorkerRequest,
+  AnnotationsExportWorkerRequest,
+  AnnotationsImportWorkerRequest,
   AttachmentFileWorkerPayload,
   LayerArtifactWorkerPayload,
   LayerArtifactFileWorkerPayload,

@@ -1,8 +1,10 @@
 /**
- * Script world building (D6: page-scoped prefetch) and the two-standard
- * event bridge (D5): the /AA keys are ISO 32000-2 Table 200; the camelCase
- * event names live in the JS API layer (ISO 21757-1 / Acrobat).
+ * Script world building (a page-scoped prefetch: the forms snapshot plus the
+ * annotations of the page the action runs on) and the event bridge between
+ * two standards: the /AA keys are ISO 32000-2 Table 200; the event names
+ * live in the JavaScript API layer (ISO 21757-1, Acrobat).
  */
+import type { PluginContext } from '@embedpdf/core';
 import { scriptFieldsFromSnapshot } from '@embedpdf/core-acrojs';
 import type {
   ScriptAnnotInput,
@@ -14,29 +16,27 @@ import { toPageRef } from '@embedpdf/engine-core/runtime';
 import type { FormSnapshot, PageObjectNumber } from '@embedpdf/engine-core/runtime';
 
 import type { ActionContext } from '../contract';
-import type { ActionsContext } from '../services';
 
-export function createScriptWorld(ctx: ActionsContext) {
+export function createScriptWorld(ctx: PluginContext<void>) {
   const engineColorToArray = (
     color: { r: number; g: number; b: number } | null | undefined,
   ): ScriptColorArray => (color ? ['RGB', color.r / 255, color.g / 255, color.b / 255] : ['T']);
 
-  const pageIndexOf = (pon: PageObjectNumber): number =>
-    ctx.document()?.pages.findIndex((page) => page.ref.pageObjectNumber === pon) ?? -1;
-
   const scriptWorldFor = async (
-    pon: PageObjectNumber,
+    pageObjectNumber: PageObjectNumber,
   ): Promise<{ snapshot: FormSnapshot; world: Omit<ScriptWorldInput, 'event'> }> => {
-    const doc = ctx.doc!;
-    const snapshot = await doc.forms.list();
-    const pageIndex = Math.max(0, pageIndexOf(pon));
-    const { annotations } = await doc.page(toPageRef(pon)).annotations.list();
+    const page = toPageRef(pageObjectNumber);
+    const snapshot = await ctx.doc.forms.list();
+    const pageIndex = Math.max(0, ctx.getPage(page)?.index ?? -1);
+    const { annotations } = await ctx.doc.page(page).annotations.list();
     const annots: ScriptAnnotInput[] = annotations
-      // Script-addressable = everything EXCEPT link and widget (they are
-      // Link/Field objects in Acrobat and separate planes here).
-      .filter((a) => a.subtype !== 'link' && !a.subtype.startsWith('widget'))
-      .map((a) => {
-        const styled = a as unknown as {
+      // Script-addressable = everything except links and widgets (they are
+      // Link and Field objects in Acrobat and separate planes here).
+      .filter(
+        (annotation) => annotation.subtype !== 'link' && !annotation.subtype.startsWith('widget'),
+      )
+      .map((annotation) => {
+        const styled = annotation as unknown as {
           color?: { r: number; g: number; b: number };
           interiorColor?: { r: number; g: number; b: number } | null;
           opacity?: number;
@@ -45,32 +45,32 @@ export function createScriptWorld(ctx: ActionsContext) {
           dashArray?: number[];
         };
         return {
-          ref: a.ref,
-          name: a.nm ?? '',
-          subtype: a.subtype,
+          ref: annotation.ref,
+          name: annotation.nm ?? '',
+          subtype: annotation.subtype,
           page: pageIndex,
-          rect: [a.rect.left, a.rect.bottom, a.rect.right, a.rect.top] as [
-            number,
-            number,
-            number,
-            number,
-          ],
-          contents: a.contents ?? '',
-          author: a.author ?? '',
-          subject: a.subject ?? '',
+          rect: [
+            annotation.rect.left,
+            annotation.rect.bottom,
+            annotation.rect.right,
+            annotation.rect.top,
+          ] as [number, number, number, number],
+          contents: annotation.contents ?? '',
+          author: annotation.author ?? '',
+          subject: annotation.subject ?? '',
           strokeColor: engineColorToArray(styled.color),
           fillColor: engineColorToArray(styled.interiorColor),
           opacity: styled.opacity ?? 1,
           width: styled.strokeWidth ?? 1,
           borderStyle: styled.borderStyle === 'dashed' ? ('D' as const) : ('S' as const),
           dash: styled.dashArray ?? [],
-          hidden: a.flags.hidden,
-          print: a.flags.print,
-          readOnly: a.flags.readOnly,
-          locked: a.flags.locked,
-          noView: a.flags.noView,
-          toggleNoView: a.flags.toggleNoView,
-          opaqueBody: a.subtype === 'stamp',
+          hidden: annotation.hidden,
+          print: annotation.print,
+          readOnly: annotation.readOnly,
+          locked: annotation.locked,
+          noView: annotation.noView,
+          toggleNoView: annotation.toggleNoView,
+          opaqueBody: annotation.subtype === 'stamp',
         };
       });
     return {
@@ -95,13 +95,12 @@ export function createScriptWorld(ctx: ActionsContext) {
   const PAGE_EVENT_NAMES: Record<string, string> = {
     open: 'Open',
     close: 'Close',
-    // No Acrobat equivalent for the PV/PI names — EmbedPDF extension.
+    // /PV and /PI have no Acrobat event name: these two are an EmbedPDF extension.
     visible: 'Visible',
     invisible: 'Invisible',
   };
-  // The two-standard bridge (D5): the /AA keys are ISO 32000-2 Table 200;
-  // the camelCase event names live in the JS API layer (ISO 21757-1 /
-  // Acrobat) — only the key half is verifiable against the in-repo spec.
+  // The /AA keys are ISO 32000-2 Table 200; the event names live in the
+  // JavaScript API layer (ISO 21757-1, Acrobat).
   const DOC_EVENT_NAMES: Record<string, string> = {
     open: 'Open',
     'will-save': 'WillSave',
@@ -111,16 +110,19 @@ export function createScriptWorld(ctx: ActionsContext) {
     'will-close': 'WillClose',
   };
 
-  const scriptEventFor = (actionCtx: ActionContext, snapshot: FormSnapshot): ScriptEventInput => {
-    const provenance = actionCtx.event;
+  const scriptEventFor = (
+    actionContext: ActionContext,
+    snapshot: FormSnapshot,
+  ): ScriptEventInput => {
+    const provenance = actionContext.event;
     const type =
       provenance.scope === 'page'
         ? 'Page'
         : provenance.scope === 'document'
           ? 'Doc'
-          : actionCtx.source.kind === 'widget'
+          : actionContext.source.kind === 'widget'
             ? 'Field'
-            : actionCtx.source.kind === 'link'
+            : actionContext.source.kind === 'link'
               ? 'Link'
               : 'Annot'; // EmbedPDF extension — Acrobat has no plain-annot type
     const name =
@@ -131,7 +133,8 @@ export function createScriptWorld(ctx: ActionsContext) {
           : provenance.scope === 'page'
             ? (PAGE_EVENT_NAMES[provenance.name] ?? 'Open')
             : (DOC_EVENT_NAMES[provenance.name] ?? 'Open');
-    const targetRef = actionCtx.source.kind === 'widget' ? actionCtx.source.field : undefined;
+    const targetRef =
+      actionContext.source.kind === 'widget' ? actionContext.source.field : undefined;
     const targetField = targetRef
       ? snapshot.fields.find((field) =>
           targetRef.kind === 'objectNumber' && field.ref.kind === 'objectNumber'

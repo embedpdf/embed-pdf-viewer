@@ -1,19 +1,17 @@
 /**
- * The annotation style panel — the v2 snippet's style sidebar, rebuilt the v3
- * way. The plugin owns the schema AND the state; this file owns only how each
- * PropSpec renders and the flat patch it writes back. There is NO per-subtype
- * branching here: a new annotation kind that declares its `PropSpec[]` in the
- * kind table gets a working style panel for free.
+ * The annotation style panel. The plugin owns the schema and the state; this
+ * file owns only how each PropSpec renders and the flat patch it writes back.
+ * There is no per-subtype branching here: a new annotation kind that declares
+ * its `PropSpec[]` in the kind table gets a working style panel for free.
  *
  * Data flow (mirrors examples/react's AnnotationSidebar):
  *   selection present → useSelectionProps() specs/values, write updateSelection()
  *   nothing selected  → propsForTool(tool) specs + useAnnotationDefaults(tool)
  *                        values, write setDefaults(tool, …)
  *
- * The look is ported 1:1 from viewers/snippet's annotation-sidebar (six-column
- * swatch grid, range slider, SVG stroke / line-ending dropdowns, font-size
- * combo, align toggles), retinted from v2's `bg-bg-input`/`text-fg-primary`
- * tokens to this app's semantic ones (bg-surface / text-fg / border-border …).
+ * The look: a six-column swatch grid, range slider, SVG stroke / line-ending
+ * dropdowns, font-size combo and align toggles, styled with this app's
+ * semantic tokens (bg-surface / text-fg / border-border …).
  */
 import { useEffect, useRef, useState } from 'react';
 import { annotationKey } from '@embedpdf/react/annotation';
@@ -40,8 +38,8 @@ import { Icon } from './icons';
 import { useAnnotationFonts } from './annotation-fonts';
 import { AnnotationFlagsSection } from './annotation-flags';
 
-// ── app-level vocabulary (a viewer's decision, like v2's color presets) ──────
-// The engine schema says WHICH controls to show; these lists say what the app
+// ── app-level vocabulary (a viewer's decision) ────────────────────────────────
+// The engine schema says which controls to show; these lists say what the app
 // offers inside a color / font / stroke picker.
 const PRESET_COLORS = [
   '#000000',
@@ -75,11 +73,11 @@ const BORDER_OPTS: { key: string; make: () => Border }[] = [
   { key: 'cloudy-1', make: () => ({ kind: 'cloudy', intensity: 1 }) },
   { key: 'cloudy-2', make: () => ({ kind: 'cloudy', intensity: 2 }) },
 ];
-const borderKey = (b: Border): string =>
-  b.kind === 'cloudy'
-    ? `cloudy-${b.intensity >= 2 ? 2 : 1}`
-    : b.kind === 'dashed'
-      ? `dashed-${b.dash.join('-')}`
+const borderKey = (border: Border): string =>
+  border.kind === 'cloudy'
+    ? `cloudy-${border.intensity >= 2 ? 2 : 1}`
+    : border.kind === 'dashed'
+      ? `dashed-${border.dash.join('-')}`
       : 'solid';
 
 const LINE_ENDINGS: { v: LineEnding; label: string }[] = [
@@ -136,10 +134,10 @@ function Field({
 }
 
 // ── color swatch grid ────────────────────────────────────────────────────────
-const isTransparent = (c: string | null) =>
-  c == null ||
-  c === 'transparent' ||
-  (/^#([0-9a-f]{8})$/i.test(c) && c.slice(-2).toLowerCase() === '00');
+const isTransparent = (color: string | null) =>
+  color == null ||
+  color === 'transparent' ||
+  (/^#([0-9a-f]{8})$/i.test(color) && color.slice(-2).toLowerCase() === '00');
 
 function Swatch({
   color,
@@ -148,7 +146,7 @@ function Swatch({
 }: {
   color: string;
   active: boolean;
-  onSelect: (c: string) => void;
+  onSelect: (color: string) => void;
 }) {
   const style = isTransparent(color)
     ? {
@@ -175,14 +173,14 @@ function SwatchGrid({
   allowTransparent,
 }: {
   value: string | null | undefined;
-  onSelect: (c: string) => void;
+  onSelect: (color: string) => void;
   allowTransparent?: boolean;
 }) {
-  const active = (c: string) => c.toLowerCase() === (value ?? '').toLowerCase();
+  const active = (color: string) => color.toLowerCase() === (value ?? '').toLowerCase();
   return (
     <div className="grid grid-cols-6 gap-x-1 gap-y-3">
-      {PRESET_COLORS.map((c) => (
-        <Swatch key={c} color={c} active={active(c)} onSelect={onSelect} />
+      {PRESET_COLORS.map((color) => (
+        <Swatch key={color} color={color} active={active(color)} onSelect={onSelect} />
       ))}
       {allowTransparent && (
         <Swatch color="transparent" active={isTransparent(value ?? null)} onSelect={onSelect} />
@@ -203,7 +201,7 @@ function RangeSlider({
   min: number;
   max: number;
   step: number;
-  onChange: (n: number) => void;
+  onChange: (value: number) => void;
 }) {
   return (
     <input
@@ -213,7 +211,7 @@ function RangeSlider({
       min={min}
       max={max}
       step={step}
-      onChange={(e) => onChange(parseFloat(e.target.value))}
+      onChange={(event) => onChange(parseFloat(event.target.value))}
     />
   );
 }
@@ -223,12 +221,12 @@ function useOutsideClose(open: boolean, close: () => void) {
   const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      // composedPath, NOT contains(e.target): at the document level an event
+    const onDoc = (event: MouseEvent) => {
+      // composedPath, not contains(event.target): at the document level an event
       // from inside the viewer's shadow root retargets to the host element, so
       // contains() reads every inside click as outside and unmounts the panel
       // on mousedown — before the option's click can fire.
-      if (rootRef.current && !e.composedPath().includes(rootRef.current)) close();
+      if (rootRef.current && !event.composedPath().includes(rootRef.current)) close();
     };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
@@ -249,7 +247,7 @@ function DropdownShell({
     <div ref={rootRef} className="relative w-full">
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpen((previous) => !previous)}
         className="border-border bg-surface text-fg flex w-full items-center justify-between gap-2 rounded border px-3 py-1.5"
       >
         {trigger}
@@ -285,15 +283,16 @@ function OptionRow({
 }
 
 // ── stroke / border preview + picker ─────────────────────────────────────────
-function borderSvg(b: Border): ReactNode {
-  if (b.kind === 'cloudy') {
-    const r = b.intensity >= 2 ? 5 : 3;
-    const n = Math.ceil(80 / (r * 2));
-    const step = 80 / n;
-    const baseline = r + 1;
-    const viewH = r * 2 + 2;
+function borderSvg(border: Border): ReactNode {
+  if (border.kind === 'cloudy') {
+    const radius = border.intensity >= 2 ? 5 : 3;
+    const bumps = Math.ceil(80 / (radius * 2));
+    const step = 80 / bumps;
+    const baseline = radius + 1;
+    const viewH = radius * 2 + 2;
     const parts = [`M 0 ${baseline}`];
-    for (let i = 0; i < n; i++) parts.push(`A ${r} ${r} 0 0 1 ${step * (i + 1)} ${baseline}`);
+    for (let i = 0; i < bumps; i++)
+      parts.push(`A ${radius} ${radius} 0 0 1 ${step * (i + 1)} ${baseline}`);
     return (
       <svg width="80" height={viewH} viewBox={`0 0 80 ${viewH}`}>
         <path
@@ -307,7 +306,7 @@ function borderSvg(b: Border): ReactNode {
       </svg>
     );
   }
-  const dash = b.kind === 'dashed' ? b.dash.join(' ') : undefined;
+  const dash = border.kind === 'dashed' ? border.dash.join(' ') : undefined;
   return (
     <svg width="80" height="8" viewBox="0 0 80 8">
       <line
@@ -330,24 +329,26 @@ function BorderSelect({
 }: {
   value: Border;
   cloudy: boolean;
-  onChange: (b: Border) => void;
+  onChange: (border: Border) => void;
 }) {
-  const opts = cloudy ? BORDER_OPTS : BORDER_OPTS.filter((o) => !o.key.startsWith('cloudy'));
+  const options = cloudy
+    ? BORDER_OPTS
+    : BORDER_OPTS.filter((option) => !option.key.startsWith('cloudy'));
   return (
     <DropdownShell trigger={<span className="text-fg-secondary">{borderSvg(value)}</span>}>
       {(close) =>
-        opts.map((o) => {
-          const b = o.make();
+        options.map((option) => {
+          const border = option.make();
           return (
             <OptionRow
-              key={o.key}
-              selected={borderKey(value) === o.key}
+              key={option.key}
+              selected={borderKey(value) === option.key}
               onClick={() => {
-                onChange(b);
+                onChange(border);
                 close();
               }}
             >
-              <span className="text-fg-secondary">{borderSvg(b)}</span>
+              <span className="text-fg-secondary">{borderSvg(border)}</span>
             </OptionRow>
           );
         })
@@ -410,21 +411,21 @@ function LineEndingSelect({
 }: {
   side: 'start' | 'end';
   value: LineEnding;
-  onChange: (v: LineEnding) => void;
+  onChange: (ending: LineEnding) => void;
 }) {
   return (
     <DropdownShell trigger={<LineEndingPreview name={value} side={side} />}>
       {(close) =>
-        LINE_ENDINGS.map((o) => (
+        LINE_ENDINGS.map((option) => (
           <OptionRow
-            key={o.v}
-            selected={value === o.v}
+            key={option.v}
+            selected={value === option.v}
             onClick={() => {
-              onChange(o.v);
+              onChange(option.v);
               close();
             }}
           >
-            <LineEndingPreview name={o.v} side={side} />
+            <LineEndingPreview name={option.v} side={side} />
           </OptionRow>
         ))
       }
@@ -433,26 +434,35 @@ function LineEndingSelect({
 }
 
 // ── font family picker ───────────────────────────────────────────────────────
-function FontFamilySelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function FontFamilySelect({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (family: string) => void;
+}) {
   // The standard faces plus the configured fonts that are registered and
   // mounted (`annotations.fonts`) — a registered key is a `fontFamily` value
   // like any standard name.
   const configured = useAnnotationFonts();
-  const options = [...FONT_OPTIONS, ...configured.map((f) => ({ v: f.key, label: f.label }))];
-  const current = options.find((o) => o.v === value);
+  const options = [
+    ...FONT_OPTIONS,
+    ...configured.map((font) => ({ v: font.key, label: font.label })),
+  ];
+  const current = options.find((option) => option.v === value);
   return (
     <DropdownShell trigger={<span className="text-fg text-sm">{current?.label ?? value}</span>}>
       {(close) =>
-        options.map((o) => (
+        options.map((option) => (
           <OptionRow
-            key={o.v}
-            selected={o.v === value}
+            key={option.v}
+            selected={option.v === value}
             onClick={() => {
-              onChange(o.v);
+              onChange(option.v);
               close();
             }}
           >
-            {o.label}
+            {option.label}
           </OptionRow>
         ))
       }
@@ -461,18 +471,18 @@ function FontFamilySelect({ value, onChange }: { value: string; onChange: (v: st
 }
 
 // ── font-size combo (number input + preset dropdown) ─────────────────────────
-function FontSizeCombo({ value, onChange }: { value: number; onChange: (n: number) => void }) {
+function FontSizeCombo({ value, onChange }: { value: number; onChange: (size: number) => void }) {
   const [open, setOpen] = useState(false);
   const rootRef = useOutsideClose(open, () => setOpen(false));
-  // Typed text is a DRAFT until Enter or blur (Escape discards): committing
+  // Typed text is a draft until Enter or blur (Escape discards): committing
   // per keystroke would apply "2" on the way to "24" — to the selected text
   // while editing. Presets commit at once.
   const [draft, setDraft] = useState<string | null>(null);
   const commit = () => {
     if (draft === null) return;
-    const n = parseInt(draft, 10);
+    const size = parseInt(draft, 10);
     setDraft(null);
-    if (Number.isFinite(n) && n > 0 && n !== value) onChange(n);
+    if (Number.isFinite(size) && size > 0 && size !== value) onChange(size);
   };
   return (
     <div ref={rootRef} className="relative w-full">
@@ -480,14 +490,14 @@ function FontSizeCombo({ value, onChange }: { value: number; onChange: (n: numbe
         type="number"
         min={1}
         value={draft ?? value}
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={(event) => setDraft(event.target.value)}
         onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
             commit();
             setOpen(false);
-          } else if (e.key === 'Escape') {
+          } else if (event.key === 'Escape') {
             setDraft(null);
             setOpen(false);
           }
@@ -498,7 +508,7 @@ function FontSizeCombo({ value, onChange }: { value: number; onChange: (n: numbe
       <button
         type="button"
         tabIndex={-1}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpen((previous) => !previous)}
         className="absolute inset-y-0 right-1 flex items-center"
       >
         <Icon name="chevronDown" size={16} className="text-fg-secondary" />
@@ -566,7 +576,7 @@ function Toggle({
       type="button"
       title={title}
       onClick={onClick}
-      onMouseDown={keepFocus ? (e) => e.preventDefault() : undefined}
+      onMouseDown={keepFocus ? (event) => event.preventDefault() : undefined}
       className={`flex h-9 w-9 items-center justify-center rounded border transition-colors ${
         active
           ? 'border-accent bg-accent text-on-accent'
@@ -604,7 +614,7 @@ function FormatToggles({
   return (
     <Field
       label={t('demo.formatLabel', { fallback: 'Format' })}
-      mixed={specs.some((s) => mixed.includes(s.key))}
+      mixed={specs.some((spec) => mixed.includes(spec.key))}
     >
       <div className="flex gap-2">
         {specs.map((spec) => {
@@ -645,7 +655,7 @@ function PropControl({
         <Field label={spec.label} mixed={mixed}>
           <SwatchGrid
             value={value as string}
-            onSelect={(c) => onChange({ [spec.key]: c } as AnnotationPropsPatch)}
+            onSelect={(color) => onChange({ [spec.key]: color } as AnnotationPropsPatch)}
           />
         </Field>
       );
@@ -655,37 +665,39 @@ function PropControl({
           <SwatchGrid
             value={value as string | null}
             allowTransparent
-            onSelect={(c) => onChange({ interiorColor: c === 'transparent' ? null : c })}
+            onSelect={(color) =>
+              onChange({ interiorColor: color === 'transparent' ? null : color })
+            }
           />
         </Field>
       );
     case 'opacity': {
-      const v = (value as number) ?? 1;
+      const opacity = (value as number) ?? 1;
       return (
         <Field label={spec.label} mixed={mixed}>
           <RangeSlider
-            value={v}
+            value={opacity}
             min={spec.min}
             max={spec.max}
             step={spec.step}
-            onChange={(n) => onChange({ opacity: n })}
+            onChange={(next) => onChange({ opacity: next })}
           />
-          <span className="text-fg-muted text-xs">{Math.round(v * 100)}%</span>
+          <span className="text-fg-muted text-xs">{Math.round(opacity * 100)}%</span>
         </Field>
       );
     }
     case 'strokeWidth': {
-      const v = (value as number) ?? spec.min;
+      const strokeWidth = (value as number) ?? spec.min;
       return (
         <Field label={spec.label} mixed={mixed}>
           <RangeSlider
-            value={v}
+            value={strokeWidth}
             min={spec.min}
             max={spec.max}
             step={spec.step}
-            onChange={(n) => onChange({ strokeWidth: n })}
+            onChange={(next) => onChange({ strokeWidth: next })}
           />
-          <span className="text-fg-muted text-xs">{v}px</span>
+          <span className="text-fg-muted text-xs">{strokeWidth}px</span>
         </Field>
       );
     }
@@ -694,7 +706,7 @@ function PropControl({
         <Field label={spec.label} mixed={mixed}>
           <FontSizeCombo
             value={(value as number) ?? 12}
-            onChange={(n) => onChange({ fontSize: n })}
+            onChange={(next) => onChange({ fontSize: next })}
           />
         </Field>
       );
@@ -704,7 +716,7 @@ function PropControl({
           <BorderSelect
             value={(value as Border) ?? { kind: 'solid' }}
             cloudy={spec.cloudy}
-            onChange={(b) => onChange({ border: b })}
+            onChange={(border) => onChange({ border })}
           />
         </Field>
       );
@@ -718,7 +730,7 @@ function PropControl({
               <LineEndingSelect
                 side="start"
                 value={le.start}
-                onChange={(v) => onChange({ lineEndings: { start: v } })}
+                onChange={(ending) => onChange({ lineEndings: { start: ending } })}
               />
             </div>
             <div>
@@ -726,7 +738,7 @@ function PropControl({
               <LineEndingSelect
                 side="end"
                 value={le.end}
-                onChange={(v) => onChange({ lineEndings: { end: v } })}
+                onChange={(ending) => onChange({ lineEndings: { end: ending } })}
               />
             </div>
           </div>
@@ -738,7 +750,7 @@ function PropControl({
         <Field label={spec.label} mixed={mixed}>
           <FontFamilySelect
             value={(value as string) ?? 'helvetica'}
-            onChange={(v) => onChange({ fontFamily: v })}
+            onChange={(family) => onChange({ fontFamily: family })}
           />
         </Field>
       );
@@ -765,7 +777,7 @@ function PropControl({
         </Field>
       );
     }
-    // The rich-text format toggles render as ONE row (see `FormatToggles`);
+    // The rich-text format toggles render as one row (see `FormatToggles`);
     // each spec is still declared by the kind, so a kind without rich text
     // never shows them.
     case 'bold':
@@ -781,7 +793,7 @@ function PropControl({
           />
         </Field>
       );
-    // `link` deliberately renders NOTHING here: a link is a verb on the
+    // `link` deliberately renders nothing here: a link is a verb on the
     // selection, edited in the anchored popover (see ui/link-editor.tsx) —
     // never a style-panel section.
     case 'link':
@@ -810,17 +822,17 @@ function EmptyState() {
 export function AnnotationStylePanel() {
   const annotation = useAnnotation();
   const { activeToolId } = useTool();
-  const sel = useSelectionProps();
+  const selection = useSelectionProps();
   const defaults = useAnnotationDefaults(activeToolId);
   const selected = useAnnotationSelected();
 
-  const hasSel = sel.specs.length > 0;
-  const specs = hasSel ? sel.specs : annotation.listPropSpecs(activeToolId);
-  const values = hasSel ? sel.values : defaults;
+  const hasSel = selection.specs.length > 0;
+  const specs = hasSel ? selection.specs : annotation.listPropSpecs(activeToolId);
+  const values = hasSel ? selection.values : defaults;
   const write = (patch: AnnotationPropsPatch) =>
     hasSel ? annotation.updateSelection(patch) : annotation.setToolDefaults(activeToolId, patch);
 
-  // A selection with no editable props (e.g. a stamp, or a LOCKED annotation —
+  // A selection with no editable props (e.g. a stamp, or a locked annotation —
   // its style is frozen) still shows its flags: that's how you unlock it.
   if (specs.length === 0 && selected.length === 0) return <EmptyState />;
 
@@ -835,9 +847,9 @@ export function AnnotationStylePanel() {
         spec.key === 'bold' ? (
           <FormatToggles
             key="format"
-            specs={specs.filter((s): s is FormatSpec => isFormatSpec(s))}
+            specs={specs.filter((spec): spec is FormatSpec => isFormatSpec(spec))}
             values={values}
-            mixed={hasSel ? sel.mixed : []}
+            mixed={hasSel ? selection.mixed : []}
             onChange={write}
           />
         ) : (
@@ -845,7 +857,7 @@ export function AnnotationStylePanel() {
             key={spec.key}
             spec={spec}
             value={values[spec.key]}
-            mixed={hasSel && sel.mixed.includes(spec.key)}
+            mixed={hasSel && selection.mixed.includes(spec.key)}
             onChange={write}
           />
         ),
@@ -890,16 +902,18 @@ function RedactionLabelSection() {
         type="text"
         value={value}
         placeholder={t('demo.redactLabelPlaceholder')}
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={(event) => setDraft(event.target.value)}
         onBlur={commit}
-        onKeyDown={(e) => e.key === 'Enter' && commit()}
+        onKeyDown={(event) => event.key === 'Enter' && commit()}
         className="border-border bg-surface text-fg w-full rounded-md border px-2 py-1.5 text-sm"
       />
       <label className="text-fg mt-2 flex items-center gap-2 text-sm">
         <input
           type="checkbox"
           checked={mark.raw?.subtype === 'redact' ? mark.raw.repeat : false}
-          onChange={(e) => void redaction.updateLabel(mark.ref, { repeat: e.target.checked })}
+          onChange={(event) =>
+            void redaction.updateLabel(mark.ref, { repeat: event.target.checked })
+          }
         />
         {t('demo.redactLabelRepeat')}
       </label>

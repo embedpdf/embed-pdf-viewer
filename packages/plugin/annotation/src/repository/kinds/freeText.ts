@@ -1,7 +1,7 @@
 /**
  * Free text (plain box + callout). Owns the callout leader group — the one
  * geometry where `/RD` means "text box inset" rather than a border effect —
- * and the `/DA` text-slice ingest. Font/size/colour lowerings are the GENERIC
+ * and the `/DA` text-slice ingest. Font/size/colour lowerings are the generic
  * 1:1 keys (safe as singles since the engine's `/DA` read-modify-write).
  */
 import {
@@ -9,7 +9,7 @@ import {
   geomPdfBounds,
   geomRotation,
   rotatedAabb,
-  type Annot,
+  type ModelAnnotation,
   type TextStyle,
 } from '@embedpdf/core-annotation';
 import type {
@@ -53,22 +53,22 @@ function textFromDTO(dto: FreeTextDTO): TextStyle {
 }
 
 /**
- * A formatting toggle is a BODY change (runs are deltas over it), so it
+ * A formatting toggle is a body change (runs are deltas over it), so it
  * lowers as a rich write carrying the current paragraphs — and every toggle
- * lowers the same COMPLETE body (the current one with the three toggles
+ * lowers the same complete body (the current one with the three toggles
  * applied: a partial body means engine defaults, which would reset the
  * size, face and colour), so a patch of several merges cleanly.
  */
-const formattingBody = (a: Annot): Wire => {
-  const doc = richDocOf(a);
-  const t = a.text;
+const formattingBody = (annotation: ModelAnnotation): Wire => {
+  const doc = richDocOf(annotation);
+  const style = annotation.text;
   return {
     richText: {
       body: {
         ...doc.body,
-        weight: t?.bold ? 700 : 400,
-        italic: !!t?.italic,
-        decoration: t?.underline ? ['underline'] : [],
+        weight: style?.bold ? 700 : 400,
+        italic: !!style?.italic,
+        decoration: style?.underline ? ['underline'] : [],
       },
       paragraphs: doc.paragraphs,
     },
@@ -84,15 +84,15 @@ const formattingBody = (a: Annot): Wire => {
  *
  * A tilted box (the upright policy) additionally emits `rotation` +
  * `unrotatedRect` (the logical text box) — the engine bakes the box + text
- * under an INLINE rotation about the box centre while the leader stays
+ * under an inline rotation about the box centre while the leader stays
  * page-space, so (unlike plain boxes) the /AP form `/Matrix` stays identity
- * and the raster stays placed by `/Rect`. `/RD` then insets to the ROTATED
+ * and the raster stays placed by `/Rect`. `/RD` then insets to the rotated
  * box's AABB — the best axis-aligned text box a foreign viewer regenerating
- * the AP can draw (spec-conformant degradation). The transform pair is TOTAL
+ * the AP can draw (spec-conformant degradation). The transform pair is total
  * (nulls state the clears) like every box emission.
  */
 export function calloutFields(
-  a: Annot,
+  annotation: ModelAnnotation,
   crop: PdfRect,
 ): {
   rect: PdfRect;
@@ -102,15 +102,15 @@ export function calloutFields(
   rotation: number | null;
   unrotatedRect: PdfRect | null;
 } | null {
-  const g = a.geom;
-  if (g.t !== 'text' || !g.callout) return null;
-  const rot = geomRotation(g);
-  const overall = geomPdfBounds(g, a.style.strokeWidth, crop);
-  const tb = contentToPdfRect(rot ? rotatedAabb(g.rect, rot) : g.rect, crop);
-  const nn = (n: number) => Math.max(0, n);
-  const pts = calloutLinePoints(g).map((p) => contentToPdfPoint(p, crop));
+  const geometry = annotation.geometry;
+  if (geometry.kind !== 'text' || !geometry.callout) return null;
+  const rot = geomRotation(geometry);
+  const overall = geomPdfBounds(geometry, annotation.style.strokeWidth, crop);
+  const tb = contentToPdfRect(rot ? rotatedAabb(geometry.rect, rot) : geometry.rect, crop);
+  const nn = (difference: number) => Math.max(0, difference);
+  const points = calloutLinePoints(geometry).map((point) => contentToPdfPoint(point, crop));
   const calloutLine = (
-    pts.length === 3 ? [pts[0], pts[1], pts[2]] : [pts[0], pts[1]]
+    points.length === 3 ? [points[0], points[1], points[2]] : [points[0], points[1]]
   ) as CalloutLine;
   return {
     rect: overall,
@@ -121,63 +121,67 @@ export function calloutFields(
       top: nn(overall.top - tb.top),
     },
     calloutLine,
-    lineEnding: g.callout.ending,
+    lineEnding: geometry.callout.ending,
     ...(rot
-      ? { rotation: toPdfRotation(rot), unrotatedRect: contentToPdfRect(g.rect, crop) }
+      ? { rotation: toPdfRotation(rot), unrotatedRect: contentToPdfRect(geometry.rect, crop) }
       : { rotation: null, unrotatedRect: null }),
   };
 }
 
 export const freeText: KindProjection = {
   ingest: (dto, crop) => {
-    const d = dto as FreeTextDTO;
+    const freeTextDto = dto as FreeTextDTO;
     // A callout (`/IT free-text-callout` + a `/CL` leader): the stored `rect`
-    // is the TEXT BOX (the overall `/Rect` inset by `/RD`); the leader's tip
+    // is the text box (the overall `/Rect` inset by `/RD`); the leader's tip
     // is `cl[0]` and the elbow `cl[1]` (a 3-point `/CL`). The connection point
-    // — `cl` last — is NOT stored; it's re-derived from the box. A tilted box
+    // — `cl` last — is not stored; it's re-derived from the box. A tilted box
     // (the upright policy) reads back from `unrotatedRect` + `rotation`
     // instead — `/RD` only recovers its axis-aligned AABB; foreign PDFs
     // (no EMBD metadata) keep the `/RD` path bit-identically.
-    if (d.intent === 'free-text-callout' && d.calloutLine && d.calloutLine.length >= 2) {
-      const cl = d.calloutLine;
-      const rot = d.rotation ? fromPdfRotation(d.rotation) : 0;
+    if (
+      freeTextDto.intent === 'free-text-callout' &&
+      freeTextDto.calloutLine &&
+      freeTextDto.calloutLine.length >= 2
+    ) {
+      const cl = freeTextDto.calloutLine;
+      const rot = freeTextDto.rotation ? fromPdfRotation(freeTextDto.rotation) : 0;
       const box =
-        rot && d.unrotatedRect
-          ? pdfToContentRect(d.unrotatedRect, crop)
-          : pdfToContentRect(insetPdfRectByRD(d.rect, d.rectDifferences), crop);
+        rot && freeTextDto.unrotatedRect
+          ? pdfToContentRect(freeTextDto.unrotatedRect, crop)
+          : pdfToContentRect(insetPdfRectByRD(freeTextDto.rect, freeTextDto.rectDifferences), crop);
       return {
-        geom: {
-          t: 'text',
+        geometry: {
+          kind: 'text',
           rect: box,
           callout: {
             tip: pdfToContentPoint(cl[0], crop),
             knee: cl.length === 3 ? pdfToContentPoint(cl[1], crop) : undefined,
-            ending: d.lineEnding ?? 'none',
+            ending: freeTextDto.lineEnding ?? 'none',
           },
-          ...(rot && d.unrotatedRect ? { rot } : {}),
+          ...(rot && freeTextDto.unrotatedRect ? { rot } : {}),
         },
-        text: textFromDTO(d),
+        text: textFromDTO(freeTextDto),
       };
     }
     // Plain text box: a box kind — read back the unrotated box + advisory tilt.
-    const rot = d.rotation ? fromPdfRotation(d.rotation) : 0;
-    const box = rot && d.unrotatedRect ? d.unrotatedRect : d.rect;
+    const rot = freeTextDto.rotation ? fromPdfRotation(freeTextDto.rotation) : 0;
+    const box = rot && freeTextDto.unrotatedRect ? freeTextDto.unrotatedRect : freeTextDto.rect;
     return {
-      geom: { t: 'text', rect: pdfToContentRect(box, crop), ...(rot ? { rot } : {}) },
-      text: textFromDTO(d),
+      geometry: { kind: 'text', rect: pdfToContentRect(box, crop), ...(rot ? { rot } : {}) },
+      text: textFromDTO(freeTextDto),
     };
   },
-  geometry: (a, crop) => {
-    if (a.geom.t !== 'text') return null;
-    const cf = calloutFields(a, crop);
+  geometry: (annotation, crop) => {
+    if (annotation.geometry.kind !== 'text') return null;
+    const cf = calloutFields(annotation, crop);
     if (cf) return { ...cf };
-    return boxEmit(a, crop);
+    return boxEmit(annotation, crop);
   },
   prop: { bold: formattingBody, italic: formattingBody, underline: formattingBody },
   // `/IT` + the initial `/Contents` are create-only statements; while typing,
   // the debounced text-edit write owns `contents`.
-  draftExtras: (a, crop) => ({
-    intent: calloutFields(a, crop) ? 'free-text-callout' : 'free-text',
-    contents: a.data?.contents ?? '',
+  draftExtras: (annotation, crop) => ({
+    intent: calloutFields(annotation, crop) ? 'free-text-callout' : 'free-text',
+    contents: annotation.data?.contents ?? '',
   }),
 };

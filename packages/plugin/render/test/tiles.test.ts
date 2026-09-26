@@ -53,7 +53,8 @@ describe('tile grid math (aligned ×2 pyramid)', () => {
   it('regionCovered is index arithmetic over the want grid', () => {
     const grid = tileGrid(PAGE, 8, 512);
     const painted = new Set(['0,0', '1,0', '0,1']);
-    const isPainted = (c: { ix: number; iy: number }) => painted.has(`${c.ix},${c.iy}`);
+    const isPainted = (coord: { ix: number; iy: number }) =>
+      painted.has(`${coord.ix},${coord.iy}`);
     // A region inside the painted L-shape: covered.
     expect(regionCovered(grid, PAGE, { x: 0, y: 0, width: 60, height: 60 }, isPainted)).toBe(true);
     // Extending into the unpainted (1,1): not covered.
@@ -64,7 +65,7 @@ describe('tile grid math (aligned ×2 pyramid)', () => {
     expect(regionCovered(grid, PAGE, { x: 5, y: 5, width: 0, height: 0 }, isPainted)).toBe(true);
   });
 
-  it('snapToPyramid snaps UP and caps at the top', () => {
+  it('snapToPyramid snaps up and caps at the top', () => {
     expect(snapToPyramid([1, 2, 4, 8], 3)).toBe(4);
     expect(snapToPyramid([1, 2, 4, 8], 8)).toBe(8);
     expect(snapToPyramid([1, 2, 4, 8], 50)).toBe(8);
@@ -72,9 +73,9 @@ describe('tile grid math (aligned ×2 pyramid)', () => {
   });
 
   it('inflateRect grows symmetrically, and velocity biases toward travel', () => {
-    const r = { x: 100, y: 100, width: 100, height: 100 };
-    expect(inflateRect(r, 0.5)).toEqual({ x: 50, y: 50, width: 200, height: 200 });
-    const biased = inflateRect(r, 0.5, { dx: 0, dy: 120 });
+    const rect = { x: 100, y: 100, width: 100, height: 100 };
+    expect(inflateRect(rect, 0.5)).toEqual({ x: 50, y: 50, width: 200, height: 200 });
+    const biased = inflateRect(rect, 0.5, { dx: 0, dy: 120 });
     // Scrolling down: more coverage below, less above.
     expect(biased.y).toBe(75); // 25 above (half margin)
     expect(biased.y + biased.height).toBe(300); // 100 below (double margin)

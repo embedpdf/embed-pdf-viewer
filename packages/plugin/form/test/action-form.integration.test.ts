@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import type { DocumentMeta } from '@embedpdf/core';
 import { createQuickJsSandbox } from '@embedpdf/core-js-sandbox';
 import { createLocalEngine } from '@embedpdf/engine';
 import type { FormSnapshot } from '@embedpdf/engine-core/runtime';
@@ -22,7 +23,7 @@ function scalar(snapshot: FormSnapshot, name: string): string {
 /**
  * The synthetic action form is the AF-library acceptance fixture: calc1/calc2 carry
  * `/AA /K` AFNumber_Keystroke + `/F` AFNumber_Format, and read-only calcsum
- * carries `/C` AFSimple_Calculate("SUM", calc1, calc2) via /CO.
+ * carries `/C` AFSimple_Calculate("sum", calc1, calc2) via /CO.
  */
 describe('synthetic action form AF library acceptance', () => {
   it('runs the AF keystroke, format, and calculate chain end-to-end', async () => {
@@ -36,12 +37,14 @@ describe('synthetic action form AF library acceptance', () => {
       { scope: ['*'] },
     );
     const pages = await doc.pages.list();
-    const document = () => ({
+    const document = (): DocumentMeta => ({
       id: doc.id,
+      instanceId: doc.id,
       name: 'action_form_fixture.pdf',
       pageCount: pages.pageCount,
       pages: pages.pages,
       revision: 0,
+      renderPolicy: { kind: 'continuous' },
     });
     const realm = standaloneRealm(doc, document, {
       now: () => Date.UTC(2026, 6, 15, 9, 30, 0),
@@ -76,7 +79,7 @@ describe('synthetic action form AF library acceptance', () => {
       expect(second.status).toBe('applied');
       const afterSecond = await doc.forms.list();
       expect(scalar(afterSecond, 'calc2')).toBe('12');
-      // AFSimple_Calculate("SUM") through the read-only /CO target.
+      // AFSimple_Calculate("sum") through the read-only /CO target.
       expect(scalar(afterSecond, 'calcsum')).toBe('24');
 
       // AFNumber_Keystroke rejects garbage with Acrobat's alert; value survives.

@@ -87,7 +87,7 @@ beforeAll(async () => {
  * Box kinds (square/circle/free-text) persist `/Rect` = the rotated AABB plus
  * an `/EMBD_Metadata/UnrotatedRect` + `/EMBD_Metadata/Rotation`, so PDFium can
  * bake a correct `/AP /Matrix`. Vertex kinds (line/polyline/ink) bake the angle
- * into the points and persist only an ADVISORY `/EMBD_Metadata/Rotation` (no
+ * into the points and persist only an advisory `/EMBD_Metadata/Rotation` (no
  * unrotatedRect) — PDFium ignores a lone Rotation, so it is inert for AP yet
  * lets EmbedPDF show an oriented selection box and offer reset on reopen.
  */
@@ -116,7 +116,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
         borderStyle: 'solid',
         opacity: 1,
       });
-      expect(created.created.subtype).toBe('square');
+      expect(created.annotation.subtype).toBe('square');
       bytes = await doc.download({ mode: 'rewrite' });
       await doc.close();
     }
@@ -166,9 +166,9 @@ describe('annotation rotation (local engine) — save + reopen', () => {
         borderStyle: 'solid',
         opacity: 1,
       });
-      ref = created.created.ref;
+      ref = created.annotation.ref;
 
-      const updated = await page.annotations.update(created.created.ref, {
+      const updated = await page.annotations.update(created.annotation.ref, {
         subtype: 'circle',
         rect: rotatedAabb(movedBox, rotation),
         unrotatedRect: movedBox,
@@ -186,7 +186,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
       baseBytes: annotationsPdf,
       layer: { kind: 'artifact', bytes: artifact },
     });
-    const rendered = await doc.page(toPageRef(PAGE)).annotations.renderAppearances();
+    const rendered = await doc.page(toPageRef(PAGE)).annotations.renderAppearancesRaw();
     const appearance = rendered.appearances.find(
       (candidate) => JSON.stringify(candidate.ref) === JSON.stringify(ref),
     );
@@ -217,8 +217,8 @@ describe('annotation rotation (local engine) — save + reopen', () => {
         opacity: 1,
       });
       // Reset: state the clear explicitly (tri-state — omission would
-      // PRESERVE the rotation; `null` removes the EMBD keys).
-      await doc.page(toPageRef(PAGE)).annotations.update(created.created.ref, {
+      // preserve the rotation; `null` removes the EMBD keys).
+      await doc.page(toPageRef(PAGE)).annotations.update(created.annotation.ref, {
         subtype: 'square',
         rect: SQUARE_RECT,
         rotation: null,
@@ -235,8 +235,8 @@ describe('annotation rotation (local engine) — save + reopen', () => {
     );
     expect(square).toBeDefined();
     if (square && square.subtype === 'square') {
-      expect(square.rotation).toBeUndefined();
-      expect(square.unrotatedRect).toBeUndefined();
+      expect(square.rotation).toBe(null);
+      expect(square.unrotatedRect).toBe(null);
     }
     await doc.close();
   });
@@ -321,11 +321,11 @@ describe('annotation rotation (local engine) — save + reopen', () => {
       expect('unrotatedRect' in ink && ink.unrotatedRect).toBeFalsy();
     }
 
-    // Appearances for vertex kinds stay on the CLASSIC render path: their
+    // Appearances for vertex kinds stay on the classic render path: their
     // rotation is baked into the vertices (advisory /Rotation only), so the
     // entry's rect is the annotation's own /Rect — never remapped to an
     // unrotated box — and the raster contains the drawn strokes.
-    const rendered = await doc.page(toPageRef(PAGE)).annotations.renderAppearances();
+    const rendered = await doc.page(toPageRef(PAGE)).annotations.renderAppearancesRaw();
     for (const dto of [polyline!, line!, ink!]) {
       const ap = rendered.appearances.find(
         (a) =>
@@ -366,7 +366,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
         color: { r: 30, g: 64, b: 175 },
         opacity: 1,
       });
-      expect(created.created.subtype).toBe('caret');
+      expect(created.annotation.subtype).toBe('caret');
       bytes = await doc.download({ mode: 'rewrite' });
       await doc.close();
     }
@@ -385,12 +385,12 @@ describe('annotation rotation (local engine) — save + reopen', () => {
       expect(Math.round(caret.unrotatedRect!.right)).toBe(UNROTATED.right);
       expect(Math.round(caret.unrotatedRect!.top)).toBe(UNROTATED.top);
 
-      // Caret is BOX-family in the appearance reader: the raster comes back
-      // rotation-stripped, PLACED BY THE LOGICAL UNROTATED BOX — not by
+      // Caret is box-family in the appearance reader: the raster comes back
+      // rotation-stripped, placed by the logical unrotated box — not by
       // /Rect. (Before caret joined BOX_FAMILY_SUBTYPES this returned the
       // rotated AABB and the consumer's re-applied `rotation` doubled the
       // tilt on reload.)
-      const rendered = await doc.page(toPageRef(PAGE)).annotations.renderAppearances();
+      const rendered = await doc.page(toPageRef(PAGE)).annotations.renderAppearancesRaw();
       const ap = rendered.appearances.find(
         (a) =>
           a.ref.kind === 'objectNumber' &&

@@ -417,7 +417,7 @@ export class PagesClient {
     }
 
     /**
-     * Multipart mutation envelope: a `body` field holding `{"destIndex"?: number}` (omitted → append) plus a `resource:source` file part carrying the standalone PDF whose pages are copied in. The inserted copies get fresh page object numbers, returned in insertion order.
+     * Multipart mutation envelope: a `body` field holding `{"toIndex"?: number}` (omitted → append) plus a `resource:source` file part carrying the standalone PDF whose pages are copied in. The inserted copies get fresh page object numbers, returned in insertion order.
      *
      * @param {CloudPDF.doc.InsertPagesRequest} request
      * @param {PagesClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -505,7 +505,7 @@ export class PagesClient {
     }
 
     /**
-     * Body is `{"size": {"width", "height"}, "count"?, "destIndex"?}` — size in PDF points, count in [1, 100], destIndex omitted → append.
+     * Body is `{"size": {"width", "height"}, "count"?, "toIndex"?}` — size in PDF points, count in [1, 100], toIndex omitted → append.
      *
      * @param {CloudPDF.doc.InsertBlankPagesRequest} request
      * @param {PagesClient.RequestOptions} requestOptions - Request-specific configuration.

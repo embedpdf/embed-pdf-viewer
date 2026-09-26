@@ -56,7 +56,7 @@ describe('addItem', () => {
   it('creates an unknown group at the end of the section', () => {
     const next = addItem(base, { bar: 'main', section: 'end', group: 'acme', item: 'acme:send' });
     const groups = next.bars.main.sections.end!;
-    expect(groups.map((g) => g.id)).toEqual(['panels', 'acme']);
+    expect(groups.map((group) => group.id)).toEqual(['panels', 'acme']);
     expect(() => normalizeBar(next.bars.main)).not.toThrow();
   });
 

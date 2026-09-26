@@ -9,14 +9,14 @@ export class MeasureReader {
     private readonly runtime: PdfRuntimeModule,
     private readonly session: DocumentSession,
   ) {}
-  viewports(pon: PageObjectNumber, signal: AbortSignal): PageMeasurementViewport[] {
+  viewports(pageObjectNumber: PageObjectNumber, signal: AbortSignal): PageMeasurementViewport[] {
     throwIfAborted(signal);
     const pool = this.session.pagePool(),
-      page = pool.acquire(pon);
+      page = pool.acquire(pageObjectNumber);
     try {
       return readViewports(this.runtime.fn, this.runtime.mem, page);
     } finally {
-      pool.release(pon);
+      pool.release(pageObjectNumber);
     }
   }
 }

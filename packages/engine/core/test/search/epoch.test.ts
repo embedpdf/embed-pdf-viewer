@@ -4,20 +4,23 @@ import type { DocumentManifest } from '../../src/shared';
 
 function manifest(
   layoutVersion: number,
-  pages: Array<[pon: number, contentVersion: number]>,
+  pages: Array<[pageObjectNumber: number, contentVersion: number]>,
 ): DocumentManifest {
   return {
     docVersion: 7,
     layoutVersion,
     metadataVersion: 3,
+    actionsVersion: 0,
+    attachmentsVersion: 0,
+    annotationsVersion: 0,
     auditHead: 42,
     baseSha: 'abc',
     layerVersion: 0,
     working: false,
     baseByteLength: 0,
-    pages: pages.map(([pon, contentVersion]) => ({
+    pages: pages.map(([pageObjectNumber, contentVersion]) => ({
       state: {
-        page: { kind: 'objectNumber', pageObjectNumber: pon },
+        page: { kind: 'objectNumber', pageObjectNumber },
       } as DocumentManifest['pages'][number]['state'],
       cache: { contentVersion } as DocumentManifest['pages'][number]['cache'],
     })),

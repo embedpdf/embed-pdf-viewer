@@ -7,8 +7,8 @@ import type { SearchQuery, SearchRequest } from '@embedpdf/engine-core/runtime';
  * (the server mints its own, authenticated, format for the wire).
  *
  * A cursor pins three things and refuses to resume if any moved:
- *  - the query+mode identity (`key`) — a cursor is not transferable
- *    between queries,
+ *  - the query identity, snippets included (`key`) — a cursor is not
+ *    transferable between queries,
  *  - the document version (`seq`) — resuming over mutated content could
  *    serve stale pages or, worse, text a redaction just removed,
  *  - the scan origin (`start`) — position is meaningless in a different
@@ -18,14 +18,14 @@ export interface SearchCursorState {
   v: 1;
   seq: number;
   key: string;
-  /** startPage pon the scan order was rotated to (0 = natural order). */
+  /** The `from` page the scan order was rotated to, by object number (0 = natural order). */
   start: number;
   /** Pages of the scan order already consumed. */
   scanned: number;
 }
 
-/** Stable identity for query + mode (option order pinned by hand). */
-export function searchQueryKey(query: SearchQuery, mode: string): string {
+/** Stable identity for a query and whether it asks for snippets (option order pinned by hand). */
+export function searchQueryKey(query: SearchQuery, snippets: boolean): string {
   return JSON.stringify([
     query.regex ? 'r' : 'l',
     query.text,
@@ -33,7 +33,7 @@ export function searchQueryKey(query: SearchQuery, mode: string): string {
     query.matchDiacritics ? 1 : 0,
     query.wholeWord ? 1 : 0,
     query.ignoreWhitespace ? 1 : 0,
-    mode,
+    snippets ? 'snippets' : 'matches',
   ]);
 }
 
@@ -69,11 +69,11 @@ export function decodeSearchCursor(
       { details: { cursorSeq: state.seq, currentSeq: expectedSeq } },
     );
   }
-  // The cursor owns position; a startPage alongside it is a caller bug.
-  if (request.startPage !== undefined && request.startPage.pageObjectNumber !== state.start) {
+  // The cursor owns position; a `from` alongside it is a caller bug.
+  if (request.from !== undefined && request.from.pageObjectNumber !== state.start) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
-      'startPage conflicts with the cursor — omit startPage when resuming',
+      '`from` conflicts with the cursor — omit it when resuming',
     );
   }
   return state;

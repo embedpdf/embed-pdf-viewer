@@ -47,7 +47,7 @@ import {
   streamingSha256,
 } from './_internal';
 
-// Type-only — does NOT trigger the runtime import (see ADAPTERS.md).
+// Type-only — does not trigger the runtime import (see `docs/conventions/server-adapters.md`).
 type BlobModule = typeof import('@azure/storage-blob');
 type IdentityModule = typeof import('@azure/identity');
 type ContainerClient = InstanceType<BlobModule['ContainerClient']>;

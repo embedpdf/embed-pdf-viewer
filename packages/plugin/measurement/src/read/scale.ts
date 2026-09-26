@@ -11,18 +11,22 @@ import type {
 
 import type { MeasurementCapability, MeasurementConfig } from '../contract';
 import { DEFAULT_PRESETS } from '../scale';
-import type { MeasurementServices } from '../services';
+import type { MeasurementContext, MeasurementServices } from '../services';
+import type { MeasurementViewportSync } from '../sync/viewports';
 
 const UNITS = Object.keys(METRES) as Array<keyof typeof METRES>;
 const AREA_UNITS: readonly AreaUnit[] = [...UNITS.map(squareOf), 'ha', 'acre'];
 
 export function createScaleReads(
+  ctx: MeasurementContext,
   { store, siblings }: Pick<MeasurementServices, 'store' | 'siblings'>,
   config: MeasurementConfig,
+  { scaleOf }: Pick<MeasurementViewportSync, 'scaleOf'>,
 ) {
-  const { state, scaleOf, toPdf } = store;
+  const { toPdf } = store;
   const { annotation } = siblings;
   const presets = config.presets ?? DEFAULT_PRESETS;
+  const state = () => ctx.state.get();
 
   const getReadout = (ref: AnnotationRef): MeasurementReadout | MeasurementUnavailable => {
     const raw = annotation.getRaw(ref);
@@ -35,7 +39,7 @@ export function createScaleReads(
   ): MeasurementReadout | MeasurementUnavailable =>
     measurementReadout({
       subtype: 'line',
-      intent: 'LineDimension',
+      intent: 'line-dimension',
       measure: scaleOf(page).measure,
       linePoints: { start: toPdf(page, from), end: toPdf(page, to) },
     });
@@ -45,9 +49,9 @@ export function createScaleReads(
   ): MeasurementReadout | MeasurementUnavailable =>
     measurementReadout({
       subtype: 'polygon',
-      intent: 'PolygonDimension',
+      intent: 'polygon-dimension',
       measure: scaleOf(page).measure,
-      vertices: vertices.map((v) => toPdf(page, v)),
+      vertices: vertices.map((vertex) => toPdf(page, vertex)),
     });
 
   return {

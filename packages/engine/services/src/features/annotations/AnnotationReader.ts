@@ -1,9 +1,9 @@
-import type { AnnotationListPageSnapshot, PageObjectNumber } from '@embedpdf/engine-core/runtime';
+import type { AnnotationList, PageObjectNumber } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
-import type { FontRegistrar } from '../fonts/FontRegistrar';
 import { throwIfAborted } from '../../shared/abort';
+import type { FontRegistrar } from '../fonts/FontRegistrar';
 import { collectPageAnnotations } from './internal/read/collectPageAnnotations';
 
 /**
@@ -24,7 +24,7 @@ export class AnnotationReader {
     private readonly fonts?: FontRegistrar,
   ) {}
 
-  list(pageObjectNumber: PageObjectNumber, signal: AbortSignal): AnnotationListPageSnapshot {
+  list(pageObjectNumber: PageObjectNumber, signal: AbortSignal): AnnotationList {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const pool = this.session.pagePool();

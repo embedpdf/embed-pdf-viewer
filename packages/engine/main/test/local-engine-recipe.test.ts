@@ -13,7 +13,7 @@ import type { WorkerRequest } from '../src/worker/protocol';
 const here = dirname(fileURLToPath(import.meta.url));
 const robotoPath = resolve(here, 'fixtures', 'Roboto-Regular.ttf');
 
-let roboto: Uint8Array;
+let roboto: Uint8Array<ArrayBuffer>;
 beforeAll(async () => {
   roboto = new Uint8Array(await readFile(robotoPath));
 });
@@ -22,7 +22,7 @@ beforeAll(async () => {
  * An in-process Web Worker: bridges the small `Worker` surface
  * `BrowserWorkerTransport` needs to a real {@link WorkerHost}, so `localEngine()`
  * boots end-to-end in node without a browser Worker. Like the real bootstrap,
- * it is INIT-DRIVEN: nothing boots until the engine posts `{ kind: 'init' }`.
+ * it is init-driven: nothing boots until the engine posts `{ kind: 'init' }`.
  * `spawned` counts how many were created (boot laziness); `terminated` proves
  * teardown; `received` records the request kinds in host arrival order
  * (boot-font ordering).
@@ -171,7 +171,7 @@ describe('localEngine()', () => {
       fallbackFonts: [{ key: 'boot-font', familyName: 'Roboto', data: roboto }],
     });
 
-    // Enqueued BEFORE the boot even starts — it must still arrive after the
+    // Enqueued before the boot even starts — it must still arrive after the
     // boot-config font registration.
     await engine.fonts.register({ key: 'user-font', familyName: 'Roboto', data: roboto });
 
