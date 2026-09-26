@@ -29,3 +29,4 @@ export {
   pdfQuadCorners,
   pdfQuadFromCorners,
 } from './convert';
+export { renderSize } from './renderSize';

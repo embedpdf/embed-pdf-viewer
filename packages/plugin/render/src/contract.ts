@@ -46,7 +46,7 @@ export interface RenderConfig {
    * to `policy.formats`.
    */
   format?: RenderFormat;
-  /** Encoder quality (webp/png); ignored for bmp. */
+  /** WebP quality from 0 (smallest) to 1 (best); PNG and BMP ignore it. */
   quality?: number;
   /** Diagnostic logging of tile scheduling and fetch outcomes (console `debug`). */
   debug?: boolean;
@@ -56,7 +56,7 @@ export interface RenderConfig {
 
 /**
  * An encoded page image: `source` is bytes or a URL, `format`/`contentType`
- * say what they are, `width`/`height` the pixel size when known, and
+ * say what they are, `width`/`height` its pixel size, and
  * `objectUrl()` mints a revocable object URL for an `<img>`.
  */
 export type PageImage = PageImageHandle;

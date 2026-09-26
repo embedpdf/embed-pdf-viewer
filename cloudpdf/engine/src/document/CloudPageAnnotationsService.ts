@@ -32,6 +32,7 @@ import {
   type PageImageResult,
   type PageNetworkRenderFormat,
   type PageRef,
+  checkImageQuality,
 } from '@embedpdf/engine-core/runtime';
 import {
   AnnotationCreateResultSchema,
@@ -132,6 +133,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       );
     }
     return AbortablePromise.run<AnnotationAppearanceImagesResult>(async (signal) => {
+      checkImageQuality(options.quality);
       // The cloud appearance endpoint is always content-addressed, so the URL
       // must carry an explicit network format (PNG/WebP). Default to WebP when
       // the caller omits it, matching render.image().

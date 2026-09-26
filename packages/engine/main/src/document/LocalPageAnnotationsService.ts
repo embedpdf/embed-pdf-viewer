@@ -34,6 +34,7 @@ import {
   type CollabTarget,
   type PageAnnotationsService,
   type PageRef,
+  checkImageQuality,
 } from '@embedpdf/engine-core/runtime';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
@@ -196,6 +197,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     options: AnnotationAppearanceImageOptions = {},
   ): AbortablePromise<AnnotationAppearanceImagesResult> {
     return AbortablePromise.run<AnnotationAppearanceImagesResult>(async (signal) => {
+      checkImageQuality(options.quality);
       const raw = this.renderAppearancesRaw(options);
       const onAbort = () => raw.abort(signal.reason);
       if (signal.aborted) onAbort();

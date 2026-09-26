@@ -52,6 +52,7 @@ export interface AnnotationAppearanceRenderOptions {
  */
 export interface AnnotationAppearanceImageOptions extends AnnotationAppearanceRenderOptions {
   format?: PageNetworkRenderFormat;
+  /** WebP quality from 0 (smallest) to 1 (best); PNG ignores it. */
   quality?: number;
 }
 

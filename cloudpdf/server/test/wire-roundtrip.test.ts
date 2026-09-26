@@ -66,7 +66,7 @@ describe.skip('render wire round trip', () => {
         viewport: { kind: 'width', width: 720 },
         rotation: 90,
         background: 'white',
-        quality: 80,
+        quality: 0.8,
         includeAnnotations: true,
       },
       versions: { contentVersion: 11, annotationVersion: 13 },
@@ -154,7 +154,7 @@ describe.skip('render wire round trip', () => {
       },
       background: 'white',
       rotation: 90,
-      quality: 80,
+      quality: 0.8,
     };
     expect(unflatten(flatten(nested))).toEqual(nested);
   });

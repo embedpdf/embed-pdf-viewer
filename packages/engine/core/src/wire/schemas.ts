@@ -706,7 +706,8 @@ const RenderRotationSchema = z.preprocess(
 
 const RenderBackgroundSchema = z.enum(['white', 'transparent']);
 
-const RenderQualitySchema = z.coerce.number().int().min(1).max(100);
+/** WebP quality, 0 (smallest) to 1 (best) — the `canvas.toBlob` scale. */
+const RenderQualitySchema = z.coerce.number().min(0).max(1);
 
 /**
  * Token/path rule: annotatedness is path-expressed —

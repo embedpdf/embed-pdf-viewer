@@ -218,7 +218,7 @@ Set any of these at registration with `renderPlugin({ … })`:
 | `tiles.settleMs`    | Rest time before a moving zoom adopts a new render size                | `150`     |
 | `tiles.fadeMs`      | Tile arrival cross-fade, ms                                            | `0`       |
 | `format`            | Encode format for all rasters: `'png'`, `'webp'`, `'bmp'` (local-only) | engine default |
-| `quality`           | Encoder quality for webp/png                                           | engine default |
+| `quality`           | WebP quality, from `0` to `1`; PNG and BMP ignore it                   | engine default |
 | `debug`             | Log tile scheduling and fetch outcomes to the console                  | `false`   |
 
 On the cloud engine, the deployment's advertised policy overrides `quantize`

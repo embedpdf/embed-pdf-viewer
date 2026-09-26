@@ -1,4 +1,4 @@
-import type { PageHandle, PageRef } from '@embedpdf/engine-core/runtime';
+import type { PageHandle, PageLayout, PageRef } from '@embedpdf/engine-core/runtime';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
@@ -28,6 +28,7 @@ export class CloudPageHandle implements PageHandle {
     isClosed: () => boolean,
     manifest: ManifestAccessor,
     publisher: SessionEventPublisher,
+    layout: (signal: AbortSignal) => Promise<PageLayout>,
   ) {
     this.measure = new CloudPageMeasureService(
       http,
@@ -48,6 +49,14 @@ export class CloudPageHandle implements PageHandle {
       publisher,
     );
     this.text = new CloudPageTextService(http, docId, layerName, ref, isClosed, manifest);
-    this.render = new CloudPageRenderService(http, docId, layerName, ref, isClosed, manifest);
+    this.render = new CloudPageRenderService(
+      http,
+      docId,
+      layerName,
+      ref,
+      isClosed,
+      manifest,
+      layout,
+    );
   }
 }

@@ -1,5 +1,4 @@
 import {
-  AbortError,
   AbortablePromise,
   DEFAULT_ANNOTATION_BUNDLE_LIMITS,
   DEFAULT_PDF_SAVE_MODE,
@@ -14,7 +13,6 @@ import {
   type DocumentEventStream,
   type DocumentFormsService,
   type DocumentHandle,
-  type DocumentPagesService,
   type DocumentRedactionService,
   CONTINUOUS_RENDER_POLICY,
   type DocumentRenderService,
@@ -48,6 +46,7 @@ import { CloudMetadataService } from './CloudMetadataService';
 import { CloudPageHandle } from './CloudPageHandle';
 import { auditRowToEvents } from '../realtime/auditRowToEvents';
 import { SseClient } from '../realtime/SseClient';
+import { awaitSignal } from '../shared/awaitSignal';
 import type { HttpClient } from '../transport/HttpClient';
 
 /**
@@ -91,7 +90,7 @@ export class CloudDocumentHandle implements DocumentHandle {
   readonly signatures: DocumentSignaturesService;
   readonly forms: DocumentFormsService;
   readonly search: CloudDocumentSearchService;
-  readonly pages: DocumentPagesService;
+  readonly pages: CloudDocumentPagesService;
   readonly redaction: DocumentRedactionService;
   readonly security: DocumentSecurityService;
   readonly render: DocumentRenderService;
@@ -295,6 +294,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       () => this.closed,
       this.manifestAccessor,
       this.publisher,
+      (signal) => this.pages.pageLayout(ref, signal),
     );
   }
 
@@ -706,26 +706,4 @@ function fallbackUnknownHead(id: string): DocumentHead {
       endpoint: wirePaths.access(id, DEFAULT_LAYER_NAME),
     },
   };
-}
-
-function awaitSignal<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
-  if (signal.aborted) {
-    return Promise.reject(new AbortError(signal.reason));
-  }
-  return new Promise<T>((resolve, reject) => {
-    const onAbort = () => {
-      reject(new AbortError(signal.reason));
-    };
-    signal.addEventListener('abort', onAbort, { once: true });
-    promise.then(
-      (value) => {
-        signal.removeEventListener('abort', onAbort);
-        resolve(value);
-      },
-      (reason) => {
-        signal.removeEventListener('abort', onAbort);
-        reject(reason);
-      },
-    );
-  });
 }

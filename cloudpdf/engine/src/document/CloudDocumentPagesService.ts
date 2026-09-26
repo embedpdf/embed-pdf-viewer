@@ -8,6 +8,7 @@ import {
   type PageDeleteResult,
   type PageInsertBlankSpec,
   type PageInsertResult,
+  type PageLayout,
   type PageListSnapshot,
   type PageMoveResult,
   type PageNameInput,
@@ -16,6 +17,7 @@ import {
   type PageRemoveNameInput,
   type PageRotateResult,
   type PageRotation,
+  pageRefsEqual,
 } from '@embedpdf/engine-core/runtime';
 import {
   PageDeleteResultSchema,
@@ -32,6 +34,7 @@ import type { SessionEventPublisher } from '@embedpdf/engine-services';
 import { buildMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import { planesInherited } from './planes';
+import { awaitSignal } from '../shared/awaitSignal';
 import type { HttpClient } from '../transport/HttpClient';
 
 /** Detach a Uint8Array view into a standalone ArrayBuffer (the resource-map
@@ -58,6 +61,9 @@ function copyToExactBuffer(view: Uint8Array): ArrayBuffer {
  *     model), only `docVersion` + `layoutVersion`.
  */
 export class CloudDocumentPagesService implements DocumentPagesService {
+  /** The last layout leaf read by {@link pageLayout}, keyed by its URL path. */
+  private layoutMemo: { path: string; snapshot: Promise<PageListSnapshot> } | null = null;
+
   constructor(
     private readonly http: HttpClient,
     private readonly docId: string,
@@ -83,26 +89,60 @@ export class CloudDocumentPagesService implements DocumentPagesService {
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
-    return AbortablePromise.run<PageListSnapshot>(async (signal) => {
-      const buildPath = async (s: AbortSignal): Promise<string> => {
-        const manifest = await this.manifest.get(s);
-        // Plane-scope rule: the layout leaf depends on the `layout` plane —
-        // while inherited (no move/rotate/insert/delete ever ran), every
-        // visitor's page list is one doc-level URL served from the base
-        // session; the SDK open sequence creates no layer session.
-        return planesInherited(manifest, ['layout'])
-          ? wirePaths.docLayout(this.docId, manifest.layoutVersion)
-          : wirePaths.layerLayout(this.docId, this.layerName, manifest.layoutVersion);
-      };
-      return this.http.getJsonWithRefresh(
-        buildPath,
-        (raw) => PageListSnapshotSchema.parse(raw),
-        async (s) => {
-          await this.manifest.refresh(s);
-        },
-        signal,
+    return AbortablePromise.run<PageListSnapshot>((signal) => this.fetchLayout(signal));
+  }
+
+  /**
+   * One page's layout, for renders to size their image without a round
+   * trip per tile. The layout leaf never changes at a given URL, so the
+   * last one read is kept and shared until the manifest points elsewhere.
+   */
+  async pageLayout(ref: PageRef, signal: AbortSignal): Promise<PageLayout> {
+    const path = await this.layoutPath(signal);
+    let memo = this.layoutMemo;
+    if (memo?.path !== path) {
+      // Not tied to this caller's signal: one caller's cancel must not
+      // fail the others waiting on the same read.
+      const snapshot = this.fetchLayout(new AbortController().signal);
+      const next = { path, snapshot };
+      snapshot.catch(() => {
+        if (this.layoutMemo === next) this.layoutMemo = null;
+      });
+      this.layoutMemo = memo = next;
+    }
+    const snapshot = await awaitSignal(memo.snapshot, signal);
+    const page = snapshot.pages.find((p) => pageRefsEqual(p.ref, ref));
+    if (!page) {
+      throw new EngineError(
+        EngineErrorCode.NotFound,
+        `no page with object number ${ref.pageObjectNumber} in document ${this.docId}`,
       );
-    });
+    }
+    return page;
+  }
+
+  /**
+   * Plane-scope rule: the layout leaf depends on the `layout` plane —
+   * while inherited (no move/rotate/insert/delete ever ran), every
+   * visitor's page list is one doc-level URL served from the base
+   * session; the SDK open sequence creates no layer session.
+   */
+  private async layoutPath(signal: AbortSignal): Promise<string> {
+    const manifest = await this.manifest.get(signal);
+    return planesInherited(manifest, ['layout'])
+      ? wirePaths.docLayout(this.docId, manifest.layoutVersion)
+      : wirePaths.layerLayout(this.docId, this.layerName, manifest.layoutVersion);
+  }
+
+  private fetchLayout(signal: AbortSignal): Promise<PageListSnapshot> {
+    return this.http.getJsonWithRefresh(
+      (s) => this.layoutPath(s),
+      (raw) => PageListSnapshotSchema.parse(raw),
+      async (s) => {
+        await this.manifest.refresh(s);
+      },
+      signal,
+    );
   }
 
   move(pages: PageRef[], toIndex: number): AbortablePromise<PageMoveResult> {

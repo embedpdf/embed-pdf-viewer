@@ -87,7 +87,7 @@ shares between users (see [Render policy](#render-policy)), so WebP is usually t
 
 </Engine>
 
-`quality` goes from `0` to `1` and applies to WebP:
+`quality` goes from `0` to `1` and applies to WebP. Any other value fails with `InvalidArg`:
 
 ```ts
 await page.render.image({ viewport: { kind: 'width', width: 800 }, format: 'webp', quality: 0.8 });

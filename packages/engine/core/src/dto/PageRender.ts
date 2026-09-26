@@ -66,7 +66,19 @@ export interface PageRenderOptions {
 
 export interface PageImageOptions extends PageRenderOptions {
   format?: PageRenderEncodedFormat;
+  /**
+   * WebP quality from 0 (smallest) to 1 (best), the same scale as
+   * `canvas.toBlob`. PNG and BMP are lossless and ignore it.
+   */
   quality?: number;
+}
+
+/** `InvalidArg` unless `quality` is absent or between 0 and 1. */
+export function checkImageQuality(quality: number | undefined): void {
+  if (quality === undefined || (quality >= 0 && quality <= 1)) return;
+  throw new EngineError(EngineErrorCode.InvalidArg, 'quality must be between 0 and 1', {
+    details: { field: 'quality' },
+  });
 }
 
 export interface PageRenderQuery {
@@ -90,8 +102,10 @@ export interface PageRaster {
 }
 
 export interface PageImageResult {
-  width?: number;
-  height?: number;
+  /** Image width in pixels. */
+  width: number;
+  /** Image height in pixels. */
+  height: number;
   format: PageRenderEncodedFormat;
   contentType: string;
   source: PageImageSource;

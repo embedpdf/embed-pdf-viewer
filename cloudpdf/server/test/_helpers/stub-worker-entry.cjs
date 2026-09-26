@@ -286,7 +286,11 @@ async function encodeStubRaster(raster, encode) {
   });
   const stream =
     encode.format === 'webp'
-      ? image.webp(encode.quality === undefined ? {} : { quality: encode.quality })
+      ? image.webp(
+          encode.quality === undefined
+            ? {}
+            : { quality: Math.min(100, Math.max(1, Math.round(encode.quality * 100))) },
+        )
       : image.png();
   const bytes = new Uint8Array(await stream.toBuffer());
   return {

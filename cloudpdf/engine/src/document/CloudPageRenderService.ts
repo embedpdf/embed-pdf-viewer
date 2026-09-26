@@ -6,11 +6,15 @@ import {
   type PageImageHandle,
   type PageImageOptions,
   type PageImageResult,
+  type PageLayout,
   type PageNetworkRenderFormat,
   type PageRaster,
   type PageRef,
   type PageRenderOptions,
   type PageRenderService,
+  normalizePdfRect,
+  renderSize,
+  checkImageQuality,
 } from '@embedpdf/engine-core/runtime';
 import { renderImageOptionsToWire, wirePaths } from '@embedpdf/engine-core/wire';
 
@@ -26,6 +30,7 @@ export class CloudPageRenderService implements PageRenderService {
     private readonly pageRef: PageRef,
     private readonly isClosed: () => boolean,
     private readonly manifest: ManifestAccessor,
+    private readonly layout: (signal: AbortSignal) => Promise<PageLayout>,
   ) {}
 
   image(options: PageImageOptions = {}): AbortablePromise<PageImageHandle> {
@@ -35,6 +40,7 @@ export class CloudPageRenderService implements PageRenderService {
       );
     }
     return AbortablePromise.run<PageImageHandle>(async (signal) => {
+      checkImageQuality(options.quality);
       const format = normalizeFormat(options.format);
       const includeAnnotations = options.includeAnnotations ?? true;
       const buildPath = async (s: AbortSignal): Promise<string> => {
@@ -86,9 +92,13 @@ export class CloudPageRenderService implements PageRenderService {
       // re-resolves per fetch through the 404 → manifest-refresh rail, so a
       // scope flip (e.g. this layer's first annotation write) self-heals
       // instead of failing on a stale path family.
-      const requestPath = await buildPath(signal);
+      const [requestPath, size] = await Promise.all([
+        buildPath(signal),
+        this.imageSize(options, signal),
+      ]);
       return createCloudPageImageHandle(
         {
+          ...size,
           format,
           contentType: `image/${format}`,
           source: { kind: 'url', url: this.http.absoluteUrl(requestPath) },
@@ -100,6 +110,26 @@ export class CloudPageRenderService implements PageRenderService {
         },
       );
     });
+  }
+
+  /**
+   * The image's pixel size, computed like the server's render (the same
+   * `renderSize`) from the page's layout, so the handle knows it before
+   * any pixels are fetched.
+   */
+  private async imageSize(
+    options: PageImageOptions,
+    signal: AbortSignal,
+  ): Promise<{ width: number; height: number }> {
+    const target = options.target ?? { kind: 'page' };
+    let area;
+    if (target.kind === 'rect') {
+      const rect = normalizePdfRect(target.rect);
+      area = { width: rect.right - rect.left, height: rect.top - rect.bottom };
+    } else {
+      area = (await this.layout(signal)).size;
+    }
+    return renderSize(area, options.rotation ?? 0, options.viewport ?? { kind: 'scale' });
   }
 
   raw(_options?: PageRenderOptions): AbortablePromise<PageRaster> {

@@ -131,7 +131,7 @@ export function maxShiftedDifference(a: Raster, b: Raster, radius = 1): number {
 }
 
 /** An 8-bit, non-interlaced RGB or RGBA PNG as RGBA. Enough for the engines' own encoders. */
-async function decodePng(png: Uint8Array): Promise<Raster> {
+export async function decodePng(png: Uint8Array): Promise<Raster> {
   const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
   let offset = 8;
   let width = 0;

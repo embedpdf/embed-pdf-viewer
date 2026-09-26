@@ -66,6 +66,7 @@ export {
   pdfQuadBounds,
   pdfQuadCorners,
   pdfQuadFromCorners,
+  renderSize,
 } from './geometry';
 export type { PageTextSnapshot } from './dto/PageTextSnapshot';
 export type {
@@ -94,7 +95,7 @@ export type {
   PageRenderTarget,
   PageRenderViewport,
 } from './dto/PageRender';
-export { createPageImageHandle } from './dto/PageRender';
+export { checkImageQuality, createPageImageHandle } from './dto/PageRender';
 export type {
   AnnotationAppearanceMode,
   AnnotationAppearanceRenderOptions,

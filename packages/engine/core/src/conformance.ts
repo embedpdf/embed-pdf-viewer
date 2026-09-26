@@ -60,6 +60,11 @@ export type {
   PageReorderConformanceOptions,
 } from './conformance/runPageReorderConformance';
 export { runPageRotateConformance } from './conformance/runPageRotateConformance';
+export {
+  CROP_OFFSET_PDF,
+  runPageRenderConformance,
+  type PageRenderConformanceOptions,
+} from './conformance/runPageRenderConformance';
 export { runPageDeleteConformance } from './conformance/runPageDeleteConformance';
 export { runNamedPagesConformance } from './conformance/runNamedPagesConformance';
 export { runAnnotationFlattenConformance } from './conformance/runAnnotationFlattenConformance';
