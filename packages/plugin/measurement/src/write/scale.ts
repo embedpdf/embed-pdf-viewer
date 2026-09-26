@@ -187,12 +187,9 @@ export function createScaleWrites(
         return change(
           pages,
           (page) =>
-            measureFromRatio(
-              preset.paper,
-              preset.real,
-              preset.unit,
-              ctx.getPage(page)?.userUnit ?? 1,
-            ),
+            measureFromRatio(preset.paper, preset.real, preset.unit, {
+              userUnit: ctx.getPage(page)?.userUnit ?? 1,
+            }),
           options,
         );
       },

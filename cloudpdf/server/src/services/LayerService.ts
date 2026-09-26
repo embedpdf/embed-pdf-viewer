@@ -2471,6 +2471,54 @@ export class LayerService {
     }
   }
 
+  /**
+   * A read's position refs as the worker addresses them, the way a write's
+   * are ({@link rewriteRefForWorker}) but without materializing the layer:
+   * each is checked against the page state the layer's manifest gives it,
+   * then stamped with the worker's. Durable refs pass as they are.
+   */
+  async workerRefsForRead(
+    ctx: LayerWriteContext,
+    docId: string,
+    layerName: string,
+    refs: readonly AnnotationRef[],
+    signal?: AbortSignal,
+  ): Promise<AnnotationRef[]> {
+    if (!refs.some((ref) => ref.kind === 'index')) return [...refs];
+    const documentService = this.requireDocumentService();
+    const manifest = await documentService.getLayerManifest(ctx, docId, layerName);
+    await documentService.ensureLayerOnPool(ctx, docId, layerName);
+    const bridge = this.requireRevisionBridge();
+    const workerStates = new Map<PageObjectNumber, PageState>();
+    const translated: AnnotationRef[] = [];
+    for (const ref of refs) {
+      if (ref.kind !== 'index') {
+        translated.push(ref);
+        continue;
+      }
+      const page = ref.page.pageObjectNumber;
+      const durable = manifest.pages.find(
+        (entry) => entry.state.page.pageObjectNumber === page,
+      )?.state;
+      if (!durable) {
+        throw new EngineError(
+          EngineErrorCode.NotFound,
+          `no page with object number ${page} in layer ${layerName} for document ${docId}`,
+        );
+      }
+      bridge.validateClientIndexRef(durable, ref, {
+        aliasDocSessionIds: [this.layerState.baseRevisionScopeId(docId)],
+      });
+      let worker = workerStates.get(page);
+      if (!worker) {
+        worker = await this.loadWorkerPageState(docId, layerName, page, signal);
+        workerStates.set(page, worker);
+      }
+      translated.push(bridge.rewriteIndexRefForWorker(worker, ref));
+    }
+    return translated;
+  }
+
   private async rewriteRefForWorker(
     docId: string,
     layerName: string,

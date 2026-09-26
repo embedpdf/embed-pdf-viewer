@@ -19,7 +19,9 @@ import type { DateInput } from './IsoDateTime';
  *
  * `custom` is a per-key three-state map over non-standard Info entries:
  * a string sets the key, `null` removes it, an absent key leaves it
- * untouched. Reserved standard keys are rejected by the engine.
+ * untouched. A standard key (`Title`, …) or one a PDF name can't hold is
+ * `InvalidArg` naming it, and nothing is written. `''` is a value
+ * everywhere: it reads back `''`, not `null`.
  */
 export interface MetadataPatch {
   title?: string | null;

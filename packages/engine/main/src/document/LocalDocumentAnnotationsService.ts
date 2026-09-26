@@ -89,10 +89,12 @@ export class LocalDocumentAnnotationsService implements DocumentAnnotationsServi
     }
     const attribution = options.attribution ?? 'restore';
     try {
-      this.guard.assertCapability('doc.annotate.modify');
       if (attribution === 'restore') {
+        // Restoring writes attribution that isn't the session's.
+        this.guard.assertCapability('doc.annotate.modify');
         this.guard.assertCapability('doc.annotate.import');
       } else {
+        // Each item is made as a create makes it, and needs what that create needs.
         this.assertMayCreate(bundle);
       }
     } catch (err) {
@@ -158,6 +160,8 @@ export class LocalDocumentAnnotationsService implements DocumentAnnotationsServi
       const { groupId } = data as { groupId?: string | null };
       groups.add(typeof groupId === 'string' ? groupId : undefined);
     }
+    // An empty bundle still takes the authority to create.
+    if (groups.size === 0) groups.add(undefined);
     for (const groupId of groups) {
       if (groupId !== undefined && groupId !== ownGroup) this.guard.assertSetGroup(groupId);
       this.guard.assertCollab('create', this.guard.targetForSelfCreate(groupId));

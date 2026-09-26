@@ -14,16 +14,14 @@ export interface RestoredAttribution extends RestoredEmbedMetadata {
   readonly author: string | null;
   readonly createdAt: string | null;
   readonly modifiedAt: string | null;
-  /** A file attachment's file: its `/Params` dates. */
-  readonly file?: Pick<AttachmentFileInfo, 'createdAt' | 'modifiedAt'> | null;
 }
 
 /**
  * Write the attribution an annotation had, instead of stamping the session
  * (convention §2.10): `/T`, `/CreationDate` and `/M` as given, `null` as
- * absent, the dates keeping their offsets; `/EMBD_Metadata` with
- * `importedBy`; and an attached file's dates. It runs last, so `/M` is the
- * date the annotation had, not the time of the import.
+ * absent, the dates keeping their offsets; and `/EMBD_Metadata` with
+ * `importedBy`. It runs last, so `/M` is the date the annotation had, not the
+ * time of the import.
  */
 export function restoreAttribution(
   fn: PdfFunctions,
@@ -39,13 +37,15 @@ export function restoreAttribution(
   if (from.modifiedAt === null) fn.EPDFAnnot_RemoveKey(annotPtr, 'M');
   else writeAnnotationModified(fn, mem, annotPtr, from.modifiedAt);
   applyEmbedMetadataOnRestore(fn, mem, annotPtr, from, importedBy);
-  if (from.file) restoreFileDates(fn, mem, annotPtr, from.file);
 }
 
-// A file's /Params dates. The file was written on create, which dated it
-// now; a date the bundle doesn't have stays that one (there is no call to
-// remove a /Params entry).
-function restoreFileDates(
+/**
+ * An attached file's `/Params` dates, as the copy had them: facts about the
+ * file, carried whoever the import stamps. The file was written on create,
+ * which dated it now; a date the copy doesn't have stays that one (there is
+ * no call to remove a `/Params` entry).
+ */
+export function restoreFileDates(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,

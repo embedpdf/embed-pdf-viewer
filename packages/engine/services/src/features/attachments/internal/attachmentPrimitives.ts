@@ -63,7 +63,7 @@ export function writeAttachmentFilePayload(
   mem: PdfRuntimeMemory,
   attachmentPtr: Ptr,
   docPtr: Ptr,
-  file: { mimeType?: string; description?: string },
+  file: { mimeType?: string | null; description?: string },
   resource: WireResource,
 ): void {
   const byteLength = resource.bytes.byteLength;
@@ -89,7 +89,8 @@ export function writeAttachmentFilePayload(
   writeUtf16String(mem, formatPdfDate(new Date()), (ptr) =>
     fn.FPDFAttachment_SetStringValue(attachmentPtr, 'CreationDate', ptr),
   );
-  if (!fn.EPDFAttachment_SetSubtype(attachmentPtr, file.mimeType ?? 'application/octet-stream')) {
+  // A file without a declared type has none: the engine never guesses one.
+  if (file.mimeType && !fn.EPDFAttachment_SetSubtype(attachmentPtr, file.mimeType)) {
     throw new EngineError(EngineErrorCode.Unknown, 'EPDFAttachment_SetSubtype returned false');
   }
   if (file.description !== undefined) {

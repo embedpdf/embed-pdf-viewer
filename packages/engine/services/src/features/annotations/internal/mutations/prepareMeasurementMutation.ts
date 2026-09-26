@@ -30,7 +30,7 @@ function validate(subtype: DimensionKind, v: DimensionWrite): void {
       v.leader != null &&
       (typeof v.leader !== 'object' || Array.isArray(v.leader))
     )
-      throw new RangeError('Invalid line leader');
+      throw new EngineError(EngineErrorCode.InvalidArg, 'Invalid line leader');
     const intents =
       subtype === 'line'
         ? ['line-dimension', 'line-arrow']
@@ -38,12 +38,12 @@ function validate(subtype: DimensionKind, v: DimensionWrite): void {
           ? ['polygon-dimension', 'polygon-cloud']
           : ['polyline-dimension'];
     if (v.intent != null && !intents.includes(v.intent))
-      throw new RangeError('Invalid measurement intent');
+      throw new EngineError(EngineErrorCode.InvalidArg, 'Invalid measurement intent');
     if (v.captionEnabled != null && typeof v.captionEnabled !== 'boolean')
-      throw new RangeError('Invalid caption visibility');
+      throw new EngineError(EngineErrorCode.InvalidArg, 'Invalid caption visibility');
     if ('captionPosition' in v && v.captionPosition != null) {
       if (!['inline', 'top'].includes(v.captionPosition))
-        throw new RangeError('Invalid caption position');
+        throw new EngineError(EngineErrorCode.InvalidArg, 'Invalid caption position');
     }
     if ('captionOffset' in v && v.captionOffset) {
       assertPdfFloat(v.captionOffset.along);
@@ -57,7 +57,10 @@ function validate(subtype: DimensionKind, v: DimensionWrite): void {
       for (const n of [v.leader.length, v.leader.extension ?? 0, v.leader.offset ?? 0])
         assertPdfFloat(n);
       if ((v.leader.extension ?? 0) < 0 || (v.leader.offset ?? 0) < 0)
-        throw new RangeError('Leader extension and offset must be nonnegative');
+        throw new EngineError(
+          EngineErrorCode.InvalidArg,
+          'Leader extension and offset must be nonnegative',
+        );
     }
     const points =
       'linePoints' in v

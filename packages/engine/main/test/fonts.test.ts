@@ -88,6 +88,18 @@ describe('engine.fonts (local engine)', () => {
     expect(engine.fonts.list()).toEqual([]);
   });
 
+  test("register() refuses a standard font's name or no key", async () => {
+    engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
+    for (const key of ['helvetica', 'times-roman', '']) {
+      const err = await rejection(engine.fonts.register({ key, data: roboto }));
+      expect(err.code).toBe(EngineErrorCode.InvalidArg);
+    }
+    expect(engine.fonts.list()).toEqual([]);
+    // Only the exact standard names are taken.
+    await engine.fonts.register({ key: 'Helvetica', data: roboto });
+    expect(engine.fonts.list()).toHaveLength(1);
+  });
+
   test('addFallback() rejects an unregistered key', async () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
     const err = await rejection(engine.fonts.addFallback('never-registered'));

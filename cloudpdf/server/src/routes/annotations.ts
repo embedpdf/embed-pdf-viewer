@@ -41,6 +41,7 @@ import {
   decodeAnnotationAppearancesRenderToken,
   decodeAnnotationToken,
   decodeAnnotationsAllToken,
+  AnnotationsExportRequestSchema,
   decodeAnnotationsExportToken,
   type AnnotationsExportToken,
   PageNetworkRenderFormatSchema,
@@ -334,6 +335,43 @@ export async function registerAnnotationRoutes(
     },
   );
 
+  // An export whose selection a URL can't carry (position refs, long ref
+  // lists): the same pins and the selection in the body, answered uncached.
+  app.post(
+    '/v1/docs/:docId/layers/:layerName/annotations/export',
+    { config: { compress: false } },
+    async (req, reply) => {
+      const { docId, layerName } = req.params as { docId: string; layerName: string };
+      const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const ctx = requireLayerResource(req, docId, layerName, 'layer-annotations-export', pdfBits);
+      const request = parseOrInvalidArg<AnnotationsExportToken>(
+        AnnotationsExportRequestSchema as unknown as SchemaLike<AnnotationsExportToken>,
+        req.body,
+        'request body',
+      );
+      const signal = abortSignalFromRequest(req);
+      const refs = request.selection.refs
+        ? await layerService.workerRefsForRead(
+            accessCtx,
+            docId,
+            layerName,
+            request.selection.refs,
+            signal,
+          )
+        : undefined;
+      return exportAnnotations({
+        documentService,
+        limits: bundleLimits,
+        reply,
+        signal,
+        scope: { kind: 'layer', ctx, docId, layerName },
+        token: { ...request, selection: { ...request.selection, ...(refs ? { refs } : {}) } },
+        cache: 'no-store',
+      });
+    },
+  );
+
   app.get('/v1/docs/:docId/layers/:layerName/annotations/items', async (req, reply) => {
     const { docId, layerName } = req.params as {
       docId: string;
@@ -516,14 +554,16 @@ export async function registerAnnotationRoutes(
     const { manifest, resources } = await readAnnotationImportRequest(req, limits);
     const attribution = manifest.options.attribution ?? 'restore';
 
-    let ctx = requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', pdfBits);
+    let ctx: ReturnType<typeof requireLayerCollabAction>;
     if (attribution === 'restore') {
       // Restoring writes attribution that isn't the caller's, groups
-      // included, so it takes the capability instead of per-group checks.
+      // included, so it takes the capabilities instead of per-group checks.
+      requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', pdfBits);
       ctx = requireLayerCapability(req, docId, layerName, 'doc.annotate.import', pdfBits);
     } else {
       // Each annotation is made as a create makes it, so each group the
-      // items name takes the authority a create in it would.
+      // items name takes the authority a create in it would, and nothing
+      // more: a user who may create their own annotations may paste them.
       const groups = new Set<string | undefined>();
       for (const item of manifest.bundle.items as unknown as Array<{
         data?: { groupId?: unknown };
@@ -531,11 +571,15 @@ export async function registerAnnotationRoutes(
         const groupId = item?.data?.groupId;
         groups.add(typeof groupId === 'string' ? groupId : undefined);
       }
+      // An empty bundle still takes the authority to create.
+      if (groups.size === 0) groups.add(undefined);
+      let checked: ReturnType<typeof requireLayerCollabAction> | undefined;
       for (const groupId of groups) {
         const group = createGroupOf(accessCtx.jwt, { groupId } as AnnotationDraft, pdfBits);
         const target = targetForSelfCreate(accessCtx.jwt, group);
-        ctx = requireLayerCollabAction(req, docId, layerName, 'create', target, pdfBits);
+        checked = requireLayerCollabAction(req, docId, layerName, 'create', target, pdfBits);
       }
+      ctx = checked!;
     }
     // The caller: whom `stamp` attributes to, whom `restore` records as `importedBy`.
     const actor = actorFromJwt(ctx.jwt, accessCtx.jwt.identity.groupId);
@@ -1416,6 +1460,8 @@ async function exportAnnotations(input: {
   signal: AbortSignal;
   scope: ReadScope;
   token: AnnotationsExportToken;
+  /** A GET at its token is immutable; a POST is answered uncached. */
+  cache?: 'immutable' | 'no-store';
 }) {
   const { scope, token } = input;
   const layerName = scope.kind === 'layer' ? scope.layerName : undefined;
@@ -1467,7 +1513,8 @@ async function exportAnnotations(input: {
     contentType: 'application/octet-stream',
     body: Buffer.from(bytes),
   }));
-  setImmutableCache(input.reply);
+  if (input.cache === 'no-store') setNoStore(input.reply);
+  else setImmutableCache(input.reply);
   const { contentType, body } = buildMultipart(manifest, parts);
   input.reply.type(contentType);
   return input.reply.send(body);

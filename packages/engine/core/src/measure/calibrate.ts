@@ -1,5 +1,7 @@
-import type { PdfMeasure, PdfNumberFormat } from '../dto/Measure';
 import { assertWritableMeasure } from './validate';
+import type { PdfMeasure, PdfNumberFormat } from '../dto/Measure';
+import { EngineError } from '../errors/EngineError';
+import { EngineErrorCode } from '../errors/EngineErrorCode';
 import {
   areaUnitLabel,
   METRES,
@@ -10,17 +12,28 @@ import {
 } from './units';
 
 export interface MeasurementFormatOptions {
-  /** Decimal precision denominator: 1, 10, 100, ... */
-  precision: number;
+  /** Decimals, as 1, 10, 100, …: 100 shows two. Default 100. */
+  precision?: number;
   fixed?: boolean;
   areaUnit?: AreaUnit;
   imperialFeetInches?: boolean;
   /** Inch fraction denominator when imperialFeetInches is true. Default 16. */
   fractionalPrecision?: number;
 }
+/** {@link measureFromRatio}'s options: how values are shown, and the page's user unit. */
+export interface MeasureFromRatioOptions extends MeasurementFormatOptions {
+  /** The page's `/UserUnit`: a point is this many 1/72 inch. Default 1. */
+  userUnit?: number;
+}
+
+function invalid(message: string): EngineError {
+  return new EngineError(EngineErrorCode.InvalidArg, message);
+}
+
 function positive(value: number): void {
-  if (!Number.isFinite(value) || value <= 0)
-    throw new RangeError('Calibration requires finite positive lengths and scales');
+  if (!Number.isFinite(value) || value <= 0) {
+    throw invalid('Calibration requires finite positive lengths and scales');
+  }
 }
 function build(
   perPoint: number,
@@ -29,15 +42,13 @@ function build(
   format: MeasurementFormatOptions,
 ): PdfMeasure {
   positive(Math.fround(perPoint));
-  if (
-    !Number.isInteger(Math.log10(format.precision)) ||
-    format.precision < 1 ||
-    format.precision > 1e9
-  )
-    throw new RangeError('Invalid decimal precision');
+  const precision = format.precision ?? 100;
+  if (!Number.isInteger(Math.log10(precision)) || precision < 1 || precision > 1e9) {
+    throw invalid('Invalid decimal precision');
+  }
   const areaUnit = format.areaUnit ?? squareOf(unit);
   const common = {
-    precision: format.precision,
+    precision,
     ...(format.fixed === undefined ? {} : { fixed: format.fixed }),
   };
   const distance: PdfNumberFormat[] = format.imperialFeetInches
@@ -58,7 +69,7 @@ function build(
       distance[1].precision! < 1 ||
       distance[1].precision! > 2147483647)
   )
-    throw new RangeError('Invalid fraction denominator');
+    throw invalid('Invalid fraction denominator');
   const measure: PdfMeasure = {
     subtype: 'rectilinear',
     ratio,
@@ -78,7 +89,7 @@ function build(
 export function measureFromKnownLength(
   userSpaceLength: number,
   real: { value: number; unit: LengthUnit },
-  format: MeasurementFormatOptions = { precision: 100 },
+  format: MeasurementFormatOptions = {},
 ): PdfMeasure {
   positive(userSpaceLength);
   positive(real.value);
@@ -94,9 +105,9 @@ export function measureFromRatio(
   paper: number,
   real: number,
   unit: LengthUnit,
-  userUnit = 1,
-  format: MeasurementFormatOptions = { precision: 100 },
+  options: MeasureFromRatioOptions = {},
 ): PdfMeasure {
+  const { userUnit = 1, ...format } = options;
   positive(paper);
   positive(real);
   positive(userUnit);

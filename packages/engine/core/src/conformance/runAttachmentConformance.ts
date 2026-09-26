@@ -4,6 +4,7 @@ import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { toAttachmentRef } from '../dto/Attachment';
 import { EngineError } from '../errors/EngineError';
+import { EngineErrorCode } from '../errors/EngineErrorCode';
 import { deletedAttachmentOf } from '../mutation/AttachmentMutationResults';
 import { AttachmentCreateResultSchema, AttachmentListSchema } from '../wire/schemas';
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
@@ -110,6 +111,33 @@ export function runAttachmentConformance(
       }
     });
 
+    test('a File brings its name and type, and a file without a type has none', async () => {
+      if (!docSupported) return;
+      const doc = await openFixture(engine, opts);
+      try {
+        const picked = new File([new Uint8Array([1, 2, 3])], '0-picked.csv', { type: 'text/csv' });
+        const { attachment: fromFile } = await doc.attachments.create({ data: picked });
+        expect(fromFile.name).toBe('0-picked.csv');
+        expect(fromFile.mimeType).toBe('text/csv');
+
+        // Bytes with no type: the engine doesn't guess one.
+        const { attachment: untyped } = await doc.attachments.create({
+          data: new Uint8Array([4, 5, 6]),
+          name: '0-untyped.bin',
+        });
+        expect(untyped.mimeType).toBe(null);
+        expect((await doc.attachments.download(untyped.ref)).mimeType).toBe(null);
+        expect((await doc.attachments.download(fromFile.ref)).mimeType).toBe('text/csv');
+
+        // Bare bytes need a name.
+        await expect(doc.attachments.create({ data: new Uint8Array([7]) })).rejects.toMatchObject({
+          code: EngineErrorCode.InvalidArg,
+        });
+      } finally {
+        await doc.close();
+      }
+    });
+
     test('create() and delete() round-trip the name tree; keys survive index shifts', async () => {
       if (!docSupported) return;
       const doc = await openFixture(engine, opts);
@@ -160,6 +188,39 @@ export function runAttachmentConformance(
         const { attachments: final } = await doc.attachments.list();
         expect(final.map((i) => i.ref)).toEqual(before.map((i) => i.ref));
         await expect(doc.attachments.delete(created.ref)).rejects.toBeInstanceOf(EngineError);
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('a file-attachment annotation takes a File as it is, and never guesses a type', async () => {
+      if (!annotSupported) return;
+      const doc = await openFixture(engine, opts);
+      try {
+        const annotations = doc.page(toPageRef(firstPageObjectNumber)).annotations;
+        const rect = { left: 80, bottom: 40, right: 100, top: 60 };
+        const picked = new File([new Uint8Array([1, 2, 3])], 'figures.csv', { type: 'text/csv' });
+        const { annotation: fromFile } = await annotations.create(
+          { subtype: 'file-attachment', rect },
+          { file: picked },
+        );
+        const file = (fromFile as FileAttachmentAnnotationDTO).file!;
+        expect(file.name).toBe('figures.csv');
+        expect(file.mimeType).toBe('text/csv');
+
+        const { annotation: untyped } = await annotations.create(
+          { subtype: 'file-attachment', rect, file: { name: 'raw.bin' } },
+          { file: new Uint8Array([4, 5]) },
+        );
+        expect((untyped as FileAttachmentAnnotationDTO).file!.mimeType).toBe(null);
+
+        // Bare bytes need a name.
+        await expect(
+          annotations.create({ subtype: 'file-attachment', rect }, { file: new Uint8Array([6]) }),
+        ).rejects.toMatchObject({
+          code: EngineErrorCode.InvalidArg,
+          details: { field: 'file.name' },
+        });
       } finally {
         await doc.close();
       }

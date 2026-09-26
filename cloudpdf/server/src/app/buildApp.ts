@@ -2,6 +2,7 @@ import { TextDecoder } from 'node:util';
 
 import { adminOperations, adminWirePaths } from '@cloudpdf/contract';
 import {
+  DEFAULT_ANNOTATION_BUNDLE_LIMITS,
   EngineError,
   EngineErrorCode,
   type AnnotationBundleLimits,
@@ -615,6 +616,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         'x-embedpdf-image-height',
         'x-embedpdf-appearance-count',
         'x-embedpdf-file-name',
+        'x-embedpdf-file-type',
       ],
       credentials: false,
       maxAge: 86_400,
@@ -1340,6 +1342,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         ...(derivedRenders ? { derivedRenders } : {}),
         ...(usageMeters ? { usageMeters } : {}),
         tenantUsage: new TenantUsageRepo(opts.db),
+        annotationBundleLimits: opts.annotationBundleLimits ?? DEFAULT_ANNOTATION_BUNDLE_LIMITS,
       });
       await registerDocsRoutes(app, { service: documentService });
       await registerMetadataRoutes(app, { service: documentService, layerService });

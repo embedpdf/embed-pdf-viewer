@@ -1,28 +1,31 @@
 import type { PdfMeasure } from '../dto/Measure';
+import { EngineError } from '../errors/EngineError';
+import { EngineErrorCode } from '../errors/EngineErrorCode';
 import { validNumberFormat } from './format';
 
 /** Shared preflight for HTTP, workers and calibration helpers. Does not write. */
 export function assertWritableMeasure(value: PdfMeasure): void {
   if (value.subtype !== 'rectilinear')
-    throw new RangeError('Only rectilinear measures can be authored');
+    throw new EngineError(EngineErrorCode.InvalidArg, 'Only rectilinear measures can be authored');
   if (value.ratio !== undefined && (typeof value.ratio !== 'string' || value.ratio.includes('\0')))
-    throw new RangeError('Invalid scale ratio');
+    throw new EngineError(EngineErrorCode.InvalidArg, 'Invalid scale ratio');
   for (const key of ['x', 'y', 'distance', 'area', 'angle', 'slope'] as const) {
     const list = value[key];
     if (list === undefined && (key === 'y' || key === 'angle' || key === 'slope')) continue;
-    if (!Array.isArray(list)) throw new RangeError(`Missing ${key} formats`);
+    if (!Array.isArray(list))
+      throw new EngineError(EngineErrorCode.InvalidArg, `Missing ${key} formats`);
     for (const nf of list) {
       if (!nf || typeof nf.unit !== 'string' || !validNumberFormat(nf))
-        throw new RangeError('Invalid number format');
+        throw new EngineError(EngineErrorCode.InvalidArg, 'Invalid number format');
       if (
         nf.fraction !== undefined &&
         !['decimal', 'fraction', 'round', 'truncate'].includes(nf.fraction)
       )
-        throw new RangeError('Invalid fraction mode');
+        throw new EngineError(EngineErrorCode.InvalidArg, 'Invalid fraction mode');
       if (nf.labelPosition !== undefined && !['prefix', 'suffix'].includes(nf.labelPosition))
-        throw new RangeError('Invalid label position');
+        throw new EngineError(EngineErrorCode.InvalidArg, 'Invalid label position');
       if (nf.fixed !== undefined && typeof nf.fixed !== 'boolean')
-        throw new RangeError('Invalid fixed precision');
+        throw new EngineError(EngineErrorCode.InvalidArg, 'Invalid fixed precision');
       for (const key of [
         'unit',
         'thousands',
@@ -32,7 +35,7 @@ export function assertWritableMeasure(value: PdfMeasure): void {
       ] as const) {
         const text = nf[key];
         if (text !== undefined && (typeof text !== 'string' || text.includes('\0')))
-          throw new RangeError('Invalid measurement text');
+          throw new EngineError(EngineErrorCode.InvalidArg, 'Invalid measurement text');
       }
     }
   }
@@ -40,10 +43,11 @@ export function assertWritableMeasure(value: PdfMeasure): void {
     for (const n of [value.origin.x, value.origin.y]) assertPdfFloat(n);
   if (value.cyx !== undefined) {
     assertPdfFloat(value.cyx);
-    if (Math.fround(value.cyx) <= 0) throw new RangeError('Invalid CYX');
+    if (Math.fround(value.cyx) <= 0)
+      throw new EngineError(EngineErrorCode.InvalidArg, 'Invalid CYX');
   }
 }
 export function assertPdfFloat(n: number): void {
   if (typeof n !== 'number' || !Number.isFinite(Math.fround(n)))
-    throw new RangeError('Value is outside PDF float range');
+    throw new EngineError(EngineErrorCode.InvalidArg, 'Value is outside PDF float range');
 }

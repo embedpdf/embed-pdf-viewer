@@ -1,6 +1,7 @@
 import type { Identity } from '../auth/scope/types';
 import type { DocCapability, PdfBits } from '../auth/scope';
 import type { AbortablePromise } from '../promise/AbortablePromise';
+import type { AnnotationBundleLimits } from '../transfer/bundleLimits';
 
 export type DocumentOpenMode = 'none' | 'user' | 'owner';
 export type DocumentEncryptionState = 'unknown' | 'none' | 'encrypted' | 'unsupported';
@@ -157,6 +158,11 @@ export interface DocumentAccessInfo {
     readonly background: 'white';
     readonly enforced: boolean;
   };
+  /**
+   * The deployment's limits for an annotation import: the cloud client
+   * checks a bundle against these before its bytes move.
+   */
+  readonly annotationBundleLimits: AnnotationBundleLimits;
 }
 
 export interface DocumentUnlockInput {

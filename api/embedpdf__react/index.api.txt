@@ -85,7 +85,7 @@ ArmedStampInfo [InterfaceDeclaration] (from packages/plugin/annotation/src/contr
 ArmedStampPreview [InterfaceDeclaration] (from packages/plugin/annotation/src/contract.ts): export interface ArmedStampPreview{ bytes: Uint8Array; mimeType?: string; }
 ArrivalAlignValue [TypeAliasDeclaration] (from packages/plugin/stage/src/contract.ts): export type ArrivalAlignValue = AlignValue | 'keep';
 ArrivalAlignment [InterfaceDeclaration] (from packages/plugin/stage/src/contract.ts): export interface ArrivalAlignment{ x: ArrivalAlignValue; y: ArrivalAlignValue; }
-AttachmentContent [InterfaceDeclaration] (from packages/engine/core/src/dto/Attachment.ts): export interface AttachmentContent{ bytes: Uint8Array; name: string; mimeType?: string; }
+AttachmentContent [InterfaceDeclaration] (from packages/engine/core/src/dto/Attachment.ts): export interface AttachmentContent{ bytes: Uint8Array; name: string; mimeType: string | null; }
 AttachmentFileSource [InterfaceDeclaration] (from packages/engine/core/src/dto/Attachment.ts): export interface AttachmentFileSource{ data: Uint8Array | ArrayBuffer | Blob; name?: string; mimeType?: string; description?: string; }
 AuthorableFormFamily [TypeAliasDeclaration] (from packages/plugin/form/src/tools/definitions.ts): export type AuthorableFormFamily = Exclude<FormFieldFamily, 'pushbutton' | 'unknown'>;
 BarChild [TypeAliasDeclaration] (from packages/core/ui/src/schema.ts): export type BarChild = BarItem | CustomItem | string;

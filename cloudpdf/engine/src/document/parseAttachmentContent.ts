@@ -10,11 +10,14 @@ import type { HttpFileResponse } from '../transport/HttpClient';
 /** Header carrying the file's name, token-text encoded (names are
  *  arbitrary UTF-8; HTTP header values are not). */
 const FILE_NAME_HEADER = 'X-EmbedPDF-File-Name';
+/** Header carrying the file's declared type; absent when it has none. */
+const FILE_TYPE_HEADER = 'X-EmbedPDF-File-Type';
 
 /**
  * Project an attachment-file response into `AttachmentContent`. The body
- * is the decoded bytes; the metadata rides as headers — `Content-Type`
- * for the declared mime type, `X-EmbedPDF-File-Name` for the file name.
+ * is the decoded bytes; the metadata rides as headers — `X-EmbedPDF-File-Type`
+ * for the declared type (`Content-Type` is only what HTTP needs), and
+ * `X-EmbedPDF-File-Name` for the file name.
  * Used by the document-level `attachments.download()`; the annotation-level
  * `annotations.downloadResource(ref, 'file')` reads the same response's bytes.
  */
@@ -36,10 +39,5 @@ export function parseAttachmentContent(file: HttpFileResponse): AttachmentConten
       { cause: err },
     );
   }
-  const mimeType = file.headers.get('Content-Type');
-  return {
-    bytes: file.bytes,
-    name,
-    ...(mimeType !== null ? { mimeType } : {}),
-  };
+  return { bytes: file.bytes, name, mimeType: file.headers.get(FILE_TYPE_HEADER) };
 }

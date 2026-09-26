@@ -9,6 +9,7 @@ import {
   type AnnotationRef,
   type AnnotationReplyType,
   type AnnotationStableId,
+  type AttachmentFileInfo,
   type PageObjectNumber,
   type PageRef,
   type RevisionToken,
@@ -28,7 +29,11 @@ import { readAnnotationFromPtr } from './internal/read/readAnnotationFromPtr';
 import type { AnnotationWriteContext } from './internal/write/annotationWriteContext';
 import { applyDraft } from './internal/write/annotationWriterRegistry';
 import { generateAppearance } from './internal/write/generateAppearance';
-import { restoreAttribution, type RestoredAttribution } from './internal/write/restoreAttribution';
+import {
+  restoreAttribution,
+  restoreFileDates,
+  type RestoredAttribution,
+} from './internal/write/restoreAttribution';
 import { stampCreation } from './internal/write/stampCreation';
 import { linkPopup, linkReply } from './internal/write/writeAnnotationRelationship';
 import { DocumentCheckpoint } from '../../document-session/DocumentCheckpoint';
@@ -67,6 +72,8 @@ export interface BatchCreate {
         /** The importing session's user, recorded as `importedBy`. */
         readonly importedBy?: string;
       };
+  /** A copied file attachment's file dates, kept in either attribution. */
+  readonly fileDates?: Pick<AttachmentFileInfo, 'createdAt' | 'modifiedAt'>;
   /** Names the create in an error, such as `import: item 3`. */
   readonly label?: string;
 }
@@ -221,13 +228,16 @@ export class AnnotationBatchApplier {
       });
 
       const now = new Date();
-      prepared.forEach(({ create: { attribution, label } }, at) => {
+      prepared.forEach(({ create: { attribution, fileDates, label } }, at) => {
         this.withOpen(placed[at]!, (annotPtr) =>
-          labelled(label, () =>
-            attribution.kind === 'stamp'
-              ? stampCreation(fn, mem, annotPtr, attribution.actor, now)
-              : restoreAttribution(fn, mem, annotPtr, attribution.from, attribution.importedBy),
-          ),
+          labelled(label, () => {
+            if (attribution.kind === 'stamp') {
+              stampCreation(fn, mem, annotPtr, attribution.actor, now);
+            } else {
+              restoreAttribution(fn, mem, annotPtr, attribution.from, attribution.importedBy);
+            }
+            if (fileDates) restoreFileDates(fn, mem, annotPtr, fileDates);
+          }),
         );
       });
 

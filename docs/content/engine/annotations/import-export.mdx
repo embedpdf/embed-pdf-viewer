@@ -109,8 +109,9 @@ imports is recorded in `importedBy`. That writes annotations in other people's n
 your own database, not to end users.
 
 With `attribution: 'stamp'`, each annotation is made as `create` makes it: the user who imports
-is its author and owner, and the dates are now. It doesn't need `doc.annotate.import`, so it's the
-one to use for a user pasting annotations.
+is its author and owner, and the dates are now. It needs what creating each annotation needs and
+nothing more, so a user who may create their own annotations may paste them. It's the one to use
+for a user pasting annotations.
 
 In both modes an attached file keeps its own dates: they're facts about the file, not about who
 wrote the annotation.
@@ -162,7 +163,9 @@ Export checks while it builds the bundle; export fewer pages at a time to stay u
 
 <Engine cloud>
 
-The server holds the limits, with these defaults unless you set others.
+The server holds the limits, with these defaults unless you set others. The client checks a
+bundle against the server's limits before it sends it, so a bundle past one fails before its bytes
+move.
 
 An import is one request, however many annotations and resources it carries. Its `opId`, made for
 you when you don't pass one, makes a retry safe: a second request with the same `opId` returns

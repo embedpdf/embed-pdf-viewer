@@ -67,21 +67,24 @@ export interface LineEndings {
  * kebab-case so the wire format is stable across language ports; the engine
  * maps these onto PDFium's `FPDF_STANDARD_FONT` integer codes at write time.
  */
-export type StandardFont =
-  | 'courier'
-  | 'courier-bold'
-  | 'courier-bold-oblique'
-  | 'courier-oblique'
-  | 'helvetica'
-  | 'helvetica-bold'
-  | 'helvetica-bold-oblique'
-  | 'helvetica-oblique'
-  | 'times-roman'
-  | 'times-bold'
-  | 'times-bold-italic'
-  | 'times-italic'
-  | 'symbol'
-  | 'zapf-dingbats';
+export const STANDARD_FONTS = [
+  'courier',
+  'courier-bold',
+  'courier-bold-oblique',
+  'courier-oblique',
+  'helvetica',
+  'helvetica-bold',
+  'helvetica-bold-oblique',
+  'helvetica-oblique',
+  'times-roman',
+  'times-bold',
+  'times-bold-italic',
+  'times-italic',
+  'symbol',
+  'zapf-dingbats',
+] as const;
+
+export type StandardFont = (typeof STANDARD_FONTS)[number];
 
 /**
  * Font selector for a free-text annotation: either one of the 14 PDF

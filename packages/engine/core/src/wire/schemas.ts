@@ -289,6 +289,21 @@ export const DocumentSecurityStateSchema: z.ZodType<DocumentSecurityState> = z.o
   }),
 });
 
+const positiveCount = z.number().int().positive();
+
+/** See `AnnotationBundleLimits`. */
+export const AnnotationBundleLimitsSchema = z
+  .object({
+    bundleBytes: positiveCount,
+    manifestBytes: positiveCount,
+    items: positiveCount,
+    pages: positiveCount,
+    resources: positiveCount,
+    resourceBytes: positiveCount,
+    imagePixels: positiveCount,
+  })
+  .strict();
+
 export const AccessResponseSchema = z.object({
   security: DocumentSecurityStateSchema,
   cdn: z.object({
@@ -389,6 +404,8 @@ export const AccessResponseSchema = z.object({
       enforced: z.boolean(),
     })
     .optional(),
+  /** The deployment's limits for an annotation import (see `AnnotationBundleLimits`). */
+  annotationBundleLimits: AnnotationBundleLimitsSchema,
 });
 export type AccessResponse = z.infer<typeof AccessResponseSchema>;
 export type RenderPolicy = NonNullable<AccessResponse['renderPolicy']>;
@@ -1098,6 +1115,18 @@ export const AnnotationExportSelectionSchema: z.ZodType<AnnotationExportSelectio
     refs: z.array(AnnotationRefSchema).optional(),
     pages: z.array(PageRefSchema).optional(),
     include: z.enum(['references', 'threads']).optional(),
+  })
+  .strict();
+
+/**
+ * The body of a POST annotation export: the pins a GET's token carries and
+ * the selection, for one a URL can't carry.
+ */
+export const AnnotationsExportRequestSchema = z
+  .object({
+    annotationsVersion: z.number().int().positive(),
+    layoutVersion: z.number().int().positive(),
+    selection: AnnotationExportSelectionSchema,
   })
   .strict();
 

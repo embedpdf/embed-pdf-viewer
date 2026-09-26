@@ -178,6 +178,7 @@ export type {
   InkIntent,
   BlendMode,
 } from './annotation/primitives';
+export { STANDARD_FONTS } from './annotation/primitives';
 export { NO_ANNOTATION_FLAGS } from './annotation/primitives';
 export { ANNOTATION_FIELD_NAMES, ANNOTATION_RESOURCE_ROLES } from './annotation/field-names';
 
@@ -215,6 +216,7 @@ export {
   ANNOTATION_RESOURCE_ROLE_NAMES,
   assertAnnotationResources,
   hasAnnotationResources,
+  withFileFromResource,
   resolveAnnotationResources,
 } from './annotation/resources';
 export { normalizeAttachmentFileSource } from './dto/normalizeAttachmentFileSource';

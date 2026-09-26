@@ -141,7 +141,7 @@ export function createIcons(
       const bytes = await doc
         .page(annotations.pageOf(ref))
         .annotations.downloadResource(ref, 'file');
-      return { bytes, name: file.name, ...(file.mimeType ? { mimeType: file.mimeType } : {}) };
+      return { bytes, name: file.name, mimeType: file.mimeType };
     },
     setFilePickerProvider: (provider: FilePickerProvider | null) => filePicker.set(provider),
   };

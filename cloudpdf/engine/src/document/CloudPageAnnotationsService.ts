@@ -7,6 +7,7 @@ import {
   encodeStableIdKey,
   hasAnnotationResources,
   resolveAnnotationResources,
+  withFileFromResource,
   type AnnotationResourceRole,
   type AnnotationResources,
   type WireAnnotationResources,
@@ -257,6 +258,8 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
+    // A `File` brings its name and type; the bytes travel without them.
+    const data = withFileFromResource(draft, resources);
     return AbortablePromise.run<AnnotationCreateResult>(async (signal) => {
       // Without resources the request is the plain JSON POST of the data;
       // with them it is multipart (see `buildAnnotationMutationForm`).
@@ -266,11 +269,11 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       const result = hasAnnotationResources(wireResources)
         ? await this.http.postMultipartJson(
             path,
-            buildAnnotationMutationForm(draft, wireResources),
+            buildAnnotationMutationForm(data, wireResources),
             parse,
             signal,
           )
-        : await this.http.postJson(path, draft, parse, signal);
+        : await this.http.postJson(path, data, parse, signal);
       return this.absorbMutation(result, 'annotations.created');
     });
   }

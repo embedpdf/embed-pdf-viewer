@@ -4,6 +4,7 @@ import {
   decodePdfBits,
   expandRawScope,
   permissionInfoWithAdvisory,
+  type AnnotationBundleLimits,
   type DocumentAccessInfo,
   type PdfBits,
 } from '@embedpdf/engine-core/runtime';
@@ -29,6 +30,8 @@ export interface AccessRouteDeps {
   cdnSigner: CdnSigner;
   /** When present, /access advertises the deployment's render lattice. */
   derivedRenders?: DerivedRenderService;
+  /** The deployment's annotation import limits, advertised so a client checks them first. */
+  annotationBundleLimits: AnnotationBundleLimits;
   usageMeters?: UsageMeters;
   tenantUsage?: TenantUsageRepo;
 }
@@ -37,7 +40,8 @@ export async function registerAccessRoutes(
   app: FastifyInstance,
   deps: AccessRouteDeps,
 ): Promise<void> {
-  const { service, cdnSigner, derivedRenders, usageMeters, tenantUsage } = deps;
+  const { service, cdnSigner, derivedRenders, usageMeters, tenantUsage, annotationBundleLimits } =
+    deps;
 
   const handleAccess = async (
     req: FastifyRequest,
@@ -108,6 +112,7 @@ export async function registerAccessRoutes(
       docId,
       layerName,
       `${req.protocol}://${req.hostname}`,
+      annotationBundleLimits,
       derivedRenders?.policy(),
       layerScopes,
     );
@@ -159,6 +164,7 @@ function buildAccessResponse(
   docId: string,
   layerName: string,
   originUrl: string,
+  annotationBundleLimits: AnnotationBundleLimits,
   renderPolicy?: RenderPolicy,
   layerScopes?: LayerScopes,
 ): DocumentAccessInfo {
@@ -209,6 +215,7 @@ function buildAccessResponse(
     // version-pinned immutable objects; the lattice is mutable deployment
     // policy.
     ...(renderPolicy ? { renderPolicy } : {}),
+    annotationBundleLimits,
   };
 }
 

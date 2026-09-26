@@ -1,4 +1,6 @@
 import type { PdfNumberFormat } from '../dto/Measure';
+import { EngineError } from '../errors/EngineError';
+import { EngineErrorCode } from '../errors/EngineErrorCode';
 
 const group = (value: string, separator: string): string =>
   value.replace(/\B(?=(\d{3})+(?!\d))/g, () => separator);
@@ -41,13 +43,17 @@ function last(value: number, nf: PdfNumberFormat): string {
  * Unit text and explicit spacing are preserved, including trailing unit spaces. */
 export function formatMeasurement(value: number, formats: readonly PdfNumberFormat[]): string {
   if (!Number.isFinite(value) || !formats.length || !formats.every(validNumberFormat)) {
-    throw new RangeError('Measurement requires a finite value and valid number formats');
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      'Measurement requires a finite value and valid number formats',
+    );
   }
   let remainder = Math.abs(value);
   const parts: string[] = [];
   for (const [index, nf] of formats.entries()) {
     remainder *= Math.fround(nf.conversion!);
-    if (!Number.isFinite(remainder)) throw new RangeError('Measurement overflow');
+    if (!Number.isFinite(remainder))
+      throw new EngineError(EngineErrorCode.InvalidArg, 'Measurement overflow');
     const whole = Math.floor(remainder);
     const fraction = remainder - whole;
     const final = index === formats.length - 1;

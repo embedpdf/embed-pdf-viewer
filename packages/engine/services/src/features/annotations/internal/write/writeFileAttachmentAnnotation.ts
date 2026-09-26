@@ -27,15 +27,22 @@ type FileMetadata = NonNullable<FileAttachmentDraft['file']>;
 
 /**
  * Validate a file-attachment draft before any native write: the file's
- * bytes must have come with it, as the `file` resource. Any bytes are a
- * valid attachment.
+ * bytes must have come with it, as the `file` resource, and its name (the
+ * data's, or the one a `File` brought). Any bytes are a valid attachment.
  */
 export function preflightFileAttachmentDraft(
-  _draft: FileAttachmentDraft,
+  draft: FileAttachmentDraft,
   ctx: AnnotationWriteContext | undefined,
 ): void {
   requireFileBytes(ctx);
   requireDocPtr(ctx);
+  if (!draft.file?.name) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      "a file attachment needs the file's name: give file.name, or the bytes as a File",
+      { details: { field: 'file.name' } },
+    );
+  }
 }
 
 /**
@@ -63,17 +70,12 @@ export function applyFileAttachmentDraft(
   setAnnotColor(fn, annotPtr, draft.color ?? DEFAULT_FILE_ATTACHMENT_COLOR);
   setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULT_OPACITY);
   setFileAttachmentIcon(fn, annotPtr, draft.icon ?? 'paperclip');
-  const attachmentPtr = addFileSpec(fn, mem, annotPtr, draft.file.name);
-  writeAttachmentFilePayload(
-    fn,
-    mem,
-    attachmentPtr,
-    requireDocPtr(ctx),
-    metadataForPayload(draft.file),
-    { bytes: requireFileBytes(ctx) },
-  );
-  // A file the data gives no MIME type has none, as on update: none is made up.
-  if (draft.file.mimeType == null) setMimeType(fn, attachmentPtr, null);
+  // `preflightFileAttachmentDraft` refused a draft without the file's name.
+  const file = draft.file!;
+  const attachmentPtr = addFileSpec(fn, mem, annotPtr, file.name);
+  writeAttachmentFilePayload(fn, mem, attachmentPtr, requireDocPtr(ctx), metadataForPayload(file), {
+    bytes: requireFileBytes(ctx),
+  });
 }
 
 /**
@@ -141,15 +143,7 @@ function writeFileChange(
   const mimeType = metadata ? (metadata.mimeType ?? null) : (current?.mimeType ?? null);
   if (bytes !== undefined) {
     // New bytes get a new embedded file stream, without the old one's type.
-    writeAttachmentFilePayload(
-      fn,
-      mem,
-      attachmentPtr,
-      requireDocPtr(ctx),
-      mimeType !== null ? { mimeType } : {},
-      { bytes },
-    );
-    if (mimeType === null) setMimeType(fn, attachmentPtr, null);
+    writeAttachmentFilePayload(fn, mem, attachmentPtr, requireDocPtr(ctx), { mimeType }, { bytes });
   } else if (mimeType !== (current?.mimeType ?? null)) {
     setMimeType(fn, attachmentPtr, mimeType);
   }

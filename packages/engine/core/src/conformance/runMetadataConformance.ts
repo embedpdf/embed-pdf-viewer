@@ -149,6 +149,31 @@ export function runMetadataConformance(
       }
     });
 
+    test("update() keeps '' as a value and refuses a key it can't write", async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        await doc.metadata.update({ title: '', custom: { EmptyKey: '' } });
+        const empty = await doc.metadata.get();
+        expect(empty.title).toBe('');
+        expect(empty.custom.EmptyKey).toBe('');
+
+        for (const key of ['Title', 'Bad\u0001Key', '']) {
+          let caught: unknown;
+          try {
+            await doc.metadata.update({ author: 'Not Written', custom: { [key]: 'x' } });
+          } catch (err) {
+            caught = err;
+          }
+          expect(EngineError.is(caught, EngineErrorCode.InvalidArg)).toBe(true);
+          expect((caught as EngineError).details?.['field']).toBe(`custom.${key}`);
+        }
+        // Refused whole: the author in the same patch wasn't written.
+        expect((await doc.metadata.get()).author !== 'Not Written').toBe(true);
+      } finally {
+        await doc.close();
+      }
+    });
+
     test('update() clears a field with null', async () => {
       const doc = await openFixture(engine, opts);
       try {

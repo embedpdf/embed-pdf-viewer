@@ -187,6 +187,30 @@ export function runAnnotationExportConformance(
       });
     });
 
+    test('takes a selection larger than a URL holds', async () => {
+      await onPage('authoring', async (page, doc) => {
+        // Long names push the selection past what an export URL carries.
+        const created: AnnotationDTO[] = [];
+        for (let i = 0; i < 24; i++) {
+          const { annotation } = await page.annotations.create({
+            subtype: 'square',
+            rect: { left: 10 + i, bottom: 10, right: 40 + i, top: 40 },
+            nm: `export-conformance-long-selection-${String(i).padStart(3, '0')}-${'x'.repeat(200)}`,
+          });
+          created.push(annotation);
+        }
+        const refs = created.map((annotation) => ({
+          kind: 'nm' as const,
+          page: annotation.ref.page,
+          nm: annotation.nm!,
+        }));
+        const bundle = await doc.annotations.export({ refs });
+        expect(bundle.items.map((item) => item.data.nm).sort()).toEqual(
+          created.map((annotation) => annotation.nm).sort(),
+        );
+      });
+    });
+
     test('refuses a page or an annotation the document does not have', async () => {
       await onPage('authoring', async (_page, doc, pageRef) => {
         const missing = { code: EngineErrorCode.NotFound };

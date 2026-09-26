@@ -112,7 +112,7 @@ export class LocalDocumentAttachmentsService implements DocumentAttachmentsServi
       return {
         bytes: new Uint8Array(content.bytes),
         name: content.name,
-        ...(content.mimeType !== undefined ? { mimeType: content.mimeType } : {}),
+        mimeType: content.mimeType ?? null,
       };
     });
   }

@@ -319,9 +319,11 @@ function attachmentRefFromPath(fileKey: string): AttachmentRef {
 
 /**
  * Stream a decoded attachment temp file. Metadata rides headers the SDK
- * decodes: `Content-Type` for the mime and `X-EmbedPDF-File-Name` for the
- * file name (token-text encoded — names are arbitrary unicode and HTTP
- * header values are not). A zero-byte attachment is a valid empty stream.
+ * decodes: `X-EmbedPDF-File-Type` for the declared type (absent when the
+ * file has none; `Content-Type` then says only what HTTP needs) and
+ * `X-EmbedPDF-File-Name` for the file name (token-text encoded — names are
+ * arbitrary unicode and HTTP header values are not). A zero-byte attachment
+ * is a valid empty stream.
  */
 function sendAttachmentFile(
   reply: FastifyReply,
@@ -330,6 +332,7 @@ function sendAttachmentFile(
 ) {
   cache === 'immutable' ? setImmutableCache(reply) : setNoStore(reply);
   reply.header('Content-Type', file.mimeType ?? 'application/octet-stream');
+  if (file.mimeType) reply.header('X-EmbedPDF-File-Type', file.mimeType);
   reply.header('Content-Length', String(file.size));
   reply.header('X-EmbedPDF-File-Name', encodeTokenText(file.name));
   reply.header('Content-Disposition', `attachment; filename="${safeHeaderFilePart(file.name)}"`);

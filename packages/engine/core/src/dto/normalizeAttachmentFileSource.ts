@@ -7,8 +7,8 @@ import { resolveBinarySource, type WireResource } from '../resource/BinarySource
  * Resolve an attachment `file` into its wire halves: metadata into the
  * JSON body, bytes into the resource map. Unlike stamps there is no
  * format allowlist — attaching arbitrary files is the point — so the
- * declared mime type wins (attachment formats cannot be reliably sniffed;
- * the writer falls back to `application/octet-stream` when absent).
+ * declared mime type wins, then the Blob's; attachment formats cannot be
+ * reliably sniffed, so without either the file has no type.
  * Used by the document-level `attachments.create`.
  */
 export async function normalizeAttachmentFileSource(

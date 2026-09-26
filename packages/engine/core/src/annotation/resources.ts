@@ -1,7 +1,9 @@
 import { ANNOTATION_RESOURCE_ROLES } from './field-names';
+import type { AnnotationDraft } from './kinds';
 import type { AnnotationSubtype } from './subtype';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
+import { blobFileName } from '../resource/BinarySource';
 import { sniffBinaryMetadata } from '../resource/binaryMetadata';
 
 /**
@@ -66,6 +68,30 @@ export async function resolveAnnotationResources(
     wire[role] = bytes;
   }
   return wire;
+}
+
+/**
+ * A file-attachment create's `file`, completed from its `file` resource when
+ * that is a `File` or a `Blob`: the name a `File` brings and the type a
+ * `Blob` does, where the data leaves them out. A `Blob` with no type gives
+ * none. Other drafts, and bare bytes, pass as they are.
+ */
+export function withFileFromResource(
+  draft: AnnotationDraft,
+  resources: AnnotationResources | undefined,
+): AnnotationDraft {
+  const data = resources?.file;
+  if (draft.subtype !== 'file-attachment' || !isBlob(data)) return draft;
+  const name = draft.file?.name ?? blobFileName(data);
+  if (name === undefined) return draft;
+  return {
+    ...draft,
+    file: {
+      ...draft.file,
+      name,
+      mimeType: draft.file?.mimeType !== undefined ? draft.file.mimeType : data.type || null,
+    },
+  };
 }
 
 export function hasAnnotationResources(resources: WireAnnotationResources): boolean {

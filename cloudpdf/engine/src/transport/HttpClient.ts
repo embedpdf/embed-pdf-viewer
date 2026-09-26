@@ -382,6 +382,21 @@ export class HttpClient {
     return this.parseJsonResponse(await this.requestJson(path, 'PUT', body, signal), parser);
   }
 
+  /** POST a JSON body and parse a `multipart/form-data` response (a large annotation export). */
+  async postJsonFormData(path: string, body: unknown, signal: AbortSignal): Promise<FormData> {
+    const res = await this.request(path, {
+      method: 'POST',
+      body: JSON.stringify(body),
+      headers: new Headers({
+        'Content-Type': 'application/json',
+        Accept: 'multipart/form-data',
+      }),
+      signal,
+    });
+    if (!res.ok) await this.throwFromBody(res);
+    return await res.formData();
+  }
+
   /** POST a JSON body and return the raw binary response (pages.extract). */
   async postJsonBytes(path: string, body: unknown, signal: AbortSignal): Promise<Uint8Array> {
     const res = await this.requestJson(path, 'POST', body, signal);
@@ -585,6 +600,8 @@ function mapStatusToCode(status: number): EngineErrorCode {
   if (status === 403) return EngineErrorCode.Forbidden;
   if (status === 409) return EngineErrorCode.WeakAnnotationSessionConflict;
   if (status === 404) return EngineErrorCode.NotFound;
+  // A request body past the server's limit, refused before any route runs.
+  if (status === 413) return EngineErrorCode.PayloadTooLarge;
   if (status === 422) return EngineErrorCode.DocOpenFailed;
   if (status === 499) return EngineErrorCode.Aborted;
   if (status === 400) return EngineErrorCode.InvalidArg;

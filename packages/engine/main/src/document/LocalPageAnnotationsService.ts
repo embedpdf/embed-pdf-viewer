@@ -9,6 +9,7 @@ import {
   createPageImageHandle,
   hasAnnotationResources,
   resolveAnnotationResources,
+  withFileFromResource,
   wirePack,
   type EngineRenderPolicy,
   type AnnotationAppearanceImage,
@@ -259,6 +260,8 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
       return AbortablePromise.rejectReason(err);
     }
     const actor = this.guard.actorForCreate(groupId);
+    // A `File` brings its name and type; the bytes travel without them.
+    const data = withFileFromResource(draft, resources);
 
     const docId = this.docId;
     const ref = this.ref;
@@ -276,7 +279,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
                 jobId,
                 docId,
                 page: ref,
-                draft,
+                draft: data,
                 ...(hasAnnotationResources(wireResources) ? { resources: wireResources } : {}),
                 ...(actor ? { actor } : {}),
               },

@@ -411,6 +411,24 @@ export function runAnnotationDeclarationConformance(
       });
     });
 
+    test('a weak annotation exports by its position ref', async () => {
+      for (const fixture of opts.documents) {
+        const doc = await openFixture(engine, opts, fixture);
+        try {
+          const weak = (await doc.annotations.list()).annotations.find(
+            (annotation) => annotation.ref.kind === 'index',
+          );
+          if (!weak) continue;
+          const bundle = await doc.annotations.export({ refs: [weak.ref] });
+          expect(bundle.items.map((item) => item.data.subtype)).toEqual([weak.subtype]);
+          return;
+        } finally {
+          await doc.close();
+        }
+      }
+      throw new Error('no fixture document has a weak annotation');
+    });
+
     test('a link read back can be sent back; its read-only target is kept', async () => {
       const doc = await openFixture(engine, opts, opts.readOnlyLink);
       try {

@@ -395,6 +395,13 @@ export const wirePaths = {
   layerAnnotationsExport: (docId: string, layerName: string, token: AnnotationsExportToken) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/export@${encodeAnnotationsExportToken(token)}`,
 
+  /**
+   * A layer annotation export whose selection a URL can't carry (position
+   * refs, long ref lists): a POST of the pins and the selection, not cached.
+   */
+  layerAnnotationsExportRequest: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/export`,
+
   /** A bundle's annotations, created in the layer as one change (`doc.annotations.import`). */
   layerAnnotationsImport: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/import`,

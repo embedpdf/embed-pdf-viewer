@@ -2,6 +2,7 @@ import {
   AbortablePromise,
   EngineError,
   EngineErrorCode,
+  STANDARD_FONTS,
   wirePack,
   type FontHandle,
   type FontIdentityInfo,
@@ -50,8 +51,19 @@ export class LocalFontService implements FontService {
   constructor(private readonly queue: WorkerQueue) {}
 
   register(spec: FontSpec): AbortablePromise<FontHandle> {
-    const bytes = toArrayBuffer(spec.data);
     const key = spec.key;
+    if (!key || (STANDARD_FONTS as readonly string[]).includes(key)) {
+      return AbortablePromise.rejectReason(
+        new EngineError(
+          EngineErrorCode.InvalidArg,
+          key
+            ? `'${key}' is a standard font's name; register the font under a key of its own`
+            : 'a font needs a key',
+          { details: { field: 'key' } },
+        ),
+      );
+    }
+    const bytes = toArrayBuffer(spec.data);
 
     const existing = this.fonts.get(key);
     if (existing) {

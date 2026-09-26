@@ -75,10 +75,17 @@ describe('measurement arithmetic and formatting', () => {
     expect(measureFromKnownLength(100, { value: 3, unit: 'm' }).x[0].conversion).toBe(
       Math.fround(0.03),
     );
-    expect(measureFromRatio(1, 50, 'm', 2).x[0].conversion).toBe(
+    expect(measureFromRatio(1, 50, 'm', { userUnit: 2 }).x[0].conversion).toBe(
       Math.fround((2 / 72) * 0.0254 * 50),
     );
-    expect(() => measureFromKnownLength(0, { value: 1, unit: 'm' })).toThrow();
+    // A bad input is the engine's InvalidArg, and precision has a default.
+    expect(() => measureFromKnownLength(0, { value: 1, unit: 'm' })).toThrow(
+      expect.objectContaining({ code: 'InvalidArg' }),
+    );
+    expect(() => measureFromRatio(1, 100, 'm', { precision: 3 })).toThrow(
+      expect.objectContaining({ code: 'InvalidArg' }),
+    );
+    expect(measureFromRatio(1, 100, 'm', { fixed: true }).x[0].precision).toBe(100);
   });
   test('coordinates AND scale factors are normalized to PDF float32', () => {
     const m = measureFromKnownLength(1, { value: 1.00000001, unit: 'm' });

@@ -1,6 +1,5 @@
 import {
   AbortablePromise,
-  DEFAULT_ANNOTATION_BUNDLE_LIMITS,
   EngineError,
   EngineErrorCode,
   annotationImportFacts,
@@ -60,6 +59,8 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
     private readonly isClosed: () => boolean,
     private readonly manifest: ManifestAccessor,
     private readonly publisher: SessionEventPublisher,
+    /** The server's import limits, as its `/v1/access` advertises them. */
+    private readonly importLimits: () => Promise<AnnotationBundleLimits>,
   ) {}
 
   /**
@@ -143,22 +144,32 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
-    if (selection.refs?.some((ref) => ref.kind === 'index')) {
-      return AbortablePromise.rejectReason(
-        new EngineError(
-          EngineErrorCode.InvalidArg,
-          'export names annotations by object number or name, not by position',
-        ),
-      );
-    }
     return AbortablePromise.run<AnnotationBundle>(async (signal) => {
-      const form = await this.http.getFormDataWithRefresh(
-        async (s) => this.exportPathAt(await this.manifest.get(s), selection),
-        async (s) => {
-          await this.manifest.refresh(s);
-        },
-        signal,
-      );
+      const read = async (s: AbortSignal): Promise<FormData> => {
+        const manifest = await this.manifest.get(s);
+        const path = this.exportPathAt(manifest, selection);
+        if (path) return this.http.getFormData(path, s);
+        // Position refs, or more refs than a URL holds: the pins and the
+        // selection in a POST body.
+        return this.http.postJsonFormData(
+          wirePaths.layerAnnotationsExportRequest(this.docId, this.layerName),
+          {
+            annotationsVersion: manifest.annotationsVersion,
+            layoutVersion: manifest.layoutVersion,
+            selection,
+          },
+          s,
+        );
+      };
+      let form: FormData;
+      try {
+        form = await read(signal);
+      } catch (error) {
+        // A pin that moved since the manifest was read: read it again, once.
+        if (!EngineError.is(error, EngineErrorCode.NotFound)) throw error;
+        await this.manifest.refresh(signal);
+        form = await read(signal);
+      }
       const manifest = form.get('manifest');
       if (typeof manifest !== 'string') {
         throw new EngineError(EngineErrorCode.WireFormat, 'annotation export has no manifest part');
@@ -206,7 +217,7 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
     return AbortablePromise.run<AnnotationImportResult>(async (signal) => {
       const { resources, ...rest } = bundle;
       const sizes = new Map(Object.entries(resources).map(([id, bytes]) => [id, bytes.length]));
-      assertBundleManifest(bundle, sizes, DEFAULT_ANNOTATION_BUNDLE_LIMITS);
+      assertBundleManifest(bundle, sizes, await this.importLimits());
       const manifest: AnnotationImportManifest = {
         bundle: rest,
         options: {
@@ -240,7 +251,16 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
 
   /** The export leaf at the manifest's pins: the base leaf while the layer
    *  inherits both planes the bundle depends on. */
-  private exportPathAt(manifest: DocumentManifest, selection: AnnotationExportSelection): string {
+  /**
+   * The cacheable export URL for `selection`, or `null` when a URL can't
+   * carry it: position refs have no durable address, and a URL has room for
+   * a few hundred refs.
+   */
+  private exportPathAt(
+    manifest: DocumentManifest,
+    selection: AnnotationExportSelection,
+  ): string | null {
+    if (selection.refs?.some((ref) => ref.kind === 'index')) return null;
     const token = {
       annotationsVersion: manifest.annotationsVersion,
       layoutVersion: manifest.layoutVersion,
@@ -250,13 +270,8 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
       return planesInherited(manifest, ['annotations', 'layout'])
         ? wirePaths.docAnnotationsExport(this.docId, token)
         : wirePaths.layerAnnotationsExport(this.docId, this.layerName, token);
-    } catch (error) {
-      // The selection travels in the URL, which has room for a few hundred refs.
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        'the selection is too large for one export: select pages, or fewer annotations at a time',
-        { cause: error },
-      );
+    } catch {
+      return null;
     }
   }
 

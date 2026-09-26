@@ -25,7 +25,7 @@ export const DEFAULT_PRESETS: ScalePreset[] = [
 export const defaultMeasure = (config: MeasurementConfig, userUnit = 1): PdfMeasure =>
   typeof config.defaultScale === 'object'
     ? config.defaultScale
-    : measureFromRatio(1, 1, config.defaultScale === 'imperial' ? 'ft' : 'm', userUnit);
+    : measureFromRatio(1, 1, config.defaultScale === 'imperial' ? 'ft' : 'm', { userUnit });
 
 export function withUnit(
   measure: PdfMeasure,

@@ -34,8 +34,8 @@ export interface AttachmentFileBase {
  * when `data` carries one itself (a browser `File`); normalization throws
  * `InvalidArg` when no name is resolvable — a PDF filespec requires one.
  * `mimeType` is stored as declared (attachment types cannot be reliably
- * sniffed); it falls back to the Blob's type, else the writer stores
- * `application/octet-stream`.
+ * sniffed); it falls back to the Blob's type, and without either the file
+ * has none (a read says `null`).
  */
 export interface AttachmentFileSource {
   data: Uint8Array | ArrayBuffer | Blob;
@@ -114,5 +114,6 @@ export interface AttachmentList {
 export interface AttachmentContent {
   bytes: Uint8Array;
   name: string;
-  mimeType?: string;
+  /** The declared type; `null` when the file has none (the engine never guesses one). */
+  mimeType: string | null;
 }

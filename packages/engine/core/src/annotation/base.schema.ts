@@ -15,7 +15,8 @@ import type {
   StrikeoutIntent,
   TextAlignment,
 } from './primitives';
-import { PdfPointSchema, PdfRectSchema, PdfQuadSchema } from '../geometry/schemas';
+import { STANDARD_FONTS } from './primitives';
+import { PdfPointSchema, PdfRectSchema } from '../geometry/schemas';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { AnnotationStableId } from '../identity/AnnotationStableId';
 import type { RevisionToken } from '../revision/RevisionToken';
@@ -63,22 +64,7 @@ export const LineEndingsSchema: z.ZodType<LineEndings> = z.object({
   end: LineEndingSchema,
 });
 
-export const StandardFontSchema: z.ZodType<StandardFont> = z.enum([
-  'courier',
-  'courier-bold',
-  'courier-bold-oblique',
-  'courier-oblique',
-  'helvetica',
-  'helvetica-bold',
-  'helvetica-bold-oblique',
-  'helvetica-oblique',
-  'times-roman',
-  'times-bold',
-  'times-bold-italic',
-  'times-italic',
-  'symbol',
-  'zapf-dingbats',
-]);
+export const StandardFontSchema: z.ZodType<StandardFont> = z.enum(STANDARD_FONTS);
 
 export const TextAlignmentSchema: z.ZodType<TextAlignment> = z.enum(['left', 'center', 'right']);
 

@@ -6,9 +6,9 @@ import { writeMetaTrapped } from './writeMetaTrapped';
 import { formatPdfDate } from '../../../../shared/pdf-date';
 
 /**
- * Standard Info-dict keys the patch maps to explicitly. Custom keys may
- * not collide with these (a custom write to `Title` would shadow the
- * structured field), so they are skipped with the date keys and /Trapped.
+ * Standard Info-dict keys the patch maps to explicitly. A custom key may
+ * not be one of these (a custom write to `Title` would shadow the
+ * structured field).
  */
 const RESERVED_INFO_KEYS = new Set([
   'Title',
@@ -37,26 +37,30 @@ const STRING_FIELDS: ReadonlyArray<[keyof MetadataPatch, string]> = [
 ];
 
 /**
- * A custom key must be writable as a PDF Name and must not shadow a
- * reserved standard key: non-empty ASCII printable, <= 127 chars, no
- * leading slash.
+ * Why a custom key can't be written, or `null` when it can: it must be
+ * writable as a PDF Name (non-empty printable ASCII, at most 127 characters,
+ * no leading slash) and must not be a standard key.
  */
-function isValidCustomKey(key: string): boolean {
-  if (!key || key.length > 127) return false;
-  if (RESERVED_INFO_KEYS.has(key)) return false;
-  if (key[0] === '/') return false;
+function customKeyProblem(key: string): string | null {
+  if (RESERVED_INFO_KEYS.has(key)) {
+    return `'${key}' is a standard key; set it with its own field`;
+  }
+  if (!key || key.length > 127 || key[0] === '/') {
+    return `'${key}' can't be a custom key: 1 to 127 characters, no leading slash`;
+  }
   for (let i = 0; i < key.length; i++) {
     const c = key.charCodeAt(i);
-    if (c < 0x20 || c > 0x7e) return false;
+    if (c < 0x20 || c > 0x7e) return `'${key}' can't be a custom key: printable ASCII only`;
   }
-  return true;
+  return null;
 }
 
 /**
  * Apply a three-state {@link MetadataPatch} to the document's Info dict
  * in place. `undefined` leaves a field, `null` clears it, a value sets
- * it (dates are formatted to PDF date syntax). Custom keys are set/cleared
- * per-key; reserved or malformed keys are skipped.
+ * it (dates are formatted to PDF date syntax); `''` is a value. Custom keys
+ * are set or cleared per key; a standard or malformed one is `InvalidArg`,
+ * before anything is written.
  *
  * Throws {@link EngineError} `Unknown` if any native write fails, so the
  * caller never reports a partially-applied edit as success.
@@ -70,6 +74,14 @@ export function applyMetadataPatch(
   const fail = (what: string): never => {
     throw new EngineError(EngineErrorCode.Unknown, `failed to write metadata ${what}`);
   };
+  for (const key of Object.keys(patch.custom ?? {})) {
+    const problem = customKeyProblem(key);
+    if (problem) {
+      throw new EngineError(EngineErrorCode.InvalidArg, problem, {
+        details: { field: `custom.${key}` },
+      });
+    }
+  }
 
   for (const [field, key] of STRING_FIELDS) {
     const value = patch[field] as string | null | undefined;
@@ -92,7 +104,6 @@ export function applyMetadataPatch(
 
   if (patch.custom !== undefined) {
     for (const [key, value] of Object.entries(patch.custom)) {
-      if (!isValidCustomKey(key)) continue;
       if (!writeMetaText(fn, mem, docPtr, key, value)) fail(key);
     }
   }

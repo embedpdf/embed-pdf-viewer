@@ -22,12 +22,14 @@ import type { AbortablePromise } from '../promise/AbortablePromise';
  */
 export interface FontService {
   /**
-   * Register a single font. Idempotent: registering a font whose `key` (or, if
-   * `key` is omitted, whose content hash) is already known resolves to the
-   * existing handle without re-uploading bytes to the runtime.
+   * Register a single font under its `key`. Idempotent: registering a `key`
+   * already known resolves to the existing handle without re-uploading bytes
+   * to the runtime.
    *
    * Rejects with `EngineErrorCode.InvalidArg` when the runtime cannot load the
-   * font (corrupt file, unsupported format, no glyphs).
+   * font (corrupt file, unsupported format, no glyphs), and for a key that is
+   * empty or one of the 14 standard font names (`'helvetica'`, …), which a
+   * `fontFamily` always resolves to the standard font.
    */
   register(spec: FontSpec): AbortablePromise<FontHandle>;
 

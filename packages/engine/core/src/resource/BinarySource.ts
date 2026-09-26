@@ -98,7 +98,7 @@ export async function resolveBinarySource(source: BinarySource): Promise<WireRes
 
 /** A browser `File` is a Blob with a `name` — pick it up so attachment
  *  drafts can pass a `File` directly without repeating the file name. */
-function blobFileName(blob: Blob): string | undefined {
+export function blobFileName(blob: Blob): string | undefined {
   const name = (blob as File).name;
   return typeof name === 'string' && name.length > 0 ? name : undefined;
 }

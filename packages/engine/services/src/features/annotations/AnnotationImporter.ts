@@ -90,6 +90,14 @@ export class AnnotationImporter {
         ...(planned.parent !== undefined ? { parent: { planned: planned.parent } } : {}),
         resources,
         attribution: attributionOf(request, planned.draft, item.data),
+        ...(item.data.subtype === 'file-attachment' && item.data.file
+          ? {
+              fileDates: {
+                createdAt: item.data.file.createdAt,
+                modifiedAt: item.data.file.modifiedAt,
+              },
+            }
+          : {}),
         label: `import: item ${planned.item}`,
       };
     });
@@ -174,7 +182,6 @@ function attributionOf(
       createdBy: data.createdBy,
       modifiedBy: data.modifiedBy,
       groupId: data.groupId ?? null,
-      ...(data.subtype === 'file-attachment' ? { file: data.file } : {}),
     },
     ...(actor?.userId ? { importedBy: actor.userId } : {}),
   };

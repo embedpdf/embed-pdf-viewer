@@ -337,6 +337,25 @@ export function runAnnotationAttributionConformance(
       });
     });
 
+    test('a user who may create their own annotations may paste them', async () => {
+      // No doc.annotate.modify: creating is all this user may do.
+      const createOnly = [
+        'doc.open',
+        'doc.render',
+        'doc.download',
+        'doc.annotate.read',
+        'annotations:create:self',
+      ];
+      await asSession({ scope: createOnly, identity: BOB }, async (page, doc) => {
+        const { annotation: created } = await page.annotations.create(SQUARE);
+        const bundle = await doc.annotations.export({ refs: [created.ref] });
+        const stamped = await doc.annotations.import(bundle, { attribution: 'stamp' });
+        expect(attributionOf(stamped.annotations[0]!)).toMatchObject({ userId: 'bob' });
+        // Restoring writes someone's attribution: that takes more.
+        await expectRefused(() => doc.annotations.import(bundle), 'doc.annotate.modify');
+      });
+    });
+
     test('doc.annotate.import is granted only by a scope that names it', async () => {
       await asSession({ scope: SCOPE, identity: ALICE }, async (_page, doc) => {
         expect(doc.security.allows('doc.annotate.import')).toBe(false);

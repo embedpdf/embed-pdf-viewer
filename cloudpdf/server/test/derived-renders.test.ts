@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
+import { DEFAULT_ANNOTATION_BUNDLE_LIMITS } from '@embedpdf/engine-core/runtime';
 import {
   createSqliteDb,
   migrate,
@@ -185,6 +186,10 @@ describe('derived renders', () => {
       background: 'white',
       enforced: false,
     });
+    // The import limits ride the same response, so a client checks them first.
+    expect((body as { annotationBundleLimits?: unknown }).annotationBundleLimits).toEqual(
+      DEFAULT_ANNOTATION_BUNDLE_LIMITS,
+    );
   });
 
   test('appearance renders: scale lattice enforced on versioned tokens only', async () => {
