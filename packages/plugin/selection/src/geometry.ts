@@ -22,13 +22,11 @@ import {
   type TextQuad,
 } from '@embedpdf/core-geometry';
 import {
-  buildPageTextLayout,
-  type PageGeometrySnapshot,
-  type PageTextLayout,
   type PdfPoint,
   type PdfQuad,
   type PdfRect,
   type PdfTextSegment,
+  type TextLayout,
 } from '@embedpdf/engine-core/runtime';
 
 /**
@@ -47,7 +45,7 @@ export interface SelectionSegment {
 
 /** A page's cached selection geometry: the canonical layout + the seam. */
 export interface SelectionPageGeometry {
-  layout: PageTextLayout;
+  layout: TextLayout;
   toContent: Mat2D<'pdf', 'content'>;
   fromContent: Mat2D<'content', 'pdf'>;
 }
@@ -59,14 +57,14 @@ export interface SelectionPageGeometry {
  * the viewer's zoom is applied later by `PageTransform.toPixels`).
  */
 export function buildSelectionPageGeometry(
-  snapshot: PageGeometrySnapshot,
+  layout: TextLayout,
   crop: PdfRect,
   rotation: 0 | 90 | 180 | 270,
   userUnit: number,
 ): SelectionPageGeometry {
   const { pdfToContent } = pageGeometry({ crop, rotation, userUnit }, 1);
   return {
-    layout: buildPageTextLayout(snapshot),
+    layout,
     toContent: pdfToContent,
     fromContent: invert(pdfToContent),
   };

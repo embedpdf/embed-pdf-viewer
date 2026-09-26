@@ -4,7 +4,6 @@ import type {
   ConformanceOptions,
 } from './runMetadataConformance';
 import type { CharMapAnchor } from '../text/charmap';
-import { sliceTextByChars } from '../text/charmap';
 import type { Engine } from '../engine/Engine';
 import { toPageRef } from '../identity/PageRef';
 import { PageTextSnapshotSchema } from '../wire/schemas';
@@ -25,7 +24,7 @@ import { PageTextSnapshotSchema } from '../wire/schemas';
  *     (`embedpdf_astral_tounicode.pdf` — two lockstep surrogate entries,
  *     identity map, astral content survives extraction).
  *
- * The search probe closes the loop: a hit's `charStart`/`charCount` must be
+ * The search probe closes the loop: a hit's `start`/`count` must be
  * character-space (segments join geometry), and slicing the snapshot by the
  * hit's range must reproduce the matched text exactly — the law that makes
  * select-this-match and copy compose.
@@ -40,9 +39,9 @@ export interface TextDivergenceConformanceFixture extends ConformanceFixture {
   /** Expected anchors; null asserts identity (no `charMap` on the wire). */
   expectedCharMap: ReadonlyArray<CharMapAnchor> | null;
   /** Char-space slice expectations (half-open). */
-  slices?: ReadonlyArray<{ from: number; to: number; text: string }>;
+  slices?: ReadonlyArray<{ start: number; count: number; text: string }>;
   /** Literal search probe with expected character-space hit range. */
-  search?: { query: string; charStart: number; charCount: number; matchedText: string };
+  search?: { query: string; start: number; count: number; matchedText: string };
 }
 
 export interface TextDivergenceConformanceOptions extends Omit<ConformanceOptions, 'fixture'> {
@@ -92,10 +91,11 @@ export function runTextDivergenceConformance(
     test('char-space slicing round-trips through the map', async () => {
       const doc = await openFixture(engine, opts);
       try {
-        const snap = await doc.page(toPageRef(fixture.pageObjectNumber)).text.get();
-        expect(sliceTextByChars(snap, 0, snap.charCount)).toBe(snap.text);
+        const page = doc.page(toPageRef(fixture.pageObjectNumber));
+        const snap = await page.text.get();
+        expect(await page.text.slice({ start: 0, count: snap.charCount })).toBe(snap.text);
         for (const s of fixture.slices ?? []) {
-          expect(sliceTextByChars(snap, s.from, s.to)).toBe(s.text);
+          expect(await page.text.slice(s)).toBe(s.text);
         }
       } finally {
         await doc.close();
@@ -107,21 +107,18 @@ export function runTextDivergenceConformance(
       test('search hits address character space and join the text by slicing', async () => {
         const doc = await openFixture(engine, opts);
         try {
-          const slice = await doc.search.query({ query: { text: probe.query }, mode: 'rects' });
+          const slice = await doc.search.query({ text: probe.query });
           const hit = slice.matches.find(
             (m) => m.page.pageObjectNumber === fixture.pageObjectNumber,
           );
           expect(hit === undefined).toBe(false);
-          expect(hit!.charStart).toBe(probe.charStart);
-          expect(hit!.charCount).toBe(probe.charCount);
+          expect(hit!.start).toBe(probe.start);
+          expect(hit!.count).toBe(probe.count);
           // Geometry join: character-space segmentation produced real quads.
           expect(hit!.segments.length > 0).toBe(true);
-          // The composition law: slicing the snapshot by the hit's range
+          // The composition law: slicing the page by the hit's range
           // reproduces the matched text (zero-width chars excluded).
-          const snap = await doc.page(toPageRef(fixture.pageObjectNumber)).text.get();
-          expect(sliceTextByChars(snap, hit!.charStart, hit!.charStart + hit!.charCount)).toBe(
-            probe.matchedText,
-          );
+          expect(await doc.page(hit!.page).text.slice(hit!)).toBe(probe.matchedText);
         } finally {
           await doc.close();
         }
@@ -164,11 +161,11 @@ export const TEXT_DIVERGENCE_CASES: Readonly<Record<string, TextDivergenceCase>>
     expectedCharCount: 31,
     expectedCharMap: [[1, 0]],
     slices: [
-      { from: 0, to: 1, text: '' }, // the non-printing char alone projects to nothing
-      { from: 1, to: 7, text: 'Hello,' },
-      { from: 16, to: 23, text: 'Goodbye' },
+      { start: 0, count: 1, text: '' }, // the non-printing char alone projects to nothing
+      { start: 1, count: 6, text: 'Hello,' },
+      { start: 16, count: 7, text: 'Goodbye' },
     ],
-    search: { query: 'Goodbye', charStart: 16, charCount: 7, matchedText: 'Goodbye' },
+    search: { query: 'Goodbye', start: 16, count: 7, matchedText: 'Goodbye' },
   },
   /** `/ActualText` replacement: the span's real glyphs are replaced by one
    *  synthetic kPiece character per ActualText character, lockstep with the
@@ -180,8 +177,8 @@ export const TEXT_DIVERGENCE_CASES: Readonly<Record<string, TextDivergenceCase>>
     exactText: 'What is my favorite food?',
     expectedCharCount: 25,
     expectedCharMap: null,
-    slices: [{ from: 11, to: 19, text: 'favorite' }],
-    search: { query: 'favorite', charStart: 11, charCount: 8, matchedText: 'favorite' },
+    slices: [{ start: 11, count: 8, text: 'favorite' }],
+    search: { query: 'favorite', start: 11, count: 8, matchedText: 'favorite' },
   },
   /** Supplementary-plane text via a ToUnicode surrogate pair: PDFium stores
    *  one character-list entry per surrogate half in lockstep with the text
@@ -196,9 +193,9 @@ export const TEXT_DIVERGENCE_CASES: Readonly<Record<string, TextDivergenceCase>>
     expectedCharCount: 4,
     expectedCharMap: null,
     slices: [
-      { from: 0, to: 2, text: '😀' },
-      { from: 2, to: 3, text: 'B' },
+      { start: 0, count: 2, text: '😀' },
+      { start: 2, count: 1, text: 'B' },
     ],
-    search: { query: 'B!', charStart: 2, charCount: 2, matchedText: 'B!' },
+    search: { query: 'B!', start: 2, count: 2, matchedText: 'B!' },
   },
 };

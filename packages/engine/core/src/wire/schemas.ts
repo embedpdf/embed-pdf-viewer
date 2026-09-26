@@ -530,36 +530,38 @@ export const PageTextSnapshotSchema: z.ZodType<PageTextSnapshot> = z
   });
 
 export const PageGeometryGlyphSchema = z.object({
-  looseBox: PdfRectSchema,
-  flags: z.number().int().nonnegative(),
-  tightBox: PdfRectSchema.optional(),
+  loose: PdfRectSchema,
+  tight: PdfRectSchema.optional(),
+  space: z.literal(true).optional(),
+  empty: z.literal(true).optional(),
 });
 
 export const RotatedGeometryGlyphSchema = z.object({
-  looseQuad: PdfQuadSchema,
-  flags: z.number().int().nonnegative(),
-  tightQuad: PdfQuadSchema.optional(),
+  loose: PdfQuadSchema,
+  tight: PdfQuadSchema.optional(),
+  space: z.literal(true).optional(),
+  empty: z.literal(true).optional(),
 });
 
 export const UprightGeometryRunSchema = z.object({
   rect: PdfRectSchema,
-  charStart: z.number().int().nonnegative(),
+  start: z.number().int().nonnegative(),
   glyphs: z.array(PageGeometryGlyphSchema),
   fontSize: z.number().optional(),
 });
 
 export const RotatedGeometryRunSchema = z.object({
   rect: PdfRectSchema,
-  charStart: z.number().int().nonnegative(),
+  start: z.number().int().nonnegative(),
   glyphs: z.array(RotatedGeometryGlyphSchema),
-  rotation: z.number(),
+  baselineAngle: z.number(),
   ascentFlip: z.boolean(),
   fontSize: z.number().optional(),
 });
 
 // Rotated first: in zod's default strip mode the upright shape would accept a
-// zero-glyph rotated run and silently drop its rotation; the rotated shape can
-// never swallow an upright run (it requires `rotation`/`ascentFlip`).
+// zero-glyph rotated run and silently drop its angle; the rotated shape can
+// never swallow an upright run (it requires `baselineAngle`/`ascentFlip`).
 export const PageGeometryRunSchema: z.ZodType<PageGeometryRun> = z.union([
   RotatedGeometryRunSchema,
   UprightGeometryRunSchema,
@@ -575,7 +577,7 @@ export const PageGeometrySnapshotSchema: z.ZodType<PageGeometrySnapshot> = z.obj
  * semantics (`validateSearchQuery`: regex dialect + flag combos) after
  * parse — the schema only checks structure.
  */
-export const SearchQuerySchema: z.ZodType<SearchQuery> = z.object({
+const searchQueryObject = z.object({
   text: z.string(),
   regex: z.boolean().optional(),
   matchCase: z.boolean().optional(),
@@ -583,27 +585,24 @@ export const SearchQuerySchema: z.ZodType<SearchQuery> = z.object({
   matchDiacritics: z.boolean().optional(),
   ignoreWhitespace: z.boolean().optional(),
 });
+export const SearchQuerySchema: z.ZodType<SearchQuery> = searchQueryObject;
 
-export const SearchModeSchema = z.enum(['rects', 'full']);
-
-export const SearchRequestSchema: z.ZodType<SearchRequest> = z.object({
-  query: SearchQuerySchema,
-  mode: SearchModeSchema.optional(),
+export const SearchRequestSchema: z.ZodType<SearchRequest> = searchQueryObject.extend({
+  snippets: z.boolean().optional(),
+  from: PageRefSchema.optional(),
   cursor: z.string().optional(),
-  startPage: PageRefSchema.optional(),
-  skip: z.number().int().nonnegative().optional(),
-  budget: z
+  limit: z
     .object({
-      maxMatches: z.number().int().positive().optional(),
-      maxPages: z.number().int().positive().optional(),
+      matches: z.number().int().positive().optional(),
+      pages: z.number().int().positive().optional(),
     })
     .optional(),
 });
 
 export const SearchSnippetSchema: z.ZodType<SearchSnippet> = z.object({
-  text: z.string(),
-  matchStart: z.number().int().nonnegative(),
-  matchLength: z.number().int().positive(),
+  before: z.string(),
+  match: z.string(),
+  after: z.string(),
 });
 
 export const PdfTextSegmentSchema: z.ZodType<PdfTextSegment> = z.object({
@@ -614,8 +613,8 @@ export const PdfTextSegmentSchema: z.ZodType<PdfTextSegment> = z.object({
 
 export const SearchMatchSchema: z.ZodType<SearchMatch> = z.object({
   page: PageRefSchema,
-  charStart: z.number().int().nonnegative(),
-  charCount: z.number().int().positive(),
+  start: z.number().int().nonnegative(),
+  count: z.number().int().positive(),
   segments: z.array(PdfTextSegmentSchema),
   snippet: SearchSnippetSchema.optional(),
 });
@@ -623,8 +622,8 @@ export const SearchMatchSchema: z.ZodType<SearchMatch> = z.object({
 export const SearchSliceSchema: z.ZodType<SearchSlice> = z.object({
   matches: z.array(SearchMatchSchema),
   nextCursor: z.string().nullable(),
-  scannedPages: z.number().int().nonnegative(),
-  totalPages: z.number().int().nonnegative(),
+  pagesSearched: z.number().int().nonnegative(),
+  pageCount: z.number().int().nonnegative(),
 });
 
 export const PageNetworkRenderFormatSchema: z.ZodType<PageNetworkRenderFormat> = z.enum([

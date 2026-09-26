@@ -4,7 +4,7 @@ import {
   charBoundaryAtTextOffset,
   charMapViolation,
   charRangeForTextOffsets,
-  sliceTextByChars,
+  sliceText,
 } from '../../src/shared';
 import type { PageTextSnapshot } from '../../src/shared';
 import { PageTextSnapshotSchema } from '../../src/wire/schemas';
@@ -26,7 +26,14 @@ const trailingDrop: PageTextSnapshot = { text: 'A', charCount: 2, charMap: [[2, 
 const interiorDrop: PageTextSnapshot = { text: 'AB', charCount: 3, charMap: [[2, 1]] };
 
 // [×, ×, A] — a plateau of two zero-width chars before the first real unit.
-const doubleDrop: PageTextSnapshot = { text: 'A', charCount: 3, charMap: [[1, 0], [2, 0]] };
+const doubleDrop: PageTextSnapshot = {
+  text: 'A',
+  charCount: 3,
+  charMap: [
+    [1, 0],
+    [2, 0],
+  ],
+};
 
 // [😀, A]
 const astral: PageTextSnapshot = { text: '😀A', charCount: 2, charMap: [[1, 2]] };
@@ -60,59 +67,80 @@ describe('boundaryTextOffset', () => {
 describe('charRangeForTextOffsets', () => {
   test('start is right-biased past leading zero-width characters', () => {
     // "A" in [×, A, B]: must not include the dropped char's geometry slot.
-    expect(charRangeForTextOffsets(leadingDrop, 0, 1)).toEqual({ start: 1, end: 2 });
+    expect(charRangeForTextOffsets(leadingDrop, { start: 0, count: 1 })).toEqual({
+      start: 1,
+      count: 1,
+    });
   });
 
   test('end is left-biased before trailing zero-width characters', () => {
     // "A" in [A, ×]: must not swallow the trailing dropped char.
-    expect(charRangeForTextOffsets(trailingDrop, 0, 1)).toEqual({ start: 0, end: 1 });
+    expect(charRangeForTextOffsets(trailingDrop, { start: 0, count: 1 })).toEqual({
+      start: 0,
+      count: 1,
+    });
   });
 
   test('an interior zero-width char belongs to neither neighbour', () => {
-    expect(charRangeForTextOffsets(interiorDrop, 0, 1)).toEqual({ start: 0, end: 1 }); // "A"
-    expect(charRangeForTextOffsets(interiorDrop, 1, 2)).toEqual({ start: 2, end: 3 }); // "B"
+    expect(charRangeForTextOffsets(interiorDrop, { start: 0, count: 1 })).toEqual({
+      start: 0,
+      count: 1,
+    }); // "A"
+    expect(charRangeForTextOffsets(interiorDrop, { start: 1, count: 1 })).toEqual({
+      start: 2,
+      count: 1,
+    }); // "B"
   });
 
   test('plateau of several zero-width chars resolves to its far edge', () => {
-    expect(charRangeForTextOffsets(doubleDrop, 0, 1)).toEqual({ start: 2, end: 3 });
+    expect(charRangeForTextOffsets(doubleDrop, { start: 0, count: 1 })).toEqual({
+      start: 2,
+      count: 1,
+    });
   });
 
   test('an offset inside a surrogate pair covers the whole character', () => {
-    expect(charRangeForTextOffsets(astral, 1, 3)).toEqual({ start: 0, end: 2 });
-    expect(charRangeForTextOffsets(astral, 0, 1)).toEqual({ start: 0, end: 1 });
+    expect(charRangeForTextOffsets(astral, { start: 1, count: 2 })).toEqual({ start: 0, count: 2 });
+    expect(charRangeForTextOffsets(astral, { start: 0, count: 1 })).toEqual({ start: 0, count: 1 });
   });
 
   test('empty input normalizes to a single boundary, never inverts', () => {
-    const r = charRangeForTextOffsets(doubleDrop, 0, 0);
-    expect(r.start).toBe(r.end);
-    expect(charRangeForTextOffsets(identity, 2, 2)).toEqual({ start: 2, end: 2 });
-    // Inverted input normalizes at startOffset (documented; see charmap.ts).
-    expect(charRangeForTextOffsets(identity, 2, 1)).toEqual({ start: 2, end: 2 });
+    const r = charRangeForTextOffsets(doubleDrop, { start: 0, count: 0 });
+    expect(r.count).toBe(0);
+    expect(charRangeForTextOffsets(identity, { start: 2, count: 0 })).toEqual({
+      start: 2,
+      count: 0,
+    });
+    // A negative count normalizes at the start (documented; see charmap.ts).
+    expect(charRangeForTextOffsets(identity, { start: 2, count: -1 })).toEqual({
+      start: 2,
+      count: 0,
+    });
   });
 });
 
-describe('sliceTextByChars', () => {
+describe('sliceText', () => {
   test('full range is always the whole text', () => {
     for (const s of [identity, leadingDrop, trailingDrop, interiorDrop, doubleDrop, astral]) {
-      expect(sliceTextByChars(s, 0, s.charCount)).toBe(s.text);
+      expect(sliceText(s, { start: 0, count: s.charCount })).toBe(s.text);
     }
   });
 
   test('dropped characters contribute nothing', () => {
-    expect(sliceTextByChars(leadingDrop, 0, 1)).toBe('');
-    expect(sliceTextByChars(leadingDrop, 0, 2)).toBe('A');
-    expect(sliceTextByChars(interiorDrop, 0, 2)).toBe('A');
-    expect(sliceTextByChars(interiorDrop, 1, 3)).toBe('B');
+    expect(sliceText(leadingDrop, { start: 0, count: 1 })).toBe('');
+    expect(sliceText(leadingDrop, { start: 0, count: 2 })).toBe('A');
+    expect(sliceText(interiorDrop, { start: 0, count: 2 })).toBe('A');
+    expect(sliceText(interiorDrop, { start: 1, count: 2 })).toBe('B');
   });
 
   test('a supplementary character arrives whole', () => {
-    expect(sliceTextByChars(astral, 0, 1)).toBe('😀');
-    expect(sliceTextByChars(astral, 1, 2)).toBe('A');
+    expect(sliceText(astral, { start: 0, count: 1 })).toBe('😀');
+    expect(sliceText(astral, { start: 1, count: 1 })).toBe('A');
   });
 
   test('empty and inverted ranges are empty', () => {
-    expect(sliceTextByChars(identity, 2, 2)).toBe('');
-    expect(sliceTextByChars(identity, 2, 1)).toBe('');
+    expect(sliceText(identity, { start: 2, count: 0 })).toBe('');
+    expect(sliceText(identity, { start: 2, count: -1 })).toBe('');
   });
 });
 
@@ -140,7 +168,12 @@ describe('charMapViolation', () => {
   });
 
   test('rejects non-strictly-increasing and out-of-range anchors', () => {
-    expect(charMapViolation(3, 2, [[1, 0], [1, 0]])).toMatch(/strictly/);
+    expect(
+      charMapViolation(3, 2, [
+        [1, 0],
+        [1, 0],
+      ]),
+    ).toMatch(/strictly/);
     expect(charMapViolation(3, 2, [[0, 0]])).toMatch(/strictly/);
     expect(charMapViolation(3, 2, [[4, 2]])).toMatch(/outside/);
   });

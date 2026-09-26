@@ -107,7 +107,6 @@ export {
   WeakAnnotationSessionResponseSchema,
   WeakAnnotationSessionPagesRequestSchema,
   SearchQuerySchema,
-  SearchModeSchema,
   SearchRequestSchema,
   SearchSnippetSchema,
   SearchMatchSchema,

@@ -1,4 +1,4 @@
-import type { SearchMatchRange } from './fold';
+import type { TextRange } from '../text/TextRange';
 import { wordAt, wordBefore } from './literal';
 import type { SearchQuery } from './types';
 
@@ -146,12 +146,12 @@ export function validateSearchQuery(query: SearchQuery): SearchQueryValidation {
  * are skipped: search UI cannot highlight nothing, and skipping them is
  * also the infinite-loop guard for patterns like `a*`.
  */
-export function matchRegex(text: string, query: SearchQuery): SearchMatchRange[] {
+export function matchRegex(text: string, query: SearchQuery): TextRange[] {
   const valid = validateSearchQuery({ ...query, regex: true });
   if (!valid.ok) throw new Error(`Invalid search query (${valid.issue}): ${valid.message}`);
 
   const re = new RegExp(query.text, query.matchCase ? 'gmu' : 'gimu');
-  const out: SearchMatchRange[] = [];
+  const out: TextRange[] = [];
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
     if (m[0].length === 0) {
@@ -163,7 +163,7 @@ export function matchRegex(text: string, query: SearchQuery): SearchMatchRange[]
     if (query.wholeWord && (wordBefore(text, m.index) || wordAt(text, m.index + m[0].length))) {
       continue;
     }
-    out.push({ start: m.index, length: m[0].length });
+    out.push({ start: m.index, count: m[0].length });
   }
   return out;
 }

@@ -8,7 +8,6 @@ import {
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import { LocalPageAnnotationsService } from './LocalPageAnnotationsService';
-import { LocalPageGeometryService } from './LocalPageGeometryService';
 import { LocalPageRenderService } from './LocalPageRenderService';
 import { LocalPageTextService } from './LocalPageTextService';
 import { LocalPieceInfoService } from './LocalPieceInfoService';
@@ -29,7 +28,6 @@ interface DocClosedView {
 export class LocalPageHandle implements PageHandle {
   readonly annotations: LocalPageAnnotationsService;
   readonly text: LocalPageTextService;
-  readonly geometry: LocalPageGeometryService;
   readonly render: LocalPageRenderService;
   readonly pieceInfo: LocalPieceInfoService;
   readonly measure: LocalPageMeasureService;
@@ -55,7 +53,6 @@ export class LocalPageHandle implements PageHandle {
       renderPolicy,
     );
     this.text = new LocalPageTextService(docId, ref, queue, view, guard);
-    this.geometry = new LocalPageGeometryService(docId, ref, queue, view, guard);
     this.render = new LocalPageRenderService(
       docId,
       ref,

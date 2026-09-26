@@ -11,15 +11,10 @@ import {
 } from '@embedpdf/core';
 import { boundsOfRects, textQuadBounds, type Point, type Rect } from '@embedpdf/core-geometry';
 import {
-  expandTextRangeToLine,
-  expandTextRangeToWord,
-  sliceTextByChars,
-  textGlyphAt,
-  textGlyphQuad,
-  textSegmentsForRange,
+  sliceText,
   toPageRef,
-  type PageGeometrySnapshot,
   type PageTextSnapshot,
+  type TextLayout,
 } from '@embedpdf/engine-core/runtime';
 import { connectSelection } from './connect';
 import type {
@@ -124,9 +119,9 @@ export function createSelectionController(
   const pageAtIndex = (index: number): PageRef | undefined => ctx.document()?.pages[index]?.ref;
 
   // ── text geometry ──
-  const geometry = ctx.pageMirror<PageGeometrySnapshot>({
+  const geometry = ctx.pageMirror<TextLayout>({
     name: 'geometry',
-    load: (doc, page) => doc.page(page).geometry.read(),
+    load: (doc, page) => doc.page(page).text.layout(),
     affected: contentChangedPagesOf,
     changed: ({ cause }) => {
       // A page's geometry arrived: a boundary page's segments can fill in.
@@ -138,7 +133,7 @@ export function createSelectionController(
 
   /** A page's snapshot while it is loaded and current: a page whose re-read
    *  failed has no geometry, exactly as {@link SelectionHostCapability.isLoaded} says. */
-  const snapshotOf = (page: PageRef): PageGeometrySnapshot | undefined =>
+  const snapshotOf = (page: PageRef): TextLayout | undefined =>
     geometry.getStatus(page) === 'ready' ? geometry.get(page) : undefined;
 
   /** Page-space geometry for a page, derived from its snapshot and current layout. */
@@ -162,7 +157,7 @@ export function createSelectionController(
   const geometryFor = (page: PageRef) => pageGeometryOf(page.pageObjectNumber);
 
   const glyphAt = (pageGeometry: SelectionPageGeometry, point: Point): number | null =>
-    textGlyphAt(pageGeometry.layout, contentPointToPdf(pageGeometry, point));
+    pageGeometry.layout.charAt(contentPointToPdf(pageGeometry, point));
 
   /** Warm a page's geometry; the returned promise never rejects (see the host contract). */
   function ensureLoaded(page: PageRef): Promise<void> {
@@ -194,7 +189,7 @@ export function createSelectionController(
   function clampPosition(position: GlyphPosition): GlyphPosition {
     const pageGeometry = geometryFor(position.page);
     if (!pageGeometry) return position;
-    const max = Math.max(pageGeometry.layout.glyphs.length - 1, 0);
+    const max = Math.max(pageGeometry.layout.charCount - 1, 0);
     const glyph = Math.max(0, Math.min(position.glyph, max));
     return glyph === position.glyph ? position : { page: position.page, glyph };
   }
@@ -224,12 +219,10 @@ export function createSelectionController(
         continue;
       }
       const from = i === startPageIndex ? start.glyph : 0;
-      const to = i === endPageIndex ? end.glyph : pageGeometry.layout.glyphs.length - 1;
-      segments[page.pageObjectNumber] = textSegmentsForRange(
-        pageGeometry.layout,
-        from,
-        to - from + 1,
-      ).map((segment) => toContentSegment(pageGeometry, segment));
+      const to = i === endPageIndex ? end.glyph : pageGeometry.layout.charCount - 1;
+      segments[page.pageObjectNumber] = pageGeometry.layout
+        .segments({ start: from, count: to - from + 1 })
+        .map((segment) => toContentSegment(pageGeometry, segment));
     }
     ctx.state.update(setSelection, clamped, segments);
   }
@@ -298,7 +291,7 @@ export function createSelectionController(
     // placement lands on the exact character edge; fall back to the segment
     // when the glyph is degenerate (e.g. a generated space).
     const pageGeometry = geometryFor(position.page);
-    const cell = pageGeometry ? textGlyphQuad(pageGeometry.layout, position.glyph) : null;
+    const cell = pageGeometry ? pageGeometry.layout.charQuad(position.glyph) : null;
     if (pageGeometry && cell) {
       const glyphQuad = toContentTextQuad(pageGeometry, cell);
       return {
@@ -399,11 +392,13 @@ export function createSelectionController(
     if (!pageGeometry) return false;
     const glyph = glyphAt(pageGeometry, point);
     if (glyph == null) return false;
-    const [from, to] =
-      expand === 'word'
-        ? expandTextRangeToWord(pageGeometry.layout, glyph)
-        : expandTextRangeToLine(pageGeometry.layout, glyph);
-    recompute({ anchor: { page, glyph: from }, focus: { page, glyph: to } });
+    const span =
+      expand === 'word' ? pageGeometry.layout.wordAt(glyph) : pageGeometry.layout.lineAt(glyph);
+    if (!span) return false;
+    recompute({
+      anchor: { page, glyph: span.start },
+      focus: { page, glyph: span.start + span.count - 1 },
+    });
     return true;
   }
 
@@ -456,7 +451,7 @@ export function createSelectionController(
     }
     // Per-page half-open character spans. Geometry is not needed: boundary
     // offsets come from the range, interior pages span their whole text
-    // (`sliceTextByChars` clamps to the snapshot's charCount).
+    // (`sliceText` clamps to the snapshot's charCount).
     const spans: Array<{ page: PageRef; from: number; to: number }> = [];
     for (let i = startPageIndex; i <= endPageIndex; i++) {
       const page = pageAtIndex(i);
@@ -473,7 +468,8 @@ export function createSelectionController(
       const batch = spans.slice(base, base + TEXT_READ_CONCURRENCY);
       const snapshots = await Promise.all(batch.map((span) => pageText(span.page)));
       snapshots.forEach((snapshot, index) => {
-        parts[base + index] = sliceTextByChars(snapshot, batch[index].from, batch[index].to);
+        const { from, to } = batch[index];
+        parts[base + index] = sliceText(snapshot, { start: from, count: to - from });
       });
     }
     throwIfAborted(options?.signal);

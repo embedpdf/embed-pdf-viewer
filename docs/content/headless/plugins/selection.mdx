@@ -55,15 +55,10 @@ selection.select({
 });
 ```
 
-Search results use this same character space, so selecting a result needs no
-text-offset conversion:
+A search hit is a range in the same character space, so it selects as it is:
 
 ```ts
-selection.select({
-  page: hit.page,
-  start: hit.charStart,
-  count: hit.charCount,
-});
+selection.select(hit);
 ```
 
 For a range that crosses pages, use `start` and `end` positions:

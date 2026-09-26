@@ -1,5 +1,4 @@
 import type { PageAnnotationsService } from './PageAnnotationsService';
-import type { PageGeometryService } from './PageGeometryService';
 import type { PageRenderService } from './PageRenderService';
 import type { PageTextService } from './PageTextService';
 import type { PieceInfoService } from './PieceInfoService';
@@ -15,7 +14,6 @@ export interface PageHandle {
   readonly ref: PageRef;
   readonly annotations: PageAnnotationsService;
   readonly text: PageTextService;
-  readonly geometry: PageGeometryService;
   readonly render: PageRenderService;
   /**
    * Page-level `/PieceInfo` private application data (ISO 32000 §14.5) —

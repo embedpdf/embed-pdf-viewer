@@ -6,11 +6,10 @@ import {
 } from '@embedpdf/core';
 import type { Rect, TextQuad } from '@embedpdf/core-geometry';
 import type { RevealAnchor, ScrollBehaviorKind } from '@embedpdf/plugin-stage/contract';
-import type { SearchMode, SearchQuery, SearchSnippet } from '@embedpdf/engine-core/runtime';
+import type { SearchQuery, SearchSnippet } from '@embedpdf/engine-core/runtime';
 
 export { validateSearchQuery, validateSearchRegex } from '@embedpdf/engine-core/runtime';
 export type {
-  SearchMode,
   SearchQuery,
   SearchQueryIssue,
   SearchQueryValidation,
@@ -32,15 +31,15 @@ export interface TextSegment {
 
 /**
  * One match. `page` is the durable page identity, `pageIndex` its display
- * index at the time of the match. `charStart`/`charCount` are engine
- * text-page offsets, so a hit can seed a selection or a markup annotation
- * without re-searching.
+ * index at the time of the match. `start`/`count` are a range of the page's
+ * characters, so a hit goes straight to `selection.select(hit)` or a markup
+ * annotation without re-searching.
  */
 export interface SearchHit {
   readonly page: PageRef;
   readonly pageIndex: number;
-  readonly charStart: number;
-  readonly charCount: number;
+  readonly start: number;
+  readonly count: number;
   /** Visual-line segments in page space — the drawing input. */
   readonly segments: readonly TextSegment[];
   /** Union of the segments — the reveal target. Absent for matches with no drawable geometry. */
@@ -55,8 +54,8 @@ export interface SearchHit {
 export type SearchStatus = 'idle' | 'searching' | 'complete' | 'cancelled' | 'error';
 
 export interface SearchProgress {
-  readonly scanned: number;
-  readonly total: number;
+  readonly pagesSearched: number;
+  readonly pageCount: number;
 }
 
 /** How a navigated hit arrives: forwarded to the Stage's positioned reveal. */
@@ -66,16 +65,16 @@ export interface SearchRevealOptions {
 }
 
 export interface SearchOptions extends OperationOptions {
-  /** Scan origin. Defaults to the Stage's current page (viewport-first) when a Stage is installed. */
-  readonly startPage?: PageRef;
+  /** Where to start. Defaults to the Stage's current page (viewport-first) when a Stage is installed. */
+  readonly from?: PageRef;
 }
 
 export interface SearchFindAllOptions extends OperationOptions {
   /**
-   * Pin the slice mode. Default `'full'` with an automatic `'rects'` fallback
-   * when snippets are denied; pass `'rects'` when only geometry is needed.
+   * Pin whether hits carry snippets. By default they do, falling back to none
+   * when snippets are denied; pass `false` when only geometry is needed.
    */
-  readonly mode?: SearchMode;
+  readonly snippets?: boolean;
 }
 
 /** What a `search()` resolved to: it finished, a newer search replaced it, or it was cancelled. */
@@ -128,11 +127,10 @@ export type SearchClearedEvent = Record<string, never>;
  */
 export interface SearchCapability {
   /**
-   * Would a search be served now. No mode (or `'rects'`) asks about finding
-   * at all (`doc.text.search`). `'full'` also needs `doc.text.copy`, because
-   * a snippet reproduces document text.
+   * Would a search be served now: `doc.text.search`. With `snippets: true`
+   * it also needs `doc.text.copy`, because a snippet reproduces document text.
    */
-  canSearch(mode?: SearchMode): boolean;
+  canSearch(options?: { readonly snippets?: boolean }): boolean;
 
   // ── the session ─────────────────────────────────────────────────────────
   /**

@@ -1,5 +1,6 @@
 import { foldText, toOriginalRange } from './fold';
-import type { FoldedText, FoldOptions, SearchMatchRange } from './fold';
+import type { FoldedText, FoldOptions } from './fold';
+import type { TextRange } from '../text/TextRange';
 import type { SearchQuery } from './types';
 
 /**
@@ -54,21 +55,21 @@ function isWholeWordHit(
   if (!query.ignoreWhitespace) {
     return !wordBefore(haystack.folded, at) && !wordAt(haystack.folded, at + needleLength);
   }
-  const { start, length } = toOriginalRange(haystack, at, needleLength);
-  return !wordBefore(haystack.original, start) && !wordAt(haystack.original, start + length);
+  const { start, count } = toOriginalRange(haystack, at, needleLength);
+  return !wordBefore(haystack.original, start) && !wordAt(haystack.original, start + count);
 }
 
 /**
  * All non-overlapping literal matches, in original code-unit space.
  * `haystack` must have been folded with `foldOptionsFor(query)`.
  */
-export function matchLiteral(haystack: FoldedText, query: SearchQuery): SearchMatchRange[] {
+export function matchLiteral(haystack: FoldedText, query: SearchQuery): TextRange[] {
   const needle = foldText(query.text, foldOptionsFor(query)).folded;
   // Nothing searchable: empty or whitespace-only needles would "match"
   // every collapsed space.
   if (needle.trim().length === 0) return [];
 
-  const out: SearchMatchRange[] = [];
+  const out: TextRange[] = [];
   let from = 0;
   while (from <= haystack.folded.length - needle.length) {
     const at = haystack.folded.indexOf(needle, from);

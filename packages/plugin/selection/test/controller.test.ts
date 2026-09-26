@@ -7,6 +7,7 @@ import {
   type Engine,
   type PageLayout,
 } from '@embedpdf/core';
+import { createTextLayout } from '@embedpdf/engine-core/runtime';
 import type { PageGeometrySnapshot, PageTextSnapshot } from '@embedpdf/engine-core/runtime';
 import { interactionPlugin } from '@embedpdf/plugin-interaction';
 import { selectionPlugin } from '../src/selection.plugin';
@@ -17,19 +18,19 @@ import { SelectionToken } from '../src/host-contract';
 
 const crop = { left: 0, bottom: 0, right: 200, top: 100 };
 
-const glyph = (left: number, bottom: number, flags = 0, width = 8, height = 10) => ({
-  looseBox: { left, bottom, right: left + width, top: bottom + height },
-  flags,
+const glyph = (left: number, bottom: number, space = false, width = 8, height = 10) => ({
+  loose: { left, bottom, right: left + width, top: bottom + height },
+  ...(space ? { space: true as const } : {}),
 });
 
 /** One upright run of `count` glyphs starting at x=10, y-up row 90..100
- *  (content space: y 0..10). A space (flag 1) after `spaceAt` splits words. */
+ *  (content space: y 0..10). A space at `spaceAt` splits words. */
 const simpleGeometry = (count: number, spaceAt?: number): PageGeometrySnapshot => ({
   runs: [
     {
       rect: { left: 10, bottom: 90, right: 10 + count * 8, top: 100 },
-      charStart: 0,
-      glyphs: Array.from({ length: count }, (_, i) => glyph(10 + i * 8, 90, i === spaceAt ? 1 : 0)),
+      start: 0,
+      glyphs: Array.from({ length: count }, (_, i) => glyph(10 + i * 8, 90, i === spaceAt)),
     },
   ],
 });
@@ -106,8 +107,10 @@ async function boot(fixtures: PageFixture[], allow = ALL) {
     pages: { list: () => Promise.resolve({ pageCount: pages.length, pages: layout() }) },
     security: { allows: (scope: string) => allow.has(scope) },
     page: (ref: { pageObjectNumber: number }) => ({
-      geometry: { read: () => geometryReads(ref.pageObjectNumber) },
-      text: { get: () => textReads(ref.pageObjectNumber) },
+      text: {
+        get: () => textReads(ref.pageObjectNumber),
+        layout: () => geometryReads(ref.pageObjectNumber).then(createTextLayout),
+      },
     }),
     close: () => Promise.resolve(),
   } as unknown as DocumentHandle;

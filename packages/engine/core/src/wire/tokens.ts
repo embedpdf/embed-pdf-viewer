@@ -22,7 +22,7 @@ import type { PdfSaveMode } from '../dto/PdfSaveMode';
 import { toPageRef } from '../identity/PageRef';
 import type { AnnotationExportSelection } from '../transfer/exportSelection';
 import type { ModificationLevel } from '../signature/types';
-import type { SearchQuery, SearchSliceBudget } from '../search/types';
+import type { SearchLimit, SearchQuery } from '../search/types';
 
 export interface DownloadToken {
   docVersion: number;
@@ -269,17 +269,18 @@ export const decodeAnnotationAppearancesRenderToken = (raw: string): TokenQuery 
 
 /**
  * The decoded state of a versioned search URL — the whole cache key.
- * `epoch` is `searchContentEpoch(manifest)`; `skip` is the number of
- * scan-order pages already consumed (0 = first slice). The server mints
- * continuation tokens (same epoch, advanced skip); the client decodes
- * them only to verify a resumed cursor still belongs to its query.
+ * `epoch` is `searchContentEpoch(manifest)`; `from` the scan origin by page
+ * object number; `skip` the number of scan-order pages already searched
+ * (0 = first batch). The server mints continuation tokens (same epoch,
+ * advanced skip); the client decodes them only to verify a resumed cursor
+ * still belongs to its query.
  */
 export interface SearchToken {
   epoch: string;
   query: SearchQuery;
-  startPage?: number;
+  from?: number;
   skip: number;
-  budget?: SearchSliceBudget;
+  limit?: SearchLimit;
 }
 
 /**
@@ -290,7 +291,7 @@ export interface SearchToken {
  * an exception to the omit-defaults rule, because its entire job is to
  * change the token bytes when the format changes.
  */
-export const SEARCH_RESULT_FORMAT = 'segments1';
+export const SEARCH_RESULT_FORMAT = 'ranges1';
 
 export const encodeSearchToken = (input: SearchToken): string => {
   const q = input.query;
@@ -304,10 +305,10 @@ export const encodeSearchToken = (input: SearchToken): string => {
     matchDiacritics: q.matchDiacritics ? true : undefined,
     wholeWord: q.wholeWord ? true : undefined,
     ignoreWhitespace: q.ignoreWhitespace ? true : undefined,
-    startPage: input.startPage,
+    from: input.from,
     skip: input.skip > 0 ? input.skip : undefined,
-    maxPages: input.budget?.maxPages,
-    maxMatches: input.budget?.maxMatches,
+    limitPages: input.limit?.pages,
+    limitMatches: input.limit?.matches,
   });
 };
 
@@ -329,22 +330,22 @@ export const decodeSearchToken = (raw: string): SearchToken => {
     ...(t.wholeWord === 'true' ? { wholeWord: true } : {}),
     ...(t.ignoreWhitespace === 'true' ? { ignoreWhitespace: true } : {}),
   };
-  const maxPages =
-    t.maxPages === undefined ? undefined : decodePositiveInteger(t.maxPages, 'maxPages');
-  const maxMatches =
-    t.maxMatches === undefined ? undefined : decodePositiveInteger(t.maxMatches, 'maxMatches');
+  const pages =
+    t.limitPages === undefined ? undefined : decodePositiveInteger(t.limitPages, 'limitPages');
+  const matches =
+    t.limitMatches === undefined
+      ? undefined
+      : decodePositiveInteger(t.limitMatches, 'limitMatches');
   return {
     epoch: t.epoch,
     query,
-    ...(t.startPage === undefined
-      ? {}
-      : { startPage: decodePositiveInteger(t.startPage, 'startPage') }),
+    ...(t.from === undefined ? {} : { from: decodePositiveInteger(t.from, 'from') }),
     skip: t.skip === undefined ? 0 : decodePositiveInteger(t.skip, 'skip'),
-    ...(maxPages !== undefined || maxMatches !== undefined
+    ...(pages !== undefined || matches !== undefined
       ? {
-          budget: {
-            ...(maxPages !== undefined ? { maxPages } : {}),
-            ...(maxMatches !== undefined ? { maxMatches } : {}),
+          limit: {
+            ...(matches !== undefined ? { matches } : {}),
+            ...(pages !== undefined ? { pages } : {}),
           },
         }
       : {}),

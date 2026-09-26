@@ -12,10 +12,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 // spaced "total amount", "in" / "voice" split across a line break, and "the invoices".
 const fixturePath = resolve(here, 'fixtures', 'letter_spaced_text.pdf');
 
-/** The matched text exactly as the page carries it (snippet, 'full' mode). */
+/** The matched text exactly as the page carries it (from the snippet). */
 function hitText(m: SearchMatch): string {
-  const s = m.snippet!;
-  return s.text.slice(s.matchStart, s.matchStart + s.matchLength);
+  return m.snippet!.match;
 }
 
 /** Case-folded, whitespace-free form — the identity the flag matches on. */
@@ -23,7 +22,7 @@ function squash(text: string): string {
   return text.replace(/\s+/g, '').toLowerCase();
 }
 
-const key = (m: SearchMatch) => `${m.page.pageObjectNumber}:${m.charStart}:${m.charCount}`;
+const key = (m: SearchMatch) => `${m.page.pageObjectNumber}:${m.start}:${m.count}`;
 
 describe('ignoreWhitespace against real page text (engine-local, wasm runtime)', () => {
   let engine: Engine;
@@ -44,7 +43,7 @@ describe('ignoreWhitespace against real page text (engine-local, wasm runtime)',
       const matches: SearchMatch[] = [];
       let cursor: string | undefined;
       for (;;) {
-        const slice = await doc.search.query({ query, cursor });
+        const slice = await doc.search.query({ ...query, snippets: true, cursor });
         matches.push(...slice.matches);
         if (slice.nextCursor === null) return matches;
         cursor = slice.nextCursor;
@@ -96,10 +95,8 @@ describe('ignoreWhitespace against real page text (engine-local, wasm runtime)',
 
     // "the invoices" is the only hit glued to a word character in the original
     // text (the snippet continues with the trailing "s").
-    const gluedToWordCharacter = (m: SearchMatch) => {
-      const s = m.snippet!;
-      return /[\p{L}\p{N}]/u.test(s.text.charAt(s.matchStart + s.matchLength));
-    };
+    const gluedToWordCharacter = (m: SearchMatch) =>
+      /[\p{L}\p{N}]/u.test(m.snippet!.after.charAt(0));
     expect(relaxed.filter(gluedToWordCharacter)).toHaveLength(1);
     expect(whole.filter(gluedToWordCharacter)).toHaveLength(0);
     expect(whole.length).toBe(relaxed.length - 1);

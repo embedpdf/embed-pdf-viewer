@@ -5,9 +5,8 @@ import {
   searchContentEpoch,
   toPageRef,
   wirePack,
-  type SearchMode,
   type SearchQuery,
-  type SearchSliceBudget,
+  type SearchLimit,
   type WorkerJobId,
 } from '@embedpdf/engine-core/runtime';
 import { decodeSearchToken, encodeSearchToken } from '@embedpdf/engine-core/wire';
@@ -24,17 +23,21 @@ interface SearchRouteDeps {
   documentService: DocumentService;
 }
 
-/** Decoded state of one search GET — the whole cache key minus the mode. */
+/** Decoded state of one search GET — the whole cache key minus the tier. */
 interface SearchGetState {
   /** Content epoch the caller pinned; absent on the unversioned form. */
   epoch?: string;
   query: SearchQuery;
-  startPage?: number;
+  /** The scan origin, by page object number. */
+  from?: number;
   skip: number;
-  budget?: SearchSliceBudget;
+  limit?: SearchLimit;
 }
 
-const RESOURCE_BY_MODE = {
+/** The two search resources: matches only, or matches with snippets. */
+type SearchTier = 'rects' | 'full';
+
+const RESOURCE_BY_TIER = {
   rects: 'layer-search-rects',
   full: 'layer-search-full',
 } as const;
@@ -51,11 +54,12 @@ const RESOURCE_BY_MODE = {
  *   - `/search/{mode}/data?…` — unversioned, flat query params (`q` as
  *     plain text), served from the current content, always `no-store`.
  *
- * Mode is the path, not a parameter: rects and full are separate
- * resources (`layer-search-rects` / `layer-search-full`) with separate
- * capability requirements and separate CDN prefixes, so a credential or
- * cache entry for one tier can never serve the other. `'full'` requires
- * `doc.text.search` and `doc.text.copy` — a snippet is extracted text.
+ * The tier is the path, not a parameter: rects (matches only) and full
+ * (with snippets) are separate resources (`layer-search-rects` /
+ * `layer-search-full`) with separate capability requirements and separate
+ * CDN prefixes, so a credential or cache entry for one tier can never serve
+ * the other. `full` requires `doc.text.search` and `doc.text.copy` — a
+ * snippet is extracted text.
  *
  * Continuation: responses carry `nextCursor` = the ready-made token for
  * the next slice (same epoch, advanced `skip`) — deterministic, so the
@@ -66,16 +70,16 @@ export async function registerSearchRoutes(
   app: FastifyInstance,
   deps: SearchRouteDeps,
 ): Promise<void> {
-  for (const mode of ['rects', 'full'] as const) {
-    app.get(`/v1/docs/:docId/layers/:layerName/search/${mode}/data@:token`, async (req, reply) => {
+  for (const tier of ['rects', 'full'] as const) {
+    app.get(`/v1/docs/:docId/layers/:layerName/search/${tier}/data@:token`, async (req, reply) => {
       const { token } = req.params as { token: string };
       rejectQueryParamsOnTokenUrl(req.query);
       const decoded = parseTokenOrInvalidArg(decodeSearchToken, token, 'search token');
-      return runSearchSlice(deps, req, reply, mode, decoded, true);
+      return runSearchSlice(deps, req, reply, tier, decoded, true);
     });
 
-    app.get(`/v1/docs/:docId/layers/:layerName/search/${mode}/data`, async (req, reply) => {
-      return runSearchSlice(deps, req, reply, mode, searchStateFromParams(req.query), false);
+    app.get(`/v1/docs/:docId/layers/:layerName/search/${tier}/data`, async (req, reply) => {
+      return runSearchSlice(deps, req, reply, tier, searchStateFromParams(req.query), false);
     });
   }
 }
@@ -84,7 +88,7 @@ async function runSearchSlice(
   deps: SearchRouteDeps,
   req: FastifyRequest,
   reply: FastifyReply,
-  mode: SearchMode,
+  tier: SearchTier,
   state: SearchGetState,
   versioned: boolean,
 ) {
@@ -96,7 +100,7 @@ async function runSearchSlice(
     req,
     docId,
     layerName,
-    RESOURCE_BY_MODE[mode],
+    RESOURCE_BY_TIER[tier],
     pdfBits,
   );
 
@@ -118,11 +122,11 @@ async function runSearchSlice(
       docId,
       layerName,
       request: {
-        query: state.query,
-        mode,
-        ...(state.startPage !== undefined ? { startPage: toPageRef(state.startPage) } : {}),
+        ...state.query,
+        snippets: tier === 'full',
+        ...(state.from !== undefined ? { from: toPageRef(state.from) } : {}),
         ...(state.skip > 0 ? { skip: state.skip } : {}),
-        ...(state.budget !== undefined ? { budget: state.budget } : {}),
+        ...(state.limit !== undefined ? { limit: state.limit } : {}),
       },
     });
   const result = await documentService.readOnPool(
@@ -151,9 +155,9 @@ async function runSearchSlice(
         : encodeSearchToken({
             epoch,
             query: state.query,
-            ...(state.startPage !== undefined ? { startPage: state.startPage } : {}),
-            skip: slice.scannedPages,
-            ...(state.budget !== undefined ? { budget: state.budget } : {}),
+            ...(state.from !== undefined ? { from: state.from } : {}),
+            skip: slice.pagesSearched,
+            ...(state.limit !== undefined ? { limit: state.limit } : {}),
           }),
   };
 }
@@ -217,18 +221,18 @@ function searchStateFromParams(params: unknown): SearchGetState {
     ...(bool('ignoreWhitespace') ? { ignoreWhitespace: true } : {}),
   };
 
-  const maxPages = int('maxPages', 1);
-  const maxMatches = int('maxMatches', 1);
+  const pages = int('limitPages', 1);
+  const matches = int('limitMatches', 1);
   return {
     ...(str('epoch') !== undefined ? { epoch: str('epoch') } : {}),
     query,
-    ...(int('startPage', 1) !== undefined ? { startPage: int('startPage', 1) } : {}),
+    ...(int('from', 1) !== undefined ? { from: int('from', 1) } : {}),
     skip: int('skip', 0) ?? 0,
-    ...(maxPages !== undefined || maxMatches !== undefined
+    ...(pages !== undefined || matches !== undefined
       ? {
-          budget: {
-            ...(maxPages !== undefined ? { maxPages } : {}),
-            ...(maxMatches !== undefined ? { maxMatches } : {}),
+          limit: {
+            ...(matches !== undefined ? { matches } : {}),
+            ...(pages !== undefined ? { pages } : {}),
           },
         }
       : {}),

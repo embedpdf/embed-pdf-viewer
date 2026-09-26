@@ -2,42 +2,44 @@ import { pdfQuadBounds } from '../geometry/convert';
 import type { PdfQuad, PdfRect } from '../geometry/primitives';
 
 /**
- * One upright glyph's geometry in PDF user space (y-up edges).
+ * One upright character's geometry in PDF user space (y-up edges).
  *
- * `looseBox` is the loose char cell (pdfium `FPDFText_GetLooseCharBox`): the
+ * `loose` is the loose char cell (pdfium `FPDFText_GetLooseCharBox`): the
  * font-metric box covering the full glyph cell without regard to the actual
- * glyph shape. Always present (zeroed + flagged empty for degenerate glyphs);
+ * glyph shape. Always present (zeroed and `empty` for degenerate glyphs);
  * it's the box selection envelopes are built from.
  *
- * `tightBox` is the tight char box (pdfium `FPDFText_GetCharBox`): the box
+ * `tight` is the tight char box (pdfium `FPDFText_GetCharBox`): the box
  * hugging the actual glyph shape. Optional — absent for empty/whitespace
  * glyphs that have no real outline.
  *
- * `flags` carries slim per-glyph state (bit 1 = space, bit 2 = empty).
+ * `space` and `empty` are present, and `true`, only for a space and for a
+ * character with no box of its own.
  */
 export interface PageGeometryGlyph {
-  looseBox: PdfRect;
-  flags: number;
-  tightBox?: PdfRect;
+  loose: PdfRect;
+  tight?: PdfRect;
+  space?: true;
+  empty?: true;
 }
 
 /**
- * One non-upright glyph's geometry: the exact oriented cells, in PDF user
- * space (page coordinates — not a local frame). The corner slots are
+ * One non-upright character's geometry: the exact oriented cells, in PDF
+ * user space (page coordinates — not a local frame). The corner slots are
  * frame-geometric in the glyph's own upright frame:
  * `p1` = upper-start, `p2` = upper-end, `p3` = lower-start, `p4` = lower-end,
  * where "upper" is the ascent side and "start" is the frame's minimum-x side.
  * Deliberately not a bidi/reading-order statement — advance direction is a
  * glyph-sequence concern, carried separately where consumers need it.
  *
- * Degenerate glyphs carry a zeroed `looseQuad` plus the empty flag (bit 2),
- * mirroring the upright variant's zeroed-box convention. `flags` bits match
- * {@link PageGeometryGlyph.flags}.
+ * Degenerate glyphs carry a zeroed `loose` quad and `empty`, mirroring the
+ * upright variant's zeroed-box convention.
  */
 export interface RotatedGeometryGlyph {
-  looseQuad: PdfQuad;
-  flags: number;
-  tightQuad?: PdfQuad;
+  loose: PdfQuad;
+  tight?: PdfQuad;
+  space?: true;
+  empty?: true;
 }
 
 /**
@@ -46,7 +48,8 @@ export interface RotatedGeometryGlyph {
  */
 export interface UprightGeometryRun {
   rect: PdfRect;
-  charStart: number;
+  /** The run's first character; it covers `glyphs.length` characters from here. */
+  start: number;
   glyphs: PageGeometryGlyph[];
   fontSize?: number;
 }
@@ -55,18 +58,20 @@ export interface UprightGeometryRun {
  * A run whose char matrix is not upright (rotated, sheared, or mirrored).
  *
  * `rect` stays a page-space AABB (culling), like every other wire rect.
- * `rotation` is the baseline angle in radians, CCW in PDF y-up space
- * (`atan2(m.b, m.a)` of the run's char matrix). Note a shear-only run has
- * `rotation === 0` and still uses this variant — its cells are
+ * `baselineAngle` is the baseline's angle in radians, CCW in PDF y-up space
+ * (`atan2(m.b, m.a)` of the run's char matrix) — math data, not a
+ * `rotation`, which in the API is always degrees clockwise. Note a
+ * shear-only run has `baselineAngle === 0` and still uses this variant — its cells are
  * parallelograms an AABB would misrepresent. `ascentFlip` is true when the
  * ascent vector maps opposite the rotated frame's +y (mirrored /
  * negative-determinant content).
  */
 export interface RotatedGeometryRun {
   rect: PdfRect;
-  charStart: number;
+  /** The run's first character; it covers `glyphs.length` characters from here. */
+  start: number;
   glyphs: RotatedGeometryGlyph[];
-  rotation: number;
+  baselineAngle: number;
   ascentFlip: boolean;
   fontSize?: number;
 }
@@ -95,7 +100,7 @@ export interface PageGeometrySnapshot {
 
 /** Narrowing guard: is this run the rotated (non-upright) variant? */
 export function isRotatedGeometryRun(run: PageGeometryRun): run is RotatedGeometryRun {
-  return 'rotation' in run;
+  return 'baselineAngle' in run;
 }
 
 /**
@@ -104,8 +109,8 @@ export function isRotatedGeometryRun(run: PageGeometryRun): run is RotatedGeomet
  * the same frame-geometric slot order).
  */
 export function glyphLooseQuad(run: PageGeometryRun, index: number): PdfQuad {
-  if (isRotatedGeometryRun(run)) return run.glyphs[index].looseQuad;
-  const b = run.glyphs[index].looseBox;
+  if (isRotatedGeometryRun(run)) return run.glyphs[index].loose;
+  const b = run.glyphs[index].loose;
   return {
     p1: { x: b.left, y: b.top },
     p2: { x: b.right, y: b.top },
@@ -122,6 +127,6 @@ export function glyphLooseQuad(run: PageGeometryRun, index: number): PdfQuad {
  * that gets drawn.
  */
 export function glyphLooseBounds(run: PageGeometryRun, index: number): PdfRect {
-  if (isRotatedGeometryRun(run)) return pdfQuadBounds(run.glyphs[index].looseQuad);
-  return run.glyphs[index].looseBox;
+  if (isRotatedGeometryRun(run)) return pdfQuadBounds(run.glyphs[index].loose);
+  return run.glyphs[index].loose;
 }

@@ -23,7 +23,7 @@ annotation.canEdit(ref); // may I move/restyle THIS one?
 annotation.canDelete(ref); // …delete this one?
 selection.canCopy(); // may selected text leave the document?
 search.canSearch(); // would a search return hits?
-search.canSearch('full'); // …with text snippets? (needs copy too)
+search.canSearch({ snippets: true }); // …with text snippets? (needs copy too)
 form.canFill(); // may I write field values?
 form.canDesign(); // may I add/edit/delete fields?
 pageEdit.canEdit(); // may I rotate/reorder/insert/delete pages?
@@ -101,7 +101,7 @@ really issue so the twins show you the UI your users will get.
 | ---------- | --------------------------------------------------------- |
 | annotation | `canRead()` `canCreate()` `canEdit(ref)` `canDelete(ref)` `canGroup()` `canUngroup()` |
 | selection  | `canSelect()` `canCopy()`                                 |
-| search     | `canSearch(mode?)` — `'full'` asks about snippets         |
+| search     | `canSearch({ snippets? })` — `snippets: true` asks about snippets |
 | render     | `canRender()`                                             |
 | page-edit  | `canEdit()` — one answer for all page structure edits     |
 | form       | `canRead()` `canFill()` `canDesign()`                     |

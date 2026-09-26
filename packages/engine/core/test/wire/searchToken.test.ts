@@ -35,9 +35,9 @@ describe('search token codec', () => {
     const token: SearchToken = {
       epoch: 'a1b2c3d4e5f60718',
       query: { text: 'net income', wholeWord: true },
-      startPage: 3056,
+      from: 3056,
       skip: 128,
-      budget: { maxPages: 1, maxMatches: 50 },
+      limit: { matches: 50, pages: 1 },
     };
     expect(decodeSearchToken(encodeSearchToken(token))).toEqual(token);
   });

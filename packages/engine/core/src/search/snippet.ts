@@ -1,12 +1,11 @@
-import type { SearchMatchRange } from './fold';
+import type { TextRange } from '../text/TextRange';
 import type { SearchSnippet } from './types';
 
 /** Default context on each side of a match, in code units. */
 export const SEARCH_SNIPPET_CONTEXT = 48;
 
 const WHITESPACE = /\s/;
-// Length-preserving: every whitespace unit becomes one plain space, so
-// `matchStart`/`matchLength` stay valid offsets into the flattened text.
+// Every whitespace unit becomes one plain space.
 const WHITESPACE_ALL = /\s/g;
 
 const isLowSurrogate = (text: string, index: number): boolean => {
@@ -15,17 +14,17 @@ const isLowSurrogate = (text: string, index: number): boolean => {
 };
 
 /**
- * The `'full'`-mode excerpt around one match: up to `context` code units
- * of page text on each side, trimmed to a whitespace boundary when one
+ * The excerpt around one match (`snippets: true`): up to `context` code
+ * units of page text on each side, trimmed to a whitespace boundary when one
  * exists inside the window (so snippets start and end on whole words),
- * never splitting a surrogate pair, whitespace flattened 1:1.
+ * never splitting a surrogate pair, whitespace flattened to spaces.
  */
 export function buildSnippet(
   text: string,
-  range: SearchMatchRange,
+  range: TextRange,
   context: number = SEARCH_SNIPPET_CONTEXT,
 ): SearchSnippet {
-  const matchEnd = range.start + range.length;
+  const matchEnd = range.start + range.count;
 
   let start = Math.max(0, range.start - context);
   if (start > 0) {
@@ -51,9 +50,10 @@ export function buildSnippet(
     if (isLowSurrogate(text, end)) end--;
   }
 
+  const flat = (from: number, to: number) => text.slice(from, to).replace(WHITESPACE_ALL, ' ');
   return {
-    text: text.slice(start, end).replace(WHITESPACE_ALL, ' '),
-    matchStart: range.start - start,
-    matchLength: range.length,
+    before: flat(start, range.start),
+    match: flat(range.start, matchEnd),
+    after: flat(matchEnd, end),
   };
 }

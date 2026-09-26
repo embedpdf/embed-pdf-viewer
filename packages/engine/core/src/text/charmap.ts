@@ -1,3 +1,4 @@
+import type { TextRange } from './TextRange';
 import type { PageTextSnapshot } from '../dto/PageTextSnapshot';
 
 /**
@@ -7,7 +8,7 @@ import type { PageTextSnapshot } from '../dto/PageTextSnapshot';
  * A page has two index spaces:
  *
  *   - character space: PDFium's internal character list, the space geometry
- *     runs tile (`PageGeometryRun.charStart`), hit-testing addresses, and
+ *     runs tile (`PageGeometryRun.start`), hit-testing addresses, and
  *     selection ranges live in. Size: `PageTextSnapshot.charCount`.
  *   - text space: UTF-16 code-unit offsets into the extracted string
  *     `PageTextSnapshot.text` — what search matching and slicing operate on.
@@ -118,47 +119,38 @@ export function charBoundaryAtTextOffset(
 }
 
 /**
- * The character range whose text projection is exactly
- * `text.slice(startOffset, endOffset)` — the inverse used by search-hit
- * conversion and select-by-text. Start is right-biased and end left-biased
- * (see {@link charBoundaryAtTextOffset}), so zero-width characters adjacent
- * to the range fall outside it on both sides.
+ * The character range whose text projection is exactly the string range
+ * `offsets` (`text.slice(offsets.start, offsets.start + offsets.count)`) —
+ * the inverse used by search-hit conversion and select-by-text. Start is
+ * right-biased and end left-biased (see {@link charBoundaryAtTextOffset}), so
+ * zero-width characters adjacent to the range fall outside it on both sides.
  *
  * A non-empty text range can never invert: `end > start` implies
  * `B(end) >= endOffset > startOffset >= B(start)`, which forces
- * `end > start` by monotonicity. Empty input (`endOffset <= startOffset`)
- * normalizes to the end-rule boundary of `startOffset` on both sides.
+ * `end > start` by monotonicity. An empty input normalizes to the end-rule
+ * boundary of its start, with `count` 0.
  */
-export function charRangeForTextOffsets(
-  snapshot: PageTextSnapshot,
-  startOffset: number,
-  endOffset: number,
-): { start: number; end: number } {
+export function charRangeForTextOffsets(snapshot: PageTextSnapshot, offsets: TextRange): TextRange {
+  const startOffset = offsets.start;
+  const endOffset = offsets.start + offsets.count;
   if (endOffset <= startOffset) {
-    const b = charBoundaryAtTextOffset(snapshot, startOffset, 'end');
-    return { start: b, end: b };
+    return { start: charBoundaryAtTextOffset(snapshot, startOffset, 'end'), count: 0 };
   }
-  return {
-    start: charBoundaryAtTextOffset(snapshot, startOffset, 'start'),
-    end: charBoundaryAtTextOffset(snapshot, endOffset, 'end'),
-  };
+  const start = charBoundaryAtTextOffset(snapshot, startOffset, 'start');
+  return { start, count: charBoundaryAtTextOffset(snapshot, endOffset, 'end') - start };
 }
 
 /**
- * The copy primitive: the text projection of the half-open character range
- * `[charStart, charEnd)`. Dropped characters inside the range contribute
- * nothing; a supplementary character contributes its full surrogate pair.
- * `sliceTextByChars(s, 0, s.charCount) === s.text` always.
+ * The copy primitive: the text of a character range. Dropped characters
+ * inside the range contribute nothing; a supplementary character contributes
+ * its full surrogate pair.
+ * `sliceText(s, { start: 0, count: s.charCount }) === s.text` always.
  */
-export function sliceTextByChars(
-  snapshot: PageTextSnapshot,
-  charStart: number,
-  charEnd: number,
-): string {
-  if (charEnd <= charStart) return '';
+export function sliceText(snapshot: PageTextSnapshot, range: TextRange): string {
+  if (range.count <= 0) return '';
   return snapshot.text.slice(
-    boundaryTextOffset(snapshot, charStart),
-    boundaryTextOffset(snapshot, charEnd),
+    boundaryTextOffset(snapshot, range.start),
+    boundaryTextOffset(snapshot, range.start + range.count),
   );
 }
 

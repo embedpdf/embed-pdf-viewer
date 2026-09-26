@@ -1173,7 +1173,7 @@ function SearchControls() {
       <span
         title={
           status === 'searching'
-            ? `scanning ${progress.scanned}/${progress.total} pages`
+            ? `scanning ${progress.pagesSearched}/${progress.pageCount} pages`
             : undefined
         }
         style={{ minWidth: 34, textAlign: 'center', color: patternError ? '#e5484d' : '#666' }}
@@ -1199,7 +1199,7 @@ function SearchControls() {
         >
           {hits.slice(0, 100).map((hit, i) => (
             <button
-              key={`${hit.page.pageObjectNumber}:${hit.charStart}`}
+              key={`${hit.page.pageObjectNumber}:${hit.start}`}
               onClick={() => search.goToHit(i)}
               style={{
                 display: 'block',
@@ -1217,14 +1217,9 @@ function SearchControls() {
               <span style={{ color: '#999', marginRight: 6 }}>p{hit.pageIndex + 1}</span>
               {hit.snippet ? (
                 <>
-                  {hit.snippet.text.slice(0, hit.snippet.matchStart)}
-                  <b style={{ background: 'rgba(255,213,0,.45)' }}>
-                    {hit.snippet.text.slice(
-                      hit.snippet.matchStart,
-                      hit.snippet.matchStart + hit.snippet.matchLength,
-                    )}
-                  </b>
-                  {hit.snippet.text.slice(hit.snippet.matchStart + hit.snippet.matchLength)}
+                  {hit.snippet.before}
+                  <b style={{ background: 'rgba(255,213,0,.45)' }}>{hit.snippet.match}</b>
+                  {hit.snippet.after}
                 </>
               ) : (
                 <i>match</i>
@@ -1233,7 +1228,7 @@ function SearchControls() {
           ))}
           <div style={{ padding: '4px 8px', fontSize: 10, color: '#999', display: 'flex', gap: 8 }}>
             {status === 'searching'
-              ? `scanning… ${progress.scanned}/${progress.total} pages`
+              ? `scanning… ${progress.pagesSearched}/${progress.pageCount} pages`
               : `${hitCount} matches${hitCount > 100 ? ' (first 100 shown)' : ''}`}
             {error && <span style={{ color: '#e5484d' }}>{error.message}</span>}
             <span style={{ marginLeft: 'auto' }} />

@@ -29,10 +29,10 @@ const page = (pageObjectNumber: number, index: number): PageLayout =>
     boxes: { media: { ...box }, crop: { ...box } },
   }) as PageLayout;
 
-const match = (pageObjectNumber: number, charStart: number) => ({
+const match = (pageObjectNumber: number, start: number) => ({
   page: toPageRef(pageObjectNumber),
-  charStart,
-  charCount: 4,
+  start,
+  count: 4,
   segments: [
     {
       quad: {
@@ -104,10 +104,9 @@ function fakeDocument(script: Answer[]) {
 const slice = (
   matches: ReturnType<typeof match>[],
   next: string | null,
-  scanned: number,
-  total = 2,
-): SearchSlice =>
-  ({ matches, nextCursor: next, scannedPages: scanned, totalPages: total }) as SearchSlice;
+  pagesSearched: number,
+  pageCount = 2,
+): SearchSlice => ({ matches, nextCursor: next, pagesSearched, pageCount }) as SearchSlice;
 
 async function boot(script: Answer[]) {
   const doc = fakeDocument(script);
@@ -130,7 +129,7 @@ describe('search session', () => {
     const log: string[] = [];
     api.onStarted((event) => log.push(`started:${event.query.text}`));
     api.onProgress((event) =>
-      log.push(`progress:${event.scanned}/${event.total}:${event.hitCount}`),
+      log.push(`progress:${event.pagesSearched}/${event.pageCount}:${event.hitCount}`),
     );
     api.onCompleted((event) => log.push(`completed:${event.hitCount}`));
 
@@ -201,16 +200,16 @@ describe('search session', () => {
     await kernel.destroy();
   });
 
-  it('degrades full → rects when snippets are denied, unless the mode is pinned', async () => {
+  it('drops snippets when they are denied, unless snippets are pinned', async () => {
     const { kernel, api, requests } = await boot([
       new PermissionDenied('doc.text.copy'),
       slice([], null, 2),
       slice([], null, 2),
     ]);
     await api.search({ text: 'x' });
-    expect(requests.map((request) => request.mode)).toEqual(['full', 'rects']);
-    await api.findAll({ text: 'x' }, { mode: 'rects' });
-    expect(requests[2].mode).toBe('rects');
+    expect(requests.map((request) => request.snippets)).toEqual([true, false]);
+    await api.findAll({ text: 'x' }, { snippets: false });
+    expect(requests[2].snippets).toBe(false);
     await kernel.destroy();
   });
 
@@ -219,11 +218,11 @@ describe('search session', () => {
     await api.search({ text: 'x' });
     const changes: number[] = [];
     api.onActiveHitChanged((event) => changes.push(event.index));
-    expect(api.nextHit()?.charStart).toBe(9);
-    expect(api.nextHit()?.charStart).toBe(2);
-    expect(api.nextHit()?.charStart).toBe(0); // wrapped
-    expect(api.previousHit()?.charStart).toBe(2);
-    expect(api.goToHit(1)?.charStart).toBe(9);
+    expect(api.nextHit()?.start).toBe(9);
+    expect(api.nextHit()?.start).toBe(2);
+    expect(api.nextHit()?.start).toBe(0); // wrapped
+    expect(api.previousHit()?.start).toBe(2);
+    expect(api.goToHit(1)?.start).toBe(9);
     api.goToHit(1); // no change, no event
     expect(changes).toEqual([1, 2, 0, 2, 1]);
     await kernel.destroy();
@@ -256,10 +255,10 @@ describe('search session', () => {
     await kernel.destroy();
   });
 
-  it('canSearch composes text.search and, for full, text.copy', async () => {
+  it('canSearch composes text.search and, for snippets, text.copy', async () => {
     const { kernel, api } = await boot([]);
     expect(api.canSearch()).toBe(true);
-    expect(api.canSearch('full')).toBe(true);
+    expect(api.canSearch({ snippets: true })).toBe(true);
     await kernel.destroy();
   });
 });

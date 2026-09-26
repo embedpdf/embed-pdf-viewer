@@ -21,6 +21,7 @@ export { caps, collab } from './auth/scope/builders';
 
 // Text and search.
 export { charRangeForTextOffsets } from './text/charmap';
+export { isRotatedGeometryRun } from './dto/PageGeometrySnapshot';
 export { validateSearchQuery } from './search/regex';
 
 // Annotations.
@@ -61,7 +62,6 @@ export type {
   DocumentAnnotationsService,
   PageAnnotationsService,
   PageTextService,
-  PageGeometryService,
   PageRenderService,
   DocumentSecurityService,
   DocumentSecurityState,
@@ -79,11 +79,16 @@ export type {
   PdfRotation,
   PdfTextSegment,
   PageTextSnapshot,
-  PageGeometrySnapshot,
+  PageGeometryRun,
+  TextLayout,
+  TextRange,
+  PageTextRange,
   SearchQuery,
   SearchRequest,
+  SearchLimit,
   SearchSlice,
   SearchMatch,
+  SearchSnippet,
   PageRenderOptions,
   PageImageOptions,
   PageImageHandle,

@@ -64,7 +64,6 @@ export { LocalDocumentAnnotationsService } from './document/LocalDocumentAnnotat
 export { LocalDocumentPagesService } from './document/LocalDocumentPagesService';
 export { LocalPageHandle } from './document/LocalPageHandle';
 export { LocalPageAnnotationsService } from './document/LocalPageAnnotationsService';
-export { LocalPageGeometryService } from './document/LocalPageGeometryService';
 export { LocalPageRenderService } from './document/LocalPageRenderService';
 export { BrowserImageEncoder } from './render/BrowserImageEncoder';
 export { PortableImageEncoder, encodePng } from './render/PortableImageEncoder';

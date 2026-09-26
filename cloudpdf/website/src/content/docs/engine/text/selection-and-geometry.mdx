@@ -74,8 +74,9 @@ const word = layout.wordAt(point); // the word under the point
 const line = layout.lineAt(point); // the whole line
 ```
 
-Both return a range, `{ start, count }`, or `null`. For a drag, take the characters at the start
-and at the end of the drag and select everything between them:
+Both return a range, `{ start, count }`, or `null`. When you already have a character number,
+pass it instead of a point: `layout.wordAt(42)`. For a drag, take the characters at the start and
+at the end of the drag and select everything between them:
 
 ```ts
 const from = layout.charAt(dragStart);
@@ -153,7 +154,12 @@ the other way, as Arabic and Hebrew do.
 
 `layout.runs` is the raw geometry: characters grouped by line and font. Each character has a
 loose box (the full line height; segments use it) and, when the font says, a tight box around the
-glyph (`charAt` checks it first). You need runs only for things like one box per letter.
+glyph (`charAt` checks it first). A space has `space: true`, and a character with no box of its
+own has `empty: true`. You need runs only for things like one box per letter.
+
+Two shortcuts save you reading runs: `layout.charCount` is how many characters the page has, and
+`layout.charQuad(index)` is one character's box as a quad, or `null` when it has none (use it to
+place a caret at the edge of a selection).
 
 A run of turned text also has `baselineAngle`: the angle of its baseline in radians, measured the
 way PDF measures angles (counterclockwise from the x axis, as in `Math.atan2`). It's raw math

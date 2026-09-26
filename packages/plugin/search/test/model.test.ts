@@ -25,11 +25,11 @@ const seg = (rect: { x: number; y: number; width: number; height: number }) => (
   advance: 1 as const,
 });
 
-const hit = (pageObjectNumber: number, charStart: number): SearchHit => ({
+const hit = (pageObjectNumber: number, start: number): SearchHit => ({
   page: toPageRef(pageObjectNumber),
   pageIndex: 0,
-  charStart,
-  charCount: 4,
+  start,
+  count: 4,
   segments: [seg({ x: 0, y: 0, width: 10, height: 10 })],
   bounds: { x: 0, y: 0, width: 10, height: 10 },
 });
@@ -57,25 +57,25 @@ describe('search transitions', () => {
 
   test('appendHits accumulates, keeps per-page arrays reference-stable, activates the first hit', () => {
     let state = started();
-    state = appendHits(state, [hit(5, 0), hit(5, 9)], { scanned: 1, total: 8 });
+    state = appendHits(state, [hit(5, 0), hit(5, 9)], { pagesSearched: 1, pageCount: 8 });
     const page5 = state.hitsByPage[5];
-    state = appendHits(state, [hit(7, 2)], { scanned: 3, total: 8 });
+    state = appendHits(state, [hit(7, 2)], { pagesSearched: 3, pageCount: 8 });
     expect(state.hits.length).toBe(3);
     expect(state.hitsByPage[5]).toBe(page5); // an untouched page keeps its array
-    expect(state.hitsByPage[7].map((found) => found.charStart)).toEqual([2]);
+    expect(state.hitsByPage[7].map((found) => found.start)).toEqual([2]);
     expect(state.activeIndex).toBe(0);
-    expect(state.progress).toEqual({ scanned: 3, total: 8 });
+    expect(state.progress).toEqual({ pagesSearched: 3, pageCount: 8 });
     expect(pagesWithHits(state).map((page) => page.pageObjectNumber)).toEqual([5, 7]);
   });
 
   test('an empty slice only advances progress; an explicit active index survives appends', () => {
     let state = started();
-    state = appendHits(state, [], { scanned: 4, total: 8 });
+    state = appendHits(state, [], { pagesSearched: 4, pageCount: 8 });
     expect(state.hits.length).toBe(0);
     expect(state.activeIndex).toBe(-1);
-    state = appendHits(state, [hit(5, 0), hit(5, 9)], { scanned: 5, total: 8 });
+    state = appendHits(state, [hit(5, 0), hit(5, 9)], { pagesSearched: 5, pageCount: 8 });
     state = setActiveHit(state, 1);
-    state = appendHits(state, [hit(7, 2)], { scanned: 6, total: 8 });
+    state = appendHits(state, [hit(7, 2)], { pagesSearched: 6, pageCount: 8 });
     expect(state.activeIndex).toBe(1);
   });
 

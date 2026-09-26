@@ -567,17 +567,17 @@ export type {
 // line-merge are exported (not just types) because the local worker, the
 // server, and the conformance suite all run the same code — parity between
 // engines is a design invariant, not a test hope.
+export { searchQueryOf } from './search/types';
 export type {
   SearchQuery,
-  SearchMode,
-  SearchSliceBudget,
+  SearchLimit,
   SearchRequest,
   SearchSnippet,
   SearchMatch,
   SearchSlice,
 } from './search/types';
 export { SEARCH_FOLD_VERSION, foldText, toOriginalRange } from './search/fold';
-export type { FoldOptions, FoldedText, SearchMatchRange } from './search/fold';
+export type { FoldOptions, FoldedText } from './search/fold';
 export { foldOptionsFor, matchLiteral, wordAt, wordBefore } from './search/literal';
 export {
   SEARCH_REGEX_MAX_LENGTH,
@@ -593,28 +593,15 @@ export type {
 } from './search/regex';
 export { matchPageText } from './search/matcher';
 export { SEARCH_SNIPPET_CONTEXT, buildSnippet } from './search/snippet';
-export { searchRectsForRange, searchSegmentsForRange } from './search/rects';
-export {
-  buildPageTextLayout,
-  expandTextRangeToLine,
-  expandTextRangeToWord,
-  textGlyphAt,
-  textGlyphQuad,
-  textSegmentsForRange,
-} from './text/layout';
-export type {
-  PageTextLayout,
-  PdfTextSegment,
-  TextLayoutFrame,
-  TextLayoutGlyph,
-  TextLayoutRun,
-} from './text/layout';
+export { createTextLayout } from './text/layout';
+export type { PdfTextSegment, TextLayout } from './text/layout';
+export type { PageTextRange, TextRange } from './text/TextRange';
 export {
   boundaryTextOffset,
   charBoundaryAtTextOffset,
   charMapViolation,
   charRangeForTextOffsets,
-  sliceTextByChars,
+  sliceText,
 } from './text/charmap';
 export type { CharBoundaryBias, CharMapAnchor } from './text/charmap';
 export { searchContentEpoch, canonicalSearchQuery } from './search/epoch';

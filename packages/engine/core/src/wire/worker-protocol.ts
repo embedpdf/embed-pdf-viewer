@@ -607,16 +607,28 @@ export interface PagesGeometryWorkerRequest {
 }
 
 /**
- * One budgeted search slice (see `DocumentSearchService`). Read-only: the
+ * A search request as the worker runs it: the request plus `skip`, a trusted
+ * absolute resume position (scan-order pages already searched). For callers
+ * that pin content versions themselves — the cloud wire pins the search
+ * content epoch in the URL, so its routes resume by position alone.
+ * Everyone else uses `cursor`, which also guards against changes between
+ * batches; `cursor` takes precedence when both are set.
+ */
+export interface SearchScanRequest extends SearchRequest {
+  skip?: number;
+}
+
+/**
+ * One budgeted search batch (see `DocumentSearchService`). Read-only: the
  * worker's per-page corpus cache is version-keyed on the session mutation
- * counter, so repeated slices between mutations reuse extracted text.
+ * counter, so repeated batches between mutations reuse extracted text.
  */
 export interface SearchQueryWorkerRequest {
   kind: 'search.query';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  request: SearchRequest;
+  request: SearchScanRequest;
 }
 
 export interface PagesRenderWorkerRequest {

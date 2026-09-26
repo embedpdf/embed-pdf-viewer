@@ -39,7 +39,7 @@ const upright = (
   flags: 0,
   looseBox,
   upright: true,
-  rotation: 0,
+  baselineAngle: 0,
   ascentFlip: false,
   ...over,
 });
@@ -47,7 +47,7 @@ const upright = (
 const rotated = (
   objectKey: number,
   looseQuad: PdfQuad,
-  rotation: number,
+  baselineAngle: number,
   over: Partial<RawGeometryGlyphRecord> = {},
 ): RawGeometryGlyphRecord => ({
   objectKey,
@@ -55,7 +55,7 @@ const rotated = (
   looseBox: box(0, 0, 0, 0),
   looseQuad,
   upright: false,
-  rotation,
+  baselineAngle,
   ascentFlip: false,
   ...over,
 });
@@ -65,7 +65,7 @@ const empty = (objectKey: number): RawGeometryGlyphRecord => ({
   flags: 2,
   looseBox: box(0, 0, 0, 0),
   upright: true,
-  rotation: 0,
+  baselineAngle: 0,
   ascentFlip: false,
 });
 
@@ -87,15 +87,15 @@ describe('buildRunsFromRawGlyphs', () => {
     expect(runs).toHaveLength(2);
     const [first, second] = runs;
     expect(isRotatedGeometryRun(first)).toBe(false);
-    expect(first.charStart).toBe(0);
+    expect(first.start).toBe(0);
     expect(first.fontSize).toBe(12);
     expect(first.rect).toEqual(box(10, 10, 30, 22));
+    // Boxes, not quads, and the space state only where it is true.
     expect(first.glyphs).toEqual([
-      { looseBox: box(10, 10, 20, 22), flags: 0, tightBox: box(11, 12, 19, 20) },
-      { looseBox: box(20, 10, 30, 22), flags: 1 },
+      { loose: box(10, 10, 20, 22), tight: box(11, 12, 19, 20) },
+      { loose: box(20, 10, 30, 22), space: true },
     ]);
-    expect(first.glyphs.some((g) => 'looseQuad' in g || 'tightQuad' in g)).toBe(false);
-    expect(second.charStart).toBe(2);
+    expect(second.start).toBe(2);
     expect(second.fontSize).toBe(9);
   });
 
@@ -108,7 +108,7 @@ describe('buildRunsFromRawGlyphs', () => {
     // The seed participates in the union — exactly the legacy reader's
     // behavior for runs opening with a degenerate glyph.
     expect(runs[0].rect).toEqual(box(0, 0, 110, 212));
-    expect(runs[0].glyphs[0]).toEqual({ looseBox: box(0, 0, 0, 0), flags: 2 });
+    expect(runs[0].glyphs[0]).toEqual({ loose: box(0, 0, 0, 0), empty: true });
   });
 
   test('rotated object emits the rotated variant; empty glyphs get zeroed quads', () => {
@@ -123,14 +123,14 @@ describe('buildRunsFromRawGlyphs', () => {
     expect(runs).toHaveLength(1);
     const run = runs[0];
     if (!isRotatedGeometryRun(run)) throw new Error('expected a rotated run');
-    expect(run.rotation).toBeCloseTo(Math.PI / 2, 6);
+    expect(run.baselineAngle).toBeCloseTo(Math.PI / 2, 6);
     expect(run.ascentFlip).toBe(false);
     expect(run.fontSize).toBe(10);
-    expect(run.glyphs[0].looseQuad).toEqual(q1);
-    expect(run.glyphs[0].tightQuad).toEqual(rotatedQuad(51, 101, 8, 12));
+    expect(run.glyphs[0].loose).toEqual(q1);
+    expect(run.glyphs[0].tight).toEqual(rotatedQuad(51, 101, 8, 12));
     expect(run.glyphs[1]).toEqual({
-      looseQuad: { p1: { x: 0, y: 0 }, p2: { x: 0, y: 0 }, p3: { x: 0, y: 0 }, p4: { x: 0, y: 0 } },
-      flags: 2,
+      loose: { p1: { x: 0, y: 0 }, p2: { x: 0, y: 0 }, p3: { x: 0, y: 0 }, p4: { x: 0, y: 0 } },
+      empty: true,
     });
     // Page-space AABB over the real glyphs' cells (the first glyph is real,
     // so the seed is its bounds — no zero-seed here).
@@ -144,8 +144,8 @@ describe('buildRunsFromRawGlyphs', () => {
       rotated(1, rotatedQuad(40, 10, 10, 12), Math.PI / 2),
     ]);
     expect(runs).toHaveLength(2);
-    expect(runs[0].charStart).toBe(0);
-    expect(runs[1].charStart).toBe(2);
+    expect(runs[0].start).toBe(0);
+    expect(runs[1].start).toBe(2);
     expect(isRotatedGeometryRun(runs[0])).toBe(false);
     expect(isRotatedGeometryRun(runs[1])).toBe(true);
     expect(runs[1].fontSize).toBe(12); // same text object → inherited
@@ -178,13 +178,13 @@ describe('buildRunsFromRawGlyphs', () => {
     // Synthesized /ActualText pieces and singular-matrix glyphs have boxes
     // but no oriented cells — they classify upright (legacy behavior).
     const runs = buildRunsFromRawGlyphs([
-      upright(1, box(10, 10, 30, 22), { upright: false, rotation: Math.PI / 2 }),
+      upright(1, box(10, 10, 30, 22), { upright: false, baselineAngle: Math.PI / 2 }),
     ]);
     expect(runs).toHaveLength(1);
     const run = runs[0];
     expect(isRotatedGeometryRun(run)).toBe(false);
-    if (isRotatedGeometryRun(run)) return; // narrows: only upright glyphs carry a looseBox
-    expect(run.glyphs[0].looseBox).toEqual(box(10, 10, 30, 22));
+    if (isRotatedGeometryRun(run)) return; // narrows: only upright glyphs carry a box
+    expect(run.glyphs[0].loose).toEqual(box(10, 10, 30, 22));
   });
 });
 

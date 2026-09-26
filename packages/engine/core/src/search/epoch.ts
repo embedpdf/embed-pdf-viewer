@@ -1,6 +1,6 @@
 import type { DocumentManifest } from '../dto/DocumentManifest';
 import { foldText } from './fold';
-import type { SearchQuery } from './types';
+import { searchQueryOf, type SearchQuery } from './types';
 
 /**
  * The search content epoch: a deterministic fingerprint of everything a
@@ -44,7 +44,8 @@ function fnv1a64(input: string): string {
  * Case- or diacritic-sensitive literals and regex patterns pass through
  * untouched (their raw form is the query).
  */
-export function canonicalSearchQuery(query: SearchQuery): SearchQuery {
+export function canonicalSearchQuery(request: SearchQuery): SearchQuery {
+  const query = searchQueryOf(request);
   if (query.regex || query.matchCase || query.matchDiacritics || query.ignoreWhitespace) {
     return query;
   }

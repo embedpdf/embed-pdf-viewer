@@ -79,14 +79,11 @@ function Checkbox({
 // ── one result row: a snippet with the match bolded, active = accented ───────
 function renderSnippet(snippet: SearchSnippet | undefined) {
   if (!snippet) return null;
-  const end = snippet.matchStart + snippet.matchLength;
   return (
     <>
-      {snippet.text.slice(0, snippet.matchStart)}
-      <span className="text-accent font-semibold">
-        {snippet.text.slice(snippet.matchStart, end)}
-      </span>
-      {snippet.text.slice(end)}
+      {snippet.before}
+      <span className="text-accent font-semibold">{snippet.match}</span>
+      {snippet.after}
     </>
   );
 }

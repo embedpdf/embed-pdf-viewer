@@ -80,7 +80,6 @@ export type {
   PieceInfoSnapshot,
 } from './dto/PieceInfo';
 export type { PageTextService } from './engine/PageTextService';
-export type { PageGeometryService } from './engine/PageGeometryService';
 export type { PageRenderService } from './engine/PageRenderService';
 
 export { wirePack, EMPTY_TRANSFER } from './wire/WirePack';
@@ -151,6 +150,7 @@ export type {
   PagesRenderWorkerRequest,
   PagesRenderEncodedWorkerRequest,
   SearchQueryWorkerRequest,
+  SearchScanRequest,
   FormsListWorkerRequest,
   FormsSetValueWorkerRequest,
   FormsResetWorkerRequest,

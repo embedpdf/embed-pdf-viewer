@@ -1,14 +1,25 @@
 import type { PageTextSnapshot } from '../dto/PageTextSnapshot';
 import type { AbortablePromise } from '../promise/AbortablePromise';
+import type { TextLayout } from '../text/layout';
+import type { TextRange } from '../text/TextRange';
 
 /**
- * Per-page text service exposed via `PageHandle.text`.
- *
- * `read()` runs PDFium's `FPDFText_LoadPage` → `FPDFText_GetText` chain on
- * the worker and returns the page's plain text, its character count and
- * the character↔text map. It carries no annotation state (`PageState`):
- * the text changes only with the page's content.
+ * Per-page text service exposed via `PageHandle.text`. Text changes only
+ * with the page's content, so none of these carry annotation state
+ * (`PageState`).
  */
 export interface PageTextService {
+  /**
+   * The page's text in reading order, its character count and, when the two
+   * numberings differ, the character↔text map. Needs `doc.text.copy`.
+   */
   get(): AbortablePromise<PageTextSnapshot>;
+  /** The text of a character range: the copy primitive. Needs `doc.text.copy`. */
+  slice(range: TextRange): AbortablePromise<string>;
+  /**
+   * Where the page's characters are: hit-testing, words and lines, and the
+   * segments to draw a selection or a highlight. Needs `doc.text.select`
+   * (where text is, not what it says).
+   */
+  layout(): AbortablePromise<TextLayout>;
 }

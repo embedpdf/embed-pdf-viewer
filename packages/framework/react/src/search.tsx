@@ -66,7 +66,7 @@ export function SearchLayer({
             const br = page.transform.toPixels(quad.lowerEnd);
             return (
               <div
-                key={`${hit.charStart}:${i}`}
+                key={`${hit.start}:${i}`}
                 onClick={onClick}
                 style={{
                   position: 'absolute',
@@ -87,7 +87,7 @@ export function SearchLayer({
           );
           return (
             <svg
-              key={`${hit.charStart}:${i}`}
+              key={`${hit.start}:${i}`}
               style={{
                 position: 'absolute',
                 inset: 0,

@@ -9,14 +9,14 @@ import type { CharMapAnchor } from '../text/charmap';
  *
  * `charCount` is the size of the page's character space — PDFium's internal
  * character list, the same space geometry runs tile
- * (`PageGeometryRun.charStart`) and selection ranges live in. It is not the
+ * (`PageGeometryRun.start`) and selection ranges live in. It is not the
  * length of `text`: a non-printing character occupies a character slot but
  * contributes zero text units, and a supplementary character contributes
  * two. `charMap` encodes exactly those deviations; absent/empty means the
  * two spaces are identical (`charCount === text.length`), which is the
  * common case and costs nothing on the wire. All translation goes through
  * the helpers in `text/charmap.ts` (`boundaryTextOffset`,
- * `charRangeForTextOffsets`, `sliceTextByChars`) — consumers never
+ * `charRangeForTextOffsets`, `sliceText`) — consumers never
  * interpret anchors directly, and the wire schema rejects maps that violate
  * the invariants documented there.
  *

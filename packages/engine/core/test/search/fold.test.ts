@@ -85,23 +85,23 @@ describe('foldText', () => {
 describe('toOriginalRange', () => {
   test('maps a folded range back to original code units', () => {
     const f = foldText('Hello World');
-    expect(toOriginalRange(f, 6, 5)).toEqual({ start: 6, length: 5 });
+    expect(toOriginalRange(f, 6, 5)).toEqual({ start: 6, count: 5 });
   });
 
   test('a hit inside a ligature covers the whole original char', () => {
     const f = foldText('ﬁle'); // folded "file"
-    expect(toOriginalRange(f, 0, 2)).toEqual({ start: 0, length: 1 }); // "fi" → ﬁ
-    expect(toOriginalRange(f, 0, 4)).toEqual({ start: 0, length: 3 }); // whole word
+    expect(toOriginalRange(f, 0, 2)).toEqual({ start: 0, count: 1 }); // "fi" → ﬁ
+    expect(toOriginalRange(f, 0, 4)).toEqual({ start: 0, count: 3 }); // whole word
   });
 
   test('a range across collapsed whitespace spans the raw whitespace', () => {
     const f = foldText('hello\n   world');
     // folded "hello world" — the full match must cover all 14 original units.
-    expect(toOriginalRange(f, 0, 11)).toEqual({ start: 0, length: 14 });
+    expect(toOriginalRange(f, 0, 11)).toEqual({ start: 0, count: 14 });
   });
 
   test('never splits a surrogate pair', () => {
     const f = foldText('\u{1F600}'); // one astral char, two folded units
-    expect(toOriginalRange(f, 0, 1)).toEqual({ start: 0, length: 2 });
+    expect(toOriginalRange(f, 0, 1)).toEqual({ start: 0, count: 2 });
   });
 });

@@ -29,7 +29,7 @@ export const initialSearchState = (): SearchState => ({
   hits: [],
   hitsByPage: {},
   activeIndex: -1,
-  progress: { scanned: 0, total: 0 },
+  progress: { pagesSearched: 0, pageCount: 0 },
   error: null,
 });
 
