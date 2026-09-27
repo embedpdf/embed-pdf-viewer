@@ -5,8 +5,9 @@
 //
 // Options: --baseline <file> (default .render-baseline/<runtime>-<platform>-<profile>.json),
 // --out <file> (check mode: also write this run), --jobs <n>, --timeout <seconds>,
-// --wasm-binary <file> (render with another embedpdf.wasm), --only <substring>.
-// See README.md next to this file.
+// --wasm-binary <file> (render with another embedpdf.wasm), --only <substring>,
+// --image-budget <MB> (decoded images kept across page loads, as the engine keeps
+// them; default 128, 0 for none). See README.md next to this file.
 
 import { fork } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -36,6 +37,7 @@ profileByName(profileName);
 const jobs = Number(args.jobs ?? Math.min(4, Math.max(1, Math.floor(os.cpus().length / 2))));
 const timeoutMs = Number(args.timeout ?? 300) * 1000;
 const wasmBinary = args['wasm-binary'] ? path.resolve(args['wasm-binary']) : undefined;
+const imageBudgetMb = Number(args['image-budget'] ?? 128);
 
 const documents = collectDocuments(profileName)
   .filter((document) => !args.only || document.id.includes(args.only))
@@ -95,7 +97,7 @@ function runAll(queue) {
       live++;
       const child = fork(
         path.join(here, 'worker.mjs'),
-        [JSON.stringify({ runtimeKind, wasmBinary })],
+        [JSON.stringify({ runtimeKind, wasmBinary, imageBudgetMb })],
         {
           stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
         },

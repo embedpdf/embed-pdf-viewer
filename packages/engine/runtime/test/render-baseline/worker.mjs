@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import { renderVariant, inspectPage } from './render.mjs';
 import { HEAVY_PAGE_OBJECTS, profileByName } from './variants.mjs';
 
-const { runtimeKind, wasmBinary } = JSON.parse(process.argv[2]);
+const { runtimeKind, wasmBinary, imageBudgetMb } = JSON.parse(process.argv[2]);
 const { createPdfRuntime } = await import(new URL('../../dist/index.node.js', import.meta.url));
 const runtime = await createPdfRuntime({
   prefer: runtimeKind,
@@ -19,6 +19,11 @@ if (runtime.kind !== runtimeKind) {
   throw new Error(`asked for the ${runtimeKind} runtime, got ${runtime.kind}`);
 }
 runtime.fn.FPDF_InitLibrary();
+// Every case loads its page again, so with a budget each later case of a page
+// renders its images from the decodes an earlier case kept, as engine jobs do.
+if (imageBudgetMb > 0 && typeof runtime.fn.EPDF_SetDecodedImageBudget === 'function') {
+  runtime.fn.EPDF_SetDecodedImageBudget(imageBudgetMb * 1024 * 1024);
+}
 
 process.on('message', (message) => {
   if (message.type !== 'document') return;

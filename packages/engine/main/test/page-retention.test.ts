@@ -1,10 +1,12 @@
 /**
- * Pages the engine keeps loaded between jobs render exactly as freshly loaded
- * pages do. Each render on one open document is compared with the same render
- * in an engine that opened the document for that render alone. The fixture's
- * JPEG 2000 image decodes at a resolution that depends on the render size and
- * is cached on the page, so a page that carried its image cache from one job
- * to the next would render differently. Mock-free: real wasm runtime.
+ * Pages the engine keeps loaded between jobs, and the image decodes it keeps
+ * between them, render exactly as freshly loaded pages do. Each render on one
+ * open document is compared with the same render in an engine that opened the
+ * document for that render alone. The fixture's JPEG 2000 image decodes at a
+ * resolution that depends on the render size and is cached on the page, so a
+ * page that carried its image cache from one job to the next would render
+ * differently, and a kept decode must only serve renders at its resolution.
+ * Mock-free: real wasm runtime.
  */
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -68,7 +70,9 @@ describe('pages kept between jobs (wasm engine)', () => {
     });
     const fresh: string[] = [];
     for (const [i, width] of WIDTHS.entries()) {
-      fresh.push(await withDocument(`retention-fresh-${i}`, (doc, page) => renderAt(doc, page, width)));
+      fresh.push(
+        await withDocument(`retention-fresh-${i}`, (doc, page) => renderAt(doc, page, width)),
+      );
     }
     expect(new Set(fresh).size).toBeGreaterThan(1);
     expect(kept).toEqual(fresh);
@@ -83,6 +87,28 @@ describe('pages kept between jobs (wasm engine)', () => {
       appearancesAt(doc, page, 0.5),
     );
     expect(kept).toHaveLength(2);
+    expect(kept).toEqual(fresh);
+  }, 120_000);
+
+  test('show an image a redaction changed exactly as a document that never rendered it', async () => {
+    const redact = async (doc: DocumentHandle, page: PageRef) => {
+      await doc.page(page).annotations.create({
+        subtype: 'redact',
+        rect: { left: 100, bottom: 100, right: 200, top: 200 },
+        interiorColor: { r: 0, g: 0, b: 0 },
+      });
+      await doc.redaction!.apply({ pages: [page] });
+    };
+    const [before, kept] = await withDocument('retention-redact', async (doc, page) => {
+      const digest = await renderAt(doc, page, 640);
+      await redact(doc, page);
+      return [digest, await renderAt(doc, page, 640)];
+    });
+    const fresh = await withDocument('retention-redact-fresh', async (doc, page) => {
+      await redact(doc, page);
+      return renderAt(doc, page, 640);
+    });
+    expect(kept).not.toEqual(before);
     expect(kept).toEqual(fresh);
   }, 120_000);
 

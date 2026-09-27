@@ -107,6 +107,7 @@ import {
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import { DocumentSession } from '../document-session/DocumentSession';
+import { DecodedImageStore } from '../document-session/pages/DecodedImageStore';
 import { IdlePageCache } from '../document-session/pages/IdlePageCache';
 import { BaseDocumentRegistry } from '../document-session/lifecycle/BaseDocumentRegistry';
 import {
@@ -184,6 +185,11 @@ export interface WorkerHostOptions {
    * the sealed file can be published by rename.
    */
   signingCandidatePath?: (basePath: string, signingId: string) => string;
+  /**
+   * Bytes of decoded images kept between read-only jobs (see
+   * {@link DecodedImageStore}). Defaults to 128 MB; 0 keeps none.
+   */
+  decodedImageBudgetBytes?: number;
 }
 
 /**
@@ -228,6 +234,8 @@ export class WorkerHost {
   private readonly fonts: FontRegistrar;
   /** Pages kept loaded between read-only jobs, for every session on this runtime. */
   private readonly idlePages: IdlePageCache;
+  /** Image decodes kept between read-only jobs, for every session on this runtime. */
+  private readonly decodedImages: DecodedImageStore;
   private destroyed = false;
 
   constructor(
@@ -248,6 +256,7 @@ export class WorkerHost {
     this.baseDocuments = new BaseDocumentRegistry(this.runtime);
     this.fonts = new FontRegistrar(this.runtime, this.fontIds);
     this.idlePages = new IdlePageCache(this.runtime);
+    this.decodedImages = new DecodedImageStore(this.runtime, this.options.decodedImageBudgetBytes);
   }
 
   /**
@@ -268,8 +277,11 @@ export class WorkerHost {
     }
 
     // Before either route below: any job that is not read-only closes every
-    // idle page first, so no change can meet a page parsed before it.
-    this.idlePages.beginJob(READ_ONLY_KINDS.has(msg.kind));
+    // idle page and drops every kept image decode first, so no change can meet
+    // a page or an image decoded before it.
+    const readOnly = READ_ONLY_KINDS.has(msg.kind);
+    this.idlePages.beginJob(readOnly);
+    this.decodedImages.beginJob(readOnly);
 
     // The encoded render kinds are the protocol's only async ops: their
     // raster comes from the same sync handlers as the raw kinds (all

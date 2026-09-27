@@ -47,6 +47,7 @@ left behind.
 | `--out <file>`         | check: also write this run, to diff or promote it               |
 | `--wasm-binary <file>` | render with another `embedpdf.wasm`, without replacing the file |
 | `--only <text>`        | only documents whose id contains the text                       |
+| `--image-budget <MB>`  | decoded images kept across page loads, in MB (128; 0 for none)  |
 | `--jobs <n>`           | worker processes (default: half the cores, at most 4)           |
 | `--timeout <seconds>`  | per document (default 300)                                      |
 | `--strict`             | check: also fail on cases the baseline does not have            |
