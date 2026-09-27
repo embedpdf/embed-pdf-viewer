@@ -4,7 +4,7 @@ import { RedactionApplyScopeSchema } from '@embedpdf/engine-core/wire';
 import { requireLayerCapability, requireLayerDocAccessOnly } from '../app/jwt-plugin';
 import type { DocumentService } from '../services/DocumentService';
 import type { LayerService } from '../services/LayerService';
-import { abortSignalFromRequest, parseOrInvalidArg, setNoStore, type SchemaLike } from './_helpers';
+import { abortSignalOf, parseOrInvalidArg, setNoStore, type SchemaLike } from './_helpers';
 
 interface RedactionRouteDeps {
   documentService: DocumentService;
@@ -50,10 +50,6 @@ export async function registerRedactionRoutes(
     );
 
     setNoStore(reply);
-    return layerService.applyRedactions(
-      ctx,
-      { docId, layerName, scope },
-      abortSignalFromRequest(req),
-    );
+    return layerService.applyRedactions(ctx, { docId, layerName, scope }, abortSignalOf(reply));
   });
 }

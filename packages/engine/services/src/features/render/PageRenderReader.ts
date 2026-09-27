@@ -1,5 +1,6 @@
 import type {
   PageObjectNumber,
+  PageRaster,
   PageRenderOptions,
   PageRenderTarget,
   PdfRect,
@@ -7,11 +8,24 @@ import type {
 import { EngineError, EngineErrorCode, normalizePdfRect } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
-import { FPDF_REVERSE_BYTE_ORDER, rasterize, readPageBox } from './deviceRaster';
+import { FPDF_REVERSE_BYTE_ORDER, rasterizeAsync, readPageBox } from './deviceRaster';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 
 const FPDF_RENDER_ANNOT = 0x01;
+const FPDF_RENDER_TOBECONTINUED = 1;
+const FPDF_RENDER_DONE = 2;
+
+/**
+ * How a page render is sliced. PDFium renders for `budgetMs` at a time and the
+ * render awaits `between()` before it goes on, so the thread can receive
+ * messages meanwhile: an abort stops the render at the next slice. The bytes
+ * are those of a render at once, however it is sliced.
+ */
+export interface RenderSlices {
+  readonly budgetMs: number;
+  between(): Promise<void>;
+}
 
 export class PageRenderReader {
   constructor(
@@ -19,7 +33,16 @@ export class PageRenderReader {
     private readonly session: DocumentSession,
   ) {}
 
-  render(pageObjectNumber: PageObjectNumber, options: PageRenderOptions, signal: AbortSignal) {
+  /**
+   * Renders a page in slices. Until it settles, PDFium holds the page's render:
+   * the caller must not let anything else use PDFium between slices.
+   */
+  async render(
+    pageObjectNumber: PageObjectNumber,
+    options: PageRenderOptions,
+    signal: AbortSignal,
+    slices: RenderSlices,
+  ): Promise<PageRaster> {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const pool = this.session.pagePool();
@@ -36,7 +59,7 @@ export class PageRenderReader {
       let flags = FPDF_REVERSE_BYTE_ORDER;
       if (options.includeAnnotations ?? true) flags |= FPDF_RENDER_ANNOT;
 
-      const raster = rasterize(this.runtime, {
+      const raster = await rasterizeAsync(this.runtime, {
         rect: target,
         page,
         rotation,
@@ -45,11 +68,28 @@ export class PageRenderReader {
           ? { maxOutputPixels: options.maxOutputPixels }
           : {}),
         background: options.background === 'transparent' ? 'transparent' : 'white',
-        draw: (bitmapPtr, matrixPtr, clipPtr) => {
+        draw: async (bitmapPtr, matrixPtr, clipPtr) => {
           throwIfAborted(signal);
-          fn.FPDF_RenderPageBitmapWithMatrix(bitmapPtr, pagePtr, matrixPtr, clipPtr, flags);
-          throwIfAborted(signal);
-          return true;
+          let status = fn.EPDF_RenderPageBitmapWithMatrix_Start(
+            bitmapPtr,
+            pagePtr,
+            matrixPtr,
+            clipPtr,
+            flags,
+            slices.budgetMs,
+          );
+          try {
+            while (status === FPDF_RENDER_TOBECONTINUED) {
+              await slices.between();
+              throwIfAborted(signal);
+              status = fn.EPDF_RenderPage_Continue(pagePtr, slices.budgetMs);
+            }
+          } finally {
+            // Before the bitmap is freed and the page released: the render
+            // draws into the bitmap until it is closed.
+            fn.FPDF_RenderPage_Close(pagePtr);
+          }
+          return status === FPDF_RENDER_DONE;
         },
       });
       if (!raster) {

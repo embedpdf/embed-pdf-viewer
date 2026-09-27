@@ -55,6 +55,12 @@ export class IdlePageCache {
   constructor(
     private readonly runtime: PdfRuntimeModule,
     private readonly policy: IdlePageCachePolicy = DEFAULT_IDLE_PAGE_POLICY,
+    /**
+     * True while a job is between two of its steps, such as a page render
+     * between slices, when nothing else may use PDFium: the idle timer then
+     * waits another period instead of closing pages.
+     */
+    private readonly busy: () => boolean = () => false,
   ) {
     this.enabled = typeof runtime.fn.EPDFPage_ResetRenderCache === 'function';
   }
@@ -139,7 +145,8 @@ export class IdlePageCache {
     this.disarmTimer();
     this.timer = setTimeout(() => {
       this.timer = null;
-      this.closeAll();
+      if (this.busy()) this.armTimer();
+      else this.closeAll();
     }, this.policy.idleMs);
     // A Node worker thread must be able to exit while pages are idle.
     (this.timer as { unref?: () => void }).unref?.();

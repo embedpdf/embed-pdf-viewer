@@ -23,7 +23,7 @@ import {
 import { requireLayerCapability, requireLayerDocAccessOnly } from '../app/jwt-plugin';
 import type { DocumentService } from '../services/DocumentService';
 import type { LayerService } from '../services/LayerService';
-import { abortSignalFromRequest, parseOrInvalidArg, setNoStore, type SchemaLike } from './_helpers';
+import { abortSignalOf, parseOrInvalidArg, setNoStore, type SchemaLike } from './_helpers';
 import { readMutationEnvelope } from './_mutationEnvelope';
 
 interface FormRouteDeps {
@@ -62,7 +62,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
     const ctx = requireLayerCapability(req, docId, layerName, 'doc.forms.read', pdfBits);
     setNoStore(reply);
-    return layerService.getFormSnapshot(ctx, { docId, layerName }, abortSignalFromRequest(req));
+    return layerService.getFormSnapshot(ctx, { docId, layerName }, abortSignalOf(reply));
   });
 
   app.get('/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey', async (req, reply) => {
@@ -74,7 +74,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     const snapshot = await layerService.getFormSnapshot(
       ctx,
       { docId, layerName },
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
     const field = snapshot.fields.find((f) =>
       ref.kind === 'objectNumber'
@@ -102,7 +102,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     const exported = await layerService.exportFormData(
       ctx,
       { docId, layerName, format },
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
     setNoStore(reply);
     reply.type(EXPORT_CONTENT_TYPE[exported.format]);
@@ -120,7 +120,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     return layerService.importFormData(
       ctx,
       { docId, layerName, data, ...(format ? { format } : {}) },
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
   });
 
@@ -137,7 +137,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     return layerService.repairForm(
       ctx,
       { docId, layerName, bakeAppearances: body.bakeAppearances ?? false },
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
   });
 
@@ -152,11 +152,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       'request body',
     );
     setNoStore(reply);
-    return layerService.createFormField(
-      ctx,
-      { docId, layerName, draft },
-      abortSignalFromRequest(req),
-    );
+    return layerService.createFormField(ctx, { docId, layerName, draft }, abortSignalOf(reply));
   });
 
   app.patch('/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey', async (req, reply) => {
@@ -174,7 +170,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     return layerService.updateFormField(
       ctx,
       { docId, layerName, ref, patch },
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
   });
 
@@ -185,11 +181,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
     const ctx = requireLayerCapability(req, docId, layerName, 'doc.forms.modify', pdfBits);
     setNoStore(reply);
-    return layerService.deleteFormField(
-      ctx,
-      { docId, layerName, ref },
-      abortSignalFromRequest(req),
-    );
+    return layerService.deleteFormField(ctx, { docId, layerName, ref }, abortSignalOf(reply));
   });
 
   app.post('/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/value', async (req, reply) => {
@@ -205,11 +197,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       'body.value',
     );
     setNoStore(reply);
-    return layerService.setFormValue(
-      ctx,
-      { docId, layerName, ref, value },
-      abortSignalFromRequest(req),
-    );
+    return layerService.setFormValue(ctx, { docId, layerName, ref, value }, abortSignalOf(reply));
   });
 
   app.post('/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/reset', async (req, reply) => {
@@ -219,7 +207,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
     const ctx = requireLayerCapability(req, docId, layerName, 'doc.forms.fill', pdfBits);
     setNoStore(reply);
-    return layerService.resetFormField(ctx, { docId, layerName, ref }, abortSignalFromRequest(req));
+    return layerService.resetFormField(ctx, { docId, layerName, ref }, abortSignalOf(reply));
   });
 
   app.post(
@@ -259,7 +247,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
           pdf: new Uint8Array(resource.bytes),
           pageIndex: parsed.pageIndex ?? 0,
         },
-        abortSignalFromRequest(req),
+        abortSignalOf(reply),
       );
     },
   );
@@ -276,11 +264,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       'body.effects',
     );
     setNoStore(reply);
-    return layerService.applyFormEffects(
-      ctx,
-      { docId, layerName, effects },
-      abortSignalFromRequest(req),
-    );
+    return layerService.applyFormEffects(ctx, { docId, layerName, effects }, abortSignalOf(reply));
   });
 
   app.post(
@@ -304,7 +288,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       return layerService.attachFormWidget(
         ctx,
         { docId, layerName, ref, widget, ...(body.onState ? { onState: body.onState } : {}) },
-        abortSignalFromRequest(req),
+        abortSignalOf(reply),
       );
     },
   );
@@ -327,7 +311,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       return layerService.detachFormWidget(
         ctx,
         { docId, layerName, ref, widget },
-        abortSignalFromRequest(req),
+        abortSignalOf(reply),
       );
     },
   );

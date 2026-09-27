@@ -7,7 +7,9 @@
 // --out <file> (check mode: also write this run), --jobs <n>, --timeout <seconds>,
 // --wasm-binary <file> (render with another embedpdf.wasm), --only <substring>,
 // --image-budget <MB> (decoded images kept across page loads, as the engine keeps
-// them; default 128, 0 for none). See README.md next to this file.
+// them; default 128, 0 for none), --slice-ms <ms> (render engine variants in slices
+// of this budget, as the engine does; 0 slices at every chance). See README.md next
+// to this file.
 
 import { fork } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -38,6 +40,7 @@ const jobs = Number(args.jobs ?? Math.min(4, Math.max(1, Math.floor(os.cpus().le
 const timeoutMs = Number(args.timeout ?? 300) * 1000;
 const wasmBinary = args['wasm-binary'] ? path.resolve(args['wasm-binary']) : undefined;
 const imageBudgetMb = Number(args['image-budget'] ?? 128);
+const sliceMs = args['slice-ms'] === undefined ? undefined : Number(args['slice-ms']);
 
 const documents = collectDocuments(profileName)
   .filter((document) => !args.only || document.id.includes(args.only))
@@ -56,6 +59,7 @@ const current = {
     node: process.version,
     os: `${os.type()} ${os.release()} ${os.arch()}`,
     documents: documents.length,
+    ...(sliceMs === undefined ? {} : { sliceMs }),
     seconds: Math.round((performance.now() - started) / 1000),
   },
   cases: sortKeys(cases),
@@ -66,6 +70,7 @@ const defaultFile = path.join(
   '.render-baseline',
   `${runtimeKind}-${platform}-${profileName}.json`,
 );
+if (sliceMs !== undefined) reportSlices(current.cases);
 if (mode === 'record') {
   const out = path.resolve(args.out ?? args.baseline ?? defaultFile);
   write(out, current);
@@ -97,7 +102,7 @@ function runAll(queue) {
       live++;
       const child = fork(
         path.join(here, 'worker.mjs'),
-        [JSON.stringify({ runtimeKind, wasmBinary, imageBudgetMb })],
+        [JSON.stringify({ runtimeKind, wasmBinary, imageBudgetMb, sliceMs })],
         {
           stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
         },
@@ -202,6 +207,28 @@ function describe(meta) {
     ? `${path.basename(meta.library.file)} ${meta.library.sha256.slice(0, 12)}`
     : '?';
   return `${meta.runtime} ${meta.platform} ${meta.profile}, ${library}, ${meta.documents} documents`;
+}
+
+// ── slices ──
+
+// How closely sliced renders kept to the budget: the cases whose longest slice ran
+// longest, and how many ran past twice the budget.
+function reportSlices(cases) {
+  const sliced = Object.entries(cases).filter(([, entry]) => entry.slices !== undefined);
+  if (sliced.length === 0) return;
+  const longest = sliced.map(([, entry]) => entry.longestSliceMs).sort((a, b) => a - b);
+  const at = (q) => longest[Math.min(longest.length - 1, Math.floor(q * longest.length))];
+  const over = longest.filter((ms) => ms > Math.max(2 * sliceMs, 1)).length;
+  console.log(
+    `sliced ${sliced.length} renders at ${sliceMs} ms: longest slice p50 ${at(0.5)} ms, ` +
+      `p90 ${at(0.9)} ms, p99 ${at(0.99)} ms, max ${longest[longest.length - 1]} ms; ` +
+      `${over} over twice the budget`,
+  );
+  for (const [id, entry] of sliced
+    .sort(([, a], [, b]) => b.longestSliceMs - a.longestSliceMs)
+    .slice(0, 12)) {
+    console.log(`  ${entry.longestSliceMs} ms of ${entry.ms} ms, ${entry.slices} slices  ${id}`);
+  }
 }
 
 // ── helpers ──

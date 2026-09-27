@@ -7,12 +7,19 @@ import { createHash } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 
 const FPDF_BITMAP_BGRA = 4;
+const FPDF_RENDER_TOBECONTINUED = 1;
+const FPDF_RENDER_DONE = 2;
 
-export function renderVariant(runtime, doc, pageIndex, variant) {
+/**
+ * Renders a variant. With `options.sliceMs`, `engine` variants render in slices of
+ * that many milliseconds (`EPDF_RenderPageBitmapWithMatrix_Start`), as the engine
+ * renders a page, and report how many slices they took and the longest one.
+ */
+export function renderVariant(runtime, doc, pageIndex, variant, options = {}) {
   const started = performance.now();
   const result =
     variant.kind === 'engine'
-      ? renderEngine(runtime, doc, pageIndex, variant)
+      ? renderEngine(runtime, doc, pageIndex, variant, options)
       : renderClassic(runtime, doc, pageIndex, variant);
   return { ...result, ms: Math.round(performance.now() - started) };
 }
@@ -35,18 +42,18 @@ export function loadEnginePage(fn, doc, pageIndex) {
   return fn.EPDFDoc_LoadPageByObjectNumberNormalized(doc, objectNumber);
 }
 
-function renderEngine(runtime, doc, pageIndex, variant) {
+function renderEngine(runtime, doc, pageIndex, variant, options) {
   const page = loadEnginePage(runtime.fn, doc, pageIndex);
   if (!page) return { error: 'page-load-failed' };
   try {
-    return renderEngineOnPage(runtime, page, variant);
+    return renderEngineOnPage(runtime, page, variant, options);
   } finally {
     runtime.fn.FPDF_ClosePage(page);
   }
 }
 
 /** Renders an `engine` variant on a page the caller loaded and closes. */
-export function renderEngineOnPage(runtime, page, variant) {
+export function renderEngineOnPage(runtime, page, variant, options = {}) {
   const { fn, mem } = runtime;
   const pageWidth = fn.FPDF_GetPageWidthF(page);
   const pageHeight = fn.FPDF_GetPageHeightF(page);
@@ -68,12 +75,41 @@ export function renderEngineOnPage(runtime, page, variant) {
     fn.FPDFBitmap_FillRect(bitmap, 0, 0, width, height, 0xffffffff);
     matrix.forEach((value, i) => mem.poke(matrixPtr, 'f32', value, i * 4));
     [0, 0, width, height].forEach((value, i) => mem.poke(clipPtr, 'f32', value, i * 4));
-    fn.FPDF_RenderPageBitmapWithMatrix(bitmap, page, matrixPtr, clipPtr, variant.flags);
-    return { sha: digest(runtime, bitmap, height), width, height };
+    if (options.sliceMs === undefined) {
+      fn.FPDF_RenderPageBitmapWithMatrix(bitmap, page, matrixPtr, clipPtr, variant.flags);
+      return { sha: digest(runtime, bitmap, height), width, height };
+    }
+    const slices = renderSliced(fn, bitmap, page, matrixPtr, clipPtr, variant.flags, options);
+    if (slices.error) return { error: slices.error, width, height };
+    return { sha: digest(runtime, bitmap, height), width, height, ...slices };
   } finally {
     mem.free(clipPtr);
     mem.free(matrixPtr);
     fn.FPDFBitmap_Destroy(bitmap);
+  }
+}
+
+function renderSliced(fn, bitmap, page, matrixPtr, clipPtr, flags, { sliceMs }) {
+  let slices = 0;
+  let longestSliceMs = 0;
+  const slice = (render) => {
+    const started = performance.now();
+    const status = render();
+    longestSliceMs = Math.max(longestSliceMs, performance.now() - started);
+    slices++;
+    return status;
+  };
+  try {
+    let status = slice(() =>
+      fn.EPDF_RenderPageBitmapWithMatrix_Start(bitmap, page, matrixPtr, clipPtr, flags, sliceMs),
+    );
+    while (status === FPDF_RENDER_TOBECONTINUED) {
+      status = slice(() => fn.EPDF_RenderPage_Continue(page, sliceMs));
+    }
+    if (status !== FPDF_RENDER_DONE) return { error: `sliced-render-status:${status}` };
+    return { slices, longestSliceMs: Math.round(longestSliceMs * 10) / 10 };
+  } finally {
+    fn.FPDF_RenderPage_Close(page);
   }
 }
 

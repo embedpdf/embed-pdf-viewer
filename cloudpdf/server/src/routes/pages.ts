@@ -51,7 +51,7 @@ import type { DocumentService, OpenContext } from '../services/DocumentService';
 import type { LayerService } from '../services/LayerService';
 import type { SharpImageEncoder } from '../render/SharpImageEncoder';
 import {
-  abortSignalFromRequest,
+  abortSignalOf,
   parseOrInvalidArg,
   parseTokenOrInvalidArg,
   resolvePageKeyParam,
@@ -96,7 +96,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     return readPageText({
       documentService,
       reply,
-      signal: abortSignalFromRequest(req),
+      signal: abortSignalOf(reply),
       scope: { kind: 'base', ctx, docId },
       pageObjectNumber: resolvePageKeyParam(pageKey),
       requestedVersion: parseTokenOrInvalidArg(decodeContentToken, token, 'contentVersion token'),
@@ -109,7 +109,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     return readPageText({
       documentService,
       reply,
-      signal: abortSignalFromRequest(req),
+      signal: abortSignalOf(reply),
       scope: { kind: 'base', ctx, docId },
       pageObjectNumber: resolvePageKeyParam(pageKey),
     });
@@ -127,7 +127,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     return readPageGeometry({
       documentService,
       reply,
-      signal: abortSignalFromRequest(req),
+      signal: abortSignalOf(reply),
       scope: { kind: 'base', ctx, docId },
       pageObjectNumber: resolvePageKeyParam(pageKey),
       requestedVersion: parseTokenOrInvalidArg(decodeContentToken, token, 'contentVersion token'),
@@ -142,7 +142,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     return readPageGeometry({
       documentService,
       reply,
-      signal: abortSignalFromRequest(req),
+      signal: abortSignalOf(reply),
       scope: { kind: 'base', ctx, docId },
       pageObjectNumber: resolvePageKeyParam(pageKey),
     });
@@ -161,7 +161,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       encodeInEngine,
       ...(derivedRenders ? { derivedRenders } : {}),
       reply,
-      signal: abortSignalFromRequest(req),
+      signal: abortSignalOf(reply),
       scope: { kind: 'base', ctx, docId },
       annotated: false,
       pageObjectNumber: resolvePageKeyParam(pageKey),
@@ -179,7 +179,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       encodeInEngine,
       ...(derivedRenders ? { derivedRenders } : {}),
       reply,
-      signal: abortSignalFromRequest(req),
+      signal: abortSignalOf(reply),
       scope: { kind: 'base', ctx, docId },
       annotated: false,
       pageObjectNumber: resolvePageKeyParam(pageKey),
@@ -203,7 +203,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       encodeInEngine,
       ...(derivedRenders ? { derivedRenders } : {}),
       reply,
-      signal: abortSignalFromRequest(req),
+      signal: abortSignalOf(reply),
       scope: { kind: 'base', ctx, docId },
       annotated: true,
       pageObjectNumber: resolvePageKeyParam(pageKey),
@@ -224,7 +224,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       encodeInEngine,
       ...(derivedRenders ? { derivedRenders } : {}),
       reply,
-      signal: abortSignalFromRequest(req),
+      signal: abortSignalOf(reply),
       scope: { kind: 'base', ctx, docId },
       annotated: true,
       pageObjectNumber: resolvePageKeyParam(pageKey),
@@ -247,7 +247,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       return readPageText({
         documentService,
         reply,
-        signal: abortSignalFromRequest(req),
+        signal: abortSignalOf(reply),
         scope: { kind: 'layer', ctx, docId, layerName },
         pageObjectNumber: resolvePageKeyParam(pageKey),
         requestedVersion: parseTokenOrInvalidArg(decodeContentToken, token, 'contentVersion token'),
@@ -267,7 +267,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     return readPageText({
       documentService,
       reply,
-      signal: abortSignalFromRequest(req),
+      signal: abortSignalOf(reply),
       scope: { kind: 'layer', ctx, docId, layerName },
       pageObjectNumber: resolvePageKeyParam(pageKey),
     });
@@ -288,7 +288,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       return readPageGeometry({
         documentService,
         reply,
-        signal: abortSignalFromRequest(req),
+        signal: abortSignalOf(reply),
         scope: { kind: 'layer', ctx, docId, layerName },
         pageObjectNumber: resolvePageKeyParam(pageKey),
         requestedVersion: parseTokenOrInvalidArg(decodeContentToken, token, 'contentVersion token'),
@@ -308,7 +308,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     return readPageGeometry({
       documentService,
       reply,
-      signal: abortSignalFromRequest(req),
+      signal: abortSignalOf(reply),
       scope: { kind: 'layer', ctx, docId, layerName },
       pageObjectNumber: resolvePageKeyParam(pageKey),
     });
@@ -332,7 +332,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
         encodeInEngine,
         ...(derivedRenders ? { derivedRenders } : {}),
         reply,
-        signal: abortSignalFromRequest(req),
+        signal: abortSignalOf(reply),
         scope: { kind: 'layer', ctx, docId, layerName },
         annotated: false,
         pageObjectNumber: resolvePageKeyParam(pageKey),
@@ -357,7 +357,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       encodeInEngine,
       ...(derivedRenders ? { derivedRenders } : {}),
       reply,
-      signal: abortSignalFromRequest(req),
+      signal: abortSignalOf(reply),
       scope: { kind: 'layer', ctx, docId, layerName },
       annotated: false,
       pageObjectNumber: resolvePageKeyParam(pageKey),
@@ -389,7 +389,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
         encodeInEngine,
         ...(derivedRenders ? { derivedRenders } : {}),
         reply,
-        signal: abortSignalFromRequest(req),
+        signal: abortSignalOf(reply),
         scope: { kind: 'layer', ctx, docId, layerName },
         annotated: true,
         pageObjectNumber: resolvePageKeyParam(pageKey),
@@ -422,7 +422,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
         encodeInEngine,
         ...(derivedRenders ? { derivedRenders } : {}),
         reply,
-        signal: abortSignalFromRequest(req),
+        signal: abortSignalOf(reply),
         scope: { kind: 'layer', ctx, docId, layerName },
         annotated: true,
         pageObjectNumber: resolvePageKeyParam(pageKey),
@@ -446,7 +446,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       docId,
       layerName,
       resolvePageKeyParam(pageKey),
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
     return { viewports };
   });
@@ -464,7 +464,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     return layerService.setPageScale(
       ctx,
       { docId, layerName, pageObjectNumber: resolvePageKeyParam(pageKey), measure: body.measure },
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
   });
 
@@ -491,7 +491,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
         pages: body.pages,
         toIndex: body.toIndex,
       },
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
   });
 
@@ -518,7 +518,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
         pages: body.pages,
         rotation: body.rotation,
       },
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
   });
 
@@ -544,7 +544,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
         layerName,
         pages: body.pages,
       },
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
   });
 
@@ -566,11 +566,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     );
 
     setNoStore(reply);
-    return layerService.setPageName(
-      ctx,
-      { docId, layerName, ...body },
-      abortSignalFromRequest(req),
-    );
+    return layerService.setPageName(ctx, { docId, layerName, ...body }, abortSignalOf(reply));
   });
 
   app.post('/v1/docs/:docId/layers/:layerName/pages/names/delete', async (req, reply) => {
@@ -591,7 +587,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     return layerService.removePageName(
       ctx,
       { docId, layerName, name: body.name },
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
   });
 
@@ -631,7 +627,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
         bytes: source.bytes,
         ...(body.toIndex !== undefined ? { toIndex: body.toIndex } : {}),
       },
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
   });
 
@@ -667,7 +663,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
         ...(body.count !== undefined ? { count: body.count } : {}),
         ...(body.toIndex !== undefined ? { toIndex: body.toIndex } : {}),
       },
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
   });
 
@@ -693,7 +689,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       docId,
       layerName,
       body.pages.map(resolvePageRefToNumber),
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
     setNoStore(reply);
     reply.type('application/pdf');
@@ -725,7 +721,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
         pages: body.pages,
         usage: body.usage,
       },
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
   });
 }
@@ -855,7 +851,9 @@ async function renderPageImage(input: {
     ...pageRenderOptionsFromImageOptions(imageOptions, includeAnnotations),
     ...(derived !== undefined ? { maxOutputPixels: derived.maxRenderPixels } : {}),
   });
-  const renderRaster = async () => {
+  // Each render runs under the signal of whoever waits for it: this request,
+  // or a shared render every waiting request can leave (see getOrRender).
+  const renderRaster = async (signal: AbortSignal) => {
     await ensureScopeOnPool();
     const build = (jobId: WorkerJobId) =>
       wirePack({
@@ -872,7 +870,7 @@ async function renderPageImage(input: {
       scope.docId,
       scope.kind === 'layer' ? scope.layerName : undefined,
       build,
-      input.signal,
+      signal,
     );
     if (result.tag !== 'pages.render') {
       throw new EngineError(
@@ -885,7 +883,7 @@ async function renderPageImage(input: {
   // With in-engine encoding (the default), render and encode use one worker op — the
   // raster never leaves the worker; only the compressed image crosses
   // the engine boundary.
-  const renderEncoded = async () => {
+  const renderEncoded = async (signal: AbortSignal) => {
     await ensureScopeOnPool();
     const build = (jobId: WorkerJobId) =>
       wirePack({
@@ -906,7 +904,7 @@ async function renderPageImage(input: {
       scope.docId,
       scope.kind === 'layer' ? scope.layerName : undefined,
       build,
-      input.signal,
+      signal,
     );
     if (result.tag !== 'pages.renderEncoded') {
       throw new EngineError(
@@ -938,16 +936,20 @@ async function renderPageImage(input: {
             classification.canonicalToken,
             input.annotated,
           );
-    const artifact = await derived.getOrRender(key, async () => {
-      if (input.encodeInEngine) {
-        const image = await renderEncoded();
-        return { bytes: image.bytes, contentType: image.contentType };
-      }
-      return input.imageEncoder.encodeToBuffer(await renderRaster(), {
-        format,
-        quality: imageOptions.quality,
-      });
-    });
+    const artifact = await derived.getOrRender(
+      key,
+      async (signal) => {
+        if (input.encodeInEngine) {
+          const image = await renderEncoded(signal);
+          return { bytes: image.bytes, contentType: image.contentType };
+        }
+        return input.imageEncoder.encodeToBuffer(await renderRaster(signal), {
+          format,
+          quality: imageOptions.quality,
+        });
+      },
+      input.signal,
+    );
     setImmutableCache(input.reply);
     input.reply.type(artifact.contentType);
     return input.reply.send(Buffer.from(artifact.bytes));
@@ -956,7 +958,7 @@ async function renderPageImage(input: {
   // Compute-only path (off-lattice or unpinned): unchanged contract —
   // body plus the advisory dimension headers.
   if (input.encodeInEngine) {
-    const image = await renderEncoded();
+    const image = await renderEncoded(input.signal);
     requestedContentVersion === undefined
       ? setNoStore(input.reply)
       : setImmutableCache(input.reply);
@@ -965,7 +967,7 @@ async function renderPageImage(input: {
     input.reply.header('X-EmbedPDF-Image-Height', String(image.height));
     return input.reply.send(Buffer.from(image.bytes));
   }
-  const raster = await renderRaster();
+  const raster = await renderRaster(input.signal);
   const encoded = input.imageEncoder.encode(raster, {
     format,
     quality: imageOptions.quality,

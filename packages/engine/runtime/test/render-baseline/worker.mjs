@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import { renderVariant, inspectPage } from './render.mjs';
 import { HEAVY_PAGE_OBJECTS, profileByName } from './variants.mjs';
 
-const { runtimeKind, wasmBinary, imageBudgetMb } = JSON.parse(process.argv[2]);
+const { runtimeKind, wasmBinary, imageBudgetMb, sliceMs } = JSON.parse(process.argv[2]);
 const { createPdfRuntime } = await import(new URL('../../dist/index.node.js', import.meta.url));
 const runtime = await createPdfRuntime({
   prefer: runtimeKind,
@@ -61,7 +61,7 @@ function renderDocument(document, profile) {
       for (const variant of variants) {
         const id = `${document.id}#${pageIndex}/${variant.id}`;
         try {
-          cases[id] = renderVariant(runtime, doc, pageIndex, variant);
+          cases[id] = renderVariant(runtime, doc, pageIndex, variant, { sliceMs });
         } catch (error) {
           cases[id] = { error: `exception:${String(error?.message ?? error).slice(0, 120)}` };
           return { cases, fatal: true };

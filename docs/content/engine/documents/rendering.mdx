@@ -239,7 +239,8 @@ const pending = page.render.image({ viewport: { kind: 'width', width: 1600 } });
 pending.abort();
 ```
 
-The promise then fails with `Aborted`. See
+The promise then fails with `Aborted`, and the engine stops drawing the page, usually within a few
+milliseconds, so the renders waiting behind it start right away. See
 [Errors & cancelling](/docs/engine/concepts/errors-and-cancelling).
 
 ## Options

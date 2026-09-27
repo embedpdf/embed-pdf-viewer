@@ -50,7 +50,7 @@ import {
 import type { FastifyInstance, FastifyReply } from 'fastify';
 
 import {
-  abortSignalFromRequest,
+  abortSignalOf,
   parseOrInvalidArg,
   parseTokenOrInvalidArg,
   setImmutableCache,
@@ -130,7 +130,7 @@ export async function registerSignatureRoutes(
       );
     }
     setImmutableCache(reply);
-    return readSignatures(ctx, docId, layerName, abortSignalFromRequest(req));
+    return readSignatures(ctx, docId, layerName, abortSignalOf(reply));
   });
 
   app.get('/v1/docs/:docId/layers/:layerName/signatures', async (req, reply) => {
@@ -139,7 +139,7 @@ export async function registerSignatureRoutes(
     const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
     const ctx = requireLayerResource(req, docId, layerName, 'layer-signatures', pdfBits);
     setNoStore(reply);
-    return readSignatures(ctx, docId, layerName, abortSignalFromRequest(req));
+    return readSignatures(ctx, docId, layerName, abortSignalOf(reply));
   });
 
   app.get('/v1/docs/:docId/layers/:layerName/signatures/analysis@:token', async (req, reply) => {
@@ -172,7 +172,7 @@ export async function registerSignatureRoutes(
     };
     // No cache header until the worker has answered: an error response must
     // never carry the immutable header the success path earns.
-    const analysis = await analyzeLayer(ctx, docId, layerName, input, abortSignalFromRequest(req));
+    const analysis = await analyzeLayer(ctx, docId, layerName, input, abortSignalOf(reply));
     return finishAnalysisReply(reply, analysis);
   });
 
@@ -194,7 +194,7 @@ export async function registerSignatureRoutes(
       docId,
       layerName,
       analyzeInputFromQuery(query, 'working-copy'),
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
   });
 
@@ -239,7 +239,7 @@ export async function registerSignatureRoutes(
     const prepared = await layerService.prepareSignature(
       ctx,
       { docId, layerName, input },
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
     return encodePrepared(prepared);
   });
@@ -272,7 +272,7 @@ export async function registerSignatureRoutes(
       return layerService.completeSignature(
         ctx,
         { docId, layerName, signingId, cms, expectedVersion: body.expectedVersion },
-        abortSignalFromRequest(req),
+        abortSignalOf(reply),
       );
     },
   );
@@ -337,12 +337,7 @@ export async function registerSignatureRoutes(
     const accessCtx = requireDocAccessOnly(req, docId);
     const pdfBits = await bitsForDoc(accessCtx, docId);
     const ctx = requireResource(req, docId, 'version-signatures', pdfBits);
-    const snapshot = await versionSignatures(
-      ctx,
-      docId,
-      requireSha(sha),
-      abortSignalFromRequest(req),
-    );
+    const snapshot = await versionSignatures(ctx, docId, requireSha(sha), abortSignalOf(reply));
     setImmutableCache(reply);
     return snapshot;
   });
@@ -363,7 +358,7 @@ export async function registerSignatureRoutes(
       requireSha(sha),
       (sessionId, jobId) =>
         wirePack({ kind: 'signatures.contents' as const, jobId, docId: sessionId, ref }),
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
     if (payload.tag !== 'signatures.contents') {
       throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload: ${payload.tag}`);
@@ -404,7 +399,7 @@ export async function registerSignatureRoutes(
             ref,
             algorithm: algorithm as DigestAlgorithm,
           }),
-        abortSignalFromRequest(req),
+        abortSignalOf(reply),
       );
       if (payload.tag !== 'signatures.digest') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload: ${payload.tag}`);
@@ -438,7 +433,7 @@ export async function registerSignatureRoutes(
       requireSha(sha),
       (sessionId, jobId) =>
         wirePack({ kind: 'signatures.analyze' as const, jobId, docId: sessionId, input }),
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
     if (payload.tag !== 'signatures.analyze') {
       throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload: ${payload.tag}`);
@@ -468,12 +463,7 @@ export async function registerSignatureRoutes(
       );
     }
     const version = await service.requireVersion(ctx, docId, requireSha(sha));
-    const snapshot = await versionSignatures(
-      ctx,
-      docId,
-      version.sha256,
-      abortSignalFromRequest(req),
-    );
+    const snapshot = await versionSignatures(ctx, docId, version.sha256, abortSignalOf(reply));
     const revision = snapshot.revisions[Number(index)];
     if (!revision) {
       throw new EngineError(

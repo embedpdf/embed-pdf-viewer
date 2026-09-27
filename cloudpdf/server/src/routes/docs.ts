@@ -21,12 +21,7 @@ import {
   requireResource,
 } from '../app/jwt-plugin';
 import type { DocumentService, SavedPdfFile } from '../services/DocumentService';
-import {
-  abortSignalFromRequest,
-  parseTokenOrInvalidArg,
-  setImmutableCache,
-  setNoStore,
-} from './_helpers';
+import { abortSignalOf, parseTokenOrInvalidArg, setImmutableCache, setNoStore } from './_helpers';
 import { requireSharedDocRead } from './_planeGuard';
 
 export interface DocsRouteDeps {
@@ -111,12 +106,7 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
         `layout version ${requested} no longer current (current=${manifest.layoutVersion})`,
       );
     }
-    const snapshot = await service.getLayerLayout(
-      ctx,
-      docId,
-      undefined,
-      abortSignalFromRequest(req),
-    );
+    const snapshot = await service.getLayerLayout(ctx, docId, undefined, abortSignalOf(reply));
     setImmutableCache(reply);
     return snapshot;
   });
@@ -133,12 +123,7 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
         `actions version ${requested} no longer current (current=${manifest.actionsVersion})`,
       );
     }
-    const snapshot = await service.getLayerActions(
-      ctx,
-      docId,
-      undefined,
-      abortSignalFromRequest(req),
-    );
+    const snapshot = await service.getLayerActions(ctx, docId, undefined, abortSignalOf(reply));
     setImmutableCache(reply);
     return snapshot;
   });
@@ -203,12 +188,7 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
         `layout version ${requested} no longer current (current=${manifest.layoutVersion})`,
       );
     }
-    const snapshot = await service.getLayerLayout(
-      ctx,
-      docId,
-      layerName,
-      abortSignalFromRequest(req),
-    );
+    const snapshot = await service.getLayerLayout(ctx, docId, layerName, abortSignalOf(reply));
     setImmutableCache(reply);
     return snapshot;
   });
@@ -218,12 +198,7 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
     const ctx = requireLayerResource(req, docId, layerName, 'layer-layout', pdfBits);
-    const snapshot = await service.getLayerLayout(
-      ctx,
-      docId,
-      layerName,
-      abortSignalFromRequest(req),
-    );
+    const snapshot = await service.getLayerLayout(ctx, docId, layerName, abortSignalOf(reply));
     setNoStore(reply);
     return snapshot;
   });
@@ -246,12 +221,7 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
         `actions version ${requested} no longer current (current=${manifest.actionsVersion})`,
       );
     }
-    const snapshot = await service.getLayerActions(
-      ctx,
-      docId,
-      layerName,
-      abortSignalFromRequest(req),
-    );
+    const snapshot = await service.getLayerActions(ctx, docId, layerName, abortSignalOf(reply));
     setImmutableCache(reply);
     return snapshot;
   });

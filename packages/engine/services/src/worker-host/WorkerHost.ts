@@ -5,6 +5,7 @@ import type {
 import { MeasureReader, MeasureMutator } from '../features/measure';
 import {
   DEFAULT_ANNOTATION_BUNDLE_LIMITS,
+  AbortError,
   EMPTY_TRANSFER,
   EngineError,
   EngineErrorCode,
@@ -108,7 +109,7 @@ import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import { DocumentSession } from '../document-session/DocumentSession';
 import { DecodedImageStore } from '../document-session/pages/DecodedImageStore';
-import { IdlePageCache } from '../document-session/pages/IdlePageCache';
+import { DEFAULT_IDLE_PAGE_POLICY, IdlePageCache } from '../document-session/pages/IdlePageCache';
 import { BaseDocumentRegistry } from '../document-session/lifecycle/BaseDocumentRegistry';
 import {
   openFatMemoryDocument,
@@ -138,7 +139,7 @@ import {
 } from '../features/pages';
 import { PieceInfoAccessor } from '../features/pieceinfo';
 import { RedactionApplier } from '../features/redaction';
-import { PageRenderReader } from '../features/render';
+import { PageRenderReader, type RenderSlices } from '../features/render';
 import { DocumentSaver } from '../features/save';
 import { SearchReader } from '../features/search';
 import { SecurityReader } from '../features/security';
@@ -153,6 +154,7 @@ import {
 import { PageTextReader } from '../features/text';
 import { ensureInitialized, destroyLibrary } from '../runtime/lifecycle/bootstrap';
 import { generateUuid } from '../shared/uuid';
+import { createEventLoopYield } from '../shared/yield';
 
 /** The image a {@link WorkerImageEncoder} produced. `bytes` must own its
  *  buffer (a fresh allocation, not a pooled `Buffer` slab view) — it is
@@ -190,7 +192,25 @@ export interface WorkerHostOptions {
    * {@link DecodedImageStore}). Defaults to 128 MB; 0 keeps none.
    */
   decodedImageBudgetBytes?: number;
+  /**
+   * Milliseconds a page render runs before it lets this thread receive
+   * messages, so an abort stops it about this soon. Defaults to
+   * {@link DEFAULT_RENDER_SLICE_MS}.
+   */
+  renderSliceMs?: number;
 }
+
+/** See {@link WorkerHostOptions.renderSliceMs}. */
+export const DEFAULT_RENDER_SLICE_MS = 8;
+
+/** The kinds that render a page, in slices (see {@link RenderSlices}). */
+type PageRenderRequest =
+  | PagesRenderWorkerRequest
+  | PagesRenderEncodedWorkerRequest
+  | DocumentRenderPageFileWorkerRequest
+  | DocumentRenderPageFileEncodedWorkerRequest;
+
+type JobRequest = Exclude<WorkerRequest, { kind: 'abort' }>;
 
 /**
  * Job kinds that only read the document and may reuse pages kept loaded by an
@@ -236,6 +256,16 @@ export class WorkerHost {
   private readonly idlePages: IdlePageCache;
   /** Image decodes kept between read-only jobs, for every session on this runtime. */
   private readonly decodedImages: DecodedImageStore;
+  private readonly renderSlices: RenderSlices;
+  /**
+   * True while a page render is in progress. The render pauses between slices
+   * so this thread can receive an abort, but PDFium holds the page's render
+   * until it ends, so nothing else may use PDFium meanwhile: requests that
+   * arrive are held (see {@link receive}).
+   */
+  private rendering = false;
+  /** Requests that arrived while a render was in progress, in arrival order. */
+  private readonly held: JobRequest[] = [];
   private destroyed = false;
 
   constructor(
@@ -255,8 +285,16 @@ export class WorkerHost {
     ensureInitialized(this.runtime);
     this.baseDocuments = new BaseDocumentRegistry(this.runtime);
     this.fonts = new FontRegistrar(this.runtime, this.fontIds);
-    this.idlePages = new IdlePageCache(this.runtime);
+    this.idlePages = new IdlePageCache(
+      this.runtime,
+      DEFAULT_IDLE_PAGE_POLICY,
+      () => this.rendering,
+    );
     this.decodedImages = new DecodedImageStore(this.runtime, this.options.decodedImageBudgetBytes);
+    this.renderSlices = {
+      budgetMs: this.options.renderSliceMs ?? DEFAULT_RENDER_SLICE_MS,
+      between: createEventLoopYield(),
+    };
   }
 
   /**
@@ -272,28 +310,62 @@ export class WorkerHost {
 
   receive(msg: WorkerRequest): void {
     if (msg.kind === 'abort') {
-      this.aborts.get(msg.jobId)?.abort();
+      this.abort(msg.jobId);
       return;
     }
+    // While a page render is in progress, and until every request held
+    // meanwhile has run, requests wait their turn in arrival order.
+    if (this.rendering || this.held.length > 0) {
+      this.held.push(msg);
+      return;
+    }
+    this.run(msg);
+  }
 
-    // Before either route below: any job that is not read-only closes every
+  /** Stops a running job, or answers a held one as aborted without running it. */
+  private abort(jobId: WorkerJobId): void {
+    const index = this.held.findIndex((msg) => msg.jobId === jobId);
+    if (index < 0) {
+      this.aborts.get(jobId)?.abort();
+      return;
+    }
+    this.held.splice(index, 1);
+    const error = serializeError(new AbortError('aborted before it ran'));
+    this.post(wirePack({ kind: 'reject', jobId, error }, EMPTY_TRANSFER));
+  }
+
+  /** Runs held requests in order until one starts a page render. */
+  private drain(): void {
+    while (!this.rendering) {
+      const next = this.held.shift();
+      if (!next) return;
+      this.run(next);
+    }
+  }
+
+  private run(msg: JobRequest): void {
+    // Before any route below: any job that is not read-only closes every
     // idle page and drops every kept image decode first, so no change can meet
     // a page or an image decoded before it.
     const readOnly = READ_ONLY_KINDS.has(msg.kind);
     this.idlePages.beginJob(readOnly);
     this.decodedImages.beginJob(readOnly);
 
-    // The encoded render kinds are the protocol's only async ops: their
-    // raster comes from the same sync handlers as the raw kinds (all
-    // session/registry use completes before the first await), and only
-    // the injected image encode awaits. They run on a parallel async
-    // path with identical resolve/reject/abort bookkeeping; everything
-    // else stays on the synchronous switch below, unchanged.
+    // Page renders run in slices, awaiting between them; see receiveRender.
     if (
+      msg.kind === 'pages.render' ||
       msg.kind === 'pages.renderEncoded' ||
-      msg.kind === 'document.renderPageFileEncoded' ||
-      msg.kind === 'annotations.renderAppearancesEncoded'
+      msg.kind === 'document.renderPageFile' ||
+      msg.kind === 'document.renderPageFileEncoded'
     ) {
+      void this.receiveRender(msg);
+      return;
+    }
+    // The encoded appearance render's rasters come from the same sync handler
+    // as the raw kind; only the injected image encode awaits, and PDFium is
+    // done by then, so other requests may run meanwhile. Everything else stays
+    // on the synchronous switch below.
+    if (msg.kind === 'annotations.renderAppearancesEncoded') {
       void this.receiveEncoded(msg);
       return;
     }
@@ -502,9 +574,6 @@ export class WorkerHost {
         case 'pages.geometry':
           resultPack = this.handlePagesGeometry(msg, ctrl.signal);
           break;
-        case 'pages.render':
-          resultPack = this.handlePagesRender(msg, ctrl.signal);
-          break;
         case 'search.query':
           resultPack = this.handleSearchQuery(msg, ctrl.signal);
           break;
@@ -519,9 +588,6 @@ export class WorkerHost {
           break;
         case 'document.probeSecurityFile':
           resultPack = this.handleDocumentProbeSecurityFile(msg);
-          break;
-        case 'document.renderPageFile':
-          resultPack = this.handleDocumentRenderPageFile(msg, ctrl.signal);
           break;
         case 'document.checkPasswordPermissions':
           resultPack = this.handleDocumentCheckPasswordPermissions(msg);
@@ -1338,62 +1404,93 @@ export class WorkerHost {
     return wirePack({ tag: 'search.query', slice });
   }
 
-  private handlePagesRender(
+  private async handlePagesRender(
     req: PagesRenderWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): Promise<WirePack<WorkerResultPayload>> {
     const session = this.requireSession(req);
     const reader = new PageRenderReader(this.runtime, session);
-    const raster = reader.render(
+    const raster = await reader.render(
       session.resolvePageRef(req.page).pageObjectNumber,
       req.options ?? {},
       signal,
+      this.renderSlices,
     );
     return wirePack({ tag: 'pages.render', raster }, [raster.data]);
   }
 
+  /**
+   * A page render: it runs in slices, and until its PDFium work ends
+   * (`rendering`), requests are held. An encoded kind then encodes the raster
+   * while other requests run.
+   */
+  private async receiveRender(msg: PageRenderRequest): Promise<void> {
+    // Fail-fast before any native work: a host without an injected encoder
+    // (browser/local workers) rejects the job without paying for a raster it
+    // could never encode.
+    const encoded =
+      msg.kind === 'pages.renderEncoded' || msg.kind === 'document.renderPageFileEncoded';
+    if (encoded && !this.options.imageEncoder) {
+      this.post(
+        wirePack({ kind: 'reject', jobId: msg.jobId, error: noEncoderError() }, EMPTY_TRANSFER),
+      );
+      return;
+    }
+    const ctrl = new AbortController();
+    this.aborts.set(msg.jobId, ctrl);
+    // Set before the handler's first await, so a request that arrives while
+    // the render pauses is held.
+    this.rendering = true;
+    try {
+      let rendered: WirePack<WorkerResultPayload>;
+      try {
+        rendered =
+          msg.kind === 'pages.render' || msg.kind === 'pages.renderEncoded'
+            ? await this.handlePagesRender({ ...msg, kind: 'pages.render' }, ctrl.signal)
+            : await this.handleDocumentRenderPageFile(
+                { ...msg, kind: 'document.renderPageFile' },
+                ctrl.signal,
+              );
+      } finally {
+        this.rendering = false;
+        // After this job's own reply below, which follows synchronously.
+        queueMicrotask(() => this.drain());
+      }
+      const resultPack =
+        msg.kind === 'pages.renderEncoded' || msg.kind === 'document.renderPageFileEncoded'
+          ? await this.encodeRendered(rendered, msg.encode, ctrl.signal)
+          : rendered;
+      this.post(
+        wirePack(
+          { kind: 'resolve', jobId: msg.jobId, result: resultPack.payload },
+          resultPack.transfer,
+        ),
+      );
+    } catch (err) {
+      this.post(
+        wirePack({ kind: 'reject', jobId: msg.jobId, error: serializeError(err) }, EMPTY_TRANSFER),
+      );
+    } finally {
+      this.aborts.delete(msg.jobId);
+    }
+  }
+
   private async receiveEncoded(
-    msg:
-      | PagesRenderEncodedWorkerRequest
-      | DocumentRenderPageFileEncodedWorkerRequest
-      | AnnotationsRenderAppearancesEncodedWorkerRequest,
+    msg: AnnotationsRenderAppearancesEncodedWorkerRequest,
   ): Promise<void> {
     // Fail-fast before any native work: a host without an injected
     // encoder (browser/local workers) rejects the job without paying for
     // a raster it could never encode.
     if (!this.options.imageEncoder) {
       this.post(
-        wirePack(
-          {
-            kind: 'reject',
-            jobId: msg.jobId,
-            error: serializeError(
-              new EngineError(
-                EngineErrorCode.NotImplemented,
-                'this engine has no image encoder (the *.renderEncoded kinds are cloud-server surface)',
-              ),
-            ),
-          },
-          EMPTY_TRANSFER,
-        ),
+        wirePack({ kind: 'reject', jobId: msg.jobId, error: noEncoderError() }, EMPTY_TRANSFER),
       );
       return;
     }
     const ctrl = new AbortController();
     this.aborts.set(msg.jobId, ctrl);
     try {
-      let resultPack: WirePack<WorkerResultPayload>;
-      switch (msg.kind) {
-        case 'pages.renderEncoded':
-          resultPack = await this.handlePagesRenderEncoded(msg, ctrl.signal);
-          break;
-        case 'document.renderPageFileEncoded':
-          resultPack = await this.handleDocumentRenderPageFileEncoded(msg, ctrl.signal);
-          break;
-        case 'annotations.renderAppearancesEncoded':
-          resultPack = await this.handleAnnotationsRenderAppearancesEncoded(msg, ctrl.signal);
-          break;
-      }
+      const resultPack = await this.handleAnnotationsRenderAppearancesEncoded(msg, ctrl.signal);
       this.post(
         wirePack(
           { kind: 'resolve', jobId: msg.jobId, result: resultPack.payload },
@@ -1416,10 +1513,7 @@ export class WorkerHost {
   ): Promise<EncodedImageWire> {
     const encoder = this.options.imageEncoder;
     if (!encoder) {
-      throw new EngineError(
-        EngineErrorCode.NotImplemented,
-        'this engine has no image encoder (the *.renderEncoded kinds are cloud-server surface)',
-      );
+      throw new EngineError(EngineErrorCode.NotImplemented, NO_ENCODER_MESSAGE);
     }
     const { bytes, contentType } = await encoder.encode(raster, encode);
     // The encoder is not abortable; honor a cancellation that arrived
@@ -1430,41 +1524,32 @@ export class WorkerHost {
     return { contentType, width: raster.width, height: raster.height, bytes };
   }
 
-  private async handlePagesRenderEncoded(
-    req: PagesRenderEncodedWorkerRequest,
+  /** The encoded reply of a page render's raw one. */
+  private async encodeRendered(
+    rendered: WirePack<WorkerResultPayload>,
+    encode: RenderEncode,
     signal: AbortSignal,
   ): Promise<WirePack<WorkerResultPayload>> {
-    const inner = this.handlePagesRender({ ...req, kind: 'pages.render' }, signal);
-    if (inner.payload.tag !== 'pages.render') {
-      throw new EngineError(EngineErrorCode.WireFormat, `unexpected ${inner.payload.tag}`);
+    const { payload } = rendered;
+    if (payload.tag === 'pages.render') {
+      const image = await this.encodeRaster(payload.raster, encode, signal);
+      return wirePack({ tag: 'pages.renderEncoded', image }, [image.bytes.buffer]);
     }
-    const image = await this.encodeRaster(inner.payload.raster, req.encode, signal);
-    return wirePack({ tag: 'pages.renderEncoded', image }, [image.bytes.buffer]);
-  }
-
-  private async handleDocumentRenderPageFileEncoded(
-    req: DocumentRenderPageFileEncodedWorkerRequest,
-    signal: AbortSignal,
-  ): Promise<WirePack<WorkerResultPayload>> {
-    // The transient session closes inside the sync handler's finally —
-    // the raster owns its pixels, so encoding after close is sound.
-    const inner = this.handleDocumentRenderPageFile(
-      { ...req, kind: 'document.renderPageFile' },
-      signal,
-    );
-    if (inner.payload.tag !== 'document.renderPageFile') {
-      throw new EngineError(EngineErrorCode.WireFormat, `unexpected ${inner.payload.tag}`);
+    if (payload.tag === 'document.renderPageFile') {
+      // The transient session closed when the render ended; the raster owns
+      // its pixels, so encoding after close is sound.
+      const image = await this.encodeRaster(payload.raster, encode, signal);
+      return wirePack(
+        {
+          tag: 'document.renderPageFileEncoded',
+          page: payload.page,
+          pageCount: payload.pageCount,
+          image,
+        },
+        [image.bytes.buffer],
+      );
     }
-    const image = await this.encodeRaster(inner.payload.raster, req.encode, signal);
-    return wirePack(
-      {
-        tag: 'document.renderPageFileEncoded',
-        page: inner.payload.page,
-        pageCount: inner.payload.pageCount,
-        image,
-      },
-      [image.bytes.buffer],
-    );
+    throw new EngineError(EngineErrorCode.WireFormat, `unexpected ${payload.tag}`);
   }
 
   private async handleAnnotationsRenderAppearancesEncoded(
@@ -1598,10 +1683,10 @@ export class WorkerHost {
    * render, close. Shares the base parse with concurrent ad-hoc opens of
    * the same file via the registry refcount.
    */
-  private handleDocumentRenderPageFile(
+  private async handleDocumentRenderPageFile(
     req: DocumentRenderPageFileWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): Promise<WirePack<WorkerResultPayload>> {
     const session = new DocumentSession(this.runtime);
     const base = this.baseDocuments.acquireFileBase({
       key: `adhoc-file:${req.path}`,
@@ -1620,10 +1705,11 @@ export class WorkerHost {
           `renderPageFile: no page at index ${req.pageIndex} (pageCount=${layout.pageCount})`,
         );
       }
-      const raster = new PageRenderReader(this.runtime, session).render(
+      const raster = await new PageRenderReader(this.runtime, session).render(
         page.ref.pageObjectNumber,
         req.options ?? {},
         signal,
+        this.renderSlices,
       );
       return wirePack(
         {
@@ -2059,6 +2145,14 @@ const MUTATING_KINDS: ReadonlySet<WorkerRequest['kind']> = new Set<WorkerRequest
 
 function sessionKey(docId: string, layerName?: string): string {
   return `${docId}::${layerName ? `layer:${layerName}` : BASE_SESSION_SUFFIX}`;
+}
+
+const NO_ENCODER_MESSAGE =
+  'this engine has no image encoder (the *.renderEncoded kinds are cloud-server surface)';
+
+/** What an encoded kind answers on a host without an image encoder. */
+function noEncoderError(): SerializedEngineError {
+  return serializeError(new EngineError(EngineErrorCode.NotImplemented, NO_ENCODER_MESSAGE));
 }
 
 function sessionKeyBelongsToDoc(key: string, docId: string): boolean {

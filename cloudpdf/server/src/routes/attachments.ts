@@ -10,7 +10,7 @@ import {
 import type { FastifyInstance, FastifyReply } from 'fastify';
 
 import {
-  abortSignalFromRequest,
+  abortSignalOf,
   parseOrInvalidArg,
   parseTokenOrInvalidArg,
   resolvePageKeyParam,
@@ -84,7 +84,7 @@ export async function registerAttachmentRoutes(
       ctx,
       docId,
       undefined,
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
     setImmutableCache(reply);
     return items;
@@ -114,7 +114,7 @@ export async function registerAttachmentRoutes(
       docId,
       undefined,
       ref,
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
     return sendAttachmentFile(reply, file, 'immutable');
   });
@@ -156,7 +156,7 @@ export async function registerAttachmentRoutes(
         undefined,
         pageObjectNumber,
         ref,
-        abortSignalFromRequest(req),
+        abortSignalOf(reply),
       );
       return sendAttachmentFile(reply, file, 'immutable');
     },
@@ -184,7 +184,7 @@ export async function registerAttachmentRoutes(
       ctx,
       docId,
       layerName,
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
     setImmutableCache(reply);
     return items;
@@ -217,7 +217,7 @@ export async function registerAttachmentRoutes(
         docId,
         layerName,
         ref,
-        abortSignalFromRequest(req),
+        abortSignalOf(reply),
       );
       return sendAttachmentFile(reply, file, 'immutable');
     },
@@ -256,7 +256,7 @@ export async function registerAttachmentRoutes(
         layerName,
         pageObjectNumber,
         ref,
-        abortSignalFromRequest(req),
+        abortSignalOf(reply),
       );
       return sendAttachmentFile(reply, file, 'immutable');
     },
@@ -281,7 +281,7 @@ export async function registerAttachmentRoutes(
     return layerService.createAttachment(
       ctx,
       { docId, layerName, file, resources },
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
   });
 
@@ -296,11 +296,7 @@ export async function registerAttachmentRoutes(
     const ctx = requireLayerCapability(req, docId, layerName, 'doc.attachments.modify', pdfBits);
     const ref = attachmentRefFromPath(fileKey);
     setNoStore(reply);
-    return layerService.deleteAttachment(
-      ctx,
-      { docId, layerName, ref },
-      abortSignalFromRequest(req),
-    );
+    return layerService.deleteAttachment(ctx, { docId, layerName, ref }, abortSignalOf(reply));
   });
 }
 

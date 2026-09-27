@@ -14,7 +14,7 @@ import type { ManifestPage } from '@embedpdf/engine-core/wire';
  *
  * Route files must use these instead of local copies, so every route
  * gets the same "abort only on actual client disconnect" behaviour of
- * {@link abortSignalFromRequest}.
+ * {@link abortSignalOf}.
  */
 
 /**
@@ -91,40 +91,32 @@ export function toPageState(page: ManifestPage): PageState {
 }
 
 /**
- * Convert a Fastify request's lifecycle into an `AbortSignal` the
- * worker pool can react to.
+ * An `AbortSignal` that aborts when the client goes away before its reply is
+ * sent, so the worker pool stops work nobody waits for any more.
  *
- * Locked behaviour (do not loosen; aborting on every `close` breaks
- * every mutation):
+ * The response tells, not the request: by the time a client disconnects, its
+ * request has been read in full (`req.raw.complete` is true, for GET and POST
+ * alike, so a request-side check never fires); only the response sees its
+ * connection close before it finished.
  *
- *   - For body-bearing requests (POST/PATCH), Fastify finishes
- *     consuming the request stream before our handler runs. Node
- *     emits `close` on the IncomingMessage immediately after that.
- *     If we abort unconditionally on `close`, every request appears
- *     "aborted" to the worker, even when the client is happily
- *     awaiting the response.
- *
- *   - The fix: only abort when the request stream did not finish
- *     reading (`req.raw.complete === false`). That distinguishes a
- *     real client disconnect from a normal end-of-body signal.
- *
- *   - `req.raw.aborted` is checked up front for the rare case where
- *     the client tore down the connection before the handler started.
+ * Locked behaviour (do not loosen): a request whose reply is sent never
+ * aborts, whether its connection then closes or is kept alive.
  */
-export function abortSignalFromRequest(req: {
+export function abortSignalOf(reply: {
   raw: {
-    on(event: 'close', cb: () => void): void;
-    readonly complete: boolean;
-    readonly aborted?: boolean;
+    on(event: 'close', cb: () => void): unknown;
+    readonly writableFinished: boolean;
+    readonly destroyed: boolean;
   };
 }): AbortSignal {
   const ctrl = new AbortController();
-  if (req.raw.aborted) {
+  // The client left before the handler ran.
+  if (reply.raw.destroyed) {
     ctrl.abort();
     return ctrl.signal;
   }
-  req.raw.on('close', () => {
-    if (!req.raw.complete) ctrl.abort();
+  reply.raw.on('close', () => {
+    if (!reply.raw.writableFinished) ctrl.abort();
   });
   return ctrl.signal;
 }

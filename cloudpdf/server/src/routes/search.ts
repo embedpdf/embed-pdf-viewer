@@ -12,12 +12,7 @@ import {
 import { decodeSearchToken, encodeSearchToken } from '@embedpdf/engine-core/wire';
 import { requireLayerDocAccessOnly, requireLayerResource } from '../app/jwt-plugin';
 import type { DocumentService, OpenContext } from '../services/DocumentService';
-import {
-  abortSignalFromRequest,
-  parseTokenOrInvalidArg,
-  setImmutableCache,
-  setNoStore,
-} from './_helpers';
+import { abortSignalOf, parseTokenOrInvalidArg, setImmutableCache, setNoStore } from './_helpers';
 
 interface SearchRouteDeps {
   documentService: DocumentService;
@@ -134,7 +129,7 @@ async function runSearchSlice(
     docId,
     layerName,
     build,
-    abortSignalFromRequest(req),
+    abortSignalOf(reply),
   );
   if (result.tag !== 'search.query') {
     throw new EngineError(

@@ -187,6 +187,25 @@ describe('IdlePageCache with PagePtrPool', () => {
     expect(calls.closes).toEqual([1]);
   });
 
+  test('waits another period instead of closing idle pages while a job is between steps', () => {
+    vi.useFakeTimers();
+    const { runtime, calls } = createFakeRuntime({ 1: 10 });
+    let busy = false;
+    const cache = new IdlePageCache(runtime, { ...policy, idleMs: 1000 }, () => busy);
+    const pool = new PagePtrPool(runtime, DOC, cache);
+
+    cache.beginJob(true);
+    use(pool, 1);
+    busy = true;
+    vi.advanceTimersByTime(1000);
+    expect(calls.closes).toEqual([]);
+    busy = false;
+    vi.advanceTimersByTime(999);
+    expect(calls.closes).toEqual([]);
+    vi.advanceTimersByTime(1);
+    expect(calls.closes).toEqual([1]);
+  });
+
   test('keeps nothing on a runtime without EPDFPage_ResetRenderCache', () => {
     const { runtime, calls } = createFakeRuntime({ 1: 10 }, { canReset: false });
     const cache = new IdlePageCache(runtime, policy);

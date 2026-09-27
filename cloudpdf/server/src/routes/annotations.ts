@@ -52,7 +52,7 @@ import {
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import {
-  abortSignalFromRequest,
+  abortSignalOf,
   parseOrInvalidArg,
   parseTokenOrInvalidArg,
   resolvePageKeyParam,
@@ -137,7 +137,7 @@ export async function registerAnnotationRoutes(
       documentService,
       revisionBridge,
       reply,
-      signal: abortSignalFromRequest(req),
+      signal: abortSignalOf(reply),
       scope: { kind: 'base', ctx, docId },
       pageObjectNumber: resolvePageKeyParam(pageKey),
       requestedVersion: parseTokenOrInvalidArg(
@@ -166,7 +166,7 @@ export async function registerAnnotationRoutes(
         encodeInEngine,
         ...(derivedRenders ? { derivedRenders } : {}),
         reply,
-        signal: abortSignalFromRequest(req),
+        signal: abortSignalOf(reply),
         scope: { kind: 'base', ctx, docId },
         pageObjectNumber: resolvePageKeyParam(pageKey),
         tokenQuery: parseTokenOrInvalidArg(
@@ -195,7 +195,7 @@ export async function registerAnnotationRoutes(
         documentService,
         revisionBridge,
         reply,
-        signal: abortSignalFromRequest(req),
+        signal: abortSignalOf(reply),
         scope: { kind: 'layer', ctx, docId, layerName },
         pageObjectNumber: resolvePageKeyParam(pageKey),
         requestedVersion: parseTokenOrInvalidArg(
@@ -222,7 +222,7 @@ export async function registerAnnotationRoutes(
         documentService,
         revisionBridge,
         reply,
-        signal: abortSignalFromRequest(req),
+        signal: abortSignalOf(reply),
         scope: { kind: 'layer', ctx, docId, layerName },
         pageObjectNumber: resolvePageKeyParam(pageKey),
       });
@@ -245,7 +245,7 @@ export async function registerAnnotationRoutes(
       documentService,
       revisionBridge,
       reply,
-      signal: abortSignalFromRequest(req),
+      signal: abortSignalOf(reply),
       scope: { kind: 'base', ctx, docId },
       requestedVersion: parseTokenOrInvalidArg(
         decodeAnnotationsAllToken,
@@ -268,7 +268,7 @@ export async function registerAnnotationRoutes(
       documentService,
       revisionBridge,
       reply,
-      signal: abortSignalFromRequest(req),
+      signal: abortSignalOf(reply),
       scope: { kind: 'layer', ctx, docId, layerName },
       requestedVersion: parseTokenOrInvalidArg(
         decodeAnnotationsAllToken,
@@ -297,7 +297,7 @@ export async function registerAnnotationRoutes(
         documentService,
         limits: bundleLimits,
         reply,
-        signal: abortSignalFromRequest(req),
+        signal: abortSignalOf(reply),
         scope: { kind: 'base', ctx, docId },
         token: parseTokenOrInvalidArg(
           decodeAnnotationsExportToken,
@@ -324,7 +324,7 @@ export async function registerAnnotationRoutes(
         documentService,
         limits: bundleLimits,
         reply,
-        signal: abortSignalFromRequest(req),
+        signal: abortSignalOf(reply),
         scope: { kind: 'layer', ctx, docId, layerName },
         token: parseTokenOrInvalidArg(
           decodeAnnotationsExportToken,
@@ -350,7 +350,7 @@ export async function registerAnnotationRoutes(
         req.body,
         'request body',
       );
-      const signal = abortSignalFromRequest(req);
+      const signal = abortSignalOf(reply);
       const refs = request.selection.refs
         ? await layerService.workerRefsForRead(
             accessCtx,
@@ -384,7 +384,7 @@ export async function registerAnnotationRoutes(
       documentService,
       revisionBridge,
       reply,
-      signal: abortSignalFromRequest(req),
+      signal: abortSignalOf(reply),
       scope: { kind: 'layer', ctx, docId, layerName },
     });
   });
@@ -414,7 +414,7 @@ export async function registerAnnotationRoutes(
         encodeInEngine,
         ...(derivedRenders ? { derivedRenders } : {}),
         reply,
-        signal: abortSignalFromRequest(req),
+        signal: abortSignalOf(reply),
         scope: { kind: 'layer', ctx, docId, layerName },
         pageObjectNumber: resolvePageKeyParam(pageKey),
         tokenQuery: parseTokenOrInvalidArg(
@@ -445,7 +445,7 @@ export async function registerAnnotationRoutes(
         encodeInEngine,
         ...(derivedRenders ? { derivedRenders } : {}),
         reply,
-        signal: abortSignalFromRequest(req),
+        signal: abortSignalOf(reply),
         scope: { kind: 'layer', ctx, docId, layerName },
         pageObjectNumber: resolvePageKeyParam(pageKey),
         query: req.query,
@@ -597,7 +597,7 @@ export async function registerAnnotationRoutes(
         limits,
         ...(idempotencyKey ? { idempotencyKey } : {}),
       },
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
   });
 
@@ -642,7 +642,7 @@ export async function registerAnnotationRoutes(
           actor,
           ...(resources ? { resources } : {}),
         },
-        abortSignalFromRequest(req),
+        abortSignalOf(reply),
       );
     },
   );
@@ -688,7 +688,7 @@ export async function registerAnnotationRoutes(
       return layerService.moveAnnotations(
         ctx,
         { docId, layerName, pageObjectNumber, refs, toIndex: rawToIndex },
-        abortSignalFromRequest(req),
+        abortSignalOf(reply),
       );
     },
   );
@@ -721,7 +721,7 @@ export async function registerAnnotationRoutes(
       return layerService.flattenAnnotations(
         ctx,
         { docId, layerName, pageObjectNumber, refs: body.refs, usage: body.usage },
-        abortSignalFromRequest(req),
+        abortSignalOf(reply),
       );
     },
   );
@@ -753,7 +753,7 @@ export async function registerAnnotationRoutes(
         layerName,
         pageObjectNumber,
         body.refs,
-        abortSignalFromRequest(req),
+        abortSignalOf(reply),
       );
       setNoStore(reply);
       reply.type('application/pdf');
@@ -783,7 +783,7 @@ export async function registerAnnotationRoutes(
         layerName,
         pageObjectNumber,
         refFromKey(annotKey, pageObjectNumber),
-        abortSignalFromRequest(req),
+        abortSignalOf(reply),
       );
       setNoStore(reply);
       reply.type('application/pdf');
@@ -806,7 +806,7 @@ export async function registerAnnotationRoutes(
       const envelope = await readMutationEnvelope(req, annotationBinaryPolicy);
       const body = envelope.body as Record<string, unknown> | null | undefined;
       const resources = annotationResourcesOf(envelope);
-      const signal = abortSignalFromRequest(req);
+      const signal = abortSignalOf(reply);
 
       if (annotKey === 'index') {
         const ref = parseOrInvalidArg<AnnotationRef>(
@@ -897,7 +897,7 @@ export async function registerAnnotationRoutes(
         );
       }
 
-      const signal = abortSignalFromRequest(req);
+      const signal = abortSignalOf(reply);
       const ref = refFromKey(annotKey, pageObjectNumber);
       setNoStore(reply);
       return deleteWithThread(req, accessCtx, pdfBits, { docId, layerName, ref }, signal);

@@ -1,6 +1,7 @@
 import { Buffer } from 'node:buffer';
 
 import {
+  AbortError,
   appearanceLatticeScale,
   EngineError,
   EngineErrorCode,
@@ -95,13 +96,23 @@ export interface DerivedRenderResult {
   source: 'store' | 'produced';
 }
 
+/** One render in progress for a key, shared by every caller of that key. */
+interface Flight {
+  readonly done: Promise<DerivedRenderResult>;
+  /** Aborted once no caller waits any more. */
+  readonly controller: AbortController;
+  /** Callers waiting with a signal they may abort, or without one. */
+  waiting: number;
+}
+
 /**
  * The derived-artifact plane for renders.
  *
  * One door: `getOrRender` is a read-through over the object store with
  * per-key singleflight — the route's miss path and the ingest warmer both
  * come through here, so a warm racing a dashboard read collapses to one
- * render. Cross-replica duplicates are accepted (cache, not truth).
+ * render. Cross-replica duplicates are accepted (cache, not truth). A shared
+ * render stops only once every caller waiting for it has left.
  *
  * The lattice makes durability sane: URL space == artifact space at the
  * canonical points, so a page has a bounded artifact set per version.
@@ -118,7 +129,7 @@ export class DerivedRenderService {
   private readonly encodeInEngine: boolean;
   private readonly documents?: DocumentsRepo;
   private readonly onWarmError?: (err: unknown, ctx: { docId: string; tenantId: string }) => void;
-  private readonly inFlight = new Map<string, Promise<DerivedRenderResult>>();
+  private readonly inFlight = new Map<string, Flight>();
 
   constructor(opts: DerivedRenderServiceOptions) {
     this.storage = opts.storage;
@@ -279,35 +290,87 @@ export class DerivedRenderService {
    * key per process), persist best-effort, serve. A failed persist never
    * fails the response — the artifact is a cache, the bytes in hand are
    * the truth.
+   *
+   * `signal` is the caller's: when it aborts, that caller is rejected at
+   * once, and when every caller waiting for the render has left, the signal
+   * `produce` got aborts, so the engine stops the render. A caller without a
+   * signal never leaves.
    */
   async getOrRender(
     key: string,
-    produce: () => Promise<{ bytes: Uint8Array; contentType: string }>,
+    produce: (signal: AbortSignal) => Promise<{ bytes: Uint8Array; contentType: string }>,
+    signal?: AbortSignal,
   ): Promise<DerivedRenderResult> {
+    if (signal?.aborted) throw new AbortError(signal.reason);
     const stored = await this.storage.get(key);
     if (stored) {
       return { bytes: stored, contentType: contentTypeForKey(key), source: 'store' };
     }
     const existing = this.inFlight.get(key);
-    if (existing) return existing;
+    if (existing) return this.wait(existing, signal);
 
-    const job = (async (): Promise<DerivedRenderResult> => {
-      // Re-check under the flight: a concurrent producer (other replica,
-      // or a warm that finished between our miss and now) may have landed.
-      const won = await this.storage.get(key);
-      if (won) {
-        return { bytes: won, contentType: contentTypeForKey(key), source: 'store' };
+    const controller = new AbortController();
+    const flight: Flight = {
+      controller,
+      waiting: 0,
+      done: (async (): Promise<DerivedRenderResult> => {
+        // Re-check under the flight: a concurrent producer (other replica,
+        // or a warm that finished between our miss and now) may have landed.
+        const won = await this.storage.get(key);
+        if (won) {
+          return { bytes: won, contentType: contentTypeForKey(key), source: 'store' };
+        }
+        const produced = await produce(controller.signal);
+        await this.storage
+          .put(key, produced.bytes, { contentLength: produced.bytes.byteLength })
+          .catch(() => undefined);
+        return { bytes: produced.bytes, contentType: produced.contentType, source: 'produced' };
+      })().finally(() => {
+        if (this.inFlight.get(key) === flight) this.inFlight.delete(key);
+      }),
+    };
+    // Every caller left: stop the render, and let a later caller start a new
+    // one rather than join this one as it ends.
+    controller.signal.addEventListener(
+      'abort',
+      () => {
+        if (this.inFlight.get(key) === flight) this.inFlight.delete(key);
+      },
+      { once: true },
+    );
+    // Waiters see a failure through wait(); this only keeps one that no
+    // caller waits for any more from going unhandled.
+    flight.done.catch(() => undefined);
+    this.inFlight.set(key, flight);
+    return this.wait(flight, signal);
+  }
+
+  /** Waits for `flight` until it ends or `signal` aborts; see getOrRender. */
+  private wait(flight: Flight, signal: AbortSignal | undefined): Promise<DerivedRenderResult> {
+    flight.waiting += 1;
+    if (!signal) return flight.done;
+    return new Promise<DerivedRenderResult>((resolve, reject) => {
+      const leave = () => {
+        reject(new AbortError(signal.reason));
+        flight.waiting -= 1;
+        if (flight.waiting === 0) flight.controller.abort(signal.reason);
+      };
+      if (signal.aborted) {
+        leave();
+        return;
       }
-      const produced = await produce();
-      await this.storage
-        .put(key, produced.bytes, { contentLength: produced.bytes.byteLength })
-        .catch(() => undefined);
-      return { bytes: produced.bytes, contentType: produced.contentType, source: 'produced' };
-    })().finally(() => {
-      this.inFlight.delete(key);
+      signal.addEventListener('abort', leave, { once: true });
+      flight.done.then(
+        (result) => {
+          signal.removeEventListener('abort', leave);
+          resolve(result);
+        },
+        (error: unknown) => {
+          signal.removeEventListener('abort', leave);
+          reject(error);
+        },
+      );
     });
-    this.inFlight.set(key, job);
-    return job;
   }
 
   /**

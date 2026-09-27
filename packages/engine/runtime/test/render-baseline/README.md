@@ -48,9 +48,18 @@ left behind.
 | `--wasm-binary <file>` | render with another `embedpdf.wasm`, without replacing the file |
 | `--only <text>`        | only documents whose id contains the text                       |
 | `--image-budget <MB>`  | decoded images kept across page loads, in MB (128; 0 for none)  |
+| `--slice-ms <ms>`      | render `engine` variants in slices of this budget (0: finest)   |
 | `--jobs <n>`           | worker processes (default: half the cores, at most 4)           |
 | `--timeout <seconds>`  | per document (default 300)                                      |
 | `--strict`             | check: also fail on cases the baseline does not have            |
+
+With `--slice-ms`, `engine` variants render through
+`EPDF_RenderPageBitmapWithMatrix_Start` / `EPDF_RenderPage_Continue`, pausing
+once the budget has passed, as the engine renders a page so that it can be
+cancelled. The digests must match a baseline recorded without it. The run also
+reports how long the longest slice of each render took: PDFium pauses only
+between objects and within image stretching, so a form, a transparency group or
+an image decode can run past the budget.
 
 Each document renders in a worker process, so a crash or a timeout is recorded
 for that document (`crashed:<signal>`, `timeout`) and the run continues.

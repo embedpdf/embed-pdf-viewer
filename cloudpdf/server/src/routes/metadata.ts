@@ -9,7 +9,7 @@ import {
 import type { DocumentService } from '../services/DocumentService';
 import type { LayerService } from '../services/LayerService';
 import {
-  abortSignalFromRequest,
+  abortSignalOf,
   parseOrInvalidArg,
   parseTokenOrInvalidArg,
   setImmutableCache,
@@ -43,12 +43,7 @@ export async function registerMetadataRoutes(
         `metadata version ${requested} no longer current (current=${manifest.metadataVersion})`,
       );
     }
-    const metadata = await service.readLayerMetadata(
-      ctx,
-      docId,
-      undefined,
-      abortSignalFromRequest(req),
-    );
+    const metadata = await service.readLayerMetadata(ctx, docId, undefined, abortSignalOf(reply));
     setImmutableCache(reply);
     return metadata;
   });
@@ -71,12 +66,7 @@ export async function registerMetadataRoutes(
         `metadata version ${requested} no longer current (current=${manifest.metadataVersion})`,
       );
     }
-    const metadata = await service.readLayerMetadata(
-      ctx,
-      docId,
-      layerName,
-      abortSignalFromRequest(req),
-    );
+    const metadata = await service.readLayerMetadata(ctx, docId, layerName, abortSignalOf(reply));
     setImmutableCache(reply);
     return metadata;
   });
@@ -89,12 +79,7 @@ export async function registerMetadataRoutes(
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await service.getEffectivePdfBits(accessCtx, docId, layerName);
     const ctx = requireLayerResource(req, docId, layerName, 'layer-metadata', pdfBits);
-    const metadata = await service.readLayerMetadata(
-      ctx,
-      docId,
-      layerName,
-      abortSignalFromRequest(req),
-    );
+    const metadata = await service.readLayerMetadata(ctx, docId, layerName, abortSignalOf(reply));
     setNoStore(reply);
     return metadata;
   });
@@ -114,10 +99,6 @@ export async function registerMetadataRoutes(
     );
 
     setNoStore(reply);
-    return layerService.updateMetadata(
-      ctx,
-      { docId, layerName, patch },
-      abortSignalFromRequest(req),
-    );
+    return layerService.updateMetadata(ctx, { docId, layerName, patch }, abortSignalOf(reply));
   });
 }

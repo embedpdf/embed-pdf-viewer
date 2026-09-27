@@ -23,7 +23,8 @@ import { readRectF } from '../../runtime/memory/structs';
  * and any future one (thumbnails, stamps, flatten) — composes these three
  * pieces and supplies only its own `draw` call. The geometry is a pure affine
  * (the engine twin of the viewer's `Mat2D`/`rotateScaleMatrix`); the bitmap
- * lifecycle (alloc → fill → draw → read back → free) lives in `rasterize`.
+ * lifecycle (alloc → fill → draw → read back → free) lives in `rasterize` and,
+ * for a draw that awaits, `rasterizeAsync`.
  */
 
 const FPDF_BITMAP_BGRA = 4;
@@ -113,6 +114,11 @@ export interface RasterizeOptions {
   draw: (bitmapPtr: Ptr, matrixPtr: Ptr, clipPtr: Ptr) => boolean;
 }
 
+/** {@link RasterizeOptions} with a `draw` that may await, as a sliced page render does. */
+export interface RasterizeAsyncOptions extends Omit<RasterizeOptions, 'draw'> {
+  draw: (bitmapPtr: Ptr, matrixPtr: Ptr, clipPtr: Ptr) => Promise<boolean>;
+}
+
 /**
  * Owns the whole bitmap lifecycle: allocate the pixel buffer + bitmap + matrix
  * (+ clip), fill the background, run the caller's `draw`, read the pixels back
@@ -120,8 +126,47 @@ export interface RasterizeOptions {
  * a failed allocation/draw.
  */
 export function rasterize(runtime: PdfRuntimeModule, opts: RasterizeOptions): PageRaster | null {
+  const target = allocateRaster(runtime, opts);
+  if (!target) return null;
+  try {
+    return opts.draw(target.bitmapPtr, target.matrixPtr, target.clipPtr) ? target.read() : null;
+  } finally {
+    target.free();
+  }
+}
+
+/** {@link rasterize} with a `draw` that may await; everything stays allocated until it settles. */
+export async function rasterizeAsync(
+  runtime: PdfRuntimeModule,
+  opts: RasterizeAsyncOptions,
+): Promise<PageRaster | null> {
+  const target = allocateRaster(runtime, opts);
+  if (!target) return null;
+  try {
+    return (await opts.draw(target.bitmapPtr, target.matrixPtr, target.clipPtr))
+      ? target.read()
+      : null;
+  } finally {
+    target.free();
+  }
+}
+
+/** A filled bitmap and its matrix and clip, ready for a draw. */
+interface RasterTarget {
+  readonly bitmapPtr: Ptr;
+  readonly matrixPtr: Ptr;
+  readonly clipPtr: Ptr;
+  /** Copies the pixels out. */
+  read(): PageRaster;
+  free(): void;
+}
+
+function allocateRaster(
+  runtime: PdfRuntimeModule,
+  opts: Omit<RasterizeOptions, 'draw'>,
+): RasterTarget | null {
   const { fn, mem } = runtime;
-  const { rect, page, rotation, viewport, background, draw } = opts;
+  const { rect, page, rotation, viewport, background } = opts;
 
   // Degenerate (zero/negative area) has no renderable output and would divide by
   // zero in the matrix.
@@ -143,10 +188,19 @@ export function rasterize(runtime: PdfRuntimeModule, opts: RasterizeOptions): Pa
   let bitmapPtr: Ptr | null = null;
   let matrixPtr: Ptr | null = null;
   let clipPtr: Ptr | null = null;
+  const free = () => {
+    if (bitmapPtr) fn.FPDFBitmap_Destroy(bitmapPtr);
+    if (clipPtr) mem.free(clipPtr);
+    if (matrixPtr) mem.free(matrixPtr);
+    if (pixelPtr) mem.free(pixelPtr);
+  };
   try {
     pixelPtr = mem.alloc(bytes);
     bitmapPtr = fn.FPDFBitmap_CreateEx(width, height, FPDF_BITMAP_BGRA, pixelPtr, stride);
-    if (!bitmapPtr) return null;
+    if (!bitmapPtr) {
+      free();
+      return null;
+    }
 
     fn.FPDFBitmap_FillRect(
       bitmapPtr,
@@ -165,24 +219,26 @@ export function rasterize(runtime: PdfRuntimeModule, opts: RasterizeOptions): Pa
     mem.poke(clipPtr, 'f32', 0, 4);
     mem.poke(clipPtr, 'f32', width, 8);
     mem.poke(clipPtr, 'f32', height, 12);
+  } catch (error) {
+    free();
+    throw error;
+  }
 
-    if (!draw(bitmapPtr, matrixPtr, clipPtr)) return null;
-
-    const pixels = mem.readBytes(pixelPtr, bytes);
-    return {
+  const pixels = pixelPtr;
+  return {
+    bitmapPtr,
+    matrixPtr,
+    clipPtr,
+    read: () => ({
       width,
       height,
       stride,
       color: 'rgba8',
       premultipliedAlpha: false,
-      data: toExactArrayBuffer(pixels),
-    };
-  } finally {
-    if (bitmapPtr) fn.FPDFBitmap_Destroy(bitmapPtr);
-    if (clipPtr) mem.free(clipPtr);
-    if (matrixPtr) mem.free(matrixPtr);
-    if (pixelPtr) mem.free(pixelPtr);
-  }
+      data: toExactArrayBuffer(mem.readBytes(pixels, bytes)),
+    }),
+    free,
+  };
 }
 
 /**
