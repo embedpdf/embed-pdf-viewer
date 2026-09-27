@@ -44,7 +44,10 @@ function renderDocument(document, profile) {
     }
     const pageCount = fn.FPDF_GetPageCount(doc);
     cases[`${document.id}#doc`] = { pages: pageCount };
-    for (const pageIndex of profile.pages(pageCount)) {
+    const pageIndices = document.allPages
+      ? Array.from({ length: pageCount }, (_, i) => i)
+      : profile.pages(pageCount);
+    for (const pageIndex of pageIndices) {
       const info = inspectPage(runtime, doc, pageIndex);
       const heavy = info !== null && info.objects > HEAVY_PAGE_OBJECTS;
       const variants = heavy
