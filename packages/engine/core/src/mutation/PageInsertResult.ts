@@ -1,6 +1,7 @@
 import type { MutationMeta } from './MutationMeta';
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
 import type { PageRef } from '../identity/PageRef';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
 /**
  * Result of a `pages.insert()`. The inserted pages are copies of the source
@@ -9,10 +10,10 @@ import type { PageRef } from '../identity/PageRef';
  * its identity and `RevisionToken` — an insert never invalidates refs on its
  * neighbours (same rule as `pages.move`).
  */
-export interface PageInsertResult {
+export interface PageInsertResult<C extends Coordinates = PageCoordinates> {
   /** The new pages, in the order they were inserted. */
   insertedPages: PageRef[];
   /** The new layout — every page in display order. */
-  layout: PageListSnapshot;
+  layout: PageListSnapshot<C>;
   meta: MutationMeta;
 }

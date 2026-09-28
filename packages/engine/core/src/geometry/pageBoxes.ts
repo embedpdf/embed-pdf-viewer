@@ -1,6 +1,7 @@
 import { pdfRectIntersection } from './convert';
 import type { PdfRect, PdfRotation } from './primitives';
 import type { PageBoxes } from '../dto/PageLayout';
+import type { PdfCoordinates } from '../pageSpace/coordinates';
 
 /**
  * A page's boxes as its dictionary writes them (ISO 32000-1 Table 30): the
@@ -33,7 +34,7 @@ const EMPTY_BOX: PdfRect = { left: 0, right: 0, bottom: 0, top: 0 };
  * nothing with the media box is empty, so a crop box off the page leaves a
  * page with no size.
  */
-export function pageBoxesOf(written: WrittenPageBoxes): PageBoxes {
+export function pageBoxesOf(written: WrittenPageBoxes): PageBoxes<PdfCoordinates> {
   const media = written.media ?? DEFAULT_MEDIA_BOX;
   const within = (box: PdfRect): PdfRect => pdfRectIntersection(box, media) ?? EMPTY_BOX;
   const crop = within(written.crop ?? media);

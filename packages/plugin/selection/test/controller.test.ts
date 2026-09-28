@@ -12,6 +12,7 @@ import type { PageGeometrySnapshot, PageTextSnapshot } from '@embedpdf/engine-co
 import { interactionPlugin } from '@embedpdf/plugin-interaction';
 import { selectionPlugin } from '../src/selection.plugin';
 import { SelectionToken } from '../src/host-contract';
+import { pageSpaceBoxesOf } from '@embedpdf/engine-core/runtime';
 
 /** The selection through the real kernel: permissions, the range model, text
  *  extraction, the gesture fact, events, invalidation. */
@@ -92,7 +93,14 @@ async function boot(fixtures: PageFixture[], allow = ALL) {
           size: { width: 200, height: 100 },
           rotation,
           userUnit: 1,
-          boxes: { media: { ...crop }, crop: { ...crop } },
+          boxes: pageSpaceBoxesOf({
+            media: { ...crop },
+            crop: { ...crop },
+            bleed: { ...crop },
+            trim: { ...crop },
+            art: { ...crop },
+          }),
+          pdfCropBox: { ...crop },
         }) as PageLayout,
     );
   const handle = {

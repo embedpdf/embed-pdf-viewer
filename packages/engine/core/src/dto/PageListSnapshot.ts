@@ -1,6 +1,6 @@
 import type { NamedPageEntry } from './NamedPage';
 import type { PageLayout } from './PageLayout';
-import type { Coordinates, PdfCoordinates } from '../pageSpace/coordinates';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
 /**
  * Read-only snapshot of every page in the open document, ordered by the
@@ -18,7 +18,7 @@ import type { Coordinates, PdfCoordinates } from '../pageSpace/coordinates';
  * DTOs); only the element type changed from a liveness envelope to
  * `PageLayout`.
  */
-export interface PageListSnapshot<C extends Coordinates = PdfCoordinates> {
+export interface PageListSnapshot<C extends Coordinates = PageCoordinates> {
   pageCount: number;
   pages: PageLayout<C>[];
   /**

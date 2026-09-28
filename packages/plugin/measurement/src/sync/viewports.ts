@@ -66,7 +66,7 @@ export function createViewportSync(
         viewports: pageViewports,
         status,
         error,
-        crop: layout?.boxes.crop,
+        crop: layout?.pdfCropBox,
         fallback: fallbackOf(layout),
         persistent,
       }),

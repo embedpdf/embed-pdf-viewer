@@ -1,6 +1,3 @@
-import type { PageScaleResult } from '../mutation/PageScaleResult';
-import type { PdfMeasure, PageMeasurementViewport } from '../dto/Measure';
-import type { FontIdentityInfo } from '../dto/FontSpec';
 import type { AnnotationList } from '../annotation/AnnotationList';
 import type { AnnotationDraft, AnnotationPatch } from '../annotation/kinds';
 import type { WireAnnotationResources } from '../annotation/resources';
@@ -12,6 +9,8 @@ import type {
 } from '../dto/AnnotationRender';
 import type { Attachment, AttachmentRef, WireAttachmentFile } from '../dto/Attachment';
 import type { DocumentMetadata } from '../dto/DocumentMetadata';
+import type { FontIdentityInfo } from '../dto/FontSpec';
+import type { PdfMeasure, PageMeasurementViewport } from '../dto/Measure';
 import type { MetadataPatch } from '../dto/MetadataPatch';
 import type { PageGeometrySnapshot } from '../dto/PageGeometrySnapshot';
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
@@ -20,6 +19,7 @@ import type { PageTextSnapshot } from '../dto/PageTextSnapshot';
 import type { DocumentActionsSnapshot } from '../dto/PdfAction';
 import type { PdfSaveMode } from '../dto/PdfSaveMode';
 import type { PieceInfoPatch, PieceInfoSnapshot } from '../dto/PieceInfo';
+import type { SessionKind } from '../dto/SessionKind';
 import type { PieceInfoDeleteResult, PieceInfoUpdateResult } from '../engine/PieceInfoService';
 import type { SerializedEngineError } from '../errors/EngineError';
 import type { FormFieldDraft } from '../forms/draft';
@@ -32,10 +32,7 @@ import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
 import type { PageRef } from '../identity/PageRef';
-import type { WireAnnotationBundle } from '../transfer/AnnotationBundle';
-import type { AnnotationImportPages, AnnotationImportResult } from '../transfer/annotationImport';
-import type { AnnotationBundleLimits } from '../transfer/bundleLimits';
-import type { AnnotationExportSelection } from '../transfer/exportSelection';
+import type { AnnotationFlattenResult } from '../mutation/AnnotationFlattenResult';
 import type {
   AnnotationCreateResult,
   AnnotationDeleteResult,
@@ -56,14 +53,15 @@ import type {
   FormWidgetLinkResult,
 } from '../mutation/FormMutationResults';
 import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
-import type { AnnotationFlattenResult } from '../mutation/AnnotationFlattenResult';
 import type { PageDeleteResult } from '../mutation/PageDeleteResult';
 import type { PageFlattenResult, PageFlattenUsage } from '../mutation/PageFlattenResult';
 import type { PageInsertResult } from '../mutation/PageInsertResult';
 import type { PageMoveResult } from '../mutation/PageMoveResult';
 import type { PageNameResult } from '../mutation/PageNameResult';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
+import type { PageScaleResult } from '../mutation/PageScaleResult';
 import type { RedactionApplyResult, RedactionApplyScope } from '../mutation/RedactionApplyResult';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 import type { WireResourceMap } from '../resource/BinarySource';
 import type { PageState } from '../revision/PageState';
 import type { SearchRequest, SearchSlice } from '../search/types';
@@ -81,7 +79,10 @@ import type {
   SignatureSnapshot,
   SignedDocumentPolicy,
 } from '../signature/types';
-import type { SessionKind } from '../dto/SessionKind';
+import type { WireAnnotationBundle } from '../transfer/AnnotationBundle';
+import type { AnnotationImportPages, AnnotationImportResult } from '../transfer/annotationImport';
+import type { AnnotationBundleLimits } from '../transfer/bundleLimits';
+import type { AnnotationExportSelection } from '../transfer/exportSelection';
 
 /**
  * Wire protocol used between an Engine-side queue and any Worker host
@@ -1229,7 +1230,12 @@ export type WorkerRequest =
   | AbortWorkerRequest
   | ShutdownWorkerRequest;
 
-export type WorkerResultPayload =
+/**
+ * What a job returns. `C` is the space its positions are in: the handlers
+ * work in PDF space, and the worker converts every result to page space
+ * before it leaves (`resultInPageSpace`).
+ */
+export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
   | {
       tag: 'open';
       docId: string;
@@ -1384,34 +1390,34 @@ export type WorkerResultPayload =
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
-  | { tag: 'pages.list'; snapshot: PageListSnapshot }
+  | { tag: 'pages.list'; snapshot: PageListSnapshot<C> }
   | {
       tag: 'pages.move';
-      result: PageMoveResult;
+      result: PageMoveResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | {
       tag: 'pages.rotate';
-      result: PageRotateResult;
+      result: PageRotateResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | {
       tag: 'pages.delete';
-      result: PageDeleteResult;
+      result: PageDeleteResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | {
       tag: 'pages.setName';
-      result: PageNameResult;
+      result: PageNameResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | {
       tag: 'pages.removeName';
-      result: PageNameResult;
+      result: PageNameResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
@@ -1449,13 +1455,13 @@ export type WorkerResultPayload =
   | { tag: 'annotations.readFile'; content: AttachmentFileWorkerPayload }
   | {
       tag: 'pages.insert';
-      result: PageInsertResult;
+      result: PageInsertResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | {
       tag: 'pages.insertBlank';
-      result: PageInsertResult;
+      result: PageInsertResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }

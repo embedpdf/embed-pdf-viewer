@@ -5,6 +5,7 @@ import {
   type PageInsertBlankSpec,
   type PageInsertResult,
   type PageRef,
+  type PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import { NULL_PTR } from '@embedpdf/engine-runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
@@ -28,7 +29,11 @@ export class PagesInserter {
     private readonly session: DocumentSession,
   ) {}
 
-  insert(bytes: ArrayBuffer, toIndex: number | undefined, signal: AbortSignal): PageInsertResult {
+  insert(
+    bytes: ArrayBuffer,
+    toIndex: number | undefined,
+    signal: AbortSignal,
+  ): PageInsertResult<PdfCoordinates> {
     throwIfAborted(signal);
     if (bytes.byteLength === 0) {
       throw new EngineError(EngineErrorCode.InvalidArg, 'pages.insert requires non-empty bytes');
@@ -114,7 +119,7 @@ export class PagesInserter {
     spec: PageInsertBlankSpec,
     toIndex: number | undefined,
     signal: AbortSignal,
-  ): PageInsertResult {
+  ): PageInsertResult<PdfCoordinates> {
     throwIfAborted(signal);
     const { size } = spec;
     const count = spec.count ?? 1;

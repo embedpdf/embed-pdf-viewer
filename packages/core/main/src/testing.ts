@@ -96,6 +96,8 @@ const layoutOf = (page: TestPage, index: number): PageLayout => {
       ? { width: page.crop.right - page.crop.left, height: page.crop.top - page.crop.bottom }
       : { width: 612, height: 792 });
   const crop = page.crop ?? { left: 0, bottom: 0, right: size.width, top: size.height };
+  // Every box is the crop box, measured from its own top-left corner.
+  const visible = { x: 0, y: 0, width: crop.right - crop.left, height: crop.top - crop.bottom };
   return {
     index,
     ref: page.ref,
@@ -104,12 +106,13 @@ const layoutOf = (page: TestPage, index: number): PageLayout => {
     rotation: page.rotation ?? 0,
     userUnit: page.userUnit ?? 1,
     boxes: {
-      media: { ...crop },
-      crop: { ...crop },
-      bleed: { ...crop },
-      trim: { ...crop },
-      art: { ...crop },
+      media: { ...visible },
+      crop: { ...visible },
+      bleed: { ...visible },
+      trim: { ...visible },
+      art: { ...visible },
     },
+    pdfCropBox: crop,
   };
 };
 
@@ -225,7 +228,7 @@ export function createTestContext<S = void>(options: TestContextOptions<S> = {})
     if (!page) return null;
     let space = spaces.get(ref.pageObjectNumber);
     if (!space) {
-      space = pageSpace(page.boxes.crop);
+      space = pageSpace(page.pdfCropBox);
       spaces.set(ref.pageObjectNumber, space);
     }
     return space;

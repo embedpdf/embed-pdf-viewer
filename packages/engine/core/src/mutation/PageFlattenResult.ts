@@ -1,6 +1,6 @@
+import type { MutationMeta } from './MutationMeta';
 import type { SerializedEngineError } from '../errors/EngineError';
 import type { PageRef } from '../identity/PageRef';
-import type { MutationMeta } from './MutationMeta';
 
 export type PageFlattenUsage = 'display' | 'print';
 

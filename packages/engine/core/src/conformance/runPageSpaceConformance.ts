@@ -97,10 +97,23 @@ export function runPageSpaceConformance(
           });
         });
 
-        test('the boxes are as ISO defines them', async () => {
+        test('the boxes are as ISO defines them, measured from the visible page', async () => {
           await eachPage(async (page, layout) => {
-            const { boxes } = page.expected;
-            expect(layout.boxes).toEqual(boxes);
+            const { boxes, visible } = page.expected;
+            expect(layout.pdfCropBox).toEqual(visible);
+            expect(layout.boxes).toEqual({
+              media: toPage(boxes.media, visible),
+              crop: toPage(boxes.crop, visible),
+              bleed: toPage(boxes.bleed, visible),
+              trim: toPage(boxes.trim, visible),
+              art: toPage(boxes.art, visible),
+            });
+            expect(layout.boxes.crop).toEqual({
+              x: 0,
+              y: 0,
+              width: width(visible),
+              height: height(visible),
+            });
           });
         });
 

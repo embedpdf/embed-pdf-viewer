@@ -10,6 +10,7 @@ import {
 import { AbortablePromise, EngineError, PermissionDenied } from '@embedpdf/engine-core/runtime';
 import type { SearchRequest, SearchSlice } from '@embedpdf/engine-core/runtime';
 import { searchPlugin, SearchToken } from '../src';
+import { pageSpaceBoxesOf } from '@embedpdf/engine-core/runtime';
 
 /**
  * The search plugin through the real kernel: a newest-wins lane for the
@@ -26,7 +27,14 @@ const page = (pageObjectNumber: number, index: number): PageLayout =>
     size: { width: 200, height: 300 },
     rotation: 0,
     userUnit: 1,
-    boxes: { media: { ...box }, crop: { ...box } },
+    boxes: pageSpaceBoxesOf({
+      media: { ...box },
+      crop: { ...box },
+      bleed: { ...box },
+      trim: { ...box },
+      art: { ...box },
+    }),
+    pdfCropBox: { ...box },
   }) as PageLayout;
 
 const match = (pageObjectNumber: number, start: number) => ({

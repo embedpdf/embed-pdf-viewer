@@ -1,5 +1,6 @@
 import type { MutationMeta } from './MutationMeta';
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
 /**
  * Result of a `pages.rotate()`. Rotation is presentation metadata: pages are
@@ -10,8 +11,8 @@ import type { PageListSnapshot } from '../dto/PageListSnapshot';
  * new `layout` (each page's `rotation` field carries the value) and the
  * viewer re-applies its display transform.
  */
-export interface PageRotateResult {
+export interface PageRotateResult<C extends Coordinates = PageCoordinates> {
   /** The new layout — same pages, same order, new `rotation` values. */
-  layout: PageListSnapshot;
+  layout: PageListSnapshot<C>;
   meta: MutationMeta;
 }

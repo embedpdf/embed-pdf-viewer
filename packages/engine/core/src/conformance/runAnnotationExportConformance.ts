@@ -86,7 +86,7 @@ export function runAnnotationExportConformance(
         expect(bundle.items.map((item) => item.data)).toEqual(read.annotations);
 
         const { pages } = await doc.pages.list();
-        expect(bundle.pages).toEqual([{ page: pageRef, position: 0, box: pages[0]!.boxes.crop }]);
+        expect(bundle.pages).toEqual([{ page: pageRef, position: 0, box: pages[0]!.pdfCropBox }]);
 
         const idOf = (ref: AnnotationRef, role: 'appearance' | 'file') =>
           bundle.items.find((item) => annotationKey(item.data.ref) === annotationKey(ref))!

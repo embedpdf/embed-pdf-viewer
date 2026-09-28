@@ -11,6 +11,7 @@ import { interactionPlugin } from '@embedpdf/plugin-interaction';
 
 import { formPlugin } from '../src/form.plugin';
 import { FormToken } from '../src/host-contract';
+import { pageSpaceBoxesOf } from '@embedpdf/engine-core/runtime';
 
 /**
  * The field tree is a mirror: it is read once, then kept current from the
@@ -24,10 +25,14 @@ const page: PageLayout = {
   size: { width: 600, height: 800 },
   rotation: 0,
   userUnit: 1,
-  boxes: {
+  boxes: pageSpaceBoxesOf({
     media: { left: 0, bottom: 0, right: 600, top: 800 },
     crop: { left: 0, bottom: 0, right: 600, top: 800 },
-  },
+    bleed: { left: 0, bottom: 0, right: 600, top: 800 },
+    trim: { left: 0, bottom: 0, right: 600, top: 800 },
+    art: { left: 0, bottom: 0, right: 600, top: 800 },
+  }),
+  pdfCropBox: { left: 0, bottom: 0, right: 600, top: 800 },
 } as PageLayout;
 
 const textField = (value: string): FormFieldDTO =>

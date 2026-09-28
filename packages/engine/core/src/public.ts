@@ -42,6 +42,16 @@ export {
 // Rendering.
 export { snapFullPageViewport } from './engine/DocumentRenderService';
 
+// Page space and PDF space: for working beside a tool that reads the file's own numbers.
+export {
+  pageBoxOf,
+  pagePointOf,
+  pageQuadOf,
+  pdfPointOf,
+  pdfQuadOf,
+  pdfRectOf,
+} from './geometry/pageSpace';
+
 export type {
   // Engine and handles.
   Engine,

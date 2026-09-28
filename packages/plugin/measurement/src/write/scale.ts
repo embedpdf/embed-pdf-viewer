@@ -73,7 +73,7 @@ export function createScaleWrites(
       ctx.state.update(setLocalViewports, page.pageObjectNumber, [
         ...kept,
         ...(scale
-          ? [{ bbox: layout.boxes.crop, name: 'EmbedPDF', owned: true, measure: scale }]
+          ? [{ bbox: layout.pdfCropBox, name: 'EmbedPDF', owned: true, measure: scale }]
           : []),
       ]);
       await refresh(page);

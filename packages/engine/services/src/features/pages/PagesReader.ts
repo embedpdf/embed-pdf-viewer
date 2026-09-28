@@ -3,6 +3,7 @@ import type {
   PageBoxes,
   PageLayout,
   PageListSnapshot,
+  PdfCoordinates,
   PdfRect,
   PdfRotation,
   PdfPageActions,
@@ -55,7 +56,7 @@ export class PagesReader {
     private readonly session: DocumentSession,
   ) {}
 
-  read(signal: AbortSignal): PageListSnapshot {
+  read(signal: AbortSignal): PageListSnapshot<PdfCoordinates> {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
     const docPtr = this.session.requireDocPtr();
@@ -67,7 +68,7 @@ export class PagesReader {
       mem,
       [RECTF_BYTES, F32_BYTES, I32_BYTES],
       ([rectPtr, userUnitPtr, intPtr]) => {
-        const pages: PageLayout[] = records.map((record) => {
+        const pages: PageLayout<PdfCoordinates>[] = records.map((record) => {
           throwIfAborted(signal);
           const index = record.pageIndex;
           const actions = readPageActions(fn, mem, docPtr, record.pageObjectNumber, actionBudget);
@@ -80,6 +81,7 @@ export class PagesReader {
             rotation: readRotation(fn, mem, docPtr, index, intPtr),
             userUnit: readUserUnit(fn, mem, docPtr, index, userUnitPtr),
             boxes,
+            pdfCropBox: boxes.crop,
             ...(actions ? { actions } : {}),
           };
         });
@@ -136,7 +138,7 @@ export function readBoxes(
   docPtr: Ptr,
   index: number,
   rectPtr: Ptr,
-): PageBoxes {
+): PageBoxes<PdfCoordinates> {
   const read = (boxType: number) => readWrittenBox(fn, mem, docPtr, index, boxType, rectPtr);
   return pageBoxesOf({
     media: read(BOX_MEDIA),

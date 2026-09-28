@@ -84,7 +84,7 @@ export function createLinkController(ctx: PluginContext<void>) {
         );
       }
       const snapshot = await doc.page(page).annotations.list();
-      return linksOf(snapshot.annotations, page, layout.boxes.crop);
+      return linksOf(snapshot.annotations, page, layout.pdfCropBox);
     },
     affected: pagesChangedBy,
     changed: ({ page, cause }) => {

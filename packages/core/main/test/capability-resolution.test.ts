@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { DocumentHandle, Engine, PageLayout } from '@embedpdf/engine-core/runtime';
 import { createKernel } from '../src/kernel';
 import type { AnyPlugin } from '../src/types';
+import { pageSpaceBoxesOf } from '@embedpdf/engine-core/runtime';
 
 /**
  * `tryCapability` + `documents.openAll` — resolution and boot policy owned by
@@ -24,13 +25,14 @@ const page = (pageObjectNumber: number, index: number): PageLayout => ({
   size: { width: 600, height: 800 },
   rotation: 0,
   userUnit: 1,
-  boxes: {
+  boxes: pageSpaceBoxesOf({
     media: { ...box },
     crop: { ...box },
     bleed: { ...box },
     trim: { ...box },
     art: { ...box },
-  },
+  }),
+  pdfCropBox: { ...box },
 });
 
 function makeHandle(id: string): DocumentHandle {

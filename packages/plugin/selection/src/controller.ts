@@ -67,7 +67,7 @@ interface ReadModel {
 
 /** The layout parameters page-space geometry depends on. */
 const layoutKeyOf = (layout: PageInfo): string => {
-  const crop = layout.boxes.crop;
+  const crop = layout.pdfCropBox;
   return `${layout.rotation}|${layout.userUnit}|${crop.left},${crop.bottom},${crop.right},${crop.top}`;
 };
 
@@ -148,7 +148,7 @@ export function createSelectionController(
       if (!snapshot || layoutKey === null || !layout) return null;
       return buildSelectionPageGeometry(
         snapshot,
-        layout.boxes.crop,
+        layout.pdfCropBox,
         layout.rotation,
         layout.userUnit,
       );

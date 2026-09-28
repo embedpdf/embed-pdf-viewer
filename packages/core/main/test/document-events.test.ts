@@ -10,6 +10,7 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 import { createKernel } from '../src/kernel';
 import type { DocumentMeta, PluginContext } from '../src/types';
+import { pageSpaceBoxesOf } from '@embedpdf/engine-core/runtime';
 
 /**
  * Document mutation events drive the kernel's page list; there is no separate
@@ -30,13 +31,14 @@ function page(pageObjectNumber: number, index: number, rotation: PdfRotation = 0
     size: { width: 600, height: 800 },
     rotation,
     userUnit: 1,
-    boxes: {
+    boxes: pageSpaceBoxesOf({
       media: { ...box },
       crop: { ...box },
       bleed: { ...box },
       trim: { ...box },
       art: { ...box },
-    },
+    }),
+    pdfCropBox: { ...box },
   };
 }
 

@@ -26,7 +26,6 @@ export {
   pdfAnnotationOf,
   pdfAnnotationPatchOf,
 } from './annotations';
-export type { PageSpaceLayout } from './pages';
 export { pageLayoutOf, pageListOf, pageSpaceBoxesOf, visibleBoxesOf } from './pages';
 export { createPageTextLayout, pageGeometryOf, pageSearchSliceOf, pageTextSegmentOf } from './text';
 export { pageAppearanceManifestOf, pageAppearancesOf, pdfRenderTargetOf } from './rendering';

@@ -11,6 +11,12 @@ import {
 import { metadataPlugin, MetadataToken } from '../src';
 import { changedKeys } from '../src/model';
 
+/** A page whose every box is its crop box, in page space: measured from that box's top-left. */
+const everyBoxIsTheCrop = (crop: { left: number; bottom: number; right: number; top: number }) => {
+  const box = { x: 0, y: 0, width: crop.right - crop.left, height: crop.top - crop.bottom };
+  return { media: box, crop: box, bleed: box, trim: box, art: box };
+};
+
 /**
  * The metadata plugin through the real kernel: the Info dict is a mirror that
  * changes only from loads and confirmed `metadata.updated` events, whoever
@@ -39,7 +45,8 @@ const page: PageLayout = {
   size: { width: 600, height: 800 },
   rotation: 0,
   userUnit: 1,
-  boxes: { media: { ...box }, crop: { ...box } },
+  boxes: everyBoxIsTheCrop(box),
+  pdfCropBox: { ...box },
 } as PageLayout;
 
 function deferred<T>() {

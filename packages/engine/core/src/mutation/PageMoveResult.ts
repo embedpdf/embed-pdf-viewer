@@ -1,5 +1,6 @@
 import type { MutationMeta } from './MutationMeta';
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
 /**
  * Result of a `pages.move()`. Page reorder is intentionally **outside** the
@@ -17,8 +18,8 @@ import type { PageListSnapshot } from '../dto/PageListSnapshot';
  * holding a previously-listed `PageListSnapshot` swap it for `result.layout`
  * and re-render.
  */
-export interface PageMoveResult {
+export interface PageMoveResult<C extends Coordinates = PageCoordinates> {
   /** The new page order + geometry — what a move changes. */
-  layout: PageListSnapshot;
+  layout: PageListSnapshot<C>;
   meta: MutationMeta;
 }

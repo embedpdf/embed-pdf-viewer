@@ -1,7 +1,7 @@
 import type { PdfPageActions } from './PdfAction';
-import type { PdfRotation, PdfSize } from '../geometry/primitives';
+import type { PdfRect, PdfRotation, PdfSize } from '../geometry/primitives';
 import type { PageRef } from '../identity/PageRef';
-import type { Coordinates, PdfCoordinates } from '../pageSpace/coordinates';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
 /**
  * The five PDF page boundary boxes, in PDF user space as `PdfRect`s
@@ -14,7 +14,7 @@ import type { Coordinates, PdfCoordinates } from '../pageSpace/coordinates';
  * Coordinates are not rotated; the display transform (origin shift, y flip,
  * rotation) lives in the SDK, never here.
  */
-export interface PageBoxes<C extends Coordinates = PdfCoordinates> {
+export interface PageBoxes<C extends Coordinates = PageCoordinates> {
   media: C['box'];
   crop: C['box'];
   bleed: C['box'];
@@ -35,7 +35,7 @@ export interface PageBoxes<C extends Coordinates = PdfCoordinates> {
  * consistent with the raw `boxes` and with the "transform lives in the SDK"
  * principle.
  */
-export interface PageLayout<C extends Coordinates = PdfCoordinates> {
+export interface PageLayout<C extends Coordinates = PageCoordinates> {
   /** Display order at read time. Not an identity; shifts on a page move. */
   index: number;
   /**
@@ -53,6 +53,12 @@ export interface PageLayout<C extends Coordinates = PdfCoordinates> {
   /** `/UserUnit`; defaults to the PDF default of 1. */
   userUnit: number;
   boxes: PageBoxes<C>;
+  /**
+   * Where the page sits in the file: its visible box (`boxes.crop`) in PDF
+   * space, the numbers PDF tools use. The only PDF-space value in the API;
+   * convert a page-space value with it (`pdfRectOf(rect, layout.pdfCropBox)`).
+   */
+  pdfCropBox: PdfRect;
   /** Page-owned `/AA` actions; absent for the usual script-less page. */
-  actions?: PdfPageActions<C['destination']>;
+  actions?: PdfPageActions;
 }

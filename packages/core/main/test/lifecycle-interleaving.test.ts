@@ -5,6 +5,7 @@ import type { DocumentHandle, Engine, PageLayout } from '@embedpdf/engine-core/r
 import { createKernel } from '../src/kernel';
 import { isCancelled } from '../src/scope';
 import type { AnyPlugin, PluginContext } from '../src/types';
+import { pageSpaceBoxesOf } from '@embedpdf/engine-core/runtime';
 
 /**
  * Interleaving tests for the session lifecycle: close/destroy racing every
@@ -22,13 +23,14 @@ const page = (pageObjectNumber: number, index: number): PageLayout => ({
   size: { width: 600, height: 800 },
   rotation: 0,
   userUnit: 1,
-  boxes: {
+  boxes: pageSpaceBoxesOf({
     media: { ...box },
     crop: { ...box },
     bleed: { ...box },
     trim: { ...box },
     art: { ...box },
-  },
+  }),
+  pdfCropBox: { ...box },
 });
 
 class FakeEvents {

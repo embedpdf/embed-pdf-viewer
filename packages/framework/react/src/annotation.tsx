@@ -1133,7 +1133,7 @@ export function enrichCommentThreads(
       ...thread,
       pageIndex: page ? page.index : -1,
       pageLabel: page ? (page.label ?? String(page.index + 1)) : '?',
-      contentRect: page ? pdfToContentRect(thread.root.rect, page.boxes.crop) : null,
+      contentRect: page ? pdfToContentRect(thread.root.rect, page.pdfCropBox) : null,
     };
   });
 }

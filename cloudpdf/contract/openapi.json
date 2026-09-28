@@ -23662,20 +23662,22 @@
                         "media": {
                           "type": "object",
                           "properties": {
-                            "left": {
+                            "x": {
                               "type": "number"
                             },
-                            "bottom": {
+                            "y": {
                               "type": "number"
                             },
-                            "right": {
-                              "type": "number"
+                            "width": {
+                              "type": "number",
+                              "minimum": 0
                             },
-                            "top": {
-                              "type": "number"
+                            "height": {
+                              "type": "number",
+                              "minimum": 0
                             }
                           },
-                          "required": ["left", "bottom", "right", "top"],
+                          "required": ["x", "y", "width", "height"],
                           "additionalProperties": false
                         },
                         "crop": {
@@ -23694,11 +23696,39 @@
                       "required": ["media", "crop", "bleed", "trim", "art"],
                       "additionalProperties": false
                     },
+                    "pdfCropBox": {
+                      "type": "object",
+                      "properties": {
+                        "left": {
+                          "type": "number"
+                        },
+                        "bottom": {
+                          "type": "number"
+                        },
+                        "right": {
+                          "type": "number"
+                        },
+                        "top": {
+                          "type": "number"
+                        }
+                      },
+                      "required": ["left", "bottom", "right", "top"],
+                      "additionalProperties": false
+                    },
                     "actions": {
                       "$ref": "#/components/schemas/PdfPageActions"
                     }
                   },
-                  "required": ["index", "ref", "label", "size", "rotation", "userUnit", "boxes"],
+                  "required": [
+                    "index",
+                    "ref",
+                    "label",
+                    "size",
+                    "rotation",
+                    "userUnit",
+                    "boxes",
+                    "pdfCropBox"
+                  ],
                   "additionalProperties": false
                 }
               },
@@ -24042,20 +24072,22 @@
                         "media": {
                           "type": "object",
                           "properties": {
-                            "left": {
+                            "x": {
                               "type": "number"
                             },
-                            "bottom": {
+                            "y": {
                               "type": "number"
                             },
-                            "right": {
-                              "type": "number"
+                            "width": {
+                              "type": "number",
+                              "minimum": 0
                             },
-                            "top": {
-                              "type": "number"
+                            "height": {
+                              "type": "number",
+                              "minimum": 0
                             }
                           },
-                          "required": ["left", "bottom", "right", "top"],
+                          "required": ["x", "y", "width", "height"],
                           "additionalProperties": false
                         },
                         "crop": {
@@ -24074,11 +24106,39 @@
                       "required": ["media", "crop", "bleed", "trim", "art"],
                       "additionalProperties": false
                     },
+                    "pdfCropBox": {
+                      "type": "object",
+                      "properties": {
+                        "left": {
+                          "type": "number"
+                        },
+                        "bottom": {
+                          "type": "number"
+                        },
+                        "right": {
+                          "type": "number"
+                        },
+                        "top": {
+                          "type": "number"
+                        }
+                      },
+                      "required": ["left", "bottom", "right", "top"],
+                      "additionalProperties": false
+                    },
                     "actions": {
                       "$ref": "#/components/schemas/PdfPageActions"
                     }
                   },
-                  "required": ["index", "ref", "label", "size", "rotation", "userUnit", "boxes"],
+                  "required": [
+                    "index",
+                    "ref",
+                    "label",
+                    "size",
+                    "rotation",
+                    "userUnit",
+                    "boxes",
+                    "pdfCropBox"
+                  ],
                   "additionalProperties": false
                 }
               },
@@ -24422,20 +24482,22 @@
                         "media": {
                           "type": "object",
                           "properties": {
-                            "left": {
+                            "x": {
                               "type": "number"
                             },
-                            "bottom": {
+                            "y": {
                               "type": "number"
                             },
-                            "right": {
-                              "type": "number"
+                            "width": {
+                              "type": "number",
+                              "minimum": 0
                             },
-                            "top": {
-                              "type": "number"
+                            "height": {
+                              "type": "number",
+                              "minimum": 0
                             }
                           },
-                          "required": ["left", "bottom", "right", "top"],
+                          "required": ["x", "y", "width", "height"],
                           "additionalProperties": false
                         },
                         "crop": {
@@ -24454,11 +24516,39 @@
                       "required": ["media", "crop", "bleed", "trim", "art"],
                       "additionalProperties": false
                     },
+                    "pdfCropBox": {
+                      "type": "object",
+                      "properties": {
+                        "left": {
+                          "type": "number"
+                        },
+                        "bottom": {
+                          "type": "number"
+                        },
+                        "right": {
+                          "type": "number"
+                        },
+                        "top": {
+                          "type": "number"
+                        }
+                      },
+                      "required": ["left", "bottom", "right", "top"],
+                      "additionalProperties": false
+                    },
                     "actions": {
                       "$ref": "#/components/schemas/PdfPageActions"
                     }
                   },
-                  "required": ["index", "ref", "label", "size", "rotation", "userUnit", "boxes"],
+                  "required": [
+                    "index",
+                    "ref",
+                    "label",
+                    "size",
+                    "rotation",
+                    "userUnit",
+                    "boxes",
+                    "pdfCropBox"
+                  ],
                   "additionalProperties": false
                 }
               },
@@ -24802,20 +24892,22 @@
                         "media": {
                           "type": "object",
                           "properties": {
-                            "left": {
+                            "x": {
                               "type": "number"
                             },
-                            "bottom": {
+                            "y": {
                               "type": "number"
                             },
-                            "right": {
-                              "type": "number"
+                            "width": {
+                              "type": "number",
+                              "minimum": 0
                             },
-                            "top": {
-                              "type": "number"
+                            "height": {
+                              "type": "number",
+                              "minimum": 0
                             }
                           },
-                          "required": ["left", "bottom", "right", "top"],
+                          "required": ["x", "y", "width", "height"],
                           "additionalProperties": false
                         },
                         "crop": {
@@ -24834,11 +24926,39 @@
                       "required": ["media", "crop", "bleed", "trim", "art"],
                       "additionalProperties": false
                     },
+                    "pdfCropBox": {
+                      "type": "object",
+                      "properties": {
+                        "left": {
+                          "type": "number"
+                        },
+                        "bottom": {
+                          "type": "number"
+                        },
+                        "right": {
+                          "type": "number"
+                        },
+                        "top": {
+                          "type": "number"
+                        }
+                      },
+                      "required": ["left", "bottom", "right", "top"],
+                      "additionalProperties": false
+                    },
                     "actions": {
                       "$ref": "#/components/schemas/PdfPageActions"
                     }
                   },
-                  "required": ["index", "ref", "label", "size", "rotation", "userUnit", "boxes"],
+                  "required": [
+                    "index",
+                    "ref",
+                    "label",
+                    "size",
+                    "rotation",
+                    "userUnit",
+                    "boxes",
+                    "pdfCropBox"
+                  ],
                   "additionalProperties": false
                 }
               },
@@ -25182,20 +25302,22 @@
                         "media": {
                           "type": "object",
                           "properties": {
-                            "left": {
+                            "x": {
                               "type": "number"
                             },
-                            "bottom": {
+                            "y": {
                               "type": "number"
                             },
-                            "right": {
-                              "type": "number"
+                            "width": {
+                              "type": "number",
+                              "minimum": 0
                             },
-                            "top": {
-                              "type": "number"
+                            "height": {
+                              "type": "number",
+                              "minimum": 0
                             }
                           },
-                          "required": ["left", "bottom", "right", "top"],
+                          "required": ["x", "y", "width", "height"],
                           "additionalProperties": false
                         },
                         "crop": {
@@ -25214,11 +25336,39 @@
                       "required": ["media", "crop", "bleed", "trim", "art"],
                       "additionalProperties": false
                     },
+                    "pdfCropBox": {
+                      "type": "object",
+                      "properties": {
+                        "left": {
+                          "type": "number"
+                        },
+                        "bottom": {
+                          "type": "number"
+                        },
+                        "right": {
+                          "type": "number"
+                        },
+                        "top": {
+                          "type": "number"
+                        }
+                      },
+                      "required": ["left", "bottom", "right", "top"],
+                      "additionalProperties": false
+                    },
                     "actions": {
                       "$ref": "#/components/schemas/PdfPageActions"
                     }
                   },
-                  "required": ["index", "ref", "label", "size", "rotation", "userUnit", "boxes"],
+                  "required": [
+                    "index",
+                    "ref",
+                    "label",
+                    "size",
+                    "rotation",
+                    "userUnit",
+                    "boxes",
+                    "pdfCropBox"
+                  ],
                   "additionalProperties": false
                 }
               },
@@ -25849,20 +25999,22 @@
                         "media": {
                           "type": "object",
                           "properties": {
-                            "left": {
+                            "x": {
                               "type": "number"
                             },
-                            "bottom": {
+                            "y": {
                               "type": "number"
                             },
-                            "right": {
-                              "type": "number"
+                            "width": {
+                              "type": "number",
+                              "minimum": 0
                             },
-                            "top": {
-                              "type": "number"
+                            "height": {
+                              "type": "number",
+                              "minimum": 0
                             }
                           },
-                          "required": ["left", "bottom", "right", "top"],
+                          "required": ["x", "y", "width", "height"],
                           "additionalProperties": false
                         },
                         "crop": {
@@ -25881,11 +26033,39 @@
                       "required": ["media", "crop", "bleed", "trim", "art"],
                       "additionalProperties": false
                     },
+                    "pdfCropBox": {
+                      "type": "object",
+                      "properties": {
+                        "left": {
+                          "type": "number"
+                        },
+                        "bottom": {
+                          "type": "number"
+                        },
+                        "right": {
+                          "type": "number"
+                        },
+                        "top": {
+                          "type": "number"
+                        }
+                      },
+                      "required": ["left", "bottom", "right", "top"],
+                      "additionalProperties": false
+                    },
                     "actions": {
                       "$ref": "#/components/schemas/PdfPageActions"
                     }
                   },
-                  "required": ["index", "ref", "label", "size", "rotation", "userUnit", "boxes"],
+                  "required": [
+                    "index",
+                    "ref",
+                    "label",
+                    "size",
+                    "rotation",
+                    "userUnit",
+                    "boxes",
+                    "pdfCropBox"
+                  ],
                   "additionalProperties": false
                 }
               },
@@ -26235,20 +26415,22 @@
                         "media": {
                           "type": "object",
                           "properties": {
-                            "left": {
+                            "x": {
                               "type": "number"
                             },
-                            "bottom": {
+                            "y": {
                               "type": "number"
                             },
-                            "right": {
-                              "type": "number"
+                            "width": {
+                              "type": "number",
+                              "minimum": 0
                             },
-                            "top": {
-                              "type": "number"
+                            "height": {
+                              "type": "number",
+                              "minimum": 0
                             }
                           },
-                          "required": ["left", "bottom", "right", "top"],
+                          "required": ["x", "y", "width", "height"],
                           "additionalProperties": false
                         },
                         "crop": {
@@ -26267,11 +26449,39 @@
                       "required": ["media", "crop", "bleed", "trim", "art"],
                       "additionalProperties": false
                     },
+                    "pdfCropBox": {
+                      "type": "object",
+                      "properties": {
+                        "left": {
+                          "type": "number"
+                        },
+                        "bottom": {
+                          "type": "number"
+                        },
+                        "right": {
+                          "type": "number"
+                        },
+                        "top": {
+                          "type": "number"
+                        }
+                      },
+                      "required": ["left", "bottom", "right", "top"],
+                      "additionalProperties": false
+                    },
                     "actions": {
                       "$ref": "#/components/schemas/PdfPageActions"
                     }
                   },
-                  "required": ["index", "ref", "label", "size", "rotation", "userUnit", "boxes"],
+                  "required": [
+                    "index",
+                    "ref",
+                    "label",
+                    "size",
+                    "rotation",
+                    "userUnit",
+                    "boxes",
+                    "pdfCropBox"
+                  ],
                   "additionalProperties": false
                 }
               },

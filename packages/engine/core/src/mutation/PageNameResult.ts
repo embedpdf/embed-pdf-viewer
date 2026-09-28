@@ -1,5 +1,6 @@
 import type { MutationMeta } from './MutationMeta';
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
 /**
  * Result of `pages.setName()` / `pages.removeName()`. Named pages are
@@ -8,7 +9,7 @@ import type { PageListSnapshot } from '../dto/PageListSnapshot';
  * advanced — per-page content/annotation pins never move (same shape as
  * `PageMoveResult` on purpose).
  */
-export interface PageNameResult {
-  layout: PageListSnapshot;
+export interface PageNameResult<C extends Coordinates = PageCoordinates> {
+  layout: PageListSnapshot<C>;
   meta: MutationMeta;
 }

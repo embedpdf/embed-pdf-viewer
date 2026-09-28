@@ -7,6 +7,7 @@ import {
   type PageNameResult,
   type PageObjectNumber,
   type PageRef,
+  type PdfCoordinates,
   type PageRemoveNameInput,
   type PageRotateResult,
   type PdfRotation,
@@ -70,7 +71,7 @@ export class PagesMutator {
    *   - every `pon` resolvable via the session's page registry;
    *   - `toIndex` in `[0, pageCount - len]`.
    */
-  move(pages: PageRef[], toIndex: number, signal: AbortSignal): PageMoveResult {
+  move(pages: PageRef[], toIndex: number, signal: AbortSignal): PageMoveResult<PdfCoordinates> {
     const pageObjectNumbers = this.session.resolvePageRefs(pages);
     throwIfAborted(signal);
     this.requireUniquePageObjectNumbers('pages.move', pageObjectNumbers);
@@ -151,7 +152,11 @@ export class PagesMutator {
    * fault converges to the requested state. Abort is honored before the
    * loop, never inside it.
    */
-  rotate(pages: PageRef[], rotation: PdfRotation, signal: AbortSignal): PageRotateResult {
+  rotate(
+    pages: PageRef[],
+    rotation: PdfRotation,
+    signal: AbortSignal,
+  ): PageRotateResult<PdfCoordinates> {
     const pageObjectNumbers = this.session.resolvePageRefs(pages);
     throwIfAborted(signal);
     this.requireUniquePageObjectNumbers('pages.rotate', pageObjectNumbers);
@@ -200,7 +205,7 @@ export class PagesMutator {
    *
    * Abort is honored before the apply loop, never inside it.
    */
-  delete(pages: PageRef[], signal: AbortSignal): PageDeleteResult {
+  delete(pages: PageRef[], signal: AbortSignal): PageDeleteResult<PdfCoordinates> {
     const pageObjectNumbers = this.session.resolvePageRefs(pages);
     throwIfAborted(signal);
     this.requireUniquePageObjectNumbers('pages.delete', pageObjectNumbers);
@@ -251,7 +256,7 @@ export class PagesMutator {
    * (no registry refresh, no revision bumps) and the fresh snapshot is
    * returned like `move()`.
    */
-  setName(input: PageNameInput, signal: AbortSignal): PageNameResult {
+  setName(input: PageNameInput, signal: AbortSignal): PageNameResult<PdfCoordinates> {
     throwIfAborted(signal);
     if (input.name.length === 0) {
       throw new EngineError(EngineErrorCode.InvalidArg, 'pages.setName requires a non-empty name');
@@ -279,7 +284,7 @@ export class PagesMutator {
   }
 
   /** Remove one `/Names /Pages` registration; the page stays. */
-  removeName(input: PageRemoveNameInput, signal: AbortSignal): PageNameResult {
+  removeName(input: PageRemoveNameInput, signal: AbortSignal): PageNameResult<PdfCoordinates> {
     throwIfAborted(signal);
     if (input.name.length === 0) {
       throw new EngineError(

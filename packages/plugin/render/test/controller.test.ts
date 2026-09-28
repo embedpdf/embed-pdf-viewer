@@ -12,6 +12,12 @@ import type { RenderConfig } from '../src/contract';
 import { RenderToken } from '../src/host-contract';
 import { renderPlugin } from '../src/render.plugin';
 
+/** A page whose every box is its crop box, in page space: measured from that box's top-left. */
+const everyBoxIsTheCrop = (crop: { left: number; bottom: number; right: number; top: number }) => {
+  const box = { x: 0, y: 0, width: crop.right - crop.left, height: crop.top - crop.bottom };
+  return { media: box, crop: box, bleed: box, trim: box, art: box };
+};
+
 /** The render plugin through the real kernel: the ledger, the two raster
  *  doors, policy conformance, the tile surface, the permission twin. */
 
@@ -69,7 +75,8 @@ async function boot(
         size: { width: crop.right - crop.left, height: crop.top - crop.bottom },
         rotation: 0,
         userUnit: 1,
-        boxes: { media: { ...crop }, crop: { ...crop } },
+        boxes: everyBoxIsTheCrop(crop),
+        pdfCropBox: { ...crop },
       }) as PageLayout,
   );
   const listeners = new Set<(event: unknown) => void>();

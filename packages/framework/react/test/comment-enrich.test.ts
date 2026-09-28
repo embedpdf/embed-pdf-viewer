@@ -20,7 +20,7 @@ const page = (pageObjectNumber: number, index: number, label: string | null = nu
     ref: toPageRef(pageObjectNumber),
     index,
     label,
-    boxes: { crop: CROP },
+    pdfCropBox: CROP,
   }) as unknown as PageLayout;
 
 describe('enrichCommentThreads', () => {

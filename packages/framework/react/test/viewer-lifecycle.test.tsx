@@ -8,6 +8,26 @@ import type { DocumentHandle, Engine, PageLayout } from '@embedpdf/core';
 import { Viewer, useKernel, DocumentGate } from '../src/runtime';
 import type { AnyPlugin, PluginContext } from '@embedpdf/core';
 
+/** A page's boxes in page space, each measured from the crop box's top-left; bleed, trim and art are the crop. */
+const pageBoxesIn = (
+  media: { left: number; bottom: number; right: number; top: number },
+  crop: { left: number; bottom: number; right: number; top: number },
+) => {
+  const boxOf = (rect: typeof crop) => ({
+    x: rect.left - crop.left,
+    y: crop.top - rect.top,
+    width: rect.right - rect.left,
+    height: rect.top - rect.bottom,
+  });
+  return {
+    media: boxOf(media),
+    crop: boxOf(crop),
+    bleed: boxOf(crop),
+    trim: boxOf(crop),
+    art: boxOf(crop),
+  };
+};
+
 /**
  * The Viewer's lifecycle contract, exercised through real React render
  * cycles:
@@ -27,13 +47,8 @@ const page = (pageObjectNumber: number, index: number): PageLayout => ({
   size: { width: 600, height: 800 },
   rotation: 0,
   userUnit: 1,
-  boxes: {
-    media: { ...box },
-    crop: { ...box },
-    bleed: { ...box },
-    trim: { ...box },
-    art: { ...box },
-  },
+  boxes: pageBoxesIn({ ...box }, { ...box }),
+  pdfCropBox: { ...box },
 });
 
 function makeHandle(id: string) {

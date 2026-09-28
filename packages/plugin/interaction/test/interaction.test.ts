@@ -12,6 +12,26 @@ import type { InteractionHandler, PointerSample } from '../src/contract';
 import { feedbackPlugin } from '../src/feedback';
 import { FeedbackToken } from '../src/feedback.types';
 
+/** A page's boxes in page space, each measured from the crop box's top-left; bleed, trim and art are the crop. */
+const pageBoxesIn = (
+  media: { left: number; bottom: number; right: number; top: number },
+  crop: { left: number; bottom: number; right: number; top: number },
+) => {
+  const boxOf = (rect: typeof crop) => ({
+    x: rect.left - crop.left,
+    y: crop.top - rect.top,
+    width: rect.right - rect.left,
+    height: rect.top - rect.bottom,
+  });
+  return {
+    media: boxOf(media),
+    crop: boxOf(crop),
+    bleed: boxOf(crop),
+    trim: boxOf(crop),
+    art: boxOf(crop),
+  };
+};
+
 /** The hub through the real kernel: tools, routing, cursor arbitration, events. */
 
 const page: PageLayout = {
@@ -21,10 +41,11 @@ const page: PageLayout = {
   size: { width: 600, height: 800 },
   rotation: 0,
   userUnit: 1,
-  boxes: {
-    media: { left: 0, bottom: 0, right: 600, top: 800 },
-    crop: { left: 0, bottom: 0, right: 600, top: 800 },
-  },
+  boxes: pageBoxesIn(
+    { left: 0, bottom: 0, right: 600, top: 800 },
+    { left: 0, bottom: 0, right: 600, top: 800 },
+  ),
+  pdfCropBox: { left: 0, bottom: 0, right: 600, top: 800 },
 } as PageLayout;
 
 function engine(): Engine {

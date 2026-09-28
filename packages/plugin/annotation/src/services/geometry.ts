@@ -23,7 +23,7 @@ export const viewEnv = (zoom?: number, rotation?: number): ViewEnv | undefined =
 export function createCropLookup(ctx: Pick<AnnotationContext, 'document'>) {
   const cropOf = (pageObjectNumber: number): PdfRect | null =>
     ctx.document()?.pages.find((pageInfo) => pageInfo.ref.pageObjectNumber === pageObjectNumber)
-      ?.boxes.crop ?? null;
+      ?.pdfCropBox ?? null;
   /** The page's box in content space (origin at the crop top-left) — the box
    *  pointer gestures clamp to, so annotations stay page-bound. */
   const pageBoxOf = (pageObjectNumber: number): Rect | undefined => {

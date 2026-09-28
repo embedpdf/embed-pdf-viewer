@@ -2,7 +2,6 @@ import type {
   MeasureViewportsWorkerRequest,
   MeasureSetScaleWorkerRequest,
 } from '@embedpdf/engine-core/runtime';
-import { MeasureReader, MeasureMutator } from '../features/measure';
 import {
   DEFAULT_ANNOTATION_BUNDLE_LIMITS,
   AbortError,
@@ -104,17 +103,19 @@ import {
   type WorkerRequest,
   type WorkerResponse,
   type WorkerResultPayload,
+  type PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
+import { resultInPageSpace } from './pageSpaceBoundary';
 import { DocumentSession } from '../document-session/DocumentSession';
-import { DecodedImageStore } from '../document-session/pages/DecodedImageStore';
-import { DEFAULT_IDLE_PAGE_POLICY, IdlePageCache } from '../document-session/pages/IdlePageCache';
 import { BaseDocumentRegistry } from '../document-session/lifecycle/BaseDocumentRegistry';
 import {
   openFatMemoryDocument,
   openLayerDocument,
 } from '../document-session/lifecycle/PdfDocumentOpener';
+import { DecodedImageStore } from '../document-session/pages/DecodedImageStore';
+import { DEFAULT_IDLE_PAGE_POLICY, IdlePageCache } from '../document-session/pages/IdlePageCache';
 import { DocumentActionsReader } from '../features/actions';
 import {
   AnnotationAppearanceReader,
@@ -129,6 +130,7 @@ import { FontRegistrar, type StartupFontSpec } from '../features/fonts';
 import { FormMutator, FormReader, FormsEffectsApplier, disposeFormModel } from '../features/forms';
 import { formMutationMeta } from '../features/forms/internal/formMutationMeta';
 import { PageGeometryReader } from '../features/geometry';
+import { MeasureReader, MeasureMutator } from '../features/measure';
 import { MetadataMutator, MetadataReader } from '../features/metadata';
 import {
   PagesExtractor,
@@ -378,7 +380,7 @@ export class WorkerHost {
     // operations — open, document save, security probe, close, shutdown —
     // are effectively atomic from our side and intentionally non-abortable,
     // so they do not receive the signal.
-    let resultPack: WirePack<WorkerResultPayload>;
+    let resultPack: WirePack<WorkerResultPayload<PdfCoordinates>>;
     try {
       // A parked signing candidate freezes the session: every mutating kind
       // is refused at dispatch, before any native write, until the signing
@@ -625,15 +627,7 @@ export class WorkerHost {
             `unknown request kind: ${(msg as WorkerRequest).kind}`,
           );
       }
-      // Lift the handler's transfer manifest onto the response envelope
-      // unchanged. The handler decided which buffers to move; the host
-      // just relays that decision through the `resolve` envelope.
-      this.post(
-        wirePack(
-          { kind: 'resolve', jobId: msg.jobId, result: resultPack.payload },
-          resultPack.transfer,
-        ),
-      );
+      this.resolve(msg.jobId, resultPack);
     } catch (err) {
       const error: SerializedEngineError = serializeError(err);
       // Reject envelopes never carry binary; explicit EMPTY_TRANSFER
@@ -644,7 +638,17 @@ export class WorkerHost {
     }
   }
 
-  private handleOpen(req: OpenWorkerRequest): WirePack<WorkerResultPayload> {
+  /**
+   * Answers a job with its result in page space. The handler decided which
+   * buffers to move; the host relays that decision on the `resolve` envelope.
+   */
+  private resolve(jobId: WorkerJobId, pack: WirePack<WorkerResultPayload<PdfCoordinates>>): void {
+    this.post(
+      wirePack({ kind: 'resolve', jobId, result: resultInPageSpace(pack.payload) }, pack.transfer),
+    );
+  }
+
+  private handleOpen(req: OpenWorkerRequest): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const key = sessionKey(req.docId, req.kind === 'open.fatMem' ? undefined : req.layerName);
     if (this.sessions.has(key)) {
       throw new EngineError(EngineErrorCode.InvalidArg, `document session already open: ${key}`);
@@ -779,7 +783,9 @@ export class WorkerHost {
     }
   }
 
-  private handleSignaturesList(req: SignaturesListWorkerRequest): WirePack<WorkerResultPayload> {
+  private handleSignaturesList(
+    req: SignaturesListWorkerRequest,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const snapshot = req.workingCopy
       ? new SignatureAnalyzer(this.runtime, session).readWorkingCopySnapshot()
@@ -789,7 +795,7 @@ export class WorkerHost {
 
   private handleSignaturesContents(
     req: SignaturesContentsWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const bytes = new SignatureReader(this.runtime, session).readContents(req.ref);
     return wirePack({ tag: 'signatures.contents', bytes }, [bytes]);
@@ -797,7 +803,7 @@ export class WorkerHost {
 
   private handleSignaturesDigest(
     req: SignaturesDigestWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const digest = new SignatureReader(this.runtime, session).digest(req.ref, req.algorithm);
     return wirePack({ tag: 'signatures.digest', digest }, [digest]);
@@ -805,13 +811,15 @@ export class WorkerHost {
 
   private handleSignaturesRevisionBytes(
     req: SignaturesRevisionBytesWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const bytes = new SignatureReader(this.runtime, session).revisionBytes(req.revisionIndex);
     return wirePack({ tag: 'signatures.revisionBytes', bytes, size: bytes.byteLength }, [bytes]);
   }
 
-  private handleDocumentVersion(req: DocumentVersionWorkerRequest): WirePack<WorkerResultPayload> {
+  private handleDocumentVersion(
+    req: DocumentVersionWorkerRequest,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const version = new SignatureReader(this.runtime, session).version();
     return wirePack({ tag: 'document.version', version });
@@ -819,7 +827,7 @@ export class WorkerHost {
 
   private handleSignaturesPrepare(
     req: SignaturesPrepareWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     // The live document is untouched: no mutation, no artifact.
     const result = new SignatureMutator(
@@ -833,7 +841,7 @@ export class WorkerHost {
 
   private handleSignaturesComplete(
     req: SignaturesCompleteWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const result = new SignatureMutator(
       this.runtime,
@@ -851,7 +859,7 @@ export class WorkerHost {
 
   private handleSignaturesAnalyze(
     req: SignaturesAnalyzeWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const analysis = new SignatureAnalyzer(this.runtime, session).analyze(req.input);
     return wirePack({ tag: 'signatures.analyze', analysis });
@@ -864,7 +872,7 @@ export class WorkerHost {
    */
   private handleSignaturesFinalizeCandidate(
     req: SignaturesFinalizeCandidateWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const finalized = new CandidateFinalizer(this.runtime, this.baseDocuments).finalize({
       path: req.path,
       byteRange: req.byteRange,
@@ -878,7 +886,7 @@ export class WorkerHost {
 
   private handleSignaturesCancel(
     req: SignaturesCancelWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const result = new SignatureMutator(
       this.runtime,
@@ -909,7 +917,7 @@ export class WorkerHost {
   private handleMetadataRead(
     req: MetadataReadWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const metadata = new MetadataReader(this.runtime, session).read(signal);
     return wirePack({ tag: 'metadata.read', metadata });
@@ -918,7 +926,7 @@ export class WorkerHost {
   private handleMetadataUpdate(
     req: MetadataUpdateWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new MetadataMutator(this.runtime, session);
     const result = mutator.update(req.patch, signal);
@@ -928,7 +936,7 @@ export class WorkerHost {
   private handleActionsRead(
     req: ActionsReadWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const snapshot = new DocumentActionsReader(this.runtime, session).read(signal);
     return wirePack({ tag: 'actions.read', snapshot });
@@ -937,7 +945,7 @@ export class WorkerHost {
   private handleAnnotationsList(
     req: AnnotationsListWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const pages = req.pages?.map((page) => session.resolvePageRef(page).pageObjectNumber);
     const reader = new RawAnnotationReader(this.runtime, session, this.fonts);
@@ -947,7 +955,7 @@ export class WorkerHost {
   private handleAnnotationsRenderAppearances(
     req: AnnotationsRenderAppearancesWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
     const reader = new AnnotationAppearanceReader(this.runtime, session);
@@ -960,7 +968,7 @@ export class WorkerHost {
   private handleAnnotationsCreate(
     req: AnnotationsCreateWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
     const mutator = new AnnotationMutator(this.runtime, session, this.fonts);
@@ -971,7 +979,7 @@ export class WorkerHost {
   private handleAnnotationsUpdate(
     req: AnnotationsUpdateWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new AnnotationMutator(this.runtime, session, this.fonts);
     const result = mutator.update(req.ref, req.patch, signal, req.actor, req.resources);
@@ -981,7 +989,7 @@ export class WorkerHost {
   private handleAnnotationsDelete(
     req: AnnotationsDeleteWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new AnnotationMutator(this.runtime, session, this.fonts);
     const result = mutator.delete(req.ref, req.checked, signal);
@@ -991,7 +999,7 @@ export class WorkerHost {
   private handleAnnotationsFlatten(
     req: AnnotationsFlattenWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
     const result = new AnnotationFlattener(this.runtime, session).flatten(
@@ -1013,7 +1021,7 @@ export class WorkerHost {
   private handleAnnotationsExportAppearance(
     req: AnnotationsExportAppearanceWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
     const exported = new AnnotationFlattener(this.runtime, session).exportAppearance(
@@ -1031,7 +1039,7 @@ export class WorkerHost {
   private handleAnnotationsExport(
     req: AnnotationsExportWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const bundle = new AnnotationExporter(this.runtime, session, this.fonts).export(
       req.selection,
@@ -1044,7 +1052,7 @@ export class WorkerHost {
   private handleAnnotationsImport(
     req: AnnotationsImportWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const result = new AnnotationImporter(this.runtime, session, this.fonts).import(
       { ...req, limits: req.limits ?? DEFAULT_ANNOTATION_BUNDLE_LIMITS },
@@ -1058,7 +1066,7 @@ export class WorkerHost {
   private handleAnnotationsReadAppearance(
     req: AnnotationsReadAppearanceWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
     const drawing = new AnnotationFlattener(this.runtime, session).readAppearance(
@@ -1075,7 +1083,7 @@ export class WorkerHost {
   private handleAnnotationsMove(
     req: AnnotationsMoveWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
     const mutator = new AnnotationMutator(this.runtime, session);
@@ -1086,7 +1094,7 @@ export class WorkerHost {
   private handlePagesList(
     req: PagesListWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const reader = new PagesReader(this.runtime, session);
     const snapshot = reader.read(signal);
@@ -1096,7 +1104,7 @@ export class WorkerHost {
   private handlePagesMove(
     req: PagesMoveWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new PagesMutator(this.runtime, session);
     const result = mutator.move(req.pages, req.toIndex, signal);
@@ -1106,7 +1114,7 @@ export class WorkerHost {
   private handlePagesRotate(
     req: PagesRotateWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new PagesMutator(this.runtime, session);
     const result = mutator.rotate(req.pages, req.rotation, signal);
@@ -1116,7 +1124,7 @@ export class WorkerHost {
   private handlePagesDelete(
     req: PagesDeleteWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new PagesMutator(this.runtime, session);
     const result = mutator.delete(req.pages, signal);
@@ -1126,7 +1134,7 @@ export class WorkerHost {
   private handlePagesSetName(
     req: PagesSetNameWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new PagesMutator(this.runtime, session);
     const result = mutator.setName(
@@ -1143,7 +1151,7 @@ export class WorkerHost {
   private handlePagesRemoveName(
     req: PagesRemoveNameWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new PagesMutator(this.runtime, session);
     const result = mutator.removeName({ name: req.name }, signal);
@@ -1153,7 +1161,7 @@ export class WorkerHost {
   private handlePagesFlatten(
     req: PagesFlattenWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const result = new PagesFlattener(this.runtime, session).flatten(req.pages, req.usage, signal);
     // A write always names its pages; applying nothing names none.
@@ -1165,7 +1173,7 @@ export class WorkerHost {
   private handleRedactionApply(
     req: RedactionApplyWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const result = new RedactionApplier(this.runtime, session).apply(req.scope, signal);
     // A write always names its pages; applying nothing names none.
@@ -1181,7 +1189,7 @@ export class WorkerHost {
   private handlePagesExtract(
     req: PagesExtractWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const extracted = new PagesExtractor(this.runtime, session).extract(req.pages, signal);
     // A read: no finishMutation, no layer artifact. Bytes transfer zero-copy.
@@ -1193,7 +1201,7 @@ export class WorkerHost {
   private handlePagesInsert(
     req: PagesInsertWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const inserter = new PagesInserter(this.runtime, session);
     const result = inserter.insert(req.bytes, req.toIndex, signal);
@@ -1203,7 +1211,7 @@ export class WorkerHost {
   private handlePagesInsertBlank(
     req: PagesInsertBlankWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const inserter = new PagesInserter(this.runtime, session);
     const result = inserter.insertBlank({ size: req.size, count: req.count }, req.toIndex, signal);
@@ -1213,7 +1221,7 @@ export class WorkerHost {
   private handleAttachmentsList(
     req: AttachmentsListWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const attachments = new AttachmentReader(this.runtime, session).list(signal);
     return wirePack({ tag: 'attachments.list', attachments });
@@ -1222,7 +1230,7 @@ export class WorkerHost {
   private handleAttachmentsReadFile(
     req: AttachmentsReadFileWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const content = new AttachmentReader(this.runtime, session).readFile(
       req.ref,
@@ -1241,7 +1249,7 @@ export class WorkerHost {
   private handleAttachmentsCreate(
     req: AttachmentsCreateWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new AttachmentMutator(this.runtime, session);
     const result = mutator.create(req.file, req.resources, signal);
@@ -1251,7 +1259,7 @@ export class WorkerHost {
   private handleAttachmentsDelete(
     req: AttachmentsDeleteWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new AttachmentMutator(this.runtime, session);
     const result = mutator.delete(req.ref, signal);
@@ -1261,7 +1269,7 @@ export class WorkerHost {
   private handleAnnotationsReadFile(
     req: AnnotationsReadFileWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const content = new AttachmentReader(this.runtime, session).readAnnotationFile(
       session.resolvePageRef(req.page).pageObjectNumber,
@@ -1279,7 +1287,7 @@ export class WorkerHost {
   private handleMeasureViewports(
     req: MeasureViewportsWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     return wirePack({
       tag: 'measure.viewports',
@@ -1292,7 +1300,7 @@ export class WorkerHost {
   private handleMeasureSetScale(
     req: MeasureSetScaleWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     new MeasureMutator(this.runtime, session).setScale(
       session.resolvePageRef(req.page).pageObjectNumber,
@@ -1315,7 +1323,7 @@ export class WorkerHost {
   private handlePieceInfoRead(
     req: PieceInfoReadWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const accessor = new PieceInfoAccessor(
       this.runtime,
@@ -1329,7 +1337,7 @@ export class WorkerHost {
   private handlePieceInfoUpdate(
     req: PieceInfoUpdateWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const accessor = new PieceInfoAccessor(
       this.runtime,
@@ -1348,7 +1356,7 @@ export class WorkerHost {
   private handlePieceInfoApplications(
     req: PieceInfoApplicationsWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const accessor = new PieceInfoAccessor(
       this.runtime,
@@ -1362,7 +1370,7 @@ export class WorkerHost {
   private handlePieceInfoDelete(
     req: PieceInfoDeleteWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const accessor = new PieceInfoAccessor(
       this.runtime,
@@ -1377,7 +1385,7 @@ export class WorkerHost {
   private handlePagesText(
     req: PagesTextWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const reader = new PageTextReader(this.runtime, session);
     const snapshot = reader.read(session.resolvePageRef(req.page).pageObjectNumber, signal);
@@ -1387,7 +1395,7 @@ export class WorkerHost {
   private handlePagesGeometry(
     req: PagesGeometryWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const reader = new PageGeometryReader(this.runtime, session);
     const snapshot = reader.read(session.resolvePageRef(req.page).pageObjectNumber, signal);
@@ -1397,7 +1405,7 @@ export class WorkerHost {
   private handleSearchQuery(
     req: SearchQueryWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const reader = new SearchReader(this.runtime, session);
     const slice = reader.query(req.request, signal);
@@ -1407,7 +1415,7 @@ export class WorkerHost {
   private async handlePagesRender(
     req: PagesRenderWorkerRequest,
     signal: AbortSignal,
-  ): Promise<WirePack<WorkerResultPayload>> {
+  ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>> {
     const session = this.requireSession(req);
     const reader = new PageRenderReader(this.runtime, session);
     const raster = await reader.render(
@@ -1442,7 +1450,7 @@ export class WorkerHost {
     // the render pauses is held.
     this.rendering = true;
     try {
-      let rendered: WirePack<WorkerResultPayload>;
+      let rendered: WirePack<WorkerResultPayload<PdfCoordinates>>;
       try {
         rendered =
           msg.kind === 'pages.render' || msg.kind === 'pages.renderEncoded'
@@ -1460,12 +1468,7 @@ export class WorkerHost {
         msg.kind === 'pages.renderEncoded' || msg.kind === 'document.renderPageFileEncoded'
           ? await this.encodeRendered(rendered, msg.encode, ctrl.signal)
           : rendered;
-      this.post(
-        wirePack(
-          { kind: 'resolve', jobId: msg.jobId, result: resultPack.payload },
-          resultPack.transfer,
-        ),
-      );
+      this.resolve(msg.jobId, resultPack);
     } catch (err) {
       this.post(
         wirePack({ kind: 'reject', jobId: msg.jobId, error: serializeError(err) }, EMPTY_TRANSFER),
@@ -1491,12 +1494,7 @@ export class WorkerHost {
     this.aborts.set(msg.jobId, ctrl);
     try {
       const resultPack = await this.handleAnnotationsRenderAppearancesEncoded(msg, ctrl.signal);
-      this.post(
-        wirePack(
-          { kind: 'resolve', jobId: msg.jobId, result: resultPack.payload },
-          resultPack.transfer,
-        ),
-      );
+      this.resolve(msg.jobId, resultPack);
     } catch (err) {
       this.post(
         wirePack({ kind: 'reject', jobId: msg.jobId, error: serializeError(err) }, EMPTY_TRANSFER),
@@ -1526,10 +1524,10 @@ export class WorkerHost {
 
   /** The encoded reply of a page render's raw one. */
   private async encodeRendered(
-    rendered: WirePack<WorkerResultPayload>,
+    rendered: WirePack<WorkerResultPayload<PdfCoordinates>>,
     encode: RenderEncode,
     signal: AbortSignal,
-  ): Promise<WirePack<WorkerResultPayload>> {
+  ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>> {
     const { payload } = rendered;
     if (payload.tag === 'pages.render') {
       const image = await this.encodeRaster(payload.raster, encode, signal);
@@ -1555,7 +1553,7 @@ export class WorkerHost {
   private async handleAnnotationsRenderAppearancesEncoded(
     req: AnnotationsRenderAppearancesEncodedWorkerRequest,
     signal: AbortSignal,
-  ): Promise<WirePack<WorkerResultPayload>> {
+  ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>> {
     const inner = this.handleAnnotationsRenderAppearances(
       { ...req, kind: 'annotations.renderAppearances' },
       signal,
@@ -1603,7 +1601,7 @@ export class WorkerHost {
 
   private handleDocumentSaveBuffer(
     req: DocumentSaveBufferWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     this.assertRewriteKeepsSignatures(session, req.mode);
     // A save that changes nothing returns the loaded bytes verbatim: a
@@ -1626,7 +1624,7 @@ export class WorkerHost {
 
   private handleDocumentSaveFile(
     req: DocumentSaveFileWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     this.assertRewriteKeepsSignatures(session, req.mode);
     // The no-op save law for files: a session whose document is still the
@@ -1652,7 +1650,7 @@ export class WorkerHost {
 
   private handleDocumentSaveLayerBuffer(
     req: DocumentSaveLayerBufferWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     if (session.kind !== 'layer') {
       throw new EngineError(
@@ -1669,7 +1667,7 @@ export class WorkerHost {
 
   private handleDocumentProbeSecurityFile(
     req: DocumentProbeSecurityFileWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const reader = new SecurityReader(this.runtime);
     const security = reader.probeFile(req.path, req.password);
     return wirePack({ tag: 'document.probeSecurityFile', security });
@@ -1686,7 +1684,7 @@ export class WorkerHost {
   private async handleDocumentRenderPageFile(
     req: DocumentRenderPageFileWorkerRequest,
     signal: AbortSignal,
-  ): Promise<WirePack<WorkerResultPayload>> {
+  ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>> {
     const session = new DocumentSession(this.runtime);
     const base = this.baseDocuments.acquireFileBase({
       key: `adhoc-file:${req.path}`,
@@ -1729,7 +1727,7 @@ export class WorkerHost {
 
   private handleDocumentCheckPasswordPermissions(
     req: DocumentCheckPasswordPermissionsWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     // The one handler that accepts a locked session: on a locked session,
     // "check this password" means "load the parked document with it". A
     // wrong password throws DocPasswordIncorrect and the session stays
@@ -1755,7 +1753,9 @@ export class WorkerHost {
     });
   }
 
-  private handleFontsRegister(req: FontsRegisterWorkerRequest): WirePack<WorkerResultPayload> {
+  private handleFontsRegister(
+    req: FontsRegisterWorkerRequest,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     this.fonts.register(
       req.fontKey,
       req.familyName,
@@ -1772,7 +1772,7 @@ export class WorkerHost {
 
   private handleFontsAuthorizeEditing(
     req: FontsAuthorizeEditingWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     return wirePack({
       tag: 'fonts.authorizeEditing',
       identity: this.fonts.authorizeEditing(req.fontKey),
@@ -1782,7 +1782,7 @@ export class WorkerHost {
   /** Per-document font and text-layout settings (session state). */
   private handleDocumentSetFontSettings(
     req: DocumentSetFontSettingsWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const docPtr = session.requireDocPtr();
     const { fn } = this.runtime;
@@ -1802,19 +1802,21 @@ export class WorkerHost {
 
   private handleFontsAddFallback(
     req: FontsAddFallbackWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     this.fonts.addFallback(req.fontKey);
     return wirePack({ tag: 'fonts.addFallback' });
   }
 
   private handleFontsClearFallbacks(
     _req: FontsClearFallbacksWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     this.fonts.clearFallbacks();
     return wirePack({ tag: 'fonts.clearFallbacks' });
   }
 
-  private handleFontsClear(_req: FontsClearWorkerRequest): WirePack<WorkerResultPayload> {
+  private handleFontsClear(
+    _req: FontsClearWorkerRequest,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     this.fonts.clear();
     return wirePack({ tag: 'fonts.clear' });
   }
@@ -1827,7 +1829,9 @@ export class WorkerHost {
    * because the caller may be reloading a layer this worker never held
    * (e.g. after a pool eviction).
    */
-  private handleLayerClose(req: LayerCloseWorkerRequest): WirePack<WorkerResultPayload> {
+  private handleLayerClose(
+    req: LayerCloseWorkerRequest,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const key = sessionKey(req.docId, req.layerName);
     const session = this.sessions.get(key);
     if (session) {
@@ -1839,7 +1843,7 @@ export class WorkerHost {
     return wirePack({ tag: 'close' });
   }
 
-  private handleClose(req: CloseWorkerRequest): WirePack<WorkerResultPayload> {
+  private handleClose(req: CloseWorkerRequest): WirePack<WorkerResultPayload<PdfCoordinates>> {
     for (const [key, session] of Array.from(this.sessions.entries())) {
       if (!sessionKeyBelongsToDoc(key, req.docId)) continue;
       disposeFormModel(this.runtime, session);
@@ -1850,7 +1854,9 @@ export class WorkerHost {
     return wirePack({ tag: 'close' });
   }
 
-  private handleShutdown(_req: ShutdownWorkerRequest): WirePack<WorkerResultPayload> {
+  private handleShutdown(
+    _req: ShutdownWorkerRequest,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     if (!this.destroyed) {
       this.destroyed = true;
       for (const session of this.sessions.values()) {
@@ -1894,7 +1900,7 @@ export class WorkerHost {
   private handleFormsList(
     req: FormsListWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const reader = new FormReader(this.runtime, session);
     return wirePack({ tag: 'forms.list', snapshot: reader.snapshot(signal) });
@@ -1903,7 +1909,7 @@ export class WorkerHost {
   private handleFormsSetValue(
     req: FormsSetValueWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new FormMutator(this.runtime, session);
     const result = mutator.setValue(req.ref, req.value, signal);
@@ -1913,7 +1919,7 @@ export class WorkerHost {
   private handleFormsReset(
     req: FormsResetWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new FormMutator(this.runtime, session);
     const result = mutator.reset(req.ref, signal);
@@ -1923,7 +1929,7 @@ export class WorkerHost {
   private handleFormsApplyEffects(
     req: FormsApplyEffectsWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const { result, wrote } = new FormsEffectsApplier(this.runtime, session).apply(
       req.effects,
@@ -1940,7 +1946,7 @@ export class WorkerHost {
   private handleFormsExport(
     req: FormsExportWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const reader = new FormReader(this.runtime, session);
     const exported = reader.exportData(req.format, signal);
@@ -1952,7 +1958,7 @@ export class WorkerHost {
   private handleFormsImport(
     req: FormsImportWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new FormMutator(this.runtime, session);
     const result = mutator.importData(req.data, req.format, signal);
@@ -1962,7 +1968,7 @@ export class WorkerHost {
   private handleFormsRepair(
     req: FormsRepairWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new FormMutator(this.runtime, session);
     const result = mutator.repair(req.bakeAppearances ?? false, signal);
@@ -1972,7 +1978,7 @@ export class WorkerHost {
   private handleFormsCreateField(
     req: FormsCreateFieldWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new FormMutator(this.runtime, session);
     const { field } = mutator.createField(req.draft, signal);
@@ -1987,7 +1993,7 @@ export class WorkerHost {
   private handleFormsUpdateField(
     req: FormsUpdateFieldWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new FormMutator(this.runtime, session);
     const { field } = mutator.updateField(req.ref, req.patch, signal);
@@ -2002,7 +2008,7 @@ export class WorkerHost {
   private handleFormsSetSignatureAppearance(
     req: FormsSetSignatureAppearanceWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const { field } = new FormMutator(this.runtime, session).setSignatureAppearance(
       req.ref,
@@ -2021,7 +2027,7 @@ export class WorkerHost {
   private handleFormsDeleteField(
     req: FormsDeleteFieldWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new FormMutator(this.runtime, session);
     const { deleted, removedWidgets } = mutator.deleteField(req.ref, signal);
@@ -2036,7 +2042,7 @@ export class WorkerHost {
   private handleFormsAttachWidget(
     req: FormsAttachWidgetWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new FormMutator(this.runtime, session);
     const { field, widget } = mutator.attachWidget(req.ref, req.widget, req.onState, signal);
@@ -2051,7 +2057,7 @@ export class WorkerHost {
   private handleFormsDetachWidget(
     req: FormsDetachWidgetWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new FormMutator(this.runtime, session);
     const { field, widget } = mutator.detachWidget(req.ref, req.widget, signal);
@@ -2063,11 +2069,11 @@ export class WorkerHost {
     );
   }
 
-  private finishMutation<P extends WorkerResultPayload>(
+  private finishMutation<P extends WorkerResultPayload<PdfCoordinates>>(
     session: DocumentSession,
     payload: P,
     artifactPath?: string,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     // Every successful mutation funnels through here; the sequence bump
     // invalidates version-keyed caches (the forms model). Forms mutators
     // bump themselves before reading back, so their tags are skipped to

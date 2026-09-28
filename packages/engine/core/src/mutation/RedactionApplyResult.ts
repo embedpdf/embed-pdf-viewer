@@ -1,7 +1,7 @@
+import type { MutationMeta } from './MutationMeta';
 import type { SerializedEngineError } from '../errors/EngineError';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { PageRef } from '../identity/PageRef';
-import type { MutationMeta } from './MutationMeta';
 
 export type RedactionApplyStatus = 'applied' | 'unchanged' | 'failed' | 'skipped';
 

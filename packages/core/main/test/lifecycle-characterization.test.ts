@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { DocumentHandle, Engine, PageLayout } from '@embedpdf/engine-core/runtime';
 import { createKernel } from '../src/kernel';
 import type { AnyPlugin, PluginContext } from '../src/types';
+import { pageSpaceBoxesOf } from '@embedpdf/engine-core/runtime';
 
 /**
  * The document lifecycle as plugin code and adapters observe it: activation
@@ -18,13 +19,14 @@ const page = (pageObjectNumber: number, index: number): PageLayout => ({
   size: { width: 600, height: 800 },
   rotation: 0,
   userUnit: 1,
-  boxes: {
+  boxes: pageSpaceBoxesOf({
     media: { ...box },
     crop: { ...box },
     bleed: { ...box },
     trim: { ...box },
     art: { ...box },
-  },
+  }),
+  pdfCropBox: { ...box },
 });
 
 function makeHandle(id: string): DocumentHandle {

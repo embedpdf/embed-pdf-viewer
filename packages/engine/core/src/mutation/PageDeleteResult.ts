@@ -1,5 +1,6 @@
 import type { MutationMeta } from './MutationMeta';
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
 /**
  * Result of a `pages.delete()`. A deleted page's object number is retired —
@@ -12,8 +13,8 @@ import type { PageListSnapshot } from '../dto/PageListSnapshot';
  * The result returns the post-delete `layout`; callers swap their snapshot
  * and drop any per-page state they hold for the deleted page object numbers.
  */
-export interface PageDeleteResult {
+export interface PageDeleteResult<C extends Coordinates = PageCoordinates> {
   /** The new layout — the surviving pages in display order. */
-  layout: PageListSnapshot;
+  layout: PageListSnapshot<C>;
   meta: MutationMeta;
 }

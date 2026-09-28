@@ -167,7 +167,7 @@ export function createPluginContext(
     let space = spaces.get(key);
     if (!space) {
       if (spaces.size > 4096) spaces.clear();
-      space = pageSpace(page.boxes.crop);
+      space = pageSpace(page.pdfCropBox);
       spaces.set(key, space);
     }
     return space;

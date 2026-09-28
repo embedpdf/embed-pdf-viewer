@@ -4,6 +4,7 @@ import { createCapabilityToken } from '../src/index';
 import { isPluginError } from '../src/errors';
 import type { AnyPlugin, PluginContext } from '../src/types';
 import { bytesInput, immediateEngine, makeHandle, page } from './helpers';
+import { pageSpaceBoxesOf } from '@embedpdf/engine-core/runtime';
 
 /**
  * The `create()` hook end to end: cheap eager construction in dependency
@@ -58,13 +59,14 @@ describe('create() controller hook', () => {
     const log: string[] = [];
     const cropped = {
       ...page(7, 0),
-      boxes: {
+      boxes: pageSpaceBoxesOf({
         media: { left: 10, bottom: 20, right: 210, top: 320 },
         crop: { left: 10, bottom: 20, right: 210, top: 320 },
         bleed: { left: 10, bottom: 20, right: 210, top: 320 },
         trim: { left: 10, bottom: 20, right: 210, top: 320 },
         art: { left: 10, bottom: 20, right: 210, top: 320 },
-      },
+      }),
+      pdfCropBox: { left: 10, bottom: 20, right: 210, top: 320 },
     };
     const handle = makeHandle('d', [cropped]);
     const kernel = createKernel({

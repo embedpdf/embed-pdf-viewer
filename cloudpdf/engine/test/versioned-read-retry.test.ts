@@ -143,6 +143,7 @@ function pageState(generation = 0) {
 // for the single stub page (the harness only asserts page identity/order).
 function layoutSnapshot() {
   const box = { left: 0, bottom: 0, right: 612, top: 792 };
+  const pageBox = { x: 0, y: 0, width: 612, height: 792 };
   return {
     pageCount: 1,
     pages: [
@@ -154,12 +155,13 @@ function layoutSnapshot() {
         rotation: 0 as const,
         userUnit: 1,
         boxes: {
-          media: { ...box },
-          crop: { ...box },
-          bleed: { ...box },
-          trim: { ...box },
-          art: { ...box },
+          media: { ...pageBox },
+          crop: { ...pageBox },
+          bleed: { ...pageBox },
+          trim: { ...pageBox },
+          art: { ...pageBox },
         },
+        pdfCropBox: { ...box },
       },
     ],
     namedPages: [],

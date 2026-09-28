@@ -1,7 +1,7 @@
+import type { MutationMeta } from './MutationMeta';
 import type { FormFieldDTO } from '../forms/field';
 import type { FormSnapshot } from '../forms/snapshot';
 import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
-import type { MutationMeta } from './MutationMeta';
 
 /**
  * A single-field write's meta: the page envelope plus what changed — the

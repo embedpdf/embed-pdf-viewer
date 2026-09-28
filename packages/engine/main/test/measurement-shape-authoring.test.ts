@@ -37,7 +37,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         const pages = (await doc.pages.list()).pages;
         const page = pages[0];
         const pageObjectNumber = page.ref.pageObjectNumber;
-        const crop = page.boxes.crop;
+        const crop = page.pdfCropBox;
         const { ctx, annotation } = await annotationShell(doc, pages);
         cleanups.push(() => ctx.dispose());
         const scale = measureFromKnownLength(100, { value: 5, unit: 'm' });

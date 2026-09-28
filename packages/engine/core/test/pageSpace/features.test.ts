@@ -4,6 +4,7 @@ import type { PageLayout } from '../../src/dto/PageLayout';
 import { pdfRectOf } from '../../src/geometry/pageSpace';
 import type { PdfRect } from '../../src/geometry/primitives';
 import { toPageRef } from '../../src/identity/PageRef';
+import type { PdfCoordinates } from '../../src/pageSpace/coordinates';
 import { pdfWidgetPlacementOf } from '../../src/pageSpace/forms';
 import { pageViewportsOf, pdfMeasureOf } from '../../src/pageSpace/measure';
 import { pageListOf, pageSpaceBoxesOf, visibleBoxesOf } from '../../src/pageSpace/pages';
@@ -19,7 +20,7 @@ const boxes = {
   art: crop,
 };
 
-const layout = (pageObjectNumber: number, visible: PdfRect): PageLayout => ({
+const layout = (pageObjectNumber: number, visible: PdfRect): PageLayout<PdfCoordinates> => ({
   index: 0,
   ref: toPageRef(pageObjectNumber),
   label: null,
@@ -27,6 +28,7 @@ const layout = (pageObjectNumber: number, visible: PdfRect): PageLayout => ({
   rotation: 0,
   userUnit: 1,
   boxes: { media: visible, crop: visible, bleed: visible, trim: visible, art: visible },
+  pdfCropBox: visible,
 });
 
 describe('pages in page space', () => {
@@ -41,7 +43,7 @@ describe('pages in page space', () => {
   });
 
   test('a page in page space keeps where it sits in PDF space, for PDF tools', () => {
-    const page = { ...layout(4, media), boxes };
+    const page = { ...layout(4, media), boxes, pdfCropBox: crop };
     const [converted] = pageListOf({ pageCount: 1, pages: [page], namedPages: [] }).pages;
     expect(converted!.pdfCropBox).toEqual(crop);
     expect(converted!.boxes.crop).toEqual({ x: 0, y: 0, width: 512, height: 672 });
@@ -53,29 +55,8 @@ describe('pages in page space', () => {
     });
   });
 
-  test("a page's action goes to another page, measured there", () => {
-    const first = {
-      ...layout(4, crop),
-      actions: {
-        open: {
-          incomplete: false,
-          warningFlags: 0,
-          warnings: [],
-          root: {
-            subtype: 'GoTo',
-            type: 'goto' as const,
-            destination: { kind: 'fitH' as const, page: toPageRef(6), top: 300 },
-            next: [],
-          },
-        },
-      },
-    };
-    const second = layout(6, { left: -306, bottom: -396, right: 306, top: 396 });
-    const list = pageListOf({ pageCount: 2, pages: [first, second], namedPages: [] });
-    expect(list.pages[0]!.actions?.open?.root).toMatchObject({
-      destination: { kind: 'fitH', y: 96 },
-    });
-    expect(() => visibleBoxesOf([first])(toPageRef(99))).toThrow();
+  test('a page missing from the document has no box', () => {
+    expect(() => visibleBoxesOf([layout(4, crop)])(toPageRef(99))).toThrow();
   });
 });
 

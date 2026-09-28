@@ -62,10 +62,11 @@ export function runPageRenderConformance(
       if (engine) await engine.destroy();
     });
 
-    test('the layout reports the crop box in file coordinates', async () => {
+    test('the layout reports where the page sits in PDF space', async () => {
       const { pages } = await doc.pages.list();
       expect(pages[0]!.size).toEqual({ width: 400, height: 400 });
-      expect(pages[0]!.boxes.crop).toEqual({ left: 100, bottom: 200, right: 500, top: 600 });
+      expect(pages[0]!.pdfCropBox).toEqual({ left: 100, bottom: 200, right: 500, top: 600 });
+      expect(pages[0]!.boxes.crop).toEqual({ x: 0, y: 0, width: 400, height: 400 });
     });
 
     test('an image reports the size of its pixels', async () => {

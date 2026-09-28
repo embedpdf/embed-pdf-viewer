@@ -15,6 +15,7 @@ import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 import { createLinkController } from '../src/controller';
 import { LinkToken } from '../src/host-contract';
 import { linkPlugin } from '../src/link.plugin';
+import { pageSpaceBoxesOf } from '@embedpdf/engine-core/runtime';
 
 /** Links through the real kernel with the stand-alone source (no annotation plugin). */
 const crop = { left: 0, bottom: 0, right: 600, top: 800 };
@@ -26,7 +27,14 @@ const pageLayout = (pageObjectNumber: number, index: number): PageLayout =>
     size: { width: 600, height: 800 },
     rotation: 0,
     userUnit: 1,
-    boxes: { media: { ...crop }, crop: { ...crop } },
+    boxes: pageSpaceBoxesOf({
+      media: { ...crop },
+      crop: { ...crop },
+      bleed: { ...crop },
+      trim: { ...crop },
+      art: { ...crop },
+    }),
+    pdfCropBox: { ...crop },
   }) as PageLayout;
 
 const linkDto = (

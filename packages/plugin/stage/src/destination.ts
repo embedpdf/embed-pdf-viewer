@@ -39,10 +39,10 @@ export function destinationToReveal(
   boundingBox?: Rect,
 ): DestinationReveal {
   const geometry = pageGeometry(
-    { crop: layout.boxes.crop, rotation: layout.rotation, userUnit: layout.userUnit },
+    { crop: layout.pdfCropBox, rotation: layout.rotation, userUnit: layout.userUnit },
     1,
   );
-  const crop = layout.boxes.crop;
+  const crop = layout.pdfCropBox;
   const toContent = (x: number, y: number) => applyPoint(geometry.pdfToContent, { x, y });
   const page: Rect = { x: 0, y: 0, width: layout.size.width, height: layout.size.height };
   const box = boundingBox ?? page;

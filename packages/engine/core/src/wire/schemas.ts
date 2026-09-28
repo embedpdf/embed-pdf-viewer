@@ -53,6 +53,7 @@ import type { FormEffectsResult, FormEffect } from '../forms/effects';
 import { FormFieldDTOSchema, FormSnapshotSchema, FormWidgetSchema } from '../forms/schema';
 import { FormFieldRefSchema, FormFieldValueSchema } from '../forms/schema';
 import {
+  PageBoxSchema,
   PdfQuadSchema,
   PdfRectSchema,
   PdfRotationSchema,
@@ -1049,12 +1050,13 @@ export const FormRepairResultSchema: z.ZodType<FormRepairResult> = z.object({
  */
 export { PdfRectSchema };
 
+/** A page's five boxes in page space: measured from the top-left of the crop box. */
 export const PageBoxesSchema: z.ZodType<PageBoxes> = z.object({
-  media: PdfRectSchema,
-  crop: PdfRectSchema,
-  bleed: PdfRectSchema,
-  trim: PdfRectSchema,
-  art: PdfRectSchema,
+  media: PageBoxSchema,
+  crop: PageBoxSchema,
+  bleed: PageBoxSchema,
+  trim: PageBoxSchema,
+  art: PageBoxSchema,
 });
 
 /**
@@ -1069,6 +1071,7 @@ export const PageLayoutSchema: z.ZodType<PageLayout> = z.object({
   rotation: PdfRotationSchema,
   userUnit: z.number().positive(),
   boxes: PageBoxesSchema,
+  pdfCropBox: PdfRectSchema,
   actions: PdfPageActionsSchema.optional(),
 });
 

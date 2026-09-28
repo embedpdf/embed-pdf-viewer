@@ -8,7 +8,10 @@ import type { DocumentHandle, PageLayout } from '@embedpdf/engine-core/runtime';
 import { createTestContext } from '../../../../core/main/src/testing';
 
 import { createAnnotationController } from '../../../../plugin/annotation/src/controller';
-import { initialAnnotationState, type AnnotationState } from '../../../../plugin/annotation/src/model';
+import {
+  initialAnnotationState,
+  type AnnotationState,
+} from '../../../../plugin/annotation/src/model';
 
 export async function annotationShell(doc: DocumentHandle, pages: readonly PageLayout[]) {
   const ctx = createTestContext<AnnotationState>({
@@ -18,7 +21,7 @@ export async function annotationShell(doc: DocumentHandle, pages: readonly PageL
     pages: pages.map((page) => ({
       ref: page.ref,
       size: page.size,
-      crop: page.boxes.crop,
+      crop: page.pdfCropBox,
       rotation: page.rotation,
       userUnit: page.userUnit,
       label: page.label,
