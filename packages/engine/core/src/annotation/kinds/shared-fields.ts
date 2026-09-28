@@ -1,11 +1,12 @@
 import { z } from 'zod';
 
+import { DateInputSchema, IsoDateTimeSchema } from '../../dto/IsoDateTime.schema';
+import type { PdfForeignMeasure, PdfMeasure } from '../../dto/Measure';
 import {
   PdfForeignMeasureSchema,
   PdfMeasurementSchema,
   PdfMeasureWriteSchema,
 } from '../../dto/Measure.schema';
-import type { PdfForeignMeasure, PdfMeasure } from '../../dto/Measure';
 import { PdfAnnotationActionsSchema } from '../../dto/PdfAction.schema';
 import {
   PdfPointSchema,
@@ -22,7 +23,6 @@ import {
 } from '../base.schema';
 import { field } from '../declaration';
 import type { FreeTextFont } from '../primitives';
-import { DateInputSchema, IsoDateTimeSchema } from '../../dto/IsoDateTime.schema';
 
 /** `/IRT` and `/RT`: the annotation this one replies to, and how it relates to it. */
 export const AnnotationReplySchema = z.object({
@@ -50,7 +50,7 @@ export const annotationBaseFields = {
   index: field.engine(z.number().int().nonnegative()),
   identityQuality: field.engine(z.enum(['durable', 'weak'])),
   nm: field.data(z.string()).nullable().optional().createOnly(),
-  rect: field.data(PdfRectSchema),
+  rect: field.data(PdfRectSchema).space('box'),
   contents: field.data(z.string()).nullable().optional(),
   subject: field.data(z.string()).nullable().optional(),
   blendMode: field.data(BlendModeSchema).optional(),
@@ -81,7 +81,7 @@ export const annotationBaseFields = {
   /** The session that restored this annotation's attribution in an import. */
   importedBy: field.engine(z.string()).nullable(),
   /** `/A` and `/AA`. */
-  actions: field.preserved(PdfAnnotationActionsSchema).nullable(),
+  actions: field.preserved(PdfAnnotationActionsSchema).nullable().space('actions'),
 };
 
 // ── style ──
@@ -110,7 +110,7 @@ export const filledStyleFields = {
  * read.
  */
 export const drawnRectFields = {
-  rect: field.engine(PdfRectSchema).readBack(),
+  rect: field.engine(PdfRectSchema).readBack().space('box'),
 };
 
 /**
@@ -132,7 +132,7 @@ export const pointsTurnFields = {
 export const boxFields = {
   ...drawnRectFields,
   /** The shape's own box, before any turn: a callout's text box. */
-  box: field.data(PdfRectSchema),
+  box: field.data(PdfRectSchema).space('box'),
   /** Degrees clockwise, about the middle of `box`. */
   rotation: field.data(z.number()).nullable().optional(),
 };
@@ -144,7 +144,7 @@ export const textMarkupFields = {
   ...colorStyleFields,
   /** The box around the quads. */
   ...drawnRectFields,
-  quadPoints: field.data(z.array(PdfQuadSchema).min(1)),
+  quadPoints: field.data(z.array(PdfQuadSchema).min(1)).space('quads'),
 };
 
 export const shapeFields = {
@@ -158,7 +158,7 @@ export const vertexFields = {
   ...annotationBaseFields,
   ...filledStyleFields,
   ...drawnRectFields,
-  vertices: field.data(z.array(PdfPointSchema)),
+  vertices: field.data(z.array(PdfPointSchema)).space('points'),
   ...pointsTurnFields,
 };
 
@@ -169,7 +169,7 @@ export const vertexFields = {
 export const iconFields = {
   ...drawnRectFields,
   /** The icon's left edge and top edge. */
-  at: field.data(PdfTopLeftSchema),
+  at: field.data(PdfTopLeftSchema).space('topLeft'),
 };
 
 /**
@@ -184,11 +184,12 @@ export const measureField = field
     >,
   )
   .nullable()
-  .optional();
+  .optional()
+  .space('measure');
 
 /** Our caption on a polygon or polyline measurement; `null` when the shape has no caption flag. */
 export const shapeCaptionFields = {
   captionEnabled: field.data(z.boolean()).nullable().optional(),
   /** `null` places the caption automatically. */
-  captionCenter: field.data(PdfPointSchema).nullable().optional(),
+  captionCenter: field.data(PdfPointSchema).nullable().optional().space('point'),
 };

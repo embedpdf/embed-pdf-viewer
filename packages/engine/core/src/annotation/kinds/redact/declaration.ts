@@ -9,8 +9,8 @@ export const RedactDeclaration = defineKind('redact', {
   ...annotationBaseFields,
   ...colorStyleFields,
   /** Worked out from the quads when a create gives quads and no `rect`. */
-  rect: field.data(PdfRectSchema).optional(),
-  quadPoints: field.data(z.array(PdfQuadSchema)).optional(),
+  rect: field.data(PdfRectSchema).optional().space('box'),
+  quadPoints: field.data(z.array(PdfQuadSchema)).optional().space('quads'),
   interiorColor: field.data(ColorSchema).nullable().optional(),
   overlayText: field.data(z.string()).nullable().optional(),
   repeat: field.data(z.boolean()).optional(),

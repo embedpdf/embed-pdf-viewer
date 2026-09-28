@@ -1,5 +1,6 @@
 import { pdfQuadBounds } from '../geometry/convert';
 import type { PdfQuad, PdfRect } from '../geometry/primitives';
+import type { Coordinates, PdfCoordinates } from '../pageSpace/coordinates';
 
 /**
  * One upright character's geometry in PDF user space (y-up edges).
@@ -16,9 +17,9 @@ import type { PdfQuad, PdfRect } from '../geometry/primitives';
  * `space` and `empty` are present, and `true`, only for a space and for a
  * character with no box of its own.
  */
-export interface PageGeometryGlyph {
-  loose: PdfRect;
-  tight?: PdfRect;
+export interface PageGeometryGlyph<C extends Coordinates = PdfCoordinates> {
+  loose: C['box'];
+  tight?: C['box'];
   space?: true;
   empty?: true;
 }
@@ -35,9 +36,9 @@ export interface PageGeometryGlyph {
  * Degenerate glyphs carry a zeroed `loose` quad and `empty`, mirroring the
  * upright variant's zeroed-box convention.
  */
-export interface RotatedGeometryGlyph {
-  loose: PdfQuad;
-  tight?: PdfQuad;
+export interface RotatedGeometryGlyph<C extends Coordinates = PdfCoordinates> {
+  loose: C['quad'];
+  tight?: C['quad'];
   space?: true;
   empty?: true;
 }
@@ -46,11 +47,11 @@ export interface RotatedGeometryGlyph {
  * A run whose char matrix is upright — byte-identical to the wire shape that
  * predates orientation support, so upright documents never pay for it.
  */
-export interface UprightGeometryRun {
-  rect: PdfRect;
+export interface UprightGeometryRun<C extends Coordinates = PdfCoordinates> {
+  rect: C['box'];
   /** The run's first character; it covers `glyphs.length` characters from here. */
   start: number;
-  glyphs: PageGeometryGlyph[];
+  glyphs: PageGeometryGlyph<C>[];
   fontSize?: number;
 }
 
@@ -66,11 +67,11 @@ export interface UprightGeometryRun {
  * ascent vector maps opposite the rotated frame's +y (mirrored /
  * negative-determinant content).
  */
-export interface RotatedGeometryRun {
-  rect: PdfRect;
+export interface RotatedGeometryRun<C extends Coordinates = PdfCoordinates> {
+  rect: C['box'];
   /** The run's first character; it covers `glyphs.length` characters from here. */
   start: number;
-  glyphs: RotatedGeometryGlyph[];
+  glyphs: RotatedGeometryGlyph<C>[];
   /** Degrees clockwise, 0 up to 360. */
   rotation: number;
   ascentFlip: boolean;
@@ -85,7 +86,9 @@ export interface RotatedGeometryRun {
  * {@link isRotatedGeometryRun}, or use the uniform {@link glyphLooseQuad} /
  * {@link glyphLooseBounds} views.
  */
-export type PageGeometryRun = UprightGeometryRun | RotatedGeometryRun;
+export type PageGeometryRun<C extends Coordinates = PdfCoordinates> =
+  | UprightGeometryRun<C>
+  | RotatedGeometryRun<C>;
 
 /**
  * Geometry-only text layout for one page, in PDF user space (y-up). The
@@ -95,12 +98,14 @@ export type PageGeometryRun = UprightGeometryRun | RotatedGeometryRun;
  * annotation liveness envelope (`PageState`) — see `PageTextSnapshot` for
  * the rationale; liveness lives on annotation reads.
  */
-export interface PageGeometrySnapshot {
-  runs: PageGeometryRun[];
+export interface PageGeometrySnapshot<C extends Coordinates = PdfCoordinates> {
+  runs: PageGeometryRun<C>[];
 }
 
 /** Narrowing guard: is this run the rotated (non-upright) variant? */
-export function isRotatedGeometryRun(run: PageGeometryRun): run is RotatedGeometryRun {
+export function isRotatedGeometryRun<C extends Coordinates>(
+  run: PageGeometryRun<C>,
+): run is RotatedGeometryRun<C> {
   return 'rotation' in run;
 }
 

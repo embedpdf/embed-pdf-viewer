@@ -5,6 +5,7 @@
 
 import { z } from 'zod';
 
+import type { PageBox, PagePoint, PageQuad } from './pageSpace';
 import type {
   CalloutLine,
   InkList,
@@ -66,3 +67,24 @@ export const PdfRotationSchema: z.ZodType<PdfRotation> = z.union([
   z.literal(180),
   z.literal(270),
 ]);
+
+// ── page space ──
+
+export const PagePointSchema: z.ZodType<PagePoint> = z.object({
+  x: z.number(),
+  y: z.number(),
+});
+
+export const PageBoxSchema: z.ZodType<PageBox> = z.object({
+  x: z.number(),
+  y: z.number(),
+  width: z.number().nonnegative(),
+  height: z.number().nonnegative(),
+});
+
+export const PageQuadSchema: z.ZodType<PageQuad> = z.object({
+  p1: PagePointSchema,
+  p2: PagePointSchema,
+  p3: PagePointSchema,
+  p4: PagePointSchema,
+});

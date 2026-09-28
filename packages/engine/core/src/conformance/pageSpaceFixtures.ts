@@ -76,11 +76,10 @@ export interface PageSpaceFixture {
   /** The rule the fixture checks. */
   about: string;
   /**
-   * `iso`: the answers are the standard's. `recovery`: the file is broken
-   * and the answers are our rule. `acrobat`: broken, and our rule waits on
-   * what Acrobat shows, so only what doesn't depend on it is checked.
+   * `iso`: the answers are the standard's. `recovery`: the file is broken and
+   * the answers are our rule, which is what Acrobat shows.
    */
-  source: 'iso' | 'recovery' | 'acrobat';
+  source: 'iso' | 'recovery';
   /** Entries of the page tree node, inherited by pages that don't set them. */
   treeEntries?: string;
   pages: PageSpaceFixturePage[];
@@ -156,6 +155,9 @@ function build(spec: FixtureSpec): PageSpaceFixture {
 }
 
 const LETTER = rect(0, 0, 612, 792);
+
+/** What a box that shares nothing with the media box becomes. */
+const EMPTY: PdfRect = { left: 0, right: 0, bottom: 0, top: 0 };
 
 /** A page on `media` (cropped to `crop`) with a mark and a word placed inside `visible`. */
 function markedPage(
@@ -432,11 +434,11 @@ export const PAGE_SPACE_FIXTURES: readonly PageSpaceFixture[] = [
   }),
   build({
     name: 'crop-outside-media',
-    about: 'a crop box entirely outside the media box (broken): falls back to the media box (PS2)',
-    source: 'acrobat',
+    about: 'a crop box entirely outside the media box (broken): an empty page, as Acrobat shows it',
+    source: 'recovery',
     pages: [
-      markedPage('/MediaBox [0 0 612 792] /CropBox [700 800 900 1000]', LETTER, {
-        boxes: sameBoxes(LETTER),
+      markedPage('/MediaBox [0 0 612 792] /CropBox [700 800 900 1000]', EMPTY, {
+        boxes: sameBoxes(LETTER, EMPTY),
         rotation: 0,
         userUnit: 1,
       }),
@@ -444,8 +446,8 @@ export const PAGE_SPACE_FIXTURES: readonly PageSpaceFixture[] = [
   }),
   build({
     name: 'odd-rotate',
-    about: '/Rotate that is not a multiple of 90 (broken): the turn Acrobat shows (PS3)',
-    source: 'acrobat',
+    about: '/Rotate that is not a multiple of 90 (broken): no turn, as Acrobat shows it',
+    source: 'recovery',
     pages: ([45, 135] as const).map((turn) =>
       markedPage(`/MediaBox [0 0 612 792] /Rotate ${turn}`, LETTER, {
         boxes: sameBoxes(LETTER),

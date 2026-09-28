@@ -123,8 +123,7 @@ function createFakeRuntime(): PdfRuntimeModule & {
       // apply its documented fallbacks (0x0 size, rotation 0, userUnit 1,
       // null label, zero-rect media).
       EPDF_GetPageBoxByIndex: () => 0,
-      EPDF_GetPageSizeByIndexNormalized: () => 0,
-      EPDF_GetPageRotationByIndex: () => 0,
+      EPDF_GetPageRotateByIndex: () => 0,
       EPDF_GetPageUserUnitByIndex: () => 0,
       FPDF_GetPageLabel: () => 0,
       // No page-level actions in this ownership/routing fixture.

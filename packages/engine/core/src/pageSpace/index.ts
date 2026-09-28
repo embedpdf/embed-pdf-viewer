@@ -1,0 +1,50 @@
+/**
+ * Page space: every position measured from the top-left of a page's visible
+ * box, y down (`geometry/pageSpace.ts`). The conversions between it and the
+ * file's coordinates for everything the engine takes and returns, and the
+ * geometry helpers for page-space values.
+ */
+
+export type { Coordinates, PageCoordinates, PdfCoordinates } from './coordinates';
+export type { PageDestination, VisibleBoxOf } from './destinations';
+export {
+  mapActionNode,
+  mapActionTree,
+  mapAnnotationActions,
+  mapDocumentActions,
+  mapFieldActions,
+  mapLinkTarget,
+  mapPageActions,
+  pageDestinationOf,
+  pdfDestinationOf,
+} from './destinations';
+export {
+  pageAnnotationDraftOf,
+  pageAnnotationOf,
+  pageAnnotationPatchOf,
+  pdfAnnotationDraftOf,
+  pdfAnnotationOf,
+  pdfAnnotationPatchOf,
+} from './annotations';
+export type { PageSpaceLayout } from './pages';
+export { pageLayoutOf, pageListOf, pageSpaceBoxesOf, visibleBoxesOf } from './pages';
+export { createPageTextLayout, pageGeometryOf, pageSearchSliceOf, pageTextSegmentOf } from './text';
+export { pageAppearanceManifestOf, pageAppearancesOf, pdfRenderTargetOf } from './rendering';
+export { pageFieldActionsOf, pdfWidgetPlacementOf } from './forms';
+export { pageMeasureOf, pageViewportsOf, pdfMeasureOf } from './measure';
+export type { PagePointTurn } from './helpers';
+export {
+  pageAppearanceTurnOf,
+  pageDrawnPointsOf,
+  pageGlyphLooseBounds,
+  pageGlyphLooseQuad,
+  pagePointsBounds,
+  pagePointTurned,
+  pagePointUnturned,
+  pageQuadBounds,
+  pageQuadCorners,
+  pageQuadFromCorners,
+  pageTurnOfDrawn,
+  pageTurnOfUpright,
+  pageViewportForPoint,
+} from './helpers';

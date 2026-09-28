@@ -21,10 +21,11 @@ import type { PdfDestination } from './PdfDestination';
  * script payload — the text already rides the base
  * `actions.activate` model, which is the scripting plane's single home
  * for action scripts. `unsupported` preserves round-trip for action
- * types the reader doesn't model.
+ * types the reader doesn't model. `Destination` is where a `goto` measures
+ * its target: the file's coordinates or page space.
  */
-export type PdfLinkTarget =
-  | { kind: 'goto'; destination: PdfDestination }
+export type PdfLinkTarget<Destination = PdfDestination> =
+  | { kind: 'goto'; destination: Destination }
   | { kind: 'uri'; uri: string }
   | { kind: 'goto-remote'; file: string }
   | { kind: 'launch'; path: string }
@@ -41,4 +42,7 @@ export type PdfLinkTarget =
  * liability the viewer never needs to author), and `unsupported` carries
  * nothing to write.
  */
-export type PdfLinkTargetWritable = Extract<PdfLinkTarget, { kind: 'goto' | 'uri' }>;
+export type PdfLinkTargetWritable<Destination = PdfDestination> = Extract<
+  PdfLinkTarget<Destination>,
+  { kind: 'goto' | 'uri' }
+>;

@@ -16,7 +16,7 @@ export const LineDeclaration = defineKind('line', {
   ...annotationBaseFields,
   ...filledStyleFields,
   ...drawnRectFields,
-  linePoints: field.data(LinePointsSchema),
+  linePoints: field.data(LinePointsSchema).space('linePoints'),
   lineEndings: field.data(LineEndingsSchema).optional(),
   ...pointsTurnFields,
   intent: field.data(LineIntentSchema).nullable().optional(),

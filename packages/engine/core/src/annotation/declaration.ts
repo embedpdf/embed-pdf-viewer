@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
 import type { AnnotationResourceRole } from './resources';
+import type { PdfAnnotationActions } from '../dto/PdfAction';
+import type { PdfDestination } from '../dto/PdfDestination';
+import type { PageBox, PagePoint } from '../geometry/pageSpace';
+import type { PageDestination } from '../pageSpace/destinations';
 
 /**
  * One declaration per annotation kind. Each field says who writes it, what it
@@ -33,6 +37,36 @@ import type { AnnotationResourceRole } from './resources';
  */
 export type FieldOwner = 'data' | 'attribution' | 'engine' | 'preserved';
 
+/**
+ * What a field holds that is measured on the page, so a value can be
+ * converted between the file's coordinates and page space (see
+ * `geometry/pageSpace.ts`).
+ *
+ * - `none`: nothing measured on the page.
+ * - `length`: numbers with position-like names that are sizes, not places
+ *   (a paragraph's margins); never converted.
+ * - `point`, `points`, `strokes` (lists of points), `box`, `quads`,
+ *   `linePoints` (`{ start, end }`), `calloutLine` (two or three points),
+ *   `topLeft` (a box's left and top edges): places on the annotation's page.
+ * - `measure`: a scale whose `origin` is a place on the page.
+ * - `linkTarget`, `actions`: destinations, each measured on the page it
+ *   goes to.
+ */
+export type FieldSpace =
+  | 'none'
+  | 'length'
+  | 'point'
+  | 'points'
+  | 'strokes'
+  | 'box'
+  | 'quads'
+  | 'linePoints'
+  | 'calloutLine'
+  | 'topLeft'
+  | 'measure'
+  | 'linkTarget'
+  | 'actions';
+
 export interface FieldTraits {
   readonly owner: FieldOwner;
   /** A read returns `null` when the PDF entry is absent. */
@@ -45,6 +79,8 @@ export interface FieldTraits {
   readonly createOnly: boolean;
   /** An update also takes what a read returns (kept only when unchanged). */
   readonly readBack: boolean;
+  /** What the field holds that is measured on the page. */
+  readonly space: FieldSpace;
 }
 
 export type Override<Traits, Changed> = Omit<Traits, keyof Changed> & Changed;
@@ -70,6 +106,10 @@ export interface Field<Read, Write, Traits> {
    * field every value is a read's: any other than the current one is refused.
    */
   readBack(): Field<Read, Write, Override<Traits, { readBack: true }>>;
+  /** What the field holds that is measured on the page. */
+  space<Space extends FieldSpace>(
+    space: Space,
+  ): Field<Read, Write, Override<Traits, { space: Space }>>;
 }
 
 export type AnyField = Field<any, any, any>;
@@ -92,6 +132,7 @@ function createField<Read, Write, Traits>(
     optional: () => next({ required: false }),
     createOnly: () => next({ createOnly: true }),
     readBack: () => next({ readBack: true }),
+    space: (space) => next({ space }),
     writes: (schema) => createField(read, schema, traits),
   };
 }
@@ -103,6 +144,7 @@ export interface OwnerTraits<Owner extends FieldOwner, Required extends boolean>
   required: Required;
   createOnly: false;
   readBack: false;
+  space: 'none';
 }
 
 const ownedBy = <Owner extends FieldOwner, Required extends boolean>(
@@ -115,6 +157,7 @@ const ownedBy = <Owner extends FieldOwner, Required extends boolean>(
   required,
   createOnly: false,
   readBack: false,
+  space: 'none',
 });
 
 /** Field builders for {@link defineKind}. */
@@ -185,6 +228,53 @@ export type UpdateShape<Fields extends KindFields> = {
   [Name in AcceptedNames<Fields>]?: ReadValue<Fields[Name]>;
 };
 
+// ── page space ──
+
+type SpaceOf<F> = F extends { traits: { space: infer Space } } ? Space : never;
+
+/**
+ * A field's value in page space, by what the field holds: a box becomes a
+ * `PageBox`, a box's left and top edges its top-left `PagePoint`, and a
+ * destination a `PageDestination`. Points keep their shape (`{ x, y }`), so
+ * their type is the same in both spaces. `null` and a value left out stay as
+ * they are.
+ */
+export type PageValue<Space, Value> = Value extends null | undefined
+  ? Value
+  : Space extends 'box'
+    ? PageBox
+    : Space extends 'topLeft'
+      ? PagePoint
+      : Space extends 'linkTarget'
+        ? Value extends { destination: PdfDestination }
+          ? Omit<Value, 'destination'> & { destination: PageDestination }
+          : Value
+        : Space extends 'actions'
+          ? PdfAnnotationActions<PageDestination>
+          : Value;
+
+type PageFieldRead<F> = PageValue<SpaceOf<F>, ReadValue<F>>;
+type PageFieldWrite<F> = PageValue<SpaceOf<F>, WriteValue<F>>;
+type PageFieldUpdate<F> = PageValue<SpaceOf<F>, UpdateValue<F>>;
+
+export type PageReadShape<Fields extends KindFields> = {
+  [Name in keyof Fields]: PageFieldRead<Fields[Name]>;
+};
+
+export type PageCreateShape<Fields extends KindFields> = {
+  [Name in NamesWhere<Fields, { owner: 'data'; required: true }>]: PageFieldWrite<Fields[Name]>;
+} & {
+  [Name in NamesWhere<Fields, { owner: 'data'; required: false }>]?: PageFieldWrite<Fields[Name]>;
+} & {
+  [Name in AcceptedNames<Fields>]?: PageFieldRead<Fields[Name]>;
+};
+
+export type PageUpdateShape<Fields extends KindFields> = {
+  [Name in NamesWhere<Fields, { owner: 'data' }>]?: PageFieldUpdate<Fields[Name]>;
+} & {
+  [Name in AcceptedNames<Fields>]?: PageFieldRead<Fields[Name]>;
+};
+
 // ── kinds ──
 
 /** The resources a kind takes, by role (`annotation/resources.ts`). */
@@ -249,6 +339,24 @@ export type CreateOf<Declaration> =
 export type UpdateOf<Declaration> =
   Declaration extends KindDeclaration<infer Subtype, infer Fields, infer _Resources>
     ? KindUpdate<Subtype, Fields>
+    : never;
+
+/** A kind's complete read in page space. */
+export type PageReadOf<Declaration> =
+  Declaration extends KindDeclaration<infer Subtype, infer Fields, infer _Resources>
+    ? Simplify<{ subtype: Subtype } & PageReadShape<Fields>>
+    : never;
+
+/** The data a create accepts, in page space. */
+export type PageCreateOf<Declaration> =
+  Declaration extends KindDeclaration<infer Subtype, infer Fields, infer _Resources>
+    ? Simplify<{ subtype: Subtype } & PageCreateShape<Fields>>
+    : never;
+
+/** The data an update accepts, in page space. */
+export type PageUpdateOf<Declaration> =
+  Declaration extends KindDeclaration<infer Subtype, infer Fields, infer _Resources>
+    ? Simplify<{ subtype?: Subtype } & PageUpdateShape<Fields>>
     : never;
 
 /**

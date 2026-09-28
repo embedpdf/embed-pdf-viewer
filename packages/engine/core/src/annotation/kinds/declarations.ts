@@ -1,4 +1,4 @@
-import type { ReadOf } from '../declaration';
+import type { PageCreateOf, PageReadOf, PageUpdateOf, ReadOf } from '../declaration';
 import { CaretDeclaration } from './caret/declaration';
 import { CircleDeclaration } from './circle/declaration';
 import { FileAttachmentDeclaration } from './file-attachment/declaration';
@@ -48,6 +48,15 @@ export type AnnotationDeclaration = (typeof ANNOTATION_DECLARATIONS)[number];
 
 /** The complete read of any annotation, discriminated by `subtype`. */
 export type AnnotationRead = ReadOf<AnnotationDeclaration>;
+
+/** The complete read of any annotation in page space. */
+export type PageAnnotationDTO = PageReadOf<AnnotationDeclaration>;
+
+/** What a create takes, in page space. */
+export type PageAnnotationDraft = PageCreateOf<AnnotationDeclaration>;
+
+/** What an update takes, in page space. */
+export type PageAnnotationPatch = PageUpdateOf<AnnotationDeclaration>;
 
 /** Looks up a kind's declaration by its `subtype`. */
 export function declarationOf(subtype: string): AnnotationDeclaration | null {

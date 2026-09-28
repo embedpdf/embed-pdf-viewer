@@ -19,7 +19,11 @@ export const FreeTextDeclaration = defineKind('free-text', {
   fontFamily: field.data(FontNameSchema),
   fontSize: field.data(z.number().positive()),
   textAlign: field.data(TextAlignmentSchema),
-  richText: field.data(RichTextDocumentSchema).writes(RichTextDocumentInputSchema).optional(),
+  richText: field
+    .data(RichTextDocumentSchema)
+    .writes(RichTextDocumentInputSchema)
+    .optional()
+    .space('length'),
   color: field.data(ColorSchema).optional(),
   fontColor: field.data(ColorSchema).nullable().optional(),
   interiorColor: field.data(ColorSchema).nullable().optional(),
@@ -27,6 +31,6 @@ export const FreeTextDeclaration = defineKind('free-text', {
   strokeWidth: field.data(z.number().nonnegative()).optional(),
   borderStyle: field.data(AnnotationBorderStyleSchema).optional(),
   dashArray: field.data(z.array(z.number().nonnegative())).nullable().optional(),
-  calloutLine: field.data(CalloutLineSchema).nullable().optional(),
+  calloutLine: field.data(CalloutLineSchema).nullable().optional().space('calloutLine'),
   lineEnding: field.data(LineEndingSchema).nullable().optional(),
 });

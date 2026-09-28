@@ -61,9 +61,6 @@ export function runPageSpaceConformance(
       describe(`${fixture.name}: ${fixture.about}`, () => {
         let doc: DocumentHandle;
         let layouts: PageLayout[];
-        // A broken file whose rule waits on Acrobat: only what doesn't
-        // depend on that rule is checked.
-        const settled = fixture.source !== 'acrobat';
 
         beforeAll(async () => {
           doc = await opts.open(engine, fixture);
@@ -82,9 +79,15 @@ export function runPageSpaceConformance(
             await check(page, layouts[index]!);
           }
         };
+        // A page whose visible box has no area shows nothing to look at.
+        const eachShownPage = (
+          check: (page: PageSpaceFixturePage, layout: PageLayout) => Promise<void>,
+        ) =>
+          eachPage((page, layout) =>
+            hasArea(page.expected.visible) ? check(page, layout) : Promise.resolve(),
+          );
 
         test('the page size is the visible page box', async () => {
-          if (!settled) return;
           await eachPage(async (page, layout) => {
             const visible = page.expected.visible;
             expect(layout.size).toEqual({
@@ -95,7 +98,6 @@ export function runPageSpaceConformance(
         });
 
         test('the boxes are as ISO defines them', async () => {
-          if (!settled) return;
           await eachPage(async (page, layout) => {
             const { boxes } = page.expected;
             expect(layout.boxes).toEqual(boxes);
@@ -103,7 +105,6 @@ export function runPageSpaceConformance(
         });
 
         test('the turn and the unit size', async () => {
-          if (!settled) return;
           await eachPage(async (page, layout) => {
             expect(layout.rotation).toBe(page.expected.rotation);
             expect(layout.userUnit).toBe(page.expected.userUnit);
@@ -111,8 +112,7 @@ export function runPageSpaceConformance(
         });
 
         test("a render starts at the visible page box's top-left", async () => {
-          if (!settled) return;
-          await eachPage(async (page, layout) => {
+          await eachShownPage(async (page, layout) => {
             const visible = page.expected.visible;
             const scale = scaleFor(visible);
             const raster = await render(doc, layout.ref, { viewport: { kind: 'scale', scale } });
@@ -127,9 +127,8 @@ export function runPageSpaceConformance(
         });
 
         test('text is found where it is drawn', async () => {
-          if (!settled) return;
           const slice = await doc.search.query({ text: 'Corner' });
-          await eachPage(async (page, layout) => {
+          await eachShownPage(async (page, layout) => {
             const visible = page.expected.visible;
             const word = page.words[0]!;
             const match = slice.matches.find((m) => samePage(m.page, layout.ref));
@@ -146,8 +145,7 @@ export function runPageSpaceConformance(
         });
 
         test('a created annotation is drawn where it was put', async () => {
-          if (!settled) return;
-          await eachPage(async (page, layout) => {
+          await eachShownPage(async (page, layout) => {
             const visible = page.expected.visible;
             const spot: PageBox = {
               x: width(visible) / 2 - 20,
@@ -179,8 +177,7 @@ export function runPageSpaceConformance(
         });
 
         test('a region render shows its own area', async () => {
-          if (!settled) return;
-          await eachPage(async (page, layout) => {
+          await eachShownPage(async (page, layout) => {
             const raster = await render(doc, layout.ref, {
               target: { kind: 'rect', rect: page.marks[0]! },
               viewport: { kind: 'scale', scale: 0.1 },
@@ -214,10 +211,10 @@ export function runPageSpaceConformance(
         }
 
         test('a redaction removes what is inside it, and only that', async () => {
-          if (!settled) return;
           const page = fixture.pages[0]!;
           const layout = layouts[0]!;
           const visible = page.expected.visible;
+          if (!hasArea(visible)) return;
           const slice = await doc.search.query({ text: 'Corner' });
           const match = slice.matches.find((m) => samePage(m.page, layout.ref));
           expect(match !== undefined).toBe(true);
@@ -252,6 +249,7 @@ export function runPageSpaceConformance(
 
 const width = (r: PdfRect) => r.right - r.left;
 const height = (r: PdfRect) => r.top - r.bottom;
+const hasArea = (r: PdfRect) => width(r) > 0 && height(r) > 0;
 
 function toPage(r: PdfRect, visible: PdfRect): PageBox {
   return { x: r.left - visible.left, y: visible.top - r.top, width: width(r), height: height(r) };

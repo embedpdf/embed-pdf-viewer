@@ -4,11 +4,13 @@ import type {
   PageLayout,
   PageListSnapshot,
   PdfRect,
+  PdfRotation,
   PdfPageActions,
 } from '@embedpdf/engine-core/runtime';
 import {
   normalizePdfRect,
   pageBoxesOf,
+  pageRotationOf,
   pdfRectSize,
   toPageRef,
 } from '@embedpdf/engine-core/runtime';
@@ -22,7 +24,14 @@ import type {
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { withScratchN } from '../../runtime/memory/scratch';
 import { readUtf16String } from '../../runtime/memory/strings';
-import { F32_BYTES, RECTF_BYTES, readF32, readRectF } from '../../runtime/memory/structs';
+import {
+  F32_BYTES,
+  I32_BYTES,
+  RECTF_BYTES,
+  readF32,
+  readI32,
+  readRectF,
+} from '../../runtime/memory/structs';
 import { throwIfAborted } from '../../shared/abort';
 import { ActionReadBudgetTracker, readActionModel } from '../actions/ActionModelReader';
 
@@ -54,25 +63,29 @@ export class PagesReader {
     const actionBudget = new ActionReadBudgetTracker();
 
     // One scratch buffer per struct kind, reused across every page.
-    return withScratchN(mem, [RECTF_BYTES, F32_BYTES], ([rectPtr, userUnitPtr]) => {
-      const pages: PageLayout[] = records.map((record) => {
-        throwIfAborted(signal);
-        const index = record.pageIndex;
-        const actions = readPageActions(fn, mem, docPtr, record.pageObjectNumber, actionBudget);
-        const boxes = readBoxes(fn, mem, docPtr, index, rectPtr);
-        return {
-          index,
-          ref: toPageRef(record.pageObjectNumber),
-          label: readLabel(fn, mem, docPtr, index),
-          size: pdfRectSize(boxes.crop),
-          rotation: readRotation(fn, docPtr, index),
-          userUnit: readUserUnit(fn, mem, docPtr, index, userUnitPtr),
-          boxes,
-          ...(actions ? { actions } : {}),
-        };
-      });
-      return { pageCount: pages.length, pages, namedPages: readNamedPages(fn, mem, docPtr) };
-    });
+    return withScratchN(
+      mem,
+      [RECTF_BYTES, F32_BYTES, I32_BYTES],
+      ([rectPtr, userUnitPtr, intPtr]) => {
+        const pages: PageLayout[] = records.map((record) => {
+          throwIfAborted(signal);
+          const index = record.pageIndex;
+          const actions = readPageActions(fn, mem, docPtr, record.pageObjectNumber, actionBudget);
+          const boxes = readBoxes(fn, mem, docPtr, index, rectPtr);
+          return {
+            index,
+            ref: toPageRef(record.pageObjectNumber),
+            label: readLabel(fn, mem, docPtr, index),
+            size: pdfRectSize(boxes.crop),
+            rotation: readRotation(fn, mem, docPtr, index, intPtr),
+            userUnit: readUserUnit(fn, mem, docPtr, index, userUnitPtr),
+            boxes,
+            ...(actions ? { actions } : {}),
+          };
+        });
+        return { pageCount: pages.length, pages, namedPages: readNamedPages(fn, mem, docPtr) };
+      },
+    );
   }
 }
 
@@ -134,19 +147,16 @@ export function readBoxes(
   });
 }
 
-function readRotation(fn: PdfFunctions, docPtr: Ptr, index: number): 0 | 90 | 180 | 270 {
-  // Returns quarter-turns (0..3), or -1 on error.
-  const quarterTurns = fn.EPDF_GetPageRotationByIndex(docPtr, index);
-  switch (quarterTurns) {
-    case 1:
-      return 90;
-    case 2:
-      return 180;
-    case 3:
-      return 270;
-    default:
-      return 0;
-  }
+/** The page's turn: its `/Rotate` as written, read by the rules of `pageRotationOf`. */
+function readRotation(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  docPtr: Ptr,
+  index: number,
+  intPtr: Ptr,
+): PdfRotation {
+  if (!fn.EPDF_GetPageRotateByIndex(docPtr, index, intPtr)) return 0;
+  return pageRotationOf(readI32(mem, intPtr));
 }
 
 function readUserUnit(

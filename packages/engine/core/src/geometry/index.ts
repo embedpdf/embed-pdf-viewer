@@ -43,4 +43,15 @@ export {
 } from './pointTurn';
 export { renderSize } from './renderSize';
 export type { WrittenPageBoxes } from './pageBoxes';
-export { DEFAULT_MEDIA_BOX, pageBoxesOf } from './pageBoxes';
+export type { PageBox, PagePoint, PageQuad } from './pageSpace';
+export {
+  pageBoxOf,
+  pagePointOf,
+  pagePointOfTopLeft,
+  pageQuadOf,
+  pdfPointOf,
+  pdfQuadOf,
+  pdfRectOf,
+  pdfTopLeftOf,
+} from './pageSpace';
+export { DEFAULT_MEDIA_BOX, pageBoxesOf, pageRotationOf } from './pageBoxes';

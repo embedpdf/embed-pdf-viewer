@@ -12,7 +12,7 @@ export const InkDeclaration = defineKind('ink', {
   ...annotationBaseFields,
   ...geometryStyleFields,
   ...drawnRectFields,
-  inkList: field.data(InkListSchema),
+  inkList: field.data(InkListSchema).space('strokes'),
   intent: field.data(InkIntentSchema).nullable().optional(),
   ...pointsTurnFields,
 });

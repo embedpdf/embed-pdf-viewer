@@ -256,6 +256,9 @@ export {
   LinePointsSchema,
   InkListSchema,
   CalloutLineSchema,
+  PagePointSchema,
+  PageBoxSchema,
+  PageQuadSchema,
 } from './geometry/schemas';
 
 export {

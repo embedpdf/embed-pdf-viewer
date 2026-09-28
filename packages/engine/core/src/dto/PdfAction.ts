@@ -99,11 +99,11 @@ export interface SubmitFormPayload {
   charSet?: string;
 }
 
-interface PdfActionNodeCommon {
+interface PdfActionNodeCommon<Destination> {
   /** Raw `/S` name, retained for unknown and future action types. */
   subtype: string;
   /** Normalized `/Next` children in PDF order. */
-  next: PdfActionNode[];
+  next: PdfActionNode<Destination>[];
 }
 
 /**
@@ -112,12 +112,13 @@ interface PdfActionNodeCommon {
  * payload — a `goto` without a destination or a `uri` without a URI is
  * unrepresentable. A payload the reader cannot materialize degrades the node
  * to `unknown` (original `/S` kept on `subtype`) and appends the tree-level
- * `'payload-dropped'` warning.
+ * `'payload-dropped'` warning. `Destination` is where a `goto` measures its
+ * target: the file's coordinates or page space.
  */
-export type PdfActionNode = PdfActionNodeCommon &
+export type PdfActionNode<Destination = PdfDestination> = PdfActionNodeCommon<Destination> &
   (
     | { type: 'javascript'; script: string }
-    | { type: 'goto'; destination: PdfDestination }
+    | { type: 'goto'; destination: Destination }
     | { type: 'uri'; uri: string; isMap: boolean }
     | { type: 'named'; name: string }
     | { type: 'hide'; targets: PdfActionTargetRef[]; hide: boolean }
@@ -163,9 +164,9 @@ export type PdfActionWarning =
  * One extracted action root plus the native reader's safety verdict.
  * Consumers must never execute a tree whose `incomplete` flag is true.
  */
-export interface PdfActionTree {
+export interface PdfActionTree<Destination = PdfDestination> {
   /** Null when the model was valid but its root exceeded a safety bound. */
-  root: PdfActionNode | null;
+  root: PdfActionNode<Destination> | null;
   incomplete: boolean;
   /** Raw native bits, retained so newer warnings survive older SDKs.
    *  TS-detected warnings (`payload-dropped`) appear only in `warnings`. */
@@ -173,53 +174,53 @@ export interface PdfActionTree {
   warnings: PdfActionWarning[];
 }
 
-export interface PdfFieldActions {
-  keystroke?: PdfActionTree;
-  format?: PdfActionTree;
-  validate?: PdfActionTree;
-  calculate?: PdfActionTree;
+export interface PdfFieldActions<Destination = PdfDestination> {
+  keystroke?: PdfActionTree<Destination>;
+  format?: PdfActionTree<Destination>;
+  validate?: PdfActionTree<Destination>;
+  calculate?: PdfActionTree<Destination>;
 }
 
-export interface PdfPageActions {
-  open?: PdfActionTree;
-  close?: PdfActionTree;
+export interface PdfPageActions<Destination = PdfDestination> {
+  open?: PdfActionTree<Destination>;
+  close?: PdfActionTree<Destination>;
 }
 
-export interface PdfAnnotationActions {
-  activate?: PdfActionTree;
-  cursorEnter?: PdfActionTree;
-  cursorExit?: PdfActionTree;
-  mouseDown?: PdfActionTree;
-  mouseUp?: PdfActionTree;
-  focus?: PdfActionTree;
-  blur?: PdfActionTree;
-  pageOpen?: PdfActionTree;
-  pageClose?: PdfActionTree;
-  pageVisible?: PdfActionTree;
-  pageInvisible?: PdfActionTree;
+export interface PdfAnnotationActions<Destination = PdfDestination> {
+  activate?: PdfActionTree<Destination>;
+  cursorEnter?: PdfActionTree<Destination>;
+  cursorExit?: PdfActionTree<Destination>;
+  mouseDown?: PdfActionTree<Destination>;
+  mouseUp?: PdfActionTree<Destination>;
+  focus?: PdfActionTree<Destination>;
+  blur?: PdfActionTree<Destination>;
+  pageOpen?: PdfActionTree<Destination>;
+  pageClose?: PdfActionTree<Destination>;
+  pageVisible?: PdfActionTree<Destination>;
+  pageInvisible?: PdfActionTree<Destination>;
 }
 
-export interface NamedJavaScriptAction {
+export interface NamedJavaScriptAction<Destination = PdfDestination> {
   /** Name-tree key. Array order is the PDF boot order. */
   name: string;
-  action: PdfActionTree;
+  action: PdfActionTree<Destination>;
 }
 
 /** Catalog-owned actions. Page actions stay on their owning PageLayout. */
-export interface DocumentActionsSnapshot {
-  nameTreeScripts: NamedJavaScriptAction[];
+export interface DocumentActionsSnapshot<Destination = PdfDestination> {
+  nameTreeScripts: NamedJavaScriptAction<Destination>[];
   /** Action-form `/OpenAction`. Mutually exclusive with `openDestination` —
    *  `/OpenAction` is one entry, a dictionary or an array. */
-  openAction: PdfActionTree | null;
+  openAction: PdfActionTree<Destination> | null;
   /** Destination-form `/OpenAction` — the initial view, not an action.
    *  Optional on the wire for skew tolerance (absent ≡ null); the schema
    *  defaults it, so parsed snapshots always carry the key. */
-  openDestination?: PdfDestination | null;
-  willClose?: PdfActionTree;
-  willSave?: PdfActionTree;
-  didSave?: PdfActionTree;
-  willPrint?: PdfActionTree;
-  didPrint?: PdfActionTree;
+  openDestination?: Destination | null;
+  willClose?: PdfActionTree<Destination>;
+  willSave?: PdfActionTree<Destination>;
+  didSave?: PdfActionTree<Destination>;
+  willPrint?: PdfActionTree<Destination>;
+  didPrint?: PdfActionTree<Destination>;
 }
 
 /**

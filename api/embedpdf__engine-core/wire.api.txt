@@ -165,6 +165,7 @@ NamedPageEntrySchema [VariableDeclaration] (from packages/engine/core/src/wire/s
 NoteIconSchema [VariableDeclaration] (from packages/engine/core/src/annotation/kinds/text/values.ts): NoteIconSchema: z.ZodType<NoteIcon> = z.enum([ 'comment', 'key', 'note', 'help', 'new-paragraph', 'paragraph', 'insert', ])
 OpenDocumentResponse [TypeAliasDeclaration] (from packages/engine/core/src/wire/schemas.ts): export type OpenDocumentResponse = z.infer<typeof OpenDocumentResponseSchema>;
 OpenDocumentResponseSchema [VariableDeclaration] (from packages/engine/core/src/wire/schemas.ts): OpenDocumentResponseSchema = z.object({ id: z.string(), } )
+PageBoxSchema [VariableDeclaration] (from packages/engine/core/src/geometry/schemas.ts): PageBoxSchema: z.ZodType<PageBox> = z.object({ x: z.number(), y: z.number(), width: z.number().nonnegative(), height: z.number().nonnegative(), } )
 PageBoxesSchema [VariableDeclaration] (from packages/engine/core/src/wire/schemas.ts): PageBoxesSchema: z.ZodType<PageBoxes> = z.object({ media: PdfRectSchema, crop: PdfRectSchema, bleed: PdfRectSchema, trim: PdfRectSchema, art: PdfRectSchema, } )
 PageDeleteInputSchema [VariableDeclaration] (from packages/engine/core/src/wire/schemas.ts): PageDeleteInputSchema: z.ZodType<PageDeleteInput> = z.object({ pages: z.array(PageRefSchema), } )
 PageDeleteResultSchema [VariableDeclaration] (from packages/engine/core/src/wire/schemas.ts): PageDeleteResultSchema: z.ZodType<PageDeleteResult> = z.object({ layout: PageListSnapshotSchema, meta: MutationMetaSchema, } )
@@ -184,6 +185,8 @@ PageMoveResultSchema [VariableDeclaration] (from packages/engine/core/src/wire/s
 PageNameInputSchema [VariableDeclaration] (from packages/engine/core/src/wire/schemas.ts): PageNameInputSchema: z.ZodType<PageNameInput> = z.object({ name: z.string().min(1), page: PageRefSchema, replace: z.string().min(1).optional(), } )
 PageNameResultSchema [VariableDeclaration] (from packages/engine/core/src/wire/schemas.ts): PageNameResultSchema: z.ZodType<PageNameResult> = z.object({ layout: PageListSnapshotSchema, meta: MutationMetaSchema, } )
 PageNetworkRenderFormatSchema [VariableDeclaration] (from packages/engine/core/src/wire/schemas.ts): PageNetworkRenderFormatSchema: z.ZodType<PageNetworkRenderFormat> = z.enum([ 'png', 'webp', ])
+PagePointSchema [VariableDeclaration] (from packages/engine/core/src/geometry/schemas.ts): PagePointSchema: z.ZodType<PagePoint> = z.object({ x: z.number(), y: z.number(), } )
+PageQuadSchema [VariableDeclaration] (from packages/engine/core/src/geometry/schemas.ts): PageQuadSchema: z.ZodType<PageQuad> = z.object({ p1: PagePointSchema, p2: PagePointSchema, p3: PagePointSchema, p4: PagePointSchema, } )
 PageRefSchema [VariableDeclaration] (from packages/engine/core/src/identity/PageRef.schema.ts): PageRefSchema: z.ZodType<PageRef> = z.object({ kind: z.literal('objectNumber'), pageObjectNumber: z.number().int().positive(), } )
 PageRemoveNameInputSchema [VariableDeclaration] (from packages/engine/core/src/wire/schemas.ts): PageRemoveNameInputSchema: z.ZodType<PageRemoveNameInput> = z.object({ name: z.string().min(1), } )
 PageRenderAnnotatedQuerySchema [VariableDeclaration] (from packages/engine/core/src/wire/schemas.ts): PageRenderAnnotatedQuerySchema = buildPageRenderQuerySchema(true)

@@ -1,6 +1,6 @@
 import type { WidgetAppearance } from '../annotation/kinds/widget.shared';
-import type { PdfRect } from '../geometry/primitives';
 import type { PageRef } from '../identity/PageRef';
+import type { Coordinates, PdfCoordinates } from '../pageSpace/coordinates';
 
 export type { WidgetAppearance } from '../annotation/kinds/widget.shared';
 
@@ -9,10 +9,9 @@ export type { WidgetAppearance } from '../annotation/kinds/widget.shared';
  * this is an annotation create + `attachWidget`, composed in one atomic
  * engine job.
  */
-export interface WidgetPlacement {
+export interface WidgetPlacement<C extends Coordinates = PdfCoordinates> {
   page: PageRef;
-  /** PDF user space. */
-  rect: PdfRect;
+  rect: C['box'];
   /**
    * Toggles: this widget's checked appearance-state name (the token
    * toggle writes address). Required per widget for radio groups;

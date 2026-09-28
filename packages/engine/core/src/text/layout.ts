@@ -6,6 +6,7 @@ import {
   type RotatedGeometryRun,
 } from '../dto/PageGeometrySnapshot';
 import type { PdfPoint, PdfQuad, PdfRect } from '../geometry/primitives';
+import type { Coordinates, PdfCoordinates } from '../pageSpace/coordinates';
 
 /**
  * The canonical text-interaction layout — the one place glyph geometry
@@ -67,9 +68,9 @@ const EDGE_EPSILON = 1e-6;
  * `advance` is the reading direction along the baseline, derived from the
  * glyph sequence (+1 = the frame's +x), never inferred from geometry.
  */
-export interface PdfTextSegment {
-  quad: PdfQuad;
-  rect: PdfRect;
+export interface PdfTextSegment<C extends Coordinates = PdfCoordinates> {
+  quad: C['quad'];
+  rect: C['box'];
   advance: 1 | -1;
 }
 
@@ -117,25 +118,25 @@ interface PageTextLayout {
  * points, y up. Characters are numbered as the page's character space, the
  * space every {@link TextRange} is in.
  */
-export interface TextLayout {
+export interface TextLayout<C extends Coordinates = PdfCoordinates> {
   /** How many characters the page has: they are numbered 0 to `charCount - 1`. */
   readonly charCount: number;
   /** The raw geometry: characters grouped by line and font, with their boxes. */
-  readonly runs: readonly PageGeometryRun[];
+  readonly runs: readonly PageGeometryRun<C>[];
   /**
    * The character at a point, or `null` when there's no text near it. The
    * tight box is tried first, then a near miss within 1.5 times the average
    * line height.
    */
-  charAt(point: PdfPoint): number | null;
+  charAt(point: C['point']): number | null;
   /** The word at a point or around a character, or `null` when there is none. */
-  wordAt(at: PdfPoint | number): TextRange | null;
+  wordAt(at: C['point'] | number): TextRange | null;
   /** The visual line at a point or around a character, or `null` when there is none. */
-  lineAt(at: PdfPoint | number): TextRange | null;
+  lineAt(at: C['point'] | number): TextRange | null;
   /** One segment per visual line the range covers: what to draw, or to highlight. */
-  segments(range: TextRange): PdfTextSegment[];
+  segments(range: TextRange): PdfTextSegment<C>[];
   /** One character's loose cell, as a quad, or `null` for a character with no box. */
-  charQuad(index: number): PdfQuad | null;
+  charQuad(index: number): C['quad'] | null;
 }
 
 /** The layout of a page's geometry. */
@@ -350,7 +351,9 @@ function textGlyphAt(
       }
       const dx = Math.min(Math.abs(q.x - b.left), Math.abs(q.x - b.right));
       const dy = Math.min(Math.abs(q.y - b.bottom), Math.abs(q.y - b.top));
-      if (dx + dy < bestDist) {
+      // Neighbours share an edge, so a point nearest to it is as near to both:
+      // the first one wins, whatever the last bit of rounding says.
+      if (dx + dy < bestDist - EDGE_EPSILON) {
         bestDist = dx + dy;
         best = run.start + i;
       }

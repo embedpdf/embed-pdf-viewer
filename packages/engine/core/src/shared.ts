@@ -80,6 +80,7 @@ export {
   renderSize,
   DEFAULT_MEDIA_BOX,
   pageBoxesOf,
+  pageRotationOf,
 } from './geometry';
 export type { PageTextSnapshot } from './dto/PageTextSnapshot';
 export type {
@@ -194,6 +195,9 @@ export type {
 export { STANDARD_FONTS } from './annotation/primitives';
 export { NO_ANNOTATION_FLAGS } from './annotation/primitives';
 export { ANNOTATION_FIELD_NAMES, ANNOTATION_RESOURCE_ROLES } from './annotation/field-names';
+export { ANNOTATION_FIELD_SPACES } from './annotation/field-spaces';
+export type { MeasuredFieldSpace } from './annotation/field-spaces';
+export type { FieldSpace } from './annotation/declaration';
 
 export type { AnnotationBase } from './annotation/base';
 export type { AnnotationDraftBase } from './annotation/draft-base';
@@ -304,6 +308,9 @@ export type {
   AnnotationDTO,
   AnnotationDraft,
   AnnotationPatch,
+  PageAnnotationDTO,
+  PageAnnotationDraft,
+  PageAnnotationPatch,
   HighlightAnnotationDTO,
   HighlightDraft,
   HighlightPatch,
@@ -442,6 +449,20 @@ export { appearanceImpactOf, semanticEqual } from './annotation/appearance';
 export { appearanceTurnOf } from './annotation/appearanceTurn';
 export { drawnPointsOf } from './annotation/drawnPoints';
 export { assertAnnotationDraft, checkAnnotationPatch } from './annotation/checkWrite';
+
+// Page space: positions from the top-left of a page's visible box, y down.
+export type { PageBox, PagePoint, PageQuad } from './geometry';
+export {
+  pageBoxOf,
+  pagePointOf,
+  pagePointOfTopLeft,
+  pageQuadOf,
+  pdfPointOf,
+  pdfQuadOf,
+  pdfRectOf,
+  pdfTopLeftOf,
+} from './geometry';
+export * from './pageSpace';
 export type { FormFieldRef, FormWidget } from './identity/FormFieldRef';
 export { formWidget, toFieldRef } from './identity/FormFieldRef';
 export { encodeFieldRefKey, decodeFieldRefKey } from './identity/FormFieldRef';

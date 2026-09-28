@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { pdfRectIntersection } from '../../src/geometry/convert';
-import { DEFAULT_MEDIA_BOX, pageBoxesOf } from '../../src/geometry/pageBoxes';
+import { DEFAULT_MEDIA_BOX, pageBoxesOf, pageRotationOf } from '../../src/geometry/pageBoxes';
 
 const rect = (left: number, bottom: number, right: number, top: number) => ({
   left,
@@ -51,15 +51,13 @@ describe('pageBoxesOf (ISO 32000-1 §14.11.2)', () => {
     expect(pageBoxesOf({}).crop).toEqual(rect(0, 0, 612, 792));
   });
 
-  it('treats a box that shares nothing with the media box as absent', () => {
+  it('makes a box that shares nothing with the media box empty, as Acrobat does', () => {
     const media = rect(0, 0, 612, 792);
-    const boxes = pageBoxesOf({
-      media,
-      crop: rect(700, 800, 900, 1000),
-      art: rect(-50, 0, -10, 20),
-    });
-    expect(boxes.crop).toEqual(media);
-    expect(boxes.art).toEqual(media);
+    const empty = { left: 0, right: 0, bottom: 0, top: 0 };
+    const offPage = pageBoxesOf({ media, crop: rect(700, 800, 900, 1000) });
+    expect(offPage.crop).toEqual(empty);
+    expect(offPage.bleed).toEqual(empty);
+    expect(pageBoxesOf({ media, art: rect(-50, 0, -10, 20) }).art).toEqual(empty);
   });
 });
 
@@ -68,5 +66,17 @@ describe('pdfRectIntersection', () => {
     expect(pdfRectIntersection(rect(0, 0, 10, 10), rect(5, 5, 20, 20))).toEqual(rect(5, 5, 10, 10));
     expect(pdfRectIntersection(rect(0, 0, 10, 10), rect(10, 0, 20, 10))).toBeNull();
     expect(pdfRectIntersection(rect(0, 0, 10, 10), rect(20, 20, 30, 30))).toBeNull();
+  });
+});
+
+describe('pageRotationOf', () => {
+  it('reads multiples of 90 as the same turn, any sign or size', () => {
+    expect([0, 90, 180, 270, 360, -90, -270, 450, 720].map(pageRotationOf)).toEqual([
+      0, 90, 180, 270, 0, 270, 90, 90, 0,
+    ]);
+  });
+
+  it('reads any other value as no turn, as Acrobat does', () => {
+    expect([45, 135, -45, 91, 89.5].map(pageRotationOf)).toEqual([0, 0, 0, 0, 0]);
   });
 });

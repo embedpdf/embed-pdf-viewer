@@ -1,6 +1,7 @@
-import type { PdfRect, PdfRotation, PdfSize } from '../geometry/primitives';
-import type { PageRef } from '../identity/PageRef';
 import type { PdfPageActions } from './PdfAction';
+import type { PdfRotation, PdfSize } from '../geometry/primitives';
+import type { PageRef } from '../identity/PageRef';
+import type { Coordinates, PdfCoordinates } from '../pageSpace/coordinates';
 
 /**
  * The five PDF page boundary boxes, in PDF user space as `PdfRect`s
@@ -13,12 +14,12 @@ import type { PdfPageActions } from './PdfAction';
  * Coordinates are not rotated; the display transform (origin shift, y flip,
  * rotation) lives in the SDK, never here.
  */
-export interface PageBoxes {
-  media: PdfRect;
-  crop: PdfRect;
-  bleed: PdfRect;
-  trim: PdfRect;
-  art: PdfRect;
+export interface PageBoxes<C extends Coordinates = PdfCoordinates> {
+  media: C['box'];
+  crop: C['box'];
+  bleed: C['box'];
+  trim: C['box'];
+  art: C['box'];
 }
 
 /**
@@ -34,7 +35,7 @@ export interface PageBoxes {
  * consistent with the raw `boxes` and with the "transform lives in the SDK"
  * principle.
  */
-export interface PageLayout {
+export interface PageLayout<C extends Coordinates = PdfCoordinates> {
   /** Display order at read time. Not an identity; shifts on a page move. */
   index: number;
   /**
@@ -51,7 +52,7 @@ export interface PageLayout {
   rotation: PdfRotation;
   /** `/UserUnit`; defaults to the PDF default of 1. */
   userUnit: number;
-  boxes: PageBoxes;
+  boxes: PageBoxes<C>;
   /** Page-owned `/AA` actions; absent for the usual script-less page. */
-  actions?: PdfPageActions;
+  actions?: PdfPageActions<C['destination']>;
 }

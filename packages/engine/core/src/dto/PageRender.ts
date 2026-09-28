@@ -1,7 +1,8 @@
 import { EngineError } from '../errors/EngineError';
-import { AbortablePromise } from '../promise/AbortablePromise';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
-import type { PdfRect, PdfRotation } from '../geometry/primitives';
+import type { PdfRotation } from '../geometry/primitives';
+import type { Coordinates, PdfCoordinates } from '../pageSpace/coordinates';
+import { AbortablePromise } from '../promise/AbortablePromise';
 
 export type PageRenderEncodedFormat = 'png' | 'webp' | 'bmp';
 
@@ -33,15 +34,12 @@ export type PageRenderViewport =
       width: number;
     };
 
-export type PageRenderTarget =
+export type PageRenderTarget<C extends Coordinates = PdfCoordinates> =
   | { kind: 'page' }
   | {
       kind: 'rect';
-      /**
-       * PDF user-space rectangle. Same convention as annotation rects:
-       * top > bottom, origin at the PDF page's bottom-left.
-       */
-      rect: PdfRect;
+      /** The area to render, in the same coordinates as annotation rects. */
+      rect: C['box'];
     };
 
 export interface PageRenderOptions {

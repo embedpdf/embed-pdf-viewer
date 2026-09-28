@@ -48,7 +48,13 @@ export * from './style.shared';
 export * from './vertex.shared';
 export * from './widget.shared';
 export { ANNOTATION_DECLARATIONS, declarationOf } from './declarations';
-export type { AnnotationDeclaration, AnnotationRead } from './declarations';
+export type {
+  AnnotationDeclaration,
+  AnnotationRead,
+  PageAnnotationDTO,
+  PageAnnotationDraft,
+  PageAnnotationPatch,
+} from './declarations';
 export type { CreateOf, ReadOf, UpdateOf } from '../declaration';
 
 /**
