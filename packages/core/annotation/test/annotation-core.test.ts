@@ -22,10 +22,6 @@ import {
   shapeRectFor,
   caretGeomFromAnchor,
   caretRectFromAnchor,
-  contentToPdfRect,
-  pdfToContentRect,
-  contentToPdfPoint,
-  pdfToContentPoint,
   centroidOf,
   geomRotation,
   geomRotateAbout,
@@ -986,14 +982,6 @@ describe('annotation-core', () => {
     const open = geomScene(line('open-arrow'), 2);
     expect(open.some((node) => node.kind === 'poly' && !node.closed)).toBe(true); // stroke-only head
     expect(open.some((node) => node.kind === 'poly' && node.closed)).toBe(false);
-  });
-
-  it('PDF↔content round-trips through a non-zero crop', () => {
-    const crop = { left: 10, bottom: 20, right: 600, top: 800 };
-    const pdf = { left: 100, bottom: 300, right: 250, top: 420 };
-    expect(contentToPdfRect(pdfToContentRect(pdf, crop), crop)).toMatchObject(pdf);
-    const pt = { x: 123, y: 456 };
-    expect(contentToPdfPoint(pdfToContentPoint(pt, crop), crop)).toMatchObject(pt);
   });
 
   it('a shape rect is its OUTER box: visual bounds equal the box, the drawn path insets by half the stroke', () => {

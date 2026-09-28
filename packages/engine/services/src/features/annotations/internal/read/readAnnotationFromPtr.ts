@@ -1,4 +1,9 @@
-import type { AnnotationDTO, PageObjectNumber, RevisionToken } from '@embedpdf/engine-core/runtime';
+import type {
+  AnnotationDTO,
+  PageObjectNumber,
+  RevisionToken,
+  PdfCoordinates,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import type { AnnotationReadContext } from './annotationReadContext';
@@ -25,7 +30,7 @@ export function readAnnotationFromPtr(
   index: number,
   revision: RevisionToken,
   ctx: AnnotationReadContext,
-): AnnotationDTO {
+): AnnotationDTO<PdfCoordinates> {
   const base = readAnnotationBase(fn, mem, ctx.docPtr, annotPtr, pageObjectNumber, index, revision);
   const subtypeCode = fn.FPDFAnnot_GetSubtype(annotPtr);
   const { reader } = pickReader(subtypeCode);

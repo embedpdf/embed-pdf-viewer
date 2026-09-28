@@ -82,7 +82,7 @@ export function createReveal(
     const positioned =
       !!options &&
       // `rect: null` means "no rect", the same as absent, so nullable sources
-      // (`CommentThreadView.contentRect`) flow in without a `?? undefined`.
+      // flow in without a `?? undefined`.
       (options.rect != null ||
         options.anchor !== undefined ||
         (options.zoom !== undefined && options.zoom !== 'keep'));

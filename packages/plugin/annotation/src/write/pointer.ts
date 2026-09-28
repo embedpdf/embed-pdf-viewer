@@ -139,7 +139,6 @@ export function createPointer(
               ...(resolvedTool.intent === 'line-dimension'
                 ? { leader: resolvedTool.measurement?.leader }
                 : {}),
-              crop,
               text: '',
             }
           : undefined;

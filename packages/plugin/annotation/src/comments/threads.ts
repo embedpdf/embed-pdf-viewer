@@ -54,16 +54,15 @@ export function createThreadIndex(
     }
     const threads = buildCommentThreads(dtos, { currentUserId: currentUserId() });
 
-    // Display order: page position first (live layout), then top of page
-    // (PDF user space is y-up — larger `top` sits higher), then creation.
+    // Display order: page position first (live layout), then from the top of
+    // the page down, then creation.
     const pages = ctx.document()?.pages ?? [];
     const displayIndex = new Map(pages.map((pageInfo, i) => [pageInfo.ref.pageObjectNumber, i]));
     threads.sort((left, right) => {
       const pa = displayIndex.get(left.page.pageObjectNumber) ?? Number.MAX_SAFE_INTEGER;
       const pb = displayIndex.get(right.page.pageObjectNumber) ?? Number.MAX_SAFE_INTEGER;
       if (pa !== pb) return pa - pb;
-      if (left.root.rect.top !== right.root.rect.top)
-        return right.root.rect.top - left.root.rect.top;
+      if (left.root.rect.y !== right.root.rect.y) return left.root.rect.y - right.root.rect.y;
       const leftCreated = left.root.createdAt;
       const rightCreated = right.root.createdAt;
       if (leftCreated === null || rightCreated === null) {

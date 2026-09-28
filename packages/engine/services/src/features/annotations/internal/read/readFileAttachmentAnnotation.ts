@@ -4,6 +4,7 @@ import type {
   Color,
   FileAttachmentAnnotationDTO,
   FileAttachmentIcon,
+  PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -28,8 +29,8 @@ export function readFileAttachment(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  base: AnnotationBase,
-): FileAttachmentAnnotationDTO {
+  base: AnnotationBase<PdfCoordinates>,
+): FileAttachmentAnnotationDTO<PdfCoordinates> {
   const color = readAnnotColor(fn, mem, annotPtr) ?? { ...DEFAULT_FILE_ATTACHMENT_COLOR };
   const ca = readAnnotOpacity(fn, mem, annotPtr);
   const opacity = ca == null ? 1 : Math.max(0, Math.min(1, ca));

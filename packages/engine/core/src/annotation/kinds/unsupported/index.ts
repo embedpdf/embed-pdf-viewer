@@ -1,13 +1,17 @@
 import { z } from 'zod';
 
 import type { ReadOf } from '../../declaration';
+import type { Coordinates, PageCoordinates } from '../../../pageSpace/coordinates';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
 import { UnsupportedDeclaration } from './declaration';
 
 export { UnsupportedDeclaration } from './declaration';
 
-export type UnsupportedAnnotationDTO = ReadOf<typeof UnsupportedDeclaration>;
+export type UnsupportedAnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+  typeof UnsupportedDeclaration,
+  C
+>;
 /** An annotation of a type the engine doesn't model can't be created or updated. */
 export type UnsupportedDraft = never;
 export type UnsupportedPatch = never;

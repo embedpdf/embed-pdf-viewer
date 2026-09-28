@@ -2,6 +2,7 @@ import type {
   WidgetDraft,
   WidgetPatch,
   WidgetStyleDraftFields,
+  PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -80,7 +81,7 @@ export function applyWidgetDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: WidgetDraft,
+  draft: WidgetDraft<PdfCoordinates>,
 ): void {
   setAnnotRect(fn, mem, annotPtr, draft.rect);
   applyWidgetStyle(fn, mem, annotPtr, draft);
@@ -95,7 +96,7 @@ export function applyWidgetPatch(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  patch: WidgetPatch,
+  patch: WidgetPatch<PdfCoordinates>,
 ): void {
   if (patch.rect) {
     setAnnotRect(fn, mem, annotPtr, patch.rect);

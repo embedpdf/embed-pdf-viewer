@@ -107,7 +107,7 @@ function annotation(index: number) {
     locked: false,
     toggleNoView: false,
     lockedContents: false,
-    rect: { left: 0, top: 0, right: 10, bottom: 10 },
+    rect: { x: 0, y: 0, width: 10, height: 10 },
     contents: null,
     subject: null,
     author: null,
@@ -939,7 +939,7 @@ describe('CloudPageAnnotationsService — binary payload wire shape', () => {
       await doc
         .page(toPageRef(PAGE_OBJECT_NUMBER))
         .annotations.create(
-          { subtype: 'stamp', box: { left: 10, bottom: 10, right: 110, top: 60 }, fit: 'cover' },
+          { subtype: 'stamp', box: { x: 10, y: 10, width: 100, height: 50 }, fit: 'cover' },
           { appearance: TINY_PNG },
         );
 
@@ -951,7 +951,7 @@ describe('CloudPageAnnotationsService — binary payload wire shape', () => {
       // The body is the data exactly: no bytes and no resource keys inside it.
       expect(JSON.parse(String(form.get('body')))).toEqual({
         subtype: 'stamp',
-        box: { left: 10, bottom: 10, right: 110, top: 60 },
+        box: { x: 10, y: 10, width: 100, height: 50 },
         fit: 'cover',
       });
       const part = form.get('resource:appearance');

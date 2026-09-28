@@ -1,4 +1,5 @@
 import type { AnnotationDTO } from './kinds';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 import type { PageRef } from '../identity/PageRef';
 import type { PageState } from '../revision/PageState';
 
@@ -13,8 +14,8 @@ import type { PageState } from '../revision/PageState';
  * reads in document order, the cloud in its page registry's order; join
  * `pages[i].page` against `pages.list()` (by ref) when display order matters.
  */
-export interface AnnotationList {
-  annotations: AnnotationDTO[];
+export interface AnnotationList<C extends Coordinates = PageCoordinates> {
+  annotations: AnnotationDTO<C>[];
   pages: PageState[];
   /**
    * Cloud, whole document only: the audit-log position the list is
@@ -37,7 +38,9 @@ export interface AnnotationListOptions {
 }
 
 /** Lists of different pages as one, in their order. */
-export function concatAnnotationLists(lists: readonly AnnotationList[]): AnnotationList {
+export function concatAnnotationLists<C extends Coordinates>(
+  lists: readonly AnnotationList<C>[],
+): AnnotationList<C> {
   return {
     annotations: lists.flatMap((list) => list.annotations),
     pages: lists.flatMap((list) => list.pages),

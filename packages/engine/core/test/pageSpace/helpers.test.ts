@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'vitest';
 
-import { appearanceTurnOf } from '../../src/annotation/appearanceTurn';
-import { drawnPointsOf } from '../../src/annotation/drawnPoints';
-import type { AnnotationDTO, PageAnnotationDTO } from '../../src/annotation/kinds';
+import { pdfAppearanceTurnOf } from '../../src/annotation/appearanceTurn';
+import { pdfDrawnPointsOf } from '../../src/annotation/drawnPoints';
+import type { AnnotationDTO } from '../../src/annotation/kinds';
 import type { PdfViewport } from '../../src/dto/Measure';
 import {
   glyphLooseBounds,
@@ -22,8 +22,8 @@ import { viewportForPoint } from '../../src/measure/viewport';
 import { pageAnnotationOf } from '../../src/pageSpace/annotations';
 import type { PdfCoordinates } from '../../src/pageSpace/coordinates';
 import {
-  pageAppearanceTurnOf,
-  pageDrawnPointsOf,
+  appearanceTurnOf,
+  drawnPointsOf,
   pageGlyphLooseBounds,
   pageGlyphLooseQuad,
   pagePointsBounds,
@@ -148,12 +148,12 @@ describe('page-space helpers agree with the originals', () => {
       { subtype: 'polyline', rotation: null, vertices: [pointAt(), pointAt()] },
     ];
     for (const annotation of cases) {
-      const dto = annotation as unknown as AnnotationDTO;
-      const page = pageAnnotationOf(dto, visible, boxOf) as PageAnnotationDTO;
-      const expected = drawnPointsOf(dto)!.map((set) => set.map(toPage));
-      close(pageDrawnPointsOf(page), expected);
+      const dto = annotation as unknown as AnnotationDTO<PdfCoordinates>;
+      const page = pageAnnotationOf(dto, visible, boxOf);
+      const expected = pdfDrawnPointsOf(dto)!.map((set) => set.map(toPage));
+      close(drawnPointsOf(page), expected);
     }
-    expect(pageDrawnPointsOf({ subtype: 'square' } as PageAnnotationDTO)).toBeNull();
+    expect(drawnPointsOf({ subtype: 'square' } as AnnotationDTO)).toBeNull();
   });
 
   test('the appearance turn', () => {
@@ -162,12 +162,12 @@ describe('page-space helpers agree with the originals', () => {
       const rect = rotation ? pdfRectTurnedBounds(box, rotation) : box;
       const annotation = { subtype: 'square', rect, box, rotation };
       expect(
-        pageAppearanceTurnOf({
+        appearanceTurnOf({
           ...annotation,
           rect: pageBoxOf(rect, visible),
           box: pageBoxOf(box, visible),
         }),
-      ).toBe(appearanceTurnOf(annotation));
+      ).toBe(pdfAppearanceTurnOf(annotation));
     }
   });
 

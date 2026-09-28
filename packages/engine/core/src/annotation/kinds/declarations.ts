@@ -1,4 +1,5 @@
-import type { PageCreateOf, PageReadOf, PageUpdateOf, ReadOf } from '../declaration';
+import type { CreateOf, ReadOf, UpdateOf } from '../declaration';
+import type { Coordinates, PageCoordinates } from '../../pageSpace/coordinates';
 import { CaretDeclaration } from './caret/declaration';
 import { CircleDeclaration } from './circle/declaration';
 import { FileAttachmentDeclaration } from './file-attachment/declaration';
@@ -46,17 +47,36 @@ export const ANNOTATION_DECLARATIONS = [
 
 export type AnnotationDeclaration = (typeof ANNOTATION_DECLARATIONS)[number];
 
-/** The complete read of any annotation, discriminated by `subtype`. */
-export type AnnotationRead = ReadOf<AnnotationDeclaration>;
+/** The kinds a create or an update can name: every kind the engine models. */
+export type WritableAnnotationDeclaration = Exclude<
+  AnnotationDeclaration,
+  typeof UnsupportedDeclaration
+>;
 
-/** The complete read of any annotation in page space. */
-export type PageAnnotationDTO = PageReadOf<AnnotationDeclaration>;
+/**
+ * The complete read of any annotation, discriminated by `subtype`: in page
+ * space, or in the file's coordinates with `PdfCoordinates`.
+ */
+export type AnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+  AnnotationDeclaration,
+  C
+>;
 
-/** What a create takes, in page space. */
-export type PageAnnotationDraft = PageCreateOf<AnnotationDeclaration>;
+/**
+ * What `create()` takes, and what the worker protocol and the HTTP surface
+ * carry: pure JSON. Bytes travel beside it, as resources
+ * (`annotation/resources.ts`).
+ */
+export type AnnotationDraft<C extends Coordinates = PageCoordinates> = CreateOf<
+  WritableAnnotationDeclaration,
+  C
+>;
 
-/** What an update takes, in page space. */
-export type PageAnnotationPatch = PageUpdateOf<AnnotationDeclaration>;
+/** What `update()` takes. */
+export type AnnotationPatch<C extends Coordinates = PageCoordinates> = UpdateOf<
+  WritableAnnotationDeclaration,
+  C
+>;
 
 /** Looks up a kind's declaration by its `subtype`. */
 export function declarationOf(subtype: string): AnnotationDeclaration | null {

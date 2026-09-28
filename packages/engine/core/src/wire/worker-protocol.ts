@@ -30,7 +30,6 @@ import type { FormDataFormat, FormFieldValue } from '../forms/value';
 import type { PdfRect, PdfRotation, PdfSize } from '../geometry/primitives';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
-import type { PageObjectNumber } from '../identity/PageObjectNumber';
 import type { PageRef } from '../identity/PageRef';
 import type { AnnotationFlattenResult } from '../mutation/AnnotationFlattenResult';
 import type {
@@ -315,13 +314,13 @@ export interface AnnotationsRenderAppearancesWorkerRequest {
   options?: AnnotationAppearanceRenderOptions;
 }
 
-export interface AnnotationsCreateWorkerRequest {
+export interface AnnotationsCreateWorkerRequest<C extends Coordinates = PageCoordinates> {
   kind: 'annotations.create';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
   page: PageRef;
-  draft: AnnotationDraft;
+  draft: AnnotationDraft<C>;
   /**
    * The bytes beside the draft, by role. The producer puts each buffer on
    * the wirePack transfer list (zero-copy, same convention as `PageRaster`).
@@ -339,13 +338,13 @@ export interface AnnotationsCreateWorkerRequest {
   actor?: AnnotationActor;
 }
 
-export interface AnnotationsUpdateWorkerRequest {
+export interface AnnotationsUpdateWorkerRequest<C extends Coordinates = PageCoordinates> {
   kind: 'annotations.update';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
   ref: AnnotationRef;
-  patch: AnnotationPatch;
+  patch: AnnotationPatch<C>;
   /** The bytes beside the patch, by role — see the create request. */
   resources?: WireAnnotationResources;
   artifactPath?: string;
@@ -409,7 +408,9 @@ export interface AnnotationsExportWorkerRequest {
 
 /**
  * A bundle's annotations, created as one change (`doc.annotations.import`).
- * The producer puts each resource's buffer on the transfer list.
+ * The producer puts each resource's buffer on the transfer list. The bundle
+ * stays in page space on its way in: the import measures each item on the
+ * page it goes to, which only the import works out.
  */
 export interface AnnotationsImportWorkerRequest {
   kind: 'annotations.import';
@@ -1158,8 +1159,8 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | AnnotationsListWorkerRequest
   | AnnotationsRenderAppearancesWorkerRequest
   | AnnotationsRenderAppearancesEncodedWorkerRequest
-  | AnnotationsCreateWorkerRequest
-  | AnnotationsUpdateWorkerRequest
+  | AnnotationsCreateWorkerRequest<C>
+  | AnnotationsUpdateWorkerRequest<C>
   | AnnotationsDeleteWorkerRequest
   | AnnotationsMoveWorkerRequest
   | FormsListWorkerRequest
@@ -1281,7 +1282,7 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
-  | { tag: 'annotations.list'; list: AnnotationList }
+  | { tag: 'annotations.list'; list: AnnotationList<C> }
   | { tag: 'annotations.renderAppearances'; page: PageRef; result: AnnotationAppearancesResult<C> }
   | {
       tag: 'annotations.renderAppearancesEncoded';
@@ -1290,13 +1291,13 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
     }
   | {
       tag: 'annotations.create';
-      result: AnnotationCreateResult;
+      result: AnnotationCreateResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | {
       tag: 'annotations.update';
-      result: AnnotationUpdateResult;
+      result: AnnotationUpdateResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
@@ -1316,16 +1317,17 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
     }
   | { tag: 'annotations.exportAppearance'; bytes: ArrayBuffer; size: number }
   | { tag: 'annotations.readAppearance'; bytes: ArrayBuffer; size: number }
+  /** A bundle is page space on both sides: the exporter measures what leaves. */
   | { tag: 'annotations.export'; bundle: WireAnnotationBundle }
   | {
       tag: 'annotations.import';
-      result: AnnotationImportResult;
+      result: AnnotationImportResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | {
       tag: 'annotations.move';
-      result: AnnotationMoveResult;
+      result: AnnotationMoveResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }

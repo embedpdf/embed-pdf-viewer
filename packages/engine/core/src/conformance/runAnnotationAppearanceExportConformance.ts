@@ -7,9 +7,9 @@ import { toPageRef } from '../identity/PageRef';
 
 const PDF_MAGIC = [0x25, 0x50, 0x44, 0x46]; // %PDF
 
-const square = (left: number, bottom: number, size = 40): SquareDraft => ({
+const square = (x: number, y: number, size = 40): SquareDraft => ({
   subtype: 'square',
-  box: { left, bottom, right: left + size, top: bottom + size },
+  box: { x, y, width: size, height: size },
   color: { r: 220, g: 20, b: 20 },
   strokeWidth: 2,
 });

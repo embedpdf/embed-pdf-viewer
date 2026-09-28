@@ -3,7 +3,6 @@ import type {
   LineDimensionCaption,
   LineLeader,
   PdfMeasurement,
-  PdfRect,
 } from '@embedpdf/engine-core/runtime';
 import { endingNodes, endingPoints } from './endings';
 import { DISTANCE_CAPTION_SIZE as CAPTION_SIZE, distanceCaptionWidth } from './measurement-font';
@@ -25,14 +24,13 @@ export type MeasurementAppearance = DistanceAppearance | ShapeMeasurementAppeara
 
 /**
  * A distance annotation's render projection. Offsets stay in directed PDF line
- * axes. The crop keeps numeric rounding in the original PDF coordinate frame.
+ * axes.
  */
 export interface DistanceAppearance {
   intent: 'line-dimension';
   measure: PdfMeasurement | null;
   caption: LineDimensionCaption;
   leader?: LineLeader;
-  crop: PdfRect;
   text: string;
 }
 
@@ -102,19 +100,11 @@ export function distanceLabel(geometry: ContentGeometry, appearance: DistanceApp
     return appearance.text;
   }
 
-  const toPdfPoint = (point: Point) => ({
-    x: point.x + appearance.crop.left,
-    y: appearance.crop.top - point.y,
-  });
-
   const readout = measurementReadout({
     subtype: 'line',
     intent: appearance.intent,
     measure: appearance.measure,
-    linePoints: {
-      start: toPdfPoint(geometry.a),
-      end: toPdfPoint(geometry.b),
-    },
+    linePoints: { start: geometry.a, end: geometry.b },
   });
 
   return isReadout(readout) ? readout.label : appearance.text;

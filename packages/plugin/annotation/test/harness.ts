@@ -2,12 +2,20 @@
  * A test harness for the annotation controller on the kernel's real test
  * context. Its fake engine behaves like the real ones: every write publishes
  * its confirmed event before the write's promise resolves, so the model
- * changes through the same event path as in production.
+ * changes through the same event path as in production. Its annotations are
+ * the file's values, as tests write them; it hands them out in page space,
+ * as the engines do (`pageAnnotationOf`).
  */
 import { createEventHook, type DocumentEvent } from '@embedpdf/core';
 import { createTestContext } from '@embedpdf/core/testing';
-import type { AnnotationDTO, AnnotationRef, PageRef } from '@embedpdf/engine-core/runtime';
-import { toPageRef } from '@embedpdf/engine-core/runtime';
+import type {
+  AnnotationDTO,
+  AnnotationRef,
+  PageRef,
+  PdfCoordinates,
+  PdfRect,
+} from '@embedpdf/engine-core/runtime';
+import { pageAnnotationOf, toPageRef } from '@embedpdf/engine-core/runtime';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { vi } from 'vitest';
 
@@ -28,8 +36,11 @@ const metaOf = (weakRefsInvalidated = false) => ({
   shouldRefetch: weakRefsInvalidated ? { reason: 'weakRefsInvalidated' } : null,
 });
 
+/** An annotation as the fake engine keeps it: the file's values. */
+export type FileAnnotation = AnnotationDTO<PdfCoordinates>;
+
 /** The whole-document list `listAll` resolves with: the records and their pages. */
-export const snapshotOf = (records: readonly AnnotationDTO[], auditHead?: number) => {
+export const snapshotOf = (records: readonly FileAnnotation[], auditHead?: number) => {
   const pages = new Map<number, PageRef>();
   for (const record of records) pages.set(record.page.pageObjectNumber, record.page);
   return {
@@ -44,7 +55,18 @@ export interface AnnotationHarnessOptions {
   readonly crop?: { left: number; bottom: number; right: number; top: number };
 }
 
+const DEFAULT_CROP: PdfRect = { left: 0, bottom: 0, right: 600, top: 800 };
+
 export function annotationHarness(options: AnnotationHarnessOptions = {}) {
+  const cropOf = (page: PageRef): PdfRect =>
+    page.pageObjectNumber === PAGE.pageObjectNumber ? (options.crop ?? DEFAULT_CROP) : DEFAULT_CROP;
+  /** A read as the engine hands it out. */
+  const read = (annotation: FileAnnotation): AnnotationDTO =>
+    pageAnnotationOf(annotation, cropOf(annotation.page), cropOf);
+  const readAll = <List extends { annotations: FileAnnotation[] }>(list: List) =>
+    list && { ...list, annotations: list.annotations.map(read) };
+  const readResult = <Result extends { annotation?: FileAnnotation }>(result: Result) =>
+    result?.annotation ? { ...result, annotation: read(result.annotation) } : result;
   const create = vi.fn();
   const update = vi.fn();
   const remove = vi.fn(async (_ref: AnnotationRef) => ({}));
@@ -86,7 +108,7 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
           create: async (draft: unknown) => {
             // Every create this plugin sends to the viewed document carries an /NM.
             if (!(draft as { nm?: string }).nm) throw new Error('a create without an /NM');
-            const result = await create(draft);
+            const result = readResult(await create(draft));
             ctx.emitDocumentEvent({
               type: 'annotations.created',
               page: result.annotation.page ?? page,
@@ -97,7 +119,7 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
             return result;
           },
           update: async (ref: AnnotationRef, patch: unknown) => {
-            const result = await update(ref, patch);
+            const result = readResult(await update(ref, patch));
             if (result?.annotation) {
               ctx.emitDocumentEvent({
                 type: 'annotations.updated',
@@ -128,17 +150,17 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
             } as unknown as DocumentEvent);
             return result;
           },
-          list,
+          list: async () => readAll(await list()),
         },
       }),
       annotations: {
         // Some pages read through each page's list, so a test queues page reads once.
         list: async (options?: { pages?: readonly PageRef[] }) => {
-          if (!options?.pages) return listAll();
-          const lists = await Promise.all(options.pages.map(() => list()));
+          if (!options?.pages) return readAll(await listAll());
+          const lists = await Promise.all(options.pages.map(async () => readAll(await list())));
           return {
-            annotations: lists.flatMap((read) => read.annotations),
-            pages: lists.flatMap((read) => read.pages ?? []),
+            annotations: lists.flatMap((page) => page.annotations),
+            pages: lists.flatMap((page) => page.pages ?? []),
           };
         },
       },
@@ -193,10 +215,13 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
     model: () => instance.model(),
     startSync,
     connectAll,
-    /** Deliver a document event (another session's change, a form write, …). */
-    emit: (event: DocumentEvent) => ctx.emitDocumentEvent(event),
+    /** A fixture (the file's values) as the engine hands it out, in page space. */
+    read,
+    /** Deliver a document event (another session's change, a form write, …); its annotation is the file's values. */
+    emit: (event: DocumentEvent) =>
+      ctx.emitDocumentEvent(readResult(event as { annotation?: FileAnnotation }) as DocumentEvent),
     /** Load these confirmed records as the document's annotations. */
-    load: async (records: readonly AnnotationDTO[], auditHead?: number) => {
+    load: async (records: readonly FileAnnotation[], auditHead?: number) => {
       listAll.mockResolvedValueOnce(snapshotOf(records, auditHead));
       if (started) await api.refresh();
       else startSync();

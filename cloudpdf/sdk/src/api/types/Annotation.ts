@@ -82,10 +82,10 @@ export namespace Annotation {
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
         }
 
         export const BlendMode = {
@@ -218,10 +218,10 @@ export namespace Annotation {
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
         }
 
         export const BlendMode = {
@@ -354,10 +354,10 @@ export namespace Annotation {
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
         }
 
         export const BlendMode = {
@@ -491,10 +491,10 @@ export namespace Annotation {
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
         }
 
         export const BlendMode = {
@@ -638,10 +638,10 @@ export namespace Annotation {
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
         }
 
         export const BlendMode = {
@@ -698,10 +698,10 @@ export namespace Annotation {
         }
 
         export interface Box {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
         }
     }
 
@@ -768,10 +768,10 @@ export namespace Annotation {
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
         }
 
         export const BlendMode = {
@@ -828,10 +828,10 @@ export namespace Annotation {
         }
 
         export interface Box {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
         }
     }
 
@@ -902,10 +902,10 @@ export namespace Annotation {
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
         }
 
         export const BlendMode = {
@@ -1049,10 +1049,10 @@ export namespace Annotation {
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
         }
 
         export const BlendMode = {
@@ -1231,10 +1231,10 @@ export namespace Annotation {
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
         }
 
         export const BlendMode = {
@@ -1419,10 +1419,10 @@ export namespace Annotation {
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
         }
 
         export const BlendMode = {
@@ -1521,10 +1521,10 @@ export namespace Annotation {
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
         }
 
         export const BlendMode = {
@@ -1658,10 +1658,10 @@ export namespace Annotation {
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
         }
 
         export const BlendMode = {
@@ -1698,10 +1698,10 @@ export namespace Annotation {
         }
 
         export interface Box {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
         }
 
         export const Intent = {
@@ -1959,10 +1959,10 @@ export namespace Annotation {
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
         }
 
         export const BlendMode = {
@@ -2005,10 +2005,10 @@ export namespace Annotation {
         }
 
         export interface Box {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
         }
 
         export const Intent = {
@@ -2076,10 +2076,10 @@ export namespace Annotation {
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
         }
 
         export const BlendMode = {
@@ -2192,10 +2192,10 @@ export namespace Annotation {
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
         }
 
         export const BlendMode = {
@@ -2232,10 +2232,10 @@ export namespace Annotation {
         }
 
         export interface Box {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
         }
 
         export const Fit = {
@@ -2304,10 +2304,10 @@ export namespace Annotation {
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
         }
 
         export const BlendMode = {
@@ -2432,10 +2432,10 @@ export namespace Annotation {
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
         }
 
         export const BlendMode = {
@@ -2597,10 +2597,10 @@ export namespace Annotation {
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
         }
 
         export const BlendMode = {
@@ -2751,10 +2751,10 @@ export namespace Annotation {
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
         }
 
         export const BlendMode = {
@@ -2847,10 +2847,10 @@ export namespace Annotation {
         export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
-            left: number;
-            bottom: number;
-            right: number;
-            top: number;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
         }
 
         export const BlendMode = {

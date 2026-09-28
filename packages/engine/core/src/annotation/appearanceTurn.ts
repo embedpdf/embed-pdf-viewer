@@ -14,7 +14,7 @@ const BOX_KINDS: ReadonlySet<string> = new Set(['square', 'circle', 'free-text',
  * its box (a cloudy border's bumps) render as the page shows them, placed by
  * `rect`.
  */
-export function appearanceTurnOf(annotation: {
+export function pdfAppearanceTurnOf(annotation: {
   subtype: string;
   rect: PdfRect;
   box?: PdfRect | null;

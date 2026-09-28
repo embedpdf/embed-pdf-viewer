@@ -39,10 +39,10 @@ export interface MutationsDemoResult {
 
 const QUAD: HighlightDraft['quadPoints'] = [
   {
-    p1: { x: 50, y: 100 },
-    p2: { x: 150, y: 100 },
-    p3: { x: 50, y: 80 },
-    p4: { x: 150, y: 80 },
+    p1: { x: 50, y: 692 },
+    p2: { x: 150, y: 692 },
+    p3: { x: 50, y: 712 },
+    p4: { x: 150, y: 712 },
   },
 ];
 
@@ -110,7 +110,7 @@ export async function runMutationsDemo(
     const createdCircle = await page.annotations.create({
       subtype: 'circle',
       contents: 'mutation demo: circle',
-      box: { left: 60, bottom: 300, right: 180, top: 400 },
+      box: { x: 60, y: 392, width: 120, height: 100 },
       interiorColor: { r: 30, g: 144, b: 255 },
       color: { r: 0, g: 0, b: 139 },
       strokeWidth: 2,
@@ -120,7 +120,7 @@ export async function runMutationsDemo(
     const createdSquare = await page.annotations.create({
       subtype: 'square',
       contents: 'mutation demo: square',
-      box: { left: 220, bottom: 300, right: 360, top: 400 },
+      box: { x: 220, y: 392, width: 140, height: 100 },
       interiorColor: null,
       color: { r: 220, g: 20, b: 60 },
       strokeWidth: 3,
@@ -136,9 +136,9 @@ export async function runMutationsDemo(
       subtype: 'polygon',
       contents: 'mutation demo: polygon',
       vertices: [
-        { x: 70, y: 460 },
-        { x: 170, y: 460 },
-        { x: 120, y: 540 },
+        { x: 70, y: 332 },
+        { x: 170, y: 332 },
+        { x: 120, y: 252 },
       ],
       interiorColor: { r: 255, g: 215, b: 0 },
       color: { r: 0, g: 0, b: 139 },
@@ -150,9 +150,9 @@ export async function runMutationsDemo(
       subtype: 'polyline',
       contents: 'mutation demo: polyline',
       vertices: [
-        { x: 230, y: 460 },
-        { x: 290, y: 540 },
-        { x: 350, y: 460 },
+        { x: 230, y: 332 },
+        { x: 290, y: 252 },
+        { x: 350, y: 332 },
       ],
       interiorColor: null,
       color: { r: 220, g: 20, b: 60 },
@@ -164,7 +164,7 @@ export async function runMutationsDemo(
     const createdLine = await page.annotations.create({
       subtype: 'line',
       contents: 'mutation demo: line',
-      linePoints: { start: { x: 410, y: 460 }, end: { x: 510, y: 540 } },
+      linePoints: { start: { x: 410, y: 332 }, end: { x: 510, y: 252 } },
       interiorColor: null,
       color: { r: 0, g: 128, b: 128 },
       strokeWidth: 2,

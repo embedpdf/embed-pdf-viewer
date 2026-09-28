@@ -22,7 +22,6 @@ const appearance: DistanceAppearance = {
   intent: 'line-dimension',
   measure: null,
   text: '6.90 m',
-  crop: { left: -20, bottom: -40, right: 580, top: 760 },
   leader: { length: -120, extension: 5 },
   caption: { enabled: true, offset: { along: 70, perpendicular: -50 } },
 };

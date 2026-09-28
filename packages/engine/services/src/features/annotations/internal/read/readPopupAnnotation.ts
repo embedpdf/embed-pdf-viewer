@@ -1,4 +1,8 @@
-import type { AnnotationBase, PopupAnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type {
+  AnnotationBase,
+  PopupAnnotationDTO,
+  PdfCoordinates,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { readAnnotBoolean } from './annotationReadPrimitives';
@@ -9,8 +13,8 @@ export function readPopup(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  base: AnnotationBase,
-): PopupAnnotationDTO {
+  base: AnnotationBase<PdfCoordinates>,
+): PopupAnnotationDTO<PdfCoordinates> {
   return {
     ...base,
     subtype: 'popup',

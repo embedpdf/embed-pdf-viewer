@@ -1,4 +1,5 @@
 import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
+import type { Coordinates, PageCoordinates } from '../../../pageSpace/coordinates';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
 import { FreeTextDeclaration } from './declaration';
@@ -6,9 +7,18 @@ import { FreeTextDeclaration } from './declaration';
 export { FreeTextDeclaration } from './declaration';
 export { RichTextDocumentInputSchema, RichTextDocumentSchema } from './values';
 
-export type FreeTextAnnotationDTO = ReadOf<typeof FreeTextDeclaration>;
-export type FreeTextDraft = CreateOf<typeof FreeTextDeclaration>;
-export type FreeTextPatch = UpdateOf<typeof FreeTextDeclaration>;
+export type FreeTextAnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+  typeof FreeTextDeclaration,
+  C
+>;
+export type FreeTextDraft<C extends Coordinates = PageCoordinates> = CreateOf<
+  typeof FreeTextDeclaration,
+  C
+>;
+export type FreeTextPatch<C extends Coordinates = PageCoordinates> = UpdateOf<
+  typeof FreeTextDeclaration,
+  C
+>;
 
 export const FreeTextDTOSchema = FreeTextDeclaration.readSchema;
 export const FreeTextDraftSchema = FreeTextDeclaration.createSchema;

@@ -16,12 +16,11 @@ import {
   type Model,
   type ModelAnnotation,
 } from '@embedpdf/core-annotation';
-import type { AnnotationDTO, PdfRect } from '@embedpdf/engine-core/runtime';
+import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
 import type { PendingChange } from '../model';
 import { fromDTO } from '../repository';
 import type { AnnotationContext } from '../services/context';
-import type { CropLookup } from '../services/geometry';
 import type { AnnotationRecord, AnnotationRecords } from '../sync/records';
 
 /**
@@ -50,22 +49,16 @@ const NO_CHANGES: readonly PendingChange[] = [];
 export function createView(
   ctx: Pick<AnnotationContext, 'state' | 'doc' | 'document'>,
   records: Mirror<AnnotationRecords>,
-  geometry: Pick<CropLookup, 'cropOf'>,
 ) {
-  /** A confirmed record in content space, cached per record version, page box and render preference. */
+  /** A confirmed record as the model has it, cached per record version and render preference. */
   const confirmed = new WeakMap<
     AnnotationRecord,
-    { crop: PdfRect; vector: boolean; annotation: ModelAnnotation }
+    { vector: boolean; annotation: ModelAnnotation }
   >();
-  const confirmedAnnotation = (
-    record: AnnotationRecord,
-    vector: boolean,
-  ): ModelAnnotation | null => {
-    const crop = geometry.cropOf(record.dto.page.pageObjectNumber);
-    if (!crop) return null;
+  const confirmedAnnotation = (record: AnnotationRecord, vector: boolean): ModelAnnotation => {
     const cached = confirmed.get(record);
-    if (cached && cached.crop === crop && cached.vector === vector) return cached.annotation;
-    const projected = fromDTO(record.dto, crop);
+    if (cached && cached.vector === vector) return cached.annotation;
+    const projected = fromDTO(record.dto);
     // Opaque bodies (stamp images, widgets) have no live rendering: always the raster.
     const live = vector && !capsFor(projected.subtype).opaqueBody;
     const annotation: ModelAnnotation = {
@@ -74,7 +67,7 @@ export function createView(
       apVersion: record.apVersion,
       authority: authorityOf(ctx, record.dto),
     };
-    confirmed.set(record, { crop, vector, annotation });
+    confirmed.set(record, { vector, annotation });
     return annotation;
   };
 

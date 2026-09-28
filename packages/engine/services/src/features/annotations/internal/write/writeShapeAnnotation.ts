@@ -3,6 +3,7 @@ import {
   type CirclePatch,
   type SquareDraft,
   type SquarePatch,
+  type PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -11,8 +12,8 @@ import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnot
 import { applyAnnotationBoxPatch, writeAnnotationBox } from './writeAnnotationBox';
 import { applyFilledStyleDraft, applyFilledStylePatch } from './writeStyle';
 
-export type ShapeDraft = CircleDraft | SquareDraft;
-export type ShapePatch = CirclePatch | SquarePatch;
+export type ShapeDraft = CircleDraft<PdfCoordinates> | SquareDraft<PdfCoordinates>;
+export type ShapePatch = CirclePatch<PdfCoordinates> | SquarePatch<PdfCoordinates>;
 
 /**
  * Apply a shape draft to a freshly-created annotation. Caller is

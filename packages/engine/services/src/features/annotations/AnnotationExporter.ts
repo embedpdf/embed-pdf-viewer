@@ -6,6 +6,7 @@ import {
   closeExportSelection,
   encodePageKey,
   manifestBytesOf,
+  pageAnnotationOf,
   pageRefsIn,
   toPageRef,
   type AnnotationBundleItem,
@@ -16,6 +17,7 @@ import {
   type AnnotationResourceRole,
   type ResourceId,
   type WireAnnotationBundle,
+  type PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
@@ -29,7 +31,7 @@ import { RECTF_BYTES } from '../../runtime/memory/structs';
 import { throwIfAborted } from '../../shared/abort';
 import { extractAttachmentToBuffer } from '../attachments/internal/attachmentPrimitives';
 import type { FontRegistrar } from '../fonts/FontRegistrar';
-import { readBoxes } from '../pages/PagesReader';
+import { readBoxes, visibleBoxReader } from '../pages/PagesReader';
 
 /**
  * `doc.annotations.export`: the annotations a selection takes
@@ -37,8 +39,10 @@ import { readBoxes } from '../pages/PagesReader';
  * No page is loaded or parsed: annotations are read raw, and each resource
  * is exported from a raw handle, so a large document costs dictionary reads.
  * A drawing is one resource however many stamps place it, and equal bytes
- * are one resource under their hash. The bundle is checked against `limits`
- * while it is built, so an export never makes one an import refuses.
+ * are one resource under their hash. A bundle is page space, like
+ * everything the engine hands out: each item is measured from the top-left
+ * of its page. It is checked against `limits` as it is built, in the form
+ * it leaves in, so an export never makes one an import refuses.
  */
 export class AnnotationExporter {
   constructor(
@@ -67,9 +71,13 @@ export class AnnotationExporter {
     assertWithinLimit(limits, 'items', annotations.length);
 
     const resources = new ResourceCollector(this.runtime, this.session, limits);
+    const boxOf = visibleBoxReader(this.runtime, this.session);
     const items: AnnotationBundleItem[] = annotations.map((data) => {
       throwIfAborted(signal);
-      return { data, resources: resources.of(data) };
+      return {
+        data: pageAnnotationOf(data, boxOf(data.ref.page), boxOf),
+        resources: resources.of(data),
+      };
     });
 
     const pages = this.pagesOf(items);
@@ -89,11 +97,14 @@ export class AnnotationExporter {
       this.session
         .allRecords()
         .filter((record) => named.has(encodePageKey(toPageRef(record.pageObjectNumber))))
-        .map((record) => ({
-          page: toPageRef(record.pageObjectNumber),
-          position: record.pageIndex,
-          box: readBoxes(fn, mem, docPtr, record.pageIndex, rectPtr).crop,
-        })),
+        .map((record) => {
+          const visible = readBoxes(fn, mem, docPtr, record.pageIndex, rectPtr).crop;
+          return {
+            page: toPageRef(record.pageObjectNumber),
+            position: record.pageIndex,
+            size: { width: visible.right - visible.left, height: visible.top - visible.bottom },
+          };
+        }),
     );
   }
 }
@@ -112,7 +123,7 @@ class ResourceCollector {
   ) {}
 
   /** The resources `data` names, by role. */
-  of(data: AnnotationDTO): AnnotationBundleItem['resources'] {
+  of(data: AnnotationDTO<PdfCoordinates>): AnnotationBundleItem<PdfCoordinates>['resources'] {
     const roles = ANNOTATION_RESOURCE_ROLES[data.subtype];
     if (!roles) return {};
     const { fn } = this.runtime;
@@ -135,7 +146,7 @@ class ResourceCollector {
 
   // The annotation a read returned, through the page's /Annots: no page is
   // loaded. The read and this lookup are one job, so the position holds.
-  private rawHandleOf(data: AnnotationDTO): Ptr {
+  private rawHandleOf(data: AnnotationDTO<PdfCoordinates>): Ptr {
     const { fn } = this.runtime;
     const record = this.session.resolvePageRef(data.ref.page);
     const annotPtr = fn.EPDFPage_GetAnnotRaw(

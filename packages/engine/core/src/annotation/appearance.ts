@@ -1,4 +1,5 @@
 import type { AnnotationDTO, AnnotationPatch } from './kinds';
+import type { PdfCoordinates } from '../pageSpace/coordinates';
 
 /**
  * Appearance-impact classification: the shared, pure decision for whether an
@@ -280,8 +281,8 @@ function isRigidTranslation(
  * 3. Anything else — style, text, unknown keys, unknown kinds → `'regenerate'`.
  */
 export function appearanceImpactOf(
-  current: AnnotationDTO,
-  patch: AnnotationPatch,
+  current: AnnotationDTO<PdfCoordinates>,
+  patch: AnnotationPatch<PdfCoordinates>,
 ): AppearanceImpact {
   if (patch.subtype !== undefined && patch.subtype !== current.subtype) return 'regenerate';
 

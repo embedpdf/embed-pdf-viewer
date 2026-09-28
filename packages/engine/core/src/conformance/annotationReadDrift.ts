@@ -1,4 +1,3 @@
-import type { AnyField } from '../annotation/declaration';
 import { declarationOf } from '../annotation/kinds/declarations';
 
 /**
@@ -34,17 +33,17 @@ export function annotationReadDriftOf(reads: readonly unknown[]): string[] {
       note('subtype: no declaration', subtype);
       continue;
     }
-    const fields: Readonly<Record<string, AnyField>> = declaration.fields;
-    for (const [name, spec] of Object.entries(fields)) {
+    for (const name of Object.keys(declaration.fields)) {
       if (!(name in record) || record[name] === undefined) {
         note(`${name}: missing`, subtype);
         continue;
       }
-      const schema = spec.traits.readNullable ? spec.read.nullable() : spec.read;
+      // Reads are page space: each field as the page-space read schema has it.
+      const schema = declaration.shapes.read[name]!;
       if (!schema.safeParse(record[name]).success) note(`${name}: invalid`, subtype);
     }
     for (const name of Object.keys(record)) {
-      if (name !== 'subtype' && !(name in fields)) note(`${name}: undeclared`, subtype);
+      if (name !== 'subtype' && !(name in declaration.fields)) note(`${name}: undeclared`, subtype);
     }
   }
 

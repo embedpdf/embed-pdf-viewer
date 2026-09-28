@@ -1,4 +1,4 @@
-import type { CaretDraft, CaretPatch, Color } from '@embedpdf/engine-core/runtime';
+import type { CaretDraft, CaretPatch, Color, PdfCoordinates } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import {
@@ -28,7 +28,7 @@ export function applyCaretDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: CaretDraft,
+  draft: CaretDraft<PdfCoordinates>,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
   writeAnnotationBox(fn, mem, annotPtr, { box: draft.box, rotation: draft.rotation ?? null });
@@ -45,7 +45,7 @@ export function applyCaretPatch(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  patch: CaretPatch,
+  patch: CaretPatch<PdfCoordinates>,
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);
   applyAnnotationBoxPatch(fn, mem, annotPtr, patch);

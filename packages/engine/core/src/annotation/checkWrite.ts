@@ -1,14 +1,21 @@
 import type { z } from 'zod';
 
 import { semanticEqual } from './appearance';
-import type { AnnotationDTO } from './kinds';
-import { AnnotationDraftSchema, annotationPatchSchemaOf, KIND_BY_SUBTYPE } from './kinds';
-import type { AnnotationDraft, AnnotationPatch } from './kinds';
-import { DRAWN_RECT_KINDS, shapeFieldsOf, shapeForRect } from './shapeForRect';
+import {
+  declarationOf,
+  FileAnnotationDraftSchema,
+  fileAnnotationPatchSchemaOf,
+  KIND_BY_SUBTYPE,
+  type AnnotationDraft,
+  type AnnotationDTO,
+  type AnnotationPatch,
+} from './kinds';
+import { DRAWN_RECT_KINDS, pdfShapeForRect, shapeFieldsOf } from './shapeForRect';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import { normalizePdfRect } from '../geometry/convert';
 import { PdfRectSchema } from '../geometry/schemas';
+import type { PdfCoordinates } from '../pageSpace/coordinates';
 
 /**
  * The checks every annotation write runs before its first write, on both
@@ -18,7 +25,7 @@ import { PdfRectSchema } from '../geometry/schemas';
  * its way in.
  */
 export function assertAnnotationDraft(
-  draft: AnnotationDraft,
+  draft: AnnotationDraft<PdfCoordinates>,
   options: {
     /**
      * Link fields the caller has taken out of the draft and links itself (a
@@ -27,14 +34,14 @@ export function assertAnnotationDraft(
     linked?: readonly string[];
   } = {},
 ): void {
-  const kind = KIND_BY_SUBTYPE[draft.subtype as keyof typeof KIND_BY_SUBTYPE];
+  const declaration = declarationOf(String(draft.subtype));
   const linked = options.linked ?? [];
   const schema =
-    kind && linked.length > 0
-      ? (kind.draftSchema as unknown as z.AnyZodObject).omit(
+    declaration && linked.length > 0
+      ? (declaration.fileSchemas.create as unknown as z.AnyZodObject).omit(
           Object.fromEntries(linked.map((name) => [name, true])),
         )
-      : AnnotationDraftSchema;
+      : FileAnnotationDraftSchema;
   const checked = schema.safeParse(draft);
   if (!checked.success) throw invalidWrite(checked.error, `${String(draft.subtype)} create`);
 }
@@ -43,12 +50,12 @@ export function assertAnnotationDraft(
  * The patch to write for `current`: a `readBack()` value sent back
  * unchanged is dropped (the annotation keeps it), a changed one is refused,
  * and the rest is checked against the kind's update schema. A drawn kind's
- * `rect` (one the engine works out) puts the shape there (`shapeForRect`).
+ * `rect` (one the engine works out) puts the shape there (`pdfShapeForRect`).
  */
 export function checkAnnotationPatch(
-  current: AnnotationDTO,
-  patch: AnnotationPatch,
-): AnnotationPatch {
+  current: AnnotationDTO<PdfCoordinates>,
+  patch: AnnotationPatch<PdfCoordinates>,
+): AnnotationPatch<PdfCoordinates> {
   if (current.subtype === 'unsupported') return patch;
   const readBackWrites = KIND_BY_SUBTYPE[current.subtype].readBackWrites;
   let checked = putShapeAtRect(current, patch);
@@ -65,9 +72,9 @@ export function checkAnnotationPatch(
       );
     }
     const { [name]: _kept, ...rest } = checked as Record<string, unknown>;
-    checked = rest as AnnotationPatch;
+    checked = rest as AnnotationPatch<PdfCoordinates>;
   }
-  const parsed = annotationPatchSchemaOf(current.subtype).safeParse(checked);
+  const parsed = fileAnnotationPatchSchemaOf(current.subtype).safeParse(checked);
   if (!parsed.success) throw invalidWrite(parsed.error, `${current.subtype} update`);
   return checked;
 }
@@ -77,13 +84,17 @@ export function checkAnnotationPatch(
  * put the drawing there. It can't come with a change to the shape itself:
  * which of the two to follow would be a guess.
  */
-function putShapeAtRect(current: AnnotationDTO, patch: AnnotationPatch): AnnotationPatch {
-  const { rect, ...rest } = patch as AnnotationPatch & { rect?: unknown };
+function putShapeAtRect(
+  current: AnnotationDTO<PdfCoordinates>,
+  patch: AnnotationPatch<PdfCoordinates>,
+): AnnotationPatch<PdfCoordinates> {
+  const { rect, ...rest } = patch as AnnotationPatch<PdfCoordinates> & { rect?: unknown };
   if (rect === undefined || !DRAWN_RECT_KINDS.has(current.subtype)) return patch;
   const parsed = PdfRectSchema.safeParse(rect);
   if (!parsed.success) throw invalidWrite(parsed.error, `${current.subtype} update`, 'rect');
   // The rect it read, sent back: nothing moves.
-  if (semanticEqual(normalizePdfRect(parsed.data), current.rect)) return rest as AnnotationPatch;
+  if (semanticEqual(normalizePdfRect(parsed.data), current.rect))
+    return rest as AnnotationPatch<PdfCoordinates>;
   const read = current as unknown as Record<string, unknown>;
   const changed = shapeFieldsOf(current.subtype).find((name) => {
     const value = (patch as unknown as Record<string, unknown>)[name];
@@ -96,7 +107,7 @@ function putShapeAtRect(current: AnnotationDTO, patch: AnnotationPatch): Annotat
       { details: { field: 'rect' } },
     );
   }
-  return { ...rest, ...shapeForRect(current, parsed.data) } as AnnotationPatch;
+  return { ...rest, ...pdfShapeForRect(current, parsed.data) } as AnnotationPatch<PdfCoordinates>;
 }
 
 function invalidWrite(error: z.ZodError, where: string, parent?: string): EngineError {

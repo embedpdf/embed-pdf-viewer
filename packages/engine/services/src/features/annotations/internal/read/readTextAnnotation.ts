@@ -3,6 +3,7 @@ import type {
   Color,
   NoteIcon,
   TextAnnotationDTO,
+  PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -25,8 +26,8 @@ export function readText(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  base: AnnotationBase,
-): TextAnnotationDTO {
+  base: AnnotationBase<PdfCoordinates>,
+): TextAnnotationDTO<PdfCoordinates> {
   const color = readAnnotColor(fn, mem, annotPtr) ?? { ...DEFAULT_NOTE_COLOR };
   const ca = readAnnotOpacity(fn, mem, annotPtr);
   const opacity = ca == null ? 1 : Math.max(0, Math.min(1, ca));

@@ -14,7 +14,7 @@ to a plan. PDF apps show an icon there and open the file from it.
 await page.annotations.create(
   {
     subtype: 'file-attachment',
-    rect: { left: 40, bottom: 40, right: 60, top: 60 },
+    rect: { x: 40, y: 732, width: 20, height: 20 },
     file: { name: 'figures.csv', mimeType: 'text/csv' },
   },
   { file: bytes },
@@ -29,7 +29,7 @@ it is:
 const picked = input.files![0];
 
 await page.annotations.create(
-  { subtype: 'file-attachment', rect: { left: 40, bottom: 40, right: 60, top: 60 } },
+  { subtype: 'file-attachment', rect: { x: 40, y: 732, width: 20, height: 20 } },
   { file: picked },
 );
 ```

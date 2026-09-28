@@ -15,9 +15,7 @@ export {
   mapFieldActions,
   mapLinkTarget,
   mapPageActions,
-  pageActionTreeOf,
   pageDestinationOf,
-  pageLinkTargetOf,
   pdfDestinationOf,
 } from './destinations';
 export {
@@ -40,8 +38,8 @@ export {
 export { pageMeasureOf, pageViewportsOf, pdfMeasureOf } from './measure';
 export type { PagePointTurn } from './helpers';
 export {
-  pageAppearanceTurnOf,
-  pageDrawnPointsOf,
+  appearanceTurnOf,
+  drawnPointsOf,
   pageGlyphLooseBounds,
   pageGlyphLooseQuad,
   pagePointsBounds,
@@ -53,4 +51,5 @@ export {
   pageTurnOfDrawn,
   pageTurnOfUpright,
   pageViewportForPoint,
+  shapeForRect,
 } from './helpers';

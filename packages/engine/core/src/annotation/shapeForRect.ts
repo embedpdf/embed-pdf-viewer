@@ -6,6 +6,7 @@ import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import { normalizePdfRect } from '../geometry/convert';
 import type { PdfPoint, PdfQuad, PdfRect } from '../geometry/primitives';
+import type { PdfCoordinates } from '../pageSpace/coordinates';
 
 /**
  * The kinds whose `rect` the engine works out from their shape: a box, points
@@ -51,9 +52,9 @@ export function shapeFieldsOf(subtype: AnnotationSubtype): string[] {
 }
 
 /**
- * The shape fields that put `annotation` at `rect`, the rule an update's
- * `rect` follows (`create({ ...copy, ...shapeForRect(copy, target) })` puts a
- * copy there).
+ * The shape fields that put `annotation` at `rect`, in the file's
+ * coordinates: the rule an update's `rect` follows. The public
+ * `shapeForRect` runs it on page-space values.
  *
  * - A kind whose shape is its rect (note, file attachment, link, popup,
  *   widget, redaction) takes `rect` as it is.
@@ -68,7 +69,10 @@ export function shapeFieldsOf(subtype: AnnotationSubtype): string[] {
  * rect has no width or height to stretch. Each refusal is `InvalidArg` on
  * `rect`.
  */
-export function shapeForRect<A extends AnnotationDTO>(annotation: A, rect: PdfRect): Partial<A> {
+export function pdfShapeForRect<A extends AnnotationDTO<PdfCoordinates>>(
+  annotation: A,
+  rect: PdfRect,
+): Partial<A> {
   const subtype = annotation.subtype;
   if (!DRAWN_RECT_KINDS.has(subtype)) return { rect } as Partial<A>;
 

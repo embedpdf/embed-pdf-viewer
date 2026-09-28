@@ -1,13 +1,23 @@
 import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
+import type { Coordinates, PageCoordinates } from '../../../pageSpace/coordinates';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
 import { CaretDeclaration } from './declaration';
 
 export { CaretDeclaration } from './declaration';
 
-export type CaretAnnotationDTO = ReadOf<typeof CaretDeclaration>;
-export type CaretDraft = CreateOf<typeof CaretDeclaration>;
-export type CaretPatch = UpdateOf<typeof CaretDeclaration>;
+export type CaretAnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+  typeof CaretDeclaration,
+  C
+>;
+export type CaretDraft<C extends Coordinates = PageCoordinates> = CreateOf<
+  typeof CaretDeclaration,
+  C
+>;
+export type CaretPatch<C extends Coordinates = PageCoordinates> = UpdateOf<
+  typeof CaretDeclaration,
+  C
+>;
 
 export const CaretDTOSchema = CaretDeclaration.readSchema;
 export const CaretDraftSchema = CaretDeclaration.createSchema;

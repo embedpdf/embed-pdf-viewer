@@ -16,7 +16,6 @@ import { ICON_PLACE_SIZE, isIconPlaceKind } from './placement';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import type { Stamps } from './stamps';
 import { setToolGhost } from '../model';
-import { pageSizeOf } from '../services/geometry';
 
 /**
  * The armed tool's footprint ghost: where (and what) the next click would
@@ -62,12 +61,11 @@ export function createGhost(
     displayRotation?: number,
   ): void => {
     const tool = tools.get(toolId);
-    const crop = geometry.cropOf(pageObjectNumber);
-    if (!tool || tool.ghost === false || !crop) {
+    const page = geometry.sizeOf(pageObjectNumber);
+    if (!tool || tool.ghost === false || !page) {
       clearGhost();
       return;
     }
-    const page = pageSizeOf(crop);
     // The armed stamp: the fitted image box (the framework blits the preview).
     const armed = stamps.armed();
     if (armed) {
@@ -121,9 +119,8 @@ export function createGhost(
    * footprint. The box is clamped to the page (a drag may overshoot).
    */
   const setPlacementPreview = (toolId: string, pageObjectNumber: number, box: Rect): void => {
-    const crop = geometry.cropOf(pageObjectNumber);
-    if (!crop) return;
-    const page = pageSizeOf(crop);
+    const page = geometry.sizeOf(pageObjectNumber);
+    if (!page) return;
     const x = Math.max(0, Math.min(box.x, page.width));
     const y = Math.max(0, Math.min(box.y, page.height));
     const rect: Rect = {

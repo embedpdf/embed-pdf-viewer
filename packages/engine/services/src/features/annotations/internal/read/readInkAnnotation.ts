@@ -1,4 +1,8 @@
-import type { AnnotationBase, InkAnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type {
+  AnnotationBase,
+  InkAnnotationDTO,
+  PdfCoordinates,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { readInkList, readIntent } from './annotationReadPrimitives';
@@ -10,8 +14,8 @@ export function readInk(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  base: AnnotationBase,
-): InkAnnotationDTO {
+  base: AnnotationBase<PdfCoordinates>,
+): InkAnnotationDTO<PdfCoordinates> {
   const drawn = readInkList(fn, mem, annotPtr);
   // The strokes upright, and the turn that draws them.
   const turn = readPointsTurn(fn, mem, annotPtr, drawn);

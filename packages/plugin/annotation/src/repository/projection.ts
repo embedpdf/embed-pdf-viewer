@@ -1,5 +1,5 @@
 import { geomRotation, type ModelAnnotation, type PropKey } from '@embedpdf/core-annotation';
-import type { AnnotationDTO, PdfRect } from '@embedpdf/engine-core/runtime';
+import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
 import { boxGeomFields } from './seam';
 
@@ -29,19 +29,19 @@ export type IngestSlice = { geometry: ModelAnnotation['geometry'] } & Partial<
  */
 export interface KindProjection {
   /** DTO → the kind's model slice (geom + text/icon/label/link/intent). */
-  ingest(dto: AnnotationDTO, crop: PdfRect): IngestSlice;
+  ingest(dto: AnnotationDTO): IngestSlice;
   /**
    * The committed-geometry wire group: the primary geometry plus every field
    * the engine writers couple to it (the box transform trio, a callout's
    * leader group, advisory rotation). `null` = the kind has no editable
    * geometry (text markup) — geometry statements fall back to the full patch.
    */
-  geometry(annotation: ModelAnnotation, crop: PdfRect): Wire | null;
+  geometry(annotation: ModelAnnotation): Wire | null;
   /** Kind-specific prop lowerings — only the exceptions; `props.ts` generic
    *  covers every 1:1 key. A kind's couplings live here, in its owner's file. */
-  prop?: Partial<Record<PropKey, (annotation: ModelAnnotation, crop: PdfRect) => Wire>>;
+  prop?: Partial<Record<PropKey, (annotation: ModelAnnotation) => Wire>>;
   /** Create-only statement extras (intent, quadPoints, contents seeds…). */
-  draftExtras?(annotation: ModelAnnotation, crop: PdfRect): Wire | null;
+  draftExtras?(annotation: ModelAnnotation): Wire | null;
   /** Kinds whose creates do not go through the repository (stamps carry a
    *  binary source and use their own create path; widgets are form-plane). */
   createable?: false;
@@ -49,10 +49,10 @@ export interface KindProjection {
 
 /** Box-kind geometry emission: the model's `rect` (its box before any turn) +
  *  its turn → `box` + `rotation`, total (null states the clear). */
-export const boxEmit = (annotation: ModelAnnotation, crop: PdfRect): Wire => {
+export const boxEmit = (annotation: ModelAnnotation): Wire => {
   const boxGeometry = annotation.geometry as Extract<
     ModelAnnotation['geometry'],
     { kind: 'rect' } | { kind: 'text' }
   >;
-  return boxGeomFields(boxGeometry.rect, geomRotation(annotation.geometry), crop);
+  return boxGeomFields(boxGeometry.rect, geomRotation(annotation.geometry));
 };

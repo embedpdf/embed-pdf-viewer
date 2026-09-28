@@ -88,8 +88,8 @@ export function createWidgetReads(
 
   /** The page's content box (`{0, 0, width, height}`), for page-bound placement. */
   const getPageBox = (page: PageRef): Box | null => {
-    const space = ctx.geometry.tryForPage(page);
-    return space ? { x: 0, y: 0, width: space.width, height: space.height } : null;
+    const size = ctx.getPage(page)?.size;
+    return size ? { x: 0, y: 0, width: size.width, height: size.height } : null;
   };
 
   return {

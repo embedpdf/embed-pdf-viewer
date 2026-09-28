@@ -4,8 +4,8 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { describe, expect, test, vi } from 'vitest';
 import {
   measureFromKnownLength,
-  pdfPointTurned,
-  pdfTurnOfUpright,
+  pagePointTurned,
+  pageTurnOfUpright,
   toPageRef,
 } from '@embedpdf/engine-core/runtime';
 import { annotationSelectionFrame, shapeMeasurementLayout } from '../../../core/annotation/src';
@@ -37,7 +37,6 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         const pages = (await doc.pages.list()).pages;
         const page = pages[0];
         const pageObjectNumber = page.ref.pageObjectNumber;
-        const crop = page.pdfCropBox;
         const { ctx, annotation } = await annotationShell(doc, pages);
         cleanups.push(() => ctx.dispose());
         const scale = measureFromKnownLength(100, { value: 5, unit: 'm' });
@@ -83,7 +82,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         expect(created.contents).toBe(tool === 'area' ? '50.00 m²' : '25.00 m');
         expect(created.captionEnabled).toBe(true);
         expect(created.captionCenter).toBe(null);
-        const model = fromDTO(created, crop);
+        const model = fromDTO(created);
         if (!model.measure || model.measure.intent === 'line-dimension')
           throw new Error('Expected shape measure');
         const label = shapeMeasurementLayout(model.geometry, model.measure, model.style)!.caption!
@@ -92,12 +91,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         annotation.editPointer('down', page.ref, label, false);
         annotation.editPointer('move', page.ref, target, false);
         annotation.editPointer('up', page.ref, target, false);
-        await vi.waitFor(() =>
-          expect(current().captionCenter).toEqual({
-            x: crop.left + target.x,
-            y: crop.top - target.y,
-          }),
-        );
+        await vi.waitFor(() => expect(current().captionCenter).toEqual(target));
         expect(current().vertices).toEqual(created.vertices);
         expectVector();
 
@@ -105,15 +99,12 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         annotation.editPointer('down', page.ref, { x: 100, y: 300 }, false);
         annotation.editPointer('move', page.ref, { x: 80, y: 290 }, false);
         annotation.editPointer('up', page.ref, { x: 80, y: 290 }, false);
-        await vi.waitFor(() => expect(current().vertices[0].x).toBeCloseTo(crop.left + 80, 3));
-        expect(current().captionCenter).toEqual({
-          x: crop.left + target.x,
-          y: crop.top - target.y,
-        });
+        await vi.waitFor(() => expect(current().vertices[0].x).toBeCloseTo(80, 3));
+        expect(current().captionCenter).toEqual(target);
         expectVector();
 
         const before = current();
-        const pivot = turnPivotOf(fromDTO(before, crop).geometry);
+        const pivot = turnPivotOf(fromDTO(before).geometry);
         const rotatedCaption = rotatePoint(target, pivot, 90);
         await annotation.rotateSelectionBy(90);
         await vi.waitFor(() => {
@@ -125,13 +116,13 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
           });
           expect(current().captionCenter?.x).toBeCloseTo(before.captionCenter!.x, 3);
           expect(current().captionCenter?.y).toBeCloseTo(before.captionCenter!.y, 3);
-          const drawnCaption = pdfPointTurned(
+          const drawnCaption = pagePointTurned(
             current().captionCenter!,
-            pdfTurnOfUpright(current().vertices, 90),
+            pageTurnOfUpright(current().vertices, 90),
           );
-          expect(drawnCaption.x).toBeCloseTo(crop.left + rotatedCaption.x, 3);
-          expect(drawnCaption.y).toBeCloseTo(crop.top - rotatedCaption.y, 3);
-          const after = turnPivotOf(fromDTO(current(), crop).geometry);
+          expect(drawnCaption.x).toBeCloseTo(rotatedCaption.x, 3);
+          expect(drawnCaption.y).toBeCloseTo(rotatedCaption.y, 3);
+          const after = turnPivotOf(fromDTO(current()).geometry);
           expect(after.x).toBeCloseTo(pivot.x, 3);
           expect(after.y).toBeCloseTo(pivot.y, 3);
         });
@@ -142,9 +133,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
           captionCenter: null,
         });
         expect(current().captionCenter).toBe(null);
-        expect(current().rect.top - current().rect.bottom).toBeLessThan(
-          displacedRect.top - displacedRect.bottom,
-        );
+        expect(current().rect.height).toBeLessThan(displacedRect.height);
         expectVector();
         const final = current();
         const saved = await doc.download();
@@ -180,9 +169,9 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
               captionEnabled: true,
               rotation: 90,
             });
-            const restoredModel = fromDTO(restored, crop);
+            const restoredModel = fromDTO(restored);
             expect(annotationSelectionFrame(restoredModel)).toEqual(
-              annotationSelectionFrame(fromDTO(final, crop)),
+              annotationSelectionFrame(fromDTO(final)),
             );
             // Rendering requests exercise the generated /AP as well as dictionary persistence.
             const appearance = await reopened

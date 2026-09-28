@@ -2,6 +2,7 @@ import type {
   AnnotationDTO,
   AnnotationList,
   PageObjectNumber,
+  PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
@@ -33,11 +34,11 @@ export function collectPageAnnotations(input: {
   getAnnotPtrAt: (index: number) => Ptr;
   signal: AbortSignal;
   fonts?: FontRegistrar;
-}): AnnotationList {
+}): AnnotationList<PdfCoordinates> {
   const { runtime, session, pageObjectNumber, count, getAnnotPtrAt, signal, fonts } = input;
   const { fn, mem } = runtime;
 
-  const annotations: AnnotationDTO[] = [];
+  const annotations: AnnotationDTO<PdfCoordinates>[] = [];
   let hasWeak = false;
   const revision = session.pageState(pageObjectNumber).revision;
   const actionBudget = new ActionReadBudgetTracker();

@@ -6,6 +6,7 @@ import type {
   PolygonPatch,
   PolylineDraft,
   PolylinePatch,
+  PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -28,7 +29,13 @@ export function writeMeasurementFields(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annot: Ptr,
-  value: LineDraft | LinePatch | PolygonDraft | PolygonPatch | PolylineDraft | PolylinePatch,
+  value:
+    | LineDraft<PdfCoordinates>
+    | LinePatch<PdfCoordinates>
+    | PolygonDraft<PdfCoordinates>
+    | PolygonPatch<PdfCoordinates>
+    | PolylineDraft<PdfCoordinates>
+    | PolylinePatch<PdfCoordinates>,
 ): void {
   if (value.intent !== undefined) {
     if (value.intent === null) fn.EPDFAnnot_RemoveKey(annot, 'IT');

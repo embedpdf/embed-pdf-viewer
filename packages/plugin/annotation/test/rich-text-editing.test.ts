@@ -7,7 +7,7 @@ import type { AnnotationDTO, AnnotationFlags, AnnotationRef } from '@embedpdf/en
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { annotationHarness } from './harness';
+import { annotationHarness, type FileAnnotation } from './harness';
 
 const PON = 1;
 const PAGE = toPageRef(PON);
@@ -30,7 +30,7 @@ const freeTextDTO = (
   contents: string,
   extra: Record<string, unknown> = {},
   paragraphs = contents.split('\r').map((line) => ({ runs: [{ text: line }] })),
-): AnnotationDTO =>
+): FileAnnotation =>
   ({
     ref: REF,
     page: PAGE,
@@ -73,9 +73,9 @@ const freeTextDTO = (
     rect: { left: 100, bottom: 700, right: 300, top: 740 },
     box: { left: 100, bottom: 700, right: 300, top: 740 },
     ...extra,
-  }) as unknown as AnnotationDTO;
+  }) as unknown as FileAnnotation;
 
-async function loaded(dto: AnnotationDTO) {
+async function loaded(dto: FileAnnotation) {
   const harness = annotationHarness({ crop: CROP });
   vi.useRealTimers();
   await harness.load([dto]);

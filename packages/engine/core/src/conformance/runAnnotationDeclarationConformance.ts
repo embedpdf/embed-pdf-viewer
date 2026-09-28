@@ -9,7 +9,7 @@ import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import { annotationKey } from '../identity/annotationKey';
 import type { Engine } from '../engine/Engine';
-import type { PdfRect } from '../geometry/primitives';
+import type { PageBox } from '../geometry/pageSpace';
 
 export interface AnnotationDeclarationFixture {
   /** Stable id used for the local engine; cloud uses its own id. */
@@ -147,23 +147,23 @@ export function runAnnotationDeclarationConformance(
 
     test("a box kind's rect is worked out, and another one puts the box there", async () => {
       await onAuthoringPage(async (page) => {
-        const box: PdfRect = { left: 300, bottom: 300, right: 360, top: 340 };
+        const box: PageBox = { x: 300, y: 300, width: 60, height: 40 };
         // A create takes the box; a rect sent with it is the engine's to work out.
         const { annotation: created } = await page.annotations.create({
           subtype: 'square',
           box,
-          rect: { left: 0, bottom: 0, right: 1, top: 1 },
+          rect: { x: 0, y: 0, width: 1, height: 1 },
         } as never);
         expect(created.rect).toEqual(box);
         // An update may send back the rect it read, with a new box or without.
-        const moved = { ...box, left: box.left + 20, right: box.right + 20 };
+        const moved = { ...box, x: box.x + 20 };
         const { annotation: updated } = await page.annotations.update(created.ref, {
           rect: created.rect,
           box: moved,
         });
         expect(updated.rect).toEqual(moved);
         // Another rect puts the box there: a square's rect is its box.
-        const wider = { ...moved, right: moved.right + 10 };
+        const wider = { ...moved, width: moved.width + 10 };
         const { annotation: placed } = await page.annotations.update(created.ref, { rect: wider });
         expect(placed.subtype === 'square' && placed.box).toEqual(wider);
         // Another rect with another box is refused, naming the field.
@@ -207,9 +207,9 @@ export function runAnnotationDeclarationConformance(
 
     test('a popup links to its parent in both directions', async () => {
       await onAuthoringPage(async (page) => {
-        const rect: PdfRect = { left: 200, bottom: 200, right: 260, top: 240 };
+        const rect: PageBox = { x: 200, y: 200, width: 60, height: 40 };
         const note = (
-          await page.annotations.create({ subtype: 'text', rect: iconRect(rect.left, rect.top) })
+          await page.annotations.create({ subtype: 'text', rect: iconRect(rect.x, rect.y) })
         ).annotation;
         const popup = (await page.annotations.create({ subtype: 'popup', rect, parent: note.ref }))
           .annotation;
@@ -234,9 +234,9 @@ export function runAnnotationDeclarationConformance(
 
     test("a popup's open state is read and written", async () => {
       await onAuthoringPage(async (page) => {
-        const rect: PdfRect = { left: 200, bottom: 260, right: 260, top: 300 };
+        const rect: PageBox = { x: 200, y: 260, width: 60, height: 40 };
         const note = (
-          await page.annotations.create({ subtype: 'text', rect: iconRect(rect.left, rect.top) })
+          await page.annotations.create({ subtype: 'text', rect: iconRect(rect.x, rect.y) })
         ).annotation;
         // A PDF that says nothing about /Open shows the window closed.
         const closed = (await page.annotations.create({ subtype: 'popup', rect, parent: note.ref }))
@@ -253,7 +253,7 @@ export function runAnnotationDeclarationConformance(
 
     test('values are checked, not only names, with the field named', async () => {
       await onAuthoringPage(async (page) => {
-        const rect: PdfRect = { left: 300, bottom: 520, right: 360, top: 560 };
+        const rect: PageBox = { x: 300, y: 520, width: 60, height: 40 };
         const refused = (field: string) => ({
           code: EngineErrorCode.InvalidArg,
           details: { field },
@@ -270,7 +270,7 @@ export function runAnnotationDeclarationConformance(
         await expect(
           page.annotations.create({
             subtype: 'text',
-            rect: iconRect(rect.left, rect.top),
+            rect: iconRect(rect.x, rect.y),
             icon: 'dragon',
           } as never),
         ).rejects.toMatchObject(refused('icon'));
@@ -295,7 +295,7 @@ export function runAnnotationDeclarationConformance(
           page.annotations.create(
             {
               subtype: 'file-attachment',
-              rect: iconRect(rect.left, rect.top),
+              rect: iconRect(rect.x, rect.y),
               file: { name: '' },
             },
             { file: new Uint8Array([1]) },
@@ -315,7 +315,7 @@ export function runAnnotationDeclarationConformance(
 
     test('opacity reads back as written', async () => {
       await onAuthoringPage(async (page) => {
-        const rect: PdfRect = { left: 300, bottom: 580, right: 360, top: 620 };
+        const rect: PageBox = { x: 300, y: 580, width: 60, height: 40 };
         const { annotation } = await page.annotations.create({
           subtype: 'square',
           box: rect,
@@ -337,11 +337,11 @@ export function runAnnotationDeclarationConformance(
 
     test('a new quad list replaces the old one, shorter or longer', async () => {
       await onAuthoringPage(async (page) => {
-        const quad = (bottom: number) => ({
-          p1: { x: 40, y: bottom + 10 },
-          p2: { x: 140, y: bottom + 10 },
-          p3: { x: 40, y: bottom },
-          p4: { x: 140, y: bottom },
+        const quad = (y: number) => ({
+          p1: { x: 40, y },
+          p2: { x: 140, y },
+          p3: { x: 40, y: y + 10 },
+          p4: { x: 140, y: y + 10 },
         });
         for (const subtype of ['highlight', 'redact'] as const) {
           const { annotation } = await page.annotations.create({
@@ -353,7 +353,7 @@ export function runAnnotationDeclarationConformance(
           });
           const quads = (fewer as { quadPoints: unknown[] }).quadPoints;
           expect(quads.length).toBe(1);
-          expect(fewer.rect).toMatchObject({ bottom: 640, top: 650 });
+          expect(fewer.rect).toMatchObject({ y: 640, height: 10 });
         }
         const { annotation } = await page.annotations.create({
           subtype: 'highlight',
@@ -381,7 +381,7 @@ export function runAnnotationDeclarationConformance(
             },
           ],
         });
-        expect(annotation.rect).toMatchObject({ left: 50, bottom: 500, right: 150, top: 520 });
+        expect(annotation.rect).toMatchObject({ x: 50, y: 500, width: 100, height: 20 });
         await expect(page.annotations.create({ subtype: 'redact' } as never)).rejects.toMatchObject(
           {
             code: EngineErrorCode.InvalidArg,
@@ -393,10 +393,10 @@ export function runAnnotationDeclarationConformance(
 
     test('a review state brings its model; a custom state needs one', async () => {
       await onAuthoringPage(async (page) => {
-        const rect: PdfRect = { left: 420, bottom: 520, right: 440, top: 540 };
+        const rect: PageBox = { x: 420, y: 520, width: 20, height: 20 };
         const { annotation } = await page.annotations.create({
           subtype: 'text',
-          rect: iconRect(rect.left, rect.top),
+          rect: iconRect(rect.x, rect.y),
           state: 'accepted',
         });
         expect(annotation.subtype === 'text' && annotation.stateModel).toBe('review');
@@ -407,7 +407,7 @@ export function runAnnotationDeclarationConformance(
         await expect(
           page.annotations.create({
             subtype: 'text',
-            rect: iconRect(rect.left, rect.top),
+            rect: iconRect(rect.x, rect.y),
             state: 'escalated',
           }),
         ).rejects.toMatchObject({
@@ -416,7 +416,7 @@ export function runAnnotationDeclarationConformance(
         });
         const { annotation: custom } = await page.annotations.create({
           subtype: 'text',
-          rect: iconRect(rect.left, rect.top),
+          rect: iconRect(rect.x, rect.y),
           state: 'escalated',
           stateModel: 'triage',
         });
@@ -447,7 +447,7 @@ export function runAnnotationDeclarationConformance(
 
     test('a stamp takes a one-page PDF', async () => {
       await onAuthoringPage(async (page) => {
-        const rect: PdfRect = { left: 420, bottom: 460, right: 480, top: 500 };
+        const rect: PageBox = { x: 420, y: 460, width: 60, height: 40 };
         await expect(
           page.annotations.create({ subtype: 'stamp', box: rect }, { appearance: TWO_PAGE_PDF }),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
@@ -501,7 +501,7 @@ export function runAnnotationDeclarationConformance(
 
     test('deleting a note deletes its thread and popups, in one change', async () => {
       await onAuthoringPage(async (page, doc) => {
-        const rect: PdfRect = { left: 460, bottom: 300, right: 480, top: 320 };
+        const rect: PageBox = { x: 460, y: 300, width: 20, height: 20 };
         const find = async (ref: AnnotationRef) =>
           (await page.annotations.list()).annotations.find(
             (annotation) => annotationKey(annotation.ref) === annotationKey(ref),
@@ -510,32 +510,32 @@ export function runAnnotationDeclarationConformance(
           (await page.annotations.create(data as never)).annotation;
         const note = await create({
           subtype: 'text',
-          rect: iconRect(rect.left, rect.top),
+          rect: iconRect(rect.x, rect.y),
           contents: 'Note',
         });
         const notePopup = await create({ subtype: 'popup', rect, parent: note.ref });
         const reply = await create({
           subtype: 'text',
-          rect: iconRect(rect.left, rect.top),
+          rect: iconRect(rect.x, rect.y),
           contents: 'Reply',
           reply: { to: note.ref },
         });
         const replyPopup = await create({ subtype: 'popup', rect, parent: reply.ref });
         const nested = await create({
           subtype: 'text',
-          rect: iconRect(rect.left, rect.top),
+          rect: iconRect(rect.x, rect.y),
           contents: 'Nested',
           reply: { to: reply.ref },
         });
         const status = await create({
           subtype: 'text',
-          rect: iconRect(rect.left, rect.top),
+          rect: iconRect(rect.x, rect.y),
           state: 'accepted',
           reply: { to: note.ref },
         });
         const bystander = await create({
           subtype: 'text',
-          rect: iconRect(rect.left, rect.top),
+          rect: iconRect(rect.x, rect.y),
           contents: 'Unrelated',
         });
 
@@ -566,7 +566,7 @@ export function runAnnotationDeclarationConformance(
 
     test('a resource belongs to the kinds that take it', async () => {
       await onAuthoringPage(async (page) => {
-        const rect: PdfRect = { left: 300, bottom: 300, right: 360, top: 340 };
+        const rect: PageBox = { x: 300, y: 300, width: 60, height: 40 };
         const refused = { code: EngineErrorCode.InvalidArg };
         await expect(
           page.annotations.create({ subtype: 'stamp', box: rect }),
@@ -574,7 +574,7 @@ export function runAnnotationDeclarationConformance(
         await expect(
           page.annotations.create({
             subtype: 'file-attachment',
-            rect: iconRect(rect.left, rect.top),
+            rect: iconRect(rect.x, rect.y),
             file: { name: 'a.txt' },
           }),
         ).rejects.toMatchObject(refused);
@@ -599,7 +599,7 @@ export function runAnnotationDeclarationConformance(
 
     test("a new appearance replaces a stamp's drawing and keeps its data", async () => {
       await onAuthoringPage(async (page) => {
-        const rect: PdfRect = { left: 300, bottom: 400, right: 360, top: 440 };
+        const rect: PageBox = { x: 300, y: 400, width: 60, height: 40 };
         const { annotation: created } = await page.annotations.create(
           { subtype: 'stamp', box: rect, name: 'Approved' },
           { appearance: PNG_1X1 },
@@ -614,7 +614,7 @@ export function runAnnotationDeclarationConformance(
 
     test("a stamp's fit is recorded, and a new box is filled the same way", async () => {
       await onAuthoringPage(async (page) => {
-        const rect: PdfRect = { left: 300, bottom: 460, right: 360, top: 500 };
+        const rect: PageBox = { x: 300, y: 460, width: 60, height: 40 };
         const fitOf = (dto: { subtype: string }) => (dto as { fit?: unknown }).fit;
         const plain = await page.annotations.create(
           { subtype: 'stamp', box: rect },
@@ -627,7 +627,7 @@ export function runAnnotationDeclarationConformance(
         );
         expect(fitOf(created)).toBe('cover');
         const moved = await page.annotations.update(created.ref, {
-          box: { ...rect, right: rect.right + 40 },
+          box: { ...rect, width: rect.width + 40 },
         });
         expect(fitOf(moved.annotation)).toBe('cover');
         const refit = await page.annotations.update(created.ref, { fit: 'fill' });

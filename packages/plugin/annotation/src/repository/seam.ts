@@ -1,13 +1,10 @@
 /**
- * The geometry/colour seam between the engine's PDF-space wire
- * vocabulary and the core's content-space model. Every conversion between the
- * two worlds lives here — kind modules speak through these helpers and never
- * hand-roll a convention flip.
+ * The geometry/colour seam between the engine's wire vocabulary and the
+ * core's model. Both measure places in page space, so geometry passes through
+ * as it is; colours cross between the engine's `Color` and CSS hex here.
  */
 import {
-  contentToPdfRect,
   FLAG_KEYS,
-  pdfToContentRect,
   type AnnotationPropsPatch,
   type Border,
   type ContentGeometry,
@@ -19,22 +16,12 @@ import type {
   AnnotationFlags,
   AnnotationRef,
   Color,
-  PdfDestination,
+  PageBox,
   PdfLinkTarget,
   PdfLinkTargetWritable,
-  PdfRect,
   StandardFont,
   WidgetAppearance,
 } from '@embedpdf/engine-core/runtime';
-
-// The content↔PDF bridge, re-exported so kind modules cross the seam through
-// one import point and never reach into the core's geometry directly.
-export {
-  contentToPdfPoint,
-  contentToPdfRect,
-  pdfToContentPoint,
-  pdfToContentRect,
-} from '@embedpdf/core-annotation';
 
 // The one annotation key (engine-core `annotationKey`): obj:<n> | nm:<page>:<name> | idx:<page>:<i>.
 export { annotationKey } from '@embedpdf/core';
@@ -86,22 +73,17 @@ export const rotFromDTO = (rotation?: number | null): { rot?: number } =>
  * as `null` when there is none (total projection — the engine's tri-state
  * writes keep an omitted field, so an omission would keep a stale turn).
  */
-export function boxGeomFields(
-  rect: Rect,
-  rot: number,
-  crop: PdfRect,
-): { box: PdfRect; rotation: number | null } {
-  return { box: contentToPdfRect(rect, crop), rotation: rot || null };
+export function boxGeomFields(rect: Rect, rot: number): { box: PageBox; rotation: number | null } {
+  return { box: rect, rotation: rot || null };
 }
 
 /** A box geom (square/circle/stamp) from its DTO: its `box` and `rot` its turn. */
 export function boxGeomFromDTO(
-  dto: { box: PdfRect; rotation: number | null },
-  crop: PdfRect,
+  dto: { box: PageBox; rotation: number | null },
   ellipse: boolean,
 ): ContentGeometry {
   const rot = dto.rotation ?? 0;
-  return { kind: 'rect', rect: pdfToContentRect(dto.box, crop), ellipse, ...(rot ? { rot } : {}) };
+  return { kind: 'rect', rect: dto.box, ellipse, ...(rot ? { rot } : {}) };
 }
 
 /** Engine border fields (`/BS /S`, `/BS /D`, `/BE /I`) → the `Border` union. A
@@ -121,8 +103,8 @@ export function borderFromDTO(dto: {
  *  read-only arms (`javascript`, `named`, `goto-remote`, `launch`,
  *  `unsupported`) yield `null` — they can be carried, never (re)written. */
 export function writableTarget(
-  target: PdfLinkTarget<PdfDestination> | null | undefined,
-): PdfLinkTargetWritable<PdfDestination> | null {
+  target: PdfLinkTarget | null | undefined,
+): PdfLinkTargetWritable | null {
   return target && (target.kind === 'goto' || target.kind === 'uri') ? target : null;
 }
 

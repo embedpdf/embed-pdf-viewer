@@ -3,6 +3,7 @@ import {
   EngineErrorCode,
   assertBundleManifest,
   assertWithinLimit,
+  pdfAnnotationDraftOf,
   planAnnotationImport,
   sniffBinaryMetadata,
   toPageRef,
@@ -14,6 +15,7 @@ import {
   type AnnotationImportResult,
   type WireAnnotationBundle,
   type WireAnnotationResources,
+  type PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
@@ -23,8 +25,10 @@ import { annotationIndexByName } from './internal/read/annotationIndexByName';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import type { FontRegistrar } from '../fonts/FontRegistrar';
+import { visibleBoxReader } from '../pages/PagesReader';
 
 export interface AnnotationImportRequest {
+  /** In page space, as bundles are: each item converts on the page it goes to. */
   readonly bundle: WireAnnotationBundle;
   readonly pages?: AnnotationImportPages;
   readonly attribution: 'restore' | 'stamp';
@@ -42,7 +46,8 @@ export interface AnnotationImportRequest {
  * shape, counts and sizes against the limits, each resource against its id,
  * and each image's decoded size, before any image is decoded. Then
  * {@link planAnnotationImport} maps pages and works out what to leave out,
- * and {@link AnnotationBatchApplier} writes the rest, all or nothing. No
+ * each create is measured on the page it goes to, from that page's
+ * top-left, and {@link AnnotationBatchApplier} writes them, all or nothing. No
  * page is loaded: names are looked up in the page dictionaries, and
  * annotations made on raw handles.
  */
@@ -54,7 +59,10 @@ export class AnnotationImporter {
     private readonly fonts?: FontRegistrar,
   ) {}
 
-  import(request: AnnotationImportRequest, signal: AbortSignal): AnnotationImportResult {
+  import(
+    request: AnnotationImportRequest,
+    signal: AbortSignal,
+  ): AnnotationImportResult<PdfCoordinates> {
     throwIfAborted(signal);
     const { bundle, limits } = request;
     this.assertBundle(bundle, limits);
@@ -75,6 +83,7 @@ export class AnnotationImporter {
         ) >= 0,
     });
 
+    const boxOf = visibleBoxReader(this.runtime, this.session);
     const creates = plan.creates.map((planned): BatchCreate => {
       const item = bundle.items[planned.item]!;
       const resources: WireAnnotationResources = {};
@@ -83,7 +92,7 @@ export class AnnotationImporter {
       }
       return {
         page: planned.page,
-        draft: planned.draft,
+        draft: pdfAnnotationDraftOf(planned.draft, boxOf(planned.page), boxOf),
         ...(planned.replyTo
           ? { replyTo: { to: { planned: planned.replyTo.planned }, type: planned.replyTo.type } }
           : {}),

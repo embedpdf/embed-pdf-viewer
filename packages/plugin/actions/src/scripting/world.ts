@@ -12,7 +12,7 @@ import type {
   ScriptEventInput,
   ScriptWorldInput,
 } from '@embedpdf/core-acrojs';
-import { toPageRef } from '@embedpdf/engine-core/runtime';
+import { pdfRectOf, toPageRef } from '@embedpdf/engine-core/runtime';
 import type { FormSnapshot, PageObjectNumber } from '@embedpdf/engine-core/runtime';
 
 import type { ActionContext } from '../contract';
@@ -27,7 +27,8 @@ export function createScriptWorld(ctx: PluginContext<void>) {
   ): Promise<{ snapshot: FormSnapshot; world: Omit<ScriptWorldInput, 'event'> }> => {
     const page = toPageRef(pageObjectNumber);
     const snapshot = await ctx.doc.forms.list();
-    const pageIndex = Math.max(0, ctx.getPage(page)?.index ?? -1);
+    const layout = ctx.getPage(page);
+    const pageIndex = Math.max(0, layout?.index ?? -1);
     const { annotations } = await ctx.doc.page(page).annotations.list();
     const annots: ScriptAnnotInput[] = annotations
       // Script-addressable = everything except links and widgets (they are
@@ -36,6 +37,9 @@ export function createScriptWorld(ctx: PluginContext<void>) {
         (annotation) => annotation.subtype !== 'link' && !annotation.subtype.startsWith('widget'),
       )
       .map((annotation) => {
+        // Acrobat's JavaScript keeps an annotation's rect in the file's
+        // numbers, [x_ll, y_ll, x_ur, y_ur], so it converts here, at its edge.
+        const inFile = layout ? pdfRectOf(annotation.rect, layout.pdfCropBox) : null;
         const styled = annotation as unknown as {
           color?: { r: number; g: number; b: number };
           interiorColor?: { r: number; g: number; b: number } | null;
@@ -49,12 +53,9 @@ export function createScriptWorld(ctx: PluginContext<void>) {
           name: annotation.nm ?? '',
           subtype: annotation.subtype,
           page: pageIndex,
-          rect: [
-            annotation.rect.left,
-            annotation.rect.bottom,
-            annotation.rect.right,
-            annotation.rect.top,
-          ] as [number, number, number, number],
+          rect: (inFile
+            ? [inFile.left, inFile.bottom, inFile.right, inFile.top]
+            : [0, 0, 0, 0]) as [number, number, number, number],
           contents: annotation.contents ?? '',
           author: annotation.author ?? '',
           subject: annotation.subject ?? '',

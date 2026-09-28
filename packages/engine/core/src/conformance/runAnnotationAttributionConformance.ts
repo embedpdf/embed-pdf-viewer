@@ -64,7 +64,7 @@ const FORGED = {
 
 const SQUARE: AnnotationDraft = {
   subtype: 'square',
-  box: { left: 40, bottom: 40, right: 140, top: 100 },
+  box: { x: 40, y: 40, width: 100, height: 60 },
 };
 
 /**
@@ -267,21 +267,21 @@ export function runAnnotationAttributionConformance(
       // annotations another tool wrote.
       const alice = await opts.openAs(engine, { scope: READ, identity: ALICE });
       const page = await firstPage(alice);
-      const rect = { left: 300, bottom: 300, right: 330, top: 330 };
+      const rect = { x: 300, y: 300, width: 30, height: 30 };
       const { annotation: square } = await page.annotations.create(SQUARE);
       const { annotation: note } = await page.annotations.create({
         subtype: 'text',
-        rect: iconRect(rect.left, rect.top),
+        rect: iconRect(rect.x, rect.y),
       });
       await page.annotations.create({
         subtype: 'text',
-        rect: iconRect(rect.left, rect.top),
+        rect: iconRect(rect.x, rect.y),
         reply: { to: note.ref },
       });
       await page.annotations.create(
         {
           subtype: 'file-attachment',
-          rect: iconRect(rect.left, rect.top),
+          rect: iconRect(rect.x, rect.y),
           file: { name: 'minutes.txt' },
         },
         { file: new TextEncoder().encode('minutes') },
@@ -381,7 +381,7 @@ export function runAnnotationAttributionConformance(
     });
 
     test("a note with someone else's reply is deleted whole or not at all", async () => {
-      const rect = { left: 200, bottom: 40, right: 220, top: 60 };
+      const rect = { x: 200, y: 40, width: 20, height: 20 };
       const alice = await opts.openAs(engine, { scope: SCOPE, identity: ALICE });
       let note: AnnotationDTO;
       try {
@@ -389,7 +389,7 @@ export function runAnnotationAttributionConformance(
           await firstPage(alice)
         ).annotations.create({
           subtype: 'text',
-          rect: iconRect(rect.left, rect.top),
+          rect: iconRect(rect.x, rect.y),
           nm: 'attribution-conformance-thread',
         }));
       } catch (error) {
@@ -404,7 +404,7 @@ export function runAnnotationAttributionConformance(
         const current = await findByNm(page, 'attribution-conformance-thread');
         ({ annotation: reply } = await page.annotations.create({
           subtype: 'text',
-          rect: iconRect(rect.left, rect.top),
+          rect: iconRect(rect.x, rect.y),
           contents: 'Seen',
           reply: { to: current.ref },
         }));

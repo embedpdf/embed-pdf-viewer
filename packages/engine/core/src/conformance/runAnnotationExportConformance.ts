@@ -10,7 +10,7 @@ import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import type { PageHandle } from '../engine/PageHandle';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
-import type { PdfRect } from '../geometry/primitives';
+import type { PageBox } from '../geometry/pageSpace';
 import { annotationKey } from '../identity/annotationKey';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import { toPageRef, type PageRef } from '../identity/PageRef';
@@ -59,7 +59,7 @@ export function runAnnotationExportConformance(
 
     test('exports the annotations as a read returns them, and each resource once', async () => {
       await onPage('authoring', async (page, doc, pageRef) => {
-        const box = (left: number): PdfRect => ({ left, bottom: 20, right: left + 60, top: 50 });
+        const box = (x: number): PageBox => ({ x, y: 20, width: 60, height: 30 });
         const first = await page.annotations.create(
           { subtype: 'stamp', box: box(20) },
           { appearance: BANDS_PDF },
@@ -75,7 +75,7 @@ export function runAnnotationExportConformance(
         const file = await page.annotations.create(
           {
             subtype: 'file-attachment',
-            rect: iconRect(box(260).left, box(260).top),
+            rect: iconRect(box(260).x, box(260).y),
             file: { name: 'note.txt' },
           },
           { file: new TextEncoder().encode('attached') },
@@ -87,7 +87,7 @@ export function runAnnotationExportConformance(
         expect(bundle.items.map((item) => item.data)).toEqual(read.annotations);
 
         const { pages } = await doc.pages.list();
-        expect(bundle.pages).toEqual([{ page: pageRef, position: 0, box: pages[0]!.pdfCropBox }]);
+        expect(bundle.pages).toEqual([{ page: pageRef, position: 0, size: pages[0]!.size }]);
 
         const idOf = (ref: AnnotationRef, role: 'appearance' | 'file') =>
           bundle.items.find((item) => annotationKey(item.data.ref) === annotationKey(ref))!
@@ -130,8 +130,8 @@ export function runAnnotationExportConformance(
     // or to the canonical drawing, changes these on purpose: update them here.
     test('exports a document to the same file on every engine', async () => {
       const expected = {
-        'acrobat-stamps': '3ca53c4dcb6100e8028287cf6c20fd854e766e367dccaf1373ec05c94dbbdc25',
-        'acrobat-rewrapped': 'a09b1b04ad84dc717932bf0a2bf3a981c193b5a521991ffe12cce1471f02d31b',
+        'acrobat-stamps': 'df9a5ec066203aa4dae25cc22e5cfb00f97bf6852ab330a8e4e8de1e45de13e1',
+        'acrobat-rewrapped': '729b682bcd5c2d70b0f896dbda4897c3c80ae556e310a244b30f33d772c0a194',
       } as const;
       for (const [fixture, hash] of Object.entries(expected)) {
         await onPage(fixture as AnnotationResourceFixture, async (_page, doc) => {
@@ -148,23 +148,23 @@ export function runAnnotationExportConformance(
 
     test('takes a comment with its thread, or only what it points at', async () => {
       await onPage('authoring', async (page, doc) => {
-        const rect: PdfRect = { left: 300, bottom: 300, right: 320, top: 320 };
+        const rect: PageBox = { x: 300, y: 300, width: 20, height: 20 };
         const create = async (draft: Parameters<PageHandle['annotations']['create']>[0]) =>
           (await page.annotations.create(draft)).annotation as AnnotationDTO;
         const note = await create({
           subtype: 'text',
-          rect: iconRect(rect.left, rect.top),
+          rect: iconRect(rect.x, rect.y),
           contents: 'Check this',
         });
         const popup = await create({ subtype: 'popup', rect, parent: note.ref });
         const reply = await create({
           subtype: 'text',
-          rect: iconRect(rect.left, rect.top),
+          rect: iconRect(rect.x, rect.y),
           reply: { to: note.ref },
         });
         const answer = await create({
           subtype: 'text',
-          rect: iconRect(rect.left, rect.top),
+          rect: iconRect(rect.x, rect.y),
           reply: { to: reply.ref },
         });
         await create({ subtype: 'square', box: rect });
@@ -185,7 +185,7 @@ export function runAnnotationExportConformance(
 
     test('exports the document as it is now, after an edit and after a page move', async () => {
       await onPage('authoring', async (page, doc, first) => {
-        const rect: PdfRect = { left: 20, bottom: 20, right: 80, top: 50 };
+        const rect: PageBox = { x: 20, y: 20, width: 60, height: 30 };
         await page.annotations.create({ subtype: 'square', box: rect });
         const before = await doc.annotations.export();
         expect(before.items).toHaveLength(1);
@@ -211,7 +211,7 @@ export function runAnnotationExportConformance(
         for (let i = 0; i < 24; i++) {
           const { annotation } = await page.annotations.create({
             subtype: 'square',
-            box: { left: 10 + i, bottom: 10, right: 40 + i, top: 40 },
+            box: { x: 10 + i, y: 10, width: 30, height: 30 },
             nm: `export-conformance-long-selection-${String(i).padStart(3, '0')}-${'x'.repeat(200)}`,
           });
           created.push(annotation);

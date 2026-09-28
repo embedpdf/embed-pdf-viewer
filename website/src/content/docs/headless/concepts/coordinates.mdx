@@ -1,74 +1,40 @@
 ---
 title: Coordinates
-description: The two coordinate systems in EmbedPDF — the file's and the viewer's — and the one rule for using them.
+description: The one coordinate space in EmbedPDF — points from the page's top-left, y down — and when pixels come in.
 ---
 
 {/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
 
 # Coordinates
 
-Every position in EmbedPDF is one of two kinds. You can tell them apart at a
-glance, and the compiler won't let you mix them.
-
-## The file's coordinates — `PdfRect`
-
-What the PDF document itself stores. Y grows **upward** (PDF is a math
-graph), measured in PDF points, corners named explicitly:
+Every position in EmbedPDF is in page space: points (1/72 inch) from the top-left corner of the
+page as it's shown (its crop box), with y going down, like HTML. Annotations, text and search
+matches, selections, reveal targets and overlays all use it. A box is `{ x, y, width, height }` and
+a point is `{ x, y }`:
 
 ```ts
 annotation.rect;
-// { left: 100, bottom: 700, right: 120, top: 720 }
-```
-
-You'll meet this shape anywhere you read or write the document: annotation
-DTOs, creation drafts, patches. It round-trips byte-for-byte with what
-Acrobat and every other PDF tool sees.
-
-## The viewer's coordinates — `Rect`
-
-What you use to put things on screen. Y grows **downward** (like HTML), same
-points scale, origin at the page's top-left:
-
-```ts
-thread.contentRect;
 // { x: 100, y: 80, width: 20, height: 20 }
 ```
 
-Every viewer API speaks this shape: `stage.reveal(...)`, selection and search
-rects, render boxes, overlay anchors.
+## Values pass straight through
 
-> **The rule:** stored in the file → `PdfRect`. Shown on screen → `Rect`.
-> Wrong one → compile error, because the shapes don't match.
-
-## You usually don't convert
-
-APIs hand you the right kind for the job. A comment thread carries both —
-same sticky note, two jobs:
+Because every API speaks the same space, a value from one goes to another as it is. A comment
+thread's root annotation is where the viewer should go:
 
 ```tsx
 const threads = useCommentThreads();
 const stage = useStage();
 
 threads.map((t) => (
-  <button key={refKey(t.root.ref)} onClick={() => stage.reveal(t.pageIndex, { rect: t.contentRect })}>
+  <button
+    key={annotationKey(t.root.ref)}
+    onClick={() => stage.reveal(t.pageIndex, { rect: t.root.rect })}
+  >
     {t.root.contents} — page {t.pageLabel}
   </button>
 ));
 ```
-
-No math. `t.root.rect` stays the document's truth (export it, save it, diff
-it); `t.contentRect` is the same box, ready for the viewer.
-
-## When you do convert
-
-Holding a raw annotation and pointing the viewer at it is one call:
-
-```ts
-const anno = useAnnotation();
-stage.reveal(pageIndex, { rect: anno.toContentBox(dto.ref.page, dto.rect) });
-```
-
-That's the only file ↔ viewer bridge you'll ever need.
 
 Calls that take a page address it by `PageRef` — `{ kind: 'objectNumber',
 pageObjectNumber }`, the page's indirect object number, which survives reorder
@@ -83,24 +49,30 @@ stores them. When you draw your own overlay, convert at the last moment:
 
 ```tsx
 function Pin({ item, page }: AnnotationRendererProps) {
-  // viewer coordinates → this page's pixels (zoom + rotation handled)
+  // page space → this page's pixels (zoom + rotation handled)
   const px = page.transform.toPixels({ x: item.box.x, y: item.box.y });
   return <div style={{ position: 'absolute', left: px.x, top: px.y }}>📌</div>;
 }
 ```
 
-Going the other way (a pointer event → viewer coordinates) is
+Going the other way (a pointer event → page space) is
 `page.transform.fromPixels(px)`, and for raw client coordinates the page
 context has `page.toContentPoint(clientX, clientY)`.
 
+## Tools that use the PDF file's numbers
+
+The PDF file stores positions in its own numbers, with y going up, and a page can sit anywhere in
+them. You only meet those numbers beside a tool that reads them, such as iText, PDFBox or Acrobat
+JavaScript. `page.pdfCropBox` says where the page sits in them, and `pdfRectOf()`, `pdfPointOf()`,
+`pageBoxOf()` and `pagePointOf()` convert; see [Pages](/docs/engine/documents/pages).
+
 ## Cheat sheet
 
-| You're doing…                                  | Use                | Shape                          |
-| ---------------------------------------------- | ------------------ | ------------------------------ |
-| Reading / writing annotations, drafts, patches | file coordinates   | `{ left, bottom, right, top }` |
-| `reveal`, selection & search rects, overlays   | viewer coordinates | `{ x, y, width, height }`      |
-| Drawing DOM/canvas right now                   | `page.transform`   | pixels — convert, never store  |
+| You're doing…                                      | Use              | Shape                                    |
+| -------------------------------------------------- | ---------------- | ---------------------------------------- |
+| Annotations, text, search, selection, `reveal`     | page space       | `{ x, y, width, height }` and `{ x, y }` |
+| Drawing DOM/canvas right now                       | `page.transform` | pixels — convert, never store            |
+| Talking to a tool that reads the PDF's own numbers | `pdfRectOf()`    | `{ left, bottom, right, top }`           |
 
-**Bringing your own coordinate system?** Viewer coordinates are a plain
-y-down frame in points — one affine transform maps them into your world, and
-nothing else in the API will surprise you.
+**Bringing your own coordinate system?** Page space is a plain y-down frame in points — one
+affine transform maps it into your world.

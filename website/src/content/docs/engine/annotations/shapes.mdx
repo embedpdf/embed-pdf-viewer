@@ -8,13 +8,13 @@ description: Draw rectangles, ellipses, lines, arrows, polygons and freehand ink
 # Shapes & drawing
 
 Shapes are drawings on top of the page: rectangles, ellipses, lines and arrows, polylines,
-polygons and freehand ink. You give the geometry in PDF points, and the engine draws the shape in
+polygons and freehand ink. You give the geometry in points, and the engine draws the shape in
 the style you choose.
 
 ```ts
 await page.annotations.create({
   subtype: 'square',
-  box: { left: 72, bottom: 600, right: 272, top: 700 },
+  box: { x: 72, y: 92, width: 200, height: 100 },
   color: { r: 220, g: 20, b: 60 },
   strokeWidth: 2,
 });
@@ -31,7 +31,7 @@ out, a shape is a solid red line, 1 point wide, with no fill.
 ```ts
 await page.annotations.create({
   subtype: 'circle',
-  box: { left: 300, bottom: 600, right: 420, top: 680 },
+  box: { x: 300, y: 112, width: 120, height: 80 },
   interiorColor: { r: 255, g: 235, b: 150 },
 });
 ```
@@ -54,7 +54,7 @@ A `line` goes from one point to another, with an optional ending at each end:
 ```ts
 await page.annotations.create({
   subtype: 'line',
-  linePoints: { start: { x: 100, y: 400 }, end: { x: 320, y: 500 } },
+  linePoints: { start: { x: 100, y: 392 }, end: { x: 320, y: 292 } },
   lineEndings: { start: 'none', end: 'closed-arrow' },
   strokeWidth: 2,
 });
@@ -84,9 +84,9 @@ and can have endings, like a line:
 await page.annotations.create({
   subtype: 'polygon',
   vertices: [
-    { x: 70, y: 460 },
-    { x: 170, y: 460 },
-    { x: 120, y: 540 },
+    { x: 70, y: 332 },
+    { x: 170, y: 332 },
+    { x: 120, y: 252 },
   ],
   interiorColor: { r: 200, g: 230, b: 255 },
 });
@@ -94,9 +94,9 @@ await page.annotations.create({
 await page.annotations.create({
   subtype: 'polyline',
   vertices: [
-    { x: 230, y: 460 },
-    { x: 290, y: 540 },
-    { x: 350, y: 460 },
+    { x: 230, y: 332 },
+    { x: 290, y: 252 },
+    { x: 350, y: 332 },
   ],
   lineEndings: { start: 'none', end: 'open-arrow' },
 });
@@ -124,13 +124,13 @@ await page.annotations.create({
   subtype: 'ink',
   inkList: [
     [
-      { x: 70, y: 80 },
-      { x: 120, y: 180 },
-      { x: 180, y: 90 },
+      { x: 70, y: 712 },
+      { x: 120, y: 612 },
+      { x: 180, y: 702 },
     ],
     [
-      { x: 200, y: 100 },
-      { x: 260, y: 160 },
+      { x: 200, y: 692 },
+      { x: 260, y: 632 },
     ],
   ],
   strokeWidth: 3,
@@ -190,7 +190,7 @@ reviewers draw around a part of a drawing. `cloudyIntensity` sets how big the bu
 ```ts
 await page.annotations.create({
   subtype: 'square',
-  box: { left: 100, bottom: 300, right: 220, top: 380 },
+  box: { x: 100, y: 412, width: 120, height: 80 },
   cloudyIntensity: 2,
   strokeWidth: 2,
 });
@@ -215,7 +215,7 @@ turns):
 ```ts
 await page.annotations.create({
   subtype: 'square',
-  box: { left: 100, bottom: 300, right: 260, top: 380 },
+  box: { x: 100, y: 412, width: 160, height: 80 },
   rotation: 30,
 });
 ```
@@ -232,9 +232,9 @@ as `rotation`; they turn about the middle of the box around the points:
 await page.annotations.create({
   subtype: 'polygon',
   vertices: [
-    { x: 100, y: 300 },
-    { x: 260, y: 300 },
-    { x: 180, y: 380 },
+    { x: 100, y: 492 },
+    { x: 260, y: 492 },
+    { x: 180, y: 412 },
   ],
   rotation: 45,
 });

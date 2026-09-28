@@ -31,6 +31,7 @@ import type {
   FileAttachmentPatch,
   PopupDraft,
   PopupPatch,
+  PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -94,25 +95,31 @@ import {
 import { applyWidgetDraft, applyWidgetPatch, isWidgetSubtype } from './writeWidgetAnnotation';
 
 /** Validate subtype inputs before AnnotationMutator performs any native write. */
-export function preflightDraft(draft: AnnotationDraft, ctx?: AnnotationWriteContext): void {
+export function preflightDraft(
+  draft: AnnotationDraft<PdfCoordinates>,
+  ctx?: AnnotationWriteContext,
+): void {
   if (isStampSubtype(draft.subtype)) {
-    preflightStampDraft(draft as StampDraft, ctx);
+    preflightStampDraft(draft as StampDraft<PdfCoordinates>, ctx);
   }
   if (isFileAttachmentSubtype(draft.subtype)) {
-    preflightFileAttachmentDraft(draft as FileAttachmentDraft, ctx);
+    preflightFileAttachmentDraft(draft as FileAttachmentDraft<PdfCoordinates>, ctx);
   }
   if (isRedactSubtype(draft.subtype)) {
-    preflightRedactDraft(draft as RedactDraft);
+    preflightRedactDraft(draft as RedactDraft<PdfCoordinates>);
   }
   if (isTextSubtype(draft.subtype)) {
-    preflightTextDraft(draft as TextDraft);
+    preflightTextDraft(draft as TextDraft<PdfCoordinates>);
   }
 }
 
 /** Validate subtype inputs before AnnotationMutator performs any native write. */
-export function preflightPatch(patch: AnnotationPatch, ctx?: AnnotationWriteContext): void {
+export function preflightPatch(
+  patch: AnnotationPatch<PdfCoordinates>,
+  ctx?: AnnotationWriteContext,
+): void {
   if (isStampSubtype(subtypeOf(patch))) {
-    preflightStampPatch(patch as StampPatch, ctx);
+    preflightStampPatch(patch as StampPatch<PdfCoordinates>, ctx);
   }
 }
 
@@ -129,7 +136,7 @@ export function applyDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: AnnotationDraft,
+  draft: AnnotationDraft<PdfCoordinates>,
   ctx?: AnnotationWriteContext,
 ): void {
   if (isTextMarkupSubtype(draft.subtype)) {
@@ -142,54 +149,54 @@ export function applyDraft(
   }
   if (isVertexSubtype(draft.subtype)) {
     if (draft.subtype === 'polygon') {
-      applyPolygonDraft(fn, mem, annotPtr, draft as PolygonDraft);
+      applyPolygonDraft(fn, mem, annotPtr, draft as PolygonDraft<PdfCoordinates>);
     } else {
-      applyPolylineDraft(fn, mem, annotPtr, draft as PolylineDraft);
+      applyPolylineDraft(fn, mem, annotPtr, draft as PolylineDraft<PdfCoordinates>);
     }
     return;
   }
   if (isLineSubtype(draft.subtype)) {
-    applyLineDraft(fn, mem, annotPtr, draft as LineDraft);
+    applyLineDraft(fn, mem, annotPtr, draft as LineDraft<PdfCoordinates>);
     return;
   }
   if (isLinkSubtype(draft.subtype)) {
-    applyLinkDraft(fn, mem, annotPtr, draft as LinkDraft, ctx);
+    applyLinkDraft(fn, mem, annotPtr, draft as LinkDraft<PdfCoordinates>, ctx);
     return;
   }
   if (isInkSubtype(draft.subtype)) {
-    applyInkDraft(fn, mem, annotPtr, draft as InkDraft);
+    applyInkDraft(fn, mem, annotPtr, draft as InkDraft<PdfCoordinates>);
     return;
   }
   if (isFreeTextSubtype(draft.subtype)) {
-    applyFreeTextDraft(fn, mem, annotPtr, draft as FreeTextDraft, ctx);
+    applyFreeTextDraft(fn, mem, annotPtr, draft as FreeTextDraft<PdfCoordinates>, ctx);
     return;
   }
   if (isCaretSubtype(draft.subtype)) {
-    applyCaretDraft(fn, mem, annotPtr, draft as CaretDraft);
+    applyCaretDraft(fn, mem, annotPtr, draft as CaretDraft<PdfCoordinates>);
     return;
   }
   if (isTextSubtype(draft.subtype)) {
-    applyTextDraft(fn, mem, annotPtr, draft as TextDraft);
+    applyTextDraft(fn, mem, annotPtr, draft as TextDraft<PdfCoordinates>);
     return;
   }
   if (isStampSubtype(draft.subtype)) {
-    applyStampDraft(fn, mem, annotPtr, draft as StampDraft, ctx);
+    applyStampDraft(fn, mem, annotPtr, draft as StampDraft<PdfCoordinates>, ctx);
     return;
   }
   if (isFileAttachmentSubtype(draft.subtype)) {
-    applyFileAttachmentDraft(fn, mem, annotPtr, draft as FileAttachmentDraft, ctx);
+    applyFileAttachmentDraft(fn, mem, annotPtr, draft as FileAttachmentDraft<PdfCoordinates>, ctx);
     return;
   }
   if (isWidgetSubtype(draft.subtype)) {
-    applyWidgetDraft(fn, mem, annotPtr, draft as WidgetDraft);
+    applyWidgetDraft(fn, mem, annotPtr, draft as WidgetDraft<PdfCoordinates>);
     return;
   }
   if (isPopupSubtype(draft.subtype)) {
-    applyPopupDraft(fn, mem, annotPtr, draft as PopupDraft);
+    applyPopupDraft(fn, mem, annotPtr, draft as PopupDraft<PdfCoordinates>);
     return;
   }
   if (isRedactSubtype(draft.subtype)) {
-    applyRedactDraft(fn, mem, annotPtr, draft as RedactDraft, ctx);
+    applyRedactDraft(fn, mem, annotPtr, draft as RedactDraft<PdfCoordinates>, ctx);
     return;
   }
   // Should be unreachable: AnnotationDraft is the closed union of writable
@@ -207,7 +214,7 @@ export function applyPatch(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  patch: AnnotationPatch,
+  patch: AnnotationPatch<PdfCoordinates>,
   ctx?: AnnotationWriteContext,
 ): void {
   const subtype = subtypeOf(patch);
@@ -221,54 +228,54 @@ export function applyPatch(
   }
   if (isVertexSubtype(subtype)) {
     if (subtype === 'polygon') {
-      applyPolygonPatch(fn, mem, annotPtr, patch as PolygonPatch);
+      applyPolygonPatch(fn, mem, annotPtr, patch as PolygonPatch<PdfCoordinates>);
     } else {
-      applyPolylinePatch(fn, mem, annotPtr, patch as PolylinePatch);
+      applyPolylinePatch(fn, mem, annotPtr, patch as PolylinePatch<PdfCoordinates>);
     }
     return;
   }
   if (isLineSubtype(subtype)) {
-    applyLinePatch(fn, mem, annotPtr, patch as LinePatch);
+    applyLinePatch(fn, mem, annotPtr, patch as LinePatch<PdfCoordinates>);
     return;
   }
   if (isLinkSubtype(subtype)) {
-    applyLinkPatch(fn, mem, annotPtr, patch as LinkPatch, ctx);
+    applyLinkPatch(fn, mem, annotPtr, patch as LinkPatch<PdfCoordinates>, ctx);
     return;
   }
   if (isInkSubtype(subtype)) {
-    applyInkPatch(fn, mem, annotPtr, patch as InkPatch);
+    applyInkPatch(fn, mem, annotPtr, patch as InkPatch<PdfCoordinates>);
     return;
   }
   if (isFreeTextSubtype(subtype)) {
-    applyFreeTextPatch(fn, mem, annotPtr, patch as FreeTextPatch, ctx);
+    applyFreeTextPatch(fn, mem, annotPtr, patch as FreeTextPatch<PdfCoordinates>, ctx);
     return;
   }
   if (isCaretSubtype(subtype)) {
-    applyCaretPatch(fn, mem, annotPtr, patch as CaretPatch);
+    applyCaretPatch(fn, mem, annotPtr, patch as CaretPatch<PdfCoordinates>);
     return;
   }
   if (isTextSubtype(subtype)) {
-    applyTextPatch(fn, mem, annotPtr, patch as TextPatch);
+    applyTextPatch(fn, mem, annotPtr, patch as TextPatch<PdfCoordinates>);
     return;
   }
   if (isStampSubtype(subtype)) {
-    applyStampPatch(fn, mem, annotPtr, patch as StampPatch, ctx);
+    applyStampPatch(fn, mem, annotPtr, patch as StampPatch<PdfCoordinates>, ctx);
     return;
   }
   if (isFileAttachmentSubtype(subtype)) {
-    applyFileAttachmentPatch(fn, mem, annotPtr, patch as FileAttachmentPatch, ctx);
+    applyFileAttachmentPatch(fn, mem, annotPtr, patch as FileAttachmentPatch<PdfCoordinates>, ctx);
     return;
   }
   if (isWidgetSubtype(subtype)) {
-    applyWidgetPatch(fn, mem, annotPtr, patch as WidgetPatch);
+    applyWidgetPatch(fn, mem, annotPtr, patch as WidgetPatch<PdfCoordinates>);
     return;
   }
   if (isPopupSubtype(subtype)) {
-    applyPopupPatch(fn, mem, annotPtr, patch as PopupPatch);
+    applyPopupPatch(fn, mem, annotPtr, patch as PopupPatch<PdfCoordinates>);
     return;
   }
   if (isRedactSubtype(subtype)) {
-    applyRedactPatch(fn, mem, annotPtr, patch as RedactPatch, ctx);
+    applyRedactPatch(fn, mem, annotPtr, patch as RedactPatch<PdfCoordinates>, ctx);
     return;
   }
   throw new EngineError(
@@ -281,7 +288,7 @@ export function applyPatch(
  * The subtype a patch is written as. The mutator fills it in from the target
  * before any write, since a caller may leave it out.
  */
-function subtypeOf(patch: AnnotationPatch): string {
+function subtypeOf(patch: AnnotationPatch<PdfCoordinates>): string {
   if (patch.subtype === undefined) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,

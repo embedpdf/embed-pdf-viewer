@@ -1,9 +1,14 @@
 import { z } from 'zod';
 
+import { PdfLinkTargetSchema, PdfLinkTargetWritableSchema } from './kinds/link/values';
 import type { AnnotationResourceRole } from './resources';
 import type { PdfAnnotationActions } from '../dto/PdfAction';
+import { PdfAnnotationActionsSchema } from '../dto/PdfAction.schema';
 import type { PageDestination, PdfDestination } from '../dto/PdfDestination';
-import type { PageBox } from '../geometry/pageSpace';
+import type { PageBox, PagePoint, PageQuad } from '../geometry/pageSpace';
+import type { PdfPoint, PdfQuad } from '../geometry/primitives';
+import { PageBoxSchema } from '../geometry/schemas';
+import type { Coordinates, PageCoordinates, PdfCoordinates } from '../pageSpace/coordinates';
 
 /**
  * One declaration per annotation kind. Each field says who writes it, what it
@@ -210,32 +215,23 @@ type AcceptedNames<Fields extends KindFields> = NamesWhere<
   { owner: 'attribution' | 'engine' | 'preserved' }
 >;
 
-export type ReadShape<Fields extends KindFields> = {
-  [Name in keyof Fields]: ReadValue<Fields[Name]>;
-};
-
-export type CreateShape<Fields extends KindFields> = {
-  [Name in NamesWhere<Fields, { owner: 'data'; required: true }>]: WriteValue<Fields[Name]>;
-} & {
-  [Name in NamesWhere<Fields, { owner: 'data'; required: false }>]?: WriteValue<Fields[Name]>;
-} & {
-  [Name in AcceptedNames<Fields>]?: ReadValue<Fields[Name]>;
-};
-
-export type UpdateShape<Fields extends KindFields> = {
-  [Name in NamesWhere<Fields, { owner: 'data' }>]?: UpdateValue<Fields[Name]>;
-} & {
-  [Name in AcceptedNames<Fields>]?: ReadValue<Fields[Name]>;
-};
-
 // ── page space ──
 
 type SpaceOf<F> = F extends { traits: { space: infer Space } } ? Space : never;
 
+/** A value's points and quads, named for page space: the same shapes. */
+type PagePointsIn<Value> = Value extends PdfQuad
+  ? PageQuad
+  : Value extends PdfPoint
+    ? PagePoint
+    : Value extends object
+      ? { [Key in keyof Value]: PagePointsIn<Value[Key]> }
+      : Value;
+
 /**
  * A field's value in page space, by what the field holds: a box becomes a
- * `PageBox` and a destination a `PageDestination`. Points keep their shape (`{ x, y }`), so
- * their type is the same in both spaces. `null` and a value left out stay as
+ * `PageBox`, a destination a `PageDestination`, and points and quads keep
+ * their shapes under page-space names. `null` and a value left out stay as
  * they are.
  */
 export type PageValue<Space, Value> = Value extends null | undefined
@@ -248,28 +244,46 @@ export type PageValue<Space, Value> = Value extends null | undefined
         : Value
       : Space extends 'actions'
         ? PdfAnnotationActions<PageDestination>
-        : Value;
+        : Space extends 'none' | 'length'
+          ? Value
+          : PagePointsIn<Value>;
 
-type PageFieldRead<F> = PageValue<SpaceOf<F>, ReadValue<F>>;
-type PageFieldWrite<F> = PageValue<SpaceOf<F>, WriteValue<F>>;
-type PageFieldUpdate<F> = PageValue<SpaceOf<F>, UpdateValue<F>>;
+/**
+ * A field's value in the space `C` stands for: the file's coordinates, as
+ * the field is declared, or page space.
+ */
+type InSpace<C extends Coordinates, F, Value> = C extends PdfCoordinates
+  ? Value
+  : PageValue<SpaceOf<F>, Value>;
 
-export type PageReadShape<Fields extends KindFields> = {
-  [Name in keyof Fields]: PageFieldRead<Fields[Name]>;
+export type ReadShape<Fields extends KindFields, C extends Coordinates = PageCoordinates> = {
+  [Name in keyof Fields]: InSpace<C, Fields[Name], ReadValue<Fields[Name]>>;
 };
 
-export type PageCreateShape<Fields extends KindFields> = {
-  [Name in NamesWhere<Fields, { owner: 'data'; required: true }>]: PageFieldWrite<Fields[Name]>;
+export type CreateShape<Fields extends KindFields, C extends Coordinates = PageCoordinates> = {
+  [Name in NamesWhere<Fields, { owner: 'data'; required: true }>]: InSpace<
+    C,
+    Fields[Name],
+    WriteValue<Fields[Name]>
+  >;
 } & {
-  [Name in NamesWhere<Fields, { owner: 'data'; required: false }>]?: PageFieldWrite<Fields[Name]>;
+  [Name in NamesWhere<Fields, { owner: 'data'; required: false }>]?: InSpace<
+    C,
+    Fields[Name],
+    WriteValue<Fields[Name]>
+  >;
 } & {
-  [Name in AcceptedNames<Fields>]?: PageFieldRead<Fields[Name]>;
+  [Name in AcceptedNames<Fields>]?: InSpace<C, Fields[Name], ReadValue<Fields[Name]>>;
 };
 
-export type PageUpdateShape<Fields extends KindFields> = {
-  [Name in NamesWhere<Fields, { owner: 'data' }>]?: PageFieldUpdate<Fields[Name]>;
+export type UpdateShape<Fields extends KindFields, C extends Coordinates = PageCoordinates> = {
+  [Name in NamesWhere<Fields, { owner: 'data' }>]?: InSpace<
+    C,
+    Fields[Name],
+    UpdateValue<Fields[Name]>
+  >;
 } & {
-  [Name in AcceptedNames<Fields>]?: PageFieldRead<Fields[Name]>;
+  [Name in AcceptedNames<Fields>]?: InSpace<C, Fields[Name], ReadValue<Fields[Name]>>;
 };
 
 // ── kinds ──
@@ -277,15 +291,38 @@ export type PageUpdateShape<Fields extends KindFields> = {
 /** The resources a kind takes, by role (`annotation/resources.ts`). */
 export type KindResources = { readonly [Role in AnnotationResourceRole]?: 'required' | 'optional' };
 
-export type KindRead<Subtype extends string, Fields extends KindFields> = Simplify<
-  { subtype: Subtype } & ReadShape<Fields>
->;
-export type KindCreate<Subtype extends string, Fields extends KindFields> = Simplify<
-  { subtype: Subtype } & CreateShape<Fields>
->;
-export type KindUpdate<Subtype extends string, Fields extends KindFields> = Simplify<
-  { subtype?: Subtype } & UpdateShape<Fields>
->;
+export type KindRead<
+  Subtype extends string,
+  Fields extends KindFields,
+  C extends Coordinates = PageCoordinates,
+> = Simplify<{ subtype: Subtype } & ReadShape<Fields, C>>;
+export type KindCreate<
+  Subtype extends string,
+  Fields extends KindFields,
+  C extends Coordinates = PageCoordinates,
+> = Simplify<{ subtype: Subtype } & CreateShape<Fields, C>>;
+export type KindUpdate<
+  Subtype extends string,
+  Fields extends KindFields,
+  C extends Coordinates = PageCoordinates,
+> = Simplify<{ subtype?: Subtype } & UpdateShape<Fields, C>>;
+
+/** A kind's three schemas: its read, and what a create and an update take. */
+export interface KindSchemas<
+  Subtype extends string,
+  Fields extends KindFields,
+  C extends Coordinates = PageCoordinates,
+> {
+  /**
+   * Validates a read: every field present. Fields it doesn't declare are
+   * dropped, so a reader tolerates a newer writer.
+   */
+  readonly read: z.ZodType<KindRead<Subtype, Fields, C>>;
+  /** Validates the data of a create. */
+  readonly create: z.ZodType<KindCreate<Subtype, Fields, C>>;
+  /** Validates the data of an update. */
+  readonly update: z.ZodType<KindUpdate<Subtype, Fields, C>>;
+}
 
 export interface KindDeclaration<
   Subtype extends string,
@@ -295,22 +332,21 @@ export interface KindDeclaration<
   readonly subtype: Subtype;
   readonly fields: Fields;
   readonly resources: Resources;
-  /**
-   * Validates a read: every field present. Fields it doesn't declare are
-   * dropped, so a reader tolerates a newer writer.
-   */
+  /** Validates a read in page space: every field present. */
   readonly readSchema: z.ZodType<KindRead<Subtype, Fields>>;
-  /** Validates the data of a create. */
+  /** Validates the data of a create, in page space. */
   readonly createSchema: z.ZodType<KindCreate<Subtype, Fields>>;
-  /** Validates the data of an update. */
+  /** Validates the data of an update, in page space. */
   readonly updateSchema: z.ZodType<KindUpdate<Subtype, Fields>>;
+  /** The same three in the file's coordinates, which the engine checks its writes with. */
+  readonly fileSchemas: KindSchemas<Subtype, Fields, PdfCoordinates>;
   /**
-   * The write schema of each `readBack()` field: an update's value outside
-   * it is a read-only value, kept only when unchanged. `null` for an engine
-   * field, which no value writes.
+   * The write schema of each `readBack()` field, in the file's coordinates:
+   * an update's value outside it is a read-only value, kept only when
+   * unchanged. `null` for an engine field, which no value writes.
    */
   readonly readBackWrites: Readonly<Record<string, z.ZodTypeAny | null>>;
-  /** The zod shapes behind the three schemas, to build variants from. */
+  /** The zod shapes behind the three page-space schemas, to build variants from. */
   readonly shapes: {
     readonly read: z.ZodRawShape;
     readonly create: z.ZodRawShape;
@@ -320,64 +356,64 @@ export interface KindDeclaration<
 
 export type AnyKindDeclaration = KindDeclaration<string, KindFields, any>;
 
-/** The complete read shape of a kind: what `list`, `get` and `listRaw` return. */
-export type ReadOf<Declaration> =
+/**
+ * The complete read shape of a kind: what `list`, `get` and `listRaw` return.
+ * In page space unless `C` is `PdfCoordinates`, as the engine reads the file.
+ */
+export type ReadOf<Declaration, C extends Coordinates = PageCoordinates> =
   Declaration extends KindDeclaration<infer Subtype, infer Fields, infer _Resources>
-    ? KindRead<Subtype, Fields>
+    ? KindRead<Subtype, Fields, C>
     : never;
 
 /** The data a create accepts. A read of the same kind is always assignable. */
-export type CreateOf<Declaration> =
+export type CreateOf<Declaration, C extends Coordinates = PageCoordinates> =
   Declaration extends KindDeclaration<infer Subtype, infer Fields, infer _Resources>
-    ? KindCreate<Subtype, Fields>
+    ? KindCreate<Subtype, Fields, C>
     : never;
 
 /** The data an update accepts. */
-export type UpdateOf<Declaration> =
+export type UpdateOf<Declaration, C extends Coordinates = PageCoordinates> =
   Declaration extends KindDeclaration<infer Subtype, infer Fields, infer _Resources>
-    ? KindUpdate<Subtype, Fields>
-    : never;
-
-/** A kind's complete read in page space. */
-export type PageReadOf<Declaration> =
-  Declaration extends KindDeclaration<infer Subtype, infer Fields, infer _Resources>
-    ? Simplify<{ subtype: Subtype } & PageReadShape<Fields>>
-    : never;
-
-/** The data a create accepts, in page space. */
-export type PageCreateOf<Declaration> =
-  Declaration extends KindDeclaration<infer Subtype, infer Fields, infer _Resources>
-    ? Simplify<{ subtype: Subtype } & PageCreateShape<Fields>>
-    : never;
-
-/** The data an update accepts, in page space. */
-export type PageUpdateOf<Declaration> =
-  Declaration extends KindDeclaration<infer Subtype, infer Fields, infer _Resources>
-    ? Simplify<{ subtype?: Subtype } & PageUpdateShape<Fields>>
+    ? KindUpdate<Subtype, Fields, C>
     : never;
 
 /**
- * Declares an annotation kind from its fields and the resources it takes
- * beside its data.
+ * The page-space schema of a field that holds a box or destinations, whose
+ * shape differs from the file's: a box is `{ x, y, width, height }`, and a
+ * destination is measured from its page's top-left. Every other place has
+ * the same shape in both spaces.
  */
-export function defineKind<
-  Subtype extends string,
-  Fields extends KindFields,
-  Resources extends KindResources = Record<never, never>,
->(
-  subtype: Subtype,
-  fields: Fields,
-  resources: Resources = {} as Resources,
-): KindDeclaration<Subtype, Fields, Resources> {
+const PAGE_SPACE_SCHEMAS: Partial<
+  Record<FieldSpace, { readonly read: z.ZodTypeAny; readonly write: z.ZodTypeAny }>
+> = {
+  box: { read: PageBoxSchema, write: PageBoxSchema },
+  linkTarget: { read: PdfLinkTargetSchema, write: PdfLinkTargetWritableSchema },
+  actions: { read: PdfAnnotationActionsSchema, write: PdfAnnotationActionsSchema },
+};
+
+interface ZodShapes {
+  read: Record<string, z.ZodTypeAny>;
+  create: Record<string, z.ZodTypeAny>;
+  update: Record<string, z.ZodTypeAny>;
+  readBackWrites: Record<string, z.ZodTypeAny | null>;
+}
+
+/** The zod shapes of a kind's fields, each field's schemas given by `schemasOf`. */
+function shapesOf(
+  subtype: string,
+  fields: KindFields,
+  schemasOf: (spec: AnyField) => { read: z.ZodTypeAny; write: z.ZodTypeAny },
+): ZodShapes {
   const read: Record<string, z.ZodTypeAny> = { subtype: z.literal(subtype) };
   const create: Record<string, z.ZodTypeAny> = { subtype: z.literal(subtype) };
   const update: Record<string, z.ZodTypeAny> = { subtype: z.literal(subtype).optional() };
   const readBackWrites: Record<string, z.ZodTypeAny | null> = {};
   for (const [name, spec] of Object.entries(fields)) {
     const { owner, readNullable, writeNullable, required, readBack } = spec.traits;
-    read[name] = readNullable ? spec.read.nullable() : spec.read;
+    const schemas = schemasOf(spec);
+    read[name] = readNullable ? schemas.read.nullable() : schemas.read;
     if (owner === 'data') {
-      const write = writeNullable ? spec.write.nullable() : spec.write;
+      const write = writeNullable ? schemas.write.nullable() : schemas.write;
       create[name] = required ? write : write.optional();
       update[name] = (readBack ? z.union([write, read[name]!]) : write).optional();
       if (readBack) readBackWrites[name] = write;
@@ -388,14 +424,42 @@ export function defineKind<
       if (readBack) readBackWrites[name] = null;
     }
   }
+  return { read, create, update, readBackWrites };
+}
+
+/**
+ * Declares an annotation kind from its fields and the resources it takes
+ * beside its data. Fields are declared as the file holds them; the page-space
+ * schemas follow from what each field holds (`space`).
+ */
+export function defineKind<
+  Subtype extends string,
+  Fields extends KindFields,
+  Resources extends KindResources = Record<never, never>,
+>(
+  subtype: Subtype,
+  fields: Fields,
+  resources: Resources = {} as Resources,
+): KindDeclaration<Subtype, Fields, Resources> {
+  const file = shapesOf(subtype, fields, (spec) => spec);
+  const page = shapesOf(
+    subtype,
+    fields,
+    (spec) => PAGE_SPACE_SCHEMAS[spec.traits.space as FieldSpace] ?? spec,
+  );
   return {
     subtype,
     fields,
     resources,
-    readSchema: z.object(read) as never,
-    createSchema: z.object(create).strict() as never,
-    updateSchema: z.object(update).strict() as never,
-    readBackWrites,
-    shapes: { read, create, update },
+    readSchema: z.object(page.read) as never,
+    createSchema: z.object(page.create).strict() as never,
+    updateSchema: z.object(page.update).strict() as never,
+    fileSchemas: {
+      read: z.object(file.read) as never,
+      create: z.object(file.create).strict() as never,
+      update: z.object(file.update).strict() as never,
+    },
+    readBackWrites: file.readBackWrites,
+    shapes: { read: page.read, create: page.create, update: page.update },
   };
 }

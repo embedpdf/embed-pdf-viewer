@@ -4,6 +4,7 @@ import type {
   Color,
   TextDraft,
   TextPatch,
+  PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode, standardStateModelOf } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
@@ -37,7 +38,7 @@ function stateNeedsModel(state: string): EngineError {
 }
 
 /** Refuse a draft whose custom state has no model, before the first write. */
-export function preflightTextDraft(draft: TextDraft): void {
+export function preflightTextDraft(draft: TextDraft<PdfCoordinates>): void {
   if (draft.state != null && draft.stateModel == null && !standardStateModelOf(draft.state)) {
     throw stateNeedsModel(draft.state);
   }
@@ -48,9 +49,9 @@ export function preflightTextDraft(draft: TextDraft): void {
  * own; a custom one keeps the annotation's, and needs one.
  */
 export function prepareTextStatePatch(
-  current: AnnotationDTO,
-  patch: AnnotationPatch,
-): AnnotationPatch {
+  current: AnnotationDTO<PdfCoordinates>,
+  patch: AnnotationPatch<PdfCoordinates>,
+): AnnotationPatch<PdfCoordinates> {
   if (current.subtype !== 'text' || patch.subtype !== 'text') return patch;
   if (patch.state == null || patch.stateModel !== undefined) return patch;
   const model = standardStateModelOf(patch.state);
@@ -70,7 +71,7 @@ export function applyTextDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: TextDraft,
+  draft: TextDraft<PdfCoordinates>,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
   setAnnotRect(fn, mem, annotPtr, draft.rect);
@@ -92,7 +93,7 @@ export function applyTextPatch(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  patch: TextPatch,
+  patch: TextPatch<PdfCoordinates>,
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);
   if (patch.rect !== undefined) setAnnotRect(fn, mem, annotPtr, patch.rect);

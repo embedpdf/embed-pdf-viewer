@@ -1,5 +1,5 @@
 import { isReadout, measurementReadout } from '@embedpdf/engine-core/runtime';
-import type { PdfMeasurement, PdfRect, ShapeDimensionCaption } from '@embedpdf/engine-core/runtime';
+import type { PdfMeasurement, ShapeDimensionCaption } from '@embedpdf/engine-core/runtime';
 import { geomRotation, pointInPoly, rotatePoint, selectionQuad, unionRect } from './geometry';
 import { DISTANCE_CAPTION_SIZE, distanceCaptionWidth } from './measurement-font';
 import { distanceLayout, distanceSelectionQuad, moveDistanceCaption } from './measurement';
@@ -10,7 +10,6 @@ export interface ShapeMeasurementAppearance {
   intent: 'polyline-dimension' | 'polygon-dimension';
   measure: PdfMeasurement | null;
   caption: ShapeDimensionCaption;
-  crop: PdfRect;
   text: string;
 }
 
@@ -22,10 +21,9 @@ export interface ShapeMeasurementLayout {
 
 const ORIGIN = { x: 0, y: 0 };
 
-/** The public caption center stays in PDF space; the editor draws in content space. */
+/** The caption's center, where it's drawn on the page. */
 export function shapeCaptionPoint(appearance: ShapeMeasurementAppearance): Point | undefined {
-  const center = appearance.caption.center;
-  return center && { x: center.x - appearance.crop.left, y: appearance.crop.top - center.y };
+  return appearance.caption.center ?? undefined;
 }
 
 export function withShapeCaptionPoint(
@@ -34,10 +32,7 @@ export function withShapeCaptionPoint(
 ): ShapeMeasurementAppearance {
   return {
     ...appearance,
-    caption: {
-      ...appearance.caption,
-      center: { x: center.x + appearance.crop.left, y: appearance.crop.top - center.y },
-    },
+    caption: { ...appearance.caption, center },
   };
 }
 
@@ -58,13 +53,7 @@ export function shapeMeasurementReadout(
     subtype: appearance.intent === 'polygon-dimension' ? 'polygon' : 'polyline',
     intent: appearance.intent,
     measure: appearance.measure,
-    vertices:
-      geometry.kind === 'poly'
-        ? geometry.points.map((point) => ({
-            x: point.x + appearance.crop.left,
-            y: appearance.crop.top - point.y,
-          }))
-        : [],
+    vertices: geometry.kind === 'poly' ? geometry.points : [],
   });
 }
 

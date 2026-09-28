@@ -199,10 +199,10 @@ export function runAttachmentConformance(
       const doc = await openFixture(engine, opts);
       try {
         const annotations = doc.page(toPageRef(firstPageObjectNumber)).annotations;
-        const rect = { left: 80, bottom: 40, right: 100, top: 60 };
+        const rect = { x: 80, y: 40, width: 20, height: 20 };
         const picked = new File([new Uint8Array([1, 2, 3])], 'figures.csv', { type: 'text/csv' });
         const { annotation: fromFile } = await annotations.create(
-          { subtype: 'file-attachment', rect: iconRect(rect.left, rect.top) },
+          { subtype: 'file-attachment', rect: iconRect(rect.x, rect.y) },
           { file: picked },
         );
         const file = (fromFile as FileAttachmentAnnotationDTO).file!;
@@ -212,7 +212,7 @@ export function runAttachmentConformance(
         const { annotation: untyped } = await annotations.create(
           {
             subtype: 'file-attachment',
-            rect: iconRect(rect.left, rect.top),
+            rect: iconRect(rect.x, rect.y),
             file: { name: 'raw.bin' },
           },
           { file: new Uint8Array([4, 5]) },
@@ -222,7 +222,7 @@ export function runAttachmentConformance(
         // Bare bytes need a name.
         await expect(
           annotations.create(
-            { subtype: 'file-attachment', rect: iconRect(rect.left, rect.top) },
+            { subtype: 'file-attachment', rect: iconRect(rect.x, rect.y) },
             { file: new Uint8Array([6]) },
           ),
         ).rejects.toMatchObject({

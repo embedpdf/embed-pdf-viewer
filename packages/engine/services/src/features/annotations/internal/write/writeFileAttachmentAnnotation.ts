@@ -3,6 +3,7 @@ import type {
   Color,
   FileAttachmentDraft,
   FileAttachmentPatch,
+  PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
@@ -23,7 +24,7 @@ const DEFAULT_FILE_ATTACHMENT_COLOR: Color = { r: 255, g: 255, b: 0 };
 const DEFAULT_OPACITY = 1;
 
 /** The file's metadata as a draft or patch carries it. */
-type FileMetadata = NonNullable<FileAttachmentDraft['file']>;
+type FileMetadata = NonNullable<FileAttachmentDraft<PdfCoordinates>['file']>;
 
 /**
  * Validate a file-attachment draft before any native write: the file's
@@ -31,7 +32,7 @@ type FileMetadata = NonNullable<FileAttachmentDraft['file']>;
  * data's, or the one a `File` brought). Any bytes are a valid attachment.
  */
 export function preflightFileAttachmentDraft(
-  draft: FileAttachmentDraft,
+  draft: FileAttachmentDraft<PdfCoordinates>,
   ctx: AnnotationWriteContext | undefined,
 ): void {
   requireFileBytes(ctx);
@@ -62,7 +63,7 @@ export function applyFileAttachmentDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: FileAttachmentDraft,
+  draft: FileAttachmentDraft<PdfCoordinates>,
   ctx: AnnotationWriteContext | undefined,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
@@ -88,7 +89,7 @@ export function applyFileAttachmentPatch(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  patch: FileAttachmentPatch,
+  patch: FileAttachmentPatch<PdfCoordinates>,
   ctx: AnnotationWriteContext | undefined,
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);

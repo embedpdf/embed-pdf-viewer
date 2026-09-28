@@ -120,7 +120,7 @@ should go, with the new text in `contents`. Its `box` is the box the caret symbo
 ```ts
 await page.annotations.create({
   subtype: 'caret',
-  box: { left: 208, bottom: 698, right: 216, top: 710 },
+  box: { x: 208, y: 82, width: 8, height: 12 },
   contents: 'not ',
 });
 ```
@@ -132,7 +132,7 @@ so PDF apps treat them as one suggestion:
 const { annotation: caret } = await page.annotations.create({
   subtype: 'caret',
   intent: 'replace',
-  box: { left: 208, bottom: 698, right: 216, top: 710 },
+  box: { x: 208, y: 82, width: 8, height: 12 },
   contents: 'invoice',
 });
 

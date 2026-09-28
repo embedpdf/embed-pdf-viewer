@@ -8,7 +8,7 @@ import {
 } from '../../src/transfer/AnnotationBundle';
 
 const page = { kind: 'objectNumber', pageObjectNumber: 3 } as const;
-const box = { left: 0, bottom: 0, right: 612, top: 792 };
+const size = { width: 612, height: 792 };
 const drawing = new TextEncoder().encode('%PDF-1.7 a drawing');
 
 async function bundleWith(
@@ -18,7 +18,7 @@ async function bundleWith(
   const bundle: Record<string, unknown> = {
     format: 'embedpdf/annotations',
     version: 1,
-    pages: [{ page, position: 0, box }],
+    pages: [{ page, position: 0, size }],
     items: [
       {
         data: {
@@ -67,8 +67,8 @@ describe('assertAnnotationBundle', () => {
       'a page listed twice',
       (bundle: Record<string, unknown>) => {
         bundle.pages = [
-          { page, position: 0, box },
-          { page, position: 1, box },
+          { page, position: 0, size },
+          { page, position: 1, size },
         ];
       },
       'listed twice',
@@ -77,8 +77,8 @@ describe('assertAnnotationBundle', () => {
       'two pages at one position',
       (bundle: Record<string, unknown>) => {
         bundle.pages = [
-          { page, position: 0, box },
-          { page: { kind: 'objectNumber', pageObjectNumber: 4 }, position: 0, box },
+          { page, position: 0, size },
+          { page: { kind: 'objectNumber', pageObjectNumber: 4 }, position: 0, size },
         ];
       },
       'position 0 is listed twice',

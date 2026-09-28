@@ -13,20 +13,14 @@ import {
 } from '@embedpdf/core-annotation';
 import type {
   AnnotationDTO,
-  CalloutLine,
+  FreeTextDraft,
   LineEnding,
-  PdfRect,
+  PageBox,
 } from '@embedpdf/engine-core/runtime';
 
 import { richDocOf } from '../../rich-text';
 import { boxEmit, type KindProjection, type Wire } from '../projection';
-import {
-  boxGeomFields,
-  colorToCss,
-  contentToPdfPoint,
-  pdfToContentPoint,
-  pdfToContentRect,
-} from '../seam';
+import { boxGeomFields, colorToCss } from '../seam';
 
 type FreeTextDTO = Extract<AnnotationDTO, { subtype: 'free-text' }>;
 
@@ -73,43 +67,40 @@ const formattingBody = (annotation: ModelAnnotation): Wire => {
 /**
  * The engine geometry for a callout: the text box (`box`, turned by
  * `rotation` about its middle), the `/CL` leader (`[tip, knee, conn]` with
- * the connection point derived) and the `/LE` ending, in PDF user space
- * (y-up). The engine works out `rect`, the text box with the line and its
+ * the connection point derived) and the `/LE` ending, in page space. The
+ * engine works out `rect`, the text box with the line and its
  * arrow. A turn tilts the text box only: the engine draws the box and its
  * text under an inline turn while the leader stays page-space. The turn is
  * total (null states the clear) like every box emission.
  */
-export function calloutFields(
-  annotation: ModelAnnotation,
-  crop: PdfRect,
-): {
-  box: PdfRect;
+export function calloutFields(annotation: ModelAnnotation): {
+  box: PageBox;
   rotation: number | null;
-  calloutLine: CalloutLine;
+  calloutLine: NonNullable<FreeTextDraft['calloutLine']>;
   lineEnding: LineEnding;
 } | null {
   const geometry = annotation.geometry;
   if (geometry.kind !== 'text' || !geometry.callout) return null;
-  const points = calloutLinePoints(geometry).map((point) => contentToPdfPoint(point, crop));
+  const points = calloutLinePoints(geometry);
   const calloutLine = (
     points.length === 3 ? [points[0], points[1], points[2]] : [points[0], points[1]]
-  ) as CalloutLine;
+  ) as NonNullable<FreeTextDraft['calloutLine']>;
   return {
-    ...boxGeomFields(geometry.rect, geomRotation(geometry), crop),
+    ...boxGeomFields(geometry.rect, geomRotation(geometry)),
     calloutLine,
     lineEnding: geometry.callout.ending,
   };
 }
 
 export const freeText: KindProjection = {
-  ingest: (dto, crop) => {
+  ingest: (dto) => {
     const freeTextDto = dto as FreeTextDTO;
     // The text box is the `box`, turned by `rotation`. A callout (`/IT
     // free-text-callout` + a `/CL` leader) adds its leader: the tip is
     // `cl[0]` and the elbow `cl[1]` (a 3-point `/CL`). The connection point —
     // `cl` last — is not stored; it's re-derived from the box.
     const rot = freeTextDto.rotation ?? 0;
-    const box = pdfToContentRect(freeTextDto.box, crop);
+    const box = freeTextDto.box;
     const cl = freeTextDto.calloutLine;
     if (freeTextDto.intent === 'free-text-callout' && cl && cl.length >= 2) {
       return {
@@ -117,8 +108,8 @@ export const freeText: KindProjection = {
           kind: 'text',
           rect: box,
           callout: {
-            tip: pdfToContentPoint(cl[0], crop),
-            knee: cl.length === 3 ? pdfToContentPoint(cl[1], crop) : undefined,
+            tip: cl[0],
+            knee: cl.length === 3 ? cl[1] : undefined,
             ending: freeTextDto.lineEnding ?? 'none',
           },
           ...(rot ? { rot } : {}),
@@ -131,17 +122,17 @@ export const freeText: KindProjection = {
       text: textFromDTO(freeTextDto),
     };
   },
-  geometry: (annotation, crop) => {
+  geometry: (annotation) => {
     if (annotation.geometry.kind !== 'text') return null;
-    const cf = calloutFields(annotation, crop);
+    const cf = calloutFields(annotation);
     if (cf) return { ...cf };
-    return boxEmit(annotation, crop);
+    return boxEmit(annotation);
   },
   prop: { bold: formattingBody, italic: formattingBody, underline: formattingBody },
   // `/IT` + the initial `/Contents` are create-only statements; while typing,
   // the debounced text-edit write owns `contents`.
-  draftExtras: (annotation, crop) => ({
-    intent: calloutFields(annotation, crop) ? 'free-text-callout' : 'free-text',
+  draftExtras: (annotation) => ({
+    intent: calloutFields(annotation) ? 'free-text-callout' : 'free-text',
     contents: annotation.data?.contents ?? '',
   }),
 };

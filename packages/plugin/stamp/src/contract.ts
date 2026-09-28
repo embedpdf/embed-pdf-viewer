@@ -29,8 +29,8 @@ export type StampLibraryKind = string;
 /**
  * How a mark is authored: drawn strokes (kept as a vector path), typed text
  * in a registered font (embedded by the flatten), a raster image, or a page
- * of a PDF. Ink strokes are in points, y-up, any origin — the asset page is
- * the mark's bounds.
+ * of a PDF. Ink strokes are in points, from the top-left and y down like
+ * every page position, any origin — the asset page is the mark's bounds.
  */
 export type MarkSource =
   | {

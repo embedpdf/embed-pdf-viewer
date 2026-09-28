@@ -14,7 +14,7 @@ picture as PNG, JPEG or PDF bytes, and the box to put it in:
 const image = await (await fetch('/approved.png')).blob();
 
 const { annotation } = await page.annotations.create(
-  { subtype: 'stamp', box: { left: 72, bottom: 640, right: 222, top: 690 } },
+  { subtype: 'stamp', box: { x: 72, y: 102, width: 150, height: 50 } },
   { appearance: image },
 );
 ```
@@ -24,7 +24,7 @@ picked) and a `Uint8Array` both work.
 
 | Field      | What it is                                                                           | Default     |
 | :--------- | :----------------------------------------------------------------------------------- | :---------- |
-| `box`      | The box the stamp fills, `{ left, bottom, right, top }` in points, before any turn   | required    |
+| `box`      | The box the stamp fills, `{ x, y, width, height }` in points, before any turn        | required    |
 | `fit`      | How the picture fills the box: `'contain'`, `'cover'` or `'fill'`                    | `'contain'` |
 | `opacity`  | From `0` (invisible) to `1` (solid), over the whole picture                          | `1`         |
 | `name`     | A label for the stamp, such as `'Approved'`                                          | none        |
@@ -105,13 +105,13 @@ See [Turned shapes](/docs/engine/annotations/shapes#turned-shapes).
 const { annotation } = await page.annotations.create(
   {
     subtype: 'stamp',
-    box: { left: 300, bottom: 300, right: 400, top: 350 }, // 100 × 50
+    box: { x: 300, y: 442, width: 100, height: 50 }, // 100 × 50
     rotation: 90,
   },
   { appearance: image },
 );
 
-annotation.rect; // { left: 325, bottom: 275, right: 375, top: 375 }: the same box, turned
+annotation.rect; // { x: 325, y: 417, width: 50, height: 100 }: the same box, turned
 ```
 
 A stamp turned in Acrobat reads the same way: its `rotation`, and its own box as `box`. A stamp
@@ -123,7 +123,7 @@ A new `box` or a new `fit` places the same picture again. Nothing is uploaded or
 
 ```ts
 await page.annotations.update(annotation.ref, {
-  box: { left: 72, bottom: 600, right: 372, top: 690 },
+  box: { x: 72, y: 102, width: 300, height: 90 },
 });
 await page.annotations.update(annotation.ref, { fit: 'cover' });
 ```

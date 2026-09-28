@@ -10,11 +10,15 @@ import {
   type AnnotationDraft,
   type AnnotationPatch,
   type PdfPoint,
+  type PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, Ptr } from '@embedpdf/engine-runtime';
 
 type DimensionKind = 'line' | 'polygon' | 'polyline';
-type DimensionWrite = Extract<AnnotationDraft | AnnotationPatch, { subtype?: DimensionKind }>;
+type DimensionWrite = Extract<
+  AnnotationDraft<PdfCoordinates> | AnnotationPatch<PdfCoordinates>,
+  { subtype?: DimensionKind }
+>;
 
 const inputs = ['linePoints', 'vertices', 'measure', 'intent', 'contents'] as const;
 
@@ -120,7 +124,9 @@ const touchesCaption = (value: object): boolean =>
  * and complete its caption fields, since the native caption setters write the
  * whole caption at once.
  */
-export function prepareMeasurementDraft(draft: AnnotationDraft): AnnotationDraft {
+export function prepareMeasurementDraft(
+  draft: AnnotationDraft<PdfCoordinates>,
+): AnnotationDraft<PdfCoordinates> {
   if (!isDimensionKind(draft.subtype)) return draft;
   const dimension = draft as DimensionWrite;
   validate(draft.subtype, dimension);
@@ -148,7 +154,7 @@ export function prepareMeasurementDraft(draft: AnnotationDraft): AnnotationDraft
       };
     }
   }
-  return deriveMeasurementLabel(prepared as never) as AnnotationDraft;
+  return deriveMeasurementLabel(prepared as never) as AnnotationDraft<PdfCoordinates>;
 }
 
 /**
@@ -161,9 +167,9 @@ export function prepareMeasurementDraft(draft: AnnotationDraft): AnnotationDraft
 export function prepareMeasurementPatch(
   fn: PdfFunctions,
   annot: Ptr,
-  current: AnnotationDTO,
-  patch: AnnotationPatch,
-): AnnotationPatch {
+  current: AnnotationDTO<PdfCoordinates>,
+  patch: AnnotationPatch<PdfCoordinates>,
+): AnnotationPatch<PdfCoordinates> {
   if (patch.subtype !== undefined && patch.subtype !== current.subtype)
     throw new EngineError(EngineErrorCode.InvalidArg, 'Annotation subtype cannot change');
   if (!isDimensionKind(current.subtype)) return patch;
@@ -234,5 +240,5 @@ export function prepareMeasurementPatch(
     if (isReadout(readout)) next = { ...next, contents: readout.label };
   }
   validate(subtype, next);
-  return next as AnnotationPatch;
+  return next as AnnotationPatch<PdfCoordinates>;
 }

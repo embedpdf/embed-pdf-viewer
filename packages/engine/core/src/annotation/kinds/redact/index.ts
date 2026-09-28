@@ -1,13 +1,23 @@
 import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
+import type { Coordinates, PageCoordinates } from '../../../pageSpace/coordinates';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
 import { RedactDeclaration } from './declaration';
 
 export { RedactDeclaration } from './declaration';
 
-export type RedactAnnotationDTO = ReadOf<typeof RedactDeclaration>;
-export type RedactDraft = CreateOf<typeof RedactDeclaration>;
-export type RedactPatch = UpdateOf<typeof RedactDeclaration>;
+export type RedactAnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+  typeof RedactDeclaration,
+  C
+>;
+export type RedactDraft<C extends Coordinates = PageCoordinates> = CreateOf<
+  typeof RedactDeclaration,
+  C
+>;
+export type RedactPatch<C extends Coordinates = PageCoordinates> = UpdateOf<
+  typeof RedactDeclaration,
+  C
+>;
 
 export const RedactDTOSchema = RedactDeclaration.readSchema;
 export const RedactDraftSchema = RedactDeclaration.createSchema;

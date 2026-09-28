@@ -41,12 +41,11 @@ export function createWidgetBoxesMirror(ctx: FormContext): PageMirror<WidgetBoxe
   return ctx.pageMirror<WidgetBoxes>({
     name: 'widget-boxes',
     load: async (doc, page) => {
-      const space = ctx.geometry.forPage(page);
       const { annotations } = await doc.page(page).annotations.list();
       const boxes: Record<number, Box> = {};
       for (const record of annotations) {
         if (record.subtype !== 'widget' || record.ref.kind !== 'objectNumber') continue;
-        boxes[record.ref.annotObjectNumber] = space.pdfRectToPage(record.rect);
+        boxes[record.ref.annotObjectNumber] = record.rect;
       }
       return boxes;
     },

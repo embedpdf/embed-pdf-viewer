@@ -1,6 +1,6 @@
 /**
- * The boundary between the engine's PDF-space annotation DTOs and the core's
- * content-space `ModelAnnotation` — organized kind-major like the rest of the stack
+ * The boundary between the engine's annotation DTOs and the core's
+ * `ModelAnnotation`, both in page space — organized kind-major like the rest of the stack
  * (engine-core `kinds/`, the services writer registry, the core PropSpec
  * table): each family declares one {@link KindProjection} and every wire
  * statement shape derives from it here:
@@ -28,7 +28,6 @@ import {
   type AnnotationDraft,
   type AnnotationDTO,
   type AnnotationPatch,
-  type PdfRect,
 } from '@embedpdf/engine-core/runtime';
 
 import { freeText } from './kinds/freeText';
@@ -46,14 +45,13 @@ import { circle, square } from './kinds/shape';
 import { captionFieldsFor, ink, line, polygon, polyline } from './kinds/stroke';
 import { boxEmit, type KindProjection, type Wire } from './projection';
 import { GENERIC_PROPS } from './props';
-import { pdfToContentRect, annotationKey, flagsOf, styleFromDTO } from './seam';
+import { annotationKey, flagsOf, styleFromDTO } from './seam';
 
 export {
   boxGeomFields,
   colorToCss,
   cssToColor,
   annotationKey,
-  contentToPdfRect,
   styleFromDTO,
   widgetAppearanceFromProps,
   writableTarget,
@@ -98,15 +96,15 @@ const projectionOf = (subtype: string): KindProjection =>
 const wireSubtypeOf = (annotation: ModelAnnotation): string =>
   annotation.subtype.startsWith('widget') ? 'widget' : annotation.subtype;
 
-/* ── DTO → content model ──────────────────────────────────────────────────── */
+/* ── DTO → model ──────────────────────────────────────────────────────────── */
 
 /**
- * Engine DTO → content-space ModelAnnotation, rendering from the engine's
+ * Engine DTO → ModelAnnotation, rendering from the engine's
  * appearance raster (`source: 'baked'`, placed by `apBox`). Whether this
  * session renders it live instead is the view's choice (read/view.ts).
  */
-export function fromDTO(dto: AnnotationDTO, crop: PdfRect): ModelAnnotation {
-  const slice = projectionOf(dto.subtype).ingest(dto, crop);
+export function fromDTO(dto: AnnotationDTO): ModelAnnotation {
+  const slice = projectionOf(dto.subtype).ingest(dto);
   // Rotation-stripped appearances (`appearanceTurnOf`, the engine's own rule):
   // a box kind drawn turned whose drawing stays inside the turned box has a
   // flat raster placed by its `box`, the stripped rotation re-applied as a
@@ -132,45 +130,41 @@ export function fromDTO(dto: AnnotationDTO, crop: PdfRect): ModelAnnotation {
     ...(dto.reply?.type === 'group' ? { group: annotationKey(dto.reply.to) } : {}),
     style: styleFromDTO(dto),
     ...slice,
-    apBox: pdfToContentRect(strippedRect ?? dto.rect, crop),
+    apBox: strippedRect ?? dto.rect,
     ...(strippedRect ? { apRot: geomRotation(slice.geometry) } : {}),
   };
 }
 
-/* ── content model → wire statements (the derivation) ─────────────────────── */
+/* ── model → wire statements (the derivation) ─────────────────────────────── */
 
 /** Lower `keys` through the kind's overrides + the generic table. `null` =
  *  some key has no lowering — the caller degrades to the full projection. */
-function emitProps(
-  annotation: ModelAnnotation,
-  crop: PdfRect,
-  keys: readonly PropKey[],
-): Wire | null {
+function emitProps(annotation: ModelAnnotation, keys: readonly PropKey[]): Wire | null {
   const kind = projectionOf(annotation.subtype);
   const out: Wire = {};
   for (const key of keys) {
     const lower = kind.prop?.[key] ?? GENERIC_PROPS[key];
     if (!lower) return null;
-    Object.assign(out, lower(annotation, crop));
+    Object.assign(out, lower(annotation));
   }
   return out;
 }
 
 const editableKeys = (subtype: string): PropKey[] => propsFor(subtype).map((spec) => spec.key);
 
-/** Content ModelAnnotation → the full engine patch: the kind's geometry group plus every
+/** ModelAnnotation → the full engine patch: the kind's geometry group plus every
  *  prop it declares editable. The reference statement — scoped emission and
  *  drafts both build on it. */
-export function toPatch(annotation: ModelAnnotation, crop: PdfRect): AnnotationPatch | null {
+export function toPatch(annotation: ModelAnnotation): AnnotationPatch | null {
   const kind = projectionOf(annotation.subtype);
-  const geo = kind.geometry(annotation, crop);
-  const props = emitProps(annotation, crop, editableKeys(annotation.subtype)) ?? {};
+  const geo = kind.geometry(annotation);
+  const props = emitProps(annotation, editableKeys(annotation.subtype)) ?? {};
   if (!geo && Object.keys(props).length === 0) return null;
   return { subtype: wireSubtypeOf(annotation), ...geo, ...props } as AnnotationPatch;
 }
 
 /**
- * Content ModelAnnotation + a {@link PatchScope} → the sparse patch for exactly that
+ * ModelAnnotation + a {@link PatchScope} → the sparse patch for exactly that
  * intent (the shell's `patch` effect emitter): the reducer says what changed —
  * geometry, or the props keys verbatim — and this lowers only that. Kinds
  * without editable geometry (text markup) and unlowerable keys degrade to the
@@ -179,14 +173,13 @@ export function toPatch(annotation: ModelAnnotation, crop: PdfRect): AnnotationP
 export function toScopedPatch(
   annotation: ModelAnnotation,
   scope: PatchScope,
-  crop: PdfRect,
 ): AnnotationPatch | null {
   const kind = projectionOf(annotation.subtype);
   if (scope.kind === 'caption') {
     return annotation.measure
       ? ({
           subtype: wireSubtypeOf(annotation),
-          ...captionFieldsFor(annotation, crop),
+          ...captionFieldsFor(annotation),
         } as AnnotationPatch)
       : null;
   }
@@ -196,27 +189,27 @@ export function toScopedPatch(
       : null;
   }
   if (scope.kind === 'geometry') {
-    const geo = kind.geometry(annotation, crop);
+    const geo = kind.geometry(annotation);
     return geo
       ? ({ subtype: wireSubtypeOf(annotation), ...geo } as AnnotationPatch)
-      : toPatch(annotation, crop);
+      : toPatch(annotation);
   }
-  const props = emitProps(annotation, crop, scope.keys);
-  if (props === null) return toPatch(annotation, crop);
+  const props = emitProps(annotation, scope.keys);
+  if (props === null) return toPatch(annotation);
   if (Object.keys(props).length === 0) return null;
   return { subtype: wireSubtypeOf(annotation), ...props } as AnnotationPatch;
 }
 
-/** Content ModelAnnotation → engine create draft: the full statement plus the kind's
+/** ModelAnnotation → engine create draft: the full statement plus the kind's
  *  create-only extras, with the model's `/F` emitted verbatim, once, for every
  *  kind (a fresh draw carries DRAWN_FLAGS plus any tool seed). `null` for the
  *  kinds whose creates travel their own path (stamps, widgets, icon place). */
-export function toCreateDraft(annotation: ModelAnnotation, crop: PdfRect): AnnotationDraft | null {
+export function toCreateDraft(annotation: ModelAnnotation): AnnotationDraft | null {
   const kind = projectionOf(annotation.subtype);
   if (kind.createable === false) return null;
-  const base = toPatch(annotation, crop);
+  const base = toPatch(annotation);
   if (!base) return null;
-  const extras = kind.draftExtras?.(annotation, crop);
+  const extras = kind.draftExtras?.(annotation);
   if (kind.draftExtras && extras === null) return null;
   // The /NM comes from `named()` at the write, like every create of this plugin.
   return { ...base, ...extras, ...annotation.flags } as unknown as AnnotationDraft;

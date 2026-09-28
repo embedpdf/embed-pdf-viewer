@@ -2,6 +2,7 @@ import type {
   AnnotationDraftBase,
   AnnotationPatchBase,
   DateInput,
+  PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -30,7 +31,7 @@ export function applyAnnotationBaseDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: AnnotationDraftBase,
+  draft: AnnotationDraftBase<PdfCoordinates>,
 ): void {
   if (draft.contents !== undefined) {
     writeAnnotStringOrClear(fn, mem, annotPtr, 'Contents', draft.contents);
@@ -61,7 +62,7 @@ export function applyAnnotationBasePatch(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  patch: AnnotationPatchBase,
+  patch: AnnotationPatchBase<PdfCoordinates>,
 ): void {
   if (patch.contents !== undefined) {
     writeAnnotStringOrClear(fn, mem, annotPtr, 'Contents', patch.contents);

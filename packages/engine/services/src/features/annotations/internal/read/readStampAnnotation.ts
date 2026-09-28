@@ -1,4 +1,9 @@
-import type { AnnotationBase, StampAnnotationDTO, StampFit } from '@embedpdf/engine-core/runtime';
+import type {
+  AnnotationBase,
+  StampAnnotationDTO,
+  StampFit,
+  PdfCoordinates,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { readAnnotName, readAnnotOpacity } from './annotationReadPrimitives';
@@ -30,8 +35,8 @@ export function readStamp(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  base: AnnotationBase,
-): StampAnnotationDTO {
+  base: AnnotationBase<PdfCoordinates>,
+): StampAnnotationDTO<PdfCoordinates> {
   return {
     ...base,
     subtype: 'stamp',

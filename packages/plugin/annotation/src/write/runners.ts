@@ -32,8 +32,7 @@ export function registerEffectRunners(
   // A new record: written with a fresh /NM, matched back to its id by that name.
   store.onEffect('create', (effect, model) => {
     const record = model.byId[effect.id];
-    const crop = record && geometry.cropOf(record.page.pageObjectNumber);
-    const draft = record && crop ? toCreateDraft(record, crop) : null;
+    const draft = record ? toCreateDraft(record) : null;
     if (!record || !draft) return;
     const create = named(draft);
     identity.expect(create.nm, effect.id);
@@ -70,8 +69,7 @@ export function registerEffectRunners(
     ) {
       return;
     }
-    const crop = geometry.cropOf(primary.page.pageObjectNumber);
-    const drafts = records.map((record) => (record && crop ? toCreateDraft(record, crop) : null));
+    const drafts = records.map((record) => (record ? toCreateDraft(record) : null));
     if (drafts.some((draft) => !draft)) return;
     const creates = drafts.map((draft) => named(draft!));
     ids.forEach((id, index) => identity.expect(creates[index]!.nm, id));
@@ -108,8 +106,7 @@ export function registerEffectRunners(
   // The part of a record the gesture changed (its geometry, or the props it restyled).
   store.onEffect('patch', (effect, model) => {
     const record = model.byId[effect.id];
-    const crop = record && geometry.cropOf(record.page.pageObjectNumber);
-    const patch = record && crop ? toScopedPatch(record, effect.scope, crop) : null;
+    const patch = record ? toScopedPatch(record, effect.scope) : null;
     if (!record || !patch) return;
     return {
       ids: [effect.id],

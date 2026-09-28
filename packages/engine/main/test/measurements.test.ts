@@ -135,10 +135,10 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
       });
       expect(moved.appearance.action).toBe('preserved');
       // The rect moves with the points; the appearance isn't drawn again.
-      expect(moved.annotation.rect.left).toBeCloseTo(a.rect.left + 20, 4);
-      expect(moved.annotation.rect.bottom).toBeCloseTo(a.rect.bottom + 30, 4);
-      expect(moved.annotation.rect.right).toBeCloseTo(a.rect.right + 20, 4);
-      expect(moved.annotation.rect.top).toBeCloseTo(a.rect.top + 30, 4);
+      expect(moved.annotation.rect.x).toBeCloseTo(a.rect.x + 20, 4);
+      expect(moved.annotation.rect.y).toBeCloseTo(a.rect.y + 30, 4);
+      expect(moved.annotation.rect.width).toBeCloseTo(a.rect.width, 4);
+      expect(moved.annotation.rect.height).toBeCloseTo(a.rect.height, 4);
       const edit = await page.annotations.update(a.ref, {
         subtype: 'polygon',
         vertices: [

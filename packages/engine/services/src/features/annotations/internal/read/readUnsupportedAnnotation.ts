@@ -1,4 +1,8 @@
-import type { AnnotationBase, UnsupportedAnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type {
+  AnnotationBase,
+  UnsupportedAnnotationDTO,
+  PdfCoordinates,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { readAnnotString } from './annotationReadPrimitives';
@@ -12,9 +16,9 @@ export function readUnsupported(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  base: AnnotationBase,
+  base: AnnotationBase<PdfCoordinates>,
   rawSubtypeCode: number,
-): UnsupportedAnnotationDTO {
+): UnsupportedAnnotationDTO<PdfCoordinates> {
   const rawSubtypeName = readAnnotString(fn, mem, annotPtr, 'Subtype');
   return {
     ...base,

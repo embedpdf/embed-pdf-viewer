@@ -9,7 +9,6 @@ import type {
   LineEnding,
   LineEndings,
   PageRef,
-  PdfDestination,
   PdfLinkTarget,
   RichTextDocumentInput,
   StrikeoutIntent,
@@ -201,7 +200,7 @@ export interface AnnotationProps extends Style, TextStyle {
    * clickable). Writing it creates/retargets/deletes those children through
    * the one `syncLink` seam.
    */
-  link?: PdfLinkTarget<PdfDestination> | null;
+  link?: PdfLinkTarget | null;
 }
 
 export type PropKey = keyof AnnotationProps;
@@ -314,7 +313,7 @@ export interface ModelAnnotation {
    * lens and materialized by the shell's `syncLink` reconciler; parents
    * store nothing.
    */
-  link?: PdfLinkTarget<PdfDestination> | null;
+  link?: PdfLinkTarget | null;
   /**
    * Relationship to another annotation. `irt` ("in reply to") links a child to a
    * parent — a reply in a comment thread, or a caret bound to its strikeout in a
@@ -826,7 +825,7 @@ export type Effect =
    *  committed children are the truth (`linkOf` reads them back). Geometry
    *  commits don't emit this; the plugin re-runs the reconciler after any
    *  `patch` of an annotation with attached children. */
-  | { type: 'syncLink'; id: Id; target: PdfLinkTarget<PdfDestination> | null }
+  | { type: 'syncLink'; id: Id; target: PdfLinkTarget | null }
   /** Delete one record from the document. A record the engine has not
    *  confirmed yet is deleted once its create is. */
   | { type: 'delete'; id: Id };

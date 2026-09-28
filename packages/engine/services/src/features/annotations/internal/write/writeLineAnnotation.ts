@@ -1,4 +1,4 @@
-import type { LineDraft, LinePatch } from '@embedpdf/engine-core/runtime';
+import type { LineDraft, LinePatch, PdfCoordinates } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { setLine, setLineEndings } from './annotationWritePrimitives';
@@ -22,7 +22,7 @@ export function applyLineDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: LineDraft,
+  draft: LineDraft<PdfCoordinates>,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
   writeMeasurementFields(fn, mem, annotPtr, draft);
@@ -37,7 +37,7 @@ export function applyLinePatch(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  patch: LinePatch,
+  patch: LinePatch<PdfCoordinates>,
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);
   writeMeasurementFields(fn, mem, annotPtr, patch);

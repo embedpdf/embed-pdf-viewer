@@ -157,8 +157,11 @@ export const PdfPageActionsSchema = PAGE_SPACE.pageActions;
 export const DocumentActionsSnapshotSchema: z.ZodType<DocumentActionsSnapshot> =
   PAGE_SPACE.documentActions;
 
-/** An annotation's actions as annotation reads carry them: destinations in the file's coordinates. */
-export const PdfAnnotationActionsSchema = PDF_SPACE.annotationActions;
+/** An annotation's actions (`/A`, `/AA`), their destinations in page space. */
+export const PdfAnnotationActionsSchema = PAGE_SPACE.annotationActions;
+
+/** An annotation's actions as the engine reads the file: destinations in the file's coordinates. */
+export const FileAnnotationActionsSchema = PDF_SPACE.annotationActions;
 
 /**
  * Stable public component names for generators that project the action wire
@@ -168,7 +171,6 @@ export const PdfAnnotationActionsSchema = PDF_SPACE.annotationActions;
 export const PdfActionWireComponents = {
   PdfActionTargetRef: PdfActionTargetRefSchema,
   PageDestination: PageDestinationSchema,
-  PdfDestination: PdfDestinationSchema,
   PdfActionNode: PdfActionNodeSchema,
   PdfActionTree: PdfActionTreeSchema,
   PdfFieldActions: PdfFieldActionsSchema,

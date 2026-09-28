@@ -5,11 +5,14 @@
  * none of that math depends on where the origin is.
  */
 
-import type { PageCoordinates } from './coordinates';
+import { pageAnnotationPatchOf, pdfAnnotationOf } from './annotations';
+import type { PageCoordinates, PdfCoordinates } from './coordinates';
+import type { VisibleBoxOf } from './destinations';
 import { mirroredRun } from './text';
-import { appearanceTurnOf } from '../annotation/appearanceTurn';
-import { drawnPointsOf } from '../annotation/drawnPoints';
-import type { AnnotationDTO, PageAnnotationDTO } from '../annotation/kinds';
+import { pdfAppearanceTurnOf } from '../annotation/appearanceTurn';
+import { pdfDrawnPointsOf } from '../annotation/drawnPoints';
+import type { AnnotationDTO } from '../annotation/kinds';
+import { DRAWN_RECT_KINDS, pdfShapeForRect, shapeFieldsOf } from '../annotation/shapeForRect';
 import type { PdfViewport } from '../dto/Measure';
 import {
   glyphLooseBounds,
@@ -37,6 +40,7 @@ import {
   pdfTurnOfUpright,
   type PdfPointTurn,
 } from '../geometry/pointTurn';
+import type { PdfRect } from '../geometry/primitives';
 import { viewportForPoint } from '../measure/viewport';
 
 /** A turn in page space: degrees clockwise, as the page shows it, about `center`. */
@@ -126,7 +130,7 @@ export const pageGlyphLooseBounds = (
  * box. One list for a line (its two ends) or a polygon, one per ink stroke;
  * `null` for any other kind.
  */
-export function pageDrawnPointsOf(annotation: PageAnnotationDTO): PagePoint[][] | null {
+export function drawnPointsOf(annotation: AnnotationDTO): PagePoint[][] | null {
   const flip = (points: readonly PagePoint[]) => points.map(mirroredPoint);
   let mirrored: object;
   switch (annotation.subtype) {
@@ -158,26 +162,33 @@ export function pageDrawnPointsOf(annotation: PageAnnotationDTO): PagePoint[][] 
     default:
       return null;
   }
-  const sets = drawnPointsOf(mirrored as AnnotationDTO);
+  const sets = pdfDrawnPointsOf(mirrored as AnnotationDTO<PdfCoordinates>);
   return sets && sets.map((set) => set.map(unmirroredPoint));
 }
 
 /**
- * The turn an annotation's appearance raster is drawn without, or `null`
- * when the raster is drawn as the page shows it: see `appearanceTurnOf`.
+ * The turn an annotation's appearance raster is drawn without, degrees
+ * clockwise, or `null` when the raster is drawn as the page shows it. A box
+ * kind drawn turned whose drawing stays inside the turned box (its `rect` is
+ * the upright box around it) renders upright over its `box`, for the
+ * consumer to turn about the middle of `box`: a new turn needs no new
+ * raster. A callout (its line isn't turned) and a drawing that reaches past
+ * its box (a cloudy border's bumps) render as the page shows them, placed by
+ * `rect`.
  */
-export const pageAppearanceTurnOf = (annotation: {
+export function appearanceTurnOf(annotation: {
   subtype: string;
   rect: PageBox;
   box?: PageBox | null;
   rotation?: number | null;
   intent?: string | null;
-}): number | null =>
-  appearanceTurnOf({
+}): number | null {
+  return pdfAppearanceTurnOf({
     ...annotation,
     rect: mirroredRect(annotation.rect),
     box: annotation.box ? mirroredRect(annotation.box) : annotation.box,
   });
+}
 
 /** The last viewport whose box holds `point` (the one drawn on top), or `undefined`. */
 export function pageViewportForPoint<Viewport extends PdfViewport<PageCoordinates>>(
@@ -190,4 +201,49 @@ export function pageViewportForPoint<Viewport extends PdfViewport<PageCoordinate
   }));
   const found = viewportForPoint(mirrored, mirroredPoint(point));
   return found ? viewports[mirrored.indexOf(found)] : undefined;
+}
+
+/** Page space with its origin as the file's: turning one into the other is the mirror. */
+const MIRROR: PdfRect = { left: 0, bottom: 0, right: 0, top: 0 };
+
+/** Shape fields hold no destinations, so nothing asks for another page's box. */
+const noOtherPage: VisibleBoxOf = () => {
+  throw new Error('a shape field holds no destination');
+};
+
+/**
+ * The shape fields that put `annotation` at `rect`, the rule an update's
+ * `rect` follows (`create({ ...copy, ...shapeForRect(copy, target) })` puts a
+ * copy there).
+ *
+ * - A kind whose shape is its rect (note, file attachment, link, popup,
+ *   widget, redaction) takes `rect` as it is.
+ * - A drawn kind has every place it holds mapped from its current `rect` onto
+ *   `rect`, each axis on its own, as Acrobat does when a script sets
+ *   `annot.rect`: a rect of the same size moves the shape, a bigger one
+ *   stretches it. The engine then works out the rect from the shape, so it
+ *   can differ a little from `rect` (a stroke keeps its width).
+ *
+ * A drawn kind refuses a rect that would squash it to no width or height, and
+ * a rect of another size when it's turned (it can only move) or when its own
+ * rect has no width or height to stretch. Each refusal is `InvalidArg` on
+ * `rect`.
+ */
+export function shapeForRect<A extends AnnotationDTO>(annotation: A, rect: PageBox): Partial<A> {
+  if (!DRAWN_RECT_KINDS.has(annotation.subtype)) return { rect } as Partial<A>;
+  const read = annotation as unknown as Record<string, unknown>;
+  const shape = Object.fromEntries(
+    ['subtype', 'rect', ...shapeFieldsOf(annotation.subtype)]
+      .filter((name) => read[name] !== undefined)
+      .map((name) => [name, read[name]]),
+  );
+  const mirrored = pdfAnnotationOf(shape as AnnotationDTO, MIRROR, noOtherPage);
+  const placed = pdfShapeForRect(mirrored, mirroredRect(rect));
+  // The kind picks what each field holds; the answer is only the shape.
+  const { subtype: _kind, ...fields } = pageAnnotationPatchOf(
+    { subtype: annotation.subtype, ...placed } as never,
+    MIRROR,
+    noOtherPage,
+  );
+  return fields as unknown as Partial<A>;
 }

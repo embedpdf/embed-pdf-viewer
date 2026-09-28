@@ -11,8 +11,9 @@ import {
 } from '../annotation/resources';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
-import type { PdfRect } from '../geometry/primitives';
+import type { PdfSize } from '../geometry/primitives';
 import { encodePageKey, type PageRef } from '../identity/PageRef';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
 /** A resource's name in a bundle: `sha256-` and the SHA-256 of its bytes, lowercase hex. */
 export type ResourceId = `sha256-${string}`;
@@ -25,13 +26,13 @@ export type ResourceId = `sha256-${string}`;
  * can check it and a host can store it once. Any set of rows and the
  * resources they name is a bundle.
  */
-export interface AnnotationBundle {
+export interface AnnotationBundle<C extends Coordinates = PageCoordinates> {
   readonly format: 'embedpdf/annotations';
   readonly version: 1;
   /** Every page an item is on or points at, in document order. */
   readonly pages: readonly AnnotationBundlePage[];
   /** In page order, then in each page's annotation order. */
-  readonly items: readonly AnnotationBundleItem[];
+  readonly items: readonly AnnotationBundleItem<C>[];
   readonly resources: Readonly<Record<ResourceId, Uint8Array>>;
 }
 
@@ -39,17 +40,24 @@ export interface AnnotationBundlePage {
   readonly page: PageRef;
   /** Where the page is in its document, for mapping pages by position; never a reference. */
   readonly position: number;
-  /** The page's box, as the source document reports it. */
-  readonly box: PdfRect;
+  /**
+   * The page's size, as its layout reports it. Positions are measured from
+   * the page's top-left, so an import puts each annotation at the same spot
+   * from the top-left of the page it goes to.
+   */
+  readonly size: PdfSize;
 }
 
-export interface AnnotationBundleItem {
-  readonly data: AnnotationDTO;
+export interface AnnotationBundleItem<C extends Coordinates = PageCoordinates> {
+  readonly data: AnnotationDTO<C>;
   readonly resources: Readonly<Partial<Record<AnnotationResourceRole, ResourceId>>>;
 }
 
 /** A bundle as a worker returns it: each resource an `ArrayBuffer` on the transfer list. */
-export interface WireAnnotationBundle extends Omit<AnnotationBundle, 'resources'> {
+export interface WireAnnotationBundle<C extends Coordinates = PageCoordinates> extends Omit<
+  AnnotationBundle<C>,
+  'resources'
+> {
   readonly resources: Readonly<Record<ResourceId, ArrayBuffer>>;
 }
 
@@ -58,7 +66,7 @@ export const ANNOTATION_BUNDLE_VERSION = 1;
 
 const RESOURCE_ID_PATTERN = /^sha256-[0-9a-f]{64}$/;
 const BUNDLE_FIELDS = ['format', 'version', 'pages', 'items', 'resources'] as const;
-const PAGE_FIELDS = ['page', 'position', 'box'] as const;
+const PAGE_FIELDS = ['page', 'position', 'size'] as const;
 const ITEM_FIELDS = ['data', 'resources'] as const;
 
 /** The id of a resource: the SHA-256 of its bytes. */
@@ -126,8 +134,8 @@ export function assertBundleManifest(
   const pageKeys = new Set<string>();
   const positions = new Set<number>();
   for (const entry of pages) {
-    if (!isRecord(entry) || !isPageRef(entry.page) || !isRect(entry.box)) {
-      invalid('a page needs a page ref, a position and a box');
+    if (!isRecord(entry) || !isPageRef(entry.page) || !isSize(entry.size)) {
+      invalid('a page needs a page ref, a position and a size');
     }
     assertKnownFields('a page', entry, PAGE_FIELDS);
     const { position } = entry;
@@ -207,11 +215,11 @@ function isPageRef(value: unknown): value is PageRef {
   );
 }
 
-function isRect(value: unknown): value is PdfRect {
+function isSize(value: unknown): value is PdfSize {
   return (
     isRecord(value) &&
-    [value.left, value.bottom, value.right, value.top].every(
-      (edge) => typeof edge === 'number' && Number.isFinite(edge),
+    [value.width, value.height].every(
+      (length) => typeof length === 'number' && Number.isFinite(length) && length >= 0,
     )
   );
 }

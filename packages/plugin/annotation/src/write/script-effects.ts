@@ -1,18 +1,26 @@
 import { scriptColorToRgb } from '@embedpdf/core-acrojs';
 import type { ScriptAnnotEffect, ScriptColorArray } from '@embedpdf/core-acrojs';
-import { toPageRef, type AnnotationPatch } from '@embedpdf/engine-core/runtime';
+import {
+  pageBoxOf,
+  toPageRef,
+  type AnnotationPatch,
+  type PdfRect,
+} from '@embedpdf/engine-core/runtime';
 import type { AnnotCommitEntry, AnnotCommitResult } from '@embedpdf/plugin-actions/contract/host';
 
 import type { AnnotationContext, AnnotationServices } from '../services';
 
 /** Script patch → the engine's per-kind patch vocabulary. Colors cross the
- *  Acrobat-array → engine {r,g,b}/255 boundary here; a script's rect is the
- *  annotation's `rect` for every kind, which puts its shape there as in
+ *  Acrobat-array → engine {r,g,b}/255 boundary here; a script's rect, in the
+ *  file's numbers as Acrobat's JavaScript keeps it, is the annotation's
+ *  `rect` in page space for every kind, which puts its shape there as in
  *  Acrobat (`shapeForRect`); everything else maps one-to-one (the VM's
- *  validity matrix already scoped keys per kind). */
+ *  validity matrix already scoped keys per kind). `crop` is the page's
+ *  `pdfCropBox`. */
 const engineScriptPatch = (
   subtype: string,
   patch: ScriptAnnotEffect['patch'],
+  crop: PdfRect | null,
 ): AnnotationPatch | Error => {
   const out: Record<string, unknown> = { subtype };
   const toEngineColor = (color: ScriptColorArray) => {
@@ -36,14 +44,18 @@ const engineScriptPatch = (
   if (patch.borderStyle) out.borderStyle = patch.borderStyle === 'D' ? 'dashed' : 'solid';
   if (patch.dash) out.dashArray = patch.dash;
   if (patch.rect) {
+    if (!crop) return new Error('annotation page not loaded');
     // Acrobat's [x1, y1, x2, y2] names two corners, in either order.
     const [x1, y1, x2, y2] = patch.rect;
-    out.rect = {
-      left: Math.min(x1, x2),
-      bottom: Math.min(y1, y2),
-      right: Math.max(x1, x2),
-      top: Math.max(y1, y2),
-    };
+    out.rect = pageBoxOf(
+      {
+        left: Math.min(x1, x2),
+        bottom: Math.min(y1, y2),
+        right: Math.max(x1, x2),
+        top: Math.max(y1, y2),
+      },
+      crop,
+    );
   }
   if (patch.contents !== undefined) out.contents = patch.contents;
   // Each `/F` flag is its own engine field.
@@ -60,7 +72,7 @@ const engineScriptPatch = (
  */
 export function createScriptEffects(
   ctx: Pick<AnnotationContext, 'doc'>,
-  { store }: Pick<AnnotationServices, 'store'>,
+  { store, geometry }: Pick<AnnotationServices, 'store' | 'geometry'>,
 ) {
   const api = {
     commitScriptEffects: async (entries: AnnotCommitEntry[]): Promise<AnnotCommitResult> => {
@@ -101,7 +113,7 @@ export function createScriptEffects(
           });
           continue;
         }
-        const patch = engineScriptPatch(subtype, entry.patch);
+        const patch = engineScriptPatch(subtype, entry.patch, geometry.cropOf(pageObjectNumber));
         if (patch instanceof Error) {
           results.push({
             annotObjectNumber: entry.annotObjectNumber,

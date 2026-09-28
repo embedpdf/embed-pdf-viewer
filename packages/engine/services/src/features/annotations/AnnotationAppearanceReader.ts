@@ -11,7 +11,7 @@ import type {
   PdfRotation,
 } from '@embedpdf/engine-core/runtime';
 import {
-  appearanceTurnOf,
+  pdfAppearanceTurnOf,
   EngineError,
   EngineErrorCode,
   normalizePdfRect,
@@ -110,7 +110,7 @@ export class AnnotationAppearanceReader {
           if (!available) continue;
 
           const identity = readAnnotationIdentity(fn, mem, annotPtr, pageObjectNumber, i, revision);
-          // Rotation-stripped rendering (`appearanceTurnOf`, the rule the
+          // Rotation-stripped rendering (`pdfAppearanceTurnOf`, the rule the
           // viewer mirrors from the DTO): a box kind drawn turned
           // (`readAnnotationTurn`: ours, a stamp Acrobat turned, a text box
           // Acrobat turned a quarter) whose drawing stays inside the turned
@@ -124,7 +124,7 @@ export class AnnotationAppearanceReader {
           const turn = readAnnotationTurn(fn, mem, annotPtr);
           const stripped =
             turn &&
-            appearanceTurnOf({
+            pdfAppearanceTurnOf({
               subtype: subtypeFromCode(subtypeCode),
               rect: pageRect,
               box: turn.box,

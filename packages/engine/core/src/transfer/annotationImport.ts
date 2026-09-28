@@ -15,6 +15,7 @@ import type { AnnotationStableId } from '../identity/AnnotationStableId';
 import { encodePageKey, type PageRef } from '../identity/PageRef';
 import type { AnnotationListMutationMeta } from '../mutation/AnnotationListMutationMeta';
 import type { AnnotationCreateResult } from '../mutation/AnnotationMutationResults';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
 /**
  * Where an import puts each page of the bundle:
@@ -85,9 +86,9 @@ export interface AnnotationImportDrop {
   readonly reason: AnnotationDropReason;
 }
 
-export interface AnnotationImportResult {
+export interface AnnotationImportResult<C extends Coordinates = PageCoordinates> {
   /** In bundle order, each as it is now. */
-  annotations: AnnotationDTO[];
+  annotations: AnnotationDTO<C>[];
   /** Each imported annotation's ref in the bundle, and its ref in this document. */
   refMap: Array<{ from: AnnotationRef; to: AnnotationRef }>;
   /** What was left out, in bundle order. */

@@ -5,6 +5,7 @@ import {
   type LinkPatch,
   type PdfDestination,
   type PdfLinkTargetWritable,
+  type PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 import { NULL_PTR } from '@embedpdf/engine-runtime';
@@ -30,7 +31,7 @@ export function applyLinkDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: LinkDraft,
+  draft: LinkDraft<PdfCoordinates>,
   ctx?: AnnotationWriteContext,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
@@ -44,7 +45,7 @@ export function applyLinkPatch(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  patch: LinkPatch,
+  patch: LinkPatch<PdfCoordinates>,
   ctx?: AnnotationWriteContext,
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);

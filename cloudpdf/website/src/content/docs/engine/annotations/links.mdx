@@ -13,7 +13,7 @@ document, or open a website.
 ```ts
 await page.annotations.create({
   subtype: 'link',
-  rect: { left: 72, bottom: 700, right: 200, top: 715 },
+  rect: { x: 72, y: 77, width: 128, height: 15 },
   target: { kind: 'uri', uri: 'https://example.com' },
 });
 ```
@@ -36,26 +36,26 @@ await page.annotations.create({
 });
 ```
 
-| `kind`    | What the reader sees                                                 | Fields                           |
-| :-------- | :------------------------------------------------------------------- | :------------------------------- |
-| `'fit'`   | The whole page.                                                      |                                  |
-| `'xyz'`   | The point `left`, `top` at the top left of the window, at `zoom`.    | `left`, `top`, `zoom`            |
-| `'fitH'`  | The page's full width, with `top` at the top of the window.          | `top`                            |
-| `'fitV'`  | The page's full height, with `left` at the left of the window.       | `left`                           |
-| `'fitR'`  | The rectangle `left`, `bottom`, `right`, `top`, as large as it fits. | `left`, `bottom`, `right`, `top` |
-| `'fitB'`  | Like `'fit'`, for the box around the page's content.                 |                                  |
-| `'fitBH'` | Like `'fitH'`, for the box around the page's content.                | `top`                            |
-| `'fitBV'` | Like `'fitV'`, for the box around the page's content.                | `left`                           |
+| `kind`    | What the reader sees                                         | Fields                      |
+| :-------- | :----------------------------------------------------------- | :-------------------------- |
+| `'fit'`   | The whole page.                                              |                             |
+| `'xyz'`   | The point `x`, `y` at the top left of the window, at `zoom`. | `x`, `y`, `zoom`            |
+| `'fitH'`  | The page's full width, with `y` at the top of the window.    | `y`                         |
+| `'fitV'`  | The page's full height, with `x` at the left of the window.  | `x`                         |
+| `'fitR'`  | The box `x`, `y`, `width`, `height`, as large as it fits.    | `x`, `y`, `width`, `height` |
+| `'fitB'`  | Like `'fit'`, for the box around the page's content.         |                             |
+| `'fitBH'` | Like `'fitH'`, for the box around the page's content.        | `y`                         |
+| `'fitBV'` | Like `'fitV'`, for the box around the page's content.        | `x`                         |
 
-Positions are in PDF points on the target page, with y going up. `zoom` is a factor: `2` shows
-the page at 200%. A position or zoom left out (or `null`) keeps what the reader has, so this link
-scrolls to a spot without changing the zoom:
+Positions are in points on the target page, from its top-left corner, with y going down. `zoom`
+is a factor: `2` shows the page at 200%. A position or zoom left out (or `null`) keeps what the
+reader has, so this link scrolls to a spot without changing the zoom:
 
 ```ts
 await page.annotations.update(link.ref, {
   target: {
     kind: 'goto',
-    destination: { kind: 'xyz', page: pages[4].ref, left: null, top: 500, zoom: null },
+    destination: { kind: 'xyz', page: pages[4].ref, x: null, y: 292, zoom: null },
   },
 });
 ```
@@ -140,8 +140,10 @@ A PDF stores a link's target as a destination (`/Dest`) or as an action (`/A`). 
 
 ### Coordinates
 
-A destination's positions are the target page's own PDF coordinates, not relative to its crop
-box, the same coordinates as the page's annotations.
+A destination's positions are measured on the page it goes to, like that page's annotations:
+from its top-left corner, with y going down. `pageDestinationOf()` and `pdfDestinationOf()`
+convert to and from the PDF file's own numbers, with the crop box of the page it goes to; see
+[Pages](/docs/engine/documents/pages).
 
 ### Copying links
 

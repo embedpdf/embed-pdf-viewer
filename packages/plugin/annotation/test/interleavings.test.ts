@@ -15,11 +15,11 @@
  * record and nothing is pending.
  */
 import type { DocumentEvent } from '@embedpdf/core';
-import type { AnnotationDTO, AnnotationFlags, AnnotationRef } from '@embedpdf/engine-core/runtime';
+import type { AnnotationFlags, AnnotationRef } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { annotationHarness } from './harness';
+import { annotationHarness, type FileAnnotation } from './harness';
 
 const PAGE = toPageRef(1);
 const REF: AnnotationRef = { kind: 'objectNumber', page: PAGE, annotObjectNumber: 20 };
@@ -50,7 +50,7 @@ const rgb = (hex: string) => ({
 const hex = ({ r, g, b }: { r: number; g: number; b: number }) =>
   `#${[r, g, b].map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
 
-const squareOf = (state: EngineState): AnnotationDTO =>
+const squareOf = (state: EngineState): FileAnnotation =>
   ({
     ref: REF,
     page: PAGE,
@@ -80,7 +80,7 @@ const squareOf = (state: EngineState): AnnotationDTO =>
     modifiedBy: null,
     importedBy: null,
     actions: null,
-  }) as unknown as AnnotationDTO;
+  }) as unknown as FileAnnotation;
 
 /** A small seeded generator (mulberry32), so a failure replays exactly. */
 function random(seed: number) {

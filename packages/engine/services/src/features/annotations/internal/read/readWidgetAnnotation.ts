@@ -1,4 +1,9 @@
-import type { AnnotationBase, Color, WidgetAnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type {
+  AnnotationBase,
+  Color,
+  WidgetAnnotationDTO,
+  PdfCoordinates,
+} from '@embedpdf/engine-core/runtime';
 import { type PdfFunctions, type PdfRuntimeMemory, type Ptr } from '@embedpdf/engine-runtime';
 
 import { withScratchN } from '../../../../runtime/memory/scratch';
@@ -37,8 +42,8 @@ export function readWidget(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  base: AnnotationBase,
-): WidgetAnnotationDTO {
+  base: AnnotationBase<PdfCoordinates>,
+): WidgetAnnotationDTO<PdfCoordinates> {
   const border = readBorderFields(fn, mem, annotPtr);
   const da = readDefaultAppearance(fn, mem, annotPtr);
   return {

@@ -1,4 +1,5 @@
 import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
+import type { Coordinates, PageCoordinates } from '../../../pageSpace/coordinates';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
 import { LinkDeclaration } from './declaration';
@@ -6,9 +7,18 @@ import { LinkDeclaration } from './declaration';
 export { LinkDeclaration } from './declaration';
 export { PdfDestinationSchema, PdfLinkTargetSchema, PdfLinkTargetWritableSchema } from './values';
 
-export type LinkAnnotationDTO = ReadOf<typeof LinkDeclaration>;
-export type LinkDraft = CreateOf<typeof LinkDeclaration>;
-export type LinkPatch = UpdateOf<typeof LinkDeclaration>;
+export type LinkAnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+  typeof LinkDeclaration,
+  C
+>;
+export type LinkDraft<C extends Coordinates = PageCoordinates> = CreateOf<
+  typeof LinkDeclaration,
+  C
+>;
+export type LinkPatch<C extends Coordinates = PageCoordinates> = UpdateOf<
+  typeof LinkDeclaration,
+  C
+>;
 
 export const LinkDTOSchema = LinkDeclaration.readSchema;
 export const LinkDraftSchema = LinkDeclaration.createSchema;

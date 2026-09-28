@@ -211,7 +211,7 @@ function annotationDto(a, index) {
       toggleNoView: false,
       lockedContents: false,
     },
-    rect: { left: 0, top: 0, right: 10, bottom: 10 },
+    rect: { x: 0, y: 0, width: 10, height: 10 },
     contents: a.contents ?? null,
     author: null,
     createdAt: null,
@@ -912,7 +912,7 @@ parentPort.on('message', (msg) => {
                 {
                   ref: { kind: 'objectNumber', page: pageRef(pon), annotObjectNumber: 9001 },
                   mode: 'normal',
-                  rect: { left: 0, bottom: 0, right: 8, top: 8 },
+                  rect: { x: 0, y: 0, width: 8, height: 8 },
                   raster: { width: side, height: side, data: data.buffer },
                 },
               ],
@@ -975,7 +975,7 @@ parentPort.on('message', (msg) => {
                     {
                       ref: { kind: 'objectNumber', page: pageRef(pon), annotObjectNumber: 9001 },
                       mode: 'normal',
-                      rect: { left: 0, bottom: 0, right: 8, top: 8 },
+                      rect: { x: 0, y: 0, width: 8, height: 8 },
                       image,
                     },
                   ],

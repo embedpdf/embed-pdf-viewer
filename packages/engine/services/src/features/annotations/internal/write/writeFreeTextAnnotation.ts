@@ -6,6 +6,7 @@ import {
   type FreeTextDraft,
   type FreeTextPatch,
   type RichTextDocumentInput,
+  type PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -89,7 +90,7 @@ export function applyFreeTextDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: FreeTextDraft,
+  draft: FreeTextDraft<PdfCoordinates>,
   ctx?: AnnotationWriteContext,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
@@ -153,7 +154,7 @@ export function applyFreeTextPatch(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  patch: FreeTextPatch,
+  patch: FreeTextPatch<PdfCoordinates>,
   ctx?: AnnotationWriteContext,
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);

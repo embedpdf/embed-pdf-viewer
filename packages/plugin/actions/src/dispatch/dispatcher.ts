@@ -25,7 +25,6 @@ import type {
 import type { ActionsDocumentEvents } from '../lifecycle/document-events';
 import type { ActionsOpenSequence } from '../lifecycle/open-sequence';
 import type { ActionsServices } from '../services';
-import { annotationTreeInPageSpace } from './annotation-trees';
 import { foldSteps } from './fold';
 import type { ActionsRunner } from './run';
 import { sameRef, type ActionsTriggers } from './triggers';
@@ -125,12 +124,7 @@ export function createDispatcher(
             annotation: trigger.ref,
             page: trigger.page,
           };
-          return await runSteps(
-            [{ source, tree: annotationTreeInPageSpace(ctx.geometry, tree) }],
-            origin,
-            eventOf(trigger),
-            diagnostics,
-          );
+          return await runSteps([{ source, tree }], origin, eventOf(trigger), diagnostics);
         }
         case 'page': {
           const lifecycle = await lifecycleAnnotationsOf(trigger.page);
@@ -196,7 +190,7 @@ export function createDispatcher(
           sameRef(candidate.ref, source.annotation),
         );
         const tree = annotation?.actions?.[source.event ?? 'activate'];
-        return tree ? annotationTreeInPageSpace(ctx.geometry, tree) : null;
+        return tree ?? null;
       }
       case 'field': {
         const { fields } = await ctx.doc.forms.list();

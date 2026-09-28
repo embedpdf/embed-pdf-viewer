@@ -14,6 +14,7 @@ import {
   type PageRef,
   type RevisionToken,
   type WireAnnotationResources,
+  type PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
@@ -53,7 +54,7 @@ export interface BatchCreate {
   /** The page it goes on. */
   readonly page: PageRef;
   /** Its data, without its links, which are the two fields below. */
-  readonly draft: AnnotationDraft;
+  readonly draft: AnnotationDraft<PdfCoordinates>;
   /** `reply`: the annotation it replies to, on the same page. */
   readonly replyTo?: { readonly to: BatchLinkTarget; readonly type: AnnotationReplyType };
   /** For a popup: the annotation it shows, on the same page. */
@@ -80,7 +81,7 @@ export interface BatchCreate {
 
 export interface BatchCreateResult {
   /** In the order of the creates, each as it is now. */
-  created: AnnotationDTO[];
+  created: AnnotationDTO<PdfCoordinates>[];
   meta: AnnotationListMutationMeta;
 }
 

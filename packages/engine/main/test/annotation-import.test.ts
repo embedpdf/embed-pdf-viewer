@@ -75,15 +75,15 @@ async function everyKind(): Promise<AnnotationBundle> {
     const pageRef = toPageRef(pages[0]!.ref.pageObjectNumber);
     const page = doc.page(pageRef);
     for (const { data, resources } of creatables()) await page.annotations.create(data, resources);
-    const rect = { left: 300, bottom: 300, right: 320, top: 320 };
+    const rect = { x: 300, y: 300, width: 20, height: 20 };
     const { annotation: note } = await page.annotations.create({
       subtype: 'text',
-      rect: iconRect(rect.left, rect.top),
+      rect: iconRect(rect.x, rect.y),
     });
     await page.annotations.create({ subtype: 'popup', rect, parent: note.ref });
     await page.annotations.create({
       subtype: 'text',
-      rect: iconRect(rect.left, rect.top),
+      rect: iconRect(rect.x, rect.y),
       reply: { to: note.ref },
     });
     await page.annotations.create({
@@ -314,10 +314,10 @@ describe.each(['wasm', 'native'] as const)('one create (%s runtime)', (prefer) =
     );
     const { snapshot } = await worker.result({ kind: 'pages.list' }, 'pages.list');
     const page = toPageRef(snapshot.pages[0]!.ref.pageObjectNumber);
-    const rect = { left: 300, bottom: 300, right: 320, top: 320 };
+    const rect = { x: 300, y: 300, width: 20, height: 20 };
     const create = (draft: Record<string, unknown>) =>
       worker.send({ kind: 'annotations.create', page, draft });
-    const created = await create({ subtype: 'text', rect: iconRect(rect.left, rect.top) });
+    const created = await create({ subtype: 'text', rect: iconRect(rect.x, rect.y) });
     if (created.kind !== 'resolve' || created.result.tag !== 'annotations.create') {
       throw new Error(`the note: ${JSON.stringify(created)}`);
     }
@@ -334,7 +334,7 @@ describe.each(['wasm', 'native'] as const)('one create (%s runtime)', (prefer) =
         .filter(({ resources }) => !resources)
         .map(({ data }) => data as unknown as Record<string, unknown>),
       { subtype: 'popup', rect, parent: note },
-      { subtype: 'text', rect: iconRect(rect.left, rect.top), reply: { to: note } },
+      { subtype: 'text', rect: iconRect(rect.x, rect.y), reply: { to: note } },
       {
         subtype: 'link',
         rect,

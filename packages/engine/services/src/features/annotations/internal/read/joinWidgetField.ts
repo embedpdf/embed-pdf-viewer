@@ -1,4 +1,4 @@
-import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type { AnnotationDTO, PdfCoordinates } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../../../document-session/DocumentSession';
@@ -30,7 +30,7 @@ export function resolveWidgetFieldObjectNumber(
 export function joinWidgetFieldNumbers(
   runtime: PdfRuntimeModule,
   session: DocumentSession,
-  annotations: AnnotationDTO[],
+  annotations: AnnotationDTO<PdfCoordinates>[],
 ): void {
   for (const annotation of annotations) {
     if (annotation.subtype !== 'widget') continue;

@@ -27,7 +27,6 @@ const geom: ContentGeometry = {
 const measure: DistanceAppearance = {
   intent: 'line-dimension',
   measure: measureFromKnownLength(100, { value: 2, unit: 'm' }),
-  crop: { left: -20, bottom: -40, top: 760, right: 580 },
   caption: { enabled: true, position: 'inline' },
   leader: { length: 12, extension: 5 },
   text: 'stored',
@@ -55,11 +54,6 @@ const pointer = (phase: 'down' | 'move' | 'up', point: { x: number; y: number })
   in: { page: toPageRef(1), point, shift: false },
 });
 describe('distance gestures and captions', () => {
-  it('rounds in original PDF coordinates at large nonzero origins', () => {
-    const crop = { left: 100000000, right: 100001000, top: 100000000, bottom: 99999000 };
-    const geometry: ContentGeometry = { kind: 'line', a: { x: 1, y: 1 }, b: { x: 12, y: 1 } };
-    expect(distanceLabel(geometry, { ...measure, crop })).toBe('0.32 m');
-  });
   it('derives live labels and preserves foreign stored contents', () => {
     expect(distanceLabel(geom, measure)).toBe('4.00 m');
     expect(distanceLabel(geom, { ...measure, measure: { subtype: 'geospatial' } })).toBe('stored');

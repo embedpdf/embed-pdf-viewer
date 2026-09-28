@@ -161,22 +161,6 @@ export function mapActionTree<From, To>(
   return { ...tree, root: tree.root ? mapActionNode(tree.root, convert) : null };
 }
 
-/** An action tree in page space: each `goto` measured on the page it goes to. */
-export function pageActionTreeOf(
-  tree: PdfActionTree<PdfDestination>,
-  box: DestinationBox,
-): PdfActionTree {
-  return mapActionTree(tree, (destination) => pageDestinationOf(destination, box));
-}
-
-/** A link target in page space: a `goto` measured on the page it goes to. */
-export function pageLinkTargetOf(
-  target: PdfLinkTarget<PdfDestination>,
-  box: DestinationBox,
-): PdfLinkTarget {
-  return mapLinkTarget(target, (destination) => pageDestinationOf(destination, box));
-}
-
 /** Every action tree in a record of triggers (an annotation's, a page's or a field's). */
 function mapTriggers<From, To>(
   triggers: object,

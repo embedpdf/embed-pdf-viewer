@@ -6,13 +6,10 @@ import { toPageRef, type PageLayout } from '../src/runtime';
 /** The join is presentation-only: identity stays the page address; pageIndex/pageLabel
  *  come from the current layout and must track moves/deletes. */
 
-const CROP = { left: 0, bottom: 0, right: 600, top: 800 };
-
-/** Root rect in PDF space (y-up, crop-relative): a 20pt box near the top. */
 const thread = (pageObjectNumber: number): CommentThread =>
   ({
     page: toPageRef(pageObjectNumber),
-    root: { rect: { left: 100, bottom: 700, right: 120, top: 720 } },
+    root: { rect: { x: 100, y: 80, width: 20, height: 20 } },
   }) as unknown as CommentThread;
 
 const page = (pageObjectNumber: number, index: number, label: string | null = null): PageLayout =>
@@ -20,7 +17,6 @@ const page = (pageObjectNumber: number, index: number, label: string | null = nu
     ref: toPageRef(pageObjectNumber),
     index,
     label,
-    pdfCropBox: CROP,
   }) as unknown as PageLayout;
 
 describe('enrichCommentThreads', () => {
@@ -45,12 +41,5 @@ describe('enrichCommentThreads', () => {
     const out = enrichCommentThreads([thread(99)], [page(10, 0)]);
     expect(out[0]!.pageIndex).toBe(-1);
     expect(out[0]!.pageLabel).toBe('?');
-    expect(out[0]!.contentRect).toBe(null);
-  });
-
-  it('contentRect converts the root rect into reveal space (y-down, crop-relative)', () => {
-    const out = enrichCommentThreads([thread(10)], [page(10, 0)]);
-    // PDF y-up top=720 within an 800pt-tall crop → content y = 800 - 720 = 80.
-    expect(out[0]!.contentRect).toEqual({ x: 100, y: 80, width: 20, height: 20 });
   });
 });

@@ -10,7 +10,7 @@ import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '../src/index';
 
 const TEXT = 'Keep this text';
-const RECT = { left: 80, bottom: 180, right: 380, top: 280 };
+const RECT = { x: 80, y: 180, width: 300, height: 100 };
 
 /** A legacy FreeText has /Contents and /DA, with no rich-text /RC. */
 function fixture(legacy: boolean, callout: boolean): Uint8Array {
@@ -109,7 +109,7 @@ describe('FreeText and Callout partial updates preserve text (wasm)', () => {
                 textAlign: cycle ? 'left' : 'center',
               },
               { subtype: 'free-text', interiorColor: { r: 240, g: 245, b: 250 }, opacity: 0.9 },
-              { subtype: 'free-text', box: { ...RECT, right: 410 + cycle * 10 } },
+              { subtype: 'free-text', box: { ...RECT, width: 330 + cycle * 10 } },
               { subtype: 'free-text', subject: `metadata-only-${cycle}` },
               ...(callout
                 ? [

@@ -1,13 +1,23 @@
 import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
+import type { Coordinates, PageCoordinates } from '../../../pageSpace/coordinates';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
 import { SquareDeclaration } from './declaration';
 
 export { SquareDeclaration } from './declaration';
 
-export type SquareAnnotationDTO = ReadOf<typeof SquareDeclaration>;
-export type SquareDraft = CreateOf<typeof SquareDeclaration>;
-export type SquarePatch = UpdateOf<typeof SquareDeclaration>;
+export type SquareAnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+  typeof SquareDeclaration,
+  C
+>;
+export type SquareDraft<C extends Coordinates = PageCoordinates> = CreateOf<
+  typeof SquareDeclaration,
+  C
+>;
+export type SquarePatch<C extends Coordinates = PageCoordinates> = UpdateOf<
+  typeof SquareDeclaration,
+  C
+>;
 
 export const SquareDTOSchema = SquareDeclaration.readSchema;
 export const SquareDraftSchema = SquareDeclaration.createSchema;

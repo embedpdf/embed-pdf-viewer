@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import type { AnnotationKindModule } from '../registry';
+import type { PdfCoordinates } from '../../pageSpace/coordinates';
 import { CaretKind } from './caret';
 import { CircleKind } from './circle';
 import { FileAttachmentKind } from './file-attachment';
@@ -21,6 +21,8 @@ import { TextKind } from './text';
 import { UnderlineKind } from './underline';
 import { UnsupportedKind } from './unsupported';
 import { WidgetKind } from './widget';
+import { ANNOTATION_DECLARATIONS, declarationOf } from './declarations';
+import type { AnnotationDTO, AnnotationDraft, AnnotationPatch } from './declarations';
 
 export * from './highlight';
 export * from './underline';
@@ -47,14 +49,15 @@ export * from './shape.shared';
 export * from './style.shared';
 export * from './vertex.shared';
 export * from './widget.shared';
-export { ANNOTATION_DECLARATIONS, declarationOf } from './declarations';
+export { ANNOTATION_DECLARATIONS, declarationOf };
 export type {
   AnnotationDeclaration,
-  AnnotationRead,
-  PageAnnotationDTO,
-  PageAnnotationDraft,
-  PageAnnotationPatch,
+  AnnotationDTO,
+  AnnotationDraft,
+  AnnotationPatch,
+  WritableAnnotationDeclaration,
 } from './declarations';
+
 export type { CreateOf, ReadOf, UpdateOf } from '../declaration';
 
 /**
@@ -110,24 +113,6 @@ export const KIND_BY_SUBTYPE: Readonly<{
     AnnotationKind
   >,
 ) as Readonly<{ [K in AnnotationKind as K['subtype']]: K }>;
-
-type DTOFromKind<K> =
-  K extends AnnotationKindModule<infer _S, infer D, infer _Dr, infer _Pa> ? D : never;
-type DraftFromKind<K> =
-  K extends AnnotationKindModule<infer _S, infer _D, infer Dr, infer _Pa> ? Dr : never;
-type PatchFromKind<K> =
-  K extends AnnotationKindModule<infer _S, infer _D, infer _Dr, infer Pa> ? Pa : never;
-
-/** Discriminated union over `subtype`, derived from the registry. */
-export type AnnotationDTO = DTOFromKind<AnnotationKind>;
-
-/**
- * What `create()` and `update()` take, and what the worker protocol and the
- * HTTP surface carry: pure JSON. Bytes travel beside them, as resources
- * (`annotation/resources.ts`).
- */
-export type AnnotationDraft = DraftFromKind<AnnotationKind>;
-export type AnnotationPatch = PatchFromKind<AnnotationKind>;
 
 /**
  * Runtime zod schema for the discriminated union. The cast unwinds the
@@ -203,4 +188,28 @@ export function annotationPatchSchemaOf(
   subtype: AnnotationSubtypeOfKind,
 ): z.ZodType<AnnotationPatch> {
   return KIND_BY_SUBTYPE[subtype].patchSchema as unknown as z.ZodType<AnnotationPatch>;
+}
+
+/**
+ * A create's data in the file's coordinates, checked against its kind: the
+ * engine's own check, after the worker converted the data from page space.
+ */
+export const FileAnnotationDraftSchema: z.ZodType<AnnotationDraft<PdfCoordinates>> =
+  z.discriminatedUnion(
+    'subtype',
+    ANNOTATION_DECLARATIONS.filter((declaration) => declaration.subtype !== 'unsupported').map(
+      (declaration) => declaration.fileSchemas.create,
+    ) as unknown as [
+      z.ZodDiscriminatedUnionOption<'subtype'>,
+      ...z.ZodDiscriminatedUnionOption<'subtype'>[],
+    ],
+  ) as unknown as z.ZodType<AnnotationDraft<PdfCoordinates>>;
+
+/** An update's data in the file's coordinates, checked against the kind it changes. */
+export function fileAnnotationPatchSchemaOf(
+  subtype: AnnotationSubtypeOfKind,
+): z.ZodType<AnnotationPatch<PdfCoordinates>> {
+  return declarationOf(subtype)!.fileSchemas.update as unknown as z.ZodType<
+    AnnotationPatch<PdfCoordinates>
+  >;
 }

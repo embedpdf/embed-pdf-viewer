@@ -15,7 +15,6 @@ import type { EventHook, ResourceStatus } from '@embedpdf/core';
 import {
   scene,
   MITER_LIMIT,
-  pdfToContentRect,
   type AnnotationProps,
   type Paint,
   type Rect,
@@ -1108,14 +1107,6 @@ export interface CommentThreadView extends CommentThread {
   /** The page's `/PageLabels` label when the PDF declares one ("iv", "A-2"),
    *  else the 1-based position as a string — print it verbatim. */
   pageLabel: string;
-  /**
-   * The root annotation's rect in content space (y-down, crop-relative,
-   * unscaled points) — the space `StageCapability.reveal` takes, so a
-   * "jump to this comment" is `stage.reveal(pageIndex, { rect: contentRect })`.
-   * Null when the page is gone. Identity still travels as `page`;
-   * this, like `pageIndex`, is presentation.
-   */
-  contentRect: Rect | null;
 }
 
 /** Pure join behind {@link useCommentThreads} — exported for tests. */
@@ -1132,7 +1123,6 @@ export function enrichCommentThreads(
       ...thread,
       pageIndex: page ? page.index : -1,
       pageLabel: page ? (page.label ?? String(page.index + 1)) : '?',
-      contentRect: page ? pdfToContentRect(thread.root.rect, page.pdfCropBox) : null,
     };
   });
 }

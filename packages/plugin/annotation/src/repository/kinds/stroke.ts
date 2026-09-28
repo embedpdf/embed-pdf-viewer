@@ -4,46 +4,44 @@
  * works out `/Rect` from what it draws. The model keeps the points as drawn
  * (with `rot`, the turn they were drawn with), so the seam turns them: a read's
  * upright points are turned onto the page, and an emit turns the model's back
- * (`pdfTurnOfDrawn` finds the middle from the drawing alone). A polygon's
+ * (`pageTurnOfDrawn` finds the middle from the drawing alone). A polygon's
  * caption center turns with its points.
  */
 import {
   distanceLabel,
   shapeMeasurementLabel,
   geomRotation,
-  pdfToContentPoint,
   type ModelAnnotation,
 } from '@embedpdf/core-annotation';
 import {
-  pdfPointTurned,
-  pdfPointUnturned,
-  pdfTurnOfDrawn,
-  pdfTurnOfUpright,
+  pagePointTurned,
+  pagePointUnturned,
+  pageTurnOfDrawn,
+  pageTurnOfUpright,
   type AnnotationDTO,
-  type PdfPoint,
-  type PdfPointTurn,
-  type PdfRect,
+  type PagePoint,
+  type PagePointTurn,
 } from '@embedpdf/engine-core/runtime';
 
 import type { KindProjection, Wire } from '../projection';
 import { borderSlice } from '../props';
-import { contentToPdfPoint, rotFromDTO } from '../seam';
+import { rotFromDTO } from '../seam';
 
 /** The turn a read's upright points are drawn with, or `undefined` upright. */
 const turnOfRead = (
-  upright: readonly PdfPoint[],
+  upright: readonly PagePoint[],
   rotation: number | null,
-): PdfPointTurn | undefined => (rotation ? pdfTurnOfUpright(upright, rotation) : undefined);
+): PagePointTurn | undefined => (rotation ? pageTurnOfUpright(upright, rotation) : undefined);
 
-/** The turn the model's points (as drawn, PDF space) were drawn with, or `undefined` upright. */
-const turnOfModel = (drawn: readonly PdfPoint[], rot: number): PdfPointTurn | undefined =>
-  rot ? pdfTurnOfDrawn(drawn, rot) : undefined;
+/** The turn the model's points (as drawn) were drawn with, or `undefined` upright. */
+const turnOfModel = (drawn: readonly PagePoint[], rot: number): PagePointTurn | undefined =>
+  rot ? pageTurnOfDrawn(drawn, rot) : undefined;
 
-const turned = (point: PdfPoint, turn: PdfPointTurn | undefined): PdfPoint =>
-  turn ? pdfPointTurned(point, turn) : point;
+const turned = (point: PagePoint, turn: PagePointTurn | undefined): PagePoint =>
+  turn ? pagePointTurned(point, turn) : point;
 
-const unturned = (point: PdfPoint, turn: PdfPointTurn | undefined): PdfPoint =>
-  turn ? pdfPointUnturned(point, turn) : point;
+const unturned = (point: PagePoint, turn: PagePointTurn | undefined): PagePoint =>
+  turn ? pagePointUnturned(point, turn) : point;
 
 /** The turn, total: 0 states `null` (tri-state clear) — omission would keep a stale turn. */
 const rotationOf = (geometry: ModelAnnotation['geometry']): { rotation: number | null } => {
@@ -76,7 +74,7 @@ const strokeProps: KindProjection['prop'] = {
 };
 
 export const line: KindProjection = {
-  ingest: (dto, crop) => {
+  ingest: (dto) => {
     const lineDto = dto as Extract<AnnotationDTO, { subtype: 'line' }>;
     return {
       ...(lineDto.intent === 'line-dimension'
@@ -90,18 +88,17 @@ export const line: KindProjection = {
                 ...(lineDto.captionOffset ? { offset: lineDto.captionOffset } : {}),
               },
               leader: lineDto.leader ?? undefined,
-              crop,
               text: lineDto.contents ?? '',
             },
           }
         : {}),
-      geometry: lineGeometryFromDTO(lineDto, crop),
+      geometry: lineGeometryFromDTO(lineDto),
     };
   },
-  geometry: (annotation, crop) => {
+  geometry: (annotation) => {
     const geometry = annotation.geometry;
     if (geometry.kind !== 'line') return null;
-    const drawn = [contentToPdfPoint(geometry.a, crop), contentToPdfPoint(geometry.b, crop)];
+    const drawn = [geometry.a, geometry.b];
     const turn = turnOfModel(drawn, geomRotation(geometry));
     return {
       ...(annotation.measure?.intent === 'line-dimension'
@@ -128,7 +125,7 @@ export const line: KindProjection = {
 };
 
 const polyProjection = (closed: boolean): KindProjection => ({
-  ingest: (dto, crop) => {
+  ingest: (dto) => {
     const polyDto = dto as Extract<AnnotationDTO, { subtype: 'polygon' | 'polyline' }>;
     const turn = turnOfRead(polyDto.vertices, polyDto.rotation);
     return {
@@ -141,24 +138,23 @@ const polyProjection = (closed: boolean): KindProjection => ({
                 enabled: polyDto.captionEnabled ?? false,
                 ...(polyDto.captionCenter ? { center: turned(polyDto.captionCenter, turn) } : {}),
               },
-              crop,
               text: polyDto.contents ?? '',
             },
           }
         : {}),
       geometry: {
         kind: 'poly',
-        points: polyDto.vertices.map((pdfPoint) => pdfToContentPoint(turned(pdfPoint, turn), crop)),
+        points: polyDto.vertices.map((point) => turned(point, turn)),
         closed,
         ...('lineEndings' in polyDto ? { ends: polyDto.lineEndings } : {}),
         ...rotFromDTO(polyDto.rotation),
       },
     };
   },
-  geometry: (annotation, crop) => {
+  geometry: (annotation) => {
     const geometry = annotation.geometry;
     if (geometry.kind !== 'poly') return null;
-    const drawn = geometry.points.map((point) => contentToPdfPoint(point, crop));
+    const drawn = geometry.points;
     const turn = turnOfModel(drawn, geomRotation(geometry));
     return {
       ...(annotation.measure && annotation.measure.intent !== 'line-dimension'
@@ -172,7 +168,7 @@ const polyProjection = (closed: boolean): KindProjection => ({
     };
   },
   prop: strokeProps,
-  draftExtras: (annotation, crop) =>
+  draftExtras: (annotation) =>
     annotation.measure && annotation.measure.intent !== 'line-dimension'
       ? {
           intent: annotation.measure.intent,
@@ -180,7 +176,7 @@ const polyProjection = (closed: boolean): KindProjection => ({
             annotation.measure.measure?.subtype === 'rectilinear'
               ? annotation.measure.measure
               : null,
-          ...captionFieldsFor(annotation, crop),
+          ...captionFieldsFor(annotation),
           subject: closed ? 'Area' : 'Perimeter',
         }
       : {},
@@ -190,26 +186,22 @@ export const polygon: KindProjection = polyProjection(true);
 export const polyline: KindProjection = polyProjection(false);
 
 export const ink: KindProjection = {
-  ingest: (dto, crop) => {
+  ingest: (dto) => {
     const inkDto = dto as Extract<AnnotationDTO, { subtype: 'ink' }>;
     const turn = turnOfRead(inkDto.inkList.flat(), inkDto.rotation);
     return {
       geometry: {
         kind: 'ink',
-        strokes: inkDto.inkList.map((stroke) =>
-          stroke.map((pdfPoint) => pdfToContentPoint(turned(pdfPoint, turn), crop)),
-        ),
+        strokes: inkDto.inkList.map((stroke) => stroke.map((point) => turned(point, turn))),
         ...rotFromDTO(inkDto.rotation),
       },
       ...(inkDto.intent ? { intent: inkDto.intent } : {}),
     };
   },
-  geometry: (annotation, crop) => {
+  geometry: (annotation) => {
     const geometry = annotation.geometry;
     if (geometry.kind !== 'ink') return null;
-    const drawn = geometry.strokes.map((stroke) =>
-      stroke.map((point) => contentToPdfPoint(point, crop)),
-    );
+    const drawn = geometry.strokes;
     const turn = turnOfModel(drawn.flat(), geomRotation(geometry));
     return {
       inkList: drawn.map((stroke) => stroke.map((point) => unturned(point, turn))),
@@ -225,49 +217,42 @@ export const ink: KindProjection = {
 /** A line's model geometry from its read: the upright points turned onto the page. */
 function lineGeometryFromDTO(
   lineDto: Extract<AnnotationDTO, { subtype: 'line' }>,
-  crop: PdfRect,
 ): ModelAnnotation['geometry'] {
   const { start, end } = lineDto.linePoints;
   const turn = turnOfRead([start, end], lineDto.rotation);
   return {
     kind: 'line',
-    a: pdfToContentPoint(turned(start, turn), crop),
-    b: pdfToContentPoint(turned(end, turn), crop),
+    a: turned(start, turn),
+    b: turned(end, turn),
     ends: lineDto.lineEndings,
     ...rotFromDTO(lineDto.rotation),
   };
 }
 
 /** The turn a poly's model points were drawn with, or `undefined` upright. */
-function modelTurnOf(annotation: ModelAnnotation, crop: PdfRect): PdfPointTurn | undefined {
+function modelTurnOf(annotation: ModelAnnotation): PagePointTurn | undefined {
   const geometry = annotation.geometry;
   if (geometry.kind !== 'poly') return undefined;
-  const drawn = geometry.points.map((point) => contentToPdfPoint(point, crop));
-  return turnOfModel(drawn, geomRotation(geometry));
+  return turnOfModel(geometry.points, geomRotation(geometry));
 }
 
 /** A measurement's caption fields (none without a measurement), its center turned back upright. */
-export function captionFieldsFor(
-  annotation: ModelAnnotation,
-  crop: PdfRect,
-): Record<string, unknown> {
-  return annotation.measure
-    ? captionFieldsOf(annotation.measure, modelTurnOf(annotation, crop))
-    : {};
+export function captionFieldsFor(annotation: ModelAnnotation): Record<string, unknown> {
+  return annotation.measure ? captionFieldsOf(annotation.measure, modelTurnOf(annotation)) : {};
 }
 
 /**
  * The model keeps a measurement's caption as one value; the engine takes its
  * parts as separate fields. A line's caption has a position and an offset, a
- * shape's a center, which the model keeps as drawn (PDF space) and the engine
- * takes upright with the points: `turn` turns it back.
+ * shape's a center, which the model keeps as drawn and the engine takes
+ * upright with the points: `turn` turns it back.
  */
 function captionFieldsOf(
   measure: {
     intent: string;
     caption: { enabled: boolean; position?: 'inline' | 'top'; offset?: unknown; center?: unknown };
   },
-  turn?: PdfPointTurn,
+  turn?: PagePointTurn,
 ): Record<string, unknown> {
   const { caption } = measure;
   if (measure.intent === 'line-dimension') {
@@ -277,7 +262,7 @@ function captionFieldsOf(
       captionOffset: caption.offset ?? null,
     };
   }
-  const center = caption.center as PdfPoint | undefined;
+  const center = caption.center as PagePoint | undefined;
   return {
     captionEnabled: caption.enabled,
     captionCenter: center ? unturned(center, turn) : null,

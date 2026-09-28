@@ -1,4 +1,8 @@
-import type { AnnotationList, PageObjectNumber } from '@embedpdf/engine-core/runtime';
+import type {
+  AnnotationList,
+  PageObjectNumber,
+  PdfCoordinates,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
@@ -24,7 +28,7 @@ export class AnnotationReader {
     private readonly fonts?: FontRegistrar,
   ) {}
 
-  list(pageObjectNumber: PageObjectNumber, signal: AbortSignal): AnnotationList {
+  list(pageObjectNumber: PageObjectNumber, signal: AbortSignal): AnnotationList<PdfCoordinates> {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const pool = this.session.pagePool();

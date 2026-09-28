@@ -4,6 +4,7 @@ import type {
   PdfAnnotationActions,
   PdfDestination,
   RevisionToken,
+  PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
@@ -32,7 +33,7 @@ export function readAnnotationBase(
   index: number,
   revision: RevisionToken,
   actionBudget = new ActionReadBudgetTracker(),
-): AnnotationBase {
+): AnnotationBase<PdfCoordinates> {
   const identity = readAnnotationIdentity(fn, mem, annotPtr, pageObjectNumber, index, revision);
   const rect = readAnnotRect(fn, mem, annotPtr);
   const flags = readAnnotFlags(fn, annotPtr);

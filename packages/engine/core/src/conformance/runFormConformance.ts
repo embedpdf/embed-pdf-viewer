@@ -418,7 +418,7 @@ export function runFormConformance(
         const page = doc.page(toPageRef(pageObjectNumber));
         const created = await page.annotations.create({
           subtype: 'widget',
-          rect: { left: 20, bottom: 20, right: 200, top: 44 },
+          rect: { x: 20, y: 20, width: 180, height: 24 },
           interiorColor: { r: 246, g: 248, b: 250 },
           color: { r: 31, g: 111, b: 235 },
           strokeWidth: 1,

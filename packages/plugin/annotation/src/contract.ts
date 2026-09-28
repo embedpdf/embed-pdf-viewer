@@ -42,7 +42,6 @@ import type {
   CommentThread,
   PageRef,
   PdfActionTree,
-  PdfDestination,
   PdfLinkTarget,
   RichTextParagraph,
 } from '@embedpdf/engine-core/runtime';
@@ -208,7 +207,7 @@ export interface LinkNavItem {
   id: string;
   /** The clickable area in page space. */
   bounds: Rect;
-  target: PdfLinkTarget<PdfDestination>;
+  target: PdfLinkTarget;
   /**
    * True for a link child riding an editable annotation (an `/RT /Group`
    * subordinate) — a property of its parent while authoring, a nav behavior
@@ -219,7 +218,7 @@ export interface LinkNavItem {
   attached: boolean;
   /** The full payload-carrying `/A` tree, when one exists — the action
    *  engine's dispatch input. `target` remains its root projection. */
-  activate?: PdfActionTree<PdfDestination>;
+  activate?: PdfActionTree;
   /** The annotation ref, carried for ActionSource context. */
   ref?: AnnotationRef;
   /** Which `/AA` hover trees this link carries — the nav layer's pump flags
@@ -608,12 +607,8 @@ export interface AnnotationCapability {
 
   // ── links (a Link child attached to an annotation) ──
   links: {
-    get(ref: AnnotationRef): PdfLinkTarget<PdfDestination> | null;
-    set(
-      ref: AnnotationRef,
-      target: PdfLinkTarget<PdfDestination>,
-      options?: OperationOptions,
-    ): Promise<void>;
+    get(ref: AnnotationRef): PdfLinkTarget | null;
+    set(ref: AnnotationRef, target: PdfLinkTarget, options?: OperationOptions): Promise<void>;
     clear(ref: AnnotationRef, options?: OperationOptions): Promise<void>;
   };
   /** The embedded file of a FileAttachment. */

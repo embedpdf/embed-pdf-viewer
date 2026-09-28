@@ -165,15 +165,17 @@ export function runActionsConformance(
           return annotation?.subtype === 'link' ? annotation.target : null;
         };
 
+        // The file's /FitR 10 20 300 400, from the page's top-left.
+        const visible = page.pdfCropBox;
         expect(rootOf('goto-fitr')).toMatchObject({
           type: 'goto',
           destination: {
             kind: 'fitR',
             page: toPageRef(pageObjectNumber),
-            left: 10,
-            bottom: 20,
-            right: 300,
-            top: 400,
+            x: 10 - visible.left,
+            y: visible.top - 400,
+            width: 290,
+            height: 380,
           },
         });
         // Dual planes agree by construction: the target is the tree's projection.
@@ -265,13 +267,14 @@ export function runActionsConformance(
         // A mixed /Next chain carries every payload in PDF order.
         const chain = rootOf('chain-js-goto-hide');
         expect(chain).toMatchObject({ type: 'javascript', script: "app.alert('chain');" });
+        // The file's /XYZ 5 10 1.25, from the page's top-left.
         expect(chain?.next[0]).toMatchObject({
           type: 'goto',
           destination: {
             kind: 'xyz',
             page: toPageRef(pageObjectNumber),
-            left: 5,
-            top: 10,
+            x: 5 - visible.left,
+            y: visible.top - 10,
             zoom: 1.25,
           },
         });

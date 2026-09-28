@@ -22,13 +22,14 @@ export function runRedactionApplyConformance(
 
   // Geometry: the highlight sits fully inside the redact rect, so applying
   // the redaction removes it as collateral (positive-area intersection).
-  const REDACT_RECT = { left: 50, bottom: 50, right: 170, top: 150 };
+  const REDACT_RECT = { x: 50, y: 50, width: 120, height: 100 };
+  /** A highlight inside the redacted area. */
   const COLLATERAL_QUAD: HighlightDraft['quadPoints'] = [
     {
-      p1: { x: 70, y: 120 },
-      p2: { x: 150, y: 120 },
-      p3: { x: 70, y: 80 },
-      p4: { x: 150, y: 80 },
+      p1: { x: 70, y: 80 },
+      p2: { x: 150, y: 80 },
+      p3: { x: 70, y: 120 },
+      p4: { x: 150, y: 120 },
     },
   ];
 
@@ -68,7 +69,7 @@ export function runRedactionApplyConformance(
         // The mark's own popup, away from the region: it goes with the mark.
         await page.annotations.create({
           subtype: 'popup',
-          rect: { left: 300, bottom: 300, right: 400, top: 360 },
+          rect: { x: 300, y: 300, width: 100, height: 60 },
           parent: marked.annotation.ref,
         });
 

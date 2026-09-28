@@ -1,13 +1,6 @@
 import { PluginError, type PluginContext, type DocumentEvent, type PageRef } from '@embedpdf/core';
 import type { Point } from '@embedpdf/core-geometry';
-import {
-  pageActionTreeOf,
-  pageDestinationOf,
-  type PdfActionTree,
-  type PdfDestination,
-  type PdfLinkTarget,
-  type PdfRect,
-} from '@embedpdf/engine-core/runtime';
+import type { PdfLinkTarget } from '@embedpdf/engine-core/runtime';
 import { ActionsToken } from '@embedpdf/plugin-actions/contract';
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
@@ -27,10 +20,7 @@ import { linksOf } from './source';
 
 const EMPTY: readonly Link[] = Object.freeze([]);
 
-/** A stand-in box for a page the document doesn't have: the `goto` executor refuses such a page, so its numbers are never read. */
-const NO_PAGE: PdfRect = { left: 0, bottom: 0, right: 0, top: 0 };
-
-const isLink = (value: PdfLinkTarget<PdfDestination> | Link): value is Link =>
+const isLink = (value: PdfLinkTarget | Link): value is Link =>
   'target' in value && 'bounds' in value;
 const contains = (
   bounds: { x: number; y: number; width: number; height: number },
@@ -84,8 +74,7 @@ export function createLinkController(ctx: PluginContext<void>) {
   const pages = ctx.pageMirror<readonly Link[]>({
     name: 'links',
     load: async (doc, page) => {
-      const layout = ctx.getPage(page);
-      if (!layout) {
+      if (!ctx.getPage(page)) {
         throw new PluginError(
           'not-found',
           'link',
@@ -93,7 +82,7 @@ export function createLinkController(ctx: PluginContext<void>) {
         );
       }
       const snapshot = await doc.page(page).annotations.list();
-      return linksOf(snapshot.annotations, page, layout.pdfCropBox);
+      return linksOf(snapshot.annotations, page);
     },
     affected: pagesChangedBy,
     changed: ({ page, cause }) => {
@@ -111,17 +100,13 @@ export function createLinkController(ctx: PluginContext<void>) {
     // With the annotation plugin installed, its model owns the data.
     annotationHost() ? Promise.resolve() : pages.ensureLoaded(page);
 
-  const resolve = (target: PdfLinkTarget<PdfDestination>): LinkResolution => {
+  const resolve = (target: PdfLinkTarget): LinkResolution => {
     switch (target.kind) {
-      case 'goto': {
-        // Measured on the page it goes to; a page the document doesn't have can't be shown.
-        const space = ctx.geometry.tryForPage(target.destination.page);
-        if (!space) return { kind: 'reported', target };
-        return {
-          kind: 'destination',
-          destination: pageDestinationOf(target.destination, space.crop),
-        };
-      }
+      case 'goto':
+        // A page the document doesn't have can't be shown.
+        return ctx.getPage(target.destination.page)
+          ? { kind: 'destination', destination: target.destination }
+          : { kind: 'reported', target };
       case 'uri':
         return { kind: 'uri', uri: target.uri };
       case 'named':
@@ -131,17 +116,10 @@ export function createLinkController(ctx: PluginContext<void>) {
     }
   };
 
-  /** The link's `/A` tree in page space, each `goto` measured on the page it goes to. */
-  const activateTree = (tree: PdfActionTree<PdfDestination>): PdfActionTree =>
-    pageActionTreeOf(tree, (page) => ctx.geometry.tryForPage(page)?.crop ?? NO_PAGE);
-
-  const perform = (
-    target: PdfLinkTarget<PdfDestination>,
-    context?: LinkActivateContext,
-  ): LinkActivation => {
+  const perform = (target: PdfLinkTarget, context?: LinkActivateContext): LinkActivation => {
     const actions = ctx.tryGet(ActionsToken);
     if (actions && context?.activate) {
-      const dispatch = actions.execute(activateTree(context.activate), {
+      const dispatch = actions.execute(context.activate, {
         origin: 'user',
         source: { kind: 'link', annotation: context.ref, page: context.page },
         event: { scope: 'activate' },
@@ -165,10 +143,7 @@ export function createLinkController(ctx: PluginContext<void>) {
     }
   };
 
-  const activate = (
-    input: PdfLinkTarget<PdfDestination> | Link,
-    context?: LinkActivateContext,
-  ): LinkActivation => {
+  const activate = (input: PdfLinkTarget | Link, context?: LinkActivateContext): LinkActivation => {
     const target = isLink(input) ? input.target : input;
     const linkContext: LinkActivateContext | undefined = isLink(input)
       ? { activate: input.activate, ref: input.ref, ...context }
@@ -192,7 +167,7 @@ export function createLinkController(ctx: PluginContext<void>) {
     return best;
   };
 
-  const getLabel = (input: Link | PdfLinkTarget<PdfDestination>): string => {
+  const getLabel = (input: Link | PdfLinkTarget): string => {
     const target = isLink(input) ? input.target : input;
     switch (target.kind) {
       case 'uri':

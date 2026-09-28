@@ -7,7 +7,7 @@ import {
   PdfMeasurementSchema,
   PdfMeasureWriteSchema,
 } from '../../dto/Measure.schema';
-import { PdfAnnotationActionsSchema } from '../../dto/PdfAction.schema';
+import { FileAnnotationActionsSchema } from '../../dto/PdfAction.schema';
 import { PdfPointSchema, PdfQuadSchema, PdfRectSchema } from '../../geometry/schemas';
 import { PageRefSchema } from '../../identity/PageRef.schema';
 import {
@@ -76,7 +76,7 @@ export const annotationBaseFields = {
   /** The session that restored this annotation's attribution in an import. */
   importedBy: field.engine(z.string()).nullable(),
   /** `/A` and `/AA`. */
-  actions: field.preserved(PdfAnnotationActionsSchema).nullable().space('actions'),
+  actions: field.preserved(FileAnnotationActionsSchema).nullable().space('actions'),
 };
 
 // ── style ──

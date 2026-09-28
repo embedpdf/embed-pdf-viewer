@@ -4,6 +4,7 @@ import type {
   PdfActionTree,
   PdfDestination,
   PdfLinkTarget,
+  PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -30,10 +31,10 @@ export function readLink(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  base: AnnotationBase,
+  base: AnnotationBase<PdfCoordinates>,
   _rawSubtypeCode: number,
   ctx: AnnotationReadContext,
-): LinkAnnotationDTO {
+): LinkAnnotationDTO<PdfCoordinates> {
   return { ...base, subtype: 'link', target: readLinkTarget(fn, mem, annotPtr, base, ctx) };
 }
 
@@ -75,7 +76,7 @@ function readLinkTarget(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  base: AnnotationBase,
+  base: AnnotationBase<PdfCoordinates>,
   ctx: AnnotationReadContext,
 ): PdfLinkTarget<PdfDestination> | null {
   const activate = base.actions?.activate;

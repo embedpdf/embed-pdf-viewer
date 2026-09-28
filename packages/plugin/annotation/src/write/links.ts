@@ -1,10 +1,4 @@
-import {
-  contentToPdfRect,
-  linkChildrenOf,
-  linkOf,
-  type ModelAnnotation,
-  type Id,
-} from '@embedpdf/core-annotation';
+import { linkChildrenOf, linkOf, type ModelAnnotation, type Id } from '@embedpdf/core-annotation';
 import {
   annotationKey,
   type AnnotationDraft,
@@ -12,7 +6,6 @@ import {
   type AnnotationPatch,
   type AnnotationRef,
   type PdfLinkTarget,
-  type PdfDestination,
 } from '@embedpdf/engine-core/runtime';
 
 import { linkChildRects, writableTarget } from '../repository';
@@ -53,21 +46,15 @@ export function createLinkWrites(
    * the `linkOf` lens converges as the run goes, here and in every other
    * session. Idempotent — foreign inconsistencies heal on the next local edit.
    */
-  const reconcileChildren = async (
-    id: Id,
-    desired: PdfLinkTarget<PdfDestination> | null,
-  ): Promise<void> => {
+  const reconcileChildren = async (id: Id, desired: PdfLinkTarget | null): Promise<void> => {
     const doc = ctx.doc;
     const annotation = store.model().byId[id];
     if (!doc || !annotation || !annotation.ref || annotation.subtype === 'link') return;
-    const crop = geometry.cropOf(annotation.page.pageObjectNumber);
-    if (!crop) return;
     const page = doc.page(annotation.page);
     // Read-only target arms can't be (re)written: children keep their /A and
     // only their rects follow the parent.
     const target = writableTarget(desired);
-    const rects =
-      desired == null ? [] : linkChildRects(annotation).map((rect) => contentToPdfRect(rect, crop));
+    const rects = desired == null ? [] : linkChildRects(annotation);
     const current = linkChildrenOf(store.model(), id);
     try {
       const paired = Math.min(current.length, rects.length);
@@ -108,7 +95,7 @@ export function createLinkWrites(
    */
   const scheduleSync = (
     id: Id,
-    intent: { target: PdfLinkTarget<PdfDestination> | null } | 'keep',
+    intent: { target: PdfLinkTarget | null } | 'keep',
   ): Promise<void> => {
     const chain = chains.get(id) ?? { parent: id, tail: Promise.resolve() };
     chains.set(id, chain);
@@ -167,7 +154,7 @@ export function createLinkWrites(
       // The verbs go straight to the reconciler chain (latest-wins per
       // parent) and resolve when the children are committed — `get` reads
       // the new value the moment the promise settles.
-      set: (ref: AnnotationRef, target: PdfLinkTarget<PdfDestination>) =>
+      set: (ref: AnnotationRef, target: PdfLinkTarget) =>
         scheduleSync(annotationKey(ref), { target }),
       clear: (ref: AnnotationRef) => scheduleSync(annotationKey(ref), { target: null }),
     },

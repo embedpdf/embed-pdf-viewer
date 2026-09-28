@@ -14,7 +14,7 @@ every PDF app.
 ```ts
 const { annotation } = await page.annotations.create({
   subtype: 'free-text',
-  box: { left: 72, bottom: 600, right: 272, top: 660 },
+  box: { x: 72, y: 132, width: 200, height: 60 },
   contents: 'Please check this section',
   fontSize: 14,
 });
@@ -56,7 +56,7 @@ A free text box has three colors, and one of them does two jobs:
 ```ts
 await page.annotations.create({
   subtype: 'free-text',
-  box: { left: 72, bottom: 520, right: 272, top: 580 },
+  box: { x: 72, y: 212, width: 200, height: 60 },
   contents: 'Approved',
   fontFamily: 'helvetica-bold',
   fontSize: 18,
@@ -88,7 +88,7 @@ await engine.fonts.register({ key: 'noto-sc', data: fontBytes });
 
 await page.annotations.create({
   subtype: 'free-text',
-  box: { left: 72, bottom: 600, right: 272, top: 660 },
+  box: { x: 72, y: 132, width: 200, height: 60 },
   contents: '请检查这一部分',
   fontFamily: 'noto-sc',
   fontSize: 14,
@@ -119,11 +119,11 @@ A callout is a text box with a line that points at something on the page. Give t
 ```ts
 await page.annotations.create({
   subtype: 'free-text',
-  box: { left: 300, bottom: 600, right: 480, top: 660 }, // the text box
+  box: { x: 300, y: 132, width: 180, height: 60 }, // the text box
   calloutLine: [
-    { x: 200, y: 520 }, // the point it points at
-    { x: 250, y: 630 }, // a bend (optional)
-    { x: 300, y: 630 }, // where the line meets the box
+    { x: 200, y: 272 }, // the point it points at
+    { x: 250, y: 162 }, // a bend (optional)
+    { x: 300, y: 162 }, // where the line meets the box
   ],
   lineEnding: 'open-arrow',
   contents: 'This total is wrong',
@@ -147,7 +147,7 @@ with a `style` that holds only what it changes:
 ```ts
 await page.annotations.create({
   subtype: 'free-text',
-  box: { left: 72, bottom: 600, right: 372, top: 660 },
+  box: { x: 72, y: 132, width: 300, height: 60 },
   fontSize: 14,
   richText: {
     paragraphs: [

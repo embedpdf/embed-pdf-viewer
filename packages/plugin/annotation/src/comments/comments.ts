@@ -7,7 +7,7 @@ import {
   type AnnotationDraft,
   type AnnotationPatch,
   type AnnotationRef,
-  type PdfRect,
+  type PageBox,
 } from '@embedpdf/engine-core/runtime';
 
 import type { CommentPermissions, CommentsApi, ThreadDeleteResult } from '../contract';
@@ -24,12 +24,7 @@ const REPLY_FLAGS = { print: true, noZoom: true, noRotate: true };
 const STATUS_FLAGS = { hidden: true, noZoom: true, noRotate: true };
 
 /** Where a reply or a state sits: the usual 20 × 20 icon at its root's top-left corner. */
-const replyRect = (root: PdfRect): PdfRect => ({
-  left: root.left,
-  bottom: root.top - 20,
-  right: root.left + 20,
-  top: root.top,
-});
+const replyRect = (root: PageBox): PageBox => ({ x: root.x, y: root.y, width: 20, height: 20 });
 
 /**
  * The conversation plane's verbs: every one compiles down to plain

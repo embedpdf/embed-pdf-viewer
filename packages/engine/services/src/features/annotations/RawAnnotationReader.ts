@@ -1,4 +1,8 @@
-import type { AnnotationList, PageObjectNumber } from '@embedpdf/engine-core/runtime';
+import type {
+  AnnotationList,
+  PageObjectNumber,
+  PdfCoordinates,
+} from '@embedpdf/engine-core/runtime';
 import { concatAnnotationLists, EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
@@ -26,13 +30,16 @@ export class RawAnnotationReader {
   ) {}
 
   /** The given pages in their order, or every page in document order. */
-  list(pages: readonly PageObjectNumber[] | undefined, signal: AbortSignal): AnnotationList {
+  list(
+    pages: readonly PageObjectNumber[] | undefined,
+    signal: AbortSignal,
+  ): AnnotationList<PdfCoordinates> {
     throwIfAborted(signal);
     if (pages === undefined) {
       this.session.ensureFullPageRegistry();
       pages = this.session.allRecords().map((record) => record.pageObjectNumber);
     }
-    const lists: AnnotationList[] = [];
+    const lists: AnnotationList<PdfCoordinates>[] = [];
     for (const pageObjectNumber of pages) {
       throwIfAborted(signal);
       lists.push(this.listOne(pageObjectNumber, signal));
@@ -40,7 +47,7 @@ export class RawAnnotationReader {
     return concatAnnotationLists(lists);
   }
 
-  listOne(pageObjectNumber: PageObjectNumber, signal: AbortSignal): AnnotationList {
+  listOne(pageObjectNumber: PageObjectNumber, signal: AbortSignal): AnnotationList<PdfCoordinates> {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();

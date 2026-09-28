@@ -7,6 +7,7 @@ import {
   type AnnotationDraft,
   type AnnotationSubtype,
   type WireAnnotationResources,
+  type PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 
 import { prepareMeasurementDraft } from './prepareMeasurementMutation';
@@ -20,10 +21,10 @@ import { preflightDraft } from '../write/annotationWriterRegistry';
  * when the same create would succeed.
  */
 export function prepareCreate(
-  draft: AnnotationDraft,
+  draft: AnnotationDraft<PdfCoordinates>,
   resources: WireAnnotationResources | undefined,
   ctx: AnnotationWriteContext,
-): AnnotationDraft {
+): AnnotationDraft<PdfCoordinates> {
   assertDeclaredFields(draft.subtype, draft);
   // A change set carries `reply` and a popup's `parent` beside the draft.
   assertAnnotationDraft(draft, { linked: ['reply', 'parent'] });

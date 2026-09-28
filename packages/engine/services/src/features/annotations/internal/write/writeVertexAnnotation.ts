@@ -6,6 +6,7 @@ import {
   type PolygonPatch,
   type PolylineDraft,
   type PolylinePatch,
+  type PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -28,8 +29,8 @@ import { applyFilledStyleDraft, applyFilledStylePatch } from './writeStyle';
 import { readShapeCaption } from '../read/readMeasurementFields';
 import { uprightPoint } from '../read/readPointsTurn';
 
-export type VertexDraft = PolygonDraft | PolylineDraft;
-export type VertexPatch = PolygonPatch | PolylinePatch;
+export type VertexDraft = PolygonDraft<PdfCoordinates> | PolylineDraft<PdfCoordinates>;
+export type VertexPatch = PolygonPatch<PdfCoordinates> | PolylinePatch<PdfCoordinates>;
 
 /** Default line endings when a polyline draft omits them. */
 const DEFAULT_LINE_ENDINGS = { start: 'none', end: 'none' } as const;
@@ -91,7 +92,7 @@ export function applyPolygonDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: PolygonDraft,
+  draft: PolygonDraft<PdfCoordinates>,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
   const placed = writeNewPoints(fn, mem, annotPtr, [draft.vertices], draft.rotation);
@@ -108,7 +109,7 @@ export function applyPolygonPatch(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  patch: PolygonPatch,
+  patch: PolygonPatch<PdfCoordinates>,
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);
   applyVertexGeometryPatch(fn, mem, annotPtr, patch);
@@ -138,7 +139,7 @@ export function applyPolylineDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: PolylineDraft,
+  draft: PolylineDraft<PdfCoordinates>,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
   const placed = writeNewPoints(fn, mem, annotPtr, [draft.vertices], draft.rotation);
@@ -152,7 +153,7 @@ export function applyPolylinePatch(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  patch: PolylinePatch,
+  patch: PolylinePatch<PdfCoordinates>,
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);
   applyVertexGeometryPatch(fn, mem, annotPtr, patch);

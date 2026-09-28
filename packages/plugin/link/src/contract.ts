@@ -5,7 +5,6 @@ import type {
   AnnotationRef,
   PageDestination,
   PdfActionTree,
-  PdfDestination,
   PdfLinkTarget,
 } from '@embedpdf/engine-core/runtime';
 import type { ActionDispatchResult } from '@embedpdf/plugin-actions/contract';
@@ -16,11 +15,10 @@ export { LinkToken } from './token';
 /**
  * A clickable link area: page-space `bounds`, its target, and its annotation
  * (when it is one). The target and `/A` tree are as the annotation holds
- * them, with destinations in the file's coordinates; activating one goes to
- * its `PageDestination`.
+ * them, their destinations in page space.
  */
 export type Link = LinkNavItem;
-export type { PageDestination, PdfDestination, PdfLinkTarget };
+export type { PageDestination, PdfLinkTarget };
 
 /** What activation did, or hands to the host to do (a `uri`/`named` outcome is the host's). */
 export type LinkActivation =
@@ -28,7 +26,7 @@ export type LinkActivation =
   | { outcome: 'destination'; destination: PageDestination }
   | { outcome: 'uri'; uri: string }
   | { outcome: 'named'; name: string }
-  | { outcome: 'reported'; target: PdfLinkTarget<PdfDestination> }
+  | { outcome: 'reported'; target: PdfLinkTarget }
   | { outcome: 'dispatched'; dispatch: Promise<ActionDispatchResult> }
   | { outcome: 'none' };
 
@@ -41,18 +39,18 @@ export type LinkResolution =
   | { kind: 'destination'; destination: PageDestination }
   | { kind: 'uri'; uri: string }
   | { kind: 'named'; name: string }
-  | { kind: 'reported'; target: PdfLinkTarget<PdfDestination> };
+  | { kind: 'reported'; target: PdfLinkTarget };
 
 export interface LinkActivateContext {
   /** The link's `/A` tree when it has one; the actions plugin runs it instead of the target. */
-  activate?: PdfActionTree<PdfDestination>;
+  activate?: PdfActionTree;
   ref?: AnnotationRef;
   page?: PageRef;
 }
 
 /** A link target was activated through this capability. */
 export interface LinkActivatedEvent {
-  readonly target: PdfLinkTarget<PdfDestination>;
+  readonly target: PdfLinkTarget;
   readonly activation: LinkActivation;
 }
 /** A page's links were read from the engine. */
@@ -79,21 +77,18 @@ export interface LinkCapability {
   /** Load state of a page's links: `idle`, `loading`, `ready`, `error` or `forbidden`. */
   getStatus(page: PageRef): ResourceStatus;
   /** What activation would do, with no side effect. */
-  resolve(target: PdfLinkTarget<PdfDestination>): LinkResolution;
+  resolve(target: PdfLinkTarget): LinkResolution;
   /**
    * Perform the activation. A `goto` goes to its destination through the stage; `uri` and
    * `named` are reported for the host to perform synchronously (a user
    * gesture is preserved); a link with an `/A` tree dispatches through the
    * actions plugin.
    */
-  activate(
-    target: PdfLinkTarget<PdfDestination> | Link,
-    context?: LinkActivateContext,
-  ): LinkActivation;
+  activate(target: PdfLinkTarget | Link, context?: LinkActivateContext): LinkActivation;
   /** Hit test, then activate. Null when nothing is there. */
   activateAt(page: PageRef, point: Point, context?: LinkActivateContext): LinkActivation | null;
   /** A human label for tooltips. */
-  getLabel(link: Link | PdfLinkTarget<PdfDestination>): string;
+  getLabel(link: Link | PdfLinkTarget): string;
   /** After the built-in handling of any activation. */
   readonly onActivated: EventHook<LinkActivatedEvent>;
   /**

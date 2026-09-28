@@ -1,5 +1,6 @@
 import {
   mapDocumentActions,
+  pageAnnotationOf,
   pageAppearancesOf,
   pageDestinationOf,
   pageFormFieldOf,
@@ -7,7 +8,10 @@ import {
   pageGeometryOf,
   pageListOf,
   pageSearchSliceOf,
+  pdfAnnotationDraftOf,
+  pdfAnnotationPatchOf,
   pdfRenderTargetOf,
+  type AnnotationDTO,
   type PageRef,
   type PageRenderOptions,
   type PdfCoordinates,
@@ -34,6 +38,8 @@ export function resultInPageSpace(
   boxOf: VisibleBoxOf,
 ): WorkerResultPayload {
   const toPage = (destination: PdfDestination) => pageDestinationOf(destination, boxOf);
+  const annotation = (read: AnnotationDTO<PdfCoordinates>) =>
+    pageAnnotationOf(read, boxOf(read.page), boxOf);
   switch (payload.tag) {
     case 'pages.list':
       return { ...payload, snapshot: pageListOf(payload.snapshot) };
@@ -62,6 +68,31 @@ export function resultInPageSpace(
     }
     case 'actions.read':
       return { ...payload, snapshot: mapDocumentActions(payload.snapshot, toPage) };
+    case 'annotations.list':
+      return {
+        ...payload,
+        list: { ...payload.list, annotations: payload.list.annotations.map(annotation) },
+      };
+    case 'annotations.create':
+      return {
+        ...payload,
+        result: { ...payload.result, annotation: annotation(payload.result.annotation) },
+      };
+    case 'annotations.update':
+      return {
+        ...payload,
+        result: { ...payload.result, annotation: annotation(payload.result.annotation) },
+      };
+    case 'annotations.move':
+      return {
+        ...payload,
+        result: { ...payload.result, annotations: payload.result.annotations.map(annotation) },
+      };
+    case 'annotations.import':
+      return {
+        ...payload,
+        result: { ...payload.result, annotations: payload.result.annotations.map(annotation) },
+      };
     case 'forms.list':
       return { ...payload, snapshot: pageFormSnapshotOf(payload.snapshot, boxOf) };
     case 'forms.import':
@@ -110,6 +141,10 @@ export type FileSpaceJob = Exclude<WorkerRequest<PdfCoordinates>, { kind: 'abort
  */
 export function requestInFileSpace(job: PageSpaceJob, boxOf: VisibleBoxOf): FileSpaceJob {
   switch (job.kind) {
+    case 'annotations.create':
+      return { ...job, draft: pdfAnnotationDraftOf(job.draft, boxOf(job.page), boxOf) };
+    case 'annotations.update':
+      return { ...job, patch: pdfAnnotationPatchOf(job.patch, boxOf(job.ref.page), boxOf) };
     case 'pages.render':
       return withRenderOptionsInFileSpace(job, boxOf);
     case 'pages.renderEncoded':

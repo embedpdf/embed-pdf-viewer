@@ -17,8 +17,6 @@ import type { AnnotationReads } from '../read/annotations';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import { named } from './named';
 import type { Stamps } from './stamps';
-import { contentToPdfRect } from '../repository';
-import { pageSizeOf } from '../services/geometry';
 import type { ResolvedTool } from '../tools/definitions';
 
 /**
@@ -63,12 +61,12 @@ export function createIcons(
     file: AttachmentFileSource | null,
   ): boolean => {
     const doc = ctx.doc;
-    const crop = geometry.cropOf(pageObjectNumber);
-    if (!doc || !crop || !isIconPlaceKind(tool.subtype)) return false;
-    const box: Rect = fitStampBox(point, ICON_PLACE_SIZE, pageSizeOf(crop), rotCW);
+    const page = geometry.sizeOf(pageObjectNumber);
+    if (!doc || !page || !isIconPlaceKind(tool.subtype)) return false;
+    const box: Rect = fitStampBox(point, ICON_PLACE_SIZE, page, rotCW);
     const placement = iconPlacement(
       tool.subtype,
-      { rect: contentToPdfRect(box, crop) },
+      { rect: box },
       defaultsFor(store.model(), tool.preset),
       tool.flags,
       file,
@@ -112,15 +110,15 @@ export function createIcons(
       authority.assertPage(page);
       const doc = ctx.doc;
       const pageObjectNumber = page.pageObjectNumber;
-      const crop = geometry.cropOf(pageObjectNumber);
+      const size = geometry.sizeOf(pageObjectNumber);
       const tool = tools.get('attachment');
-      if (!doc || !crop || !tool || !isIconPlaceKind(tool.subtype)) {
+      if (!doc || !size || !tool || !isIconPlaceKind(tool.subtype)) {
         throw new PluginError('unsupported', 'annotation', 'no attachment tool is registered');
       }
-      const box: Rect = fitStampBox(at, ICON_PLACE_SIZE, pageSizeOf(crop), 0);
+      const box: Rect = fitStampBox(at, ICON_PLACE_SIZE, size, 0);
       const placement = iconPlacement(
         tool.subtype,
-        { rect: contentToPdfRect(box, crop) },
+        { rect: box },
         defaultsFor(store.model(), tool.preset),
         tool.flags,
         file,

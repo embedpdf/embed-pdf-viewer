@@ -39,11 +39,11 @@ const inkListOf = (
 const textBounds = (
   text: string,
   fontSize: number,
-): { left: number; bottom: number; right: number; top: number } => ({
-  left: 0,
-  bottom: 0,
-  right: Math.max(1, text.length) * fontSize * 0.75 + fontSize,
-  top: fontSize * 1.6,
+): { x: number; y: number; width: number; height: number } => ({
+  x: 0,
+  y: 0,
+  width: Math.max(1, text.length) * fontSize * 0.75 + fontSize,
+  height: fontSize * 1.6,
 });
 
 export function createMarks({ assetEngine }: Pick<StampServices, 'assetEngine'>) {

@@ -4,7 +4,7 @@ import type {
   ConformanceFixture,
   ConformanceOptions,
 } from './runMetadataConformance';
-import { drawnPointsOf } from '../annotation/drawnPoints';
+import { drawnPointsOf } from '../pageSpace/helpers';
 import type {
   AnnotationDraft,
   AnnotationPatch,
@@ -28,8 +28,8 @@ import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
-import { pdfPointsBounds, pdfPointTurned, pdfTurnOfUpright } from '../geometry/pointTurn';
-import type { InkList, LinePoints, PdfPoint, PdfRect } from '../geometry/primitives';
+import type { PageBox, PagePoint } from '../geometry/pageSpace';
+import { pagePointsBounds, pagePointTurned, pageTurnOfUpright } from '../pageSpace/helpers';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { AnnotationStableId } from '../identity/AnnotationStableId';
 import { toPageRef } from '../identity/PageRef';
@@ -53,32 +53,31 @@ export interface AnnotationMutationConformanceFixture extends ConformanceFixture
   /** Page already has at least one weak annotation (no /NM, direct object). */
   expectsWeakAnnotation: boolean;
   /**
-   * QuadPoints to use for the create() smoke test. Coordinates are in
-   * PDF user space; pick a small rectangle that fits anywhere on the
-   * fixture page so we don't flake on different page sizes.
+   * QuadPoints to use for the create() smoke test, in page space; pick a
+   * small rectangle that fits anywhere on the fixture page so we don't
+   * flake on different page sizes.
    */
   createQuad?: HighlightDraft['quadPoints'];
   /**
-   * `/Rect` to use for the shape (circle/square) create tests. PDF user
+   * The box to use for the shape (circle/square) create tests, in page
    * space; pick a small box that fits anywhere on the fixture page.
    */
-  createShapeRect?: PdfRect;
+  createShapeRect?: PageBox;
   /**
-   * `/Vertices` to use for the polygon/polyline create tests. PDF user
-   * space; must fit inside `createShapeRect` (the rect the engine bakes
-   * the appearance into). Defaults to a small triangle.
+   * `/Vertices` to use for the polygon/polyline create tests, in page
+   * space; must fit inside `createShapeRect`. Defaults to a small triangle.
    */
-  createVertices?: PdfPoint[];
+  createVertices?: PagePoint[];
   /**
-   * `/L` endpoints to use for the line create test. PDF user space; must
-   * fit inside `createShapeRect`. Defaults to the rect's diagonal.
+   * `/L` endpoints to use for the line create test, in page space; must fit
+   * inside `createShapeRect`. Defaults to the rect's diagonal.
    */
-  createLinePoints?: LinePoints;
+  createLinePoints?: LineDraft['linePoints'];
   /**
-   * `/InkList` strokes to use for the ink create test. PDF user space; must
+   * `/InkList` strokes to use for the ink create test, in page space; must
    * fit inside `createShapeRect`. Defaults to a single short stroke.
    */
-  createInkList?: InkList;
+  createInkList?: InkDraft['inkList'];
 }
 
 export interface AnnotationMutationConformanceOptions extends Omit<ConformanceOptions, 'fixture'> {
@@ -93,37 +92,38 @@ export interface AnnotationMutationConformanceOptions extends Omit<ConformanceOp
   supportsAppearanceRasters?: boolean;
 }
 
+/** Its top corners first, as a text selection's quads are. */
 const DEFAULT_QUAD: HighlightDraft['quadPoints'] = [
   {
     p1: { x: 50, y: 100 },
     p2: { x: 150, y: 100 },
-    p3: { x: 50, y: 80 },
-    p4: { x: 150, y: 80 },
+    p3: { x: 50, y: 120 },
+    p4: { x: 150, y: 120 },
   },
 ];
 
-const DEFAULT_SHAPE_RECT: PdfRect = { left: 60, bottom: 60, right: 160, top: 140 };
+const DEFAULT_SHAPE_RECT: PageBox = { x: 60, y: 60, width: 100, height: 80 };
 
 /** A small triangle inside DEFAULT_SHAPE_RECT (valid for polygon: >=3). */
-const DEFAULT_VERTICES: PdfPoint[] = [
-  { x: 70, y: 70 },
-  { x: 150, y: 70 },
-  { x: 110, y: 130 },
+const DEFAULT_VERTICES: PagePoint[] = [
+  { x: 70, y: 130 },
+  { x: 150, y: 130 },
+  { x: 110, y: 70 },
 ];
 
 /** A line along the diagonal of DEFAULT_SHAPE_RECT. */
-const DEFAULT_LINE_POINTS: LinePoints = {
-  start: { x: 70, y: 70 },
-  end: { x: 150, y: 130 },
+const DEFAULT_LINE_POINTS: LineDraft['linePoints'] = {
+  start: { x: 70, y: 130 },
+  end: { x: 150, y: 70 },
 };
 
 /**
  * A knee-jointed callout leader inside DEFAULT_SHAPE_RECT: the called-out
  * point, a knee, then the point touching the text box.
  */
-const DEFAULT_CALLOUT_LINE: [PdfPoint, PdfPoint, PdfPoint] = [
-  { x: 65, y: 65 },
-  { x: 90, y: 90 },
+const DEFAULT_CALLOUT_LINE: [PagePoint, PagePoint, PagePoint] = [
+  { x: 65, y: 135 },
+  { x: 90, y: 110 },
   { x: 110, y: 100 },
 ];
 
@@ -131,12 +131,12 @@ const DEFAULT_CALLOUT_LINE: [PdfPoint, PdfPoint, PdfPoint] = [
 /** Equal to 3 decimals: points and rects are stored as f32. */
 const near = (a: number, b: number): boolean => Math.abs(a - b) < 5e-4;
 
-const DEFAULT_INK_STROKES: InkList = [
+const DEFAULT_INK_STROKES: InkDraft['inkList'] = [
   [
-    { x: 70, y: 70 },
-    { x: 100, y: 120 },
-    { x: 130, y: 80 },
-    { x: 150, y: 130 },
+    { x: 70, y: 130 },
+    { x: 100, y: 80 },
+    { x: 130, y: 120 },
+    { x: 150, y: 70 },
   ],
 ];
 
@@ -293,10 +293,7 @@ export function runAnnotationMutationConformance(
           // chosen bounds are small integers that are exactly representable
           // in f32, so an exact compare is safe.
           expect(circle.annotation.box).toEqual(shapeRect);
-          expect(circle.annotation.rect.left).toBe(shapeRect.left);
-          expect(circle.annotation.rect.right).toBe(shapeRect.right);
-          expect(circle.annotation.rect.bottom).toBe(shapeRect.bottom);
-          expect(circle.annotation.rect.top).toBe(shapeRect.top);
+          expect(circle.annotation.rect).toEqual(shapeRect);
         }
 
         const squareDraft: SquareDraft = {
@@ -368,11 +365,12 @@ export function runAnnotationMutationConformance(
         if (cloudy.annotation.subtype === 'square') {
           expect(cloudy.annotation.cloudyIntensity).toBe(2);
           const { box, rect } = cloudy.annotation;
-          for (const edge of ['left', 'bottom', 'right', 'top'] as const) {
+          for (const edge of ['x', 'y', 'width', 'height'] as const) {
             expect(Math.abs(box[edge] - shapeRect[edge]) < 1e-3).toBe(true);
           }
-          expect(rect.left < box.left - 1 && rect.bottom < box.bottom - 1).toBe(true);
-          expect(rect.right > box.right + 1 && rect.top > box.top + 1).toBe(true);
+          expect(rect.x < box.x - 1 && rect.y < box.y - 1).toBe(true);
+          expect(rect.x + rect.width > box.x + box.width + 1).toBe(true);
+          expect(rect.y + rect.height > box.y + box.height + 1).toBe(true);
         }
 
         // A solid border gives the room back: no stale bump room is left
@@ -438,12 +436,7 @@ export function runAnnotationMutationConformance(
         // invalidation signal stays off.
         const moved = await page.annotations.update(created.annotation.ref, {
           subtype: 'square',
-          box: {
-            left: shapeRect.left + 12,
-            bottom: shapeRect.bottom - 8,
-            right: shapeRect.right + 12,
-            top: shapeRect.top - 8,
-          },
+          box: { ...shapeRect, x: shapeRect.x + 12, y: shapeRect.y + 8 },
           color: { r: 200, g: 0, b: 0 },
           strokeWidth: 2,
           opacity: 1,
@@ -467,12 +460,7 @@ export function runAnnotationMutationConformance(
         // A resize is not a translation — it re-bakes too.
         const resized = await page.annotations.update(created.annotation.ref, {
           subtype: 'square',
-          box: {
-            left: shapeRect.left,
-            bottom: shapeRect.bottom,
-            right: shapeRect.right + 40,
-            top: shapeRect.top,
-          },
+          box: { ...shapeRect, width: shapeRect.width + 40 },
         });
         expect(resized.appearance).toEqual({ action: 'regenerated', changed: true });
       } finally {
@@ -548,18 +536,13 @@ export function runAnnotationMutationConformance(
         // The engine sets `rect` to the upright box around the turned box: a
         // quarter turn swaps its sides about the same middle.
         const turnedRect = created.annotation.rect;
-        expect(turnedRect.right - turnedRect.left).toBe(shapeRect.top - shapeRect.bottom);
-        expect(turnedRect.top - turnedRect.bottom).toBe(shapeRect.right - shapeRect.left);
+        expect(turnedRect.width).toBe(shapeRect.height);
+        expect(turnedRect.height).toBe(shapeRect.width);
 
         // The box and its turn riding one delta is a verified translation: the
         // rotation survives and the baked /AP is preserved.
         const d = { x: 15, y: -10 };
-        const shift = (r: typeof shapeRect) => ({
-          left: r.left + d.x,
-          bottom: r.bottom + d.y,
-          right: r.right + d.x,
-          top: r.top + d.y,
-        });
+        const shift = (r: PageBox): PageBox => ({ ...r, x: r.x + d.x, y: r.y + d.y });
         const moved = await page.annotations.update(created.annotation.ref, {
           subtype: 'square',
           box: shift(shapeRect),
@@ -600,17 +583,17 @@ export function runAnnotationMutationConformance(
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
-        const contains = (outer: PdfRect, inner: PdfRect) =>
-          outer.left <= inner.left + 1e-3 &&
-          outer.bottom <= inner.bottom + 1e-3 &&
-          outer.right >= inner.right - 1e-3 &&
-          outer.top >= inner.top - 1e-3;
-        const area = (r: PdfRect) => (r.right - r.left) * (r.top - r.bottom);
-        const grown = (r: PdfRect, by: number): PdfRect => ({
-          left: r.left - by,
-          bottom: r.bottom - by,
-          right: r.right + by,
-          top: r.top + by,
+        const contains = (outer: PageBox, inner: PageBox) =>
+          outer.x <= inner.x + 1e-3 &&
+          outer.y <= inner.y + 1e-3 &&
+          outer.x + outer.width >= inner.x + inner.width - 1e-3 &&
+          outer.y + outer.height >= inner.y + inner.height - 1e-3;
+        const area = (r: PageBox) => r.width * r.height;
+        const grown = (r: PageBox, by: number): PageBox => ({
+          x: r.x - by,
+          y: r.y - by,
+          width: r.width + 2 * by,
+          height: r.height + 2 * by,
         });
 
         // No rect is sent: the engine measures the stroke and the arrowheads.
@@ -624,7 +607,7 @@ export function runAnnotationMutationConformance(
           } satisfies LineDraft);
         const plain = (await line({ start: 'none', end: 'none' })).annotation;
         const arrowed = (await line({ start: 'closed-arrow', end: 'closed-arrow' })).annotation;
-        const ends = pdfPointsBounds([linePoints.start, linePoints.end]);
+        const ends = pagePointsBounds([linePoints.start, linePoints.end]);
         expect(contains(plain.rect, grown(ends, 0.5))).toBe(true);
         expect(contains(arrowed.rect, plain.rect)).toBe(true);
         expect(area(arrowed.rect) > area(plain.rect)).toBe(true);
@@ -639,18 +622,16 @@ export function runAnnotationMutationConformance(
           } satisfies InkDraft);
         const thin = (await ink(1)).annotation;
         const wide = (await ink(6)).annotation;
-        const drawn = pdfPointsBounds(inkStrokes.flat());
+        const drawn = pagePointsBounds(inkStrokes.flat());
         expect(contains(thin.rect, grown(drawn, 0.5))).toBe(true);
         expect(contains(wide.rect, grown(drawn, 3))).toBe(true);
-        expect(wide.rect.right - wide.rect.left > thin.rect.right - thin.rect.left + 4.9).toBe(
-          true,
-        );
+        expect(wide.rect.width > thin.rect.width + 4.9).toBe(true);
         const narrowed = await page.annotations.update(wide.ref, {
           subtype: 'ink',
           strokeWidth: 1,
         });
-        expect(near(narrowed.annotation.rect.left, thin.rect.left)).toBe(true);
-        expect(near(narrowed.annotation.rect.right, thin.rect.right)).toBe(true);
+        expect(near(narrowed.annotation.rect.x, thin.rect.x)).toBe(true);
+        expect(near(narrowed.annotation.rect.width, thin.rect.width)).toBe(true);
       } finally {
         await doc.close();
       }
@@ -660,7 +641,7 @@ export function runAnnotationMutationConformance(
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
-        const expectPoints = (actual: readonly PdfPoint[], expected: readonly PdfPoint[]) => {
+        const expectPoints = (actual: readonly PagePoint[], expected: readonly PagePoint[]) => {
           expect(actual.length).toBe(expected.length);
           actual.forEach((point, i) => {
             expect(near(point.x, expected[i]!.x)).toBe(true);
@@ -681,14 +662,16 @@ export function runAnnotationMutationConformance(
         expectPoints(polygon.vertices, vertices);
         // The page shows them turned about the middle of their box, and rect is
         // around what it shows.
-        const turn = pdfTurnOfUpright(vertices, 90);
-        const drawn = vertices.map((point) => pdfPointTurned(point, turn));
+        const turn = pageTurnOfUpright(vertices, 90);
+        const drawn = vertices.map((point) => pagePointTurned(point, turn));
         expectPoints(drawnPointsOf(polygon)![0]!, drawn);
-        const drawnBounds = pdfPointsBounds(drawn);
-        expect(polygon.rect.left <= drawnBounds.left).toBe(true);
-        expect(polygon.rect.right >= drawnBounds.right).toBe(true);
-        expect(polygon.rect.bottom <= drawnBounds.bottom).toBe(true);
-        expect(polygon.rect.top >= drawnBounds.top).toBe(true);
+        const drawnBounds = pagePointsBounds(drawn);
+        expect(polygon.rect.x <= drawnBounds.x).toBe(true);
+        expect(polygon.rect.y <= drawnBounds.y).toBe(true);
+        expect(polygon.rect.x + polygon.rect.width >= drawnBounds.x + drawnBounds.width).toBe(true);
+        expect(polygon.rect.y + polygon.rect.height >= drawnBounds.y + drawnBounds.height).toBe(
+          true,
+        );
 
         // Moving the points keeps the turn and the drawing: rect moves with them.
         const d = { x: 15, y: -10 };
@@ -699,8 +682,8 @@ export function runAnnotationMutationConformance(
         expect(moved.appearance).toEqual({ action: 'preserved', changed: false });
         if (moved.annotation.subtype !== 'polygon') throw new Error('expected a polygon');
         expect(moved.annotation.rotation).toBe(90);
-        expect(near(moved.annotation.rect.left, polygon.rect.left + d.x)).toBe(true);
-        expect(near(moved.annotation.rect.top, polygon.rect.top + d.y)).toBe(true);
+        expect(near(moved.annotation.rect.x, polygon.rect.x + d.x)).toBe(true);
+        expect(near(moved.annotation.rect.y, polygon.rect.y + d.y)).toBe(true);
 
         // A new turn keeps the points upright and draws them again.
         const turned = await page.annotations.update(polygon.ref, {
@@ -731,7 +714,7 @@ export function runAnnotationMutationConformance(
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
-        const rect = iconRect(shapeRect.left, shapeRect.top);
+        const rect = iconRect(shapeRect.x, shapeRect.y);
         const created = await page.annotations.create({
           subtype: 'text',
           rect,
@@ -742,13 +725,13 @@ export function runAnnotationMutationConformance(
         expect(note.rect).toEqual(rect);
 
         // A move keeps the drawing: the icon only moves.
-        const to = iconRect(rect.left + 30, rect.top - 15);
+        const to = iconRect(rect.x + 30, rect.y + 15);
         const moved = await page.annotations.update(note.ref, { subtype: 'text', rect: to });
         expect(moved.annotation.rect).toEqual(to);
         expect(moved.appearance.changed).toBe(false);
 
         // A bigger rect is a bigger icon, drawn again.
-        const bigger = { ...to, right: to.left + 50, bottom: to.top - 50 };
+        const bigger = { ...to, width: 50, height: 50 };
         const grown = await page.annotations.update(note.ref, { subtype: 'text', rect: bigger });
         expect(grown.annotation.rect).toEqual(bigger);
         expect(grown.appearance.changed).toBe(true);
@@ -761,21 +744,20 @@ export function runAnnotationMutationConformance(
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
-        const offset = (r: PdfRect, dx: number, dy: number): PdfRect => ({
-          left: r.left + dx,
-          bottom: r.bottom + dy,
-          right: r.right + dx,
-          top: r.top + dy,
+        const offset = (r: PageBox, dx: number, dy: number): PageBox => ({
+          ...r,
+          x: r.x + dx,
+          y: r.y + dy,
         });
-        const expectPoint = (actual: PdfPoint, expected: PdfPoint) => {
+        const expectPoint = (actual: PagePoint, expected: PagePoint) => {
           expect(near(actual.x, expected.x) && near(actual.y, expected.y)).toBe(true);
         };
-        const expectRect = (actual: PdfRect, expected: PdfRect) => {
+        const expectRect = (actual: PageBox, expected: PageBox) => {
+          expectPoint(actual, expected);
           expectPoint(
-            { x: actual.left, y: actual.bottom },
-            { x: expected.left, y: expected.bottom },
+            { x: actual.width, y: actual.height },
+            { x: expected.width, y: expected.height },
           );
-          expectPoint({ x: actual.right, y: actual.top }, { x: expected.right, y: expected.top });
         };
         const refused = { code: EngineErrorCode.InvalidArg, details: { field: 'rect' } };
 
@@ -788,8 +770,8 @@ export function runAnnotationMutationConformance(
         ).annotation;
         if (created.subtype !== 'line') throw new Error('expected a line');
 
-        // Moved: the points move by the offset, and the rect with them.
-        const movedTo = offset(created.rect, 40, -20);
+        // Moved 40 right and 20 down: the points move by the offset, and the rect with them.
+        const movedTo = offset(created.rect, 40, 20);
         const moved = await page.annotations.update(created.ref, {
           subtype: 'line',
           rect: movedTo,
@@ -798,21 +780,21 @@ export function runAnnotationMutationConformance(
         expectRect(moved.annotation.rect, movedTo);
         expectPoint(moved.annotation.linePoints.start, {
           x: linePoints.start.x + 40,
-          y: linePoints.start.y - 20,
+          y: linePoints.start.y + 20,
         });
         expectPoint(moved.annotation.linePoints.end, {
           x: linePoints.end.x + 40,
-          y: linePoints.end.y - 20,
+          y: linePoints.end.y + 20,
         });
         expect(moved.appearance.changed).toBe(false);
 
-        // Stretched: each axis on its own, from the rect it had onto the new one.
+        // Stretched 60 wider and 30 taller, right and down: each axis on its
+        // own, from the rect it had onto the new one.
         const from = moved.annotation.rect;
-        const to = { ...from, bottom: from.bottom - 30, right: from.right + 60 };
-        const onto = (point: PdfPoint): PdfPoint => ({
-          x: to.left + ((point.x - from.left) * (to.right - to.left)) / (from.right - from.left),
-          y:
-            to.bottom + ((point.y - from.bottom) * (to.top - to.bottom)) / (from.top - from.bottom),
+        const to = { ...from, width: from.width + 60, height: from.height + 30 };
+        const onto = (point: PagePoint): PagePoint => ({
+          x: to.x + ((point.x - from.x) * to.width) / from.width,
+          y: to.y + ((point.y - from.y) * to.height) / from.height,
         });
         const stretched = await page.annotations.update(created.ref, { subtype: 'line', rect: to });
         if (stretched.annotation.subtype !== 'line') throw new Error('expected a line');
@@ -844,7 +826,7 @@ export function runAnnotationMutationConformance(
         await expect(
           page.annotations.update(created.ref, {
             subtype: 'line',
-            rect: { ...rect, right: rect.left },
+            rect: { ...rect, width: 0 },
           }),
         ).rejects.toMatchObject(refused);
 
@@ -890,7 +872,7 @@ export function runAnnotationMutationConformance(
         await expect(
           page.annotations.update(turned.ref, {
             subtype: 'square',
-            rect: { ...turnedTo, right: turnedTo.right + 20 },
+            rect: { ...turnedTo, width: turnedTo.width + 20 },
           }),
         ).rejects.toMatchObject(refused);
       } finally {
@@ -1066,8 +1048,8 @@ export function runAnnotationMutationConformance(
           expect(callout.annotation.box).toEqual(shapeRect);
           const { rect } = callout.annotation;
           for (const point of DEFAULT_CALLOUT_LINE) {
-            expect(point.x >= rect.left && point.x <= rect.right).toBe(true);
-            expect(point.y >= rect.bottom && point.y <= rect.top).toBe(true);
+            expect(point.x >= rect.x && point.x <= rect.x + rect.width).toBe(true);
+            expect(point.y >= rect.y && point.y <= rect.y + rect.height).toBe(true);
           }
         }
 
@@ -1532,8 +1514,9 @@ export function runAnnotationMutationConformance(
           // The symbol fills its box; `rect` holds its outline too.
           expect(caret.annotation.box).toEqual(shapeRect);
           const { rect } = caret.annotation;
-          expect(rect.left <= shapeRect.left && rect.bottom <= shapeRect.bottom).toBe(true);
-          expect(rect.right >= shapeRect.right && rect.top >= shapeRect.top).toBe(true);
+          expect(rect.x <= shapeRect.x && rect.y <= shapeRect.y).toBe(true);
+          expect(rect.x + rect.width >= shapeRect.x + shapeRect.width).toBe(true);
+          expect(rect.y + rect.height >= shapeRect.y + shapeRect.height).toBe(true);
         }
 
         const before = await page.annotations.list();
@@ -1575,7 +1558,7 @@ export function runAnnotationMutationConformance(
         } satisfies InkDraft);
         const before = await page.annotations.list();
 
-        const newStrokes: InkList = [
+        const newStrokes: InkDraft['inkList'] = [
           ...inkStrokes,
           [
             { x: 80, y: 90 },
@@ -1657,7 +1640,7 @@ export function runAnnotationMutationConformance(
         } satisfies PolylineDraft);
         const before = await page.annotations.list();
 
-        const newVertices: PdfPoint[] = [
+        const newVertices: PagePoint[] = [
           ...vertices,
           { x: vertices[0]!.x + 5, y: vertices[0]!.y + 5 },
         ];
@@ -2459,8 +2442,8 @@ export function runAnnotationMutationConformance(
             destination: {
               kind: 'xyz',
               page: toPageRef(fix.pageObjectNumber),
-              left: 30,
-              top: 500,
+              x: 30,
+              y: 300,
               zoom: null,
             },
           },
@@ -2473,8 +2456,8 @@ export function runAnnotationMutationConformance(
             expect(dest.kind).toBe('xyz');
             if (dest.kind === 'xyz') {
               expect(dest.page.pageObjectNumber).toBe(fix.pageObjectNumber);
-              expect(dest.left).toBe(30);
-              expect(dest.top).toBe(500);
+              expect(dest.x).toBe(30);
+              expect(dest.y).toBe(300);
               expect(dest.zoom).toBe(null);
             }
           }
@@ -2485,7 +2468,7 @@ export function runAnnotationMutationConformance(
           rect: shapeRect,
           target: {
             kind: 'goto',
-            destination: { kind: 'fitH', page: toPageRef(fix.pageObjectNumber), top: 420 },
+            destination: { kind: 'fitH', page: toPageRef(fix.pageObjectNumber), y: 420 },
           },
         } satisfies LinkDraft);
         expect(fitH.annotation.subtype).toBe('link');
@@ -2493,7 +2476,7 @@ export function runAnnotationMutationConformance(
           expect(fitH.annotation.target.destination).toEqual({
             kind: 'fitH',
             page: toPageRef(fix.pageObjectNumber),
-            top: 420,
+            y: 420,
           });
         }
 
@@ -2540,12 +2523,7 @@ export function runAnnotationMutationConformance(
           });
         }
 
-        const movedRect = {
-          left: shapeRect.left + 5,
-          bottom: shapeRect.bottom + 5,
-          right: shapeRect.right + 5,
-          top: shapeRect.top + 5,
-        };
+        const movedRect = { ...shapeRect, x: shapeRect.x + 5, y: shapeRect.y + 5 };
         const toUri = await page.annotations.update(created.annotation.ref, {
           subtype: 'link',
           rect: movedRect,
@@ -2553,7 +2531,7 @@ export function runAnnotationMutationConformance(
         });
         if (toUri.annotation.subtype === 'link') {
           expect(toUri.annotation.target).toEqual({ kind: 'uri', uri: 'https://new.example/' });
-          expect(Math.round(toUri.annotation.rect.left)).toBe(Math.round(movedRect.left));
+          expect(Math.round(toUri.annotation.rect.x)).toBe(Math.round(movedRect.x));
         }
       } finally {
         await doc.close();
@@ -2822,7 +2800,7 @@ export function runAnnotationMutationConformance(
 
         const status = await page.annotations.create({
           subtype: 'text',
-          rect: iconRect(shapeRect.left, shapeRect.top),
+          rect: iconRect(shapeRect.x, shapeRect.y),
           reply: { to: target.annotation.ref },
           state: 'accepted',
           stateModel: 'review',
@@ -2859,7 +2837,7 @@ export function runAnnotationMutationConformance(
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const { annotation } = await page.annotations.create({
           subtype: 'text',
-          rect: iconRect(shapeRect.left, shapeRect.top),
+          rect: iconRect(shapeRect.x, shapeRect.y),
           state: 'accepted',
         } satisfies TextDraft);
         expect(annotation.subtype === 'text' && annotation.stateModel).toBe('review');
@@ -2867,7 +2845,7 @@ export function runAnnotationMutationConformance(
         try {
           await page.annotations.create({
             subtype: 'text',
-            rect: iconRect(shapeRect.left, shapeRect.top),
+            rect: iconRect(shapeRect.x, shapeRect.y),
             state: 'escalated',
           } satisfies TextDraft);
         } catch (err) {
@@ -2885,7 +2863,7 @@ export function runAnnotationMutationConformance(
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const note = await page.annotations.create({
           subtype: 'text',
-          rect: iconRect(shapeRect.left, shapeRect.top),
+          rect: iconRect(shapeRect.x, shapeRect.y),
           contents: 'work in progress',
           subject: 'Draft',
           state: 'none',
@@ -2947,7 +2925,7 @@ export function runAnnotationMutationConformance(
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const custom = await page.annotations.create({
           subtype: 'text',
-          rect: iconRect(shapeRect.left, shapeRect.top),
+          rect: iconRect(shapeRect.x, shapeRect.y),
           state: 'in-progress',
           stateModel: 'X-ReviewWorkflow',
         } satisfies TextDraft);

@@ -307,9 +307,6 @@ export type {
   AnnotationDTO,
   AnnotationDraft,
   AnnotationPatch,
-  PageAnnotationDTO,
-  PageAnnotationDraft,
-  PageAnnotationPatch,
   HighlightAnnotationDTO,
   HighlightDraft,
   HighlightPatch,
@@ -389,7 +386,6 @@ export type {
   PopupDraft,
   PopupPatch,
   AnnotationDeclaration,
-  AnnotationRead,
   CreateOf,
   ReadOf,
   UpdateOf,
@@ -445,9 +441,7 @@ export type {
   AppearanceOutcome,
 } from './annotation/appearance';
 export { appearanceImpactOf, semanticEqual } from './annotation/appearance';
-export { appearanceTurnOf } from './annotation/appearanceTurn';
-export { shapeForRect } from './annotation/shapeForRect';
-export { drawnPointsOf } from './annotation/drawnPoints';
+export { pdfAppearanceTurnOf } from './annotation/appearanceTurn';
 export { assertAnnotationDraft, checkAnnotationPatch } from './annotation/checkWrite';
 
 // Page space: positions from the top-left of a page's visible box, y down.

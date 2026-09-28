@@ -8,9 +8,7 @@ import {
   mapActionTree,
   mapDocumentActions,
   mapLinkTarget,
-  pageActionTreeOf,
   pageDestinationOf,
-  pageLinkTargetOf,
   pdfDestinationOf,
 } from '../../src/pageSpace/destinations';
 
@@ -105,26 +103,6 @@ describe('values that carry destinations', () => {
     expect(
       mapLinkTarget({ kind: 'goto', destination: { kind: 'fitH', page: A, top: 700 } }, toPage),
     ).toEqual({ kind: 'goto', destination: { kind: 'fitH', page: A, y: 92 } });
-  });
-
-  test('a link target and an action tree convert in one call', () => {
-    expect(
-      pageLinkTargetOf({ kind: 'goto', destination: { kind: 'fitH', page: A, top: 700 } }, boxOf),
-    ).toEqual({ kind: 'goto', destination: { kind: 'fitH', page: A, y: 92 } });
-    const tree: PdfActionTree<PdfDestination> = {
-      incomplete: false,
-      warningFlags: 0,
-      warnings: [],
-      root: {
-        subtype: 'GoTo',
-        type: 'goto',
-        destination: { kind: 'fitV', page: B, left: 0 },
-        next: [],
-      },
-    };
-    expect(pageActionTreeOf(tree, boxOf).root).toMatchObject({
-      destination: { kind: 'fitV', page: B, x: 300 },
-    });
   });
 
   test('every goto in an action tree converts, down its next chain', () => {

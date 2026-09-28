@@ -21,7 +21,7 @@ const { annotation } = await page.annotations.create({
   subtype: 'line',
   intent: 'line-dimension',
   measure: scale,
-  linePoints: { start: { x: 72, y: 702 }, end: { x: 216, y: 702 } },
+  linePoints: { start: { x: 72, y: 90 }, end: { x: 216, y: 90 } },
   captionEnabled: true,
 });
 
@@ -72,8 +72,8 @@ measureFromKnownLength(144, { value: 2, unit: 'm' }); // 144 points on the page 
 measureFromRatio(1, 100, 'm'); // the drawing is at 1:100, shown in metres
 ```
 
-A known length is in PDF points, for example the length of a line the user drew over a
-dimension printed on the plan. A ratio compares a length on paper with the same length in reality.
+A known length is in points, for example the length of a line the user drew over a dimension
+printed on the plan. A ratio compares a length on paper with the same length in reality.
 
 Units are `'pt'`, `'mm'`, `'cm'`, `'m'`, `'km'`, `'in'`, `'ft'`, `'yd'` and `'mi'`. The last
 argument sets how values are shown:
@@ -108,7 +108,7 @@ send is replaced by the value, so the label is always what the scale says:
 
 ```ts
 await page.annotations.update(annotation.ref, {
-  linePoints: { start: { x: 72, y: 702 }, end: { x: 288, y: 702 } },
+  linePoints: { start: { x: 72, y: 90 }, end: { x: 288, y: 90 } },
 });
 // contents is now "3.00 m"
 ```

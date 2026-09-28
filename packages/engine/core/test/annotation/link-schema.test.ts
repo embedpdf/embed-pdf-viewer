@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'vitest';
-import type { AnnotationDTO, LinkDraft, LinkPatch, PdfLinkTarget } from '../../src/shared';
+import type {
+  AnnotationDTO,
+  LinkDraft,
+  LinkPatch,
+  PdfCoordinates,
+  PdfLinkTarget,
+} from '../../src/shared';
 import { checkAnnotationPatch } from '../../src/shared';
 import {
   AnnotationDraftSchema,
@@ -11,7 +17,7 @@ import {
   PdfLinkTargetWritableSchema,
 } from '../../src/wire';
 
-const RECT = { left: 10, top: 100, right: 110, bottom: 80 };
+const RECT = { x: 10, y: 20, width: 100, height: 20 };
 
 describe('link kind schemas', () => {
   test('destination arms validate, including spec-null axes', () => {
@@ -117,7 +123,7 @@ describe('link kind schemas', () => {
       subtype: 'link',
       target: {
         kind: 'goto',
-        destination: { kind: 'xyz', page: { kind: 'objectNumber', pageObjectNumber: 9 }, top: 700 },
+        destination: { kind: 'xyz', page: { kind: 'objectNumber', pageObjectNumber: 9 }, y: 92 },
       },
     };
     const clear: LinkPatch = { subtype: 'link', target: null };
@@ -129,11 +135,12 @@ describe('link kind schemas', () => {
   });
 
   test('a read-only target sent back unchanged is kept; a changed one is refused', () => {
+    // The engine checks a patch in the file's coordinates, after converting it.
     const current = {
       subtype: 'link',
-      rect: RECT,
+      rect: { left: 10, bottom: 80, right: 110, top: 100 },
       target: { kind: 'named', name: 'NextPage' },
-    } as unknown as AnnotationDTO;
+    } as unknown as AnnotationDTO<PdfCoordinates>;
     // The patch schema takes what a read returns, so a read DTO passes.
     expect(LinkPatchSchema.safeParse({ target: { kind: 'named', name: 'NextPage' } }).success).toBe(
       true,

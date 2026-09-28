@@ -6,6 +6,7 @@ import type {
   SquigglyAnnotationDTO,
   StrikeoutAnnotationDTO,
   UnderlineAnnotationDTO,
+  PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -46,8 +47,8 @@ export function readHighlight(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  base: AnnotationBase,
-): HighlightAnnotationDTO {
+  base: AnnotationBase<PdfCoordinates>,
+): HighlightAnnotationDTO<PdfCoordinates> {
   const extras = readTextMarkupExtras(fn, mem, annotPtr, DEFAULT_HIGHLIGHT_COLOR);
   return { ...base, subtype: 'highlight', ...extras };
 }
@@ -56,8 +57,8 @@ export function readUnderline(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  base: AnnotationBase,
-): UnderlineAnnotationDTO {
+  base: AnnotationBase<PdfCoordinates>,
+): UnderlineAnnotationDTO<PdfCoordinates> {
   const extras = readTextMarkupExtras(fn, mem, annotPtr);
   return { ...base, subtype: 'underline', ...extras };
 }
@@ -66,8 +67,8 @@ export function readSquiggly(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  base: AnnotationBase,
-): SquigglyAnnotationDTO {
+  base: AnnotationBase<PdfCoordinates>,
+): SquigglyAnnotationDTO<PdfCoordinates> {
   const extras = readTextMarkupExtras(fn, mem, annotPtr);
   return { ...base, subtype: 'squiggly', ...extras };
 }
@@ -76,8 +77,8 @@ export function readStrikeout(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  base: AnnotationBase,
-): StrikeoutAnnotationDTO {
+  base: AnnotationBase<PdfCoordinates>,
+): StrikeoutAnnotationDTO<PdfCoordinates> {
   const extras = readTextMarkupExtras(fn, mem, annotPtr);
   const intent = strikeoutIntentFromName(readIntent(fn, mem, annotPtr));
   return { ...base, subtype: 'strikeout', intent, ...extras };

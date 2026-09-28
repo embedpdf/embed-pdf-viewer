@@ -85,7 +85,7 @@ describe('drawing bytes across runtimes', () => {
         (annotation) => annotation.subtype === 'stamp',
       );
       const { annotation: created } = await page.annotations.create(
-        { subtype: 'stamp', box: { left: 20, bottom: 20, right: 120, top: 70 }, opacity: 0.5 },
+        { subtype: 'stamp', box: { x: 20, y: 20, width: 100, height: 50 }, opacity: 0.5 },
         { appearance: drawing },
       );
       const drawings = [];
@@ -158,7 +158,7 @@ describe('replacing a stamp drawing', () => {
       );
       const { pages } = await doc.pages.list();
       const page = doc.page(toPageRef(pages[0]!.ref.pageObjectNumber));
-      const rect = { left: 20, bottom: 20, right: 120, top: 120 };
+      const rect = { x: 20, y: 20, width: 100, height: 100 };
       const small = (
         await page.annotations.create({ subtype: 'stamp', box: rect }, { appearance: drawing })
       ).annotation;
@@ -190,7 +190,7 @@ describe('stamp drawings across a reopen', () => {
     const engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
     try {
       const image = noisePng();
-      const place = async (bytes: Uint8Array, left: number) => {
+      const place = async (bytes: Uint8Array, x: number) => {
         const doc = await engine.open(
           { kind: 'bytes', id: `reopen-${++opened}`, bytes },
           { scope: ['*'] },
@@ -198,7 +198,7 @@ describe('stamp drawings across a reopen', () => {
         const { pages } = await doc.pages.list();
         const page = doc.page(toPageRef(pages[0]!.ref.pageObjectNumber));
         await page.annotations.create(
-          { subtype: 'stamp', box: { left, bottom: 20, right: left + 100, top: 120 } },
+          { subtype: 'stamp', box: { x, y: 20, width: 100, height: 100 } },
           { appearance: image },
         );
         const saved = await doc.download({ mode: 'rewrite' });

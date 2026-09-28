@@ -88,7 +88,7 @@ export function CommentsPanel() {
     // Anchor values are viewport fractions (0–1), not percentages:
     // the annotation lands a third down the viewport, the find-bar feel.
     stage?.reveal(view.pageIndex, {
-      ...(view.contentRect ? { rect: view.contentRect } : {}),
+      rect: view.root.rect,
       anchor: { x: 'center', y: 0.35 },
       behavior: 'smooth',
     });

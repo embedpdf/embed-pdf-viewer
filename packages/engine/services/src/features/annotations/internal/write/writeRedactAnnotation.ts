@@ -4,6 +4,7 @@ import {
   type Color,
   type RedactDraft,
   type RedactPatch,
+  type PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -61,7 +62,7 @@ function touchesLabelStyle(p: {
 }
 
 /** A redaction marks an area: a create gives its `rect`, or quads it is worked out from. */
-export function preflightRedactDraft(draft: RedactDraft): void {
+export function preflightRedactDraft(draft: RedactDraft<PdfCoordinates>): void {
   if (draft.rect === undefined && (draft.quadPoints ?? []).length === 0) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
@@ -91,7 +92,7 @@ export function applyRedactDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: RedactDraft,
+  draft: RedactDraft<PdfCoordinates>,
   ctx?: AnnotationWriteContext,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
@@ -140,7 +141,7 @@ export function applyRedactPatch(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  patch: RedactPatch,
+  patch: RedactPatch<PdfCoordinates>,
   ctx?: AnnotationWriteContext,
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);

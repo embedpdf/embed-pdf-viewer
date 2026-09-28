@@ -1,4 +1,8 @@
-import type { AnnotationBase, LineAnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type {
+  AnnotationBase,
+  LineAnnotationDTO,
+  PdfCoordinates,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { lineIntentFromName } from '../measurementIntent';
@@ -15,8 +19,8 @@ export function readLine(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  base: AnnotationBase,
-): LineAnnotationDTO {
+  base: AnnotationBase<PdfCoordinates>,
+): LineAnnotationDTO<PdfCoordinates> {
   const drawn = readLinePoints(fn, mem, annotPtr) ?? ZERO_LINE;
   // The points upright, and the turn that draws them.
   const turn = readPointsTurn(fn, mem, annotPtr, [[drawn.start, drawn.end]]);

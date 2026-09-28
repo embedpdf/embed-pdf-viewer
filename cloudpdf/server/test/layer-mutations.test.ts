@@ -790,7 +790,7 @@ describe('Phase 5 layer mutation pipeline', () => {
       'body',
       JSON.stringify({
         subtype: 'stamp',
-        box: { left: 100, bottom: 500, right: 260, top: 580 },
+        box: { x: 100, y: 212, width: 160, height: 80 },
         fit: 'contain',
       }),
     );
@@ -830,7 +830,7 @@ describe('Phase 5 layer mutation pipeline', () => {
       'body',
       JSON.stringify({
         subtype: 'stamp',
-        box: { left: 0, bottom: 0, right: 10, top: 10 },
+        box: { x: 0, y: 0, width: 10, height: 10 },
       }),
     );
     form.append(
@@ -867,7 +867,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     const form = new FormData();
     form.append(
       'body',
-      JSON.stringify({ subtype: 'stamp', box: { left: 0, bottom: 0, right: 10, top: 10 } }),
+      JSON.stringify({ subtype: 'stamp', box: { x: 0, y: 0, width: 10, height: 10 } }),
     );
     form.append('resource:r0', new Blob([tinyPng()], { type: 'image/png' }), 'stamp.png');
 

@@ -3,6 +3,7 @@ import type {
   CalloutLine,
   Color,
   FreeTextAnnotationDTO,
+  PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -38,10 +39,10 @@ export function readFreeText(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  base: AnnotationBase,
+  base: AnnotationBase<PdfCoordinates>,
   _subtypeCode?: number,
   ctx?: AnnotationReadContext,
-): FreeTextAnnotationDTO {
+): FreeTextAnnotationDTO<PdfCoordinates> {
   const da = readDefaultAppearance(fn, mem, annotPtr);
   const color = da?.color ?? { ...DEFAULT_FREETEXT_COLOR };
   // The rich text is always there: the annotation's own /RC, else a one-run

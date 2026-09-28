@@ -11,7 +11,7 @@ have replies, so a note, a highlight or a shape can each start a conversation.
 ```ts
 const { annotation: note } = await page.annotations.create({
   subtype: 'text',
-  rect: { left: 500, bottom: 700, right: 520, top: 720 },
+  rect: { x: 500, y: 72, width: 20, height: 20 },
   contents: 'Is this total right?',
 });
 
@@ -40,7 +40,7 @@ Change the comment like any other field, and move the icon by its `rect`:
 
 ```ts
 await page.annotations.update(note.ref, { contents: 'Is this total right? It looks low.' });
-await page.annotations.update(note.ref, { rect: { left: 480, bottom: 700, right: 500, top: 720 } });
+await page.annotations.update(note.ref, { rect: { x: 480, y: 72, width: 20, height: 20 } });
 ```
 
 ## Reply to an annotation
@@ -49,11 +49,11 @@ A reply is an annotation with a `reply` field that names the one it answers. It'
 note placed where its parent is. Here a note answers a highlight:
 
 ```ts
-const { left, top } = highlight.rect;
+const { x, y } = highlight.rect;
 
 await page.annotations.create({
   subtype: 'text',
-  rect: { left, bottom: top - 20, right: left + 20, top },
+  rect: { x, y, width: 20, height: 20 },
   contents: 'Agreed, this needs a source.',
   reply: { to: highlight.ref },
 });
@@ -149,7 +149,7 @@ own, `subtype: 'popup'`, linked to the one it shows by `parent`:
 const { annotation: popup } = await page.annotations.create({
   subtype: 'popup',
   parent: note.ref,
-  rect: { left: 320, bottom: 600, right: 500, top: 700 },
+  rect: { x: 320, y: 92, width: 180, height: 100 },
   open: true,
 });
 ```

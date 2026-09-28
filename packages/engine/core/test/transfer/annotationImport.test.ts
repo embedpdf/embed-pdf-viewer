@@ -10,7 +10,8 @@ import {
   type AnnotationImportTarget,
 } from '../../src/transfer/annotationImport';
 
-const box = { left: 10, bottom: 10, right: 40, top: 30 };
+const box = { x: 10, y: 10, width: 30, height: 20 };
+const size = { width: 612, height: 792 };
 const first = toPageRef(3);
 const second = toPageRef(7);
 const refOf = (page: PageRef, annotObjectNumber: number): AnnotationRef => ({
@@ -47,7 +48,7 @@ function bundleOf(...items: AnnotationDTO[]): Pick<AnnotationBundle, 'pages' | '
     .filter((page) =>
       items.some((item) => item.ref.page.pageObjectNumber === page.pageObjectNumber),
     )
-    .map((page, position) => ({ page, position: position === 0 ? 0 : 4, box }));
+    .map((page, position) => ({ page, position: position === 0 ? 0 : 4, size }));
   return { pages, items: items.map((data) => ({ data, resources: {} })) };
 }
 

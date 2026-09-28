@@ -11,11 +11,9 @@ import type {
   PageRef,
   PdfActionTree,
   PdfAnnotationActions,
-  PdfDestination,
   PdfPageActions,
 } from '@embedpdf/engine-core/runtime';
 
-import { annotationTreeInPageSpace } from './annotation-trees';
 import type { ActionsConfig, ActionSource, ActionTrigger } from '../contract';
 
 export const sameRef = (left: AnnotationRef, right: AnnotationRef): boolean => {
@@ -34,7 +32,7 @@ export const sameRef = (left: AnnotationRef, right: AnnotationRef): boolean => {
 /** An annotation that carries at least one page-lifecycle tree (/PO, /PC, /PV, /PI), as read. */
 interface LifecycleAnnotation {
   readonly ref: AnnotationRef;
-  readonly actions: PdfAnnotationActions<PdfDestination>;
+  readonly actions: PdfAnnotationActions;
 }
 
 /**
@@ -135,7 +133,7 @@ export function createTriggers(ctx: PluginContext<void>, config: ActionsConfig) 
         .filter((annotation) => annotation.actions[key]?.root)
         .map((annotation) => ({
           source: { kind: 'annotation', annotation: annotation.ref, page } as ActionSource,
-          tree: annotationTreeInPageSpace(ctx.geometry, annotation.actions[key]!),
+          tree: annotation.actions[key]!,
         }));
     switch (event) {
       case 'open':

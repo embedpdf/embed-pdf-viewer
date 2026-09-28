@@ -94,7 +94,7 @@ describe('pages kept between jobs (wasm engine)', () => {
     const redact = async (doc: DocumentHandle, page: PageRef) => {
       await doc.page(page).annotations.create({
         subtype: 'redact',
-        rect: { left: 100, bottom: 100, right: 200, top: 200 },
+        rect: { x: 100, y: 100, width: 100, height: 100 },
         interiorColor: { r: 0, g: 0, b: 0 },
       });
       await doc.redaction!.apply({ pages: [page] });

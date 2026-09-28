@@ -5,7 +5,7 @@ import type { ConformanceTestRunner } from './runMetadataConformance';
 import type { AnnotationDTO } from '../annotation/kinds';
 import type { PageLayout } from '../dto/PageLayout';
 import type { PageImageHandle, PageImageOptions } from '../dto/PageRender';
-import type { PageDestination, PdfDestination } from '../dto/PdfDestination';
+import type { PageDestination } from '../dto/PdfDestination';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import type { PdfRect } from '../geometry/primitives';
@@ -169,12 +169,12 @@ export function runPageSpaceConformance(
             const handle = doc.page(layout.ref);
             const { annotation } = await handle.annotations.create({
               subtype: 'square',
-              box: fromPage(spot, visible),
+              box: spot,
               color: { r: 0, g: 0, b: 0 },
               interiorColor: { r: 0, g: 0, b: 0 },
             });
             try {
-              const read = toPage(annotation.rect, visible);
+              const read = annotation.rect;
               expect(read.x <= spot.x && read.x + read.width >= spot.x + spot.width).toBe(true);
               expect(read.y <= spot.y && read.y + read.height >= spot.y + spot.height).toBe(true);
               const scale = scaleFor(visible);
@@ -209,15 +209,16 @@ export function runPageSpaceConformance(
                 (a): a is Extract<AnnotationDTO, { subtype: 'link' }> => a.subtype === 'link',
               );
               for (const link of page.links) {
-                const read = links.find((a) => sameRect(a.rect, link.rect));
+                const read = links.find((a) =>
+                  sameBox(a.rect, toPage(link.rect, page.expected.visible)),
+                );
                 expect(read !== undefined).toBe(true);
                 const target = read!.target;
                 expect(target?.kind).toBe('goto');
                 if (target?.kind !== 'goto') continue;
                 const destination = target.destination;
                 expect(samePage(destination.page, layouts[link.toPage]!.ref)).toBe(true);
-                const visible = fixture.pages[link.toPage]!.expected.visible;
-                expect(destinationInPage(destination, visible)).toEqual(link.expected);
+                expect(placeOf(destination)).toEqual(link.expected);
               }
             });
           });
@@ -270,16 +271,14 @@ export function runPageSpaceConformance(
           const match = slice.matches.find((m) => samePage(m.page, layout.ref));
           expect(match !== undefined).toBe(true);
           const found = match!.segments[0]!.rect;
-          // Annotations still take the file's numbers.
-          const inFile = fromPage(found, visible);
           const handle = doc.page(layout.ref);
           const { annotation } = await handle.annotations.create({
             subtype: 'redact',
             rect: {
-              left: inFile.left - 2,
-              bottom: inFile.bottom - 2,
-              right: inFile.right + 2,
-              top: inFile.top + 2,
+              x: found.x - 2,
+              y: found.y - 2,
+              width: found.width + 4,
+              height: found.height + 4,
             },
           });
           await doc.redaction.apply({ annotations: [annotation.ref] });
@@ -308,30 +307,7 @@ function toPage(r: PdfRect, visible: PdfRect): PageBox {
   return { x: r.left - visible.left, y: visible.top - r.top, width: width(r), height: height(r) };
 }
 
-function fromPage(box: PageBox, visible: PdfRect): PdfRect {
-  const top = visible.top - box.y;
-  const left = box.x + visible.left;
-  return { left, bottom: top - box.height, right: left + box.width, top };
-}
-
 const middleOf = (box: PageBox) => ({ x: box.x + box.width / 2, y: box.y + box.height / 2 });
-
-function destinationInPage(destination: PdfDestination, visible: PdfRect) {
-  const x = (left: number | null | undefined) => (left == null ? null : left - visible.left);
-  const y = (top: number | null | undefined) => (top == null ? null : visible.top - top);
-  switch (destination.kind) {
-    case 'xyz':
-      return { kind: 'xyz', x: x(destination.left), y: y(destination.top) };
-    case 'fitH':
-      return { kind: 'fitH', y: y(destination.top) };
-    case 'fitV':
-      return { kind: 'fitV', x: x(destination.left) };
-    case 'fitR':
-      return { kind: 'fitR', ...toPage(destination, visible) };
-    default:
-      return { kind: destination.kind };
-  }
-}
 
 /** A page-space destination's kind and place, without its page and zoom. */
 function placeOf(destination: PageDestination) {
@@ -351,11 +327,11 @@ function placeOf(destination: PageDestination) {
   }
 }
 
-const sameRect = (a: PdfRect, b: PdfRect) =>
-  Math.abs(a.left - b.left) < 0.01 &&
-  Math.abs(a.bottom - b.bottom) < 0.01 &&
-  Math.abs(a.right - b.right) < 0.01 &&
-  Math.abs(a.top - b.top) < 0.01;
+const sameBox = (a: PageBox, b: PageBox) =>
+  Math.abs(a.x - b.x) < 0.01 &&
+  Math.abs(a.y - b.y) < 0.01 &&
+  Math.abs(a.width - b.width) < 0.01 &&
+  Math.abs(a.height - b.height) < 0.01;
 
 const samePage = (a: PageRef, b: PageRef) => a.pageObjectNumber === b.pageObjectNumber;
 

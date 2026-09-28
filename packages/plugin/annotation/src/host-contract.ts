@@ -67,7 +67,7 @@ export interface RecalibrationReport {
 export interface CapturedAnnotationDraft {
   tool: string;
   page: PageRef;
-  /** Original PDF user space, matching the engine API. */
+  /** In the file's coordinates, as the page's measure viewports are read. */
   from: PdfPoint;
   to: PdfPoint;
 }

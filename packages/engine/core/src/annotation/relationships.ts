@@ -16,6 +16,7 @@
 
 import type { AnnotationBase } from './base';
 import type { AnnotationDTO } from './kinds';
+import type { PdfCoordinates } from '../pageSpace/coordinates';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import { annotationKey, annotationKeysOf } from '../identity/annotationKey';
 
@@ -137,11 +138,11 @@ export function buildThreads(annotations: readonly AnnotationDTO[]): AnnotationT
  * popup before the annotation it shows, so the annotation itself is last.
  * Empty when `ref` names nothing in `annotations`.
  */
-export function deletedWith(
-  annotations: readonly AnnotationDTO[],
+export function deletedWith<A extends AnnotationDTO | AnnotationDTO<PdfCoordinates>>(
+  annotations: readonly A[],
   ref: AnnotationRef,
-): AnnotationDTO[] {
-  const byKey = new Map<string, AnnotationDTO>();
+): A[] {
+  const byKey = new Map<string, A>();
   for (const annotation of annotations) {
     for (const key of annotationKeysOf(annotation)) {
       if (!byKey.has(key)) byKey.set(key, annotation);
@@ -150,13 +151,10 @@ export function deletedWith(
   const target = byKey.get(annotationKey(ref));
   if (!target) return [];
 
-  const children = new Map<AnnotationDTO, AnnotationDTO[]>();
-  const popups = new Map<AnnotationDTO, AnnotationDTO[]>();
-  const add = (
-    map: Map<AnnotationDTO, AnnotationDTO[]>,
-    key: AnnotationDTO,
-    value: AnnotationDTO,
-  ) => map.set(key, [...(map.get(key) ?? []), value]);
+  const children = new Map<A, A[]>();
+  const popups = new Map<A, A[]>();
+  const add = (map: Map<A, A[]>, key: A, value: A) =>
+    map.set(key, [...(map.get(key) ?? []), value]);
   for (const annotation of annotations) {
     const parent = annotation.reply ? byKey.get(annotationKey(annotation.reply.to)) : undefined;
     if (parent && parent !== annotation) add(children, parent, annotation);
@@ -171,9 +169,9 @@ export function deletedWith(
     if (own && own !== annotation && own.subtype === 'popup') add(popups, annotation, own);
   }
 
-  const members: AnnotationDTO[] = [];
-  const seen = new Set<AnnotationDTO>();
-  const visit = (annotation: AnnotationDTO): void => {
+  const members: A[] = [];
+  const seen = new Set<A>();
+  const visit = (annotation: A): void => {
     if (seen.has(annotation)) return;
     seen.add(annotation);
     for (const child of children.get(annotation) ?? []) visit(child);

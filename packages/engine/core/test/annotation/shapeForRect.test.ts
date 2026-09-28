@@ -1,13 +1,16 @@
 import { describe, expect, test } from 'vitest';
 
 import { KIND_BY_SUBTYPE, type AnnotationDTO } from '../../src/annotation/kinds';
-import { DRAWN_RECT_KINDS, shapeForRect } from '../../src/annotation/shapeForRect';
+import { DRAWN_RECT_KINDS, pdfShapeForRect } from '../../src/annotation/shapeForRect';
 import type { AnnotationSubtype } from '../../src/annotation/subtype';
 import { EngineErrorCode } from '../../src/errors/EngineErrorCode';
 import type { PdfPoint, PdfRect } from '../../src/geometry/primitives';
+import type { PdfCoordinates } from '../../src/pageSpace/coordinates';
+import { shapeForRect } from '../../src/pageSpace/helpers';
 
 /** An annotation as a read returns it, with the fields the mapping looks at. */
-const read = (fields: Record<string, unknown>) => fields as unknown as AnnotationDTO;
+const read = (fields: Record<string, unknown>) =>
+  fields as unknown as AnnotationDTO<PdfCoordinates>;
 
 /** Acrobat's `[x1, y1, x2, y2]`. */
 const rect = ([left, bottom, right, top]: number[]): PdfRect => ({ left, bottom, right, top });
@@ -22,7 +25,7 @@ const expectPoints = (actual: unknown, expected: number[][]) => {
   });
 };
 
-describe('shapeForRect', () => {
+describe('pdfShapeForRect', () => {
   test('lists exactly the kinds whose rect the engine works out', () => {
     const drawn = Object.entries(KIND_BY_SUBTYPE)
       .filter(([, kind]) => kind.readBackWrites.rect === null)
@@ -48,7 +51,7 @@ describe('shapeForRect', () => {
       ],
       rotation: null,
     });
-    const { inkList } = shapeForRect(ink, rect([108.5, 318.5, 261.5, 381.5])) as {
+    const { inkList } = pdfShapeForRect(ink, rect([108.5, 318.5, 261.5, 381.5])) as {
       inkList: PdfPoint[][];
     };
     expect(inkList).toEqual([
@@ -72,7 +75,7 @@ describe('shapeForRect', () => {
       measure: null,
       rotation: null,
     });
-    const { linePoints } = shapeForRect(line, rect([338.5, 638.5, 541.5, 731.5])) as {
+    const { linePoints } = pdfShapeForRect(line, rect([338.5, 638.5, 541.5, 731.5])) as {
       linePoints: { start: PdfPoint; end: PdfPoint };
     };
     expectPoints(
@@ -95,7 +98,7 @@ describe('shapeForRect', () => {
       measure: null,
       rotation: null,
     });
-    const shape = shapeForRect(polygon, rect([345.75, 418.34, 543.7, 512]));
+    const shape = pdfShapeForRect(polygon, rect([345.75, 418.34, 543.7, 512]));
     expectPoints((shape as { vertices: unknown }).vertices, [
       [351.85, 420.78],
       [538.39, 428.14],
@@ -117,7 +120,7 @@ describe('shapeForRect', () => {
       richText: null,
       rotation: null,
     });
-    expect(shapeForRect(callout, rect([70, 50, 170, 130]))).toEqual({
+    expect(pdfShapeForRect(callout, rect([70, 50, 170, 130]))).toEqual({
       box: rect([110, 90, 170, 130]),
       calloutLine: [
         { x: 70, y: 50 },
@@ -136,7 +139,7 @@ describe('shapeForRect', () => {
       measure: { subtype: 'rectilinear', origin: { x: 0, y: 0 } },
       rotation: null,
     });
-    const shape = shapeForRect(polyline, rect([0, 0, 200, 100]));
+    const shape = pdfShapeForRect(polyline, rect([0, 0, 200, 100]));
     expect(shape).toEqual({
       vertices: [
         { x: 0, y: 0 },
@@ -149,7 +152,7 @@ describe('shapeForRect', () => {
   test('a kind whose shape is its rect takes the rect as it is', () => {
     const note = read({ subtype: 'text', rect: rect([80, 260, 100, 280]) });
     // Acrobat's Text resize: the icon fills the new rect.
-    expect(shapeForRect(note, rect([350, 230, 430, 280]))).toEqual({
+    expect(pdfShapeForRect(note, rect([350, 230, 430, 280]))).toEqual({
       rect: rect([350, 230, 430, 280]),
     });
   });
@@ -161,10 +164,10 @@ describe('shapeForRect', () => {
       box: rect([60, 60, 160, 140]),
       rotation: 30,
     });
-    expect(shapeForRect(square, rect([60, 40, 180, 140]))).toEqual({
+    expect(pdfShapeForRect(square, rect([60, 40, 180, 140]))).toEqual({
       box: rect([70, 50, 170, 130]),
     });
-    expect(() => shapeForRect(square, rect([50, 50, 200, 150]))).toThrow(
+    expect(() => pdfShapeForRect(square, rect([50, 50, 200, 150]))).toThrow(
       expect.objectContaining({ code: EngineErrorCode.InvalidArg, details: { field: 'rect' } }),
     );
   });
@@ -176,7 +179,7 @@ describe('shapeForRect', () => {
       box: rect([60, 60, 160, 140]),
       rotation: null,
     });
-    expect(() => shapeForRect(square, rect([60, 60, 60, 140]))).toThrow(
+    expect(() => pdfShapeForRect(square, rect([60, 60, 60, 140]))).toThrow(
       expect.objectContaining({ details: { field: 'rect' } }),
     );
 
@@ -187,11 +190,41 @@ describe('shapeForRect', () => {
       linePoints: { start: { x: 0, y: 100 }, end: { x: 100, y: 100 } },
       rotation: null,
     });
-    expect(shapeForRect(flat, rect([10, 120, 110, 120]))).toEqual({
+    expect(pdfShapeForRect(flat, rect([10, 120, 110, 120]))).toEqual({
       linePoints: { start: { x: 10, y: 120 }, end: { x: 110, y: 120 } },
     });
-    expect(() => shapeForRect(flat, rect([0, 100, 100, 110]))).toThrow(
+    expect(() => pdfShapeForRect(flat, rect([0, 100, 100, 110]))).toThrow(
       expect.objectContaining({ details: { field: 'rect' } }),
     );
+  });
+});
+
+describe('shapeForRect', () => {
+  test("in page space, Acrobat's Line resize on a US Letter page", () => {
+    // The same line and rects as above, from the page's top-left (792 high).
+    const line = {
+      subtype: 'line',
+      rect: { x: 338.5, y: 60.5, width: 143, height: 63 },
+      linePoints: { start: { x: 340, y: 122 }, end: { x: 480, y: 62 } },
+      measure: null,
+      rotation: null,
+    } as unknown as AnnotationDTO;
+    const { linePoints } = shapeForRect(line, { x: 338.5, y: 60.5, width: 203, height: 93 }) as {
+      linePoints: { start: PdfPoint; end: PdfPoint };
+    };
+    expectPoints(
+      [linePoints.start, linePoints.end],
+      [
+        [340.63, 792 - 640.71],
+        [539.37, 792 - 729.29],
+      ],
+    );
+  });
+
+  test('a kind whose shape is its rect takes the rect as it is', () => {
+    const link = { subtype: 'link', rect: { x: 1, y: 2, width: 3, height: 4 } } as AnnotationDTO;
+    expect(shapeForRect(link, { x: 0.1, y: 0.2, width: 0.3, height: 0.4 })).toEqual({
+      rect: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 },
+    });
   });
 });

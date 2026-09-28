@@ -24,7 +24,7 @@ const robotoPath = resolve(here, 'fixtures', 'Roboto-Regular.ttf');
 /** A page known to exist and be editable in annotations.pdf (see the mutation
  *  conformance fixture, which authors on the same page). */
 const PAGE = 3;
-const RECT = { left: 50, bottom: 250, right: 350, top: 320 };
+const RECT = { x: 50, y: 250, width: 300, height: 70 };
 
 let annotationsPdf: Uint8Array;
 let roboto: Uint8Array;

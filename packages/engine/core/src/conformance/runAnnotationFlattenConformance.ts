@@ -9,9 +9,9 @@ import type { AnnotationRef } from '../identity/AnnotationRef';
 import { toPageRef } from '../identity/PageRef';
 import { AnnotationFlattenResultSchema } from '../wire/schemas';
 
-const square = (left: number, bottom: number): SquareDraft => ({
+const square = (x: number, y: number): SquareDraft => ({
   subtype: 'square',
-  box: { left, bottom, right: left + 40, top: bottom + 40 },
+  box: { x, y, width: 40, height: 40 },
   color: { r: 20, g: 40, b: 220 },
   strokeWidth: 2,
 });

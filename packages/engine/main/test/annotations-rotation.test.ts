@@ -4,13 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, beforeAll, describe, expect, test } from 'vitest';
 
-import {
-  appearanceTurnOf,
-  pdfRectOf,
-  toPageRef,
-  type DocumentHandle,
-  type PageBox,
-} from '@embedpdf/engine-core/runtime';
+import { appearanceTurnOf, toPageRef, type PageBox } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine, type LocalEngine } from '../src/index';
 import { encodePng } from '../src/render/PortableImageEncoder';
 
@@ -30,15 +24,8 @@ const annotationsPdfPath = resolve(
 /** A page known to exist and be editable in annotations.pdf. */
 const PAGE = 3;
 
-/** An appearance's page-space rect in the file's numbers, as annotation reads still give them. */
-async function inFile(doc: DocumentHandle, rect: PageBox) {
-  const { pages } = await doc.pages.list();
-  const layout = pages.find((page) => page.ref.pageObjectNumber === PAGE)!;
-  return pdfRectOf(rect, layout.pdfCropBox);
-}
-
 /** A square box, so a 90° turn's AABB equals the authored box. */
-const SQUARE_RECT = { left: 60, bottom: 60, right: 160, top: 160 };
+const SQUARE_RECT = { x: 60, y: 60, width: 100, height: 100 };
 
 /** A triangle that fits inside SQUARE_RECT (valid for polyline/line/ink). */
 const VERTICES = [
@@ -47,21 +34,18 @@ const VERTICES = [
   { x: 110, y: 150 },
 ];
 
-type Rect = { left: number; bottom: number; right: number; top: number };
-
-function rotatedAabb(rect: Rect, degrees: number): Rect {
+function rotatedAabb(rect: PageBox, degrees: number): PageBox {
   const radians = (degrees * Math.PI) / 180;
-  const width = rect.right - rect.left;
-  const height = rect.top - rect.bottom;
+  const { width, height } = rect;
   const aabbWidth = width * Math.abs(Math.cos(radians)) + height * Math.abs(Math.sin(radians));
   const aabbHeight = width * Math.abs(Math.sin(radians)) + height * Math.abs(Math.cos(radians));
-  const centerX = (rect.left + rect.right) / 2;
-  const centerY = (rect.bottom + rect.top) / 2;
+  const centerX = rect.x + width / 2;
+  const centerY = rect.y + height / 2;
   return {
-    left: centerX - aabbWidth / 2,
-    bottom: centerY - aabbHeight / 2,
-    right: centerX + aabbWidth / 2,
-    top: centerY + aabbHeight / 2,
+    x: centerX - aabbWidth / 2,
+    y: centerY - aabbHeight / 2,
+    width: aabbWidth,
+    height: aabbHeight,
   };
 }
 
@@ -145,8 +129,8 @@ describe('annotation rotation (local engine) — save + reopen', () => {
       expect(square.rotation).toBe(90);
       expect(square.box).toBeDefined();
       // a 90°-turned square spans the same AABB it was authored in.
-      expect(Math.round(square.box.left)).toBe(SQUARE_RECT.left);
-      expect(Math.round(square.box.right)).toBe(SQUARE_RECT.right);
+      expect(Math.round(square.box.x)).toBe(SQUARE_RECT.x);
+      expect(Math.round(square.box.width)).toBe(SQUARE_RECT.width);
     }
     await doc.close();
   });
@@ -155,8 +139,8 @@ describe('annotation rotation (local engine) — save + reopen', () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
 
     const rotation = 45;
-    const originalBox = { left: 100, bottom: 100, right: 300, top: 300 };
-    const movedBox = { left: 80, bottom: 100, right: 280, top: 300 };
+    const originalBox = { x: 100, y: 100, width: 200, height: 200 };
+    const movedBox = { x: 80, y: 100, width: 200, height: 200 };
 
     let artifact: Uint8Array;
     let ref: unknown;
@@ -203,7 +187,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
       (candidate) => JSON.stringify(candidate.ref) === JSON.stringify(ref),
     );
     expect(appearance).toBeDefined();
-    expect(await inFile(doc, appearance!.rect)).toMatchObject(movedBox);
+    expect(appearance!.rect).toMatchObject(movedBox);
     const coverage = alphaCoverage(appearance!.raster);
     expect(coverage.x).toBeGreaterThan(0.98);
     expect(coverage.y).toBeGreaterThan(0.98);
@@ -346,11 +330,11 @@ describe('annotation rotation (local engine) — save + reopen', () => {
           a.ref.annotObjectNumber === dto.ref.annotObjectNumber,
       );
       expect(ap, `appearance for ${dto.subtype}`).toBeDefined();
-      const apRect = await inFile(doc, ap!.rect);
-      expect(apRect.left).toBeCloseTo(dto.rect.left, 0);
-      expect(apRect.bottom).toBeCloseTo(dto.rect.bottom, 0);
-      expect(apRect.right).toBeCloseTo(dto.rect.right, 0);
-      expect(apRect.top).toBeCloseTo(dto.rect.top, 0);
+      const apRect = ap!.rect;
+      expect(apRect.x).toBeCloseTo(dto.rect.x, 0);
+      expect(apRect.y).toBeCloseTo(dto.rect.y, 0);
+      expect(apRect.width).toBeCloseTo(dto.rect.width, 0);
+      expect(apRect.height).toBeCloseTo(dto.rect.height, 0);
       const data = new Uint8Array(ap!.raster.data);
       expect(data.some((_, idx) => idx % 4 === 3 && data[idx] > 0)).toBe(true); // non-empty
     }
@@ -363,9 +347,9 @@ describe('annotation rotation (local engine) — save + reopen', () => {
     // Deliberately asymmetric (8×16) so the rotated AABB (16×8) differs from
     // the unrotated box — the appearance assertion below can then tell the
     // stripped path (rect = unrotated box) from the classic one (rect = /Rect).
-    const UNROTATED = { left: 70, bottom: 70, right: 78, top: 86 };
+    const UNROTATED = { x: 70, y: 70, width: 8, height: 16 };
     // 90° about the same centre (74, 78): width/height swap.
-    const ROTATED_AABB = { left: 66, bottom: 74, right: 82, top: 82 };
+    const ROTATED_AABB = { x: 66, y: 74, width: 16, height: 8 };
 
     let bytes: Uint8Array;
     {
@@ -392,21 +376,23 @@ describe('annotation rotation (local engine) — save + reopen', () => {
     if (caret && caret.subtype === 'caret') {
       expect(caret.rotation).toBe(90);
       expect(caret.box).toBeDefined();
-      expect(Math.round(caret.box.left)).toBe(UNROTATED.left);
-      expect(Math.round(caret.box.bottom)).toBe(UNROTATED.bottom);
-      expect(Math.round(caret.box.right)).toBe(UNROTATED.right);
-      expect(Math.round(caret.box.top)).toBe(UNROTATED.top);
+      expect(Math.round(caret.box.x)).toBe(UNROTATED.x);
+      expect(Math.round(caret.box.y)).toBe(UNROTATED.y);
+      expect(Math.round(caret.box.width)).toBe(UNROTATED.width);
+      expect(Math.round(caret.box.height)).toBe(UNROTATED.height);
 
       // The caret's outline reaches past its box, so `rect` holds more than
       // the turned box and its raster is drawn as the page shows it, placed
       // by `rect`: the same rule (`appearanceTurnOf`) the consumer applies
       // to the read, so it never turns the raster a second time.
-      for (const edge of ['left', 'bottom'] as const) {
-        expect(caret.rect[edge]).toBeLessThanOrEqual(ROTATED_AABB[edge]);
-      }
-      for (const edge of ['right', 'top'] as const) {
-        expect(caret.rect[edge]).toBeGreaterThanOrEqual(ROTATED_AABB[edge]);
-      }
+      expect(caret.rect.x).toBeLessThanOrEqual(ROTATED_AABB.x);
+      expect(caret.rect.y).toBeLessThanOrEqual(ROTATED_AABB.y);
+      expect(caret.rect.x + caret.rect.width).toBeGreaterThanOrEqual(
+        ROTATED_AABB.x + ROTATED_AABB.width,
+      );
+      expect(caret.rect.y + caret.rect.height).toBeGreaterThanOrEqual(
+        ROTATED_AABB.y + ROTATED_AABB.height,
+      );
       expect(appearanceTurnOf(caret)).toBe(null);
       const rendered = await doc.page(toPageRef(PAGE)).annotations.renderAppearancesRaw();
       const ap = rendered.appearances.find(
@@ -416,11 +402,11 @@ describe('annotation rotation (local engine) — save + reopen', () => {
           a.ref.annotObjectNumber === caret.ref.annotObjectNumber,
       );
       expect(ap, 'appearance for caret').toBeDefined();
-      const apRect = await inFile(doc, ap!.rect);
-      expect(apRect.left).toBeCloseTo(caret.rect.left, 2);
-      expect(apRect.bottom).toBeCloseTo(caret.rect.bottom, 2);
-      expect(apRect.right).toBeCloseTo(caret.rect.right, 2);
-      expect(apRect.top).toBeCloseTo(caret.rect.top, 2);
+      const apRect = ap!.rect;
+      expect(apRect.x).toBeCloseTo(caret.rect.x, 2);
+      expect(apRect.y).toBeCloseTo(caret.rect.y, 2);
+      expect(apRect.width).toBeCloseTo(caret.rect.width, 2);
+      expect(apRect.height).toBeCloseTo(caret.rect.height, 2);
       const data = new Uint8Array(ap!.raster.data);
       expect(data.some((_, idx) => idx % 4 === 3 && data[idx] > 0)).toBe(true); // non-empty
     }
@@ -456,7 +442,7 @@ describe("annotation rotation (local engine) — Acrobat's /Rotate", () => {
     const doc = await engine.open({ kind: 'bytes', id: 'rot-acrobat', bytes: annotationsPdf });
     const page = doc.page(toPageRef(PAGE));
     const png = await encodePng(new Uint8Array([255, 0, 0, 255, 0, 0, 255, 255]), 2, 1);
-    const box = { left: 100, bottom: 100, right: 200, top: 150 };
+    const box = { x: 100, y: 100, width: 100, height: 50 };
     const textBox = (rotation: number) =>
       page.annotations.create({
         subtype: 'free-text',

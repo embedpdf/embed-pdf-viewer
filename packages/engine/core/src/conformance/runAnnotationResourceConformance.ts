@@ -6,7 +6,7 @@ import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import type { PageHandle } from '../engine/PageHandle';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
-import type { PdfRect } from '../geometry/primitives';
+import type { PageBox } from '../geometry/pageSpace';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import { toPageRef, type PageRef } from '../identity/PageRef';
 
@@ -95,7 +95,7 @@ export function runAnnotationResourceConformance(
 
     test("a stamp's appearance and its data make the same stamp", async () => {
       await onPage('authoring', async (page) => {
-        const rect: PdfRect = { left: 100, bottom: 100, right: 260, top: 180 };
+        const rect: PageBox = { x: 100, y: 100, width: 160, height: 80 };
         const { annotation: created } = await page.annotations.create(
           {
             subtype: 'stamp',
@@ -149,14 +149,9 @@ export function runAnnotationResourceConformance(
     test('a stamp another tool made keeps its opacity through a resize', async () => {
       await onPage('acrobat-stamps', async (page) => {
         for (const stamp of await acrobatStamps(page)) {
-          const { left, bottom, right, top } = stamp.box;
+          const { x, y, width, height } = stamp.box;
           const { annotation: updated } = await page.annotations.update(stamp.ref, {
-            box: {
-              left,
-              bottom,
-              right: left + (right - left) * 2,
-              top: bottom + (top - bottom) * 2,
-            },
+            box: { x, y, width: width * 2, height: height * 2 },
           });
           expectPaintedOnce(await rasterOf(page, updated.ref), stamp.opacity!);
         }
@@ -178,7 +173,7 @@ export function runAnnotationResourceConformance(
 
     test('a turned stamp renders unturned as its unturned twin', async () => {
       await onPage('authoring', async (page) => {
-        const box: PdfRect = { left: 100, bottom: 100, right: 260, top: 180 };
+        const box: PageBox = { x: 100, y: 100, width: 160, height: 80 };
         const common = { subtype: 'stamp', fit: 'cover', opacity: 0.5 } as const;
         const turned = (
           await page.annotations.create({ ...common, box, rotation: 30 }, { appearance: BANDS_PDF })
@@ -223,7 +218,7 @@ export function runAnnotationResourceConformance(
         const drawing = await page.annotations.downloadResource(turned.ref, 'appearance');
         const { box } = turned;
         const { annotation: updated } = await page.annotations.update(turned.ref, {
-          box: { ...box, right: box.right + 60 },
+          box: { ...box, width: box.width + 60 },
           rotation: turned.rotation,
         });
         expect(
@@ -273,7 +268,7 @@ export function runAnnotationResourceConformance(
           // And after a resize here.
           const { box } = stamp;
           const { annotation: updated } = await page.annotations.update(stamp.ref, {
-            box: { ...box, right: box.right + 40 },
+            box: { ...box, width: box.width + 40 },
             rotation: stamp.rotation,
           });
           const resized = (
@@ -319,7 +314,7 @@ export function runAnnotationResourceConformance(
           await page.annotations.create(
             {
               subtype: 'stamp',
-              box: { left: 20, bottom: 20, right: 220, top: 120 },
+              box: { x: 20, y: 20, width: 200, height: 100 },
               fit: 'contain',
             },
             { appearance: BANDS_PDF },
@@ -329,7 +324,7 @@ export function runAnnotationResourceConformance(
           await page.annotations.create(
             {
               subtype: 'stamp',
-              box: { left: 20, bottom: 140, right: 120, top: 240 },
+              box: { x: 20, y: 140, width: 100, height: 100 },
               fit: 'cover',
             },
             { appearance: BANDS_PNG },
@@ -354,7 +349,7 @@ export function runAnnotationResourceConformance(
           await page.annotations.create(
             {
               subtype: 'stamp',
-              box: { left: 20, bottom: 20, right: 120, top: 120 },
+              box: { x: 20, y: 20, width: 100, height: 100 },
               fit: 'contain',
             },
             { appearance: BANDS_PNG },
@@ -364,7 +359,7 @@ export function runAnnotationResourceConformance(
           await page.annotations.create(
             {
               subtype: 'stamp',
-              box: { left: 20, bottom: 140, right: 320, top: 240 },
+              box: { x: 20, y: 140, width: 300, height: 100 },
               fit: 'cover',
             },
             { appearance: BANDS_PNG },
@@ -384,7 +379,7 @@ export function runAnnotationResourceConformance(
           await page.annotations.create(
             {
               subtype: 'stamp',
-              box: { left: 20, bottom: 20, right: 120, top: 120 },
+              box: { x: 20, y: 20, width: 100, height: 100 },
               fit: 'cover',
             },
             { appearance: BANDS_PNG },
@@ -412,7 +407,7 @@ export function runAnnotationResourceConformance(
           await page.annotations.create(
             {
               subtype: 'stamp',
-              box: { left: 20, bottom: 20, right: 220, top: 120 },
+              box: { x: 20, y: 20, width: 200, height: 100 },
               opacity: 0.5,
             },
             { appearance: BANDS_PDF },
@@ -432,13 +427,13 @@ export function runAnnotationResourceConformance(
     test('stamps with the same artwork place one drawing', async () => {
       await onPage('authoring', async (page, doc) => {
         for (let i = 0; i < 10; i++) {
-          const left = 20 + 50 * i;
+          const x = 20 + 50 * i;
           await page.annotations.create(
-            { subtype: 'stamp', box: { left, bottom: 20, right: left + 40, top: 40 } },
+            { subtype: 'stamp', box: { x, y: 20, width: 40, height: 20 } },
             { appearance: BANDS_PNG },
           );
           await page.annotations.create(
-            { subtype: 'stamp', box: { left, bottom: 60, right: left + 40, top: 80 } },
+            { subtype: 'stamp', box: { x, y: 60, width: 40, height: 20 } },
             { appearance: BANDS_PDF },
           );
         }
@@ -452,13 +447,13 @@ export function runAnnotationResourceConformance(
       await onPage('authoring', async (page, doc) => {
         const stamp = (
           await page.annotations.create(
-            { subtype: 'stamp', box: { left: 20, bottom: 20, right: 120, top: 120 } },
+            { subtype: 'stamp', box: { x: 20, y: 20, width: 100, height: 100 } },
             { appearance: BANDS_PNG },
           )
         ).annotation;
         const appearance = await page.annotations.downloadResource(stamp.ref, 'appearance');
         await page.annotations.create(
-          { subtype: 'stamp', box: { left: 200, bottom: 20, right: 260, top: 40 } },
+          { subtype: 'stamp', box: { x: 200, y: 20, width: 60, height: 20 } },
           { appearance },
         );
         expect(images(await rewrite(doc))).toBe(1);
@@ -467,12 +462,12 @@ export function runAnnotationResourceConformance(
 
     test('new artwork for one stamp leaves a stamp sharing the old alone', async () => {
       await onPage('authoring', async (page, doc) => {
-        const place = async (left: number) =>
+        const place = async (x: number) =>
           (
             await page.annotations.create(
               {
                 subtype: 'stamp',
-                box: { left, bottom: 20, right: left + 100, top: 120 },
+                box: { x, y: 20, width: 100, height: 100 },
                 opacity: 0.5,
               },
               { appearance: BANDS_PNG },
@@ -496,7 +491,7 @@ export function runAnnotationResourceConformance(
 
     test('a role the kind does not take is refused', async () => {
       await onPage('authoring', async (page) => {
-        const rect: PdfRect = { left: 300, bottom: 300, right: 360, top: 340 };
+        const rect: PageBox = { x: 300, y: 300, width: 60, height: 40 };
         const refused = { code: EngineErrorCode.InvalidArg };
         const square = (await page.annotations.create({ subtype: 'square', box: rect })).annotation;
         await expect(

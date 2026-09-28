@@ -22,7 +22,6 @@ import { setToolGhost } from '../model';
 import { boxGeomFields } from '../repository';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import { named } from './named';
-import { pageSizeOf } from '../services/geometry';
 import { ARMED_STAMP_TOOL_ID } from '../tools/definitions';
 
 /**
@@ -164,15 +163,15 @@ export function createStamps(
     identity: { name?: string; subject?: string } = {},
   ): Promise<AnnotationRef> | null => {
     const doc = ctx.doc;
-    const crop = geometry.cropOf(pageObjectNumber);
-    if (!doc || !crop) return null;
-    const box: Rect = fitStampBox(point, desired, pageSizeOf(crop), rotCW);
+    const page = geometry.sizeOf(pageObjectNumber);
+    if (!doc || !page) return null;
+    const box: Rect = fitStampBox(point, desired, page, rotCW);
     return doc
       .page(toPageRef(pageObjectNumber))
       .annotations.create(
         named({
           subtype: 'stamp',
-          ...boxGeomFields(box, rotCW, crop),
+          ...boxGeomFields(box, rotCW),
           fit: 'contain',
           ...(identity.name !== undefined ? { name: identity.name } : {}),
           ...(identity.subject !== undefined ? { subject: identity.subject } : {}),

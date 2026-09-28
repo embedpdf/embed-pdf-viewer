@@ -63,8 +63,8 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
         intent: 'line-dimension',
         contents: '10.00 m',
         linePoints: {
-          start: { x: page.pdfCropBox.left + 50, y: page.pdfCropBox.top - 100 },
-          end: { x: page.pdfCropBox.left + 250, y: page.pdfCropBox.top - 100 },
+          start: { x: 50, y: 100 },
+          end: { x: 250, y: 100 },
         },
         leader: { length: 12 },
       });
@@ -80,7 +80,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
         }),
       );
       expectVector();
-      // Caption-only drag: +15 along, +25 perpendicular in PDF y-up axes.
+      // Caption-only drag: +15 along, +25 perpendicular, in the line's own axes (/CO).
       annotation.editPointer('down', page.ref, { x: 150, y: 64 }, false);
       annotation.editPointer('move', page.ref, { x: 165, y: 39 }, false);
       annotation.editPointer('up', page.ref, { x: 165, y: 39 }, false);
@@ -105,14 +105,11 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       // and survives the native appearance echo.
       const beforeRotation = annotation.getRaw(created.ref)!;
       if (beforeRotation.subtype !== 'line') throw new Error('Expected distance annotation');
-      const pivot = turnPivotOf(fromDTO(beforeRotation, page.pdfCropBox).geometry);
-      const start = {
-        x: beforeRotation.linePoints.start.x - page.pdfCropBox.left,
-        y: page.pdfCropBox.top - beforeRotation.linePoints.start.y,
-      };
+      const pivot = turnPivotOf(fromDTO(beforeRotation).geometry);
+      const start = beforeRotation.linePoints.start;
       const rotatedStart = {
-        x: page.pdfCropBox.left + pivot.x - (start.y - pivot.y),
-        y: page.pdfCropBox.top - (pivot.y + start.x - pivot.x),
+        x: pivot.x - (start.y - pivot.y),
+        y: pivot.y + (start.x - pivot.x),
       };
       await annotation.rotateSelectionBy(90);
       await vi.waitFor(() => {
@@ -125,7 +122,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
         const drawnStart = drawnPointsOf(rotated)![0]![0]!;
         expect(drawnStart.x).toBeCloseTo(rotatedStart.x, 3);
         expect(drawnStart.y).toBeCloseTo(rotatedStart.y, 3);
-        const actual = turnPivotOf(fromDTO(rotated, page.pdfCropBox).geometry);
+        const actual = turnPivotOf(fromDTO(rotated).geometry);
         expect(actual.x).toBeCloseTo(pivot.x, 3);
         expect(actual.y).toBeCloseTo(pivot.y, 3);
       });
@@ -191,7 +188,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
           leader: { length: 36 },
           captionOffset: { along: 15, perpendicular: 25 },
         });
-        const restoredPivot = turnPivotOf(fromDTO(restored, page.pdfCropBox).geometry);
+        const restoredPivot = turnPivotOf(fromDTO(restored).geometry);
         expect(restoredPivot.x).toBeCloseTo(pivot.x, 3);
         expect(restoredPivot.y).toBeCloseTo(pivot.y, 3);
         expect(restored.subtype === 'line' && restored.rotation).toBe(90);

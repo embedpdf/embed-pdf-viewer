@@ -13,7 +13,7 @@ then you apply the marks:
 // 1. Mark: a redact annotation over the area
 const { annotation } = await page.annotations.create({
   subtype: 'redact',
-  rect: { left: 72, bottom: 640, right: 320, top: 660 },
+  rect: { x: 72, y: 132, width: 248, height: 20 },
   interiorColor: { r: 0, g: 0, b: 0 },
 });
 
@@ -30,7 +30,7 @@ A mark is a `redact` annotation. It removes nothing yet: it shows as an outline,
 can still be read and copied, and you can change or delete it like any other annotation. That
 lets someone review the marks before anything is gone.
 
-Mark an area with `rect`, in PDF points. To mark text exactly, as it runs across lines or at an
+Mark an area with `rect`, in points. To mark text exactly, as it runs across lines or at an
 angle, give its `quadPoints` instead, the same corners a highlight takes. Search results have
 them:
 

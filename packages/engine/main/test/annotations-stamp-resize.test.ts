@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { DocumentHandle, Engine, PageRaster } from '@embedpdf/engine-core/runtime';
-import { pageBoxOf, toPageRef } from '@embedpdf/engine-core/runtime';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '../src/index';
 
 /** Small independent PDF fixtures: asymmetric vector bands expose wrong crops. */
@@ -87,20 +87,16 @@ describe('vector stamp resizing (wasm)', () => {
       await page.annotations.update(ref, {
         subtype: 'stamp',
         rotation: 270,
-        box: { left: 95, bottom: 30, right: 125, top: 90 },
+        box: { x: 95, y: 30, width: 30, height: 60 },
       });
       // Render the full annotation through the page renderer: appearance
       // thumbnails deliberately remove rotation for the viewer to apply it.
-      // The area in the file's numbers, measured on the page as render targets are.
-      const area = { left: 0, bottom: -50, right: 520, top: 220 };
-      const render = async (document: DocumentHandle) => {
-        const { pages } = await document.pages.list();
-        const layout = pages.find((page) => page.ref.pageObjectNumber === 3)!;
-        return document.page(toPageRef(3)).render.raw({
+      const area = { x: 0, y: 0, width: 520, height: 270 };
+      const render = async (document: DocumentHandle) =>
+        document.page(toPageRef(3)).render.raw({
           includeAnnotations: true,
-          target: { kind: 'rect', rect: pageBoxOf(area, layout.pdfCropBox) },
+          target: { kind: 'rect', rect: area },
         });
-      };
       const live = await render(doc);
       for (const mode of [undefined, 'rewrite'] as const) {
         const saved = await doc.download(mode ? { mode } : undefined);
@@ -138,7 +134,7 @@ describe('vector stamp resizing (wasm)', () => {
         await page.annotations.update(ref, {
           subtype: 'stamp',
           fit: 'cover',
-          box: { left: 10, bottom: 10, right: 110, top: 110 },
+          box: { x: 10, y: 10, width: 100, height: 100 },
         });
         const verify = async () => {
           const raster = await appearance(doc);
@@ -174,7 +170,7 @@ describe('vector stamp resizing (wasm)', () => {
         await page.annotations.update(ref, {
           subtype: 'stamp',
           fit: 'contain',
-          box: { left: 10, bottom: 10, right: 110, top: 110 },
+          box: { x: 10, y: 10, width: 100, height: 100 },
         });
         const verify = async () => {
           const sibling = await appearance(doc, 1);
@@ -206,7 +202,7 @@ describe('vector stamp resizing (wasm)', () => {
         await page.annotations.update(ref, {
           subtype: 'stamp',
           fit: 'fill',
-          box: { left: 10, bottom: 10, right: 110, top: 60 },
+          box: { x: 10, y: 10, width: 100, height: 50 },
         });
         const raster = await appearance(doc);
         expect(pixel(raster, 0.1, 0.5)).toEqual(extraContent ? [0, 0, 255, 255] : [255, 0, 0, 255]);
@@ -229,13 +225,13 @@ describe('vector stamp resizing (wasm)', () => {
           await page.annotations.update(ref, {
             subtype: 'stamp',
             fit,
-            box: { left: 10, bottom: 10, right: 110, top: 110 },
+            box: { x: 10, y: 10, width: 100, height: 100 },
           });
         }
         await page.annotations.update(ref, {
           subtype: 'stamp',
           fit: 'fill',
-          box: { left: 10, bottom: 10, right: 210, top: 110 },
+          box: { x: 10, y: 10, width: 200, height: 100 },
         });
         const saved = await doc.download();
         await doc.close();

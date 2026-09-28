@@ -14,7 +14,7 @@ export type AnnotationLinkTarget =
 export namespace AnnotationLinkTarget {
     export interface Goto {
         kind: "goto";
-        destination: CloudPDF.PdfDestination;
+        destination: CloudPDF.PageDestination;
     }
 
     export interface Uri {

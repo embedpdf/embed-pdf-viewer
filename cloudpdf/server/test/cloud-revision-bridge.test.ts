@@ -123,7 +123,7 @@ function annotation(ref: AnnotationRef): AnnotationDTO {
     locked: false,
     toggleNoView: false,
     lockedContents: false,
-    rect: { left: 0, top: 0, right: 1, bottom: 1 },
+    rect: { x: 0, y: 0, width: 1, height: 1 },
     contents: null,
     author: null,
     createdAt: null,

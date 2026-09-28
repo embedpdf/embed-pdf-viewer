@@ -1,4 +1,5 @@
 import type { AnnotationDTO } from '../annotation/kinds';
+import type { PdfCoordinates } from '../pageSpace/coordinates';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import { annotationKey, annotationKeysOf } from '../identity/annotationKey';
@@ -32,14 +33,14 @@ export interface AnnotationExportSelection {
  * the selection is on. `pages` is the document's pages in order. A selected
  * page or annotation the document doesn't have is refused with `NotFound`.
  */
-export function closeExportSelection(
+export function closeExportSelection<A extends AnnotationDTO | AnnotationDTO<PdfCoordinates>>(
   selection: AnnotationExportSelection,
   pages: readonly PageRef[],
-  readPage: (page: PageRef) => readonly AnnotationDTO[],
-): AnnotationDTO[] {
+  readPage: (page: PageRef) => readonly A[],
+): A[] {
   const inDocument = new Set(pages.map(encodePageKey));
-  const read = new Map<string, readonly AnnotationDTO[]>();
-  const byKey = new Map<string, AnnotationDTO>();
+  const read = new Map<string, readonly A[]>();
+  const byKey = new Map<string, A>();
   // A ref may name a page the document doesn't have (a broken /IRT): it
   // finds nothing.
   const readOnce = (page: PageRef) => {
@@ -51,7 +52,7 @@ export function closeExportSelection(
       for (const key of annotationKeysOf(annotation)) byKey.set(key, annotation);
     }
   };
-  const find = (ref: AnnotationRef): AnnotationDTO | undefined => {
+  const find = (ref: AnnotationRef): A | undefined => {
     readOnce(ref.page);
     return byKey.get(annotationKey(ref));
   };
@@ -69,8 +70,8 @@ export function closeExportSelection(
   for (const page of everything ? pages : (selection.pages ?? [])) readOnce(page);
 
   const taken = new Set<string>();
-  const pending: AnnotationDTO[] = [];
-  const take = (annotation: AnnotationDTO | undefined) => {
+  const pending: A[] = [];
+  const take = (annotation: A | undefined) => {
     if (!annotation) return;
     const key = annotationKey(annotation.ref);
     if (taken.has(key)) return;
@@ -100,7 +101,7 @@ export function closeExportSelection(
     for (const annotation of [...pending]) {
       if (annotation.subtype === 'popup' && annotation.parent) take(find(annotation.parent));
     }
-    const replies = new Map<string, AnnotationDTO[]>();
+    const replies = new Map<string, A[]>();
     for (const annotations of read.values()) {
       for (const annotation of annotations) {
         const parent = annotation.reply ? find(annotation.reply.to) : undefined;
@@ -121,7 +122,7 @@ export function closeExportSelection(
     if (annotation.subtype === 'popup' && annotation.parent) take(find(annotation.parent));
   }
 
-  const ordered: AnnotationDTO[] = [];
+  const ordered: A[] = [];
   for (const page of pages) {
     for (const annotation of read.get(encodePageKey(page)) ?? []) {
       if (taken.has(annotationKey(annotation.ref))) ordered.push(annotation);

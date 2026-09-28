@@ -6,6 +6,7 @@ import {
   type StampFit,
   type StampPatch,
   type WireAnnotationResources,
+  type PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -34,13 +35,19 @@ type StampAppearance = NonNullable<WireAnnotationResources['appearance']>;
  * performs its first native write. AnnotationMutator invokes these before
  * creating an annotation or strengthening a weak annotation id.
  */
-export function preflightStampDraft(draft: StampDraft, ctx?: AnnotationWriteContext): void {
+export function preflightStampDraft(
+  draft: StampDraft<PdfCoordinates>,
+  ctx?: AnnotationWriteContext,
+): void {
   if (draft.name != null) requireStampName(draft.name);
   if (draft.fit != null) requireStampFit(draft.fit);
   requireStampContent(ctx?.resources?.appearance, ctx);
 }
 
-export function preflightStampPatch(patch: StampPatch, ctx?: AnnotationWriteContext): void {
+export function preflightStampPatch(
+  patch: StampPatch<PdfCoordinates>,
+  ctx?: AnnotationWriteContext,
+): void {
   if (patch.name !== undefined && patch.name !== null) requireStampName(patch.name);
   if (patch.fit != null) requireStampFit(patch.fit);
   const appearance = ctx?.resources?.appearance;
@@ -64,7 +71,7 @@ export function applyStampDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: StampDraft,
+  draft: StampDraft<PdfCoordinates>,
   ctx?: AnnotationWriteContext,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
@@ -89,7 +96,7 @@ export function applyStampPatch(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  patch: StampPatch,
+  patch: StampPatch<PdfCoordinates>,
   ctx?: AnnotationWriteContext,
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);

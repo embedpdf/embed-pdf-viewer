@@ -13,7 +13,7 @@ import {
   shapeRectFor,
   type ModelAnnotation,
 } from '@embedpdf/core-annotation';
-import type { AnnotationDTO, PdfRect } from '@embedpdf/engine-core/runtime';
+import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
 import type { KindProjection, Wire } from '../projection';
 import { borderSlice } from '../props';
@@ -22,25 +22,25 @@ import { boxGeomFields, boxGeomFromDTO, styleFromDTO } from '../seam';
 type ShapeDTO = Extract<AnnotationDTO, { subtype: 'square' | 'circle' }>;
 
 /** The engine's box and turn for a rect shape: its model box less the cloud's reach. */
-function shapeGeometry(annotation: ModelAnnotation, crop: PdfRect): Wire | null {
+function shapeGeometry(annotation: ModelAnnotation): Wire | null {
   const geometry = annotation.geometry;
   if (geometry.kind !== 'rect') return null;
   const box = shapeBoxOf(geometry.rect, geometry.ellipse, annotation.style);
-  return boxGeomFields(box, geomRotation(geometry), crop);
+  return boxGeomFields(box, geomRotation(geometry));
 }
 
 /** `/BE` for a rect shape, total (`null` when plain), with the box it leaves. */
-export function cloudyExtras(annotation: ModelAnnotation, crop: PdfRect): Wire {
+export function cloudyExtras(annotation: ModelAnnotation): Wire {
   if (annotation.geometry.kind !== 'rect') return {};
   const border = annotation.style.border;
   return {
     cloudyIntensity: border.kind === 'cloudy' ? border.intensity : null,
-    ...shapeGeometry(annotation, crop),
+    ...shapeGeometry(annotation),
   };
 }
 
-const ingest = (dto: AnnotationDTO, crop: PdfRect, ellipse: boolean) => {
-  const geometry = boxGeomFromDTO(dto as ShapeDTO, crop, ellipse);
+const ingest = (dto: AnnotationDTO, ellipse: boolean) => {
+  const geometry = boxGeomFromDTO(dto as ShapeDTO, ellipse);
   if (geometry.kind !== 'rect') return { geometry };
   return {
     geometry: { ...geometry, rect: shapeRectFor(geometry.rect, ellipse, styleFromDTO(dto)) },
@@ -48,18 +48,18 @@ const ingest = (dto: AnnotationDTO, crop: PdfRect, ellipse: boolean) => {
 };
 
 const projection = (ellipse: boolean): KindProjection => ({
-  ingest: (dto, crop) => ingest(dto, crop, ellipse),
+  ingest: (dto) => ingest(dto, ellipse),
   geometry: shapeGeometry,
   prop: {
     // The cloud's reach follows its intensity and the stroke width, so either
     // change states the box it leaves.
-    strokeWidth: (annotation, crop) => ({
+    strokeWidth: (annotation) => ({
       strokeWidth: annotation.style.strokeWidth,
-      ...cloudyExtras(annotation, crop),
+      ...cloudyExtras(annotation),
     }),
-    border: (annotation, crop) => ({
+    border: (annotation) => ({
       ...borderSlice(annotation.style),
-      ...cloudyExtras(annotation, crop),
+      ...cloudyExtras(annotation),
     }),
   },
 });

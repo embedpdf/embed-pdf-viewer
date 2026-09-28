@@ -17,7 +17,7 @@ const page = doc.page(pageRef);
 
 const { annotation } = await page.annotations.create({
   subtype: 'square',
-  box: { left: 72, bottom: 600, right: 272, top: 700 },
+  box: { x: 72, y: 92, width: 200, height: 100 },
   color: { r: 0, g: 120, b: 255 },
 });
 
@@ -96,6 +96,10 @@ pages. Each annotation names its `page`, and the list's `pages` has one entry pe
 Each annotation has a `subtype` (its kind), a `rect` (where it is on its page) and a `ref` (its
 address). Keep the `ref`: it's how you change or delete the annotation later.
 
+Positions are in points from the top-left corner of the page, with y going down, like every
+position in the engine: a box is `{ x, y, width, height }` and a point `{ x, y }`. See
+[Pages](/docs/engine/documents/pages).
+
 ```ts
 for (const annotation of annotations) {
   console.log(annotation.subtype, annotation.rect, annotation.contents);
@@ -130,7 +134,7 @@ Each annotation also has the [flags](#flags) and the fields that say [who wrote 
 ```ts
 const { annotation } = await page.annotations.create({
   subtype: 'circle',
-  box: { left: 60, bottom: 300, right: 180, top: 400 },
+  box: { x: 60, y: 392, width: 120, height: 100 },
   interiorColor: { r: 30, g: 144, b: 255 },
 });
 ```
@@ -181,13 +185,9 @@ bigger one stretches it:
 ```ts
 const { rect } = line;
 
+// 40 points right, 20 down
 await page.annotations.update(line.ref, {
-  rect: {
-    left: rect.left + 40,
-    bottom: rect.bottom - 20,
-    right: rect.right + 40,
-    top: rect.top - 20,
-  },
+  rect: { ...rect, x: rect.x + 40, y: rect.y + 20 },
 });
 ```
 

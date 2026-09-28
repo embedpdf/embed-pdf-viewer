@@ -6,7 +6,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createKernel, type Kernel } from '@embedpdf/core';
 import { createLocalEngine } from '@embedpdf/engine';
 import {
-  pageActionTreeOf,
   toPageRef,
   type AnnotationRef,
   type Engine,
@@ -120,13 +119,10 @@ describe('plugin-actions integration (real engine)', () => {
     firstPage = page.ref.pageObjectNumber;
     const { annotations } = await opened.page(toPageRef(firstPage)).annotations.list();
     const byNm = new Map(annotations.map((annotation) => [annotation.nm, annotation]));
-    // Annotation reads measure destinations in the file's numbers; execute() takes page space.
-    const pdfCropBoxOf = (ref: { pageObjectNumber: number }) =>
-      pages.find((layout) => layout.ref.pageObjectNumber === ref.pageObjectNumber)!.pdfCropBox;
     treeOf = (nm: string) => {
       const tree = byNm.get(nm)?.actions?.activate;
       if (!tree) throw new Error(`no activate tree on '${nm}'`);
-      return pageActionTreeOf(tree, pdfCropBoxOf);
+      return tree;
     };
     refOf = (nm: string) => {
       const ref = byNm.get(nm)?.ref;

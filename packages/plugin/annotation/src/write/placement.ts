@@ -6,7 +6,7 @@ import type {
   AttachmentFileSource,
   FileAttachmentIcon,
   NoteIcon,
-  PdfRect,
+  PageBox,
 } from '@embedpdf/engine-core/runtime';
 
 import { cssToColor } from '../repository';
@@ -40,7 +40,7 @@ export const isIconPlaceKind = (subtype: Subtype): subtype is IconPlaceKind =>
  */
 export function iconPlacement(
   subtype: IconPlaceKind,
-  geometry: { rect: PdfRect },
+  geometry: { rect: PageBox },
   defaults: AnnotationProps,
   flags: Partial<AnnotationFlags> | undefined,
   file: AttachmentFileSource | null,

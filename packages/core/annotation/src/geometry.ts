@@ -2,22 +2,17 @@
  * Pure content-space geometry, dispatched on the `ContentGeometry` union. This is the whole
  * per-kind surface: bounds, hit-testing (stroke + fill, with a configurable
  * margin), handles (with cursors), translate, handle-drag, and the dumb scene.
- * The PDF↔content bridge (crop-relative y-flip) is the only engine seam.
+ * Content space is the engine's page space: the same numbers, nothing to convert.
  */
-import type { PdfPoint, PdfRect } from '@embedpdf/engine-core/runtime';
 import {
   applyPoint,
-  applyRect,
-  invert,
   isQuarterTurn,
-  pdfToContentMatrix,
   rotateAbout,
   textQuadPoints,
   textQuadRing,
   type Mat2D,
   type PageRotation,
   type PointIn,
-  type RectIn,
   type Size,
   type TextQuad,
 } from '@embedpdf/core-geometry';
@@ -1029,8 +1024,8 @@ function endingSegs(geometry: ContentGeometry): EndingSeg[] {
  *
  * `border` matters for one case: a closed poly with a cloudy border, whose curls
  * are centred on the vertex path and reach outward (there is no outer box to
- * inset into) — the bounds grow by the cloud extent, and the engine `/Rect`
- * (via `geomPdfBounds`) grows with them so the baked scallops are never clipped.
+ * inset into) — the bounds grow by the cloud extent, and the engine's `rect`
+ * grows with them so the baked scallops are never clipped.
  */
 export function geomVisualBounds(
   geometry: ContentGeometry,
@@ -1633,43 +1628,3 @@ export function geomScene(
   // regardless, rotated text included.
   return geometry.quads.map((quad) => ({ kind: 'poly', points: textQuadRing(quad), closed: true }));
 }
-
-/* ── PDF ↔ content bridge ─────────────────────────────────────────────────────
- * The one engine seam: PDF user space (y-up, crop bottom-left) ↔ content space
- * (y-down, crop top-left). The y-flip itself lives in `@embedpdf/core-geometry`
- * (`pdfToContentMatrix`) and is applied through its generic Mat2D primitives, so
- * this file never hand-rolls the rule. The only local work is bridging the
- * engine's edge-based `PdfRect` to geometry's corner+extent `RectIn`.
- * ──────────────────────────────────────────────────────────────────────────── */
-
-const pdfRectToCorner = (rect: PdfRect): RectIn<'pdf'> =>
-  ({
-    x: rect.left,
-    y: rect.bottom,
-    width: rect.right - rect.left,
-    height: rect.top - rect.bottom,
-  }) as RectIn<'pdf'>;
-const cornerToPdfRect = (rect: RectIn<'pdf'>): PdfRect => ({
-  left: rect.x,
-  bottom: rect.y,
-  right: rect.x + rect.width,
-  top: rect.y + rect.height,
-});
-
-export const pdfToContentPoint = (pdfPoint: PdfPoint, crop: PdfRect): Point =>
-  applyPoint(pdfToContentMatrix(crop), pdfPoint as PointIn<'pdf'>);
-export const contentToPdfPoint = (point: Point, crop: PdfRect): PdfPoint =>
-  applyPoint(invert(pdfToContentMatrix(crop)), point as PointIn<'content'>);
-export const pdfToContentRect = (pdf: PdfRect, crop: PdfRect): Rect =>
-  applyRect(pdfToContentMatrix(crop), pdfRectToCorner(pdf));
-export const contentToPdfRect = (rect: Rect, crop: PdfRect): PdfRect =>
-  cornerToPdfRect(applyRect(invert(pdfToContentMatrix(crop)), rect as RectIn<'content'>));
-
-/** A geom's visual bounding box (geometry + stroke + line endings) as a PdfRect —
- *  the engine requires an explicit `rect` that encloses the baked /AP. */
-export const geomPdfBounds = (
-  geometry: ContentGeometry,
-  strokeWidth: number,
-  crop: PdfRect,
-  border?: Border,
-): PdfRect => contentToPdfRect(geomVisualBounds(geometry, strokeWidth, border), crop);

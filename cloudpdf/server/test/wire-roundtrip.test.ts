@@ -61,7 +61,7 @@ describe.skip('render wire round trip', () => {
         format: 'webp',
         target: {
           kind: 'rect',
-          rect: { left: 10, bottom: 20, right: 40.5, top: 60.25 },
+          rect: { x: 10, y: 20, width: 30.5, height: 40.25 },
         },
         viewport: { kind: 'width', width: 720 },
         rotation: 90,
@@ -150,7 +150,7 @@ describe.skip('render wire round trip', () => {
       viewport: { kind: 'width', width: 720 },
       target: {
         kind: 'rect',
-        rect: { left: 10, bottom: 20, right: 40, top: 60 },
+        rect: { x: 10, y: 20, width: 30, height: 40 },
       },
       background: 'white',
       rotation: 90,

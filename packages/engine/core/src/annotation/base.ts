@@ -1,5 +1,6 @@
 import type { ReadShape } from './declaration';
 import type { annotationBaseFields } from './kinds/shared-fields';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
 /**
  * The fields every annotation read carries, whatever its kind. Each kind's
@@ -10,4 +11,7 @@ import type { annotationBaseFields } from './kinds/shared-fields';
  * the flat page list, linked by a ref field (`reply.to`, `popup`, a popup's
  * `parent`). `buildThreads()` composes replies into threads.
  */
-export type AnnotationBase = ReadShape<typeof annotationBaseFields>;
+export type AnnotationBase<C extends Coordinates = PageCoordinates> = ReadShape<
+  typeof annotationBaseFields,
+  C
+>;

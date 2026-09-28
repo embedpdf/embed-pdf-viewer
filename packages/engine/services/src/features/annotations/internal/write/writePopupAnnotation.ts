@@ -3,6 +3,7 @@ import {
   EngineErrorCode,
   type PopupDraft,
   type PopupPatch,
+  type PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -18,7 +19,7 @@ export function applyPopupDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: PopupDraft,
+  draft: PopupDraft<PdfCoordinates>,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
   setAnnotRect(fn, mem, annotPtr, draft.rect);
@@ -29,7 +30,7 @@ export function applyPopupPatch(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  patch: PopupPatch,
+  patch: PopupPatch<PdfCoordinates>,
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);
   if (patch.rect !== undefined) setAnnotRect(fn, mem, annotPtr, patch.rect);

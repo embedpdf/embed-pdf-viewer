@@ -102,6 +102,10 @@ A link's destination is placed the same way. Every page an annotation is on, or 
 needs a match; otherwise the import fails with `InvalidArg` and `err.details.pages` lists them. A
 `to` the document doesn't have is `NotFound`.
 
+Positions in a bundle are measured from the page's top-left corner, like every position in the
+engine, so an annotation lands as far from the top-left of the page it goes to as it was on its
+own page, whatever the two pages' crop boxes.
+
 ### Who wrote it
 
 With `attribution: 'restore'`, the default, each annotation keeps its author, its creation and
@@ -194,7 +198,7 @@ create their own annotations (`annotations:create:self`) may paste a bundle. An 
 ```ts
 bundle.items; // [{ data, resources: { appearance: 'sha256-…' } }, …]
 bundle.resources; // { 'sha256-…': Uint8Array }
-bundle.pages; // [{ page, position, box }, …]
+bundle.pages; // [{ page, position, size }, …]
 ```
 
 - Each item's `data` is the annotation exactly as a read returns it, in page order and then in
@@ -202,7 +206,7 @@ bundle.pages; // [{ page, position, box }, …]
 - The bytes an annotation carries (a stamp's drawing, an attached file) are `resources`, each
   stored once under the SHA-256 of its bytes. A hundred stamps of one logo carry the logo once.
 - `pages` lists every page the items are on or point at, with its position in the document
-  (from `0`) and its crop box, so the annotations can be placed on the right pages of another
+  (from `0`) and its `size`, so the annotations can be placed on the right pages of another
   document.
 
 A bundle is plain data. You can store each item as a row and each resource once under its id,

@@ -1,15 +1,10 @@
 import type { DocumentEvent } from '@embedpdf/core';
 import { textQuadFromRect } from '@embedpdf/core-geometry';
-import type {
-  AnnotationDTO,
-  AnnotationFlags,
-  AnnotationRef,
-  PdfQuad,
-} from '@embedpdf/engine-core/runtime';
+import type { AnnotationFlags, AnnotationRef, PdfQuad } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { annotationHarness } from './harness';
+import { annotationHarness, type FileAnnotation } from './harness';
 
 const PON = 1;
 const PON2 = 2;
@@ -50,7 +45,7 @@ const base = (annotObjectNumber: number) => ({
   blendMode: 'normal' as const,
 });
 
-const caretDTO = (): AnnotationDTO =>
+const caretDTO = (): FileAnnotation =>
   ({
     ...base(10),
     subtype: 'caret',
@@ -68,9 +63,9 @@ const caretDTO = (): AnnotationDTO =>
     modifiedBy: null,
     importedBy: null,
     actions: null,
-  }) as AnnotationDTO;
+  }) as FileAnnotation;
 
-const strikeoutDTO = (): AnnotationDTO => {
+const strikeoutDTO = (): FileAnnotation => {
   const quad: PdfQuad = {
     p1: { x: 10, y: 780 },
     p2: { x: 90, y: 780 },
@@ -155,7 +150,7 @@ describe('Replace Text grouped persistence', () => {
 });
 
 describe('annotation flags', () => {
-  const squareDTO = (objectNumber: number, flags: Partial<AnnotationFlags> = {}): AnnotationDTO =>
+  const squareDTO = (objectNumber: number, flags: Partial<AnnotationFlags> = {}): FileAnnotation =>
     ({
       ...base(objectNumber),
       ...NO_FLAGS,
@@ -174,10 +169,10 @@ describe('annotation flags', () => {
       modifiedBy: null,
       importedBy: null,
       actions: null,
-    }) as AnnotationDTO;
+    }) as FileAnnotation;
 
   /** Load these records as the document's annotations. */
-  const loadPage = async (harness: ReturnType<typeof createHarness>, dtos: AnnotationDTO[]) => {
+  const loadPage = async (harness: ReturnType<typeof createHarness>, dtos: FileAnnotation[]) => {
     await harness.load(dtos);
     expect(harness.model().order.length).toBe(dtos.length);
   };
@@ -243,8 +238,8 @@ describe('annotation flags', () => {
     harness.create.mockResolvedValueOnce({ annotation: squareDTO(24) });
     await harness.capability.createRaw(PAGE, {
       subtype: 'square',
-      rect: { left: 0, bottom: 0, right: 10, top: 10 },
-      box: { left: 0, bottom: 0, right: 10, top: 10 },
+      rect: { x: 0, y: 0, width: 10, height: 10 },
+      box: { x: 0, y: 0, width: 10, height: 10 },
     } as Parameters<typeof harness.capability.createRaw>[1]);
     expect(harness.create.mock.calls[0]![0]).toMatchObject({ print: true });
   });
@@ -280,7 +275,7 @@ describe('claimsTouchAt (touch consent)', () => {
 
 // ── whole-document hydration + remote delivery ──────────────────────────
 
-const hydrationSquare = (objectNumber: number): AnnotationDTO =>
+const hydrationSquare = (objectNumber: number): FileAnnotation =>
   ({
     ...base(objectNumber),
     subtype: 'square',
@@ -297,7 +292,7 @@ const hydrationSquare = (objectNumber: number): AnnotationDTO =>
     modifiedBy: null,
     importedBy: null,
     actions: null,
-  }) as AnnotationDTO;
+  }) as FileAnnotation;
 
 /** The mutation meta every annotation event carries (a remote event replays the writer's result). */
 const META = {
@@ -316,7 +311,7 @@ const remoteOrigin = (serverId: number) => ({
   serverId,
 });
 
-const createdEvent = (dto: AnnotationDTO, serverId: number): DocumentEvent =>
+const createdEvent = (dto: FileAnnotation, serverId: number): DocumentEvent =>
   ({
     type: 'annotations.created',
     page: PAGE,
@@ -325,7 +320,7 @@ const createdEvent = (dto: AnnotationDTO, serverId: number): DocumentEvent =>
     meta: META,
   }) as unknown as DocumentEvent;
 
-const updatedEvent = (dto: AnnotationDTO, serverId: number, changed: boolean): DocumentEvent =>
+const updatedEvent = (dto: FileAnnotation, serverId: number, changed: boolean): DocumentEvent =>
   ({
     type: 'annotations.updated',
     page: PAGE,
@@ -344,7 +339,7 @@ const deletedEvent = (annotObjectNumber: number, serverId: number): DocumentEven
     meta: META,
   }) as unknown as DocumentEvent;
 
-const snapshot = (dtos: AnnotationDTO[], auditHead?: number) => ({
+const snapshot = (dtos: FileAnnotation[], auditHead?: number) => ({
   annotations: dtos,
   pages: [{ page: PAGE }],
   ...(auditHead !== undefined ? { auditHead } : {}),
@@ -469,7 +464,7 @@ describe('the records mirror', () => {
 
 describe('links lens — substrate children, no ledger', () => {
   const TARGET = { kind: 'uri', uri: 'https://www.embedpdf.com/' } as const;
-  const childDTO = (objectNumber: number, parent: number): AnnotationDTO =>
+  const childDTO = (objectNumber: number, parent: number): FileAnnotation =>
     ({
       ...hydrationSquare(objectNumber),
       subtype: 'link',
@@ -482,7 +477,7 @@ describe('links lens — substrate children, no ledger', () => {
       modifiedBy: null,
       importedBy: null,
       actions: null,
-    }) as unknown as AnnotationDTO;
+    }) as unknown as FileAnnotation;
 
   it('links.of derives from the committed child; a remote child delete clears it (no sweep)', async () => {
     const harness = createHarness();
@@ -555,14 +550,14 @@ describe('link nav items — attached vs standalone', () => {
         modifiedBy: null,
         importedBy: null,
         actions: null,
-      } as unknown as AnnotationDTO,
+      } as unknown as FileAnnotation,
       // A standalone document link (no group): navigates under any link-nav
       // tool — never stands down.
       {
         ...hydrationSquare(22),
         subtype: 'link',
         target: { kind: 'uri', uri: 'https://docs.example.com' },
-      } as unknown as AnnotationDTO,
+      } as unknown as FileAnnotation,
     ]);
     const items = harness.capability.listLinkItems(PAGE);
     const byAttached = new Map(items.map((i) => [i.attached, i]));
@@ -595,7 +590,7 @@ describe('conversation plane at the capability boundary', () => {
       modifiedBy: null,
       importedBy: null,
       actions: null,
-    } as unknown as AnnotationDTO;
+    } as unknown as FileAnnotation;
     harness.emit(createdEvent(statusDto, 45));
 
     // In the model (the conversation plane will read it)…
@@ -609,7 +604,7 @@ describe('conversation plane at the capability boundary', () => {
 
 describe('the comments lens', () => {
   const NOTE_RECT = { left: 100, bottom: 700, right: 120, top: 720 };
-  const textDto = (objectNumber: number, over: Record<string, unknown>): AnnotationDTO =>
+  const textDto = (objectNumber: number, over: Record<string, unknown>): FileAnnotation =>
     ({
       ...base(objectNumber),
       subtype: 'text',
@@ -628,18 +623,18 @@ describe('the comments lens', () => {
       importedBy: null,
       actions: null,
       ...over,
-    }) as unknown as AnnotationDTO;
-  const rootAt = (objectNumber: number, top: number): AnnotationDTO =>
+    }) as unknown as FileAnnotation;
+  const rootAt = (objectNumber: number, top: number): FileAnnotation =>
     ({
       ...hydrationSquare(objectNumber),
       rect: { left: 100, bottom: top - 60, right: 180, top },
-    }) as AnnotationDTO;
-  const page2Root = (objectNumber: number): AnnotationDTO =>
+    }) as FileAnnotation;
+  const page2Root = (objectNumber: number): FileAnnotation =>
     ({
       ...hydrationSquare(objectNumber),
       ref: { kind: 'objectNumber', page: PAGE2, annotObjectNumber: objectNumber },
       page: PAGE2,
-    }) as AnnotationDTO;
+    }) as FileAnnotation;
 
   /** Seed: two threads on page 1 (root 20 high, root 25 lower — 20's thread
    *  has a reply and alice's accepted status), one thread on page 2. */
@@ -791,7 +786,7 @@ describe('the comments lens', () => {
         ...textDto(21, { reply: { to: ref(20), type: 'reply' } }),
         ...NO_FLAGS,
         locked: true,
-      } as unknown as AnnotationDTO,
+      } as unknown as FileAnnotation,
     ]);
     const result = await harness.capability.comments.deleteThread(ref(20));
     expect(result.deleted).toEqual([]);
@@ -806,7 +801,7 @@ describe('the comments lens', () => {
         ...rootAt(20, 760),
         ...NO_FLAGS,
         lockedContents: true,
-      } as unknown as AnnotationDTO,
+      } as unknown as FileAnnotation,
       textDto(21, { reply: { to: ref(20), type: 'reply' } }),
     ]);
     const perms = harness.capability.comments.getPermissions(ref(20));
@@ -823,7 +818,7 @@ describe('the comments lens', () => {
         ...textDto(21, { reply: { to: ref(20), type: 'reply' } }),
         ...NO_FLAGS,
         locked: true,
-      } as unknown as AnnotationDTO,
+      } as unknown as FileAnnotation,
     ]);
     const perms2 = harness.capability.comments.getPermissions(ref(20));
     expect(perms2.canDelete).toBe(true);
@@ -838,7 +833,7 @@ describe('the comments lens', () => {
       (_action, target) => target.userId === 'me',
     );
     await harness.load([
-      { ...rootAt(20, 760), userId: 'me' } as unknown as AnnotationDTO,
+      { ...rootAt(20, 760), userId: 'me' } as unknown as FileAnnotation,
       textDto(21, { reply: { to: ref(20), type: 'reply' }, userId: 'me' }),
       textDto(22, {
         reply: { to: ref(20), type: 'reply' },
@@ -879,8 +874,8 @@ describe('the twin law — authority fused into presentation and gestures', () =
     harness.allowsAnnotationMutation.mockImplementation(
       (_action, target) => target.userId === 'me',
     );
-  const stamped = (objectNumber: number, userId?: string): AnnotationDTO =>
-    ({ ...hydrationSquare(objectNumber), ...(userId ? { userId } : {}) }) as AnnotationDTO;
+  const stamped = (objectNumber: number, userId?: string): FileAnnotation =>
+    ({ ...hydrationSquare(objectNumber), ...(userId ? { userId } : {}) }) as FileAnnotation;
 
   it('a foreign record renders the LOCKED treatment: selectable, zero handles', async () => {
     const harness = createHarness();
@@ -959,8 +954,8 @@ describe('the twin law — authority fused into presentation and gestures', () =
 });
 
 describe('per-record authorization (collab-resolver mirrors)', () => {
-  const stamped = (objectNumber: number, userId?: string): AnnotationDTO =>
-    ({ ...hydrationSquare(objectNumber), ...(userId ? { userId } : {}) }) as AnnotationDTO;
+  const stamped = (objectNumber: number, userId?: string): FileAnnotation =>
+    ({ ...hydrationSquare(objectNumber), ...(userId ? { userId } : {}) }) as FileAnnotation;
   /** `annotations:*:self`-shaped narrowing installed on the harness mirror. */
   const selfOnly = (harness: ReturnType<typeof createHarness>) =>
     harness.allowsAnnotationMutation.mockImplementation(
@@ -999,7 +994,7 @@ describe('per-record authorization (collab-resolver mirrors)', () => {
 });
 
 describe('remote delivery — echo-driven appearance invalidation', () => {
-  const seed = async (harness: ReturnType<typeof createHarness>, dto: AnnotationDTO) => {
+  const seed = async (harness: ReturnType<typeof createHarness>, dto: FileAnnotation) => {
     await harness.load([dto]);
   };
 
@@ -1066,7 +1061,7 @@ describe.each([
     modifiedBy: null,
     importedBy: null,
     actions: null,
-  } as unknown as AnnotationDTO;
+  } as unknown as FileAnnotation;
 
   it('a programmatic update keeps the raster and fetches the one the engine re-baked', async () => {
     const harness = createHarness();
@@ -1078,7 +1073,7 @@ describe.each([
     harness.update.mockResolvedValueOnce({ annotation: updated, appearance: { changed: true } });
     await harness.capability.updateRaw(dto.ref, { subtype, strokeWidth: 2 });
 
-    expect(harness.capability.getRaw(dto.ref)).toEqual(updated);
+    expect(harness.capability.getRaw(dto.ref)).toEqual(harness.read(updated));
     expect(harness.capability.listPageItems(PAGE)[0].source).toBe('baked');
     expect(harness.capability.getAppearanceEpoch(PAGE)).not.toBe(epoch);
   });
@@ -1102,7 +1097,9 @@ describe.each([
       expect(epoch).toBe('');
 
       finishWrite({ annotation: updated, appearance: { changed: true } });
-      await vi.waitFor(() => expect(harness.capability.getRaw(dto.ref)).toEqual(updated));
+      await vi.waitFor(() =>
+        expect(harness.capability.getRaw(dto.ref)).toEqual(harness.read(updated)),
+      );
 
       expect(harness.capability.listPageItems(PAGE)[0].source).toBe('vector');
       expect(harness.capability.getAppearanceEpoch(PAGE)).toBe(epoch);
@@ -1140,7 +1137,7 @@ describe('distance authoring and recalibration', () => {
       linePoints: { start: { x: 20, y: 780 }, end: { x: 220, y: 780 } },
       measure: region,
       captionEnabled: true,
-    } as AnnotationDTO;
+    } as FileAnnotation;
     harness.create.mockResolvedValue({ annotation: dto });
     harness.capability.createPointer('distance', 'down', PAGE, { x: 20, y: 20 });
     harness.capability.setPageViewports(PAGE, [], fallback);
@@ -1222,7 +1219,7 @@ describe('distance authoring and recalibration', () => {
           ...NO_FLAGS,
           locked: objectNumber === 81,
           userId: objectNumber === 83 ? 'other' : 'me',
-        }) as unknown as AnnotationDTO,
+        }) as unknown as FileAnnotation,
     );
     harness.listAll.mockResolvedValue(snapshot(dtos));
     harness.allowsAnnotationMutation.mockImplementation(

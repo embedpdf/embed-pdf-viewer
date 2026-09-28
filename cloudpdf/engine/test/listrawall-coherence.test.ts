@@ -62,7 +62,7 @@ function annotation(pageObjectNumber: number, index: number) {
     locked: false,
     toggleNoView: false,
     lockedContents: false,
-    rect: { left: 0, top: 0, right: 10, bottom: 10 },
+    rect: { x: 0, y: 0, width: 10, height: 10 },
     contents: null,
     subject: null,
     author: null,

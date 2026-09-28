@@ -1,4 +1,4 @@
-import type { InkDraft, InkPatch } from '@embedpdf/engine-core/runtime';
+import type { InkDraft, InkPatch, PdfCoordinates } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { setInkList, setIntent, setIntentOrClear } from './annotationWritePrimitives';
@@ -21,7 +21,7 @@ export function applyInkDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: InkDraft,
+  draft: InkDraft<PdfCoordinates>,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
   if (draft.intent != null) setIntent(fn, annotPtr, inkIntentToName(draft.intent));
@@ -38,7 +38,7 @@ export function applyInkPatch(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  patch: InkPatch,
+  patch: InkPatch<PdfCoordinates>,
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);
   if (patch.intent !== undefined) {

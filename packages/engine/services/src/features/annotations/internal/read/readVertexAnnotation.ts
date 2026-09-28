@@ -4,6 +4,7 @@ import type {
   PolygonAnnotationDTO,
   PolylineAnnotationDTO,
   VertexAnnotationFields,
+  PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -25,7 +26,7 @@ function readVertexGeometry(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-): Pick<VertexAnnotationFields, 'vertices' | 'rotation'> & {
+): Pick<VertexAnnotationFields<PdfCoordinates>, 'vertices' | 'rotation'> & {
   captionEnabled: boolean | null;
   captionCenter: PdfPoint | null;
 } {
@@ -44,8 +45,8 @@ export function readPolygon(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  base: AnnotationBase,
-): PolygonAnnotationDTO {
+  base: AnnotationBase<PdfCoordinates>,
+): PolygonAnnotationDTO<PdfCoordinates> {
   const { captionEnabled, captionCenter, ...geometry } = readVertexGeometry(fn, mem, annotPtr);
   const intent = readIntent(fn, mem, annotPtr);
   return {
@@ -67,8 +68,8 @@ export function readPolyline(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  base: AnnotationBase,
-): PolylineAnnotationDTO {
+  base: AnnotationBase<PdfCoordinates>,
+): PolylineAnnotationDTO<PdfCoordinates> {
   const { captionEnabled, captionCenter, ...geometry } = readVertexGeometry(fn, mem, annotPtr);
   const intent = readIntent(fn, mem, annotPtr);
   return {

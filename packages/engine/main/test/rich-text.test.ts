@@ -29,7 +29,7 @@ const robotoPath = resolve(here, 'fixtures', 'Roboto-Regular.ttf');
 const subsetHelveticaPath = resolve(here, 'fixtures', 'freetext_document_subset_helvetica.pdf');
 
 const PAGE = 3;
-const RECT = { left: 50, bottom: 250, right: 350, top: 320 };
+const RECT = { x: 50, y: 250, width: 300, height: 70 };
 
 let annotationsPdf: Uint8Array;
 let roboto: Uint8Array;
@@ -306,7 +306,7 @@ describe('rich text FreeText (local engine)', () => {
       fontSize: 16,
       textAlign: 'left',
       contents: 'Plain',
-      box: { left: 50, bottom: 150, right: 350, top: 220 },
+      box: { x: 50, y: 150, width: 300, height: 70 },
     });
     expect((plain.annotation as FreeTextAnnotationDTO).fontFamily).toBe('my-roboto');
     await doc.close();
@@ -358,7 +358,7 @@ describe('rich text FreeText (local engine)', () => {
       fontSize: 24,
       textAlign: 'left',
       strokeWidth: 0,
-      box: { left: 20, bottom: 120, right: 280, top: 200 },
+      box: { x: 20, y: 120, width: 260, height: 80 },
       richText: {
         body: { family: 'Helvetica', size: 24, color: '#000000' },
         paragraphs: [{ runs: [{ text: 'Hello world' }] }],

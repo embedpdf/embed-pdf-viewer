@@ -89,7 +89,7 @@ async function waitFor(predicate: () => boolean, what: string, timeoutMs = 10_00
 }
 
 describe('annotation import on the cloud engine', () => {
-  const rect = (left: number) => ({ left, bottom: 20, right: left + 40, top: 50 });
+  const rect = (x: number) => ({ x, y: 20, width: 40, height: 30 });
 
   test('a retry under the same opId applies once and returns the same result', async () => {
     if (!fx) throw new Error('fixture not initialised');
@@ -147,8 +147,8 @@ describe('annotation import on the cloud engine', () => {
     try {
       const { pages } = await source.pages.list();
       const pageRef = toPageRef(pages[0]!.ref.pageObjectNumber);
-      for (const left of [20, 80, 140]) {
-        await source.page(pageRef).annotations.create({ subtype: 'square', box: rect(left) });
+      for (const x of [20, 80, 140]) {
+        await source.page(pageRef).annotations.create({ subtype: 'square', box: rect(x) });
       }
       const bundle = await source.annotations.export();
 
@@ -229,7 +229,7 @@ describe('the server holds the bundle limits while the request streams in', () =
       const pageRef = toPageRef(pages[0]!.ref.pageObjectNumber);
       await doc.page(pageRef).annotations.create({
         subtype: 'square',
-        box: { left: 20, bottom: 20, right: 60, top: 50 },
+        box: { x: 20, y: 20, width: 40, height: 30 },
       });
       const square = (await doc.annotations.export()).items[0]!;
       const { annotations: before } = await doc.annotations.list({ pages: [pageRef] });

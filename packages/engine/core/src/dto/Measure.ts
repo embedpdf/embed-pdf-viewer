@@ -79,7 +79,7 @@ export interface LineDimensionCaption {
 }
 export interface ShapeDimensionCaption {
   enabled: boolean;
-  /** Absolute PDF user-space center. Absent = automatic; (0,0) is valid. */
+  /** The caption's center on the page. Absent = automatic; (0,0) is valid. */
   center?: PdfPoint;
 }
 export interface LineLeader {

@@ -7,7 +7,7 @@ import type { FontLookup } from '../rich-text';
 import type { AnnotationContext } from './context';
 import { createAnnotationEvents, type AnnotationEvents } from './events';
 import { createFilePickerPort, type FilePickerPort } from './file-picker';
-import { createCropLookup, type CropLookup } from './geometry';
+import { createPageLookup, type PageLookup } from './geometry';
 import { createIntents } from './intents';
 import { createRecordIdentity, type RecordIdentity } from './record-identity';
 import { createStore, type AnnotationStore } from './store';
@@ -33,7 +33,7 @@ export interface AnnotationServices {
   readonly store: AnnotationStore;
   /** Where a record changes its key, and how a write finds its engine ref. */
   readonly identity: RecordIdentity;
-  readonly geometry: CropLookup;
+  readonly geometry: PageLookup;
   readonly authority: Authority;
   readonly filePicker: FilePickerPort;
   /** The registered fonts, for face ↔ key mapping (the local engine's list;
@@ -48,9 +48,9 @@ export function createServices(
   config: AnnotationConfig,
 ): AnnotationServices {
   const events = createAnnotationEvents(ctx);
-  const geometry = createCropLookup(ctx);
+  const geometry = createPageLookup(ctx);
   const records = createRecordsMirror(ctx, events);
-  const view = createView(ctx, records, geometry);
+  const view = createView(ctx, records);
   const refOf = (id: string) => view.model().byId[id]?.ref ?? null;
   const intents = createIntents(ctx, records, events, refOf);
   const store = createStore(ctx, view, intents, events);

@@ -6,15 +6,13 @@ import {
   type VisibleBoxOf,
 } from './destinations';
 import { pageMeasureOf, pdfMeasureOf } from './measure';
-import { ANNOTATION_FIELD_SPACES, type MeasuredFieldSpace } from '../annotation/field-spaces';
-import type {
-  AnnotationDTO,
-  AnnotationDraft,
-  AnnotationPatch,
-  PageAnnotationDTO,
-  PageAnnotationDraft,
-  PageAnnotationPatch,
-} from '../annotation/kinds';
+import type { PdfCoordinates } from './coordinates';
+import {
+  ANNOTATION_FIELD_SPACES,
+  ANNOTATION_FIELD_SPACES_BY_NAME,
+  type MeasuredFieldSpace,
+} from '../annotation/field-spaces';
+import type { AnnotationDTO, AnnotationDraft, AnnotationPatch } from '../annotation/kinds';
 import type { AnnotationSubtype } from '../annotation/subtype';
 import type { PdfMeasurement } from '../dto/Measure';
 import type { PdfAnnotationActions } from '../dto/PdfAction';
@@ -32,6 +30,8 @@ import {
   type PageQuad,
 } from '../geometry/pageSpace';
 import type { PdfPoint, PdfQuad, PdfRect } from '../geometry/primitives';
+import { EngineError } from '../errors/EngineError';
+import { EngineErrorCode } from '../errors/EngineErrorCode';
 
 /**
  * Annotation values between the file's coordinates and page space, field by
@@ -89,12 +89,19 @@ const TO_PDF: Record<MeasuredFieldSpace, Converter> = {
     mapAnnotationActions(actions, (destination) => pdfDestinationOf(destination, boxOf)),
 };
 
-/** The measured fields of a kind; a kind the engine doesn't know has the base fields. */
-const spacesOf = (subtype: string): Readonly<Record<string, MeasuredFieldSpace>> =>
-  ANNOTATION_FIELD_SPACES[subtype as AnnotationSubtype] ?? ANNOTATION_FIELD_SPACES.unsupported;
+/**
+ * The measured fields of a kind; a kind the engine doesn't know has the base
+ * fields. An update may leave out its kind: a field's name says what it
+ * holds, the same in every kind.
+ */
+const spacesOf = (subtype: string | undefined): Readonly<Record<string, MeasuredFieldSpace>> =>
+  subtype === undefined
+    ? ANNOTATION_FIELD_SPACES_BY_NAME
+    : (ANNOTATION_FIELD_SPACES[subtype as AnnotationSubtype] ??
+      ANNOTATION_FIELD_SPACES.unsupported);
 
 function convertFields(
-  subtype: string,
+  subtype: string | undefined,
   value: object,
   frame: Frame,
   converters: Record<MeasuredFieldSpace, Converter>,
@@ -103,71 +110,103 @@ function convertFields(
   return Object.fromEntries(
     Object.entries(value).map(([name, field]) => {
       const space = spaces[name];
-      return [name, space && field != null ? converters[space](field as never, frame) : field];
+      if (!space || field == null) return [name, field];
+      const converted = converters[space](field as never, frame);
+      if (converters === TO_PDF && hasNaN(converted)) throw notInPageSpace(name, space);
+      return [name, converted];
     }),
+  );
+}
+
+/** Whether a converted value has a number that isn't one: a place not given in page space. */
+function hasNaN(value: unknown): boolean {
+  if (typeof value === 'number') return Number.isNaN(value);
+  if (typeof value !== 'object' || value === null) return false;
+  return Object.values(value).some(hasNaN);
+}
+
+function notInPageSpace(name: string, space: MeasuredFieldSpace): EngineError {
+  const shape = space === 'box' ? '{ x, y, width, height }' : 'points as { x, y }';
+  return new EngineError(
+    EngineErrorCode.InvalidArg,
+    `field '${name}': expected page space, ${shape} from the page's top-left`,
+    { details: { field: name } },
   );
 }
 
 /** A read in page space. `visible` is its page's visible box, in the file's coordinates. */
 export function pageAnnotationOf(
-  annotation: AnnotationDTO,
+  annotation: AnnotationDTO<PdfCoordinates>,
   visible: PdfRect,
   boxOf: VisibleBoxOf,
-): PageAnnotationDTO {
+): AnnotationDTO {
   return convertFields(
     annotation.subtype,
     annotation,
     { visible, boxOf },
     TO_PAGE,
-  ) as PageAnnotationDTO;
+  ) as AnnotationDTO;
 }
 
 /** A page-space read in the file's coordinates. */
 export function pdfAnnotationOf(
-  annotation: PageAnnotationDTO,
+  annotation: AnnotationDTO,
   visible: PdfRect,
   boxOf: VisibleBoxOf,
-): AnnotationDTO {
-  return convertFields(annotation.subtype, annotation, { visible, boxOf }, TO_PDF) as AnnotationDTO;
+): AnnotationDTO<PdfCoordinates> {
+  return convertFields(
+    annotation.subtype,
+    annotation,
+    { visible, boxOf },
+    TO_PDF,
+  ) as AnnotationDTO<PdfCoordinates>;
 }
 
 /** A page-space create in the file's coordinates. */
 export function pdfAnnotationDraftOf(
-  draft: PageAnnotationDraft,
+  draft: AnnotationDraft,
   visible: PdfRect,
   boxOf: VisibleBoxOf,
-): AnnotationDraft {
-  return convertFields(draft.subtype, draft, { visible, boxOf }, TO_PDF) as AnnotationDraft;
+): AnnotationDraft<PdfCoordinates> {
+  return convertFields(
+    draft.subtype,
+    draft,
+    { visible, boxOf },
+    TO_PDF,
+  ) as AnnotationDraft<PdfCoordinates>;
 }
 
 /** A create in the file's coordinates, in page space. */
 export function pageAnnotationDraftOf(
-  draft: AnnotationDraft,
+  draft: AnnotationDraft<PdfCoordinates>,
   visible: PdfRect,
   boxOf: VisibleBoxOf,
-): PageAnnotationDraft {
-  return convertFields(draft.subtype, draft, { visible, boxOf }, TO_PAGE) as PageAnnotationDraft;
+): AnnotationDraft {
+  return convertFields(draft.subtype, draft, { visible, boxOf }, TO_PAGE) as AnnotationDraft;
 }
 
 /**
  * A page-space update in the file's coordinates. An update may leave out its
- * `subtype`, so the kind of the annotation it changes is given.
+ * `subtype`; its fields' names say what they hold.
  */
 export function pdfAnnotationPatchOf(
-  subtype: AnnotationSubtype,
-  patch: PageAnnotationPatch,
+  patch: AnnotationPatch,
   visible: PdfRect,
   boxOf: VisibleBoxOf,
-): AnnotationPatch {
-  return convertFields(subtype, patch, { visible, boxOf }, TO_PDF) as AnnotationPatch;
+): AnnotationPatch<PdfCoordinates> {
+  return convertFields(
+    patch.subtype,
+    patch,
+    { visible, boxOf },
+    TO_PDF,
+  ) as AnnotationPatch<PdfCoordinates>;
 }
 
 /** An update in the file's coordinates, in page space. */
 export function pageAnnotationPatchOf(
-  subtype: AnnotationSubtype,
-  patch: AnnotationPatch,
+  patch: AnnotationPatch<PdfCoordinates>,
   visible: PdfRect,
   boxOf: VisibleBoxOf,
-): PageAnnotationPatch {
-  return convertFields(subtype, patch, { visible, boxOf }, TO_PAGE) as PageAnnotationPatch;
+): AnnotationPatch {
+  return convertFields(patch.subtype, patch, { visible, boxOf }, TO_PAGE) as AnnotationPatch;
 }

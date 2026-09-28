@@ -11,7 +11,7 @@ import type { Engine } from '../engine/Engine';
 import type { PageHandle } from '../engine/PageHandle';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { DocumentEvent } from '../events/DocumentEvent';
-import type { PdfRect } from '../geometry/primitives';
+import type { PageBox } from '../geometry/pageSpace';
 import { annotationKey } from '../identity/annotationKey';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import { encodePageKey, toPageRef, type PageRef } from '../identity/PageRef';
@@ -57,7 +57,7 @@ export function runAnnotationImportConformance(
       }
     };
 
-    const box = (left: number): PdfRect => ({ left, bottom: 300, right: left + 40, top: 330 });
+    const box = (x: number): PageBox => ({ x, y: 300, width: 40, height: 30 });
     const create = async (
       page: PageHandle,
       draft: Parameters<PageHandle['annotations']['create']>[0],
@@ -76,13 +76,13 @@ export function runAnnotationImportConformance(
         );
         const note = await create(page, {
           subtype: 'text',
-          rect: iconRect(box(140).left, box(140).top),
+          rect: iconRect(box(140).x, box(140).y),
           contents: 'Check',
         });
         await create(page, { subtype: 'popup', rect: box(200), parent: note.ref, open: true });
         await create(page, {
           subtype: 'text',
-          rect: iconRect(box(140).left, box(140).top),
+          rect: iconRect(box(140).x, box(140).y),
           reply: { to: note.ref },
         });
         await create(page, {
@@ -138,12 +138,12 @@ export function runAnnotationImportConformance(
         const page = source.page(pageRef);
         const taken = await create(page, {
           subtype: 'text',
-          rect: iconRect(box(20).left, box(20).top),
+          rect: iconRect(box(20).x, box(20).y),
           nm: 'taken',
         });
         const reply = await create(page, {
           subtype: 'text',
-          rect: iconRect(box(20).left, box(20).top),
+          rect: iconRect(box(20).x, box(20).y),
           reply: { to: taken.ref },
         });
         const free = await create(page, { subtype: 'square', box: box(80), nm: 'free' });

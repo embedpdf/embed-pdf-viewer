@@ -57,7 +57,7 @@ function makePng(width: number, height: number): Uint8Array<ArrayBuffer> {
   return png;
 }
 
-const RECT = { left: 10, bottom: 10, right: 110, top: 60 };
+const RECT = { x: 10, y: 10, width: 100, height: 50 };
 
 const invalid = (err: unknown) => EngineError.is(err, EngineErrorCode.InvalidArg);
 

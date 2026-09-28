@@ -1,13 +1,23 @@
 import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
+import type { Coordinates, PageCoordinates } from '../../../pageSpace/coordinates';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
 import { PolygonDeclaration } from './declaration';
 
 export { PolygonDeclaration } from './declaration';
 
-export type PolygonAnnotationDTO = ReadOf<typeof PolygonDeclaration>;
-export type PolygonDraft = CreateOf<typeof PolygonDeclaration>;
-export type PolygonPatch = UpdateOf<typeof PolygonDeclaration>;
+export type PolygonAnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+  typeof PolygonDeclaration,
+  C
+>;
+export type PolygonDraft<C extends Coordinates = PageCoordinates> = CreateOf<
+  typeof PolygonDeclaration,
+  C
+>;
+export type PolygonPatch<C extends Coordinates = PageCoordinates> = UpdateOf<
+  typeof PolygonDeclaration,
+  C
+>;
 
 export const PolygonDTOSchema = PolygonDeclaration.readSchema;
 export const PolygonDraftSchema = PolygonDeclaration.createSchema;

@@ -1,8 +1,8 @@
 import { isPluginError, toPageRef } from '@embedpdf/core';
-import type { AnnotationDTO, AnnotationFlags } from '@embedpdf/engine-core/runtime';
+import type { AnnotationFlags } from '@embedpdf/engine-core/runtime';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { annotationHarness } from './harness';
+import { annotationHarness, type FileAnnotation } from './harness';
 import { annotationKey } from '../src/repository';
 
 /**
@@ -26,7 +26,7 @@ const NO_FLAGS: AnnotationFlags = {
   lockedContents: false,
 };
 
-const squareDTO = (annotObjectNumber: number): AnnotationDTO =>
+const squareDTO = (annotObjectNumber: number): FileAnnotation =>
   ({
     ref: { kind: 'objectNumber', page: PAGE, annotObjectNumber },
     page: PAGE,
@@ -47,14 +47,14 @@ const squareDTO = (annotObjectNumber: number): AnnotationDTO =>
     strokeWidth: 1,
     opacity: 1,
     interiorColor: null,
-  }) as AnnotationDTO;
+  }) as FileAnnotation;
 
 const createHarness = () => annotationHarness({ crop: CROP });
 
 afterEach(() => vi.restoreAllMocks());
 
 describe('create() in page space', () => {
-  it('stages optimistically, writes a PDF-space draft with the crop offset applied, and resolves after onCreated', async () => {
+  it('stages optimistically, writes the page-space draft as it is, and resolves after onCreated', async () => {
     const harness = createHarness();
     harness.create.mockResolvedValueOnce({ annotation: squareDTO(42) });
     const order: string[] = [];
@@ -74,10 +74,10 @@ describe('create() in page space', () => {
     const ref = await pending.then((ref) => (order.push('resolved'), ref));
     expect(annotationKey(ref)).toBe('obj:42');
     expect(order).toEqual(['created:obj:42:local', 'resolved']);
-    // the draft the engine saw: page → PDF through the crop box, props applied
+    // the draft the engine saw: the same page-space box, props applied
     expect(harness.create.mock.calls[0]![0]).toMatchObject({
       subtype: 'square',
-      box: { left: 40, bottom: 270, right: 60, top: 280 },
+      box: { x: 30, y: 40, width: 20, height: 10 },
       color: { r: 255, g: 0, b: 0 },
       print: true,
     });

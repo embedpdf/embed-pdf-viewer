@@ -6,8 +6,10 @@ import { toPageRef } from '../../src/identity/PageRef';
 import {
   pageAnnotationOf,
   pdfAnnotationOf,
+  pdfAnnotationDraftOf,
   pdfAnnotationPatchOf,
 } from '../../src/pageSpace/annotations';
+import type { PdfCoordinates } from '../../src/pageSpace/coordinates';
 
 const PAGE = toPageRef(4);
 const OTHER = toPageRef(6);
@@ -19,7 +21,7 @@ const boxes = new Map<number, PdfRect>([
 const boxOf = (page: { pageObjectNumber: number }) => boxes.get(page.pageObjectNumber)!;
 
 /** Only the fields a test looks at; the codec leaves every other field alone. */
-const read = (value: object) => value as unknown as AnnotationDTO;
+const read = (value: object) => value as unknown as AnnotationDTO<PdfCoordinates>;
 
 describe('annotations in page space', () => {
   test('a box kind: rect and box become boxes, everything else stays', () => {
@@ -173,10 +175,9 @@ describe('annotations in page space', () => {
     expect(pdfAnnotationOf(page, visible, boxOf)).toEqual(link);
   });
 
-  test('an update names its kind, and only the fields it sends convert', () => {
+  test("an update's fields convert by their names; only the fields it sends convert", () => {
     expect(
       pdfAnnotationPatchOf(
-        'square',
         {
           box: { x: 50, y: 82, width: 50, height: 50 },
           rotation: null,
@@ -190,5 +191,15 @@ describe('annotations in page space', () => {
       rotation: null,
       color: { r: 0, g: 0, b: 0 },
     });
+  });
+
+  test('a place not given in page space is refused, naming the field', () => {
+    expect(() =>
+      pdfAnnotationDraftOf(
+        { subtype: 'square', box: { left: 100, bottom: 600, right: 150, top: 650 } } as never,
+        visible,
+        boxOf,
+      ),
+    ).toThrow(expect.objectContaining({ code: 'InvalidArg', details: { field: 'box' } }));
   });
 });

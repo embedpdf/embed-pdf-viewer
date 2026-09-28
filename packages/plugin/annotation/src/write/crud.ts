@@ -55,16 +55,8 @@ export function createCrud(
   const wireSubtypeOf = (annotation: ModelAnnotation): AnnotationDTO['subtype'] =>
     annotation.data?.subtype ?? (annotation.subtype as AnnotationDTO['subtype']);
 
-  const cropOrThrow = (annotation: ModelAnnotation) => {
-    const crop = geometry.cropOf(annotation.page.pageObjectNumber);
-    if (!crop)
-      throw new PluginError('not-found', 'annotation', 'the annotation page is not loaded');
-    return crop;
-  };
-
   const update = async (ref: AnnotationRef, patch: AnnotationPagePatch): Promise<void> => {
     const annotation = annotations.loadedOrThrow(ref);
-    const crop = cropOrThrow(annotation);
     let modified: ModelAnnotation = annotation;
     if (patch.bounds) {
       modified = { ...modified, geometry: geometryWithBounds(modified.geometry, patch.bounds) };
@@ -84,7 +76,7 @@ export function createCrud(
       modified = applied;
     }
     let engine: Record<string, unknown> = {};
-    if (modified !== annotation) engine = { ...engine, ...(toPatch(modified, crop) ?? {}) };
+    if (modified !== annotation) engine = { ...engine, ...(toPatch(modified) ?? {}) };
     // Each flag is its own engine field: only the ones the patch names are written.
     if (patch.flags) engine = { ...engine, ...patch.flags };
     if (patch.contents !== undefined) engine = { ...engine, contents: patch.contents };
@@ -107,12 +99,11 @@ export function createCrud(
 
   const setRotation = async (ref: AnnotationRef, degrees: number): Promise<void> => {
     const annotation = annotations.loadedOrThrow(ref);
-    const crop = cropOrThrow(annotation);
     const modified = {
       ...annotation,
       geometry: geometryWithRotation(annotation.geometry, degrees),
     };
-    const patch = toScopedPatch(modified, { kind: 'geometry' }, crop);
+    const patch = toScopedPatch(modified, { kind: 'geometry' });
     if (patch) await updateRaw(annotation.ref, patch);
   };
 

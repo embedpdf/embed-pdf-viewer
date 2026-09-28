@@ -1,30 +1,25 @@
 /**
  * The remaining small families: icon kinds (text note / file attachment),
  * stamps, links, widgets, and the unsupported fallback. Icon kinds (whose
- * icon fills `/Rect`) and links move by `/Rect`, with tiny prop surfaces; stamps and widgets emit
- * patches here but are not createable through the repository (stamps carry a
- * binary source through their own create path; widgets are form-plane).
+ * icon fills `rect`) and links move by `rect`, with tiny prop surfaces;
+ * stamps and widgets emit patches here but are not createable through the
+ * repository (stamps carry a binary source through their own create path;
+ * widgets are form-plane).
  */
 import type { ModelAnnotation, TextStyle } from '@embedpdf/core-annotation';
-import type { AnnotationDTO, PdfRect } from '@embedpdf/engine-core/runtime';
+import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
 import { boxEmit, type KindProjection } from '../projection';
-import {
-  boxGeomFromDTO,
-  colorToCss,
-  contentToPdfRect,
-  pdfToContentRect,
-  writableTarget,
-} from '../seam';
+import { boxGeomFromDTO, colorToCss, writableTarget } from '../seam';
 
-const rectGeometry = (annotation: ModelAnnotation, crop: PdfRect) =>
-  'rect' in annotation.geometry ? { rect: contentToPdfRect(annotation.geometry.rect, crop) } : null;
+const rectGeometry = (annotation: ModelAnnotation) =>
+  'rect' in annotation.geometry ? { rect: annotation.geometry.rect } : null;
 
 const iconProjection = (subtype: 'text' | 'file-attachment'): KindProjection => ({
-  ingest: (dto, crop) => {
+  ingest: (dto) => {
     const iconDto = dto as Extract<AnnotationDTO, { subtype: typeof subtype }>;
     return {
-      geometry: { kind: 'rect', rect: pdfToContentRect(iconDto.rect, crop), ellipse: false },
+      geometry: { kind: 'rect', rect: iconDto.rect, ellipse: false },
       // The /Name icon is a content projection like `style` — icon kinds only.
       icon: iconDto.icon,
     };
@@ -39,22 +34,22 @@ export const textNote = iconProjection('text');
 export const fileAttachment = iconProjection('file-attachment');
 
 export const stamp: KindProjection = {
-  ingest: (dto, crop) => {
+  ingest: (dto) => {
     const stampDto = dto as Extract<AnnotationDTO, { subtype: 'stamp' }>;
-    return { geometry: boxGeomFromDTO(stampDto, crop, false) };
+    return { geometry: boxGeomFromDTO(stampDto, false) };
   },
   // Geometry only — the visual is the engine-baked /AP, re-fit natively (with
   // the stamp's recorded fit) when its box changes. A new drawing is bytes: it
   // goes to the engine as the `appearance` resource, never through this path.
-  geometry: (annotation, crop) => boxEmit(annotation, crop),
+  geometry: boxEmit,
   createable: false,
 };
 
 export const link: KindProjection = {
-  ingest: (dto, crop) => {
+  ingest: (dto) => {
     const linkDto = dto as Extract<AnnotationDTO, { subtype: 'link' }>;
     return {
-      geometry: { kind: 'rect', rect: pdfToContentRect(linkDto.rect, crop), ellipse: false },
+      geometry: { kind: 'rect', rect: linkDto.rect, ellipse: false },
       // The link kind's own target — attached links (grouped children of
       // another kind) fold onto their parent's `link` slot instead, in
       // `foldAttachedLinks`.
@@ -100,10 +95,10 @@ function widgetTextFromDTO(dto: Extract<AnnotationDTO, { subtype: 'widget' }>): 
 }
 
 export const widget: KindProjection = {
-  ingest: (dto, crop) => {
+  ingest: (dto) => {
     const widgetDto = dto as Extract<AnnotationDTO, { subtype: 'widget' }>;
     return {
-      geometry: { kind: 'rect', rect: pdfToContentRect(widgetDto.rect, crop), ellipse: false },
+      geometry: { kind: 'rect', rect: widgetDto.rect, ellipse: false },
       ...(WIDGET_TEXT_KINDS.has(widgetKindOf(widgetDto.fieldFamily))
         ? { text: widgetTextFromDTO(widgetDto) }
         : {}),
@@ -114,8 +109,8 @@ export const widget: KindProjection = {
 };
 
 export const unsupported: KindProjection = {
-  ingest: (dto, crop) => ({
-    geometry: { kind: 'rect', rect: pdfToContentRect(dto.rect, crop), ellipse: false },
+  ingest: (dto) => ({
+    geometry: { kind: 'rect', rect: dto.rect, ellipse: false },
   }),
   geometry: () => null,
   createable: false,

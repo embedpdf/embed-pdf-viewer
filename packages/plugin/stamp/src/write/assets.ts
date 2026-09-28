@@ -123,7 +123,7 @@ export function createAssetWrites(
           await doc.page(page).annotations.create(
             {
               subtype: 'stamp',
-              box: { left: 0, bottom: 0, right: rasterSize!.width, top: rasterSize!.height },
+              box: { x: 0, y: 0, width: rasterSize!.width, height: rasterSize!.height },
               fit: 'fill',
             },
             { appearance: new Uint8Array(resolved.bytes) },

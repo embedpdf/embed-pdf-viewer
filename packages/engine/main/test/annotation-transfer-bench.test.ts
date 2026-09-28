@@ -106,7 +106,7 @@ describe.skipIf(!ENABLED).each(['wasm', 'native'] as const)(
           const base = pages(limits.pages);
           const source = await open(engine, base);
           const rows: string[] = [];
-          const rect = { left: 40, bottom: 40, right: 120, top: 100 };
+          const rect = { x: 40, y: 40, width: 80, height: 60 };
           await timed(rows, `create ${limits.pages}`, async () => {
             for (const page of await pageRefs(source)) {
               await source.page(page).annotations.create({ subtype: 'square', box: rect });
@@ -128,12 +128,12 @@ describe.skipIf(!ENABLED).each(['wasm', 'native'] as const)(
           const rows: string[] = [];
           await timed(rows, `create ${limits.resources} stamps`, async () => {
             for (let i = 0; i < limits.resources; i++) {
-              const left = 20 + ((i >> 4) % 10) * 55;
-              const bottom = 40 + (i % 12) * 60;
+              const x = 20 + ((i >> 4) % 10) * 55;
+              const y = 40 + (i % 12) * 60;
               await source
                 .page(refs[i % refs.length]!)
                 .annotations.create(
-                  { subtype: 'stamp', box: { left, bottom, right: left + 50, top: bottom + 40 } },
+                  { subtype: 'stamp', box: { x, y, width: 50, height: 40 } },
                   { appearance: png(16, 16, [i & 255, (i >> 8) & 255, 128]) },
                 );
             }
@@ -182,7 +182,7 @@ describe.skipIf(!ENABLED).each(['wasm', 'native'] as const)(
             await source
               .page((await pageRefs(source))[0]!)
               .annotations.create(
-                { subtype: 'stamp', box: { left: 40, bottom: 40, right: 440, top: 290 } },
+                { subtype: 'stamp', box: { x: 40, y: 40, width: 400, height: 250 } },
                 { appearance: image },
               );
           });

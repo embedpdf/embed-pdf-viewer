@@ -26,12 +26,10 @@ import { initialModel, initialStyle } from '../src/update';
 import { chrome, creationDraftAnchor, pageItems } from '../src/view';
 
 const PAGE = toPageRef(1);
-const crop = { left: -20, bottom: -40, right: 580, top: 760 };
 const appearance: ShapeMeasurementAppearance = {
   intent: 'polygon-dimension',
   measure: measureFromKnownLength(100, { value: 2, unit: 'm' }),
   caption: { enabled: true },
-  crop,
   text: '',
 };
 const points = [
@@ -153,7 +151,7 @@ describe('area and perimeter authoring', () => {
     model = pointer(model, 'move', { x: center.x + 150, y: center.y - 100 });
     const preview = pageItems(model, PAGE)[0];
     expect(preview.source).toBe('vector');
-    expect(preview.measure?.caption).toEqual({ enabled: true, center: { x: 330, y: 710 } });
+    expect(preview.measure?.caption).toEqual({ enabled: true, center: { x: 350, y: 50 } });
     expect(step(model, { type: 'cancel' })[0].byId.shape.measure).toBe(appearance);
     const [committed, effects] = step(model, {
       type: 'editPointer',

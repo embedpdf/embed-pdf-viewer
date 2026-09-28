@@ -82,18 +82,18 @@ export async function fill(doc: Doc, count: number): Promise<void> {
   for (let i = 0; i < count; i++) {
     const page = doc.page(refs[i % refs.length]!);
     const slot = Math.floor(i / refs.length);
-    const left = 20 + (slot % 10) * 55;
-    const bottom = 40 + Math.floor(slot / 10) * 60;
-    const rect = { left, bottom, right: left + 50, top: bottom + 40 };
+    const x = 20 + (slot % 10) * 55;
+    const y = 40 + Math.floor(slot / 10) * 60;
+    const rect = { x, y, width: 50, height: 40 };
     if (i % 25 === 0) {
       const { annotation: created } = await page.annotations.create({
         subtype: 'text',
-        rect: iconRect(rect.left, rect.top),
+        rect: iconRect(rect.x, rect.y),
         contents: `Note ${i}`,
       });
       await page.annotations.create({
         subtype: 'text',
-        rect: iconRect(rect.left, rect.top),
+        rect: iconRect(rect.x, rect.y),
         reply: { to: created.ref },
       });
       i++;
@@ -105,8 +105,8 @@ export async function fill(doc: Doc, count: number): Promise<void> {
     } else {
       const { data, resources } = kinds[i % kinds.length]!;
       const shifted = JSON.parse(
-        JSON.stringify(data).replaceAll(/"(x|left|right)":(\d+(\.\d+)?)/g, (_m, key, value) => {
-          return `"${key}":${Number(value) - 40 + left}`;
+        JSON.stringify(data).replaceAll(/"x":(\d+(\.\d+)?)/g, (_m, value) => {
+          return `"x":${Number(value) - 40 + x}`;
         }),
       );
       await page.annotations.create({ ...shifted, rect }, resources);

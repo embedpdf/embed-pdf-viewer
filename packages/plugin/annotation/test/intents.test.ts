@@ -5,11 +5,11 @@
  * Nothing is restored from a copy taken before the write.
  */
 import type { DocumentEvent } from '@embedpdf/core';
-import type { AnnotationDTO, AnnotationFlags, AnnotationRef } from '@embedpdf/engine-core/runtime';
+import type { AnnotationFlags, AnnotationRef } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { annotationHarness, PAGE2, snapshotOf } from './harness';
+import { annotationHarness, PAGE2, snapshotOf, type FileAnnotation } from './harness';
 
 const PAGE = toPageRef(1);
 const NO_FLAGS: AnnotationFlags = {
@@ -32,7 +32,7 @@ const ref = (annotObjectNumber: number): AnnotationRef => ({
   annotObjectNumber,
 });
 
-const square = (objectNumber: number, extra: Record<string, unknown> = {}): AnnotationDTO =>
+const square = (objectNumber: number, extra: Record<string, unknown> = {}): FileAnnotation =>
   ({
     ref: ref(objectNumber),
     page: PAGE,
@@ -62,7 +62,7 @@ const square = (objectNumber: number, extra: Record<string, unknown> = {}): Anno
     importedBy: null,
     actions: null,
     ...extra,
-  }) as unknown as AnnotationDTO;
+  }) as unknown as FileAnnotation;
 
 /** A direct-object annotation without /NM: the engine addresses it by position. */
 const WEAK_REF: AnnotationRef = {
@@ -71,10 +71,10 @@ const WEAK_REF: AnnotationRef = {
   index: 3,
   revision: { pageObjectNumber: 1, generation: 0 } as never,
 };
-const weakSquare = (): AnnotationDTO =>
+const weakSquare = (): FileAnnotation =>
   square(0, { ref: WEAK_REF, index: 3, identityQuality: 'weak' });
 
-const freeText = (contents: string, extra: Record<string, unknown> = {}): AnnotationDTO =>
+const freeText = (contents: string, extra: Record<string, unknown> = {}): FileAnnotation =>
   square(30, {
     subtype: 'free-text',
     intent: 'free-text',
@@ -104,7 +104,7 @@ const freeText = (contents: string, extra: Record<string, unknown> = {}): Annota
     ...extra,
   });
 
-const remoteUpdate = (dto: AnnotationDTO): DocumentEvent =>
+const remoteUpdate = (dto: FileAnnotation): DocumentEvent =>
   ({
     type: 'annotations.updated',
     page: PAGE,
@@ -223,7 +223,7 @@ describe('what the capability says about a write', () => {
 
     const restyle = harness.capability.updateSelection({ color: '#00ff00' });
     expect(harness.capability.get(ref(20))!.pending).toBe(true);
-    expect(harness.capability.get(ref(20))!.raw).toEqual(square(20));
+    expect(harness.capability.get(ref(20))!.raw).toEqual(harness.read(square(20)));
     write.resolve({ annotation: square(20, { color: { r: 0, g: 255, b: 0 } }) });
     await restyle;
 
@@ -333,11 +333,13 @@ describe('several changes to one record', () => {
     vi.useFakeTimers();
     const harness = annotationHarness();
     await harness.load([freeText('Hello')]);
-    const moved = { left: 200, bottom: 600, right: 400, top: 640 };
+    // The box the engine keeps in the file, and the same box on the 800-high page.
+    const inFile = { left: 200, bottom: 600, right: 400, top: 640 };
+    const moved = { x: 200, y: 160, width: 200, height: 40 };
 
     harness.capability.draftContents(ref(30), 'Hello world');
     harness.update.mockResolvedValueOnce({
-      annotation: freeText('Hello', { rect: moved, box: moved }),
+      annotation: freeText('Hello', { rect: inFile, box: inFile }),
     });
     await harness.capability.updateRaw(ref(30), { subtype: 'free-text', box: moved } as never);
 

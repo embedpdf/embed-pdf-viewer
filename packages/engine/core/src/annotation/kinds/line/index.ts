@@ -1,13 +1,23 @@
 import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
+import type { Coordinates, PageCoordinates } from '../../../pageSpace/coordinates';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
 import { LineDeclaration } from './declaration';
 
 export { LineDeclaration } from './declaration';
 
-export type LineAnnotationDTO = ReadOf<typeof LineDeclaration>;
-export type LineDraft = CreateOf<typeof LineDeclaration>;
-export type LinePatch = UpdateOf<typeof LineDeclaration>;
+export type LineAnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+  typeof LineDeclaration,
+  C
+>;
+export type LineDraft<C extends Coordinates = PageCoordinates> = CreateOf<
+  typeof LineDeclaration,
+  C
+>;
+export type LinePatch<C extends Coordinates = PageCoordinates> = UpdateOf<
+  typeof LineDeclaration,
+  C
+>;
 
 export const LineDTOSchema = LineDeclaration.readSchema;
 export const LineDraftSchema = LineDeclaration.createSchema;

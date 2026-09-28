@@ -40,7 +40,7 @@ const pageLayout = (pageObjectNumber: number, index: number): PageLayout =>
 const linkDto = (
   annotObjectNumber: number,
   pageObjectNumber: number,
-  rect: { left: number; bottom: number; right: number; top: number },
+  rect: { x: number; y: number; width: number; height: number },
   target: unknown,
 ) => ({
   ref: { kind: 'objectNumber', page: toPageRef(pageObjectNumber), annotObjectNumber },
@@ -58,14 +58,14 @@ const PAGE_ONE_LINKS = [
   linkDto(
     10,
     1,
-    { left: 100, bottom: 700, right: 300, top: 760 },
+    { x: 100, y: 40, width: 200, height: 60 },
     { kind: 'uri', uri: 'https://example.com' },
   ),
-  linkDto(11, 1, { left: 120, bottom: 720, right: 160, top: 740 }, { kind: 'named', name: 'N' }),
+  linkDto(11, 1, { x: 120, y: 60, width: 40, height: 20 }, { kind: 'named', name: 'N' }),
   linkDto(
     12,
     1,
-    { left: 400, bottom: 100, right: 500, top: 200 },
+    { x: 400, y: 600, width: 100, height: 100 },
     { kind: 'goto', destination: { page: toPageRef(2), kind: 'fit' } },
   ),
 ];
@@ -139,7 +139,6 @@ describe('link plugin', () => {
     expect(harness.link.getStatus(toPageRef(1))).toBe('ready');
     const links = harness.link.listLinks(toPageRef(1));
     expect(links.map((link) => link.id)).toEqual(['obj:10', 'obj:11', 'obj:12']);
-    // PDF (100,700)-(300,760) on an 800pt page → page space y = 800 - 760 = 40
     expect(links[0]!.bounds).toEqual({ x: 100, y: 40, width: 200, height: 60 });
     expect(harness.link.listLinks(toPageRef(1))).toBe(links);
     expect(harness.link.getLink(toPageRef(1), 'obj:11')?.target).toEqual({
@@ -173,11 +172,10 @@ describe('link plugin', () => {
       kind: 'uri',
       uri: 'https://x',
     });
-    // The file's numbers, measured from the top-left of the page the link goes to.
     expect(
       harness.link.resolve({
         kind: 'goto',
-        destination: { kind: 'xyz', page: toPageRef(2), left: crop.left + 100, top: crop.top - 50 },
+        destination: { kind: 'xyz', page: toPageRef(2), x: 100, y: 50 },
       }),
     ).toEqual({
       kind: 'destination',
@@ -223,7 +221,11 @@ describe('link plugin', () => {
     harness.emit({
       type: 'annotations.moved',
       page: toPageRef(1),
-      annotations: [PAGE_ONE_LINKS[0], PAGE_ONE_LINKS[1], linkDto(20, 2, crop, null)],
+      annotations: [
+        PAGE_ONE_LINKS[0],
+        PAGE_ONE_LINKS[1],
+        linkDto(20, 2, { x: 0, y: 0, width: 600, height: 800 }, null),
+      ],
       origin: ORIGIN,
     });
     await settle();

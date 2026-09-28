@@ -22,7 +22,7 @@ const stamp = (annotObjectNumber: number) =>
   ({
     subtype: 'stamp',
     ref: { kind: 'objectNumber', page, annotObjectNumber },
-    rect: { left: 10, bottom: 10, right: 110, top: 60 },
+    rect: { x: 10, y: 10, width: 100, height: 50 },
     contents: 'Apprové ✓',
   }) as unknown as AnnotationDTO;
 
@@ -33,7 +33,7 @@ async function sample(): Promise<AnnotationBundle> {
   return {
     format: 'embedpdf/annotations',
     version: 1,
-    pages: [{ page, position: 0, box: { left: 0, bottom: 0, right: 612, top: 792 } }],
+    pages: [{ page, position: 0, size: { width: 612, height: 792 } }],
     items: [
       { data: stamp(12), resources: { appearance: drawingId } },
       { data: stamp(13), resources: { appearance: drawingId } },

@@ -74,15 +74,15 @@ async function documentWithStamps(): Promise<Uint8Array> {
     );
     const { pages } = await doc.pages.list();
     const page = doc.page(pages[0]!.ref);
-    for (const left of [20, 100]) {
+    for (const x of [20, 100]) {
       await page.annotations.create(
-        { subtype: 'stamp', box: { left, bottom: 20, right: left + 60, top: 40 } },
+        { subtype: 'stamp', box: { x, y: 20, width: 60, height: 20 } },
         { appearance: PNG },
       );
     }
     await page.annotations.create({
       subtype: 'square',
-      box: { left: 200, bottom: 20, right: 260, top: 40 },
+      box: { x: 200, y: 20, width: 60, height: 20 },
     });
     const saved = await doc.download({ mode: 'rewrite' });
     await doc.close();

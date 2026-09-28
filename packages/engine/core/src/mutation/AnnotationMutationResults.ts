@@ -2,6 +2,7 @@ import type { AnnotationListMutationMeta } from './AnnotationListMutationMeta';
 import type { AppearanceOutcome } from '../annotation/appearance';
 import type { AnnotationDTO } from '../annotation/kinds';
 import type { AnnotationStableId } from '../identity/AnnotationStableId';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
 /**
  * Created annotation, fully materialised. The new annotation always has
@@ -9,12 +10,12 @@ import type { AnnotationStableId } from '../identity/AnnotationStableId';
  * `EPDFPage_CreateAnnot` fork helper (which creates an indirect PDF
  * object) and reads it back via `EPDFPage_GetAnnotByObjectNumber`.
  */
-export interface AnnotationCreateResult {
-  annotation: AnnotationDTO;
+export interface AnnotationCreateResult<C extends Coordinates = PageCoordinates> {
+  annotation: AnnotationDTO<C>;
   meta: AnnotationListMutationMeta;
 }
 
-export interface AnnotationUpdateResult {
+export interface AnnotationUpdateResult<C extends Coordinates = PageCoordinates> {
   /**
    * The updated annotation, fully materialised after the patch.
    *
@@ -38,7 +39,7 @@ export interface AnnotationUpdateResult {
    * intentionally no `patch.nm` — a stable id that callers can rename
    * mid-session is not stable.
    */
-  annotation: AnnotationDTO;
+  annotation: AnnotationDTO<C>;
   /**
    * The engine's appearance verdict for this update (see
    * {@link AppearanceOutcome}). Clients drive raster invalidation off
@@ -84,13 +85,13 @@ export function deletedAnnotationsOf(result: AnnotationDeleteResult): Annotation
  * revision once per batch, and `meta.shouldRefetch` is set iff the prior
  * `weakAnnotationState` was known to contain weak annotations.
  */
-export interface AnnotationMoveResult {
+export interface AnnotationMoveResult<C extends Coordinates = PageCoordinates> {
   /**
    * The moved annotations in their **new order**. `length === refs.length`.
    * `annotations[i]` is the post-move DTO of `refs[i]`, and lives at index
    * `toIndex + i` in the page's /Annots array.
    */
-  annotations: AnnotationDTO[];
+  annotations: AnnotationDTO<C>[];
   /**
    * One structural envelope per batch. One revision bump, one impact
    * computation, regardless of `refs.length`. `meta.changed` lists the

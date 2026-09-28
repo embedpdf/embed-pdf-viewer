@@ -1,4 +1,4 @@
-import { isDimension } from '@embedpdf/engine-core/runtime';
+import { isDimension, type PdfCoordinates } from '@embedpdf/engine-core/runtime';
 import {
   annotationKey,
   annotationKeysOf,
@@ -132,12 +132,14 @@ export class AnnotationMutator {
    */
   create(
     pageObjectNumber: PageObjectNumber,
-    draft: AnnotationDraft,
+    draft: AnnotationDraft<PdfCoordinates>,
     signal: AbortSignal,
     actor?: AnnotationActor,
     resources?: WireAnnotationResources,
-  ): AnnotationCreateResult {
-    const { reply, ...data } = draft as AnnotationDraft & { parent?: AnnotationRef | null };
+  ): AnnotationCreateResult<PdfCoordinates> {
+    const { reply, ...data } = draft as AnnotationDraft<PdfCoordinates> & {
+      parent?: AnnotationRef | null;
+    };
     const parent = draft.subtype === 'popup' ? draft.parent : null;
     if (draft.subtype === 'popup') delete (data as { parent?: unknown }).parent;
     const { created, meta } = new AnnotationBatchApplier(
@@ -148,7 +150,7 @@ export class AnnotationMutator {
       [
         {
           page: toPageRef(pageObjectNumber),
-          draft: data as AnnotationDraft,
+          draft: data as AnnotationDraft<PdfCoordinates>,
           ...(reply
             ? { replyTo: { to: { existing: reply.to }, type: reply.type ?? 'reply' } }
             : {}),
@@ -164,11 +166,11 @@ export class AnnotationMutator {
 
   update(
     ref: AnnotationRef,
-    patch: AnnotationPatch,
+    patch: AnnotationPatch<PdfCoordinates>,
     signal: AbortSignal,
     actor?: AnnotationActor,
     resources?: WireAnnotationResources,
-  ): AnnotationUpdateResult {
+  ): AnnotationUpdateResult<PdfCoordinates> {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
     const pool = this.session.pagePool();
@@ -413,7 +415,7 @@ export class AnnotationMutator {
       pageObjectNumber,
       signal,
     );
-    const hasWeak = (list: readonly AnnotationDTO[]) =>
+    const hasWeak = (list: readonly AnnotationDTO<PdfCoordinates>[]) =>
       list.some((annotation) => annotation.ref.kind === 'index');
     if (this.session.weakAnnotationState(pageObjectNumber).kind !== 'known') {
       this.session.recordWeakFlag(pageObjectNumber, hasWeak(annotations));
@@ -661,7 +663,7 @@ export class AnnotationMutator {
     refs: AnnotationRef[],
     toIndex: number,
     signal: AbortSignal,
-  ): AnnotationMoveResult {
+  ): AnnotationMoveResult<PdfCoordinates> {
     throwIfAborted(signal);
     if (refs.length === 0) {
       throw new EngineError(EngineErrorCode.InvalidArg, 'move requires at least one ref');
@@ -777,7 +779,7 @@ export class AnnotationMutator {
       const bumpedRev = this.session.bumpRevision(pageObjectNumber);
       bumpRequested = false;
 
-      const moved: AnnotationDTO[] = new Array(fromIndices.length);
+      const moved: AnnotationDTO<PdfCoordinates>[] = new Array(fromIndices.length);
       for (let i = 0; i < fromIndices.length; i++) {
         throwIfAborted(signal);
         const newIdx = toIndex + i;
@@ -869,7 +871,10 @@ export class AnnotationMutator {
  * a caller may leave out. A different subtype, a changed name, or any change to
  * an annotation of a type the engine doesn't model is refused.
  */
-function patchForTarget(current: AnnotationDTO, patch: AnnotationPatch): AnnotationPatch {
+function patchForTarget(
+  current: AnnotationDTO<PdfCoordinates>,
+  patch: AnnotationPatch<PdfCoordinates>,
+): AnnotationPatch<PdfCoordinates> {
   if (patch.subtype !== undefined && patch.subtype !== current.subtype) {
     throw new EngineError(EngineErrorCode.InvalidArg, 'Annotation subtype cannot change');
   }
@@ -886,7 +891,10 @@ function patchForTarget(current: AnnotationDTO, patch: AnnotationPatch): Annotat
     );
   }
   assertDeclaredFields(current.subtype, patch);
-  return checkAnnotationPatch(current, { ...patch, subtype: current.subtype } as AnnotationPatch);
+  return checkAnnotationPatch(current, {
+    ...patch,
+    subtype: current.subtype,
+  } as AnnotationPatch<PdfCoordinates>);
 }
 
 /** `NotFound` for a ref by number or name, `InvalidReference` for a position out of range. */

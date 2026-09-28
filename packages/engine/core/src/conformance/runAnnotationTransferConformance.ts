@@ -2,12 +2,13 @@ import { appearanceRasters, maxShiftedDifference } from './appearanceRasters';
 import { creatables, iconRect } from './creatables';
 import type { ConformanceTestRunner } from './runMetadataConformance';
 import { BANDS_PDF, sameBytes } from './stampFixtures';
-import { drawnPointsOf } from '../annotation/drawnPoints';
+import { drawnPointsOf } from '../pageSpace/helpers';
 import type { AnnotationDTO } from '../annotation/kinds';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import type { PageHandle } from '../engine/PageHandle';
 import { pdfRectTurnedBounds } from '../geometry/convert';
+import type { PageBox } from '../geometry/pageSpace';
 import type { PdfRect } from '../geometry/primitives';
 import { annotationKey, annotationKeysOf } from '../identity/annotationKey';
 import type { AnnotationRef } from '../identity/AnnotationRef';
@@ -151,10 +152,10 @@ export function runAnnotationTransferConformance(
         const { rect } = data;
         const outside = geometryOf(data).filter(
           ({ x, y }) =>
-            x < rect.left - epsilon ||
-            x > rect.right + epsilon ||
-            y < rect.bottom - epsilon ||
-            y > rect.top + epsilon,
+            x < rect.x - epsilon ||
+            x > rect.x + rect.width + epsilon ||
+            y < rect.y - epsilon ||
+            y > rect.y + rect.height + epsilon,
         );
         expect({ key: annotationKey(data.ref), outside }).toEqual({
           key: annotationKey(data.ref),
@@ -168,9 +169,11 @@ export function runAnnotationTransferConformance(
       for (const { data } of bundle.items) {
         const turn = turnOf(data);
         if (!turn) continue;
-        const expected = pdfRectTurnedBounds(turn.box, turn.rotation);
+        // Bounds of a box turned about its middle are the same either way y points.
+        const expected = pdfRectTurnedBounds(edgesOf(turn.box), turn.rotation);
+        const actual = edgesOf(data.rect);
         const far = (['left', 'bottom', 'right', 'top'] as const).filter(
-          (edge) => Math.abs(data.rect[edge] - expected[edge]) > 0.01,
+          (edge) => Math.abs(actual[edge] - expected[edge]) > 0.01,
         );
         expect({ key: annotationKey(data.ref), far }).toEqual({
           key: annotationKey(data.ref),
@@ -271,9 +274,6 @@ const FRAMED: ReadonlySet<string> = new Set([
   'strikeout',
 ]);
 
-/** Kinds drawn as a fixed-size icon at their box's bottom-left. */
-const ICONS: ReadonlySet<string> = new Set(['text', 'file-attachment']);
-
 /** The points an annotation's data places on the page: its line, vertices, strokes or quads. */
 function geometryOf(data: AnnotationDTO): Array<{ x: number; y: number }> {
   // A turned line's, polygon's or ink's points are upright: the drawing turns them.
@@ -353,8 +353,16 @@ function asTaken(bundle: AnnotationBundle, dropped: readonly AnnotationImportDro
  * and the `/A` a copy writes for it read the same target.
  */
 /** A box kind's turn: degrees clockwise about the middle of its own box. */
-function turnOf(data: AnnotationDTO): { rotation: number; box: PdfRect } | null {
-  const { rotation, box } = data as { rotation?: number | null; box?: PdfRect };
+/** A page box by its edges, for math that doesn't care which way y points. */
+const edgesOf = (box: PageBox): PdfRect => ({
+  left: box.x,
+  bottom: box.y,
+  right: box.x + box.width,
+  top: box.y + box.height,
+});
+
+function turnOf(data: AnnotationDTO): { rotation: number; box: PageBox } | null {
+  const { rotation, box } = data as { rotation?: number | null; box?: PageBox };
   return rotation && box ? { rotation, box } : null;
 }
 
@@ -382,7 +390,7 @@ function normalized(bundle: AnnotationBundle, attribution: Attribution) {
     return Object.fromEntries(Object.entries(record).map(([key, child]) => [key, pages(child)]));
   };
   return {
-    pages: bundle.pages.map(({ position, box }) => ({ position, box })),
+    pages: bundle.pages.map(({ position, size }) => ({ position, size })),
     items: bundle.items.map(({ data, resources }) => {
       const {
         ref,
@@ -402,9 +410,9 @@ function normalized(bundle: AnnotationBundle, attribution: Attribution) {
       if (data.subtype === 'popup') fields.parent = at(data.parent);
       // A copy is drawn from its data (§4): where the data is points, the
       // box is the frame of what we draw, checked to contain the points
-      // (`expectFramesHoldGeometry`); a note's or a file's icon is our 20 × 20
-      // at its `at`, which is compared as data.
-      if (FRAMED.has(data.subtype) || ICONS.has(data.subtype)) delete fields.rect;
+      // (`expectFramesHoldGeometry`); a note's or a file's icon fills its
+      // `rect`, which is compared as data.
+      if (FRAMED.has(data.subtype)) delete fields.rect;
       // A turned box's `rect` is the upright box around it, which the engine
       // works out (`expectTurnedRects`), not the number another app rounded.
       if (turnOf(data)) delete fields.rect;
@@ -433,19 +441,19 @@ async function fill(doc: DocumentHandle): Promise<void> {
     resources?: Parameters<PageHandle['annotations']['create']>[1],
   ) => (await page.annotations.create(draft, resources)).annotation as AnnotationDTO;
   for (const { data, resources } of creatables()) await create(data, resources);
-  const box = (left: number): PdfRect => ({ left, bottom: 300, right: left + 40, top: 330 });
+  const box = (x: number): PageBox => ({ x, y: 300, width: 40, height: 30 });
   await create({ subtype: 'stamp', box: box(20), nm: 'approved' }, { appearance: BANDS_PDF });
   await create({ subtype: 'stamp', box: box(80), opacity: 0.5 }, { appearance: BANDS_PDF });
   const note = await create({
     subtype: 'text',
-    rect: iconRect(box(140).left, box(140).top),
+    rect: iconRect(box(140).x, box(140).y),
     nm: 'note',
     contents: 'Check',
   });
   await create({ subtype: 'popup', rect: box(200), parent: note.ref, open: true });
   await create({
     subtype: 'text',
-    rect: iconRect(box(140).left, box(140).top),
+    rect: iconRect(box(140).x, box(140).y),
     reply: { to: note.ref },
   });
   await create({

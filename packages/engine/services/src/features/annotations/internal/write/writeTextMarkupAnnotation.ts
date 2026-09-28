@@ -11,6 +11,7 @@ import {
   type StrikeoutPatch,
   type UnderlineDraft,
   type UnderlinePatch,
+  type PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -40,8 +41,16 @@ const DEFAULT_OPACITY = 1;
 const DEFAULT_HIGHLIGHT_COLOR: Color = { r: 255, g: 255, b: 0 };
 const DEFAULT_TEXT_MARKUP_COLOR: Color = { r: 0, g: 0, b: 0 };
 
-export type TextMarkupDraft = HighlightDraft | UnderlineDraft | SquigglyDraft | StrikeoutDraft;
-export type TextMarkupPatch = HighlightPatch | UnderlinePatch | SquigglyPatch | StrikeoutPatch;
+export type TextMarkupDraft =
+  | HighlightDraft<PdfCoordinates>
+  | UnderlineDraft<PdfCoordinates>
+  | SquigglyDraft<PdfCoordinates>
+  | StrikeoutDraft<PdfCoordinates>;
+export type TextMarkupPatch =
+  | HighlightPatch<PdfCoordinates>
+  | UnderlinePatch<PdfCoordinates>
+  | SquigglyPatch<PdfCoordinates>
+  | StrikeoutPatch<PdfCoordinates>;
 
 /**
  * Apply a text-markup draft to a freshly-created annotation. Caller is

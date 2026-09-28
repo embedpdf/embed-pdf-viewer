@@ -4,13 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { deflateSync } from 'node:zlib';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { DocumentHandle, Engine, StampAnnotationDTO } from '@embedpdf/engine-core/runtime';
-import {
-  EngineErrorCode,
-  pdfRectOf,
-  sniffBinaryMetadata,
-  toPageRef,
-  type PageBox,
-} from '@embedpdf/engine-core/runtime';
+import { EngineErrorCode, sniffBinaryMetadata, toPageRef } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '../src/index';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -82,13 +76,6 @@ function makePng(
   return png;
 }
 
-/** An appearance's page-space rect in the file's numbers, as annotation reads still give them. */
-async function inFile(document: DocumentHandle, rect: PageBox) {
-  const { pages } = await document.pages.list();
-  const layout = pages.find((page) => page.ref.pageObjectNumber === PAGE_OBJECT_NUMBER)!;
-  return pdfRectOf(rect, layout.pdfCropBox);
-}
-
 describe('stamp annotations: engine-local (inline transport, wasm runtime)', () => {
   let engine: Engine;
   let handle: DocumentHandle;
@@ -116,7 +103,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
   test('create image stamp → DTO round-trips, appearance renders non-empty', async () => {
     const page = handle.page(toPageRef(PAGE_OBJECT_NUMBER));
     const png = makePng(8, 4, [255, 0, 0, 255]);
-    const rect = { left: 100, bottom: 500, right: 260, top: 580 };
+    const rect = { x: 100, y: 500, width: 160, height: 80 };
 
     const result = await page.annotations.create(
       {
@@ -130,8 +117,8 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     expect(result.annotation.subtype).toBe('stamp');
     const created = result.annotation as StampAnnotationDTO;
     expect(created.name).toBe('Approved');
-    expect(created.rect.left).toBeCloseTo(rect.left, 0);
-    expect(created.rect.top).toBeCloseTo(rect.top, 0);
+    expect(created.rect.x).toBeCloseTo(rect.x, 0);
+    expect(created.rect.y).toBeCloseTo(rect.y, 0);
 
     const snapshot = await page.annotations.list();
     const stamps = snapshot.annotations.filter((a) => a.subtype === 'stamp');
@@ -166,7 +153,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     const result = await page.annotations.create(
       {
         subtype: 'stamp',
-        box: { left: 50, bottom: 50, right: 90, top: 90 },
+        box: { x: 50, y: 50, width: 40, height: 40 },
       },
       { appearance: new Blob([png], { type: 'image/png' }) },
     );
@@ -199,24 +186,24 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     const { annotation: created } = await page.annotations.create(
       {
         subtype: 'stamp',
-        box: { left: 10, bottom: 10, right: 50, top: 50 },
+        box: { x: 10, y: 10, width: 40, height: 40 },
       },
       { appearance: png },
     );
     const updated = await page.annotations.update(created.ref, {
       subtype: 'stamp',
-      box: { left: 10, bottom: 10, right: 90, top: 50 },
+      box: { x: 10, y: 10, width: 80, height: 40 },
     });
     expect(updated.annotation.subtype).toBe('stamp');
-    expect(updated.annotation.rect.right).toBeCloseTo(90, 0);
+    expect(updated.annotation.rect.x + updated.annotation.rect.width).toBeCloseTo(90, 0);
   });
 
   test('rotated stamp: appearance renders UNROTATED — rect is the logical box, content is flat', async () => {
     const page = handle.page(toPageRef(PAGE_OBJECT_NUMBER));
     const png = makePng(8, 4, [255, 0, 0, 255]);
-    const unrotated = { left: 300, bottom: 300, right: 400, top: 350 }; // 100×50 landscape
+    const unrotated = { x: 300, y: 300, width: 100, height: 50 }; // 100×50 landscape
     // 90° CW about the centre (350, 325) → the /Rect AABB is 50×100 portrait.
-    const rect = { left: 325, bottom: 275, right: 375, top: 375 };
+    const rect = { x: 325, y: 275, width: 50, height: 100 };
     const { annotation: created } = await page.annotations.create(
       {
         subtype: 'stamp',
@@ -237,10 +224,10 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     );
     expect(entry).toBeDefined();
     // The convention: the entry's rect is the unrotated logical box…
-    const entryRect = await inFile(handle, entry!.rect);
-    expect(entryRect.left).toBeCloseTo(unrotated.left, 0);
-    expect(entryRect.right).toBeCloseTo(unrotated.right, 0);
-    expect(entryRect.top).toBeCloseTo(unrotated.top, 0);
+    const entryRect = entry!.rect;
+    expect(entryRect.x).toBeCloseTo(unrotated.x, 0);
+    expect(entryRect.x + entryRect.width).toBeCloseTo(unrotated.x + unrotated.width, 0);
+    expect(entryRect.y).toBeCloseTo(unrotated.y, 0);
     // …and the raster is landscape (a rotated bake would be the 50×100 AABB).
     const { width, height, stride } = entry!.raster;
     expect(width).toBeGreaterThan(height);
@@ -264,9 +251,9 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     // (the default, and what the viewer uses); 'fill' hides it.
     const page = handle.page(toPageRef(PAGE_OBJECT_NUMBER));
     const png = makePng(8, 4, [255, 0, 0, 255]); // 2:1 landscape
-    const unrotated = { left: 300, bottom: 400, right: 400, top: 450 }; // 100×50, 2:1 — matches image
+    const unrotated = { x: 300, y: 400, width: 100, height: 50 }; // 100×50, 2:1 — matches image
     // 90° CW about the centre (350, 425) → AABB 50×100 portrait.
-    const rect = { left: 325, bottom: 375, right: 375, top: 475 };
+    const rect = { x: 325, y: 375, width: 50, height: 100 };
     const { annotation: created } = await page.annotations.create(
       {
         subtype: 'stamp',
@@ -289,9 +276,9 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     // Authored in the unrotated frame: landscape raster, logical-box rect.
     const { width, height, stride } = entry!.raster;
     expect(width).toBeGreaterThan(height);
-    const entryRect = await inFile(handle, entry!.rect);
-    expect(entryRect.left).toBeCloseTo(unrotated.left, 0);
-    expect(entryRect.right).toBeCloseTo(unrotated.right, 0);
+    const entryRect = entry!.rect;
+    expect(entryRect.x).toBeCloseTo(unrotated.x, 0);
+    expect(entryRect.x + entryRect.width).toBeCloseTo(unrotated.x + unrotated.width, 0);
     // The image aspect matches the box, so contain-fit fills it: Both the middle
     // row and the middle column are red edge-to-edge. Under the old double-shrink
     // the image was ~1/4 size, so neither would be. Sampling both catches a
@@ -315,8 +302,8 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     // `rotation: null` (the viewer's total projection emits exactly that).
     const page = handle.page(toPageRef(PAGE_OBJECT_NUMBER));
     const png = makePng(4, 4, [0, 0, 255, 255]);
-    const unrotated = { left: 200, bottom: 200, right: 250, top: 250 };
-    const rect = { left: 200, bottom: 200, right: 250, top: 250 }; // square: AABB == box
+    const unrotated = { x: 200, y: 200, width: 50, height: 50 };
+    const rect = { x: 200, y: 200, width: 50, height: 50 }; // square: AABB == box
     const { annotation: created } = await page.annotations.create(
       {
         subtype: 'stamp',
@@ -331,12 +318,12 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     // A rect-only re-position preserves the omitted rotation…
     const moved = await page.annotations.update(created.ref, {
       subtype: 'stamp',
-      box: { left: 205, bottom: 205, right: 255, top: 255 },
+      box: { x: 205, y: 205, width: 50, height: 50 },
     });
     expect((moved.annotation as StampAnnotationDTO).rotation).toBe(90);
 
     // …and dropping the tilt is an explicit tri-state clear.
-    const flat = { left: 210, bottom: 210, right: 270, top: 260 };
+    const flat = { x: 210, y: 210, width: 60, height: 50 };
     const updated = await page.annotations.update(created.ref, {
       subtype: 'stamp',
       box: flat,
@@ -353,8 +340,8 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
         a.ref.annotObjectNumber === created.ref.annotObjectNumber,
     ) as StampAnnotationDTO;
     expect(re.rotation ?? 0).toBe(0);
-    expect(re.rect.left).toBeCloseTo(flat.left, 0);
-    expect(re.rect.right).toBeCloseTo(flat.right, 0);
+    expect(re.rect.x).toBeCloseTo(flat.x, 0);
+    expect(re.rect.x + re.rect.width).toBeCloseTo(flat.x + flat.width, 0);
   });
 
   test('an appearance that is not an image or PDF is refused before any transport', async () => {
@@ -363,7 +350,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
       page.annotations.create(
         {
           subtype: 'stamp',
-          box: { left: 0, bottom: 0, right: 10, top: 10 },
+          box: { x: 0, y: 0, width: 10, height: 10 },
         },
         { appearance: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]) },
       ),
@@ -380,7 +367,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
       page.annotations.create(
         {
           subtype: 'stamp',
-          box: { left: 20, bottom: 100, right: 80, top: 130 },
+          box: { x: 20, y: 100, width: 60, height: 30 },
           name: '',
         },
         { appearance: makePng(2, 1, [255, 0, 0, 255]) },
@@ -394,7 +381,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     const { annotation: created } = await page.annotations.create(
       {
         subtype: 'stamp',
-        box: { left: 20, bottom: 100, right: 80, top: 130 },
+        box: { x: 20, y: 100, width: 60, height: 30 },
         name: customName,
         contents: 'before',
       },

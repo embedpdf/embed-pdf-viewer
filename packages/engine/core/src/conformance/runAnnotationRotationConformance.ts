@@ -5,9 +5,8 @@ import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import type { PageHandle } from '../engine/PageHandle';
 import type { PageLayout } from '../dto/PageLayout';
-import type { PdfRect } from '../geometry/primitives';
 import { pdfRectTurnedBounds } from '../geometry/convert';
-import { pageBoxOf, pdfRectOf } from '../geometry/pageSpace';
+import { pageBoxOf, type PageBox } from '../geometry/pageSpace';
 import { annotationKey } from '../identity/annotationKey';
 
 export type AnnotationRotationFixture =
@@ -67,9 +66,9 @@ export function runAnnotationRotationConformance(
       }
     };
 
-    const expectRect = (actual: PdfRect | null, expected: PdfRect, tolerance: number) => {
+    const expectRect = (actual: PageBox | null, expected: PageBox, tolerance: number) => {
       expect(actual !== null).toBe(true);
-      for (const edge of ['left', 'bottom', 'right', 'top'] as const) {
+      for (const edge of ['x', 'y', 'width', 'height'] as const) {
         expect(Math.abs(actual![edge] - expected[edge]) <= tolerance).toBe(true);
       }
     };
@@ -105,31 +104,41 @@ export function runAnnotationRotationConformance(
     };
 
     test('a stamp Acrobat turned reads its turn and its own box', async () => {
-      await onPage('acrobat-stamp-rotated', async (page) => {
+      await onPage('acrobat-stamp-rotated', async (page, layout) => {
         const stamp = await stampOf(page);
         expect(stamp.rotation).toBe(36);
         // Acrobat stores no box: it's the drawing's own, stretched onto /Rect.
+        // The numbers are the file's, as Acrobat reports them.
         expectRect(
           stamp.box,
-          { left: 155.784, bottom: 508.966, right: 466.366, top: 618.542 },
+          pageBoxOf(
+            { left: 155.784, bottom: 508.966, right: 466.366, top: 618.542 },
+            layout.pdfCropBox,
+          ),
           0.02,
         );
         expectRect(
           stamp.rect,
-          { left: 153.238, bottom: 428.152, right: 468.912, top: 699.356 },
+          pageBoxOf(
+            { left: 153.238, bottom: 428.152, right: 468.912, top: 699.356 },
+            layout.pdfCropBox,
+          ),
           0.01,
         );
       });
     });
 
     test('a text box Acrobat turned a quarter reads its turn', async () => {
-      await onPage('acrobat-freetext-rotated', async (page) => {
+      await onPage('acrobat-freetext-rotated', async (page, layout) => {
         const turned = await textBoxOf(page, 'test 123');
         // /Rotate 90 is counterclockwise: the text reads from the bottom up.
         expect(turned.rotation).toBe(270);
         expectRect(
           turned.box,
-          { left: 233.423, bottom: 309.413, right: 341.423, top: 341.423 },
+          pageBoxOf(
+            { left: 233.423, bottom: 309.413, right: 341.423, top: 341.423 },
+            layout.pdfCropBox,
+          ),
           0.01,
         );
         const upright = await textBoxOf(page, 'test\rtest 123');
@@ -158,7 +167,7 @@ export function runAnnotationRotationConformance(
     test('moving a stamp Acrobat turned turns it once', async () => {
       await onPage('acrobat-stamp-rotated', async (page) => {
         const stamp = await stampOf(page);
-        const moved = { ...stamp.box, left: stamp.box.left + 40, right: stamp.box.right + 40 };
+        const moved = { ...stamp.box, x: stamp.box.x + 40 };
         const { annotation } = await page.annotations.update(stamp.ref, {
           subtype: 'stamp',
           box: moved,
@@ -167,11 +176,7 @@ export function runAnnotationRotationConformance(
         const updated = annotation as Stamp;
         expect(updated.rotation).toBe(36);
         expectRect(updated.box, moved, 0.02);
-        expectRect(
-          updated.rect,
-          { ...stamp.rect, left: stamp.rect.left + 40, right: stamp.rect.right + 40 },
-          0.02,
-        );
+        expectRect(updated.rect, { ...stamp.rect, x: stamp.rect.x + 40 }, 0.02);
         // Its drawing is upright under the turn: the wide stamp, not its turn.
         const drawing = await page.annotations.downloadResource(updated.ref, 'appearance');
         const [width, height] = pageSize(drawing);
@@ -183,13 +188,13 @@ export function runAnnotationRotationConformance(
       await onPage('authoring', async (page) => {
         const { annotation } = await page.annotations.create({
           subtype: 'square',
-          box: { left: 100, bottom: 100, right: 300, top: 300 },
+          box: { x: 100, y: 100, width: 200, height: 200 },
           rotation: 30,
         });
         // 200 × 200 turned 30° is 273.2 across, about the same middle.
         expectRect(
           annotation.rect,
-          { left: 63.397, bottom: 63.397, right: 336.603, top: 336.603 },
+          { x: 63.397, y: 63.397, width: 273.206, height: 273.206 },
           0.01,
         );
         expect((annotation as { rotation: number | null }).rotation).toBe(30);
@@ -197,8 +202,8 @@ export function runAnnotationRotationConformance(
     });
 
     test('a turned drawing that reaches past its box is drawn as the page shows it', async () => {
-      await onPage('authoring', async (page, layout) => {
-        const box = { left: 200, bottom: 400, right: 300, top: 460 };
+      await onPage('authoring', async (page) => {
+        const box = { x: 200, y: 400, width: 100, height: 60 };
         const { annotation: plain } = await page.annotations.create({
           subtype: 'square',
           box,
@@ -206,34 +211,30 @@ export function runAnnotationRotationConformance(
         });
         const { annotation: cloudy } = await page.annotations.create({
           subtype: 'square',
-          box: { ...box, bottom: 200, top: 260 },
+          box: { ...box, y: 200 },
           rotation: 30,
           cloudyIntensity: 1,
           strokeWidth: 2,
         });
         // The bumps reach past the turned box: `rect` takes them in.
-        const turned = pdfRectTurnedBounds(box, 30);
+        const turned = turnedBounds(box, 30);
         expectRect(plain.rect, turned, 0.01);
-        expect(cloudy.rect.right - cloudy.rect.left > turned.right - turned.left + 2).toBe(true);
+        expect(cloudy.rect.width > turned.width + 2).toBe(true);
         // Inside its turned box, a drawing renders upright over its box, for
         // the consumer to turn. Past it, it renders as the page shows it.
         const { appearances } = await page.annotations.renderAppearances();
-        // Appearances are placed in page space; annotations still use the file's numbers.
         const rectOf = (ref: AnnotationDTO['ref']) =>
-          pdfRectOf(
-            appearances.find(
-              (a) => a.mode === 'normal' && annotationKey(a.ref) === annotationKey(ref),
-            )!.rect,
-            layout.pdfCropBox,
-          );
-        expectRect(rectOf(plain.ref), (plain as { box: PdfRect }).box, 0.01);
+          appearances.find(
+            (a) => a.mode === 'normal' && annotationKey(a.ref) === annotationKey(ref),
+          )!.rect;
+        expectRect(rectOf(plain.ref), (plain as { box: PageBox }).box, 0.01);
         expectRect(rectOf(cloudy.ref), cloudy.rect, 0.01);
       });
     });
 
     test('rotation turns clockwise, as the page shows it', async () => {
-      await onPage('authoring', async (page, layout) => {
-        const box = { left: 200, bottom: 400, right: 300, top: 500 };
+      await onPage('authoring', async (page) => {
+        const box = { x: 200, y: 300, width: 100, height: 100 };
         await page.annotations.create({
           subtype: 'square',
           box,
@@ -242,10 +243,10 @@ export function runAnnotationRotationConformance(
           interiorColor: { r: 0, g: 0, b: 255 },
         });
         // A square turned clockwise has its highest corner left of its middle.
-        const area = { left: 150, bottom: 350, right: 350, top: 550 };
+        const area = { x: 150, y: 250, width: 200, height: 200 };
         const image = await page.render.image({
           format: 'png',
-          target: { kind: 'rect', rect: pageBoxOf(area, layout.pdfCropBox) },
+          target: { kind: 'rect', rect: area },
         });
         const { url, revoke } = await image.objectUrl();
         let raster: Raster;
@@ -260,6 +261,23 @@ export function runAnnotationRotationConformance(
       });
     });
   });
+}
+
+/**
+ * The upright box around `box` turned about its middle: the same whichever
+ * way y points, so the file-space helper serves.
+ */
+function turnedBounds(box: PageBox, degrees: number): PageBox {
+  const turned = pdfRectTurnedBounds(
+    { left: box.x, bottom: box.y, right: box.x + box.width, top: box.y + box.height },
+    degrees,
+  );
+  return {
+    x: turned.left,
+    y: turned.bottom,
+    width: turned.right - turned.left,
+    height: turned.top - turned.bottom,
+  };
 }
 
 /** The x of the first pixel, from the top, that isn't white; `null` when none is. */

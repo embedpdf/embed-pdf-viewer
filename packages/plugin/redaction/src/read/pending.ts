@@ -3,9 +3,14 @@
  * memoized on the annotation plane's own reference-stable lists, plus the
  * client-side collateral estimate.
  */
-import { edgesOfQuad, edgesOverlap } from '@embedpdf/core-geometry';
+import { rectsOverlap } from '@embedpdf/core-geometry';
 import { annotationKey, memo, memoByKey, toPageRef } from '@embedpdf/core';
-import type { AnnotationDTO, AnnotationRef, PdfRect } from '@embedpdf/engine-core';
+import {
+  pageQuadBounds,
+  type AnnotationDTO,
+  type AnnotationRef,
+  type PageBox,
+} from '@embedpdf/engine-core';
 
 import type {
   RedactionCapability,
@@ -17,9 +22,9 @@ import type { RedactionServices } from '../services';
 
 type RedactDTO = Extract<AnnotationDTO, { subtype: 'redact' }>;
 
-/** The PDF-space regions a redact mark targets: its quads' boxes, else `/Rect`. */
-const regionsOf = (dto: RedactDTO): readonly PdfRect[] =>
-  dto.quadPoints.length === 0 ? [dto.rect] : dto.quadPoints.map(edgesOfQuad);
+/** The regions a redact mark targets: its quads' boxes, else its `rect`. */
+const regionsOf = (dto: RedactDTO): readonly PageBox[] =>
+  dto.quadPoints.length === 0 ? [dto.rect] : dto.quadPoints.map(pageQuadBounds);
 
 const EMPTY: readonly RedactionMark[] = [];
 
@@ -84,7 +89,7 @@ export function createPendingReads({
       const regions = marks.flatMap(regionsOf);
       for (const other of onPage) {
         if (other.subtype === 'redact') continue;
-        if (regions.some((region) => edgesOverlap(region, other.rect))) hits.push(other.ref);
+        if (regions.some((region) => rectsOverlap(region, other.rect))) hits.push(other.ref);
       }
     }
     return { count: hits.length, refs: hits };

@@ -931,7 +931,7 @@ export class WorkerHost {
    * are refused; a request for a session that is not open falls through
    * to its handler's own `DocNotOpen`.
    */
-  private assertNoPendingSigning(msg: WorkerRequest): void {
+  private assertNoPendingSigning(msg: FileSpaceJob): void {
     if (!MUTATING_KINDS.has(msg.kind) || !('docId' in msg)) return;
     const layerName = 'layerName' in msg ? msg.layerName : undefined;
     const session = this.sessions.get(sessionKey(msg.docId, layerName));
@@ -995,7 +995,7 @@ export class WorkerHost {
   }
 
   private handleAnnotationsCreate(
-    req: AnnotationsCreateWorkerRequest,
+    req: AnnotationsCreateWorkerRequest<PdfCoordinates>,
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
@@ -1006,7 +1006,7 @@ export class WorkerHost {
   }
 
   private handleAnnotationsUpdate(
-    req: AnnotationsUpdateWorkerRequest,
+    req: AnnotationsUpdateWorkerRequest<PdfCoordinates>,
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
