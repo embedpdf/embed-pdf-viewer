@@ -11,7 +11,7 @@ import type {
   PageInsertResult,
   PageRef,
   PageRotateResult,
-  PageRotation,
+  PdfRotation,
   PdfSize,
 } from '@embedpdf/core';
 
@@ -72,10 +72,9 @@ export function createPageEditController(ctx: PluginContext<void>) {
       enqueue(async () => {
         // Group by the resulting absolute rotation: the engine wire is one
         // value per call. Wrap to [0, 360) — the double-mod keeps -90 from 0 at 270.
-        const groups = new Map<PageRotation, PageRef[]>();
+        const groups = new Map<PdfRotation, PageRef[]>();
         for (const page of pages) {
-          const next = ((((requireEntry(page).rotation + delta) % 360) + 360) %
-            360) as PageRotation;
+          const next = ((((requireEntry(page).rotation + delta) % 360) + 360) % 360) as PdfRotation;
           groups.set(next, [...(groups.get(next) ?? []), page]);
         }
         let result: PageRotateResult | null = null;

@@ -6,7 +6,7 @@ import type {
   DocumentHandle,
   Engine,
   PageLayout,
-  PageRotation,
+  PdfRotation,
 } from '@embedpdf/engine-core/runtime';
 import { createKernel } from '../src/kernel';
 import type { DocumentMeta, PluginContext } from '../src/types';
@@ -22,7 +22,7 @@ import type { DocumentMeta, PluginContext } from '../src/types';
  */
 
 const box = { left: 0, bottom: 0, right: 600, top: 800 } as const;
-function page(pageObjectNumber: number, index: number, rotation: PageRotation = 0): PageLayout {
+function page(pageObjectNumber: number, index: number, rotation: PdfRotation = 0): PageLayout {
   return {
     index,
     ref: toPageRef(pageObjectNumber),
@@ -96,7 +96,7 @@ function captureDoc(): {
 
 function rotatedEvent(
   pageObjectNumbers: number[],
-  rotation: PageRotation,
+  rotation: PdfRotation,
   pages: PageLayout[],
 ): DocumentEvent {
   return {

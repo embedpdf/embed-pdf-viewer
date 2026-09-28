@@ -129,14 +129,12 @@ export async function runMutationsDemo(
       opacity: 1,
     });
 
-    // 2c) Create a polygon, polyline, and line. These carry explicit
-    //     geometry (/Vertices or /L) plus the bounding /Rect the plugin
-    //     owns; the engine writes them verbatim and bakes the /AP. The
-    //     polyline/line also carry /LE line endings.
+    // 2c) Create a polygon, polyline, and line. These carry their points
+    //     (/Vertices or /L); the engine draws the /AP and works out /Rect
+    //     from what it draws. The polyline/line also carry /LE line endings.
     const createdPolygon = await page.annotations.create({
       subtype: 'polygon',
       contents: 'mutation demo: polygon',
-      rect: { left: 60, bottom: 450, right: 180, top: 550 },
       vertices: [
         { x: 70, y: 460 },
         { x: 170, y: 460 },
@@ -151,7 +149,6 @@ export async function runMutationsDemo(
     const createdPolyline = await page.annotations.create({
       subtype: 'polyline',
       contents: 'mutation demo: polyline',
-      rect: { left: 220, bottom: 450, right: 360, top: 550 },
       vertices: [
         { x: 230, y: 460 },
         { x: 290, y: 540 },
@@ -167,7 +164,6 @@ export async function runMutationsDemo(
     const createdLine = await page.annotations.create({
       subtype: 'line',
       contents: 'mutation demo: line',
-      rect: { left: 400, bottom: 450, right: 520, top: 550 },
       linePoints: { start: { x: 410, y: 460 }, end: { x: 510, y: 540 } },
       interiorColor: null,
       color: { r: 0, g: 128, b: 128 },

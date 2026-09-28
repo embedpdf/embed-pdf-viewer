@@ -22,6 +22,7 @@ import type {
   PdfLinkTarget,
   PdfLinkTargetWritable,
   PdfRect,
+  PdfTopLeft,
   StandardFont,
   WidgetAppearance,
 } from '@embedpdf/engine-core/runtime';
@@ -72,8 +73,9 @@ export function flagsOf(dto: AnnotationFlags): AnnotationFlags {
 /* Rotation: the model's `rot` and the engine's `rotation` are both degrees
  * clockwise, so they pass through unchanged. */
 
-/** Advisory `rot` for a vertex geom, from a DTO's `rotation`.
- *  Absent → no `rot` key (kept off the geom so unrotated shapes stay clean). */
+/** `rot` for a point kind's geom (line, polygon, polyline, ink), from a DTO's
+ *  `rotation`: the turn its points are drawn with. Absent → no `rot` key
+ *  (kept off the geom so unrotated shapes stay clean). */
 export const rotFromDTO = (rotation?: number | null): { rot?: number } =>
   rotation ? { rot: rotation } : {};
 
@@ -90,6 +92,16 @@ export function boxGeomFields(
   crop: PdfRect,
 ): { box: PdfRect; rotation: number | null } {
   return { box: contentToPdfRect(rect, crop), rotation: rot || null };
+}
+
+/**
+ * An icon's `at` (note, file attachment): the left and top edges of the
+ * model's box, where the engine draws the icon from. The engine works out
+ * `/Rect`.
+ */
+export function iconAt(rect: Rect, crop: PdfRect): PdfTopLeft {
+  const box = contentToPdfRect(rect, crop);
+  return { left: box.left, top: box.top };
 }
 
 /** A box geom (square/circle/stamp) from its DTO: its `box` and `rot` its turn. */

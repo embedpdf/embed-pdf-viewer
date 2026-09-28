@@ -125,7 +125,7 @@ const mixedSnapshot: PageGeometrySnapshot = {
     {
       rect: { left: 88, bottom: 20, right: 100, top: 44 },
       start: 2,
-      baselineAngle: Math.PI / 2,
+      rotation: 270,
       ascentFlip: false,
       glyphs: [columnGlyph(20, 28), columnGlyph(28, 36), columnGlyph(36, 44)],
     },

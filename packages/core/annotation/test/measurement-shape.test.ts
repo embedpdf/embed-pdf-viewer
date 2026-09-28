@@ -3,7 +3,13 @@ import { describe, expect, it } from 'vitest';
 
 import { step } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
-import { DEFAULT_CHROME_GEOMETRY, geomTranslate, pointInPoly, rotatePoint } from '../src/geometry';
+import {
+  DEFAULT_CHROME_GEOMETRY,
+  geomTranslate,
+  pointInPoly,
+  rotatePoint,
+  turnPivotOf,
+} from '../src/geometry';
 import { hitTest } from '../src/hit';
 import {
   automaticShapeCaptionCenter,
@@ -160,25 +166,30 @@ describe('area and perimeter authoring', () => {
   });
 
   it.each([false, true])(
-    'keeps the complete selection center stable when rotating, manual=%s',
+    'turns the shape and its caption about the middle of its points, manual=%s',
     (manual) => {
       const measure = manual ? withShapeCaptionPoint(appearance, { x: 420, y: 80 }) : appearance;
       const initial = selected(annotation(measure));
       const frame = annotationSelectionFrame(initial.byId.shape);
+      const pivot = turnPivotOf(initial.byId.shape.geometry);
       const caption = shapeMeasurementLayout(geometry, measure, initialStyle)!.caption!;
       const knob = chrome(initial, PAGE).find((node) => node.kind === 'rotate-knob');
       if (knob?.kind !== 'rotate-knob') throw new Error('Missing rotation knob');
       const armed = pointer(initial, 'down', knob.at);
       for (const angle of [30, 90, 137, 180, 270]) {
-        const at = rotatePoint(knob.at, frame.center, angle);
+        const at = rotatePoint(knob.at, pivot, angle);
         const moving = pointer(armed, 'move', at);
         const item = pageItems(moving, PAGE)[0];
         if (item.measure?.intent === 'line-dimension' || !item.measure)
           throw new Error('Missing shape');
         const layout = shapeMeasurementLayout(item.geometry, item.measure, item.style)!;
-        expectPoint(layout.caption!.center, rotatePoint(caption.center, frame.center, angle));
+        expectPoint(layout.caption!.center, rotatePoint(caption.center, pivot, angle));
         const committed = pointer(moving, 'up', at);
-        expectPoint(annotationSelectionFrame(committed.byId.shape).center, frame.center);
+        expectPoint(turnPivotOf(committed.byId.shape.geometry), pivot);
+        expectPoint(
+          annotationSelectionFrame(committed.byId.shape).center,
+          rotatePoint(frame.center, pivot, angle),
+        );
         expect(committed.byId.shape.measure).toEqual(item.measure);
         expect(committed.byId.shape.source).toBe('vector');
       }

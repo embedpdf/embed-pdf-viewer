@@ -3,20 +3,6 @@ import type { PageRef } from '../identity/PageRef';
 import type { PdfPageActions } from './PdfAction';
 
 /**
- * @deprecated The page boxes are now `PdfRect` objects (`{ left, bottom,
- * right, top }`, y-up edges) from `../geometry`. This alias remains only
- * during the geometry consolidation.
- */
-export type { PdfRect } from '../geometry/primitives';
-
-/**
- * @deprecated Use `PdfRotation` from `../geometry`. A page's display rotation
- * in degrees clockwise — the `/Rotate` values PDF permits. Presentation
- * metadata only; content coordinates stay normalized.
- */
-export type PageRotation = PdfRotation;
-
-/**
  * The five PDF page boundary boxes, each in PDF user space as a `PdfRect`
  * (`{ left, bottom, right, top }`, y-up edges, page-box origin preserved —
  * a MediaBox may have a non-zero or negative origin). `media` and `crop` are

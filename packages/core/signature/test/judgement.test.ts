@@ -47,7 +47,6 @@ async function inkOn(doc: Awaited<ReturnType<Engine['open']>>) {
         { x: 140, y: 15 },
       ],
     ],
-    rect: { left: 10, bottom: 600, right: 200, top: 700 },
     color: { r: 0, g: 0, b: 0 },
     strokeWidth: 2,
   } as never);

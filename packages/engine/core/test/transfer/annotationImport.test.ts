@@ -34,8 +34,9 @@ function annotation(
     identityQuality: 'durable',
     nm: null,
     rect: box,
-    // A square's shape is its box.
+    // A square's shape is its box; a note's icon sits at its top-left corner.
     ...(fields.subtype === undefined ? { box } : {}),
+    ...(fields.subtype === 'text' ? { at: { left: box.left, top: box.top } } : {}),
     reply: null,
     popup: null,
     ...fields,

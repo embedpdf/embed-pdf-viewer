@@ -204,7 +204,9 @@ export function runAnnotationDeclarationConformance(
     test('a popup links to its parent in both directions', async () => {
       await onAuthoringPage(async (page) => {
         const rect: PdfRect = { left: 200, bottom: 200, right: 260, top: 240 };
-        const note = (await page.annotations.create({ subtype: 'text', rect })).annotation;
+        const note = (
+          await page.annotations.create({ subtype: 'text', at: { left: rect.left, top: rect.top } })
+        ).annotation;
         const popup = (await page.annotations.create({ subtype: 'popup', rect, parent: note.ref }))
           .annotation;
         const find = async (ref: AnnotationRef) =>
@@ -229,7 +231,9 @@ export function runAnnotationDeclarationConformance(
     test("a popup's open state is read and written", async () => {
       await onAuthoringPage(async (page) => {
         const rect: PdfRect = { left: 200, bottom: 260, right: 260, top: 300 };
-        const note = (await page.annotations.create({ subtype: 'text', rect })).annotation;
+        const note = (
+          await page.annotations.create({ subtype: 'text', at: { left: rect.left, top: rect.top } })
+        ).annotation;
         // A PDF that says nothing about /Open shows the window closed.
         const closed = (await page.annotations.create({ subtype: 'popup', rect, parent: note.ref }))
           .annotation;
@@ -260,7 +264,11 @@ export function runAnnotationDeclarationConformance(
           page.annotations.create({ subtype: 'square', box: rect, cloudyIntensity: 0 }),
         ).rejects.toMatchObject(refused('cloudyIntensity'));
         await expect(
-          page.annotations.create({ subtype: 'text', rect, icon: 'dragon' } as never),
+          page.annotations.create({
+            subtype: 'text',
+            at: { left: rect.left, top: rect.top },
+            icon: 'dragon',
+          } as never),
         ).rejects.toMatchObject(refused('icon'));
         await expect(
           page.annotations.create({
@@ -281,7 +289,11 @@ export function runAnnotationDeclarationConformance(
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
         await expect(
           page.annotations.create(
-            { subtype: 'file-attachment', rect, file: { name: '' } },
+            {
+              subtype: 'file-attachment',
+              at: { left: rect.left, top: rect.top },
+              file: { name: '' },
+            },
             { file: new Uint8Array([1]) },
           ),
         ).rejects.toMatchObject(refused('file.name'));
@@ -380,7 +392,7 @@ export function runAnnotationDeclarationConformance(
         const rect: PdfRect = { left: 420, bottom: 520, right: 440, top: 540 };
         const { annotation } = await page.annotations.create({
           subtype: 'text',
-          rect,
+          at: { left: rect.left, top: rect.top },
           state: 'accepted',
         });
         expect(annotation.subtype === 'text' && annotation.stateModel).toBe('review');
@@ -389,14 +401,18 @@ export function runAnnotationDeclarationConformance(
         });
         expect(marked.subtype === 'text' && marked.stateModel).toBe('marked');
         await expect(
-          page.annotations.create({ subtype: 'text', rect, state: 'escalated' }),
+          page.annotations.create({
+            subtype: 'text',
+            at: { left: rect.left, top: rect.top },
+            state: 'escalated',
+          }),
         ).rejects.toMatchObject({
           code: EngineErrorCode.InvalidArg,
           details: { field: 'stateModel' },
         });
         const { annotation: custom } = await page.annotations.create({
           subtype: 'text',
-          rect,
+          at: { left: rect.left, top: rect.top },
           state: 'escalated',
           stateModel: 'triage',
         });
@@ -411,7 +427,6 @@ export function runAnnotationDeclarationConformance(
       await onAuthoringPage(async (page) => {
         const { annotation } = await page.annotations.create({
           subtype: 'line',
-          rect: { left: 40, bottom: 470, right: 140, top: 490 },
           linePoints: { start: { x: 40, y: 480 }, end: { x: 140, y: 480 } },
         } as never);
         expect(annotation.subtype === 'line' && annotation.captionEnabled).toBe(null);
@@ -489,28 +504,36 @@ export function runAnnotationDeclarationConformance(
           );
         const create = async (data: object) =>
           (await page.annotations.create(data as never)).annotation;
-        const note = await create({ subtype: 'text', rect, contents: 'Note' });
+        const note = await create({
+          subtype: 'text',
+          at: { left: rect.left, top: rect.top },
+          contents: 'Note',
+        });
         const notePopup = await create({ subtype: 'popup', rect, parent: note.ref });
         const reply = await create({
           subtype: 'text',
-          rect,
+          at: { left: rect.left, top: rect.top },
           contents: 'Reply',
           reply: { to: note.ref },
         });
         const replyPopup = await create({ subtype: 'popup', rect, parent: reply.ref });
         const nested = await create({
           subtype: 'text',
-          rect,
+          at: { left: rect.left, top: rect.top },
           contents: 'Nested',
           reply: { to: reply.ref },
         });
         const status = await create({
           subtype: 'text',
-          rect,
+          at: { left: rect.left, top: rect.top },
           state: 'accepted',
           reply: { to: note.ref },
         });
-        const bystander = await create({ subtype: 'text', rect, contents: 'Unrelated' });
+        const bystander = await create({
+          subtype: 'text',
+          at: { left: rect.left, top: rect.top },
+          contents: 'Unrelated',
+        });
 
         // A reply takes the replies under it, and its popup; the note stays.
         const replyDelete = await page.annotations.delete(reply.ref);
@@ -545,7 +568,11 @@ export function runAnnotationDeclarationConformance(
           page.annotations.create({ subtype: 'stamp', box: rect }),
         ).rejects.toMatchObject(refused);
         await expect(
-          page.annotations.create({ subtype: 'file-attachment', rect, file: { name: 'a.txt' } }),
+          page.annotations.create({
+            subtype: 'file-attachment',
+            at: { left: rect.left, top: rect.top },
+            file: { name: 'a.txt' },
+          }),
         ).rejects.toMatchObject(refused);
         await expect(
           page.annotations.create({ subtype: 'square', box: rect }, { appearance: PNG_1X1 }),

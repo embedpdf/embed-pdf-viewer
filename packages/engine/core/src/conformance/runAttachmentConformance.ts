@@ -201,7 +201,7 @@ export function runAttachmentConformance(
         const rect = { left: 80, bottom: 40, right: 100, top: 60 };
         const picked = new File([new Uint8Array([1, 2, 3])], 'figures.csv', { type: 'text/csv' });
         const { annotation: fromFile } = await annotations.create(
-          { subtype: 'file-attachment', rect },
+          { subtype: 'file-attachment', at: { left: rect.left, top: rect.top } },
           { file: picked },
         );
         const file = (fromFile as FileAttachmentAnnotationDTO).file!;
@@ -209,14 +209,21 @@ export function runAttachmentConformance(
         expect(file.mimeType).toBe('text/csv');
 
         const { annotation: untyped } = await annotations.create(
-          { subtype: 'file-attachment', rect, file: { name: 'raw.bin' } },
+          {
+            subtype: 'file-attachment',
+            at: { left: rect.left, top: rect.top },
+            file: { name: 'raw.bin' },
+          },
           { file: new Uint8Array([4, 5]) },
         );
         expect((untyped as FileAttachmentAnnotationDTO).file!.mimeType).toBe(null);
 
         // Bare bytes need a name.
         await expect(
-          annotations.create({ subtype: 'file-attachment', rect }, { file: new Uint8Array([6]) }),
+          annotations.create(
+            { subtype: 'file-attachment', at: { left: rect.left, top: rect.top } },
+            { file: new Uint8Array([6]) },
+          ),
         ).rejects.toMatchObject({
           code: EngineErrorCode.InvalidArg,
           details: { field: 'file.name' },
@@ -237,7 +244,7 @@ export function runAttachmentConformance(
         const { annotation: created } = await annotations.create(
           {
             subtype: 'file-attachment',
-            rect: { left: 40, bottom: 40, right: 60, top: 60 },
+            at: { left: 40, top: 60 },
             file: {
               name: 'conformance.bin',
               mimeType: 'application/octet-stream',
@@ -278,7 +285,7 @@ export function runAttachmentConformance(
         const annotations = doc.page(toPageRef(firstPageObjectNumber)).annotations;
         const { annotation: created } = await annotations.create({
           subtype: 'text',
-          rect: { left: 100, bottom: 100, right: 120, top: 120 },
+          at: { left: 100, top: 120 },
           icon: 'comment',
           color: { r: 250, g: 204, b: 21 },
           contents: 'conformance note',

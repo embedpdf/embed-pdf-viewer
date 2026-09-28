@@ -16,7 +16,7 @@ import {
   type PageRef,
   type PageRemoveNameInput,
   type PageRotateResult,
-  type PageRotation,
+  type PdfRotation,
   pageRefsEqual,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -215,7 +215,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     });
   }
 
-  rotate(pages: PageRef[], rotation: PageRotation): AbortablePromise<PageRotateResult> {
+  rotate(pages: PageRef[], rotation: PdfRotation): AbortablePromise<PageRotateResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),

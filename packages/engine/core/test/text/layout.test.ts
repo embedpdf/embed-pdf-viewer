@@ -51,7 +51,7 @@ function orientedRun(
   origin: PdfPoint,
   u: PdfPoint,
   n: PdfPoint,
-  opts: { count?: number; w?: number; h?: number; baselineAngle: number; shear?: number },
+  opts: { count?: number; w?: number; h?: number; rotation: number; shear?: number },
 ): PageGeometryRun {
   const count = opts.count ?? 3;
   const w = opts.w ?? 8;
@@ -83,7 +83,7 @@ function orientedRun(
     }),
     { left: Infinity, right: -Infinity, bottom: Infinity, top: -Infinity },
   );
-  return { rect, start, baselineAngle: opts.baselineAngle, ascentFlip: false, glyphs };
+  return { rect, start, rotation: opts.rotation, ascentFlip: false, glyphs };
 }
 
 const snapshot = (...runs: PageGeometryRun[]): PageGeometrySnapshot => ({ runs });
@@ -186,7 +186,7 @@ describe('canonical layout — oriented', () => {
     { x: 100, y: 20 },
     { x: 0, y: 1 },
     { x: -1, y: 0 },
-    { baselineAngle: Math.PI / 2, w: 8, h: 12 },
+    { rotation: 270, w: 8, h: 12 },
   );
 
   test('a 90° column is one exact oriented segment', () => {
@@ -212,7 +212,7 @@ describe('canonical layout — oriented', () => {
       { x: 60, y: 20 },
       { x: R2, y: R2 },
       { x: -R2, y: R2 },
-      { baselineAngle: Math.PI / 4, w: 8, h: 12, count: 4 },
+      { rotation: 315, w: 8, h: 12, count: 4 },
     );
     const layout = createTextLayout(snapshot(diagonal));
     const segments = layout.segments({ start: 0, count: 4 });
@@ -237,7 +237,7 @@ describe('canonical layout — oriented', () => {
       { x: 90, y: 100 },
       { x: -1, y: 0 },
       { x: 0, y: 1 },
-      { baselineAngle: Math.PI, w: 8, h: 12 },
+      { rotation: 180, w: 8, h: 12 },
     );
     const layout = createTextLayout(snapshot(mirrored));
     const segments = layout.segments({ start: 0, count: 3 });
@@ -260,7 +260,7 @@ describe('canonical layout — oriented', () => {
       { x: 30, y: 100 },
       { x: 1, y: 0 },
       { x: 0, y: 1 },
-      { baselineAngle: 0, w: 10, h: 10, count: 2, shear: 2.5 },
+      { rotation: 0, w: 10, h: 10, count: 2, shear: 2.5 },
     );
     const layout = createTextLayout(snapshot(roman, italic));
     // One segment: the italic run shares the roman run's frame (the clustering contract).
@@ -283,7 +283,7 @@ describe('canonical layout — oriented', () => {
       { x: R2, y: R2 },
       { x: -R2, y: R2 },
       {
-        baselineAngle: Math.PI / 4,
+        rotation: 315,
         count: 2,
       },
     );
@@ -291,7 +291,7 @@ describe('canonical layout — oriented', () => {
     const u2 = { x: Math.cos(Math.PI / 4 + delta), y: Math.sin(Math.PI / 4 + delta) };
     const n2 = { x: -u2.y, y: u2.x };
     const b = orientedRun(2, { x: 71.4, y: 31.2 }, u2, n2, {
-      baselineAngle: Math.PI / 4 + delta,
+      rotation: 315 - (delta * 180) / Math.PI,
       count: 2,
     });
     const near = createTextLayout(snapshot(a, b));
@@ -305,7 +305,7 @@ describe('canonical layout — oriented', () => {
           { x: 75, y: 35 },
           { x: Math.cos(Math.PI / 4 + 0.05), y: Math.sin(Math.PI / 4 + 0.05) },
           { x: -Math.sin(Math.PI / 4 + 0.05), y: Math.cos(Math.PI / 4 + 0.05) },
-          { baselineAngle: Math.PI / 4 + 0.05, count: 2 },
+          { rotation: 315 - (0.05 * 180) / Math.PI, count: 2 },
         ),
       }),
     );
@@ -322,7 +322,7 @@ describe('canonical layout — interaction', () => {
     { x: 100, y: 20 },
     { x: 0, y: 1 },
     { x: -1, y: 0 },
-    { baselineAngle: Math.PI / 2, w: 8, h: 12 },
+    { rotation: 270, w: 8, h: 12 },
   );
   const layout = createTextLayout(
     snapshot(uprightRun(0, [uprightGlyph(10), uprightGlyph(18, { space: true })]), column),

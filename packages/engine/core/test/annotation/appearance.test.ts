@@ -44,7 +44,6 @@ describe('measurement appearance impact', () => {
     });
     const moved = {
       subtype: 'polygon',
-      rect: rect(10, 20, 110, 120),
       vertices: [
         { x: 10, y: 20 },
         { x: 110, y: 20 },
@@ -180,7 +179,7 @@ describe('appearanceImpactOf — value diffing (inert)', () => {
     );
   });
 
-  it('advisory rotation on the vertex family is inert; box rotation is not', () => {
+  it('a turn draws a polygon again, as it does a box', () => {
     const poly = dto({
       subtype: 'polygon',
       rect: rect(0, 0, 100, 100),
@@ -190,7 +189,9 @@ describe('appearanceImpactOf — value diffing (inert)', () => {
         { x: 50, y: 90 },
       ],
     });
-    expect(appearanceImpactOf(poly, patch({ subtype: 'polygon', rotation: 45 }))).toBe('inert');
+    expect(appearanceImpactOf(poly, patch({ subtype: 'polygon', rotation: 45 }))).toBe(
+      'regenerate',
+    );
     expect(
       appearanceImpactOf(
         squareDto(),
@@ -218,7 +219,7 @@ describe('appearanceImpactOf — verified rigid translation', () => {
     expect(appearanceImpactOf(squareDto(), p)).toBe('regenerate');
   });
 
-  it('polygon: rect + vertices shifted by one delta is a translation', () => {
+  it('polygon: vertices shifted by one delta are a translation', () => {
     const poly = dto({
       subtype: 'polygon',
       rect: rect(0, 0, 100, 100),
@@ -230,7 +231,6 @@ describe('appearanceImpactOf — verified rigid translation', () => {
     });
     const moved = patch({
       subtype: 'polygon',
-      rect: rect(5, -7, 105, 93),
       vertices: [
         { x: 15, y: 3 },
         { x: 95, y: 3 },
@@ -240,7 +240,7 @@ describe('appearanceImpactOf — verified rigid translation', () => {
     expect(appearanceImpactOf(poly, moved)).toBe('translation');
   });
 
-  it('polygon: a rect move that leaves vertices behind regenerates', () => {
+  it('polygon: a rect alone is not a move (the engine works it out from the vertices)', () => {
     const poly = dto({
       subtype: 'polygon',
       rect: rect(0, 0, 100, 100),
@@ -264,7 +264,6 @@ describe('appearanceImpactOf — verified rigid translation', () => {
     });
     const skewed = patch({
       subtype: 'ink',
-      rect: rect(10, 10, 110, 110),
       inkList: [
         [
           { x: 20, y: 20 },
@@ -275,7 +274,6 @@ describe('appearanceImpactOf — verified rigid translation', () => {
     expect(appearanceImpactOf(ink, skewed)).toBe('regenerate');
     const rigid = patch({
       subtype: 'ink',
-      rect: rect(10, 10, 110, 110),
       inkList: [
         [
           { x: 20, y: 20 },
@@ -286,7 +284,7 @@ describe('appearanceImpactOf — verified rigid translation', () => {
     expect(appearanceImpactOf(ink, rigid)).toBe('translation');
   });
 
-  it('text markup: rect + quadPoints riding one delta is a translation', () => {
+  it('text markup: quadPoints riding one delta are a translation', () => {
     const hl = dto({
       subtype: 'highlight',
       rect: rect(0, 0, 100, 20),
@@ -301,7 +299,6 @@ describe('appearanceImpactOf — verified rigid translation', () => {
     });
     const moved = patch({
       subtype: 'highlight',
-      rect: rect(0, -30, 100, -10),
       quadPoints: [
         {
           p1: { x: 0, y: -10 },

@@ -2,6 +2,7 @@ import { appearanceRasters, maxShiftedDifference } from './appearanceRasters';
 import { creatables } from './creatables';
 import type { ConformanceTestRunner } from './runMetadataConformance';
 import { BANDS_PDF, sameBytes } from './stampFixtures';
+import { drawnPointsOf } from '../annotation/drawnPoints';
 import type { AnnotationDTO } from '../annotation/kinds';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
@@ -275,6 +276,9 @@ const ICONS: ReadonlySet<string> = new Set(['text', 'file-attachment']);
 
 /** The points an annotation's data places on the page: its line, vertices, strokes or quads. */
 function geometryOf(data: AnnotationDTO): Array<{ x: number; y: number }> {
+  // A turned line's, polygon's or ink's points are upright: the drawing turns them.
+  const drawn = drawnPointsOf(data);
+  if (drawn) return drawn.flat();
   const points: Array<{ x: number; y: number }> = [];
   const visit = (value: unknown) => {
     if (Array.isArray(value)) return value.forEach(visit);
@@ -398,12 +402,9 @@ function normalized(bundle: AnnotationBundle, attribution: Attribution) {
       if (data.subtype === 'popup') fields.parent = at(data.parent);
       // A copy is drawn from its data (§4): where the data is points, the
       // box is the frame of what we draw, checked to contain the points
-      // (`expectFramesHoldGeometry`); a note's or a file's icon is 20 × 20 at
-      // its box's bottom-left, so the anchor is compared.
-      if (ICONS.has(data.subtype)) {
-        fields.rect = { left: data.rect.left, bottom: data.rect.bottom };
-      }
-      if (FRAMED.has(data.subtype)) delete fields.rect;
+      // (`expectFramesHoldGeometry`); a note's or a file's icon is our 20 × 20
+      // at its `at`, which is compared as data.
+      if (FRAMED.has(data.subtype) || ICONS.has(data.subtype)) delete fields.rect;
       // A turned box's `rect` is the upright box around it, which the engine
       // works out (`expectTurnedRects`), not the number another app rounded.
       if (turnOf(data)) delete fields.rect;
@@ -435,9 +436,18 @@ async function fill(doc: DocumentHandle): Promise<void> {
   const box = (left: number): PdfRect => ({ left, bottom: 300, right: left + 40, top: 330 });
   await create({ subtype: 'stamp', box: box(20), nm: 'approved' }, { appearance: BANDS_PDF });
   await create({ subtype: 'stamp', box: box(80), opacity: 0.5 }, { appearance: BANDS_PDF });
-  const note = await create({ subtype: 'text', rect: box(140), nm: 'note', contents: 'Check' });
+  const note = await create({
+    subtype: 'text',
+    at: { left: box(140).left, top: box(140).top },
+    nm: 'note',
+    contents: 'Check',
+  });
   await create({ subtype: 'popup', rect: box(200), parent: note.ref, open: true });
-  await create({ subtype: 'text', rect: box(140), reply: { to: note.ref } });
+  await create({
+    subtype: 'text',
+    at: { left: box(140).left, top: box(140).top },
+    reply: { to: note.ref },
+  });
   await create({
     subtype: 'link',
     rect: box(260),

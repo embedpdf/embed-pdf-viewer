@@ -71,7 +71,7 @@ export function creatables(): Creatable[] {
       lineEnding: 'open-arrow',
     },
     { subtype: 'caret', box: rect },
-    { subtype: 'text', rect },
+    { subtype: 'text', at: { left: rect.left, top: rect.top } },
     { subtype: 'link', rect, target: { kind: 'uri', uri: 'https://example.com' } },
     { subtype: 'redact', rect, quadPoints: [quad] },
   ];
@@ -81,7 +81,7 @@ export function creatables(): Creatable[] {
     {
       data: {
         subtype: 'file-attachment',
-        rect,
+        at: { left: rect.left, top: rect.top },
         file: { name: 'note.txt', mimeType: 'text/plain', description: 'A note' },
       },
       resources: { file: new TextEncoder().encode('attached') },

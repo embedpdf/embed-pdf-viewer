@@ -596,7 +596,6 @@ describe('judging what a save would write', () => {
               { x: 80, y: 60 },
             ],
           ],
-          rect: { left: 10, bottom: 600, right: 100, top: 700 },
           color: { r: 0, g: 0, b: 0 },
           strokeWidth: 2,
         } as never);

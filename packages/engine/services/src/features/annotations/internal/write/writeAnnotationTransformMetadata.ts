@@ -18,7 +18,7 @@ import {
  *
  *   /EMBD_Metadata <<
  *     /Rotation      -45                   % degrees, PDF convention (CCW)
- *     /UnrotatedRect [x0 y0 x1 y1]         % box kinds only — the box
+ *     /UnrotatedRect [x0 y0 x1 y1]         % the box it turns about the middle of
  *   >>
  *
  * The API's `rotation` is degrees clockwise (the rule every API rotation
@@ -26,17 +26,14 @@ import {
  * the generator bakes does, so the angle is negated here, once, and written
  * in (-180, 180] as Acrobat writes its own.
  *
- * The family split:
- *   - box kinds (square/circle/free-text/stamp/caret): `/Rotation` +
- *     `/UnrotatedRect` (`writeBoxTurn`). With both present the AP generator
- *     emits an `/AP /Matrix` that turns the drawing about the box centre. A
- *     stamp, and a free text turned a quarter, also carry Acrobat's
+ * Both families record the turn the same way (`writeRecordedTurn`):
+ *   - box kinds (square/circle/free-text/stamp/caret): the box. The AP
+ *     generator emits an `/AP /Matrix` that turns the drawing about the box
+ *     centre. A stamp, and a free text turned a quarter, also carry Acrobat's
  *     `/Rotate` (`writeAcrobatRotate`).
- *   - vertex kinds (line/polyline/polygon/ink): `/Rotation` only (advisory).
- *     The points are already rotated (they are the visual), so a lone
- *     `/Rotation` is inert for the AP generator (it ignores `/Rotation` with no
- *     `/UnrotatedRect`) — it just records the applied angle so EmbedPDF can
- *     reconstruct an oriented selection box + offer reset.
+ *   - point kinds (line/polyline/polygon/ink): the box around the upright
+ *     points. The file keeps the points as drawn, so the generator never
+ *     reads the keys; the read turns the points back (`readPointsTurn`).
  *
  * A clear removes just its key via `EPDFAnnot_ClearEmbedMetadataKey`, never
  * the whole dict: identity fields UserID/GroupID/CreatedBy/UpdatedBy must
@@ -47,12 +44,6 @@ import {
 
 const KEY_ROTATION = 'Rotation';
 const KEY_UNROTATED_RECT = 'UnrotatedRect';
-
-/** A vertex kind's advisory turn. Tri-state: `undefined` preserves, `null` clears, a value sets. */
-export interface AnnotationTransform {
-  /** Degrees clockwise, the API's; stored counterclockwise. 0 ≡ none. */
-  rotation?: number | null;
-}
 
 /** Seed `/SchemaVersion` when we are about to create the dict by writing the
  *  first transform key, so the marker readers look for is always present. */
@@ -112,10 +103,10 @@ function setUnrotatedRect(
 }
 
 /**
- * Record a box kind's turn in our keys, and in Acrobat's `/Rotate` for the
- * kinds Acrobat turns; `null` clears them.
+ * Record a turn in our keys (the angle and the box it turns), and in
+ * Acrobat's `/Rotate` for the kinds Acrobat turns; `null` clears them.
  */
-export function writeBoxTurn(
+export function writeRecordedTurn(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
@@ -129,24 +120,6 @@ export function writeBoxTurn(
     fn.EPDFAnnot_ClearEmbedMetadataKey(annotPtr, KEY_UNROTATED_RECT);
   }
   writeAcrobatRotate(fn, annotPtr, turn?.rotation ?? null);
-}
-
-/**
- * Write the advisory `/Rotation` scalar for a vertex kind
- * (line/polyline/polygon/ink), tri-state: `undefined` never touches the
- * document, `null`/`0` clears, a value sets. Whenever it does write, any
- * `/UnrotatedRect` is defensively cleared — that key is an impossible state on
- * a vertex kind and must never accidentally drive the AP generator.
- */
-export function writeVertexTransformMetadata(
-  fn: PdfFunctions,
-  annotPtr: Ptr,
-  t: AnnotationTransform,
-): void {
-  if (t.rotation === undefined) return;
-  if (t.rotation !== null && t.rotation !== 0) setRotation(fn, annotPtr, t.rotation);
-  else fn.EPDFAnnot_ClearEmbedMetadataKey(annotPtr, KEY_ROTATION);
-  fn.EPDFAnnot_ClearEmbedMetadataKey(annotPtr, KEY_UNROTATED_RECT);
 }
 
 /**

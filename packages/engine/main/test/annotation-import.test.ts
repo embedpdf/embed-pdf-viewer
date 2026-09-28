@@ -75,9 +75,16 @@ async function everyKind(): Promise<AnnotationBundle> {
     const page = doc.page(pageRef);
     for (const { data, resources } of creatables()) await page.annotations.create(data, resources);
     const rect = { left: 300, bottom: 300, right: 320, top: 320 };
-    const { annotation: note } = await page.annotations.create({ subtype: 'text', rect });
+    const { annotation: note } = await page.annotations.create({
+      subtype: 'text',
+      at: { left: rect.left, top: rect.top },
+    });
     await page.annotations.create({ subtype: 'popup', rect, parent: note.ref });
-    await page.annotations.create({ subtype: 'text', rect, reply: { to: note.ref } });
+    await page.annotations.create({
+      subtype: 'text',
+      at: { left: rect.left, top: rect.top },
+      reply: { to: note.ref },
+    });
     await page.annotations.create({
       subtype: 'link',
       rect,
@@ -309,7 +316,7 @@ describe.each(['wasm', 'native'] as const)('one create (%s runtime)', (prefer) =
     const rect = { left: 300, bottom: 300, right: 320, top: 320 };
     const create = (draft: Record<string, unknown>) =>
       worker.send({ kind: 'annotations.create', page, draft });
-    const created = await create({ subtype: 'text', rect });
+    const created = await create({ subtype: 'text', at: { left: rect.left, top: rect.top } });
     if (created.kind !== 'resolve' || created.result.tag !== 'annotations.create') {
       throw new Error(`the note: ${JSON.stringify(created)}`);
     }
@@ -326,7 +333,7 @@ describe.each(['wasm', 'native'] as const)('one create (%s runtime)', (prefer) =
         .filter(({ resources }) => !resources)
         .map(({ data }) => data as unknown as Record<string, unknown>),
       { subtype: 'popup', rect, parent: note },
-      { subtype: 'text', rect, reply: { to: note } },
+      { subtype: 'text', at: { left: rect.left, top: rect.top }, reply: { to: note } },
       {
         subtype: 'link',
         rect,
@@ -386,7 +393,7 @@ describe.each(['wasm', 'native'] as const)('one create (%s runtime)', (prefer) =
         page: weak.page,
         draft: {
           subtype: 'text',
-          rect: { left: 10, bottom: 10, right: 30, top: 30 },
+          at: { left: 10, top: 30 },
           reply: { to: weak },
         },
       });

@@ -12,7 +12,7 @@ import type {
   PageMoveResult,
   PageRef,
   PageRotateResult,
-  PageRotation,
+  PdfRotation,
   PdfSize,
 } from '@embedpdf/core';
 
@@ -22,7 +22,7 @@ export type {
   PageInsertResult,
   PageMoveResult,
   PageRotateResult,
-  PageRotation,
+  PdfRotation,
   PdfSize,
 } from '@embedpdf/core';
 
@@ -60,7 +60,7 @@ export interface PageEditCapability {
   /** Set one absolute rotation on pages. */
   setRotation(
     pages: readonly PageRef[],
-    rotation: PageRotation,
+    rotation: PdfRotation,
     options?: OperationOptions,
   ): Promise<PageRotateResult>;
   /** Reorder pages as a contiguous block at the placement. */

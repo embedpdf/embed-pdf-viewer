@@ -4,15 +4,21 @@ import { LineIntentSchema, LineLeaderSchema } from '../../../dto/Measure.schema'
 import { LinePointsSchema } from '../../../geometry/schemas';
 import { LineEndingsSchema } from '../../base.schema';
 import { defineKind, field } from '../../declaration';
-import { annotationBaseFields, filledStyleFields, measureField } from '../shared-fields';
+import {
+  annotationBaseFields,
+  drawnRectFields,
+  filledStyleFields,
+  measureField,
+  pointsTurnFields,
+} from '../shared-fields';
 
 export const LineDeclaration = defineKind('line', {
   ...annotationBaseFields,
   ...filledStyleFields,
+  ...drawnRectFields,
   linePoints: field.data(LinePointsSchema),
   lineEndings: field.data(LineEndingsSchema).optional(),
-  /** The angle already applied to the points, degrees clockwise. */
-  rotation: field.data(z.number()).nullable().optional(),
+  ...pointsTurnFields,
   intent: field.data(LineIntentSchema).nullable().optional(),
   measure: measureField,
   /** `/Cap`: paint `/Contents` on the line. */

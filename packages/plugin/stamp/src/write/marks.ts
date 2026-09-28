@@ -26,27 +26,13 @@ const toArrayBuffer = (bytes: Uint8Array): ArrayBuffer => {
   return buffer;
 };
 
-/** The rect an ink mark occupies, padded by its stroke. */
-const inkBounds = (
+/** An ink mark's strokes, as the engine takes them; a mark needs at least one point. */
+const inkListOf = (
   strokes: ReadonlyArray<ReadonlyArray<{ x: number; y: number }>>,
-  strokeWidth: number,
-): { left: number; bottom: number; right: number; top: number } => {
-  let left = Infinity;
-  let bottom = Infinity;
-  let right = -Infinity;
-  let top = -Infinity;
-  for (const stroke of strokes) {
-    for (const { x, y } of stroke) {
-      if (x < left) left = x;
-      if (x > right) right = x;
-      if (y < bottom) bottom = y;
-      if (y > top) top = y;
-    }
-  }
-  if (!Number.isFinite(left))
+): { x: number; y: number }[][] => {
+  if (!strokes.some((stroke) => stroke.length > 0))
     throw stampError('invalid-input', 'an ink mark needs at least one point');
-  const pad = strokeWidth;
-  return { left: left - pad, bottom: bottom - pad, right: right + pad, top: top + pad };
+  return strokes.map((stroke) => stroke.map(({ x, y }) => ({ x, y })));
 };
 
 /** A generous box for typed text; the export crops to the glyphs. */
@@ -89,8 +75,7 @@ export function createMarks({ assetEngine }: Pick<StampServices, 'assetEngine'>)
         mark.kind === 'ink'
           ? await page.annotations.create({
               subtype: 'ink',
-              inkList: mark.strokes.map((stroke) => stroke.map(({ x, y }) => ({ x, y }))),
-              rect: inkBounds(mark.strokes, mark.strokeWidth ?? 2),
+              inkList: inkListOf(mark.strokes),
               color,
               strokeWidth: mark.strokeWidth ?? 2,
             })

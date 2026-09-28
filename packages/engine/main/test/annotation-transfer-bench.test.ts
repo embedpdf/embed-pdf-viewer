@@ -157,7 +157,7 @@ describe.skipIf(!ENABLED).each(['wasm', 'native'] as const)(
             await source.page((await pageRefs(source))[0]!).annotations.create(
               {
                 subtype: 'file-attachment',
-                rect: { left: 40, bottom: 40, right: 60, top: 60 },
+                at: { left: 40, top: 60 },
                 file: { name: 'large.bin' },
               },
               { file: bytes },

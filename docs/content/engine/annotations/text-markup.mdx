@@ -69,6 +69,7 @@ each from that page's range.
 | `contents`   | A comment, which PDF apps show with the mark.                       | none                                                |
 
 You don't pass a `rect`: the engine works it out from the quads, as the box around all of them.
+An update may send back the `rect` it read; any other fails with `InvalidArg`.
 The fields every annotation has (flags, `subject`, who wrote it) are on the
 [overview](/docs/engine/annotations).
 

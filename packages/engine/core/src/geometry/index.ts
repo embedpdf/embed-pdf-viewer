@@ -9,6 +9,7 @@
 export type {
   PdfPoint,
   PdfRect,
+  PdfTopLeft,
   PdfSize,
   PdfQuad,
   PdfRotation,
@@ -31,4 +32,12 @@ export {
   pdfRectTurnedBounds,
   isSamePdfRect,
 } from './convert';
+export type { PdfPointTurn } from './pointTurn';
+export {
+  pdfPointsBounds,
+  pdfPointTurned,
+  pdfPointUnturned,
+  pdfTurnOfDrawn,
+  pdfTurnOfUpright,
+} from './pointTurn';
 export { renderSize } from './renderSize';

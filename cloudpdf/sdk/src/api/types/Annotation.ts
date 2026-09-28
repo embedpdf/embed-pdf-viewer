@@ -2051,6 +2051,7 @@ export namespace Annotation {
         actions: CloudPDF.PdfAnnotationActions | null;
         color: AnnotationText.Color;
         opacity: number;
+        at: AnnotationText.At;
         icon: AnnotationText.Icon;
         state: string | null;
         stateModel: string | null;
@@ -2119,6 +2120,11 @@ export namespace Annotation {
             r: number;
             g: number;
             b: number;
+        }
+
+        export interface At {
+            left: number;
+            top: number;
         }
 
         export const Icon = {
@@ -2280,6 +2286,7 @@ export namespace Annotation {
         actions: CloudPDF.PdfAnnotationActions | null;
         color: AnnotationFileAttachment.Color;
         opacity: number;
+        at: AnnotationFileAttachment.At;
         icon: AnnotationFileAttachment.Icon;
         file: AnnotationFileAttachment.File_ | null;
     }
@@ -2347,6 +2354,11 @@ export namespace Annotation {
             r: number;
             g: number;
             b: number;
+        }
+
+        export interface At {
+            left: number;
+            top: number;
         }
 
         export const Icon = {

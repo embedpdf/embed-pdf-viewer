@@ -24,7 +24,7 @@ export type { DocumentMetadata, DocumentMetadataTrapped } from './dto/DocumentMe
 export type { MetadataPatch } from './dto/MetadataPatch';
 export type { PageListSnapshot } from './dto/PageListSnapshot';
 export type { NamedPageEntry, NamedPageTarget } from './dto/NamedPage';
-export type { PageLayout, PageBoxes, PageRotation } from './dto/PageLayout';
+export type { PageLayout, PageBoxes } from './dto/PageLayout';
 export type {
   PdfActionType,
   PdfActionNode,
@@ -46,11 +46,13 @@ export { decodeSubmitFormFlags } from './dto/PdfAction';
 export type {
   PdfPoint,
   PdfRect,
+  PdfTopLeft,
   PdfSize,
   PdfQuad,
   PdfRotation,
   PdfOriginSize,
   PdfQuadCorners,
+  PdfPointTurn,
   LinePoints,
   InkStroke,
   InkList,
@@ -68,6 +70,11 @@ export {
   pdfQuadFromCorners,
   pdfRectTurnedBounds,
   isSamePdfRect,
+  pdfPointsBounds,
+  pdfPointTurned,
+  pdfPointUnturned,
+  pdfTurnOfDrawn,
+  pdfTurnOfUpright,
   renderSize,
 } from './geometry';
 export type { PageTextSnapshot } from './dto/PageTextSnapshot';
@@ -429,6 +436,7 @@ export type {
 } from './annotation/appearance';
 export { appearanceImpactOf, semanticEqual } from './annotation/appearance';
 export { appearanceTurnOf } from './annotation/appearanceTurn';
+export { drawnPointsOf } from './annotation/drawnPoints';
 export { assertAnnotationDraft, checkAnnotationPatch } from './annotation/checkWrite';
 export type { FormFieldRef, FormWidget } from './identity/FormFieldRef';
 export { formWidget, toFieldRef } from './identity/FormFieldRef';

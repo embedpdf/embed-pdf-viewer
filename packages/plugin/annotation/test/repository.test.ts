@@ -16,7 +16,7 @@ import type {
   CalloutLine,
   PdfRect,
 } from '@embedpdf/engine-core/runtime';
-import { toPageRef } from '@embedpdf/engine-core/runtime';
+import { pdfPointTurned, pdfTurnOfUpright, toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -401,12 +401,16 @@ describe('repository — rotation round-trip', () => {
     expect(patch.rotation).toBe(null);
   });
 
-  it('vertex: advisory rotation round-trips and the points stay authoritative', () => {
-    const annotation = fromDTO(rotatedPolylineDTO(30), CROP);
+  it('vertex: the upright points are turned onto the page and turned back on the way out', () => {
+    const dto = rotatedPolylineDTO(30);
+    if (dto.subtype !== 'polyline') throw new Error('expected polyline');
+    const annotation = fromDTO(dto, CROP);
     if (annotation.geometry.kind !== 'poly') throw new Error('expected poly geom');
     expect(annotation.geometry.rot).toBe(30);
-    // the points are the visual — first vertex maps straight through the y-flip
-    expect(annotation.geometry.points[0]).toEqual({ x: 120, y: 680 });
+    // The model keeps the points as drawn: the upright ones turned about their box's middle.
+    const drawn = pdfPointTurned(dto.vertices[0]!, pdfTurnOfUpright(dto.vertices, 30));
+    expect(annotation.geometry.points[0]!.x).toBeCloseTo(drawn.x - CROP.left, 9);
+    expect(annotation.geometry.points[0]!.y).toBeCloseTo(CROP.top - drawn.y, 9);
 
     const patch = toPatch(annotation, CROP) as Extract<
       AnnotationPatch,
@@ -417,7 +421,9 @@ describe('repository — rotation round-trip', () => {
     if (!patch) throw new Error('expected a patch');
     expect(patch.rotation).toBe(30);
     expect(patch).not.toHaveProperty('box'); // vertex kinds never carry one
-    expect(patch.vertices?.[0]).toMatchObject({ x: 120, y: 120 });
+    expect(patch).not.toHaveProperty('rect'); // the engine works it out
+    expect(patch.vertices?.[0]!.x).toBeCloseTo(120, 9);
+    expect(patch.vertices?.[0]!.y).toBeCloseTo(120, 9);
   });
 
   it('vertex: an unrotated polyline states the advisory clear explicitly', () => {
@@ -603,14 +609,11 @@ describe('repository — polygon cloudy border', () => {
     expect(annotation.style.border).toEqual({ kind: 'cloudy', intensity: 2 });
   });
 
-  it('toPatch carries cloudyIntensity and grows /Rect by the outward cloud extent', () => {
+  it('toPatch carries cloudyIntensity and no rect: the engine measures the curls', () => {
     const annotation = fromDTO(polygonDTO(2), CROP);
     const patch = toPatch(annotation, CROP) as Extract<AnnotationPatch, { subtype?: 'polygon' }>;
     expect(patch.cloudyIntensity).toBe(2);
-    // vertex hull is x:[120,280]; the /Rect must reach beyond it by the cloud
-    // radius (4·intensity + 0.5·stroke) + stroke/2 = 8 + 1 + 1 = 10
-    expect(patch.rect!.left).toBeLessThanOrEqual(120 - 9);
-    expect(patch.rect!.right).toBeGreaterThanOrEqual(280 + 9);
+    expect(patch).not.toHaveProperty('rect');
     // no /RD for polygons — the curls are derived from /Vertices + /BE alone
     expect(patch).not.toHaveProperty('rectDifferences');
   });
@@ -623,8 +626,7 @@ describe('repository — polygon cloudy border', () => {
     };
     const patch = toPatch(solid, CROP) as Extract<AnnotationPatch, { subtype?: 'polygon' }>;
     expect(patch.cloudyIntensity).toBe(null); // tri-state remove of /BE
-    // and the /Rect shrinks back to the stroke-only bounds
-    expect(patch.rect!.left).toBeGreaterThanOrEqual(118);
+    expect(patch).not.toHaveProperty('rect');
   });
 
   it('an open polyline never carries cloudy fields', () => {
@@ -687,7 +689,7 @@ describe('repository — toScopedPatch (sparse emission)', () => {
     expect(box.right).toBeCloseTo(200);
   });
 
-  it('props strokeWidth on a polygon re-emits the VISUAL-bounds /Rect', () => {
+  it('props strokeWidth on a polygon sends no rect: the engine measures the stroke', () => {
     const annotation = fromDTO(polygonDTO(undefined), CROP);
     const patch = toScopedPatch(
       annotation,
@@ -695,7 +697,7 @@ describe('repository — toScopedPatch (sparse emission)', () => {
       CROP,
     ) as unknown as Record<string, unknown>;
     expect(patch.strokeWidth).toBeDefined();
-    expect(patch.rect).toBeDefined(); // rect includes the stroke radius
+    expect(patch).not.toHaveProperty('rect');
   });
 
   it('props border on a plain square states the tri-state clears', () => {
@@ -759,7 +761,7 @@ describe('repository — toScopedPatch (sparse emission)', () => {
   });
 });
 
-describe('repository — /Rect derives from line endings (the clipped-arrowhead class)', () => {
+describe('repository — line endings leave /Rect to the engine', () => {
   const lineDTO = (lineEndings: { start: string; end: string }): AnnotationDTO =>
     ({
       ref: { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber: 77 },
@@ -795,11 +797,9 @@ describe('repository — /Rect derives from line endings (the clipped-arrowhead 
     }) as unknown as AnnotationDTO;
 
   type RectPatch = { lineEndings?: unknown; rect?: PdfRect };
-  const area = (rect: PdfRect) => (rect.right - rect.left) * (rect.top - rect.bottom);
 
-  it('props lineEndings on a line re-emits the grown VISUAL-bounds /Rect', () => {
+  it('props lineEndings on a line sends the endings and no rect: the engine measures the arrows', () => {
     const none = fromDTO(lineDTO({ start: 'none', end: 'none' }), CROP);
-    const before = toScopedPatch(none, { kind: 'props', keys: ['lineEndings'] }, CROP) as RectPatch;
     // The model after the reducer applied the user's gesture: arrows on both ends.
     const arrows = {
       ...none,
@@ -811,22 +811,10 @@ describe('repository — /Rect derives from line endings (the clipped-arrowhead 
       CROP,
     ) as RectPatch;
     expect(patch.lineEndings).toEqual({ start: 'open-arrow', end: 'open-arrow' });
-    // The derivation rides along — the sparse patch can never change an input
-    // of /Rect without re-emitting it (else the /AP re-bakes into the stale
-    // box and the arrowhead is clipped in every other viewer).
-    expect(before.rect).toBeDefined();
-    expect(patch.rect).toBeDefined();
-    const r0 = before.rect!;
-    const r1 = patch.rect!;
-    // Grew to enclose the arrowheads, and shrank on no side.
-    expect(area(r1)).toBeGreaterThan(area(r0));
-    expect(r1.left).toBeLessThanOrEqual(r0.left);
-    expect(r1.bottom).toBeLessThanOrEqual(r0.bottom);
-    expect(r1.right).toBeGreaterThanOrEqual(r0.right);
-    expect(r1.top).toBeGreaterThanOrEqual(r0.top);
+    expect(patch).not.toHaveProperty('rect');
   });
 
-  it('polyline endings ride the same derivation', () => {
+  it('polyline endings send no rect either', () => {
     const base = fromDTO(rotatedPolylineDTO(0, 78), CROP);
     const arrows = {
       ...base,
@@ -838,7 +826,7 @@ describe('repository — /Rect derives from line endings (the clipped-arrowhead 
       CROP,
     ) as RectPatch;
     expect(patch.lineEndings).toBeDefined();
-    expect(patch.rect).toBeDefined();
+    expect(patch).not.toHaveProperty('rect');
   });
 });
 

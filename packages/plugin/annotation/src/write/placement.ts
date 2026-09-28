@@ -6,7 +6,7 @@ import type {
   AttachmentFileSource,
   FileAttachmentIcon,
   NoteIcon,
-  PdfRect,
+  PdfTopLeft,
 } from '@embedpdf/engine-core/runtime';
 
 import { cssToColor } from '../repository';
@@ -20,9 +20,9 @@ import { cssToColor } from '../repository';
  */
 
 /**
- * Icon kinds place at the generator's fixed box: the engine forces the
- * `/Rect` to 20×20 from its bottom-left corner (the spec's note-icon rule),
- * so the footprint ghost and the placement use exactly this size.
+ * Icon kinds place at the generator's fixed box: the engine draws the icon
+ * 20×20 from `at`, its left and top edges, so the footprint ghost and the
+ * placement use exactly this size.
  */
 export const ICON_PLACE_SIZE = { width: 20, height: 20 } as const;
 
@@ -34,14 +34,14 @@ export const isIconPlaceKind = (subtype: Subtype): subtype is IconPlaceKind =>
 /**
  * Build the engine create for a placed icon annotation: its data, and for a
  * file attachment the file's bytes as the `file` resource. `geometry` is the
- * icon's `/Rect`; `defaults` is the tool's resolved flat props bag
+ * icon's `at`; `defaults` is the tool's resolved flat props bag
  * (`defaultsFor`) — the
  * colour seam is crossed here via the repository's `cssToColor`, and the
  * icon falls back to the kind's own default when the bag carries none.
  */
 export function iconPlacement(
   subtype: IconPlaceKind,
-  geometry: { rect: PdfRect },
+  geometry: { at: PdfTopLeft },
   defaults: AnnotationProps,
   flags: Partial<AnnotationFlags> | undefined,
   file: AttachmentFileSource | null,

@@ -156,7 +156,7 @@ sits are separate fields, so hiding a label keeps its position.
 | `captionEnabled`  | all             | Draw the label. `null` when it was never set.                                  | `null`     |
 | `captionPosition` | distance        | `'inline'` (in the line) or `'top'` (above it).                                | `'inline'` |
 | `captionOffset`   | distance        | `{ along, perpendicular }`: points along the line and square to it, or `null`. | `null`     |
-| `captionCenter`   | perimeter, area | The label's centre `{ x, y }` on the page, or `null`.                          | `null`     |
+| `captionCenter`   | perimeter, area | The label's centre `{ x, y }`, upright like the points, or `null`.             | `null`     |
 | `leader`          | distance        | Leader lines at the ends: `{ length, extension?, offset? }` in points.         | none       |
 
 `null` for `captionOffset` or `captionCenter` places the label automatically. `captionEnabled:
@@ -164,7 +164,8 @@ false` hides the label and keeps its place. On a perimeter or area, `captionEnab
 the caption and its place together.
 
 A label you placed moves with the shape when you move or turn the whole shape, and stays put when
-you edit single points. A `captionCenter` you send wins.
+you edit single points. A `captionCenter` you send wins. On a [turned shape](/docs/engine/annotations/shapes#turned-shapes)
+it is upright, like the points, and turns with them.
 
 A measurement without a caption reads `captionEnabled: null`, a distance line too. One another app
 made keeps its look until you turn a caption on.

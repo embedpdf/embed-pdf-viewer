@@ -217,6 +217,7 @@ PdfRevisionSchema [VariableDeclaration] (from packages/engine/core/src/wire/sche
 PdfRotationSchema [VariableDeclaration] (from packages/engine/core/src/geometry/schemas.ts): PdfRotationSchema: z.ZodType<PdfRotation> = z.union([ z.literal(0), z.literal(90), z.literal(180), z.literal(270), ])
 PdfSaveModeSchema [VariableDeclaration] (from packages/engine/core/src/wire/schemas.ts): PdfSaveModeSchema: z.ZodType<PdfSaveMode> = z.enum(['incremental', 'rewrite'])
 PdfSizeSchema [VariableDeclaration] (from packages/engine/core/src/geometry/schemas.ts): PdfSizeSchema: z.ZodType<PdfSize> = z.object({ width: z.number().nonnegative(), height: z.number().nonnegative(), } )
+PdfTopLeftSchema [VariableDeclaration] (from packages/engine/core/src/geometry/schemas.ts): PdfTopLeftSchema: z.ZodType<PdfTopLeft> = z.object({ left: z.number(), top: z.number(), } )
 PointSchema [VariableDeclaration] (from packages/engine/core/src/annotation/base.schema.ts): PointSchema = PdfPointSchema
 PolygonDTOSchema [VariableDeclaration] (from packages/engine/core/src/annotation/kinds/polygon/index.ts): PolygonDTOSchema = PolygonDeclaration.readSchema
 PolygonDraftSchema [VariableDeclaration] (from packages/engine/core/src/annotation/kinds/polygon/index.ts): PolygonDraftSchema = PolygonDeclaration.createSchema

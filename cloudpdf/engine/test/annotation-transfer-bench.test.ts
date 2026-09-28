@@ -163,7 +163,7 @@ describe.skipIf(!ENABLED)('E8 annotation transfer (cloud, localhost)', () => {
       await doc.page(page!).annotations.create(
         {
           subtype: 'file-attachment',
-          rect: { left: 40, bottom: 40, right: 60, top: 60 },
+          at: { left: 40, top: 60 },
           file: { name: 'large.bin' },
         },
         { file: bytes },

@@ -88,10 +88,14 @@ export async function fill(doc: Doc, count: number): Promise<void> {
     if (i % 25 === 0) {
       const { annotation: created } = await page.annotations.create({
         subtype: 'text',
-        rect,
+        at: { left: rect.left, top: rect.top },
         contents: `Note ${i}`,
       });
-      await page.annotations.create({ subtype: 'text', rect, reply: { to: created.ref } });
+      await page.annotations.create({
+        subtype: 'text',
+        at: { left: rect.left, top: rect.top },
+        reply: { to: created.ref },
+      });
       i++;
     } else if (i % 10 === 0) {
       await page.annotations.create(

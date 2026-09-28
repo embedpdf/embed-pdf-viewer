@@ -1,6 +1,6 @@
 /** The complete annotation frame shared by selection and transform gestures. */
 import { anchoredGeom, anchoredStrokeWidth, anchorModeOf } from './anchor';
-import { geomRotation, isRotatableGeom, selectionQuad } from './geometry';
+import { geomRotation, isRotatableGeom, selectionQuad, turnPivotOf } from './geometry';
 import { measurementSelectionQuad } from './measurement-shape';
 import type { ModelAnnotation, Quad, Point, ViewEnv } from './types';
 
@@ -31,4 +31,9 @@ export function annotationSelectionFrame(
     },
     angle: isRotatableGeom(geometry) ? geomRotation(geometry) : 0,
   };
+}
+
+/** Where a turn of `annotation` pivots (`turnPivotOf`), in its frame's space. */
+export function annotationTurnPivot(annotation: ModelAnnotation, view?: ViewEnv): Point {
+  return turnPivotOf(anchoredGeom(annotation.geometry, anchorModeOf(annotation), view));
 }

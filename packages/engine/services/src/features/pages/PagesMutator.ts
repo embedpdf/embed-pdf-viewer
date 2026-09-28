@@ -9,7 +9,7 @@ import {
   type PageRef,
   type PageRemoveNameInput,
   type PageRotateResult,
-  type PageRotation,
+  type PdfRotation,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
@@ -151,7 +151,7 @@ export class PagesMutator {
    * fault converges to the requested state. Abort is honored before the
    * loop, never inside it.
    */
-  rotate(pages: PageRef[], rotation: PageRotation, signal: AbortSignal): PageRotateResult {
+  rotate(pages: PageRef[], rotation: PdfRotation, signal: AbortSignal): PageRotateResult {
     const pageObjectNumbers = this.session.resolvePageRefs(pages);
     throwIfAborted(signal);
     this.requireUniquePageObjectNumbers('pages.rotate', pageObjectNumbers);

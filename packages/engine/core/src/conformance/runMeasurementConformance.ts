@@ -27,7 +27,6 @@ export function runMeasurementConformance(
         ? engine.open({ kind: 'bytes', id: opts.fixture.id, bytes: await opts.fixture.bytes() })
         : engine.open({ kind: 'id', id: opts.fixture.cloudId ?? opts.fixture.id });
     const scale = measureFromKnownLength(100, { value: 3, unit: 'm' });
-    const rect = { left: 0, bottom: 0, right: 100, top: 100 };
     const vertices = [
       { x: 0, y: 0 },
       { x: 100, y: 0 },
@@ -42,7 +41,6 @@ export function runMeasurementConformance(
           await page.annotations.create({
             subtype: 'line',
             intent: 'line-dimension',
-            rect,
             measure: scale,
             linePoints: { start: vertices[0], end: vertices[1] },
             captionEnabled: true,
@@ -94,7 +92,6 @@ export function runMeasurementConformance(
         const drafts: AnnotationDraft[] = [
           {
             subtype: 'line',
-            rect,
             intent: 'line-dimension',
             // Both coordinates and /C cross float32 rounding boundaries.
             measure: measureFromKnownLength(1, { value: 1.00000001, unit: 'm' }),
@@ -105,7 +102,6 @@ export function runMeasurementConformance(
           },
           {
             subtype: 'polyline',
-            rect,
             intent: 'polyline-dimension',
             measure: scale,
             contents: 'wrong',
@@ -115,7 +111,6 @@ export function runMeasurementConformance(
           },
           {
             subtype: 'polygon',
-            rect,
             intent: 'polygon-dimension',
             measure: scale,
             contents: 'wrong',

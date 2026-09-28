@@ -12,7 +12,7 @@ to a plan. PDF apps show an icon there and open the file from it.
 await page.annotations.create(
   {
     subtype: 'file-attachment',
-    rect: { left: 40, bottom: 40, right: 60, top: 60 },
+    at: { left: 40, top: 60 },
     file: { name: 'figures.csv', mimeType: 'text/csv' },
   },
   { file: bytes },
@@ -27,14 +27,14 @@ it is:
 const picked = input.files![0];
 
 await page.annotations.create(
-  { subtype: 'file-attachment', rect: { left: 40, bottom: 40, right: 60, top: 60 } },
+  { subtype: 'file-attachment', at: { left: 40, top: 60 } },
   { file: picked },
 );
 ```
 
 | Field              | What it is                                                                       | Default                                  |
 | :----------------- | :------------------------------------------------------------------------------- | :--------------------------------------- |
-| `rect`             | Where the icon goes: its bottom-left corner is the icon's.                       | required                                 |
+| `at`               | Where the icon goes: its left and top edges, `{ left, top }`. Required.          |                                          |
 | `file.name`        | The file's name, which PDF apps show and save it under. Required for bare bytes. | the `File`'s name                        |
 | `file.mimeType`    | The file's type, such as `'text/csv'`.                                           | the `File`'s or `Blob`'s type, or `null` |
 | `file.description` | A short description of the file.                                                 | `null`                                   |
@@ -42,8 +42,9 @@ await page.annotations.create(
 | `color`            | The icon's color, `{ r, g, b }` from 0 to 255                                    | yellow                                   |
 | `opacity`          | From `0` (invisible) to `1` (solid)                                              | `1`                                      |
 
-The icon is always 20 × 20 points, placed at the bottom-left corner of `rect`. Any bytes are a
-valid file. The engine never guesses a type: without one, `mimeType` reads `null`.
+The icon is always 20 × 20 points, down and to the right from `at`, the corner PDF keeps in place
+for an icon that doesn't zoom; a read's `rect` is its box, which the engine works out. Move the
+icon by its `at`. Any bytes are a valid file. The engine never guesses a type: without one, `mimeType` reads `null`.
 
 ## Read and download the file
 
@@ -153,5 +154,5 @@ In the PDF, `icon` is the annotation's `/Name`. A name other than the four stand
 
 ### How a copy looks
 
-A copy's icon is the engine's own 20 × 20 icon at the same bottom-left corner, whatever icon
+A copy's icon is the engine's own 20 × 20 icon at the same `at`, whatever icon
 another app drew for the original.

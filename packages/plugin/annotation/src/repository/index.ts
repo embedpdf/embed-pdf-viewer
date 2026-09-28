@@ -43,7 +43,7 @@ import {
 } from './kinds/misc';
 import { caret, highlight, redact, squiggly, strikeout, underline } from './kinds/quads';
 import { circle, square } from './kinds/shape';
-import { captionFieldsOf, ink, line, polygon, polyline } from './kinds/stroke';
+import { captionFieldsFor, ink, line, polygon, polyline } from './kinds/stroke';
 import { boxEmit, type KindProjection, type Wire } from './projection';
 import { GENERIC_PROPS } from './props';
 import { pdfToContentRect, annotationKey, flagsOf, styleFromDTO } from './seam';
@@ -53,6 +53,7 @@ export {
   colorToCss,
   cssToColor,
   annotationKey,
+  iconAt,
   styleFromDTO,
   widgetAppearanceFromProps,
   writableTarget,
@@ -185,7 +186,7 @@ export function toScopedPatch(
     return annotation.measure
       ? ({
           subtype: wireSubtypeOf(annotation),
-          ...captionFieldsOf(annotation.measure),
+          ...captionFieldsFor(annotation, crop),
         } as AnnotationPatch)
       : null;
   }

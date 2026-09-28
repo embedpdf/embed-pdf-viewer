@@ -16,7 +16,8 @@ import { PageGeometrySnapshotSchema } from '../wire/schemas';
 /** Absolute tolerance for coordinate assertions (PDF points). */
 const COORD_TOLERANCE = 1e-3;
 /** Tolerance for baseline-angle assertions (radians). */
-const ANGLE_TOLERANCE = 1e-3;
+/** Degrees. */
+const ROTATION_TOLERANCE = 0.06;
 
 /**
  * Per-fixture expectations for the oriented-text geometry harness. One
@@ -37,11 +38,11 @@ export interface PageGeometryOrientationFixture extends ConformanceFixture {
       }
     | {
         kind: 'rotated';
-        /** Baseline angles (radians, CCW, PDF y-up) rotated runs may carry. */
-        baselineAngles: number[];
+        /** Turns (degrees clockwise) rotated runs may carry. */
+        rotations: number[];
         ascentFlip: boolean;
         /**
-         * Assert sheared cells: with `baselineAngles` ≈ [0], a non-zero start-edge
+         * Assert sheared cells: with `rotations` ≈ [0], a non-zero start-edge
          * x-offset proves the parallelogram (an AABB could not express it).
          */
         sheared?: boolean;
@@ -144,8 +145,8 @@ export function runPageGeometryOrientationConformance(
 
         for (const run of rotatedRuns) {
           expect(
-            expectation.baselineAngles.some((angle) =>
-              angleClose(run.baselineAngle, angle, ANGLE_TOLERANCE),
+            expectation.rotations.some((rotation) =>
+              rotationClose(run.rotation, rotation, ROTATION_TOLERANCE),
             ),
           ).toBe(true);
           expect(run.ascentFlip).toBe(expectation.ascentFlip);
@@ -190,9 +191,9 @@ export function runPageGeometryOrientationConformance(
   });
 }
 
-function angleClose(a: number, b: number, tolerance: number): boolean {
-  const delta = a - b;
-  return Math.abs(Math.atan2(Math.sin(delta), Math.cos(delta))) <= tolerance;
+function rotationClose(a: number, b: number, tolerance: number): boolean {
+  const delta = ((((a - b) % 360) + 540) % 360) - 180;
+  return Math.abs(delta) <= tolerance;
 }
 
 async function openFixture(engine: Engine, opts: PageGeometryOrientationOptions) {

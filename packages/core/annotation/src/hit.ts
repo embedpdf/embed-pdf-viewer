@@ -1,5 +1,5 @@
 import type { PageRef } from '@embedpdf/engine-core/runtime';
-import { annotationSelectionFrame } from './selection';
+import { annotationSelectionFrame, annotationTurnPivot } from './selection';
 import { distanceCaptionHit, distanceHandles, distanceHit, distanceLayout } from './measurement';
 import { measurementLayout } from './measurement-shape';
 import {
@@ -198,7 +198,11 @@ export function hitTest(
           Math.abs(knob.at.x - point.x) <= chromeGeometry.knobTol &&
           Math.abs(knob.at.y - point.y) <= chromeGeometry.knobTol
         ) {
-          return { kind: 'rotate', ids: [annotation.id], pivot: frame.center };
+          return {
+            kind: 'rotate',
+            ids: [annotation.id],
+            pivot: annotationTurnPivot(annotation, view),
+          };
         }
       }
       if (hasHandles(model, annotation)) {

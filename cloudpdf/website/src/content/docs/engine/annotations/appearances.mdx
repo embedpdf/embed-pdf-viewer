@@ -90,7 +90,7 @@ img.style.transform = `rotate(${rotation}deg)`;
 ```
 
 Every other annotation comes as it is shown, placed by `rect`, with nothing to turn: lines,
-polygons and ink store their turn in their points, a callout turns only its text box, and a
+polygons and ink are drawn with their points turned, a callout turns only its text box, and a
 drawing that reaches past its box (a cloudy border's bumps) is drawn turned.
 
 That split is what keeps editing cheap:
@@ -186,8 +186,8 @@ change how that annotation looks.
 ### Which way `rotation` turns
 
 Every `rotation` in the engine turns clockwise, in degrees, as you see it: a page's rotation, the
-`rotation` option on this page, and an annotation's own `rotation`. So CSS `rotate()` and the
-engine always agree.
+`rotation` option on this page, an annotation's own `rotation` and the `rotation` of a run of
+turned text. So CSS `rotate()` and the engine always agree.
 
 In the PDF file, an annotation's angle is stored the way PDF measures angles (counterclockwise,
 because `y` goes up). The engine converts when it reads and writes, as it does with coordinates,

@@ -11,7 +11,7 @@ import { capsFor } from '../kinds';
 import { linkChildrenOf } from '../links';
 import { transformMeasurementCaption } from '../measurement-shape';
 import { applyProps, kindTakesLink } from '../props';
-import { annotationSelectionFrame } from '../selection';
+import { annotationTurnPivot } from '../selection';
 import type { AnnotationPropsPatch, Effect, Id, Model, Point, PropKey } from '../types';
 import { geometryPatch, ownGeometry, toVector, withoutRecords } from './changes';
 
@@ -120,8 +120,9 @@ export function rotateSelection(model: Model, deltaDeg: number): [Model, Effect[
     return annotation && annotTransformable(annotation) && capsFor(annotation.subtype).rotatable;
   });
   if (!ids.length) return [model, []];
-  // pivot: a single shape's own selection-rect centre (so vertex kinds spin in
-  // place, not about their off-centre vertex mean); a group's union-box centre.
+  // pivot: where the engine turns a single shape (`turnPivotOf`: a box's
+  // centre, the middle of a point kind's upright points), so a turn changes only
+  // its angle; a group's union-box centre.
   // Stored space throughout — a screen-anchored member's authored tilt turns,
   // which is exactly its on-screen tilt (the display adds nothing to it); at
   // high zoom the anchor may re-seat by a hair, which the toolbar action
@@ -130,7 +131,7 @@ export function rotateSelection(model: Model, deltaDeg: number): [Model, Effect[
   let pivot: Point;
   if (ids.length === 1) {
     const annotation = model.byId[ids[0]];
-    pivot = annotationSelectionFrame(annotation).center;
+    pivot = annotationTurnPivot(annotation);
   } else {
     const page = model.byId[ids[0]].page;
     const union = groupUnionBounds({ ...model, selected: ids }, page);
@@ -164,15 +165,12 @@ export function resetRotation(model: Model): [Model, Effect[]] {
     const annotation = byId[id];
     if (!annotation || !annotTransformable(annotation) || geomRotation(annotation.geometry) === 0)
       continue;
+    const pivot = annotationTurnPivot(annotation);
     byId[id] = ownGeometry({
       ...annotation,
-      geometry: geomResetRotation(annotation.geometry, annotationSelectionFrame(annotation).center),
+      geometry: geomResetRotation(annotation.geometry, pivot),
       measure: transformMeasurementCaption(annotation.measure, (point) =>
-        rotatePoint(
-          point,
-          annotationSelectionFrame(annotation).center,
-          -geomRotation(annotation.geometry),
-        ),
+        rotatePoint(point, pivot, -geomRotation(annotation.geometry)),
       ),
     });
     fx.push(geometryPatch(id));

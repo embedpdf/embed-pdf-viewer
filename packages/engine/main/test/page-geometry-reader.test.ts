@@ -123,7 +123,7 @@ describe('buildRunsFromRawGlyphs', () => {
     expect(runs).toHaveLength(1);
     const run = runs[0];
     if (!isRotatedGeometryRun(run)) throw new Error('expected a rotated run');
-    expect(run.baselineAngle).toBeCloseTo(Math.PI / 2, 6);
+    expect(run.rotation).toBeCloseTo(270, 6);
     expect(run.ascentFlip).toBe(false);
     expect(run.fontSize).toBe(10);
     expect(run.glyphs[0].loose).toEqual(q1);

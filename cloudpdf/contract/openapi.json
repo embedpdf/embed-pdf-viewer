@@ -10614,6 +10614,19 @@
               "opacity": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/opacity"
               },
+              "at": {
+                "type": "object",
+                "properties": {
+                  "left": {
+                    "type": "number"
+                  },
+                  "top": {
+                    "type": "number"
+                  }
+                },
+                "required": ["left", "top"],
+                "additionalProperties": false
+              },
               "icon": {
                 "type": "string",
                 "enum": ["comment", "key", "note", "help", "new-paragraph", "paragraph", "insert"]
@@ -10663,6 +10676,7 @@
               "actions",
               "color",
               "opacity",
+              "at",
               "icon",
               "state",
               "stateModel"
@@ -11007,6 +11021,9 @@
               "opacity": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/opacity"
               },
+              "at": {
+                "$ref": "#/components/schemas/Annotation/anyOf/13/properties/at"
+              },
               "icon": {
                 "type": "string",
                 "enum": ["push-pin", "paperclip", "graph", "tag"]
@@ -11098,6 +11115,7 @@
               "actions",
               "color",
               "opacity",
+              "at",
               "icon",
               "file"
             ],

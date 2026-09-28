@@ -2,9 +2,14 @@
  *  and layer replay. A label move must never rewrite the measured vertices. */
 import { readFile, writeFile } from 'node:fs/promises';
 import { describe, expect, test, vi } from 'vitest';
-import { measureFromKnownLength, toPageRef } from '@embedpdf/engine-core/runtime';
+import {
+  measureFromKnownLength,
+  pdfPointTurned,
+  pdfTurnOfUpright,
+  toPageRef,
+} from '@embedpdf/engine-core/runtime';
 import { annotationSelectionFrame, shapeMeasurementLayout } from '../../../core/annotation/src';
-import { rotatePoint } from '../../../core/annotation/src/geometry';
+import { rotatePoint, turnPivotOf } from '../../../core/annotation/src/geometry';
 import { createLocalEngine } from '../src/index';
 import { fromDTO } from '../../../plugin/annotation/src/repository';
 import { annotationKey } from '@embedpdf/engine-core/runtime';
@@ -108,16 +113,27 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         expectVector();
 
         const before = current();
-        const frame = annotationSelectionFrame(fromDTO(before, crop));
-        const rotatedCaption = rotatePoint(target, frame.center, 90);
+        const pivot = turnPivotOf(fromDTO(before, crop).geometry);
+        const rotatedCaption = rotatePoint(target, pivot, 90);
         await annotation.rotateSelectionBy(90);
         await vi.waitFor(() => {
           expect(current().rotation).toBe(90);
-          expect(current().captionCenter?.x).toBeCloseTo(crop.left + rotatedCaption.x, 3);
-          expect(current().captionCenter?.y).toBeCloseTo(crop.top - rotatedCaption.y, 3);
-          const after = annotationSelectionFrame(fromDTO(current(), crop));
-          expect(after.center.x).toBeCloseTo(frame.center.x, 3);
-          expect(after.center.y).toBeCloseTo(frame.center.y, 3);
+          // The points and the caption center stay upright; the turn draws them.
+          current().vertices.forEach((vertex, i) => {
+            expect(vertex.x).toBeCloseTo(before.vertices[i]!.x, 3);
+            expect(vertex.y).toBeCloseTo(before.vertices[i]!.y, 3);
+          });
+          expect(current().captionCenter?.x).toBeCloseTo(before.captionCenter!.x, 3);
+          expect(current().captionCenter?.y).toBeCloseTo(before.captionCenter!.y, 3);
+          const drawnCaption = pdfPointTurned(
+            current().captionCenter!,
+            pdfTurnOfUpright(current().vertices, 90),
+          );
+          expect(drawnCaption.x).toBeCloseTo(crop.left + rotatedCaption.x, 3);
+          expect(drawnCaption.y).toBeCloseTo(crop.top - rotatedCaption.y, 3);
+          const after = turnPivotOf(fromDTO(current(), crop).geometry);
+          expect(after.x).toBeCloseTo(pivot.x, 3);
+          expect(after.y).toBeCloseTo(pivot.y, 3);
         });
         expectVector();
         const displacedRect = current().rect;

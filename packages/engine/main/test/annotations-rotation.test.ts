@@ -238,7 +238,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
     await doc.close();
   });
 
-  test('vertex kinds: polyline/line/ink keep an advisory rotation (no box) after reopen', async () => {
+  test('vertex kinds: polyline/line/ink keep their upright points and turn (no box) after reopen', async () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
 
     let bytes: Uint8Array;
@@ -249,7 +249,6 @@ describe('annotation rotation (local engine) — save + reopen', () => {
       await page.annotations.create({
         subtype: 'polyline',
         contents: 'rotation: polyline',
-        rect: SQUARE_RECT,
         vertices: VERTICES,
         rotation: 30,
         interiorColor: null,
@@ -263,7 +262,6 @@ describe('annotation rotation (local engine) — save + reopen', () => {
       await page.annotations.create({
         subtype: 'line',
         contents: 'rotation: line',
-        rect: SQUARE_RECT,
         linePoints: { start: { x: 70, y: 70 }, end: { x: 150, y: 150 } },
         rotation: 45,
         interiorColor: null,
@@ -277,7 +275,6 @@ describe('annotation rotation (local engine) — save + reopen', () => {
       await page.annotations.create({
         subtype: 'ink',
         contents: 'rotation: ink',
-        rect: SQUARE_RECT,
         inkList: [VERTICES],
         rotation: 60,
         color: { r: 29, g: 78, b: 216 },
@@ -300,6 +297,11 @@ describe('annotation rotation (local engine) — save + reopen', () => {
     if (polyline && polyline.subtype === 'polyline') {
       expect(polyline.rotation).toBe(30);
       expect('box' in polyline).toBe(false);
+      // The points read back as sent: upright.
+      polyline.vertices.forEach((vertex, i) => {
+        expect(vertex.x).toBeCloseTo(VERTICES[i]!.x, 3);
+        expect(vertex.y).toBeCloseTo(VERTICES[i]!.y, 3);
+      });
     }
 
     const line = list.annotations.find(
@@ -318,10 +320,10 @@ describe('annotation rotation (local engine) — save + reopen', () => {
       expect('box' in ink).toBe(false);
     }
 
-    // Appearances for vertex kinds stay on the classic render path: their
-    // rotation is baked into the vertices (advisory /Rotation only), so the
-    // entry's rect is the annotation's own /Rect — never remapped to an
-    // unrotated box — and the raster contains the drawn strokes.
+    // Appearances for vertex kinds stay on the classic render path: the file
+    // keeps their points turned, so the drawing is turned, and the entry's
+    // rect is the annotation's own /Rect — never remapped to an unrotated box
+    // — and the raster contains the drawn strokes.
     const rendered = await doc.page(toPageRef(PAGE)).annotations.renderAppearancesRaw();
     for (const dto of [polyline!, line!, ink!]) {
       const ap = rendered.appearances.find(

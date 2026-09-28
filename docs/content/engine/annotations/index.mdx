@@ -165,8 +165,10 @@ await page.annotations.update(annotation.ref, { ...annotation, opacity: 0.5 });
 ```
 
 Fields the engine writes (`author`, the dates, `userId`, `ref`…) are accepted and ignored. A
-`rect` the engine works out, as it does for rectangles, ellipses, text boxes, stamps and carets
-from their `box`, is accepted as read; a different one fails with `InvalidArg`. For free text,
+`rect` the engine works out is accepted as read; a different one fails with `InvalidArg`. It
+works out the `rect` of rectangles, ellipses, text boxes, stamps and carets from their `box`,
+of lines, polylines, polygons and ink from their points, of text markup from its quads, and of
+notes and files from their `at`. For free text,
 send `contents` or `richText`, not both with different text.
 
 ## Delete and reorder

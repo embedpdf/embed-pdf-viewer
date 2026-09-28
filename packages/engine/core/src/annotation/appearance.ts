@@ -1,4 +1,3 @@
-import type { PdfRect } from '../geometry/primitives';
 import type { AnnotationDTO, AnnotationPatch } from './kinds';
 
 /**
@@ -101,49 +100,48 @@ const INERT_KEYS: ReadonlySet<string> = new Set([
 const CONTENTS_PAINTED: ReadonlySet<string> = new Set(['free-text', 'redact']);
 
 /**
- * The vertex family's `/EMBD_Metadata/Rotation` is an advisory scalar (the
- * vertices are already rotated); it never drives the AP generator, so patches
- * touching it are appearance-inert for these kinds.
- */
-const ADVISORY_ROTATION: ReadonlySet<string> = new Set(['line', 'polyline', 'polygon', 'ink']);
-
-/**
- * The box kinds turn by `rotation` about the middle of their `box`, tri-state
- * on writes: an omitted rotation is kept, `null` (or `0`) clears it.
- * Translation verification therefore compares the after-state —
+ * The kinds that turn by `rotation`: a box kind about the middle of its
+ * `box`, a point kind about the middle of its points' box. Tri-state on
+ * writes: an omitted rotation is kept, `null` (or `0`) clears it. Translation
+ * verification therefore compares the after-state —
  * `patch.rotation ?? current.rotation` — not the patch keys.
  */
-const BOX_TRANSFORM: ReadonlySet<string> = new Set([
+const TURNING_KINDS: ReadonlySet<string> = new Set([
   'square',
   'circle',
   'free-text',
   'stamp',
   'caret',
+  'line',
+  'polyline',
+  'polygon',
+  'ink',
 ]);
 
 /**
  * Per-kind absolute-geometry fields (PDF user space) that a rigid translation
  * shifts together. A kind absent from this table never takes the translation
- * route. The first is where a move shows: `rect`, or a box kind's `box` (its
- * `rect` is the engine's, and moves with it).
+ * route. The first is where a move shows: the field the caller gives the
+ * shape in (a `box`, the points, the quads, an icon's corner), or `rect` where
+ * that is the shape. A `rect` the engine works out moves with it.
  */
 const TRANSLATABLE_GEOMETRY: Record<string, readonly string[]> = {
   square: ['box'],
   circle: ['box'],
   'free-text': ['box', 'calloutLine'],
-  line: ['rect', 'linePoints'],
-  polygon: ['rect', 'vertices'],
-  polyline: ['rect', 'vertices'],
-  ink: ['rect', 'inkList'],
-  highlight: ['rect', 'quadPoints'],
-  underline: ['rect', 'quadPoints'],
-  squiggly: ['rect', 'quadPoints'],
-  strikeout: ['rect', 'quadPoints'],
+  line: ['linePoints'],
+  polygon: ['vertices'],
+  polyline: ['vertices'],
+  ink: ['inkList'],
+  highlight: ['quadPoints'],
+  underline: ['quadPoints'],
+  squiggly: ['quadPoints'],
+  strikeout: ['quadPoints'],
   redact: ['rect', 'quadPoints'],
   caret: ['box'],
-  text: ['rect'],
+  text: ['at'],
   stamp: ['box'],
-  'file-attachment': ['rect'],
+  'file-attachment': ['at'],
   link: ['rect'],
 };
 
@@ -215,13 +213,30 @@ function shiftedBy(cur: unknown, next: unknown, dx: number, dy: number): boolean
 }
 
 /**
+ * The first point a geometry value holds: a rect's bottom-left, a point, a
+ * line's start, a quad's first corner, the first of a list.
+ */
+function firstPoint(value: unknown): { x: number; y: number } | undefined {
+  if (value == null || typeof value !== 'object') return undefined;
+  if (Array.isArray(value)) return value.length > 0 ? firstPoint(value[0]) : undefined;
+  const record = value as Record<string, unknown>;
+  if (typeof record.x === 'number' && typeof record.y === 'number') {
+    return { x: record.x, y: record.y };
+  }
+  if (typeof record.left === 'number' && typeof record.bottom === 'number') {
+    return { x: record.left, y: record.bottom };
+  }
+  return firstPoint(record.start ?? record.p1);
+}
+
+/**
  * Verify the touched geometry is one rigid translation of the current state.
- * Requires the kind's first geometry field (`rect`, or a box kind's `box`)
- * in the patch with width and height preserved; every other geometry field
- * present on the annotation must ride along shifted by the same delta — a
- * rect move that leaves `vertices` behind is not a translation (the
- * dictionary would desync from the pixels). For box kinds the turn is
- * checked as an after-state: an omitted rotation keeps the current one.
+ * Requires the kind's first geometry field in the patch; it and every other
+ * geometry field present on the annotation must ride along shifted by the
+ * same delta — a box resized, or a leader left behind by a moved text box, is
+ * not a translation (the dictionary would desync from the pixels). For the
+ * kinds that turn, the turn is checked as an after-state: an omitted rotation
+ * keeps the current one.
  */
 function isRigidTranslation(
   cur: Record<string, unknown>,
@@ -229,23 +244,21 @@ function isRigidTranslation(
   subtype: string,
   geometryKeys: readonly string[],
 ): boolean {
-  const [anchor, ...others] = geometryKeys;
-  const curRect = cur[anchor!] as PdfRect | undefined;
-  const patRect = pat[anchor!] as PdfRect | undefined;
-  if (!curRect || !patRect) return false;
-  const dx = patRect.left - curRect.left;
-  const dy = patRect.bottom - curRect.bottom;
-  if (!numEq(patRect.right - patRect.left, curRect.right - curRect.left)) return false;
-  if (!numEq(patRect.top - patRect.bottom, curRect.top - curRect.bottom)) return false;
+  const [anchor] = geometryKeys;
+  const from = firstPoint(cur[anchor!]);
+  const to = firstPoint(pat[anchor!]);
+  if (!from || !to) return false;
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
 
-  if (BOX_TRANSFORM.has(subtype)) {
+  if (TURNING_KINDS.has(subtype)) {
     // Tri-state writes: an omitted rotation preserves the current one; `null`
     // clears (≡ 0). Compare the resulting after-state.
     const rotAfter = pat.rotation === undefined ? cur.rotation : pat.rotation;
     if (!numEq(normDeg(cur.rotation), normDeg(rotAfter))) return false;
   }
 
-  for (const key of others) {
+  for (const key of geometryKeys) {
     const c = cur[key];
     const p = pat[key];
     if (c == null && p == null) continue; // absent on both — nothing to shift
@@ -260,7 +273,7 @@ function isRigidTranslation(
  *
  * 1. Value-diff: drop keys whose value semantically equals the current one,
  *    plus the always-inert metadata keys (and per-kind inert keys: `contents`
- *    where it isn't painted, advisory `rotation` on the vertex family).
+ *    where it isn't painted).
  *    Nothing left → `'inert'`.
  * 2. If every remaining key is translatable geometry for this kind and the
  *    values are one rigid translation → `'translation'`.
@@ -284,7 +297,6 @@ export function appearanceImpactOf(
   for (const [key, value] of Object.entries(pat)) {
     if (value === undefined || INERT_KEYS.has(key)) continue;
     if (key === 'contents' && !contentsPainted) continue;
-    if (key === 'rotation' && ADVISORY_ROTATION.has(subtype)) continue;
     if (!semanticEqual(value, cur[key])) touched.push(key);
   }
   if (touched.length === 0) return 'inert';

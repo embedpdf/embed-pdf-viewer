@@ -28,6 +28,7 @@ export { validateSearchQuery } from './search/regex';
 
 // Annotations.
 export { appearanceTurnOf } from './annotation/appearanceTurn';
+export { drawnPointsOf } from './annotation/drawnPoints';
 export { buildCommentThreads } from './annotation/comments';
 export { AnnotationTransfer } from './transfer/AnnotationTransfer';
 export {
@@ -79,6 +80,7 @@ export type {
   PageLayout,
   PageListSnapshot,
   PdfRect,
+  PdfTopLeft,
   PdfPoint,
   PdfQuad,
   PdfRotation,

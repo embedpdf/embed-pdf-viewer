@@ -240,6 +240,12 @@ function classOf(record: RawGeometryGlyphRecord): RunClass | undefined {
   return { upright: true };
 }
 
+/** A baseline's angle (radians, counter-clockwise) as the API's turn: degrees clockwise, 0 up to 360. */
+function rotationOfBaseline(radians: number): number {
+  const degrees = (-radians * 180) / Math.PI;
+  return ((degrees % 360) + 360) % 360;
+}
+
 function sameClass(a: RunClass, b: RunClass): boolean {
   if (a.upright || b.upright) return a.upright === b.upright;
   if (a.ascentFlip !== b.ascentFlip) return false;
@@ -269,7 +275,7 @@ function materializeRun(
       rect: runBounds(buffer, (g) => (g.looseQuad ? pdfQuadBounds(g.looseQuad) : ZERO_RECT)),
       start: charStart,
       glyphs,
-      baselineAngle: cls.baselineAngle,
+      rotation: rotationOfBaseline(cls.baselineAngle),
       ascentFlip: cls.ascentFlip,
       ...(fontSize !== undefined ? { fontSize } : {}),
     };

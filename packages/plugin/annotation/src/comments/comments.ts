@@ -61,12 +61,12 @@ export function createComments(
       const thread = threads.threadOf(ref);
       const created = await createConversationAnnot(thread.page.pageObjectNumber, {
         subtype: 'text',
-        rect: thread.root.rect,
+        at: { left: thread.root.rect.left, top: thread.root.rect.top },
         icon: 'comment',
         contents: text,
         reply: { to: thread.root.ref },
         ...REPLY_FLAGS,
-      } as AnnotationDraft);
+      });
       announce(root, 'reply');
       return created.ref;
     },
@@ -92,12 +92,12 @@ export function createComments(
       const previous = userId ? thread.review.byReviewer[userId] : undefined;
       await createConversationAnnot(thread.page.pageObjectNumber, {
         subtype: 'text',
-        rect: thread.root.rect,
+        at: { left: thread.root.rect.left, top: thread.root.rect.top },
         reply: { to: previous?.ref ?? thread.root.ref },
         state,
         stateModel: 'review',
         ...STATUS_FLAGS,
-      } as AnnotationDraft);
+      });
       announce(root, 'status');
     },
 
@@ -106,12 +106,12 @@ export function createComments(
       const thread = threads.threadOf(ref);
       await createConversationAnnot(thread.page.pageObjectNumber, {
         subtype: 'text',
-        rect: thread.root.rect,
+        at: { left: thread.root.rect.left, top: thread.root.rect.top },
         reply: { to: thread.root.ref },
         state: marked ? 'marked' : 'unmarked',
         stateModel: 'marked',
         ...STATUS_FLAGS,
-      } as AnnotationDraft);
+      });
       announce(root, 'marked');
     },
 

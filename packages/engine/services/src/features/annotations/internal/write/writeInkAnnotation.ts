@@ -1,9 +1,9 @@
 import type { InkDraft, InkPatch } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
-import { setAnnotRect, setInkList, setIntent, setIntentOrClear } from './annotationWritePrimitives';
+import { setInkList, setIntent, setIntentOrClear } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
-import { writeVertexTransformMetadata } from './writeAnnotationTransformMetadata';
+import { readCurrentPoints, updatePoints, writeNewPoints } from './writeAnnotationPoints';
 import { applyGeometryStyleDraft, applyGeometryStylePatch } from './writeStyle';
 import { inkIntentToName } from '../inkIntent';
 
@@ -12,9 +12,10 @@ import { inkIntentToName } from '../inkIntent';
  * no `/IC`, so it uses the geometry styling layer (not the filled one).
  * Order:
  *   1. base author-metadata (contents/nm)
- *   2. /Rect (required — supplied by the plugin; the engine never derives it)
- *   3. geometry styling (/C, /CA, /BS, dash)
- *   4. /InkList freehand strokes
+ *   2. geometry styling (/C, /CA, /BS, dash)
+ *   3. /InkList freehand strokes, turned by `rotation`
+ *      (`writeAnnotationPoints`); the appearance then sets /Rect to what it
+ *      paints
  */
 export function applyInkDraft(
   fn: PdfFunctions,
@@ -24,11 +25,13 @@ export function applyInkDraft(
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
   if (draft.intent != null) setIntent(fn, annotPtr, inkIntentToName(draft.intent));
-  setAnnotRect(fn, mem, annotPtr, draft.rect);
   applyGeometryStyleDraft(fn, mem, annotPtr, draft);
-  setInkList(fn, mem, annotPtr, draft.inkList);
-  // Advisory rotation: the strokes are already rotated; this just records θ.
-  writeVertexTransformMetadata(fn, annotPtr, { rotation: draft.rotation });
+  setInkList(
+    fn,
+    mem,
+    annotPtr,
+    writeNewPoints(fn, mem, annotPtr, draft.inkList, draft.rotation).drawn,
+  );
 }
 
 export function applyInkPatch(
@@ -41,15 +44,16 @@ export function applyInkPatch(
   if (patch.intent !== undefined) {
     setIntentOrClear(fn, annotPtr, patch.intent === null ? null : inkIntentToName(patch.intent));
   }
-  if (patch.rect !== undefined) {
-    setAnnotRect(fn, mem, annotPtr, patch.rect);
-  }
   applyGeometryStylePatch(fn, mem, annotPtr, patch);
-  if (patch.inkList !== undefined) {
-    setInkList(fn, mem, annotPtr, patch.inkList);
-  }
-  // Advisory rotation is tri-state (undefined preserves, null/0 clears).
-  writeVertexTransformMetadata(fn, annotPtr, { rotation: patch.rotation });
+  const placed = updatePoints(
+    fn,
+    mem,
+    annotPtr,
+    readCurrentPoints(fn, mem, annotPtr),
+    patch.inkList,
+    patch.rotation,
+  );
+  if (placed) setInkList(fn, mem, annotPtr, placed.drawn);
 }
 
 /**

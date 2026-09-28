@@ -72,7 +72,11 @@ export function runAnnotationExportConformance(
           { appearance: BANDS_PNG },
         );
         const file = await page.annotations.create(
-          { subtype: 'file-attachment', rect: box(260), file: { name: 'note.txt' } },
+          {
+            subtype: 'file-attachment',
+            at: { left: box(260).left, top: box(260).top },
+            file: { name: 'note.txt' },
+          },
           { file: new TextEncoder().encode('attached') },
         );
 
@@ -146,10 +150,22 @@ export function runAnnotationExportConformance(
         const rect: PdfRect = { left: 300, bottom: 300, right: 320, top: 320 };
         const create = async (draft: Parameters<PageHandle['annotations']['create']>[0]) =>
           (await page.annotations.create(draft)).annotation as AnnotationDTO;
-        const note = await create({ subtype: 'text', rect, contents: 'Check this' });
+        const note = await create({
+          subtype: 'text',
+          at: { left: rect.left, top: rect.top },
+          contents: 'Check this',
+        });
         const popup = await create({ subtype: 'popup', rect, parent: note.ref });
-        const reply = await create({ subtype: 'text', rect, reply: { to: note.ref } });
-        const answer = await create({ subtype: 'text', rect, reply: { to: reply.ref } });
+        const reply = await create({
+          subtype: 'text',
+          at: { left: rect.left, top: rect.top },
+          reply: { to: note.ref },
+        });
+        const answer = await create({
+          subtype: 'text',
+          at: { left: rect.left, top: rect.top },
+          reply: { to: reply.ref },
+        });
         await create({ subtype: 'square', box: rect });
 
         const keys = (refs: AnnotationDTO[]) =>

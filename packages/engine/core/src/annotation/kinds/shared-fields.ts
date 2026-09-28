@@ -7,7 +7,12 @@ import {
 } from '../../dto/Measure.schema';
 import type { PdfForeignMeasure, PdfMeasure } from '../../dto/Measure';
 import { PdfAnnotationActionsSchema } from '../../dto/PdfAction.schema';
-import { PdfPointSchema, PdfQuadSchema, PdfRectSchema } from '../../geometry/schemas';
+import {
+  PdfPointSchema,
+  PdfQuadSchema,
+  PdfRectSchema,
+  PdfTopLeftSchema,
+} from '../../geometry/schemas';
 import { PageRefSchema } from '../../identity/PageRef.schema';
 import {
   AnnotationBorderStyleSchema,
@@ -99,15 +104,33 @@ export const filledStyleFields = {
 };
 
 /**
+ * `rect` where another field gives the shape (a box, points, quads, an icon's
+ * corner): where the annotation sits on the page, the upright box around all
+ * it draws. The engine works it out; an update may send back the `rect` it
+ * read.
+ */
+export const drawnRectFields = {
+  rect: field.engine(PdfRectSchema).readBack(),
+};
+
+/**
+ * The turn of a kind drawn from points (line, polyline, polygon, ink): the
+ * points are upright, and the turn takes them about the middle of their box,
+ * as a square turns about its box.
+ */
+export const pointsTurnFields = {
+  /** Degrees clockwise, about the middle of the points' box. */
+  rotation: field.data(z.number()).nullable().optional(),
+};
+
+/**
  * A kind drawn about a box that can turn: square, circle, free text, stamp
- * and caret. The caller gives the box and the turn. `rect`, where the
- * annotation sits on the page, is the engine's: the upright box around all
- * it draws, the turned box and what the drawing adds around it (a cloudy
- * border's bumps, a callout's line and arrow). An update may send back the
- * `rect` it read.
+ * and caret. The caller gives the box and the turn; `rect` takes in the
+ * turned box and what the drawing adds around it (a cloudy border's bumps, a
+ * callout's line and arrow).
  */
 export const boxFields = {
-  rect: field.engine(PdfRectSchema).readBack(),
+  ...drawnRectFields,
   /** The shape's own box, before any turn: a callout's text box. */
   box: field.data(PdfRectSchema),
   /** Degrees clockwise, about the middle of `box`. */
@@ -119,8 +142,8 @@ export const boxFields = {
 export const textMarkupFields = {
   ...annotationBaseFields,
   ...colorStyleFields,
-  /** Derived from the quads. */
-  rect: field.engine(PdfRectSchema),
+  /** The box around the quads. */
+  ...drawnRectFields,
   quadPoints: field.data(z.array(PdfQuadSchema).min(1)),
 };
 
@@ -134,9 +157,19 @@ export const shapeFields = {
 export const vertexFields = {
   ...annotationBaseFields,
   ...filledStyleFields,
+  ...drawnRectFields,
   vertices: field.data(z.array(PdfPointSchema)),
-  /** The angle already applied to the vertices, degrees clockwise. */
-  rotation: field.data(z.number()).nullable().optional(),
+  ...pointsTurnFields,
+};
+
+/**
+ * A note's or a file's icon: a fixed-size symbol placed by its left and top
+ * edges, the corner PDF keeps in place for an icon that doesn't zoom.
+ */
+export const iconFields = {
+  ...drawnRectFields,
+  /** The icon's left edge and top edge. */
+  at: field.data(PdfTopLeftSchema),
 };
 
 /**

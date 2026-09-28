@@ -572,14 +572,14 @@ export const RotatedGeometryRunSchema = z.object({
   rect: PdfRectSchema,
   start: z.number().int().nonnegative(),
   glyphs: z.array(RotatedGeometryGlyphSchema),
-  baselineAngle: z.number(),
+  rotation: z.number(),
   ascentFlip: z.boolean(),
   fontSize: z.number().optional(),
 });
 
 // Rotated first: in zod's default strip mode the upright shape would accept a
 // zero-glyph rotated run and silently drop its angle; the rotated shape can
-// never swallow an upright run (it requires `baselineAngle`/`ascentFlip`).
+// never swallow an upright run (it requires `rotation`/`ascentFlip`).
 export const PageGeometryRunSchema: z.ZodType<PageGeometryRun> = z.union([
   RotatedGeometryRunSchema,
   UprightGeometryRunSchema,

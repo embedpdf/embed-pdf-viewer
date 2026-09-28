@@ -1,9 +1,9 @@
 import type { LineDraft, LinePatch } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
-import { setAnnotRect, setLine, setLineEndings } from './annotationWritePrimitives';
+import { setLine, setLineEndings } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
-import { writeVertexTransformMetadata } from './writeAnnotationTransformMetadata';
+import { readCurrentPoints, updatePoints, writeNewPoints } from './writeAnnotationPoints';
 import { writeMeasurementFields } from './writeMeasurementFields';
 import { applyFilledStyleDraft, applyFilledStylePatch } from './writeStyle';
 
@@ -13,10 +13,10 @@ const DEFAULT_LINE_ENDINGS = { start: 'none', end: 'none' } as const;
 /**
  * Apply a line draft to a freshly-created annotation. Order:
  *   1. base author-metadata (contents/nm)
- *   2. /Rect (required — supplied by the plugin; the engine never derives it)
- *   3. shared stroke/fill styling (/C, /CA, /BS, dash)
- *   4. /L line geometry
- *   5. /LE line endings (default none/none)
+ *   2. shared stroke/fill styling (/C, /CA, /BS, dash)
+ *   3. /L line geometry, turned by `rotation` (`writeAnnotationPoints`); the
+ *      appearance then sets /Rect to what it paints
+ *   4. /LE line endings (default none/none)
  */
 export function applyLineDraft(
   fn: PdfFunctions,
@@ -26,12 +26,11 @@ export function applyLineDraft(
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
   writeMeasurementFields(fn, mem, annotPtr, draft);
-  setAnnotRect(fn, mem, annotPtr, draft.rect);
   applyFilledStyleDraft(fn, mem, annotPtr, draft);
-  setLine(fn, mem, annotPtr, draft.linePoints);
+  const { start, end } = draft.linePoints;
+  const [drawn] = writeNewPoints(fn, mem, annotPtr, [[start, end]], draft.rotation).drawn;
+  setLine(fn, mem, annotPtr, { start: drawn![0]!, end: drawn![1]! });
   setLineEndings(fn, annotPtr, draft.lineEndings ?? DEFAULT_LINE_ENDINGS);
-  // Advisory rotation: the endpoints are already rotated; this just records θ.
-  writeVertexTransformMetadata(fn, annotPtr, { rotation: draft.rotation });
 }
 
 export function applyLinePatch(
@@ -42,15 +41,20 @@ export function applyLinePatch(
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);
   writeMeasurementFields(fn, mem, annotPtr, patch);
-  if (patch.rect !== undefined) {
-    setAnnotRect(fn, mem, annotPtr, patch.rect);
-  }
   applyFilledStylePatch(fn, mem, annotPtr, patch);
-  if (patch.linePoints !== undefined) {
-    setLine(fn, mem, annotPtr, patch.linePoints);
+  const points = patch.linePoints && [[patch.linePoints.start, patch.linePoints.end]];
+  const placed = updatePoints(
+    fn,
+    mem,
+    annotPtr,
+    readCurrentPoints(fn, mem, annotPtr),
+    points,
+    patch.rotation,
+  );
+  if (placed) {
+    const [drawn] = placed.drawn;
+    setLine(fn, mem, annotPtr, { start: drawn![0]!, end: drawn![1]! });
   }
-  // Advisory rotation is tri-state (undefined preserves, null/0 clears).
-  writeVertexTransformMetadata(fn, annotPtr, { rotation: patch.rotation });
   if (patch.lineEndings !== undefined) {
     setLineEndings(fn, annotPtr, patch.lineEndings);
   }

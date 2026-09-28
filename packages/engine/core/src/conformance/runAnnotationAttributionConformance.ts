@@ -268,10 +268,21 @@ export function runAnnotationAttributionConformance(
       const page = await firstPage(alice);
       const rect = { left: 300, bottom: 300, right: 330, top: 330 };
       const { annotation: square } = await page.annotations.create(SQUARE);
-      const { annotation: note } = await page.annotations.create({ subtype: 'text', rect });
-      await page.annotations.create({ subtype: 'text', rect, reply: { to: note.ref } });
+      const { annotation: note } = await page.annotations.create({
+        subtype: 'text',
+        at: { left: rect.left, top: rect.top },
+      });
+      await page.annotations.create({
+        subtype: 'text',
+        at: { left: rect.left, top: rect.top },
+        reply: { to: note.ref },
+      });
       await page.annotations.create(
-        { subtype: 'file-attachment', rect, file: { name: 'minutes.txt' } },
+        {
+          subtype: 'file-attachment',
+          at: { left: rect.left, top: rect.top },
+          file: { name: 'minutes.txt' },
+        },
         { file: new TextEncoder().encode('minutes') },
       );
       const bob = await opts.openAs(engine, { scope: READ, identity: BOB }, alice);
@@ -375,7 +386,11 @@ export function runAnnotationAttributionConformance(
       try {
         ({ annotation: note } = await (
           await firstPage(alice)
-        ).annotations.create({ subtype: 'text', rect, nm: 'attribution-conformance-thread' }));
+        ).annotations.create({
+          subtype: 'text',
+          at: { left: rect.left, top: rect.top },
+          nm: 'attribution-conformance-thread',
+        }));
       } catch (error) {
         await alice.close();
         throw error;
@@ -388,7 +403,7 @@ export function runAnnotationAttributionConformance(
         const current = await findByNm(page, 'attribution-conformance-thread');
         ({ annotation: reply } = await page.annotations.create({
           subtype: 'text',
-          rect,
+          at: { left: rect.left, top: rect.top },
           contents: 'Seen',
           reply: { to: current.ref },
         }));

@@ -14,7 +14,6 @@ import type { Attachment, AttachmentRef, WireAttachmentFile } from '../dto/Attac
 import type { DocumentMetadata } from '../dto/DocumentMetadata';
 import type { MetadataPatch } from '../dto/MetadataPatch';
 import type { PageGeometrySnapshot } from '../dto/PageGeometrySnapshot';
-import type { PageRotation } from '../dto/PageLayout';
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
 import type { PageNetworkRenderFormat, PageRaster, PageRenderOptions } from '../dto/PageRender';
 import type { PageTextSnapshot } from '../dto/PageTextSnapshot';
@@ -28,7 +27,7 @@ import type { FormEffect, FormEffectsResult } from '../forms/effects';
 import type { FormFieldPatch } from '../forms/patch';
 import type { FormSnapshot } from '../forms/snapshot';
 import type { FormDataFormat, FormFieldValue } from '../forms/value';
-import type { PdfSize, PdfRect } from '../geometry/primitives';
+import type { PdfRect, PdfRotation, PdfSize } from '../geometry/primitives';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
@@ -756,7 +755,7 @@ export interface PagesRotateWorkerRequest {
   layerName?: string;
   pages: PageRef[];
   /** Absolute rotation in degrees clockwise — see `PageRotateInput`. */
-  rotation: PageRotation;
+  rotation: PdfRotation;
   artifactPath?: string;
 }
 

@@ -159,6 +159,6 @@ Two shortcuts save you reading runs: `layout.charCount` is how many characters t
 `layout.charQuad(index)` is one character's box as a quad, or `null` when it has none (use it to
 place a caret at the edge of a selection).
 
-A run of turned text also has `baselineAngle`: the angle of its baseline in radians, measured the
-way PDF measures angles (counterclockwise from the x axis, as in `Math.atan2`). It's raw math
-data, so it isn't a `rotation`, which in the engine always means degrees clockwise.
+A run of turned text also has `rotation`: how far its text is turned from upright, in degrees
+clockwise as the page shows it, from 0 up to 360, like every other `rotation` in the engine. Text
+that reads straight up the page is 270; text that reads down it is 90.

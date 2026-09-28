@@ -82,8 +82,8 @@ export interface AnnotationAppearancesQuery {
  * consumer re-applies the DTO's `rotation`, degrees clockwise, as a view
  * transform about the box centre (CSS `rotate()` turns the same way), which
  * makes the raster rotation-invariant (rotating never re-renders).
- * Everything else — vertex kinds, whose rotation is pre-baked into their
- * geometry, a free-text callout, a turned drawing that reaches past its box,
+ * Everything else — lines, polygons and ink, drawn with their points turned,
+ * a free-text callout, a turned drawing that reaches past its box,
  * and appearances with any other matrix — renders as-is with `rect` =
  * `/Rect` and needs no transform.
  */

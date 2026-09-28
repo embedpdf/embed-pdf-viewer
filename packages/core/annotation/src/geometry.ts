@@ -241,12 +241,7 @@ const rotateAboutM = (pivot: Point, deg: number): Mat2D<'content', 'content'> =>
 export const rotatePoint = (point: Point, pivot: Point, deg: number): Point =>
   applyPoint(rotateAboutM(pivot, deg), point as PointIn<'content'>);
 
-/**
- * The rotation pivot for a single shape: a box turns about its own `rect`
- * centre; a vertex shape about the centroid of its points (the mean). Rotating a
- * point set about its centroid leaves the centroid fixed, so the advisory `rot`
- * stays cleanly additive across gestures and reset is exact.
- */
+/** A box's centre, or the mean of a shape's points. */
 export function centroidOf(geometry: ContentGeometry): Point {
   if (geometry.kind === 'rect' || geometry.kind === 'text' || geometry.kind === 'caret')
     return rectCenter(geometry.rect);
@@ -266,6 +261,29 @@ export function centroidOf(geometry: ContentGeometry): Point {
   }
   const count = points.length || 1;
   return { x: sx / count, y: sy / count };
+}
+
+/**
+ * Where a turn of a single shape pivots, as the engine turns it: a box about
+ * its own `rect` centre; a line, polygon, polyline or ink about the middle of
+ * the box around its points upright. A turn then changes only the angle, never
+ * where the upright points are, and a caption or an arrowhead never moves the
+ * pivot.
+ */
+export function turnPivotOf(geometry: ContentGeometry): Point {
+  const points =
+    geometry.kind === 'line'
+      ? [geometry.a, geometry.b]
+      : geometry.kind === 'poly'
+        ? geometry.points
+        : geometry.kind === 'ink'
+          ? geometry.strokes.flat()
+          : [];
+  if (points.length === 0) return centroidOf(geometry);
+  const rot = geomRotation(geometry);
+  const origin = { x: 0, y: 0 };
+  const upright = unionRect(points.map((point) => rotatePoint(point, origin, -rot)));
+  return rotatePoint(rectCenter(upright), origin, rot);
 }
 
 /** Does the geometry carry a meaningful `rot` (an oriented local box exists)?
@@ -475,7 +493,7 @@ export function geomResetRotation(geometry: ContentGeometry, pivot?: Point): Con
   if (!rot) return geometry;
   if (geometry.kind === 'rect' || geometry.kind === 'text' || geometry.kind === 'caret')
     return { ...geometry, rot: 0 };
-  const point = pivot ?? centroidOf(geometry);
+  const point = pivot ?? turnPivotOf(geometry);
   const rotated = geomRotateAbout(geometry, point, -rot);
   // geomRotateAbout already set rot = normalize(rot - rot) = 0.
   return rotated;
@@ -1162,20 +1180,6 @@ export function quadIntersectsRect(quad: [Point, Point, Point, Point], rect: Rec
     if (qHi < rLo || rHi < qLo) return false; // separated on this axis
   }
   return true;
-}
-
-/**
- * The centre of the oriented selection box — the middle of the rect you see.
- * For box kinds this is the rect centre (so squares/circles are unchanged); for
- * vertex kinds it is the OBB centre, so rotation spins the shape in place rather
- * than swinging it about the off-centre vertex mean (`centroidOf`).
- */
-export function selectionCenter(geometry: ContentGeometry, strokeWidth: number): Point {
-  const quad = selectionQuad(geometry, strokeWidth);
-  return {
-    x: (quad[0].x + quad[1].x + quad[2].x + quad[3].x) / 4,
-    y: (quad[0].y + quad[1].y + quad[2].y + quad[3].y) / 4,
-  };
 }
 
 /**

@@ -38,7 +38,7 @@ import {
   normalizeDeg,
   rotatedHandleCursor,
   selectionQuad,
-  selectionCenter,
+  turnPivotOf,
   transposedAboutCenter,
   uprightAnchoredRect,
   uprightRotation,
@@ -2244,7 +2244,7 @@ describe('annotation-core — rotation', () => {
     expect(rotated.rect.height).toBe(50);
   });
 
-  it('vertex rotation is additive about the centroid and reset is exact', () => {
+  it("vertex rotation is additive about the upright points' middle and reset is exact", () => {
     const points = [
       { x: 0, y: 0 },
       { x: 100, y: 0 },
@@ -2255,12 +2255,12 @@ describe('annotation-core — rotation', () => {
       points: points.map((point) => ({ ...point })),
       closed: false,
     };
-    const c0 = centroidOf(geometry);
-    const r1 = geomRotateAbout(geometry, centroidOf(geometry), 30);
-    const r2 = geomRotateAbout(r1, centroidOf(r1), 30);
+    const c0 = turnPivotOf(geometry);
+    const r1 = geomRotateAbout(geometry, turnPivotOf(geometry), 30);
+    const r2 = geomRotateAbout(r1, turnPivotOf(r1), 30);
     expect(geomRotation(r2)).toBe(60); // θ is additive
-    const c2 = centroidOf(r2);
-    expect(c2.x).toBeCloseTo(c0.x); // centroid is the fixed pivot
+    const c2 = turnPivotOf(r2);
+    expect(c2.x).toBeCloseTo(c0.x); // the upright points' middle is the fixed pivot
     expect(c2.y).toBeCloseTo(c0.y);
     const reset = geomResetRotation(r2);
     expect(geomRotation(reset)).toBe(0);
@@ -2434,20 +2434,20 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
     source: 'baked',
   });
 
-  it('selectionCenter of a box is the rect centre, before AND after a quarter-turn', () => {
+  it('turnPivotOf of a box is the rect centre, before AND after a quarter-turn', () => {
     const geometry: ContentGeometry = {
       kind: 'rect',
       rect: { x: 100, y: 100, width: 100, height: 50 },
       ellipse: false,
     };
-    expect(selectionCenter(geometry, 0)).toMatchObject({ x: 150, y: 125 });
-    const turned = geomRotateAbout(geometry, selectionCenter(geometry, 0), 90);
-    const point = selectionCenter(turned, 0);
+    expect(turnPivotOf(geometry)).toMatchObject({ x: 150, y: 125 });
+    const turned = geomRotateAbout(geometry, turnPivotOf(geometry), 90);
+    const point = turnPivotOf(turned);
     expect(point.x).toBeCloseTo(150);
     expect(point.y).toBeCloseTo(125);
   });
 
-  it('a vertex shape spins in place about selectionCenter, NOT its off-centre vertex mean', () => {
+  it('a vertex shape spins in place about turnPivotOf, NOT its off-centre vertex mean', () => {
     // An L-shaped (asymmetric) polyline: its vertex mean sits well away from the
     // centre of the bounding rect.
     const geometry: ContentGeometry = {
@@ -2463,23 +2463,23 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
       closed: false,
     };
     const mean = centroidOf(geometry);
-    const centre = selectionCenter(geometry, 0);
+    const centre = turnPivotOf(geometry);
     // the two are genuinely different for an asymmetric shape (the whole bug).
     expect(Math.hypot(mean.x - centre.x, mean.y - centre.y)).toBeGreaterThan(5);
 
     // rotating about the selection centre keeps that centre fixed → spins in place.
     const spun = geomRotateAbout(geometry, centre, 37);
-    const after = selectionCenter(spun, 0);
+    const after = turnPivotOf(spun);
     expect(after.x).toBeCloseTo(centre.x, 6);
     expect(after.y).toBeCloseTo(centre.y, 6);
 
     // rotating about the vertex mean (the old behaviour) drifts the visible centre.
     const swung = geomRotateAbout(geometry, mean, 37);
-    const drifted = selectionCenter(swung, 0);
+    const drifted = turnPivotOf(swung);
     expect(Math.hypot(drifted.x - centre.x, drifted.y - centre.y)).toBeGreaterThan(1);
   });
 
-  it('a rotate gesture on a vertex shape pivots about the selection centre and keeps it fixed', () => {
+  it('a rotate gesture on a vertex shape pivots about the middle of its upright points and keeps it fixed', () => {
     const geometry: ContentGeometry = {
       kind: 'poly',
       points: [
@@ -2495,7 +2495,7 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
     const poly: ModelAnnotation = { ...square('s1', geometry), subtype: 'polyline' };
     const base = modelWith([poly]);
     const selectedModel = { ...base, selected: ['s1'] };
-    const centre = selectionCenter(geometry, poly.style.strokeWidth);
+    const centre = turnPivotOf(geometry);
 
     // find the rotate knob, then start + drag the gesture there.
     const obb = obbFromGeom(geometry, poly.style.strokeWidth)!;
@@ -2527,7 +2527,7 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
       phase: 'up',
       in: { page: PAGE, point: { x: knob.x + 40, y: knob.y + 40 }, shift: false },
     })[0];
-    const after = selectionCenter(up.byId['s1'].geometry, up.byId['s1'].style.strokeWidth);
+    const after = turnPivotOf(up.byId['s1'].geometry);
     expect(after.x).toBeCloseTo(centre.x, 4);
     expect(after.y).toBeCloseTo(centre.y, 4);
     expect(geomRotation(up.byId['s1'].geometry)).not.toBe(0);

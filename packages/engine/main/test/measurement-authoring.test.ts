@@ -2,8 +2,8 @@
  * caption offsets through editing and a saved/reopened PDF. */
 import { readFile, writeFile } from 'node:fs/promises';
 import { describe, expect, test, vi } from 'vitest';
-import { measureFromKnownLength, toPageRef } from '@embedpdf/engine-core/runtime';
-import { annotationSelectionFrame } from '../../../core/annotation/src';
+import { drawnPointsOf, measureFromKnownLength, toPageRef } from '@embedpdf/engine-core/runtime';
+import { turnPivotOf } from '../../../core/annotation/src';
 import { createLocalEngine } from '../src/index';
 import { fromDTO } from '../../../plugin/annotation/src/repository';
 import { annotationKey } from '@embedpdf/engine-core/runtime';
@@ -101,28 +101,33 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       });
       expectVector();
 
-      // Rotation uses the complete annotation frame and survives the native
-      // appearance echo without replacing that frame with the PDF /Rect.
+      // A turn pivots about the middle of the line, as the engine turns it,
+      // and survives the native appearance echo.
       const beforeRotation = annotation.getRaw(created.ref)!;
       if (beforeRotation.subtype !== 'line') throw new Error('Expected distance annotation');
-      const frame = annotationSelectionFrame(fromDTO(beforeRotation, page.boxes.crop));
+      const pivot = turnPivotOf(fromDTO(beforeRotation, page.boxes.crop).geometry);
       const start = {
         x: beforeRotation.linePoints.start.x - page.boxes.crop.left,
         y: page.boxes.crop.top - beforeRotation.linePoints.start.y,
       };
       const rotatedStart = {
-        x: page.boxes.crop.left + frame.center.x - (start.y - frame.center.y),
-        y: page.boxes.crop.top - (frame.center.y + start.x - frame.center.x),
+        x: page.boxes.crop.left + pivot.x - (start.y - pivot.y),
+        y: page.boxes.crop.top - (pivot.y + start.x - pivot.x),
       };
       await annotation.rotateSelectionBy(90);
       await vi.waitFor(() => {
         const rotated = annotation.getRaw(created.ref)!;
         if (rotated.subtype !== 'line') throw new Error('Expected distance annotation');
-        expect(rotated.linePoints.start.x).toBeCloseTo(rotatedStart.x, 3);
-        expect(rotated.linePoints.start.y).toBeCloseTo(rotatedStart.y, 3);
-        const actual = annotationSelectionFrame(fromDTO(rotated, page.boxes.crop));
-        expect(actual.center.x).toBeCloseTo(frame.center.x, 3);
-        expect(actual.center.y).toBeCloseTo(frame.center.y, 3);
+        // The points stay upright; the turn draws them.
+        expect(rotated.rotation).toBe(90);
+        expect(rotated.linePoints.start.x).toBeCloseTo(beforeRotation.linePoints.start.x, 3);
+        expect(rotated.linePoints.start.y).toBeCloseTo(beforeRotation.linePoints.start.y, 3);
+        const drawnStart = drawnPointsOf(rotated)![0]![0]!;
+        expect(drawnStart.x).toBeCloseTo(rotatedStart.x, 3);
+        expect(drawnStart.y).toBeCloseTo(rotatedStart.y, 3);
+        const actual = turnPivotOf(fromDTO(rotated, page.boxes.crop).geometry);
+        expect(actual.x).toBeCloseTo(pivot.x, 3);
+        expect(actual.y).toBeCloseTo(pivot.y, 3);
       });
       expectVector();
       await annotation.resetSelectionRotation();
@@ -137,7 +142,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       await vi.waitFor(() => {
         const rotated = annotation.getRaw(created.ref)!;
         if (rotated.subtype !== 'line') throw new Error('Expected distance annotation');
-        expect(rotated.linePoints.start.x).toBeCloseTo(rotatedStart.x, 3);
+        expect(drawnPointsOf(rotated)![0]![0]!.x).toBeCloseTo(rotatedStart.x, 3);
       });
 
       const saved = await doc.download();
@@ -186,10 +191,10 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
           leader: { length: 36 },
           captionOffset: { along: 15, perpendicular: 25 },
         });
-        const restoredFrame = annotationSelectionFrame(fromDTO(restored, page.boxes.crop));
-        expect(restoredFrame.center.x).toBeCloseTo(frame.center.x, 3);
-        expect(restoredFrame.center.y).toBeCloseTo(frame.center.y, 3);
-        expect(restoredFrame.angle).toBe(90);
+        const restoredPivot = turnPivotOf(fromDTO(restored, page.boxes.crop).geometry);
+        expect(restoredPivot.x).toBeCloseTo(pivot.x, 3);
+        expect(restoredPivot.y).toBeCloseTo(pivot.y, 3);
+        expect(restored.subtype === 'line' && restored.rotation).toBe(90);
         expect(
           (
             await reopened.page(toPageRef(reopenedPageObjectNumber)).measure!.listViewports()

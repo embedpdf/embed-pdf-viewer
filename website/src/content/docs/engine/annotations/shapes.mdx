@@ -66,10 +66,11 @@ await page.annotations.create({
 | `lineEndings`   | `{ start, end }`: what's drawn at each end; see [Line endings](#line-endings). | `{ start: 'none', end: 'none' }` |
 | `interiorColor` | The fill of closed endings, such as a solid arrowhead.                         | none                             |
 | `intent`        | `'line-arrow'` labels the line as an arrow. It changes nothing in the drawing. | none                             |
+| `rotation`      | Turns the line, in degrees clockwise; see [Turned shapes](#turned-shapes).     | none                             |
 
 You don't pass a `rect` for a line, a polyline, a polygon or ink: the engine works it out from
-the points, with room for the line width and the endings, and keeps it up to date when they
-change.
+what it draws (the points, the line width, the endings) and keeps it up to date when they change;
+see [The shape's rect](#the-shapes-rect).
 
 A line with `intent: 'line-dimension'` and a `measure` is a distance measurement; see
 [Measurements](/docs/engine/annotations/measurements).
@@ -108,6 +109,7 @@ await page.annotations.create({
 | `lineEndings`     | Polyline only: what's drawn at the first and the last point.                             | `{ start: 'none', end: 'none' }` |
 | `cloudyIntensity` | Polygon only: a cloudy border.                                                           | none                             |
 | `intent`          | Polygon only: `'polygon-cloud'` labels it as a cloud. It changes nothing in the drawing. | none                             |
+| `rotation`        | Turns the shape, in degrees clockwise; see [Turned shapes](#turned-shapes).              | none                             |
 
 A polygon's last point joins its first by itself. Fewer points than a shape needs fail with
 `InvalidArg`. Polylines and polygons can also be perimeter and area measurements; see
@@ -135,10 +137,11 @@ await page.annotations.create({
 });
 ```
 
-| Field     | What it is                                                         | Default |
-| :-------- | :----------------------------------------------------------------- | :------ |
-| `inkList` | The strokes: one list of points per movement of the pen. Required. |         |
-| `intent`  | `'ink-highlight'` labels it as a freehand highlighter.             | none    |
+| Field      | What it is                                                                    | Default |
+| :--------- | :---------------------------------------------------------------------------- | :------ |
+| `inkList`  | The strokes: one list of points per movement of the pen. Required.            |         |
+| `intent`   | `'ink-highlight'` labels it as a freehand highlighter.                        | none    |
+| `rotation` | Turns the drawing, in degrees clockwise; see [Turned shapes](#turned-shapes). | none    |
 
 Ink has no fill, and its strokes have round ends. For a highlighter pen, combine
 `intent: 'ink-highlight'` with a wide `strokeWidth`, a light `color` and `blendMode: 'multiply'`,
@@ -222,16 +225,39 @@ turned shape, which is what a PDF app uses to find it. To move or resize a turne
 its `box`; to straighten it where it is, set `rotation: null`. Free text boxes, carets and stamps
 turn the same way.
 
-Lines, polylines, polygons and ink turn by turning their points. Their `rotation` field only
-records the angle the points were turned by, so an editor can show a turned selection box; it
-changes nothing in the drawing.
+Lines, polylines, polygons and ink turn the same way too. Give their points upright, and the angle
+as `rotation`; they turn about the middle of the box around the points:
+
+```ts
+await page.annotations.create({
+  subtype: 'polygon',
+  vertices: [
+    { x: 100, y: 300 },
+    { x: 260, y: 300 },
+    { x: 180, y: 380 },
+  ],
+  rotation: 45,
+});
+```
+
+A read gives the points back upright, with the turn. `drawnPointsOf(annotation)` gives them as
+the page shows them: one list for a line or a polygon, one per ink stroke. To move a turned shape,
+move its points; to straighten it where it is, set `rotation: null`. A measurement's
+[caption](/docs/engine/annotations/measurements) turns with its shape.
+
+```ts
+import { drawnPointsOf } from '@embedpdf/engine';
+
+const [shown] = drawnPointsOf(polygon)!; // the corners where the page shows them
+```
 
 ### The shape's rect
 
-`rect` is where the shape sits on the page: the upright box around the shape, its turn and what
-its border adds, such as a cloud's bumps. The engine works it out from `box`, `rotation` and the
-style. An update may send back the `rect` it read, so a read passed straight back works; any other
-`rect` fails with `InvalidArg`. To move or resize the shape, change its `box`.
+`rect` is where the shape sits on the page: the upright box around all it draws, turned, with
+what its border adds (a cloud's bumps) and, for lines, the line width and the endings. The engine
+works it out from `box` or the points, `rotation` and the style. An update may send back the
+`rect` it read, so a read passed straight back works; any other `rect` fails with `InvalidArg`.
+To move or resize the shape, change its `box` or its points.
 
 ### Border styles
 
@@ -246,3 +272,8 @@ intensity of a `/BE` cloudy border effect. For a cloudy shape the PDF's own `/Re
 bumps and `/RD` says where the shape is inside it, as Acrobat writes it; the engine writes both
 from `box`. A turned shape keeps its box in `/EMBD_Metadata`, and its drawing is turned inside its
 `/Rect`, so every PDF app shows it turned.
+
+A turned line, polyline, polygon or ink keeps its points turned in the file, as every PDF app
+reads them, and its turn and the box around its upright points in `/EMBD_Metadata`. When another
+app moves or redraws the points, the two no longer match: a read then gives the points as drawn,
+with `rotation: null`.

@@ -13,10 +13,10 @@ import {
   type PageNameResult,
   type PageRemoveNameInput,
   type PageRotateResult,
-  type PageRotation,
   type PageFlattenResult,
   type FlattenOptions,
   type PageRef,
+  type PdfRotation,
 } from '@embedpdf/engine-core/runtime';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
@@ -196,7 +196,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     });
   }
 
-  rotate(pages: PageRef[], rotation: PageRotation): AbortablePromise<PageRotateResult> {
+  rotate(pages: PageRef[], rotation: PdfRotation): AbortablePromise<PageRotateResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),

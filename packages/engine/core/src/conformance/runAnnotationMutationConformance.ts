@@ -3,6 +3,7 @@ import type {
   ConformanceFixture,
   ConformanceOptions,
 } from './runMetadataConformance';
+import { drawnPointsOf } from '../annotation/drawnPoints';
 import type {
   AnnotationDraft,
   AnnotationPatch,
@@ -26,6 +27,7 @@ import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
+import { pdfPointsBounds, pdfPointTurned, pdfTurnOfUpright } from '../geometry/pointTurn';
 import type { InkList, LinePoints, PdfPoint, PdfRect } from '../geometry/primitives';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { AnnotationStableId } from '../identity/AnnotationStableId';
@@ -125,6 +127,9 @@ const DEFAULT_CALLOUT_LINE: [PdfPoint, PdfPoint, PdfPoint] = [
 ];
 
 /** A single freehand stroke inside DEFAULT_SHAPE_RECT (valid for ink). */
+/** Equal to 3 decimals: points and rects are stored as f32. */
+const near = (a: number, b: number): boolean => Math.abs(a - b) < 5e-4;
+
 const DEFAULT_INK_STROKES: InkList = [
   [
     { x: 70, y: 70 },
@@ -386,7 +391,6 @@ export function runAnnotationMutationConformance(
         const polyDraft: PolygonDraft = {
           subtype: 'polygon',
           contents: 'mutation conformance: polygon cloudy tri-state',
-          rect: shapeRect,
           vertices,
           color: { r: 0, g: 0, b: 255 },
           strokeWidth: 2,
@@ -591,6 +595,217 @@ export function runAnnotationMutationConformance(
       }
     });
 
+    test('a line, polyline, polygon or ink: rect is what the engine draws', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(toPageRef(fix.pageObjectNumber));
+        const contains = (outer: PdfRect, inner: PdfRect) =>
+          outer.left <= inner.left + 1e-3 &&
+          outer.bottom <= inner.bottom + 1e-3 &&
+          outer.right >= inner.right - 1e-3 &&
+          outer.top >= inner.top - 1e-3;
+        const area = (r: PdfRect) => (r.right - r.left) * (r.top - r.bottom);
+        const grown = (r: PdfRect, by: number): PdfRect => ({
+          left: r.left - by,
+          bottom: r.bottom - by,
+          right: r.right + by,
+          top: r.top + by,
+        });
+
+        // No rect is sent: the engine measures the stroke and the arrowheads.
+        const line = (lineEndings: LineDraft['lineEndings']) =>
+          page.annotations.create({
+            subtype: 'line',
+            linePoints,
+            color: { r: 0, g: 0, b: 0 },
+            strokeWidth: 2,
+            lineEndings,
+          } satisfies LineDraft);
+        const plain = (await line({ start: 'none', end: 'none' })).annotation;
+        const arrowed = (await line({ start: 'closed-arrow', end: 'closed-arrow' })).annotation;
+        const ends = pdfPointsBounds([linePoints.start, linePoints.end]);
+        expect(contains(plain.rect, grown(ends, 0.5))).toBe(true);
+        expect(contains(arrowed.rect, plain.rect)).toBe(true);
+        expect(area(arrowed.rect) > area(plain.rect)).toBe(true);
+
+        // A wider pen widens the rect, a narrower one narrows it again.
+        const ink = (strokeWidth: number) =>
+          page.annotations.create({
+            subtype: 'ink',
+            inkList: inkStrokes,
+            color: { r: 29, g: 78, b: 216 },
+            strokeWidth,
+          } satisfies InkDraft);
+        const thin = (await ink(1)).annotation;
+        const wide = (await ink(6)).annotation;
+        const drawn = pdfPointsBounds(inkStrokes.flat());
+        expect(contains(thin.rect, grown(drawn, 0.5))).toBe(true);
+        expect(contains(wide.rect, grown(drawn, 3))).toBe(true);
+        expect(wide.rect.right - wide.rect.left > thin.rect.right - thin.rect.left + 4.9).toBe(
+          true,
+        );
+        const narrowed = await page.annotations.update(wide.ref, {
+          subtype: 'ink',
+          strokeWidth: 1,
+        });
+        expect(near(narrowed.annotation.rect.left, thin.rect.left)).toBe(true);
+        expect(near(narrowed.annotation.rect.right, thin.rect.right)).toBe(true);
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('points are upright: rotation turns them about the middle of their box', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(toPageRef(fix.pageObjectNumber));
+        const expectPoints = (actual: readonly PdfPoint[], expected: readonly PdfPoint[]) => {
+          expect(actual.length).toBe(expected.length);
+          actual.forEach((point, i) => {
+            expect(near(point.x, expected[i]!.x)).toBe(true);
+            expect(near(point.y, expected[i]!.y)).toBe(true);
+          });
+        };
+        const created = await page.annotations.create({
+          subtype: 'polygon',
+          vertices,
+          color: { r: 0, g: 0, b: 255 },
+          strokeWidth: 2,
+          rotation: 90,
+        } satisfies PolygonDraft);
+        const polygon = created.annotation;
+        if (polygon.subtype !== 'polygon') throw new Error('expected a polygon');
+        // A read gives the points as sent, and the turn.
+        expect(polygon.rotation).toBe(90);
+        expectPoints(polygon.vertices, vertices);
+        // The page shows them turned about the middle of their box, and rect is
+        // around what it shows.
+        const turn = pdfTurnOfUpright(vertices, 90);
+        const drawn = vertices.map((point) => pdfPointTurned(point, turn));
+        expectPoints(drawnPointsOf(polygon)![0]!, drawn);
+        const drawnBounds = pdfPointsBounds(drawn);
+        expect(polygon.rect.left <= drawnBounds.left).toBe(true);
+        expect(polygon.rect.right >= drawnBounds.right).toBe(true);
+        expect(polygon.rect.bottom <= drawnBounds.bottom).toBe(true);
+        expect(polygon.rect.top >= drawnBounds.top).toBe(true);
+
+        // Moving the points keeps the turn and the drawing: rect moves with them.
+        const d = { x: 15, y: -10 };
+        const moved = await page.annotations.update(polygon.ref, {
+          subtype: 'polygon',
+          vertices: vertices.map((point) => ({ x: point.x + d.x, y: point.y + d.y })),
+        });
+        expect(moved.appearance).toEqual({ action: 'preserved', changed: false });
+        if (moved.annotation.subtype !== 'polygon') throw new Error('expected a polygon');
+        expect(moved.annotation.rotation).toBe(90);
+        expect(near(moved.annotation.rect.left, polygon.rect.left + d.x)).toBe(true);
+        expect(near(moved.annotation.rect.top, polygon.rect.top + d.y)).toBe(true);
+
+        // A new turn keeps the points upright and draws them again.
+        const turned = await page.annotations.update(polygon.ref, {
+          subtype: 'polygon',
+          vertices,
+          rotation: 45,
+        });
+        expect(turned.appearance.action === 'preserved').toBe(false);
+        if (turned.annotation.subtype !== 'polygon') throw new Error('expected a polygon');
+        expect(turned.annotation.rotation).toBe(45);
+        expectPoints(turned.annotation.vertices, vertices);
+
+        // Null straightens the points where they are.
+        const straightened = await page.annotations.update(polygon.ref, {
+          subtype: 'polygon',
+          rotation: null,
+        });
+        if (straightened.annotation.subtype !== 'polygon') throw new Error('expected a polygon');
+        expect(straightened.annotation.rotation).toBe(null);
+        expectPoints(straightened.annotation.vertices, vertices);
+        expectPoints(drawnPointsOf(straightened.annotation)![0]!, vertices);
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('a note sits at `at`, its left and top edges, and moves by it', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(toPageRef(fix.pageObjectNumber));
+        const at = { left: shapeRect.left, top: shapeRect.top };
+        const created = await page.annotations.create({
+          subtype: 'text',
+          at,
+          icon: 'comment',
+        } satisfies TextDraft);
+        const note = created.annotation;
+        if (note.subtype !== 'text') throw new Error('expected a note');
+        expect(note.at).toEqual(at);
+        // The icon is a fixed 20 × 20 down and right from its left and top edges.
+        expect(note.rect).toEqual({
+          left: at.left,
+          bottom: at.top - 20,
+          right: at.left + 20,
+          top: at.top,
+        });
+        const to = { left: at.left + 30, top: at.top - 15 };
+        const moved = await page.annotations.update(note.ref, { subtype: 'text', at: to });
+        if (moved.annotation.subtype !== 'text') throw new Error('expected a note');
+        expect(moved.annotation.at).toEqual(to);
+        expect(moved.annotation.rect).toEqual({
+          left: to.left,
+          bottom: to.top - 20,
+          right: to.left + 20,
+          top: to.top,
+        });
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('rect on a line or text markup is the engine’s: send it back unchanged or leave it out', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(toPageRef(fix.pageObjectNumber));
+        const line = (
+          await page.annotations.create({
+            subtype: 'line',
+            linePoints,
+            color: { r: 0, g: 0, b: 0 },
+          } satisfies LineDraft)
+        ).annotation;
+        const highlight = (
+          await page.annotations.create({
+            subtype: 'highlight',
+            quadPoints: quad,
+            color: { r: 255, g: 255, b: 0 },
+          } satisfies HighlightDraft)
+        ).annotation;
+        const shifted = (r: PdfRect): PdfRect => ({ ...r, right: r.right + 10 });
+        for (const patch of [
+          { subtype: 'line', rect: shifted(line.rect) },
+          { subtype: 'highlight', rect: shifted(highlight.rect) },
+        ] as const) {
+          const ref = patch.subtype === 'line' ? line.ref : highlight.ref;
+          let caught: unknown;
+          try {
+            await page.annotations.update(ref, patch);
+          } catch (err) {
+            caught = err;
+          }
+          expect(EngineError.is(caught, EngineErrorCode.InvalidArg)).toBe(true);
+        }
+        // The read rect sent back is taken and changes nothing.
+        const back = await page.annotations.update(line.ref, {
+          subtype: 'line',
+          rect: line.rect,
+          contents: 'sent back',
+        });
+        expect(back.annotation.rect).toEqual(line.rect);
+        expect(back.annotation.contents).toBe('sent back');
+      } finally {
+        await doc.close();
+      }
+    });
+
     test('create vertex + line annotations (polygon/polyline/line) round-trip geometry', async () => {
       const doc = await openFixture(engine, opts);
       try {
@@ -599,7 +814,6 @@ export function runAnnotationMutationConformance(
         const polygonDraft: PolygonDraft = {
           subtype: 'polygon',
           contents: 'mutation conformance: polygon',
-          rect: shapeRect,
           vertices,
           interiorColor: { r: 255, g: 200, b: 0 },
           color: { r: 0, g: 0, b: 255 },
@@ -619,7 +833,6 @@ export function runAnnotationMutationConformance(
         const polylineDraft: PolylineDraft = {
           subtype: 'polyline',
           contents: 'mutation conformance: polyline',
-          rect: shapeRect,
           vertices,
           interiorColor: null,
           color: { r: 200, g: 0, b: 0 },
@@ -640,7 +853,6 @@ export function runAnnotationMutationConformance(
         const lineDraft: LineDraft = {
           subtype: 'line',
           contents: 'mutation conformance: line',
-          rect: shapeRect,
           linePoints,
           interiorColor: null,
           color: { r: 0, g: 128, b: 128 },
@@ -664,7 +876,6 @@ export function runAnnotationMutationConformance(
         const inkDraft: InkDraft = {
           subtype: 'ink',
           contents: 'mutation conformance: ink',
-          rect: shapeRect,
           inkList: inkStrokes,
           color: { r: 29, g: 78, b: 216 },
           strokeWidth: 3,
@@ -1264,7 +1475,6 @@ export function runAnnotationMutationConformance(
         const created = await page.annotations.create({
           subtype: 'ink',
           contents: 'ink-update-base',
-          rect: shapeRect,
           inkList: inkStrokes,
           color: { r: 0, g: 0, b: 0 },
           strokeWidth: 2,
@@ -1309,7 +1519,6 @@ export function runAnnotationMutationConformance(
           subtype: 'ink',
           intent: 'ink-highlight',
           blendMode: 'multiply',
-          rect: shapeRect,
           inkList: inkStrokes,
           color: { r: 255, g: 205, b: 69 },
           strokeWidth: 14,
@@ -1346,7 +1555,6 @@ export function runAnnotationMutationConformance(
         const created = await page.annotations.create({
           subtype: 'polyline',
           contents: 'polyline-update-base',
-          rect: shapeRect,
           vertices,
           interiorColor: null,
           color: { r: 0, g: 0, b: 0 },
@@ -2522,7 +2730,7 @@ export function runAnnotationMutationConformance(
 
         const status = await page.annotations.create({
           subtype: 'text',
-          rect: shapeRect,
+          at: { left: shapeRect.left, top: shapeRect.top },
           reply: { to: target.annotation.ref },
           state: 'accepted',
           stateModel: 'review',
@@ -2559,7 +2767,7 @@ export function runAnnotationMutationConformance(
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const { annotation } = await page.annotations.create({
           subtype: 'text',
-          rect: shapeRect,
+          at: { left: shapeRect.left, top: shapeRect.top },
           state: 'accepted',
         } satisfies TextDraft);
         expect(annotation.subtype === 'text' && annotation.stateModel).toBe('review');
@@ -2567,7 +2775,7 @@ export function runAnnotationMutationConformance(
         try {
           await page.annotations.create({
             subtype: 'text',
-            rect: shapeRect,
+            at: { left: shapeRect.left, top: shapeRect.top },
             state: 'escalated',
           } satisfies TextDraft);
         } catch (err) {
@@ -2585,7 +2793,7 @@ export function runAnnotationMutationConformance(
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const note = await page.annotations.create({
           subtype: 'text',
-          rect: shapeRect,
+          at: { left: shapeRect.left, top: shapeRect.top },
           contents: 'work in progress',
           subject: 'Draft',
           state: 'none',
@@ -2647,7 +2855,7 @@ export function runAnnotationMutationConformance(
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const custom = await page.annotations.create({
           subtype: 'text',
-          rect: shapeRect,
+          at: { left: shapeRect.left, top: shapeRect.top },
           state: 'in-progress',
           stateModel: 'X-ReviewWorkflow',
         } satisfies TextDraft);

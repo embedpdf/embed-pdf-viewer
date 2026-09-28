@@ -40,7 +40,6 @@ const line = (): LineDraft => ({
   intent: 'line-dimension',
   measure: scale,
   contents: 'wrong',
-  rect: { left: 98, bottom: 98, right: 202, top: 102 },
   linePoints: { start: { x: 100, y: 100 }, end: { x: 200, y: 100 } },
   captionEnabled: true,
   captionPosition: 'inline',
@@ -115,7 +114,6 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
         subtype: 'polygon',
         intent: 'polygon-dimension',
         measure: scale,
-        rect: { left: 0, bottom: 0, right: 100, top: 100 },
         vertices: [
           { x: 0, y: 0 },
           { x: 100, y: 0 },
@@ -129,12 +127,6 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
       expect(a.contents).toBe('9.00 m²');
       const moved = await page.annotations.update(a.ref, {
         subtype: 'polygon',
-        rect: {
-          left: a.rect.left + 20,
-          right: a.rect.right + 20,
-          top: a.rect.top + 30,
-          bottom: a.rect.bottom + 30,
-        },
         vertices: draft.vertices.map((p) => ({ x: p.x + 20, y: p.y + 30 })),
       });
       expect(moved.annotation).toMatchObject({
@@ -142,6 +134,11 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
         contents: '9.00 m²',
       });
       expect(moved.appearance.action).toBe('preserved');
+      // The rect moves with the points; the appearance isn't drawn again.
+      expect(moved.annotation.rect.left).toBeCloseTo(a.rect.left + 20, 4);
+      expect(moved.annotation.rect.bottom).toBeCloseTo(a.rect.bottom + 30, 4);
+      expect(moved.annotation.rect.right).toBeCloseTo(a.rect.right + 20, 4);
+      expect(moved.annotation.rect.top).toBeCloseTo(a.rect.top + 30, 4);
       const edit = await page.annotations.update(a.ref, {
         subtype: 'polygon',
         vertices: [
@@ -182,7 +179,6 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
           { x: 100, y: 0 },
           { x: 100, y: 100 },
         ],
-        rect: { left: 0, bottom: 0, right: 100, top: 100 },
         captionEnabled: true,
         captionCenter: { x: 0, y: 0 },
       });
@@ -195,7 +191,6 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
           { x: 100, y: 0 },
           { x: 100, y: 100 },
         ],
-        rect: { left: 0, bottom: 0, right: 100, top: 100 },
         captionEnabled: true,
       });
       const artifact = await doc.downloadLayer!();
@@ -388,7 +383,6 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
           subtype: 'polygon',
           intent: 'polygon-dimension',
           measure: scale,
-          rect: { left: 10, bottom: 10, right: 110, top: 110 },
           vertices,
           captionEnabled: true,
           captionCenter: { x: 90, y: 20 },

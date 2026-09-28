@@ -1,11 +1,11 @@
 import type { AnnotationBase, LineAnnotationDTO } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
-import { readIntent } from './annotationReadPrimitives';
 import { lineIntentFromName } from '../measurementIntent';
+import { readIntent } from './annotationReadPrimitives';
 import { readLine as readLinePoints, readLineEndings } from './annotationReadPrimitives';
-import { readAnnotationRotation } from './readAnnotationTransformMetadata';
 import { readAnnotationMeasure, readLineCaption, readLineLeader } from './readMeasurementFields';
+import { readPointsTurn, uprightPoint } from './readPointsTurn';
 import { readFilledStyleExtras } from './readStyle';
 
 /** Fallback `/L` when the annotation has no line geometry. */
@@ -17,7 +17,9 @@ export function readLine(
   annotPtr: Ptr,
   base: AnnotationBase,
 ): LineAnnotationDTO {
-  const rotation = readAnnotationRotation(fn, mem, annotPtr);
+  const drawn = readLinePoints(fn, mem, annotPtr) ?? ZERO_LINE;
+  // The points upright, and the turn that draws them.
+  const turn = readPointsTurn(fn, mem, annotPtr, [[drawn.start, drawn.end]]);
   const intent = readIntent(fn, mem, annotPtr);
   const caption = readLineCaption(fn, mem, annotPtr);
   const leader = readLineLeader(fn, mem, annotPtr);
@@ -33,8 +35,8 @@ export function readLine(
     leader: leader ?? null,
     subtype: 'line',
     ...readFilledStyleExtras(fn, mem, annotPtr),
-    linePoints: readLinePoints(fn, mem, annotPtr) ?? ZERO_LINE,
+    linePoints: { start: uprightPoint(drawn.start, turn), end: uprightPoint(drawn.end, turn) },
     lineEndings: readLineEndings(fn, mem, annotPtr),
-    rotation: rotation ?? null,
+    rotation: turn?.degrees ?? null,
   };
 }

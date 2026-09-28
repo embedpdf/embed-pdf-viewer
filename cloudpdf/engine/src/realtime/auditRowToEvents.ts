@@ -27,7 +27,7 @@ import {
   type PageInsertResult,
   type PageMoveResult,
   type PageRotateResult,
-  type PageRotation,
+  type PdfRotation,
   type PageScaleResult,
   type FormFieldRef,
   type SignatureCompleteResult,
@@ -152,7 +152,7 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
       const payload = row.payload as PageRotateResult;
       const rotation = (payload.layout.pages.find(
         (page) => page.ref.pageObjectNumber === row.affectedPages[0],
-      )?.rotation ?? 0) as PageRotation;
+      )?.rotation ?? 0) as PdfRotation;
       return {
         type: 'pages.rotated',
         pages: affectedPages(),

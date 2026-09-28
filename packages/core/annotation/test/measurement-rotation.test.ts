@@ -3,7 +3,13 @@ import { describe, expect, it } from 'vitest';
 
 import { step } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
-import { DEFAULT_CHROME_GEOMETRY, pointInQuad, rotatePoint, unionRect } from '../src/geometry';
+import {
+  DEFAULT_CHROME_GEOMETRY,
+  pointInQuad,
+  rotatePoint,
+  turnPivotOf,
+  unionRect,
+} from '../src/geometry';
 import { hitTest, groupUnionBounds } from '../src/hit';
 import { distanceLayout, type DistanceAppearance } from '../src/measurement';
 import { annotationSelectionFrame } from '../src/selection';
@@ -95,11 +101,13 @@ describe('measurement selection frame and rotation', () => {
     },
   ];
 
-  it.each(cases)('rotates the complete $name around the visible frame center', ({ annotation }) => {
+  it.each(cases)('rotates the complete $name about the middle of its line', ({ annotation }) => {
     const start = selected(annotation);
     const outline = outlineCorners(start);
-    const bounds = unionRect(outline);
-    const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+    // The pivot is where the engine turns the line: its own middle, not the
+    // middle of the frame the caption and leaders widen.
+    const center = turnPivotOf(annotation.geometry);
+    const frameCenter = annotationSelectionFrame(annotation).center;
     const knob = chrome(start, PAGE).find((node) => node.kind === 'rotate-knob');
     if (knob?.kind !== 'rotate-knob') throw new Error('Missing rotation handle');
     expectPoint(knob.from, {
@@ -132,7 +140,11 @@ describe('measurement selection frame and rotation', () => {
       expect(guides).toMatchObject({ center });
 
       const committed = pointer(moving, 'up', at);
-      expectPoint(annotationSelectionFrame(committed.byId.distance).center, center);
+      expectPoint(turnPivotOf(committed.byId.distance.geometry), center);
+      expectPoint(
+        annotationSelectionFrame(committed.byId.distance).center,
+        rotatePoint(frameCenter, center, angle),
+      );
       expect(committed.byId.distance.measure).toEqual(annotation.measure);
       expect(committed.byId.distance.geometry).toEqual(item.geometry);
     }
@@ -142,16 +154,16 @@ describe('measurement selection frame and rotation', () => {
 
   it('uses the same center for quarter turns and reset, without moving the annotation', () => {
     const initial = selected();
-    const center = annotationSelectionFrame(initial.byId.distance).center;
+    const center = turnPivotOf(initial.byId.distance.geometry);
     const once = step(initial, { type: 'rotate90' })[0];
-    expectPoint(annotationSelectionFrame(once.byId.distance).center, center);
+    expectPoint(turnPivotOf(once.byId.distance.geometry), center);
     const reset = step(once, { type: 'resetRotation' })[0];
     expect(reset.byId.distance.geometry).toMatchObject(initial.byId.distance.geometry);
 
     let state = initial;
     for (let turn = 0; turn < 4; turn++) {
       state = step(state, { type: 'rotate90' })[0];
-      expectPoint(annotationSelectionFrame(state.byId.distance).center, center);
+      expectPoint(turnPivotOf(state.byId.distance.geometry), center);
     }
     const geometry = state.byId.distance.geometry;
     if (geometry.kind !== 'line') throw new Error('Expected line geometry');

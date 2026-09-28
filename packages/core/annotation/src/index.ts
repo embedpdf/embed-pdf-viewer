@@ -123,7 +123,7 @@ export {
   caretRectFromTextEnd,
   selectionBounds,
   selectionQuad,
-  selectionCenter,
+  turnPivotOf,
   pointInQuad,
   quadIntersectsRect,
   shapeRectFor,

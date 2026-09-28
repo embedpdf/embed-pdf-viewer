@@ -61,7 +61,7 @@ import {
   type PageObjectNumber,
   type PageRef,
   type PageRotateResult,
-  type PageRotation,
+  type PdfRotation,
   type PageState,
   type WirePack,
   type WorkerJobId,
@@ -989,7 +989,7 @@ export class LayerService {
       docId: string;
       layerName: string;
       pages: PageRef[];
-      rotation: PageRotation;
+      rotation: PdfRotation;
     },
     signal?: AbortSignal,
   ): Promise<PageRotateResult> {

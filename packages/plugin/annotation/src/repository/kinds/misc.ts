@@ -1,7 +1,8 @@
 /**
  * The remaining small families: icon kinds (text note / file attachment),
- * stamps, links, widgets, and the unsupported fallback. Icon kinds and links
- * are `/Rect`-movable with tiny prop surfaces; stamps and widgets emit
+ * stamps, links, widgets, and the unsupported fallback. Icon kinds move by
+ * `at` (the icon's left and top edges) and links by `/Rect`, with tiny prop
+ * surfaces; stamps and widgets emit
  * patches here but are not createable through the repository (stamps carry a
  * binary source through their own create path; widgets are form-plane).
  */
@@ -13,12 +14,17 @@ import {
   boxGeomFromDTO,
   colorToCss,
   contentToPdfRect,
+  iconAt,
   pdfToContentRect,
   writableTarget,
 } from '../seam';
 
 const rectGeometry = (annotation: ModelAnnotation, crop: PdfRect) =>
   'rect' in annotation.geometry ? { rect: contentToPdfRect(annotation.geometry.rect, crop) } : null;
+
+/** An icon's geometry: `at`, the left and top edges of its box. The engine works out `rect`. */
+const iconGeometry = (annotation: ModelAnnotation, crop: PdfRect) =>
+  annotation.geometry.kind === 'rect' ? { at: iconAt(annotation.geometry.rect, crop) } : null;
 
 const iconProjection = (subtype: 'text' | 'file-attachment'): KindProjection => ({
   ingest: (dto, crop) => {
@@ -29,7 +35,7 @@ const iconProjection = (subtype: 'text' | 'file-attachment'): KindProjection => 
       icon: iconDto.icon,
     };
   },
-  geometry: rectGeometry,
+  geometry: iconGeometry,
   // Creates go through the click-to-place path (placement.ts), which also
   // carries the attached file for file-attachment — never this repository.
   createable: false,

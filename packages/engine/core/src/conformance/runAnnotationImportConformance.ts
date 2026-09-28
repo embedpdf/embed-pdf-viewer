@@ -74,9 +74,17 @@ export function runAnnotationImportConformance(
           { subtype: 'stamp', box: box(80), opacity: 0.5 },
           { appearance: BANDS_PDF },
         );
-        const note = await create(page, { subtype: 'text', rect: box(140), contents: 'Check' });
+        const note = await create(page, {
+          subtype: 'text',
+          at: { left: box(140).left, top: box(140).top },
+          contents: 'Check',
+        });
         await create(page, { subtype: 'popup', rect: box(200), parent: note.ref, open: true });
-        await create(page, { subtype: 'text', rect: box(140), reply: { to: note.ref } });
+        await create(page, {
+          subtype: 'text',
+          at: { left: box(140).left, top: box(140).top },
+          reply: { to: note.ref },
+        });
         await create(page, {
           subtype: 'link',
           rect: box(260),
@@ -128,10 +136,14 @@ export function runAnnotationImportConformance(
     test('leaves out a name the page has, and what points at it, then names on a repeat', async () => {
       await twoCopies('authoring', async (source, target, pageRef) => {
         const page = source.page(pageRef);
-        const taken = await create(page, { subtype: 'text', rect: box(20), nm: 'taken' });
+        const taken = await create(page, {
+          subtype: 'text',
+          at: { left: box(20).left, top: box(20).top },
+          nm: 'taken',
+        });
         const reply = await create(page, {
           subtype: 'text',
-          rect: box(20),
+          at: { left: box(20).left, top: box(20).top },
           reply: { to: taken.ref },
         });
         const free = await create(page, { subtype: 'square', box: box(80), nm: 'free' });

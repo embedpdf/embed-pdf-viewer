@@ -58,10 +58,10 @@ export interface UprightGeometryRun {
  * A run whose char matrix is not upright (rotated, sheared, or mirrored).
  *
  * `rect` stays a page-space AABB (culling), like every other wire rect.
- * `baselineAngle` is the baseline's angle in radians, CCW in PDF y-up space
- * (`atan2(m.b, m.a)` of the run's char matrix) — math data, not a
- * `rotation`, which in the API is always degrees clockwise. Note a
- * shear-only run has `baselineAngle === 0` and still uses this variant — its cells are
+ * `rotation` is how far the text is turned from upright, in degrees
+ * clockwise as the page shows it (0 up to 360), like every other `rotation`:
+ * text that reads straight up the page is 270. Note a shear-only run has
+ * `rotation === 0` and still uses this variant — its cells are
  * parallelograms an AABB would misrepresent. `ascentFlip` is true when the
  * ascent vector maps opposite the rotated frame's +y (mirrored /
  * negative-determinant content).
@@ -71,7 +71,8 @@ export interface RotatedGeometryRun {
   /** The run's first character; it covers `glyphs.length` characters from here. */
   start: number;
   glyphs: RotatedGeometryGlyph[];
-  baselineAngle: number;
+  /** Degrees clockwise, 0 up to 360. */
+  rotation: number;
   ascentFlip: boolean;
   fontSize?: number;
 }
@@ -100,7 +101,7 @@ export interface PageGeometrySnapshot {
 
 /** Narrowing guard: is this run the rotated (non-upright) variant? */
 export function isRotatedGeometryRun(run: PageGeometryRun): run is RotatedGeometryRun {
-  return 'baselineAngle' in run;
+  return 'rotation' in run;
 }
 
 /**
