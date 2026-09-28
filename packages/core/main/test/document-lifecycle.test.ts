@@ -25,7 +25,13 @@ function page(pageObjectNumber: number, index: number): PageLayout {
     size: { width: 600, height: 800 },
     rotation: 0,
     userUnit: 1,
-    boxes: { media: { ...box }, crop: { ...box } },
+    boxes: {
+      media: { ...box },
+      crop: { ...box },
+      bleed: { ...box },
+      trim: { ...box },
+      art: { ...box },
+    },
   };
 }
 

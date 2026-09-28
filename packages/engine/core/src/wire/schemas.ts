@@ -1052,9 +1052,9 @@ export { PdfRectSchema };
 export const PageBoxesSchema: z.ZodType<PageBoxes> = z.object({
   media: PdfRectSchema,
   crop: PdfRectSchema,
-  bleed: PdfRectSchema.optional(),
-  trim: PdfRectSchema.optional(),
-  art: PdfRectSchema.optional(),
+  bleed: PdfRectSchema,
+  trim: PdfRectSchema,
+  art: PdfRectSchema,
 });
 
 /**

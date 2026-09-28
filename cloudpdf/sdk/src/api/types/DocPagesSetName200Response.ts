@@ -50,9 +50,9 @@ export namespace DocPagesSetName200Response {
                 export interface Boxes {
                     media: Boxes.Media;
                     crop: Boxes.Crop;
-                    bleed?: Boxes.Bleed | undefined;
-                    trim?: Boxes.Trim | undefined;
-                    art?: Boxes.Art | undefined;
+                    bleed: Boxes.Bleed;
+                    trim: Boxes.Trim;
+                    art: Boxes.Art;
                 }
 
                 export namespace Boxes {

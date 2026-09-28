@@ -1,0 +1,345 @@
+import { decodePng, type Raster } from './appearanceRasters';
+import type { PageSpaceFixture, PageSpaceFixturePage } from './pageSpaceFixtures';
+import { PAGE_SPACE_FIXTURES } from './pageSpaceFixtures';
+import type { ConformanceTestRunner } from './runMetadataConformance';
+import type { AnnotationDTO } from '../annotation/kinds';
+import type { PageLayout } from '../dto/PageLayout';
+import type { PageImageHandle, PageImageOptions } from '../dto/PageRender';
+import type { PdfDestination } from '../dto/PdfDestination';
+import type { DocumentHandle } from '../engine/DocumentHandle';
+import type { Engine } from '../engine/Engine';
+import type { PdfRect } from '../geometry/primitives';
+import type { PageRef } from '../identity/PageRef';
+
+export interface PageSpaceConformanceOptions {
+  label: string;
+  /** Build a fresh engine for this suite. The suite tears it down at the end. */
+  makeEngine: () => Promise<Engine> | Engine;
+  /** Open a fresh copy of `fixture`. */
+  open: (engine: Engine, fixture: PageSpaceFixture) => Promise<DocumentHandle>;
+  /** Only these fixtures (by name); all when left out. */
+  only?: readonly string[];
+}
+
+/** A box measured from the top-left of the visible page: x right, y down. */
+interface PageBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Where things really are on a page, checked against what the renderer
+ * draws. An unturned render starts at the top-left of the visible page, so a
+ * position measured from there, times the scale, is a pixel. The fixtures
+ * write their answers out by hand from ISO 32000; this suite converts the
+ * engine's values with those answers, never with engine code, so it checks
+ * the engine's boxes, the renderer and every position the API returns.
+ */
+export function runPageSpaceConformance(
+  runner: ConformanceTestRunner,
+  opts: PageSpaceConformanceOptions,
+): void {
+  const { describe, test, beforeAll, afterAll, expect } = runner;
+  const fixtures = PAGE_SPACE_FIXTURES.filter(
+    (fixture) => !opts.only || opts.only.includes(fixture.name),
+  );
+
+  describe(`page space conformance: ${opts.label}`, () => {
+    let engine: Engine;
+
+    beforeAll(async () => {
+      engine = await opts.makeEngine();
+    });
+
+    afterAll(async () => {
+      if (engine) await engine.destroy();
+    });
+
+    for (const fixture of fixtures) {
+      describe(`${fixture.name}: ${fixture.about}`, () => {
+        let doc: DocumentHandle;
+        let layouts: PageLayout[];
+        // A broken file whose rule waits on Acrobat: only what doesn't
+        // depend on that rule is checked.
+        const settled = fixture.source !== 'acrobat';
+
+        beforeAll(async () => {
+          doc = await opts.open(engine, fixture);
+          layouts = (await doc.pages.list()).pages;
+        });
+
+        afterAll(async () => {
+          if (doc) await doc.close();
+        });
+
+        const eachPage = async (
+          check: (page: PageSpaceFixturePage, layout: PageLayout) => Promise<void>,
+        ) => {
+          expect(layouts.length).toBe(fixture.pages.length);
+          for (const [index, page] of fixture.pages.entries()) {
+            await check(page, layouts[index]!);
+          }
+        };
+
+        test('the page size is the visible page box', async () => {
+          if (!settled) return;
+          await eachPage(async (page, layout) => {
+            const visible = page.expected.visible;
+            expect(layout.size).toEqual({
+              width: visible.right - visible.left,
+              height: visible.top - visible.bottom,
+            });
+          });
+        });
+
+        test('the boxes are as ISO defines them', async () => {
+          if (!settled) return;
+          await eachPage(async (page, layout) => {
+            const { boxes } = page.expected;
+            expect(layout.boxes).toEqual(boxes);
+          });
+        });
+
+        test('the turn and the unit size', async () => {
+          if (!settled) return;
+          await eachPage(async (page, layout) => {
+            expect(layout.rotation).toBe(page.expected.rotation);
+            expect(layout.userUnit).toBe(page.expected.userUnit);
+          });
+        });
+
+        test("a render starts at the visible page box's top-left", async () => {
+          if (!settled) return;
+          await eachPage(async (page, layout) => {
+            const visible = page.expected.visible;
+            const scale = scaleFor(visible);
+            const raster = await render(doc, layout.ref, { viewport: { kind: 'scale', scale } });
+            expect(Math.abs(raster.width - width(visible) * scale) <= 1).toBe(true);
+            expect(Math.abs(raster.height - height(visible) * scale) <= 1).toBe(true);
+            for (const mark of page.marks) {
+              expect(darkAt(raster, middleOf(toPage(mark, visible)), scale)).toBe(true);
+            }
+            // The corner itself is empty: the first mark starts 40 units in.
+            expect(darkAt(raster, { x: 20, y: 20 }, scale)).toBe(false);
+          });
+        });
+
+        test('text is found where it is drawn', async () => {
+          if (!settled) return;
+          const slice = await doc.search.query({ text: 'Corner' });
+          await eachPage(async (page, layout) => {
+            const visible = page.expected.visible;
+            const word = page.words[0]!;
+            const match = slice.matches.find((m) => samePage(m.page, layout.ref));
+            expect(match !== undefined).toBe(true);
+            const box = toPage(match!.segments[0]!.rect, visible);
+            expect(Math.abs(box.x - (word.x - visible.left)) <= 3).toBe(true);
+            expect(box.y < visible.top - word.y && box.y + box.height > visible.top - word.y).toBe(
+              true,
+            );
+            const scale = scaleFor(visible);
+            const raster = await render(doc, layout.ref, { viewport: { kind: 'scale', scale } });
+            expect(darkInside(raster, box, scale) > 0).toBe(true);
+          });
+        });
+
+        test('a created annotation is drawn where it was put', async () => {
+          if (!settled) return;
+          await eachPage(async (page, layout) => {
+            const visible = page.expected.visible;
+            const spot: PageBox = {
+              x: width(visible) / 2 - 20,
+              y: height(visible) / 2 - 20,
+              width: 40,
+              height: 40,
+            };
+            const handle = doc.page(layout.ref);
+            const { annotation } = await handle.annotations.create({
+              subtype: 'square',
+              box: fromPage(spot, visible),
+              color: { r: 0, g: 0, b: 0 },
+              interiorColor: { r: 0, g: 0, b: 0 },
+            });
+            try {
+              const read = toPage(annotation.rect, visible);
+              expect(read.x <= spot.x && read.x + read.width >= spot.x + spot.width).toBe(true);
+              expect(read.y <= spot.y && read.y + read.height >= spot.y + spot.height).toBe(true);
+              const scale = scaleFor(visible);
+              const raster = await render(doc, layout.ref, {
+                viewport: { kind: 'scale', scale },
+                includeAnnotations: true,
+              });
+              expect(darkAt(raster, middleOf(spot), scale)).toBe(true);
+            } finally {
+              await handle.annotations.delete(annotation.ref);
+            }
+          });
+        });
+
+        test('a region render shows its own area', async () => {
+          if (!settled) return;
+          await eachPage(async (page, layout) => {
+            const raster = await render(doc, layout.ref, {
+              target: { kind: 'rect', rect: page.marks[0]! },
+              viewport: { kind: 'scale', scale: 0.1 },
+            });
+            expect(raster.width > 0 && raster.height > 0).toBe(true);
+            expect(everyPixelDark(raster)).toBe(true);
+          });
+        });
+
+        if (fixture.pages.some((page) => page.links?.length)) {
+          test("a destination is measured from its target page's visible box", async () => {
+            await eachPage(async (page, layout) => {
+              if (!page.links?.length) return;
+              const { annotations } = await doc.page(layout.ref).annotations.list();
+              const links = annotations.filter(
+                (a): a is Extract<AnnotationDTO, { subtype: 'link' }> => a.subtype === 'link',
+              );
+              for (const link of page.links) {
+                const read = links.find((a) => sameRect(a.rect, link.rect));
+                expect(read !== undefined).toBe(true);
+                const target = read!.target;
+                expect(target?.kind).toBe('goto');
+                if (target?.kind !== 'goto') continue;
+                const destination = target.destination;
+                expect(samePage(destination.page, layouts[link.toPage]!.ref)).toBe(true);
+                const visible = fixture.pages[link.toPage]!.expected.visible;
+                expect(destinationInPage(destination, visible)).toEqual(link.expected);
+              }
+            });
+          });
+        }
+
+        test('a redaction removes what is inside it, and only that', async () => {
+          if (!settled) return;
+          const page = fixture.pages[0]!;
+          const layout = layouts[0]!;
+          const visible = page.expected.visible;
+          const slice = await doc.search.query({ text: 'Corner' });
+          const match = slice.matches.find((m) => samePage(m.page, layout.ref));
+          expect(match !== undefined).toBe(true);
+          const found = match!.segments[0]!.rect;
+          const handle = doc.page(layout.ref);
+          const { annotation } = await handle.annotations.create({
+            subtype: 'redact',
+            rect: {
+              left: found.left - 2,
+              bottom: found.bottom - 2,
+              right: found.right + 2,
+              top: found.top + 2,
+            },
+          });
+          await doc.redaction.apply({ annotations: [annotation.ref] });
+
+          const after = await doc.search.query({ text: 'Corner' });
+          expect(after.matches.some((m) => samePage(m.page, layout.ref))).toBe(false);
+          const scale = scaleFor(visible);
+          const raster = await render(doc, layout.ref, { viewport: { kind: 'scale', scale } });
+          expect(darkInside(raster, toPage(found, visible), scale)).toBe(0);
+          for (const mark of page.marks) {
+            expect(darkAt(raster, middleOf(toPage(mark, visible)), scale)).toBe(true);
+          }
+        });
+      });
+    }
+  });
+}
+
+// ── positions, converted the way the fixtures define them ──
+
+const width = (r: PdfRect) => r.right - r.left;
+const height = (r: PdfRect) => r.top - r.bottom;
+
+function toPage(r: PdfRect, visible: PdfRect): PageBox {
+  return { x: r.left - visible.left, y: visible.top - r.top, width: width(r), height: height(r) };
+}
+
+function fromPage(box: PageBox, visible: PdfRect): PdfRect {
+  const top = visible.top - box.y;
+  const left = box.x + visible.left;
+  return { left, bottom: top - box.height, right: left + box.width, top };
+}
+
+const middleOf = (box: PageBox) => ({ x: box.x + box.width / 2, y: box.y + box.height / 2 });
+
+function destinationInPage(destination: PdfDestination, visible: PdfRect) {
+  const x = (left: number | null | undefined) => (left == null ? null : left - visible.left);
+  const y = (top: number | null | undefined) => (top == null ? null : visible.top - top);
+  switch (destination.kind) {
+    case 'xyz':
+      return { kind: 'xyz', x: x(destination.left), y: y(destination.top) };
+    case 'fitH':
+      return { kind: 'fitH', y: y(destination.top) };
+    case 'fitV':
+      return { kind: 'fitV', x: x(destination.left) };
+    case 'fitR':
+      return { kind: 'fitR', ...toPage(destination, visible) };
+    default:
+      return { kind: destination.kind };
+  }
+}
+
+const sameRect = (a: PdfRect, b: PdfRect) =>
+  Math.abs(a.left - b.left) < 0.01 &&
+  Math.abs(a.bottom - b.bottom) < 0.01 &&
+  Math.abs(a.right - b.right) < 0.01 &&
+  Math.abs(a.top - b.top) < 0.01;
+
+const samePage = (a: PageRef, b: PageRef) => a.pageObjectNumber === b.pageObjectNumber;
+
+// ── pixels ──
+
+/** Half size, or less for a large page: at most 2000 pixels on the long side, so 24 pt words stay dark. */
+const scaleFor = (visible: PdfRect) =>
+  Math.min(0.5, 2000 / Math.max(width(visible), height(visible)));
+
+async function render(
+  doc: DocumentHandle,
+  ref: PageRef,
+  options: PageImageOptions,
+): Promise<Raster> {
+  return decode(await doc.page(ref).render.image({ format: 'png', ...options }));
+}
+
+/** The image's pixels, fetched the way an app would: through its object URL. */
+async function decode(image: PageImageHandle): Promise<Raster> {
+  const { url, revoke } = await image.objectUrl();
+  try {
+    return await decodePng(new Uint8Array(await (await fetch(url)).arrayBuffer()));
+  } finally {
+    revoke();
+  }
+}
+
+function isDark(raster: Raster, px: number, py: number): boolean {
+  if (px < 0 || py < 0 || px >= raster.width || py >= raster.height) return false;
+  const at = (py * raster.width + px) * 4;
+  const { rgba } = raster;
+  return rgba[at]! < 80 && rgba[at + 1]! < 80 && rgba[at + 2]! < 80 && rgba[at + 3]! > 128;
+}
+
+function darkAt(raster: Raster, point: { x: number; y: number }, scale: number): boolean {
+  return isDark(raster, Math.floor(point.x * scale), Math.floor(point.y * scale));
+}
+
+function darkInside(raster: Raster, box: PageBox, scale: number): number {
+  let count = 0;
+  const x0 = Math.ceil(box.x * scale);
+  const x1 = Math.floor((box.x + box.width) * scale);
+  const y0 = Math.ceil(box.y * scale);
+  const y1 = Math.floor((box.y + box.height) * scale);
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0; x < x1; x++) if (isDark(raster, x, y)) count++;
+  }
+  return count;
+}
+
+function everyPixelDark(raster: Raster): boolean {
+  for (let y = 0; y < raster.height; y++) {
+    for (let x = 0; x < raster.width; x++) if (!isDark(raster, x, y)) return false;
+  }
+  return true;
+}

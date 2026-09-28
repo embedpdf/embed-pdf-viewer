@@ -27,15 +27,20 @@ for (const page of pages) {
 }
 ```
 
-| Field      | What it is                                                                                                   |
-| :--------- | :----------------------------------------------------------------------------------------------------------- |
-| `index`    | Position in the document, from 0. Changes when pages move.                                                   |
-| `ref`      | The page's address. Stays the same when pages move; pass it to every page call.                              |
-| `label`    | The page's label from the PDF (`'iii'`, `'A-1'`), or `null` when the file has none.                          |
-| `size`     | `{ width, height }` of the visible area (the crop box) in points, before rotation.                           |
-| `rotation` | `0`, `90`, `180` or `270`: how far the page is turned clockwise when shown.                                  |
-| `userUnit` | How large one point is, in multiples of 1/72 inch. `1` for almost every file.                                |
-| `boxes`    | The page's boxes in PDF points: `media` and `crop` always, `bleed`, `trim` and `art` when the file has them. |
+| Field      | What it is                                                                                  |
+| :--------- | :------------------------------------------------------------------------------------------ |
+| `index`    | Position in the document, from 0. Changes when pages move.                                  |
+| `ref`      | The page's address. Stays the same when pages move; pass it to every page call.             |
+| `label`    | The page's label from the PDF (`'iii'`, `'A-1'`), or `null` when the file has none.         |
+| `size`     | `{ width, height }` of the visible area (the crop box) in points, before rotation.          |
+| `rotation` | `0`, `90`, `180` or `270`: how far the page is turned clockwise when shown.                 |
+| `userUnit` | How large one point is, in multiples of 1/72 inch. `1` for almost every file.               |
+| `boxes`    | The page's five boxes in PDF points: `media`, `crop`, `bleed`, `trim` and `art`. See below. |
+
+`boxes` follows the PDF standard. A box the file leaves out takes its default: the crop box is the
+media box, and the bleed, trim and art boxes are the crop box. Every box stays inside the media
+box, so a crop box that reaches past it is cut back. `crop` is what the page shows, and `size` is
+its size.
 
 `size` is the page before it's turned. For a page at `90` or `270`, swap width and height to get
 the size it's shown at:

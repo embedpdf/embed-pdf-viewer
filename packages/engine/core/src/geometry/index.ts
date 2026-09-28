@@ -30,6 +30,7 @@ export {
   pdfQuadCorners,
   pdfQuadFromCorners,
   pdfRectTurnedBounds,
+  pdfRectIntersection,
   isSamePdfRect,
 } from './convert';
 export type { PdfPointTurn } from './pointTurn';
@@ -41,3 +42,5 @@ export {
   pdfTurnOfUpright,
 } from './pointTurn';
 export { renderSize } from './renderSize';
+export type { WrittenPageBoxes } from './pageBoxes';
+export { DEFAULT_MEDIA_BOX, pageBoxesOf } from './pageBoxes';

@@ -61,6 +61,9 @@ describe('create() controller hook', () => {
       boxes: {
         media: { left: 10, bottom: 20, right: 210, top: 320 },
         crop: { left: 10, bottom: 20, right: 210, top: 320 },
+        bleed: { left: 10, bottom: 20, right: 210, top: 320 },
+        trim: { left: 10, bottom: 20, right: 210, top: 320 },
+        art: { left: 10, bottom: 20, right: 210, top: 320 },
       },
     };
     const handle = makeHandle('d', [cropped]);

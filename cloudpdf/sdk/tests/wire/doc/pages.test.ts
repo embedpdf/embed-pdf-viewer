@@ -186,6 +186,9 @@ describe("PagesClient", () => {
                         boxes: {
                             media: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
                             crop: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                            bleed: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                            trim: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                            art: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
                         },
                     },
                 ],
@@ -438,6 +441,9 @@ describe("PagesClient", () => {
                         boxes: {
                             media: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
                             crop: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                            bleed: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                            trim: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                            art: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
                         },
                     },
                 ],
@@ -569,6 +575,9 @@ describe("PagesClient", () => {
                         boxes: {
                             media: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
                             crop: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                            bleed: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                            trim: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                            art: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
                         },
                     },
                 ],
@@ -700,6 +709,9 @@ describe("PagesClient", () => {
                         boxes: {
                             media: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
                             crop: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                            bleed: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                            trim: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                            art: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
                         },
                     },
                 ],
@@ -831,6 +843,9 @@ describe("PagesClient", () => {
                         boxes: {
                             media: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
                             crop: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                            bleed: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                            trim: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                            art: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
                         },
                     },
                 ],
@@ -962,6 +977,9 @@ describe("PagesClient", () => {
                         boxes: {
                             media: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
                             crop: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                            bleed: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                            trim: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                            art: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
                         },
                     },
                 ],

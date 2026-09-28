@@ -158,17 +158,27 @@ function tileGrid(fn, doc, pageWidthPx, cols, rows) {
   return tiles;
 }
 
-// The page size with rotation normalized to 0, read without parsing the page.
+// The visible page's size, unrotated, read without parsing the page: the crop
+// box within the media box (US Letter when the page has none).
 function pageSize(fn, doc) {
   const { mem } = runtime;
-  const size = mem.alloc(8);
+  const rect = mem.alloc(16);
+  const box = (type) => {
+    if (!fn.EPDF_GetPageBoxByIndex(doc, pageIndex, type, rect)) return null;
+    // FS_RECTF: left, top, right, bottom.
+    const [left, top, right, bottom] = [0, 4, 8, 12].map((at) => mem.peek(rect, 'f32', at));
+    return { left, top, right, bottom };
+  };
   try {
-    if (!fn.EPDF_GetPageSizeByIndexNormalized(doc, pageIndex, size)) {
-      throw new Error(`no page ${pageIndex}`);
-    }
-    return { width: mem.peek(size, 'f32', 0), height: mem.peek(size, 'f32', 4) };
+    const media = box(0) ?? { left: 0, top: 792, right: 612, bottom: 0 };
+    const crop = box(1) ?? media;
+    const width = Math.min(crop.right, media.right) - Math.max(crop.left, media.left);
+    const height = Math.min(crop.top, media.top) - Math.max(crop.bottom, media.bottom);
+    return width > 0 && height > 0
+      ? { width, height }
+      : { width: media.right - media.left, height: media.top - media.bottom };
   } finally {
-    mem.free(size);
+    mem.free(rect);
   }
 }
 

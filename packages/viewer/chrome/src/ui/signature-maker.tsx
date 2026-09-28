@@ -79,8 +79,10 @@ function MarkPad({
   };
   const commitStrokes = (next: Stroke[]) => {
     setStrokes(next);
+    // A mark's strokes go up the page, the pad's go down it.
+    const upright = next.map((stroke) => stroke.map(({ x, y }) => ({ x, y: PAD.height - y })));
     onChange(
-      next.length ? { kind: 'ink', strokes: next, color: '#000000', strokeWidth: 2.5 } : null,
+      next.length ? { kind: 'ink', strokes: upright, color: '#000000', strokeWidth: 2.5 } : null,
     );
   };
   const commitText = async (next: string, key: string) => {

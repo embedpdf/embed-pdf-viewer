@@ -125,6 +125,18 @@ export function pdfRectTurnedBounds(rect: PdfRect, degrees: number): PdfRect {
 }
 
 /**
+ * The area two normalized rects share, or `null` when they share none. Keys
+ * in `normalizePdfRect`'s order, so a rect reads the same whichever made it.
+ */
+export function pdfRectIntersection(rect: PdfRect, other: PdfRect): PdfRect | null {
+  const left = Math.max(rect.left, other.left);
+  const right = Math.min(rect.right, other.right);
+  const bottom = Math.max(rect.bottom, other.bottom);
+  const top = Math.min(rect.top, other.top);
+  return left < right && bottom < top ? { left, right, bottom, top } : null;
+}
+
+/**
  * Whether two rects are the same within what a file's numbers hold: Acrobat
  * writes three decimals, and a rect the engine writes is floats.
  */

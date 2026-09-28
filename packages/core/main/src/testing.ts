@@ -103,7 +103,13 @@ const layoutOf = (page: TestPage, index: number): PageLayout => {
     size,
     rotation: page.rotation ?? 0,
     userUnit: page.userUnit ?? 1,
-    boxes: { media: { ...crop }, crop: { ...crop } },
+    boxes: {
+      media: { ...crop },
+      crop: { ...crop },
+      bleed: { ...crop },
+      trim: { ...crop },
+      art: { ...crop },
+    },
   };
 };
 

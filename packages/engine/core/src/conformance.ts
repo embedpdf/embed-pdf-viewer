@@ -70,6 +70,15 @@ export {
   runPageRenderConformance,
   type PageRenderConformanceOptions,
 } from './conformance/runPageRenderConformance';
+export {
+  runPageSpaceConformance,
+  type PageSpaceConformanceOptions,
+} from './conformance/runPageSpaceConformance';
+export {
+  PAGE_SPACE_FIXTURES,
+  type PageSpaceFixture,
+  type PageSpaceFixturePage,
+} from './conformance/pageSpaceFixtures';
 export { runPageDeleteConformance } from './conformance/runPageDeleteConformance';
 export { runNamedPagesConformance } from './conformance/runNamedPagesConformance';
 export { runAnnotationFlattenConformance } from './conformance/runAnnotationFlattenConformance';

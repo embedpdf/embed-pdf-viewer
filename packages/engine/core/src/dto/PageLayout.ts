@@ -3,22 +3,22 @@ import type { PageRef } from '../identity/PageRef';
 import type { PdfPageActions } from './PdfAction';
 
 /**
- * The five PDF page boundary boxes, each in PDF user space as a `PdfRect`
- * (`{ left, bottom, right, top }`, y-up edges, page-box origin preserved —
- * a MediaBox may have a non-zero or negative origin). `media` and `crop` are
- * always present (`crop` defaults to `media` when the PDF omits it — the
- * viewer always needs an effective crop). `bleed`, `trim`, and `art` are
- * present only when the PDF actually declares them.
+ * The five PDF page boundary boxes, in PDF user space as `PdfRect`s
+ * (`{ left, bottom, right, top }`, y-up edges, page-box origin kept: a media
+ * box may start at non-zero or negative numbers), as ISO 32000-1 §14.11.2
+ * defines them: the crop box defaults to the media box and the other three to
+ * the crop box, and each is reduced to the part it shares with the media box.
+ * `crop` is the visible page, what the page shows.
  *
- * Coordinates are not rotated and not origin-normalized; the display
- * transform (origin shift, Y-flip, rotation) lives in the SDK, never here.
+ * Coordinates are not rotated; the display transform (origin shift, y flip,
+ * rotation) lives in the SDK, never here.
  */
 export interface PageBoxes {
   media: PdfRect;
   crop: PdfRect;
-  bleed?: PdfRect;
-  trim?: PdfRect;
-  art?: PdfRect;
+  bleed: PdfRect;
+  trim: PdfRect;
+  art: PdfRect;
 }
 
 /**
@@ -27,8 +27,8 @@ export interface PageBoxes {
  * `weakAnnotationState`) — that lives on annotation reads and the cloud
  * manifest only.
  *
- * `size` is the un-rotated crop dimensions (from
- * `EPDF_GetPageSizeByIndexNormalized`, which does not swap for rotation).
+ * `size` is the un-rotated size of the visible page (`boxes.crop`), not
+ * swapped for rotation.
  * `rotation` is a separate field; the SDK swaps width/height for 90/270 to
  * derive the on-screen display size. Keeping the wire un-rotated keeps it
  * consistent with the raw `boxes` and with the "transform lives in the SDK"

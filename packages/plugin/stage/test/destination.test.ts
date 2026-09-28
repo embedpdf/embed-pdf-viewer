@@ -13,6 +13,9 @@ const letter: PageLayout = {
   boxes: {
     media: { left: 0, bottom: 0, right: 612, top: 792 },
     crop: { left: 0, bottom: 0, right: 612, top: 792 },
+    bleed: { left: 0, bottom: 0, right: 612, top: 792 },
+    trim: { left: 0, bottom: 0, right: 612, top: 792 },
+    art: { left: 0, bottom: 0, right: 612, top: 792 },
   },
 };
 
@@ -23,6 +26,9 @@ const cropped: PageLayout = {
   boxes: {
     media: { left: 0, bottom: 0, right: 612, top: 792 },
     crop: { left: 10, bottom: 8, right: 610, top: 788 },
+    bleed: { left: 10, bottom: 8, right: 610, top: 788 },
+    trim: { left: 10, bottom: 8, right: 610, top: 788 },
+    art: { left: 10, bottom: 8, right: 610, top: 788 },
   },
 };
 

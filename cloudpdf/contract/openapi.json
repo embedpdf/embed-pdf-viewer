@@ -23691,7 +23691,7 @@
                           "$ref": "#/components/schemas/DocPagesMove200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
                         }
                       },
-                      "required": ["media", "crop"],
+                      "required": ["media", "crop", "bleed", "trim", "art"],
                       "additionalProperties": false
                     },
                     "actions": {
@@ -24071,7 +24071,7 @@
                           "$ref": "#/components/schemas/DocPagesRotate200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
                         }
                       },
-                      "required": ["media", "crop"],
+                      "required": ["media", "crop", "bleed", "trim", "art"],
                       "additionalProperties": false
                     },
                     "actions": {
@@ -24451,7 +24451,7 @@
                           "$ref": "#/components/schemas/DocPagesDelete200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
                         }
                       },
-                      "required": ["media", "crop"],
+                      "required": ["media", "crop", "bleed", "trim", "art"],
                       "additionalProperties": false
                     },
                     "actions": {
@@ -24831,7 +24831,7 @@
                           "$ref": "#/components/schemas/DocPagesSetName200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
                         }
                       },
-                      "required": ["media", "crop"],
+                      "required": ["media", "crop", "bleed", "trim", "art"],
                       "additionalProperties": false
                     },
                     "actions": {
@@ -25211,7 +25211,7 @@
                           "$ref": "#/components/schemas/DocPagesRemoveName200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
                         }
                       },
-                      "required": ["media", "crop"],
+                      "required": ["media", "crop", "bleed", "trim", "art"],
                       "additionalProperties": false
                     },
                     "actions": {
@@ -25878,7 +25878,7 @@
                           "$ref": "#/components/schemas/DocPagesInsert200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
                         }
                       },
-                      "required": ["media", "crop"],
+                      "required": ["media", "crop", "bleed", "trim", "art"],
                       "additionalProperties": false
                     },
                     "actions": {
@@ -26264,7 +26264,7 @@
                           "$ref": "#/components/schemas/DocPagesInsertBlank200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
                         }
                       },
-                      "required": ["media", "crop"],
+                      "required": ["media", "crop", "bleed", "trim", "art"],
                       "additionalProperties": false
                     },
                     "actions": {

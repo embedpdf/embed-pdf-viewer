@@ -53,6 +53,7 @@ export type {
   PdfOriginSize,
   PdfQuadCorners,
   PdfPointTurn,
+  WrittenPageBoxes,
   LinePoints,
   InkStroke,
   InkList,
@@ -69,6 +70,7 @@ export {
   pdfQuadCorners,
   pdfQuadFromCorners,
   pdfRectTurnedBounds,
+  pdfRectIntersection,
   isSamePdfRect,
   pdfPointsBounds,
   pdfPointTurned,
@@ -76,6 +78,8 @@ export {
   pdfTurnOfDrawn,
   pdfTurnOfUpright,
   renderSize,
+  DEFAULT_MEDIA_BOX,
+  pageBoxesOf,
 } from './geometry';
 export type { PageTextSnapshot } from './dto/PageTextSnapshot';
 export type {

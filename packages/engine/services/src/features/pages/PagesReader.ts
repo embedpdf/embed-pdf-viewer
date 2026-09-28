@@ -6,7 +6,12 @@ import type {
   PdfRect,
   PdfPageActions,
 } from '@embedpdf/engine-core/runtime';
-import { normalizePdfRect, toPageRef } from '@embedpdf/engine-core/runtime';
+import {
+  normalizePdfRect,
+  pageBoxesOf,
+  pdfRectSize,
+  toPageRef,
+} from '@embedpdf/engine-core/runtime';
 import type {
   PdfFunctions,
   PdfRuntimeMemory,
@@ -17,14 +22,7 @@ import type {
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { withScratchN } from '../../runtime/memory/scratch';
 import { readUtf16String } from '../../runtime/memory/strings';
-import {
-  F32_BYTES,
-  RECTF_BYTES,
-  SIZEF_BYTES,
-  readF32,
-  readRectF,
-  readSizeF,
-} from '../../runtime/memory/structs';
+import { F32_BYTES, RECTF_BYTES, readF32, readRectF } from '../../runtime/memory/structs';
 import { throwIfAborted } from '../../shared/abort';
 import { ActionReadBudgetTracker, readActionModel } from '../actions/ActionModelReader';
 
@@ -56,28 +54,25 @@ export class PagesReader {
     const actionBudget = new ActionReadBudgetTracker();
 
     // One scratch buffer per struct kind, reused across every page.
-    return withScratchN(
-      mem,
-      [RECTF_BYTES, SIZEF_BYTES, F32_BYTES],
-      ([rectPtr, sizePtr, userUnitPtr]) => {
-        const pages: PageLayout[] = records.map((record) => {
-          throwIfAborted(signal);
-          const index = record.pageIndex;
-          const actions = readPageActions(fn, mem, docPtr, record.pageObjectNumber, actionBudget);
-          return {
-            index,
-            ref: toPageRef(record.pageObjectNumber),
-            label: readLabel(fn, mem, docPtr, index),
-            size: readSize(fn, mem, docPtr, index, sizePtr),
-            rotation: readRotation(fn, docPtr, index),
-            userUnit: readUserUnit(fn, mem, docPtr, index, userUnitPtr),
-            boxes: readBoxes(fn, mem, docPtr, index, rectPtr),
-            ...(actions ? { actions } : {}),
-          };
-        });
-        return { pageCount: pages.length, pages, namedPages: readNamedPages(fn, mem, docPtr) };
-      },
-    );
+    return withScratchN(mem, [RECTF_BYTES, F32_BYTES], ([rectPtr, userUnitPtr]) => {
+      const pages: PageLayout[] = records.map((record) => {
+        throwIfAborted(signal);
+        const index = record.pageIndex;
+        const actions = readPageActions(fn, mem, docPtr, record.pageObjectNumber, actionBudget);
+        const boxes = readBoxes(fn, mem, docPtr, index, rectPtr);
+        return {
+          index,
+          ref: toPageRef(record.pageObjectNumber),
+          label: readLabel(fn, mem, docPtr, index),
+          size: pdfRectSize(boxes.crop),
+          rotation: readRotation(fn, docPtr, index),
+          userUnit: readUserUnit(fn, mem, docPtr, index, userUnitPtr),
+          boxes,
+          ...(actions ? { actions } : {}),
+        };
+      });
+      return { pageCount: pages.length, pages, namedPages: readNamedPages(fn, mem, docPtr) };
+    });
   }
 }
 
@@ -108,26 +103,20 @@ function readPageActions(
   return open || close ? actions : undefined;
 }
 
-/**
- * Read one FS_RECTF box and canonicalize to a y-up `PdfRect`
- * (`{ left, bottom, right, top }`, equivalent to `[llx, lly, urx, ury]`) so
- * the lower-left/upper-right invariant holds regardless of how the PDF
- * ordered the corners. Returns null when the optional box is absent.
- */
-function readBox(
+/** One box as the page writes it, or `undefined` when it is absent, empty or not four numbers. */
+function readWrittenBox(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   docPtr: Ptr,
   index: number,
   boxType: number,
   rectPtr: Ptr,
-): PdfRect | null {
-  if (!fn.EPDF_GetPageBoxByIndex(docPtr, index, boxType, rectPtr)) return null;
-  // FS_RECTF → y-up `PdfRect`, normalized so the lower-left/upper-right invariant
-  // holds regardless of how the PDF ordered the corners.
+): PdfRect | undefined {
+  if (!fn.EPDF_GetPageBoxByIndex(docPtr, index, boxType, rectPtr)) return undefined;
   return normalizePdfRect(readRectF(mem, rectPtr));
 }
 
+/** The page's five boxes as ISO 32000 defines them; `crop` is the visible page. */
 export function readBoxes(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
@@ -135,38 +124,14 @@ export function readBoxes(
   index: number,
   rectPtr: Ptr,
 ): PageBoxes {
-  // MediaBox always resolves (page-tree inheritance + PDFium default).
-  // CropBox falls back to MediaBox, so both are guaranteed present.
-  const media = readBox(fn, mem, docPtr, index, BOX_MEDIA, rectPtr) ?? {
-    left: 0,
-    bottom: 0,
-    right: 0,
-    top: 0,
-  };
-  const crop = readBox(fn, mem, docPtr, index, BOX_CROP, rectPtr) ?? media;
-  const bleed = readBox(fn, mem, docPtr, index, BOX_BLEED, rectPtr);
-  const trim = readBox(fn, mem, docPtr, index, BOX_TRIM, rectPtr);
-  const art = readBox(fn, mem, docPtr, index, BOX_ART, rectPtr);
-  return {
-    media,
-    crop,
-    ...(bleed ? { bleed } : {}),
-    ...(trim ? { trim } : {}),
-    ...(art ? { art } : {}),
-  };
-}
-
-function readSize(
-  fn: PdfFunctions,
-  mem: PdfRuntimeMemory,
-  docPtr: Ptr,
-  index: number,
-  sizePtr: Ptr,
-): { width: number; height: number } {
-  if (!fn.EPDF_GetPageSizeByIndexNormalized(docPtr, index, sizePtr)) {
-    return { width: 0, height: 0 };
-  }
-  return readSizeF(mem, sizePtr);
+  const read = (boxType: number) => readWrittenBox(fn, mem, docPtr, index, boxType, rectPtr);
+  return pageBoxesOf({
+    media: read(BOX_MEDIA),
+    crop: read(BOX_CROP),
+    bleed: read(BOX_BLEED),
+    trim: read(BOX_TRIM),
+    art: read(BOX_ART),
+  });
 }
 
 function readRotation(fn: PdfFunctions, docPtr: Ptr, index: number): 0 | 90 | 180 | 270 {
