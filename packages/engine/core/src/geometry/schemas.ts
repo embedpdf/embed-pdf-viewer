@@ -15,7 +15,6 @@ import type {
   PdfRect,
   PdfRotation,
   PdfSize,
-  PdfTopLeft,
 } from './primitives';
 
 export const PdfPointSchema: z.ZodType<PdfPoint> = z.object({
@@ -41,11 +40,6 @@ export const PdfRectSchema: z.ZodType<PdfRect> = z.object({
   left: z.number(),
   bottom: z.number(),
   right: z.number(),
-  top: z.number(),
-});
-
-export const PdfTopLeftSchema: z.ZodType<PdfTopLeft> = z.object({
-  left: z.number(),
   top: z.number(),
 });
 

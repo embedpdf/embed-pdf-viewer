@@ -8,12 +8,7 @@ import {
   PdfMeasureWriteSchema,
 } from '../../dto/Measure.schema';
 import { PdfAnnotationActionsSchema } from '../../dto/PdfAction.schema';
-import {
-  PdfPointSchema,
-  PdfQuadSchema,
-  PdfRectSchema,
-  PdfTopLeftSchema,
-} from '../../geometry/schemas';
+import { PdfPointSchema, PdfQuadSchema, PdfRectSchema } from '../../geometry/schemas';
 import { PageRefSchema } from '../../identity/PageRef.schema';
 import {
   AnnotationBorderStyleSchema,
@@ -160,16 +155,6 @@ export const vertexFields = {
   ...drawnRectFields,
   vertices: field.data(z.array(PdfPointSchema)).space('points'),
   ...pointsTurnFields,
-};
-
-/**
- * A note's or a file's icon: a fixed-size symbol placed by its left and top
- * edges, the corner PDF keeps in place for an icon that doesn't zoom.
- */
-export const iconFields = {
-  ...drawnRectFields,
-  /** The icon's left edge and top edge. */
-  at: field.data(PdfTopLeftSchema).space('topLeft'),
 };
 
 /**

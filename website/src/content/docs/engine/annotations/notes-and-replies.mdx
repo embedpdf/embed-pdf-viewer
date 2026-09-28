@@ -13,13 +13,13 @@ have replies, so a note, a highlight or a shape can each start a conversation.
 ```ts
 const { annotation: note } = await page.annotations.create({
   subtype: 'text',
-  at: { left: 500, top: 720 },
+  rect: { left: 500, bottom: 700, right: 520, top: 720 },
   contents: 'Is this total right?',
 });
 
 await page.annotations.create({
   subtype: 'text',
-  at: note.at,
+  rect: note.rect,
   contents: 'Yes, checked against the invoice.',
   reply: { to: note.ref },
 });
@@ -29,21 +29,20 @@ A note's `subtype` is `'text'`.
 
 ## Add a note
 
-| Field      | What it is                                                                                                   | Default  |
-| :--------- | :----------------------------------------------------------------------------------------------------------- | :------- |
-| `at`       | Where the icon goes: its left and top edges, `{ left, top }`. Required; see [The note icon](#the-note-icon). |          |
-| `contents` | The comment.                                                                                                 | none     |
-| `icon`     | `'note'`, `'comment'`, `'key'`, `'help'`, `'insert'`, `'paragraph'` or `'new-paragraph'`                     | `'note'` |
-| `color`    | The icon's color, `{ r, g, b }`.                                                                             | yellow   |
-| `opacity`  | From `0` to `1`.                                                                                             | `1`      |
-| `subject`  | A short label for the comment, such as `'Question'`.                                                         | none     |
+| Field      | What it is                                                                               | Default  |
+| :--------- | :--------------------------------------------------------------------------------------- | :------- |
+| `rect`     | The icon's box, which the icon fills. Required; see [The note icon](#the-note-icon).     |          |
+| `contents` | The comment.                                                                             | none     |
+| `icon`     | `'note'`, `'comment'`, `'key'`, `'help'`, `'insert'`, `'paragraph'` or `'new-paragraph'` | `'note'` |
+| `color`    | The icon's color, `{ r, g, b }`.                                                         | yellow   |
+| `opacity`  | From `0` to `1`.                                                                         | `1`      |
+| `subject`  | A short label for the comment, such as `'Question'`.                                     | none     |
 
-A read also has `rect`, the icon's box on the page, which the engine works out. Change the comment
-like any other field, and move the icon by its `at`:
+Change the comment like any other field, and move the icon by its `rect`:
 
 ```ts
 await page.annotations.update(note.ref, { contents: 'Is this total right? It looks low.' });
-await page.annotations.update(note.ref, { at: { left: 480, top: 720 } });
+await page.annotations.update(note.ref, { rect: { left: 480, bottom: 700, right: 500, top: 720 } });
 ```
 
 ## Reply to an annotation
@@ -52,9 +51,11 @@ A reply is an annotation with a `reply` field that names the one it answers. It'
 note placed where its parent is. Here a note answers a highlight:
 
 ```ts
+const { left, top } = highlight.rect;
+
 await page.annotations.create({
   subtype: 'text',
-  at: { left: highlight.rect.left, top: highlight.rect.top },
+  rect: { left, bottom: top - 20, right: left + 20, top },
   contents: 'Agreed, this needs a source.',
   reply: { to: highlight.ref },
 });
@@ -114,7 +115,7 @@ It isn't a comment, so hide its icon:
 ```ts
 await page.annotations.create({
   subtype: 'text',
-  at: note.at,
+  rect: note.rect,
   reply: { to: note.ref },
   state: 'accepted',
   hidden: true,
@@ -209,11 +210,9 @@ its parts point to; the parts' own comments are ignored.
 
 ### The note icon
 
-The icon is always 20 × 20 points, down and to the right from `at`: its left and top edges, in
-PDF points like every coordinate. That's the corner PDF keeps in place for an icon that doesn't
-zoom or turn with the page, as a link's `/XYZ` destination keeps the top-left of the view. The
-engine sets `rect` to the icon's box. The icon is filled with `color` and outlined in black or
-white, whichever stands out against it.
+The icon fills `rect`, as in every PDF app: a bigger rect draws a bigger icon, and a rect that
+isn't square stretches it. 20 × 20 points is the usual size, the one PDF apps place a note at.
+The icon is filled with `color` and outlined in black or white, whichever stands out against it.
 
 ### How it's stored
 

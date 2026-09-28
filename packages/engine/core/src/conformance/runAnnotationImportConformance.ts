@@ -1,4 +1,4 @@
-import { creatables, PNG_1X1 } from './creatables';
+import { creatables, iconRect, PNG_1X1 } from './creatables';
 import type {
   AnnotationResourceConformanceOptions,
   AnnotationResourceFixture,
@@ -76,13 +76,13 @@ export function runAnnotationImportConformance(
         );
         const note = await create(page, {
           subtype: 'text',
-          at: { left: box(140).left, top: box(140).top },
+          rect: iconRect(box(140).left, box(140).top),
           contents: 'Check',
         });
         await create(page, { subtype: 'popup', rect: box(200), parent: note.ref, open: true });
         await create(page, {
           subtype: 'text',
-          at: { left: box(140).left, top: box(140).top },
+          rect: iconRect(box(140).left, box(140).top),
           reply: { to: note.ref },
         });
         await create(page, {
@@ -138,12 +138,12 @@ export function runAnnotationImportConformance(
         const page = source.page(pageRef);
         const taken = await create(page, {
           subtype: 'text',
-          at: { left: box(20).left, top: box(20).top },
+          rect: iconRect(box(20).left, box(20).top),
           nm: 'taken',
         });
         const reply = await create(page, {
           subtype: 'text',
-          at: { left: box(20).left, top: box(20).top },
+          rect: iconRect(box(20).left, box(20).top),
           reply: { to: taken.ref },
         });
         const free = await create(page, { subtype: 'square', box: box(80), nm: 'free' });

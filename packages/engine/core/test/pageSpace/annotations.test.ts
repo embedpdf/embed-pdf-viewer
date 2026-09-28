@@ -120,10 +120,10 @@ describe('annotations in page space', () => {
     pages.forEach((page, i) => expect(pdfAnnotationOf(page, visible, boxOf)).toEqual(cases[i]));
   });
 
-  test("an icon's left and top edges become its top-left point", () => {
-    const note = read({ subtype: 'text', at: { left: 72, top: 720 } });
+  test("an icon's rect is a box like any other", () => {
+    const note = read({ subtype: 'text', rect: { left: 72, bottom: 700, right: 92, top: 720 } });
     const page = pageAnnotationOf(note, visible, boxOf);
-    expect(page).toMatchObject({ at: { x: 22, y: 12 } });
+    expect(page).toMatchObject({ rect: { x: 22, y: 12, width: 20, height: 20 } });
     expect(pdfAnnotationOf(page, visible, boxOf)).toEqual(note);
   });
 

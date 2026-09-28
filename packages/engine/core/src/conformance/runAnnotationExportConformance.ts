@@ -1,3 +1,4 @@
+import { iconRect } from './creatables';
 import type {
   AnnotationResourceConformanceOptions,
   AnnotationResourceFixture,
@@ -74,7 +75,7 @@ export function runAnnotationExportConformance(
         const file = await page.annotations.create(
           {
             subtype: 'file-attachment',
-            at: { left: box(260).left, top: box(260).top },
+            rect: iconRect(box(260).left, box(260).top),
             file: { name: 'note.txt' },
           },
           { file: new TextEncoder().encode('attached') },
@@ -152,18 +153,18 @@ export function runAnnotationExportConformance(
           (await page.annotations.create(draft)).annotation as AnnotationDTO;
         const note = await create({
           subtype: 'text',
-          at: { left: rect.left, top: rect.top },
+          rect: iconRect(rect.left, rect.top),
           contents: 'Check this',
         });
         const popup = await create({ subtype: 'popup', rect, parent: note.ref });
         const reply = await create({
           subtype: 'text',
-          at: { left: rect.left, top: rect.top },
+          rect: iconRect(rect.left, rect.top),
           reply: { to: note.ref },
         });
         const answer = await create({
           subtype: 'text',
-          at: { left: rect.left, top: rect.top },
+          rect: iconRect(rect.left, rect.top),
           reply: { to: reply.ref },
         });
         await create({ subtype: 'square', box: rect });

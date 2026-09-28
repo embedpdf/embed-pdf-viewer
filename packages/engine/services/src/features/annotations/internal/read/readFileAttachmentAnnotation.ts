@@ -10,7 +10,6 @@ import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runti
 import { readAttachmentFileInfo } from '../../../attachments/internal/attachmentPrimitives';
 import { FILE_NAME_TO_ICON } from '../annotationIcon';
 import { readAnnotColor, readAnnotOpacity, readAnnotName } from './annotationReadPrimitives';
-import { iconCornerOf } from '../iconCorner';
 
 /** Default `/C` — matches the generator's default icon fill and the writer default. */
 const DEFAULT_FILE_ATTACHMENT_COLOR: Color = { r: 255, g: 255, b: 0 };
@@ -45,7 +44,6 @@ export function readFileAttachment(
   return {
     ...base,
     subtype: 'file-attachment',
-    at: iconCornerOf(base.rect),
     icon,
     file,
     color,

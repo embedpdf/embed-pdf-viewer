@@ -46,7 +46,6 @@ export { decodeSubmitFormFlags } from './dto/PdfAction';
 export type {
   PdfPoint,
   PdfRect,
-  PdfTopLeft,
   PdfSize,
   PdfQuad,
   PdfRotation,
@@ -452,16 +451,7 @@ export { assertAnnotationDraft, checkAnnotationPatch } from './annotation/checkW
 
 // Page space: positions from the top-left of a page's visible box, y down.
 export type { PageBox, PagePoint, PageQuad } from './geometry';
-export {
-  pageBoxOf,
-  pagePointOf,
-  pagePointOfTopLeft,
-  pageQuadOf,
-  pdfPointOf,
-  pdfQuadOf,
-  pdfRectOf,
-  pdfTopLeftOf,
-} from './geometry';
+export { pageBoxOf, pagePointOf, pageQuadOf, pdfPointOf, pdfQuadOf, pdfRectOf } from './geometry';
 export * from './pageSpace';
 export type { FormFieldRef, FormWidget } from './identity/FormFieldRef';
 export { formWidget, toFieldRef } from './identity/FormFieldRef';

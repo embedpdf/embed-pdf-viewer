@@ -53,7 +53,7 @@ export {
   colorToCss,
   cssToColor,
   annotationKey,
-  iconAt,
+  contentToPdfRect,
   styleFromDTO,
   widgetAppearanceFromProps,
   writableTarget,

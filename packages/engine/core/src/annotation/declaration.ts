@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { AnnotationResourceRole } from './resources';
 import type { PdfAnnotationActions } from '../dto/PdfAction';
 import type { PageDestination, PdfDestination } from '../dto/PdfDestination';
-import type { PageBox, PagePoint } from '../geometry/pageSpace';
+import type { PageBox } from '../geometry/pageSpace';
 
 /**
  * One declaration per annotation kind. Each field says who writes it, what it
@@ -61,7 +61,6 @@ export type FieldSpace =
   | 'quads'
   | 'linePoints'
   | 'calloutLine'
-  | 'topLeft'
   | 'measure'
   | 'linkTarget'
   | 'actions';
@@ -233,8 +232,7 @@ type SpaceOf<F> = F extends { traits: { space: infer Space } } ? Space : never;
 
 /**
  * A field's value in page space, by what the field holds: a box becomes a
- * `PageBox`, a box's left and top edges its top-left `PagePoint`, and a
- * destination a `PageDestination`. Points keep their shape (`{ x, y }`), so
+ * `PageBox` and a destination a `PageDestination`. Points keep their shape (`{ x, y }`), so
  * their type is the same in both spaces. `null` and a value left out stay as
  * they are.
  */
@@ -242,15 +240,13 @@ export type PageValue<Space, Value> = Value extends null | undefined
   ? Value
   : Space extends 'box'
     ? PageBox
-    : Space extends 'topLeft'
-      ? PagePoint
-      : Space extends 'linkTarget'
-        ? Value extends { destination: PdfDestination }
-          ? Omit<Value, 'destination'> & { destination: PageDestination }
-          : Value
-        : Space extends 'actions'
-          ? PdfAnnotationActions<PageDestination>
-          : Value;
+    : Space extends 'linkTarget'
+      ? Value extends { destination: PdfDestination }
+        ? Omit<Value, 'destination'> & { destination: PageDestination }
+        : Value
+      : Space extends 'actions'
+        ? PdfAnnotationActions<PageDestination>
+        : Value;
 
 type PageFieldRead<F> = PageValue<SpaceOf<F>, ReadValue<F>>;
 type PageFieldWrite<F> = PageValue<SpaceOf<F>, WriteValue<F>>;

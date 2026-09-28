@@ -1,3 +1,4 @@
+import { iconRect } from './creatables';
 import type { ConformanceTestRunner, ConformanceOptions } from './runMetadataConformance';
 import type { FileAttachmentAnnotationDTO, TextAnnotationDTO } from '../annotation/kinds';
 import type { DocumentHandle } from '../engine/DocumentHandle';
@@ -201,7 +202,7 @@ export function runAttachmentConformance(
         const rect = { left: 80, bottom: 40, right: 100, top: 60 };
         const picked = new File([new Uint8Array([1, 2, 3])], 'figures.csv', { type: 'text/csv' });
         const { annotation: fromFile } = await annotations.create(
-          { subtype: 'file-attachment', at: { left: rect.left, top: rect.top } },
+          { subtype: 'file-attachment', rect: iconRect(rect.left, rect.top) },
           { file: picked },
         );
         const file = (fromFile as FileAttachmentAnnotationDTO).file!;
@@ -211,7 +212,7 @@ export function runAttachmentConformance(
         const { annotation: untyped } = await annotations.create(
           {
             subtype: 'file-attachment',
-            at: { left: rect.left, top: rect.top },
+            rect: iconRect(rect.left, rect.top),
             file: { name: 'raw.bin' },
           },
           { file: new Uint8Array([4, 5]) },
@@ -221,7 +222,7 @@ export function runAttachmentConformance(
         // Bare bytes need a name.
         await expect(
           annotations.create(
-            { subtype: 'file-attachment', at: { left: rect.left, top: rect.top } },
+            { subtype: 'file-attachment', rect: iconRect(rect.left, rect.top) },
             { file: new Uint8Array([6]) },
           ),
         ).rejects.toMatchObject({
@@ -244,7 +245,7 @@ export function runAttachmentConformance(
         const { annotation: created } = await annotations.create(
           {
             subtype: 'file-attachment',
-            at: { left: 40, top: 60 },
+            rect: iconRect(40, 60),
             file: {
               name: 'conformance.bin',
               mimeType: 'application/octet-stream',
@@ -285,7 +286,7 @@ export function runAttachmentConformance(
         const annotations = doc.page(toPageRef(firstPageObjectNumber)).annotations;
         const { annotation: created } = await annotations.create({
           subtype: 'text',
-          at: { left: 100, top: 120 },
+          rect: iconRect(100, 120),
           icon: 'comment',
           color: { r: 250, g: 204, b: 21 },
           contents: 'conformance note',

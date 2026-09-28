@@ -13,11 +13,11 @@ import { stateModelToPdf, stateToPdf } from '../annotationState';
 import {
   setAnnotColor,
   setAnnotOpacity,
+  setAnnotRect,
   writeAnnotString,
   writeAnnotStringOrClear,
 } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
-import { moveIcon, placeIcon } from '../iconCorner';
 
 /** Default `/C` — the generator's yellow note fill, set explicitly so reads round-trip. */
 const DEFAULT_NOTE_COLOR: Color = { r: 255, g: 255, b: 0 };
@@ -61,11 +61,10 @@ export function prepareTextStatePatch(
 
 /**
  * Apply a text (sticky-note) draft. The visual is entirely generator-owned:
- * the closing appearance pass (`generateAppearance`) bakes the 20×20 note
- * icon from `/C` + `/Name` (GenerateTextAP) with its top-left corner at `at`
- * (`iconCorner`), so this writer only records where and the state.
- * `/State` + `/StateModel` are dictionary-only (ISO 32000 §12.5.6.3) and
- * never reach the generator.
+ * the closing appearance pass (`generateAppearance`) draws the note icon from
+ * `/C` + `/Name` (GenerateTextAP), filling `/Rect`, so this writer only
+ * records where and the state. `/State` + `/StateModel` are dictionary-only
+ * (ISO 32000 §12.5.6.3) and never reach the generator.
  */
 export function applyTextDraft(
   fn: PdfFunctions,
@@ -74,7 +73,7 @@ export function applyTextDraft(
   draft: TextDraft,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
-  placeIcon(fn, mem, annotPtr, draft.at);
+  setAnnotRect(fn, mem, annotPtr, draft.rect);
   setAnnotColor(fn, annotPtr, draft.color ?? DEFAULT_NOTE_COLOR);
   setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULT_OPACITY);
   setNoteIcon(fn, annotPtr, draft.icon ?? 'note');
@@ -96,7 +95,7 @@ export function applyTextPatch(
   patch: TextPatch,
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);
-  if (patch.at !== undefined) moveIcon(fn, mem, annotPtr, patch.at);
+  if (patch.rect !== undefined) setAnnotRect(fn, mem, annotPtr, patch.rect);
   if (patch.color !== undefined) {
     setAnnotColor(fn, annotPtr, patch.color);
   }

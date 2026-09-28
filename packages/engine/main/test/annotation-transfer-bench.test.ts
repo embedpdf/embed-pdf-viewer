@@ -11,6 +11,7 @@ import {
   manifestBytesOf,
   type AnnotationBundle,
 } from '@embedpdf/engine-core/runtime';
+import { iconRect } from '@embedpdf/engine-core/conformance';
 import { createLocalEngine } from '../src/index';
 import {
   fill,
@@ -157,7 +158,7 @@ describe.skipIf(!ENABLED).each(['wasm', 'native'] as const)(
             await source.page((await pageRefs(source))[0]!).annotations.create(
               {
                 subtype: 'file-attachment',
-                at: { left: 40, top: 60 },
+                rect: iconRect(40, 60),
                 file: { name: 'large.bin' },
               },
               { file: bytes },

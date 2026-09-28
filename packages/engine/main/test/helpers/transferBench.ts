@@ -5,7 +5,7 @@
 import { performance } from 'node:perf_hooks';
 import { crc32, deflateSync } from 'node:zlib';
 import { toPageRef, type PageRef } from '@embedpdf/engine-core/runtime';
-import { creatables } from '@embedpdf/engine-core/conformance';
+import { creatables, iconRect } from '@embedpdf/engine-core/conformance';
 import type { createLocalEngine } from '../../src/index';
 import { pdf, type Objects } from './miniPdf';
 
@@ -88,12 +88,12 @@ export async function fill(doc: Doc, count: number): Promise<void> {
     if (i % 25 === 0) {
       const { annotation: created } = await page.annotations.create({
         subtype: 'text',
-        at: { left: rect.left, top: rect.top },
+        rect: iconRect(rect.left, rect.top),
         contents: `Note ${i}`,
       });
       await page.annotations.create({
         subtype: 'text',
-        at: { left: rect.left, top: rect.top },
+        rect: iconRect(rect.left, rect.top),
         reply: { to: created.ref },
       });
       i++;

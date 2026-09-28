@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { AttachmentFileInfoSchema } from '../../../dto/Attachment.schema';
 import { defineKind, field } from '../../declaration';
-import { annotationBaseFields, colorStyleFields, iconFields } from '../shared-fields';
+import { annotationBaseFields, colorStyleFields } from '../shared-fields';
 import { FileAttachmentIconSchema } from './values';
 
 /**
@@ -17,12 +17,12 @@ const AttachmentFileWriteSchema = z.object({
   description: z.string().nullable().optional(),
 });
 
+/** A file on the page: its icon fills `rect`, 20×20 at the usual size. */
 export const FileAttachmentDeclaration = defineKind(
   'file-attachment',
   {
     ...annotationBaseFields,
     ...colorStyleFields,
-    ...iconFields,
     icon: field.data(FileAttachmentIconSchema).optional(),
     /** `null` when the file specification has no embedded file. */
     file: field

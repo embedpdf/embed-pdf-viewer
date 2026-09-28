@@ -23,17 +23,15 @@ import type { PdfLinkTarget } from '../dto/PdfLinkTarget';
 import {
   pageBoxOf,
   pagePointOf,
-  pagePointOfTopLeft,
   pageQuadOf,
   pdfPointOf,
   pdfQuadOf,
   pdfRectOf,
-  pdfTopLeftOf,
   type PageBox,
   type PagePoint,
   type PageQuad,
 } from '../geometry/pageSpace';
-import type { PdfPoint, PdfQuad, PdfRect, PdfTopLeft } from '../geometry/primitives';
+import type { PdfPoint, PdfQuad, PdfRect } from '../geometry/primitives';
 
 /**
  * Annotation values between the file's coordinates and page space, field by
@@ -63,7 +61,6 @@ const TO_PAGE: Record<MeasuredFieldSpace, Converter> = {
   }),
   calloutLine: (points: PdfPoint[], { visible }) =>
     points.map((point) => pagePointOf(point, visible)),
-  topLeft: (topLeft: PdfTopLeft, { visible }) => pagePointOfTopLeft(topLeft, visible),
   measure: (measure: PdfMeasurement, { visible }) => pageMeasureOf(measure, visible),
   linkTarget: (target: PdfLinkTarget<PdfDestination>, { boxOf }) =>
     mapLinkTarget(target, (destination) => pageDestinationOf(destination, boxOf)),
@@ -85,7 +82,6 @@ const TO_PDF: Record<MeasuredFieldSpace, Converter> = {
   }),
   calloutLine: (points: PagePoint[], { visible }) =>
     points.map((point) => pdfPointOf(point, visible)),
-  topLeft: (point: PagePoint, { visible }) => pdfTopLeftOf(point, visible),
   measure: (measure: PdfMeasurement, { visible }) => pdfMeasureOf(measure, visible),
   linkTarget: (target: PdfLinkTarget<PageDestination>, { boxOf }) =>
     mapLinkTarget(target, (destination) => pdfDestinationOf(destination, boxOf)),

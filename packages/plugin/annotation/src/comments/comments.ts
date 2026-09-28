@@ -7,6 +7,7 @@ import {
   type AnnotationDraft,
   type AnnotationPatch,
   type AnnotationRef,
+  type PdfRect,
 } from '@embedpdf/engine-core/runtime';
 
 import type { CommentPermissions, CommentsApi, ThreadDeleteResult } from '../contract';
@@ -21,6 +22,14 @@ const REPLY_FLAGS = { print: true, noZoom: true, noRotate: true };
 // culls them regardless; `hidden` keeps foreign viewers from drawing an
 // icon).
 const STATUS_FLAGS = { hidden: true, noZoom: true, noRotate: true };
+
+/** Where a reply or a state sits: the usual 20 × 20 icon at its root's top-left corner. */
+const replyRect = (root: PdfRect): PdfRect => ({
+  left: root.left,
+  bottom: root.top - 20,
+  right: root.left + 20,
+  top: root.top,
+});
 
 /**
  * The conversation plane's verbs: every one compiles down to plain
@@ -61,7 +70,7 @@ export function createComments(
       const thread = threads.threadOf(ref);
       const created = await createConversationAnnot(thread.page.pageObjectNumber, {
         subtype: 'text',
-        at: { left: thread.root.rect.left, top: thread.root.rect.top },
+        rect: replyRect(thread.root.rect),
         icon: 'comment',
         contents: text,
         reply: { to: thread.root.ref },
@@ -92,7 +101,7 @@ export function createComments(
       const previous = userId ? thread.review.byReviewer[userId] : undefined;
       await createConversationAnnot(thread.page.pageObjectNumber, {
         subtype: 'text',
-        at: { left: thread.root.rect.left, top: thread.root.rect.top },
+        rect: replyRect(thread.root.rect),
         reply: { to: previous?.ref ?? thread.root.ref },
         state,
         stateModel: 'review',
@@ -106,7 +115,7 @@ export function createComments(
       const thread = threads.threadOf(ref);
       await createConversationAnnot(thread.page.pageObjectNumber, {
         subtype: 'text',
-        at: { left: thread.root.rect.left, top: thread.root.rect.top },
+        rect: replyRect(thread.root.rect),
         reply: { to: thread.root.ref },
         state: marked ? 'marked' : 'unmarked',
         stateModel: 'marked',

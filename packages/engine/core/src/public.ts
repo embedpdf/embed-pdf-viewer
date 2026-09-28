@@ -93,7 +93,6 @@ export type {
   PageDestination,
   PdfDestination,
   PdfRect,
-  PdfTopLeft,
   PdfPoint,
   PdfQuad,
   PdfRotation,

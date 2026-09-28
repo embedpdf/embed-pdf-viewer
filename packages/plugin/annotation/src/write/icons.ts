@@ -17,7 +17,7 @@ import type { AnnotationReads } from '../read/annotations';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import { named } from './named';
 import type { Stamps } from './stamps';
-import { iconAt } from '../repository';
+import { contentToPdfRect } from '../repository';
 import { pageSizeOf } from '../services/geometry';
 import type { ResolvedTool } from '../tools/definitions';
 
@@ -52,9 +52,9 @@ export function createIcons(
         return result.annotation.ref;
       });
 
-  /** Place a fixed-size icon annotation (note / file attachment) centred on a
-   *  content point — the icon-kind sibling of the stamp placement. The
-   *  engine bakes the 20×20 /AP from /C + /Name. */
+  /** Place an icon annotation (note / file attachment) at its usual size,
+   *  centred on a content point — the icon-kind sibling of the stamp
+   *  placement. The engine draws the icon from /C + /Name, filling /Rect. */
   const placeIconAt = (
     tool: ResolvedTool,
     pageObjectNumber: number,
@@ -68,7 +68,7 @@ export function createIcons(
     const box: Rect = fitStampBox(point, ICON_PLACE_SIZE, pageSizeOf(crop), rotCW);
     const placement = iconPlacement(
       tool.subtype,
-      { at: iconAt(box, crop) },
+      { rect: contentToPdfRect(box, crop) },
       defaultsFor(store.model(), tool.preset),
       tool.flags,
       file,
@@ -120,7 +120,7 @@ export function createIcons(
       const box: Rect = fitStampBox(at, ICON_PLACE_SIZE, pageSizeOf(crop), 0);
       const placement = iconPlacement(
         tool.subtype,
-        { at: iconAt(box, crop) },
+        { rect: contentToPdfRect(box, crop) },
         defaultsFor(store.model(), tool.preset),
         tool.flags,
         file,

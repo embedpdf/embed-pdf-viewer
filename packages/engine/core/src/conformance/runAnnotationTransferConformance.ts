@@ -1,5 +1,5 @@
 import { appearanceRasters, maxShiftedDifference } from './appearanceRasters';
-import { creatables } from './creatables';
+import { creatables, iconRect } from './creatables';
 import type { ConformanceTestRunner } from './runMetadataConformance';
 import { BANDS_PDF, sameBytes } from './stampFixtures';
 import { drawnPointsOf } from '../annotation/drawnPoints';
@@ -438,14 +438,14 @@ async function fill(doc: DocumentHandle): Promise<void> {
   await create({ subtype: 'stamp', box: box(80), opacity: 0.5 }, { appearance: BANDS_PDF });
   const note = await create({
     subtype: 'text',
-    at: { left: box(140).left, top: box(140).top },
+    rect: iconRect(box(140).left, box(140).top),
     nm: 'note',
     contents: 'Check',
   });
   await create({ subtype: 'popup', rect: box(200), parent: note.ref, open: true });
   await create({
     subtype: 'text',
-    at: { left: box(140).left, top: box(140).top },
+    rect: iconRect(box(140).left, box(140).top),
     reply: { to: note.ref },
   });
   await create({

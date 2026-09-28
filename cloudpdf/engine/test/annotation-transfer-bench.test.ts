@@ -14,6 +14,7 @@ import {
   manifestBytesOf,
   type AnnotationBundle,
 } from '@embedpdf/engine-core/runtime';
+import { iconRect } from '@embedpdf/engine-core/conformance';
 import { createLocalEngine } from '../../../packages/engine/main/src/index';
 import {
   fill,
@@ -163,7 +164,7 @@ describe.skipIf(!ENABLED)('E8 annotation transfer (cloud, localhost)', () => {
       await doc.page(page!).annotations.create(
         {
           subtype: 'file-attachment',
-          at: { left: 40, top: 60 },
+          rect: iconRect(40, 60),
           file: { name: 'large.bin' },
         },
         { file: bytes },

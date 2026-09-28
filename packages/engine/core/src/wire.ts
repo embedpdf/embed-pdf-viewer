@@ -249,7 +249,6 @@ export type { AnnotationRenderVersion, RenderVersions } from './wire/renderOptio
 export {
   PdfPointSchema,
   PdfRectSchema,
-  PdfTopLeftSchema,
   PdfSizeSchema,
   PdfQuadSchema,
   PdfRotationSchema,

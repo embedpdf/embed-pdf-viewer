@@ -1,3 +1,4 @@
+import { iconRect } from './creatables';
 import type {
   ConformanceTestRunner,
   ConformanceFixture,
@@ -726,36 +727,31 @@ export function runAnnotationMutationConformance(
       }
     });
 
-    test('a note sits at `at`, its left and top edges, and moves by it', async () => {
+    test("a note's icon fills its rect, and moves and grows with it", async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
-        const at = { left: shapeRect.left, top: shapeRect.top };
+        const rect = iconRect(shapeRect.left, shapeRect.top);
         const created = await page.annotations.create({
           subtype: 'text',
-          at,
+          rect,
           icon: 'comment',
         } satisfies TextDraft);
         const note = created.annotation;
         if (note.subtype !== 'text') throw new Error('expected a note');
-        expect(note.at).toEqual(at);
-        // The icon is a fixed 20 × 20 down and right from its left and top edges.
-        expect(note.rect).toEqual({
-          left: at.left,
-          bottom: at.top - 20,
-          right: at.left + 20,
-          top: at.top,
-        });
-        const to = { left: at.left + 30, top: at.top - 15 };
-        const moved = await page.annotations.update(note.ref, { subtype: 'text', at: to });
-        if (moved.annotation.subtype !== 'text') throw new Error('expected a note');
-        expect(moved.annotation.at).toEqual(to);
-        expect(moved.annotation.rect).toEqual({
-          left: to.left,
-          bottom: to.top - 20,
-          right: to.left + 20,
-          top: to.top,
-        });
+        expect(note.rect).toEqual(rect);
+
+        // A move keeps the drawing: the icon only moves.
+        const to = iconRect(rect.left + 30, rect.top - 15);
+        const moved = await page.annotations.update(note.ref, { subtype: 'text', rect: to });
+        expect(moved.annotation.rect).toEqual(to);
+        expect(moved.appearance.changed).toBe(false);
+
+        // A bigger rect is a bigger icon, drawn again.
+        const bigger = { ...to, right: to.left + 50, bottom: to.top - 50 };
+        const grown = await page.annotations.update(note.ref, { subtype: 'text', rect: bigger });
+        expect(grown.annotation.rect).toEqual(bigger);
+        expect(grown.appearance.changed).toBe(true);
       } finally {
         await doc.close();
       }
@@ -2730,7 +2726,7 @@ export function runAnnotationMutationConformance(
 
         const status = await page.annotations.create({
           subtype: 'text',
-          at: { left: shapeRect.left, top: shapeRect.top },
+          rect: iconRect(shapeRect.left, shapeRect.top),
           reply: { to: target.annotation.ref },
           state: 'accepted',
           stateModel: 'review',
@@ -2767,7 +2763,7 @@ export function runAnnotationMutationConformance(
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const { annotation } = await page.annotations.create({
           subtype: 'text',
-          at: { left: shapeRect.left, top: shapeRect.top },
+          rect: iconRect(shapeRect.left, shapeRect.top),
           state: 'accepted',
         } satisfies TextDraft);
         expect(annotation.subtype === 'text' && annotation.stateModel).toBe('review');
@@ -2775,7 +2771,7 @@ export function runAnnotationMutationConformance(
         try {
           await page.annotations.create({
             subtype: 'text',
-            at: { left: shapeRect.left, top: shapeRect.top },
+            rect: iconRect(shapeRect.left, shapeRect.top),
             state: 'escalated',
           } satisfies TextDraft);
         } catch (err) {
@@ -2793,7 +2789,7 @@ export function runAnnotationMutationConformance(
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const note = await page.annotations.create({
           subtype: 'text',
-          at: { left: shapeRect.left, top: shapeRect.top },
+          rect: iconRect(shapeRect.left, shapeRect.top),
           contents: 'work in progress',
           subject: 'Draft',
           state: 'none',
@@ -2855,7 +2851,7 @@ export function runAnnotationMutationConformance(
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const custom = await page.annotations.create({
           subtype: 'text',
-          at: { left: shapeRect.left, top: shapeRect.top },
+          rect: iconRect(shapeRect.left, shapeRect.top),
           state: 'in-progress',
           stateModel: 'X-ReviewWorkflow',
         } satisfies TextDraft);

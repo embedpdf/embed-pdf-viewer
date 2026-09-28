@@ -15,6 +15,7 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import {
   creatables,
+  iconRect,
   runAnnotationImportConformance,
   type ConformanceTestRunner,
 } from '@embedpdf/engine-core/conformance';
@@ -77,12 +78,12 @@ async function everyKind(): Promise<AnnotationBundle> {
     const rect = { left: 300, bottom: 300, right: 320, top: 320 };
     const { annotation: note } = await page.annotations.create({
       subtype: 'text',
-      at: { left: rect.left, top: rect.top },
+      rect: iconRect(rect.left, rect.top),
     });
     await page.annotations.create({ subtype: 'popup', rect, parent: note.ref });
     await page.annotations.create({
       subtype: 'text',
-      at: { left: rect.left, top: rect.top },
+      rect: iconRect(rect.left, rect.top),
       reply: { to: note.ref },
     });
     await page.annotations.create({
@@ -316,7 +317,7 @@ describe.each(['wasm', 'native'] as const)('one create (%s runtime)', (prefer) =
     const rect = { left: 300, bottom: 300, right: 320, top: 320 };
     const create = (draft: Record<string, unknown>) =>
       worker.send({ kind: 'annotations.create', page, draft });
-    const created = await create({ subtype: 'text', at: { left: rect.left, top: rect.top } });
+    const created = await create({ subtype: 'text', rect: iconRect(rect.left, rect.top) });
     if (created.kind !== 'resolve' || created.result.tag !== 'annotations.create') {
       throw new Error(`the note: ${JSON.stringify(created)}`);
     }
@@ -333,7 +334,7 @@ describe.each(['wasm', 'native'] as const)('one create (%s runtime)', (prefer) =
         .filter(({ resources }) => !resources)
         .map(({ data }) => data as unknown as Record<string, unknown>),
       { subtype: 'popup', rect, parent: note },
-      { subtype: 'text', at: { left: rect.left, top: rect.top }, reply: { to: note } },
+      { subtype: 'text', rect: iconRect(rect.left, rect.top), reply: { to: note } },
       {
         subtype: 'link',
         rect,
@@ -393,7 +394,7 @@ describe.each(['wasm', 'native'] as const)('one create (%s runtime)', (prefer) =
         page: weak.page,
         draft: {
           subtype: 'text',
-          at: { left: 10, top: 30 },
+          rect: iconRect(10, 30),
           reply: { to: weak },
         },
       });

@@ -81,7 +81,6 @@ PdfRect [InterfaceDeclaration] (from packages/engine/core/src/geometry/primitive
 PdfRotation [TypeAliasDeclaration] (from packages/engine/core/src/geometry/primitives.ts): export type PdfRotation = 0 | 90 | 180 | 270;
 PdfSaveMode [TypeAliasDeclaration] (from packages/engine/core/src/dto/PdfSaveMode.ts): export type PdfSaveMode = 'incremental' | 'rewrite';
 PdfTextSegment [InterfaceDeclaration] (from packages/engine/core/src/text/layout.ts): export interface PdfTextSegment<C extends Coordinates = PageCoordinates>{ quad: C['quad']; rect: C['box']; advance: 1 | -1; }
-PdfTopLeft [InterfaceDeclaration] (from packages/engine/core/src/geometry/primitives.ts): export interface PdfTopLeft{ left: number; top: number; }
 SearchLimit [InterfaceDeclaration] (from packages/engine/core/src/search/types.ts): export interface SearchLimit{ matches?: number; pages?: number; }
 SearchMatch [InterfaceDeclaration] (from packages/engine/core/src/search/types.ts): export interface SearchMatch<C extends Coordinates = PageCoordinates> extends PageTextRange{ segments: PdfTextSegment<C>[]; snippet?: SearchSnippet; }
 SearchQuery [InterfaceDeclaration] (from packages/engine/core/src/search/types.ts): export interface SearchQuery{ text: string; regex?: boolean; matchCase?: boolean; wholeWord?: boolean; matchDiacritics?: boolean; ignoreWhitespace?: boolean; }

@@ -4,12 +4,10 @@ import { normalizePdfRect } from '../../src/geometry/convert';
 import {
   pageBoxOf,
   pagePointOf,
-  pagePointOfTopLeft,
   pageQuadOf,
   pdfPointOf,
   pdfQuadOf,
   pdfRectOf,
-  pdfTopLeftOf,
 } from '../../src/geometry/pageSpace';
 import type { PdfRect } from '../../src/geometry/primitives';
 
@@ -44,7 +42,6 @@ describe('page space primitives', () => {
       width: 50,
       height: 50,
     });
-    expect(pagePointOfTopLeft({ left: 72, top: 720 }, visible)).toEqual({ x: 22, y: 12 });
   });
 
   test('a page-space rect in the file has its keys in normalizePdfRect order', () => {
@@ -71,9 +68,6 @@ describe('page space primitives', () => {
           top: Math.max(c, d),
         };
         expect(pdfRectOf(pageBoxOf(rect, visible), visible)).toEqual(normalizePdfRect(rect));
-
-        const topLeft = { left: value(), top: value() };
-        expect(pdfTopLeftOf(pagePointOfTopLeft(topLeft, visible), visible)).toEqual(topLeft);
 
         const quad = { p1: point, p2: { x: a, y: c }, p3: { x: b, y: d }, p4: { x: a, y: d } };
         expect(pdfQuadOf(pageQuadOf(quad, visible), visible)).toEqual(quad);

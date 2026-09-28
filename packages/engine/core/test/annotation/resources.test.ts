@@ -131,7 +131,7 @@ describe('the data carries no bytes', () => {
     expect(() =>
       AnnotationDraftSchema.parse({
         subtype: 'file-attachment',
-        at: { left: RECT.left, top: RECT.top },
+        rect: RECT,
         file: { name: 'report.pdf', mimeType: 'application/pdf', description: null },
       }),
     ).not.toThrow();
@@ -149,7 +149,7 @@ describe('the data carries no bytes', () => {
     expect(() =>
       AnnotationDraftSchema.parse({
         subtype: 'file-attachment',
-        at: { left: RECT.left, top: RECT.top },
+        rect: RECT,
         file: { resource: 'r0', name: 'report.pdf' },
       }),
     ).not.toThrow(); // a stray `resource` inside the value is dropped, like a read's `size`

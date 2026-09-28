@@ -13,10 +13,9 @@ import {
 } from '../../../attachments/internal/attachmentPrimitives';
 import { FILE_ICON_TO_NAME } from '../annotationIcon';
 import type { AnnotationWriteContext } from './annotationWriteContext';
-import { setAnnotColor, setAnnotOpacity } from './annotationWritePrimitives';
+import { setAnnotColor, setAnnotOpacity, setAnnotRect } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 import { writeUtf16String } from '../../../../runtime/memory/strings';
-import { moveIcon, placeIcon } from '../iconCorner';
 
 /** Default `/C` — the generator's default icon fill, set explicitly so reads round-trip. */
 const DEFAULT_FILE_ATTACHMENT_COLOR: Color = { r: 255, g: 255, b: 0 };
@@ -49,7 +48,7 @@ export function preflightFileAttachmentDraft(
 /**
  * Apply a file-attachment draft. Order:
  *   1. base author-metadata (contents/nm/flags)
- *   2. the icon's corner (`iconCorner`) + `/C` + `/CA` + `/Name`
+ *   2. `/Rect`, which the icon fills, + `/C` + `/CA` + `/Name`
  *   3. the embedded file: `/FS` filespec via `FPDFAnnot_AddFileAttachment`,
  *      bytes via `FPDFAttachment_SetFile` (which also writes `/Params`
  *      Size/CheckSum/CreationDate), the MIME type via
@@ -67,7 +66,7 @@ export function applyFileAttachmentDraft(
   ctx: AnnotationWriteContext | undefined,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
-  placeIcon(fn, mem, annotPtr, draft.at);
+  setAnnotRect(fn, mem, annotPtr, draft.rect);
   setAnnotColor(fn, annotPtr, draft.color ?? DEFAULT_FILE_ATTACHMENT_COLOR);
   setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULT_OPACITY);
   setFileAttachmentIcon(fn, annotPtr, draft.icon ?? 'paperclip');
@@ -93,7 +92,7 @@ export function applyFileAttachmentPatch(
   ctx: AnnotationWriteContext | undefined,
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);
-  if (patch.at !== undefined) moveIcon(fn, mem, annotPtr, patch.at);
+  if (patch.rect !== undefined) setAnnotRect(fn, mem, annotPtr, patch.rect);
   if (patch.color !== undefined) {
     setAnnotColor(fn, annotPtr, patch.color);
   }

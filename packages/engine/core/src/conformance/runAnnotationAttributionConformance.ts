@@ -1,3 +1,4 @@
+import { iconRect } from './creatables';
 import type { ConformanceTestRunner } from './runMetadataConformance';
 import type { AnnotationDTO, AnnotationDraft } from '../annotation/kinds';
 import type { Identity } from '../auth/scope';
@@ -270,17 +271,17 @@ export function runAnnotationAttributionConformance(
       const { annotation: square } = await page.annotations.create(SQUARE);
       const { annotation: note } = await page.annotations.create({
         subtype: 'text',
-        at: { left: rect.left, top: rect.top },
+        rect: iconRect(rect.left, rect.top),
       });
       await page.annotations.create({
         subtype: 'text',
-        at: { left: rect.left, top: rect.top },
+        rect: iconRect(rect.left, rect.top),
         reply: { to: note.ref },
       });
       await page.annotations.create(
         {
           subtype: 'file-attachment',
-          at: { left: rect.left, top: rect.top },
+          rect: iconRect(rect.left, rect.top),
           file: { name: 'minutes.txt' },
         },
         { file: new TextEncoder().encode('minutes') },
@@ -388,7 +389,7 @@ export function runAnnotationAttributionConformance(
           await firstPage(alice)
         ).annotations.create({
           subtype: 'text',
-          at: { left: rect.left, top: rect.top },
+          rect: iconRect(rect.left, rect.top),
           nm: 'attribution-conformance-thread',
         }));
       } catch (error) {
@@ -403,7 +404,7 @@ export function runAnnotationAttributionConformance(
         const current = await findByNm(page, 'attribution-conformance-thread');
         ({ annotation: reply } = await page.annotations.create({
           subtype: 'text',
-          at: { left: rect.left, top: rect.top },
+          rect: iconRect(rect.left, rect.top),
           contents: 'Seen',
           reply: { to: current.ref },
         }));

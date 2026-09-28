@@ -38,16 +38,6 @@ export interface PdfRect {
   top: number;
 }
 
-/**
- * Where a box of a fixed size sits: its left edge and its top edge, in PDF
- * user space. A note's or a file's icon is placed this way, as a `/XYZ`
- * destination places the view: PDF keeps that corner in place.
- */
-export interface PdfTopLeft {
-  left: number;
-  top: number;
-}
-
 /** A width/height pair in PDF points. */
 export interface PdfSize {
   width: number;

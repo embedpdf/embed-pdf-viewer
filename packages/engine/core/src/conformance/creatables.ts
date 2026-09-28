@@ -16,6 +16,11 @@ export interface Creatable {
   resources?: AnnotationResources;
 }
 
+/** A note's or a file's icon at its usual 20 × 20, by its left and top edges. */
+export function iconRect(left: number, top: number): PdfRect {
+  return { left, bottom: top - 20, right: left + 20, top };
+}
+
 /** One create for every kind the engine can create, inside a box near the page origin. */
 export function creatables(): Creatable[] {
   const rect: PdfRect = { left: 40, bottom: 40, right: 140, top: 100 };
@@ -71,7 +76,7 @@ export function creatables(): Creatable[] {
       lineEnding: 'open-arrow',
     },
     { subtype: 'caret', box: rect },
-    { subtype: 'text', at: { left: rect.left, top: rect.top } },
+    { subtype: 'text', rect: iconRect(rect.left, rect.top) },
     { subtype: 'link', rect, target: { kind: 'uri', uri: 'https://example.com' } },
     { subtype: 'redact', rect, quadPoints: [quad] },
   ];
@@ -81,7 +86,7 @@ export function creatables(): Creatable[] {
     {
       data: {
         subtype: 'file-attachment',
-        at: { left: rect.left, top: rect.top },
+        rect: iconRect(rect.left, rect.top),
         file: { name: 'note.txt', mimeType: 'text/plain', description: 'A note' },
       },
       resources: { file: new TextEncoder().encode('attached') },

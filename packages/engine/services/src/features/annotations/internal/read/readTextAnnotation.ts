@@ -14,7 +14,6 @@ import {
   readAnnotString,
   readAnnotName,
 } from './annotationReadPrimitives';
-import { iconCornerOf } from '../iconCorner';
 
 /** Default `/C` — matches the generator's yellow note fill and the writer default. */
 const DEFAULT_NOTE_COLOR: Color = { r: 255, g: 255, b: 0 };
@@ -42,7 +41,6 @@ export function readText(
   return {
     ...base,
     subtype: 'text',
-    at: iconCornerOf(base.rect),
     icon,
     color,
     opacity,

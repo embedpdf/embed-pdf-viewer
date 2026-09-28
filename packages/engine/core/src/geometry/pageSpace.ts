@@ -12,7 +12,7 @@
  * number.
  */
 
-import type { PdfPoint, PdfQuad, PdfRect, PdfTopLeft } from './primitives';
+import type { PdfPoint, PdfQuad, PdfRect } from './primitives';
 
 /** A point in page space: x from the visible page's left edge, y down from its top edge. */
 export interface PagePoint {
@@ -82,16 +82,6 @@ export function pdfQuadOf(quad: PageQuad, visible: PdfRect): PdfQuad {
     p3: pdfPointOf(quad.p3, visible),
     p4: pdfPointOf(quad.p4, visible),
   };
-}
-
-/** A box's left and top edges in the file's coordinates, as its top-left corner in page space. */
-export function pagePointOfTopLeft(topLeft: PdfTopLeft, visible: PdfRect): PagePoint {
-  return { x: topLeft.left - visible.left, y: visible.top - topLeft.top };
-}
-
-/** A box's top-left corner in page space, as its left and top edges in the file's coordinates. */
-export function pdfTopLeftOf(point: PagePoint, visible: PdfRect): PdfTopLeft {
-  return { left: point.x + visible.left, top: visible.top - point.y };
 }
 
 // ── mirroring ──

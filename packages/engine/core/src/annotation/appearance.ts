@@ -122,8 +122,8 @@ const TURNING_KINDS: ReadonlySet<string> = new Set([
  * Per-kind absolute-geometry fields (PDF user space) that a rigid translation
  * shifts together. A kind absent from this table never takes the translation
  * route. The first is where a move shows: the field the caller gives the
- * shape in (a `box`, the points, the quads, an icon's corner), or `rect` where
- * that is the shape. A `rect` the engine works out moves with it.
+ * shape in (a `box`, the points, the quads), or `rect` where that is the
+ * shape. A `rect` the engine works out moves with it.
  */
 const TRANSLATABLE_GEOMETRY: Record<string, readonly string[]> = {
   square: ['box'],
@@ -139,9 +139,9 @@ const TRANSLATABLE_GEOMETRY: Record<string, readonly string[]> = {
   strikeout: ['quadPoints'],
   redact: ['rect', 'quadPoints'],
   caret: ['box'],
-  text: ['at'],
+  text: ['rect'],
   stamp: ['box'],
-  'file-attachment': ['at'],
+  'file-attachment': ['rect'],
   link: ['rect'],
 };
 
