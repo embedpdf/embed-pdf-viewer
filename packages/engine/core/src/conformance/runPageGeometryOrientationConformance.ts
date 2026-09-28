@@ -8,12 +8,12 @@ import {
   type PageGeometrySnapshot,
   type RotatedGeometryRun,
 } from '../dto/PageGeometrySnapshot';
-import { pdfQuadBounds } from '../geometry/convert';
 import type { Engine } from '../engine/Engine';
 import { toPageRef } from '../identity/PageRef';
+import { pageQuadBounds } from '../pageSpace/helpers';
 import { PageGeometrySnapshotSchema } from '../wire/schemas';
 
-/** Absolute tolerance for coordinate assertions (PDF points). */
+/** Absolute tolerance for coordinate assertions (points). */
 const COORD_TOLERANCE = 1e-3;
 /** Tolerance for baseline-angle assertions (radians). */
 /** Degrees. */
@@ -118,10 +118,10 @@ export function runPageGeometryOrientationConformance(
             expect(isRotatedGeometryRun(run)).toBe(false);
             if (isRotatedGeometryRun(run)) continue;
             for (const glyph of run.glyphs) {
-              expect('left' in glyph.loose).toBe(true); // a box, not a quad
+              expect('width' in glyph.loose).toBe(true); // a box, not a quad
               if (glyph.empty) {
                 // Degenerate glyphs keep the zeroed-box convention.
-                expect(glyph.loose).toEqual({ left: 0, bottom: 0, right: 0, top: 0 });
+                expect(glyph.loose).toEqual({ x: 0, y: 0, width: 0, height: 0 });
               }
             }
           }
@@ -134,7 +134,7 @@ export function runPageGeometryOrientationConformance(
             if (isRotatedGeometryRun(run)) continue;
             for (const glyph of run.glyphs) {
               expect(glyph.empty).toBe(true);
-              expect(glyph.loose).toEqual({ left: 0, bottom: 0, right: 0, top: 0 });
+              expect(glyph.loose).toEqual({ x: 0, y: 0, width: 0, height: 0 });
             }
           }
           return;
@@ -181,11 +181,12 @@ export function runPageGeometryOrientationConformance(
         expect(Math.abs(q.p2.x - q.p1.x - (q.p4.x - q.p3.x)) <= COORD_TOLERANCE).toBe(true);
         expect(Math.abs(q.p2.y - q.p1.y - (q.p4.y - q.p3.y)) <= COORD_TOLERANCE).toBe(true);
         // Contained in the run's page-space AABB.
-        const bounds = pdfQuadBounds(q);
-        expect(bounds.left >= run.rect.left - COORD_TOLERANCE).toBe(true);
-        expect(bounds.right <= run.rect.right + COORD_TOLERANCE).toBe(true);
-        expect(bounds.bottom >= run.rect.bottom - COORD_TOLERANCE).toBe(true);
-        expect(bounds.top <= run.rect.top + COORD_TOLERANCE).toBe(true);
+        const bounds = pageQuadBounds(q);
+        const { rect } = run;
+        expect(bounds.x >= rect.x - COORD_TOLERANCE).toBe(true);
+        expect(bounds.x + bounds.width <= rect.x + rect.width + COORD_TOLERANCE).toBe(true);
+        expect(bounds.y >= rect.y - COORD_TOLERANCE).toBe(true);
+        expect(bounds.y + bounds.height <= rect.y + rect.height + COORD_TOLERANCE).toBe(true);
       }
     }
   });

@@ -20,6 +20,7 @@ import {
 import type { PdfPoint, PdfRect } from '../../src/geometry/primitives';
 import { viewportForPoint } from '../../src/measure/viewport';
 import { pageAnnotationOf } from '../../src/pageSpace/annotations';
+import type { PdfCoordinates } from '../../src/pageSpace/coordinates';
 import {
   pageAppearanceTurnOf,
   pageDrawnPointsOf,
@@ -108,12 +109,12 @@ describe('page-space helpers agree with the originals', () => {
   });
 
   test('glyph cells, upright and turned', () => {
-    const upright: PageGeometryRun = {
+    const upright: PageGeometryRun<PdfCoordinates> = {
       rect: { left: 10, bottom: 100, right: 40, top: 112 },
       start: 0,
       glyphs: [{ loose: { left: 10, bottom: 100, right: 20, top: 112 } }],
     };
-    const turned: PageGeometryRun = {
+    const turned: PageGeometryRun<PdfCoordinates> = {
       rect: { left: 0, bottom: 0, right: 20, top: 20 },
       start: 1,
       rotation: 315,

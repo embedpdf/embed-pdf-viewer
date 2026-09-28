@@ -2,18 +2,22 @@ import { describe, expect, it } from 'vitest';
 import type {
   PageGeometryGlyph,
   PageGeometrySnapshot,
+  PdfCoordinates,
   PdfRect,
   RotatedGeometryGlyph,
+  TextLayout,
 } from '@embedpdf/engine-core/runtime';
-import { createTextLayout } from '@embedpdf/engine-core/runtime';
-import {
-  buildSelectionPageGeometry,
-  contentPointToPdf,
-  toContentSegment,
-  type SelectionSegment,
-} from '../src/geometry';
+import { createTextLayout, pageGeometryOf } from '@embedpdf/engine-core/runtime';
+import { selectionSegmentOf, type SelectionSegment } from '../src/geometry';
 
 const crop: PdfRect = { left: 0, bottom: 0, right: 200, top: 100 };
+
+// The fixtures are written in the file's coordinates (y up) and measured on
+// the page the way the engine hands them out.
+const layoutOf = (snapshot: PageGeometrySnapshot<PdfCoordinates>): TextLayout =>
+  createTextLayout(pageGeometryOf(snapshot, crop));
+const segmentsOf = (layout: TextLayout, from: number, to: number): SelectionSegment[] =>
+  layout.segments({ start: from, count: to - from + 1 }).map(selectionSegmentOf);
 
 // y-up glyph box helper.
 const glyph = (
@@ -22,14 +26,14 @@ const glyph = (
   space = false,
   width = 8,
   height = 10,
-): PageGeometryGlyph => ({
+): PageGeometryGlyph<PdfCoordinates> => ({
   loose: { left, bottom, right: left + width, top: bottom + height },
   ...(space ? { space: true } : {}),
 });
 
 // Line A (y-up 90..100): "Hi wo " in run0 (trailing space) + "rl" in run1 (same row).
 // Line B (y-up 70..80): "ab" in run2.  Spaces terminate words.
-const snapshot: PageGeometrySnapshot = {
+const snapshot: PageGeometrySnapshot<PdfCoordinates> = {
   runs: [
     {
       rect: { left: 10, bottom: 90, right: 58, top: 100 },
@@ -56,40 +60,35 @@ const snapshot: PageGeometrySnapshot = {
   ],
 };
 
-const pageGeometry = buildSelectionPageGeometry(createTextLayout(snapshot), crop, 0, 1);
+const layout = layoutOf(snapshot);
 
-/** The seam under test: content pointer in → canonical index; canonical
- *  segments out → content space. */
-const glyphAtContent = (point: { x: number; y: number }) =>
-  pageGeometry.layout.charAt(contentPointToPdf(pageGeometry, point));
-const segmentsFor = (from: number, to: number): SelectionSegment[] =>
-  pageGeometry.layout
-    .segments({ start: from, count: to - from + 1 })
-    .map((segment) => toContentSegment(pageGeometry, segment));
+/** Page-space pointer in → canonical index; canonical segments out, ready to draw. */
+const glyphAtContent = (point: { x: number; y: number }) => layout.charAt(point);
+const segmentsFor = (from: number, to: number) => segmentsOf(layout, from, to);
 
-describe('selection geometry seam', () => {
-  it('flips PDF y-up into content y-down (crop-aware) and keeps run structure', () => {
-    expect(pageGeometry.layout.charCount).toBe(10);
-    expect(pageGeometry.layout.runs).toHaveLength(3);
+describe('selection geometry', () => {
+  it('reads page space (y down, from the crop top) and keeps run structure', () => {
+    expect(layout.charCount).toBe(10);
+    expect(layout.runs).toHaveLength(3);
     const first = segmentsFor(0, 0);
     expect(first[0].rect).toMatchObject({ x: 10, y: 0, width: 8, height: 10 });
     const lineB = segmentsFor(8, 9);
     expect(lineB[0].rect.y).toBeGreaterThan(first[0].rect.y); // line B below line A
   });
 
-  it('glyphAt: hits over text through the seam, null off-text', () => {
+  it('glyphAt: hits over text, null off-text', () => {
     expect(glyphAtContent({ x: 14, y: 5 })).toBe(0); // inside the first glyph
     expect(glyphAtContent({ x: 500, y: 500 })).toBeNull(); // far away → not over text
   });
 
   it('expandToWord stops at spaces (double-click)', () => {
-    expect(pageGeometry.layout.wordAt(0)).toEqual({ start: 0, count: 2 }); // "Hi"
-    expect(pageGeometry.layout.wordAt(4)).toEqual({ start: 3, count: 2 }); // "wo"
+    expect(layout.wordAt(0)).toEqual({ start: 0, count: 2 }); // "Hi"
+    expect(layout.wordAt(4)).toEqual({ start: 3, count: 2 }); // "wo"
   });
 
   it('expandToLine spans every run on the visual row (triple-click)', () => {
-    expect(pageGeometry.layout.lineAt(1)).toEqual({ start: 0, count: 8 }); // run0 + run1 (line A)
-    expect(pageGeometry.layout.lineAt(9)).toEqual({ start: 8, count: 2 }); // line B only
+    expect(layout.lineAt(1)).toEqual({ start: 0, count: 8 }); // run0 + run1 (line A)
+    expect(layout.lineAt(9)).toEqual({ start: 8, count: 2 }); // line B only
   });
 
   it('merges a visual line into one segment (Chromium algorithm)', () => {
@@ -105,7 +104,7 @@ describe('selection geometry seam', () => {
 // One glyph cell of a column rotated 90° counter-clockwise: the baseline runs
 // +y (up the page), ascent points −x. Frame-geometric slots: p1 upper-start,
 // p2 upper-end, p3 lower-start, p4 lower-end.
-const columnGlyph = (yBottom: number, yTop: number): RotatedGeometryGlyph => ({
+const columnGlyph = (yBottom: number, yTop: number): RotatedGeometryGlyph<PdfCoordinates> => ({
   loose: {
     p1: { x: 88, y: yBottom }, // upper-start (ascent side, baseline start)
     p2: { x: 88, y: yTop }, // upper-end
@@ -115,7 +114,7 @@ const columnGlyph = (yBottom: number, yTop: number): RotatedGeometryGlyph => ({
 });
 
 // Upright line (indices 0..1) + a 90° column (indices 2..4) on one page.
-const mixedSnapshot: PageGeometrySnapshot = {
+const mixedSnapshot: PageGeometrySnapshot<PdfCoordinates> = {
   runs: [
     {
       rect: { left: 10, bottom: 90, right: 26, top: 100 },
@@ -132,18 +131,15 @@ const mixedSnapshot: PageGeometrySnapshot = {
   ],
 };
 
-const mixed = buildSelectionPageGeometry(createTextLayout(mixedSnapshot), crop, 0, 1);
-const mixedSegments = (from: number, to: number): SelectionSegment[] =>
-  mixed.layout
-    .segments({ start: from, count: to - from + 1 })
-    .map((segment) => toContentSegment(mixed, segment));
+const mixed = layoutOf(mixedSnapshot);
+const mixedSegments = (from: number, to: number) => segmentsOf(mixed, from, to);
 
-describe('oriented selection through the seam', () => {
+describe('oriented selection', () => {
   it('selects a 90° column as one oriented segment, not an AABB per glyph', () => {
     const segments = mixedSegments(2, 4);
     expect(segments).toHaveLength(1);
     const { quad, rect, advance } = segments[0];
-    // Content space (y-down, crop top=100): the column occupies x 88..100,
+    // Page space (y-down, crop top=100): the column occupies x 88..100,
     // y 56..80, reading bottom-of-screen → top-of-screen.
     expect(quad.upperStart.x).toBeCloseTo(88);
     expect(quad.upperStart.y).toBeCloseTo(80);
@@ -158,14 +154,14 @@ describe('oriented selection through the seam', () => {
     expect(advance).toBe(1);
   });
 
-  it('hit-tests rotated glyphs through the seam', () => {
-    // Inside the middle column glyph (pdf y 28..36 → content y 64..72).
-    expect(mixed.layout.charAt(contentPointToPdf(mixed, { x: 94, y: 68 }))).toBe(3);
-    expect(mixed.layout.charAt(contentPointToPdf(mixed, { x: 150, y: 20 }))).toBeNull();
+  it('hit-tests rotated glyphs', () => {
+    // Inside the middle column glyph (file y 28..36 → page y 64..72).
+    expect(mixed.charAt({ x: 94, y: 68 })).toBe(3);
+    expect(mixed.charAt({ x: 150, y: 20 })).toBeNull();
   });
 
   it('triple-click on the column stays within its frame', () => {
-    expect(mixed.layout.lineAt(3)).toEqual({ start: 2, count: 3 });
+    expect(mixed.lineAt(3)).toEqual({ start: 2, count: 3 });
   });
 
   it('never merges segments across differently-oriented runs', () => {
@@ -176,7 +172,7 @@ describe('oriented selection through the seam', () => {
   });
 
   it('derives the advance sign from the glyph sequence (RTL runs)', () => {
-    const rtl: PageGeometrySnapshot = {
+    const rtl: PageGeometrySnapshot<PdfCoordinates> = {
       runs: [
         {
           rect: { left: 34, bottom: 90, right: 58, top: 100 },
@@ -185,10 +181,7 @@ describe('oriented selection through the seam', () => {
         },
       ],
     };
-    const rtlGeometry = buildSelectionPageGeometry(createTextLayout(rtl), crop, 0, 1);
-    const segments = rtlGeometry.layout
-      .segments({ start: 0, count: 3 })
-      .map((segment) => toContentSegment(rtlGeometry, segment));
+    const segments = segmentsOf(layoutOf(rtl), 0, 2);
     expect(segments).toHaveLength(1);
     expect(segments[0].advance).toBe(-1);
     expect(segments[0].rect.x).toBeCloseTo(34);

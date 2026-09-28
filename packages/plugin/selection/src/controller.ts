@@ -5,11 +5,16 @@ import {
   type PluginContext,
   type DocCapability,
   type OperationOptions,
-  type PageInfo,
   type PageObjectNumber,
   type PageRef,
 } from '@embedpdf/core';
-import { boundsOfRects, textQuadBounds, type Point, type Rect } from '@embedpdf/core-geometry';
+import {
+  boundsOfRects,
+  textQuadBounds,
+  textQuadFromPositional,
+  type Point,
+  type Rect,
+} from '@embedpdf/core-geometry';
 import {
   sliceText,
   toPageRef,
@@ -28,14 +33,7 @@ import type {
   SelectionSnapshot,
   TextRange,
 } from './contract';
-import {
-  buildSelectionPageGeometry,
-  contentPointToPdf,
-  toContentSegment,
-  toContentTextQuad,
-  type SelectionPageGeometry,
-  type SelectionSegment,
-} from './geometry';
+import { selectionSegmentOf, type SelectionSegment } from './geometry';
 import type { SelectionHostCapability } from './host-contract';
 import {
   clearSelection,
@@ -64,12 +62,6 @@ interface ReadModel {
   readonly pages: readonly PageRef[];
   readonly anchor: SelectionAnchor | null;
 }
-
-/** The layout parameters page-space geometry depends on. */
-const layoutKeyOf = (layout: PageInfo): string => {
-  const crop = layout.pdfCropBox;
-  return `${layout.rotation}|${layout.userUnit}|${crop.left},${crop.bottom},${crop.right},${crop.top}`;
-};
 
 /**
  * The selection controller.
@@ -136,28 +128,10 @@ export function createSelectionController(
   const snapshotOf = (page: PageRef): TextLayout | undefined =>
     geometry.getStatus(page) === 'ready' ? geometry.get(page) : undefined;
 
-  /** Page-space geometry for a page, derived from its snapshot and current layout. */
-  const pageGeometryOf = memoByKey(
-    (pageObjectNumber: PageObjectNumber) => {
-      const page = toPageRef(pageObjectNumber);
-      const layout = ctx.getPage(page);
-      return [snapshotOf(page), layout ? layoutKeyOf(layout) : null];
-    },
-    (pageObjectNumber, snapshot, layoutKey): SelectionPageGeometry | null => {
-      const layout = ctx.getPage(toPageRef(pageObjectNumber));
-      if (!snapshot || layoutKey === null || !layout) return null;
-      return buildSelectionPageGeometry(
-        snapshot,
-        layout.pdfCropBox,
-        layout.rotation,
-        layout.userUnit,
-      );
-    },
-  );
-  const geometryFor = (page: PageRef) => pageGeometryOf(page.pageObjectNumber);
+  /** A page's text layout while it is loaded and current. */
+  const geometryFor = snapshotOf;
 
-  const glyphAt = (pageGeometry: SelectionPageGeometry, point: Point): number | null =>
-    pageGeometry.layout.charAt(contentPointToPdf(pageGeometry, point));
+  const glyphAt = (layout: TextLayout, point: Point): number | null => layout.charAt(point);
 
   /** Warm a page's geometry; the returned promise never rejects (see the host contract). */
   function ensureLoaded(page: PageRef): Promise<void> {
@@ -187,9 +161,9 @@ export function createSelectionController(
 
   /** Clamp a position into its page's real character range once geometry is known. */
   function clampPosition(position: GlyphPosition): GlyphPosition {
-    const pageGeometry = geometryFor(position.page);
-    if (!pageGeometry) return position;
-    const max = Math.max(pageGeometry.layout.charCount - 1, 0);
+    const textLayout = geometryFor(position.page);
+    if (!textLayout) return position;
+    const max = Math.max(textLayout.charCount - 1, 0);
     const glyph = Math.max(0, Math.min(position.glyph, max));
     return glyph === position.glyph ? position : { page: position.page, glyph };
   }
@@ -213,16 +187,16 @@ export function createSelectionController(
     for (let i = startPageIndex; i <= endPageIndex; i++) {
       const page = pageAtIndex(i);
       if (!page) continue;
-      const pageGeometry = geometryFor(page);
-      if (!pageGeometry) {
+      const textLayout = geometryFor(page);
+      if (!textLayout) {
         void ensureLoaded(page); // recomputes on arrival
         continue;
       }
       const from = i === startPageIndex ? start.glyph : 0;
-      const to = i === endPageIndex ? end.glyph : pageGeometry.layout.charCount - 1;
-      segments[page.pageObjectNumber] = pageGeometry.layout
+      const to = i === endPageIndex ? end.glyph : textLayout.charCount - 1;
+      segments[page.pageObjectNumber] = textLayout
         .segments({ start: from, count: to - from + 1 })
-        .map((segment) => toContentSegment(pageGeometry, segment));
+        .map((segment) => selectionSegmentOf(segment));
     }
     ctx.state.update(setSelection, clamped, segments);
   }
@@ -290,10 +264,10 @@ export function createSelectionController(
     // Anchor the endpoint to the boundary glyph's own oriented cell so caret
     // placement lands on the exact character edge; fall back to the segment
     // when the glyph is degenerate (e.g. a generated space).
-    const pageGeometry = geometryFor(position.page);
-    const cell = pageGeometry ? pageGeometry.layout.charQuad(position.glyph) : null;
-    if (pageGeometry && cell) {
-      const glyphQuad = toContentTextQuad(pageGeometry, cell);
+    const textLayout = geometryFor(position.page);
+    const cell = textLayout ? textLayout.charQuad(position.glyph) : null;
+    if (textLayout && cell) {
+      const glyphQuad = textQuadFromPositional(cell);
       return {
         page: position.page,
         glyphQuad,
@@ -388,12 +362,11 @@ export function createSelectionController(
    *  other success-gated feedback key on, so nothing buzzes over blank space. */
   function selectSpanAt(page: PageRef, point: Point, expand: 'word' | 'line'): boolean {
     assertScope(SELECT_SCOPE, `selection.select${expand === 'word' ? 'WordAt' : 'LineAt'}`);
-    const pageGeometry = geometryFor(page);
-    if (!pageGeometry) return false;
-    const glyph = glyphAt(pageGeometry, point);
+    const textLayout = geometryFor(page);
+    if (!textLayout) return false;
+    const glyph = glyphAt(textLayout, point);
     if (glyph == null) return false;
-    const span =
-      expand === 'word' ? pageGeometry.layout.wordAt(glyph) : pageGeometry.layout.lineAt(glyph);
+    const span = expand === 'word' ? textLayout.wordAt(glyph) : textLayout.lineAt(glyph);
     if (!span) return false;
     recompute({
       anchor: { page, glyph: span.start },
@@ -406,12 +379,12 @@ export function createSelectionController(
     assertScope(SELECT_SCOPE, 'selection.extendTo');
     const current = state().selection;
     if (!current) return;
-    const pageGeometry = geometryFor(page);
-    if (!pageGeometry) {
+    const textLayout = geometryFor(page);
+    if (!textLayout) {
       void ensureLoaded(page); // extended onto a page not loaded yet: lands on arrival
       return;
     }
-    const glyph = glyphAt(pageGeometry, point);
+    const glyph = glyphAt(textLayout, point);
     if (glyph == null) return; // off-text: keep the last focus
     recompute({ anchor: current.anchor, focus: { page, glyph } });
   }
@@ -537,15 +510,15 @@ export function createSelectionController(
     ensureLoaded,
     isLoaded: (page) => geometry.getStatus(page) === 'ready',
     isOverText: (page, point) => {
-      const pageGeometry = geometryFor(page);
-      return pageGeometry ? glyphAt(pageGeometry, point) != null : false;
+      const textLayout = geometryFor(page);
+      return textLayout ? glyphAt(textLayout, point) != null : false;
     },
     beginGesture: () => setGesture(true),
     beginGestureAt: (page, point) => {
       if (!canSelect()) return false;
-      const pageGeometry = geometryFor(page);
-      if (!pageGeometry) return false;
-      const glyph = glyphAt(pageGeometry, point);
+      const textLayout = geometryFor(page);
+      if (!textLayout) return false;
+      const glyph = glyphAt(textLayout, point);
       if (glyph == null) return false; // not near text: the caller lets the gesture go
       // The gesture opens before the selection changes, so listeners see a
       // coherent (gesture, segments) pair.

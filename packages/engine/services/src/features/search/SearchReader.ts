@@ -1,4 +1,5 @@
 import type {
+  PdfCoordinates,
   SearchMatch,
   SearchScanRequest,
   SearchSlice,
@@ -9,7 +10,7 @@ import {
   EngineErrorCode,
   buildSnippet,
   charRangeForTextOffsets,
-  createTextLayout,
+  createPdfTextLayout,
   foldOptionsFor,
   foldText,
   matchLiteral,
@@ -59,7 +60,7 @@ export class SearchReader {
     private readonly session: DocumentSession,
   ) {}
 
-  query(request: SearchScanRequest, signal: AbortSignal): SearchSlice {
+  query(request: SearchScanRequest, signal: AbortSignal): SearchSlice<PdfCoordinates> {
     throwIfAborted(signal);
     const query = searchQueryOf(request);
     const snippets = request.snippets ?? false;
@@ -115,7 +116,7 @@ export class SearchReader {
     const maxPages = clamp(request.limit?.pages, DEFAULT_MAX_PAGES, CEILING_MAX_PAGES);
     const maxMatches = clamp(request.limit?.matches, DEFAULT_MAX_MATCHES, CEILING_MAX_MATCHES);
 
-    const matches: SearchMatch[] = [];
+    const matches: SearchMatch<PdfCoordinates>[] = [];
     let pagesThisSlice = 0;
     // Budget checks sit at page granularity: a page's matches are never
     // split across slices, so the cursor only ever points between pages.
@@ -141,7 +142,7 @@ export class SearchReader {
           signal,
         );
         // One canonical layout per page, shared by every match on it.
-        const layout = createTextLayout(geometry);
+        const layout = createPdfTextLayout(geometry);
         for (const range of ranges) {
           // Match ranges are text-space (string offsets); the hit and the
           // layout speak character space. Convert exactly once, here — the

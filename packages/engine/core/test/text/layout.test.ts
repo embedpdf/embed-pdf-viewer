@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import { createTextLayout } from '../../src/text/layout';
+import type { PdfCoordinates } from '../../src/pageSpace/coordinates';
+import { createPdfTextLayout } from '../../src/text/layout';
 import type { PdfTextSegment } from '../../src/text/layout';
 import type {
   PageGeometryGlyph,
@@ -16,7 +17,7 @@ import type {
 const uprightGlyph = (
   x: number,
   opts: { w?: number; bottom?: number; space?: true; empty?: true } = {},
-): PageGeometryGlyph => ({
+): PageGeometryGlyph<PdfCoordinates> => ({
   loose: {
     left: x,
     right: x + (opts.w ?? 10),
@@ -29,9 +30,9 @@ const uprightGlyph = (
 
 function uprightRun(
   start: number,
-  glyphs: PageGeometryGlyph[],
+  glyphs: PageGeometryGlyph<PdfCoordinates>[],
   fontSize?: number,
-): PageGeometryRun {
+): PageGeometryRun<PdfCoordinates> {
   const rect = glyphs.reduce(
     (acc, g) => ({
       left: Math.min(acc.left, g.loose.left),
@@ -52,12 +53,12 @@ function orientedRun(
   u: PdfPoint,
   n: PdfPoint,
   opts: { count?: number; w?: number; h?: number; rotation: number; shear?: number },
-): PageGeometryRun {
+): PageGeometryRun<PdfCoordinates> {
   const count = opts.count ?? 3;
   const w = opts.w ?? 8;
   const h = opts.h ?? 12;
   const shear = opts.shear ?? 0;
-  const glyphs: RotatedGeometryGlyph[] = [];
+  const glyphs: RotatedGeometryGlyph<PdfCoordinates>[] = [];
   const at = (t: number, up: number): PdfPoint => ({
     x: origin.x + u.x * t + n.x * up + u.x * shear * (up / h),
     y: origin.y + u.y * t + n.y * up + u.y * shear * (up / h),
@@ -86,7 +87,9 @@ function orientedRun(
   return { rect, start, rotation: opts.rotation, ascentFlip: false, glyphs };
 }
 
-const snapshot = (...runs: PageGeometryRun[]): PageGeometrySnapshot => ({ runs });
+const snapshot = (
+  ...runs: PageGeometryRun<PdfCoordinates>[]
+): PageGeometrySnapshot<PdfCoordinates> => ({ runs });
 
 const boundsOfQuad = (q: PdfQuad): PdfRect => ({
   left: Math.min(q.p1.x, q.p2.x, q.p3.x, q.p4.x),
@@ -95,7 +98,7 @@ const boundsOfQuad = (q: PdfQuad): PdfRect => ({
   top: Math.max(q.p1.y, q.p2.y, q.p3.y, q.p4.y),
 });
 
-const expectRectEqualsBounds = (segments: PdfTextSegment[]) => {
+const expectRectEqualsBounds = (segments: PdfTextSegment<PdfCoordinates>[]) => {
   for (const s of segments) {
     const b = boundsOfQuad(s.quad);
     expect(s.rect.left).toBeCloseTo(b.left, 6);
@@ -118,7 +121,7 @@ describe('canonical layout — upright', () => {
     );
 
   test('adjacent text objects on one line merge into one segment', () => {
-    const layout = createTextLayout(snapshot(line(0, 10), line(5, 60)));
+    const layout = createPdfTextLayout(snapshot(line(0, 10), line(5, 60)));
     const segments = layout.segments({ start: 0, count: 10 });
     expect(segments).toHaveLength(1);
     expect(segments[0].rect).toEqual({ left: 10, right: 110, bottom: 100, top: 110 });
@@ -137,13 +140,13 @@ describe('canonical layout — upright', () => {
       uprightGlyph(210),
     ]);
     const other = line(4, 10, 60);
-    const layout = createTextLayout(snapshot(gappy, other));
+    const layout = createPdfTextLayout(snapshot(gappy, other));
     const segments = layout.segments({ start: 0, count: 9 });
     expect(segments).toHaveLength(3);
   });
 
   test('empty glyphs contribute nothing; the range is half-open', () => {
-    const layout = createTextLayout(
+    const layout = createPdfTextLayout(
       snapshot(
         uprightRun(0, [uprightGlyph(10), uprightGlyph(20, { empty: true }), uprightGlyph(30)]),
       ),
@@ -159,7 +162,7 @@ describe('canonical layout — upright', () => {
   test('font-size ratio and vertical overlap still gate merging', () => {
     const big = uprightRun(0, [uprightGlyph(10), uprightGlyph(20)], 20);
     const small = uprightRun(2, [uprightGlyph(40), uprightGlyph(50)], 8);
-    const layout = createTextLayout(snapshot(big, small));
+    const layout = createPdfTextLayout(snapshot(big, small));
     expect(layout.segments({ start: 0, count: 4 })).toHaveLength(2);
   });
 
@@ -169,7 +172,7 @@ describe('canonical layout — upright', () => {
       uprightGlyph(42, { w: 8 }),
       uprightGlyph(34, { w: 8 }),
     ]);
-    const layout = createTextLayout(snapshot(rtl));
+    const layout = createPdfTextLayout(snapshot(rtl));
     const segments = layout.segments({ start: 0, count: 3 });
     expect(segments).toHaveLength(1);
     expect(segments[0].advance).toBe(-1);
@@ -190,7 +193,7 @@ describe('canonical layout — oriented', () => {
   );
 
   test('a 90° column is one exact oriented segment', () => {
-    const layout = createTextLayout(snapshot(column));
+    const layout = createPdfTextLayout(snapshot(column));
     const segments = layout.segments({ start: 0, count: 3 });
     expect(segments).toHaveLength(1);
     const q = segments[0].quad;
@@ -214,12 +217,12 @@ describe('canonical layout — oriented', () => {
       { x: -R2, y: R2 },
       { rotation: 315, w: 8, h: 12, count: 4 },
     );
-    const layout = createTextLayout(snapshot(diagonal));
+    const layout = createPdfTextLayout(snapshot(diagonal));
     const segments = layout.segments({ start: 0, count: 4 });
     expect(segments).toHaveLength(1);
     const q = segments[0].quad;
-    const first = (diagonal.glyphs as RotatedGeometryGlyph[])[0].loose;
-    const last = (diagonal.glyphs as RotatedGeometryGlyph[])[3].loose;
+    const first = (diagonal.glyphs as RotatedGeometryGlyph<PdfCoordinates>[])[0].loose;
+    const last = (diagonal.glyphs as RotatedGeometryGlyph<PdfCoordinates>[])[3].loose;
     expect(q.p1.x).toBeCloseTo(first.p1.x, 5);
     expect(q.p1.y).toBeCloseTo(first.p1.y, 5);
     expect(q.p2.x).toBeCloseTo(last.p2.x, 5);
@@ -239,7 +242,7 @@ describe('canonical layout — oriented', () => {
       { x: 0, y: 1 },
       { rotation: 180, w: 8, h: 12 },
     );
-    const layout = createTextLayout(snapshot(mirrored));
+    const layout = createPdfTextLayout(snapshot(mirrored));
     const segments = layout.segments({ start: 0, count: 3 });
     expect(segments).toHaveLength(1);
     const q = segments[0].quad;
@@ -262,7 +265,7 @@ describe('canonical layout — oriented', () => {
       { x: 0, y: 1 },
       { rotation: 0, w: 10, h: 10, count: 2, shear: 2.5 },
     );
-    const layout = createTextLayout(snapshot(roman, italic));
+    const layout = createPdfTextLayout(snapshot(roman, italic));
     // One segment: the italic run shares the roman run's frame (the clustering contract).
     const segments = layout.segments({ start: 0, count: 4 });
     expect(segments).toHaveLength(1);
@@ -273,7 +276,7 @@ describe('canonical layout — oriented', () => {
 
   test('differently oriented runs never merge; near angles share one frame', () => {
     const line = uprightRun(0, [uprightGlyph(84), uprightGlyph(94)], undefined);
-    const layout = createTextLayout(snapshot(line, { ...column, start: 2 }));
+    const layout = createPdfTextLayout(snapshot(line, { ...column, start: 2 }));
     const segments = layout.segments({ start: 0, count: 5 });
     expect(segments).toHaveLength(2);
 
@@ -294,11 +297,11 @@ describe('canonical layout — oriented', () => {
       rotation: 315 - (delta * 180) / Math.PI,
       count: 2,
     });
-    const near = createTextLayout(snapshot(a, b));
+    const near = createPdfTextLayout(snapshot(a, b));
     // One canonical frame: the two runs merge into one line.
     expect(near.segments({ start: 0, count: 4 })).toHaveLength(1);
 
-    const far = createTextLayout(
+    const far = createPdfTextLayout(
       snapshot(a, {
         ...orientedRun(
           2,
@@ -324,7 +327,7 @@ describe('canonical layout — interaction', () => {
     { x: -1, y: 0 },
     { rotation: 270, w: 8, h: 12 },
   );
-  const layout = createTextLayout(
+  const layout = createPdfTextLayout(
     snapshot(uprightRun(0, [uprightGlyph(10), uprightGlyph(18, { space: true })]), column),
   );
 
@@ -369,15 +372,19 @@ describe('canonical layout — interaction', () => {
 
   test('runs are the raw geometry it was built from', () => {
     const geometry = snapshot(uprightRun(0, [uprightGlyph(10)]));
-    expect(createTextLayout(geometry).runs).toBe(geometry.runs);
+    expect(createPdfTextLayout(geometry).runs).toBe(geometry.runs);
   });
 });
 
 /* ── segmentation (search and selection share it) ────────────────────────── */
 
 describe('canonical layout — segments', () => {
-  const rectsOf = (geometry: PageGeometrySnapshot, start: number, count: number): PdfRect[] =>
-    createTextLayout(geometry)
+  const rectsOf = (
+    geometry: PageGeometrySnapshot<PdfCoordinates>,
+    start: number,
+    count: number,
+  ): PdfRect[] =>
+    createPdfTextLayout(geometry)
       .segments({ start, count })
       .map((segment) => segment.rect);
   /** Five 10pt-wide glyphs on one line starting at x. */

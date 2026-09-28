@@ -6,7 +6,7 @@ import {
   type RotatedGeometryRun,
 } from '../dto/PageGeometrySnapshot';
 import type { PdfPoint, PdfQuad, PdfRect } from '../geometry/primitives';
-import type { Coordinates, PdfCoordinates } from '../pageSpace/coordinates';
+import type { Coordinates, PageCoordinates, PdfCoordinates } from '../pageSpace/coordinates';
 
 /**
  * The canonical text-interaction layout — the one place glyph geometry
@@ -14,12 +14,12 @@ import type { Coordinates, PdfCoordinates } from '../pageSpace/coordinates';
  *
  * Selection owns gestures and state; search owns matching and cursors;
  * neither owns segmentation. Both consume this module, so a text range has
- * exactly one canonical segmentation regardless of how it was produced, and
- * coordinate conversion (PDF → content/view) happens strictly afterward at
- * the plugin seam.
+ * exactly one canonical segmentation regardless of how it was produced.
  *
- * Everything here is PDF user space (y-up), the engine's one geometry
- * vocabulary. The line-merge is adapted from Chromium's
+ * Everything here works in the file's coordinates (y up), as the engine reads
+ * them. The public layout (`createTextLayout`, `pageSpace/text.ts`) runs this
+ * one on page-space geometry flipped top to bottom and flips its answers
+ * back. The line-merge is adapted from Chromium's
  * pdf/pdfium/pdfium_range.cc `MergeAdjacentRects` (BSD-licensed, Copyright
  * 2010 The Chromium Authors); hit-testing mirrors PDFium `GetIndexAtPos`
  * (exact tight box first, then a tolerance pass).
@@ -61,14 +61,14 @@ const FRAME_DOT_TOLERANCE = Math.cos(0.0087);
 const EDGE_EPSILON = 1e-6;
 
 /**
- * One merged visual line of a text range, in PDF user space. `quad` is the
+ * One merged visual line of a text range, in page space. `quad` is the
  * geometric authority (frame-geometric slot order: `p1..p4` = upper-start,
  * upper-end, lower-start, lower-end — visual semantics, not reading order);
  * `rect` is its axis-aligned bounds, produced by the same constructor.
  * `advance` is the reading direction along the baseline, derived from the
  * glyph sequence (+1 = the frame's +x), never inferred from geometry.
  */
-export interface PdfTextSegment<C extends Coordinates = PdfCoordinates> {
+export interface PdfTextSegment<C extends Coordinates = PageCoordinates> {
   quad: C['quad'];
   rect: C['box'];
   advance: 1 | -1;
@@ -114,11 +114,12 @@ interface PageTextLayout {
 
 /**
  * Where a page's text is, as `page.text.layout()` returns it: read it once
- * per page and keep it, every method answers right away. Positions are PDF
- * points, y up. Characters are numbered as the page's character space, the
+ * per page and keep it, every method answers right away. Positions are in
+ * page space: points from the top-left of the page, y down. Characters are
+ * numbered as the page's character space, the
  * space every {@link TextRange} is in.
  */
-export interface TextLayout<C extends Coordinates = PdfCoordinates> {
+export interface TextLayout<C extends Coordinates = PageCoordinates> {
   /** How many characters the page has: they are numbered 0 to `charCount - 1`. */
   readonly charCount: number;
   /** The raw geometry: characters grouped by line and font, with their boxes. */
@@ -139,8 +140,13 @@ export interface TextLayout<C extends Coordinates = PdfCoordinates> {
   charQuad(index: number): C['quad'] | null;
 }
 
-/** The layout of a page's geometry. */
-export function createTextLayout(snapshot: PageGeometrySnapshot): TextLayout {
+/**
+ * The layout of a page's geometry in the file's coordinates, for the engine's
+ * own readers. Everything else uses `createTextLayout`, in page space.
+ */
+export function createPdfTextLayout(
+  snapshot: PageGeometrySnapshot<PdfCoordinates>,
+): TextLayout<PdfCoordinates> {
   const layout = buildPageTextLayout(snapshot);
   const charCount = layout.glyphs.length;
   const indexOf = (at: PdfPoint | number): number | null => {
@@ -198,7 +204,7 @@ function frameBoxOfQuad(f: TextLayoutFrame, q: PdfQuad): PdfRect {
 
 /** Find-or-create the frame for a rotated run, keyed by the baseline
  *  direction + ascent handedness of its first classifiable glyph's edges. */
-function frameForRun(frames: TextLayoutFrame[], run: RotatedGeometryRun): number {
+function frameForRun(frames: TextLayoutFrame[], run: RotatedGeometryRun<PdfCoordinates>): number {
   const seed = run.glyphs.find((g) => !isEmpty(g));
   if (!seed) return 0;
   const q = seed.loose;
@@ -229,7 +235,7 @@ function frameForRun(frames: TextLayoutFrame[], run: RotatedGeometryRun): number
  * copy their wire boxes verbatim (frame 0, wire run rects included); rotated
  * runs project their glyph cells into their cluster's frame.
  */
-function buildPageTextLayout(snapshot: PageGeometrySnapshot): PageTextLayout {
+function buildPageTextLayout(snapshot: PageGeometrySnapshot<PdfCoordinates>): PageTextLayout {
   const glyphs: TextLayoutGlyph[] = [];
   const runs: TextLayoutRun[] = [];
   const frames: TextLayoutFrame[] = [IDENTITY_FRAME];
@@ -434,7 +440,7 @@ function textSegmentsForRange(
   layout: PageTextLayout,
   start: number,
   count: number,
-): PdfTextSegment[] {
+): PdfTextSegment<PdfCoordinates>[] {
   if (count <= 0 || layout.glyphs.length === 0) return [];
   const lo = Math.max(0, start);
   const hi = Math.min(layout.glyphs.length - 1, start + count - 1);
@@ -558,7 +564,10 @@ function quadOfFrameRect(f: TextLayoutFrame, frameIndex: number, r: PdfRect): Pd
   };
 }
 
-function materializeSegment(layout: PageTextLayout, m: MergedSubRun): PdfTextSegment {
+function materializeSegment(
+  layout: PageTextLayout,
+  m: MergedSubRun,
+): PdfTextSegment<PdfCoordinates> {
   const frame = layout.frames[m.frame];
   const quad = quadOfFrameRect(frame, m.frame, m.rect);
   const rect =

@@ -9,18 +9,24 @@ import type {
 import { pageBoxOf, pagePointOf, pageQuadOf } from '../../src/geometry/pageSpace';
 import type { PdfPoint, PdfRect } from '../../src/geometry/primitives';
 import { toPageRef } from '../../src/identity/PageRef';
+import type { PdfCoordinates } from '../../src/pageSpace/coordinates';
 import {
-  createPageTextLayout,
+  createTextLayout,
   pageGeometryOf,
   pageSearchSliceOf,
   pageTextSegmentOf,
 } from '../../src/pageSpace/text';
-import { createTextLayout } from '../../src/text/layout';
+import { createPdfTextLayout } from '../../src/text/layout';
 
 const visible: PdfRect = { left: 50, bottom: 60, right: 562, top: 732 };
 
-const upright = (start: number, x: number, bottom: number, count: number): PageGeometryRun => {
-  const glyphs: PageGeometryGlyph[] = Array.from({ length: count }, (_, i) => ({
+const upright = (
+  start: number,
+  x: number,
+  bottom: number,
+  count: number,
+): PageGeometryRun<PdfCoordinates> => {
+  const glyphs: PageGeometryGlyph<PdfCoordinates>[] = Array.from({ length: count }, (_, i) => ({
     loose: { left: x + i * 10, right: x + i * 10 + 10, bottom, top: bottom + 12 },
     ...(i === 3 ? { space: true as const } : {}),
   }));
@@ -39,12 +45,12 @@ const oriented = (
   n: PdfPoint,
   rotation: number,
   ascentFlip = false,
-): PageGeometryRun => {
+): PageGeometryRun<PdfCoordinates> => {
   const at = (t: number, up: number): PdfPoint => ({
     x: origin.x + u.x * t + n.x * up,
     y: origin.y + u.y * t + n.y * up,
   });
-  const glyphs: RotatedGeometryGlyph[] = Array.from({ length: 4 }, (_, i) => ({
+  const glyphs: RotatedGeometryGlyph<PdfCoordinates>[] = Array.from({ length: 4 }, (_, i) => ({
     loose: { p1: at(i * 8, 12), p2: at(i * 8 + 8, 12), p3: at(i * 8, 0), p4: at(i * 8 + 8, 0) },
   }));
   const corners = glyphs.flatMap((g) => [g.loose.p1, g.loose.p2, g.loose.p3, g.loose.p4]);
@@ -60,7 +66,7 @@ const oriented = (
 };
 
 const s = Math.SQRT1_2;
-const snapshot: PageGeometrySnapshot = {
+const snapshot: PageGeometrySnapshot<PdfCoordinates> = {
   runs: [
     upright(0, 100, 600, 8),
     upright(8, 100, 580, 6),
@@ -83,9 +89,37 @@ const close = (actual: unknown, expected: unknown) => {
 };
 
 describe('text in page space', () => {
-  const pdfLayout = createTextLayout(snapshot);
+  const pdfLayout = createPdfTextLayout(snapshot);
   const pageSnapshot = pageGeometryOf(snapshot, visible);
-  const pageLayout = createPageTextLayout(pageSnapshot);
+  const pageLayout = createTextLayout(pageSnapshot);
+
+  test('a character with no box keeps its zeroed box, in both directions', () => {
+    const run: PageGeometryRun<PdfCoordinates> = {
+      rect: { left: 100, bottom: 600, right: 110, top: 612 },
+      start: 0,
+      glyphs: [
+        { loose: { left: 0, bottom: 0, right: 0, top: 0 }, empty: true },
+        { loose: { left: 100, bottom: 600, right: 110, top: 612 } },
+      ],
+    };
+    const [page] = pageGeometryOf({ runs: [run] }, visible).runs;
+    expect(page!.glyphs[0]).toEqual({ loose: { x: 0, y: 0, width: 0, height: 0 }, empty: true });
+    expect(page!.glyphs[1]!.loose).toEqual({ x: 50, y: 120, width: 10, height: 12 });
+    expect(createTextLayout({ runs: [page!] }).charQuad(0)).toBeNull();
+
+    const blank: PageGeometryRun<PdfCoordinates> = {
+      rect: { left: 0, bottom: 0, right: 0, top: 0 },
+      start: 2,
+      glyphs: [{ loose: { left: 0, bottom: 0, right: 0, top: 0 }, empty: true }],
+    };
+    const [, blankPage] = pageGeometryOf({ runs: [run, blank] }, visible).runs;
+    expect(blankPage!.rect).toEqual({ x: 0, y: 0, width: 0, height: 0 });
+    // A triple-click on the real run doesn't reach into the blank one.
+    expect(createTextLayout({ runs: [page!, blankPage!] }).lineAt(1)).toEqual({
+      start: 0,
+      count: 2,
+    });
+  });
 
   test('the geometry is measured from the top-left of the visible box', () => {
     expect(pageSnapshot.runs[0]!.rect).toEqual({ x: 50, y: 120, width: 80, height: 12 });
@@ -93,7 +127,10 @@ describe('text in page space', () => {
       loose: { x: 80, y: 120, width: 10, height: 12 },
       space: true,
     });
-    const turned = snapshot.runs[2]! as Extract<PageGeometryRun, { rotation: number }>;
+    const turned = snapshot.runs[2]! as Extract<
+      PageGeometryRun<PdfCoordinates>,
+      { rotation: number }
+    >;
     expect(pageSnapshot.runs[2]).toMatchObject({ rotation: 270, ascentFlip: false });
     expect((pageSnapshot.runs[2]!.glyphs[0] as { loose: unknown }).loose).toEqual(
       pageQuadOf(turned.glyphs[0]!.loose, visible),

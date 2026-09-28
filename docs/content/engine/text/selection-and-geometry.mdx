@@ -14,7 +14,7 @@ line, and draw the selection yourself.
 ```ts
 const layout = await page.text.layout();
 
-const word = layout.wordAt({ x: 120, y: 700 }); // { start, count } or null
+const word = layout.wordAt({ x: 120, y: 90 }); // { start, count } or null
 const boxes = word ? layout.segments(word) : []; // where to draw it
 ```
 
@@ -33,8 +33,8 @@ it: every method on it answers right away, without another call to the engine.
 const layout = await page.text.layout();
 ```
 
-Positions are PDF points (1/72 inch), with `y` going up from the bottom of the page, the way
-every position in the engine is.
+Positions are in page space: points (1/72 inch) from the top-left corner of the page, with `y`
+going down, the way every position in the engine is.
 
 ## Find the character under the pointer
 
@@ -46,14 +46,14 @@ const index = layout.charAt(point);
 ```
 
 To turn a click on a rendered page into a point, use the image's `transform`. It knows the page's
-crop box, its rotation and your zoom:
+rotation and your zoom:
 
 ```ts
 const image = await page.render.image({ viewport: { kind: 'width', width: 800 } });
 
 img.addEventListener('click', (event) => {
   const scale = image.width / img.clientWidth; // image pixels per CSS pixel
-  const point = image.transform.pixelsToPdf({ x: event.offsetX * scale, y: event.offsetY * scale });
+  const point = image.transform.pixelsToPage({ x: event.offsetX * scale, y: event.offsetY * scale });
   const index = layout.charAt(point);
 });
 ```
@@ -61,7 +61,7 @@ img.addEventListener('click', (event) => {
 `scale` turns the click's CSS pixels into image pixels, so this works at whatever size you show
 the image. Without an image at hand (while zooming, or for a page you draw yourself),
 `pageTransform()` gives the same transform from the page's layout; see
-[From image pixels to PDF points](/docs/engine/documents/rendering#from-image-pixels-to-pdf-points).
+[From image pixels to page points](/docs/engine/documents/rendering#from-image-pixels-to-page-points).
 
 ## Select a word, a line, a range
 
@@ -91,7 +91,7 @@ if (from !== null && to !== null) {
 
 ```ts
 for (const segment of layout.segments(range)) {
-  const box = image.transform.pdfToPixels(segment.rect); // { x, y, width, height } in image pixels
+  const box = image.transform.pageToPixels(segment.rect); // { x, y, width, height } in image pixels
   drawSelectionBox(box);
 }
 ```
@@ -100,7 +100,7 @@ Each segment has:
 
 | Field  | What it is                                                                                |
 | :----- | :---------------------------------------------------------------------------------------- |
-| `rect` | The box around the text on that line, `{ left, bottom, right, top }`.                     |
+| `rect` | The box around the text on that line, `{ x, y, width, height }`.                          |
 | `quad` | The four corners of the text, `{ p1, p2, p3, p4 }`. Differs from `rect` for rotated text. |
 
 Use `rect` for a simple box. Use `quad` when text can be rotated, and for annotations: a highlight
@@ -153,7 +153,7 @@ the other way, as Arabic and Hebrew do.
 `layout.runs` is the raw geometry: characters grouped by line and font. Each character has a
 loose box (the full line height; segments use it) and, when the font says, a tight box around the
 glyph (`charAt` checks it first). A space has `space: true`, and a character with no box of its
-own has `empty: true`. You need runs only for things like one box per letter.
+own has `empty: true` and a zeroed box. You need runs only for things like one box per letter.
 
 Two shortcuts save you reading runs: `layout.charCount` is how many characters the page has, and
 `layout.charQuad(index)` is one character's box as a quad, or `null` when it has none (use it to

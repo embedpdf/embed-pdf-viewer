@@ -1412,7 +1412,7 @@ export class WorkerHost {
     const session = this.requireSession(req);
     const reader = new PageGeometryReader(this.runtime, session);
     const snapshot = reader.read(session.resolvePageRef(req.page).pageObjectNumber, signal);
-    return wirePack({ tag: 'pages.geometry', snapshot });
+    return wirePack({ tag: 'pages.geometry', page: req.page, snapshot });
   }
 
   private handleSearchQuery(

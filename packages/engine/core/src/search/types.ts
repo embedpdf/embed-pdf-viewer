@@ -1,5 +1,5 @@
 import type { PageRef } from '../identity/PageRef';
-import type { Coordinates, PdfCoordinates } from '../pageSpace/coordinates';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 import type { PdfTextSegment } from '../text/layout';
 import type { PageTextRange } from '../text/TextRange';
 
@@ -131,7 +131,7 @@ export interface SearchSnippet {
  * exactly like a selection of the same characters, one oriented segment per
  * visual line, never per glyph.
  */
-export interface SearchMatch<C extends Coordinates = PdfCoordinates> extends PageTextRange {
+export interface SearchMatch<C extends Coordinates = PageCoordinates> extends PageTextRange {
   segments: PdfTextSegment<C>[];
   snippet?: SearchSnippet;
 }
@@ -142,7 +142,7 @@ export interface SearchMatch<C extends Coordinates = PdfCoordinates> extends Pag
  * `pagesSearched / pageCount` (`pagesSearched` is cumulative across the
  * cursor chain, not per batch).
  */
-export interface SearchSlice<C extends Coordinates = PdfCoordinates> {
+export interface SearchSlice<C extends Coordinates = PageCoordinates> {
   matches: SearchMatch<C>[];
   nextCursor: string | null;
   pagesSearched: number;

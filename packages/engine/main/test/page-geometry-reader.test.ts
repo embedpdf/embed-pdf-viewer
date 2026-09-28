@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { PdfQuad, PdfRect } from '@embedpdf/engine-core/runtime';
-import { isRotatedGeometryRun } from '@embedpdf/engine-core/runtime';
+import { createPdfTextLayout, isRotatedGeometryRun } from '@embedpdf/engine-core/runtime';
 import {
   buildRunsFromRawGlyphs,
   EPDF_CHAR_GEOMETRY_LAYOUT,
@@ -99,16 +99,40 @@ describe('buildRunsFromRawGlyphs', () => {
     expect(second.fontSize).toBe(9);
   });
 
-  test('legacy run rect seeds from the first glyph, zero-seed quirk included', () => {
+  test("a run's rect covers its real glyphs; a glyph with no box takes no part", () => {
     const runs = buildRunsFromRawGlyphs([
-      empty(1), // a generated space opening the object: zeroed seed
+      empty(1), // a generated space opening the object
       upright(1, box(100, 200, 110, 212)),
+      empty(1),
+      upright(1, box(110, 200, 120, 212)),
     ]);
     expect(runs).toHaveLength(1);
-    // The seed participates in the union — exactly the legacy reader's
-    // behavior for runs opening with a degenerate glyph.
-    expect(runs[0].rect).toEqual(box(0, 0, 110, 212));
+    expect(runs[0].rect).toEqual(box(100, 200, 120, 212));
     expect(runs[0].glyphs[0]).toEqual({ loose: box(0, 0, 0, 0), empty: true });
+  });
+
+  test('a triple-click on a line opening with a glyph with no box stays on that line', () => {
+    const runs = buildRunsFromRawGlyphs([
+      empty(1),
+      upright(1, box(100, 600, 110, 612)),
+      upright(1, box(110, 600, 120, 612)),
+      upright(2, box(100, 500, 110, 512)), // the line below
+    ]);
+    expect(createPdfTextLayout({ runs }).lineAt(1)).toEqual({ start: 0, count: 3 });
+  });
+
+  test('a run of nothing but glyphs with no box keeps the zeroed rect', () => {
+    const runs = buildRunsFromRawGlyphs([empty(1), empty(1)]);
+    expect(runs).toHaveLength(1);
+    expect(runs[0].rect).toEqual(box(0, 0, 0, 0));
+  });
+
+  test('a rotated run opening with a glyph with no box covers only its real cells', () => {
+    const q1 = rotatedQuad(50, 100, 10, 14);
+    const runs = buildRunsFromRawGlyphs([empty(1), rotated(1, q1, Math.PI / 2)]);
+    expect(runs).toHaveLength(1);
+    expect(isRotatedGeometryRun(runs[0])).toBe(true);
+    expect(runs[0].rect).toEqual(box(50, 100, 64, 110));
   });
 
   test('rotated object emits the rotated variant; empty glyphs get zeroed quads', () => {

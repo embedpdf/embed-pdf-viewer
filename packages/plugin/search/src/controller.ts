@@ -7,9 +7,9 @@ import {
   type LatestCancellation,
   type PageRef,
 } from '@embedpdf/core';
-import { boundsOfRects, textQuadBounds, type TextQuad } from '@embedpdf/core-geometry';
+import { boundsOfRects, textQuadFromPositional } from '@embedpdf/core-geometry';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
-import type { PdfQuad, SearchQuery, SearchSlice } from '@embedpdf/engine-core/runtime';
+import type { SearchQuery, SearchSlice } from '@embedpdf/engine-core/runtime';
 import type {
   SearchActiveHitChangedEvent,
   SearchCancelledEvent,
@@ -93,22 +93,13 @@ export function createSearchController(ctx: PluginContext<SearchState>, config: 
       // A page that vanished mid-search (deleted) drops its hits.
       const page = ctx.getPage(match.page);
       if (!page) continue;
-      const space = ctx.geometry.forPage(match.page);
-      // Engine quads carry frame-geometric slot semantics (p1..p4 = upper-start,
-      // upper-end, lower-start, lower-end): the y-flip maps corners onto their names.
-      const toQuad = (pdfQuad: PdfQuad): TextQuad => {
-        const corners = space.pdfQuadToPage(pdfQuad);
-        return {
-          upperStart: corners.p1,
-          upperEnd: corners.p2,
-          lowerStart: corners.p3,
-          lowerEnd: corners.p4,
-        };
-      };
-      const segments = match.segments.map((segment) => {
-        const quad = toQuad(segment.quad);
-        return { quad, rect: textQuadBounds(quad), advance: segment.advance };
-      });
+      // Segments arrive in page space; the quad's corners are frame-geometric
+      // (p1..p4 = upper-start, upper-end, lower-start, lower-end).
+      const segments = match.segments.map((segment) => ({
+        quad: textQuadFromPositional(segment.quad),
+        rect: segment.rect,
+        advance: segment.advance,
+      }));
       hits.push({
         page: match.page,
         pageIndex: page.index,

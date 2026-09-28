@@ -41,15 +41,16 @@ const match = (pageObjectNumber: number, start: number) => ({
   page: toPageRef(pageObjectNumber),
   start,
   count: 4,
+  // In page space, as the engine hands matches out.
   segments: [
     {
       quad: {
-        p1: { x: 40, y: 280 },
-        p2: { x: 60, y: 280 },
-        p3: { x: 40, y: 270 },
-        p4: { x: 60, y: 270 },
+        p1: { x: 30, y: 40 },
+        p2: { x: 50, y: 40 },
+        p3: { x: 30, y: 50 },
+        p4: { x: 50, y: 50 },
       },
-      rect: { left: 40, bottom: 270, right: 60, top: 280 },
+      rect: { x: 30, y: 40, width: 20, height: 10 },
       advance: 1 as const,
     },
   ],
@@ -129,7 +130,7 @@ const tick = () => new Promise((resolve) => setTimeout(resolve));
 describe('search session', () => {
   afterEach(() => vi.useRealTimers());
 
-  it('streams hits, projects geometry to page space, and resolves complete with events in order', async () => {
+  it('streams hits with their page-space geometry and resolves complete with events in order', async () => {
     const { kernel, api } = await boot([
       slice([match(5, 0), match(5, 9)], 'c1', 1),
       slice([match(7, 2)], null, 2),
@@ -148,7 +149,9 @@ describe('search session', () => {
 
     const first = api.listHits()[0];
     expect(first.pageIndex).toBe(0);
-    expect(first.segments[0].rect).toEqual({ x: 30, y: 40, width: 20, height: 10 }); // crop offset applied
+    expect(first.segments[0].rect).toEqual({ x: 30, y: 40, width: 20, height: 10 });
+    expect(first.segments[0].quad.upperStart).toEqual({ x: 30, y: 40 });
+    expect(first.segments[0].quad.lowerEnd).toEqual({ x: 50, y: 50 });
     expect(api.listHits({ page: toPageRef(5) })).toBe(api.listHits({ page: toPageRef(5) }));
     expect(api.getHitCount(toPageRef(5))).toBe(2);
     expect(api.listPagesWithHits().map((page) => page.pageObjectNumber)).toEqual([5, 7]);

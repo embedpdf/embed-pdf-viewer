@@ -146,7 +146,7 @@ export function runPageSpaceConformance(
             const word = page.words[0]!;
             const match = slice.matches.find((m) => samePage(m.page, layout.ref));
             expect(match !== undefined).toBe(true);
-            const box = toPage(match!.segments[0]!.rect, visible);
+            const box = match!.segments[0]!.rect;
             expect(Math.abs(box.x - (word.x - visible.left)) <= 3).toBe(true);
             expect(box.y < visible.top - word.y && box.y + box.height > visible.top - word.y).toBe(
               true,
@@ -270,14 +270,16 @@ export function runPageSpaceConformance(
           const match = slice.matches.find((m) => samePage(m.page, layout.ref));
           expect(match !== undefined).toBe(true);
           const found = match!.segments[0]!.rect;
+          // Annotations still take the file's numbers.
+          const inFile = fromPage(found, visible);
           const handle = doc.page(layout.ref);
           const { annotation } = await handle.annotations.create({
             subtype: 'redact',
             rect: {
-              left: found.left - 2,
-              bottom: found.bottom - 2,
-              right: found.right + 2,
-              top: found.top + 2,
+              left: inFile.left - 2,
+              bottom: inFile.bottom - 2,
+              right: inFile.right + 2,
+              top: inFile.top + 2,
             },
           });
           await doc.redaction.apply({ annotations: [annotation.ref] });
@@ -286,7 +288,7 @@ export function runPageSpaceConformance(
           expect(after.matches.some((m) => samePage(m.page, layout.ref))).toBe(false);
           const scale = scaleFor(visible);
           const raster = await render(doc, layout.ref, { viewport: { kind: 'scale', scale } });
-          expect(darkInside(raster, toPage(found, visible), scale)).toBe(0);
+          expect(darkInside(raster, found, scale)).toBe(0);
           for (const mark of page.marks) {
             expect(darkAt(raster, middleOf(toPage(mark, visible)), scale)).toBe(true);
           }

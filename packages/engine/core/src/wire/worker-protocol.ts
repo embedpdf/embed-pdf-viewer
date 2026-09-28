@@ -1487,10 +1487,10 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | { tag: 'pages.text'; snapshot: PageTextSnapshot }
-  | { tag: 'pages.geometry'; snapshot: PageGeometrySnapshot }
+  | { tag: 'pages.geometry'; page: PageRef; snapshot: PageGeometrySnapshot<C> }
   | { tag: 'pages.render'; raster: PageRaster }
   | { tag: 'pages.renderEncoded'; image: EncodedImageWire }
-  | { tag: 'search.query'; slice: SearchSlice }
+  | { tag: 'search.query'; slice: SearchSlice<C> }
   | { tag: 'document.saveBuffer'; bytes: ArrayBuffer; size: number }
   | { tag: 'document.saveLayerBuffer'; bytes: ArrayBuffer; size: number }
   | { tag: 'document.saveFile'; path: string }

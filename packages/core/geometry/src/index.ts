@@ -750,6 +750,16 @@ export function positionalQuad(quad: TextQuad): Quad {
   return { p1: quad.upperStart, p2: quad.upperEnd, p3: quad.lowerStart, p4: quad.lowerEnd };
 }
 
+/**
+ * Read a trusted producer's positional quad (`p1..p4` = US, UE, LS, LE), such
+ * as the engine's text segments and glyph cells, as a TextQuad: the inverse of
+ * {@link positionalQuad}. A quad of unknown order (an imported `/QuadPoints`)
+ * goes through {@link normalizeQuad} instead.
+ */
+export function textQuadFromPositional(quad: Quad): TextQuad {
+  return { upperStart: quad.p1, upperEnd: quad.p2, lowerStart: quad.p3, lowerEnd: quad.p4 };
+}
+
 const QUAD_EPSILON = 1e-6;
 
 type QuadCornerList = [Point, Point, Point, Point];

@@ -6,6 +6,7 @@
  */
 
 import type { PageCoordinates } from './coordinates';
+import { mirroredRun } from './text';
 import { appearanceTurnOf } from '../annotation/appearanceTurn';
 import { drawnPointsOf } from '../annotation/drawnPoints';
 import type { AnnotationDTO, PageAnnotationDTO } from '../annotation/kinds';
@@ -106,30 +107,6 @@ export const pageQuadFromCorners = (corners: {
   p3: corners.bottomLeft,
   p4: corners.bottomRight,
 });
-
-/** A run flipped top to bottom, enough for the glyph helpers. */
-function mirroredRun(run: PageGeometryRun<PageCoordinates>): PageGeometryRun {
-  if (isRotatedGeometryRun(run)) {
-    return {
-      ...run,
-      rect: mirroredRect(run.rect),
-      glyphs: run.glyphs.map(({ loose, tight, ...glyph }) => ({
-        ...glyph,
-        loose: mirroredQuad(loose),
-        ...(tight ? { tight: mirroredQuad(tight) } : {}),
-      })),
-    };
-  }
-  return {
-    ...run,
-    rect: mirroredRect(run.rect),
-    glyphs: run.glyphs.map(({ loose, tight, ...glyph }) => ({
-      ...glyph,
-      loose: mirroredRect(loose),
-      ...(tight ? { tight: mirroredRect(tight) } : {}),
-    })),
-  };
-}
 
 /** A glyph's loose cell as a quad: `p1..p4` upper-start, upper-end, lower-start, lower-end. */
 export const pageGlyphLooseQuad = (

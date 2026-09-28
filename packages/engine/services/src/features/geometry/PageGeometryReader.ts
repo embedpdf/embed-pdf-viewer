@@ -3,6 +3,7 @@ import type {
   PageGeometryRun,
   PageGeometrySnapshot,
   PageObjectNumber,
+  PdfCoordinates,
   PdfQuad,
   PdfRect,
   RotatedGeometryGlyph,
@@ -87,7 +88,10 @@ export class PageGeometryReader {
     private readonly session: DocumentSession,
   ) {}
 
-  read(pageObjectNumber: PageObjectNumber, signal: AbortSignal): PageGeometrySnapshot {
+  read(
+    pageObjectNumber: PageObjectNumber,
+    signal: AbortSignal,
+  ): PageGeometrySnapshot<PdfCoordinates> {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
     const pool = this.session.pagePool();
@@ -197,8 +201,10 @@ export class PageGeometryReader {
  * Runs that never see a classifiable glyph emit as upright (degenerate,
  * legacy behavior).
  */
-export function buildRunsFromRawGlyphs(records: RawGeometryGlyphRecord[]): PageGeometryRun[] {
-  const runs: PageGeometryRun[] = [];
+export function buildRunsFromRawGlyphs(
+  records: RawGeometryGlyphRecord[],
+): PageGeometryRun<PdfCoordinates>[] {
+  const runs: PageGeometryRun<PdfCoordinates>[] = [];
   let buffer: RawGeometryGlyphRecord[] = [];
   let charStart = 0;
   let fontSize: number | undefined;
@@ -258,9 +264,9 @@ function materializeRun(
   charStart: number,
   fontSize: number | undefined,
   cls: RunClass | undefined,
-): PageGeometryRun {
+): PageGeometryRun<PdfCoordinates> {
   if (cls && !cls.upright) {
-    const glyphs: RotatedGeometryGlyph[] = buffer.map((g) =>
+    const glyphs: RotatedGeometryGlyph<PdfCoordinates>[] = buffer.map((g) =>
       g.looseQuad
         ? {
             loose: g.looseQuad,
@@ -281,11 +287,9 @@ function materializeRun(
     };
   }
 
-  // Upright (and degenerate-only) runs: the legacy materialization verbatim —
-  // native-offered quads are dropped, the rect seeds from the first glyph's
-  // box (zeroed for empty glyphs, quirk included) and expands over non-empty
-  // glyphs only.
-  const glyphs: PageGeometryGlyph[] = buffer.map((g) => ({
+  // Upright (and degenerate-only) runs: native-offered quads are dropped, and
+  // the rect is the union of the real glyphs' boxes.
+  const glyphs: PageGeometryGlyph<PdfCoordinates>[] = buffer.map((g) => ({
     loose: g.looseBox,
     ...(g.tightBox ? { tight: g.tightBox } : {}),
     ...statesOf(g.flags),
@@ -306,22 +310,29 @@ function statesOf(flags: number): { space?: true; empty?: true } {
   };
 }
 
-/** Legacy run-rect algorithm: seed from the first glyph, expand on non-empty. */
+/**
+ * A run's box: the union of its glyphs' boxes. A glyph with no box
+ * (`FLAG_EMPTY`) has only a zeroed stand-in, so it takes no part; a run of
+ * nothing but such glyphs gets the zeroed box itself.
+ */
 function runBounds(
   buffer: RawGeometryGlyphRecord[],
   boundsOf: (g: RawGeometryGlyphRecord) => PdfRect,
 ): PdfRect {
-  const seed = boundsOf(buffer[0]);
-  const rect = { left: seed.left, bottom: seed.bottom, right: seed.right, top: seed.top };
+  let rect: PdfRect | null = null;
   for (const g of buffer) {
     if (g.flags & FLAG_EMPTY) continue;
     const b = boundsOf(g);
+    if (!rect) {
+      rect = { left: b.left, bottom: b.bottom, right: b.right, top: b.top };
+      continue;
+    }
     rect.left = Math.min(rect.left, b.left);
     rect.bottom = Math.min(rect.bottom, b.bottom);
     rect.right = Math.max(rect.right, b.right);
     rect.top = Math.max(rect.top, b.top);
   }
-  return rect;
+  return rect ?? { ...ZERO_RECT };
 }
 
 const ZERO_RECT: PdfRect = { left: 0, bottom: 0, right: 0, top: 0 };

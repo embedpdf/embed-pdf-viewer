@@ -7,8 +7,12 @@ import {
   type Engine,
   type PageLayout,
 } from '@embedpdf/core';
-import { createTextLayout } from '@embedpdf/engine-core/runtime';
-import type { PageGeometrySnapshot, PageTextSnapshot } from '@embedpdf/engine-core/runtime';
+import { createTextLayout, pageGeometryOf } from '@embedpdf/engine-core/runtime';
+import type {
+  PageGeometrySnapshot,
+  PageTextSnapshot,
+  PdfCoordinates,
+} from '@embedpdf/engine-core/runtime';
 import { interactionPlugin } from '@embedpdf/plugin-interaction';
 import { selectionPlugin } from '../src/selection.plugin';
 import { SelectionToken } from '../src/host-contract';
@@ -26,7 +30,7 @@ const glyph = (left: number, bottom: number, space = false, width = 8, height = 
 
 /** One upright run of `count` glyphs starting at x=10, y-up row 90..100
  *  (content space: y 0..10). A space at `spaceAt` splits words. */
-const simpleGeometry = (count: number, spaceAt?: number): PageGeometrySnapshot => ({
+const simpleGeometry = (count: number, spaceAt?: number): PageGeometrySnapshot<PdfCoordinates> => ({
   runs: [
     {
       rect: { left: 10, bottom: 90, right: 10 + count * 8, top: 100 },
@@ -38,7 +42,8 @@ const simpleGeometry = (count: number, spaceAt?: number): PageGeometrySnapshot =
 
 interface PageFixture {
   pageObjectNumber: number;
-  geometry: PageGeometrySnapshot;
+  /** In the file's coordinates; the fake engine measures it on the page, as the engine does. */
+  geometry: PageGeometrySnapshot<PdfCoordinates>;
   text: PageTextSnapshot;
 }
 
@@ -117,7 +122,10 @@ async function boot(fixtures: PageFixture[], allow = ALL) {
     page: (ref: { pageObjectNumber: number }) => ({
       text: {
         get: () => textReads(ref.pageObjectNumber),
-        layout: () => geometryReads(ref.pageObjectNumber).then(createTextLayout),
+        layout: () =>
+          geometryReads(ref.pageObjectNumber).then((geometry) =>
+            createTextLayout(pageGeometryOf(geometry, crop)),
+          ),
       },
     }),
     close: () => Promise.resolve(),

@@ -29,7 +29,7 @@ export {
   pdfAnnotationPatchOf,
 } from './annotations';
 export { pageLayoutOf, pageListOf, pageSpaceBoxesOf, visibleBoxesOf } from './pages';
-export { createPageTextLayout, pageGeometryOf, pageSearchSliceOf, pageTextSegmentOf } from './text';
+export { createTextLayout, pageGeometryOf, pageSearchSliceOf, pageTextSegmentOf } from './text';
 export { pageAppearanceManifestOf, pageAppearancesOf, pdfRenderTargetOf } from './rendering';
 export {
   pageFieldActionsOf,

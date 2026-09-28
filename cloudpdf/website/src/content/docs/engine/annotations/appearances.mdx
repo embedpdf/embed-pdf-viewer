@@ -28,7 +28,7 @@ const { appearances } = await page.annotations.renderAppearancesRaw({
 
 for (const appearance of appearances) {
   const { url } = await appearance.image.objectUrl();
-  const box = pageImage.transform.pdfToPixels(appearance.rect); // { x, y, width, height } in the page image
+  const box = pageImage.transform.pageToPixels(appearance.rect); // { x, y, width, height } in the page image
   placeImage(url, box);
 }
 ```

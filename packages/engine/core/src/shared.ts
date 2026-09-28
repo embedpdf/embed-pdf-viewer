@@ -642,7 +642,7 @@ export type {
 } from './search/regex';
 export { matchPageText } from './search/matcher';
 export { SEARCH_SNIPPET_CONTEXT, buildSnippet } from './search/snippet';
-export { createTextLayout } from './text/layout';
+export { createPdfTextLayout } from './text/layout';
 export type { PdfTextSegment, TextLayout } from './text/layout';
 export type { PageTextRange, TextRange } from './text/TextRange';
 export {

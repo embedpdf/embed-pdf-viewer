@@ -54,6 +54,7 @@ import { FormFieldDTOSchema, FormSnapshotSchema, FormWidgetSchema } from '../for
 import { FormFieldRefSchema, FormFieldValueSchema } from '../forms/schema';
 import {
   PageBoxSchema,
+  PageQuadSchema,
   PdfQuadSchema,
   PdfRectSchema,
   PdfRotationSchema,
@@ -549,28 +550,28 @@ export const PageTextSnapshotSchema: z.ZodType<PageTextSnapshot> = z
   });
 
 export const PageGeometryGlyphSchema = z.object({
-  loose: PdfRectSchema,
-  tight: PdfRectSchema.optional(),
+  loose: PageBoxSchema,
+  tight: PageBoxSchema.optional(),
   space: z.literal(true).optional(),
   empty: z.literal(true).optional(),
 });
 
 export const RotatedGeometryGlyphSchema = z.object({
-  loose: PdfQuadSchema,
-  tight: PdfQuadSchema.optional(),
+  loose: PageQuadSchema,
+  tight: PageQuadSchema.optional(),
   space: z.literal(true).optional(),
   empty: z.literal(true).optional(),
 });
 
 export const UprightGeometryRunSchema = z.object({
-  rect: PdfRectSchema,
+  rect: PageBoxSchema,
   start: z.number().int().nonnegative(),
   glyphs: z.array(PageGeometryGlyphSchema),
   fontSize: z.number().optional(),
 });
 
 export const RotatedGeometryRunSchema = z.object({
-  rect: PdfRectSchema,
+  rect: PageBoxSchema,
   start: z.number().int().nonnegative(),
   glyphs: z.array(RotatedGeometryGlyphSchema),
   rotation: z.number(),
@@ -625,8 +626,8 @@ export const SearchSnippetSchema: z.ZodType<SearchSnippet> = z.object({
 });
 
 export const PdfTextSegmentSchema: z.ZodType<PdfTextSegment> = z.object({
-  quad: PdfQuadSchema,
-  rect: PdfRectSchema,
+  quad: PageQuadSchema,
+  rect: PageBoxSchema,
   advance: z.union([z.literal(1), z.literal(-1)]),
 });
 

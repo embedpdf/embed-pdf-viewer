@@ -3,7 +3,9 @@ import {
   pageDestinationOf,
   pageFormFieldOf,
   pageFormSnapshotOf,
+  pageGeometryOf,
   pageListOf,
+  pageSearchSliceOf,
   type PdfCoordinates,
   type PdfDestination,
   type VisibleBoxOf,
@@ -40,6 +42,10 @@ export function resultInPageSpace(
         ...payload,
         result: { ...payload.result, layout: pageListOf(payload.result.layout) },
       } as WorkerResultPayload;
+    case 'pages.geometry':
+      return { ...payload, snapshot: pageGeometryOf(payload.snapshot, boxOf(payload.page)) };
+    case 'search.query':
+      return { ...payload, slice: pageSearchSliceOf(payload.slice, boxOf) };
     case 'actions.read':
       return { ...payload, snapshot: mapDocumentActions(payload.snapshot, toPage) };
     case 'forms.list':

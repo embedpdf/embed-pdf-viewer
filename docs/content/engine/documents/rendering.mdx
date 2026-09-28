@@ -151,27 +151,27 @@ bytes per row). It skips encoding, so it's the fastest way to get a page onto a 
 
 </Engine>
 
-## From image pixels to PDF points
+## From image pixels to page points
 
-The engine gives every position in PDF points: text, search matches, annotations. The pointer and
-the screen work in pixels. A page transform converts between the two, and every image has the one
-it was rendered with:
+The engine gives every position in page space, in points from the page's top-left corner: text,
+search matches, annotations. The pointer and the screen work in pixels. A page transform converts
+between the two, and every image has the one it was rendered with:
 
 ```ts
 const image = await page.render.image({ viewport: { kind: 'width', width: 800 } });
 
 img.addEventListener('click', (event) => {
   const scale = image.width / img.clientWidth; // image pixels per CSS pixel
-  const point = image.transform.pixelsToPdf({ x: event.offsetX * scale, y: event.offsetY * scale });
-  // point is { x, y } in PDF points, ready for layout.charAt() or an annotation
+  const point = image.transform.pixelsToPage({ x: event.offsetX * scale, y: event.offsetY * scale });
+  // point is { x, y } in page space, ready for layout.charAt() or an annotation
 });
 
-const box = image.transform.pdfToPixels(match.segments[0].rect); // { x, y, width, height }
+const box = image.transform.pageToPixels(match.segments[0].rect); // { x, y, width, height }
 ```
 
-`pdfToPixels()` takes a point, a rect or a quad; `pixelsToPdf()` takes a point or a rect. Both
-take the page's crop box, the rotation, the size and the `target` into account, so you never do
-that math yourself.
+`pageToPixels()` takes a point, a box or a quad; `pixelsToPage()` takes a point or a box. Both
+take the page's rotation, the size and the `target` into account, so you never do that math
+yourself.
 
 <Engine local>
 

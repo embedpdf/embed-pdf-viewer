@@ -25,7 +25,7 @@ Each match tells you three things:
 
 ## Show where a match is
 
-Each segment has a `rect` (a box, `{ left, bottom, right, top }` in PDF points) and a `quad` (the
+Each segment has a `rect` (a box, `{ x, y, width, height }` from the page's top-left) and a `quad` (the
 four corners of the text, which differ from the box when text is rotated). Draw the boxes over
 the rendered page, or turn the match into a highlight annotation:
 
