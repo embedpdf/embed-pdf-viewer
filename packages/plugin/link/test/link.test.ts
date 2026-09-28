@@ -173,18 +173,21 @@ describe('link plugin', () => {
       kind: 'uri',
       uri: 'https://x',
     });
+    // The file's numbers, measured from the top-left of the page the link goes to.
     expect(
       harness.link.resolve({
         kind: 'goto',
-        destination: { page: toPageRef(2), kind: 'fit' } as never,
-      }).kind,
-    ).toBe('reveal');
+        destination: { kind: 'xyz', page: toPageRef(2), left: crop.left + 100, top: crop.top - 50 },
+      }),
+    ).toEqual({
+      kind: 'destination',
+      destination: { kind: 'xyz', page: toPageRef(2), x: 100, y: 50 },
+    });
+    // A page the document doesn't have can't be gone to: the target is reported.
     expect(
-      harness.link.resolve({
-        kind: 'goto',
-        destination: { page: toPageRef(99), kind: 'fit' } as never,
-      }).kind,
-    ).toBe('destination');
+      harness.link.resolve({ kind: 'goto', destination: { kind: 'fit', page: toPageRef(99) } })
+        .kind,
+    ).toBe('reported');
     expect(harness.link.activate({ kind: 'uri', uri: 'https://x' })).toEqual({
       outcome: 'uri',
       uri: 'https://x',

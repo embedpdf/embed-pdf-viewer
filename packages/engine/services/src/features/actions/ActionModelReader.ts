@@ -5,12 +5,9 @@ import type {
   PdfActionTree,
   PdfActionType,
   PdfActionWarning,
+  PdfDestination,
 } from '@embedpdf/engine-core/runtime';
-import {
-  decodeSubmitFormFlags,
-  EngineError,
-  EngineErrorCode,
-} from '@embedpdf/engine-core/runtime';
+import { decodeSubmitFormFlags, EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import {
   NULL_PTR,
   type PdfFunctions,
@@ -153,7 +150,7 @@ export function readActionModel(
   docPtr: Ptr,
   modelPtr: Ptr,
   budget: ActionReadBudgetTracker,
-): PdfActionTree | null {
+): PdfActionTree<PdfDestination> | null {
   if (modelPtr === NULL_PTR) return null;
   try {
     const nodeCount = fn.EPDFAction_GetNodeCount(modelPtr);
@@ -208,9 +205,7 @@ export function readActionModel(
       return targets;
     };
 
-    const readResetFormState = (
-      nodeId: number,
-    ): { hasFields: boolean; exclude: boolean } | null =>
+    const readResetFormState = (nodeId: number): { hasFields: boolean; exclude: boolean } | null =>
       withScratchN(mem, [I32_BYTES, I32_BYTES], ([hasFieldsPtr, excludePtr]) => {
         if (!fn.EPDFAction_GetNodeResetForm(modelPtr, nodeId, hasFieldsPtr, excludePtr)) {
           return null;
@@ -232,7 +227,7 @@ export function readActionModel(
         };
       });
 
-    const readNode = (nodeId: number): PdfActionNode => {
+    const readNode = (nodeId: number): PdfActionNode<PdfDestination> => {
       if (visiting.has(nodeId)) {
         throw malformedActionModel('native action model contains a cycle', { nodeId });
       }
@@ -248,7 +243,7 @@ export function readActionModel(
         if (!Number.isInteger(nextCount) || nextCount < 0) {
           throw malformedActionModel('invalid action child count', { nodeId, nextCount });
         }
-        const next: PdfActionNode[] = [];
+        const next: PdfActionNode<PdfDestination>[] = [];
         for (let index = 0; index < nextCount; index++) {
           const childId = normalizeNodeId(
             fn.EPDFAction_GetNextAt(modelPtr, nodeId, index),
@@ -257,7 +252,7 @@ export function readActionModel(
           next.push(readNode(childId));
         }
 
-        const degraded = (): PdfActionNode => {
+        const degraded = (): PdfActionNode<PdfDestination> => {
           payloadDropped = true;
           return { type: 'unknown', subtype, next };
         };

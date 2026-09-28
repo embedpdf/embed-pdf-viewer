@@ -366,7 +366,7 @@ function fieldMarkersOf(
 }
 
 /** Whether a link's `/A` is what writing its target writes again. */
-function writtenAsIs(tree: PdfActionTree | undefined): boolean {
+function writtenAsIs<Destination>(tree: PdfActionTree<Destination> | undefined): boolean {
   const root = tree?.root;
   if (!tree || tree.incomplete || !root || root.next.length > 0) return false;
   return !(root.type === 'uri' && root.isMap);

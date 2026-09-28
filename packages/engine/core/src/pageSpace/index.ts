@@ -6,7 +6,7 @@
  */
 
 export type { Coordinates, PageCoordinates, PdfCoordinates } from './coordinates';
-export type { PageDestination, VisibleBoxOf } from './destinations';
+export type { DestinationBox, VisibleBoxOf } from './destinations';
 export {
   mapActionNode,
   mapActionTree,
@@ -15,7 +15,9 @@ export {
   mapFieldActions,
   mapLinkTarget,
   mapPageActions,
+  pageActionTreeOf,
   pageDestinationOf,
+  pageLinkTargetOf,
   pdfDestinationOf,
 } from './destinations';
 export {
@@ -29,7 +31,12 @@ export {
 export { pageLayoutOf, pageListOf, pageSpaceBoxesOf, visibleBoxesOf } from './pages';
 export { createPageTextLayout, pageGeometryOf, pageSearchSliceOf, pageTextSegmentOf } from './text';
 export { pageAppearanceManifestOf, pageAppearancesOf, pdfRenderTargetOf } from './rendering';
-export { pageFieldActionsOf, pdfWidgetPlacementOf } from './forms';
+export {
+  pageFieldActionsOf,
+  pageFormFieldOf,
+  pageFormSnapshotOf,
+  pdfWidgetPlacementOf,
+} from './forms';
 export { pageMeasureOf, pageViewportsOf, pdfMeasureOf } from './measure';
 export type { PagePointTurn } from './helpers';
 export {

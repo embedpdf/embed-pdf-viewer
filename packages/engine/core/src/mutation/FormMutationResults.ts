@@ -2,6 +2,7 @@ import type { MutationMeta } from './MutationMeta';
 import type { FormFieldDTO } from '../forms/field';
 import type { FormSnapshot } from '../forms/snapshot';
 import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
 /**
  * A single-field write's meta: the page envelope plus what changed — the
@@ -17,8 +18,8 @@ export interface FormMutationMeta extends MutationMeta {
 }
 
 /** Result of a value write (`setValue` / `reset`): the field read back after the write. */
-export interface FormSetValueResult {
-  field: FormFieldDTO;
+export interface FormSetValueResult<C extends Coordinates = PageCoordinates> {
+  field: FormFieldDTO<C>;
   meta: FormMutationMeta;
 }
 
@@ -27,9 +28,9 @@ export interface FormSetValueResult {
  * entry (unknown name, family mismatch, failed validation) is counted in
  * `skipped` and never poisons the rest.
  */
-export interface FormImportResult {
+export interface FormImportResult<C extends Coordinates = PageCoordinates> {
   /** The complete form after the import — no second round trip. */
-  form: FormSnapshot;
+  form: FormSnapshot<C>;
   /** Fields filled. */
   applied: number;
   /** Fields left out: unknown, the wrong kind, a value they can't take, or locked. */
@@ -44,14 +45,14 @@ export interface FormDataExport {
 }
 
 /** Result of `create`: the field read back, widgets included. */
-export interface FormFieldCreateResult {
-  field: FormFieldDTO;
+export interface FormFieldCreateResult<C extends Coordinates = PageCoordinates> {
+  field: FormFieldDTO<C>;
   meta: FormMutationMeta;
 }
 
 /** Result of `update` and `setSignatureAppearance`. */
-export interface FormFieldUpdateResult {
-  field: FormFieldDTO;
+export interface FormFieldUpdateResult<C extends Coordinates = PageCoordinates> {
+  field: FormFieldDTO<C>;
   meta: FormMutationMeta;
 }
 
@@ -70,8 +71,8 @@ export function deletedFieldOf(result: FormFieldDeleteResult): FormFieldRef | nu
 }
 
 /** Result of `addWidget` / `removeWidget`: the field read back. */
-export interface FormWidgetLinkResult {
-  field: FormFieldDTO;
+export interface FormWidgetLinkResult<C extends Coordinates = PageCoordinates> {
+  field: FormFieldDTO<C>;
   meta: FormMutationMeta;
 }
 

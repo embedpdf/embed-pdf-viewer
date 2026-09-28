@@ -3,15 +3,248 @@
 import type * as CloudPDF from "../index.js";
 
 export interface PdfAnnotationActions {
-    activate?: CloudPDF.PdfActionTree | undefined;
-    cursorEnter?: CloudPDF.PdfActionTree | undefined;
-    cursorExit?: CloudPDF.PdfActionTree | undefined;
-    mouseDown?: CloudPDF.PdfActionTree | undefined;
-    mouseUp?: CloudPDF.PdfActionTree | undefined;
-    focus?: CloudPDF.PdfActionTree | undefined;
-    blur?: CloudPDF.PdfActionTree | undefined;
-    pageOpen?: CloudPDF.PdfActionTree | undefined;
-    pageClose?: CloudPDF.PdfActionTree | undefined;
-    pageVisible?: CloudPDF.PdfActionTree | undefined;
-    pageInvisible?: CloudPDF.PdfActionTree | undefined;
+    activate?: PdfAnnotationActions.Activate | undefined;
+    cursorEnter?: PdfAnnotationActions.CursorEnter | undefined;
+    cursorExit?: PdfAnnotationActions.CursorExit | undefined;
+    mouseDown?: PdfAnnotationActions.MouseDown | undefined;
+    mouseUp?: PdfAnnotationActions.MouseUp | undefined;
+    focus?: PdfAnnotationActions.Focus | undefined;
+    blur?: PdfAnnotationActions.Blur | undefined;
+    pageOpen?: PdfAnnotationActions.PageOpen | undefined;
+    pageClose?: PdfAnnotationActions.PageClose | undefined;
+    pageVisible?: PdfAnnotationActions.PageVisible | undefined;
+    pageInvisible?: PdfAnnotationActions.PageInvisible | undefined;
+}
+
+export namespace PdfAnnotationActions {
+    export interface Activate {
+        root: CloudPDF.PdfAnnotationActionsActivateRoot | null;
+        incomplete: boolean;
+        warningFlags: number;
+        warnings: Activate.Warnings.Item[];
+    }
+
+    export namespace Activate {
+        export type Warnings = Warnings.Item[];
+
+        export namespace Warnings {
+            export const Item = {
+                CycleDropped: "cycle-dropped",
+                MalformedNext: "malformed-next",
+                Incomplete: "incomplete",
+                PayloadDropped: "payload-dropped",
+            } as const;
+            export type Item = (typeof Item)[keyof typeof Item];
+        }
+    }
+
+    export interface CursorEnter {
+        root: CloudPDF.PdfAnnotationActionsCursorEnterRoot | null;
+        incomplete: boolean;
+        warningFlags: number;
+        warnings: CursorEnter.Warnings.Item[];
+    }
+
+    export namespace CursorEnter {
+        export type Warnings = Warnings.Item[];
+
+        export namespace Warnings {
+            export const Item = {
+                CycleDropped: "cycle-dropped",
+                MalformedNext: "malformed-next",
+                Incomplete: "incomplete",
+                PayloadDropped: "payload-dropped",
+            } as const;
+            export type Item = (typeof Item)[keyof typeof Item];
+        }
+    }
+
+    export interface CursorExit {
+        root: CloudPDF.PdfAnnotationActionsCursorExitRoot | null;
+        incomplete: boolean;
+        warningFlags: number;
+        warnings: CursorExit.Warnings.Item[];
+    }
+
+    export namespace CursorExit {
+        export type Warnings = Warnings.Item[];
+
+        export namespace Warnings {
+            export const Item = {
+                CycleDropped: "cycle-dropped",
+                MalformedNext: "malformed-next",
+                Incomplete: "incomplete",
+                PayloadDropped: "payload-dropped",
+            } as const;
+            export type Item = (typeof Item)[keyof typeof Item];
+        }
+    }
+
+    export interface MouseDown {
+        root: CloudPDF.PdfAnnotationActionsMouseDownRoot | null;
+        incomplete: boolean;
+        warningFlags: number;
+        warnings: MouseDown.Warnings.Item[];
+    }
+
+    export namespace MouseDown {
+        export type Warnings = Warnings.Item[];
+
+        export namespace Warnings {
+            export const Item = {
+                CycleDropped: "cycle-dropped",
+                MalformedNext: "malformed-next",
+                Incomplete: "incomplete",
+                PayloadDropped: "payload-dropped",
+            } as const;
+            export type Item = (typeof Item)[keyof typeof Item];
+        }
+    }
+
+    export interface MouseUp {
+        root: CloudPDF.PdfAnnotationActionsMouseUpRoot | null;
+        incomplete: boolean;
+        warningFlags: number;
+        warnings: MouseUp.Warnings.Item[];
+    }
+
+    export namespace MouseUp {
+        export type Warnings = Warnings.Item[];
+
+        export namespace Warnings {
+            export const Item = {
+                CycleDropped: "cycle-dropped",
+                MalformedNext: "malformed-next",
+                Incomplete: "incomplete",
+                PayloadDropped: "payload-dropped",
+            } as const;
+            export type Item = (typeof Item)[keyof typeof Item];
+        }
+    }
+
+    export interface Focus {
+        root: CloudPDF.PdfAnnotationActionsFocusRoot | null;
+        incomplete: boolean;
+        warningFlags: number;
+        warnings: Focus.Warnings.Item[];
+    }
+
+    export namespace Focus {
+        export type Warnings = Warnings.Item[];
+
+        export namespace Warnings {
+            export const Item = {
+                CycleDropped: "cycle-dropped",
+                MalformedNext: "malformed-next",
+                Incomplete: "incomplete",
+                PayloadDropped: "payload-dropped",
+            } as const;
+            export type Item = (typeof Item)[keyof typeof Item];
+        }
+    }
+
+    export interface Blur {
+        root: CloudPDF.PdfAnnotationActionsBlurRoot | null;
+        incomplete: boolean;
+        warningFlags: number;
+        warnings: Blur.Warnings.Item[];
+    }
+
+    export namespace Blur {
+        export type Warnings = Warnings.Item[];
+
+        export namespace Warnings {
+            export const Item = {
+                CycleDropped: "cycle-dropped",
+                MalformedNext: "malformed-next",
+                Incomplete: "incomplete",
+                PayloadDropped: "payload-dropped",
+            } as const;
+            export type Item = (typeof Item)[keyof typeof Item];
+        }
+    }
+
+    export interface PageOpen {
+        root: CloudPDF.PdfAnnotationActionsPageOpenRoot | null;
+        incomplete: boolean;
+        warningFlags: number;
+        warnings: PageOpen.Warnings.Item[];
+    }
+
+    export namespace PageOpen {
+        export type Warnings = Warnings.Item[];
+
+        export namespace Warnings {
+            export const Item = {
+                CycleDropped: "cycle-dropped",
+                MalformedNext: "malformed-next",
+                Incomplete: "incomplete",
+                PayloadDropped: "payload-dropped",
+            } as const;
+            export type Item = (typeof Item)[keyof typeof Item];
+        }
+    }
+
+    export interface PageClose {
+        root: CloudPDF.PdfAnnotationActionsPageCloseRoot | null;
+        incomplete: boolean;
+        warningFlags: number;
+        warnings: PageClose.Warnings.Item[];
+    }
+
+    export namespace PageClose {
+        export type Warnings = Warnings.Item[];
+
+        export namespace Warnings {
+            export const Item = {
+                CycleDropped: "cycle-dropped",
+                MalformedNext: "malformed-next",
+                Incomplete: "incomplete",
+                PayloadDropped: "payload-dropped",
+            } as const;
+            export type Item = (typeof Item)[keyof typeof Item];
+        }
+    }
+
+    export interface PageVisible {
+        root: CloudPDF.PdfAnnotationActionsPageVisibleRoot | null;
+        incomplete: boolean;
+        warningFlags: number;
+        warnings: PageVisible.Warnings.Item[];
+    }
+
+    export namespace PageVisible {
+        export type Warnings = Warnings.Item[];
+
+        export namespace Warnings {
+            export const Item = {
+                CycleDropped: "cycle-dropped",
+                MalformedNext: "malformed-next",
+                Incomplete: "incomplete",
+                PayloadDropped: "payload-dropped",
+            } as const;
+            export type Item = (typeof Item)[keyof typeof Item];
+        }
+    }
+
+    export interface PageInvisible {
+        root: CloudPDF.PdfAnnotationActionsPageInvisibleRoot | null;
+        incomplete: boolean;
+        warningFlags: number;
+        warnings: PageInvisible.Warnings.Item[];
+    }
+
+    export namespace PageInvisible {
+        export type Warnings = Warnings.Item[];
+
+        export namespace Warnings {
+            export const Item = {
+                CycleDropped: "cycle-dropped",
+                MalformedNext: "malformed-next",
+                Incomplete: "incomplete",
+                PayloadDropped: "payload-dropped",
+            } as const;
+            export type Item = (typeof Item)[keyof typeof Item];
+        }
+    }
 }

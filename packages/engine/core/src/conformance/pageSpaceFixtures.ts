@@ -25,10 +25,8 @@ export interface PageSpaceWord {
   size: number;
 }
 
-/** A link on a page to a spot on another page of the same file. */
-export interface PageSpaceLink {
-  /** Where the link sits, in file coordinates. */
-  rect: PdfRect;
+/** A destination: a spot on a page of the same file, as the file writes it, with its answer. */
+export interface PageSpaceGoTo {
   /** The index of the page it goes to. */
   toPage: number;
   /** The destination array after the page reference, as the file writes it. */
@@ -47,6 +45,12 @@ export interface PageSpaceLink {
   };
 }
 
+/** A link on a page to a spot on another page of the same file. */
+export interface PageSpaceLink extends PageSpaceGoTo {
+  /** Where the link sits, in file coordinates. */
+  rect: PdfRect;
+}
+
 export interface PageSpaceBoxes {
   media: PdfRect;
   crop: PdfRect;
@@ -61,6 +65,8 @@ export interface PageSpaceFixturePage {
   marks: PdfRect[];
   words: PageSpaceWord[];
   links?: PageSpaceLink[];
+  /** The page's open action (`/AA /O`): a go-to. */
+  openAction?: PageSpaceGoTo;
   expected: {
     /** The visible page box: what the page shows, in file coordinates. */
     visible: PdfRect;
@@ -82,6 +88,10 @@ export interface PageSpaceFixture {
   source: 'iso' | 'recovery';
   /** Entries of the page tree node, inherited by pages that don't set them. */
   treeEntries?: string;
+  /** The catalog's `/OpenAction` as a destination: where the document opens. */
+  openDestination?: PageSpaceGoTo;
+  /** A text field on the first page whose calculate script goes on (`/Next`) to a destination. */
+  fieldAction?: PageSpaceGoTo;
   pages: PageSpaceFixturePage[];
   bytes: Uint8Array;
 }
@@ -107,6 +117,8 @@ interface FixtureSpec {
   about: string;
   source: PageSpaceFixture['source'];
   treeEntries?: string;
+  openDestination?: PageSpaceGoTo;
+  fieldAction?: PageSpaceGoTo;
   pages: PageSpaceFixturePage[];
 }
 
@@ -120,7 +132,7 @@ function contentOf(page: PageSpaceFixturePage): string {
 
 /**
  * Objects: 1 catalog, 2 page tree, 3 font, then a page and its content per
- * page, then the link annotations.
+ * page, then the link annotations, then the text field.
  */
 function build(spec: FixtureSpec): PageSpaceFixture {
   const pageNumber = (index: number) => 4 + index * 2;
@@ -128,8 +140,14 @@ function build(spec: FixtureSpec): PageSpaceFixture {
     (page.links ?? []).map((link) => ({ link, from: index })),
   );
   const firstLink = 4 + spec.pages.length * 2;
+  const destination = (goTo: PageSpaceGoTo) => `[${pageNumber(goTo.toPage)} 0 R ${goTo.view}]`;
+  const openAction = spec.openDestination
+    ? ` /OpenAction ${destination(spec.openDestination)}`
+    : '';
+  const field = firstLink + links.length;
+  const acroForm = spec.fieldAction ? ` /AcroForm << /Fields [${field} 0 R] >>` : '';
   const objects: string[] = [
-    '<< /Type /Catalog /Pages 2 0 R >>',
+    `<< /Type /Catalog /Pages 2 0 R${openAction}${acroForm} >>`,
     `<< /Type /Pages /Kids [${spec.pages.map((_, i) => `${pageNumber(i)} 0 R`).join(' ')}] /Count ${spec.pages.length} ${spec.treeEntries ?? ''} >>`,
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
   ];
@@ -138,17 +156,28 @@ function build(spec: FixtureSpec): PageSpaceFixture {
       .map((entry, i) => ({ ...entry, number: firstLink + i }))
       .filter((entry) => entry.from === index)
       .map((entry) => `${entry.number} 0 R`);
+    if (spec.fieldAction && index === 0) own.push(`${field} 0 R`);
     const annots = own.length ? ` /Annots [${own.join(' ')}]` : '';
+    const actions = page.openAction
+      ? ` /AA << /O << /S /GoTo /D ${destination(page.openAction)} >> >>`
+      : '';
     const content = contentOf(page);
     objects.push(
-      `<< /Type /Page /Parent 2 0 R ${page.entries} /Resources << /Font << /F1 3 0 R >> >> /Contents ${pageNumber(index) + 1} 0 R${annots} >>`,
+      `<< /Type /Page /Parent 2 0 R ${page.entries} /Resources << /Font << /F1 3 0 R >> >> /Contents ${pageNumber(index) + 1} 0 R${annots}${actions} >>`,
       `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
     );
   });
   for (const { link } of links) {
     const r = link.rect;
     objects.push(
-      `<< /Type /Annot /Subtype /Link /Rect [${r.left} ${r.bottom} ${r.right} ${r.top}] /Border [0 0 0] /Dest [${pageNumber(link.toPage)} 0 R ${link.view}] >>`,
+      `<< /Type /Annot /Subtype /Link /Rect [${r.left} ${r.bottom} ${r.right} ${r.top}] /Border [0 0 0] /Dest ${destination(link)} >>`,
+    );
+  }
+  if (spec.fieldAction) {
+    const { left, bottom } = spec.pages[0]!.expected.visible;
+    const goTo = `<< /S /GoTo /D ${destination(spec.fieldAction)} >>`;
+    objects.push(
+      `<< /Type /Annot /Subtype /Widget /FT /Tx /T (total) /P ${pageNumber(0)} 0 R /Rect [${left + 40} ${bottom + 120} ${left + 140} ${bottom + 140}] /AA << /C << /S /JavaScript /JS (event.value = 1;) /Next ${goTo} >> >> >>`,
     );
   }
   return { ...spec, bytes: pdfOf(objects) };
@@ -164,7 +193,7 @@ function markedPage(
   entries: string,
   visible: PdfRect,
   expected: Omit<PageSpaceFixturePage['expected'], 'visible'>,
-  extra: Partial<Pick<PageSpaceFixturePage, 'links'>> = {},
+  extra: Partial<Pick<PageSpaceFixturePage, 'links' | 'openAction'>> = {},
 ): PageSpaceFixturePage {
   const { left, top, right, bottom } = visible;
   return {
@@ -330,12 +359,23 @@ export const PAGE_SPACE_FIXTURES: readonly PageSpaceFixture[] = [
     name: 'destinations',
     about: "a destination is measured from its target page's visible box, not the link's page",
     source: 'iso',
+    openDestination: {
+      toPage: 1,
+      view: '/FitR -200 -100 100 300',
+      expected: { kind: 'fitR', x: 100, y: 90, width: 300, height: 400 },
+    },
+    fieldAction: { toPage: 1, view: '/FitH 350', expected: { kind: 'fitH', y: 40 } },
     pages: [
       markedPage(
         '/MediaBox [0 0 612 792]',
         LETTER,
         { boxes: sameBoxes(LETTER), rotation: 0, userUnit: 1 },
         {
+          openAction: {
+            toPage: 1,
+            view: '/XYZ -250 350 0',
+            expected: { kind: 'xyz', x: 50, y: 40 },
+          },
           links: [
             {
               rect: rect(400, 700, 500, 740),
@@ -367,6 +407,7 @@ export const PAGE_SPACE_FIXTURES: readonly PageSpaceFixture[] = [
           userUnit: 1,
         },
         {
+          openAction: { toPage: 0, view: '/FitV 30', expected: { kind: 'fitV', x: 30 } },
           links: [
             {
               rect: rect(100, 300, 200, 340),

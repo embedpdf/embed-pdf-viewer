@@ -48,7 +48,7 @@ export function createArrival(
     fitBox,
     boundsFor,
     constraint,
-    indexOfPage,
+    indexOfTarget,
   } = scene;
   const state = () => ctx.state.get();
   const pageCount = () => ctx.document()?.pageCount ?? 0;
@@ -188,10 +188,9 @@ export function createArrival(
     goToTarget,
     resetView,
     api: {
-      goToPageIndex: (pageIndex, options) => goToTarget(pageIndex, options),
       goToPage: (page, options) => {
-        const index = indexOfPage(page);
-        if (index >= 0) goToTarget(index, options);
+        const index = indexOfTarget(page);
+        if (index !== null) goToTarget(index, options);
       },
       goToFirstPage: (options) => goToTarget(0, options),
       goToLastPage: (options) =>

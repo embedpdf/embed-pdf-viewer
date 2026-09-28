@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createKernel, type Kernel } from '@embedpdf/core';
 import { createLocalEngine } from '@embedpdf/engine';
 import {
+  pageActionTreeOf,
   toPageRef,
   type AnnotationRef,
   type Engine,
@@ -114,14 +115,18 @@ describe('plugin-actions integration (real engine)', () => {
       { kind: 'bytes', id: 'action-payloads-probe', bytes },
       { scope: ['*'] },
     );
-    const page = (await opened.pages.list()).pages[0];
+    const { pages } = await opened.pages.list();
+    const page = pages[0];
     firstPage = page.ref.pageObjectNumber;
     const { annotations } = await opened.page(toPageRef(firstPage)).annotations.list();
     const byNm = new Map(annotations.map((annotation) => [annotation.nm, annotation]));
+    // Annotation reads measure destinations in the file's numbers; execute() takes page space.
+    const pdfCropBoxOf = (ref: { pageObjectNumber: number }) =>
+      pages.find((layout) => layout.ref.pageObjectNumber === ref.pageObjectNumber)!.pdfCropBox;
     treeOf = (nm: string) => {
       const tree = byNm.get(nm)?.actions?.activate;
       if (!tree) throw new Error(`no activate tree on '${nm}'`);
-      return tree;
+      return pageActionTreeOf(tree, pdfCropBoxOf);
     };
     refOf = (nm: string) => {
       const ref = byNm.get(nm)?.ref;
@@ -148,7 +153,8 @@ describe('plugin-actions integration (real engine)', () => {
     expect(result.status).toBe('executed');
     expect(calls.at(-1)).toMatchObject({
       seam: 'goto',
-      detail: { kind: 'fitR', left: 10, bottom: 20, right: 300, top: 400 },
+      // The file's [10 20 300 400] on a letter page, from the page's top-left.
+      detail: { kind: 'fitR', x: 10, y: 392, width: 290, height: 380 },
     });
   });
 

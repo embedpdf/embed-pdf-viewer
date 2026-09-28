@@ -1,11 +1,17 @@
 import { PluginError, type PluginContext, type DocumentEvent, type PageRef } from '@embedpdf/core';
 import type { Point } from '@embedpdf/core-geometry';
-import type { PdfLinkTarget } from '@embedpdf/engine-core/runtime';
+import {
+  pageActionTreeOf,
+  pageDestinationOf,
+  type PdfActionTree,
+  type PdfDestination,
+  type PdfLinkTarget,
+  type PdfRect,
+} from '@embedpdf/engine-core/runtime';
 import { ActionsToken } from '@embedpdf/plugin-actions/contract';
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
-import { destinationToReveal } from '@embedpdf/plugin-stage/destination';
 
 import { connectLink } from './connect';
 import type {
@@ -21,7 +27,10 @@ import { linksOf } from './source';
 
 const EMPTY: readonly Link[] = Object.freeze([]);
 
-const isLink = (value: PdfLinkTarget | Link): value is Link =>
+/** A stand-in box for a page the document doesn't have: the `goto` executor refuses such a page, so its numbers are never read. */
+const NO_PAGE: PdfRect = { left: 0, bottom: 0, right: 0, top: 0 };
+
+const isLink = (value: PdfLinkTarget<PdfDestination> | Link): value is Link =>
   'target' in value && 'bounds' in value;
 const contains = (
   bounds: { x: number; y: number; width: number; height: number },
@@ -102,13 +111,16 @@ export function createLinkController(ctx: PluginContext<void>) {
     // With the annotation plugin installed, its model owns the data.
     annotationHost() ? Promise.resolve() : pages.ensureLoaded(page);
 
-  const resolve = (target: PdfLinkTarget): LinkResolution => {
+  const resolve = (target: PdfLinkTarget<PdfDestination>): LinkResolution => {
     switch (target.kind) {
       case 'goto': {
-        const layout = ctx.getPage(target.destination.page);
-        if (!layout) return { kind: 'destination', destination: target.destination };
-        const { pageIndex, options } = destinationToReveal(target.destination, layout);
-        return { kind: 'reveal', page: target.destination.page, pageIndex, options };
+        // Measured on the page it goes to; a page the document doesn't have can't be shown.
+        const space = ctx.geometry.tryForPage(target.destination.page);
+        if (!space) return { kind: 'reported', target };
+        return {
+          kind: 'destination',
+          destination: pageDestinationOf(target.destination, space.crop),
+        };
       }
       case 'uri':
         return { kind: 'uri', uri: target.uri };
@@ -119,10 +131,17 @@ export function createLinkController(ctx: PluginContext<void>) {
     }
   };
 
-  const perform = (target: PdfLinkTarget, context?: LinkActivateContext): LinkActivation => {
+  /** The link's `/A` tree in page space, each `goto` measured on the page it goes to. */
+  const activateTree = (tree: PdfActionTree<PdfDestination>): PdfActionTree =>
+    pageActionTreeOf(tree, (page) => ctx.geometry.tryForPage(page)?.crop ?? NO_PAGE);
+
+  const perform = (
+    target: PdfLinkTarget<PdfDestination>,
+    context?: LinkActivateContext,
+  ): LinkActivation => {
     const actions = ctx.tryGet(ActionsToken);
     if (actions && context?.activate) {
-      const dispatch = actions.execute(context.activate, {
+      const dispatch = actions.execute(activateTree(context.activate), {
         origin: 'user',
         source: { kind: 'link', annotation: context.ref, page: context.page },
         event: { scope: 'activate' },
@@ -131,18 +150,12 @@ export function createLinkController(ctx: PluginContext<void>) {
     }
     const resolution = resolve(target);
     switch (resolution.kind) {
-      case 'reveal': {
+      case 'destination': {
         const stage = ctx.tryGet(StageToken);
-        if (!stage || target.kind !== 'goto') {
-          return target.kind === 'goto'
-            ? { outcome: 'destination', destination: target.destination }
-            : { outcome: 'reported', target };
-        }
-        stage.revealIndex(resolution.pageIndex, { ...resolution.options, behavior: 'smooth' });
+        if (!stage) return { outcome: 'destination', destination: resolution.destination };
+        stage.goToDestination(resolution.destination, { behavior: 'smooth' });
         return { outcome: 'revealed' };
       }
-      case 'destination':
-        return { outcome: 'destination', destination: resolution.destination };
       case 'uri':
         return { outcome: 'uri', uri: resolution.uri };
       case 'named':
@@ -152,7 +165,10 @@ export function createLinkController(ctx: PluginContext<void>) {
     }
   };
 
-  const activate = (input: PdfLinkTarget | Link, context?: LinkActivateContext): LinkActivation => {
+  const activate = (
+    input: PdfLinkTarget<PdfDestination> | Link,
+    context?: LinkActivateContext,
+  ): LinkActivation => {
     const target = isLink(input) ? input.target : input;
     const linkContext: LinkActivateContext | undefined = isLink(input)
       ? { activate: input.activate, ref: input.ref, ...context }
@@ -176,7 +192,7 @@ export function createLinkController(ctx: PluginContext<void>) {
     return best;
   };
 
-  const getLabel = (input: Link | PdfLinkTarget): string => {
+  const getLabel = (input: Link | PdfLinkTarget<PdfDestination>): string => {
     const target = isLink(input) ? input.target : input;
     switch (target.kind) {
       case 'uri':

@@ -72,7 +72,7 @@ zoomTo({ pageWidth: 200 }); // every page 200px wide (thumbnail rails)
 ## Moving through pages
 
 `usePages()` gives you the current page, the page count, and the ways to move:
-`goToPage`, `next`, `previous`, and `reveal`.
+`goToPage`, `goToDestination`, `next`, `previous`, and `reveal`.
 
 <Example name="stage/navigation" />
 
@@ -82,12 +82,15 @@ zoomTo({ pageWidth: 200 }); // every page 200px wide (thumbnail rails)
 
 A few details that matter:
 
-- **Pages count from 0.** Page "1" in your UI is `goToPage(0)`.
+- **A page is its `ref` or its index.** `goToPage(page.ref)` and `goToPage(4)`
+  both work, and so does every other verb that takes a page. An index counts
+  from 0: page "1" in your UI is `goToPage(0)`. An index past the last page goes
+  to the last page.
 - **`next()` / `previous()` respect spreads.** When a two-page spread fits, they
   move one spread. Zoomed in, they move one page.
 - **`reveal` is gentler than `goToPage`.** It scrolls only as far as needed to
-  make a page visible, and does nothing if it already is. Use it for thumbnail
-  or outline clicks so the view does not jump hard.
+  make a page visible, and does nothing if it already is. Use it for a
+  thumbnail strip that follows along, so the view does not jump hard.
 
 ## Layouts
 
@@ -259,7 +262,7 @@ just like a native scrollbar.
 ## Jump to an exact spot
 
 `reveal` can do more than "make this page visible". Give it a rectangle and it
-becomes your "jump to search result" and "follow this link" verb:
+becomes your "jump to search result" verb:
 
 ```ts
 // Show a search hit: scroll to the match, zoomed so it's comfortable to read
@@ -270,8 +273,47 @@ stage.reveal(pageIndex, {
 });
 ```
 
-Search hits, outline clicks, "jump to comment", PDF link destinations — they
-all reduce to this one call.
+Search hits and "jump to comment" both reduce to this one call.
+
+## Follow a destination
+
+A destination is where a link, an outline entry, a PDF action or the document's
+opening view points: a page, a spot on it, and how close to zoom. The engine
+hands them out ready to use, and `goToDestination` goes exactly there:
+
+```ts
+stage.goToDestination(destination);
+```
+
+The spot is measured like every other place in the viewer: in points from the
+top-left of the page. You can build your own:
+
+```ts
+// Page 5, with the point (72, 100) at the top-left of the view, at 200%
+stage.goToDestination({ kind: 'xyz', page: pages[4].ref, x: 72, y: 100, zoom: 2 });
+```
+
+| `kind`                         | Goes to                                               |
+| ------------------------------ | ----------------------------------------------------- |
+| `'xyz'`                        | The point `x`, `y` at the top-left, at `zoom`         |
+| `'fit'`                        | The whole page                                        |
+| `'fitH'`                       | The page's full width, with `y` at the top            |
+| `'fitV'`                       | The page's full height, with `x` at the left          |
+| `'fitR'`                       | The box `x`, `y`, `width`, `height`, filling the view |
+| `'fitB'`, `'fitBH'`, `'fitBV'` | The same as `fit`, `fitH` and `fitV`                  |
+
+Any of `x`, `y` and `zoom` can be `null` or left out: the view keeps what it
+has on that axis, as a PDF means it. A zoom of `0` means the same.
+
+A destination another PDF tool gives you (PDF.js, iText, Acrobat JavaScript) is
+in the PDF file's own numbers. Turn it into this form with the crop box of the
+page it goes to:
+
+```ts
+import { pageDestinationOf } from '@embedpdf/engine';
+
+stage.goToDestination(pageDestinationOf(fromPdfJs, page.pdfCropBox));
+```
 
 ## Make it feel right
 

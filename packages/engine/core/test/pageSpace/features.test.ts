@@ -5,7 +5,8 @@ import { pdfRectOf } from '../../src/geometry/pageSpace';
 import type { PdfRect } from '../../src/geometry/primitives';
 import { toPageRef } from '../../src/identity/PageRef';
 import type { PdfCoordinates } from '../../src/pageSpace/coordinates';
-import { pdfWidgetPlacementOf } from '../../src/pageSpace/forms';
+import type { FormFieldDTO } from '../../src/forms/field';
+import { pageFormFieldOf, pdfWidgetPlacementOf } from '../../src/pageSpace/forms';
 import { pageViewportsOf, pdfMeasureOf } from '../../src/pageSpace/measure';
 import { pageListOf, pageSpaceBoxesOf, visibleBoxesOf } from '../../src/pageSpace/pages';
 import { pageAppearancesOf, pdfRenderTargetOf } from '../../src/pageSpace/rendering';
@@ -55,6 +56,35 @@ describe('pages in page space', () => {
     });
   });
 
+  test("a page's actions go to spots measured on the pages they go to", () => {
+    const other: PdfRect = { left: -300, bottom: -390, right: 300, top: 390 };
+    const page = {
+      ...layout(4, crop),
+      actions: {
+        open: {
+          incomplete: false,
+          warningFlags: 0,
+          warnings: [],
+          root: {
+            subtype: 'GoTo',
+            type: 'goto' as const,
+            destination: { kind: 'xyz' as const, page: toPageRef(6), left: -250, top: 350 },
+            next: [],
+          },
+        },
+      },
+    };
+    const { pages } = pageListOf({
+      pageCount: 2,
+      pages: [page, { ...layout(6, other), index: 1 }],
+      namedPages: [],
+    });
+    expect(pages[0]!.actions?.open?.root).toMatchObject({
+      destination: { kind: 'xyz', page: toPageRef(6), x: 50, y: 40 },
+    });
+    expect('actions' in pages[1]!).toBe(false);
+  });
+
   test('a page missing from the document has no box', () => {
     expect(() => visibleBoxesOf([layout(4, crop)])(toPageRef(99))).toThrow();
   });
@@ -81,6 +111,47 @@ describe('render, form and measure values', () => {
       crop,
     );
     expect(result.appearances[0]!.rect).toEqual({ x: 50, y: 82, width: 50, height: 50 });
+  });
+
+  test("a field's actions go to spots on the pages they go to; the rest of the field stays", () => {
+    const boxOf = visibleBoxesOf([layout(4, crop)]);
+    const field = {
+      family: 'pushbutton',
+      name: 'go',
+      widgets: [],
+      actions: {
+        calculate: {
+          incomplete: false,
+          warningFlags: 0,
+          warnings: [],
+          root: {
+            subtype: 'GoTo',
+            type: 'goto',
+            destination: { kind: 'fitH', page: toPageRef(4), top: 700 },
+            next: [],
+          },
+        },
+      },
+    } as unknown as FormFieldDTO<PdfCoordinates>;
+    expect(pageFormFieldOf(field, boxOf)).toEqual({
+      ...field,
+      actions: {
+        calculate: {
+          ...field.actions!.calculate!,
+          root: {
+            subtype: 'GoTo',
+            type: 'goto',
+            destination: { kind: 'fitH', page: toPageRef(4), y: 32 },
+            next: [],
+          },
+        },
+      },
+    });
+    const plain = {
+      family: 'pushbutton',
+      name: 'plain',
+    } as unknown as FormFieldDTO<PdfCoordinates>;
+    expect(pageFormFieldOf(plain, boxOf)).toBe(plain);
   });
 
   test('a widget is placed on its own page', () => {

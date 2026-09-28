@@ -87,7 +87,7 @@ export function CommentsPanel() {
     if (view.pageIndex < 0) return;
     // Anchor values are viewport fractions (0–1), not percentages:
     // the annotation lands a third down the viewport, the find-bar feel.
-    stage?.revealIndex(view.pageIndex, {
+    stage?.reveal(view.pageIndex, {
       ...(view.contentRect ? { rect: view.contentRect } : {}),
       anchor: { x: 'center', y: 0.35 },
       behavior: 'smooth',

@@ -1,8 +1,8 @@
 import type {
   FormDataFormat,
   FormFieldDraft,
-  FormFieldFamily,
   FormFieldDTO,
+  FormFieldFamily,
   FormFieldPatch,
   FormFieldRef,
   FormFieldValue,
@@ -11,6 +11,7 @@ import type {
   FormSetValueResult,
   FormWidget,
   MutationMeta,
+  PdfCoordinates,
   WidgetPlacement,
 } from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode, formWidget } from '@embedpdf/engine-core/runtime';
@@ -82,7 +83,11 @@ export class FormMutator {
     private readonly session: DocumentSession,
   ) {}
 
-  setValue(ref: FormFieldRef, value: FormFieldValue, signal: AbortSignal): FormSetValueResult {
+  setValue(
+    ref: FormFieldRef,
+    value: FormFieldValue,
+    signal: AbortSignal,
+  ): FormSetValueResult<PdfCoordinates> {
     throwIfAborted(signal);
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
@@ -106,7 +111,7 @@ export class FormMutator {
     return this.readBack(resolved.fieldObjectNumber, changed);
   }
 
-  reset(ref: FormFieldRef, signal: AbortSignal): FormSetValueResult {
+  reset(ref: FormFieldRef, signal: AbortSignal): FormSetValueResult<PdfCoordinates> {
     throwIfAborted(signal);
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
@@ -131,7 +136,7 @@ export class FormMutator {
     data: ArrayBuffer,
     format: FormDataFormat | undefined,
     signal: AbortSignal,
-  ): FormImportResult {
+  ): FormImportResult<PdfCoordinates> {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
     const bytes = new Uint8Array(data);
@@ -203,7 +208,7 @@ export class FormMutator {
    * (the field is unlinked from an existing parent, then a checkpoint rolls
    * back the rest), so a rejected draft creates nothing.
    */
-  createField(draft: FormFieldDraft, signal: AbortSignal): { field: FormFieldDTO } {
+  createField(draft: FormFieldDraft, signal: AbortSignal): { field: FormFieldDTO<PdfCoordinates> } {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();
@@ -374,7 +379,7 @@ export class FormMutator {
     pdf: Uint8Array,
     pageIndex: number,
     signal: AbortSignal,
-  ): { field: FormFieldDTO } {
+  ): { field: FormFieldDTO<PdfCoordinates> } {
     throwIfAborted(signal);
     const docPtr = this.session.requireDocPtr();
     const model = acquireFormModel(this.runtime, this.session);
@@ -422,7 +427,7 @@ export class FormMutator {
     ref: FormFieldRef,
     patch: FormFieldPatch,
     signal: AbortSignal,
-  ): { field: FormFieldDTO } {
+  ): { field: FormFieldDTO<PdfCoordinates> } {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();
@@ -545,7 +550,7 @@ export class FormMutator {
     widget: AnnotationRef,
     onState: string | undefined,
     signal: AbortSignal,
-  ): { field: FormFieldDTO; widget: FormWidget } {
+  ): { field: FormFieldDTO<PdfCoordinates>; widget: FormWidget } {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const model = acquireFormModel(this.runtime, this.session);
@@ -589,7 +594,7 @@ export class FormMutator {
     ref: FormFieldRef,
     widget: AnnotationRef,
     signal: AbortSignal,
-  ): { field: FormFieldDTO; widget: FormWidget } {
+  ): { field: FormFieldDTO<PdfCoordinates>; widget: FormWidget } {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const model = acquireFormModel(this.runtime, this.session);
@@ -679,7 +684,7 @@ export class FormMutator {
     }
   }
 
-  private readBackField(fieldObjectNumber: number): FormFieldDTO {
+  private readBackField(fieldObjectNumber: number): FormFieldDTO<PdfCoordinates> {
     const fresh = acquireFormModel(this.runtime, this.session);
     const fieldIndex = this.runtime.fn.EPDFForm_GetFieldIndexByObjNum(fresh, fieldObjectNumber);
     if (fieldIndex < 0) {
@@ -783,14 +788,17 @@ export class FormMutator {
   }
 
   /** Bump the session version, rebuild the model, and read the field back. */
-  private readBack(fieldObjectNumber: number, changedObjNums: number[]): FormSetValueResult {
+  private readBack(
+    fieldObjectNumber: number,
+    changedObjNums: number[],
+  ): FormSetValueResult<PdfCoordinates> {
     this.session.noteMutation();
     const fresh = acquireFormModel(this.runtime, this.session);
     const fieldIndex = this.runtime.fn.EPDFForm_GetFieldIndexByObjNum(fresh, fieldObjectNumber);
     if (fieldIndex < 0) {
       throw new EngineError(EngineErrorCode.Unknown, 'form field vanished after write');
     }
-    const field: FormFieldDTO = readFieldAt(
+    const field: FormFieldDTO<PdfCoordinates> = readFieldAt(
       this.runtime,
       fresh,
       fieldIndex,

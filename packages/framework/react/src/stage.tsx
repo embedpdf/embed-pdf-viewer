@@ -397,10 +397,11 @@ export function usePages(explicitToken?: StageTokenProp) {
   return {
     currentPage,
     pageCount,
-    goToPage: stage.goToPageIndex,
+    goToPage: stage.goToPage,
+    goToDestination: stage.goToDestination,
     next: stage.nextPage,
     previous: stage.previousPage,
-    reveal: stage.revealIndex,
+    reveal: stage.reveal,
   };
 }
 export function useLayout(explicitToken?: StageTokenProp) {

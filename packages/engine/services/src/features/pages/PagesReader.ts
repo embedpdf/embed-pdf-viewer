@@ -4,11 +4,15 @@ import type {
   PageLayout,
   PageListSnapshot,
   PdfCoordinates,
+  PdfDestination,
+  PdfPageActions,
   PdfRect,
   PdfRotation,
-  PdfPageActions,
+  VisibleBoxOf,
 } from '@embedpdf/engine-core/runtime';
 import {
+  EngineError,
+  EngineErrorCode,
   normalizePdfRect,
   pageBoxesOf,
   pageRotationOf,
@@ -23,7 +27,7 @@ import type {
 } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
-import { withScratchN } from '../../runtime/memory/scratch';
+import { withScratch, withScratchN } from '../../runtime/memory/scratch';
 import { readUtf16String } from '../../runtime/memory/strings';
 import {
   F32_BYTES,
@@ -97,8 +101,8 @@ function readPageActions(
   docPtr: Ptr,
   pageObjectNumber: number,
   budget: ActionReadBudgetTracker,
-): PdfPageActions | undefined {
-  const actions: PdfPageActions = {};
+): PdfPageActions<PdfDestination> | undefined {
+  const actions: PdfPageActions<PdfDestination> = {};
   const open = readActionModel(
     fn,
     mem,
@@ -129,6 +133,42 @@ function readWrittenBox(
 ): PdfRect | undefined {
   if (!fn.EPDF_GetPageBoxByIndex(docPtr, index, boxType, rectPtr)) return undefined;
   return normalizePdfRect(readRectF(mem, rectPtr));
+}
+
+/**
+ * Each page's visible box, read the first time it is asked for: what a
+ * result's destinations are measured on. A page that isn't in the document
+ * has none.
+ */
+export function visibleBoxReader(
+  runtime: PdfRuntimeModule,
+  session: DocumentSession,
+): VisibleBoxOf {
+  const boxes = new Map<number, PdfRect>();
+  let indexes: Map<number, number> | null = null;
+  return (page) => {
+    const known = boxes.get(page.pageObjectNumber);
+    if (known) return known;
+    indexes ??= new Map(
+      session.allRecords().map((record) => [record.pageObjectNumber, record.pageIndex]),
+    );
+    const index = indexes.get(page.pageObjectNumber);
+    if (index === undefined) {
+      throw new EngineError(
+        EngineErrorCode.NotFound,
+        `no page with object number ${page.pageObjectNumber}`,
+      );
+    }
+    const { fn, mem } = runtime;
+    const docPtr = session.requireDocPtr();
+    const box = withScratch(
+      mem,
+      RECTF_BYTES,
+      (rectPtr) => readBoxes(fn, mem, docPtr, index, rectPtr).crop,
+    );
+    boxes.set(page.pageObjectNumber, box);
+    return box;
+  };
 }
 
 /** The page's five boxes as ISO 32000 defines them; `crop` is the visible page. */

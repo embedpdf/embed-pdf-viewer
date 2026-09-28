@@ -79,8 +79,11 @@ export class FormScriptingController {
     return this.transact(ref, proposed);
   }
 
-  /** Execute one originating widget's activation action (`/A`, including `/Next`). */
-  async activate(ref: FormFieldRef, action: PdfActionTree): Promise<FormCommitResult> {
+  /**
+   * Execute one originating widget's activation action (`/A`, including
+   * `/Next`). Only its scripts run here, so any kind of destination will do.
+   */
+  async activate(ref: FormFieldRef, action: PdfActionTree<unknown>): Promise<FormCommitResult> {
     return this.transact(ref, undefined, action);
   }
 
@@ -93,7 +96,7 @@ export class FormScriptingController {
   private async transact(
     refInput: FormFieldRef | undefined,
     proposed?: FormFieldValue,
-    activation?: PdfActionTree,
+    activation?: PdfActionTree<unknown>,
   ): Promise<FormCommitResult> {
     if (this.disposed) throw new Error('Form scripting controller is disposed');
     // Everything inside the realm transaction — snapshot fetch, every pass,
@@ -105,7 +108,7 @@ export class FormScriptingController {
     txn: ScriptTransaction,
     refInput: FormFieldRef | undefined,
     proposed?: FormFieldValue,
-    activation?: PdfActionTree,
+    activation?: PdfActionTree<unknown>,
   ): Promise<FormCommitResult> {
     const snapshot = await this.options.doc.forms.list();
     // Recalculate's anchor resolves here (first live /CO field, else the

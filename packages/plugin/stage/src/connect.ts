@@ -8,7 +8,6 @@
 import type { PluginContext } from '@embedpdf/core';
 import { ActionsToken, type ActionsHostCapability } from '@embedpdf/plugin-actions/contract/host';
 
-import { destinationToReveal } from './destination';
 import type { StageHostCapability } from './host-contract';
 import type { StageState } from './model';
 
@@ -94,11 +93,9 @@ function registerNavigationExecutors(
   ctx.cleanup(
     actions.registerExecutor('goto', (node) => {
       if (node.type !== 'goto') return { status: 'inert', reason: 'not a goto node' };
-      const layout = ctx.getPage(node.destination.page);
-      if (!layout)
+      if (!ctx.getPage(node.destination.page))
         return { status: 'failed', error: 'the destination page is not in this document' };
-      const { pageIndex, options } = destinationToReveal(node.destination, layout);
-      stage.revealIndex(pageIndex, { ...options, behavior: 'smooth' });
+      stage.goToDestination(node.destination, { behavior: 'smooth' });
       return { status: 'executed' };
     }),
   );

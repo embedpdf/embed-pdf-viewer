@@ -146,11 +146,57 @@ describe('initial placement is level-triggered', () => {
 describe('goToPage', () => {
   it('scrolls to the TOP of the page, not its centre (vertical, home=start)', () => {
     const { stage } = harness(PORTRAIT);
-    stage.goToPageIndex(2, { behavior: 'instant' });
+    stage.goToPage(2, { behavior: 'instant' });
     expect(stage.getCurrentPageIndex()).toBe(2);
     const box = stage.getPageFrame(toPageRef(3))!; // page object number = index + 1
     // the page's top edge sits ~margin px below the viewport top
     expect(stage.worldToViewport({ x: box.x, y: box.y }).y).toBeCloseTo(24, 0);
+  });
+
+  it('takes a page by its ref or by its display index, the same way', () => {
+    const byIndex = harness(PORTRAIT).stage;
+    byIndex.goToPage(2, { behavior: 'instant' });
+    const byRef = harness(PORTRAIT).stage;
+    byRef.goToPage(toPageRef(3), { behavior: 'instant' }); // object 3 = page index 2
+    expect(byRef.getCurrentPageIndex()).toBe(2);
+    expect(byRef.getCamera()).toEqual(byIndex.getCamera());
+  });
+
+  it('an index past either end goes to that end; a ref or number that names no page does nothing', () => {
+    const { stage } = harness(PORTRAIT);
+    stage.goToPage(99, { behavior: 'instant' });
+    expect(stage.getCurrentPageIndex()).toBe(4);
+    stage.goToPage(-3, { behavior: 'instant' });
+    expect(stage.getCurrentPageIndex()).toBe(0);
+    stage.goToPage(2, { behavior: 'instant' });
+    stage.goToPage(1.5, { behavior: 'instant' });
+    stage.goToPage(toPageRef(99), { behavior: 'instant' });
+    expect(stage.getCurrentPageIndex()).toBe(2);
+  });
+});
+
+describe('goToDestination', () => {
+  it('lands where the destination says, at its zoom, and the page becomes current', () => {
+    const { stage } = harness(PORTRAIT);
+    stage.goToDestination(
+      { kind: 'xyz', page: toPageRef(4), x: 100, y: 200, zoom: 2 },
+      { behavior: 'instant' },
+    );
+    expect(stage.getCurrentPageIndex()).toBe(3);
+    expect(stage.getZoomLevel()).toBe(2);
+    // the point sits at the viewport's top-left, a padding in
+    const box = stage.getPageFrame(toPageRef(4))!;
+    const point = stage.worldToViewport({ x: box.x + 100, y: box.y + 200 });
+    expect(point.x).toBeCloseTo(PAD, 4);
+    expect(point.y).toBeCloseTo(PAD, 4);
+  });
+
+  it('a destination on a page that is not in the document does nothing', () => {
+    const { stage } = harness(PORTRAIT);
+    const before = stage.getCamera();
+    stage.goToDestination({ kind: 'fit', page: toPageRef(99) }, { behavior: 'instant' });
+    expect(stage.getCamera()).toEqual(before);
+    expect(stage.getCurrentPageIndex()).toBe(0);
   });
 });
 
@@ -163,7 +209,7 @@ describe('fit modes use the document max page (not the current page)', () => {
   ];
   it('automatic fits the doc max WIDTH (capped at 100%), from the current page', () => {
     const { stage } = harness(MIXED);
-    stage.goToPageIndex(0, { behavior: 'instant' }); // sit on a narrow page…
+    stage.goToPage(0, { behavior: 'instant' }); // sit on a narrow page…
     stage.fitAutomatic();
     // …zoom derives from the document's max width (2000), width-only, capped at 100%
     expect(stage.getZoomLevel()).toBeCloseTo((1000 - 2 * PAD) / 2000, 4);
@@ -183,7 +229,7 @@ describe('fit modes use the document max page (not the current page)', () => {
 describe('anchor-preserving transitions', () => {
   it('keeps the current page when switching layout', () => {
     const { stage } = harness(PORTRAIT);
-    stage.goToPageIndex(3, { behavior: 'instant' });
+    stage.goToPage(3, { behavior: 'instant' });
     expect(stage.getCurrentPageIndex()).toBe(3);
     stage.setLayout('horizontal');
     expect(stage.getCurrentPageIndex()).toBe(3);
@@ -195,7 +241,7 @@ describe('anchor-preserving transitions', () => {
       { width: 2000, height: 800 },
       { width: 2000, height: 800 },
     ]);
-    stage.goToPageIndex(1, { behavior: 'instant' });
+    stage.goToPage(1, { behavior: 'instant' });
     stage.fitWidth();
     const zoomBefore = stage.getZoomLevel();
     stage.setViewportSize({ width: 2000, height: 700 }); // wider viewport
@@ -458,10 +504,10 @@ describe('flow: paged (same scene, smaller clamp rect — no index state)', () =
       ],
       { flow: 'paged' },
     );
-    stage.goToPageIndex(0, { behavior: 'instant' });
+    stage.goToPage(0, { behavior: 'instant' });
     stage.fitWidth();
     expect(stage.getZoomLevel()).toBeCloseTo((1000 - 2 * PAD) / 600, 4); // current page (600)
-    stage.goToPageIndex(1, { behavior: 'instant' });
+    stage.goToPage(1, { behavior: 'instant' });
     stage.fitWidth();
     expect(stage.getZoomLevel()).toBeCloseTo((1000 - 2 * PAD) / 2000, 4); // current page (2000)
   });
@@ -481,7 +527,7 @@ describe('flow: paged (same scene, smaller clamp rect — no index state)', () =
 
   it('toggling flow keeps the current page (no index, page-durable handoff)', () => {
     const { stage } = harness(PORTRAIT); // continuous
-    stage.goToPageIndex(3, { behavior: 'instant' });
+    stage.goToPage(3, { behavior: 'instant' });
     expect(stage.getCurrentPageIndex()).toBe(3);
     stage.setFlow('paged');
     expect(stage.getSettings().flow).toBe('paged');
@@ -502,7 +548,7 @@ describe('flow: paged (same scene, smaller clamp rect — no index state)', () =
   // replaced by panning, even when unbounded (construction, infinite canvas).
   it('paged + unbounded: panning far NEVER changes the page (construction)', () => {
     const { stage } = harness(PORTRAIT, { flow: 'paged', bounded: false });
-    stage.goToPageIndex(2, { behavior: 'instant' });
+    stage.goToPage(2, { behavior: 'instant' });
     expect(stage.getCurrentPageIndex()).toBe(2);
     expect(stage.listVisiblePages().map((page) => page.pageIndex)).toEqual([2]);
     // pan a huge distance every direction — unbounded, the camera roams freely
@@ -515,7 +561,7 @@ describe('flow: paged (same scene, smaller clamp rect — no index state)', () =
 
   it('paged cursor round-trips through viewState (restore lands on the same page)', () => {
     const { stage } = harness(PORTRAIT, { flow: 'paged' });
-    stage.goToPageIndex(3, { behavior: 'instant' });
+    stage.goToPage(3, { behavior: 'instant' });
     const viewState = stage.getViewState();
     expect(viewState.cursor).toBe(3);
     const { stage: restored } = harness(PORTRAIT, { flow: 'paged' });
@@ -538,7 +584,7 @@ describe('smooth scroll via the injected scheduler', () => {
     const { stage } = harness(PORTRAIT, { scheduler });
     expect(frames.length).toBe(0); // placement was instant
 
-    stage.goToPageIndex(4); // smooth (default)
+    stage.goToPage(4); // smooth (default)
     expect(frames.length).toBeGreaterThan(0);
 
     const run = (timestamp: number) => frames.splice(0).forEach((callback) => callback(timestamp));
@@ -620,7 +666,7 @@ describe('the scroller contract — the camera in native DOM vocabulary', () => 
     expect(metrics.scrollHeight).toBeCloseTo(800 + 2 * PAD, 4);
     expect(metrics.scrollableY).toBe(true);
     expect(metrics.scrollableX).toBe(false);
-    stage.goToPageIndex(3, { behavior: 'instant' });
+    stage.goToPage(3, { behavior: 'instant' });
     expect(stage.getScrollMetrics().scrollHeight).toBeCloseTo(800 + 2 * PAD, 4); // same-size slice
   });
 
@@ -660,7 +706,7 @@ describe('arrival is ZOOM-INVARIANT: the landing rule never depends on magnifica
     // every zoom, and the next page peeks below (the Chrome/Acrobat continuous feel).
     const { stage } = harness(PORTRAIT);
     stage.zoomTo({ level: 0.5 }); // page = 300x400, fits — but page 2 is off-screen
-    stage.goToPageIndex(2, { behavior: 'instant' });
+    stage.goToPage(2, { behavior: 'instant' });
     const box = stage.getPageFrame(toPageRef(3))!;
     expect(stage.worldToViewport({ x: 0, y: box.y }).y).toBeCloseTo(PAD, 0);
     // x has no real freedom (the scene fits) → the fitAlign rest keeps it centered
@@ -670,7 +716,7 @@ describe('arrival is ZOOM-INVARIANT: the landing rule never depends on magnifica
   it('zoomed IN, goToPage goes to the page top-left (a padding out)', () => {
     const { stage } = harness(PORTRAIT);
     stage.zoomTo({ level: 2 }); // page = 1200x1600, overflows both axes
-    stage.goToPageIndex(2, { behavior: 'instant' });
+    stage.goToPage(2, { behavior: 'instant' });
     const box = stage.getPageFrame(toPageRef(3))!;
     const topLeft = stage.worldToViewport({ x: box.x, y: box.y });
     expect(topLeft.x).toBeCloseTo(PAD, 0);
@@ -684,7 +730,7 @@ describe('arrival is ZOOM-INVARIANT: the landing rule never depends on magnifica
     });
     for (const level of [0.5, 2]) {
       stage.zoomTo({ level });
-      stage.goToPageIndex(2, { behavior: 'instant' });
+      stage.goToPage(2, { behavior: 'instant' });
       const box = stage.getPageFrame(toPageRef(3))!;
       const center = stage.worldToViewport({ x: box.x + box.width / 2, y: box.y + box.height / 2 });
       expect(center.x).toBeCloseTo(500, 0);
@@ -698,7 +744,7 @@ describe('arrival is ZOOM-INVARIANT: the landing rule never depends on magnifica
       bounded: false,
       zoom: { level: 0.5 },
     });
-    stage.goToPageIndex(2, { behavior: 'instant' });
+    stage.goToPage(2, { behavior: 'instant' });
     const box = stage.getPageFrame(toPageRef(3))!;
     expect(stage.worldToViewport({ x: 0, y: box.y + box.height / 2 }).y).toBeCloseTo(700 * 0.35, 0);
   });
@@ -708,7 +754,7 @@ describe('arrival is ZOOM-INVARIANT: the landing rule never depends on magnifica
       zoom: { level: 2 },
       arrivalAlign: { x: 'keep', y: 'start' },
     });
-    stage.goToPageIndex(0, { behavior: 'instant' });
+    stage.goToPage(0, { behavior: 'instant' });
     stage.panBy(-200, 0); // pan into the right column
     const x = stage.getCamera().x;
     stage.nextPage({ behavior: 'instant' });
@@ -720,10 +766,10 @@ describe('arrival is ZOOM-INVARIANT: the landing rule never depends on magnifica
 
   it('a per-call arrivalAlign overrides the setting for THIS arrival only', () => {
     const { stage } = harness(PORTRAIT, { zoom: { level: 0.5 }, bounded: false });
-    stage.goToPageIndex(2, { behavior: 'instant', arrivalAlign: { y: 'center' } });
+    stage.goToPage(2, { behavior: 'instant', arrivalAlign: { y: 'center' } });
     const box = stage.getPageFrame(toPageRef(3))!;
     expect(stage.worldToViewport({ x: 0, y: box.y + box.height / 2 }).y).toBeCloseTo(350, 0);
-    stage.goToPageIndex(3, { behavior: 'instant' }); // back to the setting: top
+    stage.goToPage(3, { behavior: 'instant' }); // back to the setting: top
     const nextBox = stage.getPageFrame(toPageRef(4))!;
     expect(stage.worldToViewport({ x: 0, y: nextBox.y }).y).toBeCloseTo(PAD, 0);
   });
@@ -734,7 +780,7 @@ describe('navigation units: spread when it fits, page when zoomed in', () => {
   it('zoomed out (fit-page): next steps by SPREAD — 0 → 1 → 3', () => {
     const { stage } = harness(PORTRAIT, { spread: 'even' });
     stage.fitPage();
-    stage.goToPageIndex(0, { behavior: 'instant' });
+    stage.goToPage(0, { behavior: 'instant' });
     stage.nextPage({ behavior: 'instant' });
     expect(stage.getCurrentPageIndex()).toBe(1);
     stage.nextPage({ behavior: 'instant' });
@@ -746,7 +792,7 @@ describe('navigation units: spread when it fits, page when zoomed in', () => {
   it('zoomed in: next steps by PAGE — 0 → 1 → 2 → 3, landing top-LEFT of each page', () => {
     const { stage } = harness(PORTRAIT, { spread: 'even' });
     stage.zoomTo({ level: 2 });
-    stage.goToPageIndex(0, { behavior: 'instant' });
+    stage.goToPage(0, { behavior: 'instant' });
     stage.nextPage({ behavior: 'instant' });
     expect(stage.getCurrentPageIndex()).toBe(1);
     // landed at page 1's start, not the spread's horizontal center
@@ -760,7 +806,7 @@ describe('navigation units: spread when it fits, page when zoomed in', () => {
 
   it('paged + spread zoomed in: walks pages within the spread, then flips', () => {
     const { stage } = harness(PORTRAIT, { flow: 'paged', spread: 'even' });
-    stage.goToPageIndex(1, { behavior: 'instant' }); // spread [1,2]
+    stage.goToPage(1, { behavior: 'instant' }); // spread [1,2]
     stage.zoomTo({ level: 2 });
     stage.nextPage({ behavior: 'instant' });
     expect(stage.getCurrentPageIndex()).toBe(2); // same spread, camera moved to page 2
@@ -782,7 +828,7 @@ describe('cursor is THE current page in both flows', () => {
   it('zoomed out, next/prev always progress (never stuck on a visible page)', () => {
     const { stage } = harness(PORTRAIT);
     stage.fitAll(); // everything visible: a visibility-based step would never leave page 0
-    stage.goToPageIndex(0, { behavior: 'instant' }); // pin the indicator to page 0
+    stage.goToPage(0, { behavior: 'instant' }); // pin the indicator to page 0
     const before = stage.getCamera();
     stage.nextPage({ behavior: 'instant' });
     expect(stage.getCurrentPageIndex()).toBe(1);
@@ -859,7 +905,7 @@ describe('cursor is INTENT: a clamped camera never revokes navigation', () => {
     // at its canonical landing, exactly as it would at 115%. No visibility-dependent
     // behavior (and no zoom-dependent landing: start/start reads the same here).
     const { stage } = harness(FOUR, { layout: 'horizontal', zoom: { level: 0.8 } });
-    stage.goToPageIndex(3, { behavior: 'instant' }); // camera clamps at the right edge
+    stage.goToPage(3, { behavior: 'instant' }); // camera clamps at the right edge
     stage.previousPage({ behavior: 'instant' }); // page 3 (index 2) is visible but off-position
     expect(stage.getCurrentPageIndex()).toBe(2);
     const box = stage.getPageFrame(toPageRef(3))!; // object 3 = page index 2
@@ -878,7 +924,7 @@ describe('cursor is INTENT: a clamped camera never revokes navigation', () => {
       caf: () => {},
     };
     const { stage } = harness(FOUR, { ...config, scheduler });
-    stage.goToPageIndex(3); // smooth
+    stage.goToPage(3); // smooth
     expect(stage.getCurrentPageIndex()).toBe(3); // intent holds immediately
     const run = (timestamp: number) => frames.splice(0).forEach((callback) => callback(timestamp));
     run(0);
@@ -919,7 +965,7 @@ describe('arrivalAlign: where navigation lands', () => {
       arrivalAlign: { x: 'end', y: 'start' },
       zoom: { level: 2 },
     });
-    stage.goToPageIndex(2, { behavior: 'instant' });
+    stage.goToPage(2, { behavior: 'instant' });
     const box = stage.getPageFrame(toPageRef(3))!;
     // page right edge sits a padding in from the viewport right edge; top a padding down
     expect(stage.worldToViewport({ x: box.x + box.width, y: box.y }).x).toBeCloseTo(1000 - PAD, 0);
@@ -932,7 +978,7 @@ describe('arrivalAlign: where navigation lands', () => {
       zoom: { level: 2 },
       bounded: false, // construction feel — and proves placement needs no real clamp
     });
-    stage.goToPageIndex(2, { behavior: 'instant' });
+    stage.goToPage(2, { behavior: 'instant' });
     const box = stage.getPageFrame(toPageRef(3))!;
     const center = stage.worldToViewport({ x: box.x + box.width / 2, y: box.y + box.height / 2 });
     expect(center.x).toBeCloseTo(500, 0);
@@ -941,11 +987,11 @@ describe('arrivalAlign: where navigation lands', () => {
 
   it('arrivalAlign is runtime-changeable and only affects the NEXT arrival', () => {
     const { stage } = harness(PORTRAIT, { zoom: { level: 2 } });
-    stage.goToPageIndex(1, { behavior: 'instant' });
+    stage.goToPage(1, { behavior: 'instant' });
     const before = stage.getCamera();
     stage.updateSettings({ arrivalAlign: { x: 'end', y: 'start' } });
     expect(stage.getCamera()).toEqual(before); // no camera jump on the setting change
-    stage.goToPageIndex(2, { behavior: 'instant' });
+    stage.goToPage(2, { behavior: 'instant' });
     const box = stage.getPageFrame(toPageRef(3))!;
     expect(stage.worldToViewport({ x: box.x + box.width, y: box.y }).x).toBeCloseTo(1000 - PAD, 0);
   });
@@ -1002,7 +1048,7 @@ describe('zoomAlign: what a pointer-less zoom holds fixed', () => {
 describe('anchorAlign: which viewport point survives a reframe', () => {
   it('default start/start: a growing container never shoves the document down', () => {
     const { stage } = harness(PORTRAIT); // automatic zoom resolves to 1
-    stage.goToPageIndex(1, { behavior: 'instant' });
+    stage.goToPage(1, { behavior: 'instant' });
     const box = stage.getPageFrame(toPageRef(2))!;
     expect(stage.worldToViewport({ x: box.x, y: box.y }).y).toBeCloseTo(PAD, 0);
     stage.setViewportSize({ width: 1000, height: 900 }); // the div finishes laying out
@@ -1012,7 +1058,7 @@ describe('anchorAlign: which viewport point survives a reframe', () => {
 
   it('center/center — canvas-style symmetric resize (the Figma feel)', () => {
     const { stage } = harness(PORTRAIT, { anchorAlign: { x: 'center', y: 'center' } });
-    stage.goToPageIndex(1, { behavior: 'instant' });
+    stage.goToPage(1, { behavior: 'instant' });
     const focus = stage.viewportToWorld({ x: 500, y: 350 }); // what sat at the old center…
     stage.setViewportSize({ width: 1000, height: 900 });
     const now = stage.worldToViewport(focus);
@@ -1022,7 +1068,7 @@ describe('anchorAlign: which viewport point survives a reframe', () => {
 
   it('scene reframes (gap change) hold the anchorAlign point too', () => {
     const { stage } = harness(PORTRAIT, { zoom: { level: 2 } });
-    stage.goToPageIndex(2, { behavior: 'instant' });
+    stage.goToPage(2, { behavior: 'instant' });
     const box = stage.getPageFrame(toPageRef(3))!;
     expect(stage.worldToViewport({ x: box.x, y: box.y }).y).toBeCloseTo(PAD, 0);
     stage.updateSettings({ gap: 64 }); // pages move in world space…
@@ -1077,7 +1123,7 @@ describe('fitAlign: where content RESTS on a fitting axis', () => {
       zoom: { level: 2 },
       fitAlign: { x: 'center', y: 'start' },
     });
-    stage.goToPageIndex(1, { behavior: 'instant' });
+    stage.goToPage(1, { behavior: 'instant' });
     const before = stage.getCamera();
     stage.panBy(0, -50); // scroll down a bit on the overflowing y axis
     expect(stage.getCamera().y).toBeGreaterThan(before.y); // pan respected, not snapped back
@@ -1100,7 +1146,7 @@ describe('gap: one value between items, every layout', () => {
 
   it('gap is structural: changing it reflows but keeps the current page', () => {
     const { stage } = harness(PORTRAIT);
-    stage.goToPageIndex(3, { behavior: 'instant' });
+    stage.goToPage(3, { behavior: 'instant' });
     stage.updateSettings({ gap: 64 });
     expect(stage.getCurrentPageIndex()).toBe(3);
     expect(stage.getPageFrame(toPageRef(2))!.y).toBeCloseTo(800 + 64, 6); // scene rebuilt with the new gap
@@ -1141,7 +1187,7 @@ describe('direction: rtl — layout flips, navigation does not', () => {
 
   it('logical align: the default start/start lands top-RIGHT in rtl (no auto needed)', () => {
     const { stage } = harness(PORTRAIT, { direction: 'rtl', zoom: { level: 2 } });
-    stage.goToPageIndex(2, { behavior: 'instant' });
+    stage.goToPage(2, { behavior: 'instant' });
     const box = stage.getPageFrame(toPageRef(3))!;
     expect(stage.worldToViewport({ x: box.x + box.width, y: box.y }).x).toBeCloseTo(1000 - PAD, 0);
     expect(stage.worldToViewport({ x: box.x, y: box.y }).y).toBeCloseTo(PAD, 0);
@@ -1149,7 +1195,7 @@ describe('direction: rtl — layout flips, navigation does not', () => {
 
   it('switching direction keeps the current page (structural, anchor-preserving)', () => {
     const { stage } = harness(PORTRAIT, { layout: 'horizontal' });
-    stage.goToPageIndex(3, { behavior: 'instant' });
+    stage.goToPage(3, { behavior: 'instant' });
     stage.updateSettings({ direction: 'rtl' });
     expect(stage.getSettings().direction).toBe('rtl');
     expect(stage.getCurrentPageIndex()).toBe(3);
@@ -1198,7 +1244,7 @@ describe("columns: 'auto' — the wrapped grid (thumbnail sidebar)", () => {
   it('re-wrapping keeps the current page (anchor-preserving resize)', () => {
     const { stage } = harness(PORTRAIT, THUMBS, { skipViewport: true });
     stage.setViewportSize({ width: 160, height: 400 });
-    stage.goToPageIndex(4, { behavior: 'instant' });
+    stage.goToPage(4, { behavior: 'instant' });
     stage.setViewportSize({ width: 400, height: 400 }); // 1 → 3 columns
     expect(stage.getCurrentPageIndex()).toBe(4);
   });
@@ -1233,7 +1279,7 @@ describe('wrapped + discrete zoom: the scene re-wraps and the camera follows', (
 
   it('zoom mode changes (fit-width, automatic) settle the wrap in one pass', () => {
     const { stage } = harness(PORTRAIT, WRAPPED); // level 0.35 → 4 columns
-    stage.goToPageIndex(2, { behavior: 'instant' });
+    stage.goToPage(2, { behavior: 'instant' });
     stage.fitWidth(); // resolves to ~1.59 → re-wraps to a single column
     expect(stage.getCurrentPageIndex()).toBe(2); // the reapply never touches the cursor
     expect(stage.getPageFrame(toPageRef(2))!.y).toBeGreaterThan(
@@ -1316,7 +1362,7 @@ describe('the stage is a LENS: multiple instances per document', () => {
       columns: 'auto',
       zoom: { level: 0.2 },
     });
-    main.goToPageIndex(4, { behavior: 'instant' });
+    main.goToPage(4, { behavior: 'instant' });
     expect(main.getCurrentPageIndex()).toBe(4);
     expect(thumbs.getCurrentPageIndex()).toBe(0); // the sidebar lens did not move
     expect(thumbs.getZoomLevel()).toBeCloseTo(0.2, 6);
@@ -1359,7 +1405,7 @@ describe('zoom { pageWidth }: pixel-target thumbnails for ANY document', () => {
   it('paged + pageWidth: the CURRENT page is N px (per-page exact)', () => {
     const { stage } = harness(MIXED, { flow: 'paged', zoom: { pageWidth: 200 } });
     expect(stage.getPageFrame(toPageRef(1))!.width * stage.getZoomLevel()).toBeCloseTo(200, 4);
-    stage.goToPageIndex(1, { behavior: 'instant' }); // the 1000-wide page
+    stage.goToPage(1, { behavior: 'instant' }); // the 1000-wide page
     expect(stage.getPageFrame(toPageRef(2))!.width * stage.getZoomLevel()).toBeCloseTo(200, 4);
   });
 
@@ -1478,7 +1524,7 @@ describe('pageFrame (screen px): reserved chrome bands at the lens zoom', () => 
       zoom: { level: 0.5 },
       pageFrame: { top: 0, right: 0, bottom: 30, left: 0 },
     });
-    stage.revealIndex(3, { behavior: 'instant' });
+    stage.reveal(3, { behavior: 'instant' });
     const rect = stage.getPageFrame(toPageRef(4))!; // object 4 = page index 3
     const outerBottom = rect.y + rect.height + 30 / 0.5; // page + its band
     // coming from above, reveal pins the outer bottom at the padded view edge
@@ -1499,29 +1545,29 @@ describe('reveal: make-visible without navigating (the sidebar follower verb)', 
   it('off-screen page → minimal scroll; visible page → camera untouched', () => {
     const { stage } = harness(PORTRAIT, THUMBS); // 5 thumbs stacked, ~164px each
     const start = stage.getCamera();
-    stage.revealIndex(4, { behavior: 'instant' }); // far below the 700px window
+    stage.reveal(4, { behavior: 'instant' }); // far below the 700px window
     const revealed = stage.getCamera();
     expect(revealed).not.toEqual(start);
     // minimal: page 5's bottom edge sits a padding above the viewport bottom
     const box = stage.getPageFrame(toPageRef(5))!;
     expect(stage.worldToViewport({ x: box.x, y: box.y + box.height }).y).toBeCloseTo(700 - 10, 0);
     // revealing it again — or a neighbour that's now visible — moves nothing
-    stage.revealIndex(4, { behavior: 'instant' });
+    stage.reveal(4, { behavior: 'instant' });
     expect(stage.getCamera()).toEqual(revealed);
-    stage.revealIndex(3, { behavior: 'instant' });
+    stage.reveal(3, { behavior: 'instant' });
     expect(stage.getCamera()).toEqual(revealed);
   });
 
   it('reveal is NOT navigation: the cursor never moves', () => {
     const { stage } = harness(PORTRAIT, THUMBS);
     expect(stage.getCurrentPageIndex()).toBe(0);
-    stage.revealIndex(4, { behavior: 'instant' });
+    stage.reveal(4, { behavior: 'instant' });
     expect(stage.getCurrentPageIndex()).toBe(0); // intent untouched — only the camera moved
   });
 
   it('paged flow: revealing an off-scene page delegates to navigation', () => {
     const { stage } = harness(PORTRAIT, { flow: 'paged' });
-    stage.revealIndex(3, { behavior: 'instant' });
+    stage.reveal(3, { behavior: 'instant' });
     expect(stage.getCurrentPageIndex()).toBe(3); // the page can only be seen by going there
     expect(stage.listVisiblePages().map((page) => page.pageIndex)).toEqual([3]);
   });
@@ -1530,16 +1576,16 @@ describe('reveal: make-visible without navigating (the sidebar follower verb)', 
 describe('viewpoint: per-page view memory (construction worksheets)', () => {
   it('goToPage with a saved viewpoint restores the exact camera', () => {
     const { stage } = harness(PORTRAIT, { flow: 'paged' });
-    stage.goToPageIndex(2, { behavior: 'instant' });
+    stage.goToPage(2, { behavior: 'instant' });
     stage.zoomAround({ x: 700, y: 500 }, 3); // zoom into "the bathroom"
     stage.panBy(-40, -60);
     const saved = stage.getViewpoint();
     const cameraBefore = stage.getCamera();
 
-    stage.goToPageIndex(0, { behavior: 'instant' }); // go work on another floor
+    stage.goToPage(0, { behavior: 'instant' }); // go work on another floor
     expect(stage.getCurrentPageIndex()).toBe(0);
 
-    stage.goToPageIndex(2, { behavior: 'instant', viewpoint: saved }); // come back
+    stage.goToPage(2, { behavior: 'instant', viewpoint: saved }); // come back
     expect(stage.getCurrentPageIndex()).toBe(2);
     expect(stage.getCamera().zoom).toBeCloseTo(cameraBefore.zoom, 4);
     expect(stage.getCamera().x).toBeCloseTo(cameraBefore.x, 2);
@@ -1596,7 +1642,7 @@ describe('viewRotation: the NON-persistent view rotation (Adobe "Rotate View")',
 
   it('is an anchor-preserving reframe: the page you were on survives the turn', () => {
     const { stage } = harness(PORTRAIT);
-    stage.goToPageIndex(3, { behavior: 'instant' });
+    stage.goToPage(3, { behavior: 'instant' });
     stage.rotateViewBy(90);
     expect(stage.getCurrentPageIndex()).toBe(3);
     // and fit-width now resolves against the swapped footprint (800, not 600)

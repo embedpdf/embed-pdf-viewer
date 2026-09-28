@@ -104,6 +104,7 @@ import {
   type WorkerResponse,
   type WorkerResultPayload,
   type PdfCoordinates,
+  type VisibleBoxOf,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
@@ -138,6 +139,7 @@ import {
   PagesInserter,
   PagesMutator,
   PagesReader,
+  visibleBoxReader,
 } from '../features/pages';
 import { PieceInfoAccessor } from '../features/pieceinfo';
 import { RedactionApplier } from '../features/redaction';
@@ -627,7 +629,7 @@ export class WorkerHost {
             `unknown request kind: ${(msg as WorkerRequest).kind}`,
           );
       }
-      this.resolve(msg.jobId, resultPack);
+      this.resolve(msg, resultPack);
     } catch (err) {
       const error: SerializedEngineError = serializeError(err);
       // Reject envelopes never carry binary; explicit EMPTY_TRANSFER
@@ -642,10 +644,21 @@ export class WorkerHost {
    * Answers a job with its result in page space. The handler decided which
    * buffers to move; the host relays that decision on the `resolve` envelope.
    */
-  private resolve(jobId: WorkerJobId, pack: WirePack<WorkerResultPayload<PdfCoordinates>>): void {
-    this.post(
-      wirePack({ kind: 'resolve', jobId, result: resultInPageSpace(pack.payload) }, pack.transfer),
-    );
+  private resolve(msg: WorkerRequest, pack: WirePack<WorkerResultPayload<PdfCoordinates>>): void {
+    const result = resultInPageSpace(pack.payload, this.visibleBoxesFor(msg));
+    this.post(wirePack({ kind: 'resolve', jobId: msg.jobId, result }, pack.transfer));
+  }
+
+  /** The visible boxes of the request's document, read only when a result asks for one. */
+  private visibleBoxesFor(msg: WorkerRequest): VisibleBoxOf {
+    let read: VisibleBoxOf | null = null;
+    return (page) => {
+      if (!('docId' in msg)) {
+        throw new EngineError(EngineErrorCode.InvalidArg, `${msg.kind} has no document`);
+      }
+      read ??= visibleBoxReader(this.runtime, this.requireSession(msg));
+      return read(page);
+    };
   }
 
   private handleOpen(req: OpenWorkerRequest): WirePack<WorkerResultPayload<PdfCoordinates>> {
@@ -1468,7 +1481,7 @@ export class WorkerHost {
         msg.kind === 'pages.renderEncoded' || msg.kind === 'document.renderPageFileEncoded'
           ? await this.encodeRendered(rendered, msg.encode, ctrl.signal)
           : rendered;
-      this.resolve(msg.jobId, resultPack);
+      this.resolve(msg, resultPack);
     } catch (err) {
       this.post(
         wirePack({ kind: 'reject', jobId: msg.jobId, error: serializeError(err) }, EMPTY_TRANSFER),
@@ -1494,7 +1507,7 @@ export class WorkerHost {
     this.aborts.set(msg.jobId, ctrl);
     try {
       const resultPack = await this.handleAnnotationsRenderAppearancesEncoded(msg, ctrl.signal);
-      this.resolve(msg.jobId, resultPack);
+      this.resolve(msg, resultPack);
     } catch (err) {
       this.post(
         wirePack({ kind: 'reject', jobId: msg.jobId, error: serializeError(err) }, EMPTY_TRANSFER),

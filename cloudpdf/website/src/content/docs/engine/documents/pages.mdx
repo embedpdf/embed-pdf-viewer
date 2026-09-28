@@ -65,7 +65,8 @@ media box that reaches past the page's top-left corner has a negative `x` and `y
 `pdfCropBox` is the only value in the PDF file's own numbers: the crop box where the file places
 it, as `{ left, bottom, right, top }` with y going up. You need it only beside a tool that reads
 those numbers, such as iText, PDFBox or Acrobat JavaScript. `pdfRectOf()` and `pdfPointOf()` turn a
-box or point into them, and `pageBoxOf()` and `pagePointOf()` turn them back:
+box or point into them, and `pageBoxOf()` and `pagePointOf()` turn them back. `pdfDestinationOf()`
+and `pageDestinationOf()` do the same for a destination, with the crop box of the page it goes to:
 
 ```ts
 import { pdfRectOf } from '@cloudpdf/engine';

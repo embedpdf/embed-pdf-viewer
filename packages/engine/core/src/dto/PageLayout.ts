@@ -4,15 +4,14 @@ import type { PageRef } from '../identity/PageRef';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
 /**
- * The five PDF page boundary boxes, in PDF user space as `PdfRect`s
- * (`{ left, bottom, right, top }`, y-up edges, page-box origin kept: a media
- * box may start at non-zero or negative numbers), as ISO 32000-1 §14.11.2
- * defines them: the crop box defaults to the media box and the other three to
- * the crop box, and each is reduced to the part it shares with the media box.
- * `crop` is the visible page, what the page shows.
+ * The five PDF page boundary boxes as ISO 32000-1 §14.11.2 defines them: the
+ * crop box defaults to the media box and the other three to the crop box, and
+ * each is reduced to the part it shares with the media box. `crop` is the
+ * visible page, what the page shows, so in page space it is
+ * `{ x: 0, y: 0, width, height }` and the others are measured from its
+ * top-left corner.
  *
- * Coordinates are not rotated; the display transform (origin shift, y flip,
- * rotation) lives in the SDK, never here.
+ * The page's turn (`rotation`) never changes these numbers.
  */
 export interface PageBoxes<C extends Coordinates = PageCoordinates> {
   media: C['box'];
@@ -60,5 +59,5 @@ export interface PageLayout<C extends Coordinates = PageCoordinates> {
    */
   pdfCropBox: PdfRect;
   /** Page-owned `/AA` actions; absent for the usual script-less page. */
-  actions?: PdfPageActions;
+  actions?: PdfPageActions<C['destination']>;
 }

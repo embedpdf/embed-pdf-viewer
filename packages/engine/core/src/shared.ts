@@ -422,7 +422,7 @@ export type {
 
 export type { DocumentManifest, ManifestPage } from './dto/DocumentManifest';
 export type { LayerScopes, LayerScopePlane } from './dto/LayerScopes';
-export type { PdfDestination } from './dto/PdfDestination';
+export type { PageDestination, PdfDestination } from './dto/PdfDestination';
 export type { PdfLinkTarget, PdfLinkTargetWritable } from './dto/PdfLinkTarget';
 export type { CacheDelta, MutationMeta } from './mutation/MutationMeta';
 export type { AnnotationListMutationMeta } from './mutation/AnnotationListMutationMeta';

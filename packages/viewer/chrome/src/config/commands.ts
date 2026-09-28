@@ -24,7 +24,12 @@ import { AnnotationToken } from '@embedpdf/react/annotation';
 import { copySelection, SelectionToken, type TextRange } from '@embedpdf/react/selection';
 import { FormToken, type FormFieldRef } from '@embedpdf/react/form';
 import { ActionsToken } from '@embedpdf/react/actions';
-import { LinkToken, openLinkTarget, type PdfLinkTarget } from '@embedpdf/react/link';
+import {
+  LinkToken,
+  openLinkTarget,
+  type PdfDestination,
+  type PdfLinkTarget,
+} from '@embedpdf/react/link';
 import { SearchToken } from '@embedpdf/react/search';
 import { MeasurementToken } from '@embedpdf/react/measurement';
 import { RedactionToken } from '@embedpdf/react/redaction';
@@ -63,11 +68,12 @@ const selectionSubtypes = (commandContext: Ctx) =>
  * `undefined` when the selection cannot carry a link at all (widgets, mixed
  * link states) — the schema decides, never a subtype blocklist.
  */
-const selectionLink = (commandContext: Ctx): PdfLinkTarget | null | undefined => {
+/** The selection's link target, as the annotation holds it (destinations in the file's coordinates). */
+const selectionLink = (commandContext: Ctx): PdfLinkTarget<PdfDestination> | null | undefined => {
   const props = anno(commandContext)?.getSelectionProps();
   if (!props || !props.specs.some((spec) => spec.key === 'link') || props.mixed.includes('link'))
     return undefined;
-  return (props.values.link ?? null) as PdfLinkTarget | null;
+  return (props.values.link ?? null) as PdfLinkTarget<PdfDestination> | null;
 };
 
 // ── tool icon accents: This viewer's design decision ─────────────────────────

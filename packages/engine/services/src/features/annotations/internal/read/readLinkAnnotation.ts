@@ -2,6 +2,7 @@ import type {
   AnnotationBase,
   LinkAnnotationDTO,
   PdfActionTree,
+  PdfDestination,
   PdfLinkTarget,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
@@ -41,7 +42,9 @@ export function readLink(
  * shared with any consumer that wants the root-level navigation reading of a
  * tree (the link plugin's no-actions-plugin fallback uses the same law).
  */
-export function linkTargetFromActionTree(tree: PdfActionTree): PdfLinkTarget | null {
+export function linkTargetFromActionTree(
+  tree: PdfActionTree<PdfDestination>,
+): PdfLinkTarget<PdfDestination> | null {
   // The law, enforced at the projection too: never execute — not even
   // navigate the root of — a tree marked incomplete.
   if (tree.incomplete) return { kind: 'unsupported' };
@@ -74,7 +77,7 @@ function readLinkTarget(
   annotPtr: Ptr,
   base: AnnotationBase,
   ctx: AnnotationReadContext,
-): PdfLinkTarget | null {
+): PdfLinkTarget<PdfDestination> | null {
   const activate = base.actions?.activate;
   if (activate) return linkTargetFromActionTree(activate);
 

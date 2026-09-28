@@ -103,7 +103,7 @@ describe('the stage → actions trigger feed (real engine)', () => {
     // the open fan-out (page /O shows 7, then the /PO set shows 9).
     expect(booted.seam).toEqual(['show:12', 'show:7', 'show:9']);
     booted.seam.length = 0;
-    stage.goToPageIndex(1); // programmatic navigation to page 2 (no /AA there)
+    stage.goToPage(1); // programmatic navigation to page 2 (no /AA there)
     await booted.drain();
     await booted.drain();
     // Leaving page 3: close fires (the /PC set, then /C, in ISO order). The

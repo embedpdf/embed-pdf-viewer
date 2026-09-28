@@ -1,4 +1,4 @@
-import type { PdfDestination } from './PdfDestination';
+import type { PageDestination } from './PdfDestination';
 
 /**
  * Where a link annotation points, normalized. A link may carry either a
@@ -6,7 +6,7 @@ import type { PdfDestination } from './PdfDestination';
  * `/Dest` and a `/A GoTo` are the same intent, so the engine collapses both
  * onto the `goto` arm — clients never see the raw two-shape split (a
  * `target.action.destination` double-wrap). Named destinations are resolved
- * to explicit ones engine-side, the same rule {@link PdfDestination}
+ * to explicit ones engine-side, the same rule {@link PageDestination}
  * documents.
  *
  * Arm names follow the `PdfActionType` vocabulary (`goto`, `uri`,
@@ -21,10 +21,10 @@ import type { PdfDestination } from './PdfDestination';
  * script payload — the text already rides the base
  * `actions.activate` model, which is the scripting plane's single home
  * for action scripts. `unsupported` preserves round-trip for action
- * types the reader doesn't model. `Destination` is where a `goto` measures
- * its target: the file's coordinates or page space.
+ * types the reader doesn't model. A `goto` goes to a {@link PageDestination};
+ * the engine's readers use `PdfLinkTarget<PdfDestination>`.
  */
-export type PdfLinkTarget<Destination = PdfDestination> =
+export type PdfLinkTarget<Destination = PageDestination> =
   | { kind: 'goto'; destination: Destination }
   | { kind: 'uri'; uri: string }
   | { kind: 'goto-remote'; file: string }
@@ -42,7 +42,7 @@ export type PdfLinkTarget<Destination = PdfDestination> =
  * liability the viewer never needs to author), and `unsupported` carries
  * nothing to write.
  */
-export type PdfLinkTargetWritable<Destination = PdfDestination> = Extract<
+export type PdfLinkTargetWritable<Destination = PageDestination> = Extract<
   PdfLinkTarget<Destination>,
   { kind: 'goto' | 'uri' }
 >;

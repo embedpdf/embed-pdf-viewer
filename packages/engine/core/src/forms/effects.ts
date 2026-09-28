@@ -1,6 +1,7 @@
 import type { SerializedEngineError } from '../errors/EngineError';
 import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
 import type { FormMutationMeta } from '../mutation/FormMutationResults';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 import type { FormFieldDTO } from './field';
 import type { FormFieldValue } from './value';
 
@@ -15,11 +16,11 @@ export type FormEffect =
 
 export type FormEffectStatus = 'applied' | 'unchanged' | 'rejected' | 'failed' | 'skipped';
 
-export interface FormEffectResult {
+export interface FormEffectResult<C extends Coordinates = PageCoordinates> {
   index: number;
   status: FormEffectStatus;
   /** Re-read terminal fields affected by this effect, when available. */
-  fields: FormFieldDTO[];
+  fields: FormFieldDTO<C>[];
   changedWidgets: FormWidget[];
   error?: SerializedEngineError;
 }
@@ -31,7 +32,7 @@ export interface FormEffectResult {
  * outcome-indeterminate failure) changes nothing: no artifact, event, or
  * version bump, and `meta` lists nothing.
  */
-export interface FormEffectsResult {
-  results: FormEffectResult[];
+export interface FormEffectsResult<C extends Coordinates = PageCoordinates> {
+  results: FormEffectResult<C>[];
   meta: FormMutationMeta;
 }

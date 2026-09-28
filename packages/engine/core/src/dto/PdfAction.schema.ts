@@ -141,24 +141,24 @@ function actionSchemasFor<Destination>(destination: z.ZodType<Destination>) {
   return { arms, node, tree, fieldActions, pageActions, annotationActions, documentActions };
 }
 
+const PAGE_SPACE = actionSchemasFor(PageDestinationSchema);
 const PDF_SPACE = actionSchemasFor(PdfDestinationSchema);
 
-/** The action schemas with destinations in page space. */
-export const PAGE_SPACE_ACTION_SCHEMAS = actionSchemasFor(PageDestinationSchema);
-
-export const PdfActionNodeSchema: z.ZodType<PdfActionNode> = PDF_SPACE.node;
+export const PdfActionNodeSchema: z.ZodType<PdfActionNode> = PAGE_SPACE.node;
 
 /** The `/S` vocabulary, derived from the union arms so it cannot drift. */
 export const PdfActionTypeSchema: z.ZodType<PdfActionType> = z.enum(
-  PDF_SPACE.arms.map((option) => option.shape.type.value) as [PdfActionType, ...PdfActionType[]],
+  PAGE_SPACE.arms.map((option) => option.shape.type.value) as [PdfActionType, ...PdfActionType[]],
 ) as unknown as z.ZodType<PdfActionType>;
 
-export const PdfActionTreeSchema: z.ZodType<PdfActionTree> = PDF_SPACE.tree;
-export const PdfFieldActionsSchema = PDF_SPACE.fieldActions;
-export const PdfPageActionsSchema = PDF_SPACE.pageActions;
-export const PdfAnnotationActionsSchema = PDF_SPACE.annotationActions;
+export const PdfActionTreeSchema: z.ZodType<PdfActionTree> = PAGE_SPACE.tree;
+export const PdfFieldActionsSchema = PAGE_SPACE.fieldActions;
+export const PdfPageActionsSchema = PAGE_SPACE.pageActions;
 export const DocumentActionsSnapshotSchema: z.ZodType<DocumentActionsSnapshot> =
-  PDF_SPACE.documentActions;
+  PAGE_SPACE.documentActions;
+
+/** An annotation's actions as annotation reads carry them: destinations in the file's coordinates. */
+export const PdfAnnotationActionsSchema = PDF_SPACE.annotationActions;
 
 /**
  * Stable public component names for generators that project the action wire
@@ -167,6 +167,7 @@ export const DocumentActionsSnapshotSchema: z.ZodType<DocumentActionsSnapshot> =
  */
 export const PdfActionWireComponents = {
   PdfActionTargetRef: PdfActionTargetRefSchema,
+  PageDestination: PageDestinationSchema,
   PdfDestination: PdfDestinationSchema,
   PdfActionNode: PdfActionNodeSchema,
   PdfActionTree: PdfActionTreeSchema,

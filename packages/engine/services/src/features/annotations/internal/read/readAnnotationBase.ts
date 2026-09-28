@@ -1,8 +1,9 @@
 import type {
   AnnotationBase,
   PageObjectNumber,
-  RevisionToken,
   PdfAnnotationActions,
+  PdfDestination,
+  RevisionToken,
 } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
@@ -80,7 +81,7 @@ function readAnnotationActions(
   docPtr: Ptr,
   annotPtr: Ptr,
   budget: ActionReadBudgetTracker,
-): PdfAnnotationActions | undefined {
+): PdfAnnotationActions<PdfDestination> | undefined {
   const events = [
     ['activate', 0],
     ['cursorEnter', 1],
@@ -94,7 +95,7 @@ function readAnnotationActions(
     ['pageVisible', 9],
     ['pageInvisible', 10],
   ] as const;
-  const actions: PdfAnnotationActions = {};
+  const actions: PdfAnnotationActions<PdfDestination> = {};
   for (const [key, event] of events) {
     const action = readActionModel(
       fn,

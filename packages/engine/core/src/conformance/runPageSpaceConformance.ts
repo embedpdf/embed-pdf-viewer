@@ -5,7 +5,7 @@ import type { ConformanceTestRunner } from './runMetadataConformance';
 import type { AnnotationDTO } from '../annotation/kinds';
 import type { PageLayout } from '../dto/PageLayout';
 import type { PageImageHandle, PageImageOptions } from '../dto/PageRender';
-import type { PdfDestination } from '../dto/PdfDestination';
+import type { PageDestination, PdfDestination } from '../dto/PdfDestination';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import type { PdfRect } from '../geometry/primitives';
@@ -223,6 +223,44 @@ export function runPageSpaceConformance(
           });
         }
 
+        if (fixture.pages.some((page) => page.openAction)) {
+          test("a page's open action is measured from its target page's visible box", async () => {
+            await eachPage(async (page, layout) => {
+              if (!page.openAction) return;
+              const root = layout.actions?.open?.root;
+              expect(root?.type).toBe('goto');
+              if (root?.type !== 'goto') return;
+              const target = layouts[page.openAction.toPage]!.ref;
+              expect(samePage(root.destination.page, target)).toBe(true);
+              expect(placeOf(root.destination)).toEqual(page.openAction.expected);
+            });
+          });
+        }
+
+        if (fixture.fieldAction) {
+          const { toPage, expected } = fixture.fieldAction;
+          test("a field's actions are measured from their target page's visible box", async () => {
+            const { fields } = await doc.forms.list();
+            const script = fields.find((field) => field.name === 'total')?.actions?.calculate?.root;
+            expect(script?.type).toBe('javascript');
+            const goTo = script?.next[0];
+            expect(goTo?.type).toBe('goto');
+            if (goTo?.type !== 'goto') return;
+            expect(samePage(goTo.destination.page, layouts[toPage]!.ref)).toBe(true);
+            expect(placeOf(goTo.destination)).toEqual(expected);
+          });
+        }
+
+        if (fixture.openDestination) {
+          const { toPage, expected } = fixture.openDestination;
+          test("the document's open destination is measured from its page's visible box", async () => {
+            const { openDestination } = await doc.actions.get();
+            expect(openDestination != null).toBe(true);
+            expect(samePage(openDestination!.page, layouts[toPage]!.ref)).toBe(true);
+            expect(placeOf(openDestination!)).toEqual(expected);
+          });
+        }
+
         test('a redaction removes what is inside it, and only that', async () => {
           const page = fixture.pages[0]!;
           const layout = layouts[0]!;
@@ -288,6 +326,24 @@ function destinationInPage(destination: PdfDestination, visible: PdfRect) {
       return { kind: 'fitV', x: x(destination.left) };
     case 'fitR':
       return { kind: 'fitR', ...toPage(destination, visible) };
+    default:
+      return { kind: destination.kind };
+  }
+}
+
+/** A page-space destination's kind and place, without its page and zoom. */
+function placeOf(destination: PageDestination) {
+  switch (destination.kind) {
+    case 'xyz':
+      return { kind: 'xyz', x: destination.x ?? null, y: destination.y ?? null };
+    case 'fitH':
+      return { kind: 'fitH', y: destination.y ?? null };
+    case 'fitV':
+      return { kind: 'fitV', x: destination.x ?? null };
+    case 'fitR': {
+      const { x, y, width, height } = destination;
+      return { kind: 'fitR', x, y, width, height };
+    }
     default:
       return { kind: destination.kind };
   }

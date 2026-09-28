@@ -19,6 +19,7 @@ import type {
   AnnotationFlags,
   AnnotationRef,
   Color,
+  PdfDestination,
   PdfLinkTarget,
   PdfLinkTargetWritable,
   PdfRect,
@@ -131,8 +132,8 @@ export function borderFromDTO(dto: {
  *  read-only arms (`javascript`, `named`, `goto-remote`, `launch`,
  *  `unsupported`) yield `null` — they can be carried, never (re)written. */
 export function writableTarget(
-  target: PdfLinkTarget | null | undefined,
-): PdfLinkTargetWritable | null {
+  target: PdfLinkTarget<PdfDestination> | null | undefined,
+): PdfLinkTargetWritable<PdfDestination> | null {
   return target && (target.kind === 'goto' || target.kind === 'uri') ? target : null;
 }
 

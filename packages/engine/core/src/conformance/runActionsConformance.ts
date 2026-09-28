@@ -6,7 +6,7 @@ import { toPageRef } from '../identity/PageRef';
 import type { ConformanceFixture, ConformanceTestRunner } from './runMetadataConformance';
 
 /** The script payload rides only the javascript/rendition arms. */
-function scriptOf(node: PdfActionNode | null | undefined): string {
+function scriptOf<Destination>(node: PdfActionNode<Destination> | null | undefined): string {
   if (!node) return '';
   if (node.type === 'javascript') return node.script;
   if (node.type === 'rendition') return node.script ?? '';
@@ -321,11 +321,12 @@ export function runActionsConformance(
         expect(DocumentActionsSnapshotSchema.safeParse(snapshot).success).toBe(true);
         expect(snapshot.openAction).toBeNull();
         const pageObjectNumber = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
+        // The file's [/XYZ 10 700 1.5] on a letter page, from the page's top-left.
         expect(snapshot.openDestination).toEqual({
           kind: 'xyz',
           page: toPageRef(pageObjectNumber),
-          left: 10,
-          top: 700,
+          x: 10,
+          y: 92,
           zoom: 1.5,
         });
       } finally {

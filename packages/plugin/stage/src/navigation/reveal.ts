@@ -1,14 +1,16 @@
 /**
- * Reveals. A bare reveal is not navigation: minimal visibility, cursor
- * untouched (in paged flow, revealing a page is navigating to it). A
- * positioned reveal (rect, anchor or zoom: a search hit, a PDF destination)
- * is an arrival: the cursor is set up front, the camera lands per the anchor
- * policy, and a resolved zoom becomes the zoom intent.
+ * Reveals and destinations. A bare reveal is not navigation: minimal
+ * visibility, cursor untouched (in paged flow, revealing a page is navigating
+ * to it). A positioned reveal (rect, anchor or zoom: a search hit) is an
+ * arrival: the cursor is set up front, the camera lands per the anchor
+ * policy, and a resolved zoom becomes the zoom intent. A destination is a
+ * positioned reveal of the spot it names.
  */
 import { revealCamera, type Camera, type Rect as StageRect } from '@embedpdf/core-stage';
-import type { PluginContext, PageRef } from '@embedpdf/core';
+import type { PageDestination, PluginContext, PageRef } from '@embedpdf/core';
 
-import type { RevealAnchorValue, RevealOptions } from '../contract';
+import type { GoToDestinationOptions, RevealAnchorValue, RevealOptions } from '../contract';
+import { revealOfDestination } from '../destination';
 import type { StageAnimation } from '../camera/animation';
 import type { StageCameraWrite } from '../camera/write';
 import type { StageHostCapability } from '../host-contract';
@@ -35,7 +37,7 @@ export function createReveal(
     pageRectOf,
     worldRectForContent,
     boundsFor,
-    indexOfPage,
+    indexOfTarget,
   } = scene;
   const state = () => ctx.state.get();
 
@@ -72,7 +74,7 @@ export function createReveal(
     return rectPosition + rectExtent / 2 - (viewportExtent * fraction) / zoom;
   };
 
-  const revealIndex = (pageIndex: number, options?: RevealOptions): void => {
+  const revealAt = (pageIndex: number, options?: RevealOptions): void => {
     markCause('programmatic');
     const pageCount = ctx.document()?.pageCount ?? 0;
     if (pageCount === 0) return;
@@ -194,16 +196,24 @@ export function createReveal(
     }
   };
 
-  const reveal = (page: PageRef, options?: RevealOptions): void => {
-    const index = indexOfPage(page);
-    if (index >= 0) revealIndex(index, options);
+  const reveal = (page: PageRef | number, options?: RevealOptions): void => {
+    const index = indexOfTarget(page);
+    if (index !== null) revealAt(index, options);
+  };
+
+  const goToDestination = (
+    destination: PageDestination,
+    options?: GoToDestinationOptions,
+  ): void => {
+    const layout = ctx.getPage(destination.page);
+    if (!layout) return;
+    revealAt(layout.index, {
+      ...revealOfDestination(destination, layout.size),
+      behavior: options?.behavior,
+    });
   };
 
   return {
-    api: {
-      reveal,
-      revealRect: (page, rect, options) => reveal(page, { ...options, rect }),
-      revealIndex,
-    } satisfies Partial<StageHostCapability>,
+    api: { reveal, goToDestination } satisfies Partial<StageHostCapability>,
   };
 }

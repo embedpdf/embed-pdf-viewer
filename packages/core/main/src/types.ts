@@ -35,6 +35,7 @@ import type {
   MetadataUpdateResult,
   DocumentEvent,
   EngineRenderPolicy,
+  PageDestination,
   PdfDestination,
 } from '@embedpdf/engine-core/runtime';
 
@@ -46,6 +47,7 @@ export type {
   OpenInput,
   OpenOptions,
   PageLayout,
+  PageDestination,
   PdfDestination,
   PageObjectNumber,
   PdfRotation,

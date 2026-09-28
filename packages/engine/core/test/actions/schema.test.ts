@@ -14,10 +14,10 @@ const ARM_FIXTURES: PdfActionNode[] = [
     destination: {
       kind: 'fitR',
       page: { kind: 'objectNumber', pageObjectNumber: 3 },
-      left: 1,
-      bottom: 2,
-      right: 3,
-      top: 4,
+      x: 1,
+      y: 2,
+      width: 3,
+      height: 4,
     },
     next: [],
   },
@@ -220,8 +220,8 @@ describe('PDF action schemas', () => {
     const destination = {
       kind: 'xyz' as const,
       page: { kind: 'objectNumber', pageObjectNumber: 5 },
-      left: 10,
-      top: 700,
+      x: 10,
+      y: 92,
       zoom: 1.5,
     };
     const withDestination = {

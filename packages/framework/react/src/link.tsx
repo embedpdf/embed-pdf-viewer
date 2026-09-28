@@ -22,6 +22,7 @@ import {
   type LinkActivateContext,
   type LinkActivation,
   type LinkCapability,
+  type PdfDestination,
   type PdfLinkTarget,
 } from '@embedpdf/plugin-link';
 // The layer paints anchors only while a navigation tool is active — a host fact.
@@ -50,7 +51,7 @@ import type { PageContextValue } from './runtime';
  */
 export function openLinkTarget(
   link: LinkCapability,
-  target: PdfLinkTarget,
+  target: PdfLinkTarget<PdfDestination>,
   context?: LinkActivateContext,
 ): LinkActivation {
   const activation = link.activate(target, context);

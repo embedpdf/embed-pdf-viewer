@@ -40,7 +40,7 @@ describe('stage events', () => {
     expect(log).toContain('camera');
     log.length = 0;
 
-    stage.goToPageIndex(2, { behavior: 'instant' });
+    stage.goToPage(2, { behavior: 'instant' });
     expect(log).toEqual(['page:0→2:2', 'camera']);
     log.length = 0;
 
@@ -55,9 +55,9 @@ describe('stage events', () => {
   it('announce only what changed', () => {
     const { stage, log } = harness();
     stage.setViewportSize({ width: 1000, height: 700 });
-    stage.goToPageIndex(1, { behavior: 'instant' });
+    stage.goToPage(1, { behavior: 'instant' });
     log.length = 0;
-    stage.goToPageIndex(1, { behavior: 'instant' }); // the camera is written again
+    stage.goToPage(1, { behavior: 'instant' }); // the camera is written again
     expect(log).toEqual(['camera']);
     log.length = 0;
     stage.updateSettings({ layout: 'vertical' }); // already vertical
@@ -84,13 +84,13 @@ describe('stage events', () => {
       },
     });
     stage.setViewportSize({ width: 1000, height: 700 });
-    stage.goToPageIndex(3); // smooth
+    stage.goToPage(3); // smooth
     const run = (timestamp: number) => frames.splice(0).forEach((callback) => callback(timestamp));
     run(0);
     run(240);
     expect(log.filter((entry) => entry === 'motion-ended')).toHaveLength(1);
 
-    stage.goToPageIndex(0);
+    stage.goToPage(0);
     run(0);
     stage.stopMotion();
     expect(log.filter((entry) => entry === 'motion-ended')).toHaveLength(2);

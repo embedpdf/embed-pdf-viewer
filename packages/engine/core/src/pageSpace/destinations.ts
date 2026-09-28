@@ -7,7 +7,7 @@ import type {
   PdfFieldActions,
   PdfPageActions,
 } from '../dto/PdfAction';
-import type { PdfDestination } from '../dto/PdfDestination';
+import type { PageDestination, PdfDestination } from '../dto/PdfDestination';
 import type { PdfLinkTarget } from '../dto/PdfLinkTarget';
 import type { PdfRect } from '../geometry/primitives';
 import type { PageRef } from '../identity/PageRef';
@@ -20,20 +20,13 @@ import type { PageRef } from '../identity/PageRef';
 export type VisibleBoxOf = (page: PageRef) => PdfRect;
 
 /**
- * A destination in page space (ISO 32000-1 §12.3.2.2): the page it goes to,
- * and where on that page, measured from the top-left of that page's visible
- * box. `null` keeps the viewer's current value, as in the file; a value left
- * out means the same.
+ * The visible box a destination is measured on: the `pdfCropBox` of the page
+ * it goes to, or a function that gives any page's.
  */
-export type PageDestination =
-  | { kind: 'xyz'; page: PageRef; x?: number | null; y?: number | null; zoom?: number | null }
-  | { kind: 'fit'; page: PageRef }
-  | { kind: 'fitH'; page: PageRef; y?: number | null }
-  | { kind: 'fitV'; page: PageRef; x?: number | null }
-  | { kind: 'fitR'; page: PageRef; x: number; y: number; width: number; height: number }
-  | { kind: 'fitB'; page: PageRef }
-  | { kind: 'fitBH'; page: PageRef; y?: number | null }
-  | { kind: 'fitBV'; page: PageRef; x?: number | null };
+export type DestinationBox = PdfRect | VisibleBoxOf;
+
+const boxFor = (page: PageRef, box: DestinationBox): PdfRect =>
+  typeof box === 'function' ? box(page) : box;
 
 type Axis = number | null | undefined;
 
@@ -41,14 +34,18 @@ type Axis = number | null | undefined;
 const across = (value: Axis, convert: (value: number) => number): Axis =>
   value == null ? value : convert(value);
 
-/** A destination in the file's coordinates, in page space. */
+/**
+ * A destination in the file's coordinates, in page space: for one read by
+ * another PDF tool, before handing it to the viewer. `box` is the `pdfCropBox`
+ * of the page it goes to.
+ */
 export function pageDestinationOf(
   destination: PdfDestination,
-  boxOf: VisibleBoxOf,
+  box: DestinationBox,
 ): PageDestination {
-  const box = boxOf(destination.page);
-  const x = (left: Axis) => across(left, (value) => value - box.left);
-  const y = (top: Axis) => across(top, (value) => box.top - value);
+  const { left: boxLeft, top: boxTop } = boxFor(destination.page, box);
+  const x = (left: Axis) => across(left, (value) => value - boxLeft);
+  const y = (top: Axis) => across(top, (value) => boxTop - value);
   switch (destination.kind) {
     case 'xyz': {
       const { left, top, ...rest } = destination;
@@ -74,8 +71,8 @@ export function pageDestinationOf(
       const upper = Math.max(bottom, top);
       return {
         ...rest,
-        x: Math.min(left, right) - box.left,
-        y: box.top - upper,
+        x: Math.min(left, right) - boxLeft,
+        y: boxTop - upper,
         width: Math.abs(right - left),
         height: upper - lower,
       };
@@ -86,14 +83,17 @@ export function pageDestinationOf(
   }
 }
 
-/** A page-space destination in the file's coordinates. */
+/**
+ * A page-space destination in the file's coordinates: for handing one to
+ * another PDF tool. `box` is the `pdfCropBox` of the page it goes to.
+ */
 export function pdfDestinationOf(
   destination: PageDestination,
-  boxOf: VisibleBoxOf,
+  box: DestinationBox,
 ): PdfDestination {
-  const box = boxOf(destination.page);
-  const left = (x: Axis) => across(x, (value) => value + box.left);
-  const top = (y: Axis) => across(y, (value) => box.top - value);
+  const { left: boxLeft, top: boxTop } = boxFor(destination.page, box);
+  const left = (x: Axis) => across(x, (value) => value + boxLeft);
+  const top = (y: Axis) => across(y, (value) => boxTop - value);
   switch (destination.kind) {
     case 'xyz': {
       const { x, y, ...rest } = destination;
@@ -115,12 +115,12 @@ export function pdfDestinationOf(
     }
     case 'fitR': {
       const { x, y, width, height, ...rest } = destination;
-      const upper = box.top - y;
+      const upper = boxTop - y;
       return {
         ...rest,
-        left: x + box.left,
+        left: x + boxLeft,
         bottom: upper - height,
-        right: x + box.left + width,
+        right: x + boxLeft + width,
         top: upper,
       };
     }
@@ -159,6 +159,22 @@ export function mapActionTree<From, To>(
   convert: Convert<From, To>,
 ): PdfActionTree<To> {
   return { ...tree, root: tree.root ? mapActionNode(tree.root, convert) : null };
+}
+
+/** An action tree in page space: each `goto` measured on the page it goes to. */
+export function pageActionTreeOf(
+  tree: PdfActionTree<PdfDestination>,
+  box: DestinationBox,
+): PdfActionTree {
+  return mapActionTree(tree, (destination) => pageDestinationOf(destination, box));
+}
+
+/** A link target in page space: a `goto` measured on the page it goes to. */
+export function pageLinkTargetOf(
+  target: PdfLinkTarget<PdfDestination>,
+  box: DestinationBox,
+): PdfLinkTarget {
+  return mapLinkTarget(target, (destination) => pageDestinationOf(destination, box));
 }
 
 /** Every action tree in a record of triggers (an annotation's, a page's or a field's). */

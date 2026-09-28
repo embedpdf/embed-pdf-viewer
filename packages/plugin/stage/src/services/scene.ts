@@ -321,6 +321,16 @@ export function createScene(ctx: PluginContext<StageState>) {
   const currentAnchor = (): Anchor => anchorAt(anchorPoint());
 
   const indexOfPage = (page: PageRef): number => ctx.getPage(page)?.index ?? -1;
+  /**
+   * A page argument (a `PageRef` or a display index) as a display index, or
+   * null when it names no page: a ref not in the document, or a number that
+   * isn't a whole number. An index past either end is kept; arrivals clamp it.
+   */
+  const indexOfTarget = (page: PageRef | number): number | null => {
+    if (typeof page === 'number') return Number.isInteger(page) ? page : null;
+    const index = indexOfPage(page);
+    return index >= 0 ? index : null;
+  };
 
   return {
     camera,
@@ -351,6 +361,7 @@ export function createScene(ctx: PluginContext<StageState>) {
     anchorAt,
     currentAnchor,
     indexOfPage,
+    indexOfTarget,
   };
 }
 export type StageScene = ReturnType<typeof createScene>;

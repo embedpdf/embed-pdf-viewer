@@ -84,7 +84,7 @@ function applyLinkTarget(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  target: PdfLinkTargetWritable,
+  target: PdfLinkTargetWritable<PdfDestination>,
   ctx?: AnnotationWriteContext,
 ): void {
   const docPtr = ctx?.docPtr;

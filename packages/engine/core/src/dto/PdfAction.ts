@@ -1,4 +1,4 @@
-import type { PdfDestination } from './PdfDestination';
+import type { PageDestination } from './PdfDestination';
 
 /** Normalized values of an action dictionary's `/S` name. */
 export type PdfActionType = PdfActionNode['type'];
@@ -112,10 +112,11 @@ interface PdfActionNodeCommon<Destination> {
  * payload — a `goto` without a destination or a `uri` without a URI is
  * unrepresentable. A payload the reader cannot materialize degrades the node
  * to `unknown` (original `/S` kept on `subtype`) and appends the tree-level
- * `'payload-dropped'` warning. `Destination` is where a `goto` measures its
- * target: the file's coordinates or page space.
+ * `'payload-dropped'` warning. A `goto` goes to a {@link PageDestination};
+ * the engine's own readers, which work in the file's coordinates, use
+ * `PdfActionNode<PdfDestination>`.
  */
-export type PdfActionNode<Destination = PdfDestination> = PdfActionNodeCommon<Destination> &
+export type PdfActionNode<Destination = PageDestination> = PdfActionNodeCommon<Destination> &
   (
     | { type: 'javascript'; script: string }
     | { type: 'goto'; destination: Destination }
@@ -164,7 +165,7 @@ export type PdfActionWarning =
  * One extracted action root plus the native reader's safety verdict.
  * Consumers must never execute a tree whose `incomplete` flag is true.
  */
-export interface PdfActionTree<Destination = PdfDestination> {
+export interface PdfActionTree<Destination = PageDestination> {
   /** Null when the model was valid but its root exceeded a safety bound. */
   root: PdfActionNode<Destination> | null;
   incomplete: boolean;
@@ -174,19 +175,19 @@ export interface PdfActionTree<Destination = PdfDestination> {
   warnings: PdfActionWarning[];
 }
 
-export interface PdfFieldActions<Destination = PdfDestination> {
+export interface PdfFieldActions<Destination = PageDestination> {
   keystroke?: PdfActionTree<Destination>;
   format?: PdfActionTree<Destination>;
   validate?: PdfActionTree<Destination>;
   calculate?: PdfActionTree<Destination>;
 }
 
-export interface PdfPageActions<Destination = PdfDestination> {
+export interface PdfPageActions<Destination = PageDestination> {
   open?: PdfActionTree<Destination>;
   close?: PdfActionTree<Destination>;
 }
 
-export interface PdfAnnotationActions<Destination = PdfDestination> {
+export interface PdfAnnotationActions<Destination = PageDestination> {
   activate?: PdfActionTree<Destination>;
   cursorEnter?: PdfActionTree<Destination>;
   cursorExit?: PdfActionTree<Destination>;
@@ -200,14 +201,14 @@ export interface PdfAnnotationActions<Destination = PdfDestination> {
   pageInvisible?: PdfActionTree<Destination>;
 }
 
-export interface NamedJavaScriptAction<Destination = PdfDestination> {
+export interface NamedJavaScriptAction<Destination = PageDestination> {
   /** Name-tree key. Array order is the PDF boot order. */
   name: string;
   action: PdfActionTree<Destination>;
 }
 
 /** Catalog-owned actions. Page actions stay on their owning PageLayout. */
-export interface DocumentActionsSnapshot<Destination = PdfDestination> {
+export interface DocumentActionsSnapshot<Destination = PageDestination> {
   nameTreeScripts: NamedJavaScriptAction<Destination>[];
   /** Action-form `/OpenAction`. Mutually exclusive with `openDestination` —
    *  `/OpenAction` is one entry, a dictionary or an array. */

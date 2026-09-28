@@ -3,7 +3,6 @@ import {
   mapLinkTarget,
   pageDestinationOf,
   pdfDestinationOf,
-  type PageDestination,
   type VisibleBoxOf,
 } from './destinations';
 import { pageMeasureOf, pdfMeasureOf } from './measure';
@@ -19,6 +18,7 @@ import type {
 import type { AnnotationSubtype } from '../annotation/subtype';
 import type { PdfMeasurement } from '../dto/Measure';
 import type { PdfAnnotationActions } from '../dto/PdfAction';
+import type { PageDestination, PdfDestination } from '../dto/PdfDestination';
 import type { PdfLinkTarget } from '../dto/PdfLinkTarget';
 import {
   pageBoxOf,
@@ -65,9 +65,9 @@ const TO_PAGE: Record<MeasuredFieldSpace, Converter> = {
     points.map((point) => pagePointOf(point, visible)),
   topLeft: (topLeft: PdfTopLeft, { visible }) => pagePointOfTopLeft(topLeft, visible),
   measure: (measure: PdfMeasurement, { visible }) => pageMeasureOf(measure, visible),
-  linkTarget: (target: PdfLinkTarget, { boxOf }) =>
+  linkTarget: (target: PdfLinkTarget<PdfDestination>, { boxOf }) =>
     mapLinkTarget(target, (destination) => pageDestinationOf(destination, boxOf)),
-  actions: (actions: PdfAnnotationActions, { boxOf }) =>
+  actions: (actions: PdfAnnotationActions<PdfDestination>, { boxOf }) =>
     mapAnnotationActions(actions, (destination) => pageDestinationOf(destination, boxOf)),
 };
 

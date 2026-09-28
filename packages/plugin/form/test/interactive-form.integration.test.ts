@@ -29,7 +29,10 @@ const fixturePath = resolve(
   'interactive_pdf_forms_javascript_demo.pdf',
 );
 
-async function activationFor(doc: DocumentHandle, field: FormFieldDTO): Promise<PdfActionTree> {
+async function activationFor(
+  doc: DocumentHandle,
+  field: FormFieldDTO,
+): Promise<PdfActionTree<unknown>> {
   const widget = field.widgets[0];
   if (!widget || widget.annotObjectNumber <= 0 || !widget.page) {
     throw new Error(`field '${field.name}' has no addressable widget`);

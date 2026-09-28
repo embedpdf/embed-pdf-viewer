@@ -97,9 +97,10 @@ describe('actions public contract', () => {
 
   it('getActionTree reads annotation, field, page and document trees raw from the document', async () => {
     const { capability } = harness({ openSequence: 'off' });
+    // An annotation's tree comes back in page space: a copy, the same when it holds no goto.
     await expect(
       capability.getActionTree({ kind: 'annotation', annotation: ANNOT, page: PAGE }),
-    ).resolves.toBe(activate);
+    ).resolves.toEqual(activate);
     await expect(
       capability.getActionTree({
         kind: 'annotation',
@@ -107,7 +108,7 @@ describe('actions public contract', () => {
         page: PAGE,
         event: 'cursorEnter',
       }),
-    ).resolves.toBe(enter);
+    ).resolves.toEqual(enter);
     await expect(
       capability.getActionTree({
         kind: 'annotation',

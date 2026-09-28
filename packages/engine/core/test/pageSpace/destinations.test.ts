@@ -1,16 +1,17 @@
 import { describe, expect, test } from 'vitest';
 
 import type { DocumentActionsSnapshot, PdfActionTree } from '../../src/dto/PdfAction';
-import type { PdfDestination } from '../../src/dto/PdfDestination';
+import type { PageDestination, PdfDestination } from '../../src/dto/PdfDestination';
 import type { PdfRect } from '../../src/geometry/primitives';
 import { toPageRef } from '../../src/identity/PageRef';
 import {
   mapActionTree,
   mapDocumentActions,
   mapLinkTarget,
+  pageActionTreeOf,
   pageDestinationOf,
+  pageLinkTargetOf,
   pdfDestinationOf,
-  type PageDestination,
 } from '../../src/pageSpace/destinations';
 
 const A = toPageRef(4);
@@ -79,6 +80,13 @@ describe('destinations in page space', () => {
     ).toEqual({ kind: 'fitR', page: A, x: 100, y: 92, width: 100, height: 100 });
   });
 
+  test("the box can be the target page's own, instead of a lookup", () => {
+    const destination: PdfDestination = { kind: 'xyz', page: B, left: -250, top: 350, zoom: 0 };
+    const box = boxes.get(6)!;
+    expect(pageDestinationOf(destination, box)).toEqual(pageDestinationOf(destination, boxOf));
+    expect(pdfDestinationOf(pageDestinationOf(destination, box), box)).toEqual(destination);
+  });
+
   test('a null or absent axis is kept, never measured', () => {
     const page = pageDestinationOf({ kind: 'xyz', page: A, top: 500 }, boxOf);
     expect(page).toEqual({ kind: 'xyz', page: A, y: 292 });
@@ -99,8 +107,28 @@ describe('values that carry destinations', () => {
     ).toEqual({ kind: 'goto', destination: { kind: 'fitH', page: A, y: 92 } });
   });
 
+  test('a link target and an action tree convert in one call', () => {
+    expect(
+      pageLinkTargetOf({ kind: 'goto', destination: { kind: 'fitH', page: A, top: 700 } }, boxOf),
+    ).toEqual({ kind: 'goto', destination: { kind: 'fitH', page: A, y: 92 } });
+    const tree: PdfActionTree<PdfDestination> = {
+      incomplete: false,
+      warningFlags: 0,
+      warnings: [],
+      root: {
+        subtype: 'GoTo',
+        type: 'goto',
+        destination: { kind: 'fitV', page: B, left: 0 },
+        next: [],
+      },
+    };
+    expect(pageActionTreeOf(tree, boxOf).root).toMatchObject({
+      destination: { kind: 'fitV', page: B, x: 300 },
+    });
+  });
+
   test('every goto in an action tree converts, down its next chain', () => {
-    const tree: PdfActionTree = {
+    const tree: PdfActionTree<PdfDestination> = {
       incomplete: false,
       warningFlags: 0,
       warnings: [],
@@ -127,7 +155,7 @@ describe('values that carry destinations', () => {
   });
 
   test("a document's open destination and triggers convert", () => {
-    const snapshot: DocumentActionsSnapshot = {
+    const snapshot: DocumentActionsSnapshot<PdfDestination> = {
       nameTreeScripts: [],
       openAction: null,
       openDestination: { kind: 'xyz', page: B, left: -250, top: 350 },

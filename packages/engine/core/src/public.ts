@@ -51,6 +51,7 @@ export {
   pdfQuadOf,
   pdfRectOf,
 } from './geometry/pageSpace';
+export { pageDestinationOf, pdfDestinationOf } from './pageSpace/destinations';
 
 export type {
   // Engine and handles.
@@ -89,6 +90,8 @@ export type {
   PageRef,
   PageLayout,
   PageListSnapshot,
+  PageDestination,
+  PdfDestination,
   PdfRect,
   PdfTopLeft,
   PdfPoint,

@@ -1269,7 +1269,7 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
       version: BaseVersionInfo;
     }
   | { tag: 'metadata.read'; metadata: DocumentMetadata }
-  | { tag: 'actions.read'; snapshot: DocumentActionsSnapshot }
+  | { tag: 'actions.read'; snapshot: DocumentActionsSnapshot<C['destination']> }
   | {
       tag: 'metadata.update';
       result: MetadataUpdateResult;
@@ -1320,22 +1320,22 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
-  | { tag: 'forms.list'; snapshot: FormSnapshot }
+  | { tag: 'forms.list'; snapshot: FormSnapshot<C> }
   | {
       tag: 'forms.setValue';
-      result: FormSetValueResult;
+      result: FormSetValueResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | {
       tag: 'forms.reset';
-      result: FormSetValueResult;
+      result: FormSetValueResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | {
       tag: 'forms.applyEffects';
-      result: FormEffectsResult;
+      result: FormEffectsResult<C>;
       /** False when the batch wrote nothing: no artifact, event, or version bump. */
       wrote: boolean;
       artifact?: LayerArtifactWorkerPayload;
@@ -1344,7 +1344,7 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
   | { tag: 'forms.export'; format: FormDataFormat; bytes: ArrayBuffer }
   | {
       tag: 'forms.import';
-      result: FormImportResult;
+      result: FormImportResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
@@ -1356,19 +1356,19 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
     }
   | {
       tag: 'forms.createField';
-      result: FormFieldCreateResult;
+      result: FormFieldCreateResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | {
       tag: 'forms.updateField';
-      result: FormFieldUpdateResult;
+      result: FormFieldUpdateResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | {
       tag: 'forms.setSignatureAppearance';
-      result: FormFieldUpdateResult;
+      result: FormFieldUpdateResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
@@ -1380,13 +1380,13 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
     }
   | {
       tag: 'forms.attachWidget';
-      result: FormWidgetLinkResult;
+      result: FormWidgetLinkResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | {
       tag: 'forms.detachWidget';
-      result: FormWidgetLinkResult;
+      result: FormWidgetLinkResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }

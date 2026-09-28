@@ -6,8 +6,6 @@
  */
 export { stagePlugin } from './stage.plugin';
 export * from './contract';
-export { destinationToReveal } from './destination';
-export type { DestinationReveal } from './destination';
 export { createScrollHandler } from './scroll-handler';
 export type { ScrollHandlerOptions } from './scroll-handler';
 export { DEFAULT_SETTINGS, DEFAULT_RESPONSIVE, settingsEqual } from './settings';

@@ -1,5 +1,5 @@
 import type { PageCoordinates, PdfCoordinates } from './coordinates';
-import type { VisibleBoxOf } from './destinations';
+import { mapPageActions, pageDestinationOf, type VisibleBoxOf } from './destinations';
 import type { PageBoxes, PageLayout } from '../dto/PageLayout';
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
 import { EngineError } from '../errors/EngineError';
@@ -22,9 +22,24 @@ export function pageSpaceBoxesOf(boxes: PageBoxes<PdfCoordinates>): PageBoxes<Pa
   };
 }
 
-/** A page's layout in page space. */
-export function pageLayoutOf(layout: PageLayout<PdfCoordinates>): PageLayout<PageCoordinates> {
-  return { ...layout, boxes: pageSpaceBoxesOf(layout.boxes) };
+/**
+ * A page's layout in page space. Its actions may go to other pages, so each
+ * destination is measured with `boxOf`, the box of the page it goes to.
+ */
+export function pageLayoutOf(
+  layout: PageLayout<PdfCoordinates>,
+  boxOf: VisibleBoxOf,
+): PageLayout<PageCoordinates> {
+  const { actions, ...rest } = layout;
+  return {
+    ...rest,
+    boxes: pageSpaceBoxesOf(layout.boxes),
+    ...(actions
+      ? {
+          actions: mapPageActions(actions, (destination) => pageDestinationOf(destination, boxOf)),
+        }
+      : {}),
+  };
 }
 
 /** Every page's visible box, by page, from the pages' layouts. */
@@ -48,5 +63,6 @@ export function visibleBoxesOf(pages: readonly PageLayout<PdfCoordinates>[]): Vi
 export function pageListOf(
   snapshot: PageListSnapshot<PdfCoordinates>,
 ): PageListSnapshot<PageCoordinates> {
-  return { ...snapshot, pages: snapshot.pages.map(pageLayoutOf) };
+  const boxOf = visibleBoxesOf(snapshot.pages);
+  return { ...snapshot, pages: snapshot.pages.map((page) => pageLayoutOf(page, boxOf)) };
 }

@@ -1,5 +1,6 @@
 import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
 import type { PdfFieldActions } from '../dto/PdfAction';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 import type { FormValueEntry } from './value-entry';
 
 /**
@@ -83,7 +84,7 @@ export interface FormFieldOption {
  * record that holds the value; its widgets are page-scoped views — join
  * them to the annotation subsystem via `annotObjectNumber`.
  */
-export interface FormFieldBase {
+export interface FormFieldBase<C extends Coordinates = PageCoordinates> {
   /** Durable ref (`objectNumber` whenever the field dictionary is indirect). */
   ref: FormFieldRef;
   /** Field dictionary object number; `0` for direct (spec-violating) dicts. */
@@ -102,13 +103,13 @@ export interface FormFieldBase {
   /** Exact effective `/DV` object shape, including absent and malformed values. */
   defaultValueEntry: FormValueEntry;
   /** Effective inherited field `/AA` actions. */
-  actions?: PdfFieldActions;
+  actions?: PdfFieldActions<C['destination']>;
   /** The field's widget annotations, in control order. May be empty ("unplaced"). */
   widgets: FormWidget[];
 }
 
 /** A text field. Write with `{ type: 'text', value }`. */
-export interface TextFieldDTO extends FormFieldBase {
+export interface TextFieldDTO<C extends Coordinates = PageCoordinates> extends FormFieldBase<C> {
   family: 'text';
   value: string;
   /** /DV — restored by `reset()`. */
@@ -122,7 +123,9 @@ export interface TextFieldDTO extends FormFieldBase {
 }
 
 /** A checkbox. Write with `{ type: 'toggle', state: onState | null }`. */
-export interface CheckboxFieldDTO extends FormFieldBase {
+export interface CheckboxFieldDTO<
+  C extends Coordinates = PageCoordinates,
+> extends FormFieldBase<C> {
   family: 'checkbox';
   checked: boolean;
   /** The export value reported while checked ("Off" is never exported). */
@@ -131,7 +134,7 @@ export interface CheckboxFieldDTO extends FormFieldBase {
 }
 
 /** A radio group: One field, N widgets. Write with `{ type: 'toggle', state }`. */
-export interface RadioFieldDTO extends FormFieldBase {
+export interface RadioFieldDTO<C extends Coordinates = PageCoordinates> extends FormFieldBase<C> {
   family: 'radio';
   /** The checked widget's export value, or `"Off"` when the group is clear. */
   value: string;
@@ -143,7 +146,9 @@ export interface RadioFieldDTO extends FormFieldBase {
 }
 
 /** A combo box (dropdown). Write with `{ type: 'choice', values: [v] }`. */
-export interface ComboBoxFieldDTO extends FormFieldBase {
+export interface ComboBoxFieldDTO<
+  C extends Coordinates = PageCoordinates,
+> extends FormFieldBase<C> {
   family: 'combobox';
   /** An option export value — or free text when `edit` is set. */
   value: string;
@@ -155,7 +160,7 @@ export interface ComboBoxFieldDTO extends FormFieldBase {
 }
 
 /** A list box. Write with `{ type: 'choice', values }`. */
-export interface ListBoxFieldDTO extends FormFieldBase {
+export interface ListBoxFieldDTO<C extends Coordinates = PageCoordinates> extends FormFieldBase<C> {
   family: 'listbox';
   /** Selected option export values, in option order. */
   selectedValues: string[];
@@ -165,7 +170,9 @@ export interface ListBoxFieldDTO extends FormFieldBase {
 }
 
 /** A push button: pure trigger, holds no value. Never written or exported. */
-export interface PushButtonFieldDTO extends FormFieldBase {
+export interface PushButtonFieldDTO<
+  C extends Coordinates = PageCoordinates,
+> extends FormFieldBase<C> {
   family: 'pushbutton';
 }
 
@@ -173,7 +180,9 @@ export interface PushButtonFieldDTO extends FormFieldBase {
  * A signature field: identity and placement only. Form writes never set a
  * signature value; signing goes through the signatures API.
  */
-export interface SignatureFieldDTO extends FormFieldBase {
+export interface SignatureFieldDTO<
+  C extends Coordinates = PageCoordinates,
+> extends FormFieldBase<C> {
   family: 'signature';
 }
 
@@ -181,7 +190,7 @@ export interface SignatureFieldDTO extends FormFieldBase {
  * Forward-compat placeholder for field types the engine does not model,
  * mirroring the `unsupported` annotation kind. Round-trips safely.
  */
-export interface UnknownFieldDTO extends FormFieldBase {
+export interface UnknownFieldDTO<C extends Coordinates = PageCoordinates> extends FormFieldBase<C> {
   family: 'unknown';
   /** The raw /V value as text, for diagnostics. */
   rawValue: string;
@@ -196,12 +205,12 @@ export interface UnknownFieldDTO extends FormFieldBase {
  * }
  * ```
  */
-export type FormFieldDTO =
-  | TextFieldDTO
-  | CheckboxFieldDTO
-  | RadioFieldDTO
-  | ComboBoxFieldDTO
-  | ListBoxFieldDTO
-  | PushButtonFieldDTO
-  | SignatureFieldDTO
-  | UnknownFieldDTO;
+export type FormFieldDTO<C extends Coordinates = PageCoordinates> =
+  | TextFieldDTO<C>
+  | CheckboxFieldDTO<C>
+  | RadioFieldDTO<C>
+  | ComboBoxFieldDTO<C>
+  | ListBoxFieldDTO<C>
+  | PushButtonFieldDTO<C>
+  | SignatureFieldDTO<C>
+  | UnknownFieldDTO<C>;

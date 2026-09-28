@@ -86,10 +86,11 @@ export function injectPages(explicit?: StageTokenProp) {
     pageCount: injectKernelValue(
       (kernel) => kernel.documents.listPages(documentId() ?? undefined).length,
     ),
-    goToPage: lazy(signal, 'goToPageIndex'),
+    goToPage: lazy(signal, 'goToPage'),
+    goToDestination: lazy(signal, 'goToDestination'),
     next: lazy(signal, 'nextPage'),
     previous: lazy(signal, 'previousPage'),
-    reveal: lazy(signal, 'revealIndex'),
+    reveal: lazy(signal, 'reveal'),
   };
 }
 

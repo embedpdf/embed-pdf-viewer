@@ -3,48 +3,56 @@ import type { EventHook, OperationOptions, PageRef, ResourceStatus } from '@embe
 import type { Point } from '@embedpdf/core-geometry';
 import type {
   AnnotationRef,
+  PageDestination,
   PdfActionTree,
   PdfDestination,
   PdfLinkTarget,
 } from '@embedpdf/engine-core/runtime';
 import type { ActionDispatchResult } from '@embedpdf/plugin-actions/contract';
 import type { LinkNavItem } from '@embedpdf/plugin-annotation/contract';
-import type { RevealOptions } from '@embedpdf/plugin-stage/contract';
 
 export { LinkToken } from './token';
 
-/** A clickable link area: page-space `bounds`, its target, and its annotation (when it is one). */
+/**
+ * A clickable link area: page-space `bounds`, its target, and its annotation
+ * (when it is one). The target and `/A` tree are as the annotation holds
+ * them, with destinations in the file's coordinates; activating one goes to
+ * its `PageDestination`.
+ */
 export type Link = LinkNavItem;
-export type { PdfDestination, PdfLinkTarget };
+export type { PageDestination, PdfDestination, PdfLinkTarget };
 
 /** What activation did, or hands to the host to do (a `uri`/`named` outcome is the host's). */
 export type LinkActivation =
   | { outcome: 'revealed' }
-  | { outcome: 'destination'; destination: PdfDestination }
+  | { outcome: 'destination'; destination: PageDestination }
   | { outcome: 'uri'; uri: string }
   | { outcome: 'named'; name: string }
-  | { outcome: 'reported'; target: PdfLinkTarget }
+  | { outcome: 'reported'; target: PdfLinkTarget<PdfDestination> }
   | { outcome: 'dispatched'; dispatch: Promise<ActionDispatchResult> }
   | { outcome: 'none' };
 
-/** What activating a target would do, with no side effect. */
+/**
+ * What activating a target would do, with no side effect. A `goto` to a page
+ * of this document is its destination, ready for `stage.goToDestination`;
+ * one to a page the document doesn't have is reported.
+ */
 export type LinkResolution =
-  | { kind: 'reveal'; page: PageRef; pageIndex: number; options: RevealOptions }
-  | { kind: 'destination'; destination: PdfDestination }
+  | { kind: 'destination'; destination: PageDestination }
   | { kind: 'uri'; uri: string }
   | { kind: 'named'; name: string }
-  | { kind: 'reported'; target: PdfLinkTarget };
+  | { kind: 'reported'; target: PdfLinkTarget<PdfDestination> };
 
 export interface LinkActivateContext {
   /** The link's `/A` tree when it has one; the actions plugin runs it instead of the target. */
-  activate?: PdfActionTree;
+  activate?: PdfActionTree<PdfDestination>;
   ref?: AnnotationRef;
   page?: PageRef;
 }
 
 /** A link target was activated through this capability. */
 export interface LinkActivatedEvent {
-  readonly target: PdfLinkTarget;
+  readonly target: PdfLinkTarget<PdfDestination>;
   readonly activation: LinkActivation;
 }
 /** A page's links were read from the engine. */
@@ -71,18 +79,21 @@ export interface LinkCapability {
   /** Load state of a page's links: `idle`, `loading`, `ready`, `error` or `forbidden`. */
   getStatus(page: PageRef): ResourceStatus;
   /** What activation would do, with no side effect. */
-  resolve(target: PdfLinkTarget): LinkResolution;
+  resolve(target: PdfLinkTarget<PdfDestination>): LinkResolution;
   /**
-   * Perform the activation. A `goto` reveals through the stage; `uri` and
+   * Perform the activation. A `goto` goes to its destination through the stage; `uri` and
    * `named` are reported for the host to perform synchronously (a user
    * gesture is preserved); a link with an `/A` tree dispatches through the
    * actions plugin.
    */
-  activate(target: PdfLinkTarget | Link, context?: LinkActivateContext): LinkActivation;
+  activate(
+    target: PdfLinkTarget<PdfDestination> | Link,
+    context?: LinkActivateContext,
+  ): LinkActivation;
   /** Hit test, then activate. Null when nothing is there. */
   activateAt(page: PageRef, point: Point, context?: LinkActivateContext): LinkActivation | null;
   /** A human label for tooltips. */
-  getLabel(link: Link | PdfLinkTarget): string;
+  getLabel(link: Link | PdfLinkTarget<PdfDestination>): string;
   /** After the built-in handling of any activation. */
   readonly onActivated: EventHook<LinkActivatedEvent>;
   /**

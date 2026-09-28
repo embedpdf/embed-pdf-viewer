@@ -5,11 +5,13 @@ import type {
   FormFieldOption,
   FormKind,
   FormSnapshot,
-  PageRef,
-  FormWidget,
-  ToggleFieldWidget,
   FormValueEntry,
+  FormWidget,
+  PageRef,
+  PdfCoordinates,
+  PdfDestination,
   PdfFieldActions,
+  ToggleFieldWidget,
 } from '@embedpdf/engine-core/runtime';
 import { formWidget, toPageRef } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
@@ -126,7 +128,7 @@ export function readFieldAt(
   fieldIndex: number,
   docPtr: Ptr,
   actionBudget = new ActionReadBudgetTracker(),
-): FormFieldDTO {
+): FormFieldDTO<PdfCoordinates> {
   const { fn } = runtime;
   const fieldObjectNumber = fn.EPDFForm_GetFieldObjNum(model, fieldIndex);
   const name = readWide(runtime, (buf, cap) =>
@@ -138,7 +140,7 @@ export function readFieldAt(
   const defaultValueEntry = readValueEntry(runtime, model, fieldIndex, true);
   const actions = readFieldActions(runtime, model, fieldIndex, docPtr, actionBudget);
 
-  const base: FormFieldBase = {
+  const base: FormFieldBase<PdfCoordinates> = {
     ref:
       fieldObjectNumber > 0 ? { kind: 'objectNumber', fieldObjectNumber } : { kind: 'fqn', name },
     fieldObjectNumber,
@@ -239,16 +241,20 @@ export function readFieldAt(
   }
 }
 
-/** Read the whole native model into a detached {@link FormSnapshot}. */
-export function readFormSnapshot(runtime: PdfRuntimeModule, model: Ptr, docPtr: Ptr): FormSnapshot {
+/** Read the whole native model into a detached {@link FormSnapshot<PdfCoordinates>}. */
+export function readFormSnapshot(
+  runtime: PdfRuntimeModule,
+  model: Ptr,
+  docPtr: Ptr,
+): FormSnapshot<PdfCoordinates> {
   const { fn } = runtime;
   const count = fn.EPDFForm_CountFields(model);
-  const fields: FormFieldDTO[] = [];
+  const fields: FormFieldDTO<PdfCoordinates>[] = [];
   const actionBudget = new ActionReadBudgetTracker();
   for (let i = 0; i < count; i++) {
     fields.push(readFieldAt(runtime, model, i, docPtr, actionBudget));
   }
-  const calculationOrder: FormSnapshot['calculationOrder'] = [];
+  const calculationOrder: FormSnapshot<PdfCoordinates>['calculationOrder'] = [];
   const calculationCount = fn.EPDFForm_CountCalculationOrder(model);
   for (let index = 0; index < calculationCount; index++) {
     const fieldIndex = fn.EPDFForm_GetCalculationOrderFieldIndex(model, index);
@@ -305,7 +311,7 @@ function readFieldActions(
   fieldIndex: number,
   docPtr: Ptr,
   budget: ActionReadBudgetTracker,
-): PdfFieldActions | undefined {
+): PdfFieldActions<PdfDestination> | undefined {
   const { fn, mem } = runtime;
   const entries = [
     ['keystroke', 0],
@@ -313,7 +319,7 @@ function readFieldActions(
     ['validate', 2],
     ['calculate', 3],
   ] as const;
-  const actions: PdfFieldActions = {};
+  const actions: PdfFieldActions<PdfDestination> = {};
   for (const [key, event] of entries) {
     const action = readActionModel(
       fn,

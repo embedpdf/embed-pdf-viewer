@@ -10,7 +10,7 @@
  * Callers memoize by model identity where it matters (nav items, selection
  * props); these scans stay O(order) and allocation-light.
  */
-import type { PdfLinkTarget } from '@embedpdf/engine-core/runtime';
+import type { PdfDestination, PdfLinkTarget } from '@embedpdf/engine-core/runtime';
 
 import { isAttachedLink } from './plane';
 import type { ModelAnnotation, Id, Model } from './types';
@@ -29,7 +29,7 @@ export function linkChildrenOf(model: Model, parentId: Id): ModelAnnotation[] {
 
 /** The parent's link target, derived from its first attached child — the
  *  read side of the `syncLink` reconciler. Null when no child exists. */
-export function linkOf(model: Model, parentId: Id): PdfLinkTarget | null {
+export function linkOf(model: Model, parentId: Id): PdfLinkTarget<PdfDestination> | null {
   const data = linkChildrenOf(model, parentId)[0]?.data;
   return data?.subtype === 'link' ? (data.target ?? null) : null;
 }

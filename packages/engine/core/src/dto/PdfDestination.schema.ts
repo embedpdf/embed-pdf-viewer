@@ -1,8 +1,7 @@
 import { z } from 'zod';
 
-import type { PdfDestination } from './PdfDestination';
+import type { PageDestination, PdfDestination } from './PdfDestination';
 import { PageRefSchema } from '../identity/PageRef.schema';
-import type { PageDestination } from '../pageSpace/destinations';
 
 const page = PageRefSchema;
 /** Spec-nullable axis value: absent and `null` both mean "retain current". */

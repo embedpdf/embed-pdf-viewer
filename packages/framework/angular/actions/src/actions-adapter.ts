@@ -35,7 +35,7 @@ export function injectActionsUiAdapter(
     if (!capability) return; // no document yet — nothing to drive
     const adapter: ActionUiAdapter = createDefaultActionsUiAdapter({
       overrides,
-      goToPage: (page) => stageCapability?.goToPageIndex(page),
+      goToPage: (page) => stageCapability?.goToPage(page),
     });
     // Identity-safe by construction (the plugin's disposer only clears the
     // slot while this adapter is still current).

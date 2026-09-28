@@ -6,6 +6,7 @@ import type {
   FormFieldRef,
   FormFieldValue,
   FormWidget,
+  PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import {
   EngineError,
@@ -38,7 +39,7 @@ const DISPLAY_CODE = { visible: 0, hidden: 1, noPrint: 2, noView: 3 } as const;
 interface PreflightEffect {
   effect: FormEffect;
   fieldObjectNumbers: number[];
-  fields: FormFieldDTO[];
+  fields: FormFieldDTO<PdfCoordinates>[];
   error?: ReturnType<typeof serializeError>;
 }
 
@@ -52,7 +53,7 @@ interface NativeEffectResult {
  * wrote nothing needs no artifact, event, or version bump.
  */
 export interface AppliedFormEffects {
-  result: FormEffectsResult;
+  result: FormEffectsResult<PdfCoordinates>;
   wrote: boolean;
 }
 
@@ -69,7 +70,7 @@ export class FormsEffectsApplier {
     const resultActionBudget = new ActionReadBudgetTracker();
     const locks = readFieldLocks(this.runtime, this.session);
     const preflight = effects.map((effect) => this.preflight(effect, preflightActionBudget, locks));
-    const results: FormEffectResult[] = [];
+    const results: FormEffectResult<PdfCoordinates>[] = [];
     const allChangedWidgets = new Map<string, FormWidget>();
     const allChangedFields = new Map<string, FormFieldRef>();
     let mustFinalize = false;
@@ -92,7 +93,7 @@ export class FormsEffectsApplier {
         continue;
       }
 
-      let before: FormFieldDTO[];
+      let before: FormFieldDTO<PdfCoordinates>[];
       try {
         before = item.fieldObjectNumbers.map((objectNumber) => this.readField(objectNumber));
       } catch (error) {
@@ -216,7 +217,7 @@ export class FormsEffectsApplier {
   private readField(
     fieldObjectNumber: number,
     actionBudget = new ActionReadBudgetTracker(),
-  ): FormFieldDTO {
+  ): FormFieldDTO<PdfCoordinates> {
     const model = acquireFormModel(this.runtime, this.session);
     const index = this.runtime.fn.EPDFForm_GetFieldIndexByObjNum(model, fieldObjectNumber);
     if (index < 0) {
@@ -228,8 +229,8 @@ export class FormsEffectsApplier {
   private readFieldsBestEffort(
     fieldObjectNumbers: number[],
     actionBudget: ActionReadBudgetTracker,
-  ): FormFieldDTO[] {
-    const fields: FormFieldDTO[] = [];
+  ): FormFieldDTO<PdfCoordinates>[] {
+    const fields: FormFieldDTO<PdfCoordinates>[] = [];
     for (const objectNumber of fieldObjectNumbers) {
       try {
         fields.push(this.readField(objectNumber, actionBudget));
@@ -352,7 +353,7 @@ export class FormsEffectsApplier {
   }
 }
 
-function validateEffect(effect: FormEffect, fields: FormFieldDTO[]): void {
+function validateEffect(effect: FormEffect, fields: FormFieldDTO<PdfCoordinates>[]): void {
   if (effect.kind === 'reset') {
     for (const field of fields) {
       if (field.family === 'pushbutton' || field.family === 'signature') {
@@ -375,7 +376,7 @@ function validateEffect(effect: FormEffect, fields: FormFieldDTO[]): void {
   validateValue(field, effect.value);
 }
 
-function validateValue(field: FormFieldDTO, value: FormFieldValue): void {
+function validateValue(field: FormFieldDTO<PdfCoordinates>, value: FormFieldValue): void {
   if (value.type === 'text') {
     if (field.family !== 'text') mismatch(field, value);
     return;
@@ -404,14 +405,14 @@ function validateValue(field: FormFieldDTO, value: FormFieldValue): void {
   }
 }
 
-function mismatch(field: FormFieldDTO, value: FormFieldValue): never {
+function mismatch(field: FormFieldDTO<PdfCoordinates>, value: FormFieldValue): never {
   throw new EngineError(
     EngineErrorCode.InvalidArg,
     `value type '${value.type}' does not apply to a '${field.family}' field`,
   );
 }
 
-function isNoOp(effect: FormEffect, fields: FormFieldDTO[]): boolean {
+function isNoOp(effect: FormEffect, fields: FormFieldDTO<PdfCoordinates>[]): boolean {
   if (effect.kind === 'setAppearanceText') return fields[0].widgets.length === 0;
   if (effect.kind === 'setDisplay') return fields[0].widgets.length === 0;
   if (effect.kind === 'reset') {
@@ -434,7 +435,7 @@ function isNoOp(effect: FormEffect, fields: FormFieldDTO[]): boolean {
 
 function effectChangedState(
   effect: FormEffect,
-  before: FormFieldDTO[],
+  before: FormFieldDTO<PdfCoordinates>[],
   changedWidgetObjectNumbers: number[],
 ): boolean {
   if (effect.kind === 'setDisplay' || effect.kind === 'setAppearanceText') {
@@ -444,8 +445,8 @@ function effectChangedState(
 }
 
 function valueEntriesEqual(
-  left: FormFieldDTO['valueEntry'],
-  right: FormFieldDTO['defaultValueEntry'],
+  left: FormFieldDTO<PdfCoordinates>['valueEntry'],
+  right: FormFieldDTO<PdfCoordinates>['defaultValueEntry'],
 ): boolean {
   if (left.kind !== right.kind) return false;
   if (left.kind === 'scalar' && right.kind === 'scalar') return left.value === right.value;
@@ -460,8 +461,8 @@ function arraysEqual(left: readonly string[], right: readonly string[]): boolean
 
 function widgetRefs(
   objectNumbers: number[],
-  before: FormFieldDTO[],
-  after: FormFieldDTO[],
+  before: FormFieldDTO<PdfCoordinates>[],
+  after: FormFieldDTO<PdfCoordinates>[],
 ): FormWidget[] {
   const byObjectNumber = new Map<number, FormWidget>();
   for (const field of [...before, ...after]) {
@@ -473,7 +474,10 @@ function widgetRefs(
     .map(({ annotObjectNumber, page }) => formWidget(annotObjectNumber, page));
 }
 
-function rememberFields(target: Map<string, FormFieldRef>, fields: FormFieldDTO[]): void {
+function rememberFields(
+  target: Map<string, FormFieldRef>,
+  fields: FormFieldDTO<PdfCoordinates>[],
+): void {
   for (const field of fields) target.set(encodeFieldRefKey(field.ref), field.ref);
 }
 
@@ -483,6 +487,9 @@ function rememberWidgets(target: Map<string, FormWidget>, widgets: FormWidget[])
   }
 }
 
-function emptyResult(index: number, status: FormEffectResult['status']): FormEffectResult {
+function emptyResult(
+  index: number,
+  status: FormEffectResult<PdfCoordinates>['status'],
+): FormEffectResult<PdfCoordinates> {
   return { index, status, fields: [], changedWidgets: [] };
 }

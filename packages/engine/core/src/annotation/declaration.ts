@@ -2,9 +2,8 @@ import { z } from 'zod';
 
 import type { AnnotationResourceRole } from './resources';
 import type { PdfAnnotationActions } from '../dto/PdfAction';
-import type { PdfDestination } from '../dto/PdfDestination';
+import type { PageDestination, PdfDestination } from '../dto/PdfDestination';
 import type { PageBox, PagePoint } from '../geometry/pageSpace';
-import type { PageDestination } from '../pageSpace/destinations';
 
 /**
  * One declaration per annotation kind. Each field says who writes it, what it

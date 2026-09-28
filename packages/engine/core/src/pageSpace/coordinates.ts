@@ -1,5 +1,4 @@
-import type { PageDestination } from './destinations';
-import type { PdfDestination } from '../dto/PdfDestination';
+import type { PageDestination, PdfDestination } from '../dto/PdfDestination';
 import type { PageBox, PagePoint, PageQuad } from '../geometry/pageSpace';
 import type { PdfPoint, PdfQuad, PdfRect } from '../geometry/primitives';
 

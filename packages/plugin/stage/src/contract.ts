@@ -1,7 +1,13 @@
 /** @embedpdf/plugin-stage/contract: the public stage vocabulary: settings,
  *  the camera and view model, navigation and reveal options, events, and the
  *  capability. Surface bindings and sibling plugins use the host lens. */
-import type { CapabilityToken, EventHook, PageInfo, PageRef } from '@embedpdf/core';
+import type {
+  CapabilityToken,
+  EventHook,
+  PageDestination,
+  PageInfo,
+  PageRef,
+} from '@embedpdf/core';
 import type { PageRotation, PageTransform, Rect } from '@embedpdf/core-geometry';
 import type {
   Alignment,
@@ -320,6 +326,11 @@ export interface StageScrollToOptions {
   behavior?: ScrollBehaviorKind;
 }
 
+/** Options for `goToDestination`: the destination itself says where and how close. */
+export interface GoToDestinationOptions {
+  behavior?: ScrollBehaviorKind;
+}
+
 /** Options for navigation intents. */
 export interface GoToOptions {
   behavior?: ScrollBehaviorKind;
@@ -360,8 +371,8 @@ export interface RevealAnchor {
 export type RevealZoom = 'keep' | 'fit' | 'fit-width' | 'fit-height' | { level: number };
 
 /**
- * Options for `reveal` — the follower-UI arrival verb (search hits, outline
- * clicks, PDF destinations, "jump to comment").
+ * Options for `reveal`: bring a page or a spot on it into view (a search hit,
+ * "jump to comment"). A destination goes through `goToDestination`.
  *
  * With none of `rect`/`zoom`/`anchor` set, a reveal is minimal movement to
  * make the page visible, with the cursor untouched.
@@ -374,11 +385,10 @@ export type RevealZoom = 'keep' | 'fit' | 'fit-width' | 'fit-height' | { level: 
 export interface RevealOptions {
   behavior?: ScrollBehaviorKind;
   /**
-   * Target rect on the page in the viewer's coordinates (y-down,
-   * crop-relative, unscaled points — the same `Rect` selection/search rects
-   * and `CommentThreadView.contentRect` live in). Absent or `null` → the
-   * whole page (null accepted so nullable sources flow in directly). A
-   * zero-size rect is a point (/XYZ).
+   * Target rect in page space (points from the page's top-left, y down; the
+   * space selection and search rects and `CommentThreadView.contentRect` use).
+   * Absent or `null` → the whole page (null accepted so nullable sources flow
+   * in directly). A zero-size rect is a point.
    */
   rect?: Rect | null;
   zoom?: RevealZoom;
@@ -479,10 +489,20 @@ export interface StageCapability {
   fitAutomatic(): void;
 
   // ── navigation ──
-  /** Navigate to a page by identity. Fresh arrival places by the unit rule; pass `viewpoint` to restore. */
-  goToPage(page: PageRef, options?: GoToOptions): void;
-  /** Navigate by zero-based display index. */
-  goToPageIndex(index: number, options?: GoToOptions): void;
+  /**
+   * Go to a page: its `PageRef`, or its display index (0 is the first page; an
+   * index past either end goes to that end). The page lands by the arrival
+   * rule; pass `viewpoint` to restore a saved spot instead.
+   */
+  goToPage(page: PageRef | number, options?: GoToOptions): void;
+  /**
+   * Go where a destination says: a link's, an outline entry's, an action's,
+   * the document's open destination, or one you build. It may change the
+   * zoom, as the destination asks. A destination another PDF tool read, in
+   * the file's numbers, converts first:
+   * `goToDestination(pageDestinationOf(destination, layout.pdfCropBox))`.
+   */
+  goToDestination(destination: PageDestination, options?: GoToDestinationOptions): void;
   goToFirstPage(options?: GoToOptions): void;
   goToLastPage(options?: GoToOptions): void;
   /** Step forward / backward by the navigation unit (the item if it fits the viewport, else the page). */
@@ -493,15 +513,12 @@ export interface StageCapability {
   /** The cursor is after the first page. */
   canGoPrevious(): boolean;
   /**
-   * Bring a page, or a page-space rect on it, into view. Bare: minimal movement,
-   * cursor untouched. Positioned (`rect`/`zoom`/`anchor`): the target lands at
-   * the anchor and the cursor follows.
+   * Bring a page, or a spot on it, into view: its `PageRef` or its display
+   * index. Bare, it scrolls only when the page is off screen and leaves the
+   * current page alone. With `rect`, `zoom` or `anchor` it lands on that spot,
+   * and the current page follows.
    */
-  reveal(page: PageRef, options?: RevealOptions): void;
-  /** `reveal` by display index. */
-  revealIndex(index: number, options?: RevealOptions): void;
-  /** Sugar: a positioned reveal of a page-space rect. */
-  revealRect(page: PageRef, rect: Rect, options?: Omit<RevealOptions, 'rect'>): void;
+  reveal(page: PageRef | number, options?: RevealOptions): void;
   /** `Element.scrollTo` / `scrollBy` for the camera, in viewport px. */
   scrollTo(options: StageScrollToOptions): void;
   scrollBy(options: StageScrollToOptions): void;
