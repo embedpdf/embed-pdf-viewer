@@ -10,7 +10,6 @@ import type {
   InkIntent,
   LineEnding,
   LineEndings,
-  PdfRectDifferences,
   StandardFont,
   StrikeoutIntent,
   TextAlignment,
@@ -38,13 +37,6 @@ export const AnnotationBorderStyleSchema: z.ZodType<AnnotationBorderStyle> = z.e
   'beveled',
   'inset',
 ]);
-
-export const PdfRectDifferencesSchema: z.ZodType<PdfRectDifferences> = z.object({
-  left: z.number().nonnegative(),
-  top: z.number().nonnegative(),
-  right: z.number().nonnegative(),
-  bottom: z.number().nonnegative(),
-});
 
 export const LineEndingSchema: z.ZodType<LineEnding> = z.enum([
   'none',

@@ -6,16 +6,15 @@ import {
   ColorSchema,
   FreeTextIntentSchema,
   LineEndingSchema,
-  PdfRectDifferencesSchema,
   TextAlignmentSchema,
 } from '../../base.schema';
 import { defineKind, field } from '../../declaration';
-import { annotationBaseFields, FontNameSchema, rotationFields } from '../shared-fields';
+import { annotationBaseFields, boxFields, FontNameSchema } from '../shared-fields';
 import { RichTextDocumentInputSchema, RichTextDocumentSchema } from './values';
 
 export const FreeTextDeclaration = defineKind('free-text', {
   ...annotationBaseFields,
-  ...rotationFields,
+  ...boxFields,
   intent: field.data(FreeTextIntentSchema),
   fontFamily: field.data(FontNameSchema),
   fontSize: field.data(z.number().positive()),
@@ -28,7 +27,6 @@ export const FreeTextDeclaration = defineKind('free-text', {
   strokeWidth: field.data(z.number().nonnegative()).optional(),
   borderStyle: field.data(AnnotationBorderStyleSchema).optional(),
   dashArray: field.data(z.array(z.number().nonnegative())).nullable().optional(),
-  rectDifferences: field.data(PdfRectDifferencesSchema).nullable().optional(),
   calloutLine: field.data(CalloutLineSchema).nullable().optional(),
   lineEnding: field.data(LineEndingSchema).nullable().optional(),
 });

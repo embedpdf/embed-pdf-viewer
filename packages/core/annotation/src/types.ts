@@ -103,8 +103,9 @@ export interface Callout {
  *
  * - **Box** (`rect`, `text`): `rect` is the unrotated local box and `rot` is the
  *   applied tilt — together they reconstruct the visual. The repository emits
- *   `rect` as `unrotatedRect`, `rot` as the rendered `/EMBD_Metadata/Rotation`,
- *   and the rotated visual AABB as `/Rect`, so PDFium bakes a portable `/AP`.
+ *   `rect` as the engine's `box` and `rot` as `rotation` (both clockwise, so it
+ *   passes through); the engine works out `/Rect` around the turned drawing,
+ *   so PDFium bakes a portable `/AP`.
  * - **Vertex** (`line`, `poly`, `ink`): the points are already rotated (they are
  *   the portable visual), so `rot` is an advisory scalar — the cumulative tilt the
  *   user applied since authoring. It lets EmbedPDF reconstruct an oriented
@@ -269,11 +270,11 @@ export interface ModelAnnotation {
   apBox?: Rect;
   /**
    * Rotation (deg, CW) that was stripped from the baked raster — present only
-   * when the engine rendered this appearance rotation-free (a box-family kind
-   * whose DTO carries both `rotation` and `unrotatedRect`; `apBox` is then the
-   * unrotated box). The blit re-applies it as a view transform about the box
-   * centre. Vertex kinds pre-rotate their geometry, so this stays unset there
-   * and their rasters blit untransformed.
+   * when the engine rendered this appearance rotation-free (`appearanceTurnOf`:
+   * a box kind drawn turned, inside its turned box; `apBox` is then its `box`).
+   * The blit re-applies it as a view transform about the box centre. Vertex
+   * kinds pre-rotate their geometry, so this stays unset there and their
+   * rasters blit untransformed.
    */
   apRot?: number;
   /**

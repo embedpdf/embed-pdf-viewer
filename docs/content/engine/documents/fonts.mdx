@@ -63,7 +63,7 @@ A free text annotation's `fontFamily` takes a standard font name or a key you re
 ```ts
 await page.annotations.create({
   subtype: 'free-text',
-  rect: { left: 60, bottom: 600, right: 360, top: 660 },
+  box: { left: 60, bottom: 600, right: 360, top: 660 },
   contents: '这是一个测试',
   fontFamily: 'noto-sc',
 });
@@ -140,7 +140,7 @@ await engine.fonts.addFallback('noto-sc');
 // "Hello " is drawn in Helvetica (the default), "世界" in Noto Sans SC.
 await page.annotations.create({
   subtype: 'free-text',
-  rect: { left: 60, bottom: 540, right: 360, top: 600 },
+  box: { left: 60, bottom: 540, right: 360, top: 600 },
   contents: 'Hello 世界',
 });
 ```

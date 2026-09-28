@@ -28,5 +28,7 @@ export {
   pdfQuadBounds,
   pdfQuadCorners,
   pdfQuadFromCorners,
+  pdfRectTurnedBounds,
+  isSamePdfRect,
 } from './convert';
 export { renderSize } from './renderSize';

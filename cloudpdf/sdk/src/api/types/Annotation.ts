@@ -613,10 +613,9 @@ export namespace Annotation {
         borderStyle: AnnotationCircle.BorderStyle;
         dashArray: number[] | null;
         interiorColor: AnnotationCircle.InteriorColor | null;
+        box: AnnotationCircle.Box;
         rotation: number | null;
-        unrotatedRect: AnnotationCircle.UnrotatedRect | null;
         cloudyIntensity: number | null;
-        rectDifferences: AnnotationCircle.RectDifferences | null;
     }
 
     export namespace AnnotationCircle {
@@ -698,18 +697,11 @@ export namespace Annotation {
             b: number;
         }
 
-        export interface UnrotatedRect {
+        export interface Box {
             left: number;
             bottom: number;
             right: number;
             top: number;
-        }
-
-        export interface RectDifferences {
-            left: number;
-            top: number;
-            right: number;
-            bottom: number;
         }
     }
 
@@ -751,10 +743,9 @@ export namespace Annotation {
         borderStyle: AnnotationSquare.BorderStyle;
         dashArray: number[] | null;
         interiorColor: AnnotationSquare.InteriorColor | null;
+        box: AnnotationSquare.Box;
         rotation: number | null;
-        unrotatedRect: AnnotationSquare.UnrotatedRect | null;
         cloudyIntensity: number | null;
-        rectDifferences: AnnotationSquare.RectDifferences | null;
     }
 
     export namespace AnnotationSquare {
@@ -836,18 +827,11 @@ export namespace Annotation {
             b: number;
         }
 
-        export interface UnrotatedRect {
+        export interface Box {
             left: number;
             bottom: number;
             right: number;
             top: number;
-        }
-
-        export interface RectDifferences {
-            left: number;
-            top: number;
-            right: number;
-            bottom: number;
         }
     }
 
@@ -1636,8 +1620,8 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
+        box: AnnotationFreeText.Box;
         rotation: number | null;
-        unrotatedRect: AnnotationFreeText.UnrotatedRect | null;
         intent: AnnotationFreeText.Intent;
         fontFamily: string;
         fontSize: number;
@@ -1650,7 +1634,6 @@ export namespace Annotation {
         strokeWidth: number;
         borderStyle: AnnotationFreeText.BorderStyle;
         dashArray: number[] | null;
-        rectDifferences: AnnotationFreeText.RectDifferences | null;
         calloutLine: unknown[] | null;
         lineEnding: AnnotationFreeText.LineEnding | null;
     }
@@ -1714,7 +1697,7 @@ export namespace Annotation {
             export type Type = (typeof Type)[keyof typeof Type];
         }
 
-        export interface UnrotatedRect {
+        export interface Box {
             left: number;
             bottom: number;
             right: number;
@@ -1902,14 +1885,6 @@ export namespace Annotation {
             Inset: "inset",
         } as const;
         export type BorderStyle = (typeof BorderStyle)[keyof typeof BorderStyle];
-
-        export interface RectDifferences {
-            left: number;
-            top: number;
-            right: number;
-            bottom: number;
-        }
-
         export const LineEnding = {
             None: "none",
             Square: "square",
@@ -1959,10 +1934,9 @@ export namespace Annotation {
         actions: CloudPDF.PdfAnnotationActions | null;
         color: AnnotationCaret.Color;
         opacity: number;
+        box: AnnotationCaret.Box;
         rotation: number | null;
-        unrotatedRect: AnnotationCaret.UnrotatedRect | null;
         intent: AnnotationCaret.Intent | null;
-        rectDifferences: AnnotationCaret.RectDifferences | null;
     }
 
     export namespace AnnotationCaret {
@@ -2030,7 +2004,7 @@ export namespace Annotation {
             b: number;
         }
 
-        export interface UnrotatedRect {
+        export interface Box {
             left: number;
             bottom: number;
             right: number;
@@ -2041,13 +2015,6 @@ export namespace Annotation {
             Replace: "replace",
         } as const;
         export type Intent = (typeof Intent)[keyof typeof Intent];
-
-        export interface RectDifferences {
-            left: number;
-            top: number;
-            right: number;
-            bottom: number;
-        }
     }
 
     export interface Text {
@@ -2198,8 +2165,8 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
+        box: AnnotationStamp.Box;
         rotation: number | null;
-        unrotatedRect: AnnotationStamp.UnrotatedRect | null;
         name: string | null;
         fit: AnnotationStamp.Fit | null;
         opacity: number;
@@ -2264,7 +2231,7 @@ export namespace Annotation {
             export type Type = (typeof Type)[keyof typeof Type];
         }
 
-        export interface UnrotatedRect {
+        export interface Box {
             left: number;
             bottom: number;
             right: number;

@@ -16,6 +16,7 @@ import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { AnnotationReader } from './AnnotationReader';
 import { resolveAnnotPtr } from './internal/identity/resolveAnnotationPointer';
+import { exportUnturnedAppearance } from './internal/read/exportUnturnedAppearance';
 import { saveDocumentToBuffer } from './internal/saveDocumentToBuffer';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { withScratch } from '../../runtime/memory/scratch';
@@ -185,7 +186,7 @@ export class AnnotationFlattener {
             `a ${subtype} annotation has no 'appearance' resource`,
           );
         }
-        exportedPtr = fn.EPDFAnnot_ExportAppearance(annotPtr);
+        exportedPtr = exportUnturnedAppearance(fn, this.runtime.mem, annotPtr);
       } finally {
         fn.FPDFPage_CloseAnnot(annotPtr);
       }

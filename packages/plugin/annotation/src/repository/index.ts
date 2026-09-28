@@ -23,11 +23,12 @@ import {
   type PropKey,
 } from '@embedpdf/core-annotation';
 import { geomRotation } from '@embedpdf/core-annotation';
-import type {
-  AnnotationDraft,
-  AnnotationDTO,
-  AnnotationPatch,
-  PdfRect,
+import {
+  appearanceTurnOf,
+  type AnnotationDraft,
+  type AnnotationDTO,
+  type AnnotationPatch,
+  type PdfRect,
 } from '@embedpdf/engine-core/runtime';
 
 import { freeText } from './kinds/freeText';
@@ -105,20 +106,13 @@ const wireSubtypeOf = (annotation: ModelAnnotation): string =>
  */
 export function fromDTO(dto: AnnotationDTO, crop: PdfRect): ModelAnnotation {
   const slice = projectionOf(dto.subtype).ingest(dto, crop);
-  // Rotation-stripped appearances (mirrors the engine's exact condition — see
-  // AnnotationAppearanceReader): only when the DTO carries both `rotation` and
-  // `unrotatedRect` (box-family kinds) is the raster flat and placed by the
-  // unrotated box, with the stripped rotation re-applied as a view transform
-  // (`apRot`). Vertex kinds pre-rotate their geometry and never carry
-  // `unrotatedRect` — their rasters stay placed by `/Rect`, untransformed.
-  // A callout is excluded even when it carries both fields: only its text box
-  // tilts, via an inline matrix mid-stream (the leader is page-space), so its
-  // /AP form `/Matrix` is identity and the raster stays placed by `/Rect`.
-  const isCallout = dto.subtype === 'free-text' && dto.intent === 'free-text-callout';
-  const strippedRect =
-    !isCallout && 'unrotatedRect' in dto && 'rotation' in dto && dto.rotation
-      ? dto.unrotatedRect
-      : undefined;
+  // Rotation-stripped appearances (`appearanceTurnOf`, the engine's own rule):
+  // a box kind drawn turned whose drawing stays inside the turned box has a
+  // flat raster placed by its `box`, the stripped rotation re-applied as a
+  // view transform (`apRot`). Every other raster — vertex kinds, a callout
+  // (only its text box tilts), a turned drawing that reaches past its box —
+  // is placed by `/Rect`, untransformed.
+  const strippedRect = 'box' in dto && appearanceTurnOf(dto) !== null ? dto.box : undefined;
   return {
     id: annotationKey(dto.ref),
     ref: dto.ref,

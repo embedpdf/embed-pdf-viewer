@@ -118,7 +118,7 @@ describe('engine.fonts (local engine)', () => {
       fontSize: 18,
       textAlign: 'left',
       contents: 'Hello',
-      rect: RECT,
+      box: RECT,
     });
     expect(created.annotation.subtype).toBe('free-text');
 
@@ -145,7 +145,7 @@ describe('engine.fonts (local engine)', () => {
         fontSize: 18,
         textAlign: 'left',
         contents: 'Hello',
-        rect: RECT,
+        box: RECT,
       }),
     );
     expect(err.code).toBe(EngineErrorCode.InvalidArg);
@@ -162,7 +162,7 @@ describe('engine.fonts (local engine)', () => {
       fontSize: 18,
       textAlign: 'left',
       contents: 'Hello',
-      rect: RECT,
+      box: RECT,
     });
     expect(created.annotation.subtype).toBe('free-text');
     const saved = await doc.download();

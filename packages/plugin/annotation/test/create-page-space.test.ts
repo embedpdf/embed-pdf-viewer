@@ -42,6 +42,7 @@ const squareDTO = (annotObjectNumber: number): AnnotationDTO =>
     blendMode: 'normal',
     subtype: 'square',
     rect: { left: 40, bottom: 270, right: 60, top: 280 },
+    box: { left: 40, bottom: 270, right: 60, top: 280 },
     color: { r: 0, g: 0, b: 0 },
     strokeWidth: 1,
     opacity: 1,
@@ -76,7 +77,7 @@ describe('create() in page space', () => {
     // the draft the engine saw: page → PDF through the crop box, props applied
     expect(harness.create.mock.calls[0]![0]).toMatchObject({
       subtype: 'square',
-      rect: { left: 40, bottom: 270, right: 60, top: 280 },
+      box: { left: 40, bottom: 270, right: 60, top: 280 },
       color: { r: 255, g: 0, b: 0 },
       print: true,
     });

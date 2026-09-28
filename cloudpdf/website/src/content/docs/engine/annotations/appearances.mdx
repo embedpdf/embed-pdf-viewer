@@ -75,20 +75,23 @@ and it's cached until the page's annotations change.
 ### Turned annotations
 
 Some annotations can be turned; see [Turned shapes](/docs/engine/annotations/shapes#turned-shapes).
-When a read has both `rotation` and `unrotatedRect`, its image is drawn unturned: the image's
-`rect` is the annotation's own box (`unrotatedRect`), and you turn the image yourself, about its
-centre. `rotation` is degrees clockwise, the same direction as CSS `rotate()`:
+A turned rectangle, ellipse, text box, stamp or caret whose drawing stays inside its turned box
+has its image drawn unturned: the image's `rect` is the annotation's own `box`, and you turn the
+image yourself, about its centre. `appearanceTurnOf(annotation)` gives the turn to apply, in
+degrees clockwise, the same direction as CSS `rotate()`, or `null`:
 
 ```ts
-const rotation =
-  'unrotatedRect' in annotation && annotation.unrotatedRect ? (annotation.rotation ?? 0) : 0;
+import { appearanceTurnOf } from '@cloudpdf/engine';
+
+const rotation = appearanceTurnOf(annotation) ?? 0;
 
 img.style.transformOrigin = 'center';
 img.style.transform = `rotate(${rotation}deg)`;
 ```
 
 Every other annotation comes as it is shown, placed by `rect`, with nothing to turn: lines,
-polygons and ink store their turn in their points.
+polygons and ink store their turn in their points, a callout turns only its text box, and a
+drawing that reaches past its box (a cloudy border's bumps) is drawn turned.
 
 That split is what keeps editing cheap:
 
@@ -162,7 +165,7 @@ It's all or nothing: a ref that isn't on the page, is hidden, or has no appearan
 with `InvalidArg`. The PDF is a one-page drawing, so it can become a [stamp](/docs/engine/annotations/stamps):
 
 ```ts
-await page.annotations.create({ subtype: 'stamp', rect }, { appearance: pdf });
+await page.annotations.create({ subtype: 'stamp', box: rect }, { appearance: pdf });
 ```
 
 ## Permissions

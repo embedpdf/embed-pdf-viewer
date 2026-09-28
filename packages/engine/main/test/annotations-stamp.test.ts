@@ -108,7 +108,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     const result = await page.annotations.create(
       {
         subtype: 'stamp',
-        rect,
+        box: rect,
         name: 'Approved',
       },
       { appearance: png },
@@ -153,7 +153,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     const result = await page.annotations.create(
       {
         subtype: 'stamp',
-        rect: { left: 50, bottom: 50, right: 90, top: 90 },
+        box: { left: 50, bottom: 50, right: 90, top: 90 },
       },
       { appearance: new Blob([png], { type: 'image/png' }) },
     );
@@ -186,13 +186,13 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     const { annotation: created } = await page.annotations.create(
       {
         subtype: 'stamp',
-        rect: { left: 10, bottom: 10, right: 50, top: 50 },
+        box: { left: 10, bottom: 10, right: 50, top: 50 },
       },
       { appearance: png },
     );
     const updated = await page.annotations.update(created.ref, {
       subtype: 'stamp',
-      rect: { left: 10, bottom: 10, right: 90, top: 50 },
+      box: { left: 10, bottom: 10, right: 90, top: 50 },
     });
     expect(updated.annotation.subtype).toBe('stamp');
     expect(updated.annotation.rect.right).toBeCloseTo(90, 0);
@@ -207,10 +207,9 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     const { annotation: created } = await page.annotations.create(
       {
         subtype: 'stamp',
-        rect,
+        box: unrotated,
         fit: 'fill',
         rotation: 90,
-        unrotatedRect: unrotated,
       },
       { appearance: png },
     );
@@ -257,10 +256,9 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     const { annotation: created } = await page.annotations.create(
       {
         subtype: 'stamp',
-        rect,
+        box: unrotated,
         fit: 'contain',
         rotation: 90,
-        unrotatedRect: unrotated,
       },
       { appearance: png },
     );
@@ -307,10 +305,9 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     const { annotation: created } = await page.annotations.create(
       {
         subtype: 'stamp',
-        rect,
+        box: unrotated,
         fit: 'contain',
         rotation: 90,
-        unrotatedRect: unrotated,
       },
       { appearance: png },
     );
@@ -319,7 +316,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     // A rect-only re-position preserves the omitted rotation…
     const moved = await page.annotations.update(created.ref, {
       subtype: 'stamp',
-      rect: { left: 205, bottom: 205, right: 255, top: 255 },
+      box: { left: 205, bottom: 205, right: 255, top: 255 },
     });
     expect((moved.annotation as StampAnnotationDTO).rotation).toBe(90);
 
@@ -327,9 +324,8 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     const flat = { left: 210, bottom: 210, right: 270, top: 260 };
     const updated = await page.annotations.update(created.ref, {
       subtype: 'stamp',
-      rect: flat,
+      box: flat,
       rotation: null,
-      unrotatedRect: null,
     });
     expect((updated.annotation as StampAnnotationDTO).rotation ?? 0).toBe(0);
 
@@ -352,7 +348,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
       page.annotations.create(
         {
           subtype: 'stamp',
-          rect: { left: 0, bottom: 0, right: 10, top: 10 },
+          box: { left: 0, bottom: 0, right: 10, top: 10 },
         },
         { appearance: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]) },
       ),
@@ -369,7 +365,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
       page.annotations.create(
         {
           subtype: 'stamp',
-          rect: { left: 20, bottom: 100, right: 80, top: 130 },
+          box: { left: 20, bottom: 100, right: 80, top: 130 },
           name: '',
         },
         { appearance: makePng(2, 1, [255, 0, 0, 255]) },
@@ -383,7 +379,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     const { annotation: created } = await page.annotations.create(
       {
         subtype: 'stamp',
-        rect: { left: 20, bottom: 100, right: 80, top: 130 },
+        box: { left: 20, bottom: 100, right: 80, top: 130 },
         name: customName,
         contents: 'before',
       },

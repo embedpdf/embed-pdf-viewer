@@ -8111,46 +8111,17 @@
                 ],
                 "nullable": true
               },
+              "box": {
+                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/rect"
+              },
               "rotation": {
                 "type": "number",
-                "nullable": true
-              },
-              "unrotatedRect": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/rect"
-                  }
-                ],
                 "nullable": true
               },
               "cloudyIntensity": {
                 "type": "number",
                 "exclusiveMinimum": true,
                 "minimum": 0,
-                "nullable": true
-              },
-              "rectDifferences": {
-                "type": "object",
-                "properties": {
-                  "left": {
-                    "type": "number",
-                    "minimum": 0
-                  },
-                  "top": {
-                    "type": "number",
-                    "minimum": 0
-                  },
-                  "right": {
-                    "type": "number",
-                    "minimum": 0
-                  },
-                  "bottom": {
-                    "type": "number",
-                    "minimum": 0
-                  }
-                },
-                "required": ["left", "top", "right", "bottom"],
-                "additionalProperties": false,
                 "nullable": true
               }
             },
@@ -8192,10 +8163,9 @@
               "borderStyle",
               "dashArray",
               "interiorColor",
+              "box",
               "rotation",
-              "unrotatedRect",
-              "cloudyIntensity",
-              "rectDifferences"
+              "cloudyIntensity"
             ],
             "additionalProperties": false
           },
@@ -8362,30 +8332,17 @@
                 ],
                 "nullable": true
               },
+              "box": {
+                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/rect"
+              },
               "rotation": {
                 "type": "number",
-                "nullable": true
-              },
-              "unrotatedRect": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/rect"
-                  }
-                ],
                 "nullable": true
               },
               "cloudyIntensity": {
                 "allOf": [
                   {
                     "$ref": "#/components/schemas/Annotation/anyOf/4/properties/cloudyIntensity"
-                  }
-                ],
-                "nullable": true
-              },
-              "rectDifferences": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/Annotation/anyOf/4/properties/rectDifferences"
                   }
                 ],
                 "nullable": true
@@ -8429,10 +8386,9 @@
               "borderStyle",
               "dashArray",
               "interiorColor",
+              "box",
               "rotation",
-              "unrotatedRect",
-              "cloudyIntensity",
-              "rectDifferences"
+              "cloudyIntensity"
             ],
             "additionalProperties": false
           },
@@ -9986,16 +9942,11 @@
                 ],
                 "nullable": true
               },
+              "box": {
+                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/rect"
+              },
               "rotation": {
                 "type": "number",
-                "nullable": true
-              },
-              "unrotatedRect": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/rect"
-                  }
-                ],
                 "nullable": true
               },
               "intent": {
@@ -10234,14 +10185,6 @@
                 },
                 "nullable": true
               },
-              "rectDifferences": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/Annotation/anyOf/4/properties/rectDifferences"
-                  }
-                ],
-                "nullable": true
-              },
               "calloutLine": {
                 "anyOf": [
                   {
@@ -10317,8 +10260,8 @@
               "modifiedBy",
               "importedBy",
               "actions",
+              "box",
               "rotation",
-              "unrotatedRect",
               "intent",
               "fontFamily",
               "fontSize",
@@ -10331,7 +10274,6 @@
               "strokeWidth",
               "borderStyle",
               "dashArray",
-              "rectDifferences",
               "calloutLine",
               "lineEnding"
             ],
@@ -10478,29 +10420,16 @@
               "opacity": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/opacity"
               },
+              "box": {
+                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/rect"
+              },
               "rotation": {
                 "type": "number",
-                "nullable": true
-              },
-              "unrotatedRect": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/rect"
-                  }
-                ],
                 "nullable": true
               },
               "intent": {
                 "type": "string",
                 "enum": ["replace"],
-                "nullable": true
-              },
-              "rectDifferences": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/Annotation/anyOf/4/properties/rectDifferences"
-                  }
-                ],
                 "nullable": true
               }
             },
@@ -10538,10 +10467,9 @@
               "actions",
               "color",
               "opacity",
+              "box",
               "rotation",
-              "unrotatedRect",
-              "intent",
-              "rectDifferences"
+              "intent"
             ],
             "additionalProperties": false
           },
@@ -10876,16 +10804,11 @@
                 ],
                 "nullable": true
               },
+              "box": {
+                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/rect"
+              },
               "rotation": {
                 "type": "number",
-                "nullable": true
-              },
-              "unrotatedRect": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/rect"
-                  }
-                ],
                 "nullable": true
               },
               "name": {
@@ -10935,8 +10858,8 @@
               "modifiedBy",
               "importedBy",
               "actions",
+              "box",
               "rotation",
-              "unrotatedRect",
               "name",
               "fit",
               "opacity"

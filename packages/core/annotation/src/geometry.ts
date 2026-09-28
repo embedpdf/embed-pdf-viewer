@@ -772,6 +772,13 @@ export function shapeRectFor(dragged: Rect, ellipse: boolean, style: Style): Rec
     : dragged;
 }
 
+/** The shape's own box inside a stored `rect`: the inverse of `shapeRectFor`. */
+export function shapeBoxOf(rect: Rect, ellipse: boolean, style: Style): Rect {
+  return style.border.kind === 'cloudy'
+    ? insetRect(rect, cloudyBorderExtent(style.border.intensity, style.strokeWidth, ellipse))
+    : rect;
+}
+
 export function caretRectFromTextEnd(lineRect: Rect): Rect {
   const height = lineRect.height / 2;
   const width = height;

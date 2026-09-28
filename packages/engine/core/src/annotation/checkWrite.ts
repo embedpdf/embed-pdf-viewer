@@ -39,7 +39,8 @@ export function assertAnnotationDraft(
 /**
  * The patch to write for `current`: a `readBack()` value sent back
  * unchanged is dropped (the annotation keeps it), a changed one is refused,
- * and the rest is checked against the kind's update schema.
+ * and the rest is checked against the kind's update schema. A field the
+ * engine works out (a box kind's `rect`) takes no other value than its own.
  */
 export function checkAnnotationPatch(
   current: AnnotationDTO,
@@ -50,11 +51,13 @@ export function checkAnnotationPatch(
   let checked = patch;
   for (const [name, write] of Object.entries(readBackWrites)) {
     const value = (patch as Record<string, unknown>)[name];
-    if (value === undefined || write.safeParse(value).success) continue;
+    if (value === undefined || write?.safeParse(value).success) continue;
     if (!semanticEqual(value, (current as unknown as Record<string, unknown>)[name])) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
-        `${current.subtype} update field '${name}': this value can be read but not written; send it back unchanged or replace it`,
+        write
+          ? `${current.subtype} update field '${name}': this value can be read but not written; send it back unchanged or replace it`
+          : `${current.subtype} update field '${name}': the engine works this out; send it back unchanged or leave it out`,
         { details: { field: name } },
       );
     }

@@ -115,12 +115,12 @@ PDF apps show `contents` as the highlight's comment, so the quoted text shows up
 ## Suggest an insertion or a replacement
 
 Reviewers mark a change to the text with a caret: `subtype: 'caret'` at the spot where text
-should go, with the new text in `contents`. Its `rect` is the box the caret symbol is drawn in.
+should go, with the new text in `contents`. Its `box` is the box the caret symbol is drawn in.
 
 ```ts
 await page.annotations.create({
   subtype: 'caret',
-  rect: { left: 208, bottom: 698, right: 216, top: 710 },
+  box: { left: 208, bottom: 698, right: 216, top: 710 },
   contents: 'not ',
 });
 ```
@@ -132,7 +132,7 @@ so PDF apps treat them as one suggestion:
 const { annotation: caret } = await page.annotations.create({
   subtype: 'caret',
   intent: 'replace',
-  rect: { left: 208, bottom: 698, right: 216, top: 710 },
+  box: { left: 208, bottom: 698, right: 216, top: 710 },
   contents: 'invoice',
 });
 

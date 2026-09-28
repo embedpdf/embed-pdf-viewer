@@ -71,6 +71,9 @@ function squareDTO(
     importedBy: null,
     actions: null,
     subtype: 'square',
+    box: { left: 100, bottom: 100, right: 200, top: 200 },
+    rotation: null,
+    cloudyIntensity: null,
     color: { r: 0, g: 0, b: 0 },
     interiorColor: null,
     strokeWidth: 2,
@@ -208,7 +211,7 @@ describe('repository — Replace Text authoring', () => {
       subtype: 'caret',
       intent: 'replace',
       print: true,
-      rectDifferences: { left: 0.5, top: 0.5, right: 0.5, bottom: 0.5 },
+      box: { left: 90, right: 100, bottom: 750, top: 760 },
     });
     expect(toCreateDraft(strikeout, CROP)).toMatchObject({
       subtype: 'strikeout',
@@ -217,7 +220,7 @@ describe('repository — Replace Text authoring', () => {
     });
   });
 
-  it('a rotated caret emits the box-family transform pair', () => {
+  it('a rotated caret emits its box and its turn', () => {
     const caret: ModelAnnotation = {
       id: 'tmp:3',
       ref: null,
@@ -228,34 +231,31 @@ describe('repository — Replace Text authoring', () => {
       flags: DRAWN_FLAGS,
       source: 'vector',
     };
-    // Content CW 270° → PDF-convention 90; the logical box rides as
-    // unrotatedRect (a square's rotated AABB is itself, so /Rect matches it).
-    expect(toCreateDraft(caret, CROP)).toMatchObject({
+    // Clockwise 270° passes through with the box; the engine works out `rect`.
+    const draft = toCreateDraft(caret, CROP);
+    expect(draft).toMatchObject({
       subtype: 'caret',
-      rotation: 90,
-      unrotatedRect: { left: 94, right: 100, bottom: 741, top: 747 },
-      rect: { left: 94, right: 100, bottom: 741, top: 747 },
+      rotation: 270,
+      box: { left: 94, right: 100, bottom: 741, top: 747 },
     });
+    expect(draft).not.toHaveProperty('rect');
 
     if (caret.geometry.kind !== 'caret') throw new Error('Expected caret projection');
     const upright: ModelAnnotation = {
       ...caret,
       geometry: { kind: 'caret', rect: caret.geometry.rect },
     };
-    // Tri-state flatten: upright carets state null so a stale pair can't linger.
-    expect(toCreateDraft(upright, CROP)).toMatchObject({
-      rotation: null,
-      unrotatedRect: null,
-    });
+    // Tri-state flatten: upright carets state null so a stale turn can't linger.
+    expect(toCreateDraft(upright, CROP)).toMatchObject({ rotation: null });
   });
 });
 
 /* ── callout free-text round-trip ─────────────────────────────────────────────
  * Coordinates are PDF user space (y-up). With this crop, content = (x, 800 - y).
- * The text box PDF rect is {200,600,320,660}; the overall /Rect {30,590,330,745}
- * encloses the box + the leader (tip 40,740; knee 120,700) + the arrow; `/RD`
- * recovers the box from the overall. The 3rd `/CL` point (the connection) is
- * authored arbitrarily — the reader ignores it and re-derives off the box.
+ * The text box (`box`) is {200,600,320,660}; the engine's `rect`
+ * {30,590,330,745} encloses the box + the leader (tip 40,740; knee 120,700) +
+ * the arrow. The 3rd `/CL` point (the connection) is authored arbitrarily —
+ * the reader ignores it and re-derives off the box.
  */
 const BOX_PDF: PdfRect = { left: 200, bottom: 600, right: 320, top: 660 };
 const OVERALL_PDF: PdfRect = { left: 30, bottom: 590, right: 330, top: 745 };
@@ -275,6 +275,8 @@ function calloutDTO(annotObjectNumber = 20): AnnotationDTO {
     nm: null,
     ...NO_FLAGS,
     rect: OVERALL_PDF,
+    box: BOX_PDF,
+    rotation: null,
     contents: 'see here',
     author: null,
     createdAt: null,
@@ -298,12 +300,6 @@ function calloutDTO(annotObjectNumber = 20): AnnotationDTO {
     opacity: 1,
     strokeWidth: 1,
     borderStyle: 'solid',
-    rectDifferences: {
-      left: BOX_PDF.left - OVERALL_PDF.left, // 170
-      bottom: BOX_PDF.bottom - OVERALL_PDF.bottom, // 10
-      right: OVERALL_PDF.right - BOX_PDF.right, // 10
-      top: OVERALL_PDF.top - BOX_PDF.top, // 85
-    },
     calloutLine: CL,
     lineEnding: 'open-arrow',
   } as AnnotationDTO;
@@ -315,30 +311,27 @@ function plainFreeTextDTO(annotObjectNumber = 21): AnnotationDTO {
     ...calloutDTO(annotObjectNumber),
     intent: 'free-text',
     rect: BOX_PDF,
-    rectDifferences: null,
     calloutLine: null,
     lineEnding: null,
   } as AnnotationDTO;
 }
 
-/* ── rotation round-trip (CW content ↔ PDF convention) ────────────────────────
- * The model carries `rot` clockwise in content space; the engine DTO carries
- * `/EMBD_Metadata/Rotation` in PDF convention. The repository converts once at
- * this seam: `rot_content = -rotation_pdf (mod 360)` and back. Box kinds also
- * split `/Rect` (the rotated AABB) from `unrotatedRect` (the logical box); vertex
+/* ── rotation round-trip ───────────────────────────────────────────────────────
+ * The model's `rot` and the engine DTO's `rotation` are both degrees clockwise,
+ * so the repository passes the angle through. Box kinds carry their `box`
+ * before the turn (`rect` is the engine's upright box around it); vertex
  * kinds keep an advisory scalar only (the points are already rotated).
  */
-function rotatedSquareDTO(rotationPdf: number, annotObjectNumber = 30): AnnotationDTO {
+function rotatedSquareDTO(rotation: number, annotObjectNumber = 30): AnnotationDTO {
   return {
     ...squareDTO(annotObjectNumber),
-    // /Rect is the rotated AABB; for a square turned 90° it equals the box.
+    // For a square turned 90° the upright box around it is the box itself.
     rect: { left: 100, bottom: 100, right: 200, top: 200 },
-    rotation: rotationPdf,
-    unrotatedRect: { left: 100, bottom: 100, right: 200, top: 200 },
+    rotation,
   } as AnnotationDTO;
 }
 
-function rotatedPolylineDTO(rotationPdf: number, annotObjectNumber = 31): AnnotationDTO {
+function rotatedPolylineDTO(rotation: number, annotObjectNumber = 31): AnnotationDTO {
   const ref: AnnotationRef = { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber };
   return {
     ref,
@@ -373,50 +366,45 @@ function rotatedPolylineDTO(rotationPdf: number, annotObjectNumber = 31): Annota
       { x: 280, y: 140 },
     ],
     lineEndings: { start: 'none', end: 'none' },
-    rotation: rotationPdf,
+    rotation,
   } as AnnotationDTO;
 }
 
 describe('repository — rotation round-trip', () => {
-  it('box: fromDTO reads unrotatedRect + converts PDF→CW content rot', () => {
+  it('box: fromDTO reads the box and the clockwise rot', () => {
     const annotation = fromDTO(rotatedSquareDTO(90), CROP);
     if (annotation.geometry.kind !== 'rect') throw new Error('expected rect geom');
-    // unrotatedRect {100,100,200,200} → content {x:100,y:600,w:100,h:100}
+    // box {100,100,200,200} → content {x:100,y:600,w:100,h:100}
     expect(annotation.geometry.rect).toMatchObject({ x: 100, y: 600, width: 100, height: 100 });
-    // PDF 90° → CW content 270° (negation mod 360, from the y-flip)
-    expect(annotation.geometry.rot).toBe(270);
+    expect(annotation.geometry.rot).toBe(90);
   });
 
-  it('box: toPatch emits rect(AABB) + unrotatedRect + rotation (CW→PDF back)', () => {
+  it('box: toPatch emits the box + rotation, and no rect', () => {
     const patch = toPatch(fromDTO(rotatedSquareDTO(90), CROP), CROP) as Extract<
       AnnotationPatch,
       { subtype?: 'square' }
-    > & { rotation?: number; unrotatedRect?: PdfRect };
+    >;
     if (!patch) throw new Error('expected a patch');
-    expect(patch.rotation).toBe(90); // round-trips back to the PDF angle
-    expect(patch.unrotatedRect).toMatchObject({ left: 100, bottom: 100, right: 200, top: 200 });
-    // the square turned a quarter-turn still spans the same AABB
-    if (!patch.rect) throw new Error('expected a rect');
-    expect(patch.rect.left).toBeCloseTo(100);
-    expect(patch.rect.right).toBeCloseTo(200);
+    expect(patch.rotation).toBe(90);
+    expect(patch.box).toMatchObject({ left: 100, bottom: 100, right: 200, top: 200 });
+    expect(patch).not.toHaveProperty('rect');
   });
 
-  it('box: an unrotated DTO states the transform clears explicitly (total projection)', () => {
+  it('box: an unrotated DTO states the turn clear explicitly (total projection)', () => {
     const patch = toPatch(fromDTO(squareDTO(32), CROP), CROP) as Extract<
       AnnotationPatch,
       { subtype?: 'square' }
-    > & { rotation?: number | null; unrotatedRect?: PdfRect | null };
+    >;
     if (!patch) throw new Error('expected a patch');
     // Tri-state writes preserve omitted fields, so rotation 0 must be stated
     // as null — omission would keep a stale rotation on the document.
     expect(patch.rotation).toBe(null);
-    expect(patch.unrotatedRect).toBe(null);
   });
 
   it('vertex: advisory rotation round-trips and the points stay authoritative', () => {
     const annotation = fromDTO(rotatedPolylineDTO(30), CROP);
     if (annotation.geometry.kind !== 'poly') throw new Error('expected poly geom');
-    expect(annotation.geometry.rot).toBe(330); // -30 mod 360
+    expect(annotation.geometry.rot).toBe(30);
     // the points are the visual — first vertex maps straight through the y-flip
     expect(annotation.geometry.points[0]).toEqual({ x: 120, y: 680 });
 
@@ -425,11 +413,10 @@ describe('repository — rotation round-trip', () => {
       { subtype?: 'polyline' }
     > & {
       rotation?: number;
-      unrotatedRect?: PdfRect;
     };
     if (!patch) throw new Error('expected a patch');
-    expect(patch.rotation).toBe(30); // back to the PDF angle
-    expect(patch).not.toHaveProperty('unrotatedRect'); // vertex kinds never carry one
+    expect(patch.rotation).toBe(30);
+    expect(patch).not.toHaveProperty('box'); // vertex kinds never carry one
     expect(patch.vertices?.[0]).toMatchObject({ x: 120, y: 120 });
   });
 
@@ -447,12 +434,12 @@ describe('repository — rotation round-trip', () => {
 });
 
 describe('repository — free-text callout mapping', () => {
-  it('fromDTO: intent + /CL + /RD → a text geom with a leader (box recovered, conn dropped)', () => {
+  it('fromDTO: intent + /CL → a text geom with a leader (the box, conn dropped)', () => {
     const annotation = fromDTO(calloutDTO(), CROP);
     expect(annotation.geometry.kind).toBe('text');
     if (annotation.geometry.kind !== 'text' || !annotation.geometry.callout)
       throw new Error('expected callout geom');
-    // text box = overall inset by /RD, in content space
+    // the text box, in content space
     expect(annotation.geometry.rect).toMatchObject({ x: 200, y: 140, width: 120, height: 60 });
     // tip / knee map to content space (y flips about the 800-pt crop)
     expect(annotation.geometry.callout.tip).toEqual({ x: 40, y: 60 });
@@ -466,7 +453,7 @@ describe('repository — free-text callout mapping', () => {
     expect(annotation.geometry.kind === 'text' && annotation.geometry.callout).toBeUndefined();
   });
 
-  it('toCreateDraft: a callout geom → intent + overall /Rect + /CL + /RD + /LE', () => {
+  it('toCreateDraft: a callout geom → intent + the text box + /CL + /LE', () => {
     const draft = toCreateDraft(fromDTO(calloutDTO(), CROP), CROP) as Extract<
       AnnotationDraft,
       { subtype: 'free-text' }
@@ -480,29 +467,23 @@ describe('repository — free-text callout mapping', () => {
     expect(draft.calloutLine![0].y).toBeCloseTo(740);
     expect(draft.calloutLine![1].x).toBeCloseTo(120);
     expect(draft.calloutLine![1].y).toBeCloseTo(700);
-    // the overall /Rect reaches the tip (x≈40) and still covers the box (right≈320)
-    expect(draft.rect.left).toBeLessThanOrEqual(40);
-    expect(draft.rect.right).toBeGreaterThanOrEqual(320);
-    expect(draft.rect.top).toBeGreaterThanOrEqual(740); // y-up: the tip is the high edge
-    // every /RD inset is non-negative (the box is inside the overall)
-    const rd = draft.rectDifferences!;
-    expect(rd.left).toBeGreaterThanOrEqual(0);
-    expect(rd.right).toBeGreaterThanOrEqual(0);
-    expect(rd.top).toBeGreaterThanOrEqual(0);
-    expect(rd.bottom).toBeGreaterThanOrEqual(0);
+    // the text box is sent; the engine works out `rect` around the leader
+    expect(draft.box).toMatchObject(BOX_PDF);
+    expect(draft).not.toHaveProperty('rect');
+    expect(draft).not.toHaveProperty('rectDifferences');
   });
 
-  it('toCreateDraft: a plain free-text → intent free-text + the box as /Rect (no leader)', () => {
+  it('toCreateDraft: a plain free-text → intent free-text + its box (no leader)', () => {
     const draft = toCreateDraft(fromDTO(plainFreeTextDTO(), CROP), CROP) as Extract<
       AnnotationDraft,
       { subtype: 'free-text' }
     >;
     expect(draft.intent).toBe('free-text');
     expect(draft.calloutLine).toBeUndefined();
-    expect(draft.rect).toMatchObject(BOX_PDF);
+    expect(draft.box).toMatchObject(BOX_PDF);
   });
 
-  it('toPatch: a callout sends the overall /Rect + /CL + /RD + /LE together', () => {
+  it('toPatch: a callout sends the text box + /CL + /LE together', () => {
     const patch = toPatch(fromDTO(calloutDTO(), CROP), CROP) as Extract<
       AnnotationPatch,
       { subtype?: 'free-text' }
@@ -510,8 +491,7 @@ describe('repository — free-text callout mapping', () => {
     if (!patch) throw new Error('expected a patch');
     expect(patch.calloutLine).toHaveLength(3);
     expect(patch.lineEnding).toBe('open-arrow');
-    expect(patch.rectDifferences).toBeDefined();
-    expect(patch.rect!.left).toBeLessThanOrEqual(40);
+    expect(patch.box).toMatchObject(BOX_PDF);
   });
 });
 
@@ -665,8 +645,8 @@ describe('repository — toScopedPatch (sparse emission)', () => {
       string,
       unknown
     >;
-    // rect + the total transform trio — and nothing else.
-    expect(Object.keys(patch).sort()).toEqual(['rect', 'rotation', 'subtype', 'unrotatedRect']);
+    // the box + its total turn — and nothing else.
+    expect(Object.keys(patch).sort()).toEqual(['box', 'rotation', 'subtype']);
     expect(patch.rotation).toBe(null);
     expect(patch).not.toHaveProperty('color');
     expect(patch).not.toHaveProperty('strokeWidth');
@@ -693,22 +673,18 @@ describe('repository — toScopedPatch (sparse emission)', () => {
     expect(Object.keys(patch).sort()).toEqual(['fontSize', 'subtype']);
   });
 
-  it('props strokeWidth on a CLOUDY square carries the derived /RD (client policy)', () => {
-    const cloudy = fromDTO(
-      {
-        ...squareDTO(62),
-        cloudyIntensity: 2,
-        rectDifferences: { left: 9, top: 9, right: 9, bottom: 9 },
-      } as AnnotationDTO,
-      CROP,
-    );
+  it('props strokeWidth on a CLOUDY square states the box the cloud leaves', () => {
+    const cloudy = fromDTO({ ...squareDTO(62), cloudyIntensity: 2 } as AnnotationDTO, CROP);
     const patch = toScopedPatch(
       cloudy,
       { kind: 'props', keys: ['strokeWidth'] },
       CROP,
     ) as unknown as Record<string, unknown>;
     expect(patch.strokeWidth).toBe(2);
-    expect(patch.rectDifferences).toBeDefined(); // inset derives from stroke width
+    // The cloud's reach follows the stroke width, so the box is stated again.
+    const box = patch.box as PdfRect;
+    expect(box.left).toBeCloseTo(100);
+    expect(box.right).toBeCloseTo(200);
   });
 
   it('props strokeWidth on a polygon re-emits the VISUAL-bounds /Rect', () => {
@@ -731,7 +707,7 @@ describe('repository — toScopedPatch (sparse emission)', () => {
     ) as unknown as Record<string, unknown>;
     expect(patch.borderStyle).toBe('solid');
     expect(patch.cloudyIntensity).toBe(null);
-    expect(patch.rectDifferences).toBe(null);
+    expect(patch.box).toMatchObject({ left: 100, bottom: 100, right: 200, top: 200 });
     expect(patch).not.toHaveProperty('color');
   });
 
@@ -750,8 +726,8 @@ describe('repository — toScopedPatch (sparse emission)', () => {
         name: null,
         fit: 'contain',
         opacity: 0.3,
+        box: base.rect,
         rotation: null,
-        unrotatedRect: null,
       } as AnnotationDTO,
       CROP,
     );
@@ -868,38 +844,37 @@ describe('repository — /Rect derives from line endings (the clipped-arrowhead 
 
 describe('repository — shape cloudy border tri-state', () => {
   const cloudySquare = (annotObjectNumber = 45): AnnotationDTO =>
-    ({
-      ...squareDTO(annotObjectNumber),
-      cloudyIntensity: 2,
-      rectDifferences: { left: 9, top: 9, right: 9, bottom: 9 },
-    }) as AnnotationDTO;
+    ({ ...squareDTO(annotObjectNumber), cloudyIntensity: 2 }) as AnnotationDTO;
 
-  it('fromDTO reads /BE intensity into a cloudy border', () => {
-    expect(fromDTO(cloudySquare(), CROP).style.border).toEqual({ kind: 'cloudy', intensity: 2 });
+  it('fromDTO reads /BE intensity into a cloudy border, the model box around the cloud', () => {
+    const annotation = fromDTO(cloudySquare(), CROP);
+    expect(annotation.style.border).toEqual({ kind: 'cloudy', intensity: 2 });
+    // The model keeps the outer box: the engine's box grown by the cloud's reach.
+    if (annotation.geometry.kind !== 'rect') throw new Error('expected rect geom');
+    expect(annotation.geometry.rect.x).toBeLessThan(100);
+    expect(annotation.geometry.rect.width).toBeGreaterThan(100);
   });
 
-  it('toPatch on a cloudy square carries /BE + a derived /RD inset', () => {
+  it('toPatch on a cloudy square carries /BE and the box the cloud starts from', () => {
     const patch = toPatch(fromDTO(cloudySquare(), CROP), CROP) as Extract<
       AnnotationPatch,
       { subtype?: 'square' }
     >;
     expect(patch.cloudyIntensity).toBe(2);
-    expect(patch.rectDifferences).toBeDefined();
-    expect(patch.rectDifferences!.left).toBeGreaterThan(0);
+    expect(patch.box!.left).toBeCloseTo(100);
+    expect(patch.box!.top).toBeCloseTo(200);
   });
 
-  it('toPatch states BOTH clears when the border is solid again (no stale /RD)', () => {
+  it('toPatch states the clear when the border is solid again, and the box fills the model box', () => {
     const annotation = fromDTO(cloudySquare(), CROP);
     const solid = {
       ...annotation,
       style: { ...annotation.style, border: { kind: 'solid' as const } },
     };
     const patch = toPatch(solid, CROP) as Extract<AnnotationPatch, { subtype?: 'square' }>;
-    // Tri-state removes: /BE and /RD are stated as null, never omitted — an
-    // omitted rectDifferences preserves the stale inset (a phantom padding in
-    // Adobe viewers).
+    // Tri-state remove: /BE is stated as null, never omitted.
     expect(patch.cloudyIntensity).toBe(null);
-    expect(patch.rectDifferences).toBe(null);
+    expect(patch.box!.left).toBeLessThan(100);
   });
 });
 

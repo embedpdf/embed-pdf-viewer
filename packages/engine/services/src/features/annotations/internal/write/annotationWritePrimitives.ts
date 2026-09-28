@@ -8,7 +8,6 @@ import {
   type LinePoints,
   type PdfPoint,
   type PdfRect,
-  type PdfRectDifferences,
 } from '@embedpdf/engine-core/runtime';
 import {
   NULL_PTR,
@@ -223,27 +222,10 @@ export function clearBorderEffect(fn: PdfFunctions, annotPtr: Ptr): void {
 }
 
 /**
- * Write `/RD` rectangle differences via
- * `EPDFAnnot_SetRectangleDifferences`. PDFium core stores `/RD` as
- * `[left, bottom, right, top]`; we accept the wire-stable
- * `{ left, top, right, bottom }` shape and reorder at the boundary.
- */
-export function setRectangleDifferences(
-  fn: PdfFunctions,
-  annotPtr: Ptr,
-  rd: PdfRectDifferences,
-): void {
-  if (!fn.EPDFAnnot_SetRectangleDifferences(annotPtr, rd.left, rd.bottom, rd.right, rd.top)) {
-    throw new EngineError(
-      EngineErrorCode.Unknown,
-      'EPDFAnnot_SetRectangleDifferences returned false',
-    );
-  }
-}
-
-/**
  * Remove the `/RD` rectangle-differences entry. A false return is benign
- * (there was no entry to clear), so we don't treat it as an error.
+ * (there was no entry to clear), so we don't treat it as an error. Drawing a
+ * box kind's appearance writes it again when the drawing reaches past the
+ * shape.
  */
 export function clearRectangleDifferences(fn: PdfFunctions, annotPtr: Ptr): void {
   fn.EPDFAnnot_ClearRectangleDifferences(annotPtr);

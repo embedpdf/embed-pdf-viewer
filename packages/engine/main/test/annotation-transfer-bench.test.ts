@@ -108,7 +108,7 @@ describe.skipIf(!ENABLED).each(['wasm', 'native'] as const)(
           const rect = { left: 40, bottom: 40, right: 120, top: 100 };
           await timed(rows, `create ${limits.pages}`, async () => {
             for (const page of await pageRefs(source)) {
-              await source.page(page).annotations.create({ subtype: 'square', rect });
+              await source.page(page).annotations.create({ subtype: 'square', box: rect });
             }
           });
           await measure(engine, `${limits.pages} pages`, base, source, rows);
@@ -132,7 +132,7 @@ describe.skipIf(!ENABLED).each(['wasm', 'native'] as const)(
               await source
                 .page(refs[i % refs.length]!)
                 .annotations.create(
-                  { subtype: 'stamp', rect: { left, bottom, right: left + 50, top: bottom + 40 } },
+                  { subtype: 'stamp', box: { left, bottom, right: left + 50, top: bottom + 40 } },
                   { appearance: png(16, 16, [i & 255, (i >> 8) & 255, 128]) },
                 );
             }
@@ -181,7 +181,7 @@ describe.skipIf(!ENABLED).each(['wasm', 'native'] as const)(
             await source
               .page((await pageRefs(source))[0]!)
               .annotations.create(
-                { subtype: 'stamp', rect: { left: 40, bottom: 40, right: 440, top: 290 } },
+                { subtype: 'stamp', box: { left: 40, bottom: 40, right: 440, top: 290 } },
                 { appearance: image },
               );
           });

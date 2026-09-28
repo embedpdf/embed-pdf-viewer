@@ -15,7 +15,6 @@ import {
   colorToCss,
   contentToPdfPoint,
   contentToPdfRect,
-  fromPdfRotation,
   pdfToContentPoint,
   pdfToContentRect,
 } from '../seam';
@@ -106,12 +105,15 @@ export const strikeout = markupProjection('strikeout');
 export const caret: KindProjection = {
   ingest: (dto, crop) => {
     const caretDto = dto as Extract<AnnotationDTO, { subtype: 'caret' }>;
-    // Box-family rotation pair: when present, the model's `rect` is the
-    // logical (unrotated) box and `rot` the tilt — the free-text/shape rule.
-    const rot = caretDto.rotation ? fromPdfRotation(caretDto.rotation) : 0;
-    const box = rot && caretDto.unrotatedRect ? caretDto.unrotatedRect : caretDto.rect;
+    // A box kind: the model's `rect` is its box and `rot` its turn — the
+    // free-text/shape rule.
+    const rot = caretDto.rotation ?? 0;
     return {
-      geometry: { kind: 'caret', rect: pdfToContentRect(box, crop), ...(rot ? { rot } : {}) },
+      geometry: {
+        kind: 'caret',
+        rect: pdfToContentRect(caretDto.box, crop),
+        ...(rot ? { rot } : {}),
+      },
       ...(caretDto.intent ? { intent: caretDto.intent } : {}),
     };
   },
@@ -119,10 +121,8 @@ export const caret: KindProjection = {
     annotation.geometry.kind === 'caret'
       ? boxGeomFields(annotation.geometry.rect, annotation.geometry.rot ?? 0, crop)
       : null,
-  // The fixed drawn-symbol inset + the replace-text intent + seeded contents
-  // are create-only statements.
+  // The replace-text intent + seeded contents are create-only statements.
   draftExtras: (annotation) => ({
-    rectDifferences: { left: 0.5, top: 0.5, right: 0.5, bottom: 0.5 },
     ...(annotation.intent === 'replace' ? { intent: annotation.intent } : {}),
     ...(annotation.data?.contents != null ? { contents: annotation.data.contents } : {}),
   }),

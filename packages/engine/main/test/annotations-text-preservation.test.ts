@@ -67,7 +67,7 @@ describe('FreeText and Callout partial updates preserve text (wasm)', () => {
             await doc.page(toPageRef(3)).annotations.create({
               subtype: 'free-text',
               intent: callout ? 'free-text-callout' : 'free-text',
-              rect: RECT,
+              box: RECT,
               fontFamily: 'helvetica',
               fontSize: 18,
               textAlign: 'left',
@@ -77,7 +77,6 @@ describe('FreeText and Callout partial updates preserve text (wasm)', () => {
                       { x: 90, y: 190 },
                       { x: 120, y: 240 },
                     ],
-                    rectDifferences: { left: 40, bottom: 20, right: 0, top: 0 },
                   }
                 : {}),
               ...(source === 'rich'
@@ -110,7 +109,7 @@ describe('FreeText and Callout partial updates preserve text (wasm)', () => {
                 textAlign: cycle ? 'left' : 'center',
               },
               { subtype: 'free-text', interiorColor: { r: 240, g: 245, b: 250 }, opacity: 0.9 },
-              { subtype: 'free-text', rect: { ...RECT, right: 410 + cycle * 10 } },
+              { subtype: 'free-text', box: { ...RECT, right: 410 + cycle * 10 } },
               { subtype: 'free-text', subject: `metadata-only-${cycle}` },
               ...(callout
                 ? [

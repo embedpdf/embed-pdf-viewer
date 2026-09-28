@@ -103,14 +103,14 @@ export async function runMutationsDemo(
       quadPoints: QUAD,
     });
 
-    // 2b) Create a circle and a square. Shapes are /Rect-based (not quad
+    // 2b) Create a circle and a square. Shapes are box-based (not quad
     //     based) and carry interior/stroke colour + border style. The
     //     mutator bakes an /AP appearance stream for them on create, so
     //     they render in any compliant viewer without a separate overlay.
     const createdCircle = await page.annotations.create({
       subtype: 'circle',
       contents: 'mutation demo: circle',
-      rect: { left: 60, bottom: 300, right: 180, top: 400 },
+      box: { left: 60, bottom: 300, right: 180, top: 400 },
       interiorColor: { r: 30, g: 144, b: 255 },
       color: { r: 0, g: 0, b: 139 },
       strokeWidth: 2,
@@ -120,7 +120,7 @@ export async function runMutationsDemo(
     const createdSquare = await page.annotations.create({
       subtype: 'square',
       contents: 'mutation demo: square',
-      rect: { left: 220, bottom: 300, right: 360, top: 400 },
+      box: { left: 220, bottom: 300, right: 360, top: 400 },
       interiorColor: null,
       color: { r: 220, g: 20, b: 60 },
       strokeWidth: 3,

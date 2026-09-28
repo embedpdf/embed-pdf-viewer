@@ -14,7 +14,7 @@ the style you choose.
 ```ts
 await page.annotations.create({
   subtype: 'square',
-  rect: { left: 72, bottom: 600, right: 272, top: 700 },
+  box: { left: 72, bottom: 600, right: 272, top: 700 },
   color: { r: 220, g: 20, b: 60 },
   strokeWidth: 2,
 });
@@ -26,24 +26,26 @@ out, a shape is a solid red line, 1 point wide, with no fill.
 
 ## Rectangles and ellipses
 
-`square` draws a rectangle and `circle` an ellipse, inside `rect`:
+`square` draws a rectangle and `circle` an ellipse, inside `box`:
 
 ```ts
 await page.annotations.create({
   subtype: 'circle',
-  rect: { left: 300, bottom: 600, right: 420, top: 680 },
+  box: { left: 300, bottom: 600, right: 420, top: 680 },
   interiorColor: { r: 255, g: 235, b: 150 },
 });
 ```
 
-| Field                       | What it is                                                                        | Default |
-| :-------------------------- | :-------------------------------------------------------------------------------- | :------ |
-| `rect`                      | The box the shape fills. Required.                                                |         |
-| `interiorColor`             | The fill, or `null` for none.                                                     | none    |
-| `cloudyIntensity`           | A cloudy border instead of a straight one; see [Cloudy borders](#cloudy-borders). | none    |
-| `rotation`, `unrotatedRect` | A turned shape; see [Turned shapes](#turned-shapes).                              | none    |
+| Field             | What it is                                                                        | Default |
+| :---------------- | :-------------------------------------------------------------------------------- | :------ |
+| `box`             | The box the shape fills. Required.                                                |         |
+| `interiorColor`   | The fill, or `null` for none.                                                     | none    |
+| `cloudyIntensity` | A cloudy border instead of a straight one; see [Cloudy borders](#cloudy-borders). | none    |
+| `rotation`        | Turns the shape, in degrees clockwise; see [Turned shapes](#turned-shapes).       | none    |
 
-The line is drawn inside `rect`, so a thick border doesn't make the shape bigger.
+The line is drawn inside `box`, so a thick border doesn't make the shape bigger. A read also has
+`rect`: where the shape sits on the page, the upright box around all it draws. The engine works
+it out; see [The shape's rect](#the-shapes-rect).
 
 ## Lines and arrows
 
@@ -185,14 +187,14 @@ reviewers draw around a part of a drawing. `cloudyIntensity` sets how big the bu
 ```ts
 await page.annotations.create({
   subtype: 'square',
-  rect: { left: 100, bottom: 300, right: 220, top: 380 },
+  box: { left: 100, bottom: 300, right: 220, top: 380 },
   cloudyIntensity: 2,
   strokeWidth: 2,
 });
 ```
 
-The bumps stick out past the shape. The engine makes room for them, so `rect` stays the box of
-the shape itself.
+The bumps stick out past the box. The engine makes room for them in `rect`, and `box` stays the
+shape itself.
 
 ## Permissions
 
@@ -204,25 +206,32 @@ permissions as any annotation; see [Permissions](/docs/engine/annotations#permis
 ### Turned shapes
 
 A rectangle or an ellipse can be turned by any angle. Give the shape's own box, before turning, as
-`unrotatedRect`, and the angle as `rotation`, in degrees clockwise (as a page turns, and as CSS
-`rotate()` turns):
+`box`, and the angle as `rotation`, in degrees clockwise (as a page turns, and as CSS `rotate()`
+turns):
 
 ```ts
 await page.annotations.create({
   subtype: 'square',
-  unrotatedRect: { left: 100, bottom: 300, right: 260, top: 380 },
+  box: { left: 100, bottom: 300, right: 260, top: 380 },
   rotation: 30,
 });
 ```
 
 The shape turns about the middle of its box. The engine sets `rect` to the upright box around the
 turned shape, which is what a PDF app uses to find it. To move or resize a turned shape, change
-its `unrotatedRect`; to straighten it where it is, set `rotation: null`. A `rotation` without an
-`unrotatedRect` fails with `InvalidArg`. Free text boxes, carets and stamps turn the same way.
+its `box`; to straighten it where it is, set `rotation: null`. Free text boxes, carets and stamps
+turn the same way.
 
 Lines, polylines, polygons and ink turn by turning their points. Their `rotation` field only
 records the angle the points were turned by, so an editor can show a turned selection box; it
 changes nothing in the drawing.
+
+### The shape's rect
+
+`rect` is where the shape sits on the page: the upright box around the shape, its turn and what
+its border adds, such as a cloud's bumps. The engine works it out from `box`, `rotation` and the
+style. An update may send back the `rect` it read, so a read passed straight back works; any other
+`rect` fails with `InvalidArg`. To move or resize the shape, change its `box`.
 
 ### Border styles
 
@@ -234,6 +243,6 @@ shapes with those styles as a solid line. A cloudy border is never dashed.
 For readers who know PDF: `linePoints` is `/L`, `vertices` is `/Vertices`, `inkList` is
 `/InkList`, `lineEndings` is `/LE`, `interiorColor` is `/IC` and `cloudyIntensity` is the
 intensity of a `/BE` cloudy border effect. For a cloudy shape the PDF's own `/Rect` takes in the
-bumps and `/RD` says where the shape is inside it; the engine keeps both, and `rect` is the
-shape's box. A turned shape's drawing is turned inside its `/Rect`, so every PDF app shows it
-turned.
+bumps and `/RD` says where the shape is inside it, as Acrobat writes it; the engine writes both
+from `box`. A turned shape keeps its box in `/EMBD_Metadata`, and its drawing is turned inside its
+`/Rect`, so every PDF app shows it turned.

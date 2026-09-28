@@ -112,7 +112,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         const rotatedCaption = rotatePoint(target, frame.center, 90);
         await annotation.rotateSelectionBy(90);
         await vi.waitFor(() => {
-          expect(current().rotation).toBe(270);
+          expect(current().rotation).toBe(90);
           expect(current().captionCenter?.x).toBeCloseTo(crop.left + rotatedCaption.x, 3);
           expect(current().captionCenter?.y).toBeCloseTo(crop.top - rotatedCaption.y, 3);
           const after = annotationSelectionFrame(fromDTO(current(), crop));
@@ -162,7 +162,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
               vertices: final.vertices,
               contents: final.contents,
               captionEnabled: true,
-              rotation: 270,
+              rotation: 90,
             });
             const restoredModel = fromDTO(restored, crop);
             expect(annotationSelectionFrame(restoredModel)).toEqual(

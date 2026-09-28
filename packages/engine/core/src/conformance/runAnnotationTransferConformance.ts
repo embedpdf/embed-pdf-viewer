@@ -6,6 +6,7 @@ import type { AnnotationDTO } from '../annotation/kinds';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import type { PageHandle } from '../engine/PageHandle';
+import { pdfRectTurnedBounds } from '../geometry/convert';
 import type { PdfRect } from '../geometry/primitives';
 import { annotationKey, annotationKeysOf } from '../identity/annotationKey';
 import type { AnnotationRef } from '../identity/AnnotationRef';
@@ -161,6 +162,22 @@ export function runAnnotationTransferConformance(
       }
     };
 
+    /** Each turned box's `rect` is the upright box around its own box, turned. */
+    const expectTurnedRects = (bundle: AnnotationBundle) => {
+      for (const { data } of bundle.items) {
+        const turn = turnOf(data);
+        if (!turn) continue;
+        const expected = pdfRectTurnedBounds(turn.box, turn.rotation);
+        const far = (['left', 'bottom', 'right', 'top'] as const).filter(
+          (edge) => Math.abs(data.rect[edge] - expected[edge]) > 0.01,
+        );
+        expect({ key: annotationKey(data.ref), far }).toEqual({
+          key: annotationKey(data.ref),
+          far: [],
+        });
+      }
+    };
+
     const expectSameResources = (actual: AnnotationBundle, expected: AnnotationBundle) => {
       expect(Object.keys(actual.resources).sort()).toEqual(Object.keys(expected.resources).sort());
       for (const [id, bytes] of Object.entries(expected.resources)) {
@@ -175,6 +192,7 @@ export function runAnnotationTransferConformance(
             const taken = asTaken(bundle, result.dropped);
             expect(normalized(again, 'restore')).toEqual(normalized(taken, 'restore'));
             expectFramesHoldGeometry(again);
+            expectTurnedRects(again);
             expectSameResources(again, taken);
           });
         });
@@ -184,6 +202,7 @@ export function runAnnotationTransferConformance(
             const taken = asTaken(bundle, result.dropped);
             expect(normalized(again, 'stamp')).toEqual(normalized(taken, 'stamp'));
             expectFramesHoldGeometry(again);
+            expectTurnedRects(again);
             expectSameResources(again, taken);
           });
         });
@@ -329,6 +348,12 @@ function asTaken(bundle: AnnotationBundle, dropped: readonly AnnotationImportDro
  * A link's `activate` action is its `target`, compared there: a `/Dest`
  * and the `/A` a copy writes for it read the same target.
  */
+/** A box kind's turn: degrees clockwise about the middle of its own box. */
+function turnOf(data: AnnotationDTO): { rotation: number; box: PdfRect } | null {
+  const { rotation, box } = data as { rotation?: number | null; box?: PdfRect };
+  return rotation && box ? { rotation, box } : null;
+}
+
 function normalized(bundle: AnnotationBundle, attribution: Attribution) {
   const position = new Map<string, number>();
   bundle.items.forEach(({ data }, at) => {
@@ -379,6 +404,9 @@ function normalized(bundle: AnnotationBundle, attribution: Attribution) {
         fields.rect = { left: data.rect.left, bottom: data.rect.bottom };
       }
       if (FRAMED.has(data.subtype)) delete fields.rect;
+      // A turned box's `rect` is the upright box around it, which the engine
+      // works out (`expectTurnedRects`), not the number another app rounded.
+      if (turnOf(data)) delete fields.rect;
       if (data.subtype === 'link' && data.actions) {
         const { activate: _activate, ...triggers } = data.actions;
         fields.actions = Object.keys(triggers).length > 0 ? triggers : null;
@@ -405,8 +433,8 @@ async function fill(doc: DocumentHandle): Promise<void> {
   ) => (await page.annotations.create(draft, resources)).annotation as AnnotationDTO;
   for (const { data, resources } of creatables()) await create(data, resources);
   const box = (left: number): PdfRect => ({ left, bottom: 300, right: left + 40, top: 330 });
-  await create({ subtype: 'stamp', rect: box(20), nm: 'approved' }, { appearance: BANDS_PDF });
-  await create({ subtype: 'stamp', rect: box(80), opacity: 0.5 }, { appearance: BANDS_PDF });
+  await create({ subtype: 'stamp', box: box(20), nm: 'approved' }, { appearance: BANDS_PDF });
+  await create({ subtype: 'stamp', box: box(80), opacity: 0.5 }, { appearance: BANDS_PDF });
   const note = await create({ subtype: 'text', rect: box(140), nm: 'note', contents: 'Check' });
   await create({ subtype: 'popup', rect: box(200), parent: note.ref, open: true });
   await create({ subtype: 'text', rect: box(140), reply: { to: note.ref } });

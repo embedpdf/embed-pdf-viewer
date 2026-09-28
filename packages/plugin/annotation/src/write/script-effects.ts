@@ -5,9 +5,13 @@ import type { AnnotCommitEntry, AnnotCommitResult } from '@embedpdf/plugin-actio
 
 import type { AnnotationContext, AnnotationServices } from '../services';
 
+/** The kinds whose `rect` the engine works out: a script's rect is their box. */
+const BOX_KINDS: ReadonlySet<string> = new Set(['square', 'circle', 'free-text', 'stamp', 'caret']);
+
 /** Script patch → the engine's per-kind patch vocabulary. Colors cross the
- *  Acrobat-array → engine {r,g,b}/255 boundary here; everything else maps
- *  one-to-one (the VM's validity matrix already scoped keys per kind). */
+ *  Acrobat-array → engine {r,g,b}/255 boundary here; a box kind's rect is its
+ *  box; everything else maps one-to-one (the VM's validity matrix already
+ *  scoped keys per kind). */
 const engineScriptPatch = (
   subtype: string,
   patch: ScriptAnnotEffect['patch'],
@@ -34,7 +38,7 @@ const engineScriptPatch = (
   if (patch.borderStyle) out.borderStyle = patch.borderStyle === 'D' ? 'dashed' : 'solid';
   if (patch.dash) out.dashArray = patch.dash;
   if (patch.rect) {
-    out.rect = {
+    out[BOX_KINDS.has(subtype) ? 'box' : 'rect'] = {
       left: patch.rect[0],
       bottom: patch.rect[1],
       right: patch.rect[2],

@@ -2,7 +2,6 @@ import {
   EngineError,
   EngineErrorCode,
   sniffBinaryMetadata,
-  type PdfRect,
   type StampDraft,
   type StampFit,
   type StampPatch,
@@ -11,13 +10,13 @@ import {
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import type { AnnotationWriteContext } from './annotationWriteContext';
-import { setAnnotOpacity, setAnnotRect } from './annotationWritePrimitives';
+import { setAnnotOpacity } from './annotationWritePrimitives';
 import { drawingFor } from './stampDrawing';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
-import { writeBoxTransformMetadata } from './writeAnnotationTransformMetadata';
+import { applyAnnotationBoxPatch, writeAnnotationBox } from './writeAnnotationBox';
 import { EMBD_METADATA_SCHEMA_VERSION, writeEmbedMetadataString } from './writeEmbedMetadata';
 import type { DrawingIndex } from '../../../../document-session/DrawingIndex';
-import { readAnnotRect } from '../read/annotationReadPrimitives';
+import { readAnnotationBox, type AnnotationBox } from '../read/readAnnotationTurn';
 import { KEY_APPEARANCE_FIT, readStampFit } from '../read/readStampAnnotation';
 
 /** `EPDF_STAMP_FIT` codes from `public/fpdf_annot.h` (CSS `object-fit` naming on the wire). */
@@ -80,11 +79,8 @@ export function applyStampDraft(
   const fit = draft.fit === null ? 'fill' : (draft.fit ?? 'contain');
   const appearance = requireStampAppearance(ctx);
   authorStampAppearance(fn, mem, annotPtr, appearance, requireDrawingTarget(ctx), fit, {
-    rect: draft.rect,
-    // The appearance author wants values-or-absent; a tri-state `null`
-    // (no rotation) authors the same as an omitted field.
-    unrotatedRect: draft.unrotatedRect ?? undefined,
-    rotation: draft.rotation ?? undefined,
+    box: draft.box,
+    rotation: draft.rotation ?? null,
   });
   if (draft.fit !== null) writeStampFit(fn, mem, annotPtr, fit);
 }
@@ -114,40 +110,25 @@ export function applyStampPatch(
     // New bytes replace the drawing, so they only need the new value.
     if (patch.opacity !== undefined) setAnnotOpacity(fn, annotPtr, patch.opacity);
     // Content replacement: rebuild the appearance from the new bytes, authored
-    // in the unrotated frame (see authorStampAppearance) so a rotated stamp
+    // in the unturned box (see authorStampAppearance) so a turned stamp
     // never double-fits into its padded AABB.
-    const rect = patch.rect ?? readAnnotRect(fn, mem, annotPtr);
+    const current = readAnnotationBox(fn, mem, annotPtr);
     authorStampAppearance(fn, mem, annotPtr, appearance, requireDrawingTarget(ctx), fit, {
-      rect,
-      unrotatedRect: patch.unrotatedRect ?? undefined,
-      rotation: patch.rotation ?? undefined,
+      box: patch.box ?? current.box,
+      rotation: patch.rotation === undefined ? current.rotation : patch.rotation,
     });
     return;
   }
-  // No new bytes: geometry / rotation only.
-  if (patch.rect !== undefined) {
-    setAnnotRect(fn, mem, annotPtr, patch.rect);
-  }
-  // Transform metadata is tri-state per field (undefined preserves, null/0
-  // clears, value sets) — a rect-only re-position keeps the rotation, and
-  // rotate-back-to-0 is stated explicitly (`rotation: null`/`0`) by the
-  // emitter rather than implied by omission.
-  writeBoxTransformMetadata(fn, mem, annotPtr, {
-    rotation: patch.rotation,
-    unrotatedRect: patch.unrotatedRect,
-  });
+  // No new bytes: the box and its turn only. `rotation: null` straightens
+  // the stamp where it is; an omitted one keeps its turn.
+  const moved = applyAnnotationBoxPatch(fn, mem, annotPtr, patch);
   if (patch.opacity !== undefined) {
     // The appearance still paints the old /CA; the native side reads it with
     // that value, so its opacity layer is replaced, not kept as drawing. It
     // re-fits into the new /Rect too.
     setStampOpacity(fn, annotPtr, fit, patch.opacity);
-  } else if (
-    patch.rect !== undefined ||
-    patch.fit !== undefined ||
-    patch.rotation !== undefined ||
-    patch.unrotatedRect !== undefined
-  ) {
-    // Geometry-only patch: re-fit the existing appearance into the new /Rect.
+  } else if (moved || patch.fit !== undefined) {
+    // Geometry-only patch: re-fit the existing appearance into the new box.
     refitAppearance(fn, annotPtr, fit);
   }
 }
@@ -254,16 +235,6 @@ function requireDrawingTarget(ctx: AnnotationWriteContext | undefined): DrawingT
   return { docPtr: ctx.docPtr, drawings: ctx.drawings };
 }
 
-/** The box transform a stamp draft/patch carries (the box-kind rotation split). */
-interface StampBox {
-  /** `/Rect` — the rotated visual AABB when rotated; the box itself otherwise. */
-  rect: PdfRect;
-  /** The logical (pre-rotation) box; present only alongside a non-zero rotation. */
-  unrotatedRect?: PdfRect;
-  /** `/EMBD_Metadata/Rotation` (deg, PDF convention). */
-  rotation?: number;
-}
-
 /**
  * Author a stamp's appearance from its `appearance` resource, correct under rotation.
  *
@@ -276,12 +247,12 @@ interface StampBox {
  * aspect ratio a second time. The result is a small image adrift in white
  * padding, and only when rotated (at 0° the two frames coincide, so it fills).
  *
- * So for a rotated stamp we: author the image into the unrotated box with no
- * rotation metadata active (its recorded `EPDFOrigContentRect` is the
- * image-filled logical box), then write the rotation metadata, set the real
- * AABB `/Rect`, and re-fit once — which bakes the `/Matrix` and leaves the
- * appearance filling the box exactly as the 0° case does. The unrotated path is
- * unchanged: author straight into `/Rect`.
+ * So for a turned stamp we: author the image into the unturned box with no
+ * turn recorded (its recorded `EPDFOrigContentRect` is the image-filled box),
+ * then record the turn, which sets `/Rect` to the upright box around the
+ * turned box, and re-fit once — which bakes the `/Matrix` and leaves the
+ * appearance filling the box exactly as the 0° case does. An upright stamp is
+ * authored straight into its box.
  */
 function authorStampAppearance(
   fn: PdfFunctions,
@@ -290,27 +261,16 @@ function authorStampAppearance(
   appearance: StampAppearance,
   target: DrawingTarget,
   fit: StampFit,
-  box: StampBox,
+  geometry: AnnotationBox,
 ): void {
-  const rotated = !!box.rotation && box.unrotatedRect !== undefined;
-  if (!rotated) {
-    setAnnotRect(fn, mem, annotPtr, box.rect);
-    setStampContent(fn, mem, annotPtr, appearance, target, fit);
-    return;
-  }
-  const unrotated = box.unrotatedRect!;
-  // 1. Author in the unrotated frame — clear any rotation metadata first so the
-  //    internal re-fit records an image-shaped EPDFOrigContentRect, not the AABB.
-  writeBoxTransformMetadata(fn, mem, annotPtr, {});
-  setAnnotRect(fn, mem, annotPtr, unrotated);
+  // 1. Author upright: with no turn recorded, the internal re-fit records an
+  //    image-shaped EPDFOrigContentRect, not the AABB.
+  writeAnnotationBox(fn, mem, annotPtr, { box: geometry.box, rotation: null });
   setStampContent(fn, mem, annotPtr, appearance, target, fit);
-  // 2. Apply the transform: metadata bakes the /Matrix, /Rect becomes the AABB,
-  //    and one re-fit reconciles BBox + Matrix from the now-recorded content.
-  writeBoxTransformMetadata(fn, mem, annotPtr, {
-    rotation: box.rotation,
-    unrotatedRect: unrotated,
-  });
-  setAnnotRect(fn, mem, annotPtr, box.rect);
+  if (!geometry.rotation) return;
+  // 2. Record the turn: it bakes the /Matrix, /Rect becomes the AABB, and one
+  //    re-fit reconciles BBox + Matrix from the now-recorded content.
+  writeAnnotationBox(fn, mem, annotPtr, geometry);
   refitAppearance(fn, annotPtr, fit);
 }
 

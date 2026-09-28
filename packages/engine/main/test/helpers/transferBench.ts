@@ -95,7 +95,7 @@ export async function fill(doc: Doc, count: number): Promise<void> {
       i++;
     } else if (i % 10 === 0) {
       await page.annotations.create(
-        { subtype: 'stamp', rect },
+        { subtype: 'stamp', box: rect },
         { appearance: images[Math.floor(i / 10) % 10]! },
       );
     } else {

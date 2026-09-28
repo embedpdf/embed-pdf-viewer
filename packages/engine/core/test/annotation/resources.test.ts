@@ -126,7 +126,7 @@ describe('assertAnnotationResources', () => {
 describe('the data carries no bytes', () => {
   test('a stamp and a file attachment validate without them', () => {
     expect(() =>
-      AnnotationDraftSchema.parse({ subtype: 'stamp', rect: RECT, name: 'Approved' }),
+      AnnotationDraftSchema.parse({ subtype: 'stamp', box: RECT, name: 'Approved' }),
     ).not.toThrow();
     expect(() =>
       AnnotationDraftSchema.parse({
@@ -139,7 +139,7 @@ describe('the data carries no bytes', () => {
 
   test('bytes or a resource key inside the data are refused', () => {
     expect(() =>
-      AnnotationDraftSchema.parse({ subtype: 'stamp', rect: RECT, source: makePng(2, 2) }),
+      AnnotationDraftSchema.parse({ subtype: 'stamp', box: RECT, source: makePng(2, 2) }),
     ).toThrow();
     expect(() =>
       AnnotationPatchSchema.parse({ subtype: 'stamp', source: makePng(2, 2) }),

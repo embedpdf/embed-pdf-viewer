@@ -34,6 +34,8 @@ function annotation(
     identityQuality: 'durable',
     nm: null,
     rect: box,
+    // A square's shape is its box.
+    ...(fields.subtype === undefined ? { box } : {}),
     reply: null,
     popup: null,
     ...fields,
@@ -336,7 +338,7 @@ describe('planAnnotationImport', () => {
   });
 
   test('refuses an item whose data is not valid for its kind, naming it', () => {
-    const broken = annotation(first, 10, 0, { rect: { left: 'no' } });
+    const broken = annotation(first, 10, 0, { box: { left: 'no' } });
     expect(() => plan(bundleOf(annotation(first, 9, 0), broken))).toThrow(
       expect.objectContaining({
         code: EngineErrorCode.InvalidArg,

@@ -4,8 +4,9 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, beforeAll, describe, expect, test } from 'vitest';
 
-import { toPageRef } from '@embedpdf/engine-core/runtime';
+import { appearanceTurnOf, toPageRef } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine, type LocalEngine } from '../src/index';
+import { encodePng } from '../src/render/PortableImageEncoder';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const annotationsPdfPath = resolve(
@@ -84,12 +85,13 @@ beforeAll(async () => {
 /**
  * Rotation transform metadata must survive a full save → reopen cycle.
  *
- * Box kinds (square/circle/free-text) persist `/Rect` = the rotated AABB plus
- * an `/EMBD_Metadata/UnrotatedRect` + `/EMBD_Metadata/Rotation`, so PDFium can
- * bake a correct `/AP /Matrix`. Vertex kinds (line/polyline/ink) bake the angle
- * into the points and persist only an advisory `/EMBD_Metadata/Rotation` (no
- * unrotatedRect) — PDFium ignores a lone Rotation, so it is inert for AP yet
- * lets EmbedPDF show an oriented selection box and offer reset on reopen.
+ * Box kinds (square/circle/free-text) persist `/Rect` = the upright box around
+ * the turned drawing plus their `box` in `/EMBD_Metadata/UnrotatedRect` and
+ * `/EMBD_Metadata/Rotation`, so PDFium can bake a correct `/AP /Matrix`.
+ * Vertex kinds (line/polyline/ink) bake the angle into the points and persist
+ * only an advisory `/EMBD_Metadata/Rotation` (no box) — PDFium ignores a lone
+ * Rotation, so it is inert for AP yet lets EmbedPDF show an oriented selection
+ * box and offer reset on reopen.
  */
 describe('annotation rotation (local engine) — save + reopen', () => {
   let engine: LocalEngine;
@@ -98,7 +100,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
     await engine.destroy();
   });
 
-  test('box kind: a rotated square keeps rotation + unrotatedRect after reopen', async () => {
+  test('box kind: a rotated square keeps its rotation and box after reopen', async () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
 
     let bytes: Uint8Array;
@@ -107,8 +109,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
       const created = await doc.page(toPageRef(PAGE)).annotations.create({
         subtype: 'square',
         contents: 'rotation: square',
-        rect: SQUARE_RECT,
-        unrotatedRect: SQUARE_RECT,
+        box: SQUARE_RECT,
         rotation: 90,
         interiorColor: null,
         color: { r: 0, g: 128, b: 0 },
@@ -129,10 +130,10 @@ describe('annotation rotation (local engine) — save + reopen', () => {
     expect(square).toBeDefined();
     if (square && square.subtype === 'square') {
       expect(square.rotation).toBe(90);
-      expect(square.unrotatedRect).toBeDefined();
+      expect(square.box).toBeDefined();
       // a 90°-turned square spans the same AABB it was authored in.
-      expect(Math.round(square.unrotatedRect!.left)).toBe(SQUARE_RECT.left);
-      expect(Math.round(square.unrotatedRect!.right)).toBe(SQUARE_RECT.right);
+      expect(Math.round(square.box.left)).toBe(SQUARE_RECT.left);
+      expect(Math.round(square.box.right)).toBe(SQUARE_RECT.right);
     }
     await doc.close();
   });
@@ -157,8 +158,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
       const created = await page.annotations.create({
         subtype: 'circle',
         contents: 'rotation: preserved move',
-        rect: rotatedAabb(originalBox, rotation),
-        unrotatedRect: originalBox,
+        box: originalBox,
         rotation,
         interiorColor: { r: 255, g: 213, b: 0 },
         color: { r: 229, g: 72, b: 77 },
@@ -170,8 +170,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
 
       const updated = await page.annotations.update(created.annotation.ref, {
         subtype: 'circle',
-        rect: rotatedAabb(movedBox, rotation),
-        unrotatedRect: movedBox,
+        box: movedBox,
         rotation,
       });
       expect(updated.appearance).toEqual({ action: 'preserved', changed: false });
@@ -207,8 +206,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
       const created = await doc.page(toPageRef(PAGE)).annotations.create({
         subtype: 'square',
         contents: 'rotation: reset',
-        rect: SQUARE_RECT,
-        unrotatedRect: SQUARE_RECT,
+        box: SQUARE_RECT,
         rotation: 90,
         interiorColor: null,
         color: { r: 0, g: 128, b: 0 },
@@ -220,9 +218,8 @@ describe('annotation rotation (local engine) — save + reopen', () => {
       // preserve the rotation; `null` removes the EMBD keys).
       await doc.page(toPageRef(PAGE)).annotations.update(created.annotation.ref, {
         subtype: 'square',
-        rect: SQUARE_RECT,
+        box: SQUARE_RECT,
         rotation: null,
-        unrotatedRect: null,
       });
       bytes = await doc.download({ mode: 'rewrite' });
       await doc.close();
@@ -236,12 +233,12 @@ describe('annotation rotation (local engine) — save + reopen', () => {
     expect(square).toBeDefined();
     if (square && square.subtype === 'square') {
       expect(square.rotation).toBe(null);
-      expect(square.unrotatedRect).toBe(null);
+      expect(square.box).toEqual(SQUARE_RECT);
     }
     await doc.close();
   });
 
-  test('vertex kinds: polyline/line/ink keep an advisory rotation (no unrotatedRect) after reopen', async () => {
+  test('vertex kinds: polyline/line/ink keep an advisory rotation (no box) after reopen', async () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
 
     let bytes: Uint8Array;
@@ -302,7 +299,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
     expect(polyline).toBeDefined();
     if (polyline && polyline.subtype === 'polyline') {
       expect(polyline.rotation).toBe(30);
-      expect('unrotatedRect' in polyline && polyline.unrotatedRect).toBeFalsy();
+      expect('box' in polyline).toBe(false);
     }
 
     const line = list.annotations.find(
@@ -311,14 +308,14 @@ describe('annotation rotation (local engine) — save + reopen', () => {
     expect(line).toBeDefined();
     if (line && line.subtype === 'line') {
       expect(line.rotation).toBe(45);
-      expect('unrotatedRect' in line && line.unrotatedRect).toBeFalsy();
+      expect('box' in line).toBe(false);
     }
 
     const ink = list.annotations.find((a) => a.subtype === 'ink' && a.contents === 'rotation: ink');
     expect(ink).toBeDefined();
     if (ink && ink.subtype === 'ink') {
       expect(ink.rotation).toBe(60);
-      expect('unrotatedRect' in ink && ink.unrotatedRect).toBeFalsy();
+      expect('box' in ink).toBe(false);
     }
 
     // Appearances for vertex kinds stay on the classic render path: their
@@ -344,7 +341,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
     await doc.close();
   });
 
-  test('box kind: a rotated caret round-trips its pair and renders a STRIPPED appearance', async () => {
+  test('box kind: a rotated caret round-trips its box and turn, and its appearance agrees with the read', async () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
 
     // Deliberately asymmetric (8×16) so the rotated AABB (16×8) differs from
@@ -360,8 +357,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
       const created = await doc.page(toPageRef(PAGE)).annotations.create({
         subtype: 'caret',
         contents: 'rotation: caret',
-        rect: ROTATED_AABB,
-        unrotatedRect: UNROTATED,
+        box: UNROTATED,
         rotation: 90,
         color: { r: 30, g: 64, b: 175 },
         opacity: 1,
@@ -379,17 +375,23 @@ describe('annotation rotation (local engine) — save + reopen', () => {
     expect(caret).toBeDefined();
     if (caret && caret.subtype === 'caret') {
       expect(caret.rotation).toBe(90);
-      expect(caret.unrotatedRect).toBeDefined();
-      expect(Math.round(caret.unrotatedRect!.left)).toBe(UNROTATED.left);
-      expect(Math.round(caret.unrotatedRect!.bottom)).toBe(UNROTATED.bottom);
-      expect(Math.round(caret.unrotatedRect!.right)).toBe(UNROTATED.right);
-      expect(Math.round(caret.unrotatedRect!.top)).toBe(UNROTATED.top);
+      expect(caret.box).toBeDefined();
+      expect(Math.round(caret.box.left)).toBe(UNROTATED.left);
+      expect(Math.round(caret.box.bottom)).toBe(UNROTATED.bottom);
+      expect(Math.round(caret.box.right)).toBe(UNROTATED.right);
+      expect(Math.round(caret.box.top)).toBe(UNROTATED.top);
 
-      // Caret is box-family in the appearance reader: the raster comes back
-      // rotation-stripped, placed by the logical unrotated box — not by
-      // /Rect. (Before caret joined BOX_FAMILY_SUBTYPES this returned the
-      // rotated AABB and the consumer's re-applied `rotation` doubled the
-      // tilt on reload.)
+      // The caret's outline reaches past its box, so `rect` holds more than
+      // the turned box and its raster is drawn as the page shows it, placed
+      // by `rect`: the same rule (`appearanceTurnOf`) the consumer applies
+      // to the read, so it never turns the raster a second time.
+      for (const edge of ['left', 'bottom'] as const) {
+        expect(caret.rect[edge]).toBeLessThanOrEqual(ROTATED_AABB[edge]);
+      }
+      for (const edge of ['right', 'top'] as const) {
+        expect(caret.rect[edge]).toBeGreaterThanOrEqual(ROTATED_AABB[edge]);
+      }
+      expect(appearanceTurnOf(caret)).toBe(null);
       const rendered = await doc.page(toPageRef(PAGE)).annotations.renderAppearancesRaw();
       const ap = rendered.appearances.find(
         (a) =>
@@ -398,13 +400,80 @@ describe('annotation rotation (local engine) — save + reopen', () => {
           a.ref.annotObjectNumber === caret.ref.annotObjectNumber,
       );
       expect(ap, 'appearance for caret').toBeDefined();
-      expect(ap!.rect.left).toBeCloseTo(UNROTATED.left, 0);
-      expect(ap!.rect.bottom).toBeCloseTo(UNROTATED.bottom, 0);
-      expect(ap!.rect.right).toBeCloseTo(UNROTATED.right, 0);
-      expect(ap!.rect.top).toBeCloseTo(UNROTATED.top, 0);
+      expect(ap!.rect.left).toBeCloseTo(caret.rect.left, 2);
+      expect(ap!.rect.bottom).toBeCloseTo(caret.rect.bottom, 2);
+      expect(ap!.rect.right).toBeCloseTo(caret.rect.right, 2);
+      expect(ap!.rect.top).toBeCloseTo(caret.rect.top, 2);
       const data = new Uint8Array(ap!.raster.data);
       expect(data.some((_, idx) => idx % 4 === 3 && data[idx] > 0)).toBe(true); // non-empty
     }
     await doc.close();
+  });
+});
+
+/** Indirect object `objectNumber` as the saved file last writes it. */
+function objectText(bytes: Uint8Array, objectNumber: number): string {
+  const text = new TextDecoder('latin1').decode(bytes);
+  const matches = [
+    ...text.matchAll(new RegExp(`(?:^|\\s)${objectNumber} 0 obj([\\s\\S]*?)endobj`, 'g')),
+  ];
+  const last = matches.at(-1);
+  if (!last) throw new Error(`no object ${objectNumber}`);
+  return last[1]!;
+}
+
+/**
+ * The file keeps the counterclockwise angle, and carries Acrobat's own
+ * `/Rotate` only where Acrobat turns an annotation itself: a stamp at any
+ * angle, a text box a quarter turn.
+ */
+describe("annotation rotation (local engine) — Acrobat's /Rotate", () => {
+  let engine: LocalEngine;
+
+  afterEach(async () => {
+    await engine.destroy();
+  });
+
+  test('a turned stamp and a quarter-turned text box carry it; other turns do not', async () => {
+    engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
+    const doc = await engine.open({ kind: 'bytes', id: 'rot-acrobat', bytes: annotationsPdf });
+    const page = doc.page(toPageRef(PAGE));
+    const png = await encodePng(new Uint8Array([255, 0, 0, 255, 0, 0, 255, 255]), 2, 1);
+    const box = { left: 100, bottom: 100, right: 200, top: 150 };
+    const textBox = (rotation: number) =>
+      page.annotations.create({
+        subtype: 'free-text',
+        box,
+        rotation,
+        intent: 'free-text',
+        fontFamily: 'helvetica',
+        fontSize: 12,
+        textAlign: 'left',
+        contents: `turned ${rotation}`,
+      });
+    const { annotation: stamp } = await page.annotations.create(
+      { subtype: 'stamp', box, rotation: 36 },
+      { appearance: png },
+    );
+    const { annotation: quarter } = await textBox(270);
+    const { annotation: other } = await textBox(30);
+    const { annotation: square } = await page.annotations.create({
+      subtype: 'square',
+      box,
+      rotation: 36,
+    });
+    const bytes = await doc.download({ mode: 'rewrite' });
+    await doc.close();
+
+    const objectNumberOf = (ref: (typeof stamp)['ref']) => {
+      if (ref.kind !== 'objectNumber') throw new Error('expected an object-number ref');
+      return ref.annotObjectNumber;
+    };
+    // 36 degrees clockwise is -36 in the file, as Acrobat writes it.
+    expect(objectText(bytes, objectNumberOf(stamp.ref))).toMatch(/\/Rotate -36\b/);
+    expect(objectText(bytes, objectNumberOf(stamp.ref))).toMatch(/\/Rotation -36\b/);
+    expect(objectText(bytes, objectNumberOf(quarter.ref))).toMatch(/\/Rotate 90\b/);
+    expect(objectText(bytes, objectNumberOf(other.ref))).not.toMatch(/\/Rotate\b/);
+    expect(objectText(bytes, objectNumberOf(square.ref))).not.toMatch(/\/Rotate\b/);
   });
 });

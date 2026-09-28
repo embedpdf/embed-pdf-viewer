@@ -100,6 +100,8 @@ export function maxDifference(a: Raster, b: Raster): number {
  * The largest difference between a pixel of one raster and the closest
  * pixel of the other within `radius` pixels, both ways: an edge that moved
  * by a fraction of a pixel counts as the same, a changed area does not.
+ * Pixels compare as drawn, color times alpha, so the color of a pixel that
+ * isn't drawn at all doesn't count.
  */
 export function maxShiftedDifference(a: Raster, b: Raster, radius = 1): number {
   const oneWay = (from: Raster, to: Raster) => {
@@ -113,10 +115,10 @@ export function maxShiftedDifference(a: Raster, b: Raster, radius = 1): number {
             const nx = x + dx;
             if (ny < 0 || nx < 0 || ny >= to.height || nx >= to.width) continue;
             let difference = 0;
+            const a = (y * from.width + x) * 4;
+            const b = (ny * to.width + nx) * 4;
             for (let c = 0; c < 4; c++) {
-              const delta = Math.abs(
-                from.rgba[(y * from.width + x) * 4 + c]! - to.rgba[(ny * to.width + nx) * 4 + c]!,
-              );
+              const delta = Math.abs(drawn(from.rgba, a, c) - drawn(to.rgba, b, c));
               if (delta > difference) difference = delta;
             }
             if (difference < best) best = difference;
@@ -128,6 +130,12 @@ export function maxShiftedDifference(a: Raster, b: Raster, radius = 1): number {
     return max;
   };
   return Math.max(oneWay(a, b), oneWay(b, a));
+}
+
+/** Channel `channel` of the pixel at `at` as drawn: color times alpha, or the alpha. */
+function drawn(rgba: Uint8Array, at: number, channel: number): number {
+  const alpha = rgba[at + 3]!;
+  return channel === 3 ? alpha : Math.round((rgba[at + channel]! * alpha) / 255);
 }
 
 /** An 8-bit, non-interlaced RGB or RGBA PNG as RGBA. Enough for the engines' own encoders. */

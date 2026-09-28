@@ -1,5 +1,5 @@
 /**
- * The geometry/colour/rotation seam between the engine's PDF-space wire
+ * The geometry/colour seam between the engine's PDF-space wire
  * vocabulary and the core's content-space model. Every conversion between the
  * two worlds lives here — kind modules speak through these helpers and never
  * hand-roll a convention flip.
@@ -7,9 +7,7 @@
 import {
   contentToPdfRect,
   FLAG_KEYS,
-  normalizeDeg,
   pdfToContentRect,
-  rotatedAabb,
   type AnnotationPropsPatch,
   type Border,
   type ContentGeometry,
@@ -24,7 +22,6 @@ import type {
   PdfLinkTarget,
   PdfLinkTargetWritable,
   PdfRect,
-  PdfRectDifferences,
   StandardFont,
   WidgetAppearance,
 } from '@embedpdf/engine-core/runtime';
@@ -67,74 +64,43 @@ export function cssToColor(css: string): Color {
   return { r: 0, g: 0, b: 0 };
 }
 
-/* ── rotation seam (CW content ↔ PDF convention) ──────────────────────────────
- * The model's `rot` is clockwise in content space (y-down). PDF user space is
- * y-up, so the y-flip at this boundary turns a CW content tilt into a CCW PDF
- * tilt of the same magnitude — i.e. the stored `/EMBD_Metadata/Rotation` is the
- * negation (mod 360). This is the one place the convention is converted; every
- * layer above speaks CW-content and the engine/PDFium speaks the PDF angle.
- */
-export const toPdfRotation = (rotCW: number): number => normalizeDeg(-rotCW);
-export const fromPdfRotation = (rotPdf: number): number => normalizeDeg(-rotPdf);
-
-/** Advisory `rot` for a vertex geom, from a DTO's (PDF-convention) `rotation`.
- *  Absent → no `rot` key (kept off the geom so unrotated shapes stay clean). */
 /** The `/F` flags of a read, as the model's one flag set. */
 export function flagsOf(dto: AnnotationFlags): AnnotationFlags {
   return Object.fromEntries(FLAG_KEYS.map((key) => [key, dto[key]])) as unknown as AnnotationFlags;
 }
 
+/* Rotation: the model's `rot` and the engine's `rotation` are both degrees
+ * clockwise, so they pass through unchanged. */
+
+/** Advisory `rot` for a vertex geom, from a DTO's `rotation`.
+ *  Absent → no `rot` key (kept off the geom so unrotated shapes stay clean). */
 export const rotFromDTO = (rotation?: number | null): { rot?: number } =>
-  rotation ? { rot: fromPdfRotation(rotation) } : {};
+  rotation ? { rot: rotation } : {};
 
 /**
- * Geometry/rotation fields for a box kind (square/circle/plain free-text). The
- * model's `rect` is the unrotated logical box and `rot` the applied tilt, so:
- *  - rot == 0 → `/Rect` is the box; the transform pair is stated as `null`
- *    (total projection — the engine's tri-state writes preserve omissions, so
- *    an omitted field would keep a stale rotation instead of flattening it).
- *  - rot != 0 → `/Rect` is the rotated visual AABB (PDFium clips the baked /AP
- *    to it), `unrotatedRect` the logical box, `rotation` the PDF angle.
+ * The geometry of a box kind (square, circle, free text, stamp, caret): the
+ * model's `rect` is its box before any turn and `rot` the turn. The engine
+ * works out `/Rect`, the upright box around all it draws. The turn is stated
+ * as `null` when there is none (total projection — the engine's tri-state
+ * writes keep an omitted field, so an omission would keep a stale turn).
  */
 export function boxGeomFields(
   rect: Rect,
   rot: number,
   crop: PdfRect,
-): { rect: PdfRect; unrotatedRect: PdfRect | null; rotation: number | null } {
-  if (!rot) return { rect: contentToPdfRect(rect, crop), rotation: null, unrotatedRect: null };
-  return {
-    rect: contentToPdfRect(rotatedAabb(rect, rot), crop),
-    unrotatedRect: contentToPdfRect(rect, crop),
-    rotation: toPdfRotation(rot),
-  };
+): { box: PdfRect; rotation: number | null } {
+  return { box: contentToPdfRect(rect, crop), rotation: rot || null };
 }
 
-/** A box geom (square/circle/stamp) from its DTO: when rotated, the local box
- *  is the stored `unrotatedRect` (the AABB `/Rect` is the rendered envelope)
- *  and `rot` the converted tilt; unrotated, `/Rect` is the box. */
+/** A box geom (square/circle/stamp) from its DTO: its `box` and `rot` its turn. */
 export function boxGeomFromDTO(
-  dto: { rect: PdfRect },
-  rotation: number | undefined,
-  unrotatedRect: PdfRect | undefined,
+  dto: { box: PdfRect; rotation: number | null },
   crop: PdfRect,
   ellipse: boolean,
 ): ContentGeometry {
-  const rot = rotation ? fromPdfRotation(rotation) : 0;
-  const box = rot && unrotatedRect ? unrotatedRect : dto.rect;
-  return { kind: 'rect', rect: pdfToContentRect(box, crop), ellipse, ...(rot ? { rot } : {}) };
+  const rot = dto.rotation ?? 0;
+  return { kind: 'rect', rect: pdfToContentRect(dto.box, crop), ellipse, ...(rot ? { rot } : {}) };
 }
-
-/** Inset a PdfRect by a `/RD` (PDF user space, y-up: all four are non-negative
- *  insets from the matching `/Rect` edge). Recovers the callout text box. */
-export const insetPdfRectByRD = (rect: PdfRect, rd?: PdfRectDifferences | null): PdfRect =>
-  rd
-    ? {
-        left: rect.left + rd.left,
-        bottom: rect.bottom + rd.bottom,
-        right: rect.right - rd.right,
-        top: rect.top - rd.top,
-      }
-    : rect;
 
 /** Engine border fields (`/BS /S`, `/BS /D`, `/BE /I`) → the `Border` union. A
  *  cloudy effect wins over the underlying border style (which stays solid). */

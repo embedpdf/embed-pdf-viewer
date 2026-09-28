@@ -47,7 +47,7 @@ function RichTextToolbar() {
     const ref = await annotation.createRaw(page.ref, {
       subtype: 'free-text',
       intent: 'free-text',
-      rect: { left: 60, bottom: 640, right: 400, top: 700 },
+      box: { left: 60, bottom: 640, right: 400, top: 700 },
       fontFamily: 'helvetica',
       fontSize: 16,
       textAlign: 'left',

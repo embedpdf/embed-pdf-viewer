@@ -18,18 +18,15 @@ import { textAlignmentToCode } from '../textAlignment';
 import type { AnnotationWriteContext } from './annotationWriteContext';
 import {
   clearAnnotColor,
-  clearRectangleDifferences,
   setAnnotColor,
   setAnnotOpacity,
-  setAnnotRect,
   setCalloutLine,
   setIntent,
   setLineEndings,
-  setRectangleDifferences,
   setTextAlignment,
 } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
-import { writeBoxTransformMetadata } from './writeAnnotationTransformMetadata';
+import { applyAnnotationBoxPatch, writeAnnotationBox } from './writeAnnotationBox';
 import { applyDefaultAppearance } from './writeDefaultAppearance';
 import { applyBorderDraft, applyBorderPatch, DEFAULT_OPACITY } from './writeStyle';
 
@@ -78,15 +75,15 @@ function hexColor(color: Color): string {
  *
  * Order:
  *   1. base author-metadata (contents/nm/flags)
- *   2. `/Rect` (required — supplied by the caller; never derived)
+ *   2. the text box and its turn (a callout's turn is its text box's; the
+ *      appearance then takes in the line and writes `/Rect` and `/RD`)
  *   3. `/C` background (set or clear) + `/CA` opacity
  *   4. `/BS` border (style + width + dash)
  *   5. `/DA` default appearance (font + size + `color`)
  *   6. `TextColor` override (only when `fontColor` is given)
  *   7. `/Q` text alignment
  *   8. `/IT` intent
- *   9. `/RD` rectangle differences (optional)
- *  10. callout `/CL` + leader `/LE` ending (only for callouts with geometry)
+ *   9. callout `/CL` + leader `/LE` ending (only for callouts with geometry)
  */
 export function applyFreeTextDraft(
   fn: PdfFunctions,
@@ -96,7 +93,7 @@ export function applyFreeTextDraft(
   ctx?: AnnotationWriteContext,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
-  setAnnotRect(fn, mem, annotPtr, draft.rect);
+  writeAnnotationBox(fn, mem, annotPtr, { box: draft.box, rotation: draft.rotation ?? null });
 
   const background = draft.interiorColor ?? null;
   if (background === null) {
@@ -117,24 +114,12 @@ export function applyFreeTextDraft(
   setTextAlignment(fn, annotPtr, textAlignmentToCode(draft.textAlign));
   setIntent(fn, annotPtr, freeTextIntentToName(draft.intent));
 
-  if (draft.rectDifferences != null) {
-    setRectangleDifferences(fn, annotPtr, draft.rectDifferences);
-  }
-
   if (draft.calloutLine != null) {
     setCalloutLine(fn, mem, annotPtr, draft.calloutLine);
   }
   if (draft.lineEnding != null) {
     setLineEndings(fn, annotPtr, { start: 'none', end: draft.lineEnding });
   }
-  // A plain text box rotates like square/circle (box model). A callout's
-  // rotation applies to its text box only (`unrotatedRect` = the logical text
-  // box; the /CL leader stays page-space) — the AP generator bakes it as an
-  // inline matrix, not the form /Matrix. Absent fields simply clear the keys.
-  writeBoxTransformMetadata(fn, mem, annotPtr, {
-    rotation: draft.rotation,
-    unrotatedRect: draft.unrotatedRect,
-  });
 
   // Rich text last, always: a box is born with all four forms (/RC, /DS,
   // /DA, /Contents) and its appearance, Acrobat's shape — from the draft's
@@ -173,16 +158,7 @@ export function applyFreeTextPatch(
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);
 
-  if (patch.rect !== undefined) {
-    setAnnotRect(fn, mem, annotPtr, patch.rect);
-  }
-  // Transform metadata is tri-state per field (undefined preserves, null
-  // clears, value sets) — independent of whether /Rect was rewritten. A
-  // rect-only patch on a rotated box keeps its rotation.
-  writeBoxTransformMetadata(fn, mem, annotPtr, {
-    rotation: patch.rotation,
-    unrotatedRect: patch.unrotatedRect,
-  });
+  applyAnnotationBoxPatch(fn, mem, annotPtr, patch);
 
   if (patch.interiorColor !== undefined) {
     if (patch.interiorColor === null) {
@@ -263,12 +239,6 @@ export function applyFreeTextPatch(
   }
   if (patch.intent !== undefined) {
     setIntent(fn, annotPtr, freeTextIntentToName(patch.intent));
-  }
-
-  if (patch.rectDifferences === null) {
-    clearRectangleDifferences(fn, annotPtr);
-  } else if (patch.rectDifferences !== undefined) {
-    setRectangleDifferences(fn, annotPtr, patch.rectDifferences);
   }
 
   if (patch.calloutLine === null) {

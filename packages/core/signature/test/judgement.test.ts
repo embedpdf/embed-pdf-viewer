@@ -146,7 +146,7 @@ describe('what a validator concludes', () => {
       const page = (await doc.pages.list()).pages[0]!;
       const created = await doc.page(page.ref).annotations.create({
         subtype: 'square',
-        rect: { left: 10, bottom: 600, right: 200, top: 700 },
+        box: { left: 10, bottom: 600, right: 200, top: 700 },
         color: { r: 0, g: 0, b: 0 },
         strokeWidth: 2,
       } as never);
@@ -198,7 +198,7 @@ describe('what a validator concludes', () => {
       pageRef = page2.ref;
       const created = await doc.page(pageRef).annotations.create({
         subtype: 'square',
-        rect: { left: 20, bottom: 20, right: 120, top: 60 },
+        box: { left: 20, bottom: 20, right: 120, top: 60 },
         color: { r: 1, g: 0, b: 0 },
         strokeWidth: 2,
       } as never);
@@ -252,7 +252,7 @@ describe('what a validator concludes', () => {
 
       const created = await doc.page(page.ref).annotations.create({
         subtype: 'square',
-        rect: { left: 10, bottom: 600, right: 200, top: 700 },
+        box: { left: 10, bottom: 600, right: 200, top: 700 },
         color: { r: 0, g: 0, b: 0 },
         strokeWidth: 2,
       } as never);

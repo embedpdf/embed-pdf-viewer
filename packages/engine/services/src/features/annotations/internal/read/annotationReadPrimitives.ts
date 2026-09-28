@@ -7,7 +7,6 @@ import type {
   PdfPoint,
   PdfQuad,
   PdfRect,
-  PdfRectDifferences,
 } from '@embedpdf/engine-core/runtime';
 import {
   NULL_PTR,
@@ -180,17 +179,24 @@ export function readBorderEffect(
   });
 }
 
+/** `/RD`: how far `/Rect` reaches past the shape on each side. */
+export interface RectangleDifferences {
+  left: number;
+  bottom: number;
+  right: number;
+  top: number;
+}
+
 /**
- * Read the `/RD` rectangle differences. Returns `null` when the
- * annotation has no `/RD` entry. PDFium reports `/RD` in
- * `[left, bottom, right, top]` order; we surface the wire-stable
- * `{ left, top, right, bottom }` shape.
+ * Read the `/RD` rectangle differences, in the order PDFium reads them
+ * (`[left, bottom, right, top]`, as Acrobat writes them). Returns `null` when
+ * the annotation has no `/RD` entry.
  */
 export function readRectangleDifferences(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-): PdfRectDifferences | null {
+): RectangleDifferences | null {
   return withScratchN(
     mem,
     [F32_BYTES, F32_BYTES, F32_BYTES, F32_BYTES],

@@ -20,6 +20,7 @@ import {
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { sha256HexOf } from './internal/digest';
+import { exportUnturnedAppearance } from './internal/read/exportUnturnedAppearance';
 import { saveDocumentToBuffer } from './internal/saveDocumentToBuffer';
 import { RawAnnotationReader } from './RawAnnotationReader';
 import type { DocumentSession } from '../../document-session/DocumentSession';
@@ -170,7 +171,7 @@ class ResourceCollector {
     if (known) return known;
     const exportedPtr = drawing
       ? fn.EPDFDoc_ExportDrawing(this.session.requireDocPtr(), drawing)
-      : fn.EPDFAnnot_ExportAppearance(annotPtr);
+      : exportUnturnedAppearance(fn, mem, annotPtr);
     if (!exportedPtr) return null;
     try {
       const id = this.keep(saveDocumentToBuffer(fn, mem, exportedPtr, 'a drawing').bytes);

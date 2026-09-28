@@ -127,6 +127,7 @@ export {
   pointInQuad,
   quadIntersectsRect,
   shapeRectFor,
+  shapeBoxOf,
   unionRect,
   RECT_HANDLES,
   rotatedHandleCursor,

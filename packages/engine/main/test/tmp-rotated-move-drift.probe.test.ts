@@ -1,7 +1,7 @@
 /**
  * Temporary probe — reproduces the user-reported "rotated circle shrinks
  * after two move+refresh cycles" bug. Mirrors the client's exact emission
- * (boxEmit): every geometry patch carries rect=AABB + unrotatedRect +
+ * (boxEmit): every geometry patch carries box +
  * rotation. Deleted after diagnosis.
  */
 import { readFile } from 'node:fs/promises';
@@ -94,34 +94,29 @@ describe('rotated circle move drift probe', () => {
   });
 
   test('create rotated → (move → save → reopen) × 2, dumping geometry', async () => {
-    const ROT_PDF = 340; // client: 20° CW content tilt → toPdfRotation → 340
+    const ROTATION = 20; // degrees clockwise, as the client passes it
     let U: R = { left: 100, bottom: 500, right: 220, top: 580 }; // 120×80
 
     let doc = await engine.open({ kind: 'bytes', id: 'probe-0', bytes: pdf });
     const created = await doc.page(toPageRef(PAGE)).annotations.create({
       subtype: 'circle',
       contents: 'drift probe',
-      rect: aabb(U, ROT_PDF),
-      unrotatedRect: U,
-      rotation: ROT_PDF,
+      box: U,
+      rotation: ROTATION,
       interiorColor: { r: 250, g: 204, b: 21 },
       color: { r: 220, g: 80, b: 80 },
       strokeWidth: 6,
       borderStyle: 'solid',
       opacity: 1,
     });
-    const cd = created.annotation as { rect: R; unrotatedRect?: R; rotation?: number };
-    console.log(
-      'CREATED   rect=' + fmt(cd.rect),
-      'unrot=' + fmt(cd.unrotatedRect),
-      'rot=' + cd.rotation,
-    );
+    const cd = created.annotation as { rect: R; box?: R; rotation?: number };
+    console.log('CREATED   rect=' + fmt(cd.rect), 'unrot=' + fmt(cd.box), 'rot=' + cd.rotation);
 
     const dump = async (label: string, d: typeof doc) => {
       const list = await d.page(toPageRef(PAGE)).annotations.list();
       const a = list.annotations.find(
         (x) => x.subtype === 'circle' && x.contents === 'drift probe',
-      ) as unknown as { ref: unknown; rect: R; unrotatedRect?: R; rotation?: number };
+      ) as unknown as { ref: unknown; rect: R; box?: R; rotation?: number };
       const rendered = await d.page(toPageRef(PAGE)).annotations.renderAppearancesRaw();
       const ap = rendered.appearances.find(
         (p) => JSON.stringify((p as { ref: unknown }).ref) === JSON.stringify(a.ref),
@@ -132,7 +127,7 @@ describe('rotated circle move drift probe', () => {
         '\n  /Rect      =',
         fmt(a.rect),
         '\n  unrotRect  =',
-        fmt(a.unrotatedRect),
+        fmt(a.box),
         '\n  rotation   =',
         a.rotation,
         '\n  AP rect    =',
@@ -146,30 +141,28 @@ describe('rotated circle move drift probe', () => {
     let a = await dump('AFTER CREATE', doc);
 
     for (let move = 1; move <= 3; move++) {
-      // Mimic the client after refresh: model rect := listed unrotatedRect
+      // Mimic the client after refresh: model rect := listed box
       // (fallback /Rect), rot := listed rotation.
-      const modelRect = a.unrotatedRect ?? a.rect;
+      const modelRect = a.box ?? a.rect;
       const rot = a.rotation ?? 0;
       U = translate(modelRect, 30, 15);
       const res = await doc.page(toPageRef(PAGE)).annotations.update(
         a.ref as never,
         {
           subtype: 'circle',
-          rect: aabb(U, rot),
-          unrotatedRect: U,
+          box: U,
           rotation: rot,
         } as never,
       );
       const outcome = (res as { appearance?: { action?: string } }).appearance;
-      const echo = (res as { annotation: { rect: R; unrotatedRect?: R; rotation?: number } })
-        .annotation;
+      const echo = (res as { annotation: { rect: R; box?: R; rotation?: number } }).annotation;
       console.log(
         `\nMOVE ${move}: sent rect=${fmt(aabb(U, rot))} unrot=${fmt(U)} rot=${rot}`,
         '→ appearance:',
         JSON.stringify(outcome),
       );
       console.log(
-        `  ECHO (res.updated): rect=${fmt(echo.rect)} unrot=${fmt(echo.unrotatedRect)} rot=${echo.rotation}`,
+        `  ECHO (res.updated): rect=${fmt(echo.rect)} unrot=${fmt(echo.box)} rot=${echo.rotation}`,
       );
       await dump(`AFTER MOVE ${move} (same session)`, doc);
 

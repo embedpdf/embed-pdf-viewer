@@ -139,7 +139,7 @@ describe.skipIf(!ENABLED)('E8 annotation transfer (cloud, localhost)', () => {
         await doc
           .page(page!)
           .annotations.create(
-            { subtype: 'stamp', rect: { left, bottom, right: left + 50, top: bottom + 40 } },
+            { subtype: 'stamp', box: { left, bottom, right: left + 50, top: bottom + 40 } },
             { appearance: image },
           );
       }

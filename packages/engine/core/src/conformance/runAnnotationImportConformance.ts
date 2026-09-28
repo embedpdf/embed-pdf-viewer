@@ -68,10 +68,10 @@ export function runAnnotationImportConformance(
       await twoCopies('authoring', async (source, target, pageRef) => {
         const page = source.page(pageRef);
         for (const { data, resources } of creatables()) await create(page, data, resources);
-        await create(page, { subtype: 'stamp', rect: box(20) }, { appearance: BANDS_PDF });
+        await create(page, { subtype: 'stamp', box: box(20) }, { appearance: BANDS_PDF });
         await create(
           page,
-          { subtype: 'stamp', rect: box(80), opacity: 0.5 },
+          { subtype: 'stamp', box: box(80), opacity: 0.5 },
           { appearance: BANDS_PDF },
         );
         const note = await create(page, { subtype: 'text', rect: box(140), contents: 'Check' });
@@ -104,8 +104,8 @@ export function runAnnotationImportConformance(
     test('emits one annotations.created per annotation, as one transaction', async () => {
       await twoCopies('authoring', async (source, target, pageRef) => {
         const page = source.page(pageRef);
-        await create(page, { subtype: 'square', rect: box(20) });
-        await create(page, { subtype: 'circle', rect: box(80) });
+        await create(page, { subtype: 'square', box: box(20) });
+        await create(page, { subtype: 'circle', box: box(80) });
         const bundle = await source.annotations.export();
 
         const events: DocumentEvent[] = [];
@@ -134,9 +134,9 @@ export function runAnnotationImportConformance(
           rect: box(20),
           reply: { to: taken.ref },
         });
-        const free = await create(page, { subtype: 'square', rect: box(80), nm: 'free' });
-        const unnamed = await create(page, { subtype: 'circle', rect: box(140) });
-        await create(target.page(pageRef), { subtype: 'square', rect: box(200), nm: 'taken' });
+        const free = await create(page, { subtype: 'square', box: box(80), nm: 'free' });
+        const unnamed = await create(page, { subtype: 'circle', box: box(140) });
+        await create(target.page(pageRef), { subtype: 'square', box: box(200), nm: 'taken' });
         const bundle = await source.annotations.export();
 
         const first = await target.annotations.import(bundle, { attribution: 'stamp' });
@@ -162,7 +162,7 @@ export function runAnnotationImportConformance(
 
     test('puts each page where the options say', async () => {
       await twoCopies('authoring', async (source, target, pageRef) => {
-        await create(source.page(pageRef), { subtype: 'square', rect: box(20) });
+        await create(source.page(pageRef), { subtype: 'square', box: box(20) });
         const bundle = await source.annotations.export();
         await target.pages.insertBlank({ size: { width: 300, height: 300 } }, 0);
         const { pages } = await target.pages.list();
@@ -190,13 +190,13 @@ export function runAnnotationImportConformance(
         const page = source.page(pageRef);
         const stamp = await create(
           page,
-          { subtype: 'stamp', rect: box(20) },
+          { subtype: 'stamp', box: box(20) },
           { appearance: PNG_1X1 },
         );
         await source.pages.insertBlank({ size: { width: 300, height: 300 } }, 1);
         const { pages } = await source.pages.list();
         const second = toPageRef(pages[1]!.ref.pageObjectNumber);
-        await create(source.page(second), { subtype: 'square', rect: box(20) });
+        await create(source.page(second), { subtype: 'square', box: box(20) });
         const bundle = await source.annotations.export();
 
         const events: DocumentEvent[] = [];

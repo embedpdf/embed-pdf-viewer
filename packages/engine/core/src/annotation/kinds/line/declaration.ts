@@ -11,6 +11,7 @@ export const LineDeclaration = defineKind('line', {
   ...filledStyleFields,
   linePoints: field.data(LinePointsSchema),
   lineEndings: field.data(LineEndingsSchema).optional(),
+  /** The angle already applied to the points, degrees clockwise. */
   rotation: field.data(z.number()).nullable().optional(),
   intent: field.data(LineIntentSchema).nullable().optional(),
   measure: measureField,

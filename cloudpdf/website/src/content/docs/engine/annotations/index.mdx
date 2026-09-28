@@ -19,7 +19,7 @@ const page = doc.page(pageRef);
 
 const { annotation } = await page.annotations.create({
   subtype: 'square',
-  rect: { left: 72, bottom: 600, right: 272, top: 700 },
+  box: { left: 72, bottom: 600, right: 272, top: 700 },
   color: { r: 0, g: 120, b: 255 },
 });
 
@@ -132,7 +132,7 @@ Each annotation also has the [flags](#flags) and the fields that say [who wrote 
 ```ts
 const { annotation } = await page.annotations.create({
   subtype: 'circle',
-  rect: { left: 60, bottom: 300, right: 180, top: 400 },
+  box: { left: 60, bottom: 300, right: 180, top: 400 },
   interiorColor: { r: 30, g: 144, b: 255 },
 });
 ```
@@ -166,8 +166,10 @@ accepts. That makes "change a copy, then save it" code simple:
 await page.annotations.update(annotation.ref, { ...annotation, opacity: 0.5 });
 ```
 
-Fields the engine writes (`author`, the dates, `userId`, `ref`…) are accepted and ignored. For
-free text, send `contents` or `richText`, not both with different text.
+Fields the engine writes (`author`, the dates, `userId`, `ref`…) are accepted and ignored. A
+`rect` the engine works out, as it does for rectangles, ellipses, text boxes, stamps and carets
+from their `box`, is accepted as read; a different one fails with `InvalidArg`. For free text,
+send `contents` or `richText`, not both with different text.
 
 ## Delete and reorder
 

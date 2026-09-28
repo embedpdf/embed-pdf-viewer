@@ -67,6 +67,7 @@ const squareOf = (state: EngineState): AnnotationDTO =>
     blendMode: 'normal',
     subtype: 'square',
     rect: { left: 100, bottom: 700, right: 180, top: 760 },
+    box: { left: 100, bottom: 700, right: 180, top: 760 },
     color: rgb(state.color),
     interiorColor: null,
     opacity: 1,

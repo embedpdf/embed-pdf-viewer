@@ -47,8 +47,8 @@ export interface KindProjection {
   createable?: false;
 }
 
-/** Box-kind geometry emission: the model's unrotated `rect` + applied tilt →
- *  `/Rect`(+`unrotatedRect`+`rotation`), total (nulls state the clears). */
+/** Box-kind geometry emission: the model's `rect` (its box before any turn) +
+ *  its turn → `box` + `rotation`, total (null states the clear). */
 export const boxEmit = (annotation: ModelAnnotation, crop: PdfRect): Wire => {
   const boxGeometry = annotation.geometry as Extract<
     ModelAnnotation['geometry'],

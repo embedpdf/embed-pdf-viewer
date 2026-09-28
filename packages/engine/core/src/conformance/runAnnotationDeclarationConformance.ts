@@ -145,6 +145,30 @@ export function runAnnotationDeclarationConformance(
       });
     });
 
+    test("a box kind's rect is the engine's", async () => {
+      await onAuthoringPage(async (page) => {
+        const box: PdfRect = { left: 300, bottom: 300, right: 360, top: 340 };
+        // A create takes the box; a rect sent with it is the engine's to work out.
+        const { annotation: created } = await page.annotations.create({
+          subtype: 'square',
+          box,
+          rect: { left: 0, bottom: 0, right: 1, top: 1 },
+        } as never);
+        expect(created.rect).toEqual(box);
+        // An update may send back the rect it read, with a new box or without.
+        const moved = { ...box, left: box.left + 20, right: box.right + 20 };
+        const { annotation: updated } = await page.annotations.update(created.ref, {
+          rect: created.rect,
+          box: moved,
+        });
+        expect(updated.rect).toEqual(moved);
+        // Any other rect is refused, naming the field.
+        await expect(
+          page.annotations.update(created.ref, { rect: { ...moved, right: moved.right + 10 } }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg, details: { field: 'rect' } });
+      });
+    });
+
     test('an update takes its subtype from the annotation it targets', async () => {
       await onAuthoringPage(async (page) => {
         const { annotation: created } = await page.annotations.create(creatables()[0]!.data);
@@ -227,13 +251,13 @@ export function runAnnotationDeclarationConformance(
           details: { field },
         });
         await expect(
-          page.annotations.create({ subtype: 'square', rect, color: { r: 300, g: 0, b: 0 } }),
+          page.annotations.create({ subtype: 'square', box: rect, color: { r: 300, g: 0, b: 0 } }),
         ).rejects.toMatchObject(refused('color.r'));
         await expect(
-          page.annotations.create({ subtype: 'square', rect, opacity: 1.5 }),
+          page.annotations.create({ subtype: 'square', box: rect, opacity: 1.5 }),
         ).rejects.toMatchObject(refused('opacity'));
         await expect(
-          page.annotations.create({ subtype: 'square', rect, cloudyIntensity: 0 }),
+          page.annotations.create({ subtype: 'square', box: rect, cloudyIntensity: 0 }),
         ).rejects.toMatchObject(refused('cloudyIntensity'));
         await expect(
           page.annotations.create({ subtype: 'text', rect, icon: 'dragon' } as never),
@@ -241,7 +265,7 @@ export function runAnnotationDeclarationConformance(
         await expect(
           page.annotations.create({
             subtype: 'free-text',
-            rect,
+            box: rect,
             contents: 'x',
             intent: 'free-text',
             fontSize: 12,
@@ -261,7 +285,7 @@ export function runAnnotationDeclarationConformance(
             { file: new Uint8Array([1]) },
           ),
         ).rejects.toMatchObject(refused('file.name'));
-        const { annotation } = await page.annotations.create({ subtype: 'square', rect });
+        const { annotation } = await page.annotations.create({ subtype: 'square', box: rect });
         await expect(
           page.annotations.update(annotation.ref, { opacity: -1 }),
         ).rejects.toMatchObject(refused('opacity'));
@@ -278,7 +302,7 @@ export function runAnnotationDeclarationConformance(
         const rect: PdfRect = { left: 300, bottom: 580, right: 360, top: 620 };
         const { annotation } = await page.annotations.create({
           subtype: 'square',
-          rect,
+          box: rect,
           opacity: 0.5,
         });
         expect(annotation.subtype === 'square' && annotation.opacity).toBe(0.5);
@@ -288,7 +312,7 @@ export function runAnnotationDeclarationConformance(
         });
         expect(updated.subtype === 'square' && updated.opacity).toBe(0.3);
         const { annotation: stamp } = await page.annotations.create(
-          { subtype: 'stamp', rect, opacity: 0.75 },
+          { subtype: 'stamp', box: rect, opacity: 0.75 },
           { appearance: PNG_1X1 },
         );
         expect(stamp.subtype === 'stamp' && stamp.opacity).toBe(0.75);
@@ -406,7 +430,7 @@ export function runAnnotationDeclarationConformance(
       await onAuthoringPage(async (page) => {
         const rect: PdfRect = { left: 420, bottom: 460, right: 480, top: 500 };
         await expect(
-          page.annotations.create({ subtype: 'stamp', rect }, { appearance: TWO_PAGE_PDF }),
+          page.annotations.create({ subtype: 'stamp', box: rect }, { appearance: TWO_PAGE_PDF }),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
       });
     });
@@ -517,23 +541,23 @@ export function runAnnotationDeclarationConformance(
       await onAuthoringPage(async (page) => {
         const rect: PdfRect = { left: 300, bottom: 300, right: 360, top: 340 };
         const refused = { code: EngineErrorCode.InvalidArg };
-        await expect(page.annotations.create({ subtype: 'stamp', rect })).rejects.toMatchObject(
-          refused,
-        );
+        await expect(
+          page.annotations.create({ subtype: 'stamp', box: rect }),
+        ).rejects.toMatchObject(refused);
         await expect(
           page.annotations.create({ subtype: 'file-attachment', rect, file: { name: 'a.txt' } }),
         ).rejects.toMatchObject(refused);
         await expect(
-          page.annotations.create({ subtype: 'square', rect }, { appearance: PNG_1X1 }),
+          page.annotations.create({ subtype: 'square', box: rect }, { appearance: PNG_1X1 }),
         ).rejects.toMatchObject(refused);
         await expect(
           page.annotations.create(
-            { subtype: 'stamp', rect },
+            { subtype: 'stamp', box: rect },
             { appearance: new TextEncoder().encode('not an image') },
           ),
         ).rejects.toMatchObject(refused);
         const { annotation: created } = await page.annotations.create(
-          { subtype: 'stamp', rect },
+          { subtype: 'stamp', box: rect },
           { appearance: PNG_1X1 },
         );
         await expect(
@@ -546,7 +570,7 @@ export function runAnnotationDeclarationConformance(
       await onAuthoringPage(async (page) => {
         const rect: PdfRect = { left: 300, bottom: 400, right: 360, top: 440 };
         const { annotation: created } = await page.annotations.create(
-          { subtype: 'stamp', rect, name: 'Approved' },
+          { subtype: 'stamp', box: rect, name: 'Approved' },
           { appearance: PNG_1X1 },
         );
         const result = await page.annotations.update(created.ref, {}, { appearance: PNG_1X1 });
@@ -562,17 +586,17 @@ export function runAnnotationDeclarationConformance(
         const rect: PdfRect = { left: 300, bottom: 460, right: 360, top: 500 };
         const fitOf = (dto: { subtype: string }) => (dto as { fit?: unknown }).fit;
         const plain = await page.annotations.create(
-          { subtype: 'stamp', rect },
+          { subtype: 'stamp', box: rect },
           { appearance: PNG_1X1 },
         );
         expect(fitOf(plain.annotation)).toBe('contain');
         const { annotation: created } = await page.annotations.create(
-          { subtype: 'stamp', rect, fit: 'cover' },
+          { subtype: 'stamp', box: rect, fit: 'cover' },
           { appearance: PNG_1X1 },
         );
         expect(fitOf(created)).toBe('cover');
         const moved = await page.annotations.update(created.ref, {
-          rect: { ...rect, right: rect.right + 40 },
+          box: { ...rect, right: rect.right + 40 },
         });
         expect(fitOf(moved.annotation)).toBe('cover');
         const refit = await page.annotations.update(created.ref, { fit: 'fill' });

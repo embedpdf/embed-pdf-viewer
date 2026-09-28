@@ -154,20 +154,6 @@ export type BlendMode =
 export type AnnotationBorderStyle = 'solid' | 'dashed' | 'beveled' | 'inset';
 
 /**
- * `/RD` (rectangle differences) for shape annotations — the four margins,
- * in PDF points, between the annotation `/Rect` and the geometry actually
- * drawn inside it. Used so a thick/cloudy border has room to render
- * without being clipped by the `/Rect`. y-up PDF user space, so each value
- * is a non-negative inset from the corresponding `/Rect` edge.
- */
-export interface PdfRectDifferences {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-}
-
-/**
  * The `/RT` (reply type) relationship an annotation declares toward the
  * annotation its `/IRT` points at (ISO 32000 §12.5.6.2). Wire-stable
  * kebab/lower-case strings; the engine maps these onto PDFium's

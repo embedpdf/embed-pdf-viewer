@@ -99,8 +99,7 @@ export function runAnnotationResourceConformance(
         const { annotation: created } = await page.annotations.create(
           {
             subtype: 'stamp',
-            rect: { left: 80, bottom: 60, right: 280, top: 220 },
-            unrotatedRect: rect,
+            box: rect,
             rotation: 30,
             fit: 'cover',
             opacity: 0.5,
@@ -150,9 +149,9 @@ export function runAnnotationResourceConformance(
     test('a stamp another tool made keeps its opacity through a resize', async () => {
       await onPage('acrobat-stamps', async (page) => {
         for (const stamp of await acrobatStamps(page)) {
-          const { left, bottom, right, top } = stamp.rect;
+          const { left, bottom, right, top } = stamp.box;
           const { annotation: updated } = await page.annotations.update(stamp.ref, {
-            rect: {
+            box: {
               left,
               bottom,
               right: left + (right - left) * 2,
@@ -179,25 +178,13 @@ export function runAnnotationResourceConformance(
 
     test('a turned stamp renders unturned as its unturned twin', async () => {
       await onPage('authoring', async (page) => {
-        const unrotatedRect: PdfRect = { left: 100, bottom: 100, right: 260, top: 180 };
+        const box: PdfRect = { left: 100, bottom: 100, right: 260, top: 180 };
         const common = { subtype: 'stamp', fit: 'cover', opacity: 0.5 } as const;
         const turned = (
-          await page.annotations.create(
-            {
-              ...common,
-              rect: { left: 80, bottom: 60, right: 280, top: 220 },
-              unrotatedRect,
-              rotation: 30,
-            },
-            { appearance: BANDS_PDF },
-          )
+          await page.annotations.create({ ...common, box, rotation: 30 }, { appearance: BANDS_PDF })
         ).annotation;
-        const flat = (
-          await page.annotations.create(
-            { ...common, rect: unrotatedRect },
-            { appearance: BANDS_PDF },
-          )
-        ).annotation;
+        const flat = (await page.annotations.create({ ...common, box }, { appearance: BANDS_PDF }))
+          .annotation;
         expectSameDrawing(await rasterOf(page, turned.ref), await rasterOf(page, flat.ref));
       });
     });
@@ -217,7 +204,8 @@ export function runAnnotationResourceConformance(
       await onPage('acrobat-rewrapped', async (page) => {
         const turned = await rewrappedStamp(page, 'a');
         const opaque = await rewrappedStamp(page, 'b');
-        expect(turned).toMatchObject({ rotation: 30, fit: 'contain' });
+        // The file stores /Rotation 30, counterclockwise: 330 degrees clockwise.
+        expect(turned).toMatchObject({ rotation: 330, fit: 'contain' });
         expect(Math.abs(turned.opacity! - 0.6) < 0.005).toBe(true);
         expect(opaque.opacity).toBe(1);
         for (const stamp of [turned, opaque]) {
@@ -233,10 +221,10 @@ export function runAnnotationResourceConformance(
       await onPage('acrobat-rewrapped', async (page) => {
         const turned = await rewrappedStamp(page, 'a');
         const drawing = await page.annotations.downloadResource(turned.ref, 'appearance');
-        const box = turned.unrotatedRect!;
+        const { box } = turned;
         const { annotation: updated } = await page.annotations.update(turned.ref, {
-          unrotatedRect: { ...box, right: box.right + 60 },
-          rotation: 30,
+          box: { ...box, right: box.right + 60 },
+          rotation: turned.rotation,
         });
         expect(
           pageSize(await page.annotations.downloadResource(updated.ref, 'appearance')),
@@ -269,7 +257,7 @@ export function runAnnotationResourceConformance(
             (annotation): annotation is Extract<AnnotationDTO, { subtype: 'stamp' }> =>
               annotation.subtype === 'stamp',
           )!;
-          expect(stamp.rotation !== null && stamp.unrotatedRect !== null).toBe(true);
+          expect(stamp.rotation !== null).toBe(true);
           expect(
             Math.abs(stamp.opacity - (fixture === 'acrobat-roundtrip-60' ? 0.6 : 1)) < 0.01,
           ).toBe(true);
@@ -283,9 +271,9 @@ export function runAnnotationResourceConformance(
           expectSameDrawing(await rasterOf(page, stamp.ref), await rasterOf(page, twin.ref));
 
           // And after a resize here.
-          const box = stamp.unrotatedRect!;
+          const { box } = stamp;
           const { annotation: updated } = await page.annotations.update(stamp.ref, {
-            unrotatedRect: { ...box, right: box.right + 40 },
+            box: { ...box, right: box.right + 40 },
             rotation: stamp.rotation,
           });
           const resized = (
@@ -331,7 +319,7 @@ export function runAnnotationResourceConformance(
           await page.annotations.create(
             {
               subtype: 'stamp',
-              rect: { left: 20, bottom: 20, right: 220, top: 120 },
+              box: { left: 20, bottom: 20, right: 220, top: 120 },
               fit: 'contain',
             },
             { appearance: BANDS_PDF },
@@ -341,7 +329,7 @@ export function runAnnotationResourceConformance(
           await page.annotations.create(
             {
               subtype: 'stamp',
-              rect: { left: 20, bottom: 140, right: 120, top: 240 },
+              box: { left: 20, bottom: 140, right: 120, top: 240 },
               fit: 'cover',
             },
             { appearance: BANDS_PNG },
@@ -366,7 +354,7 @@ export function runAnnotationResourceConformance(
           await page.annotations.create(
             {
               subtype: 'stamp',
-              rect: { left: 20, bottom: 20, right: 120, top: 120 },
+              box: { left: 20, bottom: 20, right: 120, top: 120 },
               fit: 'contain',
             },
             { appearance: BANDS_PNG },
@@ -376,7 +364,7 @@ export function runAnnotationResourceConformance(
           await page.annotations.create(
             {
               subtype: 'stamp',
-              rect: { left: 20, bottom: 140, right: 320, top: 240 },
+              box: { left: 20, bottom: 140, right: 320, top: 240 },
               fit: 'cover',
             },
             { appearance: BANDS_PNG },
@@ -396,7 +384,7 @@ export function runAnnotationResourceConformance(
           await page.annotations.create(
             {
               subtype: 'stamp',
-              rect: { left: 20, bottom: 20, right: 120, top: 120 },
+              box: { left: 20, bottom: 20, right: 120, top: 120 },
               fit: 'cover',
             },
             { appearance: BANDS_PNG },
@@ -424,7 +412,7 @@ export function runAnnotationResourceConformance(
           await page.annotations.create(
             {
               subtype: 'stamp',
-              rect: { left: 20, bottom: 20, right: 220, top: 120 },
+              box: { left: 20, bottom: 20, right: 220, top: 120 },
               opacity: 0.5,
             },
             { appearance: BANDS_PDF },
@@ -446,11 +434,11 @@ export function runAnnotationResourceConformance(
         for (let i = 0; i < 10; i++) {
           const left = 20 + 50 * i;
           await page.annotations.create(
-            { subtype: 'stamp', rect: { left, bottom: 20, right: left + 40, top: 40 } },
+            { subtype: 'stamp', box: { left, bottom: 20, right: left + 40, top: 40 } },
             { appearance: BANDS_PNG },
           );
           await page.annotations.create(
-            { subtype: 'stamp', rect: { left, bottom: 60, right: left + 40, top: 80 } },
+            { subtype: 'stamp', box: { left, bottom: 60, right: left + 40, top: 80 } },
             { appearance: BANDS_PDF },
           );
         }
@@ -464,13 +452,13 @@ export function runAnnotationResourceConformance(
       await onPage('authoring', async (page, doc) => {
         const stamp = (
           await page.annotations.create(
-            { subtype: 'stamp', rect: { left: 20, bottom: 20, right: 120, top: 120 } },
+            { subtype: 'stamp', box: { left: 20, bottom: 20, right: 120, top: 120 } },
             { appearance: BANDS_PNG },
           )
         ).annotation;
         const appearance = await page.annotations.downloadResource(stamp.ref, 'appearance');
         await page.annotations.create(
-          { subtype: 'stamp', rect: { left: 200, bottom: 20, right: 260, top: 40 } },
+          { subtype: 'stamp', box: { left: 200, bottom: 20, right: 260, top: 40 } },
           { appearance },
         );
         expect(images(await rewrite(doc))).toBe(1);
@@ -484,7 +472,7 @@ export function runAnnotationResourceConformance(
             await page.annotations.create(
               {
                 subtype: 'stamp',
-                rect: { left, bottom: 20, right: left + 100, top: 120 },
+                box: { left, bottom: 20, right: left + 100, top: 120 },
                 opacity: 0.5,
               },
               { appearance: BANDS_PNG },
@@ -510,12 +498,12 @@ export function runAnnotationResourceConformance(
       await onPage('authoring', async (page) => {
         const rect: PdfRect = { left: 300, bottom: 300, right: 360, top: 340 };
         const refused = { code: EngineErrorCode.InvalidArg };
-        const square = (await page.annotations.create({ subtype: 'square', rect })).annotation;
+        const square = (await page.annotations.create({ subtype: 'square', box: rect })).annotation;
         await expect(
           page.annotations.downloadResource(square.ref, 'appearance'),
         ).rejects.toMatchObject(refused);
         const stamp = (
-          await page.annotations.create({ subtype: 'stamp', rect }, { appearance: BANDS_PDF })
+          await page.annotations.create({ subtype: 'stamp', box: rect }, { appearance: BANDS_PDF })
         ).annotation;
         await expect(page.annotations.downloadResource(stamp.ref, 'file')).rejects.toMatchObject(
           refused,

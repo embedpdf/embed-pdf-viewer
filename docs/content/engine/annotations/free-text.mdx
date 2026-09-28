@@ -14,7 +14,7 @@ every PDF app.
 ```ts
 const { annotation } = await page.annotations.create({
   subtype: 'free-text',
-  rect: { left: 72, bottom: 600, right: 272, top: 660 },
+  box: { left: 72, bottom: 600, right: 272, top: 660 },
   contents: 'Please check this section',
   fontSize: 14,
 });
@@ -22,12 +22,12 @@ const { annotation } = await page.annotations.create({
 
 ## Text boxes
 
-The text wraps inside `rect`. Start a new line with `\n` in `contents`; it reads back as `\r`,
+The text wraps inside `box`. Start a new line with `\n` in `contents`; it reads back as `\r`,
 the line break PDF uses.
 
 | Field           | What it is                                                       | Default         |
 | :-------------- | :--------------------------------------------------------------- | :-------------- |
-| `rect`          | The text box. Required.                                          |                 |
+| `box`           | The text box. Required.                                          |                 |
 | `contents`      | The text, plain.                                                 | empty           |
 | `fontFamily`    | The font; see [Fonts](#fonts).                                   | `'helvetica'`   |
 | `fontSize`      | The text size in points.                                         | `12`            |
@@ -56,7 +56,7 @@ A free text box has three colors, and one of them does two jobs:
 ```ts
 await page.annotations.create({
   subtype: 'free-text',
-  rect: { left: 72, bottom: 520, right: 272, top: 580 },
+  box: { left: 72, bottom: 520, right: 272, top: 580 },
   contents: 'Approved',
   fontFamily: 'helvetica-bold',
   fontSize: 18,
@@ -88,7 +88,7 @@ await engine.fonts.register({ key: 'noto-sc', data: fontBytes });
 
 await page.annotations.create({
   subtype: 'free-text',
-  rect: { left: 72, bottom: 600, right: 272, top: 660 },
+  box: { left: 72, bottom: 600, right: 272, top: 660 },
   contents: '请检查这一部分',
   fontFamily: 'noto-sc',
   fontSize: 14,
@@ -119,7 +119,7 @@ A callout is a text box with a line that points at something on the page. Give t
 ```ts
 await page.annotations.create({
   subtype: 'free-text',
-  rect: { left: 300, bottom: 600, right: 480, top: 660 }, // the text box
+  box: { left: 300, bottom: 600, right: 480, top: 660 }, // the text box
   calloutLine: [
     { x: 200, y: 520 }, // the point it points at
     { x: 250, y: 630 }, // a bend (optional)
@@ -135,8 +135,8 @@ await page.annotations.create({
 | `calloutLine` | Two points (straight) or three (with a bend). The first is what it points at, the last touches the box.                           | none    |
 | `lineEnding`  | What's drawn at the point it points at, such as `'open-arrow'`; see [Line endings](/docs/engine/annotations/shapes#line-endings). | none    |
 
-`rect` stays the text box; the engine makes room for the line and its arrow. To turn a callout
-back into a plain box, set `calloutLine: null`.
+`box` stays the text box; the engine makes room for the line and its arrow in `rect`, where the
+callout sits on the page. To turn a callout back into a plain box, set `calloutLine: null`.
 
 ## Rich text
 
@@ -147,7 +147,7 @@ with a `style` that holds only what it changes:
 ```ts
 await page.annotations.create({
   subtype: 'free-text',
-  rect: { left: 72, bottom: 600, right: 372, top: 660 },
+  box: { left: 72, bottom: 600, right: 372, top: 660 },
   fontSize: 14,
   richText: {
     paragraphs: [
@@ -251,14 +251,19 @@ always read back the body's font and size.
 
 ### Turned boxes
 
-A free text box turns like a rectangle: set `unrotatedRect` and `rotation` (see
+A free text box turns like a rectangle: set `box` and `rotation` (see
 [Shapes](/docs/engine/annotations/shapes#turned-shapes)). On a callout only the text box turns;
 the line stays where it is.
+
+Acrobat turns a text box only a quarter at a time, when you add one on a turned page. Such a box
+reads its `rotation` (90, 180 or 270), and a box you turn by a quarter opens in Acrobat as its
+own. A box turned by another angle shows turned in Acrobat too, but Acrobat straightens it when
+you edit its text there.
 
 ### How it's stored
 
 For readers who know PDF: `color` is the color in `/DA`, `interiorColor` is `/C`, and `richText`
 is written as `/RC` (XHTML) and `/DS`, the form Acrobat reads and writes. `contents` is
 `/Contents`, `calloutLine` is `/CL` and `intent` is `/IT`. For a callout, the PDF's own `/Rect`
-takes in the line, and `/RD` says where the text box is inside it; the engine keeps both, and
-`rect` is always the text box.
+takes in the line, and `/RD` says where the text box is inside it, as Acrobat writes it; the
+engine writes both from `box`.

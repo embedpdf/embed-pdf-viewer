@@ -50,6 +50,7 @@ import { readAnnotationFromPtr } from './internal/read/readAnnotationFromPtr';
 import { assertRichTextAgreement } from './internal/richTextWire';
 import type { AnnotationWriteContext } from './internal/write/annotationWriteContext';
 import { applyPatch, preflightPatch } from './internal/write/annotationWriterRegistry';
+import { settleAnnotationTurn } from './internal/write/writeAnnotationTransformMetadata';
 import { RawAnnotationReader } from './RawAnnotationReader';
 import { prepareTextStatePatch } from './internal/write/writeTextAnnotation';
 import { generateAppearance } from './internal/write/generateAppearance';
@@ -223,6 +224,12 @@ export class AnnotationMutator {
       // two paths cannot drift in their identity bookkeeping.
       const stableId = this.captureOrStampStableId(annotPtr);
 
+      // The appearance decision (see below) depends only on the read and the
+      // patch. A write that redraws or re-places the drawing starts from the
+      // turn the annotation reads: our keys record it first.
+      const impact = resources?.appearance ? 'regenerate' : appearanceImpactOf(currentDto, patch);
+      if (impact !== 'inert') settleAnnotationTurn(fn, mem, annotPtr);
+
       // Apply caller-supplied subtype-specific writes.
       applyPatch(fn, mem, annotPtr, patch, writeCtx);
       // A derived plain label supersedes imported rich contents; retaining stale /RC
@@ -285,7 +292,6 @@ export class AnnotationMutator {
       // echoed on the result: clients drive raster invalidation off
       // `appearance.changed` instead of guessing from the patch they sent.
       // New appearance bytes are a new drawing, whatever the patch says.
-      const impact = resources?.appearance ? 'regenerate' : appearanceImpactOf(currentDto, patch);
       let appearance: AppearanceOutcome;
       if (
         impact === 'inert' ||

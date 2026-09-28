@@ -2,16 +2,13 @@ import type { CaretDraft, CaretPatch, Color } from '@embedpdf/engine-core/runtim
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import {
-  clearRectangleDifferences,
   setAnnotColor,
   setAnnotOpacity,
-  setAnnotRect,
   setIntent,
   setIntentOrClear,
-  setRectangleDifferences,
 } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
-import { writeBoxTransformMetadata } from './writeAnnotationTransformMetadata';
+import { applyAnnotationBoxPatch, writeAnnotationBox } from './writeAnnotationBox';
 import { caretIntentToName } from '../textEditIntent';
 
 /** Default `/C` colour when a caret draft omits it (engine-wide default mark). */
@@ -21,12 +18,11 @@ const DEFAULT_CARET_COLOR: Color = { r: 255, g: 0, b: 0 };
 const DEFAULT_OPACITY = 1;
 
 /**
- * Apply a caret draft to a freshly-created annotation. Caret carries no
- * geometry of its own beyond `/Rect`. Order:
+ * Apply a caret draft to a freshly-created annotation. The caret symbol
+ * fills its box. Order:
  *   1. base author-metadata (contents/nm/flags)
- *   2. `/Rect` (required — supplied by the caller; never derived)
+ *   2. the box and its turn, before the appearance is drawn
  *   3. `/C` color + `/CA` opacity
- *   4. `/RD` rectangle differences (optional)
  */
 export function applyCaretDraft(
   fn: PdfFunctions,
@@ -35,18 +31,10 @@ export function applyCaretDraft(
   draft: CaretDraft,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
-  setAnnotRect(fn, mem, annotPtr, draft.rect);
-  // Box-family rotation pair — must land before the AP bake sees the caret.
-  writeBoxTransformMetadata(fn, mem, annotPtr, {
-    rotation: draft.rotation,
-    unrotatedRect: draft.unrotatedRect,
-  });
+  writeAnnotationBox(fn, mem, annotPtr, { box: draft.box, rotation: draft.rotation ?? null });
   setAnnotColor(fn, annotPtr, draft.color ?? DEFAULT_CARET_COLOR);
   setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULT_OPACITY);
   if (draft.intent != null) setIntent(fn, annotPtr, caretIntentToName(draft.intent));
-  if (draft.rectDifferences != null) {
-    setRectangleDifferences(fn, annotPtr, draft.rectDifferences);
-  }
 }
 
 /**
@@ -60,15 +48,7 @@ export function applyCaretPatch(
   patch: CaretPatch,
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);
-  if (patch.rect !== undefined) {
-    setAnnotRect(fn, mem, annotPtr, patch.rect);
-  }
-  if (patch.rotation !== undefined || patch.unrotatedRect !== undefined) {
-    writeBoxTransformMetadata(fn, mem, annotPtr, {
-      rotation: patch.rotation,
-      unrotatedRect: patch.unrotatedRect,
-    });
-  }
+  applyAnnotationBoxPatch(fn, mem, annotPtr, patch);
   if (patch.color !== undefined) {
     setAnnotColor(fn, annotPtr, patch.color);
   }
@@ -77,11 +57,6 @@ export function applyCaretPatch(
   }
   if (patch.intent !== undefined) {
     setIntentOrClear(fn, annotPtr, patch.intent === null ? null : caretIntentToName(patch.intent));
-  }
-  if (patch.rectDifferences === null) {
-    clearRectangleDifferences(fn, annotPtr);
-  } else if (patch.rectDifferences !== undefined) {
-    setRectangleDifferences(fn, annotPtr, patch.rectDifferences);
   }
 }
 

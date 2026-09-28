@@ -85,7 +85,7 @@ describe('drawing bytes across runtimes', () => {
         (annotation) => annotation.subtype === 'stamp',
       );
       const { annotation: created } = await page.annotations.create(
-        { subtype: 'stamp', rect: { left: 20, bottom: 20, right: 120, top: 70 }, opacity: 0.5 },
+        { subtype: 'stamp', box: { left: 20, bottom: 20, right: 120, top: 70 }, opacity: 0.5 },
         { appearance: drawing },
       );
       const drawings = [];
@@ -160,14 +160,14 @@ describe('replacing a stamp drawing', () => {
       const page = doc.page(toPageRef(pages[0]!.ref.pageObjectNumber));
       const rect = { left: 20, bottom: 20, right: 120, top: 120 };
       const small = (
-        await page.annotations.create({ subtype: 'stamp', rect }, { appearance: drawing })
+        await page.annotations.create({ subtype: 'stamp', box: rect }, { appearance: drawing })
       ).annotation;
       const withSmall = (await doc.download({ mode: 'rewrite' })).length;
       await page.annotations.delete(small.ref);
 
       const image = noisePng();
       const stamp = (
-        await page.annotations.create({ subtype: 'stamp', rect }, { appearance: image })
+        await page.annotations.create({ subtype: 'stamp', box: rect }, { appearance: image })
       ).annotation;
       const withImage = (await doc.download({ mode: 'rewrite' })).length;
       expect(withImage - withSmall > image.length / 2).toBe(true);
@@ -198,7 +198,7 @@ describe('stamp drawings across a reopen', () => {
         const { pages } = await doc.pages.list();
         const page = doc.page(toPageRef(pages[0]!.ref.pageObjectNumber));
         await page.annotations.create(
-          { subtype: 'stamp', rect: { left, bottom: 20, right: left + 100, top: 120 } },
+          { subtype: 'stamp', box: { left, bottom: 20, right: left + 100, top: 120 } },
           { appearance: image },
         );
         const saved = await doc.download({ mode: 'rewrite' });

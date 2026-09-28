@@ -1,63 +1,66 @@
 /**
- * Square + circle. Owns the cloudy-border physics: the `/BE` intensity, the
- * derived `/RD` inset (`cloudyBorderExtent(intensity, strokeWidth)` — client
- * policy, the engine never derives it), and the tri-state clears that remove
- * both when the border returns to plain. The `/Rect` we emit is the outer box
- * and `/RD` insets the drawn geometry so the scallops bulge back out to it —
- * derived, never stored on the model.
+ * Square + circle. The model keeps a cloudy shape's outer box, its scallops
+ * drawn in from it (`shapeRectFor`); the engine takes the shape's own box,
+ * which the scallops start from, and works out `rect` around them. So the
+ * box sent is the model box less the cloud's reach (`shapeBoxOf`), a read
+ * grows the engine's box by it, and a change to the cloud or the stroke
+ * width states the box again. The non-cloudy state is stated as a `null`
+ * intensity (tri-state remove), never omitted.
  */
-import { cloudyBorderExtent, type ModelAnnotation } from '@embedpdf/core-annotation';
+import {
+  geomRotation,
+  shapeBoxOf,
+  shapeRectFor,
+  type ModelAnnotation,
+} from '@embedpdf/core-annotation';
 import type { AnnotationDTO, PdfRect } from '@embedpdf/engine-core/runtime';
 
-import { boxEmit, type KindProjection, type Wire } from '../projection';
+import type { KindProjection, Wire } from '../projection';
 import { borderSlice } from '../props';
-import { boxGeomFromDTO } from '../seam';
+import { boxGeomFields, boxGeomFromDTO, styleFromDTO } from '../seam';
 
 type ShapeDTO = Extract<AnnotationDTO, { subtype: 'square' | 'circle' }>;
 
-/** Cloudy `/BE` + `/RD` for a rect shape — total: the non-cloudy state is
- *  stated as `null` (tri-state remove), never omitted, so toggling cloudy off
- *  removes the stale inset (the Adobe phantom-padding bug). */
-export function cloudyExtras(annotation: ModelAnnotation): Wire {
+/** The engine's box and turn for a rect shape: its model box less the cloud's reach. */
+function shapeGeometry(annotation: ModelAnnotation, crop: PdfRect): Wire | null {
+  const geometry = annotation.geometry;
+  if (geometry.kind !== 'rect') return null;
+  const box = shapeBoxOf(geometry.rect, geometry.ellipse, annotation.style);
+  return boxGeomFields(box, geomRotation(geometry), crop);
+}
+
+/** `/BE` for a rect shape, total (`null` when plain), with the box it leaves. */
+export function cloudyExtras(annotation: ModelAnnotation, crop: PdfRect): Wire {
   if (annotation.geometry.kind !== 'rect') return {};
-  if (annotation.style.border.kind === 'cloudy') {
-    const inset = cloudyBorderExtent(
-      annotation.style.border.intensity,
-      annotation.style.strokeWidth,
-      annotation.geometry.ellipse,
-    );
-    return {
-      cloudyIntensity: annotation.style.border.intensity,
-      rectDifferences: { left: inset, top: inset, right: inset, bottom: inset },
-    };
-  }
-  return { cloudyIntensity: null, rectDifferences: null };
+  const border = annotation.style.border;
+  return {
+    cloudyIntensity: border.kind === 'cloudy' ? border.intensity : null,
+    ...shapeGeometry(annotation, crop),
+  };
 }
 
 const ingest = (dto: AnnotationDTO, crop: PdfRect, ellipse: boolean) => {
-  const shapeDto = dto as ShapeDTO;
+  const geometry = boxGeomFromDTO(dto as ShapeDTO, crop, ellipse);
+  if (geometry.kind !== 'rect') return { geometry };
   return {
-    geometry: boxGeomFromDTO(
-      shapeDto,
-      shapeDto.rotation ?? undefined,
-      shapeDto.unrotatedRect ?? undefined,
-      crop,
-      ellipse,
-    ),
+    geometry: { ...geometry, rect: shapeRectFor(geometry.rect, ellipse, styleFromDTO(dto)) },
   };
 };
 
 const projection = (ellipse: boolean): KindProjection => ({
   ingest: (dto, crop) => ingest(dto, crop, ellipse),
-  geometry: (annotation, crop) => boxEmit(annotation, crop),
+  geometry: shapeGeometry,
   prop: {
-    // The inset derives from intensity × stroke width, so a width change on a
-    // cloudy shape re-states the /RD it owns.
-    strokeWidth: (annotation) => ({
+    // The cloud's reach follows its intensity and the stroke width, so either
+    // change states the box it leaves.
+    strokeWidth: (annotation, crop) => ({
       strokeWidth: annotation.style.strokeWidth,
-      ...cloudyExtras(annotation),
+      ...cloudyExtras(annotation, crop),
     }),
-    border: (annotation) => ({ ...borderSlice(annotation.style), ...cloudyExtras(annotation) }),
+    border: (annotation, crop) => ({
+      ...borderSlice(annotation.style),
+      ...cloudyExtras(annotation, crop),
+    }),
   },
 });
 

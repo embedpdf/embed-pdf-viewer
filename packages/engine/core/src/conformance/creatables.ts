@@ -35,15 +35,12 @@ export function creatables(): Creatable[] {
     { subtype: 'underline', quadPoints: [quad] },
     { subtype: 'squiggly', quadPoints: [quad] },
     { subtype: 'strikeout', quadPoints: [quad] },
-    { subtype: 'square', rect },
+    { subtype: 'square', box: rect },
     // Rotation and a shape caption live in /EMBD_Metadata, which a plain annotation lacks.
-    {
-      subtype: 'square',
-      rect,
-      rotation: 30,
-      unrotatedRect: { left: 60, bottom: 50, right: 120, top: 90 },
-    },
-    { subtype: 'circle', rect },
+    { subtype: 'square', box: { left: 60, bottom: 50, right: 120, top: 90 }, rotation: 30 },
+    // Bumps and a callout's line reach past the box: `rect` holds them.
+    { subtype: 'square', box: { left: 60, bottom: 50, right: 120, top: 90 }, cloudyIntensity: 1 },
+    { subtype: 'circle', box: rect },
     { subtype: 'polygon', rect, vertices },
     { subtype: 'polygon', rect, vertices, captionEnabled: true, captionCenter: { x: 90, y: 60 } },
     { subtype: 'polyline', rect, vertices },
@@ -51,21 +48,36 @@ export function creatables(): Creatable[] {
     { subtype: 'ink', rect, inkList: [vertices] },
     {
       subtype: 'free-text',
-      rect,
+      box: rect,
       intent: 'free-text',
       fontFamily: 'helvetica',
       fontSize: 12,
       textAlign: 'left',
       contents: 'Declaration conformance',
     },
-    { subtype: 'caret', rect },
+    {
+      subtype: 'free-text',
+      box: { left: 80, bottom: 60, right: 140, top: 100 },
+      intent: 'free-text-callout',
+      fontFamily: 'helvetica',
+      fontSize: 12,
+      textAlign: 'left',
+      contents: 'A callout',
+      calloutLine: [
+        { x: 45, y: 45 },
+        { x: 60, y: 70 },
+        { x: 80, y: 80 },
+      ],
+      lineEnding: 'open-arrow',
+    },
+    { subtype: 'caret', box: rect },
     { subtype: 'text', rect },
     { subtype: 'link', rect, target: { kind: 'uri', uri: 'https://example.com' } },
     { subtype: 'redact', rect, quadPoints: [quad] },
   ];
   return [
     ...drafts.map((data) => ({ data })),
-    { data: { subtype: 'stamp', rect }, resources: { appearance: PNG_1X1 } },
+    { data: { subtype: 'stamp', box: rect }, resources: { appearance: PNG_1X1 } },
     {
       data: {
         subtype: 'file-attachment',

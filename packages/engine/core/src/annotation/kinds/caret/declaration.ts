@@ -1,11 +1,10 @@
-import { CaretIntentSchema, PdfRectDifferencesSchema } from '../../base.schema';
+import { CaretIntentSchema } from '../../base.schema';
 import { defineKind, field } from '../../declaration';
-import { annotationBaseFields, colorStyleFields, rotationFields } from '../shared-fields';
+import { annotationBaseFields, boxFields, colorStyleFields } from '../shared-fields';
 
 export const CaretDeclaration = defineKind('caret', {
   ...annotationBaseFields,
   ...colorStyleFields,
-  ...rotationFields,
+  ...boxFields,
   intent: field.data(CaretIntentSchema).nullable().optional(),
-  rectDifferences: field.data(PdfRectDifferencesSchema).nullable().optional(),
 });

@@ -61,6 +61,11 @@ export type {
 } from './conformance/runPageReorderConformance';
 export { runPageRotateConformance } from './conformance/runPageRotateConformance';
 export {
+  runAnnotationRotationConformance,
+  type AnnotationRotationConformanceOptions,
+  type AnnotationRotationFixture,
+} from './conformance/runAnnotationRotationConformance';
+export {
   CROP_OFFSET_PDF,
   runPageRenderConformance,
   type PageRenderConformanceOptions,

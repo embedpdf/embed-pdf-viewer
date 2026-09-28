@@ -69,13 +69,14 @@ const squareDto = (over: Record<string, unknown> = {}) =>
   dto({
     subtype: 'square',
     rect: rect(100, 100, 200, 200),
+    box: rect(100, 100, 200, 200),
+    rotation: null,
     color: { r: 0, g: 128, b: 0 },
     interiorColor: null,
     opacity: 1,
     strokeWidth: 2,
     borderStyle: 'solid',
     cloudyIntensity: null,
-    rectDifferences: null,
     ...over,
   });
 
@@ -83,14 +84,13 @@ const squareDto = (over: Record<string, unknown> = {}) =>
 const fullSquarePatch = (over: Record<string, unknown> = {}) =>
   patch({
     subtype: 'square',
-    rect: rect(100, 100, 200, 200),
+    box: rect(100, 100, 200, 200),
     color: { r: 0, g: 128, b: 0 },
     interiorColor: null,
     opacity: 1,
     strokeWidth: 2,
     borderStyle: 'solid',
     cloudyIntensity: null,
-    rectDifferences: null,
     ...over,
   });
 
@@ -119,7 +119,7 @@ describe('appearanceImpactOf — value diffing (inert)', () => {
 
   it('f32 float drift in a full projection is inert', () => {
     const p = fullSquarePatch({
-      rect: rect(100.0001, 99.9999, 200.0001, 199.9999),
+      box: rect(100.0001, 99.9999, 200.0001, 199.9999),
       opacity: 0.9999999,
     });
     expect(appearanceImpactOf(squareDto(), p)).toBe('inert');
@@ -166,10 +166,7 @@ describe('appearanceImpactOf — value diffing (inert)', () => {
   it('tri-state: clearing an already-absent entry is a no-op', () => {
     // DTO totality states absence as null; a null-clear patch diffs away.
     expect(
-      appearanceImpactOf(
-        squareDto(),
-        patch({ subtype: 'square', cloudyIntensity: null, rectDifferences: null }),
-      ),
+      appearanceImpactOf(squareDto(), patch({ subtype: 'square', cloudyIntensity: null })),
     ).toBe('inert');
   });
 
@@ -197,7 +194,7 @@ describe('appearanceImpactOf — value diffing (inert)', () => {
     expect(
       appearanceImpactOf(
         squareDto(),
-        patch({ subtype: 'square', rotation: 45, rect: rect(100, 100, 200, 200) }),
+        patch({ subtype: 'square', rotation: 45, box: rect(100, 100, 200, 200) }),
       ),
     ).toBe('regenerate');
   });
@@ -206,18 +203,18 @@ describe('appearanceImpactOf — value diffing (inert)', () => {
 describe('appearanceImpactOf — verified rigid translation', () => {
   it('a pure move inside a FULL projection classifies as translation', () => {
     // The exact real-world case: today's plugin ships every style key on a
-    // drag. Unchanged values diff away; the remaining rect is a same-size move.
-    const p = fullSquarePatch({ rect: rect(130, 80, 230, 180) });
+    // drag. Unchanged values diff away; the remaining box is a same-size move.
+    const p = fullSquarePatch({ box: rect(130, 80, 230, 180) });
     expect(appearanceImpactOf(squareDto(), p)).toBe('translation');
   });
 
   it('a resize is NOT a translation', () => {
-    const p = fullSquarePatch({ rect: rect(100, 100, 210, 200) });
+    const p = fullSquarePatch({ box: rect(100, 100, 210, 200) });
     expect(appearanceImpactOf(squareDto(), p)).toBe('regenerate');
   });
 
   it('a move combined with a real style change regenerates', () => {
-    const p = fullSquarePatch({ rect: rect(130, 80, 230, 180), strokeWidth: 4 });
+    const p = fullSquarePatch({ box: rect(130, 80, 230, 180), strokeWidth: 4 });
     expect(appearanceImpactOf(squareDto(), p)).toBe('regenerate');
   });
 
@@ -317,28 +314,25 @@ describe('appearanceImpactOf — verified rigid translation', () => {
     expect(appearanceImpactOf(hl, moved)).toBe('translation');
   });
 
-  it('rotated box: translation must carry the transform group unchanged + shifted', () => {
-    const rotated = squareDto({ rotation: 90, unrotatedRect: rect(100, 100, 200, 200) });
-    // rect moved with rotation omitted: the tri-state writer preserves the
-    // rotation, but the (also preserved) unrotatedRect did not ride the delta
-    // — an unproven translation, so the safe path re-bakes.
+  it('turned box: a move of the box that keeps its turn is a translation', () => {
+    const turned = squareDto({ rotation: 90, rect: rect(100, 100, 200, 200) });
+    // The rotation omitted is kept (tri-state), so the box alone moves it.
     expect(
-      appearanceImpactOf(rotated, patch({ subtype: 'square', rect: rect(110, 100, 210, 200) })),
-    ).toBe('regenerate');
-    // the full group riding the same delta is a translation
-    const moved = patch({
-      subtype: 'square',
-      rect: rect(110, 100, 210, 200),
-      rotation: 90,
-      unrotatedRect: rect(110, 100, 210, 200),
-    });
-    expect(appearanceImpactOf(rotated, moved)).toBe('translation');
+      appearanceImpactOf(turned, patch({ subtype: 'square', box: rect(110, 100, 210, 200) })),
+    ).toBe('translation');
+    // Stated unchanged, the same.
+    const moved = patch({ subtype: 'square', box: rect(110, 100, 210, 200), rotation: 90 });
+    expect(appearanceImpactOf(turned, moved)).toBe('translation');
+    // A new turn draws it again.
+    const spun = patch({ subtype: 'square', box: rect(110, 100, 210, 200), rotation: 45 });
+    expect(appearanceImpactOf(turned, spun)).toBe('regenerate');
   });
 
-  it('free-text callout: rect + calloutLine + box translate together', () => {
+  it('free-text callout: box + calloutLine translate together', () => {
     const callout = dto({
       subtype: 'free-text',
       rect: rect(0, 0, 300, 100),
+      box: rect(150, 0, 300, 100),
       calloutLine: [
         { x: 10, y: 10 },
         { x: 80, y: 40 },
@@ -348,7 +342,7 @@ describe('appearanceImpactOf — verified rigid translation', () => {
     });
     const moved = patch({
       subtype: 'free-text',
-      rect: rect(20, 10, 320, 110),
+      box: rect(170, 10, 320, 110),
       calloutLine: [
         { x: 30, y: 20 },
         { x: 100, y: 50 },
@@ -360,56 +354,37 @@ describe('appearanceImpactOf — verified rigid translation', () => {
   });
 
   it('tri-state clears that remove a real entry regenerate', () => {
-    const cloudy = squareDto({
-      cloudyIntensity: 2,
-      rectDifferences: { left: 9, top: 9, right: 9, bottom: 9 },
-    });
-    expect(
-      appearanceImpactOf(
-        cloudy,
-        patch({ subtype: 'square', cloudyIntensity: null, rectDifferences: null }),
-      ),
-    ).toBe('regenerate');
+    const cloudy = squareDto({ cloudyIntensity: 2, rect: rect(91, 91, 209, 209) });
+    expect(appearanceImpactOf(cloudy, patch({ subtype: 'square', cloudyIntensity: null }))).toBe(
+      'regenerate',
+    );
   });
 
-  it('the plugin total trio (rotation: null on an unrotated shape) diffs away on a move', () => {
-    // Unrotated shapes emit { rotation: null, unrotatedRect: null } — null on
-    // an absent entry is a no-op, so a pure move still verifies as a
-    // translation and preserves /AP.
-    const p = fullSquarePatch({
-      rect: rect(130, 80, 230, 180),
-      rotation: null,
-      unrotatedRect: null,
-    });
+  it('rotation: null on an upright shape diffs away on a move', () => {
+    // Upright shapes emit `rotation: null` — null on an absent entry is a
+    // no-op, so a pure move still verifies as a translation and preserves /AP.
+    const p = fullSquarePatch({ box: rect(130, 80, 230, 180), rotation: null });
     expect(appearanceImpactOf(squareDto(), p)).toBe('translation');
   });
 
   it('clearing a REAL rotation during a move regenerates', () => {
-    const rotated = squareDto({ rotation: 90, unrotatedRect: rect(100, 100, 200, 200) });
-    const p = patch({
-      subtype: 'square',
-      rect: rect(110, 100, 210, 200),
-      rotation: null,
-      unrotatedRect: null,
-    });
+    const rotated = squareDto({ rotation: 90 });
+    const p = patch({ subtype: 'square', box: rect(110, 100, 210, 200), rotation: null });
     expect(appearanceImpactOf(rotated, p)).toBe('regenerate');
   });
 
   it('an epsilon-scale move is inert, a sub-visible-but-real move is a translation', () => {
     expect(
-      appearanceImpactOf(
-        squareDto(),
-        fullSquarePatch({ rect: rect(100.0005, 100, 200.0005, 200) }),
-      ),
+      appearanceImpactOf(squareDto(), fullSquarePatch({ box: rect(100.0005, 100, 200.0005, 200) })),
     ).toBe('inert');
     expect(
-      appearanceImpactOf(squareDto(), fullSquarePatch({ rect: rect(100.1, 100, 200.1, 200) })),
+      appearanceImpactOf(squareDto(), fullSquarePatch({ box: rect(100.1, 100, 200.1, 200) })),
     ).toBe('translation');
   });
 
   it('a subtype mismatch is conservatively regenerate', () => {
     expect(
-      appearanceImpactOf(squareDto(), patch({ subtype: 'circle', rect: rect(0, 0, 1, 1) })),
+      appearanceImpactOf(squareDto(), patch({ subtype: 'circle', box: rect(0, 0, 1, 1) })),
     ).toBe('regenerate');
   });
 });

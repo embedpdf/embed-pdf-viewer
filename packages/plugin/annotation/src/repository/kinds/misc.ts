@@ -41,18 +41,10 @@ export const fileAttachment = iconProjection('file-attachment');
 export const stamp: KindProjection = {
   ingest: (dto, crop) => {
     const stampDto = dto as Extract<AnnotationDTO, { subtype: 'stamp' }>;
-    return {
-      geometry: boxGeomFromDTO(
-        stampDto,
-        stampDto.rotation ?? undefined,
-        stampDto.unrotatedRect ?? undefined,
-        crop,
-        false,
-      ),
-    };
+    return { geometry: boxGeomFromDTO(stampDto, crop, false) };
   },
   // Geometry only — the visual is the engine-baked /AP, re-fit natively (with
-  // the stamp's recorded fit) when /Rect changes. A new drawing is bytes: it
+  // the stamp's recorded fit) when its box changes. A new drawing is bytes: it
   // goes to the engine as the `appearance` resource, never through this path.
   geometry: (annotation, crop) => boxEmit(annotation, crop),
   createable: false,
@@ -111,7 +103,7 @@ export const widget: KindProjection = {
   ingest: (dto, crop) => {
     const widgetDto = dto as Extract<AnnotationDTO, { subtype: 'widget' }>;
     return {
-      geometry: boxGeomFromDTO(widgetDto, undefined, undefined, crop, false),
+      geometry: { kind: 'rect', rect: pdfToContentRect(widgetDto.rect, crop), ellipse: false },
       ...(WIDGET_TEXT_KINDS.has(widgetKindOf(widgetDto.fieldFamily))
         ? { text: widgetTextFromDTO(widgetDto) }
         : {}),

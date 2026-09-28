@@ -1,5 +1,11 @@
 import { PluginError, toPluginError } from '@embedpdf/core';
-import { defaultsFor, fitStampBox, type Rect, type Point } from '@embedpdf/core-annotation';
+import {
+  contentToPdfRect,
+  defaultsFor,
+  fitStampBox,
+  type Rect,
+  type Point,
+} from '@embedpdf/core-annotation';
 import {
   annotationKey,
   toPageRef,
@@ -14,7 +20,6 @@ import {
 import { ICON_PLACE_SIZE, iconPlacement, isIconPlaceKind } from './placement';
 import type { FilePickerProvider } from '../contract';
 import type { AnnotationReads } from '../read/annotations';
-import { boxGeomFields } from '../repository';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import { named } from './named';
 import type { Stamps } from './stamps';
@@ -68,7 +73,7 @@ export function createIcons(
     const box: Rect = fitStampBox(point, ICON_PLACE_SIZE, pageSizeOf(crop), rotCW);
     const placement = iconPlacement(
       tool.subtype,
-      boxGeomFields(box, rotCW, crop),
+      { rect: contentToPdfRect(box, crop) },
       defaultsFor(store.model(), tool.preset),
       tool.flags,
       file,
@@ -120,7 +125,7 @@ export function createIcons(
       const box: Rect = fitStampBox(at, ICON_PLACE_SIZE, pageSizeOf(crop), 0);
       const placement = iconPlacement(
         tool.subtype,
-        boxGeomFields(box, 0, crop),
+        { rect: contentToPdfRect(box, crop) },
         defaultsFor(store.model(), tool.preset),
         tool.flags,
         file,

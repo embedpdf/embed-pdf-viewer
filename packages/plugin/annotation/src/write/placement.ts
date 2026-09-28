@@ -33,15 +33,15 @@ export const isIconPlaceKind = (subtype: Subtype): subtype is IconPlaceKind =>
 
 /**
  * Build the engine create for a placed icon annotation: its data, and for a
- * file attachment the file's bytes as the `file` resource. `geom` is the
- * repository's `boxGeomFields` emit (the `/Rect` + upright rotation pair);
- * `defaults` is the tool's resolved flat props bag (`defaultsFor`) — the
+ * file attachment the file's bytes as the `file` resource. `geometry` is the
+ * icon's `/Rect`; `defaults` is the tool's resolved flat props bag
+ * (`defaultsFor`) — the
  * colour seam is crossed here via the repository's `cssToColor`, and the
  * icon falls back to the kind's own default when the bag carries none.
  */
 export function iconPlacement(
   subtype: IconPlaceKind,
-  geometry: { rect: PdfRect; rotation?: number | null; unrotatedRect?: PdfRect | null },
+  geometry: { rect: PdfRect },
   defaults: AnnotationProps,
   flags: Partial<AnnotationFlags> | undefined,
   file: AttachmentFileSource | null,

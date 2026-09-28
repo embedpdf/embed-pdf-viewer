@@ -15,7 +15,9 @@ import type { AnnotationResourceRole } from './resources';
  * - Attribution, engine and preserved fields are accepted on every write, so
  *   a read DTO can be passed straight back. A data field whose read has more
  *   values than a write can make (`readBack()`) takes them in an update too:
- *   sent back unchanged it is kept, any other such value is refused.
+ *   sent back unchanged it is kept, any other such value is refused. An
+ *   engine field marked `readBack()` is worked out from other fields: an
+ *   update takes only the value a read returned.
  */
 
 /**
@@ -64,7 +66,8 @@ export interface Field<Read, Write, Traits> {
   /**
    * An update also takes the values only a read returns, so a read DTO can
    * be sent back: such a value is kept when it's unchanged and refused
-   * otherwise. A create still takes only what `writes` accepts.
+   * otherwise. A create still takes only what `writes` accepts. On an engine
+   * field every value is a read's: any other than the current one is refused.
    */
   readBack(): Field<Read, Write, Override<Traits, { readBack: true }>>;
 }
@@ -216,9 +219,10 @@ export interface KindDeclaration<
   readonly updateSchema: z.ZodType<KindUpdate<Subtype, Fields>>;
   /**
    * The write schema of each `readBack()` field: an update's value outside
-   * it is a read-only value, kept only when unchanged.
+   * it is a read-only value, kept only when unchanged. `null` for an engine
+   * field, which no value writes.
    */
-  readonly readBackWrites: Readonly<Record<string, z.ZodTypeAny>>;
+  readonly readBackWrites: Readonly<Record<string, z.ZodTypeAny | null>>;
   /** The zod shapes behind the three schemas, to build variants from. */
   readonly shapes: {
     readonly read: z.ZodRawShape;
@@ -263,7 +267,7 @@ export function defineKind<
   const read: Record<string, z.ZodTypeAny> = { subtype: z.literal(subtype) };
   const create: Record<string, z.ZodTypeAny> = { subtype: z.literal(subtype) };
   const update: Record<string, z.ZodTypeAny> = { subtype: z.literal(subtype).optional() };
-  const readBackWrites: Record<string, z.ZodTypeAny> = {};
+  const readBackWrites: Record<string, z.ZodTypeAny | null> = {};
   for (const [name, spec] of Object.entries(fields)) {
     const { owner, readNullable, writeNullable, required, readBack } = spec.traits;
     read[name] = readNullable ? spec.read.nullable() : spec.read;
@@ -275,7 +279,8 @@ export function defineKind<
     } else {
       // Accepted so a read DTO can be sent back; the engine decides what happens to it.
       create[name] = z.unknown().optional();
-      update[name] = z.unknown().optional();
+      update[name] = readBack ? read[name]!.optional() : z.unknown().optional();
+      if (readBack) readBackWrites[name] = null;
     }
   }
   return {

@@ -26,8 +26,11 @@ export interface AnnotationKindModule<
   readonly dtoSchema: z.ZodType<DTO>;
   readonly draftSchema: z.ZodType<Draft>;
   readonly patchSchema: z.ZodType<Patch>;
-  /** The write schema of each field an update may send back as read (`readBack()`). */
-  readonly readBackWrites: Readonly<Record<string, z.ZodTypeAny>>;
+  /**
+   * The write schema of each field an update may send back as read
+   * (`readBack()`); `null` for a field the engine works out.
+   */
+  readonly readBackWrites: Readonly<Record<string, z.ZodTypeAny | null>>;
 }
 
 /**

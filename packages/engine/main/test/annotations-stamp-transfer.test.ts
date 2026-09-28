@@ -141,7 +141,7 @@ describe('stamp annotations: resource buffers survive a detaching transport', ()
     const first = await page.annotations.create(
       {
         subtype: 'stamp',
-        rect: { left: 100, bottom: 500, right: 260, top: 580 },
+        box: { left: 100, bottom: 500, right: 260, top: 580 },
         name: 'Approved',
       },
       { appearance: png },
@@ -153,7 +153,7 @@ describe('stamp annotations: resource buffers survive a detaching transport', ()
     const second = await page.annotations.create(
       {
         subtype: 'stamp',
-        rect: { left: 100, bottom: 300, right: 260, top: 380 },
+        box: { left: 100, bottom: 300, right: 260, top: 380 },
         name: 'Approved',
       },
       { appearance: png },

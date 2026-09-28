@@ -213,8 +213,8 @@ their original drawing. So:
 
 - a highlight, a drawing or a text box that another app drew looks as the engine draws the same
   data;
-- for lines, polygons, ink and highlights the engine computes `rect` from the points, so it can
-  differ slightly from the original;
+- the engine computes `rect` from the data (the points of lines, polygons, ink and highlights,
+  the `box` of the other shapes), so it can differ slightly from the original;
 - a note's and a file's icon is the engine's own 20 × 20 icon, at the same bottom-left corner;
 - a measurement's label is worked out again from its scale.
 

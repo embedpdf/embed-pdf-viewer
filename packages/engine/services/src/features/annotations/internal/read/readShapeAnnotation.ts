@@ -6,36 +6,26 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
-import { readBorderEffect, readRectangleDifferences } from './annotationReadPrimitives';
-import {
-  readAnnotationRotation,
-  readAnnotationUnrotatedRect,
-} from './readAnnotationTransformMetadata';
+import { readBorderEffect } from './annotationReadPrimitives';
+import { readAnnotationBox } from './readAnnotationTurn';
 import { readFilledStyleExtras } from './readStyle';
 
 /**
  * Shared reader for the two shape subtypes. Materialises the common
- * stroke/fill styling plus the shape-only cloudy (`/BE`) and rect-diff
- * (`/RD`) fields; the caller fills in the `subtype` literal. Absent `/BE`
- * and `/RD` read as explicit `null` (never omission), so a read DTO
- * compares structurally against a clearing patch.
+ * stroke/fill styling, the box and its turn, and the cloudy (`/BE`)
+ * intensity; the caller fills in the `subtype` literal. An absent `/BE`
+ * reads as explicit `null` (never omission), so a read DTO compares
+ * structurally against a clearing patch.
  */
 export function readShapeExtras(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
 ): ShapeAnnotationFields {
-  const cloudyIntensity = readBorderEffect(fn, mem, annotPtr);
-  const rectDifferences = readRectangleDifferences(fn, mem, annotPtr);
-  const rotation = readAnnotationRotation(fn, mem, annotPtr);
-  const unrotatedRect = readAnnotationUnrotatedRect(fn, mem, annotPtr);
-
   return {
     ...readFilledStyleExtras(fn, mem, annotPtr),
-    cloudyIntensity,
-    rectDifferences,
-    rotation: rotation ?? null,
-    unrotatedRect: unrotatedRect ?? null,
+    ...readAnnotationBox(fn, mem, annotPtr),
+    cloudyIntensity: readBorderEffect(fn, mem, annotPtr),
   };
 }
 

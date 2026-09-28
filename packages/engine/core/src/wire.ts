@@ -267,7 +267,6 @@ export {
   LineEndingSchema,
   LineEndingsSchema,
   AnnotationBorderStyleSchema,
-  PdfRectDifferencesSchema,
   StandardFontSchema,
   TextAlignmentSchema,
   FreeTextIntentSchema,

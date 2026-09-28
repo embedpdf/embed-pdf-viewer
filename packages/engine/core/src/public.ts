@@ -27,6 +27,7 @@ export { isRotatedGeometryRun } from './dto/PageGeometrySnapshot';
 export { validateSearchQuery } from './search/regex';
 
 // Annotations.
+export { appearanceTurnOf } from './annotation/appearanceTurn';
 export { buildCommentThreads } from './annotation/comments';
 export { AnnotationTransfer } from './transfer/AnnotationTransfer';
 export {

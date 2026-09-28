@@ -264,7 +264,7 @@ export function runAnnotationMutationConformance(
         const circleDraft: CircleDraft = {
           subtype: 'circle',
           contents: 'mutation conformance: circle',
-          rect: shapeRect,
+          box: shapeRect,
           interiorColor: { r: 255, g: 0, b: 0 },
           color: { r: 0, g: 0, b: 255 },
           strokeWidth: 3,
@@ -283,8 +283,10 @@ export function runAnnotationMutationConformance(
           expect(circle.annotation.borderStyle).toBe('solid');
           // /CA stored as f32 — compare at 2dp to absorb float drift.
           expect(Math.round(circle.annotation.opacity * 100) / 100).toBe(0.6);
-          // /Rect round-trips. The chosen bounds are small integers that
-          // are exactly representable in f32, so an exact compare is safe.
+          // The border is drawn inside the box, so `rect` is the box. The
+          // chosen bounds are small integers that are exactly representable
+          // in f32, so an exact compare is safe.
+          expect(circle.annotation.box).toEqual(shapeRect);
           expect(circle.annotation.rect.left).toBe(shapeRect.left);
           expect(circle.annotation.rect.right).toBe(shapeRect.right);
           expect(circle.annotation.rect.bottom).toBe(shapeRect.bottom);
@@ -294,7 +296,7 @@ export function runAnnotationMutationConformance(
         const squareDraft: SquareDraft = {
           subtype: 'square',
           contents: 'mutation conformance: square',
-          rect: shapeRect,
+          box: shapeRect,
           interiorColor: null,
           color: { r: 0, g: 128, b: 0 },
           strokeWidth: 2,
@@ -322,59 +324,61 @@ export function runAnnotationMutationConformance(
       }
     });
 
-    test('cloudy border (/BE) + rect differences (/RD) are tri-state', async () => {
+    test('a cloudy border reaches past the box, and rect takes it in', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
 
-        // A plain shape reads both optional entries as explicit null — absence
-        // is stated, so a read DTO compares structurally against a clearing
-        // patch. The draft also states them as null (exactly what the plugin's
+        // A plain shape reads `cloudyIntensity` as explicit null — absence is
+        // stated, so a read DTO compares structurally against a clearing
+        // patch. The draft also states it as null (exactly what the plugin's
         // total projection emits for a fresh solid shape): a draft writer must
         // skip null, never dereference it — the stale-worker regression where
         // solid creates vanished while cloudy ones survived.
         const plainDraft: SquareDraft = {
           subtype: 'square',
-          contents: 'mutation conformance: cloudy tri-state',
-          rect: shapeRect,
+          contents: 'mutation conformance: cloudy border',
+          box: shapeRect,
           color: { r: 0, g: 128, b: 0 },
           strokeWidth: 2,
           borderStyle: 'solid',
           opacity: 1,
           cloudyIntensity: null,
-          rectDifferences: null,
         };
         const plain = await page.annotations.create(plainDraft);
         expect(plain.annotation.subtype).toBe('square');
         if (plain.annotation.subtype === 'square') {
           expect(plain.annotation.cloudyIntensity).toBe(null);
-          expect(plain.annotation.rectDifferences).toBe(null);
+          expect(plain.annotation.rect).toEqual(shapeRect);
         }
 
-        // A value sets /BE + /RD…
-        const rd = { left: 5, top: 5, right: 5, bottom: 5 };
+        // The bumps reach out past the box on every side: the box stays, and
+        // `rect` takes them in.
         const cloudy = await page.annotations.update(plain.annotation.ref, {
           subtype: 'square',
           cloudyIntensity: 2,
-          rectDifferences: rd,
         });
         expect(cloudy.annotation.subtype).toBe('square');
         if (cloudy.annotation.subtype === 'square') {
           expect(cloudy.annotation.cloudyIntensity).toBe(2);
-          expect(cloudy.annotation.rectDifferences).toMatchObject(rd);
+          const { box, rect } = cloudy.annotation;
+          for (const edge of ['left', 'bottom', 'right', 'top'] as const) {
+            expect(Math.abs(box[edge] - shapeRect[edge]) < 1e-3).toBe(true);
+          }
+          expect(rect.left < box.left - 1 && rect.bottom < box.bottom - 1).toBe(true);
+          expect(rect.right > box.right + 1 && rect.top > box.top + 1).toBe(true);
         }
 
-        // …and null removes them: the cloudy -> solid transition leaves no
-        // stale /RD behind (the Adobe "phantom padding" regression).
+        // A solid border gives the room back: no stale bump room is left
+        // behind (the Adobe "phantom padding" regression).
         const solid = await page.annotations.update(plain.annotation.ref, {
           subtype: 'square',
           cloudyIntensity: null,
-          rectDifferences: null,
         });
         expect(solid.annotation.subtype).toBe('square');
         if (solid.annotation.subtype === 'square') {
           expect(solid.annotation.cloudyIntensity).toBe(null);
-          expect(solid.annotation.rectDifferences).toBe(null);
+          expect(solid.annotation.rect).toEqual(shapeRect);
         }
 
         // Polygon carries /BE too (but never /RD, per ISO 32000) — same tri-state,
@@ -415,7 +419,7 @@ export function runAnnotationMutationConformance(
         const draft: SquareDraft = {
           subtype: 'square',
           contents: 'mutation conformance: appearance echo',
-          rect: shapeRect,
+          box: shapeRect,
           color: { r: 200, g: 0, b: 0 },
           strokeWidth: 2,
           borderStyle: 'solid',
@@ -429,7 +433,7 @@ export function runAnnotationMutationConformance(
         // invalidation signal stays off.
         const moved = await page.annotations.update(created.annotation.ref, {
           subtype: 'square',
-          rect: {
+          box: {
             left: shapeRect.left + 12,
             bottom: shapeRect.bottom - 8,
             right: shapeRect.right + 12,
@@ -458,7 +462,7 @@ export function runAnnotationMutationConformance(
         // A resize is not a translation — it re-bakes too.
         const resized = await page.annotations.update(created.annotation.ref, {
           subtype: 'square',
-          rect: {
+          box: {
             left: shapeRect.left,
             bottom: shapeRect.bottom,
             right: shapeRect.right + 40,
@@ -479,7 +483,7 @@ export function runAnnotationMutationConformance(
           subtype: 'free-text',
           intent: 'free-text',
           contents: 'DA read-modify-write',
-          rect: shapeRect,
+          box: shapeRect,
           fontFamily: 'times-roman',
           fontSize: 14,
           textAlign: 'left',
@@ -517,29 +521,32 @@ export function runAnnotationMutationConformance(
       }
     });
 
-    test('box transform is tri-state: rect-only moves keep rotation, null flattens', async () => {
+    test('a turn stays until changed: a box move keeps it, null straightens', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const draft: SquareDraft = {
           subtype: 'square',
           contents: 'transform tri-state',
-          rect: shapeRect,
+          box: shapeRect,
           color: { r: 0, g: 0, b: 255 },
           strokeWidth: 2,
           borderStyle: 'solid',
           opacity: 1,
-          // A 90° rotation whose AABB equals the box (square) — valid pair.
           rotation: 90,
-          unrotatedRect: shapeRect,
         };
         const created = await page.annotations.create(draft);
         expect(created.annotation.subtype).toBe('square');
         if (created.annotation.subtype === 'square') {
           expect(created.annotation.rotation).toBe(90);
         }
+        // The engine sets `rect` to the upright box around the turned box: a
+        // quarter turn swaps its sides about the same middle.
+        const turnedRect = created.annotation.rect;
+        expect(turnedRect.right - turnedRect.left).toBe(shapeRect.top - shapeRect.bottom);
+        expect(turnedRect.top - turnedRect.bottom).toBe(shapeRect.right - shapeRect.left);
 
-        // The whole group riding one delta is a verified translation: the
+        // The box and its turn riding one delta is a verified translation: the
         // rotation survives and the baked /AP is preserved.
         const d = { x: 15, y: -10 };
         const shift = (r: typeof shapeRect) => ({
@@ -548,36 +555,36 @@ export function runAnnotationMutationConformance(
           right: r.right + d.x,
           top: r.top + d.y,
         });
-        const trioMoved = await page.annotations.update(created.annotation.ref, {
+        const moved = await page.annotations.update(created.annotation.ref, {
           subtype: 'square',
-          rect: shift(shapeRect),
+          box: shift(shapeRect),
           rotation: 90,
-          unrotatedRect: shift(shapeRect),
         });
-        expect(trioMoved.appearance).toEqual({ action: 'preserved', changed: false });
-        if (trioMoved.annotation.subtype === 'square') {
-          expect(trioMoved.annotation.rotation).toBe(90);
+        expect(moved.appearance).toEqual({ action: 'preserved', changed: false });
+        expect(moved.annotation.rect).toEqual(shift(turnedRect));
+        if (moved.annotation.subtype === 'square') {
+          expect(moved.annotation.rotation).toBe(90);
         }
 
-        // A rect-only move preserves the omitted rotation (tri-state law: a
-        // patch touches what it states) — the old writer cleared it.
-        const rectOnly = await page.annotations.update(created.annotation.ref, {
+        // A box-only move keeps the omitted rotation (tri-state law: a patch
+        // touches what it states).
+        const boxOnly = await page.annotations.update(created.annotation.ref, {
           subtype: 'square',
-          rect: shapeRect,
+          box: shapeRect,
         });
-        if (rectOnly.annotation.subtype === 'square') {
-          expect(rectOnly.annotation.rotation).toBe(90);
+        if (boxOnly.annotation.subtype === 'square') {
+          expect(boxOnly.annotation.rotation).toBe(90);
         }
 
-        // Explicit null flattens — the only way to remove the rotation.
-        const flattened = await page.annotations.update(created.annotation.ref, {
+        // Explicit null straightens the box where it is.
+        const straightened = await page.annotations.update(created.annotation.ref, {
           subtype: 'square',
           rotation: null,
-          unrotatedRect: null,
         });
-        if (flattened.annotation.subtype === 'square') {
-          expect(flattened.annotation.rotation).toBe(null);
-          expect(flattened.annotation.unrotatedRect).toBe(null);
+        if (straightened.annotation.subtype === 'square') {
+          expect(straightened.annotation.rotation).toBe(null);
+          expect(straightened.annotation.box).toEqual(shapeRect);
+          expect(straightened.annotation.rect).toEqual(shapeRect);
         }
       } finally {
         await doc.close();
@@ -698,7 +705,7 @@ export function runAnnotationMutationConformance(
           subtype: 'free-text',
           intent: 'free-text',
           contents: 'mutation conformance: free text',
-          rect: shapeRect,
+          box: shapeRect,
           fontFamily: 'helvetica',
           fontSize: 14,
           textAlign: 'center',
@@ -728,7 +735,7 @@ export function runAnnotationMutationConformance(
           subtype: 'free-text',
           intent: 'free-text-callout',
           contents: 'mutation conformance: callout',
-          rect: shapeRect,
+          box: shapeRect,
           fontFamily: 'times-roman',
           fontSize: 12,
           textAlign: 'left',
@@ -752,6 +759,13 @@ export function runAnnotationMutationConformance(
           expect(callout.annotation.color).toMatchObject({ r: 0, g: 0, b: 0 });
           expect(callout.annotation.calloutLine?.length).toBe(DEFAULT_CALLOUT_LINE.length);
           expect(callout.annotation.lineEnding).toBe('open-arrow');
+          // The box is the text box; `rect` holds it, the line and its arrow.
+          expect(callout.annotation.box).toEqual(shapeRect);
+          const { rect } = callout.annotation;
+          for (const point of DEFAULT_CALLOUT_LINE) {
+            expect(point.x >= rect.left && point.x <= rect.right).toBe(true);
+            expect(point.y >= rect.bottom && point.y <= rect.top).toBe(true);
+          }
         }
 
         const after = await page.annotations.list();
@@ -770,7 +784,7 @@ export function runAnnotationMutationConformance(
           subtype: 'free-text',
           intent: 'free-text',
           contents: 'free-text-update-base',
-          rect: shapeRect,
+          box: shapeRect,
           fontFamily: 'helvetica',
           fontSize: 12,
           textAlign: 'left',
@@ -823,7 +837,7 @@ export function runAnnotationMutationConformance(
           subtype: 'free-text',
           intent: 'free-text',
           contents: 'Plain\rtext',
-          rect: shapeRect,
+          box: shapeRect,
           fontFamily: 'helvetica-bold',
           fontSize: 18,
           textAlign: 'center',
@@ -857,7 +871,7 @@ export function runAnnotationMutationConformance(
         const created = await page.annotations.create({
           subtype: 'free-text',
           intent: 'free-text',
-          rect: shapeRect,
+          box: shapeRect,
           fontFamily: 'helvetica',
           fontSize: 12,
           textAlign: 'left',
@@ -921,7 +935,7 @@ export function runAnnotationMutationConformance(
         const created = await page.annotations.create({
           subtype: 'free-text',
           intent: 'free-text',
-          rect: shapeRect,
+          box: shapeRect,
           fontFamily: 'helvetica',
           fontSize: 14,
           textAlign: 'center',
@@ -980,7 +994,7 @@ export function runAnnotationMutationConformance(
         const created = await page.annotations.create({
           subtype: 'free-text',
           intent: 'free-text',
-          rect: shapeRect,
+          box: shapeRect,
           fontFamily: 'helvetica',
           fontSize: 14,
           textAlign: 'left',
@@ -1021,7 +1035,7 @@ export function runAnnotationMutationConformance(
           subtype: 'free-text',
           intent: 'free-text',
           contents: 'x',
-          rect: shapeRect,
+          box: shapeRect,
           fontFamily: 'helvetica',
           fontSize: 14,
           textAlign: 'left',
@@ -1187,7 +1201,7 @@ export function runAnnotationMutationConformance(
       }
     });
 
-    test('create + update a caret round-trips color/opacity/rect differences', async () => {
+    test('create + update a caret round-trips color/opacity and its box', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
@@ -1196,10 +1210,9 @@ export function runAnnotationMutationConformance(
           subtype: 'caret',
           intent: 'replace',
           contents: 'mutation conformance: caret',
-          rect: shapeRect,
+          box: shapeRect,
           color: { r: 0, g: 128, b: 255 },
           opacity: 0.7,
-          rectDifferences: { left: 2, top: 2, right: 2, bottom: 2 },
         };
         const caret = await page.annotations.create(caretDraft);
         expect(AnnotationCreateResultSchema.safeParse(caret).success).toBe(true);
@@ -1213,40 +1226,29 @@ export function runAnnotationMutationConformance(
           // Caret carries no border or quads.
           expect('strokeWidth' in caret.annotation).toBe(false);
           expect('quadPoints' in caret.annotation).toBe(false);
-          expect(caret.annotation.rectDifferences).toMatchObject({
-            left: 2,
-            top: 2,
-            right: 2,
-            bottom: 2,
-          });
+          // The symbol fills its box; `rect` holds its outline too.
+          expect(caret.annotation.box).toEqual(shapeRect);
+          const { rect } = caret.annotation;
+          expect(rect.left <= shapeRect.left && rect.bottom <= shapeRect.bottom).toBe(true);
+          expect(rect.right >= shapeRect.right && rect.top >= shapeRect.top).toBe(true);
         }
 
         const before = await page.annotations.list();
         const result = await page.annotations.update(caret.annotation.ref, {
           subtype: 'caret',
           color: { r: 255, g: 0, b: 0 },
-          rectDifferences: { left: 4, top: 4, right: 4, bottom: 4 },
         });
         expect(AnnotationUpdateResultSchema.safeParse(result).success).toBe(true);
         expect(result.annotation.subtype).toBe('caret');
         if (result.annotation.subtype === 'caret') {
           expect(result.annotation.color).toMatchObject({ r: 255, g: 0, b: 0 });
+          expect(result.annotation.box).toEqual(shapeRect);
         }
         // Update never bumps the revision.
         expect(result.meta.affectedPages[0].revision.generation).toBe(
           before.pages[0].revision.generation,
         );
         expect(result.meta.weakRefsInvalidated).toBe(false);
-
-        // Tri-state: `null` removes /RD entirely (a read then states the absence).
-        const rdCleared = await page.annotations.update(caret.annotation.ref, {
-          subtype: 'caret',
-          rectDifferences: null,
-        });
-        expect(rdCleared.annotation.subtype).toBe('caret');
-        if (rdCleared.annotation.subtype === 'caret') {
-          expect(rdCleared.annotation.rectDifferences).toBe(null);
-        }
 
         const after = await page.annotations.list();
         expect(after.annotations.some((a) => a.subtype === 'caret')).toBe(true);
@@ -1388,7 +1390,7 @@ export function runAnnotationMutationConformance(
         const created = await page.annotations.create({
           subtype: 'circle',
           contents: 'shape-update-base',
-          rect: shapeRect,
+          box: shapeRect,
           interiorColor: { r: 10, g: 20, b: 30 },
           color: { r: 0, g: 0, b: 0 },
           strokeWidth: 1,
@@ -1428,7 +1430,7 @@ export function runAnnotationMutationConformance(
           const created = await page.annotations.create({
             subtype: 'circle',
             contents: 'appearance-gen',
-            rect: shapeRect,
+            box: shapeRect,
             interiorColor: { r: 255, g: 0, b: 0 },
             color: { r: 0, g: 0, b: 0 },
             strokeWidth: 2,
@@ -2098,7 +2100,7 @@ export function runAnnotationMutationConformance(
         const caret = await page.annotations.create({
           subtype: 'caret',
           contents: '',
-          rect: shapeRect,
+          box: shapeRect,
           color: { r: 0, g: 0, b: 0 },
           opacity: 1,
           reply: { to: primary.annotation.ref, type: 'group' },
@@ -2359,10 +2361,9 @@ export function runAnnotationMutationConformance(
           subtype: 'caret',
           intent: 'replace',
           contents: 'replacement text',
-          rect: shapeRect,
+          box: shapeRect,
           color: { r: 228, g: 66, b: 52 },
           opacity: 1,
-          rectDifferences: { left: 0.5, top: 0.5, right: 0.5, bottom: 0.5 },
         } satisfies CaretDraft);
         const strikeout = await page.annotations.create({
           subtype: 'strikeout',

@@ -70,8 +70,8 @@ const freeTextDTO = (
     opacity: 1,
     strokeWidth: 1,
     borderStyle: 'solid',
-    rectDifferences: null,
     rect: { left: 100, bottom: 700, right: 300, top: 740 },
+    box: { left: 100, bottom: 700, right: 300, top: 740 },
     ...extra,
   }) as unknown as AnnotationDTO;
 

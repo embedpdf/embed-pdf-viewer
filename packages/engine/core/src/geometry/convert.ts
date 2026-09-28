@@ -106,3 +106,40 @@ export function pdfQuadCorners(q: PdfQuad): PdfQuadCorners {
 export function pdfQuadFromCorners(c: PdfQuadCorners): PdfQuad {
   return { p1: c.topLeft, p2: c.topRight, p3: c.bottomLeft, p4: c.bottomRight };
 }
+
+/**
+ * The upright box around `rect` turned by `degrees` about its middle, either
+ * way: the `/Rect` of a turned box.
+ */
+export function pdfRectTurnedBounds(rect: PdfRect, degrees: number): PdfRect {
+  const radians = (degrees * Math.PI) / 180;
+  const cos = Math.abs(Math.cos(radians));
+  const sin = Math.abs(Math.sin(radians));
+  const width = rect.right - rect.left;
+  const height = rect.top - rect.bottom;
+  const halfAcross = (width * cos + height * sin) / 2;
+  const halfUp = (width * sin + height * cos) / 2;
+  const x = (rect.left + rect.right) / 2;
+  const y = (rect.bottom + rect.top) / 2;
+  return { left: x - halfAcross, bottom: y - halfUp, right: x + halfAcross, top: y + halfUp };
+}
+
+/**
+ * Whether two rects are the same within what a file's numbers hold: Acrobat
+ * writes three decimals, and a rect the engine writes is floats.
+ */
+export function isSamePdfRect(rect: PdfRect, other: PdfRect): boolean {
+  const size = Math.max(
+    rect.right - rect.left,
+    rect.top - rect.bottom,
+    other.right - other.left,
+    other.top - other.bottom,
+  );
+  const tolerance = 0.01 + 1e-4 * size;
+  return (
+    Math.abs(rect.left - other.left) <= tolerance &&
+    Math.abs(rect.bottom - other.bottom) <= tolerance &&
+    Math.abs(rect.right - other.right) <= tolerance &&
+    Math.abs(rect.top - other.top) <= tolerance
+  );
+}

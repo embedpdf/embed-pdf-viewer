@@ -56,9 +56,10 @@ const caretDTO = (): AnnotationDTO =>
     subtype: 'caret',
     intent: 'replace',
     rect: { left: 85, bottom: 745, right: 95, top: 755 },
+    box: { left: 85, bottom: 745, right: 95, top: 755 },
+    rotation: null,
     color: { r: 239, g: 68, b: 68 },
     opacity: 1,
-    rectDifferences: { left: 0.5, top: 0.5, right: 0.5, bottom: 0.5 },
     reply: null,
     popup: null,
     groupId: null,
@@ -161,6 +162,7 @@ describe('annotation flags', () => {
       ...flags,
       subtype: 'square',
       rect: { left: 100, bottom: 700, right: 180, top: 760 },
+      box: { left: 100, bottom: 700, right: 180, top: 760 },
       color: { r: 0, g: 0, b: 0 },
       opacity: 1,
       strokeWidth: 2,
@@ -242,6 +244,7 @@ describe('annotation flags', () => {
     await harness.capability.createRaw(PAGE, {
       subtype: 'square',
       rect: { left: 0, bottom: 0, right: 10, top: 10 },
+      box: { left: 0, bottom: 0, right: 10, top: 10 },
     } as Parameters<typeof harness.capability.createRaw>[1]);
     expect(harness.create.mock.calls[0]![0]).toMatchObject({ print: true });
   });
@@ -282,6 +285,7 @@ const hydrationSquare = (objectNumber: number): AnnotationDTO =>
     ...base(objectNumber),
     subtype: 'square',
     rect: { left: 100, bottom: 700, right: 180, top: 760 },
+    box: { left: 100, bottom: 700, right: 180, top: 760 },
     color: { r: 0, g: 0, b: 0 },
     opacity: 1,
     strokeWidth: 2,

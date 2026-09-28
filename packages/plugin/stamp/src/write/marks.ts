@@ -101,7 +101,7 @@ export function createMarks({ assetEngine }: Pick<StampServices, 'assetEngine'>)
               fontFamily: mark.fontFamily,
               fontSize: mark.fontSize ?? 36,
               textAlign: 'left',
-              rect: textBounds(mark.text, mark.fontSize ?? 36),
+              box: textBounds(mark.text, mark.fontSize ?? 36),
               fontColor: color,
               strokeWidth: 0,
             });

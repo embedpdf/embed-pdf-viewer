@@ -14,7 +14,6 @@ import {
   AnnotationRefSchema,
   BlendModeSchema,
   ColorSchema,
-  PdfRectDifferencesSchema,
 } from '../base.schema';
 import { field } from '../declaration';
 import type { FreeTextFont } from '../primitives';
@@ -99,10 +98,20 @@ export const filledStyleFields = {
   interiorColor: field.data(ColorSchema).nullable().optional(),
 };
 
-/** A box drawn rotated inside an axis-aligned `/Rect`. */
-export const rotationFields = {
+/**
+ * A kind drawn about a box that can turn: square, circle, free text, stamp
+ * and caret. The caller gives the box and the turn. `rect`, where the
+ * annotation sits on the page, is the engine's: the upright box around all
+ * it draws, the turned box and what the drawing adds around it (a cloudy
+ * border's bumps, a callout's line and arrow). An update may send back the
+ * `rect` it read.
+ */
+export const boxFields = {
+  rect: field.engine(PdfRectSchema).readBack(),
+  /** The shape's own box, before any turn: a callout's text box. */
+  box: field.data(PdfRectSchema),
+  /** Degrees clockwise, about the middle of `box`. */
   rotation: field.data(z.number()).nullable().optional(),
-  unrotatedRect: field.data(PdfRectSchema).nullable().optional(),
 };
 
 // ── families ──
@@ -118,16 +127,15 @@ export const textMarkupFields = {
 export const shapeFields = {
   ...annotationBaseFields,
   ...filledStyleFields,
-  ...rotationFields,
+  ...boxFields,
   cloudyIntensity: field.data(z.number().positive()).nullable().optional(),
-  rectDifferences: field.data(PdfRectDifferencesSchema).nullable().optional(),
 };
 
 export const vertexFields = {
   ...annotationBaseFields,
   ...filledStyleFields,
   vertices: field.data(z.array(PdfPointSchema)),
-  /** The angle already applied to the vertices. */
+  /** The angle already applied to the vertices, degrees clockwise. */
   rotation: field.data(z.number()).nullable().optional(),
 };
 

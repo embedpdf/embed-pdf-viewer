@@ -63,7 +63,7 @@ const FORGED = {
 
 const SQUARE: AnnotationDraft = {
   subtype: 'square',
-  rect: { left: 40, bottom: 40, right: 140, top: 100 },
+  box: { left: 40, bottom: 40, right: 140, top: 100 },
 };
 
 /**

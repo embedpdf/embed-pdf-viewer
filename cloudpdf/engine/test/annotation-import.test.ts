@@ -103,8 +103,8 @@ describe('annotation import on the cloud engine', () => {
     try {
       const { pages } = await source.pages.list();
       const pageRef = toPageRef(pages[0]!.ref.pageObjectNumber);
-      await source.page(pageRef).annotations.create({ subtype: 'square', rect: rect(20) });
-      await source.page(pageRef).annotations.create({ subtype: 'circle', rect: rect(80) });
+      await source.page(pageRef).annotations.create({ subtype: 'square', box: rect(20) });
+      await source.page(pageRef).annotations.create({ subtype: 'circle', box: rect(80) });
       const bundle = await source.annotations.export();
 
       const options = { attribution: 'stamp', opId: 'replay-1' } as const;
@@ -148,7 +148,7 @@ describe('annotation import on the cloud engine', () => {
       const { pages } = await source.pages.list();
       const pageRef = toPageRef(pages[0]!.ref.pageObjectNumber);
       for (const left of [20, 80, 140]) {
-        await source.page(pageRef).annotations.create({ subtype: 'square', rect: rect(left) });
+        await source.page(pageRef).annotations.create({ subtype: 'square', box: rect(left) });
       }
       const bundle = await source.annotations.export();
 
@@ -229,7 +229,7 @@ describe('the server holds the bundle limits while the request streams in', () =
       const pageRef = toPageRef(pages[0]!.ref.pageObjectNumber);
       await doc.page(pageRef).annotations.create({
         subtype: 'square',
-        rect: { left: 20, bottom: 20, right: 60, top: 50 },
+        box: { left: 20, bottom: 20, right: 60, top: 50 },
       });
       const square = (await doc.annotations.export()).items[0]!;
       const { annotations: before } = await doc.annotations.list({ pages: [pageRef] });

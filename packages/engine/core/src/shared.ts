@@ -66,6 +66,8 @@ export {
   pdfQuadBounds,
   pdfQuadCorners,
   pdfQuadFromCorners,
+  pdfRectTurnedBounds,
+  isSamePdfRect,
   renderSize,
 } from './geometry';
 export type { PageTextSnapshot } from './dto/PageTextSnapshot';
@@ -169,7 +171,6 @@ export type {
   AnnotationFlags,
   AnnotationReplyType,
   AnnotationBorderStyle,
-  PdfRectDifferences,
   StandardFont,
   FreeTextFont,
   TextAlignment,
@@ -427,6 +428,7 @@ export type {
   AppearanceOutcome,
 } from './annotation/appearance';
 export { appearanceImpactOf, semanticEqual } from './annotation/appearance';
+export { appearanceTurnOf } from './annotation/appearanceTurn';
 export { assertAnnotationDraft, checkAnnotationPatch } from './annotation/checkWrite';
 export type { FormFieldRef, FormWidget } from './identity/FormFieldRef';
 export { formWidget, toFieldRef } from './identity/FormFieldRef';

@@ -132,7 +132,7 @@ export function runPageRenderConformance(
     test('an appearance on a cropped page renders its own area', async () => {
       const { annotation } = await page.annotations.create({
         subtype: 'square',
-        rect: SQUARE,
+        box: SQUARE,
         color: { r: 255, g: 0, b: 0 },
         interiorColor: { r: 255, g: 0, b: 0 },
       });

@@ -306,6 +306,7 @@ describe('records mirror through the controller', () => {
       print: true,
       contents: null,
       rect: { left: 100, bottom: 700, right: 180, top: 760 },
+      box: { left: 100, bottom: 700, right: 180, top: 760 },
       color: { r: 0, g: 0, b: 0 },
       opacity: 1,
       strokeWidth: 1,

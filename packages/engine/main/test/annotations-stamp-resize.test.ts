@@ -87,8 +87,7 @@ describe('vector stamp resizing (wasm)', () => {
       await page.annotations.update(ref, {
         subtype: 'stamp',
         rotation: 270,
-        unrotatedRect: { left: 80, bottom: 45, right: 140, top: 75 },
-        rect: { left: 95, bottom: 30, right: 125, top: 90 },
+        box: { left: 95, bottom: 30, right: 125, top: 90 },
       });
       // Render the full annotation through the page renderer: appearance
       // thumbnails deliberately remove rotation for the viewer to apply it.
@@ -134,7 +133,7 @@ describe('vector stamp resizing (wasm)', () => {
         await page.annotations.update(ref, {
           subtype: 'stamp',
           fit: 'cover',
-          rect: { left: 10, bottom: 10, right: 110, top: 110 },
+          box: { left: 10, bottom: 10, right: 110, top: 110 },
         });
         const verify = async () => {
           const raster = await appearance(doc);
@@ -170,7 +169,7 @@ describe('vector stamp resizing (wasm)', () => {
         await page.annotations.update(ref, {
           subtype: 'stamp',
           fit: 'contain',
-          rect: { left: 10, bottom: 10, right: 110, top: 110 },
+          box: { left: 10, bottom: 10, right: 110, top: 110 },
         });
         const verify = async () => {
           const sibling = await appearance(doc, 1);
@@ -202,7 +201,7 @@ describe('vector stamp resizing (wasm)', () => {
         await page.annotations.update(ref, {
           subtype: 'stamp',
           fit: 'fill',
-          rect: { left: 10, bottom: 10, right: 110, top: 60 },
+          box: { left: 10, bottom: 10, right: 110, top: 60 },
         });
         const raster = await appearance(doc);
         expect(pixel(raster, 0.1, 0.5)).toEqual(extraContent ? [0, 0, 255, 255] : [255, 0, 0, 255]);
@@ -225,13 +224,13 @@ describe('vector stamp resizing (wasm)', () => {
           await page.annotations.update(ref, {
             subtype: 'stamp',
             fit,
-            rect: { left: 10, bottom: 10, right: 110, top: 110 },
+            box: { left: 10, bottom: 10, right: 110, top: 110 },
           });
         }
         await page.annotations.update(ref, {
           subtype: 'stamp',
           fit: 'fill',
-          rect: { left: 10, bottom: 10, right: 210, top: 110 },
+          box: { left: 10, bottom: 10, right: 210, top: 110 },
         });
         const saved = await doc.download();
         await doc.close();

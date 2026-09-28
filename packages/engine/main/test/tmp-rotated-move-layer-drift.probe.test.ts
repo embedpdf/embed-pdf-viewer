@@ -90,14 +90,14 @@ describe('rotated circle move drift probe — LAYER pipeline', () => {
   });
 
   test('create rotated → (reopen layer → move → export) × 3', async () => {
-    const ROT_PDF = 340;
+    const ROTATION = 20; // degrees clockwise
     let U: R = { left: 100, bottom: 500, right: 220, top: 580 };
 
     const dump = async (label: string, d: Awaited<ReturnType<LocalEngine['open']>>) => {
       const list = await d.page(toPageRef(PAGE)).annotations.list();
       const a = list.annotations.find(
         (x) => x.subtype === 'circle' && x.contents === 'drift probe',
-      ) as unknown as { ref: unknown; rect: R; unrotatedRect?: R; rotation?: number };
+      ) as unknown as { ref: unknown; rect: R; box?: R; rotation?: number };
       const rendered = await d.page(toPageRef(PAGE)).annotations.renderAppearancesRaw();
       const ap = rendered.appearances.find(
         (p) => JSON.stringify((p as { ref: unknown }).ref) === JSON.stringify(a.ref),
@@ -108,7 +108,7 @@ describe('rotated circle move drift probe — LAYER pipeline', () => {
         '\n  /Rect      =',
         fmt(a.rect),
         '\n  unrotRect  =',
-        fmt(a.unrotatedRect),
+        fmt(a.box),
         '\n  rotation   =',
         a.rotation,
         '\n  AP rect    =',
@@ -129,9 +129,8 @@ describe('rotated circle move drift probe — LAYER pipeline', () => {
     await doc.page(toPageRef(PAGE)).annotations.create({
       subtype: 'circle',
       contents: 'drift probe',
-      rect: aabb(U, ROT_PDF),
-      unrotatedRect: U,
-      rotation: ROT_PDF,
+      box: U,
+      rotation: ROTATION,
       interiorColor: { r: 250, g: 204, b: 21 },
       color: { r: 220, g: 80, b: 80 },
       strokeWidth: 6,
@@ -151,15 +150,14 @@ describe('rotated circle move drift probe — LAYER pipeline', () => {
       });
       const a = await dump(`REOPENED before move ${move}`, doc);
 
-      const modelRect = a.unrotatedRect ?? a.rect;
+      const modelRect = a.box ?? a.rect;
       const rot = a.rotation ?? 0;
       U = translate(modelRect, 30, 15);
       const res = await doc.page(toPageRef(PAGE)).annotations.update(
         a.ref as never,
         {
           subtype: 'circle',
-          rect: aabb(U, rot),
-          unrotatedRect: U,
+          box: U,
           rotation: rot,
         } as never,
       );

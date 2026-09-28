@@ -68,7 +68,7 @@ describe('rich text FreeText (local engine)', () => {
       fontSize: 18,
       textAlign: 'left',
       contents: 'Plain\rtext',
-      rect: RECT,
+      box: RECT,
     });
     const dto = created.annotation as FreeTextAnnotationDTO;
     expect(dto.fontFamily).toBe('helvetica-bold');
@@ -95,7 +95,7 @@ describe('rich text FreeText (local engine)', () => {
       fontFamily: 'helvetica',
       fontSize: 12,
       textAlign: 'left',
-      rect: RECT,
+      box: RECT,
       color: { r: 0, g: 0, b: 255 },
       richText: {
         body: { family: 'Helvetica', size: 18, color: '#102030' },
@@ -142,7 +142,7 @@ describe('rich text FreeText (local engine)', () => {
       fontSize: 14,
       textAlign: 'center',
       contents: 'centred',
-      rect: RECT,
+      box: RECT,
     });
     const ref = created.annotation.ref;
     const plain = created.annotation as FreeTextAnnotationDTO;
@@ -183,7 +183,7 @@ describe('rich text FreeText (local engine)', () => {
       fontFamily: 'helvetica',
       fontSize: 14,
       textAlign: 'left',
-      rect: RECT,
+      box: RECT,
       richText: {
         body: { family: 'Helvetica', size: 14 },
         paragraphs: [{ runs: [{ text: 'a' }, { text: 'b', style: { weight: 700 } }] }],
@@ -214,7 +214,7 @@ describe('rich text FreeText (local engine)', () => {
       fontFamily: 'helvetica',
       fontSize: 14,
       textAlign: 'left',
-      rect: RECT,
+      box: RECT,
       richText: {
         body: { family: 'Helvetica', size: 14 },
         paragraphs: [{ runs: [{ text: 'a' }, { text: 'b', style: { size: 30 } }] }],
@@ -247,7 +247,7 @@ describe('rich text FreeText (local engine)', () => {
       fontSize: 14,
       textAlign: 'left',
       contents: 'x',
-      rect: RECT,
+      box: RECT,
     });
     const ref = created.annotation.ref;
     const err = await rejection(
@@ -289,7 +289,7 @@ describe('rich text FreeText (local engine)', () => {
       fontFamily: 'my-roboto',
       fontSize: 16,
       textAlign: 'left',
-      rect: RECT,
+      box: RECT,
       richText: {
         body: { family: 'my-roboto', size: 16 },
         paragraphs: [{ runs: [{ text: 'Key ' }, { text: 'family', style: { family: 'Roboto' } }] }],
@@ -306,7 +306,7 @@ describe('rich text FreeText (local engine)', () => {
       fontSize: 16,
       textAlign: 'left',
       contents: 'Plain',
-      rect: { left: 50, bottom: 150, right: 350, top: 220 },
+      box: { left: 50, bottom: 150, right: 350, top: 220 },
     });
     expect((plain.annotation as FreeTextAnnotationDTO).fontFamily).toBe('my-roboto');
     await doc.close();
@@ -324,7 +324,7 @@ describe('rich text FreeText (local engine)', () => {
       fontSize: 18,
       textAlign: 'left',
       contents: 'Whole',
-      rect: RECT,
+      box: RECT,
     });
     // Default subsets: five glyphs of Roboto. Full re-embeds the whole
     // program on the next regeneration (streams are compressed on save, so
@@ -358,7 +358,7 @@ describe('rich text FreeText (local engine)', () => {
       fontSize: 24,
       textAlign: 'left',
       strokeWidth: 0,
-      rect: { left: 20, bottom: 120, right: 280, top: 200 },
+      box: { left: 20, bottom: 120, right: 280, top: 200 },
       richText: {
         body: { family: 'Helvetica', size: 24, color: '#000000' },
         paragraphs: [{ runs: [{ text: 'Hello world' }] }],

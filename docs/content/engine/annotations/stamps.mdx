@@ -12,7 +12,7 @@ picture as PNG, JPEG or PDF bytes, and the box to put it in:
 const image = await (await fetch('/approved.png')).blob();
 
 const { annotation } = await page.annotations.create(
-  { subtype: 'stamp', rect: { left: 72, bottom: 640, right: 222, top: 690 } },
+  { subtype: 'stamp', box: { left: 72, bottom: 640, right: 222, top: 690 } },
   { appearance: image },
 );
 ```
@@ -20,14 +20,16 @@ const { annotation } = await page.annotations.create(
 The picture goes in the second argument, as the `appearance`. A `Blob` (such as a file the user
 picked) and a `Uint8Array` both work.
 
-| Field           | What it is                                                                                                     | Default     |
-| :-------------- | :------------------------------------------------------------------------------------------------------------- | :---------- |
-| `rect`          | The box the stamp fills, `{ left, bottom, right, top }` in points; worked out for you when the stamp is turned | required    |
-| `fit`           | How the picture fills the box: `'contain'`, `'cover'` or `'fill'`                                              | `'contain'` |
-| `opacity`       | From `0` (invisible) to `1` (solid), over the whole picture                                                    | `1`         |
-| `name`          | A label for the stamp, such as `'Approved'`                                                                    | none        |
-| `rotation`      | How far the stamp is turned, in degrees; see [Turn a stamp](#turn-a-stamp)                                     | none        |
-| `unrotatedRect` | A turned stamp's own box, before turning                                                                       | none        |
+| Field      | What it is                                                                           | Default     |
+| :--------- | :----------------------------------------------------------------------------------- | :---------- |
+| `box`      | The box the stamp fills, `{ left, bottom, right, top }` in points, before any turn   | required    |
+| `fit`      | How the picture fills the box: `'contain'`, `'cover'` or `'fill'`                    | `'contain'` |
+| `opacity`  | From `0` (invisible) to `1` (solid), over the whole picture                          | `1`         |
+| `name`     | A label for the stamp, such as `'Approved'`                                          | none        |
+| `rotation` | How far the stamp is turned, in degrees clockwise; see [Turn a stamp](#turn-a-stamp) | none        |
+
+A read also has `rect`, where the stamp sits on the page: its box, or the upright box around it
+when it's turned. The engine works it out.
 
 `fit` works like CSS `object-fit`: `'contain'` shows the whole picture at its own proportions,
 `'cover'` fills the box at its own proportions and crops what sticks out, `'fill'` stretches the
@@ -54,7 +56,7 @@ PDF.
 ```ts
 const drawing = await doc.pages.extract([pageRef]);
 
-await page.annotations.create({ subtype: 'stamp', rect }, { appearance: drawing });
+await page.annotations.create({ subtype: 'stamp', box }, { appearance: drawing });
 ```
 
 ### Standard stamps
@@ -78,7 +80,7 @@ const approved = namedPages.find((entry) => entry.name.startsWith('Approved='));
 if (approved?.target.kind === 'page') {
   const drawing = await library.pages.extract([approved.target.page]);
   await page.annotations.create(
-    { subtype: 'stamp', rect, name: 'Approved', subject: 'Approved' },
+    { subtype: 'stamp', box, name: 'Approved', subject: 'Approved' },
     { appearance: drawing },
   );
 }
@@ -93,15 +95,15 @@ does this for you.
 
 ## Turn a stamp
 
-A stamp turns like a rectangle: give its own box as `unrotatedRect` and the angle as `rotation`,
-in degrees clockwise.
+A stamp turns like a rectangle: give its own box as `box` and the angle as `rotation`, in degrees
+clockwise.
 See [Turned shapes](/docs/engine/annotations/shapes#turned-shapes).
 
 ```ts
 const { annotation } = await page.annotations.create(
   {
     subtype: 'stamp',
-    unrotatedRect: { left: 300, bottom: 300, right: 400, top: 350 }, // 100 × 50
+    box: { left: 300, bottom: 300, right: 400, top: 350 }, // 100 × 50
     rotation: 90,
   },
   { appearance: image },
@@ -110,13 +112,16 @@ const { annotation } = await page.annotations.create(
 annotation.rect; // { left: 325, bottom: 275, right: 375, top: 375 }: the same box, turned
 ```
 
+A stamp turned in Acrobat reads the same way: its `rotation`, and its own box as `box`. A stamp
+you turn opens in Acrobat as a turned stamp.
+
 ## Resize and refit
 
-A new `rect` or a new `fit` places the same picture again. Nothing is uploaded or re-encoded:
+A new `box` or a new `fit` places the same picture again. Nothing is uploaded or re-encoded:
 
 ```ts
 await page.annotations.update(annotation.ref, {
-  rect: { left: 72, bottom: 600, right: 372, top: 690 },
+  box: { left: 72, bottom: 600, right: 372, top: 690 },
 });
 await page.annotations.update(annotation.ref, { fit: 'cover' });
 ```

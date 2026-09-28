@@ -48,6 +48,7 @@ const square = (objectNumber: number, extra: Record<string, unknown> = {}): Anno
     blendMode: 'normal',
     subtype: 'square',
     rect: { left: 100, bottom: 700, right: 180, top: 760 },
+    box: { left: 100, bottom: 700, right: 180, top: 760 },
     color: BLACK,
     interiorColor: null,
     opacity: 1,
@@ -98,8 +99,8 @@ const freeText = (contents: string, extra: Record<string, unknown> = {}): Annota
       paragraphs: [{ runs: [{ text: contents }] }],
     },
     borderStyle: 'solid',
-    rectDifferences: null,
     rect: { left: 100, bottom: 700, right: 300, top: 740 },
+    box: { left: 100, bottom: 700, right: 300, top: 740 },
     ...extra,
   });
 
@@ -335,8 +336,10 @@ describe('several changes to one record', () => {
     const moved = { left: 200, bottom: 600, right: 400, top: 640 };
 
     harness.capability.draftContents(ref(30), 'Hello world');
-    harness.update.mockResolvedValueOnce({ annotation: freeText('Hello', { rect: moved }) });
-    await harness.capability.updateRaw(ref(30), { subtype: 'free-text', rect: moved } as never);
+    harness.update.mockResolvedValueOnce({
+      annotation: freeText('Hello', { rect: moved, box: moved }),
+    });
+    await harness.capability.updateRaw(ref(30), { subtype: 'free-text', box: moved } as never);
 
     const annotation = harness.capability.get(ref(30))!;
     expect(annotation.contents).toBe('Hello world');

@@ -108,22 +108,29 @@ const CONTENTS_PAINTED: ReadonlySet<string> = new Set(['free-text', 'redact']);
 const ADVISORY_ROTATION: ReadonlySet<string> = new Set(['line', 'polyline', 'polygon', 'ink']);
 
 /**
- * The box kinds carry the `/EMBD_Metadata` transform pair (`rotation` +
- * `unrotatedRect`), tri-state on writes: omitted fields are preserved, `null`
- * (or `0` for rotation) clears. Translation verification therefore compares
- * the after-state — `patch.rotation ?? current.rotation` — not the patch keys.
+ * The box kinds turn by `rotation` about the middle of their `box`, tri-state
+ * on writes: an omitted rotation is kept, `null` (or `0`) clears it.
+ * Translation verification therefore compares the after-state —
+ * `patch.rotation ?? current.rotation` — not the patch keys.
  */
-const BOX_TRANSFORM: ReadonlySet<string> = new Set(['square', 'circle', 'free-text', 'stamp']);
+const BOX_TRANSFORM: ReadonlySet<string> = new Set([
+  'square',
+  'circle',
+  'free-text',
+  'stamp',
+  'caret',
+]);
 
 /**
  * Per-kind absolute-geometry fields (PDF user space) that a rigid translation
  * shifts together. A kind absent from this table never takes the translation
- * route. `rect` is required in every entry: a translation always moves `/Rect`.
+ * route. The first is where a move shows: `rect`, or a box kind's `box` (its
+ * `rect` is the engine's, and moves with it).
  */
 const TRANSLATABLE_GEOMETRY: Record<string, readonly string[]> = {
-  square: ['rect', 'unrotatedRect'],
-  circle: ['rect', 'unrotatedRect'],
-  'free-text': ['rect', 'unrotatedRect', 'calloutLine'],
+  square: ['box'],
+  circle: ['box'],
+  'free-text': ['box', 'calloutLine'],
   line: ['rect', 'linePoints'],
   polygon: ['rect', 'vertices'],
   polyline: ['rect', 'vertices'],
@@ -133,9 +140,9 @@ const TRANSLATABLE_GEOMETRY: Record<string, readonly string[]> = {
   squiggly: ['rect', 'quadPoints'],
   strikeout: ['rect', 'quadPoints'],
   redact: ['rect', 'quadPoints'],
-  caret: ['rect'],
+  caret: ['box'],
   text: ['rect'],
-  stamp: ['rect', 'unrotatedRect'],
+  stamp: ['box'],
   'file-attachment': ['rect'],
   link: ['rect'],
 };
@@ -209,14 +216,12 @@ function shiftedBy(cur: unknown, next: unknown, dx: number, dy: number): boolean
 
 /**
  * Verify the touched geometry is one rigid translation of the current state.
- * Requires `patch.rect` (a translation always moves `/Rect`) with width and
- * height preserved; every other geometry field present on the annotation must
- * ride along shifted by the same delta — a rect move that leaves `vertices`
- * behind is not a translation (the dictionary would desync from the pixels).
- * For box kinds the `/EMBD_Metadata` transform group is checked as an
- * after-state: writes are tri-state (omitted preserves, null/0 clears), so an
- * omitted rotation keeps the current one — but a preserved-yet-unshifted
- * `unrotatedRect` still fails the congruence check via the field loop.
+ * Requires the kind's first geometry field (`rect`, or a box kind's `box`)
+ * in the patch with width and height preserved; every other geometry field
+ * present on the annotation must ride along shifted by the same delta — a
+ * rect move that leaves `vertices` behind is not a translation (the
+ * dictionary would desync from the pixels). For box kinds the turn is
+ * checked as an after-state: an omitted rotation keeps the current one.
  */
 function isRigidTranslation(
   cur: Record<string, unknown>,
@@ -224,8 +229,9 @@ function isRigidTranslation(
   subtype: string,
   geometryKeys: readonly string[],
 ): boolean {
-  const curRect = cur.rect as PdfRect | undefined;
-  const patRect = pat.rect as PdfRect | undefined;
+  const [anchor, ...others] = geometryKeys;
+  const curRect = cur[anchor!] as PdfRect | undefined;
+  const patRect = pat[anchor!] as PdfRect | undefined;
   if (!curRect || !patRect) return false;
   const dx = patRect.left - curRect.left;
   const dy = patRect.bottom - curRect.bottom;
@@ -239,8 +245,7 @@ function isRigidTranslation(
     if (!numEq(normDeg(cur.rotation), normDeg(rotAfter))) return false;
   }
 
-  for (const key of geometryKeys) {
-    if (key === 'rect') continue;
+  for (const key of others) {
     const c = cur[key];
     const p = pat[key];
     if (c == null && p == null) continue; // absent on both — nothing to shift

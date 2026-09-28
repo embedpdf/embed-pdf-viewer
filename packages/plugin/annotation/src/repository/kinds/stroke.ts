@@ -19,13 +19,13 @@ import type { AnnotationDTO, PdfRect } from '@embedpdf/engine-core/runtime';
 
 import type { KindProjection, Wire } from '../projection';
 import { borderSlice } from '../props';
-import { contentToPdfPoint, contentToPdfRect, rotFromDTO, toPdfRotation } from '../seam';
+import { contentToPdfPoint, contentToPdfRect, rotFromDTO } from '../seam';
 
 /** Advisory rotation, total: rotation 0 states `null` (tri-state clear) —
  *  omission would preserve a stale advisory angle. */
 const advisoryRotation = (geometry: ModelAnnotation['geometry']): { rotation: number | null } => {
   const rot = geomRotation(geometry);
-  return { rotation: rot ? toPdfRotation(rot) : null };
+  return { rotation: rot ? rot : null };
 };
 
 /** `/BE` intensity for a closed poly (polygon): the curls are generated from

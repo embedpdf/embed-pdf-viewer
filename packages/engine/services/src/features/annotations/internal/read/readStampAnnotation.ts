@@ -2,10 +2,7 @@ import type { AnnotationBase, StampAnnotationDTO, StampFit } from '@embedpdf/eng
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { readAnnotName, readAnnotOpacity } from './annotationReadPrimitives';
-import {
-  readAnnotationRotation,
-  readAnnotationUnrotatedRect,
-} from './readAnnotationTransformMetadata';
+import { readAnnotationBox } from './readAnnotationTurn';
 import { readEmbedMetadataString } from './readEmbedMetadata';
 
 /** `/EMBD_Metadata/AppearanceFit`: how a stamp's drawing fills its box. */
@@ -25,7 +22,7 @@ export function readStampFit(
 
 /**
  * Stamp DTO: base + `/Name` (standard or custom identifier, verbatim) +
- * transform metadata + the recorded fit + `/CA`. The visual content
+ * its box and turn + the recorded fit + `/CA`. The visual content
  * stays in the `/AP` stream — rendered via `renderAppearances()`,
  * never surfaced as DTO data.
  */
@@ -35,15 +32,12 @@ export function readStamp(
   annotPtr: Ptr,
   base: AnnotationBase,
 ): StampAnnotationDTO {
-  const rotation = readAnnotationRotation(fn, mem, annotPtr);
-  const unrotatedRect = readAnnotationUnrotatedRect(fn, mem, annotPtr);
   return {
     ...base,
     subtype: 'stamp',
     name: readAnnotName(fn, mem, annotPtr),
     fit: readStampFit(fn, mem, annotPtr),
     opacity: readAnnotOpacity(fn, mem, annotPtr) ?? 1,
-    rotation: rotation ?? null,
-    unrotatedRect: unrotatedRect ?? null,
+    ...readAnnotationBox(fn, mem, annotPtr),
   };
 }

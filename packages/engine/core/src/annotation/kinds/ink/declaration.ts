@@ -10,5 +10,6 @@ export const InkDeclaration = defineKind('ink', {
   ...geometryStyleFields,
   inkList: field.data(InkListSchema),
   intent: field.data(InkIntentSchema).nullable().optional(),
+  /** The angle already applied to the points, degrees clockwise. */
   rotation: field.data(z.number()).nullable().optional(),
 });

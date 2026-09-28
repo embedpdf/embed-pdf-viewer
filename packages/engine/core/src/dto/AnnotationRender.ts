@@ -76,15 +76,16 @@ export interface AnnotationAppearancesQuery {
  * position and identify it. `rect` is the placement box in PDF user space
  * (y-up), so the consumer can place the bitmap without a second read.
  *
- * Rotation convention: for annotations whose rotation lives in the AP
- * `/Matrix` — box-family kinds (square/circle/free-text/stamp/caret) whose
- * DTO carries both `rotation` and `unrotatedRect` — the raster renders
- * rotation-stripped and `rect` is the logical `unrotatedRect`; the consumer
- * re-applies the DTO's `rotation` as a view transform about the box centre
- * (e.g. CSS `rotate`), which makes the raster rotation-invariant (rotating
- * never re-renders). Everything else — vertex kinds, whose rotation is
- * pre-baked into their geometry, and foreign PDFs with arbitrary AP
- * matrices — renders as-is with `rect` = `/Rect` and needs no transform.
+ * Rotation convention (`appearanceTurnOf`): a box kind (square, circle,
+ * free text, stamp, caret) drawn turned, whose drawing stays inside the
+ * turned box, renders turned back upright and `rect` is its `box`; the
+ * consumer re-applies the DTO's `rotation`, degrees clockwise, as a view
+ * transform about the box centre (CSS `rotate()` turns the same way), which
+ * makes the raster rotation-invariant (rotating never re-renders).
+ * Everything else — vertex kinds, whose rotation is pre-baked into their
+ * geometry, a free-text callout, a turned drawing that reaches past its box,
+ * and appearances with any other matrix — renders as-is with `rect` =
+ * `/Rect` and needs no transform.
  */
 export interface AnnotationAppearanceRaster {
   /** Full wire identity (durable or weak), including index-only annotations. */
