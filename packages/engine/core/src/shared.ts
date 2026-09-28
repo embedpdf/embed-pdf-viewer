@@ -446,6 +446,7 @@ export type {
 } from './annotation/appearance';
 export { appearanceImpactOf, semanticEqual } from './annotation/appearance';
 export { appearanceTurnOf } from './annotation/appearanceTurn';
+export { shapeForRect } from './annotation/shapeForRect';
 export { drawnPointsOf } from './annotation/drawnPoints';
 export { assertAnnotationDraft, checkAnnotationPatch } from './annotation/checkWrite';
 

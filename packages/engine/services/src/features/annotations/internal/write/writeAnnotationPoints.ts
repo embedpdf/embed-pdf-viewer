@@ -1,5 +1,4 @@
 import {
-  normalizePdfRect,
   pdfPointsBounds,
   pdfPointTurned,
   pdfTurnOfUpright,
@@ -10,8 +9,8 @@ import {
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { setAnnotRect } from './annotationWritePrimitives';
+import { shiftAnnotRect, shiftBetween } from './shiftAnnotRect';
 import { writeRecordedTurn } from './writeAnnotationTransformMetadata';
-import { readAnnotRect } from '../read/annotationReadPrimitives';
 import { readDrawnPointSets, readPointsTurn, uprightPoint } from '../read/readPointsTurn';
 
 /**
@@ -90,23 +89,6 @@ export function readCurrentPoints(
   };
 }
 
-/** How far `after` is `before` shifted, when every point moved the same way. */
-function shiftBetween(
-  before: readonly (readonly PdfPoint[])[],
-  after: readonly (readonly PdfPoint[])[],
-): { dx: number; dy: number } | undefined {
-  const from = before.flat();
-  const to = after.flat();
-  if (from.length === 0 || from.length !== to.length) return undefined;
-  const dx = to[0]!.x - from[0]!.x;
-  const dy = to[0]!.y - from[0]!.y;
-  return from.every((point, i) =>
-    semanticEqual({ x: point.x + dx, y: point.y + dy }, { x: to[i]!.x, y: to[i]!.y }),
-  )
-    ? { dx, dy }
-    : undefined;
-}
-
 /**
  * An update's points and turn, each kept when left out (`rotation: null`
  * straightens the points where they are); `undefined` when neither changes.
@@ -130,15 +112,7 @@ export function updatePoints(
   );
   if (upright === undefined && sameTurn) return undefined;
   const placed = placePoints(fn, mem, annotPtr, upright ?? current.upright, nextRotation);
-  const shift = shiftBetween(current.drawn, placed.drawn);
-  if (shift) {
-    const rect = normalizePdfRect(readAnnotRect(fn, mem, annotPtr));
-    setAnnotRect(fn, mem, annotPtr, {
-      left: rect.left + shift.dx,
-      bottom: rect.bottom + shift.dy,
-      right: rect.right + shift.dx,
-      top: rect.top + shift.dy,
-    });
-  }
+  const shift = shiftBetween(current.drawn.flat(), placed.drawn.flat());
+  if (shift) shiftAnnotRect(fn, mem, annotPtr, shift);
   return placed;
 }

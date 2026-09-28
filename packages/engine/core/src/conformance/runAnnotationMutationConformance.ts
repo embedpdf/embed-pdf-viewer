@@ -757,17 +757,98 @@ export function runAnnotationMutationConformance(
       }
     });
 
-    test('rect on a line or text markup is the engine’s: send it back unchanged or leave it out', async () => {
+    test("a new rect puts a drawing there, as a script's annot.rect does in Acrobat", async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
-        const line = (
+        const offset = (r: PdfRect, dx: number, dy: number): PdfRect => ({
+          left: r.left + dx,
+          bottom: r.bottom + dy,
+          right: r.right + dx,
+          top: r.top + dy,
+        });
+        const expectPoint = (actual: PdfPoint, expected: PdfPoint) => {
+          expect(near(actual.x, expected.x) && near(actual.y, expected.y)).toBe(true);
+        };
+        const expectRect = (actual: PdfRect, expected: PdfRect) => {
+          expectPoint(
+            { x: actual.left, y: actual.bottom },
+            { x: expected.left, y: expected.bottom },
+          );
+          expectPoint({ x: actual.right, y: actual.top }, { x: expected.right, y: expected.top });
+        };
+        const refused = { code: EngineErrorCode.InvalidArg, details: { field: 'rect' } };
+
+        const created = (
           await page.annotations.create({
             subtype: 'line',
             linePoints,
             color: { r: 0, g: 0, b: 0 },
           } satisfies LineDraft)
         ).annotation;
+        if (created.subtype !== 'line') throw new Error('expected a line');
+
+        // Moved: the points move by the offset, and the rect with them.
+        const movedTo = offset(created.rect, 40, -20);
+        const moved = await page.annotations.update(created.ref, {
+          subtype: 'line',
+          rect: movedTo,
+        });
+        if (moved.annotation.subtype !== 'line') throw new Error('expected a line');
+        expectRect(moved.annotation.rect, movedTo);
+        expectPoint(moved.annotation.linePoints.start, {
+          x: linePoints.start.x + 40,
+          y: linePoints.start.y - 20,
+        });
+        expectPoint(moved.annotation.linePoints.end, {
+          x: linePoints.end.x + 40,
+          y: linePoints.end.y - 20,
+        });
+        expect(moved.appearance.changed).toBe(false);
+
+        // Stretched: each axis on its own, from the rect it had onto the new one.
+        const from = moved.annotation.rect;
+        const to = { ...from, bottom: from.bottom - 30, right: from.right + 60 };
+        const onto = (point: PdfPoint): PdfPoint => ({
+          x: to.left + ((point.x - from.left) * (to.right - to.left)) / (from.right - from.left),
+          y:
+            to.bottom + ((point.y - from.bottom) * (to.top - to.bottom)) / (from.top - from.bottom),
+        });
+        const stretched = await page.annotations.update(created.ref, { subtype: 'line', rect: to });
+        if (stretched.annotation.subtype !== 'line') throw new Error('expected a line');
+        expectPoint(stretched.annotation.linePoints.start, onto(moved.annotation.linePoints.start));
+        expectPoint(stretched.annotation.linePoints.end, onto(moved.annotation.linePoints.end));
+        expect(stretched.appearance.changed).toBe(true);
+
+        // The rect it read, sent back, changes nothing.
+        const back = await page.annotations.update(created.ref, {
+          subtype: 'line',
+          rect: stretched.annotation.rect,
+          contents: 'sent back',
+        });
+        if (back.annotation.subtype !== 'line') throw new Error('expected a line');
+        expect(back.annotation.rect).toEqual(stretched.annotation.rect);
+        expect(back.annotation.linePoints).toEqual(stretched.annotation.linePoints);
+        expect(back.annotation.contents).toBe('sent back');
+
+        // A new rect with new points: which of the two to follow would be a guess.
+        const rect = back.annotation.rect;
+        await expect(
+          page.annotations.update(created.ref, {
+            subtype: 'line',
+            rect: offset(rect, 5, 5),
+            linePoints: { start: linePoints.start, end: { x: 90, y: 90 } },
+          }),
+        ).rejects.toMatchObject(refused);
+        // A rect with no width.
+        await expect(
+          page.annotations.update(created.ref, {
+            subtype: 'line',
+            rect: { ...rect, right: rect.left },
+          }),
+        ).rejects.toMatchObject(refused);
+
+        // Text markup: the quads move, and the rect with them.
         const highlight = (
           await page.annotations.create({
             subtype: 'highlight',
@@ -775,28 +856,43 @@ export function runAnnotationMutationConformance(
             color: { r: 255, g: 255, b: 0 },
           } satisfies HighlightDraft)
         ).annotation;
-        const shifted = (r: PdfRect): PdfRect => ({ ...r, right: r.right + 10 });
-        for (const patch of [
-          { subtype: 'line', rect: shifted(line.rect) },
-          { subtype: 'highlight', rect: shifted(highlight.rect) },
-        ] as const) {
-          const ref = patch.subtype === 'line' ? line.ref : highlight.ref;
-          let caught: unknown;
-          try {
-            await page.annotations.update(ref, patch);
-          } catch (err) {
-            caught = err;
-          }
-          expect(EngineError.is(caught, EngineErrorCode.InvalidArg)).toBe(true);
-        }
-        // The read rect sent back is taken and changes nothing.
-        const back = await page.annotations.update(line.ref, {
-          subtype: 'line',
-          rect: line.rect,
-          contents: 'sent back',
+        const highlightTo = offset(highlight.rect, 10, 15);
+        const movedHighlight = await page.annotations.update(highlight.ref, {
+          subtype: 'highlight',
+          rect: highlightTo,
         });
-        expect(back.annotation.rect).toEqual(line.rect);
-        expect(back.annotation.contents).toBe('sent back');
+        if (movedHighlight.annotation.subtype !== 'highlight')
+          throw new Error('expected a highlight');
+        expectRect(movedHighlight.annotation.rect, highlightTo);
+        expectPoint(movedHighlight.annotation.quadPoints[0]!.p1, {
+          x: quad[0]!.p1.x + 10,
+          y: quad[0]!.p1.y + 15,
+        });
+
+        // A turned drawing only moves.
+        const turned = (
+          await page.annotations.create({
+            subtype: 'square',
+            box: shapeRect,
+            rotation: 30,
+            color: { r: 0, g: 0, b: 255 },
+          } satisfies SquareDraft)
+        ).annotation;
+        if (turned.subtype !== 'square') throw new Error('expected a square');
+        const turnedTo = offset(turned.rect, 25, 5);
+        const movedTurned = await page.annotations.update(turned.ref, {
+          subtype: 'square',
+          rect: turnedTo,
+        });
+        if (movedTurned.annotation.subtype !== 'square') throw new Error('expected a square');
+        expectRect(movedTurned.annotation.box, offset(shapeRect, 25, 5));
+        expect(movedTurned.annotation.rotation).toBe(30);
+        await expect(
+          page.annotations.update(turned.ref, {
+            subtype: 'square',
+            rect: { ...turnedTo, right: turnedTo.right + 20 },
+          }),
+        ).rejects.toMatchObject(refused);
       } finally {
         await doc.close();
       }

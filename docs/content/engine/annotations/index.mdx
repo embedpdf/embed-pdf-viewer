@@ -164,12 +164,54 @@ accepts. That makes "change a copy, then save it" code simple:
 await page.annotations.update(annotation.ref, { ...annotation, opacity: 0.5 });
 ```
 
-Fields the engine writes (`author`, the dates, `userId`, `ref`…) are accepted and ignored. A
-`rect` the engine works out is accepted as read; a different one fails with `InvalidArg`. It
-works out the `rect` of rectangles, ellipses, text boxes, stamps and carets from their `box`,
-of lines, polylines, polygons and ink from their points, of text markup from its quads, and of
-notes and files from their `at`. For free text,
-send `contents` or `richText`, not both with different text.
+Fields the engine writes (`author`, the dates, `userId`, `ref`…) are accepted and ignored. For
+free text, send `contents` or `richText`, not both with different text.
+
+### Move or resize by `rect`
+
+An update takes a new `rect` for every annotation, as a script's `annot.rect` does in Acrobat. A
+note, a file, a link, a popup, a form field's widget and a redaction take it as it is.
+
+Every other annotation is drawn from its shape: rectangles, ellipses, text boxes, stamps and
+carets from their `box`, lines, polylines, polygons and ink from their points, and text markup
+from its quads. For these, a new `rect` puts the shape there: each point is mapped from the old
+`rect` onto the new one, each axis on its own. A `rect` of the same size moves the drawing, and a
+bigger one stretches it:
+
+```ts
+const { rect } = line;
+
+await page.annotations.update(line.ref, {
+  rect: {
+    left: rect.left + 40,
+    bottom: rect.bottom - 20,
+    right: rect.right + 40,
+    top: rect.top - 20,
+  },
+});
+```
+
+The engine then works out `rect` again from the shape. After a resize it can differ a little from
+the one you sent: a line keeps its width, and its endings keep their size. The `rect` you read,
+sent back, changes nothing, so a read passed straight back works.
+
+- A new `rect` with a new shape (`box`, points or quads) fails with `InvalidArg`: send one or the
+  other.
+- A turned drawing can only move. A `rect` of another size fails with `InvalidArg`; resize its
+  `box` or its points instead.
+- A `rect` that would squash a drawing to no width or no height fails with `InvalidArg`.
+
+`shapeForRect(annotation, rect)` gives the fields that put an annotation at a `rect`, by the same
+rule. Use it to place a copy somewhere else:
+
+```ts
+import { shapeForRect } from '@embedpdf/engine';
+
+await page.annotations.create({ ...copy, ...shapeForRect(copy, target) });
+```
+
+A create works out a drawn annotation's `rect` from its shape, whatever `rect` you send, so a
+copy of another app's drawing keeps its shape exactly.
 
 ## Delete and reorder
 

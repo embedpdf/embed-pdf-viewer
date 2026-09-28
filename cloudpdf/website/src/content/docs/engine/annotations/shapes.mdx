@@ -255,9 +255,11 @@ const [shown] = drawnPointsOf(polygon)!; // the corners where the page shows the
 
 `rect` is where the shape sits on the page: the upright box around all it draws, turned, with
 what its border adds (a cloud's bumps) and, for lines, the line width and the endings. The engine
-works it out from `box` or the points, `rotation` and the style. An update may send back the
-`rect` it read, so a read passed straight back works; any other `rect` fails with `InvalidArg`.
-To move or resize the shape, change its `box` or its points.
+works it out from `box` or the points, `rotation` and the style. The `rect` you read, sent back,
+changes nothing, so a read passed straight back works. A different `rect` moves or stretches the
+shape into it, as in Acrobat; see
+[Move or resize by `rect`](/docs/engine/annotations#move-or-resize-by-rect). You can also change
+the `box` or the points yourself.
 
 ### Border styles
 

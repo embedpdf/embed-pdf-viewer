@@ -21,7 +21,9 @@ import {
   setIntent,
   setIntentOrClear,
 } from './annotationWritePrimitives';
+import { shiftAnnotRect, shiftBetween } from './shiftAnnotRect';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
+import { readQuadPoints } from '../read/annotationReadPrimitives';
 import { strikeoutIntentToName } from '../textEditIntent';
 
 /**
@@ -83,7 +85,7 @@ export function applyTextMarkupDraft(
  *      replacing the list whole.
  *
  * `rect` is recomputed only when quadPoints change, to keep /Rect in sync
- * with the smallest enclosing box.
+ * with the smallest enclosing box; quads that only moved move it instead.
  */
 export function applyTextMarkupPatch(
   fn: PdfFunctions,
@@ -107,10 +109,17 @@ export function applyTextMarkupPatch(
     );
   }
   if (patch.quadPoints !== undefined) {
+    const shift = shiftBetween(
+      readQuadPoints(fn, mem, annotPtr).flatMap(cornersOf),
+      patch.quadPoints.flatMap(cornersOf),
+    );
     replaceQuadPoints(fn, mem, annotPtr, patch.quadPoints);
-    setRectFromQuadPoints(fn, mem, annotPtr, patch.quadPoints);
+    if (shift) shiftAnnotRect(fn, mem, annotPtr, shift);
+    else setRectFromQuadPoints(fn, mem, annotPtr, patch.quadPoints);
   }
 }
+
+const cornersOf = (quad: PdfQuad) => [quad.p1, quad.p2, quad.p3, quad.p4];
 
 /**
  * Type-narrowing predicate. Mirrors the reader-side dispatch. Used by

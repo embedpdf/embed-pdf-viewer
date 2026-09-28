@@ -99,10 +99,11 @@ export const filledStyleFields = {
 };
 
 /**
- * `rect` where another field gives the shape (a box, points, quads, an icon's
- * corner): where the annotation sits on the page, the upright box around all
- * it draws. The engine works it out; an update may send back the `rect` it
- * read.
+ * `rect` where another field gives the shape (a box, points, quads): where
+ * the annotation sits on the page, the upright box around all it draws. The
+ * engine works it out from the shape, so a create's `rect` is worked out
+ * again. An update's `rect` other than the one read puts the shape there
+ * (`shapeForRect`); the rect read, sent back, changes nothing.
  */
 export const drawnRectFields = {
   rect: field.engine(PdfRectSchema).readBack().space('box'),

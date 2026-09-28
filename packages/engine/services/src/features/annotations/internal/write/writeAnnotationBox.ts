@@ -7,8 +7,8 @@ import {
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { clearRectangleDifferences, setAnnotRect } from './annotationWritePrimitives';
+import { shiftAnnotRect } from './shiftAnnotRect';
 import { writeRecordedTurn } from './writeAnnotationTransformMetadata';
-import { readAnnotRect } from '../read/annotationReadPrimitives';
 import { readAnnotationBox, type AnnotationBox } from '../read/readAnnotationTurn';
 
 /**
@@ -74,14 +74,9 @@ export function applyAnnotationBoxPatch(
     writeAnnotationBox(fn, mem, annotPtr, { box, rotation });
     return true;
   }
-  const dx = box.left - current.box.left;
-  const dy = box.bottom - current.box.bottom;
-  const rect = normalizePdfRect(readAnnotRect(fn, mem, annotPtr));
-  setAnnotRect(fn, mem, annotPtr, {
-    left: rect.left + dx,
-    bottom: rect.bottom + dy,
-    right: rect.right + dx,
-    top: rect.top + dy,
+  shiftAnnotRect(fn, mem, annotPtr, {
+    dx: box.left - current.box.left,
+    dy: box.bottom - current.box.bottom,
   });
   if (rotation !== null) writeRecordedTurn(fn, mem, annotPtr, { rotation, box });
   return true;

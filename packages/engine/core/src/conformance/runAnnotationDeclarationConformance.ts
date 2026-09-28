@@ -145,7 +145,7 @@ export function runAnnotationDeclarationConformance(
       });
     });
 
-    test("a box kind's rect is the engine's", async () => {
+    test("a box kind's rect is worked out, and another one puts the box there", async () => {
       await onAuthoringPage(async (page) => {
         const box: PdfRect = { left: 300, bottom: 300, right: 360, top: 340 };
         // A create takes the box; a rect sent with it is the engine's to work out.
@@ -162,9 +162,13 @@ export function runAnnotationDeclarationConformance(
           box: moved,
         });
         expect(updated.rect).toEqual(moved);
-        // Any other rect is refused, naming the field.
+        // Another rect puts the box there: a square's rect is its box.
+        const wider = { ...moved, right: moved.right + 10 };
+        const { annotation: placed } = await page.annotations.update(created.ref, { rect: wider });
+        expect(placed.subtype === 'square' && placed.box).toEqual(wider);
+        // Another rect with another box is refused, naming the field.
         await expect(
-          page.annotations.update(created.ref, { rect: { ...moved, right: moved.right + 10 } }),
+          page.annotations.update(created.ref, { rect: moved, box: box }),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg, details: { field: 'rect' } });
       });
     });

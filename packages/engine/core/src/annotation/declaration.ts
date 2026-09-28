@@ -20,7 +20,9 @@ import type { PageBox } from '../geometry/pageSpace';
  *   values than a write can make (`readBack()`) takes them in an update too:
  *   sent back unchanged it is kept, any other such value is refused. An
  *   engine field marked `readBack()` is worked out from other fields: an
- *   update takes only the value a read returned.
+ *   update takes the value a read returned. The one such field, a drawn
+ *   kind's `rect`, also takes another rect, which puts the shape there
+ *   (`shapeForRect`).
  */
 
 /**
