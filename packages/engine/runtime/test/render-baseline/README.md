@@ -49,6 +49,7 @@ left behind.
 | `--only <text>`        | only documents whose id contains the text                       |
 | `--image-budget <MB>`  | decoded images kept across page loads, in MB (128; 0 for none)  |
 | `--slice-ms <ms>`      | render `engine` variants in slices of this budget (0: finest)   |
+| `--high-heap`          | wasm: take the low 2 GiB of the heap first (addresses ≥ 2 GiB)  |
 | `--jobs <n>`           | worker processes (default: half the cores, at most 4)           |
 | `--timeout <seconds>`  | per document (default 300)                                      |
 | `--strict`             | check: also fail on cases the baseline does not have            |

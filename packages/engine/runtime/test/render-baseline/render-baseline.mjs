@@ -9,7 +9,8 @@
 // --image-budget <MB> (decoded images kept across page loads, as the engine keeps
 // them; default 128, 0 for none), --slice-ms <ms> (render engine variants in slices
 // of this budget, as the engine does; 0 slices at every chance). See README.md next
-// to this file.
+// to this file. --high-heap (wasm): take the low 2 GiB of the heap first, so every
+// render runs at addresses above 2 GiB.
 
 import { fork } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -41,6 +42,7 @@ const timeoutMs = Number(args.timeout ?? 300) * 1000;
 const wasmBinary = args['wasm-binary'] ? path.resolve(args['wasm-binary']) : undefined;
 const imageBudgetMb = Number(args['image-budget'] ?? 128);
 const sliceMs = args['slice-ms'] === undefined ? undefined : Number(args['slice-ms']);
+const highHeap = args['high-heap'] !== undefined;
 
 const documents = collectDocuments(profileName)
   .filter((document) => !args.only || document.id.includes(args.only))
@@ -60,6 +62,7 @@ const current = {
     os: `${os.type()} ${os.release()} ${os.arch()}`,
     documents: documents.length,
     ...(sliceMs === undefined ? {} : { sliceMs }),
+    ...(highHeap ? { highHeap } : {}),
     seconds: Math.round((performance.now() - started) / 1000),
   },
   cases: sortKeys(cases),
@@ -102,7 +105,7 @@ function runAll(queue) {
       live++;
       const child = fork(
         path.join(here, 'worker.mjs'),
-        [JSON.stringify({ runtimeKind, wasmBinary, imageBudgetMb, sliceMs })],
+        [JSON.stringify({ runtimeKind, wasmBinary, imageBudgetMb, sliceMs, highHeap })],
         {
           stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
         },
@@ -260,7 +263,7 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (!arg.startsWith('--')) parsed._.push(arg);
-    else if (arg === '--strict') parsed.strict = true;
+    else if (arg === '--strict' || arg === '--high-heap') parsed[arg.slice(2)] = true;
     else parsed[arg.slice(2)] = argv[++i];
   }
   return parsed;

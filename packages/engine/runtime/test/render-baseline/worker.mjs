@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import { renderVariant, inspectPage } from './render.mjs';
 import { HEAVY_PAGE_OBJECTS, profileByName } from './variants.mjs';
 
-const { runtimeKind, wasmBinary, imageBudgetMb, sliceMs } = JSON.parse(process.argv[2]);
+const { runtimeKind, wasmBinary, imageBudgetMb, sliceMs, highHeap } = JSON.parse(process.argv[2]);
 const { createPdfRuntime } = await import(new URL('../../dist/index.node.js', import.meta.url));
 const runtime = await createPdfRuntime({
   prefer: runtimeKind,
@@ -19,6 +19,14 @@ if (runtime.kind !== runtimeKind) {
   throw new Error(`asked for the ${runtimeKind} runtime, got ${runtime.kind}`);
 }
 runtime.fn.FPDF_InitLibrary();
+// With the low 2 GiB of the wasm heap taken (never freed), every later
+// allocation lands above it, where addresses reach JS as negative i32s.
+if (highHeap && runtime.kind === 'wasm') {
+  runtime.mem.alloc(2 ** 31 + 64 * 2 ** 20);
+  const probe = runtime.mem.alloc(16);
+  if (probe < 2n ** 31n) throw new Error(`--high-heap: an allocation landed at ${probe}`);
+  runtime.mem.free(probe);
+}
 // Every case loads its page again, so with a budget each later case of a page
 // renders its images from the decodes an earlier case kept, as engine jobs do.
 if (imageBudgetMb > 0 && typeof runtime.fn.EPDF_SetDecodedImageBudget === 'function') {

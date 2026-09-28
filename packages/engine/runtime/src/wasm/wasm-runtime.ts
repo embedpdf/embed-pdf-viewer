@@ -37,8 +37,13 @@ type EmscriptenModule = Record<string, any> & {
   stringToUTF16?: (str: string, ptr: number, maxBytes: number) => void;
 };
 
+/**
+ * An address from wasm as a `Ptr`. wasm32 addresses are unsigned, but an i32
+ * reaches JS signed, so an address at or above 2 GiB (the heap may grow to
+ * 4 GiB) arrives negative: `>>> 0` gives back the address.
+ */
 function toPtr(value: number | bigint): Ptr {
-  return BigInt(value) as Ptr;
+  return BigInt(typeof value === 'number' ? value >>> 0 : value) as Ptr;
 }
 
 function toNumber(ptr: Ptr | Callback): number {
@@ -104,10 +109,14 @@ function createWasmMemory(module: EmscriptenModule): PdfRuntimeMemory {
       return ptr;
     },
     peek(ptr, kind, byteOffset = 0) {
-      return module.getValue?.(toNumber(ptr) + byteOffset, wasmValueKind(kind)) ?? 0;
+      const value = module.getValue?.(toNumber(ptr) + byteOffset, wasmValueKind(kind)) ?? 0;
+      // A pointer read from memory is a `Ptr`, as on the native runtime.
+      return kind === 'ptr' ? toPtr(value) : value;
     },
     poke(ptr, kind, value, byteOffset = 0) {
-      module.setValue?.(toNumber(ptr) + byteOffset, value, wasmValueKind(kind));
+      // A `Ptr` written as a pointer, as on the native runtime.
+      const stored = kind === 'ptr' && typeof value === 'bigint' ? Number(value) : value;
+      module.setValue?.(toNumber(ptr) + byteOffset, stored, wasmValueKind(kind));
     },
   };
 }
