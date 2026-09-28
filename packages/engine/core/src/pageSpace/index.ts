@@ -30,7 +30,7 @@ export {
 } from './annotations';
 export { pageLayoutOf, pageListOf, pageSpaceBoxesOf, visibleBoxesOf } from './pages';
 export { createTextLayout, pageGeometryOf, pageSearchSliceOf, pageTextSegmentOf } from './text';
-export { pageAppearanceManifestOf, pageAppearancesOf, pdfRenderTargetOf } from './rendering';
+export { pageAppearancesOf, pdfRenderTargetOf } from './rendering';
 export {
   pageFieldActionsOf,
   pageFormFieldOf,

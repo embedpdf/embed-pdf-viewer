@@ -31,7 +31,6 @@ let engine: LocalEngine;
 let doc: DocumentHandle;
 let pageObjectNumber: number;
 let pageW = 0;
-let pageH = 0;
 
 beforeAll(async () => {
   const bytes = new Uint8Array(await readFile(pdfPath));
@@ -40,7 +39,6 @@ beforeAll(async () => {
   const pages = (await doc.pages.list()).pages;
   pageObjectNumber = pages[0]!.ref.pageObjectNumber;
   pageW = pages[0]!.size.width;
-  pageH = pages[0]!.size.height;
 }, 60_000);
 
 afterAll(async () => {
@@ -48,13 +46,8 @@ afterAll(async () => {
   await engine?.destroy();
 });
 
-/** y-down page-point rect → y-up engine rect. */
-const eng = (x: number, y: number, w: number, h: number) => ({
-  left: x,
-  right: x + w,
-  top: pageH - y,
-  bottom: pageH - (y + h),
-});
+/** A tile's area: page space, from the page's top-left, y down. */
+const eng = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
 
 const raw = (rect: ReturnType<typeof eng>, scale: number): Promise<PageRaster> =>
   doc

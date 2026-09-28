@@ -6,6 +6,7 @@ import type {
   PageObjectNumber,
   PageRaster,
   PageRenderViewport,
+  PdfCoordinates,
   PdfRect,
   PdfRotation,
 } from '@embedpdf/engine-core/runtime';
@@ -78,7 +79,7 @@ export class AnnotationAppearanceReader {
     pageObjectNumber: PageObjectNumber,
     options: AnnotationAppearanceRenderOptions,
     signal: AbortSignal,
-  ): AnnotationAppearancesResult {
+  ): AnnotationAppearancesResult<PdfCoordinates> {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
     const pool = this.session.pagePool();
@@ -88,7 +89,7 @@ export class AnnotationAppearanceReader {
     const modes = resolveModes(options.modes);
     const revision = this.session.pageState(pageObjectNumber).revision;
 
-    const appearances: AnnotationAppearanceRaster[] = [];
+    const appearances: AnnotationAppearanceRaster<PdfCoordinates>[] = [];
 
     try {
       const page = readPageBox(this.runtime, pagePtr);

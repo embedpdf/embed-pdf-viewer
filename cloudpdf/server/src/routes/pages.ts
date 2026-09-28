@@ -760,7 +760,7 @@ async function renderPageImage(input: {
   const { page, baseSha } = await resolvePageAndManifestForRead(input);
   if (input.tokenQuery !== undefined) rejectQueryParamsOnTokenUrl(input.query);
   // Both token and query strings arrive as flat string maps. Generic
-  // `unflatten` turns dotted keys (`viewport.kind`, `target.rect.left`) into
+  // `unflatten` turns dotted keys (`viewport.kind`, `target.rect.x`) into
   // the nested object the family's schema expects. The schema then coerces,
   // validates, and shapes the result into `PageRenderQuery` (stamping
   // `includeAnnotations` from the family).

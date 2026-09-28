@@ -3,14 +3,13 @@ import {
   defaultsFor,
   isSubstrateOnly,
   pageItems as corePageItems,
-  pdfToContentRect,
   styleFromProps,
   viewable,
   type Model,
   type RenderItem,
   type ViewEnv,
 } from '@embedpdf/core-annotation';
-import type { PageRef, PdfRect } from '@embedpdf/engine-core/runtime';
+import type { PageRef } from '@embedpdf/engine-core/runtime';
 
 import type { LinkNavItem, TextItem } from '../contract';
 import type { AnnotationState } from '../model';
@@ -24,7 +23,7 @@ import { buildTextItems } from '../text-item';
  */
 export function createRenderReads(
   ctx: Pick<AnnotationContext, 'state' | 'document' | 'doc'>,
-  { view: { pageModel }, geometry, tools }: Pick<AnnotationServices, 'view' | 'geometry' | 'tools'>,
+  { view: { pageModel }, tools }: Pick<AnnotationServices, 'view' | 'tools'>,
 ) {
   const itemsCache = new Map<
     number,
@@ -196,10 +195,6 @@ export function createRenderReads(
         (result) => result.appearances,
         () => [],
       );
-    },
-    pdfToPageRect: (page: PageRef, rect: PdfRect) => {
-      const crop = geometry.cropOf(page.pageObjectNumber);
-      return crop ? pdfToContentRect(rect, crop) : null;
     },
   };
 

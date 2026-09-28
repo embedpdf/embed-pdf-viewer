@@ -192,7 +192,7 @@ export function runPageSpaceConformance(
         test('a region render shows its own area', async () => {
           await eachShownPage(async (page, layout) => {
             const raster = await render(doc, layout.ref, {
-              target: { kind: 'rect', rect: page.marks[0]! },
+              target: { kind: 'rect', rect: toPage(page.marks[0]!, page.expected.visible) },
               viewport: { kind: 'scale', scale: 0.1 },
             });
             expect(raster.width > 0 && raster.height > 0).toBe(true);

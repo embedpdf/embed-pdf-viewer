@@ -4,7 +4,13 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, beforeAll, describe, expect, test } from 'vitest';
 
-import { appearanceTurnOf, toPageRef } from '@embedpdf/engine-core/runtime';
+import {
+  appearanceTurnOf,
+  pdfRectOf,
+  toPageRef,
+  type DocumentHandle,
+  type PageBox,
+} from '@embedpdf/engine-core/runtime';
 import { createLocalEngine, type LocalEngine } from '../src/index';
 import { encodePng } from '../src/render/PortableImageEncoder';
 
@@ -23,6 +29,13 @@ const annotationsPdfPath = resolve(
 
 /** A page known to exist and be editable in annotations.pdf. */
 const PAGE = 3;
+
+/** An appearance's page-space rect in the file's numbers, as annotation reads still give them. */
+async function inFile(doc: DocumentHandle, rect: PageBox) {
+  const { pages } = await doc.pages.list();
+  const layout = pages.find((page) => page.ref.pageObjectNumber === PAGE)!;
+  return pdfRectOf(rect, layout.pdfCropBox);
+}
 
 /** A square box, so a 90° turn's AABB equals the authored box. */
 const SQUARE_RECT = { left: 60, bottom: 60, right: 160, top: 160 };
@@ -190,7 +203,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
       (candidate) => JSON.stringify(candidate.ref) === JSON.stringify(ref),
     );
     expect(appearance).toBeDefined();
-    expect(appearance!.rect).toMatchObject(movedBox);
+    expect(await inFile(doc, appearance!.rect)).toMatchObject(movedBox);
     const coverage = alphaCoverage(appearance!.raster);
     expect(coverage.x).toBeGreaterThan(0.98);
     expect(coverage.y).toBeGreaterThan(0.98);
@@ -333,10 +346,11 @@ describe('annotation rotation (local engine) — save + reopen', () => {
           a.ref.annotObjectNumber === dto.ref.annotObjectNumber,
       );
       expect(ap, `appearance for ${dto.subtype}`).toBeDefined();
-      expect(ap!.rect.left).toBeCloseTo(dto.rect.left, 0);
-      expect(ap!.rect.bottom).toBeCloseTo(dto.rect.bottom, 0);
-      expect(ap!.rect.right).toBeCloseTo(dto.rect.right, 0);
-      expect(ap!.rect.top).toBeCloseTo(dto.rect.top, 0);
+      const apRect = await inFile(doc, ap!.rect);
+      expect(apRect.left).toBeCloseTo(dto.rect.left, 0);
+      expect(apRect.bottom).toBeCloseTo(dto.rect.bottom, 0);
+      expect(apRect.right).toBeCloseTo(dto.rect.right, 0);
+      expect(apRect.top).toBeCloseTo(dto.rect.top, 0);
       const data = new Uint8Array(ap!.raster.data);
       expect(data.some((_, idx) => idx % 4 === 3 && data[idx] > 0)).toBe(true); // non-empty
     }
@@ -402,10 +416,11 @@ describe('annotation rotation (local engine) — save + reopen', () => {
           a.ref.annotObjectNumber === caret.ref.annotObjectNumber,
       );
       expect(ap, 'appearance for caret').toBeDefined();
-      expect(ap!.rect.left).toBeCloseTo(caret.rect.left, 2);
-      expect(ap!.rect.bottom).toBeCloseTo(caret.rect.bottom, 2);
-      expect(ap!.rect.right).toBeCloseTo(caret.rect.right, 2);
-      expect(ap!.rect.top).toBeCloseTo(caret.rect.top, 2);
+      const apRect = await inFile(doc, ap!.rect);
+      expect(apRect.left).toBeCloseTo(caret.rect.left, 2);
+      expect(apRect.bottom).toBeCloseTo(caret.rect.bottom, 2);
+      expect(apRect.right).toBeCloseTo(caret.rect.right, 2);
+      expect(apRect.top).toBeCloseTo(caret.rect.top, 2);
       const data = new Uint8Array(ap!.raster.data);
       expect(data.some((_, idx) => idx % 4 === 3 && data[idx] > 0)).toBe(true); // non-empty
     }

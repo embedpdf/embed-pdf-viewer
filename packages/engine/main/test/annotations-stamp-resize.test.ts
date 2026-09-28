@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { DocumentHandle, Engine, PageRaster } from '@embedpdf/engine-core/runtime';
-import { toPageRef } from '@embedpdf/engine-core/runtime';
+import { pageBoxOf, toPageRef } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '../src/index';
 
 /** Small independent PDF fixtures: asymmetric vector bands expose wrong crops. */
@@ -91,11 +91,16 @@ describe('vector stamp resizing (wasm)', () => {
       });
       // Render the full annotation through the page renderer: appearance
       // thumbnails deliberately remove rotation for the viewer to apply it.
-      const render = (document: DocumentHandle) =>
-        document.page(toPageRef(3)).render.raw({
+      // The area in the file's numbers, measured on the page as render targets are.
+      const area = { left: 0, bottom: -50, right: 520, top: 220 };
+      const render = async (document: DocumentHandle) => {
+        const { pages } = await document.pages.list();
+        const layout = pages.find((page) => page.ref.pageObjectNumber === 3)!;
+        return document.page(toPageRef(3)).render.raw({
           includeAnnotations: true,
-          target: { kind: 'rect', rect: { left: 0, bottom: -50, right: 520, top: 220 } },
+          target: { kind: 'rect', rect: pageBoxOf(area, layout.pdfCropBox) },
         });
+      };
       const live = await render(doc);
       for (const mode of [undefined, 'rewrite'] as const) {
         const saved = await doc.download(mode ? { mode } : undefined);

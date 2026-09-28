@@ -26,13 +26,13 @@ describe.skip('wire token codec', () => {
       rotation: 90,
       quality: 0.8,
       'target.kind': 'rect',
-      'target.rect.left': 10,
-      'target.rect.bottom': 20,
-      'target.rect.right': 40.5,
-      'target.rect.top': 60.25,
+      'target.rect.x': 10,
+      'target.rect.y': 20,
+      'target.rect.width': 30.5,
+      'target.rect.height': 40.25,
     });
     expect(token).toBe(
-      'annotationVersion=7,background=white,contentVersion=1,format=webp,includeAnnotations=true,quality=0.8,rotation=90,target.kind=rect,target.rect.bottom=20,target.rect.left=10,target.rect.right=40.5,target.rect.top=60.25,viewport.kind=width,viewport.width=720',
+      'annotationVersion=7,background=white,contentVersion=1,format=webp,includeAnnotations=true,quality=0.8,rotation=90,target.kind=rect,target.rect.height=40.25,target.rect.width=30.5,target.rect.x=10,target.rect.y=20,viewport.kind=width,viewport.width=720',
     );
     expect(decodeRenderToken(token)).toEqual({
       contentVersion: '1',
@@ -45,10 +45,10 @@ describe.skip('wire token codec', () => {
       rotation: '90',
       quality: '0.8',
       'target.kind': 'rect',
-      'target.rect.left': '10',
-      'target.rect.bottom': '20',
-      'target.rect.right': '40.5',
-      'target.rect.top': '60.25',
+      'target.rect.x': '10',
+      'target.rect.y': '20',
+      'target.rect.width': '30.5',
+      'target.rect.height': '40.25',
     });
   });
 
@@ -121,7 +121,7 @@ describe.skip('wire token codec', () => {
       viewport: { kind: 'width' as const, width: 720 },
       target: {
         kind: 'rect' as const,
-        rect: { left: 10, bottom: 20, right: 40.5, top: 60.25 },
+        rect: { x: 10, y: 20, width: 30.5, height: 40.25 },
       },
       rotation: 90 as const,
       background: 'white' as const,
@@ -136,10 +136,10 @@ describe.skip('wire token codec', () => {
       'viewport.kind': 'width',
       'viewport.width': 720,
       'target.kind': 'rect',
-      'target.rect.left': 10,
-      'target.rect.bottom': 20,
-      'target.rect.right': 40.5,
-      'target.rect.top': 60.25,
+      'target.rect.x': 10,
+      'target.rect.y': 20,
+      'target.rect.width': 30.5,
+      'target.rect.height': 40.25,
       rotation: 90,
       background: 'white',
       quality: 0.8,
@@ -152,7 +152,7 @@ describe.skip('wire token codec', () => {
       viewport: { kind: 'width' as const, width: 720 },
       target: {
         kind: 'rect' as const,
-        rect: { left: 10, bottom: 20, right: 40.5, top: 60.25 },
+        rect: { x: 10, y: 20, width: 30.5, height: 40.25 },
       },
       rotation: 90 as const,
       background: 'white' as const,
@@ -169,7 +169,7 @@ describe.skip('wire token codec', () => {
       viewport: { kind: 'width', width: 720 },
       target: {
         kind: 'rect',
-        rect: { left: 10, bottom: 20, right: 40.5, top: 60.25 },
+        rect: { x: 10, y: 20, width: 30.5, height: 40.25 },
       },
       rotation: 90,
       background: 'white',

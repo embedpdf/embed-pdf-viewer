@@ -4,8 +4,10 @@ import type { AnnotationDTO } from '../annotation/kinds';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import type { PageHandle } from '../engine/PageHandle';
+import type { PageLayout } from '../dto/PageLayout';
 import type { PdfRect } from '../geometry/primitives';
 import { pdfRectTurnedBounds } from '../geometry/convert';
+import { pageBoxOf, pdfRectOf } from '../geometry/pageSpace';
 import { annotationKey } from '../identity/annotationKey';
 
 export type AnnotationRotationFixture =
@@ -54,12 +56,12 @@ export function runAnnotationRotationConformance(
 
     const onPage = async (
       fixture: AnnotationRotationFixture,
-      run: (page: PageHandle) => Promise<void>,
+      run: (page: PageHandle, layout: PageLayout) => Promise<void>,
     ): Promise<void> => {
       const doc = await opts.open(engine, fixture);
       try {
         const { pages } = await doc.pages.list();
-        await run(doc.page(pages[0]!.ref));
+        await run(doc.page(pages[0]!.ref), pages[0]!);
       } finally {
         await doc.close();
       }
@@ -195,7 +197,7 @@ export function runAnnotationRotationConformance(
     });
 
     test('a turned drawing that reaches past its box is drawn as the page shows it', async () => {
-      await onPage('authoring', async (page) => {
+      await onPage('authoring', async (page, layout) => {
         const box = { left: 200, bottom: 400, right: 300, top: 460 };
         const { annotation: plain } = await page.annotations.create({
           subtype: 'square',
@@ -216,17 +218,21 @@ export function runAnnotationRotationConformance(
         // Inside its turned box, a drawing renders upright over its box, for
         // the consumer to turn. Past it, it renders as the page shows it.
         const { appearances } = await page.annotations.renderAppearances();
+        // Appearances are placed in page space; annotations still use the file's numbers.
         const rectOf = (ref: AnnotationDTO['ref']) =>
-          appearances.find(
-            (a) => a.mode === 'normal' && annotationKey(a.ref) === annotationKey(ref),
-          )!.rect;
+          pdfRectOf(
+            appearances.find(
+              (a) => a.mode === 'normal' && annotationKey(a.ref) === annotationKey(ref),
+            )!.rect,
+            layout.pdfCropBox,
+          );
         expectRect(rectOf(plain.ref), (plain as { box: PdfRect }).box, 0.01);
         expectRect(rectOf(cloudy.ref), cloudy.rect, 0.01);
       });
     });
 
     test('rotation turns clockwise, as the page shows it', async () => {
-      await onPage('authoring', async (page) => {
+      await onPage('authoring', async (page, layout) => {
         const box = { left: 200, bottom: 400, right: 300, top: 500 };
         await page.annotations.create({
           subtype: 'square',
@@ -239,7 +245,7 @@ export function runAnnotationRotationConformance(
         const area = { left: 150, bottom: 350, right: 350, top: 550 };
         const image = await page.render.image({
           format: 'png',
-          target: { kind: 'rect', rect: area },
+          target: { kind: 'rect', rect: pageBoxOf(area, layout.pdfCropBox) },
         });
         const { url, revoke } = await image.objectUrl();
         let raster: Raster;

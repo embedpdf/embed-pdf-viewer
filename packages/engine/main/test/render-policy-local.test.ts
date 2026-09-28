@@ -106,7 +106,7 @@ describe('local render policy (wasm runtime)', () => {
   test('enforced: rect targets are exempt (tile jurisdiction)', async () => {
     const page = doc.page(toPageRef(await firstPageObjectNumber(doc)));
     const raster = await page.render.raw({
-      target: { kind: 'rect', rect: { left: 0, bottom: 0, right: 100, top: 100 } },
+      target: { kind: 'rect', rect: { x: 0, y: 0, width: 100, height: 100 } },
       viewport: { kind: 'scale', scale: 1 },
     });
     expect(raster.width).toBeGreaterThan(0);

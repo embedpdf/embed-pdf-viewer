@@ -4,7 +4,13 @@ import { fileURLToPath } from 'node:url';
 import { deflateSync } from 'node:zlib';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { DocumentHandle, Engine, StampAnnotationDTO } from '@embedpdf/engine-core/runtime';
-import { EngineErrorCode, sniffBinaryMetadata, toPageRef } from '@embedpdf/engine-core/runtime';
+import {
+  EngineErrorCode,
+  pdfRectOf,
+  sniffBinaryMetadata,
+  toPageRef,
+  type PageBox,
+} from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '../src/index';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -74,6 +80,13 @@ function makePng(
     offset += p.length;
   }
   return png;
+}
+
+/** An appearance's page-space rect in the file's numbers, as annotation reads still give them. */
+async function inFile(document: DocumentHandle, rect: PageBox) {
+  const { pages } = await document.pages.list();
+  const layout = pages.find((page) => page.ref.pageObjectNumber === PAGE_OBJECT_NUMBER)!;
+  return pdfRectOf(rect, layout.pdfCropBox);
 }
 
 describe('stamp annotations: engine-local (inline transport, wasm runtime)', () => {
@@ -224,9 +237,10 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     );
     expect(entry).toBeDefined();
     // The convention: the entry's rect is the unrotated logical box…
-    expect(entry!.rect.left).toBeCloseTo(unrotated.left, 0);
-    expect(entry!.rect.right).toBeCloseTo(unrotated.right, 0);
-    expect(entry!.rect.top).toBeCloseTo(unrotated.top, 0);
+    const entryRect = await inFile(handle, entry!.rect);
+    expect(entryRect.left).toBeCloseTo(unrotated.left, 0);
+    expect(entryRect.right).toBeCloseTo(unrotated.right, 0);
+    expect(entryRect.top).toBeCloseTo(unrotated.top, 0);
     // …and the raster is landscape (a rotated bake would be the 50×100 AABB).
     const { width, height, stride } = entry!.raster;
     expect(width).toBeGreaterThan(height);
@@ -275,8 +289,9 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     // Authored in the unrotated frame: landscape raster, logical-box rect.
     const { width, height, stride } = entry!.raster;
     expect(width).toBeGreaterThan(height);
-    expect(entry!.rect.left).toBeCloseTo(unrotated.left, 0);
-    expect(entry!.rect.right).toBeCloseTo(unrotated.right, 0);
+    const entryRect = await inFile(handle, entry!.rect);
+    expect(entryRect.left).toBeCloseTo(unrotated.left, 0);
+    expect(entryRect.right).toBeCloseTo(unrotated.right, 0);
     // The image aspect matches the box, so contain-fit fills it: Both the middle
     // row and the middle column are red edge-to-edge. Under the old double-shrink
     // the image was ~1/4 size, so neither would be. Sampling both catches a

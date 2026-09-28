@@ -6,7 +6,7 @@ import type {
 } from './PageRender';
 import type { PdfRotation } from '../geometry/primitives';
 import type { AnnotationRef } from '../identity/AnnotationRef';
-import type { Coordinates, PdfCoordinates } from '../pageSpace/coordinates';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 import type { PageState } from '../revision/PageState';
 
 /**
@@ -74,8 +74,8 @@ export interface AnnotationAppearancesQuery {
 
 /**
  * One rendered appearance: the raw RGBA raster plus the metadata needed to
- * position and identify it. `rect` is the placement box in PDF user space
- * (y-up), so the consumer can place the bitmap without a second read.
+ * position and identify it. `rect` is the placement box in page space, so
+ * the consumer can place the bitmap without a second read.
  *
  * Rotation convention (`appearanceTurnOf`): a box kind (square, circle,
  * free text, stamp, caret) drawn turned, whose drawing stays inside the
@@ -88,7 +88,7 @@ export interface AnnotationAppearancesQuery {
  * and appearances with any other matrix — renders as-is with `rect` =
  * `/Rect` and needs no transform.
  */
-export interface AnnotationAppearanceRaster<C extends Coordinates = PdfCoordinates> {
+export interface AnnotationAppearanceRaster<C extends Coordinates = PageCoordinates> {
   /** Full wire identity (durable or weak), including index-only annotations. */
   ref: AnnotationRef;
   mode: AnnotationAppearanceMode;
@@ -100,7 +100,7 @@ export interface AnnotationAppearanceRaster<C extends Coordinates = PdfCoordinat
  * Batch result for one page: the page revision state plus every rendered
  * appearance, keyed implicitly by `ref` on each entry.
  */
-export interface AnnotationAppearancesResult<C extends Coordinates = PdfCoordinates> {
+export interface AnnotationAppearancesResult<C extends Coordinates = PageCoordinates> {
   pageState: PageState;
   appearances: AnnotationAppearanceRaster<C>[];
 }
@@ -112,7 +112,7 @@ export interface AnnotationAppearancesResult<C extends Coordinates = PdfCoordina
  * what both the local engine's `renderAppearances()` and the cloud
  * client (decoding the multipart parts) produce.
  */
-export interface AnnotationAppearanceImage<C extends Coordinates = PdfCoordinates> {
+export interface AnnotationAppearanceImage<C extends Coordinates = PageCoordinates> {
   ref: AnnotationRef;
   mode: AnnotationAppearanceMode;
   /** Placement box (unrotated for rotation-stripped renders) — see
@@ -125,7 +125,7 @@ export interface AnnotationAppearanceImage<C extends Coordinates = PdfCoordinate
  * Batch encoded result for one page — image-handle analogue of
  * {@link AnnotationAppearancesResult}.
  */
-export interface AnnotationAppearanceImagesResult<C extends Coordinates = PdfCoordinates> {
+export interface AnnotationAppearanceImagesResult<C extends Coordinates = PageCoordinates> {
   pageState: PageState;
   appearances: AnnotationAppearanceImage<C>[];
 }
@@ -139,7 +139,7 @@ export interface AnnotationAppearanceImagesResult<C extends Coordinates = PdfCoo
  * every annotation with an appearance stream is emitted — including index-only
  * ones.
  */
-export interface AnnotationAppearanceManifestEntry<C extends Coordinates = PdfCoordinates> {
+export interface AnnotationAppearanceManifestEntry<C extends Coordinates = PageCoordinates> {
   /** `name` of the multipart part carrying this appearance's image bytes. */
   part: string;
   ref: AnnotationRef;
@@ -155,7 +155,7 @@ export interface AnnotationAppearanceManifestEntry<C extends Coordinates = PdfCo
  * The JSON part (`name="manifest"`) of the appearance multipart response. The
  * remaining parts are the encoded images, one per `appearances[i].part`.
  */
-export interface AnnotationAppearanceManifest<C extends Coordinates = PdfCoordinates> {
+export interface AnnotationAppearanceManifest<C extends Coordinates = PageCoordinates> {
   pageState: PageState;
   appearances: AnnotationAppearanceManifestEntry<C>[];
 }

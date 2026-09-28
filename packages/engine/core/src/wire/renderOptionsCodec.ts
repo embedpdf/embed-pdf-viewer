@@ -14,7 +14,7 @@ export interface RenderVersions {
 /**
  * Project image render options plus cache versions into the flat wire shape
  * the render token encoder consumes. The output is a generic dotted-key map
- * (`viewport.kind`, `target.rect.left`, …) — the schema and codec never need
+ * (`viewport.kind`, `target.rect.x`, …) — the schema and codec never need
  * to know about specific option fields. Adding a new render option means
  * extending `PageImageOptions`, the render query schemas, and
  * `RenderTokenSchema.fields`; this function does not change.

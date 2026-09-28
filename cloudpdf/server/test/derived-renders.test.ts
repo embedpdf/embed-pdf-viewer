@@ -34,7 +34,7 @@ const OFFLATTICE_TOKEN =
 /** Rect-target region render: the tile policy's jurisdiction — exempt from
  *  full-page enforcement and compute-only until tile support is advertised. */
 const RECT_TOKEN =
-  'background=white,contentVersion=1,format=webp,target.kind=rect,target.rect.bottom=0,target.rect.left=0,target.rect.right=100,target.rect.top=100,viewport.kind=width,viewport.width=64';
+  'background=white,contentVersion=1,format=webp,target.kind=rect,target.rect.height=100,target.rect.width=100,target.rect.x=0,target.rect.y=0,viewport.kind=width,viewport.width=64';
 
 interface Fixture {
   bundle: AppBundle;

@@ -24,7 +24,6 @@ import type {
   PageRef,
   PdfMeasure,
   PdfPoint,
-  PdfRect,
   RichTextParagraph,
   SerializedEngineError,
 } from '@embedpdf/engine-core/runtime';
@@ -117,7 +116,6 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     scale: number,
     signal?: AbortSignal,
   ): Promise<AnnotationAppearanceImage[]>;
-  pdfToPageRect(page: PageRef, rect: PdfRect): Rect | null;
 
   // ── sync ──
   /**

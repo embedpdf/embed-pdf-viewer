@@ -418,7 +418,7 @@ describe('the tile surface — pure reads, page-space regions', () => {
     await fixture.kernel.destroy();
   });
 
-  it('tile regions go through the kernel page space — crop offsets included', async () => {
+  it('tile regions are asked for in page space — a crop offset changes nothing', async () => {
     const crop = { left: 10, bottom: 20, right: 622, top: 812 };
     const fixture = await boot({ config: { tiles: { settleMs: 0, bleed: 0 } }, crop });
     const view = fixture.render.createViewDemand('stage');
@@ -428,9 +428,9 @@ describe('the tile surface — pure reads, page-space regions', () => {
       rect: Record<string, number>;
     };
     expect(first.kind).toBe('rect');
-    // The page's top-left tile is at page-space (0,0): PDF left = crop.left, top = crop.top.
-    expect(first.rect.left).toBe(10);
-    expect(first.rect.top).toBe(812);
+    // The page's top-left tile starts at page-space (0,0), wherever the crop box sits in the file.
+    expect(first.rect.x).toBe(0);
+    expect(first.rect.y).toBe(0);
     expect(fixture.imageCalls[0]!.options.viewport).toEqual({ kind: 'scale', scale: 8 });
     view.dispose();
     await fixture.kernel.destroy();

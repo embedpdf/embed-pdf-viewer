@@ -638,13 +638,13 @@ export interface SearchQueryWorkerRequest {
   request: SearchScanRequest;
 }
 
-export interface PagesRenderWorkerRequest {
+export interface PagesRenderWorkerRequest<C extends Coordinates = PageCoordinates> {
   kind: 'pages.render';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
   page: PageRef;
-  options?: PageRenderOptions;
+  options?: PageRenderOptions<C>;
 }
 
 /**
@@ -692,13 +692,13 @@ export interface EncodedImageWire {
   bytes: Uint8Array;
 }
 
-export interface PagesRenderEncodedWorkerRequest {
+export interface PagesRenderEncodedWorkerRequest<C extends Coordinates = PageCoordinates> {
   kind: 'pages.renderEncoded';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
   page: PageRef;
-  options?: PageRenderOptions;
+  options?: PageRenderOptions<C>;
   encode: RenderEncode;
 }
 
@@ -727,16 +727,16 @@ export interface AnnotationsRenderAppearancesEncodedWorkerRequest {
 
 /** Encoded counterpart of `AnnotationAppearanceRaster`: same identity and
  *  placement metadata, image instead of raster. */
-export interface EncodedAppearanceWire {
+export interface EncodedAppearanceWire<C extends Coordinates = PageCoordinates> {
   ref: AnnotationRef;
   mode: AnnotationAppearanceMode;
-  rect: PdfRect;
+  rect: C['box'];
   image: EncodedImageWire;
 }
 
-export interface AnnotationAppearancesEncodedResultWire {
+export interface AnnotationAppearancesEncodedResultWire<C extends Coordinates = PageCoordinates> {
   pageState: PageState;
-  appearances: EncodedAppearanceWire[];
+  appearances: EncodedAppearanceWire<C>[];
 }
 
 export interface PagesMoveWorkerRequest {
@@ -1145,7 +1145,12 @@ export interface LayerArtifactFileWorkerPayload {
   path: string;
 }
 
-export type WorkerRequest =
+/**
+ * Every request a worker takes. `C` is where a request's places are: page
+ * space as callers send them, the file's coordinates once the worker has
+ * converted them for its handlers.
+ */
+export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | OpenWorkerRequest
   | MetadataReadWorkerRequest
   | MetadataUpdateWorkerRequest
@@ -1199,8 +1204,8 @@ export type WorkerRequest =
   | PieceInfoDeleteWorkerRequest
   | PagesTextWorkerRequest
   | PagesGeometryWorkerRequest
-  | PagesRenderWorkerRequest
-  | PagesRenderEncodedWorkerRequest
+  | PagesRenderWorkerRequest<C>
+  | PagesRenderEncodedWorkerRequest<C>
   | SearchQueryWorkerRequest
   | DocumentSaveBufferWorkerRequest
   | DocumentSaveFileWorkerRequest
@@ -1277,8 +1282,12 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | { tag: 'annotations.list'; list: AnnotationList }
-  | { tag: 'annotations.renderAppearances'; result: AnnotationAppearancesResult }
-  | { tag: 'annotations.renderAppearancesEncoded'; result: AnnotationAppearancesEncodedResultWire }
+  | { tag: 'annotations.renderAppearances'; page: PageRef; result: AnnotationAppearancesResult<C> }
+  | {
+      tag: 'annotations.renderAppearancesEncoded';
+      page: PageRef;
+      result: AnnotationAppearancesEncodedResultWire<C>;
+    }
   | {
       tag: 'annotations.create';
       result: AnnotationCreateResult;

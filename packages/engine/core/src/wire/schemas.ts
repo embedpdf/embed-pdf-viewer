@@ -689,10 +689,10 @@ const RenderTargetSchema = z.discriminatedUnion('kind', [
       kind: z.literal('rect'),
       rect: z
         .object({
-          left: z.coerce.number().finite(),
-          bottom: z.coerce.number().finite(),
-          right: z.coerce.number().finite(),
-          top: z.coerce.number().finite(),
+          x: z.coerce.number().finite(),
+          y: z.coerce.number().finite(),
+          width: z.coerce.number().positive().finite(),
+          height: z.coerce.number().positive().finite(),
         })
         .strict(),
     })
@@ -849,7 +849,7 @@ export const AnnotationAppearanceManifestSchema: z.ZodType<AnnotationAppearanceM
         part: z.string().min(1),
         ref: AnnotationRefSchema,
         mode: z.enum(['normal', 'rollover', 'down']),
-        rect: PdfRectSchema,
+        rect: PageBoxSchema,
         width: z.number().int().positive(),
         height: z.number().int().positive(),
         format: PageNetworkRenderFormatSchema,

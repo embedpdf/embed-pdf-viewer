@@ -24,6 +24,8 @@ export const CROP_OFFSET_PDF = pdfOf([
 ]);
 
 const SQUARE: PdfRect = { left: 200, bottom: 300, right: 300, top: 400 };
+/** The square in page space: from the crop box's top-left (100, 600), y down. */
+const SQUARE_ON_PAGE = { x: 100, y: 200, width: 100, height: 100 };
 
 export interface PageRenderConformanceOptions {
   label: string;
@@ -35,9 +37,9 @@ export interface PageRenderConformanceOptions {
 
 /**
  * Page images on both engines: an image reports the size of its pixels, a
- * target rect is in file coordinates like every other rect (so a page whose
- * crop box doesn't start at 0,0 renders the area asked for), and quality
- * goes from 0 to 1.
+ * target rect is in page space like every other place (so a page whose crop
+ * box doesn't start at 0,0 renders the area asked for), and quality goes
+ * from 0 to 1.
  */
 export function runPageRenderConformance(
   runner: ConformanceTestRunner,
@@ -76,14 +78,14 @@ export function runPageRenderConformance(
         { options: { viewport: { kind: 'width', width: 123 } }, size: [123, 123] },
         {
           options: {
-            target: { kind: 'rect', rect: { left: 200, bottom: 300, right: 300, top: 350 } },
+            target: { kind: 'rect', rect: { x: 100, y: 250, width: 100, height: 50 } },
             rotation: 90,
           },
           size: [50, 100],
         },
         {
           options: {
-            target: { kind: 'rect', rect: { left: 200, bottom: 300, right: 300, top: 350 } },
+            target: { kind: 'rect', rect: { x: 100, y: 250, width: 100, height: 50 } },
             viewport: { kind: 'width', width: 30 },
           },
           size: [30, 15],
@@ -106,11 +108,11 @@ export function runPageRenderConformance(
       expect(isDark(pixel(raster, 25, 25))).toBe(false);
     });
 
-    test('a target rect is in file coordinates, like annotation rects', async () => {
+    test("a target rect is in page space, from the crop box's top-left", async () => {
       const square = await decode(
         await page.render.image({
           format: 'png',
-          target: { kind: 'rect', rect: SQUARE },
+          target: { kind: 'rect', rect: SQUARE_ON_PAGE },
           viewport: { kind: 'scale', scale: 0.1 },
         }),
       );
@@ -120,10 +122,7 @@ export function runPageRenderConformance(
       const beside = await decode(
         await page.render.image({
           format: 'png',
-          target: {
-            kind: 'rect',
-            rect: { left: 300, bottom: 300, right: 400, top: 400 },
-          },
+          target: { kind: 'rect', rect: { x: 200, y: 200, width: 100, height: 100 } },
           viewport: { kind: 'scale', scale: 0.1 },
         }),
       );
@@ -143,6 +142,12 @@ export function runPageRenderConformance(
           (a) => a.mode === 'normal' && annotationKey(a.ref) === annotationKey(annotation.ref),
         );
         expect(found !== undefined).toBe(true);
+        // Placed in page space: the square, give or take its border.
+        const { x, y, width, height } = found!.rect;
+        expect(Math.abs(x - SQUARE_ON_PAGE.x) <= 2 && Math.abs(y - SQUARE_ON_PAGE.y) <= 2).toBe(
+          true,
+        );
+        expect(Math.abs(width - 100) <= 4 && Math.abs(height - 100) <= 4).toBe(true);
         const raster = await decode(found!.image);
         const [r, g, b, a] = pixel(raster, raster.width >> 1, raster.height >> 1);
         expect(r > 200 && g < 60 && b < 60 && a > 200).toBe(true);

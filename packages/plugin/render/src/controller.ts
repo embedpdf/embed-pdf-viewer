@@ -82,10 +82,7 @@ interface PageDemand {
  * live handles and abort controllers); a re-plan wakes readers with
  * `ctx.notify()`.
  */
-export function createRenderController(
-  ctx: PluginContext<RenderState>,
-  config: RenderConfig = {},
-) {
+export function createRenderController(ctx: PluginContext<RenderState>, config: RenderConfig = {}) {
   const resolved: ResolvedRenderOptions = resolveRenderOptions(config);
   const store = new RasterStore();
   const invalidated = ctx.events.source<RenderInvalidatedEvent>();
@@ -364,8 +361,7 @@ export function createRenderController(
       const page = toPageRef(pageObjectNumber);
       const strategy = currentStrategy();
       const task = ctx.doc.page(page).render.image({
-        // The kernel's page space owns the page → PDF conversion (crop offsets included).
-        target: { kind: 'rect', rect: ctx.geometry.forPage(page).pageRectToPdf(rect) },
+        target: { kind: 'rect', rect },
         viewport: { kind: 'scale', scale },
         includeAnnotations,
         ...(strategy.format !== undefined ? { format: strategy.format } : {}),

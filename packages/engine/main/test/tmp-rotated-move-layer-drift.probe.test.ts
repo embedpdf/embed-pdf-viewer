@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, test } from 'vitest';
 
-import { toPageRef } from '@embedpdf/engine-core/runtime';
+import { pdfRectOf, toPageRef, type PageBox } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine, type LocalEngine } from '../src/index';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -99,9 +99,15 @@ describe('rotated circle move drift probe — LAYER pipeline', () => {
         (x) => x.subtype === 'circle' && x.contents === 'drift probe',
       ) as unknown as { ref: unknown; rect: R; box?: R; rotation?: number };
       const rendered = await d.page(toPageRef(PAGE)).annotations.renderAppearancesRaw();
+      // Appearances are placed in page space; print them in the file's numbers.
+      const { pages } = await d.pages.list();
+      const crop = pages.find((page) => page.ref.pageObjectNumber === PAGE)!.pdfCropBox;
       const ap = rendered.appearances.find(
         (p) => JSON.stringify((p as { ref: unknown }).ref) === JSON.stringify(a.ref),
-      ) as unknown as { rect: R; raster: { width: number; height: number; data: ArrayBuffer } };
+      ) as unknown as {
+        rect: PageBox;
+        raster: { width: number; height: number; data: ArrayBuffer };
+      };
       const ink = ap ? inkFraction(ap.raster) : null;
       console.log(
         label,
@@ -112,7 +118,7 @@ describe('rotated circle move drift probe — LAYER pipeline', () => {
         '\n  rotation   =',
         a.rotation,
         '\n  AP rect    =',
-        ap ? fmt(ap.rect) : 'none',
+        ap ? fmt(pdfRectOf(ap.rect, crop)) : 'none',
         '\n  ink fill   =',
         ink ? `fx=${ink.fx} fy=${ink.fy}` : 'none',
       );

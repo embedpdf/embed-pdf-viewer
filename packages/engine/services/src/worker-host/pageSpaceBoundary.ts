@@ -1,14 +1,20 @@
 import {
   mapDocumentActions,
+  pageAppearancesOf,
   pageDestinationOf,
   pageFormFieldOf,
   pageFormSnapshotOf,
   pageGeometryOf,
   pageListOf,
   pageSearchSliceOf,
+  pdfRenderTargetOf,
+  type PageRef,
+  type PageRenderOptions,
   type PdfCoordinates,
   type PdfDestination,
+  type PdfRect,
   type VisibleBoxOf,
+  type WorkerRequest,
   type WorkerResultPayload,
 } from '@embedpdf/engine-core/runtime';
 
@@ -46,6 +52,14 @@ export function resultInPageSpace(
       return { ...payload, snapshot: pageGeometryOf(payload.snapshot, boxOf(payload.page)) };
     case 'search.query':
       return { ...payload, slice: pageSearchSliceOf(payload.slice, boxOf) };
+    case 'annotations.renderAppearances': {
+      const appearances = pageAppearancesOf(payload.result.appearances, boxOf(payload.page));
+      return { ...payload, result: { ...payload.result, appearances } };
+    }
+    case 'annotations.renderAppearancesEncoded': {
+      const appearances = pageAppearancesOf(payload.result.appearances, boxOf(payload.page));
+      return { ...payload, result: { ...payload.result, appearances } };
+    }
     case 'actions.read':
       return { ...payload, snapshot: mapDocumentActions(payload.snapshot, toPage) };
     case 'forms.list':
@@ -80,4 +94,53 @@ export function resultInPageSpace(
     default:
       return payload;
   }
+}
+
+/** A job as callers send it, in page space. */
+export type PageSpaceJob = Exclude<WorkerRequest, { kind: 'abort' }>;
+/** A job as the handlers take it, in the file's coordinates. */
+export type FileSpaceJob = Exclude<WorkerRequest<PdfCoordinates>, { kind: 'abort' }>;
+
+/**
+ * The other way across the boundary: a request as the handlers take it, each
+ * place a caller sent in page space measured in the file's coordinates on
+ * its page. It runs when the job does, after every job before it, so a page
+ * a queued edit changed is measured as it now is. A file render opens its
+ * own document, so it converts its own target (`renderOptionsInFileSpace`).
+ */
+export function requestInFileSpace(job: PageSpaceJob, boxOf: VisibleBoxOf): FileSpaceJob {
+  switch (job.kind) {
+    case 'pages.render':
+      return withRenderOptionsInFileSpace(job, boxOf);
+    case 'pages.renderEncoded':
+      return withRenderOptionsInFileSpace(job, boxOf);
+    default:
+      return job;
+  }
+}
+
+function withRenderOptionsInFileSpace<Job extends { page: PageRef; options?: PageRenderOptions }>(
+  job: Job,
+  boxOf: VisibleBoxOf,
+): Omit<Job, 'options'> & { options?: PageRenderOptions<PdfCoordinates> } {
+  const { options, ...rest } = job;
+  return options
+    ? { ...rest, options: renderOptionsInFileSpace(options, () => boxOf(job.page)) }
+    : rest;
+}
+
+/**
+ * Render options in the file's coordinates. `visible` gives the page's
+ * visible box, read only when a target rect needs it.
+ */
+export function renderOptionsInFileSpace(
+  options: PageRenderOptions,
+  visible: () => PdfRect,
+): PageRenderOptions<PdfCoordinates> {
+  const { target, ...rest } = options;
+  if (!target) return rest;
+  return {
+    ...rest,
+    target: target.kind === 'rect' ? pdfRenderTargetOf(target, visible()) : target,
+  };
 }

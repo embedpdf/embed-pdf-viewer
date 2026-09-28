@@ -3,6 +3,7 @@ import type {
   PageRaster,
   PageRenderOptions,
   PageRenderTarget,
+  PdfCoordinates,
   PdfRect,
 } from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode, normalizePdfRect } from '@embedpdf/engine-core/runtime';
@@ -39,7 +40,7 @@ export class PageRenderReader {
    */
   async render(
     pageObjectNumber: PageObjectNumber,
-    options: PageRenderOptions,
+    options: PageRenderOptions<PdfCoordinates>,
     signal: AbortSignal,
     slices: RenderSlices,
   ): Promise<PageRaster> {
@@ -109,10 +110,14 @@ export class PageRenderReader {
  * Resolve the render target to a normalized PDF-space rect: the page box, or
  * a sub-rect in the page's own coordinates (as annotation rects are).
  */
-function resolveTarget(target: PageRenderTarget | undefined, page: PdfRect): PdfRect {
+function resolveTarget(
+  target: PageRenderTarget<PdfCoordinates> | undefined,
+  page: PdfRect,
+): PdfRect {
   if (!target || target.kind === 'page') return page;
   const rect = normalizePdfRect(target.rect);
-  if (rect.right <= rect.left || rect.top <= rect.bottom) {
+  // Written so a rect that isn't numbers (NaN) is refused too.
+  if (!(rect.right > rect.left && rect.top > rect.bottom)) {
     throw new EngineError(EngineErrorCode.InvalidArg, 'render rect must have positive area');
   }
   return rect;

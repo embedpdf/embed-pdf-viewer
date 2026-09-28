@@ -108,7 +108,13 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
-import { resultInPageSpace } from './pageSpaceBoundary';
+import {
+  renderOptionsInFileSpace,
+  requestInFileSpace,
+  resultInPageSpace,
+  type FileSpaceJob,
+  type PageSpaceJob,
+} from './pageSpaceBoundary';
 import { DocumentSession } from '../document-session/DocumentSession';
 import { BaseDocumentRegistry } from '../document-session/lifecycle/BaseDocumentRegistry';
 import {
@@ -209,12 +215,10 @@ export const DEFAULT_RENDER_SLICE_MS = 8;
 
 /** The kinds that render a page, in slices (see {@link RenderSlices}). */
 type PageRenderRequest =
-  | PagesRenderWorkerRequest
-  | PagesRenderEncodedWorkerRequest
+  | PagesRenderWorkerRequest<PdfCoordinates>
+  | PagesRenderEncodedWorkerRequest<PdfCoordinates>
   | DocumentRenderPageFileWorkerRequest
   | DocumentRenderPageFileEncodedWorkerRequest;
-
-type JobRequest = Exclude<WorkerRequest, { kind: 'abort' }>;
 
 /**
  * Job kinds that only read the document and may reuse pages kept loaded by an
@@ -269,7 +273,7 @@ export class WorkerHost {
    */
   private rendering = false;
   /** Requests that arrived while a render was in progress, in arrival order. */
-  private readonly held: JobRequest[] = [];
+  private readonly held: PageSpaceJob[] = [];
   private destroyed = false;
 
   constructor(
@@ -347,13 +351,25 @@ export class WorkerHost {
     }
   }
 
-  private run(msg: JobRequest): void {
+  private run(job: PageSpaceJob): void {
     // Before any route below: any job that is not read-only closes every
     // idle page and drops every kept image decode first, so no change can meet
     // a page or an image decoded before it.
-    const readOnly = READ_ONLY_KINDS.has(msg.kind);
+    const readOnly = READ_ONLY_KINDS.has(job.kind);
     this.idlePages.beginJob(readOnly);
     this.decodedImages.beginJob(readOnly);
+
+    // The handlers work in the file's coordinates: the places a caller sent
+    // convert here, as the job runs.
+    let msg: FileSpaceJob;
+    try {
+      msg = requestInFileSpace(job, this.visibleBoxesFor(job));
+    } catch (err) {
+      this.post(
+        wirePack({ kind: 'reject', jobId: job.jobId, error: serializeError(err) }, EMPTY_TRANSFER),
+      );
+      return;
+    }
 
     // Page renders run in slices, awaiting between them; see receiveRender.
     if (
@@ -644,13 +660,13 @@ export class WorkerHost {
    * Answers a job with its result in page space. The handler decided which
    * buffers to move; the host relays that decision on the `resolve` envelope.
    */
-  private resolve(msg: WorkerRequest, pack: WirePack<WorkerResultPayload<PdfCoordinates>>): void {
+  private resolve(msg: FileSpaceJob, pack: WirePack<WorkerResultPayload<PdfCoordinates>>): void {
     const result = resultInPageSpace(pack.payload, this.visibleBoxesFor(msg));
     this.post(wirePack({ kind: 'resolve', jobId: msg.jobId, result }, pack.transfer));
   }
 
   /** The visible boxes of the request's document, read only when a result asks for one. */
-  private visibleBoxesFor(msg: WorkerRequest): VisibleBoxOf {
+  private visibleBoxesFor(msg: PageSpaceJob | FileSpaceJob): VisibleBoxOf {
     let read: VisibleBoxOf | null = null;
     return (page) => {
       if (!('docId' in msg)) {
@@ -975,7 +991,7 @@ export class WorkerHost {
     const result = reader.render(pageObjectNumber, req.options ?? {}, signal);
     // Transfer every appearance raster buffer back zero-copy, like pages.render.
     const transfer = result.appearances.map((a) => a.raster.data);
-    return wirePack({ tag: 'annotations.renderAppearances', result }, transfer);
+    return wirePack({ tag: 'annotations.renderAppearances', page: req.page, result }, transfer);
   }
 
   private handleAnnotationsCreate(
@@ -1426,7 +1442,7 @@ export class WorkerHost {
   }
 
   private async handlePagesRender(
-    req: PagesRenderWorkerRequest,
+    req: PagesRenderWorkerRequest<PdfCoordinates>,
     signal: AbortSignal,
   ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>> {
     const session = this.requireSession(req);
@@ -1581,7 +1597,7 @@ export class WorkerHost {
     // pool at once would only let one big batch monopolize it and starve
     // the encodes of interleaved jobs. One at a time matches the
     // previous API-side encoding loop exactly and keeps the pool fair.
-    const encoded: EncodedAppearanceWire[] = [];
+    const encoded: EncodedAppearanceWire<PdfCoordinates>[] = [];
     for (const a of appearances) {
       encoded.push({
         ref: a.ref,
@@ -1591,7 +1607,11 @@ export class WorkerHost {
       });
     }
     return wirePack(
-      { tag: 'annotations.renderAppearancesEncoded', result: { pageState, appearances: encoded } },
+      {
+        tag: 'annotations.renderAppearancesEncoded',
+        page: req.page,
+        result: { pageState, appearances: encoded },
+      },
       encoded.map((e) => e.image.bytes.buffer),
     );
   }
@@ -1716,9 +1736,11 @@ export class WorkerHost {
           `renderPageFile: no page at index ${req.pageIndex} (pageCount=${layout.pageCount})`,
         );
       }
+      // No session carried this document to the boundary, so the target
+      // converts here, on the page it opened.
       const raster = await new PageRenderReader(this.runtime, session).render(
         page.ref.pageObjectNumber,
-        req.options ?? {},
+        renderOptionsInFileSpace(req.options ?? {}, () => page.pdfCropBox),
         signal,
         this.renderSlices,
       );

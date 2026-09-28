@@ -118,7 +118,7 @@ async function digest(host: Host, page: PageRef, options: Record<string, unknown
 
 const tile = {
   viewport: { kind: 'scale', scale: 3 },
-  target: { kind: 'rect', rect: { left: 200, bottom: 300, right: 330, top: 430 } },
+  target: { kind: 'rect', rect: { x: 200, y: 300, width: 130, height: 130 } },
 };
 
 describe('sliced page renders (wasm engine)', () => {

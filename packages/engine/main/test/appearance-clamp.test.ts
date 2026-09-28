@@ -62,7 +62,7 @@ describe('appearance pixel clamp (wasm engine, real document)', () => {
     // appearance should render meaningfully sharper than the page-sized
     // stamp's capped scale (~5.7) would allow relative to its rect.
     const sharp = result.appearances.some((ap) => {
-      const rectW = ap.rect.right - ap.rect.left;
+      const rectW = ap.rect.width;
       return rectW > 0 && ap.raster.width / rectW > 20;
     });
     expect(sharp).toBe(true);

@@ -15,9 +15,9 @@ export { intersectRects } from '@embedpdf/core-geometry';
  *
  * Spaces: tile coords live on the device grid at their level's scale
  * (tileSize² device px per tile, constant per-job cost by construction);
- * paint rects are y-down page points (the viewer convention — the layer
- * multiplies by one container transform); engine rects are y-up PDF user
- * space (the `target: {kind:'rect'}` contract).
+ * paint rects and engine render targets (`target: {kind:'rect'}`) are
+ * page space, y-down page points (the layer multiplies by one container
+ * transform).
  */
 
 export interface PageSizePt {

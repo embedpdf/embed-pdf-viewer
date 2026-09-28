@@ -103,7 +103,7 @@ The image tells you what you got:
 | `contentType`     | The MIME type, such as `'image/webp'`              |
 | `width`, `height` | The image's size in pixels                         |
 | `objectUrl()`     | A URL for `<img>`, and `revoke()` to free it       |
-| `transform`       | Converts between its pixels and PDF points (below) |
+| `transform`       | Converts between its pixels and page space (below) |
 
 ## Background and annotations
 
@@ -119,8 +119,8 @@ await page.render.image({ includeAnnotations: false, background: 'transparent', 
 
 ## Part of a page
 
-`target` renders one area instead of the whole page. The rect is in PDF points, in the same
-coordinates as annotation rects and text positions, so you can render exactly the area of an
+`target` renders one area instead of the whole page. The rect is in page space, from the page's
+top-left like annotation rects and text positions, so you can render exactly the area of an
 annotation:
 
 ```ts
@@ -203,8 +203,8 @@ the image arrives, to keep an overlay in place while you zoom, for a page drawn 
 
 ### With CSS or a canvas
 
-`view.matrix` is the conversion from PDF points to pixels as the six numbers of a CSS `matrix()`
-or a canvas `setTransform()`. Draw an overlay in PDF points and let the browser place it:
+`view.matrix` is the conversion from page space to pixels as the six numbers of a CSS `matrix()`
+or a canvas `setTransform()`. Draw an overlay in page space and let the browser place it:
 
 ```tsx
 <svg width={view.width} height={view.height}>
@@ -212,10 +212,10 @@ or a canvas `setTransform()`. Draw an overlay in PDF points and let the browser 
     {match.segments.map(({ rect }, i) => (
       <rect
         key={i}
-        x={rect.left}
-        y={rect.bottom}
-        width={rect.right - rect.left}
-        height={rect.top - rect.bottom}
+        x={rect.x}
+        y={rect.y}
+        width={rect.width}
+        height={rect.height}
         fill="rgba(255, 215, 0, 0.4)"
       />
     ))}
@@ -226,7 +226,7 @@ or a canvas `setTransform()`. Draw an overlay in PDF points and let the browser 
 ### Turned pages
 
 Rotation is one of the settings, `0` by default as for a render: at `90` the page turns
-clockwise, the width and height swap, and the transform turns with it. Positions in PDF points don't change when a page turns, so a
+clockwise, the width and height swap, and the transform turns with it. Positions in page space don't change when a page turns, so a
 selection or a search result keeps the same numbers; only the transform is different.
 
 ## Cancel a render

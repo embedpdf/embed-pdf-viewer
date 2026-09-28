@@ -12,7 +12,6 @@ import {
   type PageRef,
   type PageRenderOptions,
   type PageRenderService,
-  normalizePdfRect,
   renderSize,
   checkImageQuality,
 } from '@embedpdf/engine-core/runtime';
@@ -122,13 +121,10 @@ export class CloudPageRenderService implements PageRenderService {
     signal: AbortSignal,
   ): Promise<{ width: number; height: number }> {
     const target = options.target ?? { kind: 'page' };
-    let area;
-    if (target.kind === 'rect') {
-      const rect = normalizePdfRect(target.rect);
-      area = { width: rect.right - rect.left, height: rect.top - rect.bottom };
-    } else {
-      area = (await this.layout(signal)).size;
-    }
+    const area =
+      target.kind === 'rect'
+        ? { width: target.rect.width, height: target.rect.height }
+        : (await this.layout(signal)).size;
     return renderSize(area, options.rotation ?? 0, options.viewport ?? { kind: 'scale' });
   }
 

@@ -96,21 +96,11 @@ describe('render, form and measure values', () => {
       pdfRenderTargetOf({ kind: 'rect', rect: { x: 50, y: 82, width: 50, height: 50 } }, crop),
     ).toEqual({ kind: 'rect', rect: { left: 100, right: 150, bottom: 600, top: 650 } });
     expect(pdfRenderTargetOf({ kind: 'page' }, crop)).toEqual({ kind: 'page' });
-    const result = pageAppearancesOf(
-      {
-        pageState: {} as never,
-        appearances: [
-          {
-            ref: {} as never,
-            mode: 'normal',
-            rect: { left: 100, bottom: 600, right: 150, top: 650 },
-            raster: {} as never,
-          },
-        ],
-      },
+    const [appearance] = pageAppearancesOf(
+      [{ mode: 'normal', rect: { left: 100, bottom: 600, right: 150, top: 650 } }],
       crop,
     );
-    expect(result.appearances[0]!.rect).toEqual({ x: 50, y: 82, width: 50, height: 50 });
+    expect(appearance).toEqual({ mode: 'normal', rect: { x: 50, y: 82, width: 50, height: 50 } });
   });
 
   test("a field's actions go to spots on the pages they go to; the rest of the field stays", () => {

@@ -1,7 +1,7 @@
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { PdfRotation } from '../geometry/primitives';
-import type { Coordinates, PdfCoordinates } from '../pageSpace/coordinates';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 import { AbortablePromise } from '../promise/AbortablePromise';
 
 export type PageRenderEncodedFormat = 'png' | 'webp' | 'bmp';
@@ -19,7 +19,7 @@ export type PageRenderBackground = 'white' | 'transparent';
 export type PageRenderViewport =
   | {
       /**
-       * Render one PDF user-space unit as `scale` device pixels. Callers
+       * Render one point as `scale` device pixels. Callers
        * that care about devicePixelRatio should fold it into this value.
        */
       kind: 'scale';
@@ -34,16 +34,16 @@ export type PageRenderViewport =
       width: number;
     };
 
-export type PageRenderTarget<C extends Coordinates = PdfCoordinates> =
+export type PageRenderTarget<C extends Coordinates = PageCoordinates> =
   | { kind: 'page' }
   | {
       kind: 'rect';
-      /** The area to render, in the same coordinates as annotation rects. */
+      /** The area to render, in page space: from the page's top-left, y down. */
       rect: C['box'];
     };
 
-export interface PageRenderOptions {
-  target?: PageRenderTarget;
+export interface PageRenderOptions<C extends Coordinates = PageCoordinates> {
+  target?: PageRenderTarget<C>;
   viewport?: PageRenderViewport;
   rotation?: PdfRotation;
   background?: PageRenderBackground;
@@ -62,7 +62,9 @@ export interface PageRenderOptions {
   maxOutputPixels?: number;
 }
 
-export interface PageImageOptions extends PageRenderOptions {
+export interface PageImageOptions<
+  C extends Coordinates = PageCoordinates,
+> extends PageRenderOptions<C> {
   format?: PageRenderEncodedFormat;
   /**
    * WebP quality from 0 (smallest) to 1 (best), the same scale as

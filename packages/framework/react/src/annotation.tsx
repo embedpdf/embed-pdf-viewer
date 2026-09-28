@@ -869,10 +869,9 @@ export function AnnotationLayer({ renderers }: AnnotationLayerProps = {}) {
         const imgs = await anno.renderAppearances(page.ref, bakeScale, controller.signal);
         const map: Record<string, { url: string; box: Rect }> = {};
         for (const ap of imgs) {
-          // Place the baked bitmap by its own /Rect (the box it was rendered into),
-          // converted to content space by the plugin — never a recomputed bound.
-          const box = anno.pdfToPageRect(page.ref, ap.rect);
-          if (!box) continue;
+          // Place the baked bitmap by its own rect (the box it was rendered
+          // into, in page space) — never a recomputed bound.
+          const box = ap.rect;
           const obj = await ap.image.objectUrl().abortWith(controller.signal);
           if (controller.signal.aborted) {
             obj.revoke();
