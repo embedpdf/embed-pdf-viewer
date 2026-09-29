@@ -985,7 +985,8 @@ export function runAnnotationMutationConformance(
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
 
-        // Plain free text, no fontColor override => text follows `color`.
+        // Plain free text: `color` is the border; the text is black unless
+        // `fontColor` says otherwise.
         const freeTextDraft: FreeTextDraft = {
           subtype: 'free-text',
           intent: 'free-text',
@@ -1010,12 +1011,11 @@ export function runAnnotationMutationConformance(
           expect(freeText.annotation.textAlign).toBe('center');
           expect(freeText.annotation.color).toBe('#14283c');
           expect(freeText.annotation.interiorColor).toBe('#fafad2');
-          // No override sent => text follows `color`, so fontColor is omitted.
-          expect(freeText.annotation.fontColor).toBe(null);
+          expect(freeText.annotation.fontColor).toBe('#000000');
         }
 
-        // Callout: intent + /CL leader + /LE ending, explicit fontColor
-        // override, transparent (null) background.
+        // Callout: intent + /CL leader + /LE ending, its own text color,
+        // transparent (null) background.
         const calloutDraft: FreeTextDraft = {
           subtype: 'free-text',
           intent: 'free-text-callout',
@@ -1039,7 +1039,6 @@ export function runAnnotationMutationConformance(
         if (callout.annotation.subtype === 'free-text') {
           expect(callout.annotation.intent).toBe('free-text-callout');
           expect(callout.annotation.interiorColor).toBe(null);
-          // fontColor differs from color => surfaced as an override.
           expect(callout.annotation.fontColor).toBe('#c80000');
           expect(callout.annotation.color).toBe('#000000');
           expect(callout.annotation.calloutLine?.length).toBe(DEFAULT_CALLOUT_LINE.length);
@@ -1157,10 +1156,8 @@ export function runAnnotationMutationConformance(
           subtype: 'free-text',
           intent: 'free-text',
           box: shapeRect,
-          fontFamily: 'helvetica',
-          fontSize: 12,
-          textAlign: 'left',
           color: '#0000ff',
+          // The body carries the size; a `fontSize` beside it would win.
           richText: {
             body: { family: 'Helvetica', size: 18, color: '#102030' },
             paragraphs: [
@@ -1181,10 +1178,12 @@ export function runAnnotationMutationConformance(
           const dto = created.annotation;
           // `contents` is the projection: paragraphs joined by \r, runs concatenated.
           expect(dto.contents).toBe('Hello bold red\rH2');
-          // The body became the /DA font and size; the /DA colour stayed the draft's.
+          // The body became the /DA font and size; the /DA colour, the border's,
+          // stayed the draft's, and the text is the body's color.
           expect(dto.fontFamily).toBe('helvetica');
           expect(dto.fontSize).toBe(18);
           expect(dto.color).toBe('#0000ff');
+          expect(dto.fontColor).toBe('#102030');
           expect(dto.richText.body.color).toBe('#102030');
           expect(dto.richText.paragraphs[0]!.runs).toEqual([
             { text: 'Hello ' },

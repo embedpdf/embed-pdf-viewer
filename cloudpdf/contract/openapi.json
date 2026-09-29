@@ -9010,7 +9010,10 @@
                 "nullable": true
               },
               "vertices": {
-                "$ref": "#/components/schemas/Annotation/anyOf/6/properties/vertices"
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/p1"
+                }
               },
               "rotation": {
                 "type": "number",
@@ -9812,7 +9815,8 @@
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/opacity"
               },
               "strokeWidth": {
-                "$ref": "#/components/schemas/Annotation/anyOf/4/properties/strokeWidth"
+                "type": "number",
+                "minimum": 0
               },
               "borderStyle": {
                 "$ref": "#/components/schemas/Annotation/anyOf/4/properties/borderStyle"
@@ -10031,7 +10035,7 @@
               },
               "intent": {
                 "type": "string",
-                "enum": ["free-text", "free-text-callout"]
+                "enum": ["free-text", "free-text-callout", "free-text-typewriter"]
               },
               "fontFamily": {
                 "type": "string",
@@ -10044,7 +10048,11 @@
               },
               "textAlign": {
                 "type": "string",
-                "enum": ["left", "center", "right"]
+                "enum": ["left", "center", "right", "justify"]
+              },
+              "verticalAlign": {
+                "type": "string",
+                "enum": ["top", "middle", "bottom"]
               },
               "richText": {
                 "type": "object",
@@ -10094,8 +10102,7 @@
                         "type": "string"
                       },
                       "align": {
-                        "type": "string",
-                        "enum": ["left", "center", "right", "justify"]
+                        "$ref": "#/components/schemas/Annotation/anyOf/11/properties/textAlign"
                       },
                       "dir": {
                         "type": "string",
@@ -10150,7 +10157,7 @@
                       "type": "object",
                       "properties": {
                         "align": {
-                          "$ref": "#/components/schemas/Annotation/anyOf/11/properties/richText/properties/body/properties/align"
+                          "$ref": "#/components/schemas/Annotation/anyOf/11/properties/textAlign"
                         },
                         "dir": {
                           "$ref": "#/components/schemas/Annotation/anyOf/11/properties/richText/properties/body/properties/dir"
@@ -10229,12 +10236,7 @@
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
               },
               "fontColor": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
-                  }
-                ],
-                "nullable": true
+                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
               },
               "interiorColor": {
                 "allOf": [
@@ -10262,6 +10264,12 @@
                   "type": "number",
                   "minimum": 0
                 },
+                "nullable": true
+              },
+              "cloudyIntensity": {
+                "type": "number",
+                "exclusiveMinimum": true,
+                "minimum": 0,
                 "nullable": true
               },
               "calloutLine": {
@@ -10345,6 +10353,7 @@
               "fontFamily",
               "fontSize",
               "textAlign",
+              "verticalAlign",
               "richText",
               "color",
               "fontColor",
@@ -10353,6 +10362,7 @@
               "strokeWidth",
               "borderStyle",
               "dashArray",
+              "cloudyIntensity",
               "calloutLine",
               "lineEnding"
             ],
@@ -10697,6 +10707,9 @@
                 "type": "string",
                 "enum": ["comment", "key", "note", "help", "new-paragraph", "paragraph", "insert"]
               },
+              "open": {
+                "type": "boolean"
+              },
               "state": {
                 "type": "string",
                 "minLength": 1,
@@ -10743,6 +10756,7 @@
               "color",
               "opacity",
               "icon",
+              "open",
               "state",
               "stateModel"
             ],
@@ -11374,7 +11388,8 @@
                 "nullable": true
               },
               "textAlign": {
-                "$ref": "#/components/schemas/Annotation/anyOf/11/properties/textAlign"
+                "type": "string",
+                "enum": ["left", "center", "right"]
               },
               "field": {
                 "anyOf": [
@@ -11644,7 +11659,7 @@
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
               },
               "textAlign": {
-                "$ref": "#/components/schemas/Annotation/anyOf/11/properties/textAlign"
+                "$ref": "#/components/schemas/Annotation/anyOf/16/properties/textAlign"
               }
             },
             "required": [

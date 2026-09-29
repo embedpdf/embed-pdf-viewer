@@ -19,8 +19,12 @@ function linkTargetSchemasFor<Destination>(destination: z.ZodType<Destination>) 
     z.object({ kind: z.literal('named'), name: z.string() }),
     z.object({ kind: z.literal('unsupported') }),
   ]) as unknown as z.ZodType<PdfLinkTarget<Destination>>;
-  /** Drafts and patches only author `goto` and `uri`; see {@link PdfLinkTargetWritable}. */
-  const write = z.discriminatedUnion('kind', [goto, uri]) as unknown as z.ZodType<
+  /** Drafts and patches author `goto`, `uri` and the standard named verbs; see {@link PdfLinkTargetWritable}. */
+  const named = z.object({
+    kind: z.literal('named'),
+    name: z.enum(['NextPage', 'PrevPage', 'FirstPage', 'LastPage']),
+  });
+  const write = z.discriminatedUnion('kind', [goto, uri, named]) as unknown as z.ZodType<
     PdfLinkTargetWritable<Destination>
   >;
   return { read, write };

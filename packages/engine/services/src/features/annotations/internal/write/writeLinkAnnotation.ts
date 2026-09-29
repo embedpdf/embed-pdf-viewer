@@ -18,9 +18,10 @@ import { F32_BYTES } from '../../../../runtime/memory/structs';
 import { VIEW_CODE_BY_KIND } from '../../../destinations/destinationViewCodes';
 
 /**
- * Link writer: rect + the `/A` action. Only `goto`/`uri` targets are
- * writable (the draft/patch types enforce it; `goto-remote`/`launch` are
- * read-only by design). Relationship (`/IRT` + `/RT`, for grouped links)
+ * Link writer: rect + the `/A` action. `goto`, `uri` and the standard
+ * `named` page verbs are writable (the draft/patch types enforce it;
+ * `goto-remote`/`launch` are read-only by design). A new link draws no
+ * border: `/Border [0 0 0]`, where PDF apps would draw a black one. Relationship (`/IRT` + `/RT`, for grouped links)
  * is written by the mutator's kind-agnostic relationship pass, never here.
  *
  * A retarget replaces `/A`; it cannot remove a pre-existing direct `/Dest`
@@ -36,6 +37,9 @@ export function applyLinkDraft(
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
   setAnnotRect(fn, mem, annotPtr, draft.rect);
+  if (!fn.FPDFAnnot_SetBorder(annotPtr, 0, 0, 0)) {
+    throw new EngineError(EngineErrorCode.Unknown, 'FPDFAnnot_SetBorder returned false');
+  }
   // `target: null` is the create-then-edit flow: the rect exists first, a
   // later patch supplies the destination/URI. Nothing to write yet.
   if (draft.target) applyLinkTarget(fn, mem, annotPtr, draft.target, ctx);
@@ -53,15 +57,20 @@ export function applyLinkPatch(
   if (patch.target === null) clearLinkTarget(fn, annotPtr);
   else if (patch.target !== undefined) {
     // A read-only target sent back unchanged was dropped before the write
-    // (`checkAnnotationPatch`); any other one was refused there.
-    if (patch.target.kind !== 'goto' && patch.target.kind !== 'uri') {
+    // (`checkAnnotationPatch`); any other one, another app's named verb
+    // included, was refused there.
+    if (
+      patch.target.kind !== 'goto' &&
+      patch.target.kind !== 'uri' &&
+      patch.target.kind !== 'named'
+    ) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
         `a '${patch.target.kind}' link target can't be written`,
         { details: { field: 'target' } },
       );
     }
-    applyLinkTarget(fn, mem, annotPtr, patch.target, ctx);
+    applyLinkTarget(fn, mem, annotPtr, patch.target as PdfLinkTargetWritable<PdfDestination>, ctx);
   }
 }
 
@@ -99,7 +108,9 @@ function applyLinkTarget(
   const actionPtr =
     target.kind === 'uri'
       ? fn.EPDFAction_CreateURI(docPtr, target.uri)
-      : fn.EPDFAction_CreateGoTo(docPtr, createDestination(fn, mem, docPtr, target.destination));
+      : target.kind === 'named'
+        ? fn.EPDFAction_CreateNamed(docPtr, target.name)
+        : fn.EPDFAction_CreateGoTo(docPtr, createDestination(fn, mem, docPtr, target.destination));
   if (!actionPtr) {
     throw new EngineError(EngineErrorCode.Unknown, `failed to create '${target.kind}' action`);
   }
@@ -150,9 +161,8 @@ function createViewDestination(
   page: number,
   dest: Exclude<PdfDestination, { kind: 'xyz' }>,
 ): Ptr {
-  // The runtime pads missing params with 0 up to the fit type's arity —
-  // a null top/left therefore writes as 0 (the array form has no
-  // per-param null encoding through this API).
+  // The runtime pads a missing param with null up to the fit type's arity:
+  // a null top/left writes a PDF null, and the viewer keeps its own.
   const params: number[] = (() => {
     switch (dest.kind) {
       case 'fitH':

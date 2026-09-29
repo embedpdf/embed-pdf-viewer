@@ -136,30 +136,37 @@ describe('link kind schemas', () => {
 
   test('a read-only target sent back unchanged is kept; a changed one is refused', () => {
     // The engine checks a patch in the file's coordinates, after converting it.
+    // `GoBack` is another app's own verb: read, and kept as it is.
     const current = {
       subtype: 'link',
       rect: { left: 10, bottom: 80, right: 110, top: 100 },
-      target: { kind: 'named', name: 'NextPage' },
+      target: { kind: 'named', name: 'GoBack' },
     } as unknown as AnnotationDTO<PdfCoordinates>;
     // The patch schema takes what a read returns, so a read DTO passes.
-    expect(LinkPatchSchema.safeParse({ target: { kind: 'named', name: 'NextPage' } }).success).toBe(
+    expect(LinkPatchSchema.safeParse({ target: { kind: 'named', name: 'GoBack' } }).success).toBe(
       true,
     );
     const kept = checkAnnotationPatch(current, {
       subtype: 'link',
-      contents: 'Next',
-      target: { name: 'NextPage', kind: 'named' },
+      contents: 'Back',
+      target: { name: 'GoBack', kind: 'named' },
     });
-    expect(kept).toEqual({ subtype: 'link', contents: 'Next' });
+    expect(kept).toEqual({ subtype: 'link', contents: 'Back' });
     expect(() =>
       checkAnnotationPatch(current, {
         subtype: 'link',
-        target: { kind: 'named', name: 'PrevPage' },
+        target: { kind: 'named', name: 'Print' },
       }),
     ).toThrow(expect.objectContaining({ code: 'InvalidArg', details: { field: 'target' } }));
     expect(() =>
       checkAnnotationPatch(current, { subtype: 'link', target: { kind: 'javascript' } }),
     ).toThrow(expect.objectContaining({ code: 'InvalidArg' }));
+    // The four standard page-turning verbs are written like any target.
+    const next = checkAnnotationPatch(current, {
+      subtype: 'link',
+      target: { kind: 'named', name: 'NextPage' },
+    });
+    expect(next).toEqual({ subtype: 'link', target: { kind: 'named', name: 'NextPage' } });
     // A writable target replaces it.
     const uri = checkAnnotationPatch(current, {
       subtype: 'link',

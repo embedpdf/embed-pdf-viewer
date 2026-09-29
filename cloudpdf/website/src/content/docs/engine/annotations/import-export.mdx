@@ -128,16 +128,18 @@ What an import can't carry it leaves out, lists in `dropped`, and imports the re
 `{ ref, reason }`, the `ref` as the bundle names it. An entry with a `field` means only that field
 was left out: the annotation itself was imported without it.
 
-| `reason`             | What was left out                                                                                                         |
-| :------------------- | :------------------------------------------------------------------------------------------------------------------------ |
-| `unsupported-kind`   | An annotation of a kind the engine doesn't model.                                                                         |
-| `form-field`         | A form field's widget: it travels with its field, through [forms](/docs/engine/forms).                                    |
-| `name-conflict`      | An annotation whose `nm` ([its unique name](/docs/engine/concepts/identity)) is taken on its page, or by an earlier item. |
-| `parent-missing`     | A reply or popup whose parent isn't in the bundle, on the same page.                                                      |
-| `parent-dropped`     | A reply or popup whose parent was left out.                                                                               |
-| `geospatial`         | Field `measure`: a map's scale, which the engine can't write.                                                             |
-| `unknown-measure`    | Field `measure`: a scale of a kind the engine doesn't know.                                                               |
-| `unsupported-action` | Field `target` or `actions`: what a link does, or actions, that the engine can't write.                                   |
+| `reason`             | What was left out                                                                                                                                                       |
+| :------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `unsupported-kind`   | An annotation of a kind the engine doesn't model.                                                                                                                       |
+| `form-field`         | A form field's widget: it travels with its field, through [forms](/docs/engine/forms).                                                                                  |
+| `name-conflict`      | An annotation whose `nm` ([its unique name](/docs/engine/concepts/identity)) is taken on its page, or by an earlier item.                                               |
+| `parent-missing`     | A reply or popup whose parent isn't in the bundle, on the same page.                                                                                                    |
+| `parent-dropped`     | A reply or popup whose parent was left out.                                                                                                                             |
+| `geospatial`         | Field `measure`: a map's scale, which the engine can't write.                                                                                                           |
+| `unknown-measure`    | Field `measure`: a scale of a kind the engine doesn't know.                                                                                                             |
+| `unsupported-action` | Field `target` or `actions`: what a link does, or actions, that the engine can't write.                                                                                 |
+| `unsupported-value`  | A value another app wrote that a write can't make, such as a shape's beveled border: that field, or the whole annotation when it's its shape (a polyline of one point). |
+| `popup-taken`        | A second popup for the same annotation: an annotation has one.                                                                                                          |
 
 Because of `name-conflict`, importing the same bundle twice doesn't duplicate the annotations that
 have a name. A reply or popup whose parent is left out goes too, so a thread never arrives in

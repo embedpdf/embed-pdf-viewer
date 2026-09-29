@@ -196,7 +196,8 @@ so you never see the stored number.
 Annotations with only a position ref are rendered too. See
 [Refs & identity](/docs/engine/concepts/identity).
 
-### New annotations don't print
+### What prints
 
-New annotations have `print` off unless you set it, so `usage: 'print'` skips them. Set
-`print: true` on the annotations that should print, or flatten with `'display'`.
+New annotations print unless you create them with `print: false`, so `usage: 'print'` includes
+them. Annotations from other apps may have `print` off; set `print: true` on the ones that should
+print, or flatten with `'display'`.

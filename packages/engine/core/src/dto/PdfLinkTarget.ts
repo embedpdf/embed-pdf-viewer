@@ -31,18 +31,21 @@ export type PdfLinkTarget<Destination = PageDestination> =
   | { kind: 'launch'; path: string }
   | { kind: 'javascript' }
   /** `/S /Named` — a viewer verb (`NextPage`, `PrevPage`, `FirstPage`,
-   *  `LastPage`, …). Read-only in v1; common in TOC/nav links. */
+   *  `LastPage`, …), as the file names it; common in TOC/nav links. */
   | { kind: 'named'; name: string }
   | { kind: 'unsupported' };
 
+/** The page-turning viewer verbs every PDF app knows (ISO 32000 Table 211). */
+export type PdfStandardNamedAction = 'NextPage' | 'PrevPage' | 'FirstPage' | 'LastPage';
+
 /**
  * The subset of {@link PdfLinkTarget} that drafts/patches may author:
- * in-document destinations and URIs. Keeping `goto-remote`/`launch` out of
- * the write surface is deliberate (executable-shaped actions are a security
- * liability the viewer never needs to author), and `unsupported` carries
- * nothing to write.
+ * in-document destinations, URIs and the four standard page-turning verbs.
+ * Keeping `goto-remote`/`launch` out of the write surface is deliberate
+ * (executable-shaped actions are a security liability the viewer never
+ * needs to author), another app's own named verb is only sent back as read,
+ * and `unsupported` carries nothing to write.
  */
-export type PdfLinkTargetWritable<Destination = PageDestination> = Extract<
-  PdfLinkTarget<Destination>,
-  { kind: 'goto' | 'uri' }
->;
+export type PdfLinkTargetWritable<Destination = PageDestination> =
+  | Extract<PdfLinkTarget<Destination>, { kind: 'goto' | 'uri' }>
+  | { kind: 'named'; name: PdfStandardNamedAction };

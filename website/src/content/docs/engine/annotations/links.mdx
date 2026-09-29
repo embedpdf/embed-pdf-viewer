@@ -91,7 +91,7 @@ for (const annotation of annotations) {
 | :-------------- | :------------------------------------------------- | :---------------- |
 | `'goto'`        | Goes to a page of this document (`destination`).   | Yes               |
 | `'uri'`         | Opens a web address (`uri`).                       | Yes               |
-| `'named'`       | Runs a viewer command such as `NextPage` (`name`). | No                |
+| `'named'`       | Runs a viewer command such as `NextPage` (`name`). | The four below    |
 | `'goto-remote'` | Opens another PDF file (`file`).                   | No                |
 | `'launch'`      | Opens a file or an app (`path`).                   | No                |
 | `'javascript'`  | Runs a script.                                     | No                |
@@ -99,6 +99,19 @@ for (const annotation of annotations) {
 
 `target: null` is a link that does nothing. A PDF can name a destination instead of spelling it
 out; the engine looks the name up, so you always get an explicit `destination` with its page.
+
+A `named` link you create runs one of the page commands every PDF app has: `NextPage`,
+`PrevPage`, `FirstPage` or `LastPage`. Other names, which only some apps know, are read and kept:
+
+```ts
+await page.annotations.create({
+  subtype: 'link',
+  rect,
+  target: { kind: 'named', name: 'NextPage' },
+});
+```
+
+A new link has no border: PDF apps would otherwise draw a black line around it.
 
 ## Change or remove what a link does
 
@@ -114,8 +127,8 @@ A new target replaces the old one, and `null` removes it.
 
 ## What the engine doesn't run
 
-Links that run a script, open another file or run a viewer command are read and kept in the PDF
-as they are. The engine never runs or follows them, and you can't create them: a `target` of one
+Links that run a script, open another file or run another app's own command are read and kept
+in the PDF as they are. The engine never runs or follows them, and you can't create them: a `target` of one
 of these kinds in a create is refused with `InvalidArg`. Changing another field of such a link
 (its `rect`, its `contents`) keeps what it does, and so does sending back a link you read: its
 `target` stays as it was.

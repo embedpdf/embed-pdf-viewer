@@ -78,6 +78,7 @@ export function applyTextDraft(
   setAnnotColor(fn, annotPtr, draft.color ?? DEFAULT_NOTE_COLOR);
   setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULT_OPACITY);
   setNoteIcon(fn, annotPtr, draft.icon ?? 'note');
+  if (draft.open !== undefined) setOpen(fn, annotPtr, draft.open);
   // `preflightTextDraft` refused a custom state without a model.
   const stateModel =
     draft.stateModel ?? (draft.state != null ? standardStateModelOf(draft.state) : null);
@@ -106,6 +107,8 @@ export function applyTextPatch(
   if (patch.icon !== undefined) {
     setNoteIcon(fn, annotPtr, patch.icon);
   }
+  // The popup's `/Open` follows in the mutator, which can reach it.
+  if (patch.open !== undefined) setOpen(fn, annotPtr, patch.open);
   // Three-state; `prepareTextStatePatch` filled in a new state's model.
   if (patch.stateModel !== undefined) {
     writeAnnotStringOrClear(
@@ -124,6 +127,12 @@ export function applyTextPatch(
       'State',
       patch.state === null ? null : stateToPdf(patch.state),
     );
+  }
+}
+
+function setOpen(fn: PdfFunctions, annotPtr: Ptr, open: boolean): void {
+  if (!fn.EPDFAnnot_SetBooleanValue(annotPtr, 'Open', open)) {
+    throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetBooleanValue returned false');
   }
 }
 

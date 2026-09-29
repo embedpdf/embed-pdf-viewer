@@ -4,12 +4,17 @@ import type {
   AnnotationStableId,
   PageObjectNumber,
 } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import {
+  EngineError,
+  EngineErrorCode,
+  PdfAnnotationSubtypeCode,
+} from '@embedpdf/engine-core/runtime';
 import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../../../document-session/DocumentSession';
 import { captureOrStampStableId } from '../identity/captureOrStampStableId';
 import { resolveAnnotPtr } from '../identity/resolveAnnotationPointer';
+import { readAnnotBoolean } from '../read/annotationReadPrimitives';
 import { RT_UNKNOWN, replyTypeToCode } from '../replyType';
 
 /**
@@ -167,10 +172,80 @@ export function linkReply(
 /** Link a popup and the annotation it shows, both ways: `/Parent` and `/Popup`. */
 export function linkPopup(runtime: PdfRuntimeModule, popupPtr: Ptr, parentPtr: Ptr): void {
   const { fn } = runtime;
+  assertNoOtherPopup(runtime, popupPtr, parentPtr);
   if (
     !fn.EPDFAnnot_SetLinkedAnnot(popupPtr, 'Parent', parentPtr) ||
     !fn.EPDFAnnot_SetLinkedAnnot(parentPtr, 'Popup', popupPtr)
   ) {
     throw new EngineError(EngineErrorCode.Unknown, 'failed to link a popup to its parent');
+  }
+  syncNoteOpen(runtime, popupPtr, parentPtr);
+}
+
+/**
+ * An annotation has one popup: a second is refused, naming the first.
+ * Deleting a popup clears its parent's link, so delete, then create.
+ */
+function assertNoOtherPopup(runtime: PdfRuntimeModule, popupPtr: Ptr, parentPtr: Ptr): void {
+  const { fn } = runtime;
+  const existingPtr = fn.FPDFAnnot_GetLinkedAnnot(parentPtr, 'Popup');
+  if (!existingPtr) return;
+  const existing = fn.EPDFAnnot_GetObjectNumber(existingPtr);
+  fn.FPDFPage_CloseAnnot(existingPtr);
+  if (existing === fn.EPDFAnnot_GetObjectNumber(popupPtr)) return;
+  throw new EngineError(
+    EngineErrorCode.InvalidArg,
+    `the annotation already has a popup (object ${existing}); delete it first`,
+    { details: { field: 'parent', popupObjectNumber: existing } },
+  );
+}
+
+/**
+ * A note and its popup hold one `/Open`, kept equal. On linking, the
+ * popup's wins when it has one, else it takes the note's. Other parents
+ * keep theirs.
+ */
+function syncNoteOpen(runtime: PdfRuntimeModule, popupPtr: Ptr, parentPtr: Ptr): void {
+  const { fn, mem } = runtime;
+  if (fn.FPDFAnnot_GetSubtype(parentPtr) !== PdfAnnotationSubtypeCode.TEXT) return;
+  const popupOpen = readAnnotBoolean(fn, mem, popupPtr, 'Open');
+  if (popupOpen !== null) {
+    setOpen(runtime, parentPtr, popupOpen);
+    return;
+  }
+  const noteOpen = readAnnotBoolean(fn, mem, parentPtr, 'Open');
+  if (noteOpen !== null) setOpen(runtime, popupPtr, noteOpen);
+}
+
+/**
+ * Write `open` on the other half of a note and its popup: `target` is the
+ * note's popup, or the popup's parent. Only a note shares it: `null` when
+ * `target` is another parent, which keeps its own. Returns the stable id of
+ * the annotation it wrote.
+ */
+export function writeLinkedOpen(
+  runtime: PdfRuntimeModule,
+  session: DocumentSession,
+  pagePtr: Ptr,
+  target: AnnotationRef,
+  open: boolean,
+  onlyNote: boolean,
+): AnnotationStableId | null {
+  const { fn } = runtime;
+  const targetPtr = resolveAnnotPtr(runtime, session, pagePtr, target);
+  try {
+    if (onlyNote && fn.FPDFAnnot_GetSubtype(targetPtr) !== PdfAnnotationSubtypeCode.TEXT) {
+      return null;
+    }
+    setOpen(runtime, targetPtr, open);
+    return captureOrStampStableId(runtime, targetPtr);
+  } finally {
+    fn.FPDFPage_CloseAnnot(targetPtr);
+  }
+}
+
+function setOpen(runtime: PdfRuntimeModule, annotPtr: Ptr, open: boolean): void {
+  if (!runtime.fn.EPDFAnnot_SetBooleanValue(annotPtr, 'Open', open)) {
+    throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetBooleanValue returned false');
   }
 }

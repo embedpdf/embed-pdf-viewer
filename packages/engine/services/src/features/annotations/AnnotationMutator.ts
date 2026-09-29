@@ -57,6 +57,7 @@ import { generateAppearance } from './internal/write/generateAppearance';
 import { writeAnnotationModified } from './internal/write/writeAnnotationBase';
 import {
   writeAnnotationRelationship,
+  writeLinkedOpen,
   writePopupParent,
 } from './internal/write/writeAnnotationRelationship';
 import { applyEmbedMetadataOnUpdate } from './internal/write/writeEmbedMetadata';
@@ -259,12 +260,14 @@ export class AnnotationMutator {
             : { inReplyTo: patch.reply.to, replyType: patch.reply.type ?? 'reply' },
         );
       }
+      let relinked = false;
       if (
         patch.subtype === 'popup' &&
         currentDto.subtype === 'popup' &&
         patch.parent !== undefined &&
         !sameRef(patch.parent, currentDto.parent)
       ) {
+        relinked = true;
         linkedParentId = writePopupParent(
           this.runtime,
           this.session,
@@ -274,6 +277,28 @@ export class AnnotationMutator {
           patch.parent,
           currentDto.parent,
         );
+      }
+      // A note and its popup hold one `/Open`: writing it on one writes the
+      // other (a relink has made them equal already).
+      let linkedOpenId: AnnotationStableId | null = null;
+      const open = (patch as { open?: boolean }).open;
+      if (open !== undefined && !relinked) {
+        const other =
+          currentDto.subtype === 'text'
+            ? currentDto.popup
+            : currentDto.subtype === 'popup'
+              ? currentDto.parent
+              : null;
+        if (other) {
+          linkedOpenId = writeLinkedOpen(
+            this.runtime,
+            this.session,
+            pagePtr,
+            other,
+            open,
+            currentDto.subtype === 'popup',
+          );
+        }
       }
       // Refresh standard /M (modified date) on every update — independent
       // of whether the patch touched any subtype-specific field. Then
@@ -350,7 +375,13 @@ export class AnnotationMutator {
         mutation: 'update',
         pageStateBefore,
         pageStateAfter,
-        changed: linkedParentId ? [stableId, linkedParentId] : [stableId],
+        changed: [
+          ...new Set(
+            [stableId, linkedParentId, linkedOpenId].filter(
+              (id): id is AnnotationStableId => id !== null,
+            ),
+          ),
+        ],
       });
       return { annotation: dto, appearance, meta };
     } finally {

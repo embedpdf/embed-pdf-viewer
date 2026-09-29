@@ -135,13 +135,15 @@ await page.annotations.create({
 });
 ```
 
-| Field      | What it is                                                                    | Default |
-| :--------- | :---------------------------------------------------------------------------- | :------ |
-| `inkList`  | The strokes: one list of points per movement of the pen. Required.            |         |
-| `intent`   | `'ink-highlight'` labels it as a freehand highlighter.                        | none    |
-| `rotation` | Turns the drawing, in degrees clockwise; see [Turned shapes](#turned-shapes). | none    |
+| Field         | What it is                                                                    | Default |
+| :------------ | :---------------------------------------------------------------------------- | :------ |
+| `inkList`     | The strokes: one list of points per movement of the pen. Required.            |         |
+| `strokeWidth` | The pen's width in points, more than `0`: ink has no fill to show otherwise.  | `1`     |
+| `intent`      | `'ink-highlight'` labels it as a freehand highlighter.                        | none    |
+| `rotation`    | Turns the drawing, in degrees clockwise; see [Turned shapes](#turned-shapes). | none    |
 
-Ink has no fill, and its strokes have round ends. For a highlighter pen, combine
+Ink has no fill, and its strokes have round ends. An `inkList` without strokes, or with a stroke
+without points, fails with `InvalidArg`. For a highlighter pen, combine
 `intent: 'ink-highlight'` with a wide `strokeWidth`, a light `color` and `blendMode: 'multiply'`,
 so the text under it stays readable.
 
@@ -177,7 +179,7 @@ await page.annotations.update(shape.ref, { borderStyle: 'dashed', dashArray: [6,
 ```
 
 `[6, 3]` draws 6 points of line, then 3 points of gap. Without a `dashArray`, dashes are 3 points
-on, 3 off.
+on, 3 off. A `dashArray` on a `'solid'` border is kept, and draws when the border becomes dashed.
 
 ## Cloudy borders
 
@@ -261,8 +263,9 @@ the `box` or the points yourself.
 
 ### Border styles
 
-`borderStyle` also takes `'beveled'` and `'inset'`, for PDF apps that draw them. The engine draws
-shapes with those styles as a solid line. A cloudy border is never dashed.
+A shape from another PDF app can read `'beveled'` or `'inset'`. Only form widgets draw those, so
+the engine draws such a shape with a solid line and keeps the style when you send it back
+unchanged; a write that sets one fails with `InvalidArg`. A cloudy border is never dashed.
 
 ### How it's stored
 

@@ -2,11 +2,20 @@ import { z } from 'zod';
 
 import { ColorSchema } from '../../base.schema';
 import type {
+  RichTextAlign,
   RichTextDocument,
   RichTextDocumentInput,
   RichTextParagraph,
   RichTextRunStyle,
 } from '../../../dto/RichText';
+
+/** How a paragraph's lines line up: a free text's `textAlign` too. */
+export const RichTextAlignSchema: z.ZodType<RichTextAlign> = z.enum([
+  'left',
+  'center',
+  'right',
+  'justify',
+]);
 
 const RichTextRunStyleShape = {
   family: z.string().min(1),
@@ -21,7 +30,7 @@ const RichTextRunStyleShape = {
   unknown: z.string().optional(),
 };
 const RichTextParagraphPropsShape = {
-  align: z.enum(['left', 'center', 'right', 'justify']),
+  align: RichTextAlignSchema,
   dir: z.enum(['ltr', 'rtl']),
   lineHeight: z.number().positive().optional(),
   margins: z

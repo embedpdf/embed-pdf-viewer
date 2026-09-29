@@ -319,11 +319,15 @@ function calloutDTO(annotObjectNumber = 20): AnnotationDTO<PdfCoordinates> {
     fontFamily: 'helvetica',
     fontSize: 14,
     textAlign: 'left',
+    verticalAlign: 'top',
     color: '#c80000',
+    fontColor: '#1e1e1e',
     interiorColor: null,
     opacity: 1,
     strokeWidth: 1,
     borderStyle: 'solid',
+    dashArray: null,
+    cloudyIntensity: null,
     calloutLine: CL,
     lineEnding: 'open-arrow',
   } as AnnotationDTO<PdfCoordinates>;
@@ -529,12 +533,12 @@ describe('repository — free-text callout mapping', () => {
 });
 
 describe('repository — free-text style + font round-trip', () => {
-  it('fromDTO projects the /DA font fields into `text` (fontColor falls back to /DA colour)', () => {
+  it('fromDTO projects the text fields into `text`: fontColor is the text, never the border', () => {
     const annotation = fromDTO(fromFile(calloutDTO()));
     expect(annotation.text).toEqual({
       fontFamily: 'helvetica',
       fontSize: 14,
-      fontColor: '#c80000', // no explicit fontColor → the /DA colour {200,0,0}
+      fontColor: '#1e1e1e', // the text's; the border's `color` is '#c80000'
       textAlign: 'left',
     });
   });

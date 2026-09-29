@@ -25,33 +25,38 @@ const { annotation } = await page.annotations.create({
 The text wraps inside `box`. Start a new line with `\n` in `contents`; it reads back as `\r`,
 the line break PDF uses.
 
-| Field           | What it is                                                       | Default         |
-| :-------------- | :--------------------------------------------------------------- | :-------------- |
-| `box`           | The text box. Required.                                          |                 |
-| `contents`      | The text, plain.                                                 | empty           |
-| `fontFamily`    | The font; see [Fonts](#fonts).                                   | `'helvetica'`   |
-| `fontSize`      | The text size in points.                                         | `12`            |
-| `textAlign`     | `'left'`, `'center'`, `'right'` or `'justify'`.                  | `'left'`        |
-| `color`         | The border color, and the text color unless you set `fontColor`. | black           |
-| `fontColor`     | The text color, or `null` to follow `color`.                     | follows `color` |
-| `interiorColor` | The background, or `null` for none.                              | none            |
-| `strokeWidth`   | The border width in points. `0` for no border.                   | `1`             |
-| `opacity`       | From `0` to `1`, for the whole box: border, background and text. | `1`             |
+| Field           | What it is                                                       | Default       |
+| :-------------- | :--------------------------------------------------------------- | :------------ |
+| `box`           | The text box. Required.                                          |               |
+| `contents`      | The text, plain.                                                 | empty         |
+| `fontFamily`    | The font; see [Fonts](#fonts).                                   | `'helvetica'` |
+| `fontSize`      | The text size in points.                                         | `12`          |
+| `textAlign`     | `'left'`, `'center'`, `'right'` or `'justify'`.                  | `'left'`      |
+| `verticalAlign` | Where the lines sit in the box: `'top'`, `'middle'`, `'bottom'`. | `'top'`       |
+| `fontColor`     | The text color.                                                  | black         |
+| `color`         | The border color, and a callout's line.                          | black         |
+| `interiorColor` | The background, or `null` for none.                              | none          |
+| `strokeWidth`   | The border width in points. `0` for no border.                   | `1`           |
+| `opacity`       | From `0` to `1`, for the whole box: border, background and text. | `1`           |
 
 A read also has `intent`: `'free-text-callout'` for a box with a [callout line](#callouts),
-`'free-text'` for the others. The engine sets it from the `calloutLine`; you don't need to.
+`'free-text'` for the others. The engine sets it from the `calloutLine`; you don't need to. A
+box another app made as a typewriter reads `'free-text-typewriter'` and stays one; you can't
+create one.
 
 `borderStyle` and `dashArray` work as for every annotation; see the
-[overview](/docs/engine/annotations#style).
+[overview](/docs/engine/annotations#style). A cloudy border takes `cloudyIntensity`, as on
+[shapes](/docs/engine/annotations/shapes).
 
 ## Colors
 
-A free text box has three colors, and one of them does two jobs:
+A free text box has three colors, each with its own job:
 
-- `color` draws the border (and a callout's line). The text uses it too, unless you set a
-  `fontColor`.
-- `fontColor` colors only the text.
+- `fontColor` colors the text.
+- `color` draws the border and a callout's line.
 - `interiorColor` fills the box. Leave it out for a transparent box.
+
+Acrobat keeps them apart the same way, so a box from Acrobat reads the colors it shows there.
 
 ```ts
 await page.annotations.create({
@@ -136,7 +141,10 @@ await page.annotations.create({
 | `lineEnding`  | What's drawn at the point it points at, such as `'open-arrow'`; see [Line endings](/docs/engine/annotations/shapes#line-endings). | none    |
 
 `box` stays the text box; the engine makes room for the line and its arrow in `rect`, where the
-callout sits on the page. To turn a callout back into a plain box, set `calloutLine: null`.
+callout sits on the page. A callout line goes only with `intent: 'free-text-callout'`, which a
+create sets for you; elsewhere it fails with `InvalidArg`. To add a line to a plain box, send
+both, and to turn a callout back into a plain box, send `calloutLine: null` and
+`intent: 'free-text'`.
 
 ## Rich text
 
@@ -163,9 +171,10 @@ await page.annotations.create({
 });
 ```
 
-The `body` takes its style from `fontFamily`, `fontSize`, `textAlign` and the text color, so you
-rarely write one. `contents` always reads back as the plain text: `'Total is wrong, see page
-4.'`, with paragraphs joined by `\r`.
+The `body` is the same style as `fontFamily`, `fontSize`, `fontColor` and `textAlign`, so you
+rarely write one. When you send both, the field wins: `fontColor: '#CC0000'` with a `body` of
+`{ color: '#0000CC' }` makes red text. `contents` always reads back as the plain text:
+`'Total is wrong, see page 4.'`, with paragraphs joined by `\r`.
 
 A style can hold:
 
@@ -235,7 +244,11 @@ permissions as any annotation; see [Permissions](/docs/engine/annotations#permis
 
 The text starts twice the border width inside the box, on every side, the way Acrobat lays it
 out: a 1-point border leaves 2 points around the text. Text that doesn't fit in that area is cut
-off. Text sits at the top of the box; there is no vertical alignment.
+off.
+
+PDF has no entry for where the lines sit in the box, so `verticalAlign` is the engine's own:
+other PDF apps show the box as the engine drew it, and put the text at the top if they draw it
+again themselves.
 
 ### Justified text
 
@@ -262,8 +275,9 @@ you edit its text there.
 
 ### How it's stored
 
-For readers who know PDF: `color` is the color in `/DA`, `interiorColor` is `/C`, and `richText`
-is written as `/RC` (XHTML) and `/DS`, the form Acrobat reads and writes. `contents` is
+For readers who know PDF: `color` is the color in `/DA`, `fontColor` is the color of the rich
+text's body, `interiorColor` is `/C`, and `richText` is written as `/RC` (XHTML) and `/DS`, the
+form Acrobat reads and writes. `verticalAlign` is kept in the annotation's `/EMBD_Metadata`. `contents` is
 `/Contents`, `calloutLine` is `/CL` and `intent` is `/IT`. For a callout, the PDF's own `/Rect`
 takes in the line, and `/RD` says where the text box is inside it, as Acrobat writes it; the
 engine writes both from `box`.

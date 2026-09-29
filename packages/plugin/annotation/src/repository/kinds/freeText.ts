@@ -24,8 +24,8 @@ import { boxGeomFields } from '../seam';
 
 type FreeTextDTO = Extract<AnnotationDTO, { subtype: 'free-text' }>;
 
-/** Free-text `/DA` fields → content {@link TextStyle}. An absent `fontColor`
- *  falls back to the `/DA` colour — the same rule the CPVT renderer applies. */
+/** Free-text text fields → content {@link TextStyle}. `fontColor` is the
+ *  text's color (the rich text body's); `color` is the border's. */
 function textFromDTO(dto: FreeTextDTO): TextStyle {
   // The rich body carries the formatting the `/DA` cannot: its weight,
   // italic and decoration read back as the toggles (absent = off).
@@ -33,8 +33,10 @@ function textFromDTO(dto: FreeTextDTO): TextStyle {
   return {
     fontFamily: dto.fontFamily,
     fontSize: dto.fontSize,
-    fontColor: dto.fontColor ?? dto.color,
-    textAlign: dto.textAlign,
+    fontColor: dto.fontColor,
+    // The editor has no justify: a justified box edits left-aligned, and
+    // keeps its justify until another alignment is picked.
+    textAlign: dto.textAlign === 'justify' ? 'left' : dto.textAlign,
     ...(body && body.weight >= 600 ? { bold: true } : {}),
     ...(body?.italic ? { italic: true } : {}),
     ...(body?.decoration.includes('underline') ? { underline: true } : {}),

@@ -80,6 +80,12 @@ export {
   type ColorConformanceOptions,
 } from './conformance/runColorConformance';
 export {
+  DRAWING_FIXTURE_PDF,
+  runDrawingDetailsConformance,
+  type DrawingDetailsConformanceOptions,
+  type DrawingDetailsFixture,
+} from './conformance/runDrawingDetailsConformance';
+export {
   PAGE_SPACE_FIXTURES,
   type PageSpaceFixture,
   type PageSpaceFixturePage,

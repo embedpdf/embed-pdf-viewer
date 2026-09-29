@@ -35,6 +35,7 @@ A note's `subtype` is `'text'`.
 | `contents` | The comment.                                                                             | none     |
 | `icon`     | `'note'`, `'comment'`, `'key'`, `'help'`, `'insert'`, `'paragraph'` or `'new-paragraph'` | `'note'` |
 | `color`    | The icon's color, `'#rrggbb'`.                                                           | yellow   |
+| `open`     | Whether PDF apps show its comment window open; see [Popups](#popups).                    | `false`  |
 | `opacity`  | From `0` to `1`.                                                                         | `1`      |
 | `subject`  | A short label for the comment, such as `'Question'`.                                     | none     |
 
@@ -163,8 +164,9 @@ const { annotation: popup } = await page.annotations.create({
 | `open`   | Whether PDF apps show the window open.           | `false` |
 
 The engine keeps the link both ways: after this call, the note's `popup` field is the popup's ref.
-You never set `popup` yourself. An annotation normally has one popup; to move it, update its
-`rect`.
+You never set `popup` yourself. An annotation has one popup: creating a second fails with
+`InvalidArg` naming the first. To replace it, delete it and create the new one; to move it, update
+its `rect`.
 
 A popup has no text of its own: it shows its parent's `contents`. To open or close it:
 
@@ -172,8 +174,12 @@ A popup has no text of its own: it shows its parent's `contents`. To open or clo
 await page.annotations.update(popup.ref, { open: false });
 ```
 
+A note and its popup hold one `open`: set it on either, and both change (the update's
+`meta.changed` names both). A popup made without `open` takes its note's. Other annotations
+have no `open` of their own; their popup's is the only one.
+
 You don't need a popup to have a note. Add one when the document should say where the comment
-window goes, or whether it starts open.
+window goes. A note without one can still start open: PDF apps make the window themselves.
 
 ## Delete a note
 
@@ -213,10 +219,11 @@ its parts point to; the parts' own comments are ignored.
 The icon fills `rect`, as in every PDF app: a bigger rect draws a bigger icon, and a rect that
 isn't square stretches it. 20 × 20 points is the usual size, the one PDF apps place a note at.
 The icon is filled with `color` and outlined in black or white, whichever stands out against it.
+Each `icon` draws its own symbol, and a name the engine doesn't know draws `'note'`.
 
 ### How it's stored
 
 For readers who know PDF: `reply` is `/IRT` with `/RT`, a popup is linked by the parent's
-`/Popup` and the popup's `/Parent`, `open` is `/Open`, and states are `/State` and `/StateModel`
+`/Popup` and the popup's `/Parent`, `open` is `/Open` on the note and on its popup, and states are `/State` and `/StateModel`
 on a text annotation, as ISO 32000 describes them. So threads, states and popups made here show
 up in other PDF apps, and theirs show up here.
