@@ -6,23 +6,17 @@
 import type { AnnotationDTO, AnnotationRef } from '@embedpdf/engine-core/runtime';
 import { annotationKey } from '@embedpdf/core';
 
-import type { Id, ModelAnnotation, Subtype } from '../types';
+import { kindNamed, widgetKindOf, type AnnotationKind } from '../kinds';
+import type { Id, ModelAnnotation } from '../types';
 
-/** One PDF `widget` subtype → per-family client kinds (radios have no font). */
-const WIDGET_KIND_BY_FAMILY: Record<string, string> = {
-  text: 'widget-text',
-  combobox: 'widget-choice',
-  listbox: 'widget-choice',
-  pushbutton: 'widget-button',
-  checkbox: 'widget-toggle',
-  radio: 'widget-toggle',
-};
-export const widgetKindOf = (family: string): string =>
-  WIDGET_KIND_BY_FAMILY[family] ?? 'widget-box';
-
-/** An annotation's kind: its subtype, or a widget's field family (`widget-text`…). */
-export const kindOf = (annotation: AnnotationDTO): Subtype =>
-  annotation.subtype === 'widget' ? widgetKindOf(annotation.fieldFamily) : annotation.subtype;
+/**
+ * An annotation's kind (`kinds/`): the one its subtype names, or for a widget
+ * the one its field family picks (`widget-text`…).
+ */
+export const kindOf = (annotation: AnnotationDTO): AnnotationKind =>
+  kindNamed(
+    annotation.subtype === 'widget' ? widgetKindOf(annotation.fieldFamily) : annotation.subtype,
+  );
 
 /**
  * A record's engine ref: `null` while a record this session created waits for

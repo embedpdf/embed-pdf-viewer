@@ -40,7 +40,9 @@ export function createSelectionFieldsReads(
       // Parents store no link: the committed children are the truth, read
       // through the lens. The link kind reads its own target.
       link:
-        kindOf(annotation.annotation) === 'link' ? (link ?? null) : linkOf(model, annotation.id),
+        kindOf(annotation.annotation).name === 'link'
+          ? (link ?? null)
+          : linkOf(model, annotation.id),
     };
   };
 

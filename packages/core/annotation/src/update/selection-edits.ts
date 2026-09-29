@@ -22,7 +22,6 @@ import {
 } from '../flags';
 import { geomResetRotation, geomRotateAbout, geomRotation } from '../geometry';
 import { groupUnionBounds } from '../hit';
-import { capsFor, fieldsFor } from '../kinds';
 import { linkChildrenOf } from '../links';
 import { kindTakesLink } from '../props';
 import { fieldsOf, kindOf, withFields } from '../record';
@@ -98,7 +97,7 @@ export function setTextFormat(
   for (const id of model.selected) {
     const record = model.byId[id];
     if (!record || !annotTransformable(record)) continue;
-    if (!fieldsFor(kindOf(record.annotation)).some((spec) => spec.key === format)) continue;
+    if (!kindOf(record.annotation).fields.some((spec) => spec.key === format)) continue;
     const { text } = fieldsOf(record);
     if (!text || (text[format] ?? false) === on) continue;
     byId ??= { ...model.byId };
@@ -120,7 +119,7 @@ export function setLink(model: Model, target: PdfLinkTarget | null): [Model, Eff
     const record = model.byId[id];
     if (!record || !annotTransformable(record) || !kindTakesLink(kindOf(record.annotation)))
       continue;
-    if (kindOf(record.annotation) !== 'link') {
+    if (kindOf(record.annotation).name !== 'link') {
       fx.push({ type: 'syncLink', id, target });
       continue;
     }
@@ -179,9 +178,7 @@ export function rotateSelection(model: Model, deltaDeg: number): [Model, Effect[
   const ids = model.selected.filter((id) => {
     const annotation = model.byId[id];
     return (
-      annotation &&
-      annotTransformable(annotation) &&
-      capsFor(kindOf(annotation.annotation)).rotatable
+      annotation && annotTransformable(annotation) && kindOf(annotation.annotation).caps.rotatable
     );
   });
   if (!ids.length) return [model, []];

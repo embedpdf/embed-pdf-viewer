@@ -23,7 +23,6 @@ import {
   type AnnotationDTO,
   type AnnotationFlags,
 } from '@embedpdf/engine-core/runtime';
-import { capsFor } from './kinds';
 import { kindOf } from './record/identity';
 
 export type { AnnotationFlags };
@@ -73,7 +72,7 @@ export interface FlagBearer {
  *  (ISO 32000 — a ReadOnly form field must still be movable by a form designer;
  *  the form-filling layer enforces field ReadOnly itself). */
 export const annotInteractive = (record: FlagBearer): boolean =>
-  capsFor(kindOf(record.annotation)).ignoresReadOnly
+  kindOf(record.annotation).caps.ignoresReadOnly
     ? !record.annotation.hidden && !record.annotation.noView
     : interactive(record.annotation);
 

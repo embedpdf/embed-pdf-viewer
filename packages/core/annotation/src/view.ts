@@ -29,7 +29,6 @@ import { rectFromPoints, rotatePoint, unionRect } from './rect';
 import { calloutShape } from './shapes/text-box';
 import { groupCaps } from './group';
 import { isSelectable, paintOrder } from './hit';
-import { capsFor } from './kinds';
 import { annotTransformable, viewable } from './flags';
 import { anchoredGeom, anchoredStrokeWidth, anchorModeOf, type ViewEnv } from './anchor';
 import { blendFor } from './scene';
@@ -162,7 +161,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
     items.push({
       id,
       ref: refOf(annotation),
-      subtype: kindOf(annotation.annotation),
+      subtype: kindOf(annotation.annotation).name,
       geometry,
       box: distance?.visualBounds ?? geomVisualBounds(geometry, style.strokeWidth, style.border),
       apBox: ap.box,
@@ -336,7 +335,7 @@ export function selectedItems(model: Model, view?: ViewEnv): RenderItem[] {
     items.push({
       id,
       ref: refOf(annotation),
-      subtype: kindOf(annotation.annotation),
+      subtype: kindOf(annotation.annotation).name,
       geometry,
       box: geomVisualBounds(geometry, style.strokeWidth, style.border),
       style,
@@ -406,7 +405,7 @@ function placeSelectionKnob(
     // (`noRotate` only exempts it from the page's rotation). The obb takes
     // the projected stroke width (`effStyle`) — with the raw width, the knob
     // drifts off the outline as zoom grows.
-    if (!capsFor(kindOf(annotation.annotation)).rotatable || !annotTransformable(annotation))
+    if (!kindOf(annotation.annotation).caps.rotatable || !annotTransformable(annotation))
       return null;
     const frame = effectiveSelectionFrame(model, annotation.id, geomOf(annotation.id), view);
     return placeRotateKnob(frame.corners, knobOffset, pageBox);
@@ -529,7 +528,7 @@ export function chrome(
     const annotation = model.byId[selection[0]];
     const geometry = effGeom(model, selection[0], view);
     const style = effStyle(annotation, view);
-    const caps = capsFor(kindOf(annotation.annotation));
+    const caps = kindOf(annotation.annotation).caps;
     const rot = geomRotation(geometry);
     const measure = effMeasure(model, annotation.id);
     const distance =

@@ -11,7 +11,6 @@
 import { memo, type Mirror } from '@embedpdf/core';
 import {
   type AnnotationView,
-  capsFor,
   type Id,
   kindOf,
   type Model,
@@ -79,7 +78,7 @@ export function createView(
     if (cached && cached.vector === vector) return cached.annotation;
     const projected = fromDTO(record.dto);
     // Opaque bodies (stamp images, widgets) have no live rendering: always the raster.
-    const live = vector && !capsFor(kindOf(projected.annotation)).opaqueBody;
+    const live = vector && !kindOf(projected.annotation).caps.opaqueBody;
     const annotation: ModelAnnotation = {
       ...projected,
       source: live ? 'vector' : 'baked',

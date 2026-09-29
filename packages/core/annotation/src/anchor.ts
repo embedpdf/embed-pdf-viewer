@@ -35,7 +35,6 @@
  */
 import { geomBounds, geomRotateAbout, geomScaleAbout, geomTranslate } from './geometry';
 import { normalizeDeg, rotatePoint } from './rect';
-import { capsFor } from './kinds';
 import type { FlagBearer } from './flags';
 import { kindOf } from './record/identity';
 import type { ModelGeometry, Point, ViewEnv } from './types';
@@ -55,7 +54,7 @@ export interface AnchorMode {
  * NoRotate are always set", expressed as kind caps. Null when not anchored.
  */
 export function anchorModeOf(record: FlagBearer): AnchorMode | null {
-  const caps = capsFor(kindOf(record.annotation));
+  const caps = kindOf(record.annotation).caps;
   const zoom = !!record.annotation.noZoom || caps.noZoom;
   const upright = !!record.annotation.noRotate || caps.noRotate;
   return zoom || upright ? { zoom, upright } : null;

@@ -29,7 +29,7 @@ import {
 
 import { FLAG_KEYS } from '../flags';
 import { geomRotation, geomVisualBounds } from '../geometry';
-import { fieldsFor } from '../kinds';
+import { kindNamed } from '../kinds';
 import type {
   Id,
   ModelAnnotation,
@@ -141,14 +141,14 @@ function projected(dto: AnnotationDTO): Projected {
   const group = groupOf(dto);
   const fields: Projected = {
     page: dto.page,
-    subtype: kindOf(dto),
+    subtype: kindOf(dto).name,
     ...(irt !== undefined ? { irt } : {}),
     ...(group !== undefined ? { group } : {}),
     // `/F` verbatim — every behavioral question (visible? selectable? frozen?)
     // is answered by the core's flag predicates, never derived here.
     flags: flagsOf(dto),
     style: styleFromDTO(dto),
-    ...projectionOf(kindOf(dto)).ingest(dto),
+    ...projectionOf(kindOf(dto).name).ingest(dto),
   };
   projections.set(dto, fields);
   return fields;
@@ -219,7 +219,7 @@ function emitProps(annotation: RecordFields, keys: readonly LoweredKey[]): Wire 
 
 /** The parts of its fields a kind's editable fields lower from: its border picker is its `border`. */
 const editableKeys = (subtype: string): LoweredKey[] =>
-  fieldsFor(subtype).map((spec) => (spec.key === 'borderStyle' ? 'border' : spec.key));
+  kindNamed(subtype).fields.map((spec) => (spec.key === 'borderStyle' ? 'border' : spec.key));
 
 /** ModelAnnotation → the full engine patch: the kind's geometry group plus every
  *  prop it declares editable. The reference statement — scoped emission and

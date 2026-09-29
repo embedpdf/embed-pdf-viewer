@@ -37,7 +37,6 @@ import {
 
 import { anchoredBox, anchorModeOf, anchorOf } from './anchor';
 import { geomRotation } from './geometry';
-import { capsFor } from './kinds';
 import { normalizeDeg } from './rect';
 import { fieldsOf, kindOf } from './record';
 import type { Id, Model, ModelAnnotation, ModelGeometry, Rect, ViewEnv } from './types';
@@ -46,7 +45,7 @@ import type { Id, Model, ModelAnnotation, ModelGeometry, Rect, ViewEnv } from '.
 export type DrawState = Pick<ModelAnnotation, 'source' | 'apBox'>;
 
 /** Has the annotation a live drawing? Stamps and form widgets don't: their raster is the drawing. */
-const drawsLive = (annotation: AnnotationDTO): boolean => !capsFor(kindOf(annotation)).opaqueBody;
+const drawsLive = (annotation: AnnotationDTO): boolean => !kindOf(annotation).caps.opaqueBody;
 
 /** How a record this session creates is drawn at first. */
 export const sourceOfNew = (annotation: AnnotationDTO): ModelAnnotation['source'] =>

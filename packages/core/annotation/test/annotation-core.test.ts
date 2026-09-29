@@ -47,7 +47,7 @@ import { caretFromAnchor, caretRectFromAnchor } from '../src/shapes/caret';
 import { calloutEnd, calloutShape, textPlateInset } from '../src/shapes/text-box';
 import { expandGroups, groupKeyOf, groupMembers } from '../src/group';
 import { cursorAt, groupUnionBounds, hitTest, paintOrder } from '../src/hit';
-import { capsFor } from '../src/kinds';
+import { kindNamed } from '../src/kinds';
 import { linkChildrenOf, linkOf } from '../src/links';
 import { clickCreateGeom, resolveClickPlacement } from '../src/placement';
 import { isAttachedLink, isConversationOnly, isSubstrateOnly } from '../src/plane';
@@ -1134,28 +1134,28 @@ describe('annotation-core', () => {
   });
 
   it('capabilities are orthogonal, not one binary: shapes resize, lines vertex-edit, markup neither', () => {
-    expect(capsFor('square')).toMatchObject({
+    expect(kindNamed('square').caps).toMatchObject({
       selectable: true,
       movable: true,
       resizable: true,
       vertexEditable: false,
     });
-    expect(capsFor('line')).toMatchObject({
+    expect(kindNamed('line').caps).toMatchObject({
       selectable: true,
       movable: true,
       resizable: false,
       vertexEditable: true,
     });
-    expect(capsFor('polygon')).toMatchObject({ selectable: true, vertexEditable: true });
+    expect(kindNamed('polygon').caps).toMatchObject({ selectable: true, vertexEditable: true });
     // markup is selectable but anchored — recolor/delete, never move/resize.
-    expect(capsFor('highlight')).toMatchObject({
+    expect(kindNamed('highlight').caps).toMatchObject({
       selectable: true,
       anchored: true,
       movable: false,
       resizable: false,
       vertexEditable: false,
     });
-    expect(capsFor('totally-unknown').selectable).toBe(false); // unknown → read-only
+    expect(kindNamed('totally-unknown').caps.selectable).toBe(false); // unknown → read-only
   });
 
   it('a markup preview renders as a live ghost via pageItems, and clears', () => {
@@ -1961,7 +1961,7 @@ describe('annotation-core callout', () => {
     ]);
     const annotation = model.byId[model.order[0]];
     const geometry = fieldsOf(annotation).geometry;
-    expect(kindOf(annotation.annotation)).toBe('free-text');
+    expect(kindOf(annotation.annotation).name).toBe('free-text');
     expect(geometry.kind).toBe('text-box');
     if (geometry.kind !== 'text-box' || !geometry.calloutLine)
       throw new Error('expected callout geom');

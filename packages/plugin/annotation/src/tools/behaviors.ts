@@ -32,7 +32,10 @@ export function createBehaviors(store: AnnotationStore) {
       if (!annotation || annotation.annotation.page.objectNumber !== pageObjectNumber) continue;
       if (
         behaviors.some((behavior) =>
-          matches(behavior, { subtype: kindOf(annotation.annotation), ref: refOf(annotation) }),
+          matches(behavior, {
+            subtype: kindOf(annotation.annotation).name,
+            ref: refOf(annotation),
+          }),
         )
       ) {
         (out ??= new Set()).add(id);
@@ -60,7 +63,10 @@ export function createBehaviors(store: AnnotationStore) {
         return (
           annotation &&
           behaviors.some((behavior) =>
-            matches(behavior, { subtype: kindOf(annotation.annotation), ref: refOf(annotation) }),
+            matches(behavior, {
+              subtype: kindOf(annotation.annotation).name,
+              ref: refOf(annotation),
+            }),
           )
         );
       });

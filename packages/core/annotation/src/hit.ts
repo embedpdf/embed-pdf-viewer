@@ -4,7 +4,7 @@ import { distanceCaptionHit, distanceHandles, distanceHit, distanceLayout } from
 import { measurementLayout } from './measurement-shape';
 import { geomHandles, geomHit, placeRotateKnob, pointInQuad, rectHandlesFor } from './geometry';
 import { unionRect } from './rect';
-import { capsFor, isMarkup } from './kinds';
+import { isMarkup } from './kinds';
 import { groupCaps } from './group';
 import { isSubstrateOnly } from './plane';
 import { annotInteractive, annotTransformable, viewable } from './flags';
@@ -59,9 +59,7 @@ export function paintOrder(model: Model, page: PageRef): Id[] {
 export const isSelectable = (model: Model, id: Id): boolean => {
   const annotation = model.byId[id];
   return (
-    !!annotation &&
-    annotInteractive(annotation) &&
-    capsFor(kindOf(annotation.annotation)).selectable
+    !!annotation && annotInteractive(annotation) && kindOf(annotation.annotation).caps.selectable
   );
 };
 
@@ -71,7 +69,7 @@ export const isSelectable = (model: Model, id: Id): boolean => {
  *  as fixed as classic markup. Markup kinds themselves have `movable: false`
  *  and never reach this gate. */
 const textBound = (annotation: ModelAnnotation): boolean =>
-  capsFor(kindOf(annotation.annotation)).anchored && fieldsOf(annotation).geometry.kind === 'quads';
+  kindOf(annotation.annotation).caps.anchored && fieldsOf(annotation).geometry.kind === 'quads';
 
 /** Can this annotation be dragged by its body to move? (`locked` freezes it.) */
 export const canMove = (model: Model, id: Id): boolean => {
@@ -79,7 +77,7 @@ export const canMove = (model: Model, id: Id): boolean => {
   return (
     !!annotation &&
     annotTransformable(annotation) &&
-    capsFor(kindOf(annotation.annotation)).movable &&
+    kindOf(annotation.annotation).caps.movable &&
     !textBound(annotation)
   );
 };
@@ -90,7 +88,7 @@ export const canMove = (model: Model, id: Id): boolean => {
  *  the display transform, they don't freeze its size or vertices. */
 const hasHandles = (model: Model, annotation: ModelAnnotation): boolean => {
   if (!annotTransformable(annotation) || textBound(annotation)) return false;
-  const caps = capsFor(kindOf(annotation.annotation));
+  const caps = kindOf(annotation.annotation).caps;
   return caps.resizable || caps.vertexEditable;
 };
 
@@ -114,7 +112,7 @@ const isFilled = (annotation: ModelAnnotation): boolean => {
   return (
     style.interiorColor != null ||
     geometry.kind === 'quads' ||
-    capsFor(kindOf(annotation.annotation)).opaqueBody
+    kindOf(annotation.annotation).caps.opaqueBody
   );
 };
 const inRect = (rect: Rect, point: Point): boolean =>
@@ -194,7 +192,7 @@ export function hitTest(
       // gesture edits its authored tilt; `noRotate` only exempts it from the
       // page's rotation). Locked suppresses it. `placeRotateKnob` keeps it
       // inside `pageBox`.
-      if (capsFor(kindOf(annotation.annotation)).rotatable && annotTransformable(annotation)) {
+      if (kindOf(annotation.annotation).caps.rotatable && annotTransformable(annotation)) {
         const frame = annotationSelectionFrame(annotation, view);
         const knob = placeRotateKnob(frame.corners, chromeGeometry.knobOffset, pageBox);
         if (

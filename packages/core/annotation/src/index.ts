@@ -89,13 +89,15 @@ export {
   type AnchorMode,
   type ViewEnv,
 } from './anchor';
+// The kinds: one declaration per kind (kinds/), by name.
 export {
+  defineKind,
   KINDS,
-  capsFor,
-  fieldsFor,
-  type KindCaps,
+  kindNamed,
+  NO_CAPS,
   type AnnotationKind,
   type FieldSpec,
+  type KindCaps,
 } from './kinds';
 export { initialTextStyle, kindTakesLink, sharedFields } from './props';
 export {

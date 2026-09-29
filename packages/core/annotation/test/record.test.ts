@@ -958,7 +958,7 @@ describe('record — attached links (fold + desired state + link kind mapping)',
 
   it('fromDTO maps a link DTO target onto the link slot', () => {
     const annotation = fromDTO(fromFile(linkDTO(20, URI)));
-    expect(kindOf(annotation.annotation)).toBe('link');
+    expect(kindOf(annotation.annotation).name).toBe('link');
     expect(fieldsOf(annotation).link).toEqual(URI);
   });
 

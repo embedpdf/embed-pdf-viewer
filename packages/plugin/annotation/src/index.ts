@@ -32,6 +32,7 @@ export type {
   ToolAuthoringKind,
   ToolDefaultsFor,
 } from './tools/definitions';
-// The editable-field schema (defined in the portable core; re-exported so
-// app code building property UIs needs only this package).
-export { fieldsFor } from '@embedpdf/core-annotation';
+// The kinds and their editable-field schema (defined in the portable core;
+// re-exported so app code building property UIs needs only this package):
+// `kindNamed('square').fields`.
+export { kindNamed } from '@embedpdf/core-annotation';

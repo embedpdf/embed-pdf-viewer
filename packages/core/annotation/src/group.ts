@@ -15,9 +15,9 @@
  * shows Ungroup, and the ungroup verb can never strip an attached link's
  * `/IRT` (which would orphan it into an unmanaged standalone document link).
  */
-import { capsFor } from './kinds';
 import { annotTransformable } from './flags';
 import { isAttachedLink } from './plane';
+import type { KindCaps } from './kinds';
 import { groupOf, kindOf } from './record';
 import type { ModelAnnotation, Id, Model } from './types';
 
@@ -44,10 +44,9 @@ export function groupCaps(model: Model, ids: Id[]): GroupCaps {
     .map((id) => model.byId[id])
     .filter((annotation): annotation is NonNullable<typeof annotation> => !!annotation);
   if (members.length === 0) return { movable: false, resizable: false, rotatable: false };
-  const ok = (pick: (caps: ReturnType<typeof capsFor>) => boolean): boolean =>
+  const ok = (pick: (caps: KindCaps) => boolean): boolean =>
     members.every(
-      (annotation) =>
-        annotTransformable(annotation) && pick(capsFor(kindOf(annotation.annotation))),
+      (annotation) => annotTransformable(annotation) && pick(kindOf(annotation.annotation).caps),
     );
   return {
     movable: ok((caps) => caps.groupMovable),

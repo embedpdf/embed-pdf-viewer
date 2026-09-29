@@ -58,7 +58,12 @@ export function createLinkWrites(
    */
   const reconcileChildren = async (id: Id, desired: PdfLinkTarget | null): Promise<void> => {
     const annotation = store.model().byId[id];
-    if (!ctx.doc || !annotation || !refOf(annotation) || kindOf(annotation.annotation) === 'link')
+    if (
+      !ctx.doc ||
+      !annotation ||
+      !refOf(annotation) ||
+      kindOf(annotation.annotation).name === 'link'
+    )
       return;
     // Read-only target arms can't be (re)written: children keep their /A and
     // only their rects follow the parent.
@@ -158,7 +163,7 @@ export function createLinkWrites(
         const model = store.model();
         const annotation = model.byId[annotationKey(ref)];
         if (!annotation) return null;
-        return kindOf(annotation.annotation) === 'link'
+        return kindOf(annotation.annotation).name === 'link'
           ? (fieldsOf(annotation).link ?? null)
           : linkOf(model, annotation.id);
       },

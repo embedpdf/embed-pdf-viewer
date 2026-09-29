@@ -35,7 +35,7 @@ export function createAnnotationHoverFeed(
     const annotation = annotOf(id);
     const ref = annotation ? refOf(annotation) : null;
     if (!annotation || !ref) return null;
-    const kind = kindOf(annotation.annotation);
+    const kind = kindOf(annotation.annotation).name;
     if (kind.startsWith('widget') || kind === 'link') return null;
     const enter = Boolean(annotation.annotation.actions?.cursorEnter?.root);
     const exit = Boolean(annotation.annotation.actions?.cursorExit?.root);

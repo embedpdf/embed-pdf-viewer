@@ -117,7 +117,7 @@ export function createRenderReads(
       if (
         !annotation ||
         annotation.annotation.page.objectNumber !== pageObjectNumber ||
-        kindOf(annotation.annotation) !== 'link'
+        kindOf(annotation.annotation).name !== 'link'
       )
         continue;
       if (!viewable(annotation.annotation, false)) continue; // hidden links don't navigate

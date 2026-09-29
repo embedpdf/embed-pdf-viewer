@@ -1,6 +1,6 @@
 import {
   defaultsFor,
-  fieldsFor,
+  kindNamed,
   readOfDefaults,
   styleOfDefaults,
   uprightRotation,
@@ -23,7 +23,7 @@ import type { AnnotationStore } from '../services/store';
 /**
  * The resolved tool table (built-ins + config overrides). A tool is a named
  * authoring preset: it maps its id → a routing subtype, a `defaults` key
- * (`preset`), a `fieldsFor` kind, and — for stamps — a source spec. The config
+ * (`preset`), the kind whose fields it shows, and — for stamps — a source spec. The config
  * tools are kept so `registerTool` can re-resolve `extends` against the same
  * base pool.
  */
@@ -73,7 +73,7 @@ export function createToolRegistry(
     >;
     // A tool's style panel edits its kind's fields: a callout edits a free
     // text's, an arrow a line's. The registry holds that mapping.
-    const fields = fieldsFor(tool?.fieldsKind ?? toolId);
+    const fields = kindNamed(tool?.fieldsKind ?? toolId).fields;
     const { text, target } = styleOfDefaults(kind, own);
     const entry = {
       own,

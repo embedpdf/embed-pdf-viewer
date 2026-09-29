@@ -328,7 +328,7 @@ export interface ResolvedTool {
   subtype: Subtype;
   /** The `defaults` key (always the tool id) — keeps same-subtype tools apart. */
   preset: string;
-  /** The `fieldsFor` key for the style panel. */
+  /** The kind whose fields the style panel shows (`kindNamed(…).fields`). */
   fieldsKind: string;
   cursor: string;
   enables: ReadonlySet<string>;

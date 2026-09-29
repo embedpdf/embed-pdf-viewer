@@ -13,7 +13,7 @@ import { readBox, writeBox } from '../../shapes/box';
 import type { RecordFields, TextStyle } from '../../types';
 import type { KindProjection, Wire } from '../projection';
 import { borderSlice } from '../props';
-import { widgetKindOf } from '../identity';
+import { widgetKindOf } from '../../kinds';
 import { writableTarget } from '../seam';
 
 /** The engine fields that state a box kind's shape. */
