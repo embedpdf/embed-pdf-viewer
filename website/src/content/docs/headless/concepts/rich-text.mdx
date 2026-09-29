@@ -120,7 +120,7 @@ import { attachRichTextEditor } from '@embedpdf/web';
 const binding = attachRichTextEditor(
   element,
   {
-    onInput: (doc) => anno.setRichText(item.ref, doc), // typing → optimistic model + debounced write
+    onInput: (doc) => anno.draftRichText(item.ref, doc), // typing → shown at once, written after a pause
     onSelectionChange: (range) => anno.setTextSelection(item.ref, range), // the range the toolbar restyles
     onCommand: (format) => anno.toggleTextFormat(format), // Ctrl/Cmd+B/I/U
     cssFontFamily: (family) => anno.cssFontFamily(family), // a run's face → a CSS family list

@@ -45,14 +45,14 @@ export function createAnnotationController(ctx: AnnotationContext, config: Annot
   const selectionProps = createSelectionPropsReads(ctx, services);
 
   // Sync: what follows when the engine confirms a change.
-  followConfirmedChanges(ctx, services, createAnnouncer(events, annotations.projectRef));
+  followConfirmedChanges(ctx, services, createAnnouncer(events));
 
   // Writes: every change goes through the store, a gesture's through `commit`,
   // one stated in code through `apply`, and each ends in the same writes.
-  const text = createTextEditing(ctx, services, annotations, chrome);
+  const text = createTextEditing(ctx, services, chrome);
   const links = createLinkWrites(ctx, services);
   registerEffectRunners(ctx, services, links);
-  const crud = createCrud(ctx, services, annotations, text);
+  const crud = createCrud(ctx, services, annotations);
   const stamps = createStamps(ctx, services);
   const ghost = createGhost(ctx, services, stamps);
   const icons = createIcons(ctx, services, annotations, stamps);
@@ -113,6 +113,8 @@ export function createAnnotationController(ctx: AnnotationContext, config: Annot
     connect: () => connectAnnotation(ctx, api),
     /** The composed model every read and gesture works on (for the plugin's tests). */
     model: view.model,
+    /** The door for gestures and selection verbs (for the plugin's tests). */
+    commit: services.store.commit,
     /** The door for changes stated in code (for the plugin's tests). */
     apply: services.store.apply,
   };

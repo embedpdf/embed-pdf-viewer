@@ -886,7 +886,7 @@ function RedactionLabelSection() {
   useEffect(() => setDraft(null), [mark?.ref && annotationKey(mark.ref)]);
   if (!redaction || !mark || mark.subtype !== 'redact') return null;
 
-  const value = draft ?? (mark.raw?.subtype === 'redact' ? mark.raw.overlayText : null) ?? '';
+  const value = draft ?? mark.overlayText ?? '';
   const commit = () => {
     if (draft === null) return;
     void redaction.updateLabel(mark.ref, { overlayText: draft.length > 0 ? draft : null });
@@ -910,7 +910,7 @@ function RedactionLabelSection() {
       <label className="text-fg mt-2 flex items-center gap-2 text-sm">
         <input
           type="checkbox"
-          checked={mark.raw?.subtype === 'redact' ? mark.raw.repeat : false}
+          checked={mark.repeat}
           onChange={(event) =>
             void redaction.updateLabel(mark.ref, { repeat: event.target.checked })
           }

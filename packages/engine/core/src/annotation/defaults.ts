@@ -26,11 +26,11 @@ const RED: Color = '#ff0000';
 const BLACK: Color = '#000000';
 const YELLOW: Color = '#ffff00';
 
-/** Every kind: no flag set, normal blending. */
+/** Every kind: printed (as Acrobat creates them), no other flag set, normal blending. */
 const BASE = {
   invisible: false,
   hidden: false,
-  print: false,
+  print: true,
   noZoom: false,
   noRotate: false,
   noView: false,

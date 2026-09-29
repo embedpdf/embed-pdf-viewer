@@ -44,16 +44,15 @@ export function createPendingReads({
     (pageObjectNumber, records, pageIndex): readonly RedactionMark[] => {
       const page = toPageRef(pageObjectNumber);
       const marks = records.flatMap((record): RedactionMark[] => {
-        const raw = annotation.getRaw(record.ref);
-        if (!raw || raw.subtype !== 'redact') return [];
+        if (record.subtype !== 'redact') return [];
         return [
           {
             ref: record.ref,
             page,
             pageIndex,
-            kind: raw.quadPoints.length > 0 ? 'text' : 'area',
-            bounds: record.bounds,
-            overlayText: raw.overlayText,
+            kind: record.quadPoints.length > 0 ? 'text' : 'area',
+            bounds: record.rect,
+            overlayText: record.overlayText,
           },
         ];
       });
@@ -80,7 +79,7 @@ export function createPendingReads({
     const wanted = refs ? new Set(refs.map(annotationKey)) : null;
     const hits: AnnotationRef[] = [];
     for (const page of pages()) {
-      const onPage = annotation.listRaw({ page });
+      const onPage = annotation.list({ page });
       const marks = onPage.filter(
         (dto): dto is RedactDTO =>
           dto.subtype === 'redact' && (!wanted || wanted.has(annotationKey(dto.ref))),

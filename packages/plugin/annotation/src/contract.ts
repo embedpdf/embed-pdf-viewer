@@ -19,7 +19,6 @@ import type {
   AnnotationFlags,
   AnnotationProps,
   AnnotationPropsPatch,
-  Callout,
   CreationDraftAnchor,
   ModelGeometry,
   Id,
@@ -28,14 +27,14 @@ import type {
   Rect,
   SnapSettings,
   Subtype,
-  TextQuad,
 } from '@embedpdf/core-annotation';
 import type { PageRotation, Point } from '@embedpdf/core-geometry';
 import type {
   AnnotationDraft,
   AnnotationDTO,
-  AnnotationPatch as AnnotationPatchRaw,
+  AnnotationPatch,
   AnnotationRef,
+  AnnotationResources,
   AttachmentContent,
   AttachmentFileSource,
   BinarySource,
@@ -46,18 +45,17 @@ import type {
   RichTextParagraph,
 } from '@embedpdf/engine-core/runtime';
 
-import type { CreateAnnotationInput } from './create-input';
 import type { TextFormat } from './rich-text';
 import type { AnnotationToolInput } from './tools/definitions';
 
 export { AnnotationToken } from './token';
-export type { CreateAnnotationInput, CreateAnnotationGeometry } from './create-input';
 export type { Face, TextFormat, TextSelection } from './rich-text';
 export type {
   AnnotationDTO,
   AnnotationDraft,
-  AnnotationPatch as AnnotationPatchRaw,
+  AnnotationPatch,
   AnnotationRef,
+  AnnotationResources,
   AnnotationSubtype,
   AttachmentContent,
   AttachmentFileSource,
@@ -363,77 +361,6 @@ export interface CommentThreadChangedEvent {
   readonly change: 'reply' | 'text' | 'status' | 'marked' | 'deleted';
 }
 
-/** A confirmed creation or update: the durable record, whoever caused it. */
-/**
- * The page-space record every read returns. Projected from the plugin's
- * model (which already lives in page space), so it is reference-stable per
- * annotation until that annotation changes. The PDF-space engine record is
- * `raw`: the engine's confirmed record, null for a new annotation the engine
- * has not confirmed yet. The `…Raw` methods return the same records.
- */
-export interface Annotation {
-  readonly ref: AnnotationRef;
-  readonly page: PageRef;
-  readonly subtype: Subtype;
-  /** Visual bounds in page space (stroke included). */
-  readonly bounds: Rect;
-  readonly geometry: AnnotationGeometry;
-  readonly props: Partial<AnnotationProps>;
-  readonly flags: AnnotationFlags;
-  readonly contents: string;
-  readonly author: string | null;
-  readonly createdAt: string | null;
-  readonly modifiedAt: string | null;
-  /** The group's primary annotation, when this one is a grouped part. */
-  readonly group: AnnotationRef | null;
-  readonly inReplyTo: AnnotationRef | null;
-  readonly authority: { readonly update: boolean; readonly delete: boolean };
-  /** The engine's confirmed record. While a change is pending it is the record before that change. */
-  readonly raw: AnnotationDTO | null;
-  /** Present while a change the user made to it waits for the engine. */
-  readonly pending?: true;
-}
-
-/** Subtype-specific geometry in page space (one shape per model geometry). */
-export type AnnotationGeometry =
-  | { readonly kind: 'rect'; readonly bounds: Rect; readonly rotation: number }
-  | { readonly kind: 'line'; readonly from: Point; readonly to: Point }
-  | { readonly kind: 'polygon' | 'polyline'; readonly vertices: readonly Point[] }
-  | { readonly kind: 'ink'; readonly strokes: readonly (readonly Point[])[] }
-  | { readonly kind: 'markup'; readonly quads: readonly TextQuad[] }
-  | { readonly kind: 'caret'; readonly bounds: Rect }
-  | {
-      readonly kind: 'text';
-      readonly bounds: Rect;
-      readonly rotation: number;
-      readonly callout: Callout | null;
-    };
-
-/** A page-space patch: geometry, properties, flags and text. Omitted parts are untouched. */
-export interface AnnotationPatch {
-  /** Move / resize a box-shaped annotation (square, circle, free text, caret, stamp). */
-  readonly bounds?: Rect;
-  /** Replace the geometry of a line, polygon, polyline, ink or markup. */
-  readonly geometry?: AnnotationGeometryPatch;
-  readonly props?: AnnotationPropsPatch;
-  readonly flags?: Partial<AnnotationFlags>;
-  readonly contents?: string;
-  readonly richText?: { paragraphs: RichTextParagraph[] };
-}
-
-export type AnnotationGeometryPatch =
-  | { readonly kind: 'rect'; readonly bounds: Rect; readonly rotation?: number }
-  | { readonly kind: 'line'; readonly from: Point; readonly to: Point }
-  | { readonly kind: 'polygon' | 'polyline'; readonly vertices: readonly Point[] }
-  | { readonly kind: 'ink'; readonly strokes: readonly (readonly Point[])[] }
-  | { readonly kind: 'markup'; readonly quads: readonly TextQuad[] }
-  | {
-      readonly kind: 'text';
-      readonly bounds: Rect;
-      readonly rotation?: number;
-      readonly callout?: Callout | null;
-    };
-
 /** The public shape of an authoring tool (a named preset over a subtype). */
 export interface AnnotationTool {
   readonly id: string;
@@ -457,14 +384,9 @@ export interface AnnotationSelectionAnchor {
   knob?: Point;
 }
 
+/** A confirmed creation or update: the engine's record, whoever caused it. */
 export interface AnnotationChangedEvent {
-  readonly ref: AnnotationRef;
-  readonly page: PageRef;
-  readonly subtype: AnnotationDTO['subtype'];
-  /** The page-space record after the change (null when it is no longer loaded). */
-  readonly annotation: Annotation | null;
-  /** The confirmed engine record. */
-  readonly raw: AnnotationDTO;
+  readonly annotation: AnnotationDTO;
   readonly origin: ChangeOrigin;
 }
 
@@ -507,10 +429,10 @@ export interface AnnotationEditingChangedEvent {
   readonly ref: AnnotationRef | null;
 }
 
-/** A filter for `list` / `listRaw`: every field narrows. */
+/** A filter for `list`: every field narrows. */
 export interface AnnotationFilter {
   readonly page?: PageRef;
-  readonly subtype?: Subtype;
+  readonly subtype?: AnnotationDTO['subtype'];
   readonly author?: string;
   /** Members of this group (its primary's ref). */
   readonly group?: AnnotationRef;
@@ -528,12 +450,17 @@ export interface AnnotationFilter {
  * methods.
  */
 export interface AnnotationCapability {
-  // ── reading (page space; the PDF-space engine record is on the Raw twins) ──
-  get(ref: AnnotationRef): Annotation | null;
+  // ── reading: the engine's records, with this session's pending changes on them ──
+  /**
+   * The annotation as the user sees it: the engine's record with any change
+   * the user made applied, as the engine will apply it. A new annotation shows
+   * before the engine confirms it, under the `nm` ref it was created with.
+   */
+  get(ref: AnnotationRef): AnnotationDTO | null;
   /** Annotations in z-order — the whole document, or a page / subtype / author / group. */
-  list(filter?: AnnotationFilter): readonly Annotation[];
-  getRaw(ref: AnnotationRef): AnnotationDTO | null;
-  listRaw(filter?: AnnotationFilter): readonly AnnotationDTO[];
+  list(filter?: AnnotationFilter): readonly AnnotationDTO[];
+  /** Whether a change the user made to it waits for the engine. */
+  isPending(ref: AnnotationRef): boolean;
   /** The topmost annotation under a page point (a selected annotation's handles count as it). */
   hitTestAt(page: PageRef, point: Point): AnnotationRef | null;
   /** Hydration: `loading` until the document's annotations are in, then `ready`. */
@@ -541,19 +468,19 @@ export interface AnnotationCapability {
   /** Re-read every annotation from the engine. */
   refresh(options?: OperationOptions): Promise<void>;
 
-  // ── creating ──
-  /** Create one annotation from page-space input — the same commit path the draw tools use. */
-  create(input: CreateAnnotationInput, options?: OperationOptions): Promise<AnnotationRef>;
-  createMany(
-    inputs: readonly CreateAnnotationInput[],
-    options?: OperationOptions,
-  ): Promise<BatchResult<AnnotationRef, CreateAnnotationInput>>;
-  /** The PDF-space escape hatch: an engine draft as-is. */
-  createRaw(
+  // ── creating, updating and deleting, in the engine's own terms ──
+  /**
+   * Create an annotation from an engine draft: what the draft leaves out takes
+   * the engine's defaults. Bytes travel beside it (a stamp's `appearance`, a
+   * file attachment's `file`). It shows at once; resolves with the engine's
+   * record. `select` selects it, as a tool does.
+   */
+  create(
     page: PageRef,
     draft: AnnotationDraft,
-    options?: OperationOptions,
-  ): Promise<AnnotationRef>;
+    resources?: AnnotationResources,
+    options?: OperationOptions & { select?: boolean },
+  ): Promise<{ annotation: AnnotationDTO }>;
   /**
    * Text markup, an insert-text caret, a replace-text pair or redaction marks
    * from the current text selection — one annotation per page. Requires the
@@ -573,37 +500,19 @@ export interface AnnotationCapability {
   /** Place stamp bytes without the pointer. */
   placeStamp(input: StampToolInput, placement: StampPlacement): Promise<AnnotationRef>;
 
-  // ── updating ──
-  /** Patch geometry, props, flags or text in page space. */
-  update(ref: AnnotationRef, patch: AnnotationPatch, options?: OperationOptions): Promise<void>;
-  updateMany(
-    refs: readonly AnnotationRef[],
+  /**
+   * Change the fields the patch names, as given: the engine works out what
+   * follows (a free text's body from its font, a measurement's label from its
+   * points, a drawn kind's shape from a new `rect`). New bytes replace what
+   * they are for. It shows at once; resolves with the engine's record.
+   */
+  update(
+    ref: AnnotationRef,
     patch: AnnotationPatch,
+    resources?: AnnotationResources,
     options?: OperationOptions,
-  ): Promise<BatchResult<AnnotationRef, AnnotationRef>>;
-  /** The PDF-space escape hatch: an engine patch as-is. */
-  updateRaw(
-    ref: AnnotationRef,
-    patch: AnnotationPatchRaw,
-    options?: OperationOptions,
-  ): Promise<void>;
-  /** Absolute rotation (degrees, clockwise) for subtypes that carry one. */
-  setRotation(ref: AnnotationRef, degrees: number, options?: OperationOptions): Promise<void>;
-  rotateBy(ref: AnnotationRef, delta: number, options?: OperationOptions): Promise<void>;
-  /** Plain text contents; resolves once the engine confirmed the write. */
-  setContents(ref: AnnotationRef, text: string, options?: OperationOptions): Promise<void>;
-  setRichText(
-    ref: AnnotationRef,
-    document: { paragraphs: RichTextParagraph[] },
-    options?: OperationOptions,
-  ): Promise<void>;
-
-  // ── deleting ──
+  ): Promise<{ annotation: AnnotationDTO }>;
   delete(ref: AnnotationRef, options?: OperationOptions): Promise<void>;
-  deleteMany(
-    refs: readonly AnnotationRef[],
-    options?: OperationOptions,
-  ): Promise<BatchResult<AnnotationRef, AnnotationRef>>;
 
   // ── links (a Link child attached to an annotation) ──
   links: {
@@ -623,7 +532,7 @@ export interface AnnotationCapability {
   selectInRect(page: PageRef, rect: Rect, options?: { add?: boolean }): void;
   clearSelection(): void;
   getSelection(): readonly AnnotationRef[];
-  listSelected(): readonly Annotation[];
+  listSelected(): readonly AnnotationDTO[];
   /** Editable property specs, values and mixed keys for the selection. Reference-stable. */
   getSelectionProps(): SelectionProps;
   /** The selection's `/F` flags (null for a mixed key). Reference-stable. */

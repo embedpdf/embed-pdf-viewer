@@ -15,8 +15,8 @@ import type { ThreadIndex } from './threads';
 import type { Crud } from '../write/crud';
 import { appliedOrThrow, appliedRefOf } from '../write/outcomes';
 
-// Screen-anchored like a sticky note; `print` for Acrobat parity.
-const REPLY_FLAGS = { print: true, noZoom: true, noRotate: true };
+// Screen-anchored like a sticky note (it prints by the engine's default).
+const REPLY_FLAGS = { noZoom: true, noRotate: true };
 // Status annotations are metadata: hidden everywhere (our paint plane
 // culls them regardless; `hidden` keeps foreign viewers from drawing an
 // icon).
@@ -34,7 +34,7 @@ export function createComments(
   ctx: Pick<AnnotationContext, 'doc'>,
   { store, authority, events }: Pick<AnnotationServices, 'store' | 'authority' | 'events'>,
   threads: ThreadIndex,
-  crud: Pick<Crud, 'updateRaw'>,
+  crud: Pick<Crud, 'update'>,
 ) {
   /** Create a conversation annotation (a reply or a review state): shown at once, then confirmed. */
   const createConversationAnnot = (
@@ -78,7 +78,7 @@ export function createComments(
       if (record && isDimension(record.annotation))
         throw new Error('[annotation] measurement contents are derived');
       if (!record?.ref) throw new Error('[annotation] cannot edit an uncommitted annotation');
-      await crud.updateRaw(ref, {
+      await crud.update(ref, {
         subtype: record.annotation.subtype,
         contents: text,
       } as AnnotationPatch);

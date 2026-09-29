@@ -67,11 +67,9 @@ export function MeasurementSection() {
         .filter(
           (candidate) =>
             (candidate.subtype === 'polygon' || candidate.subtype === 'polyline') &&
-            candidate.raw &&
-            (candidate.raw.subtype === 'polygon' || candidate.raw.subtype === 'polyline') &&
-            candidate.raw.captionCenter &&
+            candidate.captionCenter &&
             annotation.canEdit(candidate.ref) &&
-            !candidate.flags.lockedContents,
+            !candidate.lockedContents,
         ),
     (left, right) =>
       left.length === right.length && left.every((annotation, i) => annotation === right[i]),
@@ -257,10 +255,9 @@ export function MeasurementSection() {
               onClick={() =>
                 void run(async () => {
                   for (const annotation of resettable) {
-                    const raw = annotation.raw;
-                    if (raw && (raw.subtype === 'polygon' || raw.subtype === 'polyline')) {
-                      await anno.updateRaw(annotation.ref, {
-                        subtype: raw.subtype,
+                    if (annotation.subtype === 'polygon' || annotation.subtype === 'polyline') {
+                      await anno.update(annotation.ref, {
+                        subtype: annotation.subtype,
                         captionCenter: null,
                       });
                     }

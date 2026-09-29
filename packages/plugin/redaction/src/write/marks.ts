@@ -1,9 +1,8 @@
 /** Marking: every mark is a `redact` annotation created through the annotation plugin. */
-import { PluginError, annotationKey, toPluginError } from '@embedpdf/core';
+import { PluginError, annotationKey, toPluginError, toPluginErrorInfo } from '@embedpdf/core';
 import type { BatchResult } from '@embedpdf/core';
 import type { Rect } from '@embedpdf/core-geometry';
-import type { AnnotationRef, PageRef, SearchQuery } from '@embedpdf/engine-core';
-import type { AnnotationPropsPatch } from '@embedpdf/plugin-annotation/contract';
+import type { AnnotationRef, PageRef, SearchQuery, StandardFont } from '@embedpdf/engine-core';
 
 import type { RedactionCapability, RedactionConfig, RedactionLabelPatch } from '../contract';
 import type { RedactionPendingReads } from '../read/pending';
@@ -27,15 +26,23 @@ export function createMarking(
     }
   };
   /** The configured overlay look, as annotation props. */
-  const overlayProps = (): AnnotationPropsPatch => {
+  /**
+   * A new mark's style, as the engine takes it: the redact tool's current
+   * defaults (the user's drawing preferences), with the configured overlay
+   * over them.
+   */
+  const markStyle = () => {
+    const tool = annotation.getToolDefaults('redact');
     const overlay = config.overlay;
-    if (!overlay) return {};
     return {
-      ...(overlay.fill ? { interiorColor: overlay.fill } : {}),
-      ...(overlay.text?.color ? { fontColor: overlay.text.color } : {}),
-      ...(overlay.text?.fontFamily ? { fontFamily: overlay.text.fontFamily } : {}),
-      ...(overlay.text?.fontSize !== undefined ? { fontSize: overlay.text.fontSize } : {}),
-    } as AnnotationPropsPatch;
+      color: tool.color,
+      interiorColor: overlay?.fill ?? tool.interiorColor,
+      opacity: tool.opacity,
+      fontFamily: (overlay?.text?.fontFamily ?? tool.fontFamily) as StandardFont,
+      fontSize: overlay?.text?.fontSize ?? tool.fontSize,
+      fontColor: overlay?.text?.color ?? tool.fontColor,
+      textAlign: tool.textAlign,
+    };
   };
 
   const markSelection = async (): Promise<readonly AnnotationRef[]> => {
@@ -50,13 +57,12 @@ export function createMarking(
 
   const markArea = async (page: PageRef, bounds: Rect): Promise<AnnotationRef> => {
     assertCanMark();
-    return annotation.create({
-      page,
+    const created = await annotation.create(page, {
       subtype: 'redact',
-      bounds,
-      tool: 'redact',
-      props: overlayProps(),
+      rect: bounds,
+      ...markStyle(),
     });
+    return created.annotation.ref;
   };
 
   const markPage = async (page: PageRef): Promise<AnnotationRef> => {
@@ -80,15 +86,19 @@ export function createMarking(
     for (const hit of finder.listHits()) {
       if (wanted && !wanted.has(hit.page.pageObjectNumber)) continue;
       if (hit.segments.length === 0) continue;
-      refs.push(
-        await annotation.create({
-          page: hit.page,
-          subtype: 'redact',
-          quads: hit.segments.map((segment) => segment.quad),
-          tool: 'redact',
-          props: overlayProps(),
-        }),
-      );
+      // The engine's quads name their corners by position; its rect covers them.
+      const quadPoints = hit.segments.map(({ quad }) => ({
+        p1: quad.upperStart,
+        p2: quad.upperEnd,
+        p3: quad.lowerStart,
+        p4: quad.lowerEnd,
+      }));
+      const created = await annotation.create(hit.page, {
+        subtype: 'redact',
+        quadPoints,
+        ...markStyle(),
+      });
+      refs.push(created.annotation.ref);
     }
     return refs;
   };
@@ -102,14 +112,23 @@ export function createMarking(
       .filter((ref) => !pending.has(annotationKey(ref)))
       .map((ref) => ({ ref, reason: 'not a pending redaction mark' }));
     if (marks.length === 0) return { applied: [], skipped, failed: [] };
-    const result = await annotation.deleteMany(marks);
-    return { ...result, skipped: [...result.skipped, ...skipped] };
+    const applied: AnnotationRef[] = [];
+    const failed: BatchResult<AnnotationRef, AnnotationRef>['failed'][number][] = [];
+    for (const ref of marks) {
+      try {
+        await annotation.delete(ref);
+        applied.push(ref);
+      } catch (error) {
+        failed.push({ ref, error: toPluginErrorInfo(toPluginError('redaction', error)) });
+      }
+    }
+    return { applied, skipped, failed };
   };
   const clearPending = (): Promise<BatchResult<AnnotationRef, AnnotationRef>> =>
     unmark(listPending().map((mark) => mark.ref));
 
   const updateLabel = async (ref: AnnotationRef, patch: RedactionLabelPatch): Promise<void> => {
-    const current = annotation.getRaw(ref);
+    const current = annotation.get(ref);
     if (!current || current.subtype !== 'redact') {
       throw new PluginError('not-found', 'redaction', 'the target is not a redaction mark');
     }
@@ -117,7 +136,7 @@ export function createMarking(
       // Always carry the current /DA styling: the engine rewrites /DA whenever
       // a label field rides a patch, so a text-only edit must not let the
       // styling fall back to defaults.
-      await annotation.updateRaw(ref, {
+      await annotation.update(ref, {
         subtype: 'redact',
         ...(patch.overlayText !== undefined ? { overlayText: patch.overlayText } : {}),
         ...(patch.repeat !== undefined ? { repeat: patch.repeat } : {}),

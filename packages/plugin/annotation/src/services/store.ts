@@ -121,14 +121,23 @@ export const refsOfIn = (model: Model, ids: readonly Id[]): AnnotationRef[] =>
 const sameIds = (left: readonly Id[], right: readonly Id[]): boolean =>
   left === right || (left.length === right.length && left.every((id, i) => id === right[i]));
 
-/** The record a ref names: its key, or the name a record not confirmed yet was created with. */
+/**
+ * The record a ref names: its key, or, for an `nm` ref, the record on that
+ * page with that name (as the engine resolves one), confirmed or not.
+ */
 export function recordOfRef(model: Model, ref: AnnotationRef): ModelAnnotation | null {
   const byKey = model.byId[annotationKey(ref)];
   if (byKey) return byKey;
   if (ref.kind !== 'nm') return null;
   for (const id of model.order) {
     const record = model.byId[id];
-    if (record && !record.ref && record.annotation.nm === ref.nm) return record;
+    if (
+      record &&
+      record.annotation.nm === ref.nm &&
+      record.page.pageObjectNumber === ref.page.pageObjectNumber
+    ) {
+      return record;
+    }
   }
   return null;
 }

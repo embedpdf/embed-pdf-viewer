@@ -226,19 +226,19 @@ describe('annotation flags', () => {
     const harness = createHarness();
     await loadPage(harness, [squareDTO(25)]);
     harness.update.mockResolvedValueOnce({ annotation: squareDTO(25, { hidden: true }) });
-    await harness.capability.update(ref(25), { flags: { hidden: true } });
+    await harness.capability.update(ref(25), { subtype: 'square', hidden: true });
     expect(harness.update.mock.calls[0]![1]).toEqual({ subtype: 'square', hidden: true });
   });
 
-  it('the data-API create defaults /F to print when the caller omits flags', async () => {
+  it('create writes the draft as given: printing is the engine’s default, not added', async () => {
     const harness = createHarness();
+    await harness.load([]);
     harness.create.mockResolvedValueOnce({ annotation: squareDTO(24) });
-    await harness.capability.createRaw(PAGE, {
+    await harness.capability.create(PAGE, {
       subtype: 'square',
-      rect: { x: 0, y: 0, width: 10, height: 10 },
       box: { x: 0, y: 0, width: 10, height: 10 },
-    } as Parameters<typeof harness.capability.createRaw>[1]);
-    expect(harness.create.mock.calls[0]![0]).toMatchObject({ print: true });
+    });
+    expect(harness.create.mock.calls[0]![0]).not.toHaveProperty('print');
   });
 });
 
@@ -429,13 +429,13 @@ describe('the records mirror', () => {
     harness.create.mockImplementationOnce(async (draft: { nm: string }) => ({
       annotation: { ...hydrationSquare(60), nm: draft.nm },
     }));
-    const created = await harness.capability.create({
-      subtype: 'square',
-      page: PAGE,
-      bounds: { x: 10, y: 10, width: 50, height: 40 },
-      select: true,
-    });
-    expect(created).toEqual(ref(60));
+    const created = await harness.capability.create(
+      PAGE,
+      { subtype: 'square', box: { x: 10, y: 10, width: 50, height: 40 } },
+      undefined,
+      { select: true },
+    );
+    expect(created.annotation.ref).toEqual(ref(60));
     expect(harness.model().order).toEqual(['obj:60']);
     expect(harness.model().selected).toEqual(['obj:60']);
   });
@@ -449,7 +449,7 @@ describe('the records mirror', () => {
       annotation: hydrationSquare(70),
       appearance: { changed: true },
     });
-    await harness.capability.updateRaw(ref(70), { subtype: 'square', contents: 'x' } as never);
+    await harness.capability.update(ref(70), { subtype: 'square', contents: 'x' } as never);
     expect(updated).toHaveBeenCalledTimes(1);
     expect(updated.mock.calls[0]![0].origin).toEqual({
       locality: 'local',
@@ -691,7 +691,6 @@ describe('the comments lens', () => {
         contents: 'agreed',
         icon: 'comment',
         reply: { to: ref(20) }, // the root, not the reply
-        print: true,
         noZoom: true,
         noRotate: true,
       }),
@@ -1068,9 +1067,9 @@ describe.each([
 
     const updated = { ...dto, strokeWidth: 2 };
     harness.update.mockResolvedValueOnce({ annotation: updated, appearance: { changed: true } });
-    await harness.capability.updateRaw(dto.ref, { subtype, strokeWidth: 2 });
+    await harness.capability.update(dto.ref, { subtype, strokeWidth: 2 });
 
-    expect(harness.capability.getRaw(dto.ref)).toEqual(harness.read(updated));
+    expect(harness.capability.get(dto.ref)).toEqual(harness.read(updated));
     expect(harness.capability.listPageItems(PAGE)[0].source).toBe('baked');
     expect(harness.capability.getAppearanceEpoch(PAGE)).not.toBe(epoch);
   });
@@ -1095,7 +1094,7 @@ describe.each([
 
       finishWrite({ annotation: updated, appearance: { changed: true } });
       await vi.waitFor(() =>
-        expect(harness.capability.getRaw(dto.ref)).toEqual(harness.read(updated)),
+        expect(harness.capability.get(dto.ref)).toEqual(harness.read(updated)),
       );
 
       expect(harness.capability.listPageItems(PAGE)[0].source).toBe('vector');
@@ -1152,7 +1151,7 @@ describe('distance authoring and recalibration', () => {
         leader: { length: 12, extension: 5, offset: 0 },
       }),
     );
-    await vi.waitFor(() => expect(harness.capability.getRaw(ref(71))).toBeTruthy());
+    await vi.waitFor(() => expect(harness.capability.get(ref(71))).toBeTruthy());
     expect(harness.capability.listPageItems(PAGE)[0].source).toBe('vector');
     expect(harness.capability.getAppearanceEpoch(PAGE)).toBe('');
     expect(harness.capability.comments.getPermissions(ref(71)).canEditText).toBe(false);
@@ -1288,7 +1287,7 @@ describe.each(['area', 'perimeter'])('%s scale resolution', (tool) => {
         contents: tool === 'area' ? '100.00 m²' : '30.00 m',
       }),
     );
-    await vi.waitFor(() => expect(harness.capability.getRaw(ref(75))).toBeTruthy());
+    await vi.waitFor(() => expect(harness.capability.get(ref(75))).toBeTruthy());
     expect(harness.capability.listPageItems(PAGE)[0].source).toBe('vector');
     expect(harness.capability.getAppearanceEpoch(PAGE)).toBe('');
   });

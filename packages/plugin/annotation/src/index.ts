@@ -10,7 +10,6 @@ export { annotationPlugin } from './annotation.plugin';
 // The one annotation key, re-exported so app code keying by ref needs only this package.
 export { annotationKey, refFromStableId } from '@embedpdf/core';
 export * from './contract';
-export { fromDTO, toPatch, styleFromDTO } from '@embedpdf/core-annotation';
 // The shared placement layer + the one click↔drag threshold, re-exported so a
 // sibling commit plane (the form plugin's place handler) resolves clicks with
 // the exact call the annotation core and the footprint ghost use.

@@ -32,7 +32,7 @@ export function createIcons(
     tools,
     filePicker,
   }: Pick<AnnotationServices, 'store' | 'geometry' | 'authority' | 'tools' | 'filePicker'>,
-  annotations: Pick<AnnotationReads, 'pageOf' | 'api'>,
+  annotations: Pick<AnnotationReads, 'pageOf' | 'get'>,
   stamps: Pick<Stamps, 'placeArmedStamp' | 'requestStampAt'>,
 ) {
   /** Create an icon annotation and select it (the anchor for its menu and comment popup). */
@@ -128,7 +128,7 @@ export function createIcons(
       const doc = ctx.doc;
       if (!doc) throw new Error('[annotation] no document bound');
       // The name and MIME type are the annotation's data; the bytes are its `file` resource.
-      const dto = annotations.api.getRaw(ref);
+      const dto = annotations.get(ref);
       const file = dto?.subtype === 'file-attachment' ? dto.file : null;
       if (!file) {
         throw new PluginError('not-found', 'annotation', 'the annotation has no attached file');

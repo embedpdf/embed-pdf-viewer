@@ -25,8 +25,8 @@ export function subscribeChanges(
     applied.emit({ result, origin: originOf(event) });
   });
 
-  const markChanged = (event: AnnotationChangedEvent) => {
-    if (event.subtype === 'redact') pendingChanged.emit({ pages: [event.page] });
+  const markChanged = ({ annotation: changed }: AnnotationChangedEvent) => {
+    if (changed.subtype === 'redact') pendingChanged.emit({ pages: [changed.page] });
   };
   ctx.listen(annotation.onCreated, markChanged);
   ctx.listen(annotation.onUpdated, markChanged);

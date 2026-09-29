@@ -28,7 +28,7 @@ export function createScaleReads(
   const state = () => ctx.state.get();
 
   const getReadout = (ref: AnnotationRef): MeasurementReadout | MeasurementUnavailable => {
-    const raw = annotation.getRaw(ref);
+    const raw = annotation.get(ref);
     return raw ? measurementReadout(raw) : { unavailable: 'not-dimension' };
   };
   const measureDistance = (

@@ -23,6 +23,10 @@ import { createAnnotationController } from '../src/controller';
 import { initialAnnotationState, type AnnotationState } from '../src/model';
 
 export const PAGE = toPageRef(1);
+
+/** A read's fields by name, for assertions that span kinds (`color` is a square's, not a widget's). */
+export const fieldsOf = (annotation: AnnotationDTO | null | undefined): Record<string, unknown> =>
+  (annotation ?? {}) as unknown as Record<string, unknown>;
 export const PAGE2 = toPageRef(2);
 
 const localOrigin = { kind: 'local', sessionId: 'me', sub: null, ts: 0, serverId: null };
@@ -213,6 +217,8 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
     state: () => ctx.state.get(),
     /** The composed model: confirmed records, pending changes and the session. */
     model: () => instance.model(),
+    /** Run a core message through the store's `commit` door, as a gesture does. */
+    commit: instance.commit,
     /** State changes in code, through the store's `apply` door. */
     apply: instance.apply,
     startSync,

@@ -20,7 +20,7 @@ import type { AnnotationFlags, AnnotationRef } from '@embedpdf/engine-core/runti
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { annotationHarness, type FileAnnotation } from './harness';
+import { annotationHarness, type FileAnnotation, fieldsOf } from './harness';
 
 const PAGE = toPageRef(1);
 const REF: AnnotationRef = { kind: 'objectNumber', page: PAGE, annotObjectNumber: 20 };
@@ -146,8 +146,8 @@ async function play(seed: number, steps: number) {
     outstanding().at(-1)?.source ?? (preferVector ? 'vector' : 'baked');
   const check = (label: string) => {
     const annotation = harness.capability.get(REF)!;
-    expect(annotation.props.color, `${label}: color`).toBe(expected('color'));
-    expect(annotation.flags.print, `${label}: print`).toBe(expected('print'));
+    expect(fieldsOf(annotation).color, `${label}: color`).toBe(expected('color'));
+    expect(annotation.print, `${label}: print`).toBe(expected('print'));
     const item = harness.capability.listPageItems(PAGE).find(({ id }) => id === 'obj:20')!;
     expect(item.source, `${label}: source`).toBe(expectedSource());
   };
@@ -174,7 +174,7 @@ async function play(seed: number, steps: number) {
       changes.push(change);
       inFlight.push(change);
     } else if (roll < 0.5) {
-      const print = !harness.capability.get(REF)!.flags.print;
+      const print = !harness.capability.get(REF)!.print;
       // Flags leave the appearance alone: the record renders as it did.
       const source = expectedSource();
       void harness.capability.updateSelectionFlags({ print });
@@ -232,8 +232,8 @@ async function play(seed: number, steps: number) {
     check(`seed ${seed} drain`);
   }
   expect(harness.state().pending).toEqual([]);
-  expect(harness.capability.get(REF)!.props.color).toBe(engine.color);
-  expect(harness.capability.get(REF)!.flags.print).toBe(engine.print);
+  expect(fieldsOf(harness.capability.get(REF)).color).toBe(engine.color);
+  expect(harness.capability.get(REF)!.print).toBe(engine.print);
 }
 
 describe('randomized interleavings of changes to one record', () => {

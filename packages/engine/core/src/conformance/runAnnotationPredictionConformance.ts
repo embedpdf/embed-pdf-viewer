@@ -264,6 +264,11 @@ const CASES: PredictionCase[] = [
     resources: { file: new TextEncoder().encode('attached') },
     patch: { file: { name: 'note.txt', description: 'Another note' } },
   },
+  {
+    name: 'widget: hidden and locked',
+    draft: { subtype: 'widget', rect: BOX },
+    patch: { hidden: true, locked: true },
+  },
 ];
 
 /** A create whose outcome is predicted with `annotationOfDraft`. */
@@ -304,6 +309,10 @@ const CREATE_CASES: CreateCase[] = [
   { name: 'link, as little as it takes', draft: { subtype: 'link', rect: BOX, target: null } },
   { name: 'redaction, as little as it takes', draft: { subtype: 'redact', rect: BOX } },
   { name: 'widget, as little as it takes', draft: { subtype: 'widget', rect: BOX } },
+  {
+    name: 'widget, named, described and not printed',
+    draft: { subtype: 'widget', rect: BOX, nm: 'field-1', contents: 'Your name', print: false },
+  },
   {
     name: 'stamp, as little as it takes',
     draft: { subtype: 'stamp', box: BOX },

@@ -36,20 +36,21 @@ describe('changes faster than the engine answers (local engine)', () => {
   test('an edit of a new annotation before its create is confirmed is written after it', async () => {
     const { doc, pages, ctx, annotation } = await openFixture('pending-create-edit');
     try {
-      const created = annotation.create({
-        subtype: 'square',
-        page: pages[0]!.ref,
-        bounds: { x: 20, y: 20, width: 60, height: 40 },
-        select: true,
-      });
-      // The create is in flight: the new annotation is selected under its new: id.
+      const created = annotation.create(
+        pages[0]!.ref,
+        { subtype: 'square', box: { x: 20, y: 20, width: 60, height: 40 } },
+        undefined,
+        { select: true },
+      );
+      // The create is in flight: the new annotation is selected under the name it was created with.
       const restyled = annotation.updateSelection({ color: '#00ff00' });
-      const ref = await created;
+      const { ref } = (await created).annotation;
       await restyled;
       await annotation.whenSynced();
 
       expect(annotation.getSelection()).toEqual([ref]);
-      expect(annotation.get(ref)!.props.color).toBe('#00ff00');
+      const shown = annotation.get(ref);
+      expect(shown && 'color' in shown ? shown.color : null).toBe('#00ff00');
       const raw = (await doc.page(ref.page).annotations.list()).annotations.find(
         (dto) => annotationKey(dto.ref) === annotationKey(ref),
       );
@@ -83,11 +84,9 @@ describe('changes faster than the engine answers (local engine)', () => {
       const [selected] = annotation.getSelection();
       expect(selected?.kind).toBe('nm');
       // The engine stores opacity in 1/255 steps.
-      const { props } = annotation.get(selected!)!;
-      expect(props.color).toBe('#00ff00');
-      expect(props.opacity).toBeCloseTo(0.2, 2);
-      const raw = annotation.getRaw(selected!);
-      expect(raw && 'opacity' in raw ? raw.opacity : null).toBeCloseTo(0.2, 2);
+      const shown = annotation.get(selected!);
+      expect(shown && 'color' in shown ? shown.color : null).toBe('#00ff00');
+      expect(shown && 'opacity' in shown ? shown.opacity : null).toBeCloseTo(0.2, 2);
     } finally {
       await ctx.dispose();
     }

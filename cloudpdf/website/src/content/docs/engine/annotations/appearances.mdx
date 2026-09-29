@@ -198,7 +198,7 @@ so you never see the stored number.
 Annotations with only a position ref are rendered too. See
 [Refs & identity](/docs/engine/concepts/identity).
 
-### New annotations don't print
+### New annotations print
 
-New annotations have `print` off unless you set it, so `usage: 'print'` skips them. Set
-`print: true` on the annotations that should print, or flatten with `'display'`.
+New annotations have `print` on unless you set it off, as Acrobat creates them, so `usage: 'print'`
+includes them. Set `print: false` on an annotation that should show on screen only.

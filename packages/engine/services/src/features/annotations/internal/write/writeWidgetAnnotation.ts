@@ -11,6 +11,7 @@ import { borderStyleToCode } from '../shapeBorderStyle';
 import { standardFontToCode } from '../standardFont';
 import { textAlignmentToCode } from '../textAlignment';
 import { setAnnotRect } from './annotationWritePrimitives';
+import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 
 const MK_BORDER_COLOR = 0; // EPDF_MK_COLOR_BC
 const MK_BACKGROUND_COLOR = 1; // EPDF_MK_COLOR_BG
@@ -73,13 +74,14 @@ export function applyWidgetStyle(
   }
 }
 
-/** Create an inert widget: placement + style. Adoption is a forms concern. */
+/** Create an inert widget: the fields every kind has, placement and style. Adoption is a forms concern. */
 export function applyWidgetDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
   draft: WidgetDraft<PdfCoordinates>,
 ): void {
+  applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
   setAnnotRect(fn, mem, annotPtr, draft.rect);
   applyWidgetStyle(fn, mem, annotPtr, draft);
 }
@@ -95,6 +97,7 @@ export function applyWidgetPatch(
   annotPtr: Ptr,
   patch: WidgetPatch<PdfCoordinates>,
 ): void {
+  applyAnnotationBasePatch(fn, mem, annotPtr, patch);
   if (patch.rect) {
     setAnnotRect(fn, mem, annotPtr, patch.rect);
   }

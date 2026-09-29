@@ -279,8 +279,9 @@ The user comes from the identity in their token; see
 
 ## Flags
 
-Every annotation has the standard PDF flags as `true`/`false` fields. Set the ones you need; the
-rest stay off (on create) or keep their value (on update):
+Every annotation has the standard PDF flags as `true`/`false` fields. Set the ones you need. On
+create, a new annotation prints and every other flag stays off; on update, a flag you leave out
+keeps its value:
 
 ```ts
 await page.annotations.update(annotation.ref, { print: true, locked: true });

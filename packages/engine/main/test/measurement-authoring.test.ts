@@ -5,7 +5,7 @@ import { describe, expect, test, vi } from 'vitest';
 import { drawnPointsOf, measureFromKnownLength, toPageRef } from '@embedpdf/engine-core/runtime';
 import { turnPivotOf } from '../../../core/annotation/src';
 import { createLocalEngine } from '../src/index';
-import { fromDTO } from '../../../plugin/annotation/src/repository';
+import { fromDTO } from '../../../core/annotation/src/record';
 import { annotationKey } from '@embedpdf/engine-core/runtime';
 import { annotationShell } from './helpers/annotation-shell';
 
@@ -44,8 +44,9 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       expect(annotation.listSelected()).toHaveLength(0);
       annotation.createPointer('distance', 'move', page.ref, { x: 250, y: 88 });
       annotation.createPointer('distance', 'down', page.ref, { x: 250, y: 88 });
-      await vi.waitFor(() => expect(annotation.listSelected()).toHaveLength(1));
-      const created = annotation.listSelected()[0].raw!;
+      // Written and confirmed: its ref is the engine's.
+      await vi.waitFor(() => expect(annotation.listSelected()[0]?.ref.kind).toBe('objectNumber'));
+      const created = annotation.listSelected()[0]!;
       const createdId = annotationKey(created.ref);
       const expectVector = () => {
         expect(
@@ -73,7 +74,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       annotation.editPointer('move', page.ref, { x: 250, y: 64 }, false);
       annotation.editPointer('up', page.ref, { x: 250, y: 64 }, false);
       await vi.waitFor(() =>
-        expect(annotation.getRaw(created.ref)).toMatchObject({
+        expect(annotation.get(created.ref)).toMatchObject({
           contents: '10.00 m',
           linePoints: created.subtype === 'line' ? created.linePoints : undefined,
           leader: { length: 36 },
@@ -85,7 +86,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       annotation.editPointer('move', page.ref, { x: 165, y: 39 }, false);
       annotation.editPointer('up', page.ref, { x: 165, y: 39 }, false);
       await vi.waitFor(() =>
-        expect(annotation.getRaw(created.ref)).toMatchObject({
+        expect(annotation.get(created.ref)).toMatchObject({
           captionOffset: { along: 15, perpendicular: 25 },
         }),
       );
@@ -95,7 +96,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       const report = await annotation.remeasurePage(page.ref, newScale);
       expect(report.failed).toEqual([]);
       expect(report.error).toBeUndefined();
-      expect(annotation.getRaw(created.ref)).toMatchObject({
+      expect(annotation.get(created.ref)).toMatchObject({
         contents: '16.00 ft',
         captionOffset: { along: 15, perpendicular: 25 },
       });
@@ -103,7 +104,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
 
       // A turn pivots about the middle of the line, as the engine turns it,
       // and survives the native appearance echo.
-      const beforeRotation = annotation.getRaw(created.ref)!;
+      const beforeRotation = annotation.get(created.ref)!;
       if (beforeRotation.subtype !== 'line') throw new Error('Expected distance annotation');
       const pivot = turnPivotOf(fromDTO(beforeRotation).geometry);
       const start = beforeRotation.linePoints.start;
@@ -113,7 +114,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       };
       await annotation.rotateSelectionBy(90);
       await vi.waitFor(() => {
-        const rotated = annotation.getRaw(created.ref)!;
+        const rotated = annotation.get(created.ref)!;
         if (rotated.subtype !== 'line') throw new Error('Expected distance annotation');
         // The points stay upright; the turn draws them.
         expect(rotated.rotation).toBe(90);
@@ -129,7 +130,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       expectVector();
       await annotation.resetSelectionRotation();
       await vi.waitFor(() => {
-        const reset = annotation.getRaw(created.ref)!;
+        const reset = annotation.get(created.ref)!;
         if (reset.subtype !== 'line') throw new Error('Expected distance annotation');
         expect(reset.linePoints.start.x).toBeCloseTo(beforeRotation.linePoints.start.x, 3);
         expect(reset.linePoints.start.y).toBeCloseTo(beforeRotation.linePoints.start.y, 3);
@@ -137,7 +138,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       expectVector();
       await annotation.rotateSelectionBy(90);
       await vi.waitFor(() => {
-        const rotated = annotation.getRaw(created.ref)!;
+        const rotated = annotation.get(created.ref)!;
         if (rotated.subtype !== 'line') throw new Error('Expected distance annotation');
         expect(drawnPointsOf(rotated)![0]![0]!.x).toBeCloseTo(rotatedStart.x, 3);
       });

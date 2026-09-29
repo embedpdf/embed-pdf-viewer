@@ -15,12 +15,9 @@ import {
 } from '@embedpdf/engine-core/runtime';
 
 import { setTextSelection } from '../model';
-import type { AnnotationReads } from '../read/annotations';
 import type { ChromeReads } from '../read/chrome';
 import { cssFontFamilyForFace, textCommitPatch, type TextSelection } from '../rich-text';
 import type { AnnotationContext, AnnotationServices } from '../services';
-import { throwIfFailed } from './outcomes';
-import type { Commit } from '../services/store';
 
 const TEXT_WRITE_DELAY_MS = 250;
 
@@ -32,7 +29,6 @@ interface Waiter {
 export function createTextEditing(
   ctx: Pick<AnnotationContext, 'doc' | 'state' | 'cleanup'>,
   { store, identity, fonts }: Pick<AnnotationServices, 'store' | 'identity' | 'fonts'>,
-  annotations: Pick<AnnotationReads, 'loadedOrThrow'>,
   chrome: Pick<ChromeReads, 'hitAt'>,
 ) {
   /** The pause timer of each record being typed in. */
@@ -99,30 +95,7 @@ export function createTextEditing(
       }),
   }));
 
-  /** Apply a text message and write it at once; rejects when the engine refuses it. */
-  const writeNow = async (id: Id, commit: () => Commit): Promise<void> => {
-    const committed = commit();
-    void flushText(id);
-    throwIfFailed(await committed.written);
-  };
-
   const api = {
-    setContents: async (ref: AnnotationRef, text: string) => {
-      const annotation = annotations.loadedOrThrow(ref);
-      await writeNow(annotation.id, () =>
-        store.commit({ type: 'setText', id: annotation.id, text }),
-      );
-    },
-    setRichText: async (ref: AnnotationRef, doc: { paragraphs: RichTextParagraph[] }) => {
-      const annotation = annotations.loadedOrThrow(ref);
-      await writeNow(annotation.id, () =>
-        store.commit({
-          type: 'setRichText',
-          id: annotation.id,
-          doc: { paragraphs: doc.paragraphs },
-        }),
-      );
-    },
     beginTextEdit: (ref: AnnotationRef) => {
       store.commit({ type: 'beginTextEdit', id: annotationKey(ref) });
     },

@@ -57,7 +57,7 @@ const resultOf = (scope: RedactionApplyScope): RedactionApplyResult => ({
 /** The annotation plugin's host lens, reduced to what redaction reads; lists stay stable until `setRaws`. */
 function fakeAnnotation(options: { canCreate?: boolean; raws?: AnnotationDTO[] } = {}) {
   let raws = options.raws ?? [];
-  let lists = new Map<number, readonly { ref: AnnotationRef; bounds: object }[]>();
+  let lists = new Map<number, readonly AnnotationDTO[]>();
   const created = createEventHook<AnnotationChangedEvent>();
   const updated = createEventHook<AnnotationChangedEvent>();
   const deleted = createEventHook<AnnotationDeletedEvent>();
@@ -67,17 +67,13 @@ function fakeAnnotation(options: { canCreate?: boolean; raws?: AnnotationDTO[] }
     list: ({ page }: { page: { pageObjectNumber: number } }) => {
       let list = lists.get(page.pageObjectNumber);
       if (!list) {
-        list = raws
-          .filter((raw) => raw.ref.page.pageObjectNumber === page.pageObjectNumber)
-          .map((raw) => ({ ref: raw.ref, bounds: { x: 10, y: 10, width: 40, height: 40 } }));
+        list = raws.filter((raw) => raw.ref.page.pageObjectNumber === page.pageObjectNumber);
         lists.set(page.pageObjectNumber, list);
       }
       return list;
     },
-    getRaw: (ref: AnnotationRef) =>
+    get: (ref: AnnotationRef) =>
       raws.find((raw) => annotationKey(raw.ref) === annotationKey(ref)) ?? null,
-    listRaw: ({ page }: { page: { pageObjectNumber: number } }) =>
-      raws.filter((raw) => raw.ref.page.pageObjectNumber === page.pageObjectNumber),
     setRaws: (next: AnnotationDTO[]) => {
       raws = next;
       lists = new Map();
@@ -221,7 +217,7 @@ describe('the pending view', () => {
       pages.push(...event.pages.map((page) => page.pageObjectNumber)),
     );
     const changed = (subtype: string) =>
-      ({ ref: MARK, page: PAGE, subtype }) as unknown as AnnotationChangedEvent;
+      ({ annotation: { ref: MARK, page: PAGE, subtype } }) as unknown as AnnotationChangedEvent;
     annotation.created.emit(changed('redact'));
     annotation.updated.emit(changed('square'));
     annotation.deleted.emit({ ref: MARK, page: OTHER_PAGE } as AnnotationDeletedEvent);

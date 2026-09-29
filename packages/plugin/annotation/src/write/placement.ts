@@ -48,9 +48,8 @@ export function iconPlacement(
     ...geometry,
     color: hexColorOf(defaults.color),
     opacity: defaults.opacity,
-    // A fresh placement carries print (Acrobat parity) plus the tool's seed
-    // (the note/attachment tools pass noZoom + noRotate).
-    print: true,
+    // The tool's seed (the note/attachment tools pass noZoom + noRotate); a
+    // new annotation prints by the engine's default.
     ...flags,
   };
   if (subtype === 'text') {

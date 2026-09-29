@@ -11,7 +11,7 @@ import {
 import { annotationSelectionFrame, shapeMeasurementLayout } from '../../../core/annotation/src';
 import { rotatePoint, turnPivotOf } from '../../../core/annotation/src/geometry';
 import { createLocalEngine } from '../src/index';
-import { fromDTO } from '../../../plugin/annotation/src/repository';
+import { fromDTO } from '../../../core/annotation/src/record';
 import { annotationKey } from '@embedpdf/engine-core/runtime';
 import { annotationShell } from './helpers/annotation-shell';
 
@@ -58,12 +58,13 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
           annotation.createPointer(tool, 'down', page.ref, point);
         }
         void annotation.finishCreationDraft();
-        await vi.waitFor(() => expect(annotation.listSelected()).toHaveLength(1));
-        const created = annotation.listSelected()[0].raw!;
+        // Written and confirmed: its ref is the engine's.
+        await vi.waitFor(() => expect(annotation.listSelected()[0]?.ref.kind).toBe('objectNumber'));
+        const created = annotation.listSelected()[0]!;
         if (created.subtype !== 'polygon' && created.subtype !== 'polyline')
           throw new Error('Expected shape');
         const current = () => {
-          const dto = annotation.getRaw(created.ref)!;
+          const dto = annotation.get(created.ref)!;
           if (dto.subtype !== 'polygon' && dto.subtype !== 'polyline')
             throw new Error('Expected shape');
           return dto;
@@ -128,7 +129,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         });
         expectVector();
         const displacedRect = current().rect;
-        await annotation.updateRaw(created.ref, {
+        await annotation.update(created.ref, {
           subtype: created.subtype,
           captionCenter: null,
         });

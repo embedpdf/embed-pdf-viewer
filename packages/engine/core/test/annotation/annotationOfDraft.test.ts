@@ -27,7 +27,7 @@ describe('annotationOfDraft', () => {
       borderStyle: 'solid',
       interiorColor: null,
       rotation: null,
-      print: false,
+      print: true,
       author: 'Ada',
       userId: 'u-1',
       createdAt: null,

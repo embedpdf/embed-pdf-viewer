@@ -109,7 +109,7 @@ async function openEditor() {
   );
 
   const writes: AnnotationRef[] = [];
-  annotation.onUpdated((event) => writes.push(event.ref));
+  annotation.onUpdated((event) => writes.push(event.annotation.ref));
   annotation.beginTextEdit(freeText.ref);
   const editor = await waitFor(() => {
     const element = view.container.querySelector<HTMLElement>('[contenteditable="true"]');
@@ -148,8 +148,8 @@ describe('free-text typing through the React editor', () => {
         expect(writes).toHaveLength(0);
 
         await waitFor(() => expect(writes).toHaveLength(1), { timeout: 5_000 });
-        expect(annotation.getRaw(ref)!.contents).toContain('Typed text');
-        expect(annotation.get(ref)!.pending).toBeUndefined();
+        expect(annotation.get(ref)!.contents).toContain('Typed text');
+        expect(annotation.isPending(ref)).toBe(false);
       } finally {
         await close();
       }
@@ -163,7 +163,7 @@ describe('free-text typing through the React editor', () => {
       await annotation.endTextEdit();
 
       expect(writes).toHaveLength(1);
-      expect(annotation.getRaw(ref)!.contents).toContain('Finished');
+      expect(annotation.get(ref)!.contents).toContain('Finished');
     } finally {
       await close();
     }

@@ -23,8 +23,8 @@ import {
 import {
   AnnotationToken,
   annotationKey,
-  type Annotation,
   type AnnotationCapability,
+  type AnnotationDTO,
   type AnnotationFilter,
   type AnnotationRef,
   type Behavior,
@@ -1027,9 +1027,9 @@ export function useAnnotationEvent<T>(
   useCapabilityEvent(AnnotationToken, select, handler);
 }
 
-/** Page-space annotation records matching `filter` (a page, a subtype, an
- *  author, a group), reference-stable while the matching set is unchanged. */
-export function useAnnotationList(filter?: AnnotationFilter): readonly Annotation[] {
+/** The annotations matching `filter` (a page, a subtype, an author, a group),
+ *  as the user sees them, reference-stable while the matching set is unchanged. */
+export function useAnnotationList(filter?: AnnotationFilter): readonly AnnotationDTO[] {
   const key = filter
     ? `${filter.page?.pageObjectNumber ?? ''}|${filter.subtype ?? ''}|${filter.author ?? ''}|${
         filter.group ? annotationKey(filter.group) : ''

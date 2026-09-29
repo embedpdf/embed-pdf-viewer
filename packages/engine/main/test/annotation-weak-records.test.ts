@@ -54,7 +54,8 @@ describe('weak annotations (local engine)', () => {
       expect(keys).not.toContain(annotationKey(weak));
       const [selected] = annotation.getSelection() as AnnotationRef[];
       expect(selected?.kind).toBe('nm');
-      expect(annotation.get(selected!)!.props.color).toBe('#00ff00');
+      const shown = annotation.get(selected!);
+      expect(shown && 'color' in shown ? shown.color : null).toBe('#00ff00');
     } finally {
       await ctx.dispose();
     }
