@@ -1,7 +1,8 @@
 /**
  * Randomized interleavings of changes to one record: restyles and flag
  * toggles whose engine writes settle in any order, some refused, with other
- * sessions' updates arriving meanwhile. The fake engine applies a write when
+ * sessions' updates arriving meanwhile. A restyle to the colour the record
+ * already shows changes nothing and writes nothing. The fake engine applies a write when
  * it answers it and publishes the result before the promise settles, as the
  * real engines do.
  *
@@ -157,6 +158,11 @@ async function play(seed: number, steps: number) {
     if (roll < 0.3) {
       const color = rng.pick(COLORS);
       void harness.capability.updateSelection({ color });
+      // The colour it already shows: no change, and no write.
+      if (color === expected('color')) {
+        check(label);
+        continue;
+      }
       // A restyle renders live: this session owns the appearance now.
       const change: UserChange = {
         field: 'color',

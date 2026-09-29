@@ -197,17 +197,19 @@ describe('flag-driven behavior in the model', () => {
     // …but setFlags is not gated by locked: unlocking must work
     const [unlocked, unlockFx] = step(model, { type: 'setFlags', patch: { locked: false } });
     expect(unlocked.byId['l1'].flags.locked).toBe(false);
-    expect(unlockFx).toEqual([{ type: 'flags', id: 'l1' }]);
+    expect(unlockFx).toEqual([
+      { type: 'patch', id: 'l1', patch: { subtype: 'square', locked: false } },
+    ]);
   });
 
   it('setFlags merges onto the selection, skips no-ops, keeps the render source', () => {
     let model = loaded([square('s1', DRAWN_FLAGS, { source: 'baked' }), square('s2', DRAWN_FLAGS)]);
     model = { ...model, selected: ['s1', 's2'] };
     const [next, fx] = step(model, { type: 'setFlags', patch: { print: true, hidden: true } });
-    // print was already set on both — only `hidden` changes, but both change by it
+    // print was already set on both — only `hidden` changes, and only it is written
     expect(fx).toEqual([
-      { type: 'flags', id: 's1' },
-      { type: 'flags', id: 's2' },
+      { type: 'patch', id: 's1', patch: { subtype: 'square', hidden: true } },
+      { type: 'patch', id: 's2', patch: { subtype: 'square', hidden: true } },
     ]);
     expect(next.byId['s1'].flags.hidden).toBe(true);
     expect(next.byId['s1'].source).toBe('baked'); // flags never re-bake
@@ -223,7 +225,9 @@ describe('flag-driven behavior in the model', () => {
     model = { ...model, selected: ['new:1'] };
     const [next, fx] = step(model, { type: 'setFlags', patch: { locked: true } });
     expect(next.byId['new:1'].flags.locked).toBe(true);
-    expect(fx).toEqual([{ type: 'flags', id: 'new:1' }]);
+    expect(fx).toEqual([
+      { type: 'patch', id: 'new:1', patch: { subtype: 'square', locked: true } },
+    ]);
   });
 
   it('lockedContents blocks beginTextEdit', () => {

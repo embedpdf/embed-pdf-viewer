@@ -41,13 +41,6 @@ export const ownGeometry = (annotation: ModelAnnotation): ModelAnnotation => {
     : annotation;
 };
 
-/** The patch effect for a committed geometry edit. */
-export const geometryPatch = (id: Id): Effect => ({
-  type: 'patch',
-  id,
-  scope: { kind: 'geometry' },
-});
-
 export const sub = (from: Point, to: Point): Point => ({ x: from.x - to.x, y: from.y - to.y });
 
 export const translateRect = (rect: Rect, point: Point): Rect => ({

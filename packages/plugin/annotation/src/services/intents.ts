@@ -98,7 +98,13 @@ export function createIntents(
         token: ++token,
         id: record.id,
         change: previous
-          ? { kind: 'edit', fields: { ...changedFields(previous, record), source: record.source } }
+          ? {
+              kind: 'edit',
+              ...(result.change.patches[record.id]
+                ? { patch: result.change.patches[record.id] }
+                : {}),
+              fields: { ...changedFields(previous, record), source: record.source },
+            }
           : { kind: 'create', record },
       });
     }

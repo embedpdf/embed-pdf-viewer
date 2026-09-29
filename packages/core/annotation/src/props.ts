@@ -125,43 +125,29 @@ export function applyProps(
 ): ModelAnnotation | null {
   if (!annotTransformable(annotation)) return null;
   const takes = new Set<PropKey>(propsFor(annotation.subtype).map((spec) => spec.key));
+  /** A key this kind takes, set to a value other than the one it has. */
+  const changes = <K extends PropKey>(key: K, current: unknown): boolean =>
+    patch[key] !== undefined && takes.has(key) && !sameProp(patch[key], current);
   let next = annotation;
 
   // `!== undefined` (not truthiness): `interiorColor: null` means clear the fill.
   const style: Style = { ...annotation.style };
   let styleChanged = false;
-  if (patch.color !== undefined && takes.has('color')) {
-    style.color = patch.color;
-    styleChanged = true;
-  }
-  if (patch.interiorColor !== undefined && takes.has('interiorColor')) {
-    style.interiorColor = patch.interiorColor;
-    styleChanged = true;
-  }
-  if (patch.strokeWidth !== undefined && takes.has('strokeWidth')) {
-    style.strokeWidth = patch.strokeWidth;
-    styleChanged = true;
-  }
-  if (patch.opacity !== undefined && takes.has('opacity')) {
-    style.opacity = patch.opacity;
-    styleChanged = true;
-  }
-  if (patch.blendMode !== undefined && takes.has('blendMode')) {
-    style.blendMode = patch.blendMode;
-    styleChanged = true;
-  }
-  if (patch.border !== undefined && takes.has('border')) {
-    style.border = patch.border;
+  for (const key of STYLE_PROPS) {
+    if (!changes(key, style[key])) continue;
+    (style as unknown as Record<string, unknown>)[key] = patch[key];
     styleChanged = true;
   }
   if (styleChanged) next = { ...next, style };
 
   if (patch.lineEndings && takes.has('lineEndings') && endingsGeom(next.geometry)) {
     const ends: LineEndings = { ...(next.geometry.ends ?? NO_ENDINGS), ...patch.lineEndings };
-    next = { ...next, geometry: { ...next.geometry, ends } };
+    if (!sameProp(ends, next.geometry.ends ?? NO_ENDINGS)) {
+      next = { ...next, geometry: { ...next.geometry, ends } };
+    }
   }
 
-  if (patch.icon !== undefined && takes.has('icon')) {
+  if (changes('icon', annotation.icon)) {
     next = { ...next, icon: patch.icon };
   }
 
@@ -169,41 +155,48 @@ export function applyProps(
   // other kind the value lives in attached child annotations: `setProps`
   // emits the `syncLink` intent instead of touching the model, and reads
   // derive through the `linkOf` lens.
-  if (patch.link !== undefined && takes.has('link') && annotation.subtype === 'link') {
+  if (annotation.subtype === 'link' && changes('link', annotation.link ?? null)) {
     next = { ...next, link: patch.link };
   }
 
   if (next.text) {
     const text: TextStyle = { ...next.text };
     let textChanged = false;
-    if (patch.fontFamily !== undefined && takes.has('fontFamily')) {
-      text.fontFamily = patch.fontFamily;
-      textChanged = true;
-    }
-    if (patch.fontSize !== undefined && takes.has('fontSize')) {
-      text.fontSize = patch.fontSize;
-      textChanged = true;
-    }
-    if (patch.fontColor !== undefined && takes.has('fontColor')) {
-      text.fontColor = patch.fontColor;
-      textChanged = true;
-    }
-    if (patch.textAlign !== undefined && takes.has('textAlign')) {
-      text.textAlign = patch.textAlign;
+    for (const key of TEXT_PROPS) {
+      if (!changes(key, text[key])) continue;
+      (text as unknown as Record<string, unknown>)[key] = patch[key];
       textChanged = true;
     }
     for (const key of ['bold', 'italic', 'underline'] as const) {
-      const value = patch[key];
-      if (value !== undefined && takes.has(key) && (text[key] ?? false) !== value) {
-        text[key] = value;
-        textChanged = true;
-      }
+      if (!changes(key, text[key] ?? false)) continue;
+      text[key] = patch[key];
+      textChanged = true;
     }
     if (textChanged) next = { ...next, text };
   }
 
   return next === annotation ? null : next;
 }
+
+const STYLE_PROPS = [
+  'color',
+  'interiorColor',
+  'strokeWidth',
+  'opacity',
+  'blendMode',
+  'border',
+] as const satisfies readonly (keyof Style & PropKey)[];
+
+const TEXT_PROPS = [
+  'fontFamily',
+  'fontSize',
+  'fontColor',
+  'textAlign',
+] as const satisfies readonly (keyof TextStyle & PropKey)[];
+
+/** Two prop values alike: the same value, or the same border, endings or link target. */
+const sameProp = (left: unknown, right: unknown): boolean =>
+  left === right || JSON.stringify(left) === JSON.stringify(right);
 
 /**
  * The ordered property specs every given kind declares — the schema for a mixed

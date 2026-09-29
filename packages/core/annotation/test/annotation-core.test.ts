@@ -112,6 +112,12 @@ const createPtr = (
 const run = (model: Model, msgs: Message[]): Model =>
   msgs.reduce((acc, message) => step(acc, message)[0], model);
 const rectGeom = (geometry: ModelGeometry) => (geometry.kind === 'rect' ? geometry.rect : null);
+/** The write a committed edit asks for: one `patch` effect stating at least `fields`. */
+const writes = (id: string, fields: Record<string, unknown>) => ({
+  type: 'patch',
+  id,
+  patch: expect.objectContaining(fields),
+});
 // rotatedAabb goes through sin/cos, so a quarter-turn carries ~1e-14 fuzz —
 // compare the round-trip footprints field-wise, not with toEqual.
 const expectRectClose = (
@@ -1370,9 +1376,17 @@ describe('annotation-core', () => {
     const lnGeom = next.byId[ln].geometry;
     expect(lnGeom.kind === 'line' && lnGeom.ends?.end).toBe('closed-arrow');
     expect(fx).toEqual([
-      { type: 'patch', id: sq, scope: { kind: 'props', keys: ['strokeWidth', 'lineEndings'] } },
-      { type: 'patch', id: ln, scope: { kind: 'props', keys: ['strokeWidth', 'lineEndings'] } },
+      writes(sq, { subtype: 'square', strokeWidth: 7 }),
+      writes(ln, {
+        subtype: 'line',
+        strokeWidth: 7,
+        lineEndings: { start: 'none', end: 'closed-arrow' },
+      }),
     ]);
+    // Each writes what changed for it: no endings on the square, no points on the line.
+    const [square, line] = fx.map((effect) => (effect.type === 'patch' ? effect.patch : null));
+    expect(square).not.toHaveProperty('lineEndings');
+    expect(line).not.toHaveProperty('linePoints');
   });
 
   it('setProps skips locked annotations and keys the kind does not declare', () => {
@@ -2306,7 +2320,7 @@ describe('annotation-core — rotation', () => {
   it('rotate90 turns a single selected shape about its centre (one patch)', () => {
     const base = modelWith([seededSquare('s1', { x: 100, y: 100, width: 100, height: 50 })]);
     const [model, fx] = step({ ...base, selected: ['s1'] }, { type: 'rotate90' });
-    expect(fx).toEqual([{ type: 'patch', id: 's1', scope: { kind: 'geometry' } }]);
+    expect(fx).toEqual([writes('s1', { subtype: 'square', rotation: 90 })]);
     const geometry = model.byId['s1'].geometry;
     expect(geomRotation(geometry)).toBe(90);
     expect(centroidOf(geometry)).toMatchObject({ x: 150, y: 125 });
@@ -2329,7 +2343,7 @@ describe('annotation-core — rotation', () => {
     const base = modelWith([seededSquare('s1', { x: 100, y: 100, width: 100, height: 50 })]);
     const rotated = step({ ...base, selected: ['s1'] }, { type: 'rotate90' })[0];
     const [model, fx] = step(rotated, { type: 'resetRotation' });
-    expect(fx).toEqual([{ type: 'patch', id: 's1', scope: { kind: 'geometry' } }]);
+    expect(fx).toEqual([writes('s1', { subtype: 'square', rotation: null })]);
     expect(geomRotation(model.byId['s1'].geometry)).toBe(0);
   });
 });
@@ -2901,8 +2915,8 @@ describe('page-bound gestures', () => {
     expect(draft.delta.y).toBeGreaterThan(0);
     expect(draft.delta.y).toBeLessThan(40); // pinned at the edge, not 190
     const [done, fx] = step(model, edit('up', 320, 900));
-    expect(fx).toEqual([{ type: 'patch', id: done.selected[0], scope: { kind: 'geometry' } }]);
     const rect = rectGeom(done.byId[done.selected[0]].geometry)!;
+    expect(fx).toEqual([writes(done.selected[0], { box: rect })]);
     expect(rect.x).toBe(300); // slid right by the full 50
     // Bottom rests on the page edge (± the stroke's visual inflation).
     expect(rect.y + rect.height).toBeGreaterThan(788);
@@ -2917,8 +2931,8 @@ describe('page-bound gestures', () => {
       edit('up', 270, 900),
     );
     expect(done.draft).toBeNull();
-    expect(fx).toEqual([{ type: 'patch', id: done.selected[0], scope: { kind: 'geometry' } }]);
     const rect = rectGeom(done.byId[done.selected[0]].geometry)!;
+    expect(fx).toEqual([writes(done.selected[0], { box: rect })]);
     expect(rect.y).toBeGreaterThan(700); // it moved…
     expect(rect.y + rect.height).toBeLessThanOrEqual(792); // …but stayed on the page
   });
@@ -3147,7 +3161,7 @@ describe('annotation-core — snapping', () => {
     const chip = chrome(live, PAGE).find((node) => node.kind === 'angle-chip');
     expect(chip).toMatchObject({ kind: 'angle-chip', angle: 90 });
     const [model, fx] = step(live, editPtr('up', 0, 0));
-    expect(fx).toEqual([{ type: 'patch', id: 's1', scope: { kind: 'geometry' } }]);
+    expect(fx).toEqual([writes('s1', { rotation: expect.closeTo(90) })]);
     expect(geomRotation(model.byId['s1'].geometry)).toBeCloseTo(90);
     expect(chrome(model, PAGE).some((node) => node.kind === 'angle-chip')).toBe(false);
   });
@@ -3936,7 +3950,17 @@ describe('render source after an edit (what keeps a raster, what renders live)',
     [model] = step(model, editPtr('down', 150, 130)); // grab the body
     [model] = step(model, editPtr('move', 190, 160));
     const [next, fx] = step(model, editPtr('up', 190, 160));
-    expect(fx).toEqual([{ type: 'patch', id: 'A1', scope: { kind: 'geometry' } }]);
+    expect(fx).toEqual([
+      {
+        type: 'patch',
+        id: 'A1',
+        patch: {
+          subtype: 'stamp',
+          box: { x: 140, y: 130, width: 100, height: 60 },
+          rotation: null,
+        },
+      },
+    ]);
     const geometry = next.byId['A1'].geometry;
     expect(geometry.kind === 'rect' && geometry.rect.x).toBe(140); // moved…
     expect(next.byId['A1'].source).toBe('baked'); // …and still baked
@@ -3949,14 +3973,24 @@ describe('render source after an edit (what keeps a raster, what renders live)',
     const [next, fx] = step(model, editPtr('up', 240, 190));
     // Whether the re-baked raster differs is the engine's answer (its
     // `appearance.changed`), so the patch carries no guess about it.
-    expect(fx).toEqual([{ type: 'patch', id: 'A1', scope: { kind: 'geometry' } }]);
+    expect(fx).toEqual([
+      {
+        type: 'patch',
+        id: 'A1',
+        patch: {
+          subtype: 'stamp',
+          box: { x: 100, y: 100, width: 140, height: 90 },
+          rotation: null,
+        },
+      },
+    ]);
     expect(next.byId['A1'].source).toBe('baked'); // opaque-body: no vector render
     expect(next.byId['A1'].apBox).toEqual({ x: 100, y: 100, width: 140, height: 90 });
   });
 
   it('a stamp rotate90 commits a bare patch — rotation is stripped at the blit', () => {
     const [next, fx] = step(committed('stamp'), { type: 'rotate90' });
-    expect(fx).toEqual([{ type: 'patch', id: 'A1', scope: { kind: 'geometry' } }]);
+    expect(fx).toEqual([writes('A1', { subtype: 'stamp', rotation: 90 })]);
     expect(next.byId['A1'].source).toBe('baked');
   });
 
@@ -3965,10 +3999,10 @@ describe('render source after an edit (what keeps a raster, what renders live)',
     [model] = step(model, editPtr('down', 200, 160)); // SE handle
     [model] = step(model, editPtr('move', 260, 200));
     const [afterResize, fx1] = step(model, editPtr('up', 260, 200));
-    expect(fx1).toEqual([{ type: 'patch', id: 'A1', scope: { kind: 'geometry' } }]);
+    expect(fx1).toEqual([writes('A1', { subtype: 'square', box: expect.anything() })]);
     expect(afterResize.byId['A1'].source).toBe('vector');
     const [afterRotate, fx2] = step(committed('square'), { type: 'rotate90' });
-    expect(fx2).toEqual([{ type: 'patch', id: 'A1', scope: { kind: 'geometry' } }]);
+    expect(fx2).toEqual([writes('A1', { subtype: 'square', rotation: 90 })]);
     expect(afterRotate.byId['A1'].source).toBe('vector');
   });
 
@@ -4007,7 +4041,7 @@ describe('render source after an edit (what keeps a raster, what renders live)',
     };
     const [next, fx] = step(model, { type: 'setProps', patch: { interiorColor: '#ffd500' } });
     expect(fx).toEqual([
-      { type: 'patch', id: 'W1', scope: { kind: 'props', keys: ['interiorColor'] } },
+      { type: 'patch', id: 'W1', patch: { subtype: 'widget', interiorColor: '#ffd500' } },
     ]);
     // Baked stays baked: the widget has no vector render, and leaving `baked`
     // would drop it from appearanceEpoch — its raster would freeze forever.
@@ -4081,9 +4115,10 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
     const model = withSelected(committedSquare());
     const [next, fx] = step(model, { type: 'setProps', patch: { link: URI, color: '#00ff00' } });
     expect(next.byId['S1'].style.color).toBe('#00ff00');
+    // The children follow the target; the square writes only its colour.
     expect(fx).toEqual([
-      { type: 'patch', id: 'S1', scope: { kind: 'props', keys: ['link', 'color'] } },
       { type: 'syncLink', id: 'S1', target: URI },
+      { type: 'patch', id: 'S1', patch: { subtype: 'square', color: '#00ff00' } },
     ]);
   });
 
@@ -4092,7 +4127,7 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
     const model = withSelected(link);
     const [next, fx] = step(model, { type: 'setProps', patch: { link: URI } });
     expect(next.byId['L1'].link).toEqual(URI);
-    expect(fx).toEqual([{ type: 'patch', id: 'L1', scope: { kind: 'props', keys: ['link'] } }]);
+    expect(fx).toEqual([{ type: 'patch', id: 'L1', patch: { subtype: 'link', target: URI } }]);
   });
 
   it('widgets do not take the link key: no change, no effect', () => {

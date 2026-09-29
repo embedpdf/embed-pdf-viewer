@@ -193,12 +193,8 @@ describe('annotation flags', () => {
     await vi.waitFor(() => expect(harness.update).toHaveBeenCalledTimes(1));
     const [wref, patch] = harness.update.mock.calls[0]!;
     expect(wref).toEqual(ref(20));
-    // a flags-only patch: no geometry/style keys ride along, so nothing re-bakes
-    expect(patch).toEqual({
-      subtype: 'square',
-      ...NO_FLAGS,
-      locked: true,
-    });
+    // a flags-only patch, of the one flag that changed: nothing re-bakes
+    expect(patch).toEqual({ subtype: 'square', locked: true });
     // the re-sync preserves 'baked'
     await vi.waitFor(() => expect(harness.model().byId[id].source).toBe('baked'));
   });

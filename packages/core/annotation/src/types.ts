@@ -1,6 +1,7 @@
 import type { PageRotation, Point, Rect as GeometryRect, TextQuad } from '@embedpdf/core-geometry';
 import type {
   AnnotationDTO,
+  AnnotationPatch,
   AnnotationFlags,
   AnnotationRef,
   BlendMode,
@@ -204,20 +205,6 @@ export interface AnnotationProps extends Style, TextStyle {
 }
 
 export type PropKey = keyof AnnotationProps;
-
-/**
- * What a committed edit changed — carried on the `patch` effect so the shell
- * emits exactly that intent (`toScopedPatch`) instead of
- * reconstructing a full projection. `geometry` covers every gesture commit
- * (move/resize/rotate/vertex edit); `props` forwards the user's patch keys
- * verbatim. Text content never rides this effect (the debounced text-edit
- * write owns `contents`).
- */
-export type PatchScope =
-  | { kind: 'geometry' }
-  | { kind: 'caption' }
-  | { kind: 'leader' }
-  | { kind: 'props'; keys: PropKey[] };
 
 /** A partial property write. `lineEndings` merges per side (set just `end`
  *  without knowing `start`); every other key overwrites. */
@@ -602,6 +589,13 @@ export type Model = Session & AnnotationView;
 export interface ChangeSet {
   readonly put: readonly ModelAnnotation[];
   readonly drop: readonly Id[];
+  /**
+   * What each changed record's change means to the engine, by id: the fields
+   * it changed, as `update` takes them. None for a new record (its create
+   * writes it) or for a change the engine keeps nothing of (a record handed
+   * to live rendering, a value set to what it was).
+   */
+  readonly patches: Readonly<Record<Id, AnnotationPatch>>;
 }
 
 /** The result of one message: the next session, the records it changed, and the engine work to do. */
@@ -824,15 +818,14 @@ export type Effect =
   | { type: 'captured'; tool: string; page: PageRef; geometry: ModelGeometry }
   | { type: 'create'; id: Id }
   | { type: 'createGroup'; primary: Id; members: Id[] }
-  /** Write the part of one record that `scope` names. Whether the engine's
-   *  re-baked appearance differs is the engine's answer, not the core's guess. */
-  | { type: 'patch'; id: Id; scope: PatchScope }
+  /** Write one record's change: its entry in the change set's `patches`. `update`
+   *  asks for it for every changed record that has one, except typed text, which
+   *  its `text` effect writes after a pause. Whether the engine's re-baked
+   *  appearance differs is the engine's answer, not the core's guess. */
+  | { type: 'patch'; id: Id; patch: AnnotationPatch }
   /** Write the edited text of one free-text record. The plugin waits for a
    *  pause in typing and writes the latest text once. */
   | { type: 'text'; id: Id }
-  /** A `/F`-only engine write for one record: the plugin sends the record's
-   *  merged flags. Flags never change an appearance, so nothing re-renders. */
-  | { type: 'flags'; id: Id }
   /** The parent's `link` prop changed on a non-link kind: reconcile its
    *  attached link children (create / retarget / delete) toward `target`
    *  (null = remove them). Declarative — the plugin's reconciler is the only

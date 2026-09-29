@@ -1,6 +1,7 @@
 /**
  * Edits the toolbar applies to the whole selection: restyle, flags, quarter
- * turns, reset rotation, delete. Each changed record gets its own effect.
+ * turns, reset rotation, delete. Each changed record's change is its own
+ * engine write (`update` derives it from the change set).
  */
 import type { AnnotationFlags } from '@embedpdf/engine-core/runtime';
 
@@ -12,24 +13,22 @@ import { linkChildrenOf } from '../links';
 import { transformMeasurementCaption } from '../measurement-shape';
 import { applyProps, kindTakesLink } from '../props';
 import { annotationTurnPivot } from '../selection';
-import type { AnnotationPropsPatch, Effect, Id, Model, Point, PropKey } from '../types';
-import { geometryPatch, ownGeometry, toVector, withoutRecords } from './changes';
+import type { AnnotationPropsPatch, Effect, Id, Model, Point } from '../types';
+import { ownGeometry, toVector, withoutRecords } from './changes';
 
 /**
  * Apply a flat property patch to the current selection. Each member takes only
  * the keys its kind declares (see `applyProps` — routing to `style`, `geom.ends`
  * or `text` happens there) and ignores the rest, so one patch restyles a mixed
- * selection. Changed members flip to `vector` (we own the appearance now) and
- * emit one engine patch each. The base style / tool defaults are never touched:
+ * selection. Changed members flip to `vector` (we own the appearance now), and
+ * each one's change is written. The base style / tool defaults are never touched:
  * editing existing annotations must not change what the next drawn one looks like.
  */
 export function setProps(model: Model, patch: AnnotationPropsPatch): [Model, Effect[]] {
   if (!model.selected.length) return [model, []];
   const byId = { ...model.byId };
   const fx: Effect[] = [];
-  // The effect carries the user's keys verbatim — the shell lowers exactly
-  // this intent to wire fields; the changed-prop set is the artifact.
-  const keys = (Object.keys(patch) as PropKey[]).filter((propKey) => patch[propKey] !== undefined);
+  let changed = false;
   for (const id of model.selected) {
     const annotation = byId[id];
     if (!annotation) continue;
@@ -62,12 +61,10 @@ export function setProps(model: Model, patch: AnnotationPropsPatch): [Model, Eff
     // Flipping them would also drop them out of `appearanceEpoch`, freezing
     // their raster forever.
     byId[id] = capsFor(annotation.subtype).opaqueBody || !otherChanged ? next : toVector(next);
-    // The link kind's target lives on its own DTO — a plain engine patch.
-    if (otherChanged || (linkChanged && annotation.subtype === 'link'))
-      fx.push({ type: 'patch', id, scope: { kind: 'props', keys } });
+    changed ||= otherChanged || linkChanged;
     if (linkIntent) fx.push({ type: 'syncLink', id, target: patch.link ?? null });
   }
-  return fx.length ? [{ ...model, byId }, fx] : [model, []];
+  return changed || fx.length ? [{ ...model, byId }, fx] : [model, []];
 }
 
 /**
@@ -75,8 +72,8 @@ export function setProps(model: Model, patch: AnnotationPropsPatch): [Model, Eff
  * path, on purpose: flags aren't appearance — members keep their render
  * `source` (a baked raster stays valid; nothing re-bakes) — and the write is
  * not gated by `locked`, because unlocking a locked annotation is the whole
- * point (Acrobat's Locked checkbox stays live). One `flags` effect per changed
- * member.
+ * point (Acrobat's Locked checkbox stays live). Each changed member writes the
+ * flags that changed.
  */
 /**
  * The actions plane's session-visibility write (Hide actions, script
@@ -94,7 +91,6 @@ export function setFlags(
 ): [Model, Effect[]] {
   const targets = ids ?? model.selected;
   if (!targets.length) return [model, []];
-  const fx: Effect[] = [];
   let byId: Model['byId'] | null = null;
   for (const id of targets) {
     const annotation = (byId ?? model.byId)[id];
@@ -103,9 +99,8 @@ export function setFlags(
     if (flagsEqual(flags, annotation.flags)) continue; // no spurious engine writes
     byId ??= { ...model.byId };
     byId[id] = { ...annotation, flags };
-    fx.push({ type: 'flags', id });
   }
-  return byId ? [{ ...model, byId }, fx] : [model, []];
+  return byId ? [{ ...model, byId }, []] : [model, []];
 }
 
 /**
@@ -139,7 +134,6 @@ export function rotateSelection(model: Model, deltaDeg: number): [Model, Effect[
     pivot = { x: union.x + union.width / 2, y: union.y + union.height / 2 };
   }
   const byId = { ...model.byId };
-  const fx: Effect[] = [];
   for (const id of ids) {
     const annotation = byId[id];
     const before = annotation.geometry;
@@ -150,9 +144,8 @@ export function rotateSelection(model: Model, deltaDeg: number): [Model, Effect[
         rotatePoint(point, pivot, deltaDeg),
       ),
     });
-    fx.push(geometryPatch(id));
   }
-  return [{ ...model, byId }, fx];
+  return [{ ...model, byId }, []];
 }
 
 /** Reset rotation on the selection to the as-authored orientation. For a
@@ -160,7 +153,7 @@ export function rotateSelection(model: Model, deltaDeg: number): [Model, Effect[
  *  as meaningful as for anyone else. */
 export function resetRotation(model: Model): [Model, Effect[]] {
   const byId = { ...model.byId };
-  const fx: Effect[] = [];
+  let turned = false;
   for (const id of model.selected) {
     const annotation = byId[id];
     if (!annotation || !annotTransformable(annotation) || geomRotation(annotation.geometry) === 0)
@@ -173,9 +166,9 @@ export function resetRotation(model: Model): [Model, Effect[]] {
         rotatePoint(point, pivot, -geomRotation(annotation.geometry)),
       ),
     });
-    fx.push(geometryPatch(id));
+    turned = true;
   }
-  return fx.length ? [{ ...model, byId }, fx] : [model, []];
+  return turned ? [{ ...model, byId }, []] : [model, []];
 }
 
 export function deleteSelection(model: Model): [Model, Effect[]] {

@@ -17,7 +17,7 @@ import {
   transformMeasurementCaption,
 } from '../measurement-shape';
 import type { Effect, Model, ModelAnnotation } from '../types';
-import { commitViewGesture, geomEqual, geometryPatch, ownGeometry, translateRect } from './changes';
+import { commitViewGesture, geomEqual, ownGeometry, translateRect } from './changes';
 import { rotateDraftDelta } from './edit';
 
 export function editUp(model: Model): [Model, Effect[]] {
@@ -41,10 +41,7 @@ export function editUp(model: Model): [Model, Effect[]] {
       },
     };
 
-    return [
-      { ...model, draft: null, byId: { ...model.byId, [updated.id]: updated } },
-      [{ type: 'patch', id: updated.id, scope: { kind: 'leader' } }],
-    ];
+    return [{ ...model, draft: null, byId: { ...model.byId, [updated.id]: updated } }, []];
   }
   if (draft.kind === 'caption') {
     const annotation = model.byId[draft.id];
@@ -68,7 +65,7 @@ export function editUp(model: Model): [Model, Effect[]] {
           },
         },
       },
-      [{ type: 'patch', id: annotation.id, scope: { kind: 'caption' } }],
+      [],
     ];
   }
   if (draft.kind === 'handle') {
@@ -88,16 +85,12 @@ export function editUp(model: Model): [Model, Effect[]] {
       }
     }
     const annotation = ownGeometry({ ...before, geometry: stored });
-    return [
-      { ...model, byId: { ...model.byId, [draft.id]: annotation }, draft: null },
-      [geometryPatch(draft.id)],
-    ];
+    return [{ ...model, byId: { ...model.byId, [draft.id]: annotation }, draft: null }, []];
   }
   if (draft.kind === 'rotate') {
     const { delta } = rotateDraftDelta(model, draft);
     if (Math.abs(delta) < 0.01) return [{ ...model, draft: null }, []];
     const byId = { ...model.byId };
-    const fx: Effect[] = [];
     for (const id of draft.ids) {
       const annotation = byId[id];
       if (!annotation) continue;
@@ -112,15 +105,13 @@ export function editUp(model: Model): [Model, Effect[]] {
         rotatePoint(point, draft.pivot, delta),
       );
       byId[id] = ownGeometry({ ...annotation, geometry: rotated, measure });
-      fx.push(geometryPatch(id));
     }
-    return [{ ...model, byId, draft: null }, fx];
+    return [{ ...model, byId, draft: null }, []];
   }
   if (draft.kind === 'group') {
     const { sx, sy } = groupResizeFactors(draft.base, draft.current);
     if (Math.abs(sx - 1) < 1e-4 && Math.abs(sy - 1) < 1e-4) return [{ ...model, draft: null }, []];
     const byId = { ...model.byId };
-    const fx: Effect[] = [];
     for (const id of draft.ids) {
       const annotation = byId[id];
       if (!annotation) continue;
@@ -132,14 +123,12 @@ export function editUp(model: Model): [Model, Effect[]] {
         y: draft.anchor.y + (point.y - draft.anchor.y) * sy,
       }));
       byId[id] = ownGeometry({ ...annotation, geometry: scaled, measure });
-      fx.push(geometryPatch(id));
     }
-    return [{ ...model, byId, draft: null }, fx];
+    return [{ ...model, byId, draft: null }, []];
   }
   if (draft.kind === 'move') {
     if (Math.hypot(draft.delta.x, draft.delta.y) < 0.01) return [{ ...model, draft: null }, []]; // a click
     const byId = { ...model.byId };
-    const fx: Effect[] = [];
     for (const id of draft.ids) {
       const annotation = byId[id];
       // A move is a rigid translation — the appearance is unchanged, so a baked
@@ -153,9 +142,8 @@ export function editUp(model: Model): [Model, Effect[]] {
         })),
         apBox: annotation.apBox ? translateRect(annotation.apBox, draft.delta) : undefined,
       };
-      fx.push({ type: 'patch', id, scope: { kind: 'geometry' } }); // a move never invalidates the raster
     }
-    return [{ ...model, byId, draft: null }, fx];
+    return [{ ...model, byId, draft: null }, []];
   }
   return [{ ...model, draft: null }, []];
 }

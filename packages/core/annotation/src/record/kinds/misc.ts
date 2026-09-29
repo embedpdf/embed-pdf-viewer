@@ -105,6 +105,12 @@ export const widget: KindProjection = {
     };
   },
   geometry: rectGeometry,
+  prop: {
+    // A widget's border has a style but no dash pattern of its own.
+    border: (annotation) => ({
+      borderStyle: annotation.style.border.kind === 'dashed' ? 'dashed' : 'solid',
+    }),
+  },
   createable: false,
 };
 

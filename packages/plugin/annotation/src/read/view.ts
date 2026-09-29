@@ -16,7 +16,11 @@ import {
   type Model,
   type ModelAnnotation,
 } from '@embedpdf/core-annotation';
-import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import {
+  applyAnnotationPatch,
+  type AnnotationDTO,
+  type AnnotationPatch,
+} from '@embedpdf/engine-core/runtime';
 
 import type { PendingChange } from '../model';
 import { fromDTO } from '@embedpdf/core-annotation';
@@ -46,6 +50,20 @@ export const authorityOf = (
 
 const NO_CHANGES: readonly PendingChange[] = [];
 
+/**
+ * A record's annotation with a pending patch applied as the engine will apply
+ * it. A patch the record no longer takes (another session changed it under
+ * the edit) is one the engine will refuse: the annotation shows as it is until
+ * that refusal drops the change.
+ */
+function patched(annotation: AnnotationDTO, patch: AnnotationPatch): AnnotationDTO {
+  try {
+    return applyAnnotationPatch(annotation, patch);
+  } catch {
+    return annotation;
+  }
+}
+
 export function createView(
   ctx: Pick<AnnotationContext, 'state' | 'doc' | 'document'>,
   records: Mirror<AnnotationRecords>,
@@ -72,9 +90,11 @@ export function createView(
   };
 
   /**
-   * A record with its pending changes applied, oldest first. Over a confirmed
-   * record it keeps the confirmed appearance version and authority: those
-   * are the engine's, and may have moved on since the changes were made.
+   * A record with its pending changes applied, oldest first: each edit's
+   * fields over the record, and its patch over the record's annotation. Over
+   * a confirmed record it keeps the confirmed appearance version and
+   * authority: those are the engine's, and may have moved on since the
+   * changes were made.
    * Cached per record while its base and changes stay the same.
    */
   const layered = new Map<
@@ -98,7 +118,11 @@ export function createView(
     }
     let annotation = base;
     for (const { change } of changes) {
-      if (change.kind === 'edit') annotation = { ...annotation, ...change.fields };
+      if (change.kind !== 'edit') continue;
+      annotation = { ...annotation, ...change.fields };
+      if (change.patch) {
+        annotation = { ...annotation, annotation: patched(annotation.annotation, change.patch) };
+      }
     }
     if (confirmed) {
       annotation = { ...annotation, apVersion: base.apVersion, authority: base.authority };

@@ -84,7 +84,19 @@ describe('distance gestures and captions', () => {
     expect(step(state, { type: 'cancel' })[0].byId.a).toBe(annotation);
     const [committed, effects] = step(state, pointer('up', at));
     expect(committed.byId.a.geometry).toBe(geom);
-    expect(effects).toEqual([{ type: 'patch', id: 'a', scope: { kind: 'caption' } }]);
+    // Only the caption is written, not the measured points.
+    expect(effects).toEqual([
+      {
+        type: 'patch',
+        id: 'a',
+        patch: {
+          subtype: 'line',
+          captionEnabled: true,
+          captionPosition: 'inline',
+          captionOffset: { along: 20, perpendicular: 30 },
+        },
+      },
+    ]);
   });
   it('keeps directed offset signs for a reversed diagonal', () => {
     const geometry: ModelGeometry = { kind: 'line', a: { x: 100, y: 100 }, b: { x: 0, y: 0 } };
@@ -180,7 +192,17 @@ describe('distance gestures and captions', () => {
       const [committed, effects] = step(state, pointer('up', point));
       expect((committed.byId.a.measure as DistanceAppearance).leader?.length).toBe(-60);
       expect(committed.byId.a.geometry).toBe(geom);
-      expect(effects).toEqual([{ type: 'patch', id: 'a', scope: { kind: 'leader' } }]);
+      // Only the leader is written, not the measured points.
+      expect(effects).toEqual([
+        {
+          type: 'patch',
+          id: 'a',
+          patch: {
+            subtype: 'line',
+            leader: (committed.byId.a.measure as DistanceAppearance).leader,
+          },
+        },
+      ]);
     },
   );
 

@@ -15,11 +15,10 @@ import { linkChildrenOf } from '@embedpdf/core-annotation';
 import {
   annotationKey,
   type AnnotationDraft,
-  type AnnotationPatch,
   type AnnotationRef,
 } from '@embedpdf/engine-core/runtime';
 
-import { toCreateDraft, toScopedPatch } from '@embedpdf/core-annotation';
+import { toCreateDraft } from '@embedpdf/core-annotation';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import type { LinkWrites } from './links';
 import { named } from './named';
@@ -103,11 +102,10 @@ export function registerEffectRunners(
     };
   });
 
-  // The part of a record the gesture changed (its geometry, or the props it restyled).
-  store.onEffect('patch', (effect, model) => {
-    const record = model.byId[effect.id];
-    const patch = record ? toScopedPatch(record, effect.scope) : null;
-    if (!record || !patch) return;
+  // What a record's change means to the engine, as the core worked it out:
+  // the same patch its pending change holds.
+  store.onEffect('patch', (effect) => {
+    const { patch } = effect;
     return {
       ids: [effect.id],
       perform: () =>
@@ -118,23 +116,6 @@ export function registerEffectRunners(
           if (linkChildrenOf(store.model(), parent).length) {
             void links.scheduleSync(parent, 'keep');
           }
-        }),
-    };
-  });
-
-  // A `/F`-only write: the full merged flags, which never change an appearance.
-  store.onEffect('flags', (effect, model) => {
-    const record = model.byId[effect.id];
-    if (!record) return;
-    const patch = {
-      subtype: record.annotation.subtype,
-      ...record.flags,
-    } as AnnotationPatch;
-    return {
-      ids: [effect.id],
-      perform: () =>
-        identity.withRef(effect.id, async (ref) => {
-          await ctx.doc.page(ref.page).annotations.update(ref, patch);
         }),
     };
   });

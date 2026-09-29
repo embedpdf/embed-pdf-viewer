@@ -10,9 +10,10 @@
  * The view (read/view.ts) lays the pending changes over the confirmed records
  * and composes the session with them into the core's `Model`.
  *
- * A pending change holds exactly what one engine write carries (a record's
- * new flags, its new geometry, its typed text), so settling one write never
- * touches other outstanding work on the same record. A refused change is
+ * A pending edit holds the engine patch its write carries (a record's new
+ * flags, its new geometry, its typed text), beside the record's new fields,
+ * so settling one write never touches other outstanding work on the same
+ * record. A refused change is
  * dropped at once: the view shows the engine's record again, never a copy
  * taken before the write. An accepted change is dropped once the confirmed
  * record holds it and every older change of that record has settled, so the
@@ -20,7 +21,7 @@
  */
 import { initialSession, sameSession } from '@embedpdf/core-annotation';
 import type { Id, ModelAnnotation, Session } from '@embedpdf/core-annotation';
-import { generateUuid } from '@embedpdf/engine-core/runtime';
+import { generateUuid, type AnnotationPatch } from '@embedpdf/engine-core/runtime';
 
 import type { AnnotationConfig, ChromeSettings, ChromeSettingsPatch, ToolGhost } from './contract';
 import type { TextSelection } from './rich-text';
@@ -29,8 +30,17 @@ import type { TextSelection } from './rich-text';
 export type RecordChange =
   /** A record this session created, not yet confirmed. */
   | { readonly kind: 'create'; readonly record: ModelAnnotation }
-  /** New values for some of a record's fields: exactly what one write carries. */
-  | { readonly kind: 'edit'; readonly fields: Partial<ModelAnnotation> }
+  /**
+   * An edit: the engine patch its write carries (none when the engine keeps
+   * nothing of it), and the record's new fields beside it. The view lays the
+   * fields over the record, and the patch over its annotation, as the engine
+   * will apply it.
+   */
+  | {
+      readonly kind: 'edit';
+      readonly patch?: AnnotationPatch;
+      readonly fields: Partial<Omit<ModelAnnotation, 'annotation'>>;
+    }
   /** The user deleted the record. */
   | { readonly kind: 'delete' };
 
@@ -118,17 +128,21 @@ export const initialAnnotationState = (config: AnnotationConfig = {}): Annotatio
 
 /* ── the session and pending changes ─────────────────────────────────────── */
 
-/** The top-level fields whose value differs between two versions of a record. */
+/**
+ * The top-level fields whose value differs between two versions of a record,
+ * its annotation aside: an edit carries that as its patch.
+ */
 export function changedFields(
   before: ModelAnnotation,
   after: ModelAnnotation,
-): Partial<ModelAnnotation> {
+): Partial<Omit<ModelAnnotation, 'annotation'>> {
   const fields: Record<string, unknown> = {};
   const keys = new Set([...Object.keys(before), ...Object.keys(after)]) as Set<
     keyof ModelAnnotation
   >;
+  keys.delete('annotation');
   for (const key of keys) if (before[key] !== after[key]) fields[key] = after[key];
-  return fields as Partial<ModelAnnotation>;
+  return fields as Partial<Omit<ModelAnnotation, 'annotation'>>;
 }
 
 /**

@@ -15,13 +15,15 @@ export function setText(model: Model, id: Id, text: string): [Model, Effect[]] {
   const record = model.byId[id];
   if (!record) return [model, []];
   // The rich projection follows plain text: body-style paragraphs, one per
-  // line break, so an editor rendering `richText` shows what was typed.
+  // line break, so an editor rendering `richText` shows what was typed; and
+  // `contents` is their plain projection, as the engine reads it back.
+  const paragraphs = paragraphsFromPlainText(text);
   const annotation =
     record.annotation.subtype === 'free-text'
       ? {
           ...record.annotation,
-          contents: text,
-          richText: { ...record.annotation.richText, paragraphs: paragraphsFromPlainText(text) },
+          contents: plainTextOf({ paragraphs }),
+          richText: { ...record.annotation.richText, paragraphs },
         }
       : { ...record.annotation, contents: text };
   const next = toVector({ ...record, annotation });

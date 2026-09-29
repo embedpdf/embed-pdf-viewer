@@ -20,10 +20,13 @@
 import { annotContentsEditable } from '../flags';
 import { expandGroups } from '../group';
 import { isSelectable } from '../hit';
-import { annotationAfter } from '../record';
+import { annotationAfter, patchBetween } from '../record';
+import type { AnnotationPatch } from '@embedpdf/engine-core/runtime';
+
 import type {
   ChangeSet,
   Effect,
+  Id,
   Message,
   Model,
   ModelAnnotation,
@@ -54,7 +57,21 @@ export const initialModel: Model = { ...initialSession, byId: {}, order: [] };
  */
 export function update(model: Model, message: Message): UpdateResult {
   const [next, effects] = transition(model, message);
-  return { session: sessionOf(next), change: changeBetween(model, next), effects };
+  const change = changeBetween(model, next);
+  return { session: sessionOf(next), change, effects: [...effects, ...writesOf(change, effects)] };
+}
+
+/**
+ * A `patch` effect for each changed record the change set has a patch for:
+ * the change is the write. Typed text is the exception; its `text` effect
+ * writes it once typing pauses.
+ */
+function writesOf(change: ChangeSet, effects: readonly Effect[]): Effect[] {
+  const typed = new Set(effects.flatMap((effect) => (effect.type === 'text' ? [effect.id] : [])));
+  return change.put.flatMap((record): Effect[] => {
+    const patch = change.patches[record.id];
+    return patch && !typed.has(record.id) ? [{ type: 'patch', id: record.id, patch }] : [];
+  });
 }
 
 /** Every session field, checked by the compiler to be exactly the fields of `Session`. */
@@ -93,25 +110,33 @@ export const sameSession = (left: Session, right: Session): boolean =>
   SESSION_KEYS.every((key) => Object.is(left[key], right[key]));
 
 /** The change set of a message that changed no record. */
-export const EMPTY_CHANGE: ChangeSet = { put: [], drop: [] };
+export const EMPTY_CHANGE: ChangeSet = { put: [], drop: [], patches: {} };
 
 /**
- * The records a transition changed, each with its annotation brought up to
- * date with the fields the transition changed (a new record already carries
- * the one it predicts). Cheap when nothing changed: `byId` keeps its identity.
+ * The records a transition changed, each with the patch its change means and
+ * its annotation brought up to date with that patch (a new record already
+ * carries the annotation it predicts). Cheap when nothing changed: `byId`
+ * keeps its identity.
  */
 function changeBetween(before: Model, after: Model): ChangeSet {
   if (before.byId === after.byId) return EMPTY_CHANGE;
   const put: ModelAnnotation[] = [];
+  const patches: Record<Id, AnnotationPatch> = {};
   for (const id of after.order) {
     const record = after.byId[id];
     const previous = before.byId[id];
     if (!record || record === previous) continue;
-    const annotation = previous ? annotationAfter(previous, record) : record.annotation;
+    if (!previous) {
+      put.push(record);
+      continue;
+    }
+    const patch = patchBetween(previous, record);
+    if (patch) patches[id] = patch;
+    const annotation = annotationAfter(previous, record, patch);
     put.push(annotation === record.annotation ? record : { ...record, annotation });
   }
   const drop = before.order.filter((id) => before.byId[id] && !after.byId[id]);
-  return put.length || drop.length ? { put, drop } : EMPTY_CHANGE;
+  return put.length || drop.length ? { put, drop, patches } : EMPTY_CHANGE;
 }
 
 function transition(model: Model, message: Message): [Model, Effect[]] {

@@ -162,9 +162,10 @@ describe('the property surface while editing', () => {
     harness.capability.beginTextEdit(REF);
     harness.capability.setTextSelection(REF, { start: 0, end: 5 });
     harness.capability.updateSelection({ bold: true, fontColor: '#ff0000' });
+    // As the engine will read it back: colours in lowercase.
     expect(harness.data().richText.paragraphs).toEqual([
       {
-        runs: [{ text: 'hello', style: { weight: 700, color: '#FF0000' } }, { text: ' world' }],
+        runs: [{ text: 'hello', style: { weight: 700, color: '#ff0000' } }, { text: ' world' }],
       },
     ]);
     expect(harness.model().byId[harness.id]!.text!.bold).toBeUndefined(); // the body is untouched

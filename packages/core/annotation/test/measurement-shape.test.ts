@@ -160,7 +160,14 @@ describe('area and perimeter authoring', () => {
     });
     expect(committed.byId.shape.geometry).toBe(geometry);
     expect(committed.byId.shape.measure).toEqual(preview.measure);
-    expect(effects).toEqual([{ type: 'patch', id: 'shape', scope: { kind: 'caption' } }]);
+    // Only the caption is written: its center, not the vertices.
+    expect(effects).toEqual([
+      {
+        type: 'patch',
+        id: 'shape',
+        patch: { subtype: 'polygon', captionEnabled: true, captionCenter: { x: 350, y: 50 } },
+      },
+    ]);
   });
 
   it.each([false, true])(

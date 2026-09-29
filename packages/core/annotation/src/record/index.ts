@@ -26,13 +26,12 @@ import {
   type AnnotationRef,
 } from '@embedpdf/engine-core/runtime';
 
-import { flagsEqual } from '../flags';
+import { FLAG_KEYS } from '../flags';
 import { geomRotation, geomVisualBounds } from '../geometry';
 import { propsFor } from '../kinds';
 import type {
   ModelAnnotation,
   ModelGeometry,
-  PatchScope,
   PropKey,
   RecordFields,
   Style,
@@ -167,40 +166,6 @@ export function toPatch(annotation: RecordFields): AnnotationPatch | null {
   return { subtype: wireSubtypeOf(annotation), ...geo, ...props } as AnnotationPatch;
 }
 
-/**
- * ModelAnnotation + a {@link PatchScope} → the sparse patch for exactly that
- * intent (the shell's `patch` effect emitter): the reducer says what changed —
- * geometry, or the props keys verbatim — and this lowers only that. Kinds
- * without editable geometry (text markup) and unlowerable keys degrade to the
- * full patch: verbose, never a dropped write.
- */
-export function toScopedPatch(annotation: RecordFields, scope: PatchScope): AnnotationPatch | null {
-  const kind = projectionOf(annotation.subtype);
-  if (scope.kind === 'caption') {
-    return annotation.measure
-      ? ({
-          subtype: wireSubtypeOf(annotation),
-          ...captionFieldsFor(annotation),
-        } as AnnotationPatch)
-      : null;
-  }
-  if (scope.kind === 'leader') {
-    return annotation.measure?.intent === 'line-dimension'
-      ? { subtype: 'line', leader: annotation.measure.leader }
-      : null;
-  }
-  if (scope.kind === 'geometry') {
-    const geo = kind.geometry(annotation);
-    return geo
-      ? ({ subtype: wireSubtypeOf(annotation), ...geo } as AnnotationPatch)
-      : toPatch(annotation);
-  }
-  const props = emitProps(annotation, scope.keys);
-  if (props === null) return toPatch(annotation);
-  if (Object.keys(props).length === 0) return null;
-  return { subtype: wireSubtypeOf(annotation), ...props } as AnnotationPatch;
-}
-
 /** ModelAnnotation → engine create draft: the full statement plus the kind's
  *  create-only extras, with the model's `/F` emitted verbatim, once, for every
  *  kind (a fresh draw carries DRAWN_FLAGS plus any tool seed). `null` for the
@@ -284,13 +249,31 @@ const sameValue = (left: unknown, right: unknown): boolean =>
 
 const endsOf = (geometry: ModelGeometry) => ('ends' in geometry ? geometry.ends : undefined);
 
+/** Whether the shape moved: its geometry other than its line endings (those are a prop). */
+const shapeMoved = (before: ModelGeometry, after: ModelGeometry): boolean =>
+  before !== after && !sameValue({ ...before, ends: undefined }, { ...after, ends: undefined });
+
+/** The fields the core wrote on the annotation itself (typed text), each value whole. */
+function annotationWrites(before: AnnotationDTO, after: AnnotationDTO): Wire {
+  const out: Wire = {};
+  if (before === after) return out;
+  const was = before as unknown as Wire;
+  for (const [name, value] of Object.entries(after)) if (value !== was[name]) out[name] = value;
+  return out;
+}
+
 /**
- * What the engine is told for the change from `before` to `after`: the
- * kind's geometry group when its geometry or measurement moved, each prop
- * whose value changed, and its flags. `null` when nothing the engine keeps
- * changed.
+ * What the change from `before` to `after` means to the engine, as `update`
+ * takes it: the fields the core wrote on the annotation itself, the kind's
+ * geometry group when its geometry moved, a measurement's caption or leader
+ * when that moved, each prop whose value changed, and each flag that changed.
+ * `null` when nothing the engine keeps changed: a record handed to live
+ * rendering, or a value set to what it was, makes no write.
  */
-function patchBetween(before: ModelAnnotation, after: ModelAnnotation): AnnotationPatch | null {
+export function patchBetween(
+  before: ModelAnnotation,
+  after: ModelAnnotation,
+): AnnotationPatch | null {
   const takes = new Set(editableKeys(after.subtype));
   const keys: PropKey[] = [];
   const compare = (key: PropKey, was: unknown, now: unknown) => {
@@ -306,27 +289,39 @@ function patchBetween(before: ModelAnnotation, after: ModelAnnotation): Annotati
   compare('icon', before.icon, after.icon);
   compare('link', before.link, after.link);
 
-  const out: Wire = {};
-  if (before.geometry !== after.geometry || before.measure !== after.measure) {
+  const out = annotationWrites(before.annotation, after.annotation);
+  if (shapeMoved(before.geometry, after.geometry)) {
     Object.assign(out, projectionOf(after.subtype).geometry(after));
   }
-  if (before.measure !== after.measure && after.measure) {
-    Object.assign(out, captionFieldsFor(after));
-    if (after.measure.intent === 'line-dimension') out.leader = after.measure.leader;
+  const measure = after.measure;
+  if (measure && before.measure !== measure) {
+    if (!sameValue(before.measure?.caption, measure.caption)) {
+      Object.assign(out, captionFieldsFor(after));
+    }
+    const leaderBefore =
+      before.measure?.intent === 'line-dimension' ? before.measure.leader : undefined;
+    if (measure.intent === 'line-dimension' && !sameValue(leaderBefore, measure.leader)) {
+      out.leader = measure.leader;
+    }
   }
   if (keys.length) Object.assign(out, emitProps(after, keys) ?? toPatch(after));
-  if (!flagsEqual(before.flags, after.flags)) Object.assign(out, after.flags);
+  for (const flag of FLAG_KEYS) {
+    if (before.flags[flag] !== after.flags[flag]) out[flag] = after.flags[flag];
+  }
   return Object.keys(out).length
     ? ({ ...out, subtype: wireSubtypeOf(after) } as AnnotationPatch)
     : null;
 }
 
 /**
- * A record's annotation after the core changed its fields: the writes those
- * changes make, applied as the engine applies them. The same annotation when
- * nothing the engine keeps changed.
+ * A record's annotation after the core changed its fields: the patch the
+ * change means (`patchBetween`), applied as the engine applies it. The same
+ * annotation when nothing the engine keeps changed.
  */
-export function annotationAfter(before: ModelAnnotation, after: ModelAnnotation): AnnotationDTO {
-  const patch = patchBetween(before, after);
-  return patch ? applyAnnotationPatch(after.annotation, patch) : after.annotation;
+export function annotationAfter(
+  before: ModelAnnotation,
+  after: ModelAnnotation,
+  patch: AnnotationPatch | null = patchBetween(before, after),
+): AnnotationDTO {
+  return patch ? applyAnnotationPatch(before.annotation, patch) : before.annotation;
 }

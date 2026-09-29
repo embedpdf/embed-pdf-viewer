@@ -51,7 +51,21 @@ describe('update', () => {
     const result = update(dragged, editPtr('up', 190, 160));
     expect(result.change.put.map((record) => record.id)).toEqual(['obj:1']);
     expect(result.change.drop).toEqual([]);
-    expect(result.effects).toEqual([{ type: 'patch', id: 'obj:1', scope: { kind: 'geometry' } }]);
+    // The change is the write: the moved square's box group, nothing else.
+    expect(result.effects).toEqual([
+      {
+        type: 'patch',
+        id: 'obj:1',
+        patch: {
+          subtype: 'square',
+          box: { x: 140, y: 130, width: 100, height: 60 },
+          rotation: null,
+        },
+      },
+    ]);
+    // The change set holds the very patch the effect writes.
+    const [write] = result.effects;
+    expect(write?.type === 'patch' && write.patch).toBe(result.change.patches['obj:1']);
     // The records it was given are untouched: the core keeps nothing.
     expect(dragged.byId['obj:1']!.geometry).toEqual(model.byId['obj:1']!.geometry);
   });
@@ -59,7 +73,7 @@ describe('update', () => {
   it('a delete drops the deleted ids and asks for the engine delete', () => {
     const model = modelWith([square('obj:1', 100)], { selected: ['obj:1'] });
     const result = update(model, { type: 'delete' });
-    expect(result.change).toEqual({ put: [], drop: ['obj:1'] });
+    expect(result.change).toEqual({ put: [], drop: ['obj:1'], patches: {} });
     expect(result.effects).toEqual([{ type: 'delete', id: 'obj:1' }]);
     expect(result.session.selected).toEqual([]);
   });
@@ -83,8 +97,12 @@ describe('update', () => {
       geometry: { kind: 'text', rect: { x: 100, y: 100, width: 100, height: 60 } },
       annotation: undefined,
     });
-    const result = update(modelWith([box]), { type: 'setText', id: 'obj:3', text: 'Hi there' });
-    expect(result.change.put[0]!.annotation.contents).toBe('Hi there');
+    const result = update(modelWith([box]), { type: 'setText', id: 'obj:3', text: 'Hi\nthere' });
+    // As the engine reads it back: one paragraph per line, joined by `\r`.
+    expect(result.change.put[0]!.annotation).toMatchObject({
+      contents: 'Hi\rthere',
+      richText: { paragraphs: [{ runs: [{ text: 'Hi' }] }, { runs: [{ text: 'there' }] }] },
+    });
     expect(result.change.put[0]!.source).toBe('vector');
     expect(result.effects).toEqual([{ type: 'text', id: 'obj:3' }]);
   });
@@ -138,11 +156,16 @@ describe('every record holds its annotation', () => {
     expect(hidden.annotation).toMatchObject({ hidden: true, print: true });
   });
 
-  it('a change the engine keeps nothing of leaves the annotation as it was', () => {
+  it('an edit that changes nothing changes nothing: no record, no write', () => {
     const model = modelWith([square('obj:1', 100)], { selected: ['obj:1'] });
     const same = update(model, { type: 'setProps', patch: { color: initialStyle.color } });
-    expect(same.change.put).toHaveLength(1);
-    expect(same.change.put[0]!.annotation).toBe(model.byId['obj:1']!.annotation);
+    expect(same.change).toBe(EMPTY_CHANGE);
+    expect(same.effects).toEqual([]);
+    // A click on the selected square: grabbed and let go where it was.
+    const [grabbed] = step(model, editPtr('down', 150, 130));
+    const click = update(grabbed, editPtr('up', 150, 130));
+    expect(click.change).toBe(EMPTY_CHANGE);
+    expect(click.effects).toEqual([]);
   });
 
   it('a replace-text strikeout replies to its caret by the caret’s name', () => {
