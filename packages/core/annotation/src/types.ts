@@ -18,7 +18,9 @@ import type {
 import type { DistanceAppearance, MeasurementAppearance } from './measurement';
 import type { ShapeMeasurementAppearance } from './measurement-shape';
 import type { BoxShape } from './shapes/box';
+import type { CaretShape } from './shapes/caret';
 import type { PointsShape } from './shapes/points';
+import type { QuadsShape } from './shapes/quads';
 import type { TextBoxShape } from './shapes/text-box';
 
 export type { Quad, QuadRing } from '@embedpdf/core-geometry';
@@ -85,10 +87,9 @@ export type Subtype =
  * polygon/polyline (poly), text markup (quads), and caret.
  */
 /**
- * The shape a gesture moves, one arm per family. The box, text box and points
- * families' arms are their own shapes, the engine's fields ({@link BoxShape},
- * {@link TextBoxShape}, {@link PointsShape}); the quads and caret arms still
- * carry the core's older names until their family moves.
+ * The shape a gesture moves, one arm per family, each the engine's own fields
+ * ({@link BoxShape}, {@link TextBoxShape}, {@link PointsShape},
+ * {@link QuadsShape}, {@link CaretShape}).
  *
  * Rotation is degrees clockwise in page space, normalized `[0,360)`, and
  * works the same way for every family that turns: the shape is kept upright
@@ -98,8 +99,8 @@ export type Subtype =
 export type ModelGeometry =
   | BoxShape // square, circle, stamp, and the kinds whose shape is their rect
   | PointsShape // line, polyline, polygon, ink
-  | { kind: 'quads'; quads: Quad[] } // highlight / underline / squiggly / strikeout
-  | { kind: 'caret'; rect: Rect; rot?: number } // caret insertion marker (rect = unrotated box; rot = its text's baseline tilt, authoring metadata — no gesture)
+  | QuadsShape // text markup, text redaction
+  | CaretShape // an insertion mark on its text
   | TextBoxShape; // free text; its text is data, rendered by the framework as an editable element
 
 /**

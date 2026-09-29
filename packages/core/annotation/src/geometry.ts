@@ -1,18 +1,13 @@
 /**
  * Pure page-space geometry, dispatched on the `ModelGeometry` union: bounds,
  * hit-testing (stroke + fill, with a configurable margin), handles (with
- * cursors), translate, handle-drag, and the dumb scene. A family that has its
- * own module (`shapes/`) answers for its arm; the rest are answered here.
- * The engine speaks page space too: the same numbers, nothing to convert.
+ * cursors), translate, handle-drag, and the dumb scene. Each family answers
+ * for its own arm (`shapes/`); what spans families lives here: the selection
+ * outline, the rotate knob, a multi-selection's resize, and upright
+ * placement. The engine speaks page space too: the same numbers, nothing to
+ * convert.
  */
-import {
-  isQuarterTurn,
-  quadCorners,
-  quadRing,
-  type PageRotation,
-  type Size,
-  type Quad,
-} from '@embedpdf/core-geometry';
+import { isQuarterTurn, type PageRotation, type Size } from '@embedpdf/core-geometry';
 import {
   DEG2RAD,
   MIN_SIZE,
@@ -20,16 +15,12 @@ import {
   RECT_CURSOR,
   RECT_HANDLES,
   type RectHandle,
-  expandRect,
   normalizeDeg,
   pointInPoly,
   rectCenter,
-  rectContains,
   rectCornerPoints,
   rectHandlePoint,
   resizeRect,
-  rotatePoint,
-  unionRect,
 } from './rect';
 import {
   boxCorners,
@@ -54,6 +45,15 @@ import {
   textBoxTranslate,
   textBoxUpright,
 } from './shapes/text-box';
+import { caretHit, caretScene } from './shapes/caret';
+import {
+  quadsBounds,
+  quadsCentroid,
+  quadsDrawnBounds,
+  quadsHit,
+  quadsScene,
+  quadsTranslate,
+} from './shapes/quads';
 import {
   drawnStrokesOf,
   pointsBounds,
@@ -70,16 +70,7 @@ import {
   pointsUpright,
   type PointsShape,
 } from './shapes/points';
-import type {
-  Border,
-  ModelGeometry,
-  Handle,
-  QuadRing,
-  Rect,
-  RenderNode,
-  TextEndAnchor,
-  Point,
-} from './types';
+import type { Border, ModelGeometry, Handle, Rect, RenderNode, Point } from './types';
 
 /** Is the geometry of the points family: a line, polyline, polygon or ink? */
 const isPoints = (geometry: ModelGeometry): geometry is PointsShape =>
@@ -104,24 +95,20 @@ export const DEFAULT_CHROME_GEOMETRY = {
   knobOffset: ROTATE_KNOB_OFFSET,
 } as const;
 
-/** A geom's applied rotation (deg), or 0 for the non-rotatable kinds. A
- *  caret's `rot` is authoring metadata (its text's baseline tilt): reported
- *  here so the renderer and selection chrome follow it, while the caret's
- *  caps (not movable/resizable) keep every rotate gesture away from it. */
+/** A geom's applied rotation (deg), or 0 for text markup. A caret's turn is
+ *  its text's baseline tilt: reported here so the renderer and selection
+ *  chrome follow it, while the caret's caps (not movable/resizable) keep
+ *  every rotate gesture away from it. */
 export function geomRotation(geometry: ModelGeometry): number {
-  if (geometry.kind === 'box' || geometry.kind === 'text-box' || isPoints(geometry))
-    return geometry.rotation;
-  if (geometry.kind === 'caret') return geometry.rot ?? 0;
-  return 0;
+  return geometry.kind === 'quads' ? 0 : geometry.rotation;
 }
 
 /** A box's centre, or the mean of a shape's points. */
 export function centroidOf(geometry: ModelGeometry): Point {
-  if (geometry.kind === 'box' || geometry.kind === 'text-box') return rectCenter(geometry.box);
-  if (geometry.kind === 'caret') return rectCenter(geometry.rect);
-  const points = isPoints(geometry)
-    ? drawnStrokesOf(geometry).flat()
-    : geometry.quads.flatMap(quadCorners);
+  if (geometry.kind === 'box' || geometry.kind === 'text-box' || geometry.kind === 'caret')
+    return rectCenter(geometry.box);
+  if (geometry.kind === 'quads') return quadsCentroid(geometry);
+  const points = drawnStrokesOf(geometry).flat();
   let sx = 0;
   let sy = 0;
   for (const point of points) {
@@ -189,13 +176,9 @@ export function geomRotateAbout(
  * Position is deliberately absent — a translation never invalidates a raster.
  */
 function apFrameSize(geometry: ModelGeometry): Size {
-  if (geometry.kind === 'box' || geometry.kind === 'text-box')
+  if (geometry.kind === 'box' || geometry.kind === 'text-box' || geometry.kind === 'caret')
     return { width: geometry.box.width, height: geometry.box.height };
-  if (geometry.kind === 'caret')
-    return { width: geometry.rect.width, height: geometry.rect.height };
-  const rect = isPoints(geometry)
-    ? pointsBounds(geometry)
-    : unionRect(geometry.quads.flatMap(quadCorners));
+  const rect = isPoints(geometry) ? pointsBounds(geometry) : quadsBounds(geometry);
   return { width: rect.width, height: rect.height };
 }
 
@@ -305,9 +288,8 @@ export function fitStampBox(center: Point, desired: Size, page: Size, rotCW: num
 export function geomResetRotation(geometry: ModelGeometry, pivot?: Point): ModelGeometry {
   const rot = geomRotation(geometry);
   if (!rot) return geometry;
-  if (geometry.kind === 'box') return { ...geometry, rotation: 0 };
+  if (geometry.kind === 'box' || geometry.kind === 'caret') return { ...geometry, rotation: 0 };
   if (geometry.kind === 'text-box') return textBoxUpright(geometry);
-  if (geometry.kind === 'caret') return { ...geometry, rot: 0 };
   if (isPoints(geometry)) return pointsUpright(geometry, pivot);
   return geometry;
 }
@@ -326,15 +308,8 @@ export function obbFromGeom(
 ): { corners: [Point, Point, Point, Point]; angle: number } | null {
   if (!isRotatableGeom(geometry)) return null;
   const rot = geomRotation(geometry);
-  if (geometry.kind === 'box' || geometry.kind === 'text-box')
+  if (geometry.kind === 'box' || geometry.kind === 'text-box' || geometry.kind === 'caret')
     return { corners: boxCorners(geometry), angle: rot };
-  if (geometry.kind === 'caret') {
-    const point = rectCenter(geometry.rect);
-    const corners = rectCornerPoints(geometry.rect).map((corner) =>
-      rotatePoint(corner, point, rot),
-    );
-    return { corners: corners as [Point, Point, Point, Point], angle: rot };
-  }
   if (isPoints(geometry))
     return { corners: pointsCorners(geometry, strokeWidth, border), angle: rot };
   return null;
@@ -404,23 +379,11 @@ export function geomScaleAbout(
   sx: number,
   sy: number,
 ): ModelGeometry {
-  const sp = (point: Point): Point => ({
-    x: anchor.x + (point.x - anchor.x) * sx,
-    y: anchor.y + (point.y - anchor.y) * sy,
-  });
-  if (geometry.kind === 'box') return boxScaleAbout(geometry, anchor, sx, sy);
+  if (geometry.kind === 'box' || geometry.kind === 'caret')
+    return boxScaleAbout(geometry, anchor, sx, sy);
   if (geometry.kind === 'text-box') return textBoxScaleAbout(geometry, anchor, sx, sy);
   if (isPoints(geometry)) return pointsScaleAbout(geometry, anchor, sx, sy);
-  if (geometry.kind === 'caret') {
-    const point = sp(rectCenter(geometry.rect));
-    const width = Math.max(MIN_SIZE, geometry.rect.width * Math.abs(sx));
-    const height = Math.max(MIN_SIZE, geometry.rect.height * Math.abs(sy));
-    return {
-      ...geometry,
-      rect: { x: point.x - width / 2, y: point.y - height / 2, width, height },
-    };
-  }
-  return geometry; // quads scale with their points
+  return geometry; // quads follow their text
 }
 
 /** Where the rotate knob sits, given the OBB corners (nw, ne, se, sw) and the
@@ -517,87 +480,6 @@ export function placeRotateKnob(
   };
 }
 
-export function caretRectFromTextEnd(lineRect: Rect): Rect {
-  const height = lineRect.height / 2;
-  const width = height;
-  const lineEndX = lineRect.x + lineRect.width;
-  return {
-    x: lineEndX - width / 2,
-    y: lineRect.y + lineRect.height / 2,
-    width,
-    height,
-  };
-}
-
-/**
- * Caret box for a text-edit anchor: half the glyph's ink height, centered on
- * the trailing baseline corner in reading direction (`advance` decides which
- * end — RTL carets land on the visual left), sitting on the baseline. The box
- * stays axis-aligned; use {@link caretGeomFromAnchor} for the tilt-carrying
- * geometry.
- */
-export function caretRectFromAnchor(anchor: TextEndAnchor): Rect {
-  const quad = anchor.glyphQuad;
-  const ink = Math.hypot(quad.lowerLeft.x - quad.upperLeft.x, quad.lowerLeft.y - quad.upperLeft.y);
-  const size = Math.max(ink / 2, 1);
-  const corner = anchor.advance > 0 ? quad.lowerRight : quad.lowerLeft;
-  return { x: corner.x - size / 2, y: corner.y - size, width: size, height: size };
-}
-
-/** Rotations closer than ~0.05° to upright stay upright (float noise guard). */
-const CARET_ROT_EPSILON = 0.05;
-
-/**
- * Caret geometry for a text-edit anchor: the box-family pair — an unrotated
- * box whose centre sits half a caret-size ascent-ward of the trailing
- * baseline corner, plus `rot` = the text's baseline tilt (deg, CW in y-down
- * page space). Rotating the box about its centre by `rot` lands it
- * hugging the rotated baseline, symbol pointing at its text. For upright
- * anchors this degenerates exactly to {@link caretRectFromAnchor} with no
- * `rot` key — the dominant case is byte-identical.
- */
-export function caretGeomFromAnchor(
-  anchor: TextEndAnchor,
-): Extract<ModelGeometry, { kind: 'caret' }> {
-  const quad = anchor.glyphQuad;
-  const ink = Math.hypot(quad.lowerLeft.x - quad.upperLeft.x, quad.lowerLeft.y - quad.upperLeft.y);
-  const size = Math.max(ink / 2, 1);
-  const corner = anchor.advance > 0 ? quad.lowerRight : quad.lowerLeft;
-  // The caret's own orientation follows the text (the symbol points at its
-  // line regardless of reading direction), so the tilt comes from the
-  // baseline edge, not from `advance`.
-  const bx = quad.lowerRight.x - quad.lowerLeft.x;
-  const by = quad.lowerRight.y - quad.lowerLeft.y;
-  const rot = Math.hypot(bx, by) > 0 ? normalizeDeg((Math.atan2(by, bx) * 180) / Math.PI) : 0;
-  const upright = rot < CARET_ROT_EPSILON || rot > 360 - CARET_ROT_EPSILON;
-  if (upright) {
-    return {
-      kind: 'caret',
-      rect: { x: corner.x - size / 2, y: corner.y - size, width: size, height: size },
-    };
-  }
-  // Centre = trailing corner + (size/2) toward the ascent side.
-  const ux = (quad.upperLeft.x - quad.lowerLeft.x) / ink;
-  const uy = (quad.upperLeft.y - quad.lowerLeft.y) / ink;
-  const cx = corner.x + (ux * size) / 2;
-  const cy = corner.y + (uy * size) / 2;
-  return {
-    kind: 'caret',
-    rect: { x: cx - size / 2, y: cy - size / 2, width: size, height: size },
-    rot,
-  };
-}
-
-/** Map a Quad's corners through a point function (names ride along). */
-function mapQuad(quad: Quad, mapPoint: (point: Point) => Point): Quad {
-  return {
-    upperLeft: mapPoint(quad.upperLeft),
-    upperRight: mapPoint(quad.upperRight),
-    lowerLeft: mapPoint(quad.lowerLeft),
-    lowerRight: mapPoint(quad.lowerRight),
-  };
-}
-
 /**
  * A geom's visual bounds: the rect that encloses the drawn appearance, so the
  * baked /AP is never clipped.
@@ -621,8 +503,8 @@ export function geomVisualBounds(
   if (geometry.kind === 'box') return boxDrawnBounds(geometry, strokeWidth, border);
   if (isPoints(geometry)) return pointsDrawnBounds(geometry, strokeWidth, border);
   if (geometry.kind === 'text-box') return textBoxDrawnBounds(geometry, strokeWidth);
-  if (geometry.kind === 'caret') return geometry.rect;
-  return expandRect(unionRect(geometry.quads.flatMap(quadCorners)), strokeWidth / 2);
+  if (geometry.kind === 'caret') return geometry.box;
+  return quadsDrawnBounds(geometry, strokeWidth);
 }
 
 /**
@@ -715,10 +597,10 @@ export function quadIntersectsRect(quad: [Point, Point, Point, Point], rect: Rec
 /* ── geom ops ─────────────────────────────────────────────────────────────── */
 
 export function geomBounds(geometry: ModelGeometry): Rect {
-  if (geometry.kind === 'box' || geometry.kind === 'text-box') return geometry.box;
-  if (geometry.kind === 'caret') return geometry.rect;
+  if (geometry.kind === 'box' || geometry.kind === 'text-box' || geometry.kind === 'caret')
+    return geometry.box;
   if (isPoints(geometry)) return pointsBounds(geometry);
-  return unionRect(geometry.quads.flatMap(quadCorners));
+  return quadsBounds(geometry);
 }
 
 /**
@@ -737,18 +619,8 @@ export function geomHit(
   if (geometry.kind === 'box') return boxHit(geometry, point, margin, filled, strokeWidth, border);
   if (geometry.kind === 'text-box') return textBoxHit(geometry, point, margin, strokeWidth);
   if (isPoints(geometry)) return pointsHit(geometry, point, margin, filled, strokeWidth);
-  // A caret is a solid hit target anywhere in its box (+ the click margin),
-  // tested in the box's own frame.
-  if (geometry.kind === 'caret') {
-    const local = geometry.rot
-      ? rotatePoint(point, rectCenter(geometry.rect), -geometry.rot)
-      : point;
-    return rectContains(expandRect(geometry.rect, margin), local);
-  }
-  // quads (markup): oriented per-line cells — hit anywhere inside any quad.
-  // Quad rings are simple (non-self-intersecting) by construction, so the
-  // generic point-in-poly test is exact for rotated text too.
-  return geometry.quads.some((quad) => pointInQuad(point, quadRing(quad)));
+  if (geometry.kind === 'caret') return caretHit(geometry, point, margin);
+  return quadsHit(geometry, point);
 }
 
 export function geomHandles(geometry: ModelGeometry): Handle[] {
@@ -759,16 +631,10 @@ export function geomHandles(geometry: ModelGeometry): Handle[] {
 }
 
 export function geomTranslate(geometry: ModelGeometry, delta: Point): ModelGeometry {
-  const mv = (vertex: Point): Point => ({ x: vertex.x + delta.x, y: vertex.y + delta.y });
-  if (geometry.kind === 'box') return boxTranslate(geometry, delta);
+  if (geometry.kind === 'box' || geometry.kind === 'caret') return boxTranslate(geometry, delta);
   if (geometry.kind === 'text-box') return textBoxTranslate(geometry, delta);
-  if (geometry.kind === 'caret')
-    return {
-      ...geometry,
-      rect: { ...geometry.rect, x: geometry.rect.x + delta.x, y: geometry.rect.y + delta.y },
-    };
   if (isPoints(geometry)) return pointsTranslate(geometry, delta);
-  return { ...geometry, quads: geometry.quads.map((quad) => mapQuad(quad, mv)) };
+  return quadsTranslate(geometry, delta);
 }
 
 export function geomDragHandle(geometry: ModelGeometry, handle: string, to: Point): ModelGeometry {
@@ -783,22 +649,8 @@ export function geomScene(geometry: ModelGeometry, strokeWidth = 0, border?: Bor
   // callout alike, so the live view paints exactly what the AP generator
   // bakes. The framework's editable element owns only the text.
   if (geometry.kind === 'text-box') return textBoxScene(geometry, strokeWidth);
-  if (geometry.kind === 'caret') {
-    const rect = geometry.rect;
-    const midX = rect.x + rect.width / 2;
-    const bottom = rect.y + rect.height;
-    const pathData = [
-      `M ${rect.x} ${bottom}`,
-      `C ${rect.x + rect.width * 0.27} ${bottom} ${midX} ${rect.y + rect.height * 0.56} ${midX} ${rect.y}`,
-      `C ${midX} ${rect.y + rect.height * 0.56} ${rect.x + rect.width * 0.73} ${bottom} ${rect.x + rect.width} ${bottom}`,
-      'Z',
-    ].join(' ');
-    return [{ kind: 'path', d: pathData }];
-  }
+  if (geometry.kind === 'caret') return caretScene(geometry);
   if (geometry.kind === 'box') return boxScene(geometry, strokeWidth, border);
   if (isPoints(geometry)) return pointsScene(geometry, strokeWidth, border);
-  // markup fallback: a closed ring per quad (upper-left round to lower-left). The scene
-  // painter renders these per-subtype; this keeps the generic scene correct
-  // regardless, rotated text included.
-  return geometry.quads.map((quad) => ({ kind: 'poly', points: quadRing(quad), closed: true }));
+  return quadsScene(geometry);
 }

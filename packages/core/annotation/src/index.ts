@@ -112,9 +112,6 @@ export {
   geomHandles,
   geomTranslate,
   geomDragHandle,
-  caretGeomFromAnchor,
-  caretRectFromAnchor,
-  caretRectFromTextEnd,
   selectionBounds,
   selectionQuad,
   turnPivotOf,
@@ -152,6 +149,14 @@ export {
   type RectHandle,
 } from './rect';
 export { readBox, writeBox, type BoxShape, type TurnedBox } from './shapes/box';
+export {
+  caretFromAnchor,
+  caretRectFromAnchor,
+  readCaret,
+  writeCaret,
+  type CaretShape,
+} from './shapes/caret';
+export { readQuads, type QuadsShape } from './shapes/quads';
 export {
   MITER_LIMIT,
   drawnStrokesOf,

@@ -165,7 +165,7 @@ const rectRing = (rect: Rect): [Point, Point, Point, Point] => [
 function redactRegions(geometry: ModelGeometry): RedactRegion[] {
   if (geometry.kind === 'quads') {
     const out: RedactRegion[] = [];
-    for (const quad of geometry.quads) {
+    for (const quad of geometry.quadPoints) {
       const bounds = quadBounds(quad);
       if (bounds.width > 0 && bounds.height > 0) out.push({ ring: quadRing(quad), bounds });
     }
@@ -268,7 +268,7 @@ export function scene(item: RenderItem): SceneNode[] {
     return distanceScene(item.geometry, item.measure, item.style);
   if (item.subtype === 'redact') return redactScene(item);
   if (item.geometry.kind === 'quads')
-    return markupScene(item.subtype, item.geometry.quads, item.style);
+    return markupScene(item.subtype, item.geometry.quadPoints, item.style);
   if (item.geometry.kind === 'caret') {
     return geomScene(item.geometry).map((node) => ({
       ...node,

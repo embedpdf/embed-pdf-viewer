@@ -356,7 +356,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
   // will become (same `scene()` paint as the committed annotation).
   const quads = model.preview?.byPage[pageObjectNumber];
   if (model.preview && quads?.length) {
-    const geometry: ModelGeometry = { kind: 'quads', quads };
+    const geometry: ModelGeometry = { kind: 'quads', quadPoints: quads };
     items.push({
       id: PREVIEW_ID,
       ref: null,

@@ -329,7 +329,7 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
     // markup quads are bound to page text — no screen anchoring for them.
     const quads: ModelGeometry = {
       kind: 'quads',
-      quads: [quadFromRect({ x: 0, y: 0, width: 10, height: 5 })],
+      quadPoints: [quadFromRect({ x: 0, y: 0, width: 10, height: 5 })],
     };
     expect(anchoredGeom(quads, { zoom: true, upright: true }, { zoom: 2, rotation: 0 })).toBe(
       quads,

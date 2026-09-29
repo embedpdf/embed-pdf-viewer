@@ -16,8 +16,6 @@ import {
   geomTranslate,
   geomDragHandle,
   selectionBounds,
-  caretGeomFromAnchor,
-  caretRectFromAnchor,
   centroidOf,
   geomRotation,
   geomRotateAbout,
@@ -35,6 +33,7 @@ import {
   apSizeChanged,
 } from '../src/geometry';
 import { normalizeDeg, rotatedAabb, rotatedHandleCursor } from '../src/rect';
+import { caretFromAnchor, caretRectFromAnchor } from '../src/shapes/caret';
 import { calloutEnd, calloutShape, textPlateInset } from '../src/shapes/text-box';
 import { expandGroups, groupKeyOf, groupMembers } from '../src/group';
 import { cursorAt, groupUnionBounds, hitTest, paintOrder } from '../src/hit';
@@ -467,14 +466,15 @@ describe('annotation-core', () => {
     expect(creationDraftAnchor(model)).toBeNull();
   });
 
-  it('caretGeomFromAnchor: upright anchors stay byte-identical, rotated carry rot', () => {
+  it('caretFromAnchor: upright anchors are the upright caret box, turned text turns it', () => {
     const upright = {
       glyphQuad: quadFromRect({ x: 90, y: 40, width: 10, height: 20 }),
       advance: 1 as const,
     };
-    expect(caretGeomFromAnchor(upright)).toEqual({
+    expect(caretFromAnchor(upright)).toEqual({
       kind: 'caret',
-      rect: caretRectFromAnchor(upright),
+      box: caretRectFromAnchor(upright),
+      rotation: 0,
     });
 
     // 90°-CCW column in page space: baseline runs up-screen (lowerLeft
@@ -488,23 +488,23 @@ describe('annotation-core', () => {
       },
       advance: 1 as const,
     };
-    const geometry = caretGeomFromAnchor(rotated);
-    expect(geometry.rot).toBeCloseTo(270, 5); // up-screen, CW-positive convention
+    const geometry = caretFromAnchor(rotated);
+    expect(geometry.rotation).toBeCloseTo(270, 5); // up-screen, CW-positive convention
     // ink = 12 → size 6; centre = trailing corner (100,56) + 3·ascent(−1,0).
-    expect(geometry.rect.x).toBeCloseTo(94, 5);
-    expect(geometry.rect.y).toBeCloseTo(53, 5);
-    expect(geometry.rect.width).toBe(6);
-    expect(geometry.rect.height).toBe(6);
+    expect(geometry.box.x).toBeCloseTo(94, 5);
+    expect(geometry.box.y).toBeCloseTo(53, 5);
+    expect(geometry.box.width).toBe(6);
+    expect(geometry.box.height).toBe(6);
 
     // RTL anchors place at the start corner; the tilt still follows the text.
     const rtl = { glyphQuad: rotated.glyphQuad, advance: -1 as const };
-    const rtlGeom = caretGeomFromAnchor(rtl);
-    expect(rtlGeom.rot).toBeCloseTo(270, 5);
-    expect(rtlGeom.rect.y).toBeCloseTo(77, 5); // centred off lowerLeft (100,80)
+    const rtlGeom = caretFromAnchor(rtl);
+    expect(rtlGeom.rotation).toBeCloseTo(270, 5);
+    expect(rtlGeom.box.y).toBeCloseTo(77, 5); // centred off lowerLeft (100,80)
   });
 
   it('a tilted caret draws oriented chrome (obb) with no rotate knob or handles', () => {
-    // The 90°-CCW column anchor from above: caretGeomFromAnchor yields rot 270.
+    // The 90°-CCW column anchor from above: caretFromAnchor turns it 270.
     const anchor = {
       glyphQuad: {
         upperLeft: { x: 88, y: 80 },
@@ -518,7 +518,7 @@ describe('annotation-core', () => {
     const annotation = model.byId[model.order[0]];
     expect(fieldsOf(annotation).geometry).toMatchObject({
       kind: 'caret',
-      rot: expect.closeTo(270, 5),
+      rotation: expect.closeTo(270, 5),
     });
 
     // Create auto-selects; oriented chrome follows the geometry, not the caps…
@@ -548,8 +548,8 @@ describe('annotation-core', () => {
   it('obbFromGeom/geomResetRotation treat the caret as a box-family geom', () => {
     const geometry: ModelGeometry = {
       kind: 'caret',
-      rect: { x: 94, y: 53, width: 6, height: 6 },
-      rot: 270,
+      box: { x: 94, y: 53, width: 6, height: 6 },
+      rotation: 270,
     };
     const obb = obbFromGeom(geometry, 0)!;
     expect(obb.angle).toBe(270);
@@ -571,7 +571,7 @@ describe('annotation-core', () => {
         { x: 94, y: 59 },
       ]),
     );
-    expect(geomResetRotation(geometry)).toEqual({ ...geometry, rot: 0 });
+    expect(geomResetRotation(geometry)).toEqual({ ...geometry, rotation: 0 });
   });
 
   it('creates a caret at the trailing edge of the boundary glyph', () => {
@@ -585,7 +585,7 @@ describe('annotation-core', () => {
     const annotation = model.byId[model.order[0]];
     expect(fieldsOf(annotation)).toMatchObject({
       subtype: 'caret',
-      geometry: { kind: 'caret', rect: { x: 95, y: 50, width: 10, height: 10 } },
+      geometry: { kind: 'caret', box: { x: 95, y: 50, width: 10, height: 10 }, rotation: 0 },
       source: 'vector',
     });
     expect(model.selected).toEqual([annotation.id]);
@@ -1162,7 +1162,7 @@ describe('annotation-core', () => {
   it('scene() paints markup per subtype in the core (no framework logic): highlight fills+multiply, squiggly strokes a path', () => {
     const quads: ModelGeometry = {
       kind: 'quads',
-      quads: [quadFromRect({ x: 0, y: 0, width: 100, height: 12 })],
+      quadPoints: [quadFromRect({ x: 0, y: 0, width: 100, height: 12 })],
     };
     const mk = (subtype: string): RenderItem => ({
       id: 'x',
@@ -1504,7 +1504,7 @@ describe('annotation-core', () => {
       subtype: 'highlight',
       geometry: {
         kind: 'quads',
-        quads: [quadFromRect({ x: 10, y: 10, width: 80, height: 20 })],
+        quadPoints: [quadFromRect({ x: 10, y: 10, width: 80, height: 20 })],
       },
       style: {
         color: '#ffcc00',
@@ -1699,7 +1699,7 @@ describe('annotation-core', () => {
       subtype: 'highlight',
       geometry: {
         kind: 'quads',
-        quads: [quadFromRect({ x: 0, y: 0, width: 100, height: 100 })],
+        quadPoints: [quadFromRect({ x: 0, y: 0, width: 100, height: 100 })],
       },
       style: {
         color: '#ffcc00',
@@ -2706,7 +2706,7 @@ describe('annotation-core — selectionAnchor carries the knob alongside a centr
   it('a non-rotatable selection (highlight) exposes a box but NO knob', () => {
     const hi = square(
       's2',
-      { kind: 'quads', quads: [quadFromRect({ x: 10, y: 10, width: 80, height: 12 })] },
+      { kind: 'quads', quadPoints: [quadFromRect({ x: 10, y: 10, width: 80, height: 12 })] },
       'highlight',
     );
     const base = modelWith([hi]);
@@ -4438,7 +4438,7 @@ describe('conversation plane — replies and review states never reach the page'
   const reply = annotation('reply', { subtype: 'text', geometry: at(100, 10), irt: 'root' });
   const subordinate = annotation('sub', {
     subtype: 'caret',
-    geometry: { kind: 'caret', rect: { x: 200, y: 10, width: 40, height: 30 } },
+    geometry: { kind: 'caret', box: { x: 200, y: 10, width: 40, height: 30 }, rotation: 0 },
     irt: 'root',
     group: 'root',
   });

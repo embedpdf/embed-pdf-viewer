@@ -32,7 +32,7 @@ const takesLink = (subtype: string): boolean =>
  * `/QuadPoints` (tier 2).
  */
 export function linkChildRects(annotation: RecordFields): Rect[] {
-  if (annotation.geometry.kind === 'quads') return annotation.geometry.quads.map(quadBounds);
+  if (annotation.geometry.kind === 'quads') return annotation.geometry.quadPoints.map(quadBounds);
   return [
     unionRect(
       selectionQuad(annotation.geometry, annotation.style.strokeWidth, annotation.style.border),

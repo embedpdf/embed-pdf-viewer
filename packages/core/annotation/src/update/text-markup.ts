@@ -6,7 +6,7 @@
 import type { AnnotationFlags, PageRef } from '@embedpdf/engine-core/runtime';
 
 import { DRAWN_FLAGS } from '../flags';
-import { caretGeomFromAnchor } from '../geometry';
+import { caretFromAnchor } from '../shapes/caret';
 import type { Effect, Model, Subtype, TextEndAnchor, Quad } from '../types';
 import { newRecord } from './changes';
 import { toolStyleOf } from './session';
@@ -40,7 +40,7 @@ export function createMarkup(
   const annotation = newRecord(model, {
     page,
     subtype,
-    geometry: { kind: 'quads', quads },
+    geometry: { kind: 'quads', quadPoints: quads },
     style: toolStyleOf(model, subtype, preset).style,
     flags: { ...DRAWN_FLAGS, ...flags },
   });
@@ -79,7 +79,7 @@ export function createReplaceText(
     page,
     subtype: 'caret',
     intent: 'replace',
-    geometry: caretGeomFromAnchor(anchor),
+    geometry: caretFromAnchor(anchor),
     style,
     flags: DRAWN_FLAGS,
   });
@@ -90,7 +90,7 @@ export function createReplaceText(
       page,
       subtype: 'strikeout',
       intent: 'strikeout-text-edit',
-      geometry: { kind: 'quads', quads },
+      geometry: { kind: 'quads', quadPoints: quads },
       style,
       flags: DRAWN_FLAGS,
       irt: primaryId,
@@ -119,8 +119,8 @@ export function createCaret(
   anchor: TextEndAnchor,
   flags?: Partial<AnnotationFlags>,
 ): [Model, Effect[]] {
-  const caretGeom = caretGeomFromAnchor(anchor);
-  if (caretGeom.rect.width <= 0 || caretGeom.rect.height <= 0) return [model, []];
+  const caretGeom = caretFromAnchor(anchor);
+  if (caretGeom.box.width <= 0 || caretGeom.box.height <= 0) return [model, []];
   const annotation = newRecord(model, {
     page,
     subtype: 'caret',

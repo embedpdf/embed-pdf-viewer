@@ -108,7 +108,7 @@ describe('redact scene', () => {
         hovered: true,
         geometry: {
           kind: 'quads',
-          quads: [
+          quadPoints: [
             quadFromRect({ x: 0, y: 0, width: 50, height: 10 }),
             quadFromRect({ x: 0, y: 14, width: 30, height: 10 }),
           ],

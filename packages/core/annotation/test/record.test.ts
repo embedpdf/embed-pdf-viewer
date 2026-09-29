@@ -228,7 +228,7 @@ describe('record — Replace Text authoring', () => {
       page: toPageRef(1),
       subtype: 'caret',
       intent: 'replace',
-      geometry: { kind: 'caret', rect: { x: 90, y: 40, width: 10, height: 10 } },
+      geometry: { kind: 'caret', box: { x: 90, y: 40, width: 10, height: 10 }, rotation: 0 },
       style,
       flags: DRAWN_FLAGS,
       source: 'vector',
@@ -241,7 +241,7 @@ describe('record — Replace Text authoring', () => {
       intent: 'strikeout-text-edit',
       geometry: {
         kind: 'quads',
-        quads: [quadFromRect({ x: 10, y: 20, width: 80, height: 15 })],
+        quadPoints: [quadFromRect({ x: 10, y: 20, width: 80, height: 15 })],
       },
       style,
       flags: DRAWN_FLAGS,
@@ -269,7 +269,7 @@ describe('record — Replace Text authoring', () => {
       ref: null,
       page: toPageRef(1),
       subtype: 'caret',
-      geometry: { kind: 'caret', rect: { x: 94, y: 53, width: 6, height: 6 }, rot: 270 },
+      geometry: { kind: 'caret', box: { x: 94, y: 53, width: 6, height: 6 }, rotation: 270 },
       style,
       flags: DRAWN_FLAGS,
       source: 'vector',
@@ -287,7 +287,7 @@ describe('record — Replace Text authoring', () => {
     if (caretGeometry.kind !== 'caret') throw new Error('Expected caret projection');
     const upright: RecordFields = {
       ...fieldsOf(caret),
-      geometry: { kind: 'caret', rect: caretGeometry.rect },
+      geometry: { kind: 'caret', box: caretGeometry.box, rotation: 0 },
     };
     // Tri-state flatten: upright carets state null so a stale turn can't linger.
     expect(draftToFile(toCreateDraft(upright))).toMatchObject({ rotation: null });
@@ -1026,7 +1026,7 @@ describe('record — attached links (fold + desired state + link kind mapping)',
       subtype: 'highlight',
       geometry: {
         kind: 'quads',
-        quads: [
+        quadPoints: [
           quadFromRect({ x: 0, y: 0, width: 50, height: 10 }),
           quadFromRect({ x: 0, y: 20, width: 30, height: 10 }),
         ],
@@ -1091,9 +1091,9 @@ describe('record — every field a kind takes writes only fields its engine kind
       case 'squiggly':
       case 'strikeout':
       case 'redact':
-        return { kind: 'quads', quads: [quadFromRect(box)] };
+        return { kind: 'quads', quadPoints: [quadFromRect(box)] };
       case 'caret':
-        return { kind: 'caret', rect: box };
+        return { kind: 'caret', box: box, rotation: 0 };
       default:
         return { kind: 'box', box: box, rotation: 0, ellipse: subtype === 'circle' };
     }

@@ -1,21 +1,24 @@
 /**
- * The quad-bound kinds: text markup (highlight/underline/squiggly/strikeout),
- * caret, and redact. Their `/QuadPoints` are text-anchored — set at create and
- * never patched — so markup and text-redact have no editable geometry (the
- * full projection is their geometry fallback). A caret is box-like and moves
- * by its `box`; an area redaction is a box family kind, moved by its `rect`.
+ * The text-bound kinds: text markup (highlight/underline/squiggly/strikeout),
+ * caret, and redact. Their shapes are read by their families
+ * (`shapes/quads.ts`, `shapes/caret.ts`, and `shapes/box.ts` for an area
+ * redaction). Quads are set at create and never patched, so markup and text
+ * redaction have no editable geometry (the full projection is their geometry
+ * fallback). A caret is written as its `box` and turn; an area redaction
+ * moves by its `rect`.
  */
 import type { AnnotationDTO, PageBox, PageQuad } from '@embedpdf/engine-core/runtime';
 
 import { readBox } from '../../shapes/box';
+import { readCaret, writeCaret } from '../../shapes/caret';
+import { readQuads } from '../../shapes/quads';
 import type { ModelGeometry, RecordFields } from '../../types';
 import type { KindProjection } from '../projection';
-import { boxGeomFields } from '../seam';
 import { boxGeometry } from './box';
 
-/** Content quads as the engine's `quadPoints`; null off quads geom. */
+/** A record's quads, as the engine's `quadPoints`; null off the quads family. */
 export function quadPointsFor(annotation: RecordFields): PageQuad[] | null {
-  return annotation.geometry.kind === 'quads' ? annotation.geometry.quads : null;
+  return annotation.geometry.kind === 'quads' ? annotation.geometry.quadPoints : null;
 }
 
 /** The box around a set of quads — the `rect` a quad-bearing draft must carry alongside its quads. */
@@ -38,7 +41,7 @@ const markupProjection = (subtype: 'highlight' | 'underline' | 'squiggly' | 'str
     ingest: (dto) => {
       const markupDto = dto as Extract<AnnotationDTO, { subtype: typeof subtype }>;
       return {
-        geometry: { kind: 'quads', quads: markupDto.quadPoints },
+        geometry: readQuads(markupDto),
         ...(subtype === 'strikeout' && 'intent' in markupDto && markupDto.intent
           ? { intent: markupDto.intent }
           : {}),
@@ -68,22 +71,13 @@ export const strikeout = markupProjection('strikeout');
 export const caret: KindProjection = {
   ingest: (dto) => {
     const caretDto = dto as Extract<AnnotationDTO, { subtype: 'caret' }>;
-    // A box kind: the model's `rect` is its box and `rot` its turn — the
-    // free-text/shape rule.
-    const rot = caretDto.rotation ?? 0;
     return {
-      geometry: {
-        kind: 'caret',
-        rect: caretDto.box,
-        ...(rot ? { rot } : {}),
-      },
+      geometry: readCaret(caretDto),
       ...(caretDto.intent ? { intent: caretDto.intent } : {}),
     };
   },
   geometry: (annotation) =>
-    annotation.geometry.kind === 'caret'
-      ? boxGeomFields(annotation.geometry.rect, annotation.geometry.rot ?? 0)
-      : null,
+    annotation.geometry.kind === 'caret' ? writeCaret(annotation.geometry) : null,
   // The replace-text intent + seeded contents are create-only statements.
   draftExtras: (annotation) => ({
     ...(annotation.intent === 'replace' ? { intent: annotation.intent } : {}),
@@ -100,9 +94,7 @@ export const redact: KindProjection = {
     // (`/Rect` is the removal region per ISO 32000-2), so its geometry is a
     // box and it moves/resizes like a shape.
     const geometry: ModelGeometry =
-      redactDto.quadPoints.length > 0
-        ? { kind: 'quads', quads: redactDto.quadPoints }
-        : readBox(redactDto);
+      redactDto.quadPoints.length > 0 ? readQuads(redactDto) : readBox(redactDto);
     return {
       geometry,
       // The label is `/DA`-styled exactly like free text; `fontSize` 0 means
