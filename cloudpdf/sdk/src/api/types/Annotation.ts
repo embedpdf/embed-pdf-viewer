@@ -1534,14 +1534,16 @@ export namespace Annotation {
         fontFamily: string;
         fontSize: number;
         textAlign: AnnotationFreeText.TextAlign;
+        verticalAlign: AnnotationFreeText.VerticalAlign;
         richText: AnnotationFreeText.RichText;
         color: string;
-        fontColor: string | null;
+        fontColor: string;
         interiorColor: string | null;
         opacity: number;
         strokeWidth: number;
         borderStyle: AnnotationFreeText.BorderStyle;
         dashArray: number[] | null;
+        cloudyIntensity: number | null;
         calloutLine: unknown[] | null;
         lineEnding: AnnotationFreeText.LineEnding | null;
     }
@@ -1615,14 +1617,22 @@ export namespace Annotation {
         export const Intent = {
             FreeText: "free-text",
             FreeTextCallout: "free-text-callout",
+            FreeTextTypewriter: "free-text-typewriter",
         } as const;
         export type Intent = (typeof Intent)[keyof typeof Intent];
         export const TextAlign = {
             Left: "left",
             Center: "center",
             Right: "right",
+            Justify: "justify",
         } as const;
         export type TextAlign = (typeof TextAlign)[keyof typeof TextAlign];
+        export const VerticalAlign = {
+            Top: "top",
+            Middle: "middle",
+            Bottom: "bottom",
+        } as const;
+        export type VerticalAlign = (typeof VerticalAlign)[keyof typeof VerticalAlign];
 
         export interface RichText {
             body: RichText.Body;
@@ -1936,6 +1946,7 @@ export namespace Annotation {
         color: string;
         opacity: number;
         icon: AnnotationText.Icon;
+        open: boolean;
         state: string | null;
         stateModel: string | null;
     }
