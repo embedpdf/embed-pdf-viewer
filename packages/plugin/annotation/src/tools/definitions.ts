@@ -22,11 +22,7 @@ import type {
 import type {
   AnnotationDraft,
   BinarySource,
-  InkIntent,
-  LineDimensionCaption,
-  LineLeader,
   RichTextBody,
-  ShapeDimensionCaption,
   WidgetAppearance,
 } from '@embedpdf/engine-core/runtime';
 
@@ -107,6 +103,10 @@ const LINE_FIELDS = [
   'dashArray',
   'lineEndings',
 ] as const;
+/** A distance's measurement fields: its intent, caption and leader. */
+const DISTANCE_FIELDS = ['intent', 'captionEnabled', 'captionPosition', 'leader'] as const;
+/** A perimeter's or area's: its intent and whether its caption shows. */
+const SHAPE_DIMENSION_FIELDS = ['intent', 'captionEnabled'] as const;
 const FREE_TEXT_FIELDS = [
   'fontFamily',
   'fontSize',
@@ -138,10 +138,10 @@ const WIDGET_TEXT_FIELDS = [
 export const TOOL_DEFAULT_FIELDS = {
   square: SHAPE_FIELDS,
   circle: SHAPE_FIELDS,
-  line: LINE_FIELDS,
-  polygon: SHAPE_FIELDS,
-  polyline: LINE_FIELDS,
-  ink: ['color', 'opacity', 'strokeWidth', 'blendMode'],
+  line: [...LINE_FIELDS, ...DISTANCE_FIELDS],
+  polygon: [...SHAPE_FIELDS, ...SHAPE_DIMENSION_FIELDS],
+  polyline: [...LINE_FIELDS, ...SHAPE_DIMENSION_FIELDS],
+  ink: ['color', 'opacity', 'strokeWidth', 'blendMode', 'intent'],
   'free-text': FREE_TEXT_FIELDS,
   'free-text-callout': [...FREE_TEXT_FIELDS, 'lineEnding'],
   highlight: ['color', 'opacity', 'blendMode'],
@@ -236,22 +236,6 @@ export interface AnnotationToolDef<K extends ToolAuthoringKind = ToolAuthoringKi
       : never;
   /** What a committed text selection authors. Omit for pointer/click tools. */
   selection?: SelectionAuthoring;
-  /** PDF `/IT` authored by an intent-bearing ink preset. */
-  intent?: K extends 'ink'
-    ? InkIntent
-    : K extends 'line'
-      ? 'line-dimension'
-      : K extends 'polygon'
-        ? 'polygon-dimension'
-        : K extends 'polyline'
-          ? 'polyline-dimension'
-          : never;
-  /** Caption defaults for a measurement preset. Shape centers use absolute PDF coordinates. */
-  measurement?: K extends 'line'
-    ? { caption: LineDimensionCaption; leader?: LineLeader }
-    : K extends 'polygon' | 'polyline'
-      ? { caption: ShapeDimensionCaption }
-      : never;
   /** Ink-only stroke grouping and straightening policy. */
   ink?: K extends 'ink' ? InkAuthoringOptions : never;
   /**
@@ -353,8 +337,6 @@ export interface ResolvedTool {
   flags?: Partial<AnnotationFlags>;
   source?: StampSourceSpec;
   selection?: SelectionAuthoring;
-  intent?: InkIntent | 'line-dimension' | 'polyline-dimension' | 'polygon-dimension';
-  measurement?: { caption: LineDimensionCaption | ShapeDimensionCaption; leader?: LineLeader };
   ink?: InkAuthoringOptions;
   /** Counter-rotate creations against the page's display rotation (see
    *  {@link AnnotationToolDef.upright}). */
@@ -422,11 +404,13 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
   {
     id: 'distance',
     extends: 'line',
-    intent: 'line-dimension',
     clickCreate: false,
-    defaults: { strokeWidth: 1, lineEndings: { start: 'closed-arrow', end: 'closed-arrow' } },
-    measurement: {
-      caption: { enabled: true, position: 'inline' },
+    defaults: {
+      intent: 'line-dimension',
+      strokeWidth: 1,
+      lineEndings: { start: 'closed-arrow', end: 'closed-arrow' },
+      captionEnabled: true,
+      captionPosition: 'inline',
       leader: { length: 12, extension: 5, offset: 0 },
     },
   },
@@ -455,16 +439,17 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
   {
     id: 'perimeter',
     extends: 'polyline',
-    intent: 'polyline-dimension',
-    defaults: { strokeWidth: 1, lineEndings: { start: 'none', end: 'none' } },
-    measurement: { caption: { enabled: true } },
+    defaults: {
+      intent: 'polyline-dimension',
+      strokeWidth: 1,
+      lineEndings: { start: 'none', end: 'none' },
+      captionEnabled: true,
+    },
   },
   {
     id: 'area',
     extends: 'polygon',
-    intent: 'polygon-dimension',
-    defaults: { strokeWidth: 1 },
-    measurement: { caption: { enabled: true } },
+    defaults: { intent: 'polygon-dimension', strokeWidth: 1, captionEnabled: true },
   },
   {
     id: 'ink',
@@ -477,8 +462,7 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
   {
     id: 'ink-highlight',
     extends: 'ink',
-    intent: 'ink-highlight',
-    defaults: { color: '#ffcd45', strokeWidth: 14, blendMode: 'multiply' },
+    defaults: { intent: 'ink-highlight', color: '#ffcd45', strokeWidth: 14, blendMode: 'multiply' },
     ink: {
       straighten: { deviationThreshold: 0.15, axisSnapDegrees: 15 },
     },
@@ -711,8 +695,6 @@ export function buildToolRegistry(
       flags: base?.flags || definition.flags ? { ...base?.flags, ...definition.flags } : undefined,
       source: definition.source ?? base?.source,
       selection: definition.selection ?? base?.selection,
-      intent: definition.intent ?? base?.intent,
-      measurement: definition.measurement ?? base?.measurement,
       ink: base?.ink || definition.ink ? { ...base?.ink, ...definition.ink } : undefined,
       upright: definition.upright ?? base?.upright ?? false,
       clickCreate: definition.clickCreate ?? base?.clickCreate ?? false,

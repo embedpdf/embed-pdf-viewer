@@ -5,12 +5,7 @@
  */
 import { anchorModeOf, unanchoredGeom } from '../anchor';
 import { geomRotateAbout, geomScaleAbout, geomTranslate, groupResizeFactors } from '../geometry';
-import { rotatePoint } from '../rect';
-import {
-  moveMeasurementCaption,
-  shapeMeasurementReadout,
-  transformMeasurementCaption,
-} from '../measurement-shape';
+import { moveMeasurementCaption, shapeMeasurementReadout } from '../measurement-shape';
 import { fieldsOf, withFields } from '../record';
 import type { Effect, Model } from '../types';
 import { commitViewGesture, geomEqual, ownGeometry, translateRect } from './changes';
@@ -30,10 +25,7 @@ export function editUp(model: Model): [Model, Effect[]] {
       {
         measure: {
           ...measure,
-          leader: {
-            ...measure.leader,
-            length: (measure.leader?.length ?? 0) + draft.delta,
-          },
+          leader: { ...measure.leader, length: (measure.leader?.length ?? 0) + draft.delta },
         },
       },
     );
@@ -45,11 +37,10 @@ export function editUp(model: Model): [Model, Effect[]] {
     const fields = annotation && fieldsOf(annotation);
     if (!fields?.measure || (!draft.delta.x && !draft.delta.y))
       return [{ ...model, draft: null }, []];
+    // A distance's caption offset, or a perimeter's or area's caption center.
     const moved = withFields(
       { ...annotation!, source: 'vector' },
-      {
-        measure: moveMeasurementCaption(fields.geometry, fields.measure, draft.delta, fields.style),
-      },
+      moveMeasurementCaption(fields.geometry, fields.measure, draft.delta, fields.style),
     );
     return [{ ...model, draft: null, byId: { ...model.byId, [moved.id]: moved } }, []];
   }
@@ -83,14 +74,12 @@ export function editUp(model: Model): [Model, Effect[]] {
       // rotation re-bakes the appearance → live (vector) render + patch. The
       // gesture composed in view space (`effGeom`); the commit replays the
       // same composition and unprojects — a screen-anchored member's authored
-      // tilt turns WYSIWYG, exactly as previewed.
+      // tilt turns WYSIWYG, exactly as previewed. A measurement's caption
+      // center turns with its shape.
       const rotated = commitViewGesture(annotation, draft.view, (geometry) =>
         geomRotateAbout(geometry, draft.pivot, delta),
       );
-      const measure = transformMeasurementCaption(fieldsOf(annotation).measure, (point) =>
-        rotatePoint(point, draft.pivot, delta),
-      );
-      byId[id] = ownGeometry(withFields(annotation, { geometry: rotated, measure }));
+      byId[id] = ownGeometry(withFields(annotation, { geometry: rotated }));
     }
     return [{ ...model, byId, draft: null }, []];
   }
@@ -104,11 +93,7 @@ export function editUp(model: Model): [Model, Effect[]] {
       const scaled = commitViewGesture(annotation, draft.view, (geometry) =>
         geomScaleAbout(geometry, draft.anchor, sx, sy),
       );
-      const measure = transformMeasurementCaption(fieldsOf(annotation).measure, (point) => ({
-        x: draft.anchor.x + (point.x - draft.anchor.x) * sx,
-        y: draft.anchor.y + (point.y - draft.anchor.y) * sy,
-      }));
-      byId[id] = ownGeometry(withFields(annotation, { geometry: scaled, measure }));
+      byId[id] = ownGeometry(withFields(annotation, { geometry: scaled }));
     }
     return [{ ...model, byId, draft: null }, []];
   }
@@ -117,7 +102,7 @@ export function editUp(model: Model): [Model, Effect[]] {
     const byId = { ...model.byId };
     for (const id of draft.ids) {
       const annotation = byId[id];
-      const { geometry, measure } = fieldsOf(annotation);
+      const { geometry } = fieldsOf(annotation);
       // A move is a rigid translation — the appearance is unchanged, so a baked
       // annotation stays baked and its raster box rides along. Source preserved.
       byId[id] = withFields(
@@ -125,13 +110,7 @@ export function editUp(model: Model): [Model, Effect[]] {
           ...annotation,
           apBox: annotation.apBox ? translateRect(annotation.apBox, draft.delta) : undefined,
         },
-        {
-          geometry: geomTranslate(geometry, draft.delta),
-          measure: transformMeasurementCaption(measure, (point) => ({
-            x: point.x + draft.delta.x,
-            y: point.y + draft.delta.y,
-          })),
-        },
+        { geometry: geomTranslate(geometry, draft.delta) },
       );
     }
     return [{ ...model, byId, draft: null }, []];

@@ -20,11 +20,9 @@ import {
   mergeFlags,
 } from '../flags';
 import { geomResetRotation, geomRotateAbout, geomRotation } from '../geometry';
-import { rotatePoint } from '../rect';
 import { groupUnionBounds } from '../hit';
 import { capsFor, fieldsFor } from '../kinds';
 import { linkChildrenOf } from '../links';
-import { transformMeasurementCaption } from '../measurement-shape';
 import { kindTakesLink } from '../props';
 import { fieldsOf, withFields } from '../record';
 import { annotationTurnPivot } from '../selection';
@@ -200,14 +198,9 @@ export function rotateSelection(model: Model, deltaDeg: number): [Model, Effect[
   const byId = { ...model.byId };
   for (const id of ids) {
     const annotation = byId[id];
-    const { geometry, measure } = fieldsOf(annotation);
+    const { geometry } = fieldsOf(annotation);
     byId[id] = ownGeometry(
-      withFields(annotation, {
-        geometry: geomRotateAbout(geometry, pivot, deltaDeg),
-        measure: transformMeasurementCaption(measure, (point) =>
-          rotatePoint(point, pivot, deltaDeg),
-        ),
-      }),
+      withFields(annotation, { geometry: geomRotateAbout(geometry, pivot, deltaDeg) }),
     );
   }
   return [{ ...model, byId }, []];
@@ -222,15 +215,11 @@ export function resetRotation(model: Model): [Model, Effect[]] {
   for (const id of model.selected) {
     const annotation = byId[id];
     if (!annotation || !annotTransformable(annotation)) continue;
-    const { geometry, measure } = fieldsOf(annotation);
-    const turn = geomRotation(geometry);
-    if (turn === 0) continue;
+    const { geometry } = fieldsOf(annotation);
+    if (geomRotation(geometry) === 0) continue;
     const pivot = annotationTurnPivot(annotation);
     byId[id] = ownGeometry(
-      withFields(annotation, {
-        geometry: geomResetRotation(geometry, pivot),
-        measure: transformMeasurementCaption(measure, (point) => rotatePoint(point, pivot, -turn)),
-      }),
+      withFields(annotation, { geometry: geomResetRotation(geometry, pivot) }),
     );
     turned = true;
   }

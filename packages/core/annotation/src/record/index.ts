@@ -347,16 +347,10 @@ function patchFor(before: RecordFields, after: RecordFields): AnnotationPatch | 
   if (shapeMoved(before.geometry, after.geometry)) {
     Object.assign(out, projectionOf(after.subtype).geometry(after));
   }
-  const measure = after.measure;
-  if (measure && before.measure !== measure) {
-    if (!sameValue(before.measure?.caption, measure.caption)) {
-      Object.assign(out, captionFieldsFor(after));
-    }
-    const leaderBefore =
-      before.measure?.intent === 'line-dimension' ? before.measure.leader : undefined;
-    if (measure.intent === 'line-dimension' && !sameValue(leaderBefore, measure.leader)) {
-      out.leader = measure.leader;
-    }
+  // A measurement's caption and leader, as it has them: the write carries what
+  // changed. Its label is the engine's.
+  if (after.measure && before.measure !== after.measure) {
+    Object.assign(out, captionFieldsFor(after));
   }
   if (keys.length) Object.assign(out, emitProps(after, keys) ?? toPatch(after));
   for (const flag of FLAG_KEYS) {

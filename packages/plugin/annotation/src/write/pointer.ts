@@ -1,10 +1,16 @@
-import type { MeasurementAppearance, Subtype, Point } from '@embedpdf/core-annotation';
+import {
+  defaultsFor,
+  type MeasurementAppearance,
+  type Subtype,
+  type Point,
+} from '@embedpdf/core-annotation';
 import type { PageRotation } from '@embedpdf/core-geometry';
 import {
   isDimension,
   isReadout,
   measurementReadout,
   viewportForPoint,
+  type LineLeader,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
 import { ActionsToken as PublicActionsToken } from '@embedpdf/plugin-actions/contract';
@@ -122,7 +128,10 @@ export function createPointer(
         (draft?.kind === 'create-distance' || draft?.kind === 'create-poly') &&
         draft.page.pageObjectNumber === pageObjectNumber &&
         draft.preset === (resolvedTool?.preset ?? tool);
-      const dimension = resolvedTool && isDimension(resolvedTool);
+      // A tool's intent, caption and leader are among its defaults (the user's changes included).
+      const own = resolvedTool ? defaultsFor(store.model(), resolvedTool.preset) : {};
+      const intent = own.intent as string | undefined;
+      const dimension = resolvedTool && isDimension({ subtype: resolvedTool.subtype, intent });
       if (
         dimension &&
         phase === 'down' &&
@@ -133,17 +142,26 @@ export function createPointer(
       }
       const viewport =
         laidOut && cache?.viewports ? viewportForPoint(cache.viewports, point) : undefined;
+      const scale = viewport ? (viewport.measure ?? null) : cache?.fallback;
+      const captionEnabled = (own.captionEnabled as boolean | null | undefined) ?? true;
       const measure: MeasurementAppearance | undefined =
         dimension && laidOut && cache
-          ? {
-              intent: resolvedTool.intent as MeasurementAppearance['intent'],
-              measure: viewport ? (viewport.measure ?? null) : cache.fallback,
-              caption: resolvedTool.measurement?.caption ?? { enabled: true },
-              ...(resolvedTool.intent === 'line-dimension'
-                ? { leader: resolvedTool.measurement?.leader }
-                : {}),
-              text: '',
-            }
+          ? intent === 'line-dimension'
+            ? {
+                intent,
+                measure: scale ?? null,
+                captionEnabled,
+                captionPosition: (own.captionPosition as 'inline' | 'top' | undefined) ?? 'inline',
+                captionOffset: null,
+                leader: (own.leader as LineLeader | undefined) ?? null,
+                contents: '',
+              }
+            : {
+                intent: intent as 'polyline-dimension' | 'polygon-dimension',
+                measure: scale ?? null,
+                captionEnabled,
+                contents: '',
+              }
           : undefined;
       // Resolve the scale at the first point. Subsequent points retain the
       // draft's snapshot, even when the pointer crosses another viewport.
@@ -173,7 +191,7 @@ export function createPointer(
         phase,
         subtype: resolvedTool?.subtype ?? (tool as Subtype),
         preset: resolvedTool?.preset ?? tool,
-        intent: resolvedTool?.intent === 'ink-highlight' ? resolvedTool.intent : undefined,
+        intent: intent === 'ink-highlight' ? intent : undefined,
         clickCreate: resolvedTool?.clickCreate,
         flags: resolvedTool?.flags,
         deferInkCommit: (resolvedTool?.ink?.groupStrokesMs ?? 0) > 0,

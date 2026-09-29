@@ -9,7 +9,6 @@ import { distanceHandles, distanceLayout } from './measurement';
 import {
   measurementLayout,
   moveMeasurementCaption,
-  transformMeasurementCaption,
   shapeMeasurementReadout,
 } from './measurement-shape';
 import {
@@ -74,7 +73,7 @@ function effMeasure(model: Model, id: Id) {
 
   if (draft.kind === 'caption' && draft.id === id) {
     const { geometry, style } = fieldsOf(annotation);
-    return moveMeasurementCaption(geometry, measure, draft.delta, style);
+    return moveMeasurementCaption(geometry, measure, draft.delta, style).measure;
   }
 
   if (draft.kind === 'leader' && draft.id === id && measure.intent === 'line-dimension') {
@@ -87,24 +86,6 @@ function effMeasure(model: Model, id: Id) {
     };
   }
 
-  if (draft.kind === 'move' && draft.ids.includes(id)) {
-    return transformMeasurementCaption(measure, (point) => ({
-      x: point.x + draft.delta.x,
-      y: point.y + draft.delta.y,
-    }));
-  }
-  if (draft.kind === 'rotate' && draft.ids.includes(id)) {
-    return transformMeasurementCaption(measure, (point) =>
-      rotatePoint(point, draft.pivot, rotateDraftDelta(model, draft).delta),
-    );
-  }
-  if (draft.kind === 'group' && draft.ids.includes(id)) {
-    const { sx, sy } = groupResizeFactors(draft.base, draft.current);
-    return transformMeasurementCaption(measure, (point) => ({
-      x: draft.anchor.x + (point.x - draft.anchor.x) * sx,
-      y: draft.anchor.y + (point.y - draft.anchor.y) * sy,
-    }));
-  }
   return measure;
 }
 
@@ -126,6 +107,13 @@ function effGeom(model: Model, id: Id, view: ViewEnv | undefined): ModelGeometry
     if (draft.kind === 'move' && draft.ids.includes(id))
       return geomTranslate(geometry, draft.delta);
     if (draft.kind === 'handle' && draft.id === id) return draft.current; // already view space
+    if (draft.kind === 'caption' && draft.id === id) {
+      // A perimeter's or area's caption center is its shape's.
+      const { measure, style } = fieldsOf(annotation);
+      return measure
+        ? moveMeasurementCaption(geometry, measure, draft.delta, style).geometry
+        : geometry;
+    }
     if (draft.kind === 'rotate' && draft.ids.includes(id)) {
       // The same snapped angle rule the commit uses (see `rotateDraftDelta`).
       return geomRotateAbout(geometry, draft.pivot, rotateDraftDelta(model, draft).delta);

@@ -13,20 +13,18 @@ export function createMeasuring(
   const { annotation } = siblings;
 
   /**
-   * The measurement's engine draft: the tool's current style and its caption
-   * and leader, the dimension intent, and the page's scale. The engine works
-   * out the label from the points and the scale.
+   * The measurement's engine draft: the tool's current defaults (style,
+   * caption and leader), the dimension intent, and the page's scale. The
+   * engine works out the label from the points and the scale.
    */
   const draftOf = (input: CreateMeasurementInput, tool: string): AnnotationDraft | Error => {
     const style = annotation.getToolDefaults(tool);
-    const measurement = annotation.getResolvedTool(tool)?.measurement;
-    const caption = measurement?.caption;
     const shared = {
       color: style.color,
       strokeWidth: style.strokeWidth,
       opacity: style.opacity,
       measure: scaleOf(input.page).measure,
-      captionEnabled: caption?.enabled ?? true,
+      captionEnabled: style.captionEnabled ?? true,
     };
     switch (input.kind) {
       case 'distance': {
@@ -46,9 +44,8 @@ export function createMeasuring(
           // The arrowheads fill with the line's color unless the tool sets a fill.
           interiorColor: style.interiorColor ?? style.color,
           ...shared,
-          captionPosition:
-            caption && 'position' in caption ? (caption.position ?? 'inline') : 'inline',
-          ...(measurement?.leader ? { leader: measurement.leader } : {}),
+          captionPosition: style.captionPosition ?? 'inline',
+          ...(style.leader ? { leader: style.leader } : {}),
         } as AnnotationDraft;
       }
       case 'perimeter':

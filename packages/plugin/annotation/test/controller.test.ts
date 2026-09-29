@@ -1107,6 +1107,7 @@ describe.each([
 describe('distance authoring and recalibration', () => {
   it('uses the viewport at the first point, retaining that snapshot throughout the drag', async () => {
     const harness = createHarness();
+    harness.seedToolDefaults();
     const { measureFromKnownLength } = await import('@embedpdf/engine-core/runtime');
     const fallback = measureFromKnownLength(100, { value: 1, unit: 'm' });
     const region = measureFromKnownLength(100, { value: 10, unit: 'ft' });
@@ -1146,12 +1147,13 @@ describe('distance authoring and recalibration', () => {
       expect.objectContaining({
         intent: 'line-dimension',
         measure: region,
-        contents: '20.00 ft',
         captionEnabled: true,
         captionPosition: 'inline',
         leader: { length: 12, extension: 5, offset: 0 },
       }),
     );
+    // The label is the engine's: it works it out from the points and the scale.
+    expect(harness.create.mock.calls[0]![0]).not.toHaveProperty('contents');
     await vi.waitFor(() => expect(harness.capability.get(ref(71))).toBeTruthy());
     expect(harness.capability.listPageItems(PAGE)[0].source).toBe('vector');
     expect(harness.capability.getAppearanceEpoch(PAGE)).toBe('');
@@ -1162,6 +1164,7 @@ describe('distance authoring and recalibration', () => {
   });
   it('does not create over a winning foreign viewport or before viewport hydration', async () => {
     const harness = createHarness();
+    harness.seedToolDefaults();
     const { measureFromRatio } = await import('@embedpdf/engine-core/runtime');
     harness.capability.createPointer('distance', 'down', PAGE, { x: 20, y: 20 });
     expect(harness.model().draft).toBeNull();
@@ -1241,6 +1244,7 @@ describe('distance authoring and recalibration', () => {
 describe.each(['area', 'perimeter'])('%s scale resolution', (tool) => {
   it('freezes the first viewport through multiple vertices and writes shape caption defaults', async () => {
     const harness = createHarness();
+    harness.seedToolDefaults();
     const { measureFromKnownLength } = await import('@embedpdf/engine-core/runtime');
     const region = measureFromKnownLength(100, { value: 10, unit: 'm' });
     const fallback = measureFromKnownLength(100, { value: 1, unit: 'm' });
@@ -1281,13 +1285,10 @@ describe.each(['area', 'perimeter'])('%s scale resolution', (tool) => {
     harness.capability.createPointer(tool, 'down', PAGE, { x: 220, y: 120 });
     harness.capability.finishCreationDraft();
     expect(harness.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        subtype,
-        measure: region,
-        captionEnabled: true,
-        contents: tool === 'area' ? '100.00 m²' : '30.00 m',
-      }),
+      expect.objectContaining({ subtype, measure: region, captionEnabled: true }),
     );
+    // The label is the engine's: it works it out from the points and the scale.
+    expect(harness.create.mock.calls[0]![0]).not.toHaveProperty('contents');
     await vi.waitFor(() => expect(harness.capability.get(ref(75))).toBeTruthy());
     expect(harness.capability.listPageItems(PAGE)[0].source).toBe('vector');
     expect(harness.capability.getAppearanceEpoch(PAGE)).toBe('');
@@ -1295,6 +1296,7 @@ describe.each(['area', 'perimeter'])('%s scale resolution', (tool) => {
 
   it('rejects unhydrated, foreign and unauthorized creation without starting a draft', async () => {
     const harness = createHarness();
+    harness.seedToolDefaults();
     const { measureFromRatio } = await import('@embedpdf/engine-core/runtime');
     harness.capability.createPointer(tool, 'down', PAGE, { x: 20, y: 20 });
     expect(harness.model().draft).toBeNull();

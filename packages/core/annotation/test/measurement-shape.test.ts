@@ -8,12 +8,11 @@ import { pointInPoly, rotatePoint } from '../src/rect';
 import { hitTest } from '../src/hit';
 import {
   automaticShapeCaptionCenter,
-  shapeCaptionPoint,
   shapeMeasurementLayout,
   shapeMeasurementReadout,
-  withShapeCaptionPoint,
   type ShapeMeasurementAppearance,
 } from '../src/measurement-shape';
+import type { PolyShape } from '../src/shapes/points';
 import { scene } from '../src/scene';
 import { annotationSelectionFrame } from '../src/selection';
 import type { ModelAnnotation, ModelGeometry, Model, Message, Point } from '../src/types';
@@ -25,8 +24,8 @@ const PAGE = toPageRef(1);
 const appearance: ShapeMeasurementAppearance = {
   intent: 'polygon-dimension',
   measure: measureFromKnownLength(100, { value: 2, unit: 'm' }),
-  caption: { enabled: true },
-  text: '',
+  captionEnabled: true,
+  contents: '',
 };
 const points = [
   { x: 100, y: 100 },
@@ -34,9 +33,11 @@ const points = [
   { x: 300, y: 200 },
   { x: 100, y: 200 },
 ];
-const geometry: ModelGeometry = { kind: 'poly', closed: true, vertices: points, rotation: 0 };
+const geometry: PolyShape = { kind: 'poly', closed: true, vertices: points, rotation: 0 };
+/** The shape with a manually placed caption: its center, upright with the vertices. */
+const withCenter = (center: Point): PolyShape => ({ ...geometry, captionCenter: center });
 
-function annotation(measure = appearance, geom = geometry): ModelAnnotation {
+function annotation(measure = appearance, geom: ModelGeometry = geometry): ModelAnnotation {
   return record({
     id: 'shape',
     ref: null,
@@ -102,7 +103,10 @@ describe('area and perimeter authoring', () => {
     expect(effects).toMatchObject([{ type: 'create' }]);
     const created = committed.byId[committed.order[0]];
     expect(fieldsOf(created).geometry).toMatchObject({ closed, vertices: points.slice(0, 3) });
-    expect(fieldsOf(created).measure).toEqual({ ...measure, text: closed ? '4.00 m²' : '6.00 m' });
+    expect(fieldsOf(created).measure).toEqual({
+      ...measure,
+      contents: closed ? '4.00 m²' : '6.00 m',
+    });
     expect(created.source).toBe('vector');
   });
 
@@ -147,19 +151,18 @@ describe('area and perimeter authoring', () => {
     model = pointer(model, 'move', { x: center.x + 150, y: center.y - 100 });
     const preview = pageItems(model, PAGE)[0];
     expect(preview.source).toBe('vector');
-    expect(preview.measure?.caption).toEqual({ enabled: true, center: { x: 350, y: 50 } });
-    expect(withoutLabel(fieldsOf(step(model, { type: 'cancel' })[0].byId.shape).measure)).toEqual(
-      withoutLabel(appearance),
-    );
+    expect(preview.geometry).toMatchObject({ captionCenter: { x: 350, y: 50 } });
+    expect(fieldsOf(step(model, { type: 'cancel' })[0].byId.shape).geometry).toEqual({
+      ...geometry,
+      captionCenter: null,
+    });
     const [committed, effects] = step(model, {
       type: 'editPointer',
       phase: 'up',
       in: { page: toPageRef(1), point: center, shift: false },
     });
-    expect(fieldsOf(committed.byId.shape).geometry).toEqual(geometry);
-    expect(withoutLabel(fieldsOf(committed.byId.shape).measure)).toEqual(
-      withoutLabel(preview.measure),
-    );
+    expect(fieldsOf(committed.byId.shape).geometry).toEqual(withCenter({ x: 350, y: 50 }));
+    expect(withoutLabel(fieldsOf(committed.byId.shape).measure)).toEqual(withoutLabel(appearance));
     // Only the caption is written: its center, not the vertices.
     expect(effects).toEqual([
       {
@@ -173,11 +176,11 @@ describe('area and perimeter authoring', () => {
   it.each([false, true])(
     'turns the shape and its caption about the middle of its points, manual=%s',
     (manual) => {
-      const measure = manual ? withShapeCaptionPoint(appearance, { x: 420, y: 80 }) : appearance;
-      const initial = selected(annotation(measure));
+      const shape = manual ? withCenter({ x: 420, y: 80 }) : geometry;
+      const initial = selected(annotation(appearance, shape));
       const frame = annotationSelectionFrame(initial.byId.shape);
       const pivot = turnPivotOf(fieldsOf(initial.byId.shape).geometry);
-      const caption = shapeMeasurementLayout(geometry, measure, STYLE)!.caption!;
+      const caption = shapeMeasurementLayout(shape, appearance, STYLE)!.caption!;
       const knob = chrome(initial, PAGE).find((node) => node.kind === 'rotate-knob');
       if (knob?.kind !== 'rotate-knob') throw new Error('Missing rotation knob');
       const armed = pointer(initial, 'down', knob.at);
@@ -207,20 +210,16 @@ describe('area and perimeter authoring', () => {
   );
 
   it('keeps a manually placed label fixed during vertex edits and moves it with the whole shape', () => {
-    const measure = withShapeCaptionPoint(appearance, { x: 420, y: 80 });
-    const original = selected(annotation(measure));
+    const original = selected(annotation(appearance, withCenter({ x: 420, y: 80 })));
     let model = pointer(original, 'down', points[0]);
     model = pointer(model, 'move', { x: 80, y: 90 });
     model = pointer(model, 'up', { x: 80, y: 90 });
-    expect(withoutLabel(fieldsOf(model.byId.shape).measure)).toEqual(withoutLabel(measure));
+    expect(fieldsOf(model.byId.shape).geometry).toMatchObject({ captionCenter: { x: 420, y: 80 } });
     model = pointer(model, 'down', { x: 200, y: 150 });
     model = pointer(model, 'move', { x: 220, y: 175 });
     model = pointer(model, 'up', { x: 220, y: 175 });
-    expect(
-      shapeCaptionPoint(fieldsOf(model.byId.shape).measure as ShapeMeasurementAppearance),
-    ).toEqual({
-      x: 440,
-      y: 105,
+    expect(fieldsOf(model.byId.shape).geometry).toMatchObject({
+      captionCenter: { x: 440, y: 105 },
     });
   });
 
@@ -262,8 +261,7 @@ describe('area and perimeter authoring', () => {
   });
 
   it('scales a manual caption with its group and commits the released preview', () => {
-    const measure = withShapeCaptionPoint(appearance, { x: 420, y: 80 });
-    const first = annotation(measure);
+    const first = annotation(appearance, withCenter({ x: 420, y: 80 }));
     const second = {
       ...annotation(appearance, geomTranslate(geometry, { x: 400, y: 0 })),
       id: 'second',
@@ -285,13 +283,13 @@ describe('area and perimeter authoring', () => {
     model = pointer(model, 'move', target);
     if (model.draft?.kind !== 'group') throw new Error('Missing group resize');
     const draft = model.draft;
-    const center = shapeCaptionPoint(measure)!;
+    const center = { x: 420, y: 80 };
     const expected = {
       x: draft.anchor.x + (center.x - draft.anchor.x) * (draft.current.width / draft.base.width),
       y: draft.anchor.y + (center.y - draft.anchor.y) * (draft.current.height / draft.base.height),
     };
     const preview = pageItems(model, PAGE).find((item) => item.id === 'shape')!;
-    expectPoint(shapeCaptionPoint(preview.measure as ShapeMeasurementAppearance)!, expected);
+    expectPoint((preview.geometry as PolyShape).captionCenter!, expected);
     const committed = pointer(model, 'up', target);
     expect(withoutLabel(fieldsOf(committed.byId.shape).measure)).toEqual(
       withoutLabel(preview.measure),

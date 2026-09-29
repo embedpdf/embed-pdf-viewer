@@ -11,6 +11,10 @@
  * and straightening one clears it. A dragged vertex lands where it was
  * dropped: the drawn points change and the upright ones follow, turned back
  * as the engine turns them.
+ *
+ * A polygon or polyline measurement's caption center is kept as the engine
+ * keeps it, upright with the vertices: a move or a scale carries it along, a
+ * turn turns it with the drawing, and a dragged vertex leaves it where it is.
  */
 import {
   pagePointTurned,
@@ -51,6 +55,8 @@ export interface PolyShape {
   vertices: Point[];
   closed: boolean;
   lineEndings?: LineEndings;
+  /** A measurement's caption center, upright with the vertices; `null` places it automatically. */
+  captionCenter?: Point | null;
   /** Degrees clockwise about the middle of the box around the upright points; 0 when upright. */
   rotation: number;
 }
@@ -88,10 +94,21 @@ export function readPoints(annotation: PointsAnnotation): PointsShape {
         vertices: annotation.vertices,
         closed: false,
         ...(annotation.lineEndings ? { lineEndings: annotation.lineEndings } : {}),
+        ...(annotation.captionCenter !== undefined
+          ? { captionCenter: annotation.captionCenter }
+          : {}),
         rotation,
       };
     case 'polygon':
-      return { kind: 'poly', vertices: annotation.vertices, closed: true, rotation };
+      return {
+        kind: 'poly',
+        vertices: annotation.vertices,
+        closed: true,
+        ...(annotation.captionCenter !== undefined
+          ? { captionCenter: annotation.captionCenter }
+          : {}),
+        rotation,
+      };
     case 'ink':
       return { kind: 'ink', inkList: annotation.inkList, rotation };
   }
@@ -105,7 +122,12 @@ export function readPoints(annotation: PointsAnnotation): PointsShape {
 export function writePoints(shape: PointsShape) {
   const rotation = shape.rotation || null;
   if (shape.kind === 'line') return { linePoints: shape.linePoints, rotation };
-  if (shape.kind === 'poly') return { vertices: shape.vertices, rotation };
+  if (shape.kind === 'poly')
+    return {
+      vertices: shape.vertices,
+      ...(shape.captionCenter !== undefined ? { captionCenter: shape.captionCenter } : {}),
+      rotation,
+    };
   return { inkList: shape.inkList, rotation };
 }
 
@@ -126,9 +148,32 @@ function withUprightStrokes<S extends PointsShape>(shape: S, strokes: Point[][])
   return { ...shape, inkList: strokes };
 }
 
+/** The shape with every upright point, a caption center included, moved by `map`. */
+function mapUpright<S extends PointsShape>(shape: S, map: (point: Point) => Point): S {
+  const moved = withUprightStrokes(
+    shape,
+    uprightStrokesOf(shape).map((stroke) => stroke.map(map)),
+  );
+  return moved.kind === 'poly' && moved.captionCenter
+    ? { ...moved, captionCenter: map(moved.captionCenter) }
+    : moved;
+}
+
 /** The turn that draws the upright points, or `undefined` upright. */
 const turnOf = (shape: PointsShape): PagePointTurn | undefined =>
   shape.rotation ? pageTurnOfUpright(uprightStrokesOf(shape).flat(), shape.rotation) : undefined;
+
+/** Where an upright `point` of the shape (a caption center) is drawn. */
+export function drawnPointOf(shape: PointsShape, point: Point): Point {
+  const turn = turnOf(shape);
+  return turn ? pagePointTurned(point, turn) : point;
+}
+
+/** The upright point of the shape that is drawn at `point`. */
+export function uprightPointOf(shape: PointsShape, point: Point): Point {
+  const turn = turnOf(shape);
+  return turn ? pagePointUnturned(point, turn) : point;
+}
 
 const drawn = new WeakMap<PointsShape, Point[][]>();
 
@@ -168,11 +213,7 @@ export const pointsBounds = (shape: PointsShape): Rect => unionRect(drawnStrokes
 /** The shape moved by `delta`. */
 export function pointsTranslate<S extends PointsShape>(shape: S, delta: Point): S {
   if (!delta.x && !delta.y) return shape;
-  const move = (point: Point): Point => ({ x: point.x + delta.x, y: point.y + delta.y });
-  return withUprightStrokes(
-    shape,
-    uprightStrokesOf(shape).map((stroke) => stroke.map(move)),
-  );
+  return mapUpright(shape, (point) => ({ x: point.x + delta.x, y: point.y + delta.y }));
 }
 
 /** Moves smaller than this are float noise from a turn about the shape's own middle. */
@@ -212,14 +253,10 @@ export function pointsScaleAbout<S extends PointsShape>(
   const middle = shape.rotation
     ? { x: anchor.x + (about.x - anchor.x) * sx, y: anchor.y + (about.y - anchor.y) * sy }
     : anchor;
-  const scale = (point: Point): Point => ({
+  return mapUpright(shape, (point) => ({
     x: middle.x + (point.x - about.x) * sx,
     y: middle.y + (point.y - about.y) * sy,
-  });
-  return withUprightStrokes(
-    shape,
-    uprightStrokesOf(shape).map((stroke) => stroke.map(scale)),
-  );
+  }));
 }
 
 /** The shape straightened: turned back about `pivot` (its own middle by default). */

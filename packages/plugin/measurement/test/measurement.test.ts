@@ -58,12 +58,9 @@ function harness(
       strokeWidth: 1,
       opacity: 1,
       lineEndings: { start: 'closed-arrow', end: 'closed-arrow' },
-    }),
-    getResolvedTool: () => ({
-      measurement: {
-        caption: { enabled: true, position: 'inline' },
-        leader: { length: 12, extension: 5, offset: 0 },
-      },
+      captionEnabled: true,
+      captionPosition: 'inline',
+      leader: { length: 12, extension: 5, offset: 0 },
     }),
     create: vi.fn(async () => ({
       annotation: { ref: { kind: 'objectNumber', annotObjectNumber: 9, page: PAGE } },

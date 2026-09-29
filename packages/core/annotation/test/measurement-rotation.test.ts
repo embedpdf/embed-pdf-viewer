@@ -18,9 +18,11 @@ const PAGE = toPageRef(1);
 const appearance: DistanceAppearance = {
   intent: 'line-dimension',
   measure: null,
-  text: '6.90 m',
+  contents: '6.90 m',
   leader: { length: -120, extension: 5 },
-  caption: { enabled: true, offset: { along: 70, perpendicular: -50 } },
+  captionEnabled: true,
+  captionPosition: 'inline',
+  captionOffset: { along: 70, perpendicular: -50 },
 };
 
 function measurement(overrides: Partial<RecordInput> = {}): ModelAnnotation {
@@ -85,7 +87,7 @@ describe('measurement selection frame and rotation', () => {
     {
       name: 'top caption',
       annotation: measurement({
-        measure: { ...appearance, caption: { enabled: true, position: 'top' } },
+        measure: { ...appearance, captionPosition: 'top', captionOffset: null },
       }),
     },
     {
@@ -96,7 +98,7 @@ describe('measurement selection frame and rotation', () => {
           linePoints: { start: { x: 140, y: 180 }, end: { x: 170, y: 180 } },
           rotation: 0,
         },
-        measure: { ...appearance, caption: { enabled: true } },
+        measure: { ...appearance, captionOffset: null },
       }),
     },
   ];

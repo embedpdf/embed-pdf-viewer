@@ -1,9 +1,5 @@
 import { isReadout, measurementReadout } from '@embedpdf/engine-core/runtime';
-import type {
-  LineDimensionCaption,
-  LineLeader,
-  PdfMeasurement,
-} from '@embedpdf/engine-core/runtime';
+import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 import { endingNodes, endingNodesHit, endingPoints } from './endings';
 import { DISTANCE_CAPTION_SIZE as CAPTION_SIZE, distanceCaptionWidth } from './measurement-font';
 import { geomRotation, selectionQuad } from './geometry';
@@ -24,17 +20,19 @@ import type { ShapeMeasurementAppearance } from './measurement-shape';
 
 export type MeasurementAppearance = DistanceAppearance | ShapeMeasurementAppearance;
 
+type LineAnnotation = Extract<AnnotationDTO, { subtype: 'line' }>;
+
 /**
- * A distance annotation's render projection. Offsets stay in directed PDF line
- * axes.
+ * A distance's measurement: the engine's own fields for its scale, its
+ * caption (on or off, its position, and its offset in the line's own axes),
+ * its leader and its label (`contents`, which the engine works out).
  */
-export interface DistanceAppearance {
-  intent: 'line-dimension';
-  measure: PdfMeasurement | null;
-  caption: LineDimensionCaption;
-  leader?: LineLeader;
-  text: string;
-}
+export type DistanceAppearance = { intent: 'line-dimension' } & Pick<
+  LineAnnotation,
+  'measure' | 'captionEnabled' | 'captionPosition' | 'captionOffset' | 'leader' | 'contents'
+>;
+
+type CaptionOffset = DistanceAppearance['captionOffset'];
 
 export interface DistanceSegment {
   from: Point;
@@ -99,7 +97,7 @@ function lineAxes(start: Point, end: Point) {
 
 export function distanceLabel(geometry: ModelGeometry, appearance: DistanceAppearance): string {
   if (geometry.kind !== 'line') {
-    return appearance.text;
+    return appearance.contents ?? '';
   }
 
   const readout = measurementReadout({
@@ -109,7 +107,7 @@ export function distanceLabel(geometry: ModelGeometry, appearance: DistanceAppea
     linePoints: geometry.linePoints,
   });
 
-  return isReadout(readout) ? readout.label : appearance.text;
+  return isReadout(readout) ? readout.label : (appearance.contents ?? '');
 }
 
 function captionQuad(
@@ -135,7 +133,7 @@ function captionConnector(
   caption: DistanceCaptionLayout,
   along: Point,
   normal: Point,
-  offset: LineDimensionCaption['offset'],
+  offset: CaptionOffset,
 ): DistanceSegment[] {
   if (!offset || (offset.along === 0 && offset.perpendicular === 0)) {
     return [];
@@ -171,7 +169,7 @@ function dimensionSegments(
   normal: Point,
   length: number,
   caption: DistanceCaptionLayout | null,
-  position: LineDimensionCaption['position'],
+  position: DistanceAppearance['captionPosition'],
   outside: boolean,
   strokeWidth: number,
 ): DistanceSegment[] {
@@ -225,7 +223,7 @@ export function distanceLayout(
   const midpoint = offsetPoint(dimensionStart, along, length / 2);
   const text = distanceLabel(geometry, appearance);
   const width = distanceCaptionWidth(text);
-  const hasCaption = appearance.caption.enabled && text.length > 0;
+  const hasCaption = !!appearance.captionEnabled && text.length > 0;
   // A documented fit policy, constrained by the Acrobat 1.75 m / 2.01 m cases.
   const outside = hasCaption && width + 2 * CAPTION_PADDING + ARROW_RESERVE * strokeWidth > length;
 
@@ -234,11 +232,11 @@ export function distanceLayout(
     const reversed = along.x < 0 || (along.x === 0 && along.y > 0);
     const textAlong = reversed ? { x: -along.x, y: -along.y } : along;
     const textNormal = { x: textAlong.y, y: -textAlong.x };
-    const offset = appearance.caption.offset;
+    const offset = appearance.captionOffset;
     let center = offsetPoint(midpoint, along, offset?.along ?? 0);
     center = offsetPoint(center, normal, offset?.perpendicular ?? 0);
 
-    if (appearance.caption.position === 'top' || outside) {
+    if (appearance.captionPosition === 'top' || outside) {
       const side = outside && leaderLength < 0 ? -1 : 1;
       const padding = outside ? OUTSIDE_CAPTION_PADDING : CAPTION_PADDING;
       // The anchor follows the directed line when it rotates. Only the glyph
@@ -278,12 +276,12 @@ export function distanceLayout(
     normal,
     length,
     caption,
-    appearance.caption.position,
+    appearance.captionPosition,
     outside,
     strokeWidth,
   );
   const connector = caption
-    ? captionConnector(midpoint, caption, along, normal, appearance.caption.offset)
+    ? captionConnector(midpoint, caption, along, normal, appearance.captionOffset)
     : [];
 
   const angle = Math.atan2(along.y, along.x);
@@ -440,16 +438,13 @@ export function moveDistanceCaption(
 
   const { start, end } = drawnLineOf(geometry);
   const { along, normal } = lineAxes(start, end);
-  const previous = appearance.caption.offset;
+  const previous = appearance.captionOffset;
 
   return {
     ...appearance,
-    caption: {
-      ...appearance.caption,
-      offset: {
-        along: (previous?.along ?? 0) + delta.x * along.x + delta.y * along.y,
-        perpendicular: (previous?.perpendicular ?? 0) + delta.x * normal.x + delta.y * normal.y,
-      },
+    captionOffset: {
+      along: (previous?.along ?? 0) + delta.x * along.x + delta.y * along.y,
+      perpendicular: (previous?.perpendicular ?? 0) + delta.x * normal.x + delta.y * normal.y,
     },
   };
 }

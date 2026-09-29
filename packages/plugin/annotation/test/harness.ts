@@ -202,6 +202,11 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
     started = true;
     ctx.connect(instance);
   };
+  /** Seed each tool's defaults into the session, as `connect` does. */
+  const seedToolDefaults = () => {
+    for (const tool of api.listResolvedTools())
+      if (tool.defaults) api.updateToolDefaults(tool.id, tool.defaults);
+  };
 
   return {
     ctx,
@@ -223,6 +228,7 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
     apply: instance.apply,
     startSync,
     connectAll,
+    seedToolDefaults,
     /** A fixture (the file's values) as the engine hands it out, in page space. */
     read,
     /** Deliver a document event (another session's change, a form write, …); its annotation is the file's values. */

@@ -29,9 +29,11 @@ const geom: LineShape = {
 const measure: DistanceAppearance = {
   intent: 'line-dimension',
   measure: measureFromKnownLength(100, { value: 2, unit: 'm' }),
-  caption: { enabled: true, position: 'inline' },
+  captionEnabled: true,
+  captionPosition: 'inline',
+  captionOffset: null,
   leader: { length: 12, extension: 5 },
-  text: 'stored',
+  contents: 'stored',
 };
 const annotation = record({
   id: 'a',
@@ -76,7 +78,7 @@ describe('distance gestures and captions', () => {
     state = step(state, pointer('down', at))[0];
     state = step(state, pointer('move', { x: at.x + 20, y: at.y - 30 }))[0];
     expect(pageItems(state, PAGE)[0].source).toBe('vector');
-    expect((pageItems(state, PAGE)[0].measure as DistanceAppearance).caption.offset).toEqual({
+    expect((pageItems(state, PAGE)[0].measure as DistanceAppearance).captionOffset).toEqual({
       along: 20,
       perpendicular: 30,
     });
@@ -102,8 +104,8 @@ describe('distance gestures and captions', () => {
       rotation: 0,
     };
     const moved = moveDistanceCaption(geometry, measure, { x: -10, y: 0 });
-    expect(moved.caption.offset?.along).toBeCloseTo(Math.sqrt(50));
-    expect(moved.caption.offset?.perpendicular).toBeCloseTo(Math.sqrt(50));
+    expect(moved.captionOffset?.along).toBeCloseTo(Math.sqrt(50));
+    expect(moved.captionOffset?.perpendicular).toBeCloseTo(Math.sqrt(50));
   });
   it('captures the original tool without inserting an annotation', () => {
     let model = initialModel;
@@ -213,12 +215,24 @@ describe('distance gestures and captions', () => {
     let state = model();
     state = step(state, pointer('down', { x: 40, y: 100 }))[0];
     state = step(state, pointer('move', { x: 100, y: 100 }))[0];
-    const [committed] = step(state, pointer('up', { x: 100, y: 100 }));
+    const [committed, effects] = step(state, pointer('up', { x: 100, y: 100 }));
     expect(fieldsOf(committed.byId.a).geometry).toMatchObject({
       linePoints: { start: { x: 100, y: 100 }, end: { x: 240, y: 100 } },
     });
     expect(withoutLabel(fieldsOf(committed.byId.a).measure)).toEqual(withoutLabel(measure));
-    expect(fieldsOf(committed.byId.a).measure?.text).toBe('2.80 m');
+    // The write carries the points, never the label: the label is the
+    // engine's, worked out from the new points, and the record shows it.
+    expect(effects).toEqual([
+      {
+        type: 'patch',
+        id: 'a',
+        patch: {
+          subtype: 'line',
+          linePoints: { start: { x: 100, y: 100 }, end: { x: 240, y: 100 } },
+        },
+      },
+    ]);
+    expect(fieldsOf(committed.byId.a).measure?.contents).toBe('2.80 m');
     expect(distanceLabel(fieldsOf(committed.byId.a).geometry, measure)).toBe('2.80 m');
   });
 
@@ -228,7 +242,8 @@ describe('distance gestures and captions', () => {
       a: withFields(annotation, {
         measure: {
           ...measure,
-          caption: { enabled: true, offset: { along: 170, perpendicular: -90 } },
+          captionEnabled: true,
+          captionOffset: { along: 170, perpendicular: -90 },
         },
       }),
     };
@@ -256,7 +271,7 @@ describe('distance gestures and captions', () => {
     const fixtureMeasure = {
       ...measure,
       measure: null,
-      text: '1.75 m',
+      contents: '1.75 m',
       leader: { length: -15, extension: 5 },
     };
     const short: LineShape = {
@@ -276,9 +291,9 @@ describe('distance gestures and captions', () => {
       ...short,
       linePoints: { ...short.linePoints, end: { x: 56.9457, y: 0 } },
     };
-    expect(distanceLayout(longer, { ...fixtureMeasure, text: '2.01 m' }, 1)!.arrowPlacement).toBe(
-      'inside',
-    );
+    expect(
+      distanceLayout(longer, { ...fixtureMeasure, contents: '2.01 m' }, 1)!.arrowPlacement,
+    ).toBe('inside');
   });
 
   it('hit-tests the rotated caption rectangle rather than a circle around it', () => {
@@ -289,7 +304,8 @@ describe('distance gestures and captions', () => {
     };
     const appearance = {
       ...measure,
-      caption: { enabled: true, offset: { along: 0, perpendicular: 80 } },
+      captionEnabled: true,
+      captionOffset: { along: 0, perpendicular: 80 },
     };
     const state = model();
     state.byId = { a: withFields(annotation, { geometry: diagonal, measure: appearance }) };

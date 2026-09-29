@@ -3,31 +3,19 @@
  * turn are read and written by the family (`shapes/points.ts`) as the engine
  * keeps them: upright, with `rotation` turning them about the middle of their
  * box. What a kind adds here is beside its points: a polygon's cloud, the
- * line endings, and a measurement's caption and label. The model keeps a
- * polygon measurement's caption center where it is drawn; the engine takes
- * it upright with the points, so it is turned back with them.
+ * line endings, and a measurement's intent, scale, caption and leader, by the
+ * engine's names. The label (`contents`) is the engine's: it works it out
+ * from the points and the scale, so it is read, never written.
  */
-import {
-  pagePointTurned,
-  pagePointUnturned,
-  pageTurnOfUpright,
-  type AnnotationDTO,
-  type PagePoint,
-  type PagePointTurn,
-} from '@embedpdf/engine-core/runtime';
+import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
-import { distanceLabel } from '../../measurement';
-import { shapeMeasurementLabel } from '../../measurement-shape';
-import { readPoints, uprightStrokesOf, writePoints, type PointsShape } from '../../shapes/points';
+import type { MeasurementAppearance } from '../../measurement';
+import { readPoints, writePoints, type PointsShape } from '../../shapes/points';
 import type { RecordFields } from '../../types';
 import type { KindProjection, Wire } from '../projection';
 import { borderSlice } from '../props';
 
 type PointsDTO = Extract<AnnotationDTO, { subtype: 'line' | 'polyline' | 'polygon' | 'ink' }>;
-
-/** The turn that draws a shape's upright points, or `undefined` upright. */
-const turnOf = (shape: PointsShape): PagePointTurn | undefined =>
-  shape.rotation ? pageTurnOfUpright(uprightStrokesOf(shape).flat(), shape.rotation) : undefined;
 
 /** A points record's shape, or `undefined` for any other geometry. */
 const pointsOf = (annotation: RecordFields): PointsShape | undefined => {
@@ -75,94 +63,48 @@ export const line: KindProjection = {
         ? {
             measure: {
               intent: lineDto.intent,
-              measure: lineDto.measure ?? null,
-              caption: {
-                enabled: lineDto.captionEnabled ?? false,
-                position: lineDto.captionPosition,
-                ...(lineDto.captionOffset ? { offset: lineDto.captionOffset } : {}),
-              },
-              leader: lineDto.leader ?? undefined,
-              text: lineDto.contents ?? '',
+              measure: lineDto.measure,
+              captionEnabled: lineDto.captionEnabled,
+              captionPosition: lineDto.captionPosition,
+              captionOffset: lineDto.captionOffset,
+              leader: lineDto.leader,
+              contents: lineDto.contents,
             },
           }
         : {}),
       geometry: readPoints(lineDto),
     };
   },
-  geometry: (annotation) => {
-    const geometry = annotation.geometry;
-    if (geometry.kind !== 'line') return null;
-    return {
-      ...(annotation.measure?.intent === 'line-dimension'
-        ? { contents: distanceLabel(geometry, annotation.measure) }
-        : {}),
-      ...writePoints(geometry),
-    };
-  },
+  geometry: pointsGeometry,
   prop: strokeProps,
   draftExtras: (annotation) =>
     annotation.measure?.intent === 'line-dimension'
-      ? {
-          intent: annotation.measure.intent,
-          measure:
-            annotation.measure.measure?.subtype === 'rectilinear'
-              ? annotation.measure.measure
-              : null,
-          ...captionFieldsOf(annotation.measure),
-          leader: annotation.measure.leader,
-          subject: 'Distance',
-        }
+      ? { ...measurementDraftOf(annotation.measure), subject: 'Distance' }
       : {},
 };
 
 const polyProjection = (closed: boolean): KindProjection => ({
   ingest: (dto) => {
     const polyDto = dto as Extract<AnnotationDTO, { subtype: 'polygon' | 'polyline' }>;
-    const shape = readPoints(polyDto);
-    const turn = turnOf(shape);
-    const center = polyDto.captionCenter;
     return {
       ...(polyDto.intent === 'polygon-dimension' || polyDto.intent === 'polyline-dimension'
         ? {
             measure: {
               intent: polyDto.intent,
-              measure: polyDto.measure ?? null,
-              caption: {
-                enabled: polyDto.captionEnabled ?? false,
-                ...(center ? { center: turn ? pagePointTurned(center, turn) : center } : {}),
-              },
-              text: polyDto.contents ?? '',
+              measure: polyDto.measure,
+              captionEnabled: polyDto.captionEnabled,
+              contents: polyDto.contents,
             },
           }
         : {}),
-      geometry: shape,
+      geometry: readPoints(polyDto),
     };
   },
-  geometry: (annotation) => {
-    const geometry = annotation.geometry;
-    if (geometry.kind !== 'poly') return null;
-    return {
-      ...(annotation.measure && annotation.measure.intent !== 'line-dimension'
-        ? {
-            contents: shapeMeasurementLabel(geometry, annotation.measure),
-            ...captionFieldsOf(annotation.measure, turnOf(geometry)),
-          }
-        : {}),
-      ...writePoints(geometry),
-    };
-  },
+  geometry: pointsGeometry,
   prop: strokeProps,
   draftExtras: (annotation) =>
     annotation.measure && annotation.measure.intent !== 'line-dimension'
-      ? {
-          intent: annotation.measure.intent,
-          measure:
-            annotation.measure.measure?.subtype === 'rectilinear'
-              ? annotation.measure.measure
-              : null,
-          ...captionFieldsFor(annotation),
-          subject: closed ? 'Area' : 'Perimeter',
-        }
+      ? { ...measurementDraftOf(annotation.measure), subject: closed ? 'Area' : 'Perimeter' }
       : {},
 });
 
@@ -184,37 +126,27 @@ export const ink: KindProjection = {
     annotation.intent === 'ink-highlight' ? { intent: annotation.intent } : {},
 };
 
-/** A measurement's caption fields (none without a measurement), its center turned back upright. */
-export function captionFieldsFor(annotation: RecordFields): Record<string, unknown> {
-  if (!annotation.measure) return {};
-  const shape = pointsOf(annotation);
-  return captionFieldsOf(annotation.measure, shape && turnOf(shape));
+/** The caption and leader fields of a measurement a change states: those it has, never its label. */
+function captionFieldsOf(measure: MeasurementAppearance): Wire {
+  const fields: Wire =
+    measure.intent === 'line-dimension'
+      ? {
+          captionEnabled: measure.captionEnabled,
+          captionPosition: measure.captionPosition,
+          captionOffset: measure.captionOffset,
+          leader: measure.leader,
+        }
+      : { captionEnabled: measure.captionEnabled };
+  return Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined));
 }
 
-/**
- * The model keeps a measurement's caption as one value; the engine takes its
- * parts as separate fields. A line's caption has a position and an offset, a
- * shape's a center, which the model keeps as drawn and the engine takes
- * upright with the points: `turn` turns it back.
- */
-function captionFieldsOf(
-  measure: {
-    intent: string;
-    caption: { enabled: boolean; position?: 'inline' | 'top'; offset?: unknown; center?: unknown };
-  },
-  turn?: PagePointTurn,
-): Record<string, unknown> {
-  const { caption } = measure;
-  if (measure.intent === 'line-dimension') {
-    return {
-      captionEnabled: caption.enabled,
-      captionPosition: caption.position ?? 'inline',
-      captionOffset: caption.offset ?? null,
-    };
-  }
-  const center = caption.center as PagePoint | undefined;
-  return {
-    captionEnabled: caption.enabled,
-    captionCenter: center ? (turn ? pagePointUnturned(center, turn) : center) : null,
-  };
-}
+/** A record's measurement caption and leader, as a change states them (none without a measurement). */
+export const captionFieldsFor = (annotation: RecordFields): Wire =>
+  annotation.measure ? captionFieldsOf(annotation.measure) : {};
+
+/** What a new measurement states beside its points: its intent, its scale (one the engine can write), caption and leader. */
+const measurementDraftOf = (measure: MeasurementAppearance): Wire => ({
+  intent: measure.intent,
+  measure: measure.measure?.subtype === 'rectilinear' ? measure.measure : null,
+  ...captionFieldsOf(measure),
+});

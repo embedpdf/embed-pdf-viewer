@@ -27,14 +27,17 @@ export type RecordInput = Omit<RecordFields, 'annotation'> & {
 /**
  * A record as the plugin hands one to the core: its fields, and the
  * annotation they predict, with the annotation fields the test states laid
- * over it. A confirmed record keeps its ref; one not written yet is named by
- * its id.
+ * over it. A measurement's stated label stands where the engine can't work
+ * one out (no scale), as a file's stored label does. A confirmed record keeps
+ * its ref; one not written yet is named by its id.
  */
 export function record(input: RecordInput): ModelAnnotation {
   const { annotation: stated, ...fields } = input;
   const ref = fields.ref ?? { kind: 'nm' as const, page: fields.page, nm: fields.id };
   const predicted = annotationOfRecord(fields, { ref, index: 0 });
-  return recordOf(fields, { ...predicted, ...stated } as AnnotationDTO);
+  const label =
+    fields.measure?.contents && !predicted.contents ? { contents: fields.measure.contents } : {};
+  return recordOf(fields, { ...predicted, ...label, ...stated } as AnnotationDTO);
 }
 
 /** A model over these records (in this order), with an optional session on top of the initial one. */
@@ -90,11 +93,11 @@ export function rounded<T>(value: T, digits = 9): T {
  * A measurement without its label: the label is worked out from the points
  * and the scale, so a test that states an appearance compares the rest.
  */
-export function withoutLabel<M extends { text: string }>(
+export function withoutLabel<M extends { contents?: string | null }>(
   measure: M | undefined,
-): Omit<M, 'text'> | undefined {
+): Omit<M, 'contents'> | undefined {
   if (!measure) return measure;
-  const { text: _label, ...rest } = measure;
+  const { contents: _label, ...rest } = measure;
   return rest;
 }
 

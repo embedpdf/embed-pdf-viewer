@@ -378,6 +378,7 @@ describe('annotation-core', () => {
         { x: 40, y: 70 },
       ],
       closed: true,
+      captionCenter: null,
       rotation: 0,
     });
     expect(pg.source).toBe('vector');
@@ -399,6 +400,7 @@ describe('annotation-core', () => {
       ],
       closed: false,
       lineEndings: { start: 'none', end: 'none' },
+      captionCenter: null,
       rotation: 0,
     });
   });
