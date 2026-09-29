@@ -16,7 +16,8 @@ one call straight to another, and to the screen.
 1. **Positions** are points (1/72 inch) from the top-left corner of the page, with y going down,
    as on a screen.
 2. **Shapes:** a point is `{ x, y }`, a box is `{ x, y, width, height }` with `x, y` its top-left
-   corner, and a quad is four points `p1` to `p4`.
+   corner, and a quad is four named corners: `upperLeft`, `upperRight`, `lowerLeft` and
+   `lowerRight`.
 3. **Angles** are degrees, clockwise as you see the page, as CSS `rotate()` turns.
 4. **Colors** are `'#rrggbb'`, as in CSS: lowercase when the engine gives one, either case when it
    takes one. Transparency is the separate `opacity`.
@@ -56,10 +57,12 @@ down to the highlight's top.
   `captionOffset.perpendicular`, point to the left of the line as you go from its start to its
   end, as the page shows it: above a line drawn from left to right. `captionOffset.along` runs
   from the start toward the end.
-- **Order.** The points of a quad, a polygon, a polyline or an ink stroke keep the order they
-  have in the file. Quads the engine makes from text (search matches, selections) name their
-  corners by what you see: `p1` and `p2` are the top edge from where the text starts, `p3` and
-  `p4` the bottom edge. A quad another app wrote keeps whatever order it had.
+- **Order.** The points of a polygon, a polyline or an ink stroke keep the order they have in
+  the file.
+- **Quad corners** are named as the text stands, not as the page shows it: `upperLeft` and
+  `upperRight` are the top edge of the letters, left to right as the text would sit upright. On
+  text turned 180°, `upperLeft` is at the bottom right of the page. A quad another app wrote gets
+  the same names when the engine reads it.
 
 ## Colors in the file
 

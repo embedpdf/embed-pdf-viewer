@@ -11,7 +11,7 @@ import type {
   ModelGeometry,
   Handle,
   Paint,
-  Quad,
+  QuadRing,
   Rect,
   RenderNode,
   SceneNode,
@@ -46,7 +46,7 @@ export interface DistanceCaptionLayout {
   normal: Point;
   width: number;
   height: number;
-  bounds: Quad;
+  bounds: QuadRing;
 }
 
 /** One layout drives the preview, selection, handles, and hit testing. */
@@ -116,7 +116,7 @@ function captionQuad(
   normal: Point,
   width: number,
   height: number,
-): Quad {
+): QuadRing {
   const corner = (x: number, y: number) => offsetPoint(offsetPoint(center, along, x), normal, y);
 
   return [
@@ -333,7 +333,7 @@ export function distanceSelectionQuad(
   geometry: ModelGeometry,
   appearance: DistanceAppearance,
   strokeWidth: number,
-): Quad {
+): QuadRing {
   const layout = distanceLayout(geometry, appearance, strokeWidth);
   if (!layout || geometry.kind !== 'line') {
     return selectionQuad(geometry, strokeWidth);

@@ -3,7 +3,7 @@
  * and the effects. The core never keeps a record; these tests pin what it
  * reports about them.
  */
-import { textQuadFromRect } from '@embedpdf/core-geometry';
+import { quadFromRect } from '@embedpdf/core-geometry';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
@@ -173,8 +173,8 @@ describe('every record holds its annotation', () => {
     const [model] = step(modelWith([]), {
       type: 'createReplaceText',
       page: PAGE,
-      quads: [textQuadFromRect(rect)],
-      anchor: { glyphQuad: textQuadFromRect(rect), advance: 1 },
+      quads: [quadFromRect(rect)],
+      anchor: { glyphQuad: quadFromRect(rect), advance: 1 },
     });
     const [caret, strikeout] = model.order.map((id) => model.byId[id]!);
     expect(caret!.annotation).toMatchObject({ subtype: 'caret', intent: 'replace', nm: 'new-1' });

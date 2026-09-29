@@ -1,4 +1,4 @@
-import { textQuadFromRect } from '@embedpdf/core-geometry';
+import { quadFromRect } from '@embedpdf/core-geometry';
 import { toPageRef, type PageRef } from '@embedpdf/engine-core/runtime';
 import type { InteractionHostCapability } from '@embedpdf/plugin-interaction/contract/host';
 import type { SelectionHostCapability } from '@embedpdf/plugin-selection/contract/host';
@@ -10,7 +10,7 @@ import { wireMarkup } from '../../src/tools/markup-bridge';
 describe('selection authoring bridge', () => {
   it('previews and commits Replace Text from its declarative tool recipe', () => {
     const seg = (rect: { x: number; y: number; width: number; height: number }) => ({
-      quad: textQuadFromRect(rect),
+      quad: quadFromRect(rect),
       rect,
       advance: 1 as const,
     });

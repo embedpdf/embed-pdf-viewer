@@ -156,7 +156,10 @@ export function runPageGeometryOrientationConformance(
         if (expectation.sheared) {
           const shearedGlyphs = rotatedRuns
             .flatMap((run) => run.glyphs)
-            .filter((glyph) => !glyph.empty && Math.abs(glyph.loose.p3.x - glyph.loose.p1.x) > 1);
+            .filter(
+              (glyph) =>
+                !glyph.empty && Math.abs(glyph.loose.lowerLeft.x - glyph.loose.upperLeft.x) > 1,
+            );
           expect(shearedGlyphs.length > 0).toBe(true);
         }
       } finally {
@@ -168,18 +171,23 @@ export function runPageGeometryOrientationConformance(
       for (const glyph of run.glyphs) {
         if (glyph.empty) {
           expect(glyph.loose).toEqual({
-            p1: { x: 0, y: 0 },
-            p2: { x: 0, y: 0 },
-            p3: { x: 0, y: 0 },
-            p4: { x: 0, y: 0 },
+            upperLeft: { x: 0, y: 0 },
+            upperRight: { x: 0, y: 0 },
+            lowerLeft: { x: 0, y: 0 },
+            lowerRight: { x: 0, y: 0 },
           });
           continue;
         }
         const q = glyph.loose;
-        // The cell is a parallelogram: both baseline-direction edges match,
-        // and both side edges match (slots: p1 US, p2 UE, p3 LS, p4 LE).
-        expect(Math.abs(q.p2.x - q.p1.x - (q.p4.x - q.p3.x)) <= COORD_TOLERANCE).toBe(true);
-        expect(Math.abs(q.p2.y - q.p1.y - (q.p4.y - q.p3.y)) <= COORD_TOLERANCE).toBe(true);
+        // The cell is a parallelogram: the upper edge runs like the lower one.
+        expect(
+          Math.abs(q.upperRight.x - q.upperLeft.x - (q.lowerRight.x - q.lowerLeft.x)) <=
+            COORD_TOLERANCE,
+        ).toBe(true);
+        expect(
+          Math.abs(q.upperRight.y - q.upperLeft.y - (q.lowerRight.y - q.lowerLeft.y)) <=
+            COORD_TOLERANCE,
+        ).toBe(true);
         // Contained in the run's page-space AABB.
         const bounds = pageQuadBounds(q);
         const { rect } = run;

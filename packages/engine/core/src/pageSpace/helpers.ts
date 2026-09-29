@@ -39,7 +39,7 @@ import {
   type PageGeometryRun,
 } from '../dto/PageGeometrySnapshot';
 import { isRotatedGeometryRun } from '../dto/PageGeometrySnapshot';
-import { pdfQuadBounds, pdfQuadCorners } from '../geometry/convert';
+import { pdfQuadBounds } from '../geometry/convert';
 import {
   mirroredPoint,
   mirroredQuad,
@@ -101,36 +101,7 @@ export const pageTurnOfDrawn = (points: readonly PagePoint[], degrees: number): 
 export const pageQuadBounds = (quad: PageQuad): PageBox =>
   unmirroredBox(pdfQuadBounds(mirroredQuad(quad)));
 
-/** A quad's corners as the page shows them. Right only for an upright quad: see `pdfQuadCorners`. */
-export function pageQuadCorners(quad: PageQuad): {
-  topLeft: PagePoint;
-  topRight: PagePoint;
-  bottomLeft: PagePoint;
-  bottomRight: PagePoint;
-} {
-  const corners = pdfQuadCorners(mirroredQuad(quad));
-  return {
-    topLeft: unmirroredPoint(corners.topLeft),
-    topRight: unmirroredPoint(corners.topRight),
-    bottomLeft: unmirroredPoint(corners.bottomLeft),
-    bottomRight: unmirroredPoint(corners.bottomRight),
-  };
-}
-
-/** A quad from the corners the page shows: `p1` top-left, `p2` top-right, `p3` bottom-left, `p4` bottom-right. */
-export const pageQuadFromCorners = (corners: {
-  topLeft: PagePoint;
-  topRight: PagePoint;
-  bottomLeft: PagePoint;
-  bottomRight: PagePoint;
-}): PageQuad => ({
-  p1: corners.topLeft,
-  p2: corners.topRight,
-  p3: corners.bottomLeft,
-  p4: corners.bottomRight,
-});
-
-/** A glyph's loose cell as a quad: `p1..p4` upper-start, upper-end, lower-start, lower-end. */
+/** A glyph's loose cell as a quad. */
 export const pageGlyphLooseQuad = (
   run: PageGeometryRun<PageCoordinates>,
   index: number,

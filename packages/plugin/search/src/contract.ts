@@ -4,9 +4,9 @@ import {
   type PageRef,
   type PluginErrorInfo,
 } from '@embedpdf/core';
-import type { Rect, TextQuad } from '@embedpdf/core-geometry';
+import type { Rect } from '@embedpdf/core-geometry';
 import type { RevealAnchor, ScrollBehaviorKind } from '@embedpdf/plugin-stage/contract';
-import type { SearchQuery, SearchSnippet } from '@embedpdf/engine-core/runtime';
+import type { PdfTextSegment, SearchQuery, SearchSnippet } from '@embedpdf/engine-core/runtime';
 
 export { validateSearchQuery, validateSearchRegex } from '@embedpdf/engine-core/runtime';
 export type {
@@ -18,16 +18,12 @@ export type {
 } from '@embedpdf/engine-core/runtime';
 
 /**
- * One merged visual line of a match in page space — the structural twin of
- * selection's `SelectionSegment`. `quad` is the geometric authority
- * (corner-named, frame-geometric); `rect` its bounds; `advance` the reading
- * direction along the baseline.
+ * One merged visual line of a match in page space, as the engine's layout
+ * gives it (selection's `SelectionSegment` is the same line). `quad` is the
+ * geometric authority, its corners named in the line's own frame; `rect` its
+ * bounds; `advance` the reading direction along the baseline.
  */
-export interface TextSegment {
-  readonly quad: TextQuad;
-  readonly rect: Rect;
-  readonly advance: 1 | -1;
-}
+export type TextSegment = PdfTextSegment;
 
 /**
  * One match. `page` is the durable page identity, `pageIndex` its display

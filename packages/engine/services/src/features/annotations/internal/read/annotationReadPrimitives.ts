@@ -8,7 +8,7 @@ import type {
   PdfQuad,
   PdfRect,
 } from '@embedpdf/engine-core/runtime';
-import { colorOf } from '@embedpdf/engine-core/runtime';
+import { colorOf, normalizePdfQuad } from '@embedpdf/engine-core/runtime';
 import {
   NULL_PTR,
   type PdfFunctions,
@@ -402,8 +402,8 @@ export function readCalloutLine(
 }
 
 /**
- * Read attachment points for a text-markup annotation.
- * Each `FS_QUADPOINTSF` is 8 floats = 32 bytes.
+ * Read an annotation's `/QuadPoints`, each entry's corners named by
+ * `normalizePdfQuad`. Each `FS_QUADPOINTSF` is 8 floats = 32 bytes.
  */
 export function readQuadPoints(fn: PdfFunctions, mem: PdfRuntimeMemory, annotPtr: Ptr): PdfQuad[] {
   const count = fn.FPDFAnnot_CountAttachmentPoints(annotPtr);
@@ -414,15 +414,15 @@ export function readQuadPoints(fn: PdfFunctions, mem: PdfRuntimeMemory, annotPtr
     for (let i = 0; i < count; i++) {
       if (!fn.FPDFAnnot_GetAttachmentPoints(annotPtr, i, buf)) continue;
       const f = (off: number) => readF32(mem, buf, off);
-      // Positional, in PDFium FS_QUADPOINTSF slot order (PDF 32000 12.5.6.10):
-      // { x1,y1, x2,y2, x3,y3, x4,y4 } -> p1 p2 p3 p4. We do not relabel these
-      // as named corners: PdfQuad asserts no corner semantics (see its docs).
-      out.push({
-        p1: { x: f(0), y: f(4) },
-        p2: { x: f(8), y: f(12) },
-        p3: { x: f(16), y: f(20) },
-        p4: { x: f(24), y: f(28) },
-      });
+      // FS_QUADPOINTSF holds { x1,y1, x2,y2, x3,y3, x4,y4 }, in the file's order.
+      out.push(
+        normalizePdfQuad([
+          { x: f(0), y: f(4) },
+          { x: f(8), y: f(12) },
+          { x: f(16), y: f(20) },
+          { x: f(24), y: f(28) },
+        ]),
+      );
     }
     return out;
   });

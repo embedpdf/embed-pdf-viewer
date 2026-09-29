@@ -46,7 +46,7 @@ function uprightRun(
 }
 
 /** A run of glyph cells along an arbitrary baseline. `origin` is the first
- *  cell's lower-start corner; û the baseline unit; n̂ the ascent unit. */
+ *  cell's lower-left corner; û the baseline unit; n̂ the ascent unit. */
 function orientedRun(
   start: number,
   origin: PdfPoint,
@@ -67,14 +67,19 @@ function orientedRun(
     const t = i * w;
     glyphs.push({
       loose: {
-        p1: at(t, h), // upper-start
-        p2: at(t + w, h), // upper-end
-        p3: at(t, 0), // lower-start
-        p4: at(t + w, 0), // lower-end
+        upperLeft: at(t, h),
+        upperRight: at(t + w, h),
+        lowerLeft: at(t, 0),
+        lowerRight: at(t + w, 0),
       },
     });
   }
-  const xs = glyphs.flatMap((g) => [g.loose.p1, g.loose.p2, g.loose.p3, g.loose.p4]);
+  const xs = glyphs.flatMap((g) => [
+    g.loose.upperLeft,
+    g.loose.upperRight,
+    g.loose.lowerLeft,
+    g.loose.lowerRight,
+  ]);
   const rect = xs.reduce(
     (acc, p) => ({
       left: Math.min(acc.left, p.x),
@@ -92,10 +97,10 @@ const snapshot = (
 ): PageGeometrySnapshot<PdfCoordinates> => ({ runs });
 
 const boundsOfQuad = (q: PdfQuad): PdfRect => ({
-  left: Math.min(q.p1.x, q.p2.x, q.p3.x, q.p4.x),
-  bottom: Math.min(q.p1.y, q.p2.y, q.p3.y, q.p4.y),
-  right: Math.max(q.p1.x, q.p2.x, q.p3.x, q.p4.x),
-  top: Math.max(q.p1.y, q.p2.y, q.p3.y, q.p4.y),
+  left: Math.min(q.upperLeft.x, q.upperRight.x, q.lowerLeft.x, q.lowerRight.x),
+  bottom: Math.min(q.upperLeft.y, q.upperRight.y, q.lowerLeft.y, q.lowerRight.y),
+  right: Math.max(q.upperLeft.x, q.upperRight.x, q.lowerLeft.x, q.lowerRight.x),
+  top: Math.max(q.upperLeft.y, q.upperRight.y, q.lowerLeft.y, q.lowerRight.y),
 });
 
 const expectRectEqualsBounds = (segments: PdfTextSegment<PdfCoordinates>[]) => {
@@ -125,9 +130,9 @@ describe('canonical layout — upright', () => {
     const segments = layout.segments({ start: 0, count: 10 });
     expect(segments).toHaveLength(1);
     expect(segments[0].rect).toEqual({ left: 10, right: 110, bottom: 100, top: 110 });
-    // Upright quads are the rect's own corners (US, UE, LS, LE — y-up).
-    expect(segments[0].quad.p1).toEqual({ x: 10, y: 110 });
-    expect(segments[0].quad.p4).toEqual({ x: 110, y: 100 });
+    // Upright quads are the rect's own corners (y-up: upper = larger y).
+    expect(segments[0].quad.upperLeft).toEqual({ x: 10, y: 110 });
+    expect(segments[0].quad.lowerRight).toEqual({ x: 110, y: 100 });
     expect(segments[0].advance).toBe(1);
     expectRectEqualsBounds(segments);
   });
@@ -197,12 +202,12 @@ describe('canonical layout — oriented', () => {
     const segments = layout.segments({ start: 0, count: 3 });
     expect(segments).toHaveLength(1);
     const q = segments[0].quad;
-    expect(q.p1.x).toBeCloseTo(88, 6); // upper-start
-    expect(q.p1.y).toBeCloseTo(20, 6);
-    expect(q.p2.x).toBeCloseTo(88, 6); // upper-end
-    expect(q.p2.y).toBeCloseTo(44, 6);
-    expect(q.p3.x).toBeCloseTo(100, 6); // lower-start
-    expect(q.p3.y).toBeCloseTo(20, 6);
+    expect(q.upperLeft.x).toBeCloseTo(88, 6);
+    expect(q.upperLeft.y).toBeCloseTo(20, 6);
+    expect(q.upperRight.x).toBeCloseTo(88, 6);
+    expect(q.upperRight.y).toBeCloseTo(44, 6);
+    expect(q.lowerLeft.x).toBeCloseTo(100, 6);
+    expect(q.lowerLeft.y).toBeCloseTo(20, 6);
     expect(segments[0].rect.left).toBeCloseTo(88, 6);
     expect(segments[0].rect.top).toBeCloseTo(44, 6);
     expect(segments[0].advance).toBe(1);
@@ -223,12 +228,12 @@ describe('canonical layout — oriented', () => {
     const q = segments[0].quad;
     const first = (diagonal.glyphs as RotatedGeometryGlyph<PdfCoordinates>[])[0].loose;
     const last = (diagonal.glyphs as RotatedGeometryGlyph<PdfCoordinates>[])[3].loose;
-    expect(q.p1.x).toBeCloseTo(first.p1.x, 5);
-    expect(q.p1.y).toBeCloseTo(first.p1.y, 5);
-    expect(q.p2.x).toBeCloseTo(last.p2.x, 5);
-    expect(q.p2.y).toBeCloseTo(last.p2.y, 5);
-    expect(q.p3.x).toBeCloseTo(first.p3.x, 5);
-    expect(q.p4.x).toBeCloseTo(last.p4.x, 5);
+    expect(q.upperLeft.x).toBeCloseTo(first.upperLeft.x, 5);
+    expect(q.upperLeft.y).toBeCloseTo(first.upperLeft.y, 5);
+    expect(q.upperRight.x).toBeCloseTo(last.upperRight.x, 5);
+    expect(q.upperRight.y).toBeCloseTo(last.upperRight.y, 5);
+    expect(q.lowerLeft.x).toBeCloseTo(first.lowerLeft.x, 5);
+    expect(q.lowerRight.x).toBeCloseTo(last.lowerRight.x, 5);
     expectRectEqualsBounds(segments);
   });
 
@@ -246,10 +251,10 @@ describe('canonical layout — oriented', () => {
     const segments = layout.segments({ start: 0, count: 3 });
     expect(segments).toHaveLength(1);
     const q = segments[0].quad;
-    // upper-start sits at the visual right — the mirror is part of the frame.
-    expect(q.p1.x).toBeCloseTo(90, 6);
-    expect(q.p2.x).toBeCloseTo(66, 6);
-    expect(q.p1.y).toBeCloseTo(112, 6);
+    // upper-left sits at the visual right — the mirror is part of the frame.
+    expect(q.upperLeft.x).toBeCloseTo(90, 6);
+    expect(q.upperRight.x).toBeCloseTo(66, 6);
+    expect(q.upperLeft.y).toBeCloseTo(112, 6);
     expect(segments[0].advance).toBe(1);
     expectRectEqualsBounds(segments);
   });
@@ -350,10 +355,10 @@ describe('canonical layout — interaction', () => {
   test('charQuad returns the oriented cell for endpoints', () => {
     const q = layout.charQuad(2);
     expect(q).not.toBeNull();
-    expect(q!.p1.x).toBeCloseTo(88, 6);
-    expect(q!.p1.y).toBeCloseTo(20, 6);
-    expect(q!.p4.x).toBeCloseTo(100, 6);
-    expect(q!.p4.y).toBeCloseTo(28, 6);
+    expect(q!.upperLeft.x).toBeCloseTo(88, 6);
+    expect(q!.upperLeft.y).toBeCloseTo(20, 6);
+    expect(q!.lowerRight.x).toBeCloseTo(100, 6);
+    expect(q!.lowerRight.y).toBeCloseTo(28, 6);
     expect(layout.charQuad(1)).not.toBeNull(); // spaces still have cells
   });
 

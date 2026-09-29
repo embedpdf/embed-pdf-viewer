@@ -11,7 +11,7 @@
  */
 import { distanceScene, measurementCaptionScene } from './measurement';
 import { shapeMeasurementLayout } from './measurement-shape';
-import { textQuadBounds, textQuadRing } from '@embedpdf/core-geometry';
+import { quadBounds, quadRing } from '@embedpdf/core-geometry';
 import { geomScene } from './geometry';
 import type {
   ModelGeometry,
@@ -21,7 +21,7 @@ import type {
   SceneNode,
   Style,
   Subtype,
-  TextQuad,
+  Quad,
   TextStyle,
   Point,
 } from './types';
@@ -77,22 +77,25 @@ function squigglePath(
   return pathData;
 }
 
-/** Per-subtype markup nodes on the quads' own edges (corner-named TextQuads:
- *  upper = ascent side, lower = baseline side, start → end along the frame).
+/** Per-subtype markup nodes on the quads' own edges (upper = ascent side,
+ *  lower = baseline side, left → right along the frame).
  *  The colour is the markup `/C` (our model keeps stroke==fill). Rotated and
  *  sheared cells draw along their true baselines; upright output is identical
  *  to the old axis-aligned math. */
-function markupScene(subtype: Subtype, quads: TextQuad[], style: Style): SceneNode[] {
+function markupScene(subtype: Subtype, quads: Quad[], style: Style): SceneNode[] {
   const color = style.color;
   const opacity = style.opacity;
   const nodes: SceneNode[] = [];
   for (const quad of quads) {
     const down = {
-      x: quad.lowerStart.x - quad.upperStart.x,
-      y: quad.lowerStart.y - quad.upperStart.y,
+      x: quad.lowerLeft.x - quad.upperLeft.x,
+      y: quad.lowerLeft.y - quad.upperLeft.y,
     };
     const inkHeight = Math.hypot(down.x, down.y); // true ink height
-    const wVec = { x: quad.lowerEnd.x - quad.lowerStart.x, y: quad.lowerEnd.y - quad.lowerStart.y };
+    const wVec = {
+      x: quad.lowerRight.x - quad.lowerLeft.x,
+      y: quad.lowerRight.y - quad.lowerLeft.y,
+    };
     const baselineLength = Math.hypot(wVec.x, wVec.y); // true baseline length
     if (baselineLength <= 0 || inkHeight <= 0) continue;
     const normal = { x: down.x / inkHeight, y: down.y / inkHeight }; // unit, toward the baseline
@@ -101,20 +104,20 @@ function markupScene(subtype: Subtype, quads: TextQuad[], style: Style): SceneNo
       // the baseline edge, inset lw off the descent side (the old `y + h − lw`)
       nodes.push({
         kind: 'line',
-        a: { x: quad.lowerStart.x - normal.x * lw, y: quad.lowerStart.y - normal.y * lw },
-        b: { x: quad.lowerEnd.x - normal.x * lw, y: quad.lowerEnd.y - normal.y * lw },
+        a: { x: quad.lowerLeft.x - normal.x * lw, y: quad.lowerLeft.y - normal.y * lw },
+        b: { x: quad.lowerRight.x - normal.x * lw, y: quad.lowerRight.y - normal.y * lw },
         paint: { stroke: color, width: lw, opacity, blend: blendFor(style) },
       });
     } else if (subtype === 'strikeout') {
       nodes.push({
         kind: 'line',
         a: {
-          x: (quad.upperStart.x + quad.lowerStart.x) / 2,
-          y: (quad.upperStart.y + quad.lowerStart.y) / 2,
+          x: (quad.upperLeft.x + quad.lowerLeft.x) / 2,
+          y: (quad.upperLeft.y + quad.lowerLeft.y) / 2,
         },
         b: {
-          x: (quad.upperEnd.x + quad.lowerEnd.x) / 2,
-          y: (quad.upperEnd.y + quad.lowerEnd.y) / 2,
+          x: (quad.upperRight.x + quad.lowerRight.x) / 2,
+          y: (quad.upperRight.y + quad.lowerRight.y) / 2,
         },
         paint: { stroke: color, width: lw, opacity, blend: blendFor(style) },
       });
@@ -122,8 +125,8 @@ function markupScene(subtype: Subtype, quads: TextQuad[], style: Style): SceneNo
       const amp = Math.min(2, Math.max(1, inkHeight * 0.08));
       const direction = { x: wVec.x / baselineLength, y: wVec.y / baselineLength };
       const start = {
-        x: quad.lowerStart.x - normal.x * amp,
-        y: quad.lowerStart.y - normal.y * amp,
+        x: quad.lowerLeft.x - normal.x * amp,
+        y: quad.lowerLeft.y - normal.y * amp,
       };
       nodes.push({
         kind: 'path',
@@ -135,7 +138,7 @@ function markupScene(subtype: Subtype, quads: TextQuad[], style: Style): SceneNo
       // highlight: translucent fill with `multiply` so the text reads through it
       nodes.push({
         kind: 'poly',
-        points: textQuadRing(quad),
+        points: quadRing(quad),
         closed: true,
         paint: { fill: color, opacity, blend: blendFor(style) },
       });
@@ -163,8 +166,8 @@ function redactRegions(geometry: ModelGeometry): RedactRegion[] {
   if (geometry.kind === 'quads') {
     const out: RedactRegion[] = [];
     for (const quad of geometry.quads) {
-      const bounds = textQuadBounds(quad);
-      if (bounds.width > 0 && bounds.height > 0) out.push({ ring: textQuadRing(quad), bounds });
+      const bounds = quadBounds(quad);
+      if (bounds.width > 0 && bounds.height > 0) out.push({ ring: quadRing(quad), bounds });
     }
     return out;
   }

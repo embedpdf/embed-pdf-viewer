@@ -8,18 +8,18 @@ import type { AnnotationFlags, PageRef } from '@embedpdf/engine-core/runtime';
 import { DRAWN_FLAGS } from '../flags';
 import { caretGeomFromAnchor } from '../geometry';
 import { styleFromProps } from '../props';
-import type { Effect, Model, Subtype, TextEndAnchor, TextQuad } from '../types';
+import type { Effect, Model, Subtype, TextEndAnchor, Quad } from '../types';
 import { newRecord } from './changes';
 import { defaultsFor } from './session';
 
 /** Drop degenerate segment quads (zero-length baseline or ink extent). Area is
  *  the cross product of the two edge vectors — orientation-safe. */
-const usableQuads = (quads: TextQuad[]): TextQuad[] =>
+const usableQuads = (quads: Quad[]): Quad[] =>
   quads.filter((quad) => {
-    const ux = quad.upperEnd.x - quad.upperStart.x;
-    const uy = quad.upperEnd.y - quad.upperStart.y;
-    const sx = quad.lowerStart.x - quad.upperStart.x;
-    const sy = quad.lowerStart.y - quad.upperStart.y;
+    const ux = quad.upperRight.x - quad.upperLeft.x;
+    const uy = quad.upperRight.y - quad.upperLeft.y;
+    const sx = quad.lowerLeft.x - quad.upperLeft.x;
+    const sy = quad.lowerLeft.y - quad.upperLeft.y;
     return Math.abs(ux * sy - uy * sx) > 0;
   });
 
@@ -32,7 +32,7 @@ export function createMarkup(
   model: Model,
   subtype: Subtype,
   page: PageRef,
-  segmentQuads: TextQuad[],
+  segmentQuads: Quad[],
   preset: string = subtype,
   flags?: Partial<AnnotationFlags>,
 ): [Model, Effect[]] {
@@ -69,7 +69,7 @@ export function createMarkup(
 export function createReplaceText(
   model: Model,
   page: PageRef,
-  segmentQuads: TextQuad[],
+  segmentQuads: Quad[],
   anchor: TextEndAnchor,
   preset = 'replace-text',
 ): [Model, Effect[]] {
@@ -149,10 +149,10 @@ export function createCaret(
 export function setMarkupPreview(
   model: Model,
   subtype: Subtype,
-  quadsByPage: Record<number, TextQuad[]>,
+  quadsByPage: Record<number, Quad[]>,
   preset: string = subtype,
 ): [Model, Effect[]] {
-  const byPage: Record<number, TextQuad[]> = {};
+  const byPage: Record<number, Quad[]> = {};
   for (const key in quadsByPage) {
     const quads = usableQuads(quadsByPage[key]);
     if (quads.length) byPage[Number(key)] = quads;

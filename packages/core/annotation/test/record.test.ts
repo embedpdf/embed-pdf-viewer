@@ -1,5 +1,5 @@
 import { annotationKey } from '@embedpdf/core';
-import { textQuadFromRect } from '@embedpdf/core-geometry';
+import { quadFromRect } from '@embedpdf/core-geometry';
 import type {
   AnnotationDraft,
   AnnotationDTO,
@@ -223,7 +223,7 @@ describe('record — Replace Text authoring', () => {
       intent: 'strikeout-text-edit',
       geometry: {
         kind: 'quads',
-        quads: [textQuadFromRect({ x: 10, y: 20, width: 80, height: 15 })],
+        quads: [quadFromRect({ x: 10, y: 20, width: 80, height: 15 })],
       },
       style,
       flags: DRAWN_FLAGS,
@@ -1002,8 +1002,8 @@ describe('record — attached links (fold + desired state + link kind mapping)',
       geometry: {
         kind: 'quads',
         quads: [
-          textQuadFromRect({ x: 0, y: 0, width: 50, height: 10 }),
-          textQuadFromRect({ x: 0, y: 20, width: 30, height: 10 }),
+          quadFromRect({ x: 0, y: 0, width: 50, height: 10 }),
+          quadFromRect({ x: 0, y: 20, width: 30, height: 10 }),
         ],
       },
     };
@@ -1060,7 +1060,7 @@ describe('record — every prop a kind takes writes only fields its engine kind 
       case 'squiggly':
       case 'strikeout':
       case 'redact':
-        return { kind: 'quads', quads: [textQuadFromRect(box)] };
+        return { kind: 'quads', quads: [quadFromRect(box)] };
       case 'caret':
         return { kind: 'caret', rect: box };
       default:

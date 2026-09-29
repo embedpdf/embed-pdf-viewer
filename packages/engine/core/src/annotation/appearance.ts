@@ -227,7 +227,7 @@ function firstPoint(value: unknown): { x: number; y: number } | undefined {
   if (typeof record.left === 'number' && typeof record.bottom === 'number') {
     return { x: record.left, y: record.bottom };
   }
-  return firstPoint(record.start ?? record.p1);
+  return firstPoint(record.start ?? record.upperLeft);
 }
 
 /**

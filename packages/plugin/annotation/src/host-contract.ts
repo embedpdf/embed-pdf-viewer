@@ -12,7 +12,7 @@ import type {
   RenderItem,
   Subtype,
   TextEndAnchor,
-  TextQuad,
+  Quad,
   Point,
   ViewEnv,
 } from '@embedpdf/core-annotation';
@@ -201,10 +201,10 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   requestStampAt(page: PageRef, point: Point, displayRotation?: PageRotation): boolean;
 
   // ── markup bridge (the selection plugin's commit path) ──
-  createMarkup(subtype: Subtype, page: PageRef, quads: TextQuad[], preset?: string): void;
+  createMarkup(subtype: Subtype, page: PageRef, quads: Quad[], preset?: string): void;
   createCaret(page: PageRef, anchor: TextEndAnchor): void;
-  createReplaceText(page: PageRef, quads: TextQuad[], anchor: TextEndAnchor, preset?: string): void;
-  previewMarkup(subtype: Subtype, quadsByPage: Record<number, TextQuad[]>, preset?: string): void;
+  createReplaceText(page: PageRef, quads: Quad[], anchor: TextEndAnchor, preset?: string): void;
+  previewMarkup(subtype: Subtype, quadsByPage: Record<number, Quad[]>, preset?: string): void;
   clearMarkupPreview(): void;
 
   // ── ghosts and previews ──

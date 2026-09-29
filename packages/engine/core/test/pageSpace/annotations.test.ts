@@ -72,10 +72,10 @@ describe('annotations in page space', () => {
         subtype: 'highlight',
         quadPoints: [
           {
-            p1: { x: 50, y: 732 },
-            p2: { x: 150, y: 732 },
-            p3: { x: 50, y: 712 },
-            p4: { x: 150, y: 712 },
+            upperLeft: { x: 50, y: 732 },
+            upperRight: { x: 150, y: 732 },
+            lowerLeft: { x: 50, y: 712 },
+            lowerRight: { x: 150, y: 712 },
           },
         ],
       }),
@@ -107,7 +107,12 @@ describe('annotations in page space', () => {
     });
     expect(pages[2]).toMatchObject({
       quadPoints: [
-        { p1: { x: 0, y: 0 }, p2: { x: 100, y: 0 }, p3: { x: 0, y: 20 }, p4: { x: 100, y: 20 } },
+        {
+          upperLeft: { x: 0, y: 0 },
+          upperRight: { x: 100, y: 0 },
+          lowerLeft: { x: 0, y: 20 },
+          lowerRight: { x: 100, y: 20 },
+        },
       ],
     });
     expect(pages[3]).toMatchObject({

@@ -13,7 +13,7 @@ import {
 import { hitTest, groupUnionBounds } from '../src/hit';
 import { distanceLayout, type DistanceAppearance } from '../src/measurement';
 import { annotationSelectionFrame } from '../src/selection';
-import type { ModelAnnotation, Model, Quad, Point } from '../src/types';
+import type { ModelAnnotation, Model, QuadRing, Point } from '../src/types';
 import { initialModel, initialStyle, annotsInBox } from '../src/update';
 import { chrome, pageItems } from '../src/view';
 
@@ -61,7 +61,7 @@ function expectPoint(actual: Point, expected: Point) {
   expect(actual.y).toBeCloseTo(expected.y, 6);
 }
 
-function outlineCorners(model: Model): Quad {
+function outlineCorners(model: Model): QuadRing {
   const node = chrome(model, PAGE).find((item) => item.kind === 'outline' || item.kind === 'obb');
   if (node?.kind === 'obb') return node.corners;
   if (node?.kind !== 'outline') throw new Error('Missing selection outline');

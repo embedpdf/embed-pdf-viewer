@@ -1,4 +1,4 @@
-import { textQuadFromRect } from '@embedpdf/core-geometry';
+import { quadFromRect } from '@embedpdf/core-geometry';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
@@ -109,8 +109,8 @@ describe('redact scene', () => {
         geometry: {
           kind: 'quads',
           quads: [
-            textQuadFromRect({ x: 0, y: 0, width: 50, height: 10 }),
-            textQuadFromRect({ x: 0, y: 14, width: 30, height: 10 }),
+            quadFromRect({ x: 0, y: 0, width: 50, height: 10 }),
+            quadFromRect({ x: 0, y: 14, width: 30, height: 10 }),
           ],
         },
       }),

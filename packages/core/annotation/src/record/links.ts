@@ -4,20 +4,17 @@
  * parent's `link` prop, and the reconciler derives the children it should
  * have from the parent's committed geometry.
  */
-import { textQuadBounds } from '@embedpdf/core-geometry';
+import { quadBounds } from '@embedpdf/core-geometry';
 
 import { selectionQuad, unionRect } from '../geometry';
 import { propsFor } from '../kinds';
-import type { ModelAnnotation, Quad, Rect } from '../types';
+import type { ModelAnnotation, Rect } from '../types';
 import { annotationKey } from './seam';
 
 /** Does this kind's table declare the `link` prop (may it carry an attached
  *  link)? Widgets/caret/redact/file-attachment deliberately don't. */
 const takesLink = (subtype: string): boolean =>
   propsFor(subtype).some((spec) => spec.key === 'link');
-
-/** Bounds of one quad (page space). */
-const quadBounds = (quad: Quad): Rect => unionRect(quad);
 
 /**
  * The desired hit rects (page space) of a parent's attached link
@@ -34,7 +31,7 @@ const quadBounds = (quad: Quad): Rect => unionRect(quad);
  * `/QuadPoints` (tier 2).
  */
 export function linkChildRects(annotation: ModelAnnotation): Rect[] {
-  if (annotation.geometry.kind === 'quads') return annotation.geometry.quads.map(textQuadBounds);
+  if (annotation.geometry.kind === 'quads') return annotation.geometry.quads.map(quadBounds);
   return [
     unionRect(
       selectionQuad(annotation.geometry, annotation.style.strokeWidth, annotation.style.border),

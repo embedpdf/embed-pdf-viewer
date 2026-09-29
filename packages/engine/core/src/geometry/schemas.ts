@@ -49,10 +49,10 @@ export const PdfSizeSchema: z.ZodType<PdfSize> = z.object({
 });
 
 export const PdfQuadSchema: z.ZodType<PdfQuad> = z.object({
-  p1: PdfPointSchema,
-  p2: PdfPointSchema,
-  p3: PdfPointSchema,
-  p4: PdfPointSchema,
+  upperLeft: PdfPointSchema,
+  upperRight: PdfPointSchema,
+  lowerLeft: PdfPointSchema,
+  lowerRight: PdfPointSchema,
 });
 
 export const PdfRotationSchema: z.ZodType<PdfRotation> = z.union([
@@ -77,8 +77,8 @@ export const PageBoxSchema: z.ZodType<PageBox> = z.object({
 });
 
 export const PageQuadSchema: z.ZodType<PageQuad> = z.object({
-  p1: PagePointSchema,
-  p2: PagePointSchema,
-  p3: PagePointSchema,
-  p4: PagePointSchema,
+  upperLeft: PagePointSchema,
+  upperRight: PagePointSchema,
+  lowerLeft: PagePointSchema,
+  lowerRight: PagePointSchema,
 });

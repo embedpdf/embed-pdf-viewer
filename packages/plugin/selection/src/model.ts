@@ -4,7 +4,7 @@
  * the controller applies the transitions with `ctx.state.update`.
  */
 import type { DocumentEvent, PageObjectNumber, PageRef } from '@embedpdf/core';
-import type { TextQuad } from '@embedpdf/core-geometry';
+import type { Quad } from '@embedpdf/core-geometry';
 import type { SelectionSegment } from './geometry';
 
 /** A glyph address: a page and a character index within that page. */
@@ -49,8 +49,8 @@ const sameRange = (left: SelectionRange | null, right: SelectionRange | null): b
     samePosition(left.anchor, right.anchor) &&
     samePosition(left.focus, right.focus));
 
-const sameQuad = (left: TextQuad, right: TextQuad): boolean =>
-  (['upperStart', 'upperEnd', 'lowerStart', 'lowerEnd'] as const).every(
+const sameQuad = (left: Quad, right: Quad): boolean =>
+  (['upperLeft', 'upperRight', 'lowerLeft', 'lowerRight'] as const).every(
     (corner) => left[corner].x === right[corner].x && left[corner].y === right[corner].y,
   );
 

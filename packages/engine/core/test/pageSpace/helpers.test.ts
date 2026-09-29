@@ -8,7 +8,7 @@ import {
   glyphLooseQuad,
   type PageGeometryRun,
 } from '../../src/dto/PageGeometrySnapshot';
-import { pdfQuadBounds, pdfQuadCorners, pdfRectTurnedBounds } from '../../src/geometry/convert';
+import { pdfQuadBounds, pdfRectTurnedBounds } from '../../src/geometry/convert';
 import { pageBoxOf, pagePointOf, pageQuadOf } from '../../src/geometry/pageSpace';
 import {
   pdfPointsBounds,
@@ -27,7 +27,6 @@ import {
   pagePointsBounds,
   pagePointTurned,
   pageQuadBounds,
-  pageQuadCorners,
   pageTurnOfDrawn,
   pageTurnOfUpright,
 } from '../../src/pageSpace/helpers';
@@ -89,19 +88,17 @@ describe('page-space helpers agree with the originals', () => {
     }
   });
 
-  test('bounds and corners', () => {
+  test('bounds', () => {
     for (let n = 0; n < 100; n++) {
       const points = [pointAt(), pointAt(), pointAt(), pointAt()];
       close(pagePointsBounds(points.map(toPage)), pageBoxOf(pdfPointsBounds(points), visible));
-      const quad = { p1: points[0]!, p2: points[1]!, p3: points[2]!, p4: points[3]! };
+      const quad = {
+        upperLeft: points[0]!,
+        upperRight: points[1]!,
+        lowerLeft: points[2]!,
+        lowerRight: points[3]!,
+      };
       close(pageQuadBounds(pageQuadOf(quad, visible)), pageBoxOf(pdfQuadBounds(quad), visible));
-      const corners = pdfQuadCorners(quad);
-      close(pageQuadCorners(pageQuadOf(quad, visible)), {
-        topLeft: toPage(corners.topLeft),
-        topRight: toPage(corners.topRight),
-        bottomLeft: toPage(corners.bottomLeft),
-        bottomRight: toPage(corners.bottomRight),
-      });
     }
   });
 
@@ -119,10 +116,10 @@ describe('page-space helpers agree with the originals', () => {
       glyphs: [
         {
           loose: {
-            p1: { x: 0, y: 10 },
-            p2: { x: 10, y: 20 },
-            p3: { x: 10, y: 0 },
-            p4: { x: 20, y: 10 },
+            upperLeft: { x: 0, y: 10 },
+            upperRight: { x: 10, y: 20 },
+            lowerLeft: { x: 10, y: 0 },
+            lowerRight: { x: 20, y: 10 },
           },
         },
       ],

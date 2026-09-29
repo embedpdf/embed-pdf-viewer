@@ -12,6 +12,8 @@ export function redactDraftFollows(
   if (draft.subtype !== 'redact' || draft.rect != null) return draft;
   const quads = draft.quadPoints ?? [];
   if (quads.length === 0) return draft;
-  const rect = pdfPointsBounds(quads.flatMap((quad) => [quad.p1, quad.p2, quad.p3, quad.p4]));
+  const rect = pdfPointsBounds(
+    quads.flatMap((quad) => [quad.upperLeft, quad.upperRight, quad.lowerLeft, quad.lowerRight]),
+  );
   return { ...draft, rect };
 }

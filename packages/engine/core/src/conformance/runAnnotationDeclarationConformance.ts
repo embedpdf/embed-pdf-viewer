@@ -338,10 +338,10 @@ export function runAnnotationDeclarationConformance(
     test('a new quad list replaces the old one, shorter or longer', async () => {
       await onAuthoringPage(async (page) => {
         const quad = (y: number) => ({
-          p1: { x: 40, y },
-          p2: { x: 140, y },
-          p3: { x: 40, y: y + 10 },
-          p4: { x: 140, y: y + 10 },
+          upperLeft: { x: 40, y },
+          upperRight: { x: 140, y },
+          lowerLeft: { x: 40, y: y + 10 },
+          lowerRight: { x: 140, y: y + 10 },
         });
         for (const subtype of ['highlight', 'redact'] as const) {
           const { annotation } = await page.annotations.create({
@@ -374,10 +374,10 @@ export function runAnnotationDeclarationConformance(
           subtype: 'redact',
           quadPoints: [
             {
-              p1: { x: 50, y: 520 },
-              p2: { x: 150, y: 520 },
-              p3: { x: 50, y: 500 },
-              p4: { x: 150, y: 500 },
+              upperLeft: { x: 50, y: 520 },
+              upperRight: { x: 150, y: 520 },
+              lowerLeft: { x: 50, y: 500 },
+              lowerRight: { x: 150, y: 500 },
             },
           ],
         });

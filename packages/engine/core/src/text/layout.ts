@@ -62,8 +62,8 @@ const EDGE_EPSILON = 1e-6;
 
 /**
  * One merged visual line of a text range, in page space. `quad` is the
- * geometric authority (frame-geometric slot order: `p1..p4` = upper-start,
- * upper-end, lower-start, lower-end — visual semantics, not reading order);
+ * geometric authority (corners named in the line's own frame, not in reading
+ * order);
  * `rect` is its axis-aligned bounds, produced by the same constructor.
  * `advance` is the reading direction along the baseline, derived from the
  * glyph sequence (+1 = the frame's +x), never inferred from geometry.
@@ -191,7 +191,7 @@ const ZERO_RECT: PdfRect = { left: 0, bottom: 0, right: 0, top: 0 };
 /** Frame-local AABB of a page-space cell (exact under the frame's rotation;
  *  shear residue is the documented in-frame envelope). */
 function frameBoxOfQuad(f: TextLayoutFrame, q: PdfQuad): PdfRect {
-  const pts = [q.p1, q.p2, q.p3, q.p4].map((p) => toFrame(f, p));
+  const pts = [q.upperLeft, q.upperRight, q.lowerLeft, q.lowerRight].map((p) => toFrame(f, p));
   const xs = pts.map((p) => p.x);
   const ys = pts.map((p) => p.y);
   return {
@@ -208,15 +208,15 @@ function frameForRun(frames: TextLayoutFrame[], run: RotatedGeometryRun<PdfCoord
   const seed = run.glyphs.find((g) => !isEmpty(g));
   if (!seed) return 0;
   const q = seed.loose;
-  const bx = q.p2.x - q.p1.x;
-  const by = q.p2.y - q.p1.y;
+  const bx = q.upperRight.x - q.upperLeft.x;
+  const by = q.upperRight.y - q.upperLeft.y;
   const len = Math.hypot(bx, by);
   if (len <= EDGE_EPSILON) return 0;
   const baseline: PdfPoint = { x: bx / len, y: by / len };
-  // Handedness from the actual ascent edge (lower-start → upper-start), so
+  // Handedness from the actual ascent edge (lower-left → upper-left), so
   // mirrored text gets its own frame with "up" on its true ascent side.
-  const ax = q.p1.x - q.p3.x;
-  const ay = q.p1.y - q.p3.y;
+  const ax = q.upperLeft.x - q.lowerLeft.x;
+  const ay = q.upperLeft.y - q.lowerLeft.y;
   const sign = baseline.x * ay - baseline.y * ax >= 0 ? 1 : -1;
   const ascent: PdfPoint = { x: -baseline.y * sign, y: baseline.x * sign };
 
@@ -545,22 +545,22 @@ function mergeAdjacentSubRuns(runs: SubRun[]): MergedSubRun[] {
 }
 
 /** Segment quad for a frame-local rect (frame 0: the rect's own corners,
- *  no float round-trip). Slot order US, UE, LS, LE; frame is y-up, so the
- *  upper corners sit at the frame top. */
+ *  no float round-trip). The frame is y-up, so the upper corners sit at the
+ *  frame top. */
 function quadOfFrameRect(f: TextLayoutFrame, frameIndex: number, r: PdfRect): PdfQuad {
   if (frameIndex === 0) {
     return {
-      p1: { x: r.left, y: r.top },
-      p2: { x: r.right, y: r.top },
-      p3: { x: r.left, y: r.bottom },
-      p4: { x: r.right, y: r.bottom },
+      upperLeft: { x: r.left, y: r.top },
+      upperRight: { x: r.right, y: r.top },
+      lowerLeft: { x: r.left, y: r.bottom },
+      lowerRight: { x: r.right, y: r.bottom },
     };
   }
   return {
-    p1: fromFrame(f, { x: r.left, y: r.top }),
-    p2: fromFrame(f, { x: r.right, y: r.top }),
-    p3: fromFrame(f, { x: r.left, y: r.bottom }),
-    p4: fromFrame(f, { x: r.right, y: r.bottom }),
+    upperLeft: fromFrame(f, { x: r.left, y: r.top }),
+    upperRight: fromFrame(f, { x: r.right, y: r.top }),
+    lowerLeft: fromFrame(f, { x: r.left, y: r.bottom }),
+    lowerRight: fromFrame(f, { x: r.right, y: r.bottom }),
   };
 }
 
@@ -574,10 +574,15 @@ function materializeSegment(
     m.frame === 0
       ? m.rect
       : {
-          left: Math.min(quad.p1.x, quad.p2.x, quad.p3.x, quad.p4.x),
-          bottom: Math.min(quad.p1.y, quad.p2.y, quad.p3.y, quad.p4.y),
-          right: Math.max(quad.p1.x, quad.p2.x, quad.p3.x, quad.p4.x),
-          top: Math.max(quad.p1.y, quad.p2.y, quad.p3.y, quad.p4.y),
+          left: Math.min(quad.upperLeft.x, quad.upperRight.x, quad.lowerLeft.x, quad.lowerRight.x),
+          bottom: Math.min(
+            quad.upperLeft.y,
+            quad.upperRight.y,
+            quad.lowerLeft.y,
+            quad.lowerRight.y,
+          ),
+          right: Math.max(quad.upperLeft.x, quad.upperRight.x, quad.lowerLeft.x, quad.lowerRight.x),
+          top: Math.max(quad.upperLeft.y, quad.upperRight.y, quad.lowerLeft.y, quad.lowerRight.y),
         };
   return { quad, rect, advance: m.lastX >= m.firstX ? 1 : -1 };
 }

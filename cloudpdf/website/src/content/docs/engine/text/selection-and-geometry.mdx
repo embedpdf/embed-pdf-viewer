@@ -55,7 +55,10 @@ const image = await page.render.image({ viewport: { kind: 'width', width: 800 } 
 
 img.addEventListener('click', (event) => {
   const scale = image.width / img.clientWidth; // image pixels per CSS pixel
-  const point = image.transform.pixelsToPage({ x: event.offsetX * scale, y: event.offsetY * scale });
+  const point = image.transform.pixelsToPage({
+    x: event.offsetX * scale,
+    y: event.offsetY * scale,
+  });
   const index = layout.charAt(point);
 });
 ```
@@ -100,10 +103,10 @@ for (const segment of layout.segments(range)) {
 
 Each segment has:
 
-| Field  | What it is                                                                                |
-| :----- | :---------------------------------------------------------------------------------------- |
-| `rect` | The box around the text on that line, `{ x, y, width, height }`.                          |
-| `quad` | The four corners of the text, `{ p1, p2, p3, p4 }`. Differs from `rect` for rotated text. |
+| Field  | What it is                                                                                                                                        |
+| :----- | :------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `rect` | The box around the text on that line, `{ x, y, width, height }`.                                                                                  |
+| `quad` | The four corners of the text, `{ upperLeft, upperRight, lowerLeft, lowerRight }`, named as the text stands. Differs from `rect` for rotated text. |
 
 Use `rect` for a simple box. Use `quad` when text can be rotated, and for annotations: a highlight
 takes quads.

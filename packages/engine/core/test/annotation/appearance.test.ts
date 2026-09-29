@@ -293,10 +293,10 @@ describe('appearanceImpactOf — verified rigid translation', () => {
       rect: rect(0, 0, 100, 20),
       quadPoints: [
         {
-          p1: { x: 0, y: 20 },
-          p2: { x: 100, y: 20 },
-          p3: { x: 0, y: 0 },
-          p4: { x: 100, y: 0 },
+          upperLeft: { x: 0, y: 20 },
+          upperRight: { x: 100, y: 20 },
+          lowerLeft: { x: 0, y: 0 },
+          lowerRight: { x: 100, y: 0 },
         },
       ],
     });
@@ -304,10 +304,10 @@ describe('appearanceImpactOf — verified rigid translation', () => {
       subtype: 'highlight',
       quadPoints: [
         {
-          p1: { x: 0, y: -10 },
-          p2: { x: 100, y: -10 },
-          p3: { x: 0, y: -30 },
-          p4: { x: 100, y: -30 },
+          upperLeft: { x: 0, y: -10 },
+          upperRight: { x: 100, y: -10 },
+          lowerLeft: { x: 0, y: -30 },
+          lowerRight: { x: 100, y: -30 },
         },
       ],
     });

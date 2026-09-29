@@ -119,10 +119,10 @@ export function pdfShapeForRect<A extends AnnotationDTO<PdfCoordinates>>(
     strokes: (strokes: PdfPoint[][]) => strokes.map((stroke) => stroke.map(point)),
     quads: (quads: PdfQuad[]) =>
       quads.map((quad) => ({
-        p1: point(quad.p1),
-        p2: point(quad.p2),
-        p3: point(quad.p3),
-        p4: point(quad.p4),
+        upperLeft: point(quad.upperLeft),
+        upperRight: point(quad.upperRight),
+        lowerLeft: point(quad.lowerLeft),
+        lowerRight: point(quad.lowerRight),
       })),
     linePoints: (line: { start: PdfPoint; end: PdfPoint }) => ({
       start: point(line.start),

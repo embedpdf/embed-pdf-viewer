@@ -279,10 +279,10 @@ interface CreateCase {
 }
 
 const QUAD = {
-  p1: { x: 72, y: 300 },
-  p2: { x: 192, y: 300 },
-  p3: { x: 72, y: 320 },
-  p4: { x: 192, y: 320 },
+  upperLeft: { x: 72, y: 300 },
+  upperRight: { x: 192, y: 300 },
+  lowerLeft: { x: 72, y: 320 },
+  lowerRight: { x: 192, y: 320 },
 };
 
 const STAMP_BYTES = { appearance: PNG_1X1 };

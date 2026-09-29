@@ -1,5 +1,5 @@
 import type { DocumentEvent } from '@embedpdf/core';
-import { textQuadFromRect } from '@embedpdf/core-geometry';
+import { quadFromRect } from '@embedpdf/core-geometry';
 import type { AnnotationFlags, AnnotationRef, PdfQuad } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -68,10 +68,10 @@ const caretDTO = (): FileAnnotation =>
 
 const strikeoutDTO = (): FileAnnotation => {
   const quad: PdfQuad = {
-    p1: { x: 10, y: 780 },
-    p2: { x: 90, y: 780 },
-    p3: { x: 10, y: 765 },
-    p4: { x: 90, y: 765 },
+    upperLeft: { x: 10, y: 780 },
+    upperRight: { x: 90, y: 780 },
+    lowerLeft: { x: 10, y: 765 },
+    lowerRight: { x: 90, y: 765 },
   };
   return {
     ...base(11),
@@ -106,8 +106,8 @@ describe('Replace Text grouped persistence', () => {
 
     harness.capability.createReplaceText(
       PAGE,
-      [textQuadFromRect(rect)],
-      { glyphQuad: textQuadFromRect(rect), advance: 1 },
+      [quadFromRect(rect)],
+      { glyphQuad: quadFromRect(rect), advance: 1 },
       'replace-text',
     );
     await vi.waitFor(() => expect(harness.create).toHaveBeenCalledTimes(2));
@@ -141,8 +141,8 @@ describe('Replace Text grouped persistence', () => {
 
     harness.capability.createReplaceText(
       PAGE,
-      [textQuadFromRect(rect)],
-      { glyphQuad: textQuadFromRect(rect), advance: 1 },
+      [quadFromRect(rect)],
+      { glyphQuad: quadFromRect(rect), advance: 1 },
       'replace-text',
     );
     await vi.waitFor(() => expect(harness.remove).toHaveBeenCalledWith(ref(10)));
@@ -251,8 +251,8 @@ describe('claimsTouchAt (touch consent)', () => {
     const rect = { x: 10, y: 20, width: 80, height: 15 };
     harness.capability.createReplaceText(
       PAGE,
-      [textQuadFromRect(rect)],
-      { glyphQuad: textQuadFromRect(rect), advance: 1 },
+      [quadFromRect(rect)],
+      { glyphQuad: quadFromRect(rect), advance: 1 },
       'replace-text',
     );
     await vi.waitFor(() => expect(harness.create).toHaveBeenCalledTimes(2));
@@ -404,8 +404,8 @@ describe('the records mirror', () => {
     const rect = { x: 10, y: 20, width: 80, height: 15 };
     harness.capability.createReplaceText(
       PAGE,
-      [textQuadFromRect(rect)],
-      { glyphQuad: textQuadFromRect(rect), advance: 1 },
+      [quadFromRect(rect)],
+      { glyphQuad: quadFromRect(rect), advance: 1 },
       'replace-text',
     );
     const newIds = harness.model().order.filter((id) => id.startsWith('new:'));
@@ -909,12 +909,12 @@ describe('the twin law — authority fused into presentation and gestures', () =
     const harness = createHarness();
     harness.allowsAnnotationCreate.mockReturnValue(false);
     const rect = { x: 10, y: 20, width: 80, height: 15 };
-    harness.capability.createMarkup('highlight', PAGE, [textQuadFromRect(rect)], 'highlight');
-    harness.capability.createCaret(PAGE, { glyphQuad: textQuadFromRect(rect), advance: 1 });
+    harness.capability.createMarkup('highlight', PAGE, [quadFromRect(rect)], 'highlight');
+    harness.capability.createCaret(PAGE, { glyphQuad: quadFromRect(rect), advance: 1 });
     harness.capability.createReplaceText(
       PAGE,
-      [textQuadFromRect(rect)],
-      { glyphQuad: textQuadFromRect(rect), advance: 1 },
+      [quadFromRect(rect)],
+      { glyphQuad: quadFromRect(rect), advance: 1 },
       'replace-text',
     );
     await expect(harness.capability.createFromSelection('highlight')).rejects.toMatchObject({

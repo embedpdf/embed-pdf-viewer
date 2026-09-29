@@ -1,4 +1,4 @@
-import { textQuadFromRect } from '@embedpdf/core-geometry';
+import { quadFromRect } from '@embedpdf/core-geometry';
 import { toPageRef, type AnnotationDTO } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
@@ -463,7 +463,7 @@ describe('annotation-core', () => {
 
   it('caretGeomFromAnchor: upright anchors stay byte-identical, rotated carry rot', () => {
     const upright = {
-      glyphQuad: textQuadFromRect({ x: 90, y: 40, width: 10, height: 20 }),
+      glyphQuad: quadFromRect({ x: 90, y: 40, width: 10, height: 20 }),
       advance: 1 as const,
     };
     expect(caretGeomFromAnchor(upright)).toEqual({
@@ -471,14 +471,14 @@ describe('annotation-core', () => {
       rect: caretRectFromAnchor(upright),
     });
 
-    // 90°-CCW column in page space: baseline runs up-screen (lowerStart
-    // (100,80) → lowerEnd (100,56)), ascent points left toward x=88.
+    // 90°-CCW column in page space: baseline runs up-screen (lowerLeft
+    // (100,80) → lowerRight (100,56)), ascent points left toward x=88.
     const rotated = {
       glyphQuad: {
-        upperStart: { x: 88, y: 80 },
-        upperEnd: { x: 88, y: 56 },
-        lowerStart: { x: 100, y: 80 },
-        lowerEnd: { x: 100, y: 56 },
+        upperLeft: { x: 88, y: 80 },
+        upperRight: { x: 88, y: 56 },
+        lowerLeft: { x: 100, y: 80 },
+        lowerRight: { x: 100, y: 56 },
       },
       advance: 1 as const,
     };
@@ -494,17 +494,17 @@ describe('annotation-core', () => {
     const rtl = { glyphQuad: rotated.glyphQuad, advance: -1 as const };
     const rtlGeom = caretGeomFromAnchor(rtl);
     expect(rtlGeom.rot).toBeCloseTo(270, 5);
-    expect(rtlGeom.rect.y).toBeCloseTo(77, 5); // centred off lowerStart (100,80)
+    expect(rtlGeom.rect.y).toBeCloseTo(77, 5); // centred off lowerLeft (100,80)
   });
 
   it('a tilted caret draws oriented chrome (obb) with no rotate knob or handles', () => {
     // The 90°-CCW column anchor from above: caretGeomFromAnchor yields rot 270.
     const anchor = {
       glyphQuad: {
-        upperStart: { x: 88, y: 80 },
-        upperEnd: { x: 88, y: 56 },
-        lowerStart: { x: 100, y: 80 },
-        lowerEnd: { x: 100, y: 56 },
+        upperLeft: { x: 88, y: 80 },
+        upperRight: { x: 88, y: 56 },
+        lowerLeft: { x: 100, y: 80 },
+        lowerRight: { x: 100, y: 56 },
       },
       advance: 1 as const,
     };
@@ -527,7 +527,7 @@ describe('annotation-core', () => {
 
   it('an upright caret keeps the plain axis-aligned outline', () => {
     const anchor = {
-      glyphQuad: textQuadFromRect({ x: 90, y: 40, width: 10, height: 20 }),
+      glyphQuad: quadFromRect({ x: 90, y: 40, width: 10, height: 20 }),
       advance: 1 as const,
     };
     const [model] = step(initialModel, { type: 'createCaret', page: PAGE, anchor });
@@ -567,7 +567,7 @@ describe('annotation-core', () => {
 
   it('creates a caret at the trailing edge of the boundary glyph', () => {
     const anchor = {
-      glyphQuad: textQuadFromRect({ x: 90, y: 40, width: 10, height: 20 }),
+      glyphQuad: quadFromRect({ x: 90, y: 40, width: 10, height: 20 }),
       advance: 1 as const,
     };
     expect(caretRectFromAnchor(anchor)).toEqual({ x: 95, y: 50, width: 10, height: 10 });
@@ -600,8 +600,8 @@ describe('annotation-core', () => {
     const [model, fx] = step(seeded, {
       type: 'createReplaceText',
       page: PAGE,
-      quads: rects.map(textQuadFromRect),
-      anchor: { glyphQuad: textQuadFromRect(rects[1]), advance: 1 },
+      quads: rects.map(quadFromRect),
+      anchor: { glyphQuad: quadFromRect(rects[1]), advance: 1 },
       preset: 'replace-text',
     });
 
@@ -631,8 +631,8 @@ describe('annotation-core', () => {
     let model = step(initialModel, {
       type: 'createReplaceText',
       page: PAGE,
-      quads: [textQuadFromRect(rect)],
-      anchor: { glyphQuad: textQuadFromRect(rect), advance: 1 },
+      quads: [quadFromRect(rect)],
+      anchor: { glyphQuad: quadFromRect(rect), advance: 1 },
     })[0];
     const [caretId, strikeoutId] = model.order;
     const result = update(model, { type: 'rekey', from: caretId, to: 'obj:42' });
@@ -1102,7 +1102,7 @@ describe('annotation-core', () => {
     const model = step(initialModel, {
       type: 'setMarkupPreview',
       subtype: 'highlight',
-      quadsByPage: { [PON]: [textQuadFromRect({ x: 10, y: 10, width: 80, height: 12 })] },
+      quadsByPage: { [PON]: [quadFromRect({ x: 10, y: 10, width: 80, height: 12 })] },
     })[0];
     const ghost = pageItems(model, PAGE).find((item) => item.source === 'ghost');
     expect(ghost?.subtype).toBe('highlight');
@@ -1114,7 +1114,7 @@ describe('annotation-core', () => {
   it('scene() paints markup per subtype in the core (no framework logic): highlight fills+multiply, squiggly strokes a path', () => {
     const quads: ModelGeometry = {
       kind: 'quads',
-      quads: [textQuadFromRect({ x: 0, y: 0, width: 100, height: 12 })],
+      quads: [quadFromRect({ x: 0, y: 0, width: 100, height: 12 })],
     };
     const mk = (subtype: string): RenderItem => ({
       id: 'x',
@@ -1436,7 +1436,7 @@ describe('annotation-core', () => {
       subtype: 'highlight',
       geometry: {
         kind: 'quads',
-        quads: [textQuadFromRect({ x: 10, y: 10, width: 80, height: 20 })],
+        quads: [quadFromRect({ x: 10, y: 10, width: 80, height: 20 })],
       },
       style: {
         color: '#ffcc00',
@@ -1621,7 +1621,7 @@ describe('annotation-core', () => {
       subtype: 'highlight',
       geometry: {
         kind: 'quads',
-        quads: [textQuadFromRect({ x: 0, y: 0, width: 100, height: 100 })],
+        quads: [quadFromRect({ x: 0, y: 0, width: 100, height: 100 })],
       },
       style: {
         color: '#ffcc00',
@@ -2577,7 +2577,7 @@ describe('annotation-core — selectionAnchor carries the knob alongside a centr
   it('a non-rotatable selection (highlight) exposes a box but NO knob', () => {
     const hi = square(
       's2',
-      { kind: 'quads', quads: [textQuadFromRect({ x: 10, y: 10, width: 80, height: 12 })] },
+      { kind: 'quads', quads: [quadFromRect({ x: 10, y: 10, width: 80, height: 12 })] },
       'highlight',
     );
     const base = modelWith([hi]);

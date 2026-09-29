@@ -4,7 +4,7 @@ import { geomRotation, pointInPoly, rotatePoint, selectionQuad, unionRect } from
 import { DISTANCE_CAPTION_SIZE, distanceCaptionWidth } from './measurement-font';
 import { distanceLayout, distanceSelectionQuad, moveDistanceCaption } from './measurement';
 import type { DistanceCaptionLayout, MeasurementAppearance } from './measurement';
-import type { ModelGeometry, Quad, Rect, Style, Point } from './types';
+import type { ModelGeometry, QuadRing, Rect, Style, Point } from './types';
 
 export interface ShapeMeasurementAppearance {
   intent: 'polyline-dimension' | 'polygon-dimension';
@@ -192,7 +192,7 @@ export function measurementSelectionQuad(
   geometry: ModelGeometry,
   appearance: MeasurementAppearance,
   style: Style,
-): Quad {
+): QuadRing {
   if (appearance.intent === 'line-dimension') {
     return distanceSelectionQuad(geometry, appearance, style.strokeWidth);
   }
@@ -207,7 +207,7 @@ export function measurementSelectionQuad(
     { x: bounds.x + bounds.width, y: bounds.y },
     { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
     { x: bounds.x, y: bounds.y + bounds.height },
-  ].map((point) => rotatePoint(point, ORIGIN, angle)) as Quad;
+  ].map((point) => rotatePoint(point, ORIGIN, angle)) as QuadRing;
 }
 
 export function moveMeasurementCaption(

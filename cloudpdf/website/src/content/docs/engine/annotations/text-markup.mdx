@@ -161,12 +161,14 @@ copy.
 
 ### Quads
 
-A quad is four corners, `{ p1, p2, p3, p4 }`: the two ends of the top edge, then the two ends of
-the bottom edge, each from the side where the line starts. Segments from a search and from the
-layout come in this order, for upright, rotated and vertical text alike, so pass them unchanged.
+A quad is four corners, `{ upperLeft, upperRight, lowerLeft, lowerRight }`, named as the text
+itself stands: `upper` is the top of the letters, and `left` is the left end as it would be if the
+text stood upright. On text turned upside down, `upperLeft` is at the bottom right of the page.
+Right-to-left text uses the same names. Segments from a search and from the layout carry these
+names, for upright, rotated and vertical text alike, so pass them unchanged.
 
-Markups made by other PDF apps don't always keep this order. To find where one is, use its
-`rect`, or the box around each quad, rather than naming its corners.
+Other PDF apps store a markup's corners in different orders. The engine sorts them out when it
+reads the file, so every quad it gives you uses these names.
 
 ### One mark, many lines
 

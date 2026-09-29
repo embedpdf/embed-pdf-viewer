@@ -58,12 +58,12 @@ export function SearchLayer({
           // Upright hits keep the classic rounded div (pixel-identical to the
           // pre-orientation layer); rotated hits draw their true oriented cell.
           const upright =
-            quad.upperStart.y === quad.upperEnd.y &&
-            quad.lowerStart.y === quad.lowerEnd.y &&
-            quad.upperStart.x === quad.lowerStart.x;
+            quad.upperLeft.y === quad.upperRight.y &&
+            quad.lowerLeft.y === quad.lowerRight.y &&
+            quad.upperLeft.x === quad.lowerLeft.x;
           if (upright) {
-            const tl = page.transform.toPixels(quad.upperStart);
-            const br = page.transform.toPixels(quad.lowerEnd);
+            const tl = page.transform.toPixels(quad.upperLeft);
+            const br = page.transform.toPixels(quad.lowerRight);
             return (
               <div
                 key={`${hit.start}:${i}`}
@@ -82,7 +82,7 @@ export function SearchLayer({
               />
             );
           }
-          const ring = [quad.upperStart, quad.upperEnd, quad.lowerEnd, quad.lowerStart].map(
+          const ring = [quad.upperLeft, quad.upperRight, quad.lowerRight, quad.lowerLeft].map(
             (point) => page.transform.toPixels(point),
           );
           return (

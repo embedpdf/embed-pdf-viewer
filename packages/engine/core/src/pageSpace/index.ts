@@ -49,8 +49,6 @@ export {
   pagePointTurned,
   pagePointUnturned,
   pageQuadBounds,
-  pageQuadCorners,
-  pageQuadFromCorners,
   pageTurnOfDrawn,
   pageTurnOfUpright,
   resolveAnnotationDraft,

@@ -17,7 +17,7 @@ export type {
   InkList,
   CalloutLine,
 } from './primitives';
-export type { PdfOriginSize, PdfQuadCorners } from './convert';
+export type { PdfOriginSize, PdfQuadPoints } from './convert';
 export {
   normalizePdfRect,
   pdfRectWidth,
@@ -26,8 +26,7 @@ export {
   pdfRectToOriginSize,
   pdfRectFromOriginSize,
   pdfQuadBounds,
-  pdfQuadCorners,
-  pdfQuadFromCorners,
+  normalizePdfQuad,
   pdfRectTurnedBounds,
   pdfRectIntersection,
   isSamePdfRect,

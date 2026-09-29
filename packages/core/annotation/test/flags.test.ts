@@ -1,4 +1,4 @@
-import { textQuadFromRect } from '@embedpdf/core-geometry';
+import { quadFromRect } from '@embedpdf/core-geometry';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
@@ -313,7 +313,7 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
     // markup quads are bound to page text — no screen anchoring for them.
     const quads: ModelGeometry = {
       kind: 'quads',
-      quads: [textQuadFromRect({ x: 0, y: 0, width: 10, height: 5 })],
+      quads: [quadFromRect({ x: 0, y: 0, width: 10, height: 5 })],
     };
     expect(anchoredGeom(quads, { zoom: true, upright: true }, { zoom: 2, rotation: 0 })).toBe(
       quads,

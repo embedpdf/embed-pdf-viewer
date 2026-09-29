@@ -86,16 +86,10 @@ export function createMarking(
     for (const hit of finder.listHits()) {
       if (wanted && !wanted.has(hit.page.pageObjectNumber)) continue;
       if (hit.segments.length === 0) continue;
-      // The engine's quads name their corners by position; its rect covers them.
-      const quadPoints = hit.segments.map(({ quad }) => ({
-        p1: quad.upperStart,
-        p2: quad.upperEnd,
-        p3: quad.lowerStart,
-        p4: quad.lowerEnd,
-      }));
+      // The engine's rect covers the quads.
       const created = await annotation.create(hit.page, {
         subtype: 'redact',
-        quadPoints,
+        quadPoints: hit.segments.map((segment) => segment.quad),
         ...markStyle(),
       });
       refs.push(created.annotation.ref);

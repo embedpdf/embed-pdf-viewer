@@ -8,13 +8,13 @@ import {
   applyPoint,
   isQuarterTurn,
   rotateAbout,
-  textQuadPoints,
-  textQuadRing,
+  quadCorners,
+  quadRing,
   type Mat2D,
   type PageRotation,
   type PointIn,
   type Size,
-  type TextQuad,
+  type Quad,
 } from '@embedpdf/core-geometry';
 import { cloudyBorderExtent, cloudyPath, cloudyPolyPath } from './cloudy';
 import { endingNodes, endingPoints } from './endings';
@@ -24,7 +24,7 @@ import type {
   ModelGeometry,
   Handle,
   LineEnding,
-  Quad,
+  QuadRing,
   Rect,
   RenderNode,
   Style,
@@ -246,7 +246,7 @@ export function centroidOf(geometry: ModelGeometry): Point {
       ? geometry.points
       : geometry.kind === 'ink'
         ? geometry.strokes.flat()
-        : geometry.quads.flatMap(textQuadPoints);
+        : geometry.quads.flatMap(quadCorners);
   let sx = 0;
   let sy = 0;
   for (const point of points) {
@@ -367,7 +367,7 @@ function apFrameSize(geometry: ModelGeometry): Size {
         ? geometry.points
         : geometry.kind === 'ink'
           ? geometry.strokes.flat()
-          : geometry.quads.flatMap(textQuadPoints);
+          : geometry.quads.flatMap(quadCorners);
   const rect = unionRect(points);
   return { width: rect.width, height: rect.height };
 }
@@ -812,12 +812,9 @@ export function caretRectFromTextEnd(lineRect: Rect): Rect {
  */
 export function caretRectFromAnchor(anchor: TextEndAnchor): Rect {
   const quad = anchor.glyphQuad;
-  const ink = Math.hypot(
-    quad.lowerStart.x - quad.upperStart.x,
-    quad.lowerStart.y - quad.upperStart.y,
-  );
+  const ink = Math.hypot(quad.lowerLeft.x - quad.upperLeft.x, quad.lowerLeft.y - quad.upperLeft.y);
   const size = Math.max(ink / 2, 1);
-  const corner = anchor.advance > 0 ? quad.lowerEnd : quad.lowerStart;
+  const corner = anchor.advance > 0 ? quad.lowerRight : quad.lowerLeft;
   return { x: corner.x - size / 2, y: corner.y - size, width: size, height: size };
 }
 
@@ -837,17 +834,14 @@ export function caretGeomFromAnchor(
   anchor: TextEndAnchor,
 ): Extract<ModelGeometry, { kind: 'caret' }> {
   const quad = anchor.glyphQuad;
-  const ink = Math.hypot(
-    quad.lowerStart.x - quad.upperStart.x,
-    quad.lowerStart.y - quad.upperStart.y,
-  );
+  const ink = Math.hypot(quad.lowerLeft.x - quad.upperLeft.x, quad.lowerLeft.y - quad.upperLeft.y);
   const size = Math.max(ink / 2, 1);
-  const corner = anchor.advance > 0 ? quad.lowerEnd : quad.lowerStart;
+  const corner = anchor.advance > 0 ? quad.lowerRight : quad.lowerLeft;
   // The caret's own orientation follows the text (the symbol points at its
   // line regardless of reading direction), so the tilt comes from the
   // baseline edge, not from `advance`.
-  const bx = quad.lowerEnd.x - quad.lowerStart.x;
-  const by = quad.lowerEnd.y - quad.lowerStart.y;
+  const bx = quad.lowerRight.x - quad.lowerLeft.x;
+  const by = quad.lowerRight.y - quad.lowerLeft.y;
   const rot = Math.hypot(bx, by) > 0 ? normalizeDeg((Math.atan2(by, bx) * 180) / Math.PI) : 0;
   const upright = rot < CARET_ROT_EPSILON || rot > 360 - CARET_ROT_EPSILON;
   if (upright) {
@@ -857,8 +851,8 @@ export function caretGeomFromAnchor(
     };
   }
   // Centre = trailing corner + (size/2) toward the ascent side.
-  const ux = (quad.upperStart.x - quad.lowerStart.x) / ink;
-  const uy = (quad.upperStart.y - quad.lowerStart.y) / ink;
+  const ux = (quad.upperLeft.x - quad.lowerLeft.x) / ink;
+  const uy = (quad.upperLeft.y - quad.lowerLeft.y) / ink;
   const cx = corner.x + (ux * size) / 2;
   const cy = corner.y + (uy * size) / 2;
   return {
@@ -868,13 +862,13 @@ export function caretGeomFromAnchor(
   };
 }
 
-/** Map a TextQuad's corners through a point function (names ride along). */
-function mapTextQuad(quad: TextQuad, mapPoint: (point: Point) => Point): TextQuad {
+/** Map a Quad's corners through a point function (names ride along). */
+function mapQuad(quad: Quad, mapPoint: (point: Point) => Point): Quad {
   return {
-    upperStart: mapPoint(quad.upperStart),
-    upperEnd: mapPoint(quad.upperEnd),
-    lowerStart: mapPoint(quad.lowerStart),
-    lowerEnd: mapPoint(quad.lowerEnd),
+    upperLeft: mapPoint(quad.upperLeft),
+    upperRight: mapPoint(quad.upperRight),
+    lowerLeft: mapPoint(quad.lowerLeft),
+    lowerRight: mapPoint(quad.lowerRight),
   };
 }
 
@@ -1058,7 +1052,7 @@ export function geomVisualBounds(
   if (geometry.kind === 'rect' || geometry.kind === 'text' || geometry.kind === 'caret')
     return geometry.rect;
   if (geometry.kind === 'quads')
-    return expandRect(unionRect(geometry.quads.flatMap(textQuadPoints)), strokeWidth / 2);
+    return expandRect(unionRect(geometry.quads.flatMap(quadCorners)), strokeWidth / 2);
   // Ink is round-capped/round-joined: it never spikes, so a plain half-width grow of the
   // freehand hull is exact — left as-is (the freehand look must not change).
   if (geometry.kind === 'ink')
@@ -1227,7 +1221,7 @@ export function geomBounds(geometry: ModelGeometry): Rect {
   if (geometry.kind === 'line') return rectFromPoints(geometry.a, geometry.b);
   if (geometry.kind === 'poly') return unionRect(geometry.points);
   if (geometry.kind === 'ink') return unionRect(geometry.strokes.flat());
-  return unionRect(geometry.quads.flatMap(textQuadPoints));
+  return unionRect(geometry.quads.flatMap(quadCorners));
 }
 
 /**
@@ -1342,9 +1336,9 @@ export function geomHit(
     return false;
   }
   // quads (markup): oriented per-line cells — hit anywhere inside any quad.
-  // TextQuad rings are simple (non-self-intersecting) by construction, so the
+  // Quad rings are simple (non-self-intersecting) by construction, so the
   // generic point-in-poly test is exact for rotated text too.
-  return geometry.quads.some((quad) => pointInQuad(point, textQuadRing(quad)));
+  return geometry.quads.some((quad) => pointInQuad(point, quadRing(quad)));
 }
 
 export function geomHandles(geometry: ModelGeometry): Handle[] {
@@ -1406,7 +1400,7 @@ export function geomTranslate(geometry: ModelGeometry, delta: Point): ModelGeome
   if (geometry.kind === 'poly') return { ...geometry, points: geometry.points.map(mv) };
   if (geometry.kind === 'ink')
     return { ...geometry, strokes: geometry.strokes.map((stroke) => stroke.map(mv)) };
-  return { ...geometry, quads: geometry.quads.map((quad) => mapTextQuad(quad, mv)) };
+  return { ...geometry, quads: geometry.quads.map((quad) => mapQuad(quad, mv)) };
 }
 
 const OPPOSITE_HANDLE: Record<RectHandle, RectHandle> = {
@@ -1614,8 +1608,8 @@ export function geomScene(geometry: ModelGeometry, strokeWidth = 0, border?: Bor
     // each pen stroke is an open polyline (stroke-only; `scene` paints it)
     return geometry.strokes.map((stroke) => ({ kind: 'poly', points: stroke, closed: false }));
   }
-  // markup fallback: a closed ring per quad (US → UE → LE → LS). The scene
+  // markup fallback: a closed ring per quad (upper-left round to lower-left). The scene
   // painter renders these per-subtype; this keeps the generic scene correct
   // regardless, rotated text included.
-  return geometry.quads.map((quad) => ({ kind: 'poly', points: textQuadRing(quad), closed: true }));
+  return geometry.quads.map((quad) => ({ kind: 'poly', points: quadRing(quad), closed: true }));
 }

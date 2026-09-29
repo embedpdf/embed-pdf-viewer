@@ -26,12 +26,8 @@ export interface PageGeometryGlyph<C extends Coordinates = PageCoordinates> {
 
 /**
  * One non-upright character's geometry: the exact oriented cells, in page
- * space (not a local frame). The corner slots are
- * frame-geometric in the glyph's own upright frame:
- * `p1` = upper-start, `p2` = upper-end, `p3` = lower-start, `p4` = lower-end,
- * where "upper" is the ascent side and "start" is the frame's minimum-x side.
- * Deliberately not a bidi/reading-order statement — advance direction is a
- * glyph-sequence concern, carried separately where consumers need it.
+ * space (not a local frame). Each cell's corners are named in the glyph's
+ * own upright frame, as every quad's are (see `PdfQuad`).
  *
  * Degenerate glyphs carry a zeroed `loose` quad and `empty`, mirroring the
  * upright variant's zeroed-box convention.
@@ -112,16 +108,16 @@ export function isRotatedGeometryRun<C extends Coordinates>(
 /**
  * Uniform oriented-cell view over either run variant, in the file's
  * coordinates: the glyph's loose cell as a quad (synthesized from the box
- * corners when the run is upright, in the same frame-geometric slot order).
+ * corners when the run is upright).
  */
 export function glyphLooseQuad(run: PageGeometryRun<PdfCoordinates>, index: number): PdfQuad {
   if (isRotatedGeometryRun(run)) return run.glyphs[index].loose;
   const b = run.glyphs[index].loose;
   return {
-    p1: { x: b.left, y: b.top },
-    p2: { x: b.right, y: b.top },
-    p3: { x: b.left, y: b.bottom },
-    p4: { x: b.right, y: b.bottom },
+    upperLeft: { x: b.left, y: b.top },
+    upperRight: { x: b.right, y: b.top },
+    lowerLeft: { x: b.left, y: b.bottom },
+    lowerRight: { x: b.right, y: b.bottom },
   };
 }
 

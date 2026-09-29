@@ -2,10 +2,10 @@
 import { anchoredGeom, anchoredStrokeWidth, anchorModeOf } from './anchor';
 import { geomRotation, isRotatableGeom, selectionQuad, turnPivotOf } from './geometry';
 import { measurementSelectionQuad } from './measurement-shape';
-import type { ModelAnnotation, Quad, Point, ViewEnv } from './types';
+import type { ModelAnnotation, QuadRing, Point, ViewEnv } from './types';
 
 export interface SelectionFrame {
-  corners: Quad;
+  corners: QuadRing;
   center: Point;
   angle: number;
 }

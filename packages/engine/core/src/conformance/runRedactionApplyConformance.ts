@@ -26,10 +26,10 @@ export function runRedactionApplyConformance(
   /** A highlight inside the redacted area. */
   const COLLATERAL_QUAD: HighlightDraft['quadPoints'] = [
     {
-      p1: { x: 70, y: 80 },
-      p2: { x: 150, y: 80 },
-      p3: { x: 70, y: 120 },
-      p4: { x: 150, y: 120 },
+      upperLeft: { x: 70, y: 80 },
+      upperRight: { x: 150, y: 80 },
+      lowerLeft: { x: 70, y: 120 },
+      lowerRight: { x: 150, y: 120 },
     },
   ];
 

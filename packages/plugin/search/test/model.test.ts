@@ -16,10 +16,10 @@ import {
 
 const seg = (rect: { x: number; y: number; width: number; height: number }) => ({
   quad: {
-    upperStart: { x: rect.x, y: rect.y },
-    upperEnd: { x: rect.x + rect.width, y: rect.y },
-    lowerStart: { x: rect.x, y: rect.y + rect.height },
-    lowerEnd: { x: rect.x + rect.width, y: rect.y + rect.height },
+    upperLeft: { x: rect.x, y: rect.y },
+    upperRight: { x: rect.x + rect.width, y: rect.y },
+    lowerLeft: { x: rect.x, y: rect.y + rect.height },
+    lowerRight: { x: rect.x + rect.width, y: rect.y + rect.height },
   },
   rect,
   advance: 1 as const,

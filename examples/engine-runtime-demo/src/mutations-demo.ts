@@ -39,10 +39,10 @@ export interface MutationsDemoResult {
 
 const QUAD: HighlightDraft['quadPoints'] = [
   {
-    p1: { x: 50, y: 692 },
-    p2: { x: 150, y: 692 },
-    p3: { x: 50, y: 712 },
-    p4: { x: 150, y: 712 },
+    upperLeft: { x: 50, y: 692 },
+    upperRight: { x: 150, y: 692 },
+    lowerLeft: { x: 50, y: 712 },
+    lowerRight: { x: 150, y: 712 },
   },
 ];
 

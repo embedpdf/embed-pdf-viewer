@@ -75,21 +75,23 @@ export type InkList = InkStroke[];
 export type CalloutLine = readonly [PdfPoint, PdfPoint] | readonly [PdfPoint, PdfPoint, PdfPoint];
 
 /**
- * A /QuadPoints quad. The four points are positional, in PDFium
- * `FS_QUADPOINTSF` order (PDF 32000 §12.5.6.10): `p1 p2 p3 p4`. Coordinates
- * are PDF user space, y-up.
+ * A quad: four corners named in the text's own upright frame. `upper` is the
+ * ascent side and `lower` the baseline side; `left` to `right` runs along the
+ * frame's x axis. The names are neither screen directions nor reading order:
+ * text turned 180° has its `upperLeft` at the bottom right of the page, and
+ * right-to-left text still runs from `left` to `right`. Coordinates are PDF
+ * user space, y-up.
  *
- * This type asserts no corner semantics. Quads can be rotated or skewed
- * (e.g. text markup over rotated text), and PDF producers disagree on corner
- * order — so naming corners `topLeft`/... on the wire would be a false
- * guarantee. Derive named corners with `pdfQuadCorners` (valid only for
- * axis-aligned quads) or get the enclosing box with `pdfQuadBounds`.
+ * The engine keeps the names true: its text geometry makes them, and every
+ * `/QuadPoints` entry it reads is named by `normalizePdfQuad`. It writes the
+ * corners in the order Acrobat reads: upper-left, upper-right, lower-left,
+ * lower-right.
  */
 export interface PdfQuad {
-  p1: PdfPoint;
-  p2: PdfPoint;
-  p3: PdfPoint;
-  p4: PdfPoint;
+  upperLeft: PdfPoint;
+  upperRight: PdfPoint;
+  lowerLeft: PdfPoint;
+  lowerRight: PdfPoint;
 }
 
 /**

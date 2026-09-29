@@ -69,7 +69,12 @@ describe('page space primitives', () => {
         };
         expect(pdfRectOf(pageBoxOf(rect, visible), visible)).toEqual(normalizePdfRect(rect));
 
-        const quad = { p1: point, p2: { x: a, y: c }, p3: { x: b, y: d }, p4: { x: a, y: d } };
+        const quad = {
+          upperLeft: point,
+          upperRight: { x: a, y: c },
+          lowerLeft: { x: b, y: d },
+          lowerRight: { x: a, y: d },
+        };
         expect(pdfQuadOf(pageQuadOf(quad, visible), visible)).toEqual(quad);
       }
     },

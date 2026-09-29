@@ -203,7 +203,7 @@ export type {
   ClickCreate,
   PointerInput,
   PropKey,
-  Quad,
+  QuadRing,
   Rect,
   RecordFields,
   LineEnding,
@@ -219,7 +219,7 @@ export type {
   Subtype,
   TextAlign,
   TextEndAnchor,
-  TextQuad,
+  Quad,
   TextStyle,
   Point,
 } from './types';

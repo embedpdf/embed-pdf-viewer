@@ -5,38 +5,25 @@
  * full projection is their geometry fallback), while an area redact and a
  * caret are box-like and move by `/Rect`.
  */
-import { normalizeQuad } from '@embedpdf/core-geometry';
 import type { AnnotationDTO, PageBox, PageQuad } from '@embedpdf/engine-core/runtime';
 
-import type { ModelAnnotation, RecordFields, TextQuad } from '../../types';
+import type { ModelAnnotation, RecordFields } from '../../types';
 import type { KindProjection } from '../projection';
 import { boxGeomFields } from '../seam';
 
-/**
- * Imported `/QuadPoints` → semantic TextQuads. `normalizeQuad` is a
- * normalizer, not a cast: the de-facto zigzag order passes through, ring-order
- * producers are repaired, and garbage gets a deterministic labeling — so
- * drawing code can never put an underline on the wrong edge of a well-formed
- * quad, rotated ones included.
- */
-const quadsFromDTO = (quadPoints: PageQuad[]): TextQuad[] => quadPoints.map(normalizeQuad);
-
-/** Content quads → engine `quadPoints`, in the zigzag slot order: p1..p4 =
- *  upper-start, upper-end, lower-start, lower-end (PDFium's documented TL,
- *  TR, BL, BR); null off quads geom. */
+/** Content quads as the engine's `quadPoints`; null off quads geom. */
 export function quadPointsFor(annotation: RecordFields): PageQuad[] | null {
-  if (annotation.geometry.kind !== 'quads') return null;
-  return annotation.geometry.quads.map((quad) => ({
-    p1: quad.upperStart,
-    p2: quad.upperEnd,
-    p3: quad.lowerStart,
-    p4: quad.lowerEnd,
-  }));
+  return annotation.geometry.kind === 'quads' ? annotation.geometry.quads : null;
 }
 
 /** The box around a set of quads — the `rect` a quad-bearing draft must carry alongside its quads. */
 export const boundsOfQuads = (quads: PageQuad[]): PageBox => {
-  const points = quads.flatMap((quad) => [quad.p1, quad.p2, quad.p3, quad.p4]);
+  const points = quads.flatMap((quad) => [
+    quad.upperLeft,
+    quad.upperRight,
+    quad.lowerLeft,
+    quad.lowerRight,
+  ]);
   const xs = points.map((point) => point.x);
   const ys = points.map((point) => point.y);
   const x = Math.min(...xs);
@@ -49,7 +36,7 @@ const markupProjection = (subtype: 'highlight' | 'underline' | 'squiggly' | 'str
     ingest: (dto) => {
       const markupDto = dto as Extract<AnnotationDTO, { subtype: typeof subtype }>;
       return {
-        geometry: { kind: 'quads', quads: quadsFromDTO(markupDto.quadPoints) },
+        geometry: { kind: 'quads', quads: markupDto.quadPoints },
         ...(subtype === 'strikeout' && 'intent' in markupDto && markupDto.intent
           ? { intent: markupDto.intent }
           : {}),
@@ -112,7 +99,7 @@ export const redact: KindProjection = {
     // box and it moves/resizes like a shape.
     const geometry: ModelAnnotation['geometry'] =
       redactDto.quadPoints.length > 0
-        ? { kind: 'quads', quads: quadsFromDTO(redactDto.quadPoints) }
+        ? { kind: 'quads', quads: redactDto.quadPoints }
         : { kind: 'rect', rect: redactDto.rect, ellipse: false };
     return {
       geometry,

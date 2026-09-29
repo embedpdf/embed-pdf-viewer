@@ -26,7 +26,12 @@ import { createPdfTextLayout, type PdfTextSegment, type TextLayout } from '../te
  */
 const NO_BOX: PageBox = { x: 0, y: 0, width: 0, height: 0 };
 const NO_RECT: PdfRect = { left: 0, bottom: 0, right: 0, top: 0 };
-const NO_QUAD = { p1: { x: 0, y: 0 }, p2: { x: 0, y: 0 }, p3: { x: 0, y: 0 }, p4: { x: 0, y: 0 } };
+const NO_QUAD = {
+  upperLeft: { x: 0, y: 0 },
+  upperRight: { x: 0, y: 0 },
+  lowerLeft: { x: 0, y: 0 },
+  lowerRight: { x: 0, y: 0 },
+};
 
 /** Whether a run has a character with a box of its own. */
 const hasBox = (run: { glyphs: readonly { empty?: true }[] }): boolean =>

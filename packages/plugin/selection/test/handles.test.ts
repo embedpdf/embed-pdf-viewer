@@ -3,18 +3,13 @@
  * 45°, RTL edge choice, and the drag session's re-root/gap/commit rules.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { textQuadFromRect } from '@embedpdf/core-geometry';
-import type { Point, TextQuad } from '@embedpdf/core-geometry';
+import { quadFromRect } from '@embedpdf/core-geometry';
+import type { Point, Quad } from '@embedpdf/core-geometry';
 import { toPageRef, type PageRef } from '@embedpdf/engine-core/runtime';
 import { HANDLE_HEAD, createSelectionHandleDrag, selectionHandleGeom } from '../src/handles';
 import type { SelectionHandleEndpoint, SelectionHandleView } from '../src/handles';
 
-const rotateQuad = (
-  quad: TextQuad,
-  angleDeg: number,
-  pivotX: number,
-  pivotY: number,
-): TextQuad => {
+const rotateQuad = (quad: Quad, angleDeg: number, pivotX: number, pivotY: number): Quad => {
   const radians = (angleDeg * Math.PI) / 180;
   const cos = Math.cos(radians);
   const sin = Math.sin(radians);
@@ -23,10 +18,10 @@ const rotateQuad = (
     y: pivotY + (point.x - pivotX) * sin + (point.y - pivotY) * cos,
   });
   return {
-    upperStart: rotate(quad.upperStart),
-    upperEnd: rotate(quad.upperEnd),
-    lowerStart: rotate(quad.lowerStart),
-    lowerEnd: rotate(quad.lowerEnd),
+    upperLeft: rotate(quad.upperLeft),
+    upperRight: rotate(quad.upperRight),
+    lowerLeft: rotate(quad.lowerLeft),
+    lowerRight: rotate(quad.lowerRight),
   };
 };
 
@@ -37,8 +32,8 @@ const view = (zoom = 1): SelectionHandleView => ({
   pointOnPage: () => null,
 });
 
-const CELL = textQuadFromRect({ x: 100, y: 200, width: 60, height: 16 });
-const endpoint = (glyphQuad: TextQuad, advance: 1 | -1 = 1): SelectionHandleEndpoint => ({
+const CELL = quadFromRect({ x: 100, y: 200, width: 60, height: 16 });
+const endpoint = (glyphQuad: Quad, advance: 1 | -1 = 1): SelectionHandleEndpoint => ({
   page: toPageRef(7),
   glyphQuad,
   advance,
@@ -60,7 +55,11 @@ describe('selectionHandleGeom', () => {
 
   it('bar length is the ink height at every rotation — never the AABB height', () => {
     for (const deg of [30, 45, 90, 180, 270]) {
-      const geometry = selectionHandleGeom(view(), endpoint(rotateQuad(CELL, deg, 100, 200)), 'start')!;
+      const geometry = selectionHandleGeom(
+        view(),
+        endpoint(rotateQuad(CELL, deg, 100, 200)),
+        'start',
+      )!;
       expect(geometry.length).toBeCloseTo(16, 6);
       expect(geometry.upright).toBe(false);
       // the bar's screen angle tracks the text's tilt exactly
@@ -69,7 +68,11 @@ describe('selectionHandleGeom', () => {
   });
 
   it('zoom scales the projected geometry with no extra factor', () => {
-    const geometry = selectionHandleGeom(view(2.5), endpoint(rotateQuad(CELL, 45, 100, 200)), 'start')!;
+    const geometry = selectionHandleGeom(
+      view(2.5),
+      endpoint(rotateQuad(CELL, 45, 100, 200)),
+      'start',
+    )!;
     expect(geometry.length).toBeCloseTo(40, 6); // 16 × 2.5
   });
 
@@ -79,14 +82,18 @@ describe('selectionHandleGeom', () => {
     expect(ltr.bar.from.x).toBeCloseTo(100, 9);
     expect(rtl.bar.from.x).toBeCloseTo(160, 9); // the cell's end side
     // …and the same mirroring under rotation
-    const rtl45 = selectionHandleGeom(view(), endpoint(rotateQuad(CELL, 45, 100, 200), -1), 'start')!;
+    const rtl45 = selectionHandleGeom(
+      view(),
+      endpoint(rotateQuad(CELL, 45, 100, 200), -1),
+      'start',
+    )!;
     expect(rtl45.length).toBeCloseTo(16, 6);
   });
 
   it('null when the page is not laid out or the cell is degenerate', () => {
     const dead: SelectionHandleView = { ...view(), toOverlay: () => null };
     expect(selectionHandleGeom(dead, endpoint(CELL), 'start')).toBeNull();
-    const flat = textQuadFromRect({ x: 0, y: 0, width: 10, height: 0 });
+    const flat = quadFromRect({ x: 0, y: 0, width: 10, height: 0 });
     expect(selectionHandleGeom(view(), endpoint(flat), 'start')).toBeNull();
   });
 });
