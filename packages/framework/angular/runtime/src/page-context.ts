@@ -22,7 +22,7 @@ import type { PageFrame, PageTransform, Point, Rect } from '@embedpdf/core-geome
 export interface EpdfPageContext {
   readonly documentId: string;
   /** The page's durable address — use for keys / render / annotations (read
-   *  `ref.pageObjectNumber` where a map key is needed). */
+   *  `ref.objectNumber` where a map key is needed). */
   readonly ref: PageRef;
   /** Display index (page N) — can shift under page reorders, hence a signal. */
   readonly pageIndex: Signal<number>;

@@ -11,13 +11,13 @@ export namespace AnnotationRedactReplyTo {
     export interface ObjectNumber {
         kind: "objectNumber";
         page: AnnotationRedactReplyToObjectNumber.Page;
-        annotObjectNumber: number;
+        objectNumber: number;
     }
 
     export namespace AnnotationRedactReplyToObjectNumber {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -37,7 +37,7 @@ export namespace AnnotationRedactReplyTo {
     export namespace AnnotationRedactReplyToNm {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -58,7 +58,7 @@ export namespace AnnotationRedactReplyTo {
     export namespace AnnotationRedactReplyToIndex {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -77,7 +77,7 @@ export namespace AnnotationRedactReplyTo {
         export namespace Revision {
             export interface Page {
                 kind: Page.Kind;
-                pageObjectNumber: number;
+                objectNumber: number;
             }
 
             export namespace Page {

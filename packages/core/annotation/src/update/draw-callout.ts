@@ -94,10 +94,7 @@ export function calloutPointer(
 ): [Model, Effect[]] {
   const draft = model.draft;
   if (phase === 'down') {
-    if (
-      draft?.kind !== 'create-callout' ||
-      draft.page.pageObjectNumber !== input.page.pageObjectNumber
-    ) {
+    if (draft?.kind !== 'create-callout' || draft.page.objectNumber !== input.page.objectNumber) {
       return [
         {
           ...model,

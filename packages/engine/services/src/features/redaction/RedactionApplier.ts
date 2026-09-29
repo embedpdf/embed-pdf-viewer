@@ -157,12 +157,12 @@ export class RedactionApplier {
       );
     }
     for (const ref of scope.annotations) {
-      const existing = plan.get(ref.page.pageObjectNumber);
+      const existing = plan.get(ref.page.objectNumber);
       if (existing === null) {
         throw new EngineError(EngineErrorCode.InvalidArg, 'mixed redaction scopes on one page');
       }
       if (existing) existing.push(ref);
-      else plan.set(ref.page.pageObjectNumber, [ref]);
+      else plan.set(ref.page.objectNumber, [ref]);
     }
     // Applying removes annotations, which shifts positional indices — a
     // batch of multiple refs on one page can only address the survivors

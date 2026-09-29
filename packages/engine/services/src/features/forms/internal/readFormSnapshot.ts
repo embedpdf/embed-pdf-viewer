@@ -159,8 +159,9 @@ export function readFieldAt(
 
   const base: FormFieldBase<PdfCoordinates> = {
     ref:
-      fieldObjectNumber > 0 ? { kind: 'objectNumber', fieldObjectNumber } : { kind: 'fqn', name },
-    fieldObjectNumber,
+      fieldObjectNumber > 0
+        ? { kind: 'objectNumber', objectNumber: fieldObjectNumber }
+        : { kind: 'fqn', name },
     name,
     family,
     origin: fn.EPDFForm_GetFieldOrigin(model, fieldIndex) === 1 ? 'recovered' : 'acroform',

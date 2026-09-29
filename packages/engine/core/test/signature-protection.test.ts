@@ -13,7 +13,7 @@ import type { SignatureDTO } from '../src/signature/types';
 
 const sig = (over: Partial<SignatureDTO>): SignatureDTO => ({
   index: 0,
-  field: { kind: 'objectNumber', fieldObjectNumber: 10 },
+  field: { kind: 'objectNumber', objectNumber: 10 },
   fieldName: 'sig',
   widget: null,
   signed: true,

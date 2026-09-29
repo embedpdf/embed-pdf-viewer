@@ -125,7 +125,7 @@ export function injectPageList(explicit?: StageTokenProp) {
         left.length === right.length &&
         left.every(
           (pageInfo, i) =>
-            pageInfo.ref.pageObjectNumber === right[i].ref.pageObjectNumber &&
+            pageInfo.ref.objectNumber === right[i].ref.objectNumber &&
             pageInfo.label === right[i].label,
         ),
     ),

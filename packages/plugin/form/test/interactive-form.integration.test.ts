@@ -34,12 +34,12 @@ async function activationFor(
   field: FormFieldDTO,
 ): Promise<PdfActionTree<unknown>> {
   const widget = field.widgets[0];
-  if (!widget || widget.annotObjectNumber <= 0 || !widget.page) {
+  if (!widget || widget.objectNumber <= 0 || !widget.page) {
     throw new Error(`field '${field.name}' has no addressable widget`);
   }
   const { annotations } = await doc.page(widget.page).annotations.list();
   const annotation = annotations.find(
-    ({ ref }) => ref.kind === 'objectNumber' && ref.annotObjectNumber === widget.annotObjectNumber,
+    ({ ref }) => ref.kind === 'objectNumber' && ref.objectNumber === widget.objectNumber,
   );
   const action = annotation?.actions?.activate;
   if (!action) throw new Error(`field '${field.name}' has no activation action`);

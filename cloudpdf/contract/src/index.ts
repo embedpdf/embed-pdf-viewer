@@ -1741,7 +1741,7 @@ export const docOperations = {
     requestHeaders: [documentPasswordHeader],
     params: DocLayerParamsSchema,
     notes:
-      'Returns one entry per page plus the audit-log cursor for reconciling subsequent document events. Page order is unspecified; join by `pageState.pageObjectNumber` when display order matters.',
+      'Returns one entry per page plus the audit-log cursor for reconciling subsequent document events. Page order is unspecified; join by `page` (a `PageRef`) when display order matters.',
     responses: {
       200: { contentType: 'application/json', schema: AnnotationListSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
@@ -2151,7 +2151,7 @@ export const docOperations = {
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
     notes:
-      'A read, not a mutation: the source document is untouched and no event is published. Body is `{"pageObjectNumbers": number[]}`; the response body is the new PDF.',
+      'A read, not a mutation: the source document is untouched and no event is published. Body is `{"pages": PageRef[]}`; the response body is the new PDF.',
   },
   'doc.redactions.apply': {
     operationId: 'doc.redactions.apply',

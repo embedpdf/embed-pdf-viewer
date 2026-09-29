@@ -39,7 +39,7 @@ const META = (over: Partial<DocumentMetadata> = {}): DocumentMetadata => ({
 const box = { left: 0, bottom: 0, right: 600, top: 800 } as const;
 const page: PageLayout = {
   index: 0,
-  ref: { kind: 'objectNumber', pageObjectNumber: 1 },
+  ref: { kind: 'objectNumber', objectNumber: 1 },
   label: null,
   size: { width: 600, height: 800 },
   rotation: 0,

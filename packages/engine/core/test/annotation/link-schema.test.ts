@@ -24,7 +24,7 @@ describe('link kind schemas', () => {
     expect(
       PdfDestinationSchema.safeParse({
         kind: 'xyz',
-        page: { kind: 'objectNumber', pageObjectNumber: 12 },
+        page: { kind: 'objectNumber', objectNumber: 12 },
         left: null,
         top: 640,
         zoom: null,
@@ -33,13 +33,13 @@ describe('link kind schemas', () => {
     expect(
       PdfDestinationSchema.safeParse({
         kind: 'fit',
-        page: { kind: 'objectNumber', pageObjectNumber: 3 },
+        page: { kind: 'objectNumber', objectNumber: 3 },
       }).success,
     ).toBe(true);
     expect(
       PdfDestinationSchema.safeParse({
         kind: 'fitR',
-        page: { kind: 'objectNumber', pageObjectNumber: 3 },
+        page: { kind: 'objectNumber', objectNumber: 3 },
         left: 0,
         bottom: 0,
         right: 200,
@@ -50,7 +50,7 @@ describe('link kind schemas', () => {
     expect(
       PdfDestinationSchema.safeParse({
         kind: 'fitR',
-        page: { kind: 'objectNumber', pageObjectNumber: 3 },
+        page: { kind: 'objectNumber', objectNumber: 3 },
       }).success,
     ).toBe(false);
   });
@@ -59,7 +59,7 @@ describe('link kind schemas', () => {
     const arms: PdfLinkTarget[] = [
       {
         kind: 'goto',
-        destination: { kind: 'fit', page: { kind: 'objectNumber', pageObjectNumber: 5 } },
+        destination: { kind: 'fit', page: { kind: 'objectNumber', objectNumber: 5 } },
       },
       { kind: 'uri', uri: 'https://embedpdf.com' },
       { kind: 'goto-remote', file: 'other.pdf' },
@@ -96,8 +96,8 @@ describe('link kind schemas', () => {
       reply: {
         to: {
           kind: 'objectNumber',
-          page: { kind: 'objectNumber', pageObjectNumber: 4 },
-          annotObjectNumber: 77,
+          page: { kind: 'objectNumber', objectNumber: 4 },
+          objectNumber: 77,
         },
         type: 'group',
       },
@@ -123,7 +123,7 @@ describe('link kind schemas', () => {
       subtype: 'link',
       target: {
         kind: 'goto',
-        destination: { kind: 'xyz', page: { kind: 'objectNumber', pageObjectNumber: 9 }, y: 92 },
+        destination: { kind: 'xyz', page: { kind: 'objectNumber', objectNumber: 9 }, y: 92 },
       },
     };
     const clear: LinkPatch = { subtype: 'link', target: null };

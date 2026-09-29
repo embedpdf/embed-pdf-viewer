@@ -108,9 +108,7 @@ export function runTextDivergenceConformance(
         const doc = await openFixture(engine, opts);
         try {
           const slice = await doc.search.query({ text: probe.query });
-          const hit = slice.matches.find(
-            (m) => m.page.pageObjectNumber === fixture.pageObjectNumber,
-          );
+          const hit = slice.matches.find((m) => m.page.objectNumber === fixture.pageObjectNumber);
           expect(hit === undefined).toBe(false);
           expect(hit!.start).toBe(probe.start);
           expect(hit!.count).toBe(probe.count);

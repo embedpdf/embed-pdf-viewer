@@ -30,7 +30,7 @@ export async function runAnnotationsDemo(
 
     const byPage: Record<number, AnnotationList> = {};
     for (const state of all.pages) {
-      byPage[state.page.pageObjectNumber] = await doc.page(state.page).annotations.list();
+      byPage[state.page.objectNumber] = await doc.page(state.page).annotations.list();
     }
 
     return { label, docId: doc.id, elapsedMs: Date.now() - started, all, byPage };
@@ -58,11 +58,11 @@ export interface AnnotationsSummary {
 export function summarizeList(list: AnnotationList): AnnotationsSummary {
   return {
     pages: list.pages.map((state, pageIndex) => ({
-      pageObjectNumber: state.page.pageObjectNumber,
+      pageObjectNumber: state.page.objectNumber,
       pageIndex,
       hasAnyWeakAnnotations: knownWeakFlag(state),
       annotations: list.annotations
-        .filter((a) => a.page.pageObjectNumber === state.page.pageObjectNumber)
+        .filter((a) => a.page.objectNumber === state.page.objectNumber)
         .map((a) => ({
           index: a.index,
           subtype: a.subtype,
@@ -83,7 +83,7 @@ function knownWeakFlag(pageState: PageState): boolean | null {
 function describeRef(a: AnnotationDTO): string {
   switch (a.ref.kind) {
     case 'objectNumber':
-      return `objectNumber=${a.ref.annotObjectNumber}`;
+      return `objectNumber=${a.ref.objectNumber}`;
     case 'nm':
       return `nm=${a.ref.nm}`;
     case 'index':

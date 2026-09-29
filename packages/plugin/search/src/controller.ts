@@ -310,9 +310,9 @@ export function createSearchController(ctx: PluginContext<SearchState>, config: 
     getQuery: () => state().query,
     getStatus: () => state().status,
     listHits: (filter) =>
-      filter?.page ? (state().hitsByPage[filter.page.pageObjectNumber] ?? EMPTY) : state().hits,
+      filter?.page ? (state().hitsByPage[filter.page.objectNumber] ?? EMPTY) : state().hits,
     getHitCount: (page) =>
-      page ? (state().hitsByPage[page.pageObjectNumber]?.length ?? 0) : state().hits.length,
+      page ? (state().hitsByPage[page.objectNumber]?.length ?? 0) : state().hits.length,
     listPagesWithHits: () => (state().hits.length ? pagesWithHits(state()) : EMPTY_PAGES),
     getActiveHitIndex: () => state().activeIndex,
     getActiveHit: () => {

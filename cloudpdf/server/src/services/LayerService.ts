@@ -129,7 +129,7 @@ function pageObjectNumbersOf(pages: readonly PageRef[]): PageObjectNumber[] {
         `unsupported page address kind '${String((page as { kind: unknown }).kind)}'`,
       );
     }
-    return page.pageObjectNumber;
+    return page.objectNumber;
   });
 }
 
@@ -613,7 +613,7 @@ export class LayerService {
       // resolve against.
       switch (ref.kind) {
         case 'objectNumber':
-          return a.ref.kind === 'objectNumber' && a.ref.annotObjectNumber === ref.annotObjectNumber;
+          return a.ref.kind === 'objectNumber' && a.ref.objectNumber === ref.objectNumber;
         case 'nm':
           return a.nm === ref.nm;
         case 'index':
@@ -677,7 +677,7 @@ export class LayerService {
         docId: input.docId,
         layerName: input.layerName,
         layer,
-        pageObjectNumber: input.ref.page.pageObjectNumber,
+        pageObjectNumber: input.ref.page.objectNumber,
       });
       const ref = await this.rewriteRefForWorker(
         input.docId,
@@ -1234,7 +1234,7 @@ export class LayerService {
       const targetPages =
         'pages' in input.scope
           ? pageObjectNumbersOf(input.scope.pages)
-          : [...new Set(input.scope.annotations.map((ref) => ref.page.pageObjectNumber))];
+          : [...new Set(input.scope.annotations.map((ref) => ref.page.objectNumber))];
       for (const pageObjectNumber of targetPages) {
         await this.assertWeakAnnotationStructuralEditAllowed(ctx, {
           docId: input.docId,
@@ -1732,7 +1732,7 @@ export class LayerService {
     );
   }
 
-  /** The visual fill of an unsigned signature field: a PDF page drawn into its widgets, nothing sealed. */
+  /** The visual fill of an unsigned signature field: a one-page PDF drawn into its widgets, nothing sealed. */
   async setSignatureAppearance(
     ctx: LayerWriteContext,
     input: {
@@ -1740,7 +1740,6 @@ export class LayerService {
       layerName: string;
       ref: FormFieldRef;
       pdf: Uint8Array;
-      pageIndex: number;
     },
     signal?: AbortSignal,
   ): Promise<FormFieldUpdateResult> {
@@ -1762,7 +1761,6 @@ export class LayerService {
               layerName: input.layerName,
               ref: input.ref,
               pdf,
-              pageIndex: input.pageIndex,
               artifactPath,
             },
             [pdf],
@@ -2156,7 +2154,7 @@ export class LayerService {
       layerName,
       layer,
       pageObjectNumber: requireSingleAffectedPage(input.result.meta.affectedPages).page
-        .pageObjectNumber,
+        .objectNumber,
       kind,
       artifactKey,
       artifactSha: uploaded.sha256,
@@ -2235,7 +2233,7 @@ export class LayerService {
       kind: 'pages.move',
       layout: input.result.layout,
       // Every page's position is touched by a reorder.
-      affectedPages: input.result.layout.pages.map((page) => page.ref.pageObjectNumber),
+      affectedPages: input.result.layout.pages.map((page) => page.ref.objectNumber),
       artifactKey,
       artifactSha: uploaded.sha256,
       artifactSize: uploaded.size,
@@ -2420,7 +2418,7 @@ export class LayerService {
       layer,
       kind: input.kind,
       layout: input.result.layout,
-      insertedPages: input.result.insertedPages.map((page) => page.pageObjectNumber),
+      insertedPages: input.result.insertedPages.map((page) => page.objectNumber),
       artifactKey,
       artifactSha: uploaded.sha256,
       artifactSize: uploaded.size,
@@ -2538,10 +2536,8 @@ export class LayerService {
         translated.push(ref);
         continue;
       }
-      const page = ref.page.pageObjectNumber;
-      const durable = manifest.pages.find(
-        (entry) => entry.state.page.pageObjectNumber === page,
-      )?.state;
+      const page = ref.page.objectNumber;
+      const durable = manifest.pages.find((entry) => entry.state.page.objectNumber === page)?.state;
       if (!durable) {
         throw new EngineError(
           EngineErrorCode.NotFound,
@@ -2570,7 +2566,7 @@ export class LayerService {
   ): Promise<AnnotationRef> {
     if (ref.kind !== 'index') return ref;
 
-    const page = await this.requireLayerPage(layer.id, ref.page.pageObjectNumber);
+    const page = await this.requireLayerPage(layer.id, ref.page.objectNumber);
     const durablePageState = this.layerState.decorateLayerPageState(docId, layerName, page);
     // Refs minted by shared base reads carry the base revision scope;
     // the generation check still gates staleness (see the bridge's doc).
@@ -2580,7 +2576,7 @@ export class LayerService {
     const workerPageState = await this.loadWorkerPageState(
       docId,
       layerName,
-      ref.page.pageObjectNumber,
+      ref.page.objectNumber,
       signal,
     );
     return this.requireRevisionBridge().rewriteIndexRefForWorker(workerPageState, ref);
@@ -2818,7 +2814,7 @@ export class LayerService {
 
         // The worker's layout is the new order; validate its page set against
         // the durable rows before trusting it.
-        const pageOrder = input.layout.pages.map((page) => page.ref.pageObjectNumber);
+        const pageOrder = input.layout.pages.map((page) => page.ref.objectNumber);
         const rows = await trx
           .selectFrom('layer_pages')
           .select('page_object_number')
@@ -2916,7 +2912,7 @@ export class LayerService {
           .execute();
         const known = new Set(rows.map((row) => Number(row.page_object_number)));
         const deleted = new Set(input.deletedPages);
-        const survivorOrder = input.layout.pages.map((page) => page.ref.pageObjectNumber);
+        const survivorOrder = input.layout.pages.map((page) => page.ref.objectNumber);
         if (rows.length !== survivorOrder.length + input.deletedPages.length) {
           throw new EngineError(
             EngineErrorCode.WireFormat,
@@ -3053,7 +3049,7 @@ export class LayerService {
           .execute();
         const known = new Set(rows.map((row) => Number(row.page_object_number)));
         const inserted = new Set(input.insertedPages);
-        const pageOrder = input.layout.pages.map((page) => page.ref.pageObjectNumber);
+        const pageOrder = input.layout.pages.map((page) => page.ref.objectNumber);
         if (inserted.size !== input.insertedPages.length) {
           throw new EngineError(
             EngineErrorCode.WireFormat,
@@ -3173,7 +3169,7 @@ export class LayerService {
         const currentLayer = await this.readLayerForCommit(trx, input.layer);
         const weakStateByPage = new Map(
           input.raw.meta.affectedPages.map((page) => [
-            page.page.pageObjectNumber,
+            page.page.objectNumber,
             page.weakAnnotationState,
           ]),
         );
@@ -3305,7 +3301,7 @@ export class LayerService {
       .execute(async (trx) => {
         const now = Date.now();
         const currentLayer = await this.readLayerForCommit(trx, input.layer);
-        const affected = input.raw.meta.affectedPages.map((state) => state.page.pageObjectNumber);
+        const affected = input.raw.meta.affectedPages.map((state) => state.page.objectNumber);
 
         let bumpLayerDocVersion = false;
         const nextPages: DurablePageRow[] = [];
@@ -3422,7 +3418,7 @@ export class LayerService {
         const currentLayer = await this.readLayerForCommit(trx, input.layer);
         const weakStateByPage = new Map(
           input.raw.meta.affectedPages.map((page) => [
-            page.page.pageObjectNumber,
+            page.page.objectNumber,
             page.weakAnnotationState,
           ]),
         );
@@ -4062,16 +4058,16 @@ export class LayerService {
     }
     const match = payload.snapshot.signatures.find((s) =>
       field.kind === 'objectNumber'
-        ? s.field.kind === 'objectNumber' && s.field.fieldObjectNumber === field.fieldObjectNumber
+        ? s.field.kind === 'objectNumber' && s.field.objectNumber === field.objectNumber
         : s.fieldName === field.name,
     );
     if (!match || match.field.kind !== 'objectNumber') {
       throw new EngineError(
         EngineErrorCode.NotFound,
-        `no signature field ${field.kind === 'fqn' ? `'${field.name}'` : `#${field.fieldObjectNumber}`}`,
+        `no signature field ${field.kind === 'fqn' ? `'${field.name}'` : `#${field.objectNumber}`}`,
       );
     }
-    return match.field.fieldObjectNumber;
+    return match.field.objectNumber;
   }
 
   private async uploadSigningTail(
@@ -4186,7 +4182,7 @@ export class LayerService {
         const now = Date.now();
         const { signing, finalized, layer } = input;
         const cmsSha = sha256Hex(input.cms);
-        const widgetPage = finalized.signature.widget?.page?.pageObjectNumber ?? null;
+        const widgetPage = finalized.signature.widget?.page?.objectNumber ?? null;
 
         // (1) The signing row first, under its expiry: the single arbiter
         //     across replicas.
@@ -4915,7 +4911,7 @@ function widgetImpacts(
   // A widget stored as a direct object has no page to attribute the
   // impact to (`page === null`) — it cannot be addressed at all.
   return widgets.flatMap((widget) =>
-    widget.page === null ? [] : [{ pageObjectNumber: widget.page.pageObjectNumber, kind }],
+    widget.page === null ? [] : [{ pageObjectNumber: widget.page.objectNumber, kind }],
   );
 }
 
@@ -4962,7 +4958,7 @@ function requireKnownWeakAnnotationBoolean(page: PageState): boolean {
   if (page.weakAnnotationState.kind !== 'known') {
     throw new EngineError(
       EngineErrorCode.WireFormat,
-      `annotation mutation returned unknown weak annotation state for page ${page.page.pageObjectNumber}`,
+      `annotation mutation returned unknown weak annotation state for page ${page.page.objectNumber}`,
     );
   }
   return page.weakAnnotationState.hasAnyWeakAnnotations;
@@ -4995,7 +4991,7 @@ function actorFromContext(ctx: LayerWriteContext): AnnotationActor | undefined {
 /** The cache-impact view of a widget addressed by ref: an object-number address is a placed widget. */
 function widgetOfRef(ref: AnnotationRef): FormWidget {
   return ref.kind === 'objectNumber'
-    ? formWidget(ref.annotObjectNumber, ref.page)
+    ? formWidget(ref.objectNumber, ref.page)
     : formWidget(0, ref.page);
 }
 

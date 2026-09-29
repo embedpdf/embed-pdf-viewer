@@ -35,7 +35,7 @@ function fakeHandle() {
       },
     },
     pages: { list: () => abortableCall },
-    page: (ref: { pageObjectNumber: number }) => ({
+    page: (ref: { objectNumber: number }) => ({
       ref,
       render: { image: () => Promise.resolve('img') },
     }),
@@ -53,8 +53,8 @@ describe('guardHandle', () => {
     read.resolve('meta');
     await expect(pending).resolves.toBe('meta');
     // nested objects are wrapped lazily and cached
-    const page = doc.page({ kind: 'objectNumber', pageObjectNumber: 3 });
-    expect(doc.page({ kind: 'objectNumber', pageObjectNumber: 3 })).not.toBe(page); // new object each call from the fake
+    const page = doc.page({ kind: 'objectNumber', objectNumber: 3 });
+    expect(doc.page({ kind: 'objectNumber', objectNumber: 3 })).not.toBe(page); // new object each call from the fake
     await expect(page.render.image({} as never)).resolves.toBe('img');
   });
 

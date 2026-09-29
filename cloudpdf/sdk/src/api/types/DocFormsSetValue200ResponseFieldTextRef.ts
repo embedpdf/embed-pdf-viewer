@@ -9,7 +9,7 @@ export type DocFormsSetValue200ResponseFieldTextRef =
 export namespace DocFormsSetValue200ResponseFieldTextRef {
     export interface ObjectNumber {
         kind: "objectNumber";
-        fieldObjectNumber: number;
+        objectNumber: number;
     }
 
     export interface Fqn {

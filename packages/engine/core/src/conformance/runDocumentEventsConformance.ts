@@ -60,7 +60,7 @@ export function runDocumentEventsConformance(
 
         const list = await doc.pages.list();
         if (list.pages.length < 3) return;
-        const pageObjectNumber = list.pages[0].ref.pageObjectNumber;
+        const pageObjectNumber = list.pages[0].ref.objectNumber;
         const page = doc.page(toPageRef(pageObjectNumber));
 
         const draft: HighlightDraft = {
@@ -74,7 +74,7 @@ export function runDocumentEventsConformance(
           contents: 'updated',
         });
         const rotated = await doc.pages.rotate([toPageRef(pageObjectNumber)], 90);
-        const victim = list.pages[2].ref.pageObjectNumber;
+        const victim = list.pages[2].ref.objectNumber;
         const deleted = await doc.pages.delete([toPageRef(victim)]);
         const meta = await doc.metadata.update({ title: 'events conformance' });
         const custom = await doc.metadata.custom.update({ EventsConformance: 'yes' });

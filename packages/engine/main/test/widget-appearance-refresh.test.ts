@@ -72,10 +72,10 @@ describe('widget appearance refresh across planes (engine-local, wasm)', () => {
     if (!found) throw new Error('fixture is missing the First_Name field');
     field = found;
     const widget = field.widgets[0]!;
-    pageObjectNumber = widget.page!.pageObjectNumber;
+    pageObjectNumber = widget.page!.objectNumber;
     widgetRef = {
       kind: 'objectNumber',
-      annotObjectNumber: widget.annotObjectNumber,
+      objectNumber: widget.objectNumber,
       page: toPageRef(pageObjectNumber),
     };
   }, 30_000);
@@ -93,7 +93,7 @@ describe('widget appearance refresh across planes (engine-local, wasm)', () => {
     const entry = result.appearances.find(
       (a) =>
         a.ref.kind === 'objectNumber' &&
-        a.ref.annotObjectNumber === (widgetRef as { annotObjectNumber: number }).annotObjectNumber,
+        a.ref.objectNumber === (widgetRef as { objectNumber: number }).objectNumber,
     );
     return entry?.raster ?? null;
   }
@@ -114,10 +114,7 @@ describe('widget appearance refresh across planes (engine-local, wasm)', () => {
   });
 
   test('a form-plane value write is visible in the SAME render pass, not one behind', async () => {
-    await doc.forms.setValue(
-      { kind: 'objectNumber', fieldObjectNumber: field.fieldObjectNumber },
-      { value: 'Hello' },
-    );
+    await doc.forms.setValue(field.ref, { value: 'Hello' });
     const raster = await widgetRaster();
     expect(raster).not.toBeNull();
     // Text glyphs: dark opaque pixels over the yellow fill.

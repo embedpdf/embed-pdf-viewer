@@ -13,12 +13,8 @@ describe("AnnotationsClient", () => {
             annotations: [
                 {
                     subtype: "highlight",
-                    ref: {
-                        kind: "objectNumber",
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
-                        annotObjectNumber: 1,
-                    },
-                    page: { kind: "objectNumber", pageObjectNumber: 1 },
+                    ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                    page: { kind: "objectNumber", objectNumber: 1 },
                     index: 1,
                     identityQuality: "durable",
                     nm: "nm",
@@ -37,18 +33,10 @@ describe("AnnotationsClient", () => {
                     toggleNoView: true,
                     lockedContents: true,
                     reply: {
-                        to: {
-                            kind: "objectNumber",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
-                            annotObjectNumber: 1,
-                        },
+                        to: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
                         type: "reply",
                     },
-                    popup: {
-                        kind: "objectNumber",
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
-                        annotObjectNumber: 1,
-                    },
+                    popup: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
                     groupId: "groupId",
                     author: "author",
                     createdAt: "2024-01-15T09:30:00Z",
@@ -72,10 +60,10 @@ describe("AnnotationsClient", () => {
             ],
             pages: [
                 {
-                    page: { kind: "objectNumber", pageObjectNumber: 1 },
+                    page: { kind: "objectNumber", objectNumber: 1 },
                     revision: {
                         docSessionId: "docSessionId",
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         generation: 1,
                     },
                     weakAnnotationState: { kind: "unknown" },
@@ -151,12 +139,8 @@ describe("AnnotationsClient", () => {
             annotations: [
                 {
                     subtype: "highlight",
-                    ref: {
-                        kind: "objectNumber",
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
-                        annotObjectNumber: 1,
-                    },
-                    page: { kind: "objectNumber", pageObjectNumber: 1 },
+                    ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                    page: { kind: "objectNumber", objectNumber: 1 },
                     index: 1,
                     identityQuality: "durable",
                     nm: "nm",
@@ -175,18 +159,10 @@ describe("AnnotationsClient", () => {
                     toggleNoView: true,
                     lockedContents: true,
                     reply: {
-                        to: {
-                            kind: "objectNumber",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
-                            annotObjectNumber: 1,
-                        },
+                        to: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
                         type: "reply",
                     },
-                    popup: {
-                        kind: "objectNumber",
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
-                        annotObjectNumber: 1,
-                    },
+                    popup: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
                     groupId: "groupId",
                     author: "author",
                     createdAt: "2024-01-15T09:30:00Z",
@@ -210,10 +186,10 @@ describe("AnnotationsClient", () => {
             ],
             pages: [
                 {
-                    page: { kind: "objectNumber", pageObjectNumber: 1 },
+                    page: { kind: "objectNumber", objectNumber: 1 },
                     revision: {
                         docSessionId: "docSessionId",
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         generation: 1,
                     },
                     weakAnnotationState: { kind: "unknown" },
@@ -268,12 +244,8 @@ describe("AnnotationsClient", () => {
         const rawResponseBody = {
             annotation: {
                 subtype: "highlight",
-                ref: {
-                    kind: "objectNumber",
-                    page: { kind: "objectNumber", pageObjectNumber: 1 },
-                    annotObjectNumber: 1,
-                },
-                page: { kind: "objectNumber", pageObjectNumber: 1 },
+                ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                page: { kind: "objectNumber", objectNumber: 1 },
                 index: 1,
                 identityQuality: "durable",
                 nm: "nm",
@@ -292,18 +264,10 @@ describe("AnnotationsClient", () => {
                 toggleNoView: true,
                 lockedContents: true,
                 reply: {
-                    to: {
-                        kind: "objectNumber",
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
-                        annotObjectNumber: 1,
-                    },
+                    to: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
                     type: "reply",
                 },
-                popup: {
-                    kind: "objectNumber",
-                    page: { kind: "objectNumber", pageObjectNumber: 1 },
-                    annotObjectNumber: 1,
-                },
+                popup: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
                 groupId: "groupId",
                 author: "author",
                 createdAt: "2024-01-15T09:30:00Z",
@@ -334,10 +298,10 @@ describe("AnnotationsClient", () => {
             meta: {
                 affectedPages: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         revision: {
                             docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             generation: 1,
                         },
                         weakAnnotationState: { kind: "unknown" },
@@ -354,12 +318,12 @@ describe("AnnotationsClient", () => {
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             cache: { contentVersion: 1, annotationVersion: 1 },
                         },
                     ],
                 },
-                changed: [{ kind: "objectNumber", value: 1 }],
+                changed: [{ kind: "objectNumber", objectNumber: 1 }],
                 weakRefsInvalidated: true,
                 shouldRefetch: { reason: "weakRefsInvalidated" },
             },
@@ -451,10 +415,10 @@ describe("AnnotationsClient", () => {
             meta: {
                 affectedPages: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         revision: {
                             docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             generation: 1,
                         },
                         weakAnnotationState: { kind: "unknown" },
@@ -471,12 +435,12 @@ describe("AnnotationsClient", () => {
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             cache: { contentVersion: 1, annotationVersion: 1 },
                         },
                     ],
                 },
-                changed: [{ kind: "objectNumber", value: 1 }],
+                changed: [{ kind: "objectNumber", objectNumber: 1 }],
                 weakRefsInvalidated: true,
                 shouldRefetch: { reason: "weakRefsInvalidated" },
             },
@@ -530,12 +494,8 @@ describe("AnnotationsClient", () => {
         const rawResponseBody = {
             annotation: {
                 subtype: "highlight",
-                ref: {
-                    kind: "objectNumber",
-                    page: { kind: "objectNumber", pageObjectNumber: 1 },
-                    annotObjectNumber: 1,
-                },
-                page: { kind: "objectNumber", pageObjectNumber: 1 },
+                ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                page: { kind: "objectNumber", objectNumber: 1 },
                 index: 1,
                 identityQuality: "durable",
                 nm: "nm",
@@ -554,18 +514,10 @@ describe("AnnotationsClient", () => {
                 toggleNoView: true,
                 lockedContents: true,
                 reply: {
-                    to: {
-                        kind: "objectNumber",
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
-                        annotObjectNumber: 1,
-                    },
+                    to: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
                     type: "reply",
                 },
-                popup: {
-                    kind: "objectNumber",
-                    page: { kind: "objectNumber", pageObjectNumber: 1 },
-                    annotObjectNumber: 1,
-                },
+                popup: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
                 groupId: "groupId",
                 author: "author",
                 createdAt: "2024-01-15T09:30:00Z",
@@ -597,10 +549,10 @@ describe("AnnotationsClient", () => {
             meta: {
                 affectedPages: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         revision: {
                             docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             generation: 1,
                         },
                         weakAnnotationState: { kind: "unknown" },
@@ -617,12 +569,12 @@ describe("AnnotationsClient", () => {
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             cache: { contentVersion: 1, annotationVersion: 1 },
                         },
                     ],
                 },
-                changed: [{ kind: "objectNumber", value: 1 }],
+                changed: [{ kind: "objectNumber", objectNumber: 1 }],
                 weakRefsInvalidated: true,
                 shouldRefetch: { reason: "weakRefsInvalidated" },
             },
@@ -714,25 +666,21 @@ describe("AnnotationsClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { key: "value" };
         const rawResponseBody = {
-            page: { kind: "objectNumber", pageObjectNumber: 1 },
+            page: { kind: "objectNumber", objectNumber: 1 },
             usage: "display",
             results: [
                 {
-                    ref: {
-                        kind: "objectNumber",
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
-                        annotObjectNumber: 1,
-                    },
+                    ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
                     status: "applied",
                 },
             ],
             meta: {
                 affectedPages: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         revision: {
                             docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             generation: 1,
                         },
                         weakAnnotationState: { kind: "unknown" },
@@ -749,7 +697,7 @@ describe("AnnotationsClient", () => {
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             cache: { contentVersion: 1, annotationVersion: 1 },
                         },
                     ],

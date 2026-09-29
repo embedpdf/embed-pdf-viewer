@@ -58,7 +58,7 @@ describe('plane-scoped view sharing (cloud SDK, real runtime)', () => {
     const alice = await openLayer('alice');
     const bob = await openLayer('bob');
     try {
-      const pageObjectNumber = (await alice.doc.pages.list()).pages[0]!.ref.pageObjectNumber;
+      const pageObjectNumber = (await alice.doc.pages.list()).pages[0]!.ref.objectNumber;
 
       // Annotation-free renders: one doc-level URL for both visitors.
       const [a, b] = await Promise.all([
@@ -112,7 +112,7 @@ describe('plane-scoped view sharing (cloud SDK, real runtime)', () => {
     const carol = await openLayer('carol');
     const dave = await openLayer('dave');
     try {
-      const pageObjectNumber = (await carol.doc.pages.list()).pages[0]!.ref.pageObjectNumber;
+      const pageObjectNumber = (await carol.doc.pages.list()).pages[0]!.ref.objectNumber;
       const page = carol.doc.page(toPageRef(pageObjectNumber));
 
       // Pre-write: everything doc-level, including an annotated handle we
@@ -177,7 +177,7 @@ describe('plane-scoped view sharing (cloud SDK, real runtime)', () => {
   test('LIVE handle: rotate owns LAYOUT only — normalized renders keep sharing', async () => {
     const erin = await openLayer('erin');
     try {
-      const pageObjectNumber = (await erin.doc.pages.list()).pages[0]!.ref.pageObjectNumber;
+      const pageObjectNumber = (await erin.doc.pages.list()).pages[0]!.ref.objectNumber;
       await erin.doc.pages.rotate([toPageRef(pageObjectNumber)], 90);
 
       // Same handle: rotation flipped layout, not content — the
@@ -196,9 +196,7 @@ describe('plane-scoped view sharing (cloud SDK, real runtime)', () => {
       // The layout leaf itself is layer-scoped now — list() must re-route
       // and still serve (rotation visible in the snapshot).
       const layout = await erin.doc.pages.list();
-      expect(layout.pages.find((p) => p.ref.pageObjectNumber === pageObjectNumber)?.rotation).toBe(
-        90,
-      );
+      expect(layout.pages.find((p) => p.ref.objectNumber === pageObjectNumber)?.rotation).toBe(90);
     } finally {
       await erin.doc.close();
       await erin.engine.destroy();

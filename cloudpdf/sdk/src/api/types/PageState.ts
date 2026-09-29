@@ -11,7 +11,7 @@ export interface PageState {
 export namespace PageState {
     export interface Page {
         kind: Page.Kind;
-        pageObjectNumber: number;
+        objectNumber: number;
     }
 
     export namespace Page {
@@ -30,7 +30,7 @@ export namespace PageState {
     export namespace Revision {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {

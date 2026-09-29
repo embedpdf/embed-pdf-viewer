@@ -11,13 +11,13 @@ export namespace DocFormsSetValue200ResponseFieldRadioWidgetsItemRef {
     export interface ObjectNumber {
         kind: "objectNumber";
         page: DocFormsSetValue200ResponseFieldRadioWidgetsItemRefObjectNumber.Page;
-        annotObjectNumber: number;
+        objectNumber: number;
     }
 
     export namespace DocFormsSetValue200ResponseFieldRadioWidgetsItemRefObjectNumber {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -37,7 +37,7 @@ export namespace DocFormsSetValue200ResponseFieldRadioWidgetsItemRef {
     export namespace DocFormsSetValue200ResponseFieldRadioWidgetsItemRefNm {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -58,7 +58,7 @@ export namespace DocFormsSetValue200ResponseFieldRadioWidgetsItemRef {
     export namespace DocFormsSetValue200ResponseFieldRadioWidgetsItemRefIndex {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -77,7 +77,7 @@ export namespace DocFormsSetValue200ResponseFieldRadioWidgetsItemRef {
         export namespace Revision {
             export interface Page {
                 kind: Page.Kind;
-                pageObjectNumber: number;
+                objectNumber: number;
             }
 
             export namespace Page {

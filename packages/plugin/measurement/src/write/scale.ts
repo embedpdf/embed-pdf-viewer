@@ -67,10 +67,10 @@ export function createScaleWrites(
     } else {
       // A session-only scale: no engine event announces it, so re-read the page.
       const layout = requirePage(page);
-      const kept = (ctx.state.get().localViewports[page.pageObjectNumber] ?? []).filter(
+      const kept = (ctx.state.get().localViewports[page.objectNumber] ?? []).filter(
         (viewport) => !viewport.owned,
       );
-      ctx.state.update(setLocalViewports, page.pageObjectNumber, [
+      ctx.state.update(setLocalViewports, page.objectNumber, [
         ...kept,
         ...(scale
           ? [
@@ -107,25 +107,23 @@ export function createScaleWrites(
     try {
       const reports = await Promise.all(
         target.map((page) =>
-          ctx.serialQueue(`scale:${page.pageObjectNumber}`)(
-            async (): Promise<ScaleChangeReport> => {
-              try {
-                await ensureLoaded(page);
-                const scale = measure(page);
-                if (scale) assertWritableMeasure(scale);
-                return await save(page, scale, options);
-              } catch (error) {
-                if (!tolerant) throw toPluginError('measurement', error);
-                return {
-                  page,
-                  updated: [],
-                  skipped: [],
-                  failed: [],
-                  scaleError: serializeError(error),
-                };
-              }
-            },
-          ),
+          ctx.serialQueue(`scale:${page.objectNumber}`)(async (): Promise<ScaleChangeReport> => {
+            try {
+              await ensureLoaded(page);
+              const scale = measure(page);
+              if (scale) assertWritableMeasure(scale);
+              return await save(page, scale, options);
+            } catch (error) {
+              if (!tolerant) throw toPluginError('measurement', error);
+              return {
+                page,
+                updated: [],
+                skipped: [],
+                failed: [],
+                scaleError: serializeError(error),
+              };
+            }
+          }),
         ),
       );
       ctx.state.update(setReports, reports);

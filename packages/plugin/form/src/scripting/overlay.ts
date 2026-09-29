@@ -20,7 +20,7 @@ export interface Overlay {
 }
 
 export const refKey = (ref: FormFieldRef): string =>
-  ref.kind === 'objectNumber' ? `obj:${ref.fieldObjectNumber}` : `fqn:${ref.name}`;
+  ref.kind === 'objectNumber' ? `obj:${ref.objectNumber}` : `fqn:${ref.name}`;
 
 export const sameRef = (left: FormFieldRef, right: FormFieldRef): boolean =>
   refKey(left) === refKey(right);

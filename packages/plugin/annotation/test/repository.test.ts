@@ -72,7 +72,11 @@ function squareDTO(
   annotObjectNumber: number,
   reply: { to: AnnotationRef; type: 'reply' | 'group' } | null = null,
 ): AnnotationDTO<PdfCoordinates> {
-  const ref: AnnotationRef = { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber };
+  const ref: AnnotationRef = {
+    kind: 'objectNumber',
+    page: toPageRef(1),
+    objectNumber: annotObjectNumber,
+  };
   return {
     ref,
     page: toPageRef(1),
@@ -117,7 +121,7 @@ describe('repository.fromDTO — group/relationship mapping', () => {
     const primary: AnnotationRef = {
       kind: 'objectNumber',
       page: toPageRef(1),
-      annotObjectNumber: 10,
+      objectNumber: 10,
     };
     const sub = fromDTO(fromFile(squareDTO(11, { to: primary, type: 'group' })));
     expect(sub.irt).toBe(annotationKey(primary));
@@ -128,7 +132,7 @@ describe('repository.fromDTO — group/relationship mapping', () => {
     const parent: AnnotationRef = {
       kind: 'objectNumber',
       page: toPageRef(1),
-      annotObjectNumber: 10,
+      objectNumber: 10,
     };
     const reply = fromDTO(fromFile(squareDTO(12, { to: parent, type: 'reply' })));
     expect(reply.irt).toBe(annotationKey(parent));
@@ -138,7 +142,7 @@ describe('repository.fromDTO — group/relationship mapping', () => {
 
 describe('repository — Ink Highlight intent and blend', () => {
   const dto = (): AnnotationDTO<PdfCoordinates> => ({
-    ref: { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber: 20 },
+    ref: { kind: 'objectNumber', page: toPageRef(1), objectNumber: 20 },
     page: toPageRef(1),
     index: 0,
     identityQuality: 'durable',
@@ -290,7 +294,11 @@ const CL: CalloutLine = [
 ];
 
 function calloutDTO(annotObjectNumber = 20): AnnotationDTO<PdfCoordinates> {
-  const ref: AnnotationRef = { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber };
+  const ref: AnnotationRef = {
+    kind: 'objectNumber',
+    page: toPageRef(1),
+    objectNumber: annotObjectNumber,
+  };
   return {
     ref,
     page: toPageRef(1),
@@ -363,7 +371,11 @@ function rotatedPolylineDTO(
   rotation: number,
   annotObjectNumber = 31,
 ): AnnotationDTO<PdfCoordinates> {
-  const ref: AnnotationRef = { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber };
+  const ref: AnnotationRef = {
+    kind: 'objectNumber',
+    page: toPageRef(1),
+    objectNumber: annotObjectNumber,
+  };
   return {
     ref,
     page: toPageRef(1),
@@ -609,7 +621,11 @@ function polygonDTO(
   cloudyIntensity: number | undefined,
   annotObjectNumber = 40,
 ): AnnotationDTO<PdfCoordinates> {
-  const ref: AnnotationRef = { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber };
+  const ref: AnnotationRef = {
+    kind: 'objectNumber',
+    page: toPageRef(1),
+    objectNumber: annotObjectNumber,
+  };
   return {
     ref,
     page: toPageRef(1),
@@ -808,7 +824,7 @@ describe('repository — toScopedPatch (sparse emission)', () => {
 describe('repository — line endings leave /Rect to the engine', () => {
   const lineDTO = (lineEndings: { start: string; end: string }): AnnotationDTO<PdfCoordinates> =>
     ({
-      ref: { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber: 77 },
+      ref: { kind: 'objectNumber', page: toPageRef(1), objectNumber: 77 },
       page: toPageRef(1),
       index: 0,
       identityQuality: 'durable',
@@ -925,7 +941,7 @@ describe('repository — attached links (fold + desired state + link kind mappin
   const parentRef: AnnotationRef = {
     kind: 'objectNumber',
     page: toPageRef(1),
-    annotObjectNumber: 10,
+    objectNumber: 10,
   };
 
   // Minimal Model for lens reads (order + byId are all the lens touches).
@@ -957,7 +973,7 @@ describe('repository — attached links (fold + desired state + link kind mappin
     const orphan = fromDTO(
       fromFile(
         linkDTO(12, URI, {
-          to: { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber: 99 },
+          to: { kind: 'objectNumber', page: toPageRef(1), objectNumber: 99 },
           type: 'group',
         }),
       ),

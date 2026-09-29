@@ -223,7 +223,7 @@ class LocalWeakAnnotationEditSession implements WeakAnnotationEditSession {
   }
 
   covers(page: PageRef): boolean {
-    return this._pages.some((p) => p.pageObjectNumber === page.pageObjectNumber);
+    return this._pages.some((p) => p.objectNumber === page.objectNumber);
   }
 
   updatePages(pages: readonly PageRef[]): AbortablePromise<void> {

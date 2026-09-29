@@ -15,7 +15,7 @@ const tree = {
 const annotation = (id: string, over: Partial<ModelAnnotation> = {}): ModelAnnotation =>
   ({
     id,
-    ref: { kind: 'objectNumber', page: toPageRef(7), annotObjectNumber: Number(id.slice(4)) },
+    ref: { kind: 'objectNumber', page: toPageRef(7), objectNumber: Number(id.slice(4)) },
     page: toPageRef(7),
     subtype: 'square',
     ...over,
@@ -26,8 +26,7 @@ function createHarness(annots: Record<string, ModelAnnotation>) {
   const actions = {
     dispatch: (trigger: ActionTrigger) => {
       if (trigger.scope === 'annotation') {
-        const objectNumber =
-          trigger.ref.kind === 'objectNumber' ? trigger.ref.annotObjectNumber : -1;
+        const objectNumber = trigger.ref.kind === 'objectNumber' ? trigger.ref.objectNumber : -1;
         submitted.push(`${trigger.event === 'cursorEnter' ? 'E' : 'X'}:${objectNumber}`);
       }
       return Promise.resolve({ status: 'executed' as const, steps: [], diagnostics: [] });

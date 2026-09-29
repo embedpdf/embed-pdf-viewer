@@ -17,7 +17,7 @@ describe('CloudRevisionBridge', () => {
     const list: AnnotationList = {
       annotations: [
         annotation(indexRef('sess_worker', 0)),
-        annotation({ kind: 'objectNumber', page: toPageRef(3), annotObjectNumber: 10 }),
+        annotation({ kind: 'objectNumber', page: toPageRef(3), objectNumber: 10 }),
       ],
       pages: [pageState('sess_worker', 0)],
     };
@@ -39,7 +39,7 @@ describe('CloudRevisionBridge', () => {
     expect(decorated.annotations[1]?.ref).toEqual({
       kind: 'objectNumber',
       page: toPageRef(3),
-      annotObjectNumber: 10,
+      objectNumber: 10,
     });
     expect(JSON.stringify(decorated)).not.toContain('sess_worker');
   });
@@ -71,7 +71,7 @@ describe('CloudRevisionBridge', () => {
     const stable: AnnotationRef = {
       kind: 'objectNumber',
       page: toPageRef(3),
-      annotObjectNumber: 42,
+      objectNumber: 42,
     };
 
     expect(rewritten).toMatchObject({

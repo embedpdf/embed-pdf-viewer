@@ -262,7 +262,7 @@ export class PagesClient {
     }
 
     /**
-     * A read, not a mutation: the source document is untouched and no event is published. Body is `{"pageObjectNumbers": number[]}`; the response body is the new PDF.
+     * A read, not a mutation: the source document is untouched and no event is published. Body is `{"pages": PageRef[]}`; the response body is the new PDF.
      *
      * @throws {@link CloudPDF.BadRequestError}
      * @throws {@link CloudPDF.NotFoundError}

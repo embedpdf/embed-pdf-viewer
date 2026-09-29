@@ -12,8 +12,8 @@
  * `create()`, but reads never mutate the document.
  */
 export type AnnotationStableId =
-  | { kind: 'objectNumber'; value: number }
-  | { kind: 'nm'; value: string };
+  | { kind: 'objectNumber'; objectNumber: number }
+  | { kind: 'nm'; nm: string };
 
 /**
  * URL-safe encoding of a stable id, used by the cloud HTTP surface as the
@@ -21,8 +21,8 @@ export type AnnotationStableId =
  * `AnnotationStableId` via `decodeStableIdKey`.
  *
  * Format:
- *   `{ kind: 'objectNumber', value: 42 }` -> `'obj:42'`
- *   `{ kind: 'nm', value: 'foo bar' }`    -> `'nm:foo bar'`
+ *   `{ kind: 'objectNumber', objectNumber: 42 }` -> `'obj:42'`
+ *   `{ kind: 'nm', nm: 'foo bar' }`              -> `'nm:foo bar'`
  *
  * The caller is responsible for `encodeURIComponent`-ing the result before
  * splicing it into a URL path; `wirePaths.layerAnnotationByKey` already does
@@ -32,14 +32,14 @@ export type AnnotationStableId =
  */
 export function encodeStableIdKey(id: AnnotationStableId): string {
   if (id.kind === 'objectNumber') {
-    if (!Number.isInteger(id.value) || id.value <= 0) {
+    if (!Number.isInteger(id.objectNumber) || id.objectNumber <= 0) {
       throw new RangeError(
-        `encodeStableIdKey: objectNumber must be a positive integer, got ${id.value}`,
+        `encodeStableIdKey: objectNumber must be a positive integer, got ${id.objectNumber}`,
       );
     }
-    return `obj:${id.value}`;
+    return `obj:${id.objectNumber}`;
   }
-  return `nm:${id.value}`;
+  return `nm:${id.nm}`;
 }
 
 /**
@@ -56,12 +56,12 @@ export function decodeStableIdKey(key: string): AnnotationStableId | null {
     const rest = key.slice('obj:'.length);
     const n = Number.parseInt(rest, 10);
     if (!Number.isInteger(n) || n <= 0 || String(n) !== rest) return null;
-    return { kind: 'objectNumber', value: n };
+    return { kind: 'objectNumber', objectNumber: n };
   }
   if (key.startsWith('nm:')) {
-    const value = key.slice('nm:'.length);
-    if (value.length === 0) return null;
-    return { kind: 'nm', value };
+    const nm = key.slice('nm:'.length);
+    if (nm.length === 0) return null;
+    return { kind: 'nm', nm };
   }
   return null;
 }

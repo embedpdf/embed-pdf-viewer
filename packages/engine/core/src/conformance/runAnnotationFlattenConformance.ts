@@ -48,7 +48,7 @@ export function runAnnotationFlattenConformance(
       const doc = await openFixture(engine, opts);
       try {
         const layoutBefore = await doc.pages.list();
-        const pageObjectNumber = layoutBefore.pages[0].ref.pageObjectNumber;
+        const pageObjectNumber = layoutBefore.pages[0].ref.objectNumber;
         const page = doc.page(toPageRef(pageObjectNumber));
         if (!page.annotations.flatten) return;
 
@@ -67,7 +67,7 @@ export function runAnnotationFlattenConformance(
         unsubscribe();
 
         expect(AnnotationFlattenResultSchema.safeParse(result).success).toBe(true);
-        expect(result.page.pageObjectNumber).toBe(pageObjectNumber);
+        expect(result.page.objectNumber).toBe(pageObjectNumber);
         expect(result.usage).toBe('display');
         expect(result.results.map((item) => item.status)).toEqual(['applied', 'unchanged']);
         expect(result.meta.affectedPages.map((state) => state.page)).toEqual([page.ref]);
@@ -110,7 +110,7 @@ export function runAnnotationFlattenConformance(
     test('an empty ref list rejects InvalidArg; an unknown ref rejects NotFound', async () => {
       const doc = await openFixture(engine, opts);
       try {
-        const pageObjectNumber = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
+        const pageObjectNumber = (await doc.pages.list()).pages[0].ref.objectNumber;
         const page = doc.page(toPageRef(pageObjectNumber));
         if (!page.annotations.flatten) return;
         await expect(page.annotations.flatten([])).rejects.toMatchObject({
@@ -122,7 +122,7 @@ export function runAnnotationFlattenConformance(
             {
               kind: 'objectNumber',
               page: toPageRef(pageObjectNumber),
-              annotObjectNumber: 987654321,
+              objectNumber: 987654321,
             },
           ]);
         } catch (error) {
@@ -138,7 +138,7 @@ export function runAnnotationFlattenConformance(
 
 function sameRef(left: AnnotationRef, right: AnnotationRef): boolean {
   if (left.kind === 'objectNumber' && right.kind === 'objectNumber') {
-    return left.annotObjectNumber === right.annotObjectNumber;
+    return left.objectNumber === right.objectNumber;
   }
   return JSON.stringify(left) === JSON.stringify(right);
 }

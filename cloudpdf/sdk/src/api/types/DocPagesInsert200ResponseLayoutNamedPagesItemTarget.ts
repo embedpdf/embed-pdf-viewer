@@ -16,7 +16,7 @@ export namespace DocPagesInsert200ResponseLayoutNamedPagesItemTarget {
     export namespace DocPagesInsert200ResponseLayoutNamedPagesItemTargetPage {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {

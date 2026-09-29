@@ -87,7 +87,7 @@ export function buildThreads(annotations: readonly AnnotationDTO[]): AnnotationT
     // Index under /NM too, so a child that points at the parent by name
     // still resolves when the parent's own ref is objectNumber-form.
     if (a.nm && a.nm.length > 0) {
-      byKey.set(`nm:${a.ref.page.pageObjectNumber}:${a.nm}`, a);
+      byKey.set(`nm:${a.ref.page.objectNumber}:${a.nm}`, a);
     }
   }
 

@@ -1,0 +1,331 @@
+---
+title: Selecting & editing
+description: How people select and change annotations, and how to add a menu, a style panel and your own handles.
+---
+
+# Selecting & editing
+
+With the `pointer` tool active, people click an annotation to select it. A box with handles appears
+around it: drag the annotation to move it, a handle to resize it, and the round handle above it to
+turn it. Your code reads and changes the same selection, and you build the menu and the style
+panel around it.
+
+## How people select
+
+- **Click** an annotation to select it. **Shift-click** adds it to the selection, or takes it out.
+- **Drag on empty space** to draw a box: everything it touches is selected.
+- **Click empty space** to clear the selection.
+- **Double-click** a text box to type in it.
+
+While moving, the selection snaps to the edges and centers of other annotations and of the page,
+and a turn snaps to 0°, 90°, 180° and 270°. Hold Shift to move or turn freely. See
+[Snapping](#snapping) to change it.
+
+## Select with code
+
+```ts
+const annotation = useAnnotation();
+
+annotation.selection.set([ref]); // select these
+annotation.selection.add([otherRef]); // add to the selection
+annotation.selection.selectAll(page.ref); // everything on a page (or leave out the page)
+annotation.selection.selectInRect(page.ref, { x: 50, y: 50, width: 200, height: 100 });
+annotation.selection.clear();
+```
+
+To show the selection in a component, use a hook. It re-renders when the selection changes:
+
+```ts
+const { selected } = useAnnotationState(); // the selected annotations
+```
+
+## Add a menu
+
+`<AnnotationMenu>` places your own UI next to the selection. Mount it in the Stage's `overlay`, and
+it stays attached while the user scrolls and zooms:
+
+```tsx
+import { AnnotationMenu, useAnnotation, useAnnotationState } from '@embedpdf/react/annotation';
+
+function SelectionActions() {
+  const annotation = useAnnotation();
+  const { selected } = useAnnotationState();
+  const allText = selected.every((a) => a.subtype === 'free-text');
+
+  return (
+    <div className="menu">
+      {allText && <button onClick={() => annotation.text.toggleFormat('bold')}>Bold</button>}
+      <button onClick={() => annotation.selection.update({ color: '#dc143c' })}>Red</button>
+      <button onClick={() => annotation.selection.delete()}>Delete</button>
+    </div>
+  );
+}
+
+<Stage
+  overlay={
+    <AnnotationMenu placement="bottom">
+      <SelectionActions />
+    </AnnotationMenu>
+  }
+>
+  {() => (
+    <>
+      <RenderLayer annotations={false} />
+      <AnnotationLayer />
+    </>
+  )}
+</Stage>;
+```
+
+- **The menu only places things.** What's in it is yours: build it from the selection, as above,
+  to show buttons that fit what's selected.
+- **It moves out of the way.** It hides while the user drags, and it never covers the rotation
+  handle.
+- **`placement`** is `'top'` (the default), `'bottom'`, `'left'` or `'right'`, and `gap` is the
+  space between the selection and the menu, in pixels.
+
+## A style panel
+
+A style panel shows the fields of what's selected, such as color, width, opacity and font, with
+their current values. `useSelectionFields()` gives you everything to draw it:
+
+```ts
+const { fields, values, mixed } = useSelectionFields();
+```
+
+- **`fields`** are the fields the selection can change, in display order. Each one says which
+  control fits: a color, a number with its range, a choice from a list, or an on/off flag.
+- **`values`** are their current values.
+- **`mixed`** lists the fields where the selected annotations differ. Show those as "mixed".
+
+When different kinds are selected, you get only the fields they all have.
+
+Each field's `key` is the annotation's own field name, so reading and writing need no mapping:
+
+```tsx
+function StylePanel() {
+  const annotation = useAnnotation();
+  const { fields, values, mixed } = useSelectionFields();
+
+  return fields.map((field) => (
+    <Control
+      key={field.key}
+      field={field}
+      value={values[field.key]}
+      mixed={mixed.includes(field.key)}
+      onChange={(value) => annotation.selection.update({ [field.key]: value })}
+    />
+  ));
+}
+```
+
+| `field.control` | What to show                                                                                                   | Also on the field    |
+| :-------------- | :------------------------------------------------------------------------------------------------------------- | :------------------- |
+| `'color'`       | A color picker. `null` means no color.                                                                         |                      |
+| `'number'`      | A slider or a number input.                                                                                    | `min`, `max`, `step` |
+| `'choice'`      | A list, such as fonts or line endings.                                                                         | `options`            |
+| `'flag'`        | An on/off switch, such as `locked` or `print`.                                                                 |                      |
+| `'text'`        | A text input, such as a redaction's label.                                                                     |                      |
+| `'textFormat'`  | A bold, italic or underline toggle for text boxes. Write it with `annotation.text.toggleFormat(field.format)`. | `format`             |
+| `'link'`        | Where the annotation links to. Write it with `annotation.links.set(ref, target)`.                              |                      |
+
+`selection.update()` gives each selected annotation the fields its kind has, and skips the rest.
+To change each annotation relative to itself, pass a function. For example, to set only the end
+arrow of lines that keep their own start:
+
+```ts
+await annotation.selection.update((member) =>
+  member.subtype === 'line' ? { lineEndings: { ...member.lineEndings, end: 'open-arrow' } } : {},
+);
+```
+
+The same fields drive a panel for a tool's defaults; see
+[Let people change the defaults](tools#let-people-change-the-defaults).
+
+## Change the handles
+
+By default the selection has a blue outline, square handles on its corners and sides (or on each
+point of a line or a polygon), and a round rotation handle above it. Everything about them can
+change.
+
+**Set them at startup.** One color changes every part; the rest is optional:
+
+```ts
+annotationPlugin({
+  chrome: {
+    accent: '#e91e63',
+    outline: { style: 'dashed', width: 1 },
+    handles: { shape: 'circle', size: 10 },
+    rotationHandle: { offset: 30 },
+  },
+});
+```
+
+| Setting          | What it changes                                                                                                                                                   |
+| :--------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `accent`         | The color of every part below, unless you set one of its own.                                                                                                     |
+| `outline`        | The box around the selection: `style` (`'solid'`, `'dashed'`), `width`, `color`.                                                                                  |
+| `handles`        | The resize and point handles: `shape` (`'square'`, `'circle'`), `size`, `hitSize`, `fill`, `stroke`.                                                              |
+| `rotationHandle` | The turn handle: `enabled`, `size`, `hitSize`, `offset` (distance from the box), `stalk` (the line to it), `fill`, `stroke`, `readout` (the angle while turning). |
+| `guides`         | The lines shown while snapping and turning: `enabled`, `style`, `width`, colors.                                                                                  |
+
+Every size is in screen pixels, so handles stay the same size at every zoom. `hitSize` is the area
+you can grab; keep it at 24 or more for touch.
+
+**Change them while the app runs**, for example when the user switches to a dark theme:
+
+```ts
+annotation.updateSettings({ chrome: { accent: theme.accent } });
+annotation.resetSettings(); // back to what the plugin was registered with
+```
+
+**Draw them yourself.** Pass your own components, and the layer draws them in place of its handles:
+
+```tsx
+function Handle({ at, size, rotation }: HandleProps) {
+  return (
+    <div
+      className="my-handle"
+      style={{
+        left: at.x - size / 2,
+        top: at.y - size / 2,
+        width: size,
+        height: size,
+        rotate: `${rotation}deg`,
+      }}
+    />
+  );
+}
+
+<AnnotationLayer components={{ Handle, RotationHandle }} />;
+```
+
+| Prop       | What it is                                                          |
+| :--------- | :------------------------------------------------------------------ |
+| `at`       | The handle's center, in pixels on the page.                         |
+| `size`     | The `size` from the settings.                                       |
+| `rotation` | The selection's rotation, so a square handle can turn with it.      |
+| `kind`     | `'corner'`, `'side'` or `'point'` (a point of a line or a polygon). |
+| `active`   | True while it's being dragged.                                      |
+
+A `RotationHandle` gets the same props, plus `from`, where its stalk starts on the box. You only
+draw: the viewer still decides where a handle can be grabbed, so your component can't break
+dragging.
+
+## Snapping
+
+```ts
+annotationPlugin({
+  snap: {
+    guides: true, // snap to other annotations and the page while moving
+    guideThreshold: 5, // how close, in points, before it snaps
+    rotation: true,
+    rotationAngles: [0, 45, 90, 135, 180, 225, 270, 315],
+    rotationThreshold: 4, // degrees
+  },
+});
+
+annotation.updateSettings({ snap: { guides: false } }); // while the app runs
+```
+
+## Turn and group
+
+```ts
+annotation.selection.rotateBy(90); // a quarter turn clockwise; -90 the other way
+annotation.selection.resetRotation(); // upright again
+```
+
+Grouping makes several annotations select and move as one. The group is saved in the PDF the way
+Acrobat saves it, so it stays a group there too:
+
+```ts
+if (annotation.selection.canGroup()) await annotation.selection.group();
+if (annotation.selection.canUngroup()) await annotation.selection.ungroup();
+```
+
+To bring an annotation to the front or send it to the back, see
+[Change the drawing order](with-code#change-the-drawing-order).
+
+## Edit text
+
+A double-click on a text box starts typing in it; a click outside ends it. From code:
+
+```ts
+annotation.text.begin(ref);
+await annotation.text.toggleFormat('bold'); // the selected words, or the whole box
+await annotation.text.end();
+```
+
+`annotation.text.getEditing()` is the box being typed in, or `null`. How fonts and formatting work
+is on [Rich text](../../concepts/rich-text).
+
+## Shapes with many points
+
+A polygon or a polyline takes a click per point, and a double-click ends it. While it's being drawn,
+`<AnnotationDraftMenu>` can show buttons to finish or cancel it, which helps on touch screens:
+
+```tsx
+<AnnotationDraftMenu>
+  {(draft) => (
+    <>
+      <button disabled={!draft.canFinish} onClick={() => annotation.draft.finish()}>
+        Done
+      </button>
+      <button onClick={() => annotation.draft.cancel()}>Cancel</button>
+    </>
+  )}
+</AnnotationDraftMenu>
+```
+
+## Keyboard
+
+The headless plugin doesn't take over any keys, since your app may already use them. Delete and
+Escape are a few lines:
+
+```ts
+const annotation = useAnnotation();
+const interaction = useInteraction();
+
+useEffect(() => {
+  const onKey = (event: KeyboardEvent) => {
+    if (event.target instanceof HTMLInputElement || annotation.text.getEditing()) return;
+    if (event.key === 'Delete' || event.key === 'Backspace') void annotation.selection.delete();
+    if (event.key === 'Escape') {
+      annotation.cancel(); // a drag or a polygon in progress
+      interaction.activateDefaultTool();
+    }
+  };
+  window.addEventListener('keydown', onKey);
+  return () => window.removeEventListener('keydown', onKey);
+}, [annotation, interaction]);
+```
+
+## Events
+
+```ts
+useAnnotationEvent(
+  (annotation) => annotation.onSelectionChanged,
+  ({ refs }) => setSidebarOpen(refs.length > 0),
+);
+```
+
+| Event                | Fires when                                        | Carries                  |
+| :------------------- | :------------------------------------------------ | :----------------------- |
+| `onSelectionChanged` | The selection changed                             | `refs`, `previousRefs`   |
+| `onDraftChanged`     | A polygon or polyline is being drawn, or ended    | `draft`                  |
+| `onEditingChanged`   | Typing in a text box started or ended             | `ref`                    |
+
+Changes to the annotations themselves are on [Events, saving & sharing](saving#events).
+
+## Good to know
+
+### Locked annotations
+
+People can select a `locked` annotation, but not move, resize, turn or delete it, and
+`lockedContents` stops them from changing its text. A `hidden` annotation can't be selected at all.
+
+### Touch
+
+A tap selects. The handles of a selected annotation are easier to grab with a finger: their grab
+area is twice as large on touch. One finger on the selected annotation moves it; anywhere else, it
+scrolls the page.

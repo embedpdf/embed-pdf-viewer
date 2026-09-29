@@ -5,7 +5,7 @@ import type { FormFieldRef } from './FormFieldRef';
 export const FormFieldRefSchema: z.ZodType<FormFieldRef> = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('objectNumber'),
-    fieldObjectNumber: z.number().int().positive(),
+    objectNumber: z.number().int().positive(),
   }),
   z.object({
     kind: z.literal('fqn'),

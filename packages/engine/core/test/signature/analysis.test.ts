@@ -102,7 +102,7 @@ function signature(
 ): SignatureDTO<PdfCoordinates> {
   return {
     index,
-    field: { kind: 'objectNumber', fieldObjectNumber },
+    field: { kind: 'objectNumber', objectNumber: fieldObjectNumber },
     fieldName: `sig${index}`,
     widget: null,
     signed: true,

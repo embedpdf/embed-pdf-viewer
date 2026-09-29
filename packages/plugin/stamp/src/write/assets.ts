@@ -133,7 +133,7 @@ export function createAssetWrites(
           }
         }
         const layout = (await doc.pages.list()).pages.find(
-          (candidate) => candidate.ref.pageObjectNumber === page.pageObjectNumber,
+          (candidate) => candidate.ref.objectNumber === page.objectNumber,
         );
         const handle = doc.page(page);
         if (!layout) {

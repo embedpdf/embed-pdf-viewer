@@ -19,6 +19,7 @@ import { readUtf16String } from '../../../runtime/memory/strings';
 import { pdfDateToIso } from '../../../shared/pdf-date';
 import { U64_BYTES, peekU64, pokeU64 } from '../../../runtime/memory/u64';
 import { readFormSnapshot, widgetPageRef } from '../../forms/internal/readFormSnapshot';
+import { fieldObjectNumberOf } from '../../forms/internal/resolveFieldRef';
 import type { WidgetRectOf } from '../../forms/internal/widgetRects';
 
 // Mirrors public/epdf_signature.h.
@@ -175,7 +176,7 @@ export function readSignaturesFromModel(
     const docMdp = fn.EPDFSig_GetDocMDPPermission(model, i);
     out.push({
       index: i,
-      field: { kind: 'objectNumber', fieldObjectNumber: fn.EPDFSig_GetFieldObjNum(model, i) },
+      field: { kind: 'objectNumber', objectNumber: fn.EPDFSig_GetFieldObjNum(model, i) },
       fieldName: readWide(runtime, (buf, cap) => fn.EPDFSig_GetFieldName(model, i, buf, cap)) ?? '',
       widget:
         widgetObjNum > 0
@@ -317,10 +318,10 @@ export function readStructure(runtime: PdfRuntimeModule, docPtr: Ptr): RevisionS
       // The snapshot lists the model's fields in model order.
       snapshot.fields.forEach((f, index) => {
         fields.push({
-          objectNumber: f.fieldObjectNumber,
+          objectNumber: fieldObjectNumberOf(f),
           name: f.name,
           family: f.family,
-          widgets: f.widgets.map((w) => w.annotObjectNumber),
+          widgets: f.widgets.map((w) => w.objectNumber),
           flags: fn.EPDFForm_GetFieldFlags(formModel, index),
         });
       });

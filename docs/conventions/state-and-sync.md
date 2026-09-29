@@ -282,7 +282,7 @@ const pages = ctx.pageMirror<readonly Link[]>({
       throw new PluginError(
         'not-found',
         'link',
-        `page ${page.pageObjectNumber} is not in this document`,
+        `page ${page.objectNumber} is not in this document`,
       );
     }
     const snapshot = await doc.page(page).annotations.list();

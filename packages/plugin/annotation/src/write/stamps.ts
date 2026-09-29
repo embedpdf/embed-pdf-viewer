@@ -213,7 +213,7 @@ export function createStamps(
       throw new Error('[annotation] stamp source must be PNG, JPEG, or single-page PDF bytes');
     }
     const placed = createStampAt(
-      placement.page.pageObjectNumber,
+      placement.page.objectNumber,
       placement.at,
       input.source,
       desiredStampSize(meta, placement.targetWidth ?? input.targetWidth, input.intrinsicSize),
@@ -225,7 +225,7 @@ export function createStamps(
     );
     if (!placed) {
       throw new Error(
-        `[annotation] cannot place a stamp on page ${placement.page.pageObjectNumber}: document or page not ready`,
+        `[annotation] cannot place a stamp on page ${placement.page.objectNumber}: document or page not ready`,
       );
     }
     return placed;
@@ -313,9 +313,9 @@ export function createStamps(
     placeStamp,
     hasArmedStamp: () => armed != null,
     placeArmedStamp: (page: PageRef, point: Point, displayRotation?: number) =>
-      placeArmedStamp(page.pageObjectNumber, point, displayRotation),
+      placeArmedStamp(page.objectNumber, point, displayRotation),
     requestStampAt: (page: PageRef, point: Point, displayRotation?: number) =>
-      requestStampAt(page.pageObjectNumber, point, displayRotation),
+      requestStampAt(page.objectNumber, point, displayRotation),
     getArmedStamp: () => armedInfo,
     renderArmedStampPreview: (devicePixelWidth?: number) => {
       const payload = armed;

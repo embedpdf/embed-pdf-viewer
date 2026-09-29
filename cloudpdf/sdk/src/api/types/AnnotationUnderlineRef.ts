@@ -11,13 +11,13 @@ export namespace AnnotationUnderlineRef {
     export interface ObjectNumber {
         kind: "objectNumber";
         page: AnnotationUnderlineRefObjectNumber.Page;
-        annotObjectNumber: number;
+        objectNumber: number;
     }
 
     export namespace AnnotationUnderlineRefObjectNumber {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -37,7 +37,7 @@ export namespace AnnotationUnderlineRef {
     export namespace AnnotationUnderlineRefNm {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -58,7 +58,7 @@ export namespace AnnotationUnderlineRef {
     export namespace AnnotationUnderlineRefIndex {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -77,7 +77,7 @@ export namespace AnnotationUnderlineRef {
         export namespace Revision {
             export interface Page {
                 kind: Page.Kind;
-                pageObjectNumber: number;
+                objectNumber: number;
             }
 
             export namespace Page {

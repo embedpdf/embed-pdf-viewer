@@ -65,7 +65,7 @@ describe('search transitions', () => {
     expect(state.hitsByPage[7].map((found) => found.start)).toEqual([2]);
     expect(state.activeIndex).toBe(0);
     expect(state.progress).toEqual({ pagesSearched: 3, pageCount: 8 });
-    expect(pagesWithHits(state).map((page) => page.pageObjectNumber)).toEqual([5, 7]);
+    expect(pagesWithHits(state).map((page) => page.objectNumber)).toEqual([5, 7]);
   });
 
   test('an empty slice only advances progress; an explicit active index survives appends', () => {

@@ -50,7 +50,7 @@ export function createPageReads(
 
   // The durable identity of the page at a display index, from the registry.
   const pageObjectNumberAt = (index: number): number =>
-    ctx.document()?.pages[index]?.ref.pageObjectNumber ?? index + 1;
+    ctx.document()?.pages[index]?.ref.objectNumber ?? index + 1;
 
   // The un-rotated point size of a laid-out box, for when the registry entry
   // is momentarily absent. `displaySize` is its own inverse (display box →
@@ -226,9 +226,7 @@ export function createPageReads(
       getScrollMetrics: scrollMetricsNow,
       listVisiblePages: visiblePages,
       isPageVisible: (page) =>
-        visiblePages().some(
-          (visiblePage) => visiblePage.ref.pageObjectNumber === page.pageObjectNumber,
-        ),
+        visiblePages().some((visiblePage) => visiblePage.ref.objectNumber === page.objectNumber),
       getCurrentPageIndex: () => state().cursor,
       getCurrentPage: () => ctx.document()?.pages[state().cursor] ?? null,
       listCurrentItemPages: () => {
@@ -267,7 +265,7 @@ export function createPageReads(
         // `getPageAt` without the containment check: project onto one page's
         // plane, valid outside its bounds, through the same inverse transform.
         const target = visiblePages().find(
-          (visiblePage) => visiblePage.ref.pageObjectNumber === page.pageObjectNumber,
+          (visiblePage) => visiblePage.ref.objectNumber === page.objectNumber,
         );
         if (!target) return null;
         return target.transform.viewToPage({

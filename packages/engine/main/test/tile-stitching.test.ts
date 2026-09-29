@@ -37,7 +37,7 @@ beforeAll(async () => {
   engine = createLocalEngine({ runtime: { prefer: 'wasm' } });
   doc = await engine.open({ kind: 'bytes', id: 'stitch-doc', bytes });
   const pages = (await doc.pages.list()).pages;
-  pageObjectNumber = pages[0]!.ref.pageObjectNumber;
+  pageObjectNumber = pages[0]!.ref.objectNumber;
   pageW = pages[0]!.size.width;
 }, 60_000);
 

@@ -47,7 +47,11 @@ import {
 } from './internal/fieldValues';
 import { withWideStringArray } from './internal/wideStringArray';
 import { readFieldAt, readFormSnapshot } from './internal/readFormSnapshot';
-import { resolveFieldRef, type ResolvedField } from './internal/resolveFieldRef';
+import {
+  fieldObjectNumberOf,
+  resolveFieldRef,
+  type ResolvedField,
+} from './internal/resolveFieldRef';
 import { AnnotationMutator } from '../annotations/AnnotationMutator';
 import { DocumentCheckpoint } from '../../document-session/DocumentCheckpoint';
 import { readUtf16String } from '../../runtime/memory/strings';
@@ -136,7 +140,7 @@ export class FormMutator {
       .filter((field) => !isAtDefault(field))
       .map((before) => {
         const changed = this.withChangedWidgets((buf, cap, countPtr) =>
-          fn.EPDFForm_ResetField(docPtr, before.fieldObjectNumber, buf, cap, countPtr),
+          fn.EPDFForm_ResetField(docPtr, fieldObjectNumberOf(before), buf, cap, countPtr),
         );
         if (changed === null) {
           throw new EngineError(EngineErrorCode.Unknown, `'${before.name}' could not be reset`);
@@ -148,13 +152,13 @@ export class FormMutator {
     const fields: FormFieldDTO<PdfCoordinates>[] = [];
     const changedWidgets: FormWidget[] = [];
     for (const { before, changed } of written) {
-      const after = this.readBackField(before.fieldObjectNumber);
+      const after = this.readBackField(fieldObjectNumberOf(before));
       if (changed.length === 0 && valueEntriesEqual(before.valueEntry, after.valueEntry)) continue;
       fields.push(after);
       const changedSet = new Set(changed);
       for (const widget of after.widgets) {
-        if (changedSet.has(widget.annotObjectNumber)) {
-          changedWidgets.push(formWidget(widget.annotObjectNumber, widget.page));
+        if (changedSet.has(widget.objectNumber)) {
+          changedWidgets.push(formWidget(widget.objectNumber, widget.page));
         }
       }
     }
@@ -176,7 +180,7 @@ export class FormMutator {
     const count = this.runtime.fn.EPDFForm_CountFields(model);
     for (let index = 0; index < count; index++) {
       const field = readFieldAt(this.runtime, model, index, docPtr);
-      if (!VALUE_FAMILIES.has(field.family) || field.fieldObjectNumber === 0) continue;
+      if (!VALUE_FAMILIES.has(field.family) || field.ref.kind !== 'objectNumber') continue;
       if (locks?.(field.name)) continue;
       targets.push(field);
     }
@@ -440,7 +444,6 @@ export class FormMutator {
   setSignatureAppearance(
     ref: FormFieldRef,
     pdf: Uint8Array,
-    pageIndex: number,
     signal: AbortSignal,
   ): { field: FormFieldDTO<PdfCoordinates> } {
     throwIfAborted(signal);
@@ -460,7 +463,7 @@ export class FormMutator {
         (s) =>
           s.signed &&
           s.field.kind === 'objectNumber' &&
-          s.field.fieldObjectNumber === resolved.fieldObjectNumber,
+          s.field.objectNumber === resolved.fieldObjectNumber,
       ),
     );
     if (signed) {
@@ -476,11 +479,11 @@ export class FormMutator {
       );
     }
     for (const widget of before.widgets) {
-      bakeWidgetAppearance(this.runtime, docPtr, widget, pdf, pageIndex);
+      bakeWidgetAppearance(this.runtime, docPtr, widget, pdf);
     }
     this.session.noteMutation();
     const pages = [
-      ...new Set(before.widgets.flatMap((w) => (w.page ? [w.page.pageObjectNumber] : []))),
+      ...new Set(before.widgets.flatMap((w) => (w.page ? [w.page.objectNumber] : []))),
     ];
     for (const pageObjectNumber of pages) this.session.bumpRevision(pageObjectNumber);
     return { field: this.readBackField(resolved.fieldObjectNumber) };
@@ -598,7 +601,7 @@ export class FormMutator {
       resolved.fieldIndex,
       this.session.requireDocPtr(),
     );
-    const removedWidgets = before.widgets.map((w) => formWidget(w.annotObjectNumber, w.page));
+    const removedWidgets = before.widgets.map((w) => formWidget(w.objectNumber, w.page));
 
     // Apply boundary. EPDFForm_DeleteField validates before it writes, so a
     // refusal leaves the document untouched; nothing after it may throw for
@@ -839,8 +842,8 @@ export class FormMutator {
     );
     const changedSet = new Set(changedObjNums);
     const changedWidgets: FormWidget[] = field.widgets
-      .filter((w) => changedSet.has(w.annotObjectNumber))
-      .map((w) => formWidget(w.annotObjectNumber, w.page));
+      .filter((w) => changedSet.has(w.objectNumber))
+      .map((w) => formWidget(w.objectNumber, w.page));
     return { field, meta: formMutationMeta(this.session, [field.ref], changedWidgets) };
   }
 }
@@ -964,5 +967,5 @@ function widgetObjectNumber(widget: AnnotationRef): number {
   if (widget.kind !== 'objectNumber') {
     throw new EngineError(EngineErrorCode.InvalidArg, 'widget must be addressed by object number');
   }
-  return widget.annotObjectNumber;
+  return widget.objectNumber;
 }

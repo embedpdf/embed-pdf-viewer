@@ -46,9 +46,9 @@ const sameTextRange = (left: TextRange | null, right: TextRange | null): boolean
   left === right ||
   (!!left &&
     !!right &&
-    left.start.page.pageObjectNumber === right.start.page.pageObjectNumber &&
+    left.start.page.objectNumber === right.start.page.objectNumber &&
     left.start.index === right.start.index &&
-    left.end.page.pageObjectNumber === right.end.page.pageObjectNumber &&
+    left.end.page.objectNumber === right.end.page.objectNumber &&
     left.end.index === right.end.index);
 
 // ── annotation-selection predicates (drive the floating strip's contents) ────
@@ -635,10 +635,10 @@ export const defaultCommands: CommandDef[] = [
       // Widgets are field-plane citizens: deleting one goes through doc.forms
       // (the field and every widget of it cascade), never the raw annotation —
       // otherwise the /AcroForm entry would be orphaned.
-      const fields = new Map<number, FormFieldRef>();
+      const fields = new Map<string, FormFieldRef>();
       for (const annotation of widgets) {
         const field = form!.getFieldForWidget(annotation.ref);
-        if (field) fields.set(field.fieldObjectNumber, field.ref);
+        if (field) fields.set(field.name, field.ref);
       }
       for (const ref of fields.values()) void form!.deleteField(ref);
       for (const dto of dtos) if (!isWidget(dto.subtype)) void annotation.delete(dto.ref);
@@ -726,7 +726,7 @@ export const defaultCommands: CommandDef[] = [
       !selectionSubtypes(commandContext).has('redact') &&
       new Set(
         (anno(commandContext)?.listSelected() ?? []).map(
-          (annotation) => annotation.ref.page.pageObjectNumber,
+          (annotation) => annotation.ref.page.objectNumber,
         ),
       ).size === 1,
     enabled: (commandContext) =>

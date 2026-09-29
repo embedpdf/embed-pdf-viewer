@@ -133,7 +133,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
       (a) =>
         a.ref.kind === 'objectNumber' &&
         created.ref.kind === 'objectNumber' &&
-        a.ref.annotObjectNumber === created.ref.annotObjectNumber,
+        a.ref.objectNumber === created.ref.objectNumber,
     );
     expect(appearance).toBeDefined();
     expect(appearance!.raster.width).toBeGreaterThan(0);
@@ -224,7 +224,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
       (a) =>
         a.ref.kind === 'objectNumber' &&
         created.ref.kind === 'objectNumber' &&
-        a.ref.annotObjectNumber === created.ref.annotObjectNumber,
+        a.ref.objectNumber === created.ref.objectNumber,
     );
     expect(entry).toBeDefined();
     // The convention: the entry's rect is the unrotated logical box…
@@ -274,7 +274,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
       (a) =>
         a.ref.kind === 'objectNumber' &&
         created.ref.kind === 'objectNumber' &&
-        a.ref.annotObjectNumber === created.ref.annotObjectNumber,
+        a.ref.objectNumber === created.ref.objectNumber,
     );
     expect(entry).toBeDefined();
     // Authored in the unrotated frame: landscape raster, logical-box rect.
@@ -341,7 +341,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
       (a) =>
         a.ref.kind === 'objectNumber' &&
         created.ref.kind === 'objectNumber' &&
-        a.ref.annotObjectNumber === created.ref.annotObjectNumber,
+        a.ref.objectNumber === created.ref.objectNumber,
     ) as StampAnnotationDTO;
     expect(re.rotation ?? 0).toBe(0);
     expect(re.rect.x).toBeCloseTo(flat.x, 0);
@@ -407,7 +407,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
       (annotation) =>
         annotation.ref.kind === 'objectNumber' &&
         created.ref.kind === 'objectNumber' &&
-        annotation.ref.annotObjectNumber === created.ref.annotObjectNumber,
+        annotation.ref.objectNumber === created.ref.objectNumber,
     );
     expect(reread?.contents).toBe('before');
     if (reread?.subtype === 'stamp') expect(reread.name).toBe(customName);

@@ -82,7 +82,7 @@ export function createFieldWrites(
     if (annotationHost) await annotationHost.whenSynced();
     const widget =
       result.field.widgets.find(
-        (candidate) => candidate.page?.pageObjectNumber === page.pageObjectNumber,
+        (candidate) => candidate.page?.objectNumber === page.objectNumber,
       ) ?? null;
     return { field: result.field, widget };
   };

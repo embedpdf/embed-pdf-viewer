@@ -202,16 +202,14 @@ export function runPageSpaceConformance(
             };
             const { field } = await doc.forms.create({
               family: 'text',
-              name: `placed_${layout.ref.pageObjectNumber}`,
+              name: `placed_${layout.ref.objectNumber}`,
               widgets: [{ page: layout.ref, rect: spot }],
             });
             try {
               const widget = field.widgets[0]!;
               const { annotations } = await doc.page(layout.ref).annotations.list();
               const read = annotations.find(
-                (a) =>
-                  a.ref.kind === 'objectNumber' &&
-                  a.ref.annotObjectNumber === widget.annotObjectNumber,
+                (a) => a.ref.kind === 'objectNumber' && a.ref.objectNumber === widget.objectNumber,
               );
               expect(read?.rect).toEqual(spot);
             } finally {
@@ -364,7 +362,7 @@ const sameBox = (a: PageBox, b: PageBox) =>
   Math.abs(a.width - b.width) < 0.01 &&
   Math.abs(a.height - b.height) < 0.01;
 
-const samePage = (a: PageRef, b: PageRef) => a.pageObjectNumber === b.pageObjectNumber;
+const samePage = (a: PageRef, b: PageRef) => a.objectNumber === b.objectNumber;
 
 // ── pixels ──
 

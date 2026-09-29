@@ -29,7 +29,7 @@ const BLACK = '#000000';
 const ref = (annotObjectNumber: number): AnnotationRef => ({
   kind: 'objectNumber',
   page: PAGE,
-  annotObjectNumber,
+  objectNumber: annotObjectNumber,
 });
 
 const square = (objectNumber: number, extra: Record<string, unknown> = {}): FileAnnotation =>
@@ -184,7 +184,7 @@ describe('a refused write shows the truth', () => {
     const harness = annotationHarness();
     await harness.load([square(20), square(21)]);
     harness.update.mockImplementation(async (target: AnnotationRef) => {
-      if (target.kind === 'objectNumber' && target.annotObjectNumber === 21) {
+      if (target.kind === 'objectNumber' && target.objectNumber === 21) {
         throw new Error('Forbidden');
       }
       return { annotation: square(20, { color: '#00ff00' }) };
@@ -541,7 +541,7 @@ describe('what stays as it is', () => {
     harness.emit({
       type: 'annotations.deleted',
       page: PAGE,
-      deleted: [{ kind: 'objectNumber', value: 20 }],
+      deleted: [{ kind: 'objectNumber', objectNumber: 20 }],
       origin: { kind: 'remote', sessionId: 'cloud:bob', sub: 'bob', ts: 0, serverId: 51 },
       meta: {
         affectedPages: [],
@@ -753,7 +753,7 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     harness.emit({
       type: 'annotations.deleted',
       page: PAGE,
-      deleted: [{ kind: 'objectNumber', value: 60 }],
+      deleted: [{ kind: 'objectNumber', objectNumber: 60 }],
       origin: { kind: 'remote', sessionId: 'cloud:bob', sub: 'bob', ts: 0, serverId: 50 },
       meta,
     } as unknown as DocumentEvent);

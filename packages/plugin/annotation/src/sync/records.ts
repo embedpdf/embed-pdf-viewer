@@ -99,8 +99,8 @@ function bumpAppearance(records: AnnotationRecords, keys: readonly string[]): An
 }
 
 const keysOnPages = (records: AnnotationRecords, pages: readonly PageRef[]): string[] => {
-  const wanted = new Set(pages.map((page) => page.pageObjectNumber));
-  return records.order.filter((key) => wanted.has(records.byKey[key]!.dto.page.pageObjectNumber));
+  const wanted = new Set(pages.map((page) => page.objectNumber));
+  return records.order.filter((key) => wanted.has(records.byKey[key]!.dto.page.objectNumber));
 };
 
 /**
@@ -168,7 +168,7 @@ const recordsOf = (event: AnnotationEvent): readonly AnnotationDTO[] => {
 const hasWeakRecords = (records: AnnotationRecords, page: PageRef): boolean =>
   records.order.some((key) => {
     const { ref } = records.byKey[key]!.dto;
-    return ref.kind === 'index' && ref.page.pageObjectNumber === page.pageObjectNumber;
+    return ref.kind === 'index' && ref.page.objectNumber === page.objectNumber;
   });
 
 /**

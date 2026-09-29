@@ -11,13 +11,13 @@ export namespace AnnotationFileAttachmentRef {
     export interface ObjectNumber {
         kind: "objectNumber";
         page: AnnotationFileAttachmentRefObjectNumber.Page;
-        annotObjectNumber: number;
+        objectNumber: number;
     }
 
     export namespace AnnotationFileAttachmentRefObjectNumber {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -37,7 +37,7 @@ export namespace AnnotationFileAttachmentRef {
     export namespace AnnotationFileAttachmentRefNm {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -58,7 +58,7 @@ export namespace AnnotationFileAttachmentRef {
     export namespace AnnotationFileAttachmentRefIndex {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -77,7 +77,7 @@ export namespace AnnotationFileAttachmentRef {
         export namespace Revision {
             export interface Page {
                 kind: Page.Kind;
-                pageObjectNumber: number;
+                objectNumber: number;
             }
 
             export namespace Page {

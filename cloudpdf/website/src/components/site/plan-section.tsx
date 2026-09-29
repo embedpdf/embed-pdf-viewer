@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 
 import {
   DOCS_INTEGRATION_LABELS,
-  docsGettingStartedHref,
+  docsEntryHref,
   PRODUCT_INTEGRATIONS,
   type DocsIntegration,
   type FanoutDocsProduct,
@@ -39,7 +39,7 @@ function FrameworkButton({
   const s = fwToneStyles[tone];
   return (
     <Link
-      href={docsGettingStartedHref(product, integration)}
+      href={docsEntryHref(product, integration)}
       className={`group flex items-center gap-2.5 rounded-xl border px-3 py-2.5 no-underline transition-all ${s.link} ${
         integration === 'vanilla' ? 'col-span-2 max-[400px]:col-span-1' : ''
       }`}

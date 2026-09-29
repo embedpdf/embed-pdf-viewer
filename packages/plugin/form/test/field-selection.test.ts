@@ -16,8 +16,7 @@ const field = (
   }> = {},
 ): FormFieldDTO =>
   ({
-    ref: { kind: 'objectNumber', fieldObjectNumber: overrides.fieldObjectNumber ?? 0 },
-    fieldObjectNumber: overrides.fieldObjectNumber ?? 0,
+    ref: { kind: 'objectNumber', objectNumber: overrides.fieldObjectNumber ?? 0 },
     name,
     family: overrides.family ?? 'text',
     origin: 'acroform',

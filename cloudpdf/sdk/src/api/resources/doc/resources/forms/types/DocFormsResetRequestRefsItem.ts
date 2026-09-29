@@ -9,7 +9,7 @@ export type DocFormsResetRequestRefsItem =
 export namespace DocFormsResetRequestRefsItem {
     export interface ObjectNumber {
         kind: "objectNumber";
-        fieldObjectNumber: number;
+        objectNumber: number;
     }
 
     export interface Fqn {

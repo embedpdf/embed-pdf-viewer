@@ -30,11 +30,11 @@ export interface Box {
 /** Stable client key for a field: its object number when durable, else its fully qualified name. */
 export type FieldKey = string;
 
-export const fieldKeyOf = (field: { fieldObjectNumber: number; name: string }): FieldKey =>
-  field.fieldObjectNumber > 0 ? `obj:${field.fieldObjectNumber}` : `fqn:${field.name}`;
-
 export const fieldKeyOfRef = (ref: FormFieldRef): FieldKey =>
-  ref.kind === 'objectNumber' ? `obj:${ref.fieldObjectNumber}` : `fqn:${ref.name}`;
+  ref.kind === 'objectNumber' ? `obj:${ref.objectNumber}` : `fqn:${ref.name}`;
+
+/** A field's ref is its object number, or its name when it has none. */
+export const fieldKeyOf = (field: { ref: FormFieldRef }): FieldKey => fieldKeyOfRef(field.ref);
 
 // ── the field index (the `fields` mirror) ────────────────────────────────────
 
@@ -54,7 +54,7 @@ export function indexFields(snapshot: FormSnapshot): FieldIndex {
   snapshot.fields.forEach((field, position) => {
     byKey[fieldKeyOf(field)] = position;
     for (const widget of field.widgets) {
-      if (widget.annotObjectNumber > 0) byWidget[widget.annotObjectNumber] = position;
+      if (widget.objectNumber > 0) byWidget[widget.objectNumber] = position;
     }
   });
   return { snapshot, byKey, byWidget };
@@ -76,7 +76,7 @@ export function removeField(index: FieldIndex, ref: FormFieldRef): FieldIndex {
   if (!index.snapshot) return index;
   const fields = index.snapshot.fields.filter((field) =>
     ref.kind === 'objectNumber'
-      ? field.fieldObjectNumber !== ref.fieldObjectNumber
+      ? !(field.ref.kind === 'objectNumber' && field.ref.objectNumber === ref.objectNumber)
       : field.name !== ref.name,
   );
   if (fields.length === index.snapshot.fields.length) return index;

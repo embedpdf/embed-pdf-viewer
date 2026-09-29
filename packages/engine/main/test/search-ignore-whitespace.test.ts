@@ -22,7 +22,7 @@ function squash(text: string): string {
   return text.replace(/\s+/g, '').toLowerCase();
 }
 
-const key = (m: SearchMatch) => `${m.page.pageObjectNumber}:${m.start}:${m.count}`;
+const key = (m: SearchMatch) => `${m.page.objectNumber}:${m.start}:${m.count}`;
 
 describe('ignoreWhitespace against real page text (engine-local, wasm runtime)', () => {
   let engine: Engine;
@@ -70,7 +70,7 @@ describe('ignoreWhitespace against real page text (engine-local, wasm runtime)',
     const texts = relaxed.map(hitText);
     // The letter-spaced occurrences, one per page — the hit spans the gaps.
     expect(texts.filter((t) => t === 'i n v o i c e')).toHaveLength(2);
-    expect(new Set(relaxed.map((m) => m.page.pageObjectNumber)).size).toBe(2);
+    expect(new Set(relaxed.map((m) => m.page.objectNumber)).size).toBe(2);
     // The word split across a line break.
     expect(texts.some((t) => /^in\s+voice$/.test(t))).toBe(true);
     // Every hit is the same word once whitespace and case are dropped.

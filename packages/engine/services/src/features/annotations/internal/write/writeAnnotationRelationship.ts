@@ -70,10 +70,10 @@ export function writeAnnotationRelationship(
 
   // Set / relink.
   if (rel.inReplyTo) {
-    if (rel.inReplyTo.page.pageObjectNumber !== pageObjectNumber) {
+    if (rel.inReplyTo.page.objectNumber !== pageObjectNumber) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
-        `/IRT parent must be on the same page as the reply (parent page ${rel.inReplyTo.page.pageObjectNumber}, reply page ${pageObjectNumber})`,
+        `/IRT parent must be on the same page as the reply (parent page ${rel.inReplyTo.page.objectNumber}, reply page ${pageObjectNumber})`,
       );
     }
     const parentPtr = resolveAnnotPtr(runtime, session, pagePtr, rel.inReplyTo);
@@ -139,10 +139,10 @@ export function writePopupParent(
     fn.EPDFAnnot_SetLinkedAnnot(popupPtr, 'Parent', NULL_PTR);
     return null;
   }
-  if (parent.page.pageObjectNumber !== pageObjectNumber) {
+  if (parent.page.objectNumber !== pageObjectNumber) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
-      `a popup's parent must be on the same page (parent page ${parent.page.pageObjectNumber}, popup page ${pageObjectNumber})`,
+      `a popup's parent must be on the same page (parent page ${parent.page.objectNumber}, popup page ${pageObjectNumber})`,
     );
   }
   const parentPtr = resolveAnnotPtr(runtime, session, pagePtr, parent);

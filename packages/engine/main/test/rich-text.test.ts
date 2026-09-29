@@ -375,7 +375,7 @@ describe('rich text FreeText (local engine)', () => {
       (a) =>
         a.ref.kind === 'objectNumber' &&
         created.annotation.ref.kind === 'objectNumber' &&
-        a.ref.annotObjectNumber === created.annotation.ref.annotObjectNumber,
+        a.ref.objectNumber === created.annotation.ref.objectNumber,
     );
     expect(match).toBeDefined();
     const raster = match!.raster;

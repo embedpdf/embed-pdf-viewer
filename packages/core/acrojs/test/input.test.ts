@@ -12,7 +12,7 @@ describe('scriptFieldsFromSnapshot', () => {
     'exposes an absent %s value and default as Acrobat Off tokens',
     (family) => {
       const field = {
-        ref: { kind: 'objectNumber', fieldObjectNumber: 5 },
+        ref: { kind: 'objectNumber', objectNumber: 5 },
         name: 'toggle',
         family,
         valueEntry: { kind: 'none' },
@@ -32,7 +32,7 @@ describe('scriptFieldsFromSnapshot', () => {
   it("shows a toggle's export value, not its on-state name", () => {
     const widget = (onState: string, exportValue: string) => ({ onState, exportValue });
     const field = {
-      ref: { kind: 'objectNumber', fieldObjectNumber: 7 },
+      ref: { kind: 'objectNumber', objectNumber: 7 },
       name: 'size',
       family: 'radio',
       valueEntry: { kind: 'scalar', value: '1' },
@@ -51,7 +51,7 @@ describe('scriptFieldsFromSnapshot', () => {
 
   it('keeps an absent text value as null', () => {
     const field = {
-      ref: { kind: 'objectNumber', fieldObjectNumber: 6 },
+      ref: { kind: 'objectNumber', objectNumber: 6 },
       name: 'text',
       family: 'text',
       valueEntry: { kind: 'none' },

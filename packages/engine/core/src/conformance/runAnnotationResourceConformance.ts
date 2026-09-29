@@ -591,5 +591,5 @@ function pageSize(pdf: Uint8Array): [number, number] | null {
 async function firstPage(doc: DocumentHandle): Promise<PageRef> {
   const { pages } = await doc.pages.list();
   if (!pages[0]) throw new Error('the document has no pages');
-  return toPageRef(pages[0].ref.pageObjectNumber);
+  return toPageRef(pages[0].ref.objectNumber);
 }

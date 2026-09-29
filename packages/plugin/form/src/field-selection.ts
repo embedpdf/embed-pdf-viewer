@@ -32,7 +32,7 @@ export const resolveFieldSelection = <F extends { name: string; ref: FormFieldRe
     targets.filter((target) => target.kind === 'objectNumber').map((target) => target.objectNumber),
   );
   const listed = (field: F): boolean =>
-    (field.ref.kind === 'objectNumber' && objectNumbers.has(field.ref.fieldObjectNumber)) ||
+    (field.ref.kind === 'objectNumber' && objectNumbers.has(field.ref.objectNumber)) ||
     names.some((name) => field.name === name || field.name.startsWith(`${name}.`));
   const selected = exclude ? all.filter((field) => !listed(field)) : all.filter(listed);
   return { selected, listed };

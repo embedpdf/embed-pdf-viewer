@@ -15,8 +15,7 @@ describe("FormsClient", () => {
             fields: [
                 {
                     family: "text",
-                    ref: { kind: "objectNumber", fieldObjectNumber: 1 },
-                    fieldObjectNumber: 1,
+                    ref: { kind: "objectNumber", objectNumber: 1 },
                     name: "name",
                     origin: "acroform",
                     readOnly: true,
@@ -26,7 +25,7 @@ describe("FormsClient", () => {
                     mappingName: "mappingName",
                     valueEntry: { kind: "none" },
                     defaultValueEntry: { kind: "none" },
-                    widgets: [{ ref: null, annotObjectNumber: 1, page: null, rect: null }],
+                    widgets: [{ ref: null, objectNumber: 1, page: null, rect: null }],
                     value: "value",
                     defaultValue: "defaultValue",
                     maxLength: 1,
@@ -35,7 +34,7 @@ describe("FormsClient", () => {
                     comb: true,
                 },
             ],
-            calculationOrder: [{ kind: "objectNumber", fieldObjectNumber: 1 }],
+            calculationOrder: [{ kind: "objectNumber", objectNumber: 1 }],
         };
 
         server
@@ -86,8 +85,7 @@ describe("FormsClient", () => {
                 fields: [
                     {
                         family: "text",
-                        ref: { kind: "objectNumber", fieldObjectNumber: 1 },
-                        fieldObjectNumber: 1,
+                        ref: { kind: "objectNumber", objectNumber: 1 },
                         name: "name",
                         origin: "acroform",
                         readOnly: true,
@@ -97,7 +95,7 @@ describe("FormsClient", () => {
                         mappingName: null,
                         valueEntry: { kind: "none" },
                         defaultValueEntry: { kind: "none" },
-                        widgets: [{ ref: null, annotObjectNumber: 1, page: null, rect: null }],
+                        widgets: [{ ref: null, objectNumber: 1, page: null, rect: null }],
                         value: "value",
                         defaultValue: "defaultValue",
                         maxLength: null,
@@ -106,17 +104,17 @@ describe("FormsClient", () => {
                         comb: true,
                     },
                 ],
-                calculationOrder: [{ kind: "objectNumber", fieldObjectNumber: 1 }],
+                calculationOrder: [{ kind: "objectNumber", objectNumber: 1 }],
             },
             applied: 1,
             skipped: 1,
             meta: {
                 affectedPages: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         revision: {
                             docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             generation: 1,
                         },
                         weakAnnotationState: { kind: "unknown" },
@@ -133,7 +131,7 @@ describe("FormsClient", () => {
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             cache: { contentVersion: 1, annotationVersion: 1 },
                         },
                     ],
@@ -223,8 +221,7 @@ describe("FormsClient", () => {
         const rawResponseBody = {
             field: {
                 family: "text",
-                ref: { kind: "objectNumber", fieldObjectNumber: 1 },
-                fieldObjectNumber: 1,
+                ref: { kind: "objectNumber", objectNumber: 1 },
                 name: "name",
                 origin: "acroform",
                 readOnly: true,
@@ -240,7 +237,7 @@ describe("FormsClient", () => {
                     validate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
                     calculate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
                 },
-                widgets: [{ ref: null, annotObjectNumber: 1, page: null, rect: null }],
+                widgets: [{ ref: null, objectNumber: 1, page: null, rect: null }],
                 value: "value",
                 defaultValue: "defaultValue",
                 maxLength: 1,
@@ -251,10 +248,10 @@ describe("FormsClient", () => {
             meta: {
                 affectedPages: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         revision: {
                             docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             generation: 1,
                         },
                         weakAnnotationState: { kind: "unknown" },
@@ -271,13 +268,13 @@ describe("FormsClient", () => {
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             cache: { contentVersion: 1, annotationVersion: 1 },
                         },
                     ],
                 },
-                changedFields: [{ kind: "objectNumber", fieldObjectNumber: 1 }],
-                changedWidgets: [{ ref: null, annotObjectNumber: 1, page: null }],
+                changedFields: [{ kind: "objectNumber", objectNumber: 1 }],
+                changedWidgets: [{ ref: null, objectNumber: 1, page: null }],
             },
         };
 
@@ -367,8 +364,7 @@ describe("FormsClient", () => {
             fields: [
                 {
                     family: "text",
-                    ref: { kind: "objectNumber", fieldObjectNumber: 1 },
-                    fieldObjectNumber: 1,
+                    ref: { kind: "objectNumber", objectNumber: 1 },
                     name: "name",
                     origin: "acroform",
                     readOnly: true,
@@ -378,7 +374,7 @@ describe("FormsClient", () => {
                     mappingName: "mappingName",
                     valueEntry: { kind: "none" },
                     defaultValueEntry: { kind: "none" },
-                    widgets: [{ ref: null, annotObjectNumber: 1, page: null, rect: null }],
+                    widgets: [{ ref: null, objectNumber: 1, page: null, rect: null }],
                     value: "value",
                     defaultValue: "defaultValue",
                     maxLength: 1,
@@ -390,10 +386,10 @@ describe("FormsClient", () => {
             meta: {
                 affectedPages: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         revision: {
                             docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             generation: 1,
                         },
                         weakAnnotationState: { kind: "unknown" },
@@ -410,13 +406,13 @@ describe("FormsClient", () => {
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             cache: { contentVersion: 1, annotationVersion: 1 },
                         },
                     ],
                 },
-                changedFields: [{ kind: "objectNumber", fieldObjectNumber: 1 }],
-                changedWidgets: [{ ref: null, annotObjectNumber: 1, page: null }],
+                changedFields: [{ kind: "objectNumber", objectNumber: 1 }],
+                changedWidgets: [{ ref: null, objectNumber: 1, page: null }],
             },
         };
 

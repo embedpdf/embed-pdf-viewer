@@ -33,7 +33,7 @@ export namespace DocPagesSetName200Response {
             export namespace Item {
                 export interface Ref {
                     kind: Ref.Kind;
-                    pageObjectNumber: number;
+                    objectNumber: number;
                 }
 
                 export namespace Ref {
@@ -142,7 +142,7 @@ export namespace DocPagesSetName200Response {
                 export namespace Item {
                     export interface Page {
                         kind: Page.Kind;
-                        pageObjectNumber: number;
+                        objectNumber: number;
                     }
 
                     export namespace Page {

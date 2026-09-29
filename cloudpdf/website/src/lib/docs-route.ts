@@ -16,8 +16,8 @@ type StaticParam = Record<string, string | string[]>;
 /**
  * Maps a public documentation URL back to its canonical content source.
  *
- * `/docs/headless/react/getting-started` and its Vue/Svelte/Angular siblings
- * all resolve to the single `docs/headless/getting-started` content source.
+ * `/docs/headless/react/quick-start` and its Vue/Svelte/Angular siblings
+ * all resolve to the single `docs/headless/quick-start` content source.
  * Framework-less products (engine, server, api-reference) pass through.
  */
 export function resolveDocsPath(mdxPath: string[]): ResolvedDocsPath | null {

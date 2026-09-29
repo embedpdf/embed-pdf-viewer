@@ -327,7 +327,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
         (a) =>
           a.ref.kind === 'objectNumber' &&
           dto.ref.kind === 'objectNumber' &&
-          a.ref.annotObjectNumber === dto.ref.annotObjectNumber,
+          a.ref.objectNumber === dto.ref.objectNumber,
       );
       expect(ap, `appearance for ${dto.subtype}`).toBeDefined();
       const apRect = ap!.rect;
@@ -399,7 +399,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
         (a) =>
           a.ref.kind === 'objectNumber' &&
           caret.ref.kind === 'objectNumber' &&
-          a.ref.annotObjectNumber === caret.ref.annotObjectNumber,
+          a.ref.objectNumber === caret.ref.objectNumber,
       );
       expect(ap, 'appearance for caret').toBeDefined();
       const apRect = ap!.rect;
@@ -470,7 +470,7 @@ describe("annotation rotation (local engine) — Acrobat's /Rotate", () => {
 
     const objectNumberOf = (ref: (typeof stamp)['ref']) => {
       if (ref.kind !== 'objectNumber') throw new Error('expected an object-number ref');
-      return ref.annotObjectNumber;
+      return ref.objectNumber;
     };
     // 36 degrees clockwise is -36 in the file, as Acrobat writes it.
     expect(objectText(bytes, objectNumberOf(stamp.ref))).toMatch(/\/Rotate -36\b/);

@@ -58,11 +58,11 @@ export function createPointer(
           page,
           point,
           shift,
-          pageBox: geometry.pageBoxOf(page.pageObjectNumber),
+          pageBox: geometry.pageBoxOf(page.objectNumber),
           // Touch grabs with the same widened zones the claim used, so the
           // gesture picks up exactly what claimsTouchAt said it would.
           chrome: chrome.chromeGeomAt(scale, chrome.grabBoost(touch)),
-          inert: behaviors.engagedIdsOn(page.pageObjectNumber),
+          inert: behaviors.engagedIdsOn(page.objectNumber),
           // the view env (screen-anchored bodies hit/clamp at their footprint)
           ...(zoom != null ? { zoom } : {}),
           ...(rotation != null ? { displayRotation: rotation } : {}),
@@ -85,8 +85,8 @@ export function createPointer(
           page,
           point,
           shift,
-          pageBox: geometry.pageBoxOf(page.pageObjectNumber),
-          inert: behaviors.engagedIdsOn(page.pageObjectNumber),
+          pageBox: geometry.pageBoxOf(page.objectNumber),
+          inert: behaviors.engagedIdsOn(page.objectNumber),
           ...(zoom != null ? { zoom } : {}),
           ...(rotation != null ? { displayRotation: rotation } : {}),
         },
@@ -100,7 +100,7 @@ export function createPointer(
       finish = false,
       displayRotation?: PageRotation,
     ) => {
-      const pageObjectNumber = page.pageObjectNumber;
+      const pageObjectNumber = page.objectNumber;
       // No create authority → creation gestures are inert: no ghost, no
       // draft, no doomed 403. The engine enforces; this keeps pixels honest.
       const resolvedTool = tools.get(tool);
@@ -120,7 +120,7 @@ export function createPointer(
       const draft = store.model().draft;
       const continuingMeasurement =
         (draft?.kind === 'create-distance' || draft?.kind === 'create-poly') &&
-        draft.page.pageObjectNumber === pageObjectNumber &&
+        draft.page.objectNumber === pageObjectNumber &&
         draft.preset === (resolvedTool?.preset ?? tool);
       const dimension = resolvedTool && isDimension(resolvedTool);
       if (

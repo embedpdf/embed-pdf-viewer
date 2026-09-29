@@ -73,12 +73,10 @@ export function createMarking(
     const finder = search();
     if (!finder) throw new PluginError('unsupported', 'redaction', 'no search plugin');
     await finder.search(query);
-    const wanted = options?.pages
-      ? new Set(options.pages.map((page) => page.pageObjectNumber))
-      : null;
+    const wanted = options?.pages ? new Set(options.pages.map((page) => page.objectNumber)) : null;
     const refs: AnnotationRef[] = [];
     for (const hit of finder.listHits()) {
-      if (wanted && !wanted.has(hit.page.pageObjectNumber)) continue;
+      if (wanted && !wanted.has(hit.page.objectNumber)) continue;
       if (hit.segments.length === 0) continue;
       refs.push(
         await annotation.create({

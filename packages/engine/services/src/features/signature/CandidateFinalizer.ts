@@ -101,8 +101,7 @@ export class CandidateFinalizer {
       const reader = new SignatureReader(this.runtime, session);
       const snapshot = reader.readSnapshot();
       const signature = snapshot.signatures.find(
-        (s) =>
-          s.field.kind === 'objectNumber' && s.field.fieldObjectNumber === input.fieldObjectNumber,
+        (s) => s.field.kind === 'objectNumber' && s.field.objectNumber === input.fieldObjectNumber,
       )!;
       return {
         signature: pageSignatureOf(signature, visibleBoxReader(this.runtime, session)),

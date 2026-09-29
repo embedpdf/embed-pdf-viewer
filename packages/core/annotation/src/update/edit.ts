@@ -193,7 +193,7 @@ export function editMove(model: Model, input: PointerInput): [Model, Effect[]] {
   const draft = model.draft!;
   // Foreign coordinate frame (see the page-bound gesture rules above) — ignore.
   const home = editDraftPage(model, draft);
-  if (home != null && input.page.pageObjectNumber !== home.pageObjectNumber) return [model, []];
+  if (home != null && input.page.objectNumber !== home.objectNumber) return [model, []];
   if (draft.kind === 'move') {
     const view = viewOf(input);
     const raw = clampMoveDelta(

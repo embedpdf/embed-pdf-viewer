@@ -200,7 +200,7 @@ describe('signature protection (cloud SDK, real runtime)', () => {
       expect(doc.security.allows('doc.pages.assemble')).toBe(true);
       const page = await firstPage(doc);
       expect(await errorCode(doc.page(page).annotations.create(square))).toBe('ok');
-      expect(await errorCode(doc.pages.rotate([toPageRef(page.pageObjectNumber)], 90))).toBe('ok');
+      expect(await errorCode(doc.pages.rotate([toPageRef(page.objectNumber)], 90))).toBe('ok');
     } finally {
       await close();
     }

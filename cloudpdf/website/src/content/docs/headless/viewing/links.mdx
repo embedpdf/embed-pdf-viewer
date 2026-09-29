@@ -1,0 +1,112 @@
+---
+title: Links
+description: "Make the links in a PDF work: go to a page, open a website, and change how link areas look."
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Links
+
+Most PDFs have links: a table of contents that jumps to a chapter, a footnote to a website. Register
+`linkPlugin()` and put a `<LinkLayer>` in each page, and they work:
+
+```tsx
+import { LinkLayer, linkPlugin } from '@embedpdf/react/link';
+
+const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), linkPlugin()];
+
+<Stage>
+  {() => (
+    <>
+      <RenderLayer />
+      <LinkLayer />
+    </>
+  )}
+</Stage>;
+```
+
+- **A link to a page** goes there, to the exact spot and zoom the link names.
+- **A link to a website** opens in a new tab, after a safety check (see [Good to know](#good-to-know)).
+- **A link with a PDF action**, such as a button that resets a form, runs the action when the
+  [actions plugin](../documents/actions) is registered.
+
+The pointer turns into a hand over a link, and a link can be reached with the Tab key and followed
+with Enter.
+
+## Change how links look
+
+By default a link area is invisible, as in other PDF apps. `renderLink` lets you draw it yourself,
+for example with an underline on hover:
+
+```tsx
+<LinkLayer
+  renderLink={({ link, native }) => (
+    <span className="pdf-link" title={link.target.kind === 'uri' ? link.target.uri : undefined}>
+      {native}
+    </span>
+  )}
+/>
+```
+
+`native` is the layer's own clickable area: wrap it to keep what a click does. Return `undefined` for
+a link you don't want to change.
+
+## Read the links on a page
+
+```ts
+const link = useLink();
+
+link.listLinks(page.ref); // every link on the page
+link.getLinkAt(page.ref, { x: 120, y: 80 }); // the link at a point, or null
+```
+
+Each link has an `id`, its `bounds` on the page, and a `target`: where it goes.
+
+| `target.kind` | Goes to                                          |
+| :------------ | :----------------------------------------------- |
+| `'goto'`      | A page of this document: `target.destination`    |
+| `'uri'`       | A website or an email address: `target.uri`      |
+| `'named'`     | A viewer action, such as the next page           |
+
+## Follow a link from code
+
+`activate()` does what a click does:
+
+```ts
+await link.activate(someLink);
+```
+
+It resolves with what happened: `'revealed'` (the view went to a page), `'uri'` (a website opened),
+or `'dispatched'` (the actions plugin ran the link's action).
+
+## Events
+
+```ts
+useLinkEvent(
+  (link) => link.onActivated,
+  ({ target }) => analytics.track('link_followed', { kind: target.kind }),
+);
+```
+
+| Event         | Fires when                                         | Carries                  |
+| :------------ | :------------------------------------------------- | :----------------------- |
+| `onActivated` | Someone followed a link, by click, key or code     | `target`, `activation`   |
+| `onLoaded`    | A page's links are read and ready                  | `page`                   |
+
+## Good to know
+
+### Which links never run
+
+A website link opens only with `http`, `https`, `mailto` or `tel`. Links that would start a program,
+open another file on the user's computer, or run JavaScript are never followed.
+
+### Links while editing annotations
+
+Links work while the `pointer` or `pan` tool is active. With the annotation plugin's `link` tool,
+the layer steps aside and links become annotations you can move, resize and retarget; see
+[Annotations](../annotations).
+
+### Making links
+
+Links are annotations: create them with the annotation plugin, or with the engine; see
+[Links](/docs/engine/annotations/links).

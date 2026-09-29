@@ -146,7 +146,7 @@ export function createLibraryWrites(
         );
       }
       const pagesByObjectNumber = new Map(
-        layout.pages.map((page) => [page.ref.pageObjectNumber, page]),
+        layout.pages.map((page) => [page.ref.objectNumber, page]),
       );
 
       // Library identity: /Title (Acrobat), then format version 1 PieceInfo, then the caller's fallback.
@@ -198,7 +198,7 @@ export function createLibraryWrites(
             );
           }
           seen.add(name);
-          const page = pagesByObjectNumber.get(entry.target.page.pageObjectNumber)!;
+          const page = pagesByObjectNumber.get(entry.target.page.objectNumber)!;
           return { page: page.ref, index: page.index, name, label };
         });
         // Display order is page order, never the tree's key-sorted order.
@@ -248,7 +248,7 @@ export function createLibraryWrites(
         const kind = options?.kind ?? kindFromPdfName(entryName(entries, 'Kind')) ?? 'stamp';
         const subject = entryString(entries, 'SubjectOverride');
         const categories = entryStringArray(entries, 'Categories');
-        const page = pagesByObjectNumber.get(descriptor.page.pageObjectNumber)!;
+        const page = pagesByObjectNumber.get(descriptor.page.objectNumber)!;
         const asset: StampAsset = {
           id: assetIdFor(libraryId, descriptor.name),
           libraryId,

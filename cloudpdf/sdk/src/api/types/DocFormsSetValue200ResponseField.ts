@@ -16,7 +16,6 @@ export namespace DocFormsSetValue200ResponseField {
     export interface Text {
         family: "text";
         ref: CloudPDF.DocFormsSetValue200ResponseFieldTextRef;
-        fieldObjectNumber: number;
         name: string;
         origin: DocFormsSetValue200ResponseFieldText.Origin;
         readOnly: boolean;
@@ -47,7 +46,7 @@ export namespace DocFormsSetValue200ResponseField {
         export namespace Widgets {
             export interface Item {
                 ref: CloudPDF.DocFormsSetValue200ResponseFieldTextWidgetsItemRef | null;
-                annotObjectNumber: number;
+                objectNumber: number;
                 page: Item.Page | null;
                 rect: Item.Rect | null;
             }
@@ -55,7 +54,7 @@ export namespace DocFormsSetValue200ResponseField {
             export namespace Item {
                 export interface Page {
                     kind: Page.Kind;
-                    pageObjectNumber: number;
+                    objectNumber: number;
                 }
 
                 export namespace Page {
@@ -78,7 +77,6 @@ export namespace DocFormsSetValue200ResponseField {
     export interface Checkbox {
         family: "checkbox";
         ref: CloudPDF.DocFormsSetValue200ResponseFieldCheckboxRef;
-        fieldObjectNumber: number;
         name: string;
         origin: DocFormsSetValue200ResponseFieldCheckbox.Origin;
         readOnly: boolean;
@@ -105,7 +103,7 @@ export namespace DocFormsSetValue200ResponseField {
         export namespace Widgets {
             export interface Item {
                 ref: CloudPDF.DocFormsSetValue200ResponseFieldCheckboxWidgetsItemRef | null;
-                annotObjectNumber: number;
+                objectNumber: number;
                 page: Item.Page | null;
                 rect: Item.Rect | null;
                 onState: string;
@@ -116,7 +114,7 @@ export namespace DocFormsSetValue200ResponseField {
             export namespace Item {
                 export interface Page {
                     kind: Page.Kind;
-                    pageObjectNumber: number;
+                    objectNumber: number;
                 }
 
                 export namespace Page {
@@ -139,7 +137,6 @@ export namespace DocFormsSetValue200ResponseField {
     export interface Radio {
         family: "radio";
         ref: CloudPDF.DocFormsSetValue200ResponseFieldRadioRef;
-        fieldObjectNumber: number;
         name: string;
         origin: DocFormsSetValue200ResponseFieldRadio.Origin;
         readOnly: boolean;
@@ -167,7 +164,7 @@ export namespace DocFormsSetValue200ResponseField {
         export namespace Widgets {
             export interface Item {
                 ref: CloudPDF.DocFormsSetValue200ResponseFieldRadioWidgetsItemRef | null;
-                annotObjectNumber: number;
+                objectNumber: number;
                 page: Item.Page | null;
                 rect: Item.Rect | null;
                 onState: string;
@@ -178,7 +175,7 @@ export namespace DocFormsSetValue200ResponseField {
             export namespace Item {
                 export interface Page {
                     kind: Page.Kind;
-                    pageObjectNumber: number;
+                    objectNumber: number;
                 }
 
                 export namespace Page {
@@ -201,7 +198,6 @@ export namespace DocFormsSetValue200ResponseField {
     export interface Combobox {
         family: "combobox";
         ref: CloudPDF.DocFormsSetValue200ResponseFieldComboboxRef;
-        fieldObjectNumber: number;
         name: string;
         origin: DocFormsSetValue200ResponseFieldCombobox.Origin;
         readOnly: boolean;
@@ -230,7 +226,7 @@ export namespace DocFormsSetValue200ResponseField {
         export namespace Widgets {
             export interface Item {
                 ref: CloudPDF.DocFormsSetValue200ResponseFieldComboboxWidgetsItemRef | null;
-                annotObjectNumber: number;
+                objectNumber: number;
                 page: Item.Page | null;
                 rect: Item.Rect | null;
             }
@@ -238,7 +234,7 @@ export namespace DocFormsSetValue200ResponseField {
             export namespace Item {
                 export interface Page {
                     kind: Page.Kind;
-                    pageObjectNumber: number;
+                    objectNumber: number;
                 }
 
                 export namespace Page {
@@ -271,7 +267,6 @@ export namespace DocFormsSetValue200ResponseField {
     export interface Listbox {
         family: "listbox";
         ref: CloudPDF.DocFormsSetValue200ResponseFieldListboxRef;
-        fieldObjectNumber: number;
         name: string;
         origin: DocFormsSetValue200ResponseFieldListbox.Origin;
         readOnly: boolean;
@@ -300,7 +295,7 @@ export namespace DocFormsSetValue200ResponseField {
         export namespace Widgets {
             export interface Item {
                 ref: CloudPDF.DocFormsSetValue200ResponseFieldListboxWidgetsItemRef | null;
-                annotObjectNumber: number;
+                objectNumber: number;
                 page: Item.Page | null;
                 rect: Item.Rect | null;
             }
@@ -308,7 +303,7 @@ export namespace DocFormsSetValue200ResponseField {
             export namespace Item {
                 export interface Page {
                     kind: Page.Kind;
-                    pageObjectNumber: number;
+                    objectNumber: number;
                 }
 
                 export namespace Page {
@@ -341,7 +336,6 @@ export namespace DocFormsSetValue200ResponseField {
     export interface Pushbutton {
         family: "pushbutton";
         ref: CloudPDF.DocFormsSetValue200ResponseFieldPushbuttonRef;
-        fieldObjectNumber: number;
         name: string;
         origin: DocFormsSetValue200ResponseFieldPushbutton.Origin;
         readOnly: boolean;
@@ -366,7 +360,7 @@ export namespace DocFormsSetValue200ResponseField {
         export namespace Widgets {
             export interface Item {
                 ref: CloudPDF.DocFormsSetValue200ResponseFieldPushbuttonWidgetsItemRef | null;
-                annotObjectNumber: number;
+                objectNumber: number;
                 page: Item.Page | null;
                 rect: Item.Rect | null;
             }
@@ -374,7 +368,7 @@ export namespace DocFormsSetValue200ResponseField {
             export namespace Item {
                 export interface Page {
                     kind: Page.Kind;
-                    pageObjectNumber: number;
+                    objectNumber: number;
                 }
 
                 export namespace Page {
@@ -397,7 +391,6 @@ export namespace DocFormsSetValue200ResponseField {
     export interface Signature {
         family: "signature";
         ref: CloudPDF.DocFormsSetValue200ResponseFieldSignatureRef;
-        fieldObjectNumber: number;
         name: string;
         origin: DocFormsSetValue200ResponseFieldSignature.Origin;
         readOnly: boolean;
@@ -422,7 +415,7 @@ export namespace DocFormsSetValue200ResponseField {
         export namespace Widgets {
             export interface Item {
                 ref: CloudPDF.DocFormsSetValue200ResponseFieldSignatureWidgetsItemRef | null;
-                annotObjectNumber: number;
+                objectNumber: number;
                 page: Item.Page | null;
                 rect: Item.Rect | null;
             }
@@ -430,7 +423,7 @@ export namespace DocFormsSetValue200ResponseField {
             export namespace Item {
                 export interface Page {
                     kind: Page.Kind;
-                    pageObjectNumber: number;
+                    objectNumber: number;
                 }
 
                 export namespace Page {
@@ -453,7 +446,6 @@ export namespace DocFormsSetValue200ResponseField {
     export interface Unknown {
         family: "unknown";
         ref: CloudPDF.DocFormsSetValue200ResponseFieldUnknownRef;
-        fieldObjectNumber: number;
         name: string;
         origin: DocFormsSetValue200ResponseFieldUnknown.Origin;
         readOnly: boolean;
@@ -479,7 +471,7 @@ export namespace DocFormsSetValue200ResponseField {
         export namespace Widgets {
             export interface Item {
                 ref: CloudPDF.DocFormsSetValue200ResponseFieldUnknownWidgetsItemRef | null;
-                annotObjectNumber: number;
+                objectNumber: number;
                 page: Item.Page | null;
                 rect: Item.Rect | null;
             }
@@ -487,7 +479,7 @@ export namespace DocFormsSetValue200ResponseField {
             export namespace Item {
                 export interface Page {
                     kind: Page.Kind;
-                    pageObjectNumber: number;
+                    objectNumber: number;
                 }
 
                 export namespace Page {

@@ -13,7 +13,7 @@ import {
   type AnnotationBundleLimits,
 } from '../../src/transfer/bundleLimits';
 
-const page = { kind: 'objectNumber', pageObjectNumber: 3 } as const;
+const page = { kind: 'objectNumber', objectNumber: 3 } as const;
 const drawing = new TextEncoder().encode('%PDF-1.7 a drawing');
 const file = new TextEncoder().encode('an attached file');
 
@@ -21,7 +21,7 @@ const file = new TextEncoder().encode('an attached file');
 const stamp = (annotObjectNumber: number) =>
   ({
     subtype: 'stamp',
-    ref: { kind: 'objectNumber', page, annotObjectNumber },
+    ref: { kind: 'objectNumber', page, objectNumber: annotObjectNumber },
     rect: { x: 10, y: 10, width: 100, height: 50 },
     contents: 'Apprové ✓',
   }) as unknown as AnnotationDTO;
@@ -40,7 +40,7 @@ async function sample(): Promise<AnnotationBundle> {
       {
         data: {
           subtype: 'file-attachment',
-          ref: { kind: 'objectNumber', page, annotObjectNumber: 14 },
+          ref: { kind: 'objectNumber', page, objectNumber: 14 },
         } as unknown as AnnotationDTO,
         resources: { file: fileId },
       },
@@ -133,8 +133,7 @@ describe('parse refuses a file that is not a bundle', () => {
     const error = await refusal(
       AnnotationTransfer.parse(
         edited(bundle, (json) => {
-          (json.pages as Array<{ page: { pageObjectNumber: number } }>)[0]!.page.pageObjectNumber =
-            4;
+          (json.pages as Array<{ page: { objectNumber: number } }>)[0]!.page.objectNumber = 4;
         }),
       ),
     );

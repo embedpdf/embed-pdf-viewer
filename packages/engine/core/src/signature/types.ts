@@ -217,14 +217,13 @@ export interface DocumentVersionRef {
 // ---------------------------------------------------------------------------
 
 /**
- * Widget artwork for the signature, as a page of a PDF (the same path
- * stamps take: the page is drawn into the widget's appearance stream).
+ * Widget artwork for the signature, as a one-page PDF (the same path stamps
+ * take: the page is drawn into the widget's appearance stream). A PDF with
+ * more pages is refused with `InvalidArg`.
  */
 export interface SignatureAppearanceInput {
-  /** A PDF whose page carries the artwork. */
+  /** A one-page PDF that carries the artwork. */
   pdf: Uint8Array;
-  /** Which page; default 0. */
-  pageIndex?: number;
 }
 
 export interface SignaturePrepareInput {

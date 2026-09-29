@@ -65,7 +65,7 @@ export namespace Annotation {
     export namespace AnnotationHighlight {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -195,7 +195,7 @@ export namespace Annotation {
     export namespace AnnotationUnderline {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -325,7 +325,7 @@ export namespace Annotation {
     export namespace AnnotationSquiggly {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -456,7 +456,7 @@ export namespace Annotation {
     export namespace AnnotationStrikeout {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -597,7 +597,7 @@ export namespace Annotation {
     export namespace AnnotationCircle {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -715,7 +715,7 @@ export namespace Annotation {
     export namespace AnnotationSquare {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -837,7 +837,7 @@ export namespace Annotation {
     export namespace AnnotationPolygon {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -971,7 +971,7 @@ export namespace Annotation {
     export namespace AnnotationPolyline {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -1140,7 +1140,7 @@ export namespace Annotation {
     export namespace AnnotationLine {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -1316,7 +1316,7 @@ export namespace Annotation {
     export namespace AnnotationLink {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -1418,7 +1418,7 @@ export namespace Annotation {
     export namespace AnnotationInk {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -1551,7 +1551,7 @@ export namespace Annotation {
     export namespace AnnotationFreeText {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -1842,7 +1842,7 @@ export namespace Annotation {
     export namespace AnnotationCaret {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -1954,7 +1954,7 @@ export namespace Annotation {
     export namespace AnnotationText {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -2064,7 +2064,7 @@ export namespace Annotation {
     export namespace AnnotationStamp {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -2176,7 +2176,7 @@ export namespace Annotation {
     export namespace AnnotationFileAttachment {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -2298,7 +2298,7 @@ export namespace Annotation {
     export namespace AnnotationWidget {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -2444,7 +2444,7 @@ export namespace Annotation {
     export namespace AnnotationRedact {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -2580,7 +2580,7 @@ export namespace Annotation {
     export namespace AnnotationPopup {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -2676,7 +2676,7 @@ export namespace Annotation {
     export namespace AnnotationUnsupported {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {

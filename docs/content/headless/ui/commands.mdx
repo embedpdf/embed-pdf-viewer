@@ -1,0 +1,165 @@
+---
+title: Commands & shortcuts
+description: Give every action in your viewer one name, with its label, icon, state and keyboard shortcut, and run it from buttons, menus and keys.
+---
+
+# Commands & shortcuts
+
+A **command** is one action of your viewer, like "zoom in" or "download", defined once: its label, its
+icon, when it's enabled or active, what it does, and its keyboard shortcut. Toolbars, menus, a command
+palette and the keyboard all run the same command, so they always agree. Register the plugin with the
+commands you need:
+
+```ts
+import { commandsPlugin, standardCommands } from '@embedpdf/react/commands';
+
+const plugins = [
+  /* … */
+  commandsPlugin({
+    commands: [
+      ...standardCommands,
+      {
+        id: 'review:approve',
+        label: 'Approve',
+        icon: 'check',
+        shortcut: 'Mod+Enter',
+        enabled: ({ get }) => get(AnnotationToken).canCreate(),
+        run: ({ get }) => approveDocument(get(DocumentsToken)),
+      },
+    ],
+  }),
+];
+```
+
+## Show a command
+
+`useCommand(id)` gives you everything a button needs, and re-renders when any of it changes:
+
+```tsx
+function CommandButton({ id }: { id: string }) {
+  const command = useCommand(id);
+  if (!command?.visible) return null;
+
+  return (
+    <button onClick={command.run} disabled={!command.enabled} aria-pressed={command.active}>
+      <Icon name={command.icon} />
+      {command.label}
+      {command.shortcut && <kbd>{command.shortcut}</kbd>}
+    </button>
+  );
+}
+```
+
+`shortcut` is formatted for the user's platform: `⌘ K` on a Mac, `Ctrl+K` elsewhere. The
+[toolbar](toolbar) draws commands the same way.
+
+## The standard commands
+
+`standardCommands` covers what every viewer has, with labels in [every language you load](translations):
+
+| Command                                              | Does                                         | Shortcut         |
+| :--------------------------------------------------- | :------------------------------------------- | :--------------- |
+| `zoom:in`, `zoom:out`                                | Zoom in or out                               | `Mod+=`, `Mod+-` |
+| `zoom:fit-width`, `zoom:fit-page`                    | Fit the page's width, or the whole page      |                  |
+| `page:next`, `page:previous`, `page:first`, `page:last` | Move through pages                        | `→`, `←`, `Home`, `End` |
+| `view:rotate-clockwise`, `view:rotate-counterclockwise` | Turn the view                             |                  |
+| `tool:pointer`, `tool:pan`                           | Switch tools                                 | `V`, `H`         |
+| `tool:<id>`                                          | Any registered tool, such as `tool:highlight` |                 |
+| `selection:copy`                                     | Copy the selected text                       | `Mod+C`          |
+| `annotation:delete`                                  | Delete the selected annotations              | `Delete`         |
+| `document:download`, `document:print`                | Download or print the document               | `Mod+S`, `Mod+P` |
+
+Each one is enabled only when it can run: `selection:copy` needs a selection and permission to copy,
+`annotation:delete` a selection the user may delete.
+
+## Keyboard shortcuts
+
+`useCommandShortcuts()` turns every command's shortcut into a working key. Call it once, near the top
+of your viewer:
+
+```ts
+useCommandShortcuts();
+```
+
+It ignores keys typed into text fields, runs commands for the active document, and does nothing for a
+command that's disabled. `Mod` means Cmd on a Mac and Ctrl elsewhere.
+
+## Run a command from code
+
+```ts
+const commands = useCommands();
+
+await commands.execute('zoom:in');
+await commands.execute('review:approve', { args: { note: 'Looks good' } });
+```
+
+`execute()` resolves with `{ status: 'executed' }`, or `{ status: 'rejected', reason }` when the command
+is disabled, hidden or unknown.
+
+## A command palette
+
+`searchCommands()` finds commands by their label, for a palette like the one in code editors:
+
+```tsx
+const results = commands.searchCommands(query); // enabled and visible commands that match
+```
+
+## Define a command
+
+| Field         | What it is                                                                       |
+| :------------ | :------------------------------------------------------------------------------- |
+| `id`          | A unique name, by convention `area:action`                                       |
+| `label`       | What the user sees, or `labelKey` for a [translated](translations) label         |
+| `icon`        | Your icon's name; your buttons turn it into an icon                              |
+| `shortcut`    | A key such as `'Mod+K'`, or a list of them                                       |
+| `enabled`     | When it can run, as a function of the viewer's state                             |
+| `active`      | When it shows as pressed, such as the current tool                               |
+| `visible`     | When it shows at all                                                             |
+| `run`         | What it does                                                                     |
+| `categories`  | Groups you can turn off together                                                 |
+| `panel`, `menu`, `modal` | A command that opens a [panel, menu or dialog](panels) needs no `run`  |
+
+`enabled`, `active` and `visible` get the viewer's state through `get(Token)`, and are asked again
+whenever anything changes, so a button is always right without events or effects of your own.
+
+## Turn features off
+
+Put commands in categories, and turn a whole category off: its commands are hidden and disabled,
+wherever they appear:
+
+```ts
+commandsPlugin({ commands, disabledCategories: ['annotate'] });
+
+commands.disableCategory('annotate'); // or while the app runs
+commands.enableCategory('annotate');
+```
+
+## Settings
+
+Set them when you register the plugin.
+
+| Setting              | What it does                                          | Default |
+| :------------------- | :---------------------------------------------------- | :------ |
+| `commands`           | The commands your viewer has                          | none    |
+| `disabledCategories` | Categories that start turned off                      | none    |
+
+## Events
+
+```ts
+useCommandsEvent(
+  (commands) => commands.onExecuted,
+  ({ id }) => analytics.track('command', { id }),
+);
+```
+
+| Event               | Fires when                      | Carries          |
+| :------------------ | :------------------------------ | :--------------- |
+| `onExecuted`        | A command ran                   | `id`, `args`     |
+| `onExecutionFailed` | A command's `run` threw         | `id`, `error`    |
+
+## Good to know
+
+### Commands and permissions
+
+A command's `enabled` is where permission checks go: `({ get }) => get(AnnotationToken).canCreate()`.
+The standard commands already check theirs.

@@ -1709,7 +1709,7 @@ await client.tokens.revoke({
 <dl>
 <dd>
 
-Returns one entry per page plus the audit-log cursor for reconciling subsequent document events. Page order is unspecified; join by `pageState.pageObjectNumber` when display order matters.
+Returns one entry per page plus the audit-log cursor for reconciling subsequent document events. Page order is unspecified; join by `page` (a `PageRef`) when display order matters.
 </dd>
 </dl>
 </dd>
@@ -2660,7 +2660,7 @@ await client.doc.pages.delete({
 <dl>
 <dd>
 
-A read, not a mutation: the source document is untouched and no event is published. Body is `{"pageObjectNumbers": number[]}`; the response body is the new PDF.
+A read, not a mutation: the source document is untouched and no event is published. Body is `{"pages": PageRef[]}`; the response body is the new PDF.
 </dd>
 </dl>
 </dd>

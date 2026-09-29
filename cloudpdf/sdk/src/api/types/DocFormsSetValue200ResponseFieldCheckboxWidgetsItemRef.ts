@@ -11,13 +11,13 @@ export namespace DocFormsSetValue200ResponseFieldCheckboxWidgetsItemRef {
     export interface ObjectNumber {
         kind: "objectNumber";
         page: DocFormsSetValue200ResponseFieldCheckboxWidgetsItemRefObjectNumber.Page;
-        annotObjectNumber: number;
+        objectNumber: number;
     }
 
     export namespace DocFormsSetValue200ResponseFieldCheckboxWidgetsItemRefObjectNumber {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -37,7 +37,7 @@ export namespace DocFormsSetValue200ResponseFieldCheckboxWidgetsItemRef {
     export namespace DocFormsSetValue200ResponseFieldCheckboxWidgetsItemRefNm {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -58,7 +58,7 @@ export namespace DocFormsSetValue200ResponseFieldCheckboxWidgetsItemRef {
     export namespace DocFormsSetValue200ResponseFieldCheckboxWidgetsItemRefIndex {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -77,7 +77,7 @@ export namespace DocFormsSetValue200ResponseFieldCheckboxWidgetsItemRef {
         export namespace Revision {
             export interface Page {
                 kind: Page.Kind;
-                pageObjectNumber: number;
+                objectNumber: number;
             }
 
             export namespace Page {

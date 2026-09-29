@@ -42,7 +42,7 @@ function pagesChangedBy(event: DocumentEvent): readonly PageRef[] | null {
       return [event.page];
     case 'annotations.moved': {
       const pages = new Map<number, PageRef>();
-      for (const dto of event.annotations) pages.set(dto.page.pageObjectNumber, dto.page);
+      for (const dto of event.annotations) pages.set(dto.page.objectNumber, dto.page);
       return [...pages.values()];
     }
     // These can remove annotations, links included, from the pages they applied to.
@@ -78,7 +78,7 @@ export function createLinkController(ctx: PluginContext<void>) {
         throw new PluginError(
           'not-found',
           'link',
-          `page ${page.pageObjectNumber} is not in this document`,
+          `page ${page.objectNumber} is not in this document`,
         );
       }
       const snapshot = await doc.page(page).annotations.list();

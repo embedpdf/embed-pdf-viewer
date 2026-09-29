@@ -78,7 +78,7 @@ export function resolvePageRefToNumber(ref: PageRef): number {
       `unsupported page address kind '${String((ref as { kind: unknown }).kind)}'`,
     );
   }
-  return ref.pageObjectNumber;
+  return ref.objectNumber;
 }
 
 /** `parsePageKey` + `resolvePageRefToNumber` in one call, for route handlers. */

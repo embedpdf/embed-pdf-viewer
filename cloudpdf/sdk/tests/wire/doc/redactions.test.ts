@@ -11,14 +11,14 @@ describe("RedactionsClient", () => {
         const rawRequestBody = {};
         const rawResponseBody = {
             scope: {
-                pages: [{ kind: "objectNumber", pageObjectNumber: 1 }],
+                pages: [{ kind: "objectNumber", objectNumber: 1 }],
                 annotations: [
-                    { kind: "objectNumber", page: { kind: "objectNumber", pageObjectNumber: 1 }, annotObjectNumber: 1 },
+                    { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
                 ],
             },
             results: [
                 {
-                    page: { kind: "objectNumber", pageObjectNumber: 1 },
+                    page: { kind: "objectNumber", objectNumber: 1 },
                     status: "applied",
                     removedAnnotationCount: 1,
                     error: { name: "EngineError", code: "Unknown", message: "message" },
@@ -28,10 +28,10 @@ describe("RedactionsClient", () => {
             meta: {
                 affectedPages: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         revision: {
                             docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             generation: 1,
                         },
                         weakAnnotationState: { kind: "unknown" },
@@ -48,7 +48,7 @@ describe("RedactionsClient", () => {
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             cache: { contentVersion: 1, annotationVersion: 1 },
                         },
                     ],

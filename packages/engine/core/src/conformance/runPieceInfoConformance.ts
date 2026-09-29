@@ -91,7 +91,7 @@ export function runPieceInfoConformance(
       let reopened: LocalDocumentHandle | null = null;
       try {
         const list = await doc.pages.list();
-        const pageObjectNumber = list.pages[0].ref.pageObjectNumber;
+        const pageObjectNumber = list.pages[0].ref.objectNumber;
         await doc.pieceInfo.update(APP, { name: 'Standard Stamps' });
         await doc
           .page(toPageRef(pageObjectNumber))

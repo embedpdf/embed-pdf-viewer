@@ -81,14 +81,14 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     );
     const field = snapshot.fields.find((f) =>
       ref.kind === 'objectNumber'
-        ? f.fieldObjectNumber === ref.fieldObjectNumber
+        ? f.ref.kind === 'objectNumber' && f.ref.objectNumber === ref.objectNumber
         : f.name === ref.name,
     );
     if (!field) {
       throw new EngineError(
         EngineErrorCode.NotFound,
         ref.kind === 'objectNumber'
-          ? `form field not found: object ${ref.fieldObjectNumber}`
+          ? `form field not found: object ${ref.objectNumber}`
           : `form field not found: "${ref.name}"`,
       );
     }
@@ -320,7 +320,6 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
           layerName,
           ref,
           pdf: new Uint8Array(resource.bytes),
-          pageIndex: parsed.pageIndex ?? 0,
         },
         abortSignalOf(reply),
       );

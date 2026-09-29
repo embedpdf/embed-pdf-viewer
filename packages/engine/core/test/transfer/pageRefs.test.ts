@@ -6,7 +6,7 @@ import { mapPageRefs, pageRefsIn } from '../../src/transfer/pageRefs';
 const first = toPageRef(3);
 const second = toPageRef(7);
 const link = {
-  ref: { kind: 'objectNumber', page: first, annotObjectNumber: 10 } as AnnotationRef,
+  ref: { kind: 'objectNumber', page: first, objectNumber: 10 } as AnnotationRef,
   target: { kind: 'goto', destination: { kind: 'fit', page: second } },
   rect: { left: 0, bottom: 0, right: 1, top: 1 },
 };
@@ -19,7 +19,7 @@ describe('pageRefsIn', () => {
 
 describe('mapPageRefs', () => {
   test('replaces every page ref and copies the rest', () => {
-    const mapped = mapPageRefs(link, (page) => toPageRef(page.pageObjectNumber + 100));
+    const mapped = mapPageRefs(link, (page) => toPageRef(page.objectNumber + 100));
     expect(mapped).toEqual({
       ...link,
       ref: { ...link.ref, page: toPageRef(103) },

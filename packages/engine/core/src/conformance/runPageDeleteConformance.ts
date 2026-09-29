@@ -58,7 +58,7 @@ export function runPageDeleteConformance(
       try {
         const before = await doc.pages.list();
         if (before.pages.length < 2) return;
-        const victim = before.pages[1].ref.pageObjectNumber;
+        const victim = before.pages[1].ref.objectNumber;
 
         const result = await doc.pages.delete([toPageRef(victim)]);
         expect(PageDeleteResultSchema.safeParse(result).success).toBe(true);
@@ -66,20 +66,20 @@ export function runPageDeleteConformance(
         const after = result.layout;
         expect(after.pages.length).toBe(before.pages.length - 1);
         expect(after.pageCount).toBe(before.pageCount - 1);
-        expect(after.pages.some((p) => p.ref.pageObjectNumber === victim)).toBe(false);
+        expect(after.pages.some((p) => p.ref.objectNumber === victim)).toBe(false);
 
         // Survivors keep their relative order, contiguous 0..N-1 indices.
         const expectedOrder = before.pages
-          .map((p) => p.ref.pageObjectNumber)
+          .map((p) => p.ref.objectNumber)
           .filter((pageObjectNumber) => pageObjectNumber !== victim);
-        expect(after.pages.map((p) => p.ref.pageObjectNumber)).toEqual(expectedOrder);
+        expect(after.pages.map((p) => p.ref.objectNumber)).toEqual(expectedOrder);
         for (let i = 0; i < after.pages.length; i++) {
           expect(after.pages[i].index).toBe(i);
         }
 
         // A subsequent list() agrees (the result is not a one-off view).
         const relisted = await doc.pages.list();
-        expect(relisted.pages.map((p) => p.ref.pageObjectNumber)).toEqual(expectedOrder);
+        expect(relisted.pages.map((p) => p.ref.objectNumber)).toEqual(expectedOrder);
       } finally {
         await doc.close();
       }
@@ -90,7 +90,7 @@ export function runPageDeleteConformance(
       try {
         const before = await doc.pages.list();
         if (before.pages.length < 2) return;
-        const victim = before.pages[1].ref.pageObjectNumber;
+        const victim = before.pages[1].ref.objectNumber;
         await doc.pages.delete([toPageRef(victim)]);
 
         let caught: unknown;
@@ -111,8 +111,8 @@ export function runPageDeleteConformance(
         const list = await doc.pages.list();
         if (list.pages.length < 2) return;
 
-        const hostPageObjectNumber = list.pages[0].ref.pageObjectNumber;
-        const victimPageObjectNumber = list.pages[1].ref.pageObjectNumber;
+        const hostPageObjectNumber = list.pages[0].ref.objectNumber;
+        const victimPageObjectNumber = list.pages[1].ref.objectNumber;
         const hostPage = doc.page(toPageRef(hostPageObjectNumber));
 
         const draft: HighlightDraft = {
@@ -126,7 +126,7 @@ export function runPageDeleteConformance(
           (a) =>
             a.ref.kind === 'objectNumber' &&
             created.annotation.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === created.annotation.ref.annotObjectNumber,
+            a.ref.objectNumber === created.annotation.ref.objectNumber,
         );
         expect(targetIndex >= 0).toBe(true);
 
@@ -167,7 +167,7 @@ export function runPageDeleteConformance(
       const doc = await openFixture(engine, opts);
       try {
         const list = await doc.pages.list();
-        const pageObjectNumber = list.pages[0].ref.pageObjectNumber;
+        const pageObjectNumber = list.pages[0].ref.objectNumber;
         let caught: unknown;
         try {
           await doc.pages.delete([toPageRef(pageObjectNumber), toPageRef(pageObjectNumber)]);
@@ -185,7 +185,7 @@ export function runPageDeleteConformance(
       try {
         const list = await doc.pages.list();
         let bogus = 0;
-        for (const p of list.pages) bogus = Math.max(bogus, p.ref.pageObjectNumber);
+        for (const p of list.pages) bogus = Math.max(bogus, p.ref.objectNumber);
         bogus += 9999;
 
         let caught: unknown;
@@ -208,7 +208,7 @@ export function runPageDeleteConformance(
       try {
         const list = await doc.pages.list();
         if (list.pages.length < 2) return;
-        const pageObjectNumber = list.pages[1].ref.pageObjectNumber;
+        const pageObjectNumber = list.pages[1].ref.objectNumber;
         const p = doc.pages.delete([toPageRef(pageObjectNumber)]);
         p.abort('test');
         await expect(p).rejects.toBeInstanceOf(AbortError);

@@ -41,10 +41,10 @@ export function createWidgetReads(
     for (const item of annotationHost.listPageItems(page)) {
       if (!item.subtype.startsWith('widget') || item.ref?.kind !== 'objectNumber') continue;
       if (!boxContains(item.box, point)) continue;
-      const field = fieldForWidget(fields.get(), item.ref.annotObjectNumber);
+      const field = fieldForWidget(fields.get(), item.ref.objectNumber);
       if (!field) continue;
       if (!best || item.box.width * item.box.height < best.box.width * best.box.height) {
-        best = { annotObjectNumber: item.ref.annotObjectNumber, field, box: item.box };
+        best = { annotObjectNumber: item.ref.objectNumber, field, box: item.box };
       }
     }
     return best;
@@ -59,7 +59,7 @@ export function createWidgetReads(
   const listFillItems = memoByKey(
     (pageObjectNumber: number) => [
       fields.get(),
-      widgetBoxes.get({ kind: 'objectNumber', pageObjectNumber }),
+      widgetBoxes.get({ kind: 'objectNumber', objectNumber: pageObjectNumber }),
       ctx.state.get().writing,
       authority.can('doc.forms.fill'),
     ],
@@ -73,7 +73,7 @@ export function createWidgetReads(
     (annotObjectNumber: number) => {
       const index = fields.get();
       const page = fieldForWidget(index, annotObjectNumber)?.widgets.find(
-        (widget) => widget.annotObjectNumber === annotObjectNumber,
+        (widget) => widget.objectNumber === annotObjectNumber,
       )?.page;
       return [
         index,
@@ -95,8 +95,8 @@ export function createWidgetReads(
   return {
     getPageBox,
     api: {
-      listFillItems: (page: PageRef) => listFillItems(page.pageObjectNumber),
-      listWidgets: (page: PageRef) => listFillItems(page.pageObjectNumber),
+      listFillItems: (page: PageRef) => listFillItems(page.objectNumber),
+      listWidgets: (page: PageRef) => listFillItems(page.objectNumber),
       getFillItem,
       ensureLoaded: loadBoxes,
       getWidgetAt,

@@ -73,7 +73,7 @@ export interface SignatureConfig {
 export type Mark = { assetId: string } | { source: BinarySource };
 
 /** How a signature field is addressed: its field ref, its widget's annotation ref, or the widget's object number. */
-export type SignatureFieldAddress = FormFieldRef | AnnotationRef | { annotObjectNumber: number };
+export type SignatureFieldAddress = FormFieldRef | AnnotationRef | { objectNumber: number };
 
 export interface SignFieldInput {
   field: FormFieldRef;

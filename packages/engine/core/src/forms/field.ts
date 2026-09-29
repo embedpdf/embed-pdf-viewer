@@ -73,13 +73,14 @@ export interface FormFieldOption {
  * The trunk every field family shares: identity, provenance, universal
  * flags, and widget placement. A logical field is the document-scoped
  * record that holds the value; its widgets are page-scoped views — join
- * them to the annotation subsystem via `annotObjectNumber`.
+ * them to the annotation subsystem via each widget's `ref`.
  */
 export interface FormFieldBase<C extends Coordinates = PageCoordinates> {
-  /** Durable ref (`objectNumber` whenever the field dictionary is indirect). */
+  /**
+   * Durable ref: the field dictionary's object number, or its full name when
+   * the dictionary is a direct object (spec-violating) and has no number.
+   */
   ref: FormFieldRef;
-  /** Field dictionary object number; `0` for direct (spec-violating) dicts. */
-  fieldObjectNumber: number;
   /** Fully qualified name, e.g. `"billing.name"`. */
   name: string;
   family: FormFieldFamily;

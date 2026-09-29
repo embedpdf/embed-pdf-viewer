@@ -388,12 +388,12 @@ function widgetRefs(
 ): FormWidget[] {
   const byObjectNumber = new Map<number, FormWidget>();
   for (const field of [...before, ...after]) {
-    for (const widget of field.widgets) byObjectNumber.set(widget.annotObjectNumber, widget);
+    for (const widget of field.widgets) byObjectNumber.set(widget.objectNumber, widget);
   }
   return [...new Set(objectNumbers)]
     .map((objectNumber) => byObjectNumber.get(objectNumber))
     .filter((widget): widget is FormWidget => widget !== undefined)
-    .map(({ annotObjectNumber, page }) => formWidget(annotObjectNumber, page));
+    .map(({ objectNumber: annotObjectNumber, page }) => formWidget(annotObjectNumber, page));
 }
 
 function rememberFields(
@@ -405,7 +405,7 @@ function rememberFields(
 
 function rememberWidgets(target: Map<string, FormWidget>, widgets: FormWidget[]): void {
   for (const widget of widgets) {
-    target.set(`${widget.page?.pageObjectNumber ?? 0}:${widget.annotObjectNumber}`, widget);
+    target.set(`${widget.page?.objectNumber ?? 0}:${widget.objectNumber}`, widget);
   }
 }
 

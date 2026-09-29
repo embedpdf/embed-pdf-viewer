@@ -28,18 +28,18 @@ export function createViewportSync(
       ctx.assertPageRef(page);
       const service = doc.page(page).measure;
       // Without a page measure service, scales live for the session only.
-      if (!service) return ctx.state.get().localViewports[page.pageObjectNumber] ?? [];
+      if (!service) return ctx.state.get().localViewports[page.objectNumber] ?? [];
       try {
         return (await service.listViewports()).viewports;
       } catch (error) {
-        ctx.state.update(recordLoadError, page.pageObjectNumber, serializeError(error));
+        ctx.state.update(recordLoadError, page.objectNumber, serializeError(error));
         throw error;
       }
     },
     affected: (event) => (event.type === 'pages.scaleSet' ? [event.page] : null),
     changed: ({ page, cause, next }) => {
       if (cause === 'drop' || next === undefined) return;
-      ctx.state.update(clearLoadError, page.pageObjectNumber);
+      ctx.state.update(clearLoadError, page.objectNumber);
       const layout = ctx.getPage(page);
       if (layout) annotation.setPageViewports(page, [...next], fallbackOf(layout));
     },
@@ -71,7 +71,7 @@ export function createViewportSync(
         persistent,
       }),
   );
-  const scaleOf = (page: PageRef): PageScale => scaleOfPage(page.pageObjectNumber);
+  const scaleOf = (page: PageRef): PageScale => scaleOfPage(page.objectNumber);
 
   const ensureLoaded = (page: PageRef): Promise<void> => {
     if (!ctx.getPage(page)) {

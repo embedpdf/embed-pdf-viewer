@@ -63,7 +63,7 @@ export function createComments(
     reply: async (ref, text) => {
       const root = threads.rootRefOf(ref);
       const thread = threads.threadOf(ref);
-      const created = await createConversationAnnot(thread.page.pageObjectNumber, {
+      const created = await createConversationAnnot(thread.page.objectNumber, {
         subtype: 'text',
         rect: replyRect(thread.root.rect),
         icon: 'comment',
@@ -94,7 +94,7 @@ export function createComments(
       // exists, else to the root. Readers everywhere (ours included) accept
       // both shapes.
       const previous = userId ? thread.review.byReviewer[userId] : undefined;
-      await createConversationAnnot(thread.page.pageObjectNumber, {
+      await createConversationAnnot(thread.page.objectNumber, {
         subtype: 'text',
         rect: replyRect(thread.root.rect),
         reply: { to: previous?.ref ?? thread.root.ref },
@@ -108,7 +108,7 @@ export function createComments(
     setMarked: async (ref, marked) => {
       const root = threads.rootRefOf(ref);
       const thread = threads.threadOf(ref);
-      await createConversationAnnot(thread.page.pageObjectNumber, {
+      await createConversationAnnot(thread.page.objectNumber, {
         subtype: 'text',
         rect: replyRect(thread.root.rect),
         reply: { to: thread.root.ref },

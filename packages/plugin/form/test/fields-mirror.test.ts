@@ -37,8 +37,7 @@ const page: PageLayout = {
 
 const textField = (value: string): FormFieldDTO =>
   ({
-    ref: { kind: 'objectNumber', fieldObjectNumber: 5 },
-    fieldObjectNumber: 5,
+    ref: { kind: 'objectNumber', objectNumber: 5 },
     name: 'name',
     family: 'text',
     origin: 'acroform',
@@ -47,7 +46,7 @@ const textField = (value: string): FormFieldDTO =>
     noExport: false,
     alternateName: null,
     mappingName: null,
-    widgets: [{ annotObjectNumber: 9, page: toPageRef(1) }],
+    widgets: [{ objectNumber: 9, page: toPageRef(1) }],
     value,
     valueEntry: { kind: 'scalar', value },
     defaultValue: '',
@@ -121,7 +120,7 @@ async function boot() {
 
 const settle = () => new Promise((resolve) => setTimeout(resolve));
 const nameValue = (form: { getValue(ref: never): unknown }) =>
-  form.getValue({ kind: 'objectNumber', fieldObjectNumber: 5 } as never);
+  form.getValue({ kind: 'objectNumber', objectNumber: 5 } as never);
 
 describe('form fields mirror', () => {
   it('reads the field tree once and applies own and remote writes from their events', async () => {
@@ -132,7 +131,7 @@ describe('form fields mirror', () => {
     expect(harness.form.getStatus()).toBe('ready');
 
     const written = harness.form.setValueRaw(
-      { kind: 'objectNumber', fieldObjectNumber: 5 },
+      { kind: 'objectNumber', objectNumber: 5 },
       {
         value: 'own',
       },
@@ -157,7 +156,7 @@ describe('form fields mirror', () => {
     const harness = await boot();
     harness.reads[0]!(snapshot('initial'));
     await settle();
-    const written = harness.form.setText({ kind: 'objectNumber', fieldObjectNumber: 5 }, 'typed');
+    const written = harness.form.setText({ kind: 'objectNumber', objectNumber: 5 }, 'typed');
     await settle();
     harness.emit({
       type: 'forms.valueSet',

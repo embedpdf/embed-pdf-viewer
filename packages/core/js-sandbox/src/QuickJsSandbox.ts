@@ -104,7 +104,7 @@ function failedOutput(
         const ref = field.ref;
         const targetRef = input.event.target!;
         return ref.kind === 'objectNumber' && targetRef.kind === 'objectNumber'
-          ? ref.fieldObjectNumber === targetRef.fieldObjectNumber
+          ? ref.objectNumber === targetRef.objectNumber
           : ref.kind === 'fqn' && targetRef.kind === 'fqn'
             ? ref.name === targetRef.name
             : false;

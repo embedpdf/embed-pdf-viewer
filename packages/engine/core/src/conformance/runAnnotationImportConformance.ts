@@ -50,7 +50,7 @@ export function runAnnotationImportConformance(
       const target = await opts.open(engine, fixture);
       try {
         const { pages } = await source.pages.list();
-        await run(source, target, toPageRef(pages[0]!.ref.pageObjectNumber));
+        await run(source, target, toPageRef(pages[0]!.ref.objectNumber));
       } finally {
         await source.close();
         await target.close();
@@ -178,7 +178,7 @@ export function runAnnotationImportConformance(
         const bundle = await source.annotations.export();
         await target.pages.insertBlank({ size: { width: 300, height: 300 } }, 0);
         const { pages } = await target.pages.list();
-        const blank = toPageRef(pages[0]!.ref.pageObjectNumber);
+        const blank = toPageRef(pages[0]!.ref.objectNumber);
 
         const pageOf = (result: AnnotationImportResult) => result.annotations[0]!.ref.page;
         const same = await target.annotations.import(bundle, { attribution: 'stamp' });
@@ -207,7 +207,7 @@ export function runAnnotationImportConformance(
         );
         await source.pages.insertBlank({ size: { width: 300, height: 300 } }, 1);
         const { pages } = await source.pages.list();
-        const second = toPageRef(pages[1]!.ref.pageObjectNumber);
+        const second = toPageRef(pages[1]!.ref.objectNumber);
         await create(source.page(second), { subtype: 'square', box: box(20) });
         const bundle = await source.annotations.export();
 

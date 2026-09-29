@@ -1026,7 +1026,7 @@ export async function registerAnnotationRoutes(
       accessCtx,
       input.docId,
       input.layerName,
-      input.ref.page.pageObjectNumber,
+      input.ref.page.objectNumber,
       input.ref,
       signal,
     );
@@ -1707,10 +1707,10 @@ async function readAnnotationsAll(input: {
     // manifest that certified the pin (toManifestPage already scope-stamped
     // the revision tokens).
     const stateByPageObjectNumber = new Map(
-      manifest.pages.map((page) => [page.state.page.pageObjectNumber, page.state]),
+      manifest.pages.map((page) => [page.state.page.objectNumber, page.state]),
     );
     const list = input.revisionBridge.decorateAnnotationList(result.list, (page) =>
-      stateByPageObjectNumber.get(page.pageObjectNumber),
+      stateByPageObjectNumber.get(page.objectNumber),
     );
 
     input.requestedVersion === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
@@ -1736,7 +1736,7 @@ async function resolvePageForRead(input: {
           input.scope.layerName,
         )
       : await input.documentService.getManifest(input.scope.ctx, input.scope.docId);
-  const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === input.pageObjectNumber);
+  const page = manifest.pages.find((p) => p.state.page.objectNumber === input.pageObjectNumber);
   if (page) {
     return page;
   }

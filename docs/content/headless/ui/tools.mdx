@@ -1,0 +1,181 @@
+---
+title: Tools, cursors & touch
+description: "The active tool decides what the pointer does: select, pan, draw. Switch tools, add your own, and choose cursors, touch behavior and haptics."
+---
+
+# Tools, cursors & touch
+
+At any moment one **tool** is active, and it decides what a click or a drag on the page does: select
+text, scroll, draw a rectangle, place a stamp. The interaction plugin keeps track of it, and every
+feature that uses the pointer works through it. Register it, and switch tools from your toolbar:
+
+```tsx
+import { interactionPlugin, useInteraction, useInteractionState } from '@embedpdf/react/interaction';
+
+const plugins = [stagePlugin(), renderPlugin(), interactionPlugin()];
+
+function ToolSwitch() {
+  const interaction = useInteraction();
+  const { activeToolId } = useInteractionState();
+
+  return (
+    <>
+      <button aria-pressed={activeToolId === 'pointer'} onClick={() => interaction.activateTool('pointer')}>
+        Select
+      </button>
+      <button aria-pressed={activeToolId === 'pan'} onClick={() => interaction.activateTool('pan')}>
+        Hand
+      </button>
+    </>
+  );
+}
+```
+
+## The built-in tools
+
+| Tool      | A drag on the page                              | Also                                     |
+| :-------- | :---------------------------------------------- | :--------------------------------------- |
+| `pointer` | Selects text, or selects and moves annotations  | Fills forms, follows links. The default. |
+| `pan`     | Scrolls, like Acrobat's hand tool               | Fills forms, follows links               |
+
+Plugins add their own: the annotation plugin a tool per kind (`square`, `highlight`, `note`…), the form
+plugin a tool per field, redaction `redact`, measurements `distance`. They're all switched the same
+way, with `activateTool(id)`, and `useInteractionState().tools` lists them.
+
+## Hold a tool for a moment
+
+`pushTool()` switches to a tool and remembers the one before; `popTool()` goes back. That's how
+"hold Space to pan" works:
+
+```ts
+useEffect(() => {
+  const down = (event: KeyboardEvent) => {
+    if (event.code === 'Space' && !event.repeat) interaction.pushTool('pan');
+  };
+  const up = (event: KeyboardEvent) => {
+    if (event.code === 'Space') interaction.popTool();
+  };
+  window.addEventListener('keydown', down);
+  window.addEventListener('keyup', up);
+  return () => {
+    window.removeEventListener('keydown', down);
+    window.removeEventListener('keyup', up);
+  };
+}, [interaction]);
+```
+
+`activateDefaultTool()` goes back to the default tool, `pointer` unless you set another.
+
+## Your own tool
+
+A tool of your own gets the pointer on the page, in page coordinates:
+
+```ts
+const remove = interaction.registerTool({
+  id: 'pin',
+  cursor: 'copy',
+  onPointerDown: ({ page, point }) => {
+    addPin(page, point);
+    return true; // this tool handled the click
+  },
+});
+
+interaction.activateTool('pin');
+```
+
+| Option          | What it is                                                         |
+| :-------------- | :----------------------------------------------------------------- |
+| `id`            | The tool's name, for `activateTool(id)`                            |
+| `cursor`        | The cursor over the page, any CSS cursor                           |
+| `onPointerDown` | A press on a page: `page`, `point`, `modifiers`. Return `true` to take the gesture |
+| `onPointerMove`, `onPointerUp` | The rest of a gesture you took                      |
+| `onHover`       | The pointer moving over a page, with no button pressed             |
+| `touch`         | `'draw'`: one finger drives the tool; `'tap'` (default): a tap is a click, a drag scrolls |
+
+`registerTool()` returns a function that removes the tool again.
+
+## Cursors
+
+Each tool has a cursor. Over things the tool can act on, the viewer switches to the right one by itself:
+a move or resize cursor over an annotation, a text cursor over text, a hand over a link. You choose the
+tool's own cursor, in three steps:
+
+- **A CSS cursor**: `cursor: 'crosshair'`.
+- **An image**: `cursor: svgCursor({ svg: penIcon, hotspot: { x: 2, y: 22 } })`. The SVG needs a
+  `width` and a `height`, and `hotspot` is the point that clicks.
+- **An image that changes**, such as a pen in the current color: `useToolCursor()` from a component.
+
+```tsx
+import { svgCursor, useToolCursor } from '@embedpdf/react/interaction';
+
+function PenCursor({ color }: { color: string }) {
+  useToolCursor({ toolId: 'ink', cursors: { crosshair: { svg: penIcon(color), hotspot: { x: 2, y: 22 } } } });
+  return null;
+}
+```
+
+`cursors` replaces the tool's cursors by name, and the tool's own comes back when the component
+unmounts. See [The cursor](../annotations/tools#the-cursor) for annotation tools.
+
+## Touch
+
+On a touch screen, the viewer behaves like a native app:
+
+- **One finger scrolls**, and two fingers pinch-zoom, with `pointer` and `pan`.
+- **Drawing tools take one finger**: it draws, and two fingers still scroll and zoom.
+- **Click tools**, such as placing a note, place with a tap, and a drag still scrolls.
+- **Long-press selects a word**, and handles grow the selection.
+
+A tool of your own chooses with `touch`: `'draw'` for tools you drag with, `'tap'` for tools you
+click with.
+
+## Haptic feedback
+
+Register a feedback provider, and a long-press that lands on a word gives the small tick people know
+from native apps:
+
+```ts
+import { feedbackPlugin, vibrationFeedback } from '@embedpdf/react/interaction';
+
+const plugins = [/* … */ interactionPlugin(), feedbackPlugin({ provider: vibrationFeedback })];
+```
+
+It's safe to leave in: where the browser can't vibrate, iOS Safari included, nothing happens. In a
+native app shell, pass `wkFeedback('yourHandlerName')` to use the app's own haptics.
+
+## Settings
+
+Set them when you register the plugin.
+
+| Setting       | What it does                                 | Default     |
+| :------------ | :------------------------------------------- | :---------- |
+| `defaultTool` | The tool that's active when a document opens | `'pointer'` |
+| `tools`       | Your own tools, registered from the start    | none        |
+
+## Events
+
+```ts
+useInteractionEvent(
+  (interaction) => interaction.onToolChanged,
+  ({ toolId }) => analytics.track('tool', { toolId }),
+);
+```
+
+| Event                 | Fires when                                   | Carries                           |
+| :-------------------- | :------------------------------------------- | :-------------------------------- |
+| `onToolChanged`       | Another tool became active                   | `toolId`, `previousToolId`        |
+| `onGestureStarted`    | A drag with a tool began                     | `toolId`, `page`, `pointerType`   |
+| `onGestureEnded`      | It ended                                     | `toolId`, `page`, `pointerType`   |
+| `onGestureCancelled`  | It was cancelled, for example by a second finger | `toolId`, `page`, `pointerType` |
+
+## Good to know
+
+### Each document has its own tool
+
+The active tool belongs to the document: switch tabs, and each document is in the tool you left it in.
+
+### Permissions
+
+Tools don't check permissions themselves; the features behind them do. A drawing tool without
+permission to create draws nothing. Hide the buttons with each plugin's checks, such as
+`annotation.canCreate()`.

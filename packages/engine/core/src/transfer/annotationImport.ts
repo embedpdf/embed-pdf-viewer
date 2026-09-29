@@ -119,14 +119,14 @@ export function annotationImportFacts(
     const { page } = annotation.ref;
     const id: AnnotationStableId =
       annotation.ref.kind === 'objectNumber'
-        ? { kind: 'objectNumber', value: annotation.ref.annotObjectNumber }
-        : { kind: 'nm', value: annotation.nm! };
+        ? { kind: 'objectNumber', objectNumber: annotation.ref.objectNumber }
+        : { kind: 'nm', nm: annotation.nm! };
     return {
       page,
       annotation,
       meta: {
         affectedPages: result.meta.affectedPages.filter(
-          (state) => state.page.pageObjectNumber === page.pageObjectNumber,
+          (state) => state.page.objectNumber === page.objectNumber,
         ),
         cacheDelta: index === last ? result.meta.cacheDelta : null,
         changed: [id],

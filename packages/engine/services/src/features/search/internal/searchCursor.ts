@@ -70,7 +70,7 @@ export function decodeSearchCursor(
     );
   }
   // The cursor owns position; a `from` alongside it is a caller bug.
-  if (request.from !== undefined && request.from.pageObjectNumber !== state.start) {
+  if (request.from !== undefined && request.from.objectNumber !== state.start) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
       '`from` conflicts with the cursor — omit it when resuming',

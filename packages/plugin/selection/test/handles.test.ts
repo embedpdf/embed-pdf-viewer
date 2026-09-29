@@ -142,7 +142,7 @@ describe('createSelectionHandleDrag', () => {
         .fn<(overlay: Point) => { ref: PageRef; point: Point } | null>()
         .mockReturnValueOnce({ ref: toPageRef(9), point: { x: 1, y: 2 } })
         .mockReturnValue(null),
-      pointOnPage: (page, overlay) => ({ x: overlay.x + page.pageObjectNumber, y: overlay.y }),
+      pointOnPage: (page, overlay) => ({ x: overlay.x + page.objectNumber, y: overlay.y }),
     };
     const session = createSelectionHandleDrag(selection, handleView, endpoint(CELL), toPageRef(7));
     session.move({ x: 10, y: 10 }); // hits page 9
@@ -155,7 +155,7 @@ describe('createSelectionHandleDrag', () => {
     const handleView: SelectionHandleView = {
       toOverlay: (_page, point) => point,
       pageAt: () => null,
-      pointOnPage: (page, overlay) => ({ x: overlay.x + page.pageObjectNumber, y: overlay.y }),
+      pointOnPage: (page, overlay) => ({ x: overlay.x + page.objectNumber, y: overlay.y }),
     };
     const session = createSelectionHandleDrag(selection, handleView, endpoint(CELL), toPageRef(7));
     session.move({ x: 5, y: 5 });

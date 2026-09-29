@@ -88,13 +88,13 @@ async function boot(scripting: boolean, scope?: string[]) {
     return {
       kind: 'objectNumber',
       page: widget.page!,
-      annotObjectNumber: widget.annotObjectNumber,
+      objectNumber: widget.objectNumber,
     };
   };
   const press = (name: string): Promise<WidgetActivationResult> =>
     form.activateWidget(widgetRefOf(name));
   const paintedIds = () => annotation.listPageItems(page).map((item) => item.id);
-  const widgetId = (name: string) => `obj:${fieldOf(name).widgets[0]!.annotObjectNumber}`;
+  const widgetId = (name: string) => `obj:${fieldOf(name).widgets[0]!.objectNumber}`;
   const notify = (name: string, event: PdfAnnotationEventKind) =>
     form.notifyWidgetEvent(fieldOf(name).ref, widgetRefOf(name), event);
   // notifyWidgetEvent is fire-and-forget; a bogus hover dispatch drains the
@@ -104,7 +104,7 @@ async function boot(scripting: boolean, scope?: string[]) {
     actions.dispatch({
       scope: 'annotation',
       event: 'cursorEnter',
-      ref: { kind: 'objectNumber', page, annotObjectNumber: 999_999 },
+      ref: { kind: 'objectNumber', page, objectNumber: 999_999 },
       page,
     });
 
@@ -133,7 +133,7 @@ async function boot(scripting: boolean, scope?: string[]) {
 describe('action buttons e2e (scripting OFF — actions ≠ JavaScript)', () => {
   it('HIDE session-hides the target widget; SHOW (/H false) restores it', async () => {
     await using harness = await boot(false);
-    const alphaId = `obj:${harness.fieldOf('alpha').widgets[0]!.annotObjectNumber}`;
+    const alphaId = `obj:${harness.fieldOf('alpha').widgets[0]!.objectNumber}`;
     expect(harness.paintedIds()).toContain(alphaId);
 
     const hide = await harness.press('btn-hide');
@@ -157,7 +157,7 @@ describe('action buttons e2e (scripting OFF — actions ≠ JavaScript)', () => 
     // (ISO puts /A on the annotation dictionary) — field family and the
     // ReadOnly flag are irrelevant to it.
     await using harness = await boot(false);
-    const alphaId = `obj:${harness.fieldOf('alpha').widgets[0]!.annotObjectNumber}`;
+    const alphaId = `obj:${harness.fieldOf('alpha').widgets[0]!.objectNumber}`;
     expect(harness.fieldOf('fakeButton').readOnly).toBe(true);
     expect(harness.paintedIds()).toContain(alphaId);
 

@@ -147,16 +147,16 @@ export function visibleBoxReader(
   const boxes = new Map<number, PdfRect>();
   let indexes: Map<number, number> | null = null;
   return (page) => {
-    const known = boxes.get(page.pageObjectNumber);
+    const known = boxes.get(page.objectNumber);
     if (known) return known;
     indexes ??= new Map(
       session.allRecords().map((record) => [record.pageObjectNumber, record.pageIndex]),
     );
-    const index = indexes.get(page.pageObjectNumber);
+    const index = indexes.get(page.objectNumber);
     if (index === undefined) {
       throw new EngineError(
         EngineErrorCode.NotFound,
-        `no page with object number ${page.pageObjectNumber}`,
+        `no page with object number ${page.objectNumber}`,
       );
     }
     const { fn, mem } = runtime;
@@ -166,7 +166,7 @@ export function visibleBoxReader(
       RECTF_BYTES,
       (rectPtr) => readBoxes(fn, mem, docPtr, index, rectPtr).crop,
     );
-    boxes.set(page.pageObjectNumber, box);
+    boxes.set(page.objectNumber, box);
     return box;
   };
 }

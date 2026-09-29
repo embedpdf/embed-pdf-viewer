@@ -165,5 +165,5 @@ describe('local render policy (wasm runtime)', () => {
 
 async function firstPageObjectNumber(doc: LocalDocumentHandle): Promise<never> {
   const pages = await doc.pages.list();
-  return pages.pages[0]!.ref.pageObjectNumber as never;
+  return pages.pages[0]!.ref.objectNumber as never;
 }

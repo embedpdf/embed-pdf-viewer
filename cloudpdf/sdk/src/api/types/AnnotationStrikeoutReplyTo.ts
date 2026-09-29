@@ -11,13 +11,13 @@ export namespace AnnotationStrikeoutReplyTo {
     export interface ObjectNumber {
         kind: "objectNumber";
         page: AnnotationStrikeoutReplyToObjectNumber.Page;
-        annotObjectNumber: number;
+        objectNumber: number;
     }
 
     export namespace AnnotationStrikeoutReplyToObjectNumber {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -37,7 +37,7 @@ export namespace AnnotationStrikeoutReplyTo {
     export namespace AnnotationStrikeoutReplyToNm {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -58,7 +58,7 @@ export namespace AnnotationStrikeoutReplyTo {
     export namespace AnnotationStrikeoutReplyToIndex {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -77,7 +77,7 @@ export namespace AnnotationStrikeoutReplyTo {
         export namespace Revision {
             export interface Page {
                 kind: Page.Kind;
-                pageObjectNumber: number;
+                objectNumber: number;
             }
 
             export namespace Page {

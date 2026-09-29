@@ -489,9 +489,7 @@ export function runFormConformance(
 
         // 2. The annotation plane sees it, joined to its field.
         const widgetDto = (await page.annotations.list()).annotations.find(
-          (a) =>
-            a.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === widgetRef.annotObjectNumber,
+          (a) => a.ref.kind === 'objectNumber' && a.ref.objectNumber === widgetRef.objectNumber,
         );
         if (widgetDto?.subtype !== 'widget') throw new Error('expected widget DTO');
         expect(widgetDto.field).toEqual(field.field.ref);
@@ -515,9 +513,7 @@ export function runFormConformance(
         // 5. Removed from its field -> inert -> ordinary annotation delete succeeds.
         await doc.forms.removeWidget(field.field.ref, widgetRef);
         const inert = (await page.annotations.list()).annotations.find(
-          (a) =>
-            a.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === widgetRef.annotObjectNumber,
+          (a) => a.ref.kind === 'objectNumber' && a.ref.objectNumber === widgetRef.objectNumber,
         );
         if (inert?.subtype !== 'widget') throw new Error('expected widget DTO');
         expect(inert.field).toBeNull();
@@ -770,7 +766,7 @@ export function runFormConformance(
       const page = doc.page(toPageRef(opts.fixtures.toggleFields.pageObjectNumber));
       const placed = async () =>
         (await page.annotations.list()).annotations.flatMap((a) =>
-          a.ref.kind === 'objectNumber' ? [a.ref.annotObjectNumber] : [],
+          a.ref.kind === 'objectNumber' ? [a.ref.objectNumber] : [],
         );
       try {
         const events: DocumentEvent[] = [];
@@ -778,13 +774,13 @@ export function runFormConformance(
         for (const name of ['maxlen_text', 'billing.name']) {
           const field = await doc.forms.get(toFieldRef(name));
           if (field.ref.kind !== 'objectNumber') throw new Error('expected an object-number ref');
-          const merged = field.ref.fieldObjectNumber;
-          expect(field.widgets.map((w) => w.annotObjectNumber)).toEqual([merged]);
+          const merged = field.ref.objectNumber;
+          expect(field.widgets.map((w) => w.objectNumber)).toEqual([merged]);
           expect(await placed()).toContain(merged);
 
           const removed = await doc.forms.delete(field.ref);
           expect(removed.meta.changedFields).toEqual([field.ref]);
-          expect(removed.meta.changedWidgets.map((w) => w.annotObjectNumber)).toEqual([merged]);
+          expect(removed.meta.changedWidgets.map((w) => w.objectNumber)).toEqual([merged]);
           expect((await placed()).includes(merged)).toBe(false);
           await expect(doc.forms.get(toFieldRef(name))).rejects.toMatchObject({
             code: EngineErrorCode.NotFound,
@@ -810,7 +806,7 @@ export function runFormConformance(
         if (field.ref.kind !== 'objectNumber' || widgetRef?.kind !== 'objectNumber') {
           throw new Error('expected object-number refs');
         }
-        expect(widgetRef.annotObjectNumber).toBe(field.ref.fieldObjectNumber);
+        expect(widgetRef.objectNumber).toBe(field.ref.objectNumber);
 
         // Removing the field's own dictionary from itself is refused.
         const detach = await doc.forms.removeWidget(field.ref, widgetRef).then(
@@ -831,15 +827,11 @@ export function runFormConformance(
 
         // Both refusals left the field and its placement untouched.
         const after = await doc.forms.get(field.ref);
-        expect(after.widgets.map((w) => w.annotObjectNumber)).toEqual([
-          widgetRef.annotObjectNumber,
-        ]);
+        expect(after.widgets.map((w) => w.objectNumber)).toEqual([widgetRef.objectNumber]);
         const { annotations } = await page.annotations.list();
         expect(
           annotations.some(
-            (a) =>
-              a.ref.kind === 'objectNumber' &&
-              a.ref.annotObjectNumber === widgetRef.annotObjectNumber,
+            (a) => a.ref.kind === 'objectNumber' && a.ref.objectNumber === widgetRef.objectNumber,
           ),
         ).toBe(true);
       } finally {

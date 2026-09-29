@@ -36,7 +36,7 @@ beforeAll(async () => {
   const bytes = new Uint8Array(await readFile(pdfPath));
   engine = createLocalEngine({ runtime: { prefer: 'wasm' } });
   doc = await engine.open({ kind: 'bytes', id: 'clamp-doc', bytes });
-  pageObjectNumber = (await doc.pages.list()).pages[0]!.ref.pageObjectNumber;
+  pageObjectNumber = (await doc.pages.list()).pages[0]!.ref.objectNumber;
 }, 60_000);
 
 afterAll(async () => {

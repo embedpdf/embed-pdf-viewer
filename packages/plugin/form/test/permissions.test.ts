@@ -13,8 +13,7 @@ import { fieldRef } from '../src/host-contract';
 import { initialFormState } from '../src/model';
 
 const field = (): FormFieldDTO => ({
-  ref: { kind: 'objectNumber', fieldObjectNumber: 5 },
-  fieldObjectNumber: 5,
+  ref: { kind: 'objectNumber', objectNumber: 5 },
   name: 'name',
   family: 'text',
   origin: 'acroform',

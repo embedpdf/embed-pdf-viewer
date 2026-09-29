@@ -36,7 +36,7 @@ export function createRenderReads(
     }
   >();
   const pageItemsOf = (page: PageRef, view?: ViewEnv): RenderItem[] => {
-    const pageObjectNumber = page.pageObjectNumber;
+    const pageObjectNumber = page.objectNumber;
     const model = pageModel(pageObjectNumber);
     const ghost = ctx.state.get().toolGhost;
     const cached = itemsCache.get(pageObjectNumber);
@@ -51,7 +51,7 @@ export function createRenderReads(
     const items = corePageItems(model, page, view);
     // The armed tool's vector footprint ghost rides the same items pipeline as
     // every draft preview (image ghosts blit through the framework instead).
-    if (ghost && ghost.page.pageObjectNumber === pageObjectNumber && ghost.kind === 'vector') {
+    if (ghost && ghost.page.objectNumber === pageObjectNumber && ghost.kind === 'vector') {
       const tool = tools.get(ghost.toolId);
       const style = styleFromProps(defaultsFor(model, tool?.preset ?? ghost.toolId));
       items.push({
@@ -80,7 +80,7 @@ export function createRenderReads(
     { model: Model; zoom: number | undefined; rotation: number | undefined; v: TextItem[] }
   >();
   const textItemsOf = (page: PageRef, view?: ViewEnv): TextItem[] => {
-    const pageObjectNumber = page.pageObjectNumber;
+    const pageObjectNumber = page.objectNumber;
     const model = pageModel(pageObjectNumber);
     const cached = textsCache.get(pageObjectNumber);
     if (
@@ -113,7 +113,7 @@ export function createRenderReads(
       const annotation = model.byId[id];
       if (
         !annotation ||
-        annotation.page.pageObjectNumber !== pageObjectNumber ||
+        annotation.page.objectNumber !== pageObjectNumber ||
         annotation.subtype !== 'link'
       )
         continue;
@@ -147,9 +147,9 @@ export function createRenderReads(
   const api = {
     listPageItems: (page: PageRef, view?: ViewEnv) => pageItemsOf(page, view),
     listTextItems: (page: PageRef, view?: ViewEnv) => textItemsOf(page, view),
-    listLinkItems: (page: PageRef) => linkItemsOf(page.pageObjectNumber),
+    listLinkItems: (page: PageRef) => linkItemsOf(page.objectNumber),
     getAppearanceEpoch: (page: PageRef) => {
-      const pageObjectNumber = page.pageObjectNumber;
+      const pageObjectNumber = page.objectNumber;
       // What a baked raster depends on, and nothing else: which annotations are
       // baked on this page, and each one's /AP content version (`apVersion` —
       // bumped when a size-changing patch resolves, or a remote edit folds in).
@@ -164,7 +164,7 @@ export function createRenderReads(
         const annotation = model.byId[id];
         if (
           !annotation ||
-          annotation.page.pageObjectNumber !== pageObjectNumber ||
+          annotation.page.objectNumber !== pageObjectNumber ||
           annotation.source !== 'baked' ||
           !annotation.ref
         )

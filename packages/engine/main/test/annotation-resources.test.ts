@@ -79,7 +79,7 @@ describe('drawing bytes across runtimes', () => {
         { scope: ['*'] },
       );
       const { pages } = await doc.pages.list();
-      const page = doc.page(toPageRef(pages[0]!.ref.pageObjectNumber));
+      const page = doc.page(toPageRef(pages[0]!.ref.objectNumber));
       const acrobat = (await page.annotations.list()).annotations.filter(
         (annotation) => annotation.subtype === 'stamp',
       );
@@ -156,7 +156,7 @@ describe('replacing a stamp drawing', () => {
         { scope: ['*'] },
       );
       const { pages } = await doc.pages.list();
-      const page = doc.page(toPageRef(pages[0]!.ref.pageObjectNumber));
+      const page = doc.page(toPageRef(pages[0]!.ref.objectNumber));
       const rect = { x: 20, y: 20, width: 100, height: 100 };
       const small = (
         await page.annotations.create({ subtype: 'stamp', box: rect }, { appearance: drawing })
@@ -195,7 +195,7 @@ describe('stamp drawings across a reopen', () => {
           { scope: ['*'] },
         );
         const { pages } = await doc.pages.list();
-        const page = doc.page(toPageRef(pages[0]!.ref.pageObjectNumber));
+        const page = doc.page(toPageRef(pages[0]!.ref.objectNumber));
         await page.annotations.create(
           { subtype: 'stamp', box: { x, y: 20, width: 100, height: 100 } },
           { appearance: image },

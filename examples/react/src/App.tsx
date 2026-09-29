@@ -961,7 +961,7 @@ function FieldPanel() {
       {(field.family === 'combobox' || field.family === 'listbox') && (
         <SideField label="Options (one per line)">
           <textarea
-            key={field.fieldObjectNumber}
+            key={field.name}
             defaultValue={field.options.map((o) => o.label).join('\n')}
             rows={4}
             onBlur={(e) => {
@@ -1199,7 +1199,7 @@ function SearchControls() {
         >
           {hits.slice(0, 100).map((hit, i) => (
             <button
-              key={`${hit.page.pageObjectNumber}:${hit.start}`}
+              key={`${hit.page.objectNumber}:${hit.start}`}
               onClick={() => search.goToHit(i)}
               style={{
                 display: 'block',

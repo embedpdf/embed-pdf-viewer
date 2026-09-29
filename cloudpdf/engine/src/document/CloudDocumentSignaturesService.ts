@@ -165,14 +165,7 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
       const { appearance, ...rest } = input;
       const body = {
         ...rest,
-        ...(appearance
-          ? {
-              appearance: {
-                resource: 'appearance',
-                ...(appearance.pageIndex !== undefined ? { pageIndex: appearance.pageIndex } : {}),
-              },
-            }
-          : {}),
+        ...(appearance ? { appearance: { resource: 'appearance' } } : {}),
       };
       const form = buildMutationForm(
         body,
@@ -258,14 +251,10 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
       signal,
     );
     const match = snapshot.signatures.find(
-      (s) =>
-        s.field.kind === 'objectNumber' && s.field.fieldObjectNumber === field.fieldObjectNumber,
+      (s) => s.field.kind === 'objectNumber' && s.field.objectNumber === field.objectNumber,
     );
     if (!match) {
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `no signature field #${field.fieldObjectNumber}`,
-      );
+      throw new EngineError(EngineErrorCode.NotFound, `no signature field #${field.objectNumber}`);
     }
     return match.fieldName;
   }

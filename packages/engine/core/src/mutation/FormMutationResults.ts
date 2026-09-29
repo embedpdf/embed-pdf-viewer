@@ -41,18 +41,18 @@ export function formResetFacts<C extends Coordinates>(
   result: FormResetResult<C>,
 ): FormSetValueResult<C>[] {
   return result.fields.map((field) => {
-    const own = new Set(field.widgets.map((widget) => widget.annotObjectNumber));
+    const own = new Set(field.widgets.map((widget) => widget.objectNumber));
     const changedWidgets = result.meta.changedWidgets.filter((widget) =>
-      own.has(widget.annotObjectNumber),
+      own.has(widget.objectNumber),
     );
     const pages = new Set(
-      changedWidgets.flatMap((widget) => (widget.page ? [widget.page.pageObjectNumber] : [])),
+      changedWidgets.flatMap((widget) => (widget.page ? [widget.page.objectNumber] : [])),
     );
     return {
       field,
       meta: {
         affectedPages: result.meta.affectedPages.filter((state) =>
-          pages.has(state.page.pageObjectNumber),
+          pages.has(state.page.objectNumber),
         ),
         cacheDelta: null,
         changedFields: [field.ref],

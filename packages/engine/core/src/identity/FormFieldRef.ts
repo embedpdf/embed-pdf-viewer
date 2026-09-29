@@ -15,7 +15,7 @@ import type { AnnotationRef } from './AnnotationRef';
  *   it. The engine resolves it against the reconciled field tree.
  */
 export type FormFieldRef =
-  | { kind: 'objectNumber'; fieldObjectNumber: number }
+  | { kind: 'objectNumber'; objectNumber: number }
   | { kind: 'fqn'; name: string };
 
 /** A ref to a field by its full name (`'billing.name'`), for a name you already know. */
@@ -30,7 +30,7 @@ export function toFieldRef(name: string): FormFieldRef {
  * `encodeStableIdKey` (`obj:42` / `nm:…`) so the two member-key syntaxes
  * read the same on the wire:
  *
- *   `{ kind: 'objectNumber', fieldObjectNumber: 12 }` -> `'obj:12'`
+ *   `{ kind: 'objectNumber', objectNumber: 12 }` -> `'obj:12'`
  *   `{ kind: 'fqn', name: 'billing.name' }`           -> `'fqn:billing.name'`
  *
  * The caller is responsible for `encodeURIComponent`-ing the result before
@@ -40,12 +40,12 @@ export function toFieldRef(name: string): FormFieldRef {
  */
 export function encodeFieldRefKey(ref: FormFieldRef): string {
   if (ref.kind === 'objectNumber') {
-    if (!Number.isInteger(ref.fieldObjectNumber) || ref.fieldObjectNumber <= 0) {
+    if (!Number.isInteger(ref.objectNumber) || ref.objectNumber <= 0) {
       throw new RangeError(
-        `encodeFieldRefKey: fieldObjectNumber must be a positive integer, got ${ref.fieldObjectNumber}`,
+        `encodeFieldRefKey: objectNumber must be a positive integer, got ${ref.objectNumber}`,
       );
     }
-    return `obj:${ref.fieldObjectNumber}`;
+    return `obj:${ref.objectNumber}`;
   }
   return `fqn:${ref.name}`;
 }
@@ -62,7 +62,7 @@ export function decodeFieldRefKey(key: string): FormFieldRef | null {
     const rest = key.slice('obj:'.length);
     const n = Number.parseInt(rest, 10);
     if (!Number.isInteger(n) || n <= 0 || String(n) !== rest) return null;
-    return { kind: 'objectNumber', fieldObjectNumber: n };
+    return { kind: 'objectNumber', objectNumber: n };
   }
   if (key.startsWith('fqn:')) {
     const name = key.slice('fqn:'.length);
@@ -78,20 +78,21 @@ export function decodeFieldRefKey(key: string): FormFieldRef | null {
  * must be able to report widgets the annotation subsystem cannot reach.
  *
  * `ref` is the widget as an annotation address, computed once by the engine:
- * present exactly when the widget is an indirect object (`annotObjectNumber
- * > 0`) placed on a page (`page !== null`). In a conforming PDF every widget
- * has one; the two raw fields survive for the degenerate cases and for the
- * forms model's own joins by object number.
+ * present exactly when the widget is an indirect object (`objectNumber > 0`)
+ * placed on a page (`page !== null`). In a conforming PDF every widget has
+ * one. `objectNumber` stays beside it because a widget can be an object on no
+ * page: it has a number but no annotation address, and the field still owns
+ * it (signature checks join changed objects to fields by these numbers).
  */
 export interface FormWidget {
   /** The widget as an annotation address, or null when it cannot be addressed as one. */
   ref: AnnotationRef | null;
   /**
-   * Indirect object number of the widget annotation — the join key to the
-   * annotation subsystem's `objectNumber` refs. `0` when the widget is
-   * stored as a direct object (spec-violating; cannot be addressed).
+   * The widget annotation's object number, whether or not it is on a page.
+   * `0` when the widget is stored as a direct object (spec-violating; it
+   * cannot be addressed).
    */
-  annotObjectNumber: number;
+  objectNumber: number;
   /**
    * The page whose /Annots array references the widget; `null` when the
    * widget is not reachable from any page ("unplaced").
@@ -100,10 +101,10 @@ export interface FormWidget {
 }
 
 /** The one place a widget record is built: computes `ref` from the raw facts. */
-export function formWidget(annotObjectNumber: number, page: PageRef | null): FormWidget {
+export function formWidget(objectNumber: number, page: PageRef | null): FormWidget {
   return {
-    ref: annotObjectNumber > 0 && page ? { kind: 'objectNumber', page, annotObjectNumber } : null,
-    annotObjectNumber,
+    ref: objectNumber > 0 && page ? { kind: 'objectNumber', page, objectNumber } : null,
+    objectNumber,
     page,
   };
 }

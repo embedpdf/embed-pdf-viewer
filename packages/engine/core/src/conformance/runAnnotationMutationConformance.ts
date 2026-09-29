@@ -194,7 +194,7 @@ export function runAnnotationMutationConformance(
         const result = await page.annotations.create(draft);
         expect(AnnotationCreateResultSchema.safeParse(result).success).toBe(true);
         expect(result.meta.affectedPages.length).toBe(1);
-        expect(result.meta.affectedPages[0].page.pageObjectNumber).toBe(fix.pageObjectNumber);
+        expect(result.meta.affectedPages[0].page.objectNumber).toBe(fix.pageObjectNumber);
         expect('cacheDelta' in result.meta).toBe(true);
 
         // Always durable (engine uses the EPDFPage_CreateAnnot fork helper).
@@ -1742,7 +1742,7 @@ export function runAnnotationMutationConformance(
         const result = await page.annotations.update(ref, patch);
         expect(AnnotationUpdateResultSchema.safeParse(result).success).toBe(true);
         expect(result.meta.affectedPages.length).toBe(1);
-        expect(result.meta.affectedPages[0].page.pageObjectNumber).toBe(fix.pageObjectNumber);
+        expect(result.meta.affectedPages[0].page.objectNumber).toBe(fix.pageObjectNumber);
         expect('cacheDelta' in result.meta).toBe(true);
 
         // Same identity, /NM untouched.
@@ -1782,7 +1782,7 @@ export function runAnnotationMutationConformance(
           const result = await page.annotations.update(weak.ref, patch);
           expect(AnnotationUpdateResultSchema.safeParse(result).success).toBe(true);
           expect(result.meta.affectedPages.length).toBe(1);
-          expect(result.meta.affectedPages[0].page.pageObjectNumber).toBe(fix.pageObjectNumber);
+          expect(result.meta.affectedPages[0].page.objectNumber).toBe(fix.pageObjectNumber);
           expect('cacheDelta' in result.meta).toBe(true);
 
           // The ref is upgraded to durable. Either nm (engine-stamped) or
@@ -1842,12 +1842,12 @@ export function runAnnotationMutationConformance(
             [
               {
                 kind: 'objectNumber',
-                value: (created.annotation.ref as { annotObjectNumber: number }).annotObjectNumber,
+                objectNumber: (created.annotation.ref as { objectNumber: number }).objectNumber,
               },
             ],
           ]);
           expect(result.meta.affectedPages.length).toBe(1);
-          expect(result.meta.affectedPages[0].page.pageObjectNumber).toBe(fix.pageObjectNumber);
+          expect(result.meta.affectedPages[0].page.objectNumber).toBe(fix.pageObjectNumber);
           expect('cacheDelta' in result.meta).toBe(true);
 
           // Its stable id is in meta (we created it; it's durable).
@@ -1892,7 +1892,7 @@ export function runAnnotationMutationConformance(
             ).toBe(true);
             expect(result.meta.changed.length <= 1).toBe(true);
             expect(result.meta.affectedPages.length).toBe(1);
-            expect(result.meta.affectedPages[0].page.pageObjectNumber).toBe(fix.pageObjectNumber);
+            expect(result.meta.affectedPages[0].page.objectNumber).toBe(fix.pageObjectNumber);
             expect('cacheDelta' in result.meta).toBe(true);
 
             // The page had weak refs before, structural mutation,
@@ -1999,13 +1999,13 @@ export function runAnnotationMutationConformance(
           (x) =>
             x.ref.kind === 'objectNumber' &&
             a.annotation.ref.kind === 'objectNumber' &&
-            x.ref.annotObjectNumber === a.annotation.ref.annotObjectNumber,
+            x.ref.objectNumber === a.annotation.ref.objectNumber,
         );
         const bIdx = list.annotations.findIndex(
           (x) =>
             x.ref.kind === 'objectNumber' &&
             b.annotation.ref.kind === 'objectNumber' &&
-            x.ref.annotObjectNumber === b.annotation.ref.annotObjectNumber,
+            x.ref.objectNumber === b.annotation.ref.objectNumber,
         );
         expect(aIdx >= 0 && bIdx >= 0).toBe(true);
         expect(aIdx < bIdx).toBe(true);
@@ -2019,7 +2019,7 @@ export function runAnnotationMutationConformance(
         try {
           expect(AnnotationMoveResultSchema.safeParse(result).success).toBe(true);
           expect(result.meta.affectedPages.length).toBe(1);
-          expect(result.meta.affectedPages[0].page.pageObjectNumber).toBe(fix.pageObjectNumber);
+          expect(result.meta.affectedPages[0].page.objectNumber).toBe(fix.pageObjectNumber);
           expect('cacheDelta' in result.meta).toBe(true);
           expect(result.annotations.length).toBe(1);
 
@@ -2028,9 +2028,9 @@ export function runAnnotationMutationConformance(
 
           // The moved DTO sits at toIndex.
           if (result.annotations[0].ref.kind === 'objectNumber') {
-            const movedObjNum = result.annotations[0].ref.annotObjectNumber;
+            const movedObjNum = result.annotations[0].ref.objectNumber;
             if (a.annotation.ref.kind === 'objectNumber') {
-              expect(movedObjNum).toBe(a.annotation.ref.annotObjectNumber);
+              expect(movedObjNum).toBe(a.annotation.ref.objectNumber);
             }
           }
 
@@ -2080,10 +2080,10 @@ export function runAnnotationMutationConformance(
             ids[2].annotation.ref,
             ids[0].annotation.ref,
             ids[1].annotation.ref,
-          ].map((r) => (r.kind === 'objectNumber' ? r.annotObjectNumber : null));
+          ].map((r) => (r.kind === 'objectNumber' ? r.objectNumber : null));
 
           const movedObjNums = result.annotations.map((d) =>
-            d.ref.kind === 'objectNumber' ? d.ref.annotObjectNumber : null,
+            d.ref.kind === 'objectNumber' ? d.ref.objectNumber : null,
           );
           for (let i = 0; i < expectedOrder.length; i++) {
             expect(movedObjNums[i]).toBe(expectedOrder[i]);
@@ -2150,7 +2150,7 @@ export function runAnnotationMutationConformance(
           (x) =>
             x.ref.kind === 'objectNumber' &&
             a.annotation.ref.kind === 'objectNumber' &&
-            x.ref.annotObjectNumber === a.annotation.ref.annotObjectNumber,
+            x.ref.objectNumber === a.annotation.ref.objectNumber,
         );
         if (aIdx < 0) return;
 
@@ -2277,7 +2277,7 @@ export function runAnnotationMutationConformance(
         // we exercise the cross-page case; fall back to the host itself for
         // single-page fixtures).
         const mover =
-          list.pages.find((pg) => pg.ref.pageObjectNumber !== fix.pageObjectNumber)?.ref ??
+          list.pages.find((pg) => pg.ref.objectNumber !== fix.pageObjectNumber)?.ref ??
           toPageRef(fix.pageObjectNumber);
         await doc.pages.move([mover], 0);
 
@@ -2325,10 +2325,8 @@ export function runAnnotationMutationConformance(
           reply.annotation.reply?.to.kind === 'objectNumber' &&
           parent.annotation.ref.kind === 'objectNumber'
         ) {
-          expect(reply.annotation.reply!.to.annotObjectNumber).toBe(
-            parent.annotation.ref.annotObjectNumber,
-          );
-          expect(reply.annotation.reply!.to.page.pageObjectNumber).toBe(fix.pageObjectNumber);
+          expect(reply.annotation.reply!.to.objectNumber).toBe(parent.annotation.ref.objectNumber);
+          expect(reply.annotation.reply!.to.page.objectNumber).toBe(fix.pageObjectNumber);
         }
         // The parent (already durable) is reported alongside the new reply.
         expect(reply.meta.changed.length).toBe(2);
@@ -2342,7 +2340,7 @@ export function runAnnotationMutationConformance(
           (a) =>
             a.ref.kind === 'objectNumber' &&
             reply.annotation.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === reply.annotation.ref.annotObjectNumber,
+            a.ref.objectNumber === reply.annotation.ref.objectNumber,
         );
         expect(readReply?.reply?.type).toBe('reply');
         expect(readReply?.reply?.to !== undefined).toBe(true);
@@ -2378,7 +2376,7 @@ export function runAnnotationMutationConformance(
           (a) =>
             a.ref.kind === 'objectNumber' &&
             caret.annotation.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === caret.annotation.ref.annotObjectNumber,
+            a.ref.objectNumber === caret.annotation.ref.objectNumber,
         );
         expect(readCaret?.reply?.type).toBe('group');
       } finally {
@@ -2436,7 +2434,7 @@ export function runAnnotationMutationConformance(
             const dest = xyz.annotation.target.destination;
             expect(dest.kind).toBe('xyz');
             if (dest.kind === 'xyz') {
-              expect(dest.page.pageObjectNumber).toBe(fix.pageObjectNumber);
+              expect(dest.page.objectNumber).toBe(fix.pageObjectNumber);
               expect(dest.x).toBe(30);
               expect(dest.y).toBe(300);
               expect(dest.zoom).toBe(null);
@@ -2545,7 +2543,7 @@ export function runAnnotationMutationConformance(
           (a) =>
             a.ref.kind === 'objectNumber' &&
             created.annotation.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === created.annotation.ref.annotObjectNumber,
+            a.ref.objectNumber === created.annotation.ref.objectNumber,
         );
         expect(readBack?.subtype).toBe('link');
         if (readBack?.subtype === 'link') expect(readBack.target).toBe(null);
@@ -2589,9 +2587,7 @@ export function runAnnotationMutationConformance(
           link.annotation.reply?.to.kind === 'objectNumber' &&
           parent.annotation.ref.kind === 'objectNumber'
         ) {
-          expect(link.annotation.reply!.to.annotObjectNumber).toBe(
-            parent.annotation.ref.annotObjectNumber,
-          );
+          expect(link.annotation.reply!.to.objectNumber).toBe(parent.annotation.ref.objectNumber);
         }
 
         // Both the relationship and the target survive a fresh read.
@@ -2600,7 +2596,7 @@ export function runAnnotationMutationConformance(
           (a) =>
             a.ref.kind === 'objectNumber' &&
             link.annotation.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === link.annotation.ref.annotObjectNumber,
+            a.ref.objectNumber === link.annotation.ref.objectNumber,
         );
         expect(readLink?.subtype).toBe('link');
         expect(readLink?.reply?.type).toBe('group');
@@ -2647,13 +2643,13 @@ export function runAnnotationMutationConformance(
           (a) =>
             a.ref.kind === 'objectNumber' &&
             caret.annotation.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === caret.annotation.ref.annotObjectNumber,
+            a.ref.objectNumber === caret.annotation.ref.objectNumber,
         );
         const readStrikeout = after.annotations.find(
           (a) =>
             a.ref.kind === 'objectNumber' &&
             strikeout.annotation.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === strikeout.annotation.ref.annotObjectNumber,
+            a.ref.objectNumber === strikeout.annotation.ref.objectNumber,
         );
         expect(readCaret?.subtype === 'caret' && readCaret.intent).toBe('replace');
         expect(readStrikeout?.subtype === 'strikeout' && readStrikeout.intent).toBe(
@@ -2711,7 +2707,7 @@ export function runAnnotationMutationConformance(
         const crossPageRef: AnnotationRef = {
           kind: 'objectNumber',
           page: toPageRef(fix.pageObjectNumber + 2),
-          annotObjectNumber: parent.annotation.ref.annotObjectNumber,
+          objectNumber: parent.annotation.ref.objectNumber,
         };
         let caught: unknown;
         try {
@@ -2742,7 +2738,7 @@ export function runAnnotationMutationConformance(
         });
         // A name is unique per page (ISO 32000-2 §12.5.2): another page may use it.
         const { pages } = await doc.pages.list();
-        const other = pages.find((entry) => entry.ref.pageObjectNumber !== fix.pageObjectNumber);
+        const other = pages.find((entry) => entry.ref.objectNumber !== fix.pageObjectNumber);
         if (!other) return;
         const elsewhere = await doc.page(other.ref).annotations.create(draft);
         expect(elsewhere.annotation.nm).toBe('taken');
@@ -2800,7 +2796,7 @@ export function runAnnotationMutationConformance(
           (a) =>
             a.ref.kind === 'objectNumber' &&
             status.annotation.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === status.annotation.ref.annotObjectNumber,
+            a.ref.objectNumber === status.annotation.ref.objectNumber,
         );
         expect(read?.subtype).toBe('text');
         if (read?.subtype === 'text') {
@@ -2887,7 +2883,7 @@ export function runAnnotationMutationConformance(
           (a) =>
             a.ref.kind === 'objectNumber' &&
             note.annotation.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === note.annotation.ref.annotObjectNumber,
+            a.ref.objectNumber === note.annotation.ref.objectNumber,
         );
         expect(read?.contents).toBe(null);
         expect(read?.subject).toBe(null);
@@ -2920,7 +2916,7 @@ export function runAnnotationMutationConformance(
           (a) =>
             a.ref.kind === 'objectNumber' &&
             custom.annotation.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === custom.annotation.ref.annotObjectNumber,
+            a.ref.objectNumber === custom.annotation.ref.objectNumber,
         );
         if (read?.subtype === 'text') {
           expect(read.state).toBe('in-progress');

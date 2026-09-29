@@ -227,7 +227,7 @@ export function createTestContext<S = void>(options: TestContextOptions<S> = {})
     capabilities.set(DocumentsToken as CapabilityToken<unknown>, testDocuments(meta));
   }
   const notFound = (ref: PageRef) =>
-    new PluginError('not-found', id, `page ${ref.pageObjectNumber} is not in this document`);
+    new PluginError('not-found', id, `page ${ref.objectNumber} is not in this document`);
   const resolve = <T>(token: CapabilityToken<T>): T | null =>
     capabilities.has(token as CapabilityToken<unknown>)
       ? (capabilities.get(token as CapabilityToken<unknown>) as T)

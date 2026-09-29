@@ -130,14 +130,14 @@ const sameRange = (left: TextRange | null, right: TextRange | null): boolean =>
   left === right ||
   (!!left &&
     !!right &&
-    left.start.page.pageObjectNumber === right.start.page.pageObjectNumber &&
+    left.start.page.objectNumber === right.start.page.objectNumber &&
     left.start.index === right.start.index &&
-    left.end.page.pageObjectNumber === right.end.page.pageObjectNumber &&
+    left.end.page.objectNumber === right.end.page.objectNumber &&
     left.end.index === right.end.index);
 const samePages = (left: readonly PageRef[], right: readonly PageRef[]): boolean =>
   left === right ||
   (left.length === right.length &&
-    left.every((page, i) => page.pageObjectNumber === right[i]!.pageObjectNumber));
+    left.every((page, i) => page.objectNumber === right[i]!.objectNumber));
 
 /** The selection's reactive read-model for chrome: whether anything is
  *  selected, the character range (persist/restore), and the pages it spans. */
@@ -163,7 +163,7 @@ const sameAnchor = (left: SelectionAnchor | null, right: SelectionAnchor | null)
   if (left === right) return true;
   if (!left || !right) return false;
   return (
-    left.page.pageObjectNumber === right.page.pageObjectNumber &&
+    left.page.objectNumber === right.page.objectNumber &&
     left.bounds.x === right.bounds.x &&
     left.bounds.y === right.bounds.y &&
     left.bounds.width === right.bounds.width &&
@@ -219,8 +219,8 @@ const sameEndpoints = (left: Endpoints | null, right: Endpoints | null): boolean
   if (left === right) return true;
   if (!left || !right) return false;
   return (
-    left.start.page.pageObjectNumber === right.start.page.pageObjectNumber &&
-    left.end.page.pageObjectNumber === right.end.page.pageObjectNumber &&
+    left.start.page.objectNumber === right.start.page.objectNumber &&
+    left.end.page.objectNumber === right.end.page.objectNumber &&
     left.start.advance === right.start.advance &&
     left.end.advance === right.end.advance &&
     // corner-wise, so a boundary that rotates without moving its bounding box

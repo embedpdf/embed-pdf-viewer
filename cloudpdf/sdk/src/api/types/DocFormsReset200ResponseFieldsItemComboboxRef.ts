@@ -9,7 +9,7 @@ export type DocFormsReset200ResponseFieldsItemComboboxRef =
 export namespace DocFormsReset200ResponseFieldsItemComboboxRef {
     export interface ObjectNumber {
         kind: "objectNumber";
-        fieldObjectNumber: number;
+        objectNumber: number;
     }
 
     export interface Fqn {

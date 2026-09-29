@@ -71,7 +71,7 @@ async function everyKind(): Promise<AnnotationBundle> {
       { scope: ['*'] },
     );
     const { pages } = await doc.pages.list();
-    const pageRef = toPageRef(pages[0]!.ref.pageObjectNumber);
+    const pageRef = toPageRef(pages[0]!.ref.objectNumber);
     const page = doc.page(pageRef);
     for (const { data, resources } of creatables()) await page.annotations.create(data, resources);
     const rect = { x: 300, y: 300, width: 20, height: 20 };
@@ -271,7 +271,7 @@ describe('an import into an open document', () => {
         { scope: ['*'] },
       );
       const { pages } = await doc.pages.list();
-      const page = doc.page(toPageRef(pages[0]!.ref.pageObjectNumber));
+      const page = doc.page(toPageRef(pages[0]!.ref.objectNumber));
       // Loaded the way a viewer loads it: drawn, and its annotations listed.
       const before = await page.render.raw();
       expect((await page.annotations.list()).annotations).toEqual([]);
@@ -292,7 +292,7 @@ describe('an import into an open document', () => {
         { scope: ['*'] },
       );
       const reopened = (await fresh.pages.list()).pages[0]!;
-      const drawn = await fresh.page(toPageRef(reopened.ref.pageObjectNumber)).render.raw();
+      const drawn = await fresh.page(toPageRef(reopened.ref.objectNumber)).render.raw();
       expect(Buffer.from(drawn.data).equals(Buffer.from(after.data))).toBe(true);
       await fresh.close();
       await doc.close();
@@ -312,7 +312,7 @@ describe.each(['wasm', 'native'] as const)('one create (%s runtime)', (prefer) =
       'one-create',
     );
     const { snapshot } = await worker.result({ kind: 'pages.list' }, 'pages.list');
-    const page = toPageRef(snapshot.pages[0]!.ref.pageObjectNumber);
+    const page = toPageRef(snapshot.pages[0]!.ref.objectNumber);
     const rect = { x: 300, y: 300, width: 20, height: 20 };
     const create = (draft: Record<string, unknown>) =>
       worker.send({ kind: 'annotations.create', page, draft });

@@ -1,0 +1,78 @@
+---
+title: Menus over the page
+description: Attach your own UI to a spot on a page, such as a selection, an annotation or a search match, and keep it there while people scroll and zoom.
+---
+
+# Menus over the page
+
+A menu next to selected text, a card next to an annotation, a button over a search match: UI that
+belongs to a spot on the page, but floats above it. `<Anchored>` places your UI at a spot, and keeps it
+there while people scroll, zoom and rotate. Put it in the Stage's `overlay`:
+
+```tsx
+import { Anchored } from '@embedpdf/react/anchored';
+
+<Stage
+  overlay={
+    <Anchored anchor={{ page: hit.page, bounds: hit.bounds }} placement="bottom">
+      <button onClick={() => highlight(hit)}>Highlight</button>
+    </Anchored>
+  }
+>
+  {() => <RenderLayer />}
+</Stage>;
+```
+
+The anchor is a box on a page, in page coordinates: the same `page` and `bounds` every plugin gives
+you. The overlay moves with the view in the same frame as the pages, so your menu never lags behind.
+
+## Ready-made menus
+
+Most menus follow something that's already on the page. These place themselves:
+
+| Component                | Attaches to                                  | Page                                                         |
+| :----------------------- | :------------------------------------------- | :----------------------------------------------------------- |
+| `<SelectionMenu>`        | The selected text                            | [Selecting & copying](../text/selection#add-a-selection-menu) |
+| `<AnnotationMenu>`       | The selected annotations                     | [Selecting & editing](../annotations/selecting#add-a-menu)   |
+| `<AnnotationDraftMenu>`  | A polygon or polyline being drawn            | [Selecting & editing](../annotations/selecting#shapes-with-many-points) |
+
+They hide while people drag, and show when the selection settles. What's inside is yours.
+
+## Attach to an annotation
+
+`useAnnotationAnchor(ref)` gives you an annotation's anchor, and follows it while it's moved:
+
+```tsx
+function ReplyCount({ note }: { note: Annotation }) {
+  const anchor = useAnnotationAnchor(note.ref);
+  const thread = useCommentThread(note.ref);
+
+  return (
+    <Anchored anchor={anchor} placement="right" gap={4}>
+      <span className="badge">{thread?.replies.length ?? 0}</span>
+    </Anchored>
+  );
+}
+```
+
+## Where it goes
+
+| Prop        | What it is                                                           | Default  |
+| :---------- | :------------------------------------------------------------------- | :------- |
+| `anchor`    | `{ page, bounds }`, or `null` to hide. `avoid` adds points to keep clear of, such as a rotation handle | required |
+| `placement` | `'top'`, `'bottom'`, `'left'` or `'right'` of the box                | `'top'`  |
+| `gap`       | The space between the box and your UI, in pixels                     | `8`      |
+
+When there's no room on the side you chose, it flips to the other side, and it stays inside the view.
+
+## Good to know
+
+### Clicks stay in your menu
+
+A click in an anchored menu never reaches the page underneath, so it doesn't clear the selection or
+start a drag.
+
+### In a PageView
+
+Inside a [PageView](../viewing/page-view), anchored UI is placed above everything else on your page,
+so a scrolling list or a card can't cut it off.

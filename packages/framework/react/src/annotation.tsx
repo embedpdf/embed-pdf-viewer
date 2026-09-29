@@ -1031,7 +1031,7 @@ export function useAnnotationEvent<T>(
  *  author, a group), reference-stable while the matching set is unchanged. */
 export function useAnnotationList(filter?: AnnotationFilter): readonly Annotation[] {
   const key = filter
-    ? `${filter.page?.pageObjectNumber ?? ''}|${filter.subtype ?? ''}|${filter.author ?? ''}|${
+    ? `${filter.page?.objectNumber ?? ''}|${filter.subtype ?? ''}|${filter.author ?? ''}|${
         filter.group ? annotationKey(filter.group) : ''
       }`
     : '';
@@ -1115,10 +1115,10 @@ export function enrichCommentThreads(
   pages: readonly PageLayout[],
 ): CommentThreadView[] {
   const byPageObjectNumber = new Map(
-    pages.map((pageInfo) => [pageInfo.ref.pageObjectNumber, pageInfo] as const),
+    pages.map((pageInfo) => [pageInfo.ref.objectNumber, pageInfo] as const),
   );
   return threads.map((thread) => {
-    const page = byPageObjectNumber.get(thread.page.pageObjectNumber);
+    const page = byPageObjectNumber.get(thread.page.objectNumber);
     return {
       ...thread,
       pageIndex: page ? page.index : -1,

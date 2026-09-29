@@ -91,7 +91,7 @@ function annotation(index: number) {
     ref: {
       kind: 'objectNumber',
       page: toPageRef(PAGE_OBJECT_NUMBER),
-      annotObjectNumber: 10_000 + index,
+      objectNumber: 10_000 + index,
     },
     page: toPageRef(PAGE_OBJECT_NUMBER),
     index,
@@ -406,7 +406,7 @@ function buildStub(initial: ServerState): StubbedFixture {
               ],
             },
             affectedPages: [pageState()],
-            changed: [{ kind: 'objectNumber', value: created.ref.annotObjectNumber }],
+            changed: [{ kind: 'objectNumber', objectNumber: created.ref.objectNumber }],
             weakRefsInvalidated: false,
             shouldRefetch: null,
           },
@@ -553,7 +553,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
     const doc = await engine.open({ kind: 'token', token: docToken() });
     try {
       const list = await doc.pages.list();
-      expect(list.pages.map((page) => page.ref.pageObjectNumber)).toEqual([PAGE_OBJECT_NUMBER]);
+      expect(list.pages.map((page) => page.ref.objectNumber)).toEqual([PAGE_OBJECT_NUMBER]);
       const paths = fx.calls.map((call) => call.path);
       // pages.list reads layoutVersion off the (seeded) manifest, then fetches
       // the content-addressed /layout leaf — no extra /head.
@@ -588,7 +588,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
     const doc = await engine.open({ kind: 'token', token: docToken() });
     try {
       const list = await doc.pages.list();
-      expect(list.pages.map((page) => page.ref.pageObjectNumber)).toEqual([PAGE_OBJECT_NUMBER]);
+      expect(list.pages.map((page) => page.ref.objectNumber)).toEqual([PAGE_OBJECT_NUMBER]);
       const paths = fx.calls.map((call) => call.path);
       // Stale seed → manifest ladder refreshes to docVersion=2 first, then the /layout
       // leaf is fetched at the refreshed layoutVersion.

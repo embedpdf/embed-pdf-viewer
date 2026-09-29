@@ -24,7 +24,10 @@ import {
 import { createFormScriptingController } from '../src/scripting/controller';
 import { standaloneRealm } from './helpers/standalone-realm';
 
-const ref = (fieldObjectNumber: number) => ({ kind: 'objectNumber' as const, fieldObjectNumber });
+const ref = (fieldObjectNumber: number) => ({
+  kind: 'objectNumber' as const,
+  objectNumber: fieldObjectNumber,
+});
 
 const action = (script: string): PdfActionTree => ({
   root: { type: 'javascript', subtype: 'JavaScript', script, next: [] },
@@ -40,7 +43,6 @@ const text = (
   actions?: FormFieldDTO['actions'],
 ): FormFieldDTO => ({
   ref: ref(fieldObjectNumber),
-  fieldObjectNumber,
   name,
   family: 'text',
   origin: 'acroform',

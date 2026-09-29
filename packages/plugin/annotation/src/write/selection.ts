@@ -155,9 +155,8 @@ export function createSelectionWrites(
       const model = store.model();
       const members = annotations.selectedCommitted();
       if (members.length < 2) return;
-      const pageObjectNumber = members[0].page.pageObjectNumber;
-      if (members.some((annotation) => annotation.page.pageObjectNumber !== pageObjectNumber))
-        return; // groups are page-local
+      const pageObjectNumber = members[0].page.objectNumber;
+      if (members.some((annotation) => annotation.page.objectNumber !== pageObjectNumber)) return; // groups are page-local
       const ordered = [...members].sort(
         (left, right) => model.order.indexOf(left.id) - model.order.indexOf(right.id),
       );
@@ -185,9 +184,7 @@ export function createSelectionWrites(
       const members = annotations.selectedCommitted();
       if (members.length < 2) return false;
       if (
-        members.some(
-          (annotation) => annotation.page.pageObjectNumber !== members[0].page.pageObjectNumber,
-        )
+        members.some((annotation) => annotation.page.objectNumber !== members[0].page.objectNumber)
       )
         return false;
       // Grouping writes a relationship onto every member — each must

@@ -9,7 +9,7 @@ export type DocFormsReset200ResponseFieldsItemRadioRef =
 export namespace DocFormsReset200ResponseFieldsItemRadioRef {
     export interface ObjectNumber {
         kind: "objectNumber";
-        fieldObjectNumber: number;
+        objectNumber: number;
     }
 
     export interface Fqn {

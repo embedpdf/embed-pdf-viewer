@@ -76,7 +76,7 @@ export class LocalRevisionAuthority implements RevisionAuthority {
         { details: { token } },
       );
     }
-    const current = this.token(token.page.pageObjectNumber);
+    const current = this.token(token.page.objectNumber);
     if (!revisionTokensEqual(current, token)) {
       throw new EngineError(EngineErrorCode.InvalidReference, 'revision token is stale', {
         details: { provided: token, current },

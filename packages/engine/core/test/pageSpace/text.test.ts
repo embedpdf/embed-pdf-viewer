@@ -178,7 +178,7 @@ describe('text in page space', () => {
         pagesSearched: 2,
         pageCount: 2,
       },
-      (page) => (page.pageObjectNumber === 4 ? visible : other),
+      (page) => (page.objectNumber === 4 ? visible : other),
     );
     expect(slice.matches[0]!.segments[0]!.rect).toEqual(pageBoxOf(pdfSegment.rect, visible));
     expect(slice.matches[1]!.segments[0]!.rect).toEqual({ x: 0, y: 780, width: 10, height: 12 });

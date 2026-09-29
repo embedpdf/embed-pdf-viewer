@@ -1,0 +1,120 @@
+---
+title: Metadata
+description: "Show and change a document's properties: title, author, subject, keywords, dates, and your own fields."
+---
+
+# Metadata
+
+A PDF carries information about itself: a title, an author, when it was made. Register
+`metadataPlugin()` to show it in your UI and let people change it:
+
+```tsx
+import { useMetadata, useMetadataState } from '@embedpdf/react/metadata';
+
+function TitleField() {
+  const { update, canUpdate } = useMetadata();
+  const { metadata } = useMetadataState();
+
+  return (
+    <label>
+      Title
+      <input
+        defaultValue={metadata?.title ?? ''}
+        disabled={!canUpdate()}
+        onBlur={(event) => update({ title: event.target.value })}
+      />
+    </label>
+  );
+}
+```
+
+`useMetadataState()` updates by itself: after your own changes, and on a shared document, after
+someone else's.
+
+## Read
+
+`metadata` has every standard field. A field the file doesn't set is `null`:
+
+| Field        | What it is                                                  |
+| :----------- | :---------------------------------------------------------- |
+| `title`      | The document's title                                        |
+| `author`     | Who wrote it                                                |
+| `subject`    | What it's about                                             |
+| `keywords`   | Keywords, as one string (often separated by commas)         |
+| `creator`    | The app the document was made in                            |
+| `producer`   | The app that turned it into a PDF                           |
+| `createdAt`  | When it was created, as an ISO date                         |
+| `modifiedAt` | When it was last changed, as an ISO date                    |
+
+`status` says whether the metadata is still loading (`'loading'`), there (`'ready'`), or not
+allowed (`'forbidden'`).
+
+## Change
+
+`update()` changes the fields you pass, and `null` removes one:
+
+```ts
+const metadata = useMetadata();
+
+await metadata.update({
+  title: 'Q2 Proposal (final)',
+  author: 'Dana Smith',
+  subject: null,
+});
+```
+
+It resolves with `{ metadata }`: the fields after the change. The change is part of the document, kept when it's
+downloaded.
+
+## Your own fields
+
+Keep your own values in the document, such as a contract number or who reviewed it. PDF apps show
+them as custom properties:
+
+```ts
+const { custom } = useMetadataState();
+// { contractId: 'C-2026-114', reviewedBy: 'dana' }
+```
+
+```ts
+const metadata = useMetadata();
+await metadata.custom.update({ reviewedBy: 'lee', draftOwner: null });
+```
+
+A string sets a field, `null` removes it, and fields you leave out stay as they are. A field name is
+1 to 127 plain characters and can't be a standard field's name.
+
+## Events
+
+```ts
+useMetadataEvent(
+  (metadata) => metadata.onUpdated,
+  ({ metadata, origin }) => {
+    if (origin.kind === 'remote') toast(`The title is now "${metadata.title}"`);
+  },
+);
+```
+
+| Event                   | Fires when                                          | Carries                    |
+| :---------------------- | :-------------------------------------------------- | :------------------------- |
+| `onUpdated`             | The standard fields changed                         | `metadata`, `origin`       |
+| `custom.onUpdated`      | Your own fields changed                             | `custom`, `origin`         |
+
+## Permissions
+
+| Permission            | What it allows                                 | Check                  |
+| :-------------------- | :--------------------------------------------- | :--------------------- |
+| `doc.open`            | Reading every field                            | none: it opened        |
+| `doc.metadata.modify` | Changing the standard fields and your own ones | `metadata.canUpdate()` |
+
+## Good to know
+
+### The modified date
+
+Changing a property doesn't change `modifiedAt` for you. Set it yourself when you want it to move:
+`update({ modifiedAt: new Date() })`.
+
+### Dates
+
+Dates are ISO strings, with the time zone the PDF gives, so they survive JSON. Write a date as an
+ISO string or a `Date`. See [Metadata](/docs/engine/documents/metadata) for the details.

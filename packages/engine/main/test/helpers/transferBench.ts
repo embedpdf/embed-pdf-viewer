@@ -67,7 +67,7 @@ export async function timed<T>(rows: string[], label: string, fn: () => Promise<
 export const kb = (bytes: number) => `${(bytes / 1024).toFixed(1)} KB`;
 
 export async function pageRefs(doc: Doc): Promise<PageRef[]> {
-  return (await doc.pages.list()).pages.map((entry) => toPageRef(entry.ref.pageObjectNumber));
+  return (await doc.pages.list()).pages.map((entry) => toPageRef(entry.ref.objectNumber));
 }
 
 /**

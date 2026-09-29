@@ -18,7 +18,7 @@ const boxes = new Map<number, PdfRect>([
   [4, visible],
   [6, { left: -300, bottom: -390, right: 300, top: 390 }],
 ]);
-const boxOf = (page: { pageObjectNumber: number }) => boxes.get(page.pageObjectNumber)!;
+const boxOf = (page: { objectNumber: number }) => boxes.get(page.objectNumber)!;
 
 /** Only the fields a test looks at; the codec leaves every other field alone. */
 const read = (value: object) => value as unknown as AnnotationDTO<PdfCoordinates>;

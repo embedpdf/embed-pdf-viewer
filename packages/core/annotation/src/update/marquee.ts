@@ -21,7 +21,7 @@ export function marqueePointer(
     return [{ ...model, draft: { kind: 'marquee', page: input.page, from: point, to: point } }, []];
   }
   if (model.draft?.kind !== 'marquee') return [model, []];
-  if (model.draft.page.pageObjectNumber !== input.page.pageObjectNumber) return [model, []]; // foreign frame — ignore
+  if (model.draft.page.objectNumber !== input.page.objectNumber) return [model, []]; // foreign frame — ignore
   if (phase === 'move') {
     return [{ ...model, draft: { ...model.draft, to: point } }, []];
   }
@@ -53,12 +53,12 @@ export function annotsInBox(
   inert?: ReadonlySet<Id>,
   view?: ViewEnv,
 ): Id[] {
-  const pageObjectNumber = page.pageObjectNumber;
+  const pageObjectNumber = page.objectNumber;
   const box = rectFromPoints(from, to);
   return model.order.filter((id) => {
     const annotation = model.byId[id];
     if (
-      annotation?.page.pageObjectNumber !== pageObjectNumber ||
+      annotation?.page.objectNumber !== pageObjectNumber ||
       inert?.has(id) ||
       !isSelectable(model, id)
     )

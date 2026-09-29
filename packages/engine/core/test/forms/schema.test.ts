@@ -8,7 +8,6 @@ import {
 import type { FormFieldDTO, FormSnapshot } from '../../src/shared';
 
 const BASE = {
-  fieldObjectNumber: 6,
   origin: 'acroform',
   readOnly: false,
   required: false,
@@ -19,7 +18,7 @@ const BASE = {
 
 const RADIO: FormFieldDTO = {
   ...BASE,
-  ref: { kind: 'objectNumber', fieldObjectNumber: 6 },
+  ref: { kind: 'objectNumber', objectNumber: 6 },
   name: 'gender',
   family: 'radio',
   valueEntry: { kind: 'scalar', value: 'male' },
@@ -31,11 +30,11 @@ const RADIO: FormFieldDTO = {
     {
       ref: {
         kind: 'objectNumber',
-        page: { kind: 'objectNumber', pageObjectNumber: 3 },
-        annotObjectNumber: 8,
+        page: { kind: 'objectNumber', objectNumber: 3 },
+        objectNumber: 8,
       },
-      annotObjectNumber: 8,
-      page: { kind: 'objectNumber', pageObjectNumber: 3 },
+      objectNumber: 8,
+      page: { kind: 'objectNumber', objectNumber: 3 },
       onState: 'male',
       exportValue: 'male',
       checked: true,
@@ -44,11 +43,11 @@ const RADIO: FormFieldDTO = {
     {
       ref: {
         kind: 'objectNumber',
-        page: { kind: 'objectNumber', pageObjectNumber: 3 },
-        annotObjectNumber: 9,
+        page: { kind: 'objectNumber', objectNumber: 3 },
+        objectNumber: 9,
       },
-      annotObjectNumber: 9,
-      page: { kind: 'objectNumber', pageObjectNumber: 3 },
+      objectNumber: 9,
+      page: { kind: 'objectNumber', objectNumber: 3 },
       onState: 'female',
       exportValue: 'female',
       checked: false,
@@ -59,8 +58,7 @@ const RADIO: FormFieldDTO = {
 
 const LISTBOX: FormFieldDTO = {
   ...BASE,
-  ref: { kind: 'objectNumber', fieldObjectNumber: 9 },
-  fieldObjectNumber: 9,
+  ref: { kind: 'objectNumber', objectNumber: 9 },
   name: 'fruits',
   family: 'listbox',
   valueEntry: { kind: 'array', values: ['Apple', 'Cherry'] },
@@ -77,11 +75,11 @@ const LISTBOX: FormFieldDTO = {
     {
       ref: {
         kind: 'objectNumber',
-        page: { kind: 'objectNumber', pageObjectNumber: 3 },
-        annotObjectNumber: 9,
+        page: { kind: 'objectNumber', objectNumber: 3 },
+        objectNumber: 9,
       },
-      annotObjectNumber: 9,
-      page: { kind: 'objectNumber', pageObjectNumber: 3 },
+      objectNumber: 9,
+      page: { kind: 'objectNumber', objectNumber: 3 },
       rect: null,
     },
   ],

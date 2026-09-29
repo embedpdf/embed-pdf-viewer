@@ -1,0 +1,183 @@
+---
+title: Headless
+description: Build your own PDF viewer from plugins, components and hooks, in React, Vue, Svelte or Angular.
+---
+
+import { Cards, Card } from '@/components/docs/cards';
+
+{/* Served at `…/headless/<framework>` with NO trailing slash: a relative href
+    resolves against `…/headless/`, so pages are `quick-start`,
+    `viewing/stage`, `concepts/how-it-works`. */}
+
+# Build your own PDF viewer
+
+The headless packages give you everything a PDF viewer does, without a look of their own: pages
+that scroll and zoom, crisp rendering, text selection and search, annotations, forms and
+signatures. You build the interface in React, Vue, Svelte or Angular, and nothing appears on
+screen unless you put it there.
+
+<Engine local>
+
+```tsx
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
+import { Stage, stagePlugin } from '@embedpdf/react/stage';
+import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
+import { localEngine } from '@embedpdf/engine';
+
+const engine = localEngine();
+const plugins = [stagePlugin(), renderPlugin()];
+
+export function App() {
+  return (
+    <Viewer
+      engine={engine}
+      plugins={plugins}
+      initialDocuments={[{ source: { kind: 'url', url: '/contract.pdf' } }]}
+    >
+      <DocumentGate fallback={<p>Opening…</p>}>
+        <Stage style={{ height: 600 }}>{() => <RenderLayer />}</Stage>
+      </DocumentGate>
+    </Viewer>
+  );
+}
+```
+
+</Engine>
+
+<Engine cloud>
+
+```tsx
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
+import { Stage, stagePlugin } from '@embedpdf/react/stage';
+import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
+import { cloudEngine } from '@cloudpdf/engine';
+
+const engine = cloudEngine({ baseUrl: 'https://pdf.example.com' });
+const plugins = [stagePlugin(), renderPlugin()];
+
+export function App() {
+  return (
+    <Viewer
+      engine={engine}
+      plugins={plugins}
+      initialDocuments={[{ source: { kind: 'token', token: () => fetchDocumentToken('contract') } }]}
+    >
+      <DocumentGate fallback={<p>Opening…</p>}>
+        <Stage style={{ height: 600 }}>{() => <RenderLayer />}</Stage>
+      </DocumentGate>
+    </Viewer>
+  );
+}
+```
+
+</Engine>
+
+That's a complete viewer: the pages scroll, zoom with a pinch or Ctrl and the wheel, and stay sharp
+at every zoom. Everything else is a plugin you add, and a few lines of your own UI.
+
+## Headless or the ready-made Viewer?
+
+EmbedPDF comes in two forms, built on the same engine and plugins:
+
+- **The [Viewer](/docs/viewer)** is finished: a toolbar, sidebars, annotation tools and search,
+  ready in minutes. You configure it and theme it.
+- **Headless** is the parts: you decide what the toolbar looks like, where the search box goes, and
+  what happens when someone clicks an annotation.
+
+Choose headless when the viewer is part of your product's own interface. You can start with the
+Viewer and move to headless later: the plugins and their options are the same.
+
+## How it's put together
+
+A headless viewer has five parts. You meet them on every page:
+
+- **The engine** opens and reads PDF files. It runs in the browser, or on your server with
+  CloudPDF.
+- **`<Viewer>`** starts the engine, opens documents, and holds the plugins.
+- **Plugins** add one feature each: search, annotations, forms. Register the ones you need; the
+  rest never reach your bundle.
+- **Layers** draw inside each page: the page itself, the text selection, the annotations.
+- **Hooks** connect your own UI: `useSearch()` to search, `useSearchState()` to show the results,
+  `useSearchEvent()` to react when something happens.
+
+[How it works](concepts/how-it-works) explains each in a few minutes.
+
+## Every plugin
+
+Each plugin is one import line. Registering a plugin and importing its components come from the
+same place:
+
+| Plugin | What it gives you | Import from |
+| :-- | :-- | :-- |
+| [Stage](viewing/stage) | Scrolling, zoom, layouts, page navigation | `@embedpdf/react/stage` |
+| [Render](viewing/render) | Sharp pages at every zoom, deep-zoom tiles | `@embedpdf/react/render` |
+| [Links](viewing/links) | Clickable links to pages and websites | `@embedpdf/react/link` |
+| [Selection](text/selection) | Selecting and copying text | `@embedpdf/react/selection` |
+| [Search](text/search) | Finding text, and showing every match | `@embedpdf/react/search` |
+| [Annotations](annotations) | Highlights, notes, shapes, free text, and your own tools | `@embedpdf/react/annotation` |
+| [Stamps](annotations/stamps) | Libraries of stamps, placed by click or by code | `@embedpdf/react/stamp` |
+| [Measurements](annotations/measurements) | Distances, perimeters and areas at a real scale | `@embedpdf/react/measurement` |
+| [Redaction](annotations/redaction) | Removing content for good | `@embedpdf/react/redaction` |
+| [Forms](forms) | Filling and building PDF forms | `@embedpdf/react/form` |
+| [Signatures](forms/signatures) | Signing documents and checking signatures | `@embedpdf/react/signature` |
+| [Page edit](documents/pages) | Rotating, reordering, inserting and deleting pages | `@embedpdf/react/page-edit` |
+| [Metadata](documents/metadata) | A document's title, author and your own fields | `@embedpdf/react/metadata` |
+| [Actions](documents/actions) | What a PDF does by itself: buttons, scripts, printing | `@embedpdf/react/actions` |
+| [View manager](documents/tabs) | Several documents side by side | `@embedpdf/react/view-manager` |
+| [Interaction](ui/tools) | The active tool, cursors and touch | `@embedpdf/react/interaction` |
+| [Commands](ui/commands) | Named actions with labels, icons and shortcuts | `@embedpdf/react/commands` |
+| [Shell](ui/panels) | Which panels, dialogs and menus are open | `@embedpdf/react/shell` |
+| [Translations](ui/translations) | Your UI in the user's language | `@embedpdf/react/i18n` |
+
+## Local or cloud
+
+The same viewer runs on either engine. Only how you create the engine and open a document differs;
+every plugin, hook and component stays the same.
+
+<Engine local>
+
+The local engine runs in the browser: no server, no upload, and it works offline. It's the right
+choice when the user already has the file, or when the file may not leave their device.
+
+<CloudPdfCallout
+  title="Show a 500-page PDF before it downloads"
+  href="https://www.cloudpdf.com/docs/headless"
+  cta="Build your viewer on CloudPDF"
+>
+
+With the CloudPDF engine, the file stays on your server and pages arrive as images, so the first
+page shows at once, without downloading the whole PDF or the engine. Every call is checked on the
+server, several people can review one document together, and every change is stored as it's made.
+Your viewer stays the same: swap `localEngine()` for `cloudEngine()`.
+
+</CloudPdfCallout>
+
+</Engine>
+
+<Engine cloud>
+
+The CloudPDF engine keeps the file on your server. Pages arrive as images, so the first page
+shows at once; every call is checked against the user's token; and annotations and form values are
+stored as people make them, with everyone who has the document open seeing each other's changes.
+
+</Engine>
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Quick start"
+    description="A viewer with text selection, a zoom control and a highlighter, step by step."
+    href="quick-start"
+  />
+  <Card
+    title="Setup"
+    description="Install for your framework, create the engine, and render on the server."
+    href="setup"
+  />
+  <Card
+    title="How it works"
+    description="Plugins, hooks, layers, and which document a component talks to."
+    href="concepts/how-it-works"
+  />
+</Cards>

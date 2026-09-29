@@ -18,7 +18,7 @@ import { searchQueryOf, type SearchQuery } from './types';
 export function searchContentEpoch(manifest: DocumentManifest): string {
   let input = `${manifest.layoutVersion}`;
   for (const page of manifest.pages) {
-    input += `|${page.state.page.pageObjectNumber}:${page.cache.contentVersion}`;
+    input += `|${page.state.page.objectNumber}:${page.cache.contentVersion}`;
   }
   return fnv1a64(input);
 }

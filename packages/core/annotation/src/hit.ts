@@ -45,12 +45,12 @@ export type Target =
  *  Conversation-plane annotations (replies, review-status states) are culled
  *  here too — dialogue lives in the comments UI, never on the page. */
 export function paintOrder(model: Model, page: PageRef): Id[] {
-  const pageObjectNumber = page.pageObjectNumber;
+  const pageObjectNumber = page.objectNumber;
   const markup: Id[] = [];
   const other: Id[] = [];
   for (const id of model.order) {
     const annotation = model.byId[id];
-    if (!annotation || annotation.page.pageObjectNumber !== pageObjectNumber) continue;
+    if (!annotation || annotation.page.objectNumber !== pageObjectNumber) continue;
     if (!viewable(annotation.flags, model.selected.includes(id))) continue;
     if (isSubstrateOnly(annotation)) continue;
     (isMarkup(annotation.subtype) ? markup : other).push(id);
@@ -134,10 +134,10 @@ const inBounds = (annotation: ModelAnnotation, point: Point, view: ViewEnv | und
  * works from anywhere inside its visible outline (not only on a member).
  */
 function selectionUnionBounds(model: Model, page: PageRef, view: ViewEnv | undefined): Rect | null {
-  const pageObjectNumber = page.pageObjectNumber;
+  const pageObjectNumber = page.objectNumber;
   const selection = model.selected.filter(
     (id) =>
-      model.byId[id]?.page.pageObjectNumber === pageObjectNumber &&
+      model.byId[id]?.page.objectNumber === pageObjectNumber &&
       isSelectable(model, id) &&
       canMove(model, id),
   );
@@ -153,11 +153,11 @@ function selectionUnionBounds(model: Model, page: PageRef, view: ViewEnv | undef
 /** The axis-aligned union of the selection bounds of every selected annotation on
  *  a page (no movable/lock filter) — the box group chrome + group rotate use. */
 export function groupUnionBounds(model: Model, page: PageRef, view?: ViewEnv): Rect | null {
-  const pageObjectNumber = page.pageObjectNumber;
+  const pageObjectNumber = page.objectNumber;
   const corners: Point[] = [];
   for (const id of model.selected) {
     const annotation = model.byId[id];
-    if (!annotation || annotation.page.pageObjectNumber !== pageObjectNumber) continue;
+    if (!annotation || annotation.page.objectNumber !== pageObjectNumber) continue;
     corners.push(...annotationSelectionFrame(annotation, view).corners);
   }
   return corners.length ? unionRect(corners) : null;
@@ -181,10 +181,10 @@ export function hitTest(
   inert?: ReadonlySet<Id>,
   view?: ViewEnv,
 ): Target {
-  const pageObjectNumber = page.pageObjectNumber;
+  const pageObjectNumber = page.objectNumber;
   if (model.selected.length === 1 && isSelectable(model, model.selected[0])) {
     const annotation = model.byId[model.selected[0]];
-    if (annotation.page.pageObjectNumber === pageObjectNumber) {
+    if (annotation.page.objectNumber === pageObjectNumber) {
       // The rotate knob (checked first — it floats outside the box, clear of
       // the handles), placed on the projected selection frame so it sits exactly
       // where the chrome drew it — a screen-anchored body rotates too (the
@@ -268,7 +268,7 @@ export function hitTest(
           return {
             kind: 'rotate',
             ids: model.selected.filter(
-              (id) => model.byId[id]?.page.pageObjectNumber === pageObjectNumber,
+              (id) => model.byId[id]?.page.objectNumber === pageObjectNumber,
             ),
             pivot,
           };
@@ -286,7 +286,7 @@ export function hitTest(
             return {
               kind: 'group-handle',
               ids: model.selected.filter(
-                (id) => model.byId[id]?.page.pageObjectNumber === pageObjectNumber,
+                (id) => model.byId[id]?.page.objectNumber === pageObjectNumber,
               ),
               handle: handle.id,
               cursor: handle.cursor,

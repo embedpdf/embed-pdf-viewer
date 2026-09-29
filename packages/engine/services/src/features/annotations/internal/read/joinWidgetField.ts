@@ -38,7 +38,7 @@ export function joinWidgetFieldNumbers(
     const model = acquireFormModel(runtime, session);
     const fieldIndex = runtime.fn.EPDFForm_GetFieldIndexForWidget(
       model,
-      annotation.ref.annotObjectNumber,
+      annotation.ref.objectNumber,
     );
     const fieldObjectNumber =
       fieldIndex < 0 ? 0 : runtime.fn.EPDFForm_GetFieldObjNum(model, fieldIndex);
@@ -48,7 +48,7 @@ export function joinWidgetFieldNumbers(
       annotation.fieldFamily = 'unknown';
       continue;
     }
-    annotation.field = { kind: 'objectNumber', fieldObjectNumber };
+    annotation.field = { kind: 'objectNumber', objectNumber: fieldObjectNumber };
     annotation.fieldFamily =
       FAMILY_BY_CODE[runtime.fn.EPDFForm_GetFieldFamily(model, fieldIndex)] ?? 'unknown';
   }

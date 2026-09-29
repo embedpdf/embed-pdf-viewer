@@ -352,7 +352,7 @@ describe('@embedpdf/default-stamps', () => {
         true,
       );
       // Page order == registry order: the n-th asset is the n-th page.
-      const pageObjectNumbers = assets.map((asset) => asset.page.pageObjectNumber);
+      const pageObjectNumbers = assets.map((asset) => asset.page.objectNumber);
       expect([...new Set(pageObjectNumbers)]).toHaveLength(pageObjectNumbers.length);
       for (const asset of assets) {
         expect(asset.size.width).toBeGreaterThan(0);

@@ -129,7 +129,7 @@ export type SetValueResult = FormCommitResult;
 export type FormWidgetItem = FillItem;
 
 /** A widget address for lookups: its annotation ref, or its object number alone. */
-export type WidgetAddress = AnnotationRef | { annotObjectNumber: number };
+export type WidgetAddress = AnnotationRef | { objectNumber: number };
 
 export interface FormFilter {
   readonly family?: FormFieldFamily;
@@ -164,7 +164,7 @@ export const fieldRef = {
   byName: (name: string): FormFieldRef => ({ kind: 'fqn', name }),
   byObjectNumber: (fieldObjectNumber: number): FormFieldRef => ({
     kind: 'objectNumber',
-    fieldObjectNumber,
+    objectNumber: fieldObjectNumber,
   }),
 };
 

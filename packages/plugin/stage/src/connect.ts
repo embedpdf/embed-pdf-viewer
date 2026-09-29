@@ -61,8 +61,8 @@ function feedPageState(
       const current = snapshot();
       return current === null
         ? 'unplaced'
-        : `${current.currentPage?.pageObjectNumber ?? -1}|${current.visiblePages
-            .map((page) => page.pageObjectNumber)
+        : `${current.currentPage?.objectNumber ?? -1}|${current.visiblePages
+            .map((page) => page.objectNumber)
             .sort((left, right) => left - right)
             .join(',')}`;
     },

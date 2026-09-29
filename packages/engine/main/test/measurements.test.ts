@@ -287,7 +287,7 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
       );
       const doc = await open(bytes);
       try {
-        const pageObjectNumber = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
+        const pageObjectNumber = (await doc.pages.list()).pages[0].ref.objectNumber;
         const annotations = (await doc.page(toPageRef(pageObjectNumber)).annotations.list())
           .annotations;
         const dimensions = annotations.filter((a) =>

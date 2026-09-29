@@ -1767,7 +1767,7 @@ export class WorkerHost {
       // No session carried this document to the boundary, so the target
       // converts here, on the page it opened.
       const { raster } = await new PageRenderReader(this.runtime, session).render(
-        page.ref.pageObjectNumber,
+        page.ref.objectNumber,
         renderOptionsInFileSpace(req.options ?? {}, () => page.pdfCropBox),
         signal,
         this.renderSlices,
@@ -2076,7 +2076,6 @@ export class WorkerHost {
     const { field } = new FormMutator(this.runtime, session).setSignatureAppearance(
       req.ref,
       new Uint8Array(req.pdf),
-      req.pageIndex,
       signal,
     );
     const meta = formMutationMeta(session, [field.ref], field.widgets);

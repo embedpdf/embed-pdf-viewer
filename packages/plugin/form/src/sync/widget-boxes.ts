@@ -45,7 +45,7 @@ export function createWidgetBoxesMirror(ctx: FormContext): PageMirror<WidgetBoxe
       const boxes: Record<number, Box> = {};
       for (const record of annotations) {
         if (record.subtype !== 'widget' || record.ref.kind !== 'objectNumber') continue;
-        boxes[record.ref.annotObjectNumber] = record.rect;
+        boxes[record.ref.objectNumber] = record.rect;
       }
       return boxes;
     },

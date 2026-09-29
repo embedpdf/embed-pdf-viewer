@@ -44,7 +44,7 @@ export function useRedactionEvent<T>(
 
 /** The pending marks (optionally of one page), reactive against the annotation plane. */
 export function usePendingRedactions(filter?: RedactionMarkFilter): readonly RedactionMark[] {
-  const pageObjectNumber = filter?.page?.pageObjectNumber;
+  const pageObjectNumber = filter?.page?.objectNumber;
   const stable = useMemo(() => filter, [pageObjectNumber]);
   return useSelector(RedactionToken, (redaction) => redaction.listPending(stable), pendingEqual);
 }

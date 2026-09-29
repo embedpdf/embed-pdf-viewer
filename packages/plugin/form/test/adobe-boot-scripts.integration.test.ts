@@ -60,9 +60,7 @@ describe('Adobe boot-script boilerplate (i-140, hybrid-XFA AcroForm)', () => {
 
       // And the value really landed engine-side.
       const after = await doc.forms.list();
-      const same = after.fields.find(
-        (field) => field.fieldObjectNumber === text.fieldObjectNumber,
-      )!;
+      const same = after.fields.find((field) => field.name === text.name)!;
       expect(same.valueEntry).toEqual({ kind: 'scalar', value: 'FAMILY-NAME' });
     } finally {
       await doc?.close().catch(() => {});

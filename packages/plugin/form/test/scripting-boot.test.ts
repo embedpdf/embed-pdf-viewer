@@ -52,8 +52,7 @@ function failingBootSandbox(): ScriptSandbox {
 
 function textField(objnum: number, name: string) {
   return {
-    ref: { kind: 'objectNumber' as const, fieldObjectNumber: objnum },
-    fieldObjectNumber: objnum,
+    ref: { kind: 'objectNumber' as const, objectNumber: objnum },
     name,
     family: 'text' as const,
     origin: 'acroform' as const,
@@ -62,7 +61,7 @@ function textField(objnum: number, name: string) {
     noExport: false,
     alternateName: null,
     mappingName: null,
-    widgets: [{ annotObjectNumber: objnum + 100, page: toPageRef(3) }],
+    widgets: [{ objectNumber: objnum + 100, page: toPageRef(3) }],
     value: '',
     defaultValue: '',
     valueEntry: { kind: 'none' as const },
@@ -129,14 +128,14 @@ describe('FormScriptingController — boot failures degrade, never brick', () =>
     });
 
     const first = await controller.commit(
-      { kind: 'objectNumber', fieldObjectNumber: 7 },
+      { kind: 'objectNumber', objectNumber: 7 },
       { value: 'HELLO' },
     );
     expect(first.status).toBe('applied');
     expect(applied[0]).toEqual([
       {
         kind: 'setValue',
-        ref: { kind: 'objectNumber', fieldObjectNumber: 7 },
+        ref: { kind: 'objectNumber', objectNumber: 7 },
         value: { value: 'HELLO' },
       },
     ]);
@@ -147,7 +146,7 @@ describe('FormScriptingController — boot failures degrade, never brick', () =>
 
     // Boot ran once; the next commit neither retries nor fails.
     const second = await controller.commit(
-      { kind: 'objectNumber', fieldObjectNumber: 7 },
+      { kind: 'objectNumber', objectNumber: 7 },
       { value: 'WORLD' },
     );
     expect(second.status).toBe('applied');
@@ -172,7 +171,7 @@ describe('FormScriptingController — boot failures degrade, never brick', () =>
       budget: realm.budget,
     });
     const result = await controller.commit(
-      { kind: 'objectNumber', fieldObjectNumber: 7 },
+      { kind: 'objectNumber', objectNumber: 7 },
       { value: 'HELLO' },
     );
     expect(result.status).toBe('applied');

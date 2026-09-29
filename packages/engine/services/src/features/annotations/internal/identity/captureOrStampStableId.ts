@@ -21,10 +21,10 @@ export function captureOrStampStableId(
 ): AnnotationStableId {
   const { fn, mem } = runtime;
   const objNum = fn.EPDFAnnot_GetObjectNumber(annotPtr);
-  if (objNum > 0) return { kind: 'objectNumber', value: objNum };
+  if (objNum > 0) return { kind: 'objectNumber', objectNumber: objNum };
   const nm = readAnnotString(fn, mem, annotPtr, 'NM');
-  if (nm !== null && nm.length > 0) return { kind: 'nm', value: nm };
+  if (nm !== null && nm.length > 0) return { kind: 'nm', nm };
   const minted = generateUuid();
   writeAnnotationNm(fn, mem, annotPtr, minted);
-  return { kind: 'nm', value: minted };
+  return { kind: 'nm', nm: minted };
 }

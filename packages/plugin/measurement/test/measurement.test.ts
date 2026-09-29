@@ -52,7 +52,7 @@ function harness(
     })),
     onDraftCaptured: draftCaptured.on,
     getRaw: () => null,
-    create: vi.fn(async () => ({ kind: 'objectNumber', annotObjectNumber: 9, page: PAGE })),
+    create: vi.fn(async () => ({ kind: 'objectNumber', objectNumber: 9, page: PAGE })),
   };
   const interaction = { activateTool: vi.fn() };
   let engineViewports: PageMeasurementViewport[] = options.viewports ?? [];

@@ -177,12 +177,9 @@ export function runSignatureConformance(
         const fields = await doc.forms.list();
         const text = fields.fields.find((f) => f.name === fixture.textField)!;
         expect(text).toBeTruthy();
-        await doc.forms.setValue(
-          { kind: 'objectNumber', fieldObjectNumber: text.fieldObjectNumber },
-          {
-            value: 'unsaved',
-          },
-        );
+        await doc.forms.setValue(text.ref, {
+          value: 'unsaved',
+        });
         const again = await doc.signatures.list();
         expect(again.revisions).toEqual(snapshot.revisions);
         expect(again.signatures.map((s) => [s.coverage, s.revisionIndex, s.byteRange])).toEqual(
@@ -799,7 +796,7 @@ function runSigningTests(
       const artwork = await opts.fixtures.artwork.bytes();
       const prepared = await doc.signatures.prepare({
         field: sigRef(),
-        appearance: { pdf: artwork, pageIndex: 0 },
+        appearance: { pdf: artwork },
       });
       const result = await doc.signatures.complete({
         signingId: prepared.signingId,
@@ -813,7 +810,7 @@ function runSigningTests(
       const widget = annots.annotations.find(
         (a) =>
           a.ref.kind === 'objectNumber' &&
-          a.ref.annotObjectNumber === result.signature.widget!.annotObjectNumber,
+          a.ref.objectNumber === result.signature.widget!.objectNumber,
       );
       expect(widget).toBeTruthy();
     } finally {

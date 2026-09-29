@@ -27,11 +27,11 @@ export function resolveAnnotPtr(
   const { fn, mem } = runtime;
   switch (ref.kind) {
     case 'objectNumber': {
-      const annotPtr = fn.EPDFPage_GetAnnotByObjectNumber(pagePtr, ref.annotObjectNumber);
+      const annotPtr = fn.EPDFPage_GetAnnotByObjectNumber(pagePtr, ref.objectNumber);
       if (!annotPtr) {
         throw new EngineError(
           EngineErrorCode.NotFound,
-          `no annotation with object number ${ref.annotObjectNumber} on page ${ref.page.pageObjectNumber}`,
+          `no annotation with object number ${ref.objectNumber} on page ${ref.page.objectNumber}`,
         );
       }
       return annotPtr;
@@ -43,7 +43,7 @@ export function resolveAnnotPtr(
         if (!annotPtr) {
           throw new EngineError(
             EngineErrorCode.NotFound,
-            `no annotation with /NM '${ref.nm}' on page ${ref.page.pageObjectNumber}`,
+            `no annotation with /NM '${ref.nm}' on page ${ref.page.objectNumber}`,
           );
         }
         return annotPtr;
@@ -57,7 +57,7 @@ export function resolveAnnotPtr(
       if (!annotPtr) {
         throw new EngineError(
           EngineErrorCode.InvalidReference,
-          `index ${ref.index} out of range on page ${ref.page.pageObjectNumber}`,
+          `index ${ref.index} out of range on page ${ref.page.objectNumber}`,
         );
       }
       return annotPtr;

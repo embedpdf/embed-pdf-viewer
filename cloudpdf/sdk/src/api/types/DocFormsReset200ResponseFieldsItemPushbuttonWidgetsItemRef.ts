@@ -11,13 +11,13 @@ export namespace DocFormsReset200ResponseFieldsItemPushbuttonWidgetsItemRef {
     export interface ObjectNumber {
         kind: "objectNumber";
         page: DocFormsReset200ResponseFieldsItemPushbuttonWidgetsItemRefObjectNumber.Page;
-        annotObjectNumber: number;
+        objectNumber: number;
     }
 
     export namespace DocFormsReset200ResponseFieldsItemPushbuttonWidgetsItemRefObjectNumber {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -37,7 +37,7 @@ export namespace DocFormsReset200ResponseFieldsItemPushbuttonWidgetsItemRef {
     export namespace DocFormsReset200ResponseFieldsItemPushbuttonWidgetsItemRefNm {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -58,7 +58,7 @@ export namespace DocFormsReset200ResponseFieldsItemPushbuttonWidgetsItemRef {
     export namespace DocFormsReset200ResponseFieldsItemPushbuttonWidgetsItemRefIndex {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -77,7 +77,7 @@ export namespace DocFormsReset200ResponseFieldsItemPushbuttonWidgetsItemRef {
         export namespace Revision {
             export interface Page {
                 kind: Page.Kind;
-                pageObjectNumber: number;
+                objectNumber: number;
             }
 
             export namespace Page {

@@ -11,13 +11,13 @@ export namespace DocRedactionsApplyRequestAnnotationsItem {
     export interface ObjectNumber {
         kind: "objectNumber";
         page: DocRedactionsApplyRequestAnnotationsItemObjectNumber.Page;
-        annotObjectNumber: number;
+        objectNumber: number;
     }
 
     export namespace DocRedactionsApplyRequestAnnotationsItemObjectNumber {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -37,7 +37,7 @@ export namespace DocRedactionsApplyRequestAnnotationsItem {
     export namespace DocRedactionsApplyRequestAnnotationsItemNm {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -58,7 +58,7 @@ export namespace DocRedactionsApplyRequestAnnotationsItem {
     export namespace DocRedactionsApplyRequestAnnotationsItemIndex {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -77,7 +77,7 @@ export namespace DocRedactionsApplyRequestAnnotationsItem {
         export namespace Revision {
             export interface Page {
                 kind: Page.Kind;
-                pageObjectNumber: number;
+                objectNumber: number;
             }
 
             export namespace Page {

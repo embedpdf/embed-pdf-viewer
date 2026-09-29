@@ -10,7 +10,7 @@ export interface DocPagesSetScale200Response {
 export namespace DocPagesSetScale200Response {
     export interface Page {
         kind: Page.Kind;
-        pageObjectNumber: number;
+        objectNumber: number;
     }
 
     export namespace Page {
@@ -50,7 +50,7 @@ export namespace DocPagesSetScale200Response {
                 export namespace Item {
                     export interface Page {
                         kind: Page.Kind;
-                        pageObjectNumber: number;
+                        objectNumber: number;
                     }
 
                     export namespace Page {

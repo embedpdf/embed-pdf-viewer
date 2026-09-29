@@ -119,7 +119,7 @@ export function createCrud(
       throw new PluginError(
         'not-found',
         'annotation',
-        `page ${input.page.pageObjectNumber} is not in this document`,
+        `page ${input.page.objectNumber} is not in this document`,
       );
     }
     const staged: { subtype: Subtype; geometry: ModelGeometry } = geometryFromInput(input);

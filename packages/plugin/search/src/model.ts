@@ -52,7 +52,7 @@ export function appendHits(
   if (hits.length === 0) return { ...state, progress };
   const hitsByPage: Record<number, readonly SearchHit[]> = { ...state.hitsByPage };
   for (const hit of hits) {
-    const pageObjectNumber = hit.page.pageObjectNumber;
+    const pageObjectNumber = hit.page.objectNumber;
     hitsByPage[pageObjectNumber] = [...(hitsByPage[pageObjectNumber] ?? []), hit];
   }
   return {

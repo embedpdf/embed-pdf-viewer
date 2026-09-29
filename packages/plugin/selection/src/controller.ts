@@ -194,7 +194,7 @@ export function createSelectionController(
       }
       const from = i === startPageIndex ? start.glyph : 0;
       const to = i === endPageIndex ? end.glyph : textLayout.charCount - 1;
-      segments[page.pageObjectNumber] = textLayout
+      segments[page.objectNumber] = textLayout
         .segments({ start: from, count: to - from + 1 })
         .map((segment) => selectionSegmentOf(segment));
     }
@@ -210,11 +210,11 @@ export function createSelectionController(
   function buildReadModel(current: SelectionState): ReadModel {
     const pagesWithSegments = Object.keys(current.segments)
       .map((key) => toPageRef(Number(key)))
-      .filter((page) => (current.segments[page.pageObjectNumber]?.length ?? 0) > 0)
+      .filter((page) => (current.segments[page.objectNumber]?.length ?? 0) > 0)
       .sort((left, right) => pageIndexOf(left) - pageIndexOf(right));
     const snapshotPages = pagesWithSegments.map((page) => ({
       page,
-      segments: current.segments[page.pageObjectNumber],
+      segments: current.segments[page.objectNumber],
     }));
     const pages = pagesWithSegments.length ? pagesWithSegments : EMPTY_PAGES;
     if (!current.selection) {
@@ -244,11 +244,11 @@ export function createSelectionController(
     // Prefer the gesture's end page; while its geometry is still loading,
     // fall back to the last page (document order) with materialized
     // segments, so the anchor never jumps backwards mid-drag.
-    const endBounds = unionOf(current.segments[end.page.pageObjectNumber]);
+    const endBounds = unionOf(current.segments[end.page.objectNumber]);
     let anchor: SelectionAnchor | null = endBounds ? { page: end.page, bounds: endBounds } : null;
     const last = pagesWithSegments[pagesWithSegments.length - 1];
     if (!anchor && last) {
-      anchor = { page: last, bounds: unionOf(current.segments[last.pageObjectNumber])! };
+      anchor = { page: last, bounds: unionOf(current.segments[last.objectNumber])! };
     }
     return { snapshot, pages, anchor };
   }
@@ -258,7 +258,7 @@ export function createSelectionController(
     position: GlyphPosition,
     which: 'start' | 'end',
   ): SelectionEndpoint | null {
-    const segments = segmentsByPage[position.page.pageObjectNumber] ?? EMPTY_SEGMENTS;
+    const segments = segmentsByPage[position.page.objectNumber] ?? EMPTY_SEGMENTS;
     if (!segments.length) return null;
     const segment = which === 'start' ? segments[0] : segments[segments.length - 1];
     // Anchor the endpoint to the boundary glyph's own oriented cell so caret
@@ -394,7 +394,7 @@ export function createSelectionController(
    *  one fetch. Rejections are evicted: a refused or failed read must not
    *  poison the cache for a later authorized call. */
   function pageText(page: PageRef): Promise<PageTextSnapshot> {
-    const key = page.pageObjectNumber;
+    const key = page.objectNumber;
     const cached = textSnapshots.get(key);
     if (cached) return cached;
     const pending = Promise.resolve(ctx.doc.page(page).text.get());
@@ -461,7 +461,7 @@ export function createSelectionController(
    *  through the layout key; a deleted endpoint page clears through
    *  recompute's registry check. */
   function onPagesUpdated(): void {
-    const alive = new Set((ctx.document()?.pages ?? []).map((info) => info.ref.pageObjectNumber));
+    const alive = new Set((ctx.document()?.pages ?? []).map((info) => info.ref.objectNumber));
     for (const pageObjectNumber of [...textSnapshots.keys()]) {
       if (!alive.has(pageObjectNumber)) textSnapshots.delete(pageObjectNumber);
     }
@@ -473,7 +473,7 @@ export function createSelectionController(
    *  into a character space that no longer exists, so it clears. The
    *  geometry mirror re-reads those pages itself. */
   function onContentChanged(pages: readonly PageRef[]): void {
-    for (const page of pages) textSnapshots.delete(page.pageObjectNumber);
+    for (const page of pages) textSnapshots.delete(page.objectNumber);
     ctx.state.update(clearSelection);
   }
 
@@ -494,8 +494,8 @@ export function createSelectionController(
     getSnapshot: () => readModel().snapshot,
     getRange: () => readModel().snapshot.range,
     listSelectedPages: () => readModel().pages,
-    listSegments: (page) => state().segments[page.pageObjectNumber] ?? EMPTY_SEGMENTS,
-    listRects: (page) => rectsOf(page.pageObjectNumber),
+    listSegments: (page) => state().segments[page.objectNumber] ?? EMPTY_SEGMENTS,
+    listRects: (page) => rectsOf(page.objectNumber),
     getAnchor: () => readModel().anchor,
     readText: (options) => {
       const range = readModel().snapshot.range;

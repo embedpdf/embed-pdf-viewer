@@ -94,7 +94,7 @@ describe('pending changes', () => {
   });
 
   it('followRecord moves changes, the vector preference and the text range; pointers follow', () => {
-    const REF = { kind: 'objectNumber', page: record('x').page, annotObjectNumber: 9 } as const;
+    const REF = { kind: 'objectNumber', page: record('x').page, objectNumber: 9 } as const;
     const state = followRecord(
       {
         ...withPending([

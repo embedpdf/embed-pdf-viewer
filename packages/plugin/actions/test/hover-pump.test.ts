@@ -8,7 +8,7 @@ import type { ActionTrigger, ActionTriggerResult } from '../src/host-contract';
 const ref = (objectNumber: number): AnnotationRef => ({
   kind: 'objectNumber',
   page: toPageRef(1),
-  annotObjectNumber: objectNumber,
+  objectNumber,
 });
 const target = (objectNumber: number, events?: HoverTarget['events']): HoverTarget => ({
   ref: ref(objectNumber),
@@ -22,7 +22,7 @@ function fakeDispatch() {
   const pending: Array<() => void> = [];
   const dispatch = (trigger: ActionTrigger): Promise<ActionTriggerResult> => {
     if (trigger.scope !== 'annotation') throw new Error('unexpected scope');
-    const objectNumber = trigger.ref.kind === 'objectNumber' ? trigger.ref.annotObjectNumber : -1;
+    const objectNumber = trigger.ref.kind === 'objectNumber' ? trigger.ref.objectNumber : -1;
     submitted.push(`${trigger.event === 'cursorEnter' ? 'E' : 'X'}:${objectNumber}`);
     return new Promise((resolve) =>
       pending.push(() => resolve({ status: 'executed', steps: [], diagnostics: [] })),

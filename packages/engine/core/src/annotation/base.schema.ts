@@ -107,8 +107,8 @@ export const BlendModeSchema: z.ZodType<BlendMode> = z.enum([
 export const AnnotationStableIdSchema: z.ZodType<AnnotationStableId> = z.discriminatedUnion(
   'kind',
   [
-    z.object({ kind: z.literal('objectNumber'), value: z.number().int().nonnegative() }),
-    z.object({ kind: z.literal('nm'), value: z.string() }),
+    z.object({ kind: z.literal('objectNumber'), objectNumber: z.number().int().nonnegative() }),
+    z.object({ kind: z.literal('nm'), nm: z.string() }),
   ],
 );
 
@@ -122,7 +122,7 @@ export const AnnotationRefSchema: z.ZodType<AnnotationRef> = z.discriminatedUnio
   z.object({
     kind: z.literal('objectNumber'),
     page: PageRefSchema,
-    annotObjectNumber: z.number().int().positive(),
+    objectNumber: z.number().int().positive(),
   }),
   z.object({
     kind: z.literal('nm'),

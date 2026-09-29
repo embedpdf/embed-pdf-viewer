@@ -63,7 +63,7 @@ export function createPointer(
     phase !== 'down' &&
     model.draft &&
     'page' in model.draft &&
-    model.draft.page.pageObjectNumber !== input.page.pageObjectNumber
+    model.draft.page.objectNumber !== input.page.objectNumber
   )
     return [model, []];
   // Shapes can't be drawn past the page edge — the pointer pins to it.
@@ -89,7 +89,7 @@ export function createPointer(
         model.draft?.kind === 'create-poly' &&
         model.draft.subtype === subtype &&
         model.draft.preset === preset &&
-        model.draft.page.pageObjectNumber === input.page.pageObjectNumber
+        model.draft.page.objectNumber === input.page.objectNumber
       ) {
         return [
           {
@@ -140,7 +140,7 @@ export function createPointer(
           ? model.draft?.kind === 'create-ink' &&
             model.draft.subtype === subtype &&
             model.draft.preset === preset &&
-            model.draft.page.pageObjectNumber === input.page.pageObjectNumber
+            model.draft.page.objectNumber === input.page.objectNumber
             ? { ...model.draft, strokes: [...model.draft.strokes, [input.point]] }
             : {
                 kind: 'create-ink',

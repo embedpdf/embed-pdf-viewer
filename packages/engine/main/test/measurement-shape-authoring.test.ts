@@ -36,7 +36,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
       try {
         const pages = (await doc.pages.list()).pages;
         const page = pages[0];
-        const pageObjectNumber = page.ref.pageObjectNumber;
+        const pageObjectNumber = page.ref.objectNumber;
         const { ctx, annotation } = await annotationShell(doc, pages);
         cleanups.push(() => ctx.dispose());
         const scale = measureFromKnownLength(100, { value: 5, unit: 'm' });
@@ -156,7 +156,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
           const reopened = await engine.open(source, { scope: ['*'] });
           try {
             const reopenedPageObjectNumber = (await reopened.pages.list()).pages[0].ref
-              .pageObjectNumber;
+              .objectNumber;
             const list = (
               await reopened.page(toPageRef(reopenedPageObjectNumber)).annotations.list()
             ).annotations;

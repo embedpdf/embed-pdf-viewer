@@ -33,7 +33,7 @@ export const initialSignatureState = (): SignatureState => ({
 
 export const sameFieldRef = (left: FormFieldRef, right: FormFieldRef): boolean =>
   left.kind === 'objectNumber' && right.kind === 'objectNumber'
-    ? left.fieldObjectNumber === right.fieldObjectNumber
+    ? left.objectNumber === right.objectNumber
     : left.kind === 'fqn' && right.kind === 'fqn'
       ? left.name === right.name
       : false;

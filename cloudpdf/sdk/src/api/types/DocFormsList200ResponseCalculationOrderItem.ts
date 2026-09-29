@@ -9,7 +9,7 @@ export type DocFormsList200ResponseCalculationOrderItem =
 export namespace DocFormsList200ResponseCalculationOrderItem {
     export interface ObjectNumber {
         kind: "objectNumber";
-        fieldObjectNumber: number;
+        objectNumber: number;
     }
 
     export interface Fqn {

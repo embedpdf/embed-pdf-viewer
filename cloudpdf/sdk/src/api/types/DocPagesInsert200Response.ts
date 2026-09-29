@@ -14,7 +14,7 @@ export namespace DocPagesInsert200Response {
     export namespace InsertedPages {
         export interface Item {
             kind: Item.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Item {
@@ -50,7 +50,7 @@ export namespace DocPagesInsert200Response {
             export namespace Item {
                 export interface Ref {
                     kind: Ref.Kind;
-                    pageObjectNumber: number;
+                    objectNumber: number;
                 }
 
                 export namespace Ref {
@@ -159,7 +159,7 @@ export namespace DocPagesInsert200Response {
                 export namespace Item {
                     export interface Page {
                         kind: Page.Kind;
-                        pageObjectNumber: number;
+                        objectNumber: number;
                     }
 
                     export namespace Page {

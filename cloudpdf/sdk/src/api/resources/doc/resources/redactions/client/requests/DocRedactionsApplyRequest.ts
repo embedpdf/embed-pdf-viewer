@@ -24,7 +24,7 @@ export namespace DocRedactionsApplyRequest {
     export namespace Pages {
         export interface Item {
             kind: Item.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Item {

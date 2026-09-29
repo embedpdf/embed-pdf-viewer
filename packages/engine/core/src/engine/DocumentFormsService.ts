@@ -37,7 +37,7 @@ export interface FormRepairOptions {
  * fields hold the values and widget annotations are their page-scoped
  * views. Filling mutates the field plane; rendering only ever reads the
  * widget plane (through the annotation subsystem — join widgets to
- * annotations via `FormWidget.annotObjectNumber`).
+ * annotations via `FormWidget.ref`).
  *
  * Reads are gated by `doc.forms.read`, value writes and imports by
  * `doc.forms.fill`, and repair by `doc.forms.modify`. On layer documents

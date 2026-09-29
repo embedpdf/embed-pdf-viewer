@@ -41,7 +41,7 @@ export function createThreadIndex(
   /** Value-stable layout key: display order is all the sort consumes, so
    *  the memo must survive hosts that rebuild the pages array per read. */
   const layoutSignature = (): string =>
-    (ctx.document()?.pages ?? []).map((pageInfo) => pageInfo.ref.pageObjectNumber).join(',');
+    (ctx.document()?.pages ?? []).map((pageInfo) => pageInfo.ref.objectNumber).join(',');
 
   const computeIndex = (): ThreadsIndex => {
     const model = store.model();
@@ -57,10 +57,10 @@ export function createThreadIndex(
     // Display order: page position first (live layout), then from the top of
     // the page down, then creation.
     const pages = ctx.document()?.pages ?? [];
-    const displayIndex = new Map(pages.map((pageInfo, i) => [pageInfo.ref.pageObjectNumber, i]));
+    const displayIndex = new Map(pages.map((pageInfo, i) => [pageInfo.ref.objectNumber, i]));
     threads.sort((left, right) => {
-      const pa = displayIndex.get(left.page.pageObjectNumber) ?? Number.MAX_SAFE_INTEGER;
-      const pb = displayIndex.get(right.page.pageObjectNumber) ?? Number.MAX_SAFE_INTEGER;
+      const pa = displayIndex.get(left.page.objectNumber) ?? Number.MAX_SAFE_INTEGER;
+      const pb = displayIndex.get(right.page.objectNumber) ?? Number.MAX_SAFE_INTEGER;
       if (pa !== pb) return pa - pb;
       if (left.root.rect.y !== right.root.rect.y) return left.root.rect.y - right.root.rect.y;
       const leftCreated = left.root.createdAt;

@@ -1639,10 +1639,9 @@ const SignatureSignerInputSchema = z.object({
   signedAt: IsoDateTimeSchema.optional(),
 });
 
-/** The JSON part of a visual signature fill (multipart envelope): which resource part holds the PDF, and its page. */
+/** The JSON part of a visual signature fill (multipart envelope): which resource part holds the one-page PDF. */
 export const SignatureAppearanceBodySchema = z.object({
   resource: z.string().min(1),
-  pageIndex: z.number().int().nonnegative().optional(),
 });
 export type SignatureAppearanceBody = z.infer<typeof SignatureAppearanceBodySchema>;
 
@@ -1660,9 +1659,7 @@ export const SignaturePrepareBodySchema = z.object({
   signer: SignatureSignerInputSchema.optional(),
   certify: z.object({ permission: DocMdpPermissionSchema }).optional(),
   lock: FieldLockSpecSchema.optional(),
-  appearance: z
-    .object({ resource: z.string().min(1), pageIndex: z.number().int().nonnegative().optional() })
-    .optional(),
+  appearance: z.object({ resource: z.string().min(1) }).optional(),
 });
 export type SignaturePrepareBody = z.infer<typeof SignaturePrepareBodySchema>;
 

@@ -134,14 +134,14 @@ export function createGhost(
 
   const api = {
     hoverGhostAt: (toolId: string, page: PageRef, point: Point, displayRotation?: number) =>
-      hoverAt(toolId, page.pageObjectNumber, point, displayRotation),
+      hoverAt(toolId, page.objectNumber, point, displayRotation),
     clearGhost,
     setPlacementPreview: (toolId: string, page: PageRef, box: Rect) =>
-      setPlacementPreview(toolId, page.pageObjectNumber, box),
+      setPlacementPreview(toolId, page.objectNumber, box),
     clearPlacementPreview: clearGhost,
     getToolGhost: (page: PageRef) => {
       const ghost = ctx.state.get().toolGhost;
-      return ghost && ghost.page.pageObjectNumber === page.pageObjectNumber ? ghost : null;
+      return ghost && ghost.page.objectNumber === page.objectNumber ? ghost : null;
     },
   };
 

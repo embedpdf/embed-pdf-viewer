@@ -116,8 +116,7 @@ describe('signatures.finalizeCandidate', () => {
     const before = await call({ kind: 'signatures.list', docId: 'sign' }, 'signatures.list');
     const field = before.snapshot.signatures.find((s) => s.fieldName === 'sig')!;
     expect(field.signed).toBe(false);
-    const fieldObjectNumber =
-      field.field.kind === 'objectNumber' ? field.field.fieldObjectNumber : -1;
+    const fieldObjectNumber = field.field.kind === 'objectNumber' ? field.field.objectNumber : -1;
     expect(fieldObjectNumber).toBeGreaterThan(0);
 
     const { result: prepared } = await call(
@@ -207,7 +206,7 @@ describe('signatures.finalizeCandidate', () => {
       {
         kind: 'signatures.contents',
         docId: 'verify',
-        ref: { kind: 'objectNumber', fieldObjectNumber },
+        ref: { kind: 'objectNumber', objectNumber: fieldObjectNumber },
       },
       'signatures.contents',
     );

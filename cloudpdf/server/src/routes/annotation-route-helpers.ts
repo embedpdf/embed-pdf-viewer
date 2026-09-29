@@ -16,16 +16,16 @@ export function refFromKey(annotKey: string, pageObjectNumber: number): Annotati
   }
   const page = toPageRef(pageObjectNumber);
   if (stableId.kind === 'objectNumber') {
-    return { kind: 'objectNumber', page, annotObjectNumber: stableId.value };
+    return { kind: 'objectNumber', page, objectNumber: stableId.objectNumber };
   }
-  return { kind: 'nm', page, nm: stableId.value };
+  return { kind: 'nm', page, nm: stableId.nm };
 }
 
 export function assertRefMatchesPage(ref: AnnotationRef, pageObjectNumber: number): void {
-  if (ref.page.pageObjectNumber !== pageObjectNumber) {
+  if (ref.page.objectNumber !== pageObjectNumber) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
-      `ref.page ${ref.page.pageObjectNumber} != path :pageKey ${pageObjectNumber}`,
+      `ref.page ${ref.page.objectNumber} != path :pageKey ${pageObjectNumber}`,
     );
   }
 }

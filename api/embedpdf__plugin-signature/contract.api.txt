@@ -5,7 +5,7 @@ ChangeAnalysis [InterfaceDeclaration] (from packages/engine/core/src/signature/a
 DocMdpPermission [TypeAliasDeclaration] (from packages/engine/core/src/signature/types.ts): export type DocMdpPermission = 1 | 2 | 3;
 DocumentProtection [InterfaceDeclaration] (from packages/engine/core/src/signature/types.ts): export interface DocumentProtection{ enforced: ModificationLevel | null; judged: ModificationLevel | null; certification:{ signatureIndex: number; permission: DocMdpPermission} | null; fieldLocks: DocumentFieldLock[]; policyVersion: number; }
 FieldLockSpec [InterfaceDeclaration] (from packages/engine/core/src/signature/types.ts): export interface FieldLockSpec{ action: FieldLockAction; fields: string[]; permission?: DocMdpPermission; }
-FormFieldRef [TypeAliasDeclaration] (from packages/engine/core/src/identity/FormFieldRef.ts): export type FormFieldRef = |{ kind: 'objectNumber'; fieldObjectNumber: number} |{ kind: 'fqn'; name: string} ;
+FormFieldRef [TypeAliasDeclaration] (from packages/engine/core/src/identity/FormFieldRef.ts): export type FormFieldRef = |{ kind: 'objectNumber'; objectNumber: number} |{ kind: 'fqn'; name: string} ;
 INITIALS_MARK_NAME [VariableDeclaration]: INITIALS_MARK_NAME = 'initials'
 Mark [TypeAliasDeclaration]: export type Mark ={ assetId: string} |{ source: BinarySource} ;
 MarkRole [TypeAliasDeclaration]: export type MarkRole = 'signature' | 'initials';
@@ -19,7 +19,7 @@ SignatureCapability [InterfaceDeclaration]: export interface SignatureCapability
 SignatureCompleteResult [InterfaceDeclaration] (from packages/engine/core/src/signature/types.ts): export interface SignatureCompleteResult<C extends Coordinates = PageCoordinates>{ status: 'completed' | 'already-completed'; signature: SignatureDTO<C>; version: BaseVersionInfo; previous: DocumentVersionRef; protection: DocumentProtection; meta: MutationMeta; }
 SignatureConfig [InterfaceDeclaration]: export interface SignatureConfig{ mode?: SignatureMode; key?: SignerPort | (() => Promise<SignerPort>); trust?: TrustPort; allowCertify?: boolean; }
 SignatureDTO [InterfaceDeclaration] (from packages/engine/core/src/signature/types.ts): export interface SignatureDTO<C extends Coordinates = PageCoordinates>{ index: number; field: FormFieldRef; fieldName: string; widget: FormFieldWidget<C> | null; signed: boolean; kind: SignatureKind; filter: string | null; subFilter: string | null; byteRange: [number, number, number, number] | null; contentsSize: number; coverage: SignatureCoverage | null; revisionIndex: number | null; signer: SignatureSigner; docMdp: DocMdpPermission | null; catalogCertification: boolean; fieldMdp: FieldLockSpec | null; lock: FieldLockSpec | null; seedValue: SignatureSeedValue | null; }
-SignatureFieldAddress [TypeAliasDeclaration]: export type SignatureFieldAddress = FormFieldRef | AnnotationRef |{ annotObjectNumber: number} ;
+SignatureFieldAddress [TypeAliasDeclaration]: export type SignatureFieldAddress = FormFieldRef | AnnotationRef |{ objectNumber: number} ;
 SignatureFieldEvent [InterfaceDeclaration]: export interface SignatureFieldEvent{ readonly field: FormFieldRef; }
 SignatureInspectionRequestedEvent [InterfaceDeclaration]: export interface SignatureInspectionRequestedEvent{ readonly field: FormFieldRef; }
 SignatureInvalidatingEvent [InterfaceDeclaration]: export interface SignatureInvalidatingEvent{ readonly field: FormFieldRef; readonly detail: string; }

@@ -70,7 +70,7 @@ async function boot() {
     return {
       kind: 'objectNumber',
       page: widget.page!,
-      annotObjectNumber: widget.annotObjectNumber,
+      objectNumber: widget.objectNumber,
     };
   };
   const press = (name: string) => form.activateWidget(widgetRefOf(name));

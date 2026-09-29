@@ -204,13 +204,7 @@ export class SignatureMutator {
         );
       }
       if (input.appearance && field.widget) {
-        bakeWidgetAppearance(
-          this.runtime,
-          candidate.docPtr,
-          field.widget,
-          input.appearance.pdf,
-          input.appearance.pageIndex ?? 0,
-        );
+        bakeWidgetAppearance(this.runtime, candidate.docPtr, field.widget, input.appearance.pdf);
       }
 
       const store = this.storeFor();
@@ -299,8 +293,7 @@ export class SignatureMutator {
     const reader = new SignatureReader(this.runtime, this.session);
     const snapshot = reader.readSnapshot();
     const signature = snapshot.signatures.find(
-      (s) =>
-        s.field.kind === 'objectNumber' && s.field.fieldObjectNumber === pending.fieldObjectNumber,
+      (s) => s.field.kind === 'objectNumber' && s.field.objectNumber === pending.fieldObjectNumber,
     );
     if (!signature) {
       throw new EngineError(

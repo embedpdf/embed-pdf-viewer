@@ -45,8 +45,8 @@ export class CloudPageRenderService implements PageRenderService {
       const includeAnnotations = options.includeAnnotations ?? true;
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        const pageObjectNumber = this.pageRef.pageObjectNumber;
-        const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pageObjectNumber);
+        const pageObjectNumber = this.pageRef.objectNumber;
+        const page = manifest.pages.find((p) => p.state.page.objectNumber === pageObjectNumber);
         if (!page) {
           throw new EngineError(
             EngineErrorCode.NotFound,

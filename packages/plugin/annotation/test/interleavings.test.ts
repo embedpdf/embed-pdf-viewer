@@ -22,7 +22,7 @@ import { describe, expect, it } from 'vitest';
 import { annotationHarness, type FileAnnotation } from './harness';
 
 const PAGE = toPageRef(1);
-const REF: AnnotationRef = { kind: 'objectNumber', page: PAGE, annotObjectNumber: 20 };
+const REF: AnnotationRef = { kind: 'objectNumber', page: PAGE, objectNumber: 20 };
 const FLAGS: AnnotationFlags = {
   invisible: false,
   hidden: false,

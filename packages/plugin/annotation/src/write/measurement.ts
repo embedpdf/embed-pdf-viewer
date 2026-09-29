@@ -42,10 +42,10 @@ export function createMeasurement(
       viewports: PageMeasurementViewport[] | undefined,
       fallback: PdfMeasure,
     ) => {
-      pageViewports.set(page.pageObjectNumber, { viewports, fallback });
+      pageViewports.set(page.objectNumber, { viewports, fallback });
     },
     remeasurePage: async (page: PageRef, scale: PdfMeasure) => {
-      const pageObjectNumber = page.pageObjectNumber;
+      const pageObjectNumber = page.objectNumber;
       // Recalibration needs every dimension on the page: retry a failed load,
       // and wait for any load or page reload still running.
       if (records.getStatus() !== 'ready') {
@@ -62,7 +62,7 @@ export function createMeasurement(
       const model = store.model();
       const candidates = Object.values(records.get().byKey).flatMap(({ dto }) => {
         const annotation = model.byId[annotationKey(dto.ref)];
-        return annotation && dto.page.pageObjectNumber === pageObjectNumber && isDimension(dto)
+        return annotation && dto.page.objectNumber === pageObjectNumber && isDimension(dto)
           ? [{ dto, annotation }]
           : [];
       });

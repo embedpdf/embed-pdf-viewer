@@ -1,6 +1,6 @@
 # @embedpdf/plugin-measurement — .
 
-AnnotationRef [TypeAliasDeclaration] (from packages/engine/core/src/identity/AnnotationRef.ts): export type AnnotationRef = |{ kind: 'objectNumber'; page: PageRef; annotObjectNumber: number; } |{ kind: 'nm'; page: PageRef; nm: string; } |{ kind: 'index'; page: PageRef; index: number; revision: RevisionToken; } ;
+AnnotationRef [TypeAliasDeclaration] (from packages/engine/core/src/identity/AnnotationRef.ts): export type AnnotationRef = |{ kind: 'objectNumber'; page: PageRef; objectNumber: number; } |{ kind: 'nm'; page: PageRef; nm: string; } |{ kind: 'index'; page: PageRef; index: number; revision: RevisionToken; } ;
 AreaUnit [TypeAliasDeclaration] (from packages/engine/core/src/measure/units.ts): export type AreaUnit = `${ LengthUnit} 2` | 'ha' | 'acre';
 CalibrateInput [InterfaceDeclaration] (from packages/plugin/measurement/src/contract.ts): export interface CalibrateInput{ page: PageRef; from: Point; to: Point; distance:{ value: number; unit: LengthUnit} ; }
 CalibrationCompletedEvent [InterfaceDeclaration] (from packages/plugin/measurement/src/contract.ts): export interface CalibrationCompletedEvent{ readonly page: PageRef; }

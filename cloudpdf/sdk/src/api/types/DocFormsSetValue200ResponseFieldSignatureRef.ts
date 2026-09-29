@@ -9,7 +9,7 @@ export type DocFormsSetValue200ResponseFieldSignatureRef =
 export namespace DocFormsSetValue200ResponseFieldSignatureRef {
     export interface ObjectNumber {
         kind: "objectNumber";
-        fieldObjectNumber: number;
+        objectNumber: number;
     }
 
     export interface Fqn {

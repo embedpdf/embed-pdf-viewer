@@ -420,7 +420,7 @@ export interface PageContextValue {
   documentId: string;
   /**
    * The page's durable address — use for keys / render / annotations (read
-   * `ref.pageObjectNumber` where a map key is needed). Identity-stable for
+   * `ref.objectNumber` where a map key is needed). Identity-stable for
    * the surface's lifetime, so layers may key effects on it.
    */
   ref: PageRef;

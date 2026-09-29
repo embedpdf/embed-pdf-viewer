@@ -130,7 +130,7 @@ function createDestination(
   docPtr: Ptr,
   dest: PdfDestination,
 ): Ptr {
-  const page = dest.page.pageObjectNumber;
+  const page = dest.page.objectNumber;
   const destPtr =
     dest.kind === 'xyz'
       ? // Absent axes write PDF nulls (spec: "retain current value").

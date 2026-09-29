@@ -46,7 +46,7 @@ function annotation(pageObjectNumber: number, index: number) {
     ref: {
       kind: 'objectNumber',
       page: toPageRef(pageObjectNumber),
-      annotObjectNumber: pageObjectNumber * 1000 + index,
+      objectNumber: pageObjectNumber * 1000 + index,
     },
     page: toPageRef(pageObjectNumber),
     index,
@@ -240,7 +240,7 @@ describe('annotations.list() — one bulk read at the manifest pin', () => {
 
       expect(snap.pages).toHaveLength(PAGE_OBJECT_NUMBERS.length);
       expect(snap.auditHead).toBe(40);
-      expect(new Set(snap.pages.map((p) => p.page.pageObjectNumber))).toEqual(
+      expect(new Set(snap.pages.map((p) => p.page.objectNumber))).toEqual(
         new Set(PAGE_OBJECT_NUMBERS),
       );
       // Exactly one items request — the versioned bulk leaf; the per-page

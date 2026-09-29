@@ -245,7 +245,7 @@ function indexRoles(s: RevisionStructure): RoleIndex {
   const signedFields = new Set<number>();
   for (const sig of s.signatures) {
     if (sig.signed && sig.field.kind === 'objectNumber')
-      signedFields.add(sig.field.fieldObjectNumber);
+      signedFields.add(sig.field.objectNumber);
   }
   return { fieldByObj, widgetToField, pages: new Set(s.pages), signedFields, sigFields };
 }
@@ -400,8 +400,8 @@ class StepContext {
       [];
     for (const sig of this.input.after.signatures) {
       if (!sig.signed || sig.field.kind !== 'objectNumber') continue;
-      if (this.before.signedFields.has(sig.field.fieldObjectNumber)) continue;
-      out.push({ fieldObjectNumber: sig.field.fieldObjectNumber, sig });
+      if (this.before.signedFields.has(sig.field.objectNumber)) continue;
+      out.push({ fieldObjectNumber: sig.field.objectNumber, sig });
     }
     return out;
   }

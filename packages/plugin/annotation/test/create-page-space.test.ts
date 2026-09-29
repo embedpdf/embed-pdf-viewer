@@ -28,7 +28,7 @@ const NO_FLAGS: AnnotationFlags = {
 
 const squareDTO = (annotObjectNumber: number): FileAnnotation =>
   ({
-    ref: { kind: 'objectNumber', page: PAGE, annotObjectNumber },
+    ref: { kind: 'objectNumber', page: PAGE, objectNumber: annotObjectNumber },
     page: PAGE,
     index: annotObjectNumber,
     identityQuality: 'durable',

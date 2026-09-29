@@ -23,7 +23,7 @@ export class AnnotationsClient {
     }
 
     /**
-     * Returns one entry per page plus the audit-log cursor for reconciling subsequent document events. Page order is unspecified; join by `pageState.pageObjectNumber` when display order matters.
+     * Returns one entry per page plus the audit-log cursor for reconciling subsequent document events. Page order is unspecified; join by `page` (a `PageRef`) when display order matters.
      *
      * @param {CloudPDF.doc.ListAllAnnotationsRequest} request
      * @param {AnnotationsClient.RequestOptions} requestOptions - Request-specific configuration.

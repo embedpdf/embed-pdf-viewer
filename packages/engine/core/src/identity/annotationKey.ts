@@ -24,9 +24,9 @@ import type { PageRef } from './PageRef';
 export function annotationKey(ref: AnnotationRef): string {
   switch (ref.kind) {
     case 'objectNumber':
-      return `obj:${ref.annotObjectNumber}`;
+      return `obj:${ref.objectNumber}`;
     case 'nm':
-      return `nm:${ref.page.pageObjectNumber}:${ref.nm}`;
+      return `nm:${ref.page.objectNumber}:${ref.nm}`;
     case 'index':
       return positionKey(ref.page, ref.index);
   }
@@ -38,7 +38,7 @@ export function annotationKey(ref: AnnotationRef): string {
  * reader can find the key a weak record had before the engine named it.
  */
 export function positionKey(page: PageRef, index: number): string {
-  return `idx:${page.pageObjectNumber}:${index}`;
+  return `idx:${page.objectNumber}:${index}`;
 }
 
 /**
@@ -64,6 +64,6 @@ export function annotationKeysOf(annotation: {
  */
 export function refFromStableId(page: PageRef, id: AnnotationStableId): AnnotationRef {
   return id.kind === 'objectNumber'
-    ? { kind: 'objectNumber', page, annotObjectNumber: id.value }
-    : { kind: 'nm', page, nm: id.value };
+    ? { kind: 'objectNumber', page, objectNumber: id.objectNumber }
+    : { kind: 'nm', page, nm: id.nm };
 }

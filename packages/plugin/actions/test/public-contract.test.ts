@@ -38,7 +38,7 @@ const uri = (value: string): PdfActionNode => ({
 });
 
 const PAGE = toPageRef(3);
-const ANNOT: AnnotationRef = { kind: 'objectNumber', page: PAGE, annotObjectNumber: 41 };
+const ANNOT: AnnotationRef = { kind: 'objectNumber', page: PAGE, objectNumber: 41 };
 const activate = tree(named('NextPage'));
 const enter = tree(named('FirstPage'));
 const validate = tree(uri('https://validate.test/'));
@@ -63,7 +63,7 @@ function harness(config?: ActionsConfig) {
           fields: [
             {
               name: 'amount',
-              ref: { kind: 'objectNumber', fieldObjectNumber: 7 },
+              ref: { kind: 'objectNumber', objectNumber: 7 },
               actions: { validate },
             },
           ],
@@ -112,14 +112,14 @@ describe('actions public contract', () => {
     await expect(
       capability.getActionTree({
         kind: 'annotation',
-        annotation: { kind: 'objectNumber', page: PAGE, annotObjectNumber: 99 },
+        annotation: { kind: 'objectNumber', page: PAGE, objectNumber: 99 },
         page: PAGE,
       }),
     ).resolves.toBeNull();
     await expect(
       capability.getActionTree({
         kind: 'field',
-        field: { kind: 'objectNumber', fieldObjectNumber: 7 },
+        field: { kind: 'objectNumber', objectNumber: 7 },
         event: 'validate',
       }),
     ).resolves.toBe(validate);

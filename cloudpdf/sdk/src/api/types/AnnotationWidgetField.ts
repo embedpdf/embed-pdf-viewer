@@ -7,7 +7,7 @@ export type AnnotationWidgetField = CloudPDF.AnnotationWidgetField.ObjectNumber 
 export namespace AnnotationWidgetField {
     export interface ObjectNumber {
         kind: "objectNumber";
-        fieldObjectNumber: number;
+        objectNumber: number;
     }
 
     export interface Fqn {

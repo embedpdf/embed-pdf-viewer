@@ -79,8 +79,8 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     return AbortablePromise.run<AnnotationList>(async (signal) => {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        const pageObjectNumber = this.pageRef.pageObjectNumber;
-        const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pageObjectNumber);
+        const pageObjectNumber = this.pageRef.objectNumber;
+        const page = manifest.pages.find((p) => p.state.page.objectNumber === pageObjectNumber);
         if (!page) {
           throw new EngineError(
             EngineErrorCode.NotFound,
@@ -127,8 +127,8 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       const format: PageNetworkRenderFormat = options.format ?? 'webp';
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        const pageObjectNumber = this.pageRef.pageObjectNumber;
-        const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pageObjectNumber);
+        const pageObjectNumber = this.pageRef.objectNumber;
+        const page = manifest.pages.find((p) => p.state.page.objectNumber === pageObjectNumber);
         if (!page) {
           throw new EngineError(
             EngineErrorCode.NotFound,
@@ -176,11 +176,11 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
-    if (ref.page.pageObjectNumber !== this.pageRef.pageObjectNumber) {
+    if (ref.page.objectNumber !== this.pageRef.objectNumber) {
       return AbortablePromise.rejectReason(
         new EngineError(
           EngineErrorCode.InvalidArg,
-          `ref.page ${ref.page.pageObjectNumber} != page ${this.pageRef.pageObjectNumber}`,
+          `ref.page ${ref.page.objectNumber} != page ${this.pageRef.objectNumber}`,
         ),
       );
     }
@@ -277,11 +277,11 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
-    if (ref.page.pageObjectNumber !== this.pageRef.pageObjectNumber) {
+    if (ref.page.objectNumber !== this.pageRef.objectNumber) {
       return AbortablePromise.rejectReason(
         new EngineError(
           EngineErrorCode.InvalidArg,
-          `ref.page ${ref.page.pageObjectNumber} != page ${this.pageRef.pageObjectNumber}`,
+          `ref.page ${ref.page.objectNumber} != page ${this.pageRef.objectNumber}`,
         ),
       );
     }
@@ -340,11 +340,11 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
-    if (ref.page.pageObjectNumber !== this.pageRef.pageObjectNumber) {
+    if (ref.page.objectNumber !== this.pageRef.objectNumber) {
       return AbortablePromise.rejectReason(
         new EngineError(
           EngineErrorCode.InvalidArg,
-          `ref.page ${ref.page.pageObjectNumber} != page ${this.pageRef.pageObjectNumber}`,
+          `ref.page ${ref.page.objectNumber} != page ${this.pageRef.objectNumber}`,
         ),
       );
     }
@@ -394,11 +394,11 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     // The page is part of the URL; the worker validates per-ref consistency
     // again, but rejecting up front gives a cleaner error from the client side.
     for (const r of refs) {
-      if (r.page.pageObjectNumber !== this.pageRef.pageObjectNumber) {
+      if (r.page.objectNumber !== this.pageRef.objectNumber) {
         return AbortablePromise.rejectReason(
           new EngineError(
             EngineErrorCode.InvalidArg,
-            `move ref points at page ${r.page.pageObjectNumber}; service is bound to page ${this.pageRef.pageObjectNumber}`,
+            `move ref points at page ${r.page.objectNumber}; service is bound to page ${this.pageRef.objectNumber}`,
           ),
         );
       }
@@ -426,11 +426,11 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       );
     }
     for (const r of refs) {
-      if (r.page.pageObjectNumber !== this.pageRef.pageObjectNumber) {
+      if (r.page.objectNumber !== this.pageRef.objectNumber) {
         return AbortablePromise.rejectReason(
           new EngineError(
             EngineErrorCode.InvalidArg,
-            `flatten ref points at page ${r.page.pageObjectNumber}; service is bound to page ${this.pageRef.pageObjectNumber}`,
+            `flatten ref points at page ${r.page.objectNumber}; service is bound to page ${this.pageRef.objectNumber}`,
           ),
         );
       }
@@ -460,11 +460,11 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       );
     }
     for (const r of refs) {
-      if (r.page.pageObjectNumber !== this.pageRef.pageObjectNumber) {
+      if (r.page.objectNumber !== this.pageRef.objectNumber) {
         return AbortablePromise.rejectReason(
           new EngineError(
             EngineErrorCode.InvalidArg,
-            `exportAppearance ref points at page ${r.page.pageObjectNumber}; service is bound to page ${this.pageRef.pageObjectNumber}`,
+            `exportAppearance ref points at page ${r.page.objectNumber}; service is bound to page ${this.pageRef.objectNumber}`,
           ),
         );
       }
@@ -580,9 +580,9 @@ async function parseAppearanceForm(form: FormData): Promise<AnnotationAppearance
  */
 function refToStableId(
   ref: Extract<AnnotationRef, { kind: 'objectNumber' | 'nm' }>,
-): { kind: 'objectNumber'; value: number } | { kind: 'nm'; value: string } {
+): { kind: 'objectNumber'; objectNumber: number } | { kind: 'nm'; nm: string } {
   if (ref.kind === 'objectNumber') {
-    return { kind: 'objectNumber', value: ref.annotObjectNumber };
+    return { kind: 'objectNumber', objectNumber: ref.objectNumber };
   }
-  return { kind: 'nm', value: ref.nm };
+  return { kind: 'nm', nm: ref.nm };
 }

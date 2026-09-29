@@ -1,0 +1,125 @@
+---
+title: Toolbar
+description: A toolbar that fits itself to the space it has, shrinking buttons and moving them into a menu instead of wrapping, with every pixel yours.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Toolbar
+
+A viewer's toolbar has to fit a phone and a wide screen. `<Toolbar>` takes a list of what should be in
+it, measures what fits, and makes room when it has to: labels become icons, a group folds into one
+button, and what's left over goes into a "More" menu. You draw every button.
+
+The items are [commands](commands), so each one already knows its label, icon, whether it's enabled,
+and what it does. These are from the [standard commands](commands#the-standard-commands):
+
+```tsx
+import { Toolbar, group, item } from '@embedpdf/react/toolbar';
+
+const bar = {
+  id: 'main',
+  sections: {
+    start: [group('navigation', ['page:previous', 'page:next'])],
+    center: [group('zoom', ['zoom:out', item('zoom:in', { variants: ['icon+label', 'icon'] })])],
+    end: [group('tools', ['tool:pointer', 'tool:pan', 'tool:highlight'], { collapse: 'menu' })],
+  },
+};
+
+<Toolbar
+  bar={bar}
+  renderCommand={(command, variant, run) => (
+    <button onClick={run} disabled={!command.enabled} aria-pressed={command.active} title={command.label}>
+      <Icon name={command.icon} />
+      {variant === 'icon+label' && command.label}
+    </button>
+  )}
+/>;
+```
+
+Resize the window, and the toolbar adjusts on its own. It measures real rendered widths, so a longer
+translation or a bigger font just works.
+
+## How it makes room
+
+When the items don't fit, the toolbar takes these steps, in order, until they do:
+
+1. **An item gets smaller**: from its first `variant` to the next, such as `'icon+label'` to `'icon'`.
+2. **A group folds** into one button with a menu, when it has `collapse: 'menu'`, or into a dropdown
+   with `collapse: 'select'`.
+3. **An item moves into the "More" menu**, the least important first.
+
+`importance` decides the order, from `1` (goes first) to `5` (never leaves the bar):
+
+```ts
+item('document:download', { importance: 5 }); // always visible
+group('annotate', ['tool:note', 'tool:ink'], { importance: 2 });
+```
+
+## Sections
+
+`start`, `center` and `end` are the toolbar's left, middle and right. The center stays centered in the
+space the other two leave. In a right-to-left language, `start` and `end` swap sides.
+
+## Your own items
+
+Not everything is a command: a page number input, a search box. Put a custom item in the bar and draw
+it:
+
+```tsx
+const bar = {
+  id: 'main',
+  sections: {
+    center: [group('page', [custom('page-number', 'page:go-to', { variants: ['full', 'compact'] })])],
+  },
+};
+
+<Toolbar
+  bar={bar}
+  renderCommand={renderCommand}
+  renderCustom={{ 'page-number': (variant) => <PageNumberInput compact={variant === 'compact'} /> }}
+/>;
+```
+
+The second argument, `'page:go-to'` (a command of your own that opens a "Go to page" dialog), is what
+the item becomes in the "More" menu when there's no room for it. `variants` lets it get smaller first, like a command's variants.
+
+## Draw every part
+
+| Prop                    | Draws                                                                  |
+| :---------------------- | :--------------------------------------------------------------------- |
+| `renderCommand`         | A button, for a command and its variant                                |
+| `renderCustom`          | Your own items, by name                                                |
+| `renderCollapsed`       | A folded group: its button and its menu                                |
+| `renderSeparator`       | The line between groups                                                |
+| `renderOverflowTrigger` | The "More" button                                                      |
+| `renderOverflowMenu`    | The "More" menu, with its sections, items and the call to run each one |
+
+Every prop you leave out has a plain default, so you can start with `renderCommand` and add the rest as
+you style them. `gap` and `separatorWidth` set the spacing, and `className` and `style` go on the
+toolbar itself.
+
+## A toolbar per mode
+
+Most viewers change the toolbar with what people do: annotation tools while annotating, field tools
+while building a form. Keep a bar per mode and pick one from your state:
+
+```tsx
+const { activeToolId } = useInteractionState();
+const bar = activeToolId === 'form-edit' ? formBar : mainBar;
+
+<Toolbar bar={bar} renderCommand={renderCommand} />;
+```
+
+## Good to know
+
+### Commands keep the buttons right
+
+Because the items are commands, a button disables itself when its command can't run, shows as pressed
+when it's active, and hides when the command isn't visible, with no code in the toolbar. Change a
+permission or open a document, and the toolbar follows.
+
+### Labels in the user's language
+
+A command's label comes through [translations](translations), so the toolbar is in the user's language
+and re-measures when it changes.

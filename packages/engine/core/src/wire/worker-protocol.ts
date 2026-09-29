@@ -573,7 +573,6 @@ export interface FormsSetSignatureAppearanceWorkerRequest {
   layerName?: string;
   ref: FormFieldRef;
   pdf: ArrayBuffer;
-  pageIndex: number;
   artifactPath?: string;
 }
 

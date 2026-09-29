@@ -157,7 +157,7 @@ describe('render, form and measure values', () => {
           ref: null,
           rect: { left: 100, right: 150, bottom: 600, top: 650 },
         },
-        { annotObjectNumber: 9, page: null, ref: null, rect: null },
+        { objectNumber: 9, page: null, ref: null, rect: null },
       ],
     } as unknown as FormFieldDTO<PdfCoordinates>;
     expect(pageFormFieldOf(field, boxOf).widgets.map((widget) => widget.rect)).toEqual([

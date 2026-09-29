@@ -165,7 +165,7 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
     case 'pages.rotate': {
       const payload = row.payload as PageRotateResult;
       const rotation = (payload.layout.pages.find(
-        (page) => page.ref.pageObjectNumber === row.affectedPages[0],
+        (page) => page.ref.objectNumber === row.affectedPages[0],
       )?.rotation ?? 0) as PdfRotation;
       return {
         type: 'pages.rotated',

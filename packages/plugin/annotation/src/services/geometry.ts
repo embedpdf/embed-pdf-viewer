@@ -14,7 +14,7 @@ export const viewEnv = (zoom?: number, rotation?: number): ViewEnv | undefined =
 /** Each page's size and crop box, as the document registry reports them. */
 export function createPageLookup(ctx: Pick<AnnotationContext, 'document'>) {
   const layoutOf = (pageObjectNumber: number) =>
-    ctx.document()?.pages.find((pageInfo) => pageInfo.ref.pageObjectNumber === pageObjectNumber);
+    ctx.document()?.pages.find((pageInfo) => pageInfo.ref.objectNumber === pageObjectNumber);
   const sizeOf = (pageObjectNumber: number): PdfSize | null =>
     layoutOf(pageObjectNumber)?.size ?? null;
   /** The crop box in the file's numbers, for Acrobat scripts, which speak them. */

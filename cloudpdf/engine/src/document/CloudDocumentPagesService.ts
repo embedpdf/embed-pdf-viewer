@@ -115,7 +115,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     if (!page) {
       throw new EngineError(
         EngineErrorCode.NotFound,
-        `no page with object number ${ref.pageObjectNumber} in document ${this.docId}`,
+        `no page with object number ${ref.objectNumber} in document ${this.docId}`,
       );
     }
     return page;

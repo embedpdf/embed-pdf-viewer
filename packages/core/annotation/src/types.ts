@@ -229,7 +229,7 @@ export interface ModelAnnotation {
   id: Id;
   ref: AnnotationRef | null;
   /** The page this annotation lives on. Internals may key by
-   *  `page.pageObjectNumber`; the address itself is what callers pass around. */
+   *  `page.objectNumber`; the address itself is what callers pass around. */
   page: PageRef;
   subtype: Subtype;
   geometry: ModelGeometry;

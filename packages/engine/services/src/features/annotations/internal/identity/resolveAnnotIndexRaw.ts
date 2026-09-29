@@ -18,18 +18,14 @@ export function resolveAnnotIndexRaw(
   const { fn } = runtime;
   const docPtr = session.requireDocPtr();
   const { pageIndex } = session.resolvePageRef(ref.page);
-  const page = ref.page.pageObjectNumber;
+  const page = ref.page.objectNumber;
   switch (ref.kind) {
     case 'objectNumber': {
-      const index = fn.EPDFPage_GetAnnotIndexByObjectNumberRaw(
-        docPtr,
-        pageIndex,
-        ref.annotObjectNumber,
-      );
+      const index = fn.EPDFPage_GetAnnotIndexByObjectNumberRaw(docPtr, pageIndex, ref.objectNumber);
       if (index < 0) {
         throw new EngineError(
           EngineErrorCode.NotFound,
-          `no annotation with object number ${ref.annotObjectNumber} on page ${page}`,
+          `no annotation with object number ${ref.objectNumber} on page ${page}`,
         );
       }
       return { pageIndex, index };

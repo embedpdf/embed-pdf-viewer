@@ -23,6 +23,7 @@ import {
 } from '@/components/site/icons';
 import {
   DOCS_INTEGRATION_LABELS,
+  docsEntryHref,
   type DocsIntegration,
   type HeadlessIntegration,
 } from '@/lib/docs-integrations';
@@ -87,7 +88,7 @@ function IntegrationLink({
   const isViewer = product === 'viewer';
   return (
     <Link
-      href={`/docs/${product}/${integration}/getting-started`}
+      href={docsEntryHref(product, integration)}
       className={`border-ep-border text-ep-navy group inline-flex items-center gap-2 rounded-[10px] border bg-white px-3 py-2 font-sans text-[13px] font-bold no-underline transition-all hover:-translate-y-0.5 ${
         isViewer
           ? 'hover:border-ep-blue hover:shadow-[0_12px_24px_-16px_rgba(8,118,253,0.55)]'

@@ -68,7 +68,7 @@ export function createChromeReads(
     inert: ReadonlySet<Id> | null | undefined = undefined,
   ) => {
     const model = store.model();
-    const pageObjectNumber = page.pageObjectNumber;
+    const pageObjectNumber = page.objectNumber;
     return hitTest(
       model,
       page,
@@ -102,7 +102,7 @@ export function createChromeReads(
     rotation?: number,
     zoom?: number,
   ): ChromeNode[] => {
-    const pageObjectNumber = page.pageObjectNumber;
+    const pageObjectNumber = page.objectNumber;
     const model = store.model();
     const cs = chromeSettings();
     const cached = chromeCache.get(pageObjectNumber);
@@ -157,7 +157,7 @@ export function createChromeReads(
       return anchorCache.v;
     const anchor = coreSelectionAnchor(
       model,
-      (page) => geometry.pageBoxOf(page.pageObjectNumber),
+      (page) => geometry.pageBoxOf(page.objectNumber),
       () => chromeGeomAt(scale).knobOffset,
       () => viewEnv(zoom, rotation),
     );
@@ -218,7 +218,7 @@ export function createChromeReads(
       rotation?: number,
       zoom?: number,
     ) => {
-      const pageObjectNumber = page.pageObjectNumber;
+      const pageObjectNumber = page.objectNumber;
       const model = store.model();
       return cursorAt(
         model,

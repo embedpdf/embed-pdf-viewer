@@ -1,0 +1,186 @@
+---
+title: Your own annotation look
+description: Draw annotations with your own components, react to hover, show cards next to them, and make them interactive.
+---
+
+# Your own annotation look
+
+The annotation layer draws each annotation the way the PDF describes it. You can draw some of them
+with your own component instead: a stamp that shows live data from your server, a note that looks
+like your app's comment bubble, a highlight with a badge.
+
+This changes the screen only. The PDF keeps the annotation's own look, so other PDF apps,
+printing and downloads show the original:
+
+| Where                               | What people see                 |
+| :---------------------------------- | :------------------------------ |
+| Your viewer                         | Your component                  |
+| The saved PDF, other apps, printing | The annotation's own appearance |
+
+## Draw an annotation your way
+
+Give the layer a list of **renderers**. Each one says which annotations it draws and with which
+component:
+
+```tsx
+const renderers = [
+  {
+    for: (annotation) => annotation.subtype === 'stamp' && annotation.name === 'Approved',
+    component: ApprovedBadge,
+  },
+];
+
+<AnnotationLayer renderers={renderers} />;
+```
+
+`for` gets the annotation, with all its fields, so you can pick by kind, name, author or anything
+else. The first renderer that matches wins; an annotation no renderer matches is drawn as usual.
+
+Define the list once, outside your component or in `useMemo`. The layer registers each entry, and
+a new list every render would register them again (the viewer warns about it while you develop).
+
+Your component gets:
+
+| Prop          | What it is                                                                          |
+| :------------ | :---------------------------------------------------------------------------------- |
+| `annotation`  | The annotation, as `get()` returns it.                                              |
+| `box`         | Where to draw it, in page coordinates. It follows a drag or a resize as it happens. |
+| `page`        | The page: `page.transform.pageToViewRect(box)` turns `box` into pixels.             |
+| `native`      | The layer's own drawing of it. Render it to keep the original look and add to it.   |
+| `appearance`  | The engine's picture of the annotation (`url`, `box`), or `null`.                   |
+| `hovered`     | True while the pointer is over it.                                                  |
+| `interactive` | True when your component takes the pointer (see [below](#take-over-the-pointer)).   |
+
+```tsx
+function ApprovedBadge({ box, page, native, hovered }: AnnotationRendererProps) {
+  const { x, y, width, height } = page.transform.pageToViewRect(box);
+  return (
+    <>
+      {native}
+      <div
+        className={hovered ? 'badge badge--hover' : 'badge'}
+        style={{ position: 'absolute', left: x + width - 12, top: y - 12 }}
+      >
+        ✓
+      </div>
+    </>
+  );
+}
+```
+
+People can still select, move, resize and delete the annotation: your component draws, and the
+viewer keeps handling the pointer. That's also why a component like this gets no clicks of its
+own. For that, see [Take over the pointer](#take-over-the-pointer).
+
+## Show a card on hover
+
+A hover card sits next to an annotation while the pointer is over it. Two hooks give you what you
+need: the annotation under the pointer, and an anchor that keeps a card attached to it:
+
+```tsx
+import { Anchored } from '@embedpdf/react/anchored';
+import { useAnnotationAnchor, useAnnotationState } from '@embedpdf/react/annotation';
+
+function StampCard() {
+  const { hovered } = useAnnotationState(); // the annotation under the pointer, or null
+  const anchor = useAnnotationAnchor(hovered?.ref ?? null);
+
+  if (hovered?.subtype !== 'stamp') return null;
+  return (
+    <Anchored anchor={anchor} placement="top">
+      <div className="card">Approved by {hovered.author}</div>
+    </Anchored>
+  );
+}
+
+<Stage overlay={<StampCard />}>{/* … */}</Stage>;
+```
+
+Mount it in the Stage's `overlay`, like a menu. The card stays next to the annotation while the
+user scrolls and zooms, and while the annotation is moved.
+
+`useAnnotationAnchor(ref)` works for any annotation, not only the hovered one. Use it for a badge
+that's always there, such as a count of replies next to each note.
+
+## Take over the pointer
+
+Sometimes your component must take clicks itself: buttons, links, a text field. Mark the
+renderer `interactive`:
+
+```tsx
+const renderers = [
+  {
+    for: (annotation) => annotation.subtype === 'stamp' && annotation.name === 'Approved',
+    component: ApprovalWidget,
+    interactive: true,
+  },
+];
+```
+
+While a renderer is interactive, the pointer belongs to your component, and people can't select,
+move or delete that annotation with it. Most apps want both: interactive while reading, editable
+while editing. Pass a function, and the viewer asks it whenever it matters:
+
+```ts
+{
+  for: (annotation) => annotation.subtype === 'stamp' && annotation.name === 'Approved',
+  component: ApprovalWidget,
+  interactive: ({ toolId }) => toolId === 'pan', // interactive in reading mode only
+}
+```
+
+## Example: an interactive stamp
+
+A stamp that's an ordinary stamp in the PDF, but on screen shows its approval status, a card
+with details on hover, and working buttons when you're reading:
+
+```tsx
+const renderers = [
+  {
+    for: (annotation) => annotation.subtype === 'stamp' && annotation.name === 'Approved',
+    component: ApprovalStamp,
+    interactive: ({ toolId }) => toolId === 'pan',
+  },
+];
+
+function ApprovalStamp({ annotation, box, page, native, interactive }: AnnotationRendererProps) {
+  const approval = useApproval(annotationKey(annotation.ref)); // your own data
+  const { x, y, width, height } = page.transform.pageToViewRect(box);
+
+  return (
+    <div style={{ position: 'absolute', left: x, top: y, width, height }}>
+      {native}
+      <StatusDot status={approval.status} />
+      {interactive && <button onClick={approval.open}>Details</button>}
+    </div>
+  );
+}
+```
+
+1. The stamp is placed like any stamp, so the PDF holds the real one; see [Stamps](stamps).
+2. `for` picks it out by its `name`, which the stamp keeps in every PDF app.
+3. The component draws the stamp itself (`native`) and your status on top.
+4. In reading mode (the `pan` tool) the button works. With the `pointer` tool, people select and
+   move the stamp as usual.
+5. For a card on hover, add the [hover card](#show-a-card-on-hover) to the overlay.
+
+To find your own data for an annotation, key it by `annotationKey(annotation.ref)`: the ref stays
+the same after the document is saved and opened again.
+
+## Good to know
+
+### Hover cards people can use
+
+A card closes when the pointer leaves the annotation, so the pointer can't reach a button in it.
+Keep the card open while the pointer is over the card itself, for example with a short delay
+before it closes and a `pointerenter` on the card that cancels it.
+
+### Form fields
+
+Form fields are annotations too, and the form plugin draws them with its own renderer, which you
+add to the same list. A plugin's renderer always wins over your rules for the fields it handles.
+
+### Other layers
+
+A renderer replaces the drawing inside the annotation layer. Anything that isn't tied to one
+annotation, such as a comments sidebar, belongs in your own UI, fed by `useAnnotationList()`.

@@ -11,7 +11,7 @@ export const DOCS_PRODUCTS = {
   },
   headless: {
     label: 'Headless',
-    href: '/docs/headless/getting-started',
+    href: '/docs/headless',
   },
   engine: {
     label: 'Engine',

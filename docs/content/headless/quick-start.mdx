@@ -1,0 +1,228 @@
+---
+title: Quick start
+description: Build a PDF viewer step by step, with text selection, zoom buttons, a highlighter and a save button.
+---
+
+import { Cards, Card } from '@/components/docs/cards';
+
+# Quick start
+
+This guide builds a small PDF viewer: the pages, text people can select, zoom buttons, a
+highlighter and a save button. Each step adds one plugin or one control, so you can stop at any
+step and have a working viewer.
+
+## 1. Install
+
+You need two packages: the one for your framework, and an engine.
+
+<Fw only="react">
+<Engine local>
+```sh npm2yarn
+npm install @embedpdf/react @embedpdf/engine
+```
+</Engine>
+<Engine cloud>
+```sh npm2yarn
+npm install @embedpdf/react @cloudpdf/engine
+```
+</Engine>
+</Fw>
+
+<Fw only="vue">
+<Engine local>
+```sh npm2yarn
+npm install @embedpdf/vue @embedpdf/engine
+```
+</Engine>
+<Engine cloud>
+```sh npm2yarn
+npm install @embedpdf/vue @cloudpdf/engine
+```
+</Engine>
+</Fw>
+
+<Fw only="svelte">
+<Engine local>
+```sh npm2yarn
+npm install @embedpdf/svelte @embedpdf/engine
+```
+</Engine>
+<Engine cloud>
+```sh npm2yarn
+npm install @embedpdf/svelte @cloudpdf/engine
+```
+</Engine>
+</Fw>
+
+<Fw only="angular">
+<Engine local>
+```sh npm2yarn
+npm install @embedpdf/angular @embedpdf/engine
+```
+</Engine>
+<Engine cloud>
+```sh npm2yarn
+npm install @embedpdf/angular @cloudpdf/engine
+```
+</Engine>
+</Fw>
+
+Every feature is a separate import from the framework package, such as `@embedpdf/react/stage`,
+so what you don't use never reaches your bundle.
+
+## 2. Show a PDF
+
+Create the engine once, then give it to `<Viewer>` with the plugins you want and the document to
+open. `<Stage>` shows the pages, and `<RenderLayer>` draws each one:
+
+<Example name="getting-started/basic" mode="open" />
+
+<Engine local>
+
+`localEngine()` costs nothing until it's used, so creating it at the top of a module is safe, even
+with server-side rendering. The viewer starts it when it mounts: PDFium boots in a Web Worker in
+the background, and the first page shows as soon as the document is open. The engine's
+WebAssembly is part of your build and loads from your own site; see [Setup](setup).
+
+</Engine>
+
+<Engine cloud>
+
+`cloudEngine({ baseUrl })` holds an HTTP client and nothing else, so creating it at the top of a
+module is safe, even with server-side rendering. Every page, text and annotation call goes to your
+CloudPDF server; see [Setup](setup).
+
+</Engine>
+
+`<DocumentGate>` shows its `fallback` until the document is open, so the Stage never renders
+without one.
+
+## 3. Let people select text
+
+Add the interaction plugin, which handles the pointer for every feature, and the selection plugin.
+Then put a `<SelectionLayer>` above the page:
+
+```tsx
+import { interactionPlugin } from '@embedpdf/react/interaction';
+import { SelectionLayer, selectionPlugin } from '@embedpdf/react/selection';
+
+const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPlugin()];
+
+<Stage>
+  {() => (
+    <>
+      <RenderLayer />
+      <SelectionLayer />
+    </>
+  )}
+</Stage>;
+```
+
+Drag over text to select it, double-click a word, or triple-click a line. On a phone, long-press a
+word. See [Selecting & copying](text/selection) for copying and a selection menu.
+
+## 4. Add zoom buttons
+
+Every plugin has a hook for its API and one for its state. `useStage()` does things, and
+`useStageState()` gives you what to show:
+
+```tsx
+import { useStage, useStageState } from '@embedpdf/react/stage';
+
+function ZoomControls() {
+  const stage = useStage();
+  const { zoomLevel } = useStageState();
+
+  return (
+    <div>
+      <button onClick={() => stage.zoomOut()}>−</button>
+      <span>{Math.round(zoomLevel * 100)}%</span>
+      <button onClick={() => stage.zoomIn()}>+</button>
+    </div>
+  );
+}
+```
+
+Put `<ZoomControls />` anywhere inside `<DocumentGate>`. It re-renders when the zoom changes,
+whether a button, a pinch or code changed it.
+
+## 5. Add a highlighter
+
+The annotation plugin shows the annotations a PDF already has, and lets people add their own. Add
+it with its layer, and a button that turns on the highlight tool:
+
+```tsx
+import { AnnotationLayer, annotationPlugin } from '@embedpdf/react/annotation';
+import { useInteraction, useInteractionState } from '@embedpdf/react/interaction';
+
+const plugins = [/* …as before */ annotationPlugin()];
+
+function HighlightButton() {
+  const interaction = useInteraction();
+  const { activeToolId } = useInteractionState();
+  const on = activeToolId === 'highlight';
+
+  return (
+    <button aria-pressed={on} onClick={() => interaction.activateTool(on ? 'pointer' : 'highlight')}>
+      Highlight
+    </button>
+  );
+}
+
+<Stage>
+  {() => (
+    <>
+      <RenderLayer annotations={false} />
+      <SelectionLayer />
+      <AnnotationLayer />
+    </>
+  )}
+</Stage>;
+```
+
+With the tool on, select text and it's highlighted. Click a highlight with the `pointer` tool to
+select it. `annotations={false}` leaves annotations out of the page picture, because the
+annotation layer draws them now. See [Annotations](annotations) for every tool.
+
+## 6. Save
+
+`documents.download()` gives you the PDF with every change, as bytes. `saveFile` hands them to the
+browser as a download:
+
+```tsx
+import { saveFile, useDocuments } from '@embedpdf/react/runtime';
+
+function SaveButton() {
+  const documents = useDocuments();
+  return (
+    <button onClick={async () => saveFile(await documents.download(), 'reviewed.pdf')}>Save</button>
+  );
+}
+```
+
+<Engine cloud>
+
+You don't need to save to keep the highlights: the server stored each one as it was made.
+`download()` is for when you want the file itself.
+
+</Engine>
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Setup"
+    description="Server-side rendering, bundlers, fonts, and hosting the engine yourself."
+    href="setup"
+  />
+  <Card
+    title="How it works"
+    description="Plugins, the four hooks, layers, and which document a component talks to."
+    href="concepts/how-it-works"
+  />
+  <Card
+    title="Scroll, zoom & layout"
+    description="Layouts, zoom modes, page navigation and touch."
+    href="viewing/stage"
+  />
+</Cards>

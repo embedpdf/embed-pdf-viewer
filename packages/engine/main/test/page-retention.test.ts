@@ -38,7 +38,7 @@ async function withDocument<T>(
   try {
     const doc = await engine.open({ kind: 'bytes', id, bytes });
     try {
-      const page = toPageRef((await doc.pages.list()).pages[0]!.ref.pageObjectNumber);
+      const page = toPageRef((await doc.pages.list()).pages[0]!.ref.objectNumber);
       return await run(doc, page);
     } finally {
       await doc.close();

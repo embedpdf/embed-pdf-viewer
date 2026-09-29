@@ -11,13 +11,13 @@ export namespace DocSignaturesComplete200ResponseSignatureWidgetRef {
     export interface ObjectNumber {
         kind: "objectNumber";
         page: DocSignaturesComplete200ResponseSignatureWidgetRefObjectNumber.Page;
-        annotObjectNumber: number;
+        objectNumber: number;
     }
 
     export namespace DocSignaturesComplete200ResponseSignatureWidgetRefObjectNumber {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -37,7 +37,7 @@ export namespace DocSignaturesComplete200ResponseSignatureWidgetRef {
     export namespace DocSignaturesComplete200ResponseSignatureWidgetRefNm {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -58,7 +58,7 @@ export namespace DocSignaturesComplete200ResponseSignatureWidgetRef {
     export namespace DocSignaturesComplete200ResponseSignatureWidgetRefIndex {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -77,7 +77,7 @@ export namespace DocSignaturesComplete200ResponseSignatureWidgetRef {
         export namespace Revision {
             export interface Page {
                 kind: Page.Kind;
-                pageObjectNumber: number;
+                objectNumber: number;
             }
 
             export namespace Page {

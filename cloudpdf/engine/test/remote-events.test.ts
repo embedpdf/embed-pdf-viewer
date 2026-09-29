@@ -75,7 +75,7 @@ describe('remote events: two engines, one document (the collaboration loop)', ()
       await new Promise((r) => setTimeout(r, 300));
 
       const list = await docA.pages.list();
-      const pageObjectNumber = list.pages[0].ref.pageObjectNumber;
+      const pageObjectNumber = list.pages[0].ref.objectNumber;
       const rotated = await docA.pages.rotate([toPageRef(pageObjectNumber)], 90);
 
       // A: exactly one event, its own, local.
@@ -106,9 +106,7 @@ describe('remote events: two engines, one document (the collaboration loop)', ()
       // And B's manifest absorbed the pins: a follow-up read on B sees the
       // rotation without a manual refresh.
       const listB = await docB.pages.list();
-      expect(listB.pages.find((p) => p.ref.pageObjectNumber === pageObjectNumber)?.rotation).toBe(
-        90,
-      );
+      expect(listB.pages.find((p) => p.ref.objectNumber === pageObjectNumber)?.rotation).toBe(90);
     } finally {
       await docA.close();
       await docB.close();
@@ -135,7 +133,7 @@ describe('remote events: two engines, one document (the collaboration loop)', ()
       await new Promise((r) => setTimeout(r, 300));
 
       const list = await docB.pages.list();
-      const pageObjectNumber = list.pages[0].ref.pageObjectNumber;
+      const pageObjectNumber = list.pages[0].ref.objectNumber;
       const created = await docB
         .page(toPageRef(pageObjectNumber))
         .annotations.create({ subtype: 'highlight', contents: 'from B', quadPoints: QUAD });

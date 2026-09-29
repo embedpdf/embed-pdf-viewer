@@ -82,15 +82,19 @@ export function integrationForProduct(
 }
 
 /**
+ * Where each fanned-out product starts, below its integration segment: the
+ * Viewer at its getting-started page, Headless at its overview (like Engine).
+ */
+export const DOCS_ENTRY_TOPIC = { viewer: 'getting-started', headless: '' } as const;
+
+/**
  * The canonical entry point into a fanned-out product for one integration —
  * the concrete URL, so marketing and docs links land on the reader's framework
  * without a middleware redirect hop.
  */
-export function docsGettingStartedHref(
-  product: FanoutDocsProduct,
-  integration: DocsIntegration,
-): string {
-  return `/docs/${product}/${integration}/getting-started`;
+export function docsEntryHref(product: FanoutDocsProduct, integration: DocsIntegration): string {
+  const topic = DOCS_ENTRY_TOPIC[product];
+  return `/docs/${product}/${integration}${topic ? `/${topic}` : ''}`;
 }
 
 /** Rewrites a canonical or concrete product route to one integration sibling. */

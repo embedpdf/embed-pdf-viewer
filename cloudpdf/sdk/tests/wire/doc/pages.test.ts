@@ -10,14 +10,14 @@ describe("PagesClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = {};
         const rawResponseBody = {
-            page: { kind: "objectNumber", pageObjectNumber: 1 },
+            page: { kind: "objectNumber", objectNumber: 1 },
             meta: {
                 affectedPages: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         revision: {
                             docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             generation: 1,
                         },
                         weakAnnotationState: { kind: "unknown" },
@@ -34,7 +34,7 @@ describe("PagesClient", () => {
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             cache: { contentVersion: 1, annotationVersion: 1 },
                         },
                     ],
@@ -178,7 +178,7 @@ describe("PagesClient", () => {
                 pages: [
                     {
                         index: 1,
-                        ref: { kind: "objectNumber", pageObjectNumber: 1 },
+                        ref: { kind: "objectNumber", objectNumber: 1 },
                         label: null,
                         size: { width: 1.1, height: 1.1 },
                         rotation: 1.1,
@@ -194,16 +194,16 @@ describe("PagesClient", () => {
                     },
                 ],
                 namedPages: [
-                    { name: "name", target: { kind: "page", page: { kind: "objectNumber", pageObjectNumber: 1 } } },
+                    { name: "name", target: { kind: "page", page: { kind: "objectNumber", objectNumber: 1 } } },
                 ],
             },
             meta: {
                 affectedPages: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         revision: {
                             docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             generation: 1,
                         },
                         weakAnnotationState: { kind: "unknown" },
@@ -220,7 +220,7 @@ describe("PagesClient", () => {
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             cache: { contentVersion: 1, annotationVersion: 1 },
                         },
                     ],
@@ -308,11 +308,11 @@ describe("PagesClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { key: "value" };
         const rawResponseBody = {
-            pages: [{ kind: "objectNumber", pageObjectNumber: 1 }],
+            pages: [{ kind: "objectNumber", objectNumber: 1 }],
             usage: "display",
             results: [
                 {
-                    page: { kind: "objectNumber", pageObjectNumber: 1 },
+                    page: { kind: "objectNumber", objectNumber: 1 },
                     status: "applied",
                     error: { name: "EngineError", code: "Unknown", message: "message" },
                 },
@@ -320,10 +320,10 @@ describe("PagesClient", () => {
             meta: {
                 affectedPages: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         revision: {
                             docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             generation: 1,
                         },
                         weakAnnotationState: { kind: "unknown" },
@@ -340,7 +340,7 @@ describe("PagesClient", () => {
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             cache: { contentVersion: 1, annotationVersion: 1 },
                         },
                     ],
@@ -428,13 +428,13 @@ describe("PagesClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { key: "value" };
         const rawResponseBody = {
-            insertedPages: [{ kind: "objectNumber", pageObjectNumber: 1 }],
+            insertedPages: [{ kind: "objectNumber", objectNumber: 1 }],
             layout: {
                 pageCount: 1,
                 pages: [
                     {
                         index: 1,
-                        ref: { kind: "objectNumber", pageObjectNumber: 1 },
+                        ref: { kind: "objectNumber", objectNumber: 1 },
                         label: null,
                         size: { width: 1.1, height: 1.1 },
                         rotation: 1.1,
@@ -450,16 +450,16 @@ describe("PagesClient", () => {
                     },
                 ],
                 namedPages: [
-                    { name: "name", target: { kind: "page", page: { kind: "objectNumber", pageObjectNumber: 1 } } },
+                    { name: "name", target: { kind: "page", page: { kind: "objectNumber", objectNumber: 1 } } },
                 ],
             },
             meta: {
                 affectedPages: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         revision: {
                             docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             generation: 1,
                         },
                         weakAnnotationState: { kind: "unknown" },
@@ -476,7 +476,7 @@ describe("PagesClient", () => {
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             cache: { contentVersion: 1, annotationVersion: 1 },
                         },
                     ],
@@ -569,7 +569,7 @@ describe("PagesClient", () => {
                 pages: [
                     {
                         index: 1,
-                        ref: { kind: "objectNumber", pageObjectNumber: 1 },
+                        ref: { kind: "objectNumber", objectNumber: 1 },
                         label: null,
                         size: { width: 1.1, height: 1.1 },
                         rotation: 1.1,
@@ -585,16 +585,16 @@ describe("PagesClient", () => {
                     },
                 ],
                 namedPages: [
-                    { name: "name", target: { kind: "page", page: { kind: "objectNumber", pageObjectNumber: 1 } } },
+                    { name: "name", target: { kind: "page", page: { kind: "objectNumber", objectNumber: 1 } } },
                 ],
             },
             meta: {
                 affectedPages: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         revision: {
                             docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             generation: 1,
                         },
                         weakAnnotationState: { kind: "unknown" },
@@ -611,7 +611,7 @@ describe("PagesClient", () => {
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             cache: { contentVersion: 1, annotationVersion: 1 },
                         },
                     ],
@@ -704,7 +704,7 @@ describe("PagesClient", () => {
                 pages: [
                     {
                         index: 1,
-                        ref: { kind: "objectNumber", pageObjectNumber: 1 },
+                        ref: { kind: "objectNumber", objectNumber: 1 },
                         label: null,
                         size: { width: 1.1, height: 1.1 },
                         rotation: 1.1,
@@ -720,16 +720,16 @@ describe("PagesClient", () => {
                     },
                 ],
                 namedPages: [
-                    { name: "name", target: { kind: "page", page: { kind: "objectNumber", pageObjectNumber: 1 } } },
+                    { name: "name", target: { kind: "page", page: { kind: "objectNumber", objectNumber: 1 } } },
                 ],
             },
             meta: {
                 affectedPages: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         revision: {
                             docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             generation: 1,
                         },
                         weakAnnotationState: { kind: "unknown" },
@@ -746,7 +746,7 @@ describe("PagesClient", () => {
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             cache: { contentVersion: 1, annotationVersion: 1 },
                         },
                     ],
@@ -839,7 +839,7 @@ describe("PagesClient", () => {
                 pages: [
                     {
                         index: 1,
-                        ref: { kind: "objectNumber", pageObjectNumber: 1 },
+                        ref: { kind: "objectNumber", objectNumber: 1 },
                         label: null,
                         size: { width: 1.1, height: 1.1 },
                         rotation: 1.1,
@@ -855,16 +855,16 @@ describe("PagesClient", () => {
                     },
                 ],
                 namedPages: [
-                    { name: "name", target: { kind: "page", page: { kind: "objectNumber", pageObjectNumber: 1 } } },
+                    { name: "name", target: { kind: "page", page: { kind: "objectNumber", objectNumber: 1 } } },
                 ],
             },
             meta: {
                 affectedPages: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         revision: {
                             docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             generation: 1,
                         },
                         weakAnnotationState: { kind: "unknown" },
@@ -881,7 +881,7 @@ describe("PagesClient", () => {
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             cache: { contentVersion: 1, annotationVersion: 1 },
                         },
                     ],
@@ -974,7 +974,7 @@ describe("PagesClient", () => {
                 pages: [
                     {
                         index: 1,
-                        ref: { kind: "objectNumber", pageObjectNumber: 1 },
+                        ref: { kind: "objectNumber", objectNumber: 1 },
                         label: null,
                         size: { width: 1.1, height: 1.1 },
                         rotation: 1.1,
@@ -990,16 +990,16 @@ describe("PagesClient", () => {
                     },
                 ],
                 namedPages: [
-                    { name: "name", target: { kind: "page", page: { kind: "objectNumber", pageObjectNumber: 1 } } },
+                    { name: "name", target: { kind: "page", page: { kind: "objectNumber", objectNumber: 1 } } },
                 ],
             },
             meta: {
                 affectedPages: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         revision: {
                             docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             generation: 1,
                         },
                         weakAnnotationState: { kind: "unknown" },
@@ -1016,7 +1016,7 @@ describe("PagesClient", () => {
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             cache: { contentVersion: 1, annotationVersion: 1 },
                         },
                     ],

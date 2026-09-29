@@ -160,9 +160,9 @@ describe("VersionsClient", () => {
             signatures: [
                 {
                     index: 1,
-                    field: { kind: "objectNumber", fieldObjectNumber: 1 },
+                    field: { kind: "objectNumber", objectNumber: 1 },
                     fieldName: "fieldName",
-                    widget: { ref: null, annotObjectNumber: 1, page: null, rect: null },
+                    widget: { ref: null, objectNumber: 1, page: null, rect: null },
                     signed: true,
                     kind: "signature",
                     filter: "filter",

@@ -40,7 +40,7 @@ export namespace DocFormsSetValue200Response {
                 export namespace Item {
                     export interface Page {
                         kind: Page.Kind;
-                        pageObjectNumber: number;
+                        objectNumber: number;
                     }
 
                     export namespace Page {
@@ -63,14 +63,14 @@ export namespace DocFormsSetValue200Response {
         export namespace ChangedWidgets {
             export interface Item {
                 ref: CloudPDF.DocFormsSetValue200ResponseMetaChangedWidgetsItemRef | null;
-                annotObjectNumber: number;
+                objectNumber: number;
                 page: Item.Page | null;
             }
 
             export namespace Item {
                 export interface Page {
                     kind: Page.Kind;
-                    pageObjectNumber: number;
+                    objectNumber: number;
                 }
 
                 export namespace Page {

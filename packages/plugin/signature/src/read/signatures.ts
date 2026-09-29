@@ -13,15 +13,15 @@ const EMPTY_FIELDS: readonly FormFieldRef[] = [];
 
 /** The widget object number an address names, or null for a field ref. */
 const widgetObjectOf = (field: SignatureFieldAddress): number | null => {
-  if (!('kind' in field)) return field.annotObjectNumber;
-  if (field.kind === 'objectNumber' && 'annotObjectNumber' in field) {
-    return field.annotObjectNumber;
-  }
+  if (!('kind' in field)) return field.objectNumber;
+  // An annotation ref names its page; a field ref doesn't.
+  if (field.kind === 'objectNumber' && 'page' in field) return field.objectNumber;
   return null;
 };
 
 const isFieldRef = (field: SignatureFieldAddress): field is FormFieldRef =>
-  'kind' in field && (field.kind === 'fqn' || 'fieldObjectNumber' in field);
+  'kind' in field &&
+  (field.kind === 'fqn' || (field.kind === 'objectNumber' && !('page' in field)));
 
 export function createSignatureReads(
   ctx: SignatureContext,
@@ -50,10 +50,10 @@ export function createSignatureReads(
     const widgetObject = widgetObjectOf(field);
     if (widgetObject !== null) {
       const byWidget = current.signatures.find(
-        (signature) => signature.widget?.annotObjectNumber === widgetObject,
+        (signature) => signature.widget?.objectNumber === widgetObject,
       );
       if (byWidget) return byWidget;
-      const owner = form.getFieldForWidget({ annotObjectNumber: widgetObject });
+      const owner = form.getFieldForWidget({ objectNumber: widgetObject });
       return owner ? getSignature(owner.ref) : null;
     }
     if (!isFieldRef(field)) return null;

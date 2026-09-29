@@ -66,7 +66,7 @@ export class AnnotationExporter {
     const annotations = closeExportSelection(
       selection,
       records.map((record) => toPageRef(record.pageObjectNumber)),
-      (page) => reader.listOne(page.pageObjectNumber, signal).annotations,
+      (page) => reader.listOne(page.objectNumber, signal).annotations,
     );
     assertWithinLimit(limits, 'items', annotations.length);
 
@@ -162,7 +162,7 @@ class ResourceCollector {
     }
     if (
       data.ref.kind === 'objectNumber' &&
-      fn.EPDFAnnot_GetObjectNumber(annotPtr) !== data.ref.annotObjectNumber
+      fn.EPDFAnnot_GetObjectNumber(annotPtr) !== data.ref.objectNumber
     ) {
       fn.FPDFPage_CloseAnnot(annotPtr);
       throw new EngineError(

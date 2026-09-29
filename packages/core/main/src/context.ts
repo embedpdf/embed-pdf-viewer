@@ -158,11 +158,7 @@ export function createPluginContext(
     session ? (store.getCore().documents[session.id] ?? session.stagedMeta) : null;
 
   const notFound = (ref: PageRef) =>
-    new PluginError(
-      'not-found',
-      capability,
-      `page ${ref.pageObjectNumber} is not in this document`,
-    );
+    new PluginError('not-found', capability, `page ${ref.objectNumber} is not in this document`);
 
   const queues = new Map<string, <T>(operation: () => Promise<T>) => Promise<T>>();
   const lanes = new Map<string, LatestLane>();

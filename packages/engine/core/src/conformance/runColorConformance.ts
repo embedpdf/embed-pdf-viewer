@@ -53,7 +53,7 @@ export function runColorConformance(
 
     const squareOf = async (doc: DocumentHandle) => {
       const { pages } = await doc.pages.list();
-      const page = doc.page(toPageRef(pages[0]!.ref.pageObjectNumber));
+      const page = doc.page(toPageRef(pages[0]!.ref.objectNumber));
       const { annotations } = await page.annotations.list();
       const square = annotations.find((a) => a.nm === 'colored');
       if (!square || square.subtype !== 'square') throw new Error('no square in the fixture');

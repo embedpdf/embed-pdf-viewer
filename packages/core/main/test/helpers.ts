@@ -6,7 +6,7 @@ const box = { left: 0, bottom: 0, right: 600, top: 800 } as const;
 export const page = (pageObjectNumber: number, index: number): PageLayout =>
   ({
     index,
-    ref: { kind: 'objectNumber', pageObjectNumber },
+    ref: { kind: 'objectNumber', objectNumber: pageObjectNumber },
     label: null,
     size: { width: 600, height: 800 },
     rotation: 0,

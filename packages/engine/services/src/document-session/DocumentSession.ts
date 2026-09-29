@@ -354,7 +354,7 @@ export class DocumentSession {
    * unknown page.
    */
   resolvePageRef(ref: PageRef): PageRecord {
-    return this.recordByObjectNumber(ref.pageObjectNumber);
+    return this.recordByObjectNumber(ref.objectNumber);
   }
 
   /** `resolvePageRef` over a batch, preserving order. */

@@ -157,7 +157,7 @@ export class LayerStateService {
     await this.documentPages.upsertForDocument(
       docId,
       observed.map((page) => ({
-        pageObjectNumber: page.page.pageObjectNumber,
+        pageObjectNumber: page.page.objectNumber,
         hasWeakAnnotations: requireKnownWeakAnnotationBoolean(page),
       })),
     );
@@ -549,7 +549,7 @@ export class LayerStateService {
 function requireKnownWeakAnnotationBoolean(page: PageState): boolean {
   if (page.weakAnnotationState.kind !== 'known') {
     throw new Error(
-      `cannot initialize durable manifest state from unknown weak annotation state for page ${page.page.pageObjectNumber}`,
+      `cannot initialize durable manifest state from unknown weak annotation state for page ${page.page.objectNumber}`,
     );
   }
   return page.weakAnnotationState.hasAnyWeakAnnotations;

@@ -146,7 +146,7 @@ export const encodeAnnotationsExportToken = (token: AnnotationsExportToken): str
   const { selection } = token;
   const wire: TokenSelection = {};
   if (selection.pages) {
-    wire.p = [...new Set(selection.pages.map((page) => page.pageObjectNumber))].sort(
+    wire.p = [...new Set(selection.pages.map((page) => page.objectNumber))].sort(
       (left, right) => left - right,
     );
   }
@@ -157,8 +157,8 @@ export const encodeAnnotationsExportToken = (token: AnnotationsExportToken): str
         throw new Error('an export names annotations by object number or name, not by position');
       }
       const entry: [number, number | string] = [
-        ref.page.pageObjectNumber,
-        ref.kind === 'objectNumber' ? ref.annotObjectNumber : ref.nm,
+        ref.page.objectNumber,
+        ref.kind === 'objectNumber' ? ref.objectNumber : ref.nm,
       ];
       refs.set(JSON.stringify(entry), entry);
     }
@@ -200,7 +200,7 @@ export const decodeAnnotationsExportToken = (raw: string): AnnotationsExportToke
         }
         const page = toPageRef(entry[0]);
         const [, id] = entry;
-        if (isNumber(id)) return { kind: 'objectNumber', page, annotObjectNumber: id } as const;
+        if (isNumber(id)) return { kind: 'objectNumber', page, objectNumber: id } as const;
         if (typeof id === 'string' && id.length > 0) return { kind: 'nm', page, nm: id } as const;
         throw new Error('malformed export ref');
       });

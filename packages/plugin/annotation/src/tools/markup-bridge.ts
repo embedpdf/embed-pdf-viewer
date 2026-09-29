@@ -42,7 +42,7 @@ export function wireMarkup(
         ReturnType<typeof selection.listSegments>[number]['quad'][]
       > = {};
       for (const entry of selection.getSnapshot().pages) {
-        quadsByPage[entry.page.pageObjectNumber] = entry.segments.map((segment) => segment.quad);
+        quadsByPage[entry.page.objectNumber] = entry.segments.map((segment) => segment.quad);
       }
       annotation.previewMarkup(previewSubtype, quadsByPage, tool.preset);
     } else {
@@ -77,7 +77,7 @@ export function wireMarkup(
         const last = entry.segments[entry.segments.length - 1];
         if (!last) continue;
         const anchor =
-          snapshot.end && snapshot.end.page.pageObjectNumber === entry.page.pageObjectNumber
+          snapshot.end && snapshot.end.page.objectNumber === entry.page.objectNumber
             ? { glyphQuad: snapshot.end.glyphQuad, advance: snapshot.end.advance }
             : { glyphQuad: last.quad, advance: last.advance };
         annotation.createReplaceText(

@@ -37,7 +37,7 @@ const square = (
   ref: {
     kind: 'objectNumber',
     page: PAGE,
-    annotObjectNumber: Number(id.replace(/\D/g, '') || 7),
+    objectNumber: Number(id.replace(/\D/g, '') || 7),
   },
   page: PAGE,
   subtype: 'square',

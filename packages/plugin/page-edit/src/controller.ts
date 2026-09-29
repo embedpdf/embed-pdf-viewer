@@ -39,7 +39,7 @@ export function createPageEditController(ctx: PluginContext<void>) {
   const requireEntry = (page: PageRef) => {
     const entry = ctx.getPage(page);
     if (!entry) {
-      throw new PluginError('not-found', 'page-edit', `no page ${page.pageObjectNumber}`);
+      throw new PluginError('not-found', 'page-edit', `no page ${page.objectNumber}`);
     }
     return entry;
   };

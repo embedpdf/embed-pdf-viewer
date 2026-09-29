@@ -13,7 +13,7 @@ const ARM_FIXTURES: PdfActionNode[] = [
     subtype: 'GoTo',
     destination: {
       kind: 'fitR',
-      page: { kind: 'objectNumber', pageObjectNumber: 3 },
+      page: { kind: 'objectNumber', objectNumber: 3 },
       x: 1,
       y: 2,
       width: 3,
@@ -219,7 +219,7 @@ describe('PDF action schemas', () => {
   test('carries a destination-form OpenAction and rejects both forms at once', () => {
     const destination = {
       kind: 'xyz' as const,
-      page: { kind: 'objectNumber', pageObjectNumber: 5 },
+      page: { kind: 'objectNumber', objectNumber: 5 },
       x: 10,
       y: 92,
       zoom: 1.5,

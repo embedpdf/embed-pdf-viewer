@@ -74,7 +74,7 @@ export function runAnnotationAppearanceConformance(
       try {
         const { pageState, appearances } = await collect(doc, opts);
 
-        expect(pageState.page.pageObjectNumber).toBe(opts.fixture.pageObjectNumber);
+        expect(pageState.page.objectNumber).toBe(opts.fixture.pageObjectNumber);
         expect(appearances.length >= opts.fixture.minAppearanceCount).toBe(true);
 
         for (const appearance of appearances) {

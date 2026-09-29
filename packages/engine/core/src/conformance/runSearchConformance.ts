@@ -77,9 +77,9 @@ export function runSearchConformance(
           text: fixture.presentLiteral,
         });
         expect(matches.length > 0).toBe(true);
-        expect(
-          matches.some((m) => m.page.pageObjectNumber === fixture.presentPageObjectNumber),
-        ).toBe(true);
+        expect(matches.some((m) => m.page.objectNumber === fixture.presentPageObjectNumber)).toBe(
+          true,
+        );
         for (const m of matches) {
           expect(m.count > 0).toBe(true);
           expect(m.segments.length > 0).toBe(true);
@@ -185,7 +185,7 @@ export function runSearchConformance(
           limit: { pages: 1 },
         });
         expect(slice.matches.length > 0).toBe(true);
-        expect(slice.matches[0].page.pageObjectNumber).toBe(fixture.presentPageObjectNumber);
+        expect(slice.matches[0].page.objectNumber).toBe(fixture.presentPageObjectNumber);
       } finally {
         await doc.close();
       }
@@ -256,7 +256,7 @@ export function runSearchConformance(
           text: fixture.presentRegex,
           regex: true,
         });
-        const key = (m: SearchMatch) => `${m.page.pageObjectNumber}:${m.start}:${m.count}`;
+        const key = (m: SearchMatch) => `${m.page.objectNumber}:${m.start}:${m.count}`;
         const allKeys = new Set(all.matches.map(key));
         // Each flag can only remove matches, never invent them — true for
         // any fixture pattern, so the suite needs no per-fixture counts.
@@ -277,7 +277,7 @@ export function runSearchConformance(
     test('ignoreWhitespace keeps every default hit and finds the space-free needle', async () => {
       const doc = await openFixture(engine, opts);
       try {
-        const key = (m: SearchMatch) => `${m.page.pageObjectNumber}:${m.start}:${m.count}`;
+        const key = (m: SearchMatch) => `${m.page.objectNumber}:${m.start}:${m.count}`;
         const plain = await collectAll(doc, { text: fixture.presentLiteral });
         // Dropping whitespace can only add matches over the collapsing default
         // fold — every default hit survives, at the same place.

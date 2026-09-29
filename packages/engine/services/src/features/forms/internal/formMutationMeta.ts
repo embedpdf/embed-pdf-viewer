@@ -13,7 +13,7 @@ export function formMutationMeta(
 ): FormMutationMeta {
   const pages = new Set<number>();
   for (const widget of changedWidgets) {
-    if (widget.page) pages.add(widget.page.pageObjectNumber);
+    if (widget.page) pages.add(widget.page.objectNumber);
   }
   return {
     affectedPages: [...pages].map((pageObjectNumber) => session.pageState(pageObjectNumber)),

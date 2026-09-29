@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 import {
+  DOCS_ENTRY_TOPIC,
   docsIntegrationFromPath,
   INTEGRATION_COOKIE,
   integrationForProduct,
@@ -22,9 +23,9 @@ export function middleware(request: NextRequest) {
 
   const redirectToVariant = (product: 'headless' | 'viewer', variant: string) => {
     const rest = segments.slice(3).join('/');
-    const topic = rest || 'getting-started';
+    const topic = rest || DOCS_ENTRY_TOPIC[product];
     const url = request.nextUrl.clone();
-    url.pathname = `/docs/${product}/${variant}/${topic}${isMarkdown ? '.md' : ''}`;
+    url.pathname = `/docs/${product}/${variant}${topic ? `/${topic}` : ''}${isMarkdown ? '.md' : ''}`;
     return NextResponse.redirect(url, 307);
   };
 

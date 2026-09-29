@@ -20,7 +20,7 @@ export type AnnotationRef =
   | {
       kind: 'objectNumber';
       page: PageRef;
-      annotObjectNumber: number;
+      objectNumber: number;
     }
   | {
       kind: 'nm';

@@ -24,7 +24,7 @@ const NO_FLAGS: AnnotationFlags = {
   toggleNoView: false,
   lockedContents: false,
 };
-const REF: AnnotationRef = { kind: 'objectNumber', page: PAGE, annotObjectNumber: 30 };
+const REF: AnnotationRef = { kind: 'objectNumber', page: PAGE, objectNumber: 30 };
 
 const freeTextDTO = (
   contents: string,

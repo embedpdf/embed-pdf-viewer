@@ -232,7 +232,7 @@ export class CloudDocumentFormsService implements DocumentFormsService {
       const bytes = new ArrayBuffer(appearance.pdf.byteLength);
       new Uint8Array(bytes).set(appearance.pdf);
       const form = buildMutationForm(
-        { resource: 'r0', pageIndex: appearance.pageIndex ?? 0 },
+        { resource: 'r0' },
         { r0: { bytes, mimeType: 'application/pdf', name: 'appearance.pdf' } },
       );
       const result = await this.http.postMultipartJson(

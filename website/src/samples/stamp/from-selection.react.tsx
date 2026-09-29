@@ -71,7 +71,7 @@ function MakeStamp() {
   const [status, setStatus] = useState('draw a shape, select it, make a stamp');
 
   // One page at a time: a stamp is one page of artwork.
-  const pages = new Set(selected.map((a) => a.page.pageObjectNumber));
+  const pages = new Set(selected.map((a) => a.page.objectNumber));
   const canMake = selection.length > 0 && pages.size === 1 && documentId !== null;
 
   const make = async () => {

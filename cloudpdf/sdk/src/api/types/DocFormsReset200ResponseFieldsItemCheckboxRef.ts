@@ -9,7 +9,7 @@ export type DocFormsReset200ResponseFieldsItemCheckboxRef =
 export namespace DocFormsReset200ResponseFieldsItemCheckboxRef {
     export interface ObjectNumber {
         kind: "objectNumber";
-        fieldObjectNumber: number;
+        objectNumber: number;
     }
 
     export interface Fqn {

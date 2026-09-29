@@ -77,14 +77,14 @@ export class LocalDocumentFormsService implements DocumentFormsService {
       const snapshot = await this.forwardAbort(this.list(), signal);
       const field = snapshot.fields.find((f) =>
         ref.kind === 'objectNumber'
-          ? f.fieldObjectNumber === ref.fieldObjectNumber
+          ? f.ref.kind === 'objectNumber' && f.ref.objectNumber === ref.objectNumber
           : f.name === ref.name,
       );
       if (!field) {
         throw new EngineError(
           EngineErrorCode.NotFound,
           ref.kind === 'objectNumber'
-            ? `form field not found: object ${ref.fieldObjectNumber}`
+            ? `form field not found: object ${ref.objectNumber}`
             : `form field not found: "${ref.name}"`,
         );
       }
@@ -217,13 +217,10 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     if (rejected) return rejected;
     const docId = this.docId;
     const pdf = appearance.pdf.slice().buffer as ArrayBuffer;
-    const pageIndex = appearance.pageIndex ?? 0;
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'forms.setSignatureAppearance', jobId, docId, ref, pdf, pageIndex }, [
-            pdf,
-          ]),
+          wirePack({ kind: 'forms.setSignatureAppearance', jobId, docId, ref, pdf }, [pdf]),
       },
       { priority: Priority.HIGH },
     );

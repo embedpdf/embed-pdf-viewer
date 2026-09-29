@@ -63,9 +63,7 @@ export function registerEffectRunners(
     const primary = records[0];
     if (
       !primary ||
-      records.some(
-        (record) => !record || record.page.pageObjectNumber !== primary.page.pageObjectNumber,
-      )
+      records.some((record) => !record || record.page.objectNumber !== primary.page.objectNumber)
     ) {
       return;
     }

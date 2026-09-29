@@ -21,7 +21,7 @@ EditorStyle [InterfaceDeclaration] (from packages/framework/web/src/rich-text-ed
 IndexedDbByteStoreOptions [InterfaceDeclaration] (from packages/framework/web/src/byte-store.ts): export interface IndexedDbByteStoreOptions{ storeName?: string; }
 LineModel [InterfaceDeclaration] (from packages/framework/web/src/web-font-metrics.ts): export interface LineModel{ ascent: number; descent: number; lineHeight: number; }
 ObjectUrlImageSource [InterfaceDeclaration] (from packages/framework/web/src/painted-image.ts): export interface ObjectUrlImageSource{ objectUrl():{ abortWith(signal: AbortSignal): PromiseLike<{ url: string; revoke(): void} >; } ; }
-PageRef [InterfaceDeclaration] (from packages/framework/web/src/page-ref.ts): export interface PageRef{ readonly kind: 'objectNumber'; readonly pageObjectNumber: number; }
+PageRef [InterfaceDeclaration] (from packages/framework/web/src/page-ref.ts): export interface PageRef{ readonly kind: 'objectNumber'; readonly objectNumber: number; }
 PaintedImageCallbacks [InterfaceDeclaration] (from packages/framework/web/src/painted-image.ts): export interface PaintedImageCallbacks{ onPainted(): void; onUnpainted(): void; }
 PickFileOptions [InterfaceDeclaration] (from packages/framework/web/src/file-picker.ts): export interface PickFileOptions{ accept?: string; multiple?: boolean; }
 RichTextEditorAlign [TypeAliasDeclaration] (from packages/framework/web/src/rich-text-editor.ts): export type RichTextEditorAlign = 'left' | 'center' | 'right' | 'justify';

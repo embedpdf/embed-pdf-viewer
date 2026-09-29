@@ -20,7 +20,7 @@ const FormWidgetShape = {
   // The annotation address, present exactly when the widget is indirect and placed.
   ref: AnnotationRefSchema.nullable(),
   // 0 = direct (unaddressable) widget; null page = unplaced widget.
-  annotObjectNumber: z.number().int().nonnegative(),
+  objectNumber: z.number().int().nonnegative(),
   page: PageRefSchema.nullable(),
 };
 
@@ -56,7 +56,6 @@ export const FormValueEntrySchema: z.ZodType<FormValueEntry> = z.discriminatedUn
 
 const FormFieldBaseShape = {
   ref: FormFieldRefSchema,
-  fieldObjectNumber: z.number().int().nonnegative(),
   name: z.string(),
   origin: z.enum(['acroform', 'recovered']),
   readOnly: z.boolean(),

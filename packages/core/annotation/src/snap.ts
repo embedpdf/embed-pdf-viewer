@@ -58,7 +58,7 @@ export function computeMoveSnap(
   threshold: number,
   pageBox: Rect | undefined,
 ): SnapResult {
-  const pageObjectNumber = page.pageObjectNumber;
+  const pageObjectNumber = page.objectNumber;
   const moving = new Set(ids);
   // Screen-anchored (`noZoom`/`noRotate`) annotations sit outside the snapping
   // system, both ways: their page-space footprint depends on the view, so
@@ -78,7 +78,7 @@ export function computeMoveSnap(
       .filter(
         (id) =>
           !moving.has(id) &&
-          model.byId[id].page.pageObjectNumber === pageObjectNumber &&
+          model.byId[id].page.objectNumber === pageObjectNumber &&
           isSelectable(model, id) &&
           !anchorModeOf(model.byId[id]),
       )

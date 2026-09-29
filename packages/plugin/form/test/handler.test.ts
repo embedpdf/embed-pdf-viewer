@@ -105,13 +105,13 @@ describe('form place handler', () => {
     handler.onMove?.(
       sample({
         page: { ref: toPageRef(99), point: { x: 1, y: 1 } },
-        project: (page) => (page.pageObjectNumber === PON ? { x: 90, y: 40 } : null),
+        project: (page) => (page.objectNumber === PON ? { x: 90, y: 40 } : null),
       }),
     );
     handler.onUp?.(
       sample({
         phase: 'up',
-        project: (page) => (page.pageObjectNumber === PON ? { x: 110, y: 60 } : null),
+        project: (page) => (page.objectNumber === PON ? { x: 110, y: 60 } : null),
       }),
     );
     await flush();
@@ -150,7 +150,7 @@ describe('form place handler', () => {
     handler.onDown(at('down', 100, 100));
     handler.onUp?.(at('up', 100, 100));
     await flush();
-    expect(selects).toEqual([{ kind: 'objectNumber', annotObjectNumber: 42, page: PAGE_REF }]);
+    expect(selects).toEqual([{ kind: 'objectNumber', objectNumber: 42, page: PAGE_REF }]);
 
     // Tool changes while the engine write runs → stale, no selection.
     let live = 'form-text';

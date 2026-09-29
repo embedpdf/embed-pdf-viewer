@@ -40,4 +40,4 @@ the field; anywhere else it is placed as a stamp.
 
 Requires `@embedpdf/plugin-form`; optional `@embedpdf/plugin-stamp`,
 `@embedpdf/plugin-annotation`, `@embedpdf/plugin-interaction`. See the docs
-page `headless/plugins/signature` for the full contract.
+page `headless/forms/signatures` for the full contract.

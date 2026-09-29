@@ -1,0 +1,252 @@
+---
+title: Signatures
+description: Sign documents with a drawn, typed or uploaded signature and a key you control, check the signatures a document has, and warn before an edit breaks one.
+---
+
+import { Callout } from '@/components/docs/callout';
+
+# Signatures
+
+A digital signature has two parts: the **mark**, what people see in the signature field, such as a
+drawn signature; and the **key**, which seals the document so any later change shows. The signature
+plugin signs with both, checks the signatures a document already has, and warns before an edit would
+break one.
+
+Register `signaturePlugin()` next to `formPlugin()` and `stampPlugin()`, with the key to sign with:
+
+<Example name="signature/basic" mode="open" />
+
+```ts
+import { indexedDbKeyStore, personalSigner, signaturePlugin } from '@embedpdf/react/signature';
+
+signaturePlugin({
+  key: () => personalSigner({ subject: 'Ada Lovelace', store: indexedDbKeyStore('my-app-keys') }),
+  trust: { anchors: async () => [rootCertificate] }, // the certificates you trust
+});
+```
+
+## Sign a field
+
+```ts
+const signature = useSignature();
+
+const { version } = await signature.sign({
+  field: toFieldRef('approval'),
+  mark: { assetId },
+  signer: { reason: 'Approved', location: 'Amsterdam' },
+});
+```
+
+The mark becomes what the field shows, the key seals the document, and the signed document is saved
+as a new version. If anything fails along the way, nothing is left half-signed.
+
+A mark is a stamp from a person's signature library, or image bytes you bring:
+
+```ts
+{ assetId } // a stamp, drawn, typed or uploaded; see "A person's signatures" below
+{ source: pngBytes } // a PNG, a JPEG, or a one-page PDF
+```
+
+## Let people click to sign
+
+People can also arm their signature and click where it goes, as in Preview. With the stamp plugin, arm
+a mark from a signature library:
+
+- **over an empty signature field**, the click signs it;
+- **over a signed field**, nothing happens;
+- **anywhere else**, the mark is placed as a stamp.
+
+`placeMark()` does the same from code:
+
+```ts
+await signature.placeMark({ assetId }, { field: toFieldRef('approval') }); // signs the field
+await signature.placeMark({ assetId }, { page: page.ref, at: { x: 120, y: 90 } }); // a stamp
+```
+
+What happens in a field depends on `mode`: `'sign'` signs it, `'visual'` only draws the mark in,
+and `'ask'` asks your UI first through `onSignRequested`, so you can show your own sign dialog.
+
+## Fill a field without signing
+
+Sometimes a signature only needs to look signed, such as for a form that gets printed. Draw the mark
+into the field without sealing anything:
+
+```ts
+await signature.fillField(toFieldRef('approval'), { source: pngBytes });
+await signature.clearField(toFieldRef('approval'));
+```
+
+A signed field can't be filled or cleared: what it shows is part of what was signed.
+
+## The key
+
+The engine never holds a key. You give the plugin a **signer**, which does the signing:
+
+```ts
+import { createTestSigner, personalSigner, remoteSigner, webCryptoSigner } from '@embedpdf/react/signature';
+
+// Your own key and certificate chain
+webCryptoSigner({ privateKey, certificateChain: [leaf, issuer] });
+
+// Your signing service or hardware module: only the document's fingerprint leaves the browser
+remoteSigner({ sign: ({ digest, algorithm, subFilter }) => api.sign(digest, algorithm, subFilter) });
+
+// A key per person, created in the browser and kept there, never readable
+personalSigner({ subject: 'Ada Lovelace', store: indexedDbKeyStore('my-app-keys') });
+
+// For tests and demos
+createTestSigner({ commonName: 'Demo' });
+```
+
+A personal signer works like signing in Preview, with real cryptography: a reader who trusts that
+person's certificate sees a valid signature, and everyone else sees "validity unknown", the honest
+answer for a key the person made themselves. For signatures everyone can check, sign with a
+certificate from a trusted provider, through `webCryptoSigner` or `remoteSigner`.
+
+### Signing in two steps
+
+When the key signs somewhere else, such as on a phone or in a signing service that asks for approval,
+split the signing in two:
+
+```ts
+const { id, digest } = await signature.prepareSignature({ field, mark: { assetId } });
+const cms = await myService.sign(digest); // may take minutes
+await signature.completeSignature(id, cms);
+```
+
+While a signature is prepared, the document can't be changed, so nothing can slip in between.
+`signature.cancelPending()` gives up.
+
+## Check the signatures
+
+```tsx
+const { signatures } = useSignatureState();
+
+signatures.map((sig) => (
+  <li key={sig.field.name}>
+    {sig.field.name}: {sig.verdict?.summary ?? 'checking…'}
+  </li>
+));
+```
+
+A verdict's `summary` is:
+
+| Summary             | Means                                                               |
+| :------------------ | :------------------------------------------------------------------ |
+| `'valid'`           | Nothing changed since it was signed, and you trust the signer       |
+| `'valid-untrusted'` | Nothing changed, but the signer's certificate isn't one you trust   |
+| `'invalid'`         | The document changed in a way the signature doesn't allow           |
+| `'indeterminate'`   | It couldn't be checked, for example because a certificate is missing |
+
+The plugin checks the signatures when the document opens, and again after every change. For a
+detailed report of what changed since a signature, rule by rule, use `signature.analyzeChanges()`.
+
+## Warn before an edit breaks a signature
+
+After an approval signature, filling in the form and adding more signatures keep it valid, but an
+annotation doesn't. The plugin warns you the moment a change would break a signature once it's saved,
+as Acrobat does:
+
+```ts
+useSignatureEvent(
+  (signature) => signature.onInvalidationPredicted,
+  ({ field }) => toast(`This change will break the signature in "${field.name}" when saved.`),
+);
+```
+
+`signature.getProtection()` tells you what the document's signatures allow, before anyone tries. A
+signer who wants comments to stay allowed signs with a certification that allows them.
+
+## A person's signatures
+
+A person's signature and initials are stamps, in a library of kind `'signatures'`, drawn, typed or
+uploaded with the [stamp plugin](../annotations/stamps):
+
+```ts
+const { library } = await stamp.createLibrary('Ada Lovelace', { kind: 'signatures' });
+await stamp.createAsset({ libraryId: library.id, name: 'signature', label: 'Signature', mark: { kind: 'ink', strokes } });
+await stamp.createAsset({
+  libraryId: library.id,
+  name: 'initials',
+  label: 'Initials',
+  mark: { kind: 'text', text: 'AL', fontFamily: 'times-italic' },
+});
+```
+
+`useSignerRows()` lists each person with their signature and initials, for a picker. The library is
+a normal PDF, so Acrobat can open it too.
+
+## "Sign here" in a form
+
+With the [form layer](index), an empty signature field shows a "sign here" button. Clicking it makes
+the field the **target**: the next mark the person picks goes there. A signed field, clicked, asks your
+UI to show its details:
+
+```ts
+signature.setTarget(toFieldRef('approval')); // the next mark goes here; null clears
+```
+
+| Event                   | Fires when                                     | Show                     |
+| :---------------------- | :--------------------------------------------- | :----------------------- |
+| `onTargetChanged`       | A field became the target                      | your signatures panel    |
+| `onSignRequested`       | In `'ask'` mode, a mark was dropped on a field | your sign dialog         |
+| `onInspectionRequested` | A signed field was clicked                     | the signature's details  |
+
+## Settings
+
+Set them when you register the plugin.
+
+| Setting        | What it does                                                           | Default                         |
+| :------------- | :--------------------------------------------------------------------- | :------------------------------ |
+| `key`          | The signer, or a function that returns one when someone signs          | none                            |
+| `mode`         | What a mark does in a field: `'sign'`, `'visual'` or `'ask'`           | `'sign'` with a key, else `'visual'` |
+| `trust`        | The certificates you trust, for checking signatures                    | none                            |
+| `allowCertify` | Let a first signature be a certification, which sets what stays allowed | `false`                        |
+
+## Events
+
+```ts
+useSignatureEvent(
+  (signature) => signature.onInvalidationPredicted,
+  () => showWarning('Saving this change will break a signature.'),
+);
+```
+
+| Event                     | Fires when                                          | Carries              |
+| :------------------------ | :-------------------------------------------------- | :------------------- |
+| `onSigned`                | A field was signed                                  | `field`, `version`   |
+| `onFilled`, `onCleared`   | A mark was drawn into a field, or removed           | `field`              |
+| `onValidated`             | The signatures were checked                         | `verdicts`           |
+| `onProtectionChanged`     | What the signatures allow changed                   | `protection`         |
+| `onInvalidationPredicted` | A change would break a signature once saved         | `field`              |
+
+The events for your UI are in ["Sign here" in a form](#sign-here-in-a-form).
+
+## Permissions
+
+| Permission         | What it allows                                     | Check                     |
+| :----------------- | :------------------------------------------------- | :------------------------ |
+| `doc.sign`         | Signing                                            | `signature.canSign()`     |
+| `doc.sign.certify` | Signing a certification                            | `signature.canCertify()`  |
+| `doc.forms.fill`   | Drawing a mark into a field without signing        | `signature.canFill()`     |
+| `doc.download`     | Reading the exact bytes a signature covers          | `signature.canReadRevision()` |
+
+On a signed document, the engine also refuses what its signatures forbid.
+
+## Good to know
+
+### Which bytes are checked
+
+The plugin checks the document as it is in the viewer, with changes that haven't been downloaded yet,
+so the verdict is the one the downloaded file will get. `validate({ until: 'persisted' })` checks the
+file as it was opened.
+
+### The signed bytes
+
+`signature.readRevision({ revisionIndex })` gives you the exact version of the file a signature
+covers, for an audit trail.
+
+<Callout type="info">
+  How signatures are stored, and what each certification allows, is on
+  [Digital signatures](/docs/engine/forms/signatures).
+</Callout>

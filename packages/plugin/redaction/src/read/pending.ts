@@ -63,13 +63,13 @@ export function createPendingReads({
 
   /** The whole document's marks, the same array while no page's marks changed. */
   const allMarks = memo(
-    () => pages().map((page) => marksOn(page.pageObjectNumber)),
+    () => pages().map((page) => marksOn(page.objectNumber)),
     (...perPage: (readonly RedactionMark[])[]): readonly RedactionMark[] =>
       perPage.some((marks) => marks.length) ? perPage.flat() : EMPTY,
   );
 
   const listPending = (filter?: RedactionMarkFilter): readonly RedactionMark[] =>
-    filter?.page ? marksOn(filter.page.pageObjectNumber) : allMarks();
+    filter?.page ? marksOn(filter.page.objectNumber) : allMarks();
 
   const getPending = (ref: AnnotationRef): RedactionMark | null => {
     const key = annotationKey(ref);

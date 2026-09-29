@@ -198,7 +198,7 @@ export function createDispatcher(
         const field = fields.find((candidate) =>
           target.kind === 'objectNumber'
             ? candidate.ref.kind === 'objectNumber' &&
-              candidate.ref.fieldObjectNumber === target.fieldObjectNumber
+              candidate.ref.objectNumber === target.objectNumber
             : candidate.name === target.name,
         );
         return field?.actions?.[source.event] ?? null;

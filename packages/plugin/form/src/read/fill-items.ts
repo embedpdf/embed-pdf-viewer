@@ -97,7 +97,7 @@ export function projectWidget(
     fieldRef: field.ref,
     annotObjectNumber,
     annotationRef:
-      field.widgets.find((widget) => widget.annotObjectNumber === annotObjectNumber)?.ref ?? null,
+      field.widgets.find((widget) => widget.objectNumber === annotObjectNumber)?.ref ?? null,
     box,
     disabled: field.readOnly || writing[key] === true,
     label: field.alternateName ?? field.name,
@@ -114,7 +114,7 @@ export function projectWidget(
         comb: field.comb,
       };
     case 'checkbox': {
-      const toggle = field.widgets.find((widget) => widget.annotObjectNumber === annotObjectNumber);
+      const toggle = field.widgets.find((widget) => widget.objectNumber === annotObjectNumber);
       return {
         ...base,
         control: 'toggle',
@@ -124,7 +124,7 @@ export function projectWidget(
       };
     }
     case 'radio': {
-      const toggle = field.widgets.find((widget) => widget.annotObjectNumber === annotObjectNumber);
+      const toggle = field.widgets.find((widget) => widget.objectNumber === annotObjectNumber);
       return {
         ...base,
         control: 'toggle',
@@ -177,10 +177,10 @@ export function fillItems(
   const items: FillItem[] = [];
   for (const field of index.snapshot.fields) {
     for (const widget of field.widgets) {
-      if (widget.page?.pageObjectNumber !== pageObjectNumber) continue;
-      const box = boxes[widget.annotObjectNumber];
+      if (widget.page?.objectNumber !== pageObjectNumber) continue;
+      const box = boxes[widget.objectNumber];
       if (!box) continue;
-      const item = projectWidget(field, widget.annotObjectNumber, writing, box);
+      const item = projectWidget(field, widget.objectNumber, writing, box);
       if (item) items.push(item);
     }
   }
@@ -202,6 +202,6 @@ export function fillItemForWidget(
 ): FillItem | null {
   const field = fieldForWidget(index, annotObjectNumber);
   if (!field) return null;
-  if (!field.widgets.some((widget) => widget.annotObjectNumber === annotObjectNumber)) return null;
+  if (!field.widgets.some((widget) => widget.objectNumber === annotObjectNumber)) return null;
   return projectWidget(field, annotObjectNumber, writing, box);
 }

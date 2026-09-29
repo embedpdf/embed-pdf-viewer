@@ -66,7 +66,7 @@ export function runActionsConformance(
         expect(scriptOf(snapshot.didPrint?.root)).toMatch(/Did Print/);
 
         const form = await doc.forms.list();
-        expect(form.calculationOrder).toEqual([{ kind: 'objectNumber', fieldObjectNumber: 9 }]);
+        expect(form.calculationOrder).toEqual([{ kind: 'objectNumber', objectNumber: 9 }]);
       } finally {
         await doc.close();
       }
@@ -92,11 +92,11 @@ export function runActionsConformance(
         const snapshot = await doc.page(firstPage.ref).annotations.list();
         const button = snapshot.annotations.find(
           (annotation) =>
-            annotation.ref.kind === 'objectNumber' && annotation.ref.annotObjectNumber === 7,
+            annotation.ref.kind === 'objectNumber' && annotation.ref.objectNumber === 7,
         );
         const link = snapshot.annotations.find(
           (annotation) =>
-            annotation.ref.kind === 'objectNumber' && annotation.ref.annotObjectNumber === 8,
+            annotation.ref.kind === 'objectNumber' && annotation.ref.objectNumber === 8,
         );
         expect(button?.actions?.activate?.root?.type).toBe('uri');
         // A link carries both planes: the base-level scripting action model
@@ -154,7 +154,7 @@ export function runActionsConformance(
       try {
         const page = (await doc.pages.list()).pages[0];
         const snapshot = await doc.page(page.ref).annotations.list();
-        const pageObjectNumber = page.ref.pageObjectNumber;
+        const pageObjectNumber = page.ref.objectNumber;
         const rootOf = (nm: string) => {
           const annotation = snapshot.annotations.find((candidate) => candidate.nm === nm);
           expect(Boolean(annotation)).toBe(true);
@@ -323,7 +323,7 @@ export function runActionsConformance(
         const snapshot = await doc.actions!.get();
         expect(DocumentActionsSnapshotSchema.safeParse(snapshot).success).toBe(true);
         expect(snapshot.openAction).toBeNull();
-        const pageObjectNumber = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
+        const pageObjectNumber = (await doc.pages.list()).pages[0].ref.objectNumber;
         // The file's [/XYZ 10 700 1.5] on a letter page, from the page's top-left.
         expect(snapshot.openDestination).toEqual({
           kind: 'xyz',

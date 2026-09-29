@@ -55,7 +55,7 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
   const refKey = (ref: unknown): string => {
     const value = ref as AnyRecord | null | undefined;
     return value?.kind === 'objectNumber'
-      ? `obj:${String(value.fieldObjectNumber)}`
+      ? `obj:${String(value.objectNumber)}`
       : `fqn:${String(value?.name ?? '')}`;
   };
   const diagnostic = (code: string, message: string): void => {

@@ -113,7 +113,7 @@ function makeAssetEngine(
   const namedPages = () => [
     ...[...names.entries()].map(([name, pageObjectNumber]) => ({
       name,
-      target: pages.some((page) => page.ref.pageObjectNumber === pageObjectNumber)
+      target: pages.some((page) => page.ref.objectNumber === pageObjectNumber)
         ? { kind: 'page' as const, page: toPageRef(pageObjectNumber) }
         : { kind: 'dangling' as const },
     })),
@@ -126,7 +126,7 @@ function makeAssetEngine(
   const setName = vi.fn(async (input: { name: string; page: PageRef; replace?: string }) => {
     if (input.replace !== undefined) names.delete(input.replace);
     names.delete(input.name);
-    names.set(input.name, input.page.pageObjectNumber);
+    names.set(input.name, input.page.objectNumber);
     return { layout: layout(), meta: { affectedPages: [], cacheDelta: null } };
   });
   const removeName = vi.fn(async (input: { name: string }) => {
@@ -136,16 +136,16 @@ function makeAssetEngine(
   const catalogEntries = { ...(seed?.catalog ?? {}) };
   const pageEntries = new Map<number, MetadataSeed>(
     pages.map((page) => [
-      page.ref.pageObjectNumber,
-      { ...(seed?.pages?.[page.ref.pageObjectNumber] ?? {}) },
+      page.ref.objectNumber,
+      { ...(seed?.pages?.[page.ref.objectNumber] ?? {}) },
     ]),
   );
   const close = vi.fn(async () => {});
   const extract = vi.fn(async (refs: PageRef[]) =>
-    new TextEncoder().encode(`%PDF-page-${refs[0].pageObjectNumber}`),
+    new TextEncoder().encode(`%PDF-page-${refs[0].objectNumber}`),
   );
   const insert = vi.fn(async (_bytes: Uint8Array | ArrayBuffer, _toIndex?: number) => {
-    const pageObjectNumber = Math.max(99, ...pages.map((page) => page.ref.pageObjectNumber)) + 1;
+    const pageObjectNumber = Math.max(99, ...pages.map((page) => page.ref.objectNumber)) + 1;
     pages = [
       ...pages,
       {
@@ -162,7 +162,7 @@ function makeAssetEngine(
     };
   });
   const insertBlank = vi.fn(async (spec: { size: { width: number; height: number } }) => {
-    const pageObjectNumber = Math.max(99, ...pages.map((page) => page.ref.pageObjectNumber)) + 1;
+    const pageObjectNumber = Math.max(99, ...pages.map((page) => page.ref.objectNumber)) + 1;
     pages = [
       ...pages,
       { ref: toPageRef(pageObjectNumber), index: pages.length, size: { ...spec.size } },
@@ -182,9 +182,9 @@ function makeAssetEngine(
     meta: { affectedPages: [], cacheDelta: null },
   }));
   const deletePages = vi.fn(async (refs: PageRef[]) => {
-    const deleted = refs.map((ref) => ref.pageObjectNumber);
+    const deleted = refs.map((ref) => ref.objectNumber);
     pages = pages
-      .filter((page) => !deleted.includes(page.ref.pageObjectNumber))
+      .filter((page) => !deleted.includes(page.ref.objectNumber))
       .map((page, index) => ({ ...page, index }));
     for (const pageObjectNumber of deleted) {
       pageEntries.delete(pageObjectNumber);
@@ -245,7 +245,7 @@ function makeAssetEngine(
       setName,
       removeName,
     },
-    page: ({ pageObjectNumber }: PageRef) => ({
+    page: ({ objectNumber: pageObjectNumber }: PageRef) => ({
       pieceInfo: pageService(pageObjectNumber),
       annotations: { create: createAnnotation },
       render: {
@@ -380,7 +380,7 @@ describe('stamp plugin: library import', () => {
     expect(
       stamp
         .listAssets({ libraryId: libraryId })
-        .map((asset) => [asset.name, asset.label, asset.page.pageObjectNumber]),
+        .map((asset) => [asset.name, asset.label, asset.page.objectNumber]),
     ).toEqual([
       ['#alpha', 'Alpha', 100],
       ['Approved', 'Goedgekeurd', 101],
@@ -682,7 +682,7 @@ describe('stamp plugin: from a selection', () => {
     } as unknown as DocumentHandle;
     const { stamp } = makeStamp(engine, { target: { id: 'doc-1', handle: target } });
     const libraryId = await stamp.importLibrary(pdfBytes());
-    const refs = [{ kind: 'objectNumber' as const, page: toPageRef(5), annotObjectNumber: 9 }];
+    const refs = [{ kind: 'objectNumber' as const, page: toPageRef(5), objectNumber: 9 }];
 
     const id = await stamp.createAssetFromAnnotations('doc-1', toPageRef(5), refs, {
       libraryId,
@@ -731,7 +731,7 @@ describe('stamp plugin: placement', () => {
 
   it('placeAsset places without the pointer through the same payload', async () => {
     const { engine } = makeAssetEngine(1, { names: { 'Approved=Goedgekeurd': 100 } });
-    const ref = { kind: 'objectNumber', page: toPageRef(7), annotObjectNumber: 42 };
+    const ref = { kind: 'objectNumber', page: toPageRef(7), objectNumber: 42 };
     const placeStamp = vi.fn(async () => ref);
     const { stamp } = makeStamp(engine, { annotation: { placeStamp } });
     const libraryId = await stamp.importLibrary(pdfBytes());

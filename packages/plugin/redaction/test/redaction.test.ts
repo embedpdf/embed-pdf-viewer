@@ -20,7 +20,7 @@ import { initialRedactionState, type RedactionState } from '../src/model';
 
 const PAGE = toPageRef(7);
 const OTHER_PAGE = toPageRef(8);
-const MARK: AnnotationRef = { kind: 'objectNumber', annotObjectNumber: 41, page: PAGE };
+const MARK: AnnotationRef = { kind: 'objectNumber', objectNumber: 41, page: PAGE };
 const LOCAL_ORIGIN = {
   kind: 'local',
   sessionId: 'session-a',
@@ -64,20 +64,20 @@ function fakeAnnotation(options: { canCreate?: boolean; raws?: AnnotationDTO[] }
   return {
     canCreate: () => options.canCreate ?? true,
     createFromSelection: vi.fn(async () => [MARK]),
-    list: ({ page }: { page: { pageObjectNumber: number } }) => {
-      let list = lists.get(page.pageObjectNumber);
+    list: ({ page }: { page: { objectNumber: number } }) => {
+      let list = lists.get(page.objectNumber);
       if (!list) {
         list = raws
-          .filter((raw) => raw.ref.page.pageObjectNumber === page.pageObjectNumber)
+          .filter((raw) => raw.ref.page.objectNumber === page.objectNumber)
           .map((raw) => ({ ref: raw.ref, bounds: { x: 10, y: 10, width: 40, height: 40 } }));
-        lists.set(page.pageObjectNumber, list);
+        lists.set(page.objectNumber, list);
       }
       return list;
     },
     getRaw: (ref: AnnotationRef) =>
       raws.find((raw) => annotationKey(raw.ref) === annotationKey(ref)) ?? null,
-    listRaw: ({ page }: { page: { pageObjectNumber: number } }) =>
-      raws.filter((raw) => raw.ref.page.pageObjectNumber === page.pageObjectNumber),
+    listRaw: ({ page }: { page: { objectNumber: number } }) =>
+      raws.filter((raw) => raw.ref.page.objectNumber === page.objectNumber),
     setRaws: (next: AnnotationDTO[]) => {
       raws = next;
       lists = new Map();
@@ -218,7 +218,7 @@ describe('the pending view', () => {
     const { redaction, annotation } = harness();
     const pages: number[] = [];
     redaction.onPendingChanged((event) =>
-      pages.push(...event.pages.map((page) => page.pageObjectNumber)),
+      pages.push(...event.pages.map((page) => page.objectNumber)),
     );
     const changed = (subtype: string) =>
       ({ ref: MARK, page: PAGE, subtype }) as unknown as AnnotationChangedEvent;

@@ -13,9 +13,9 @@ import type { FormServices } from '../services';
 export const widgetObjectOf = (widget: WidgetAddress): number =>
   'kind' in widget
     ? widget.kind === 'objectNumber'
-      ? widget.annotObjectNumber
+      ? widget.objectNumber
       : 0
-    : widget.annotObjectNumber;
+    : widget.objectNumber;
 
 /** A field's value in the write vocabulary, or null for a valueless or unsupported entry. */
 export function valueOf(field: FormFieldDTO): FormFieldValue | null {

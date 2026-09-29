@@ -36,8 +36,7 @@ export function assertSealedSignature(
     readSignaturesFromModel(runtime, model, rectOf),
   );
   const signature = signatures.find(
-    (s) =>
-      s.field.kind === 'objectNumber' && s.field.fieldObjectNumber === expected.fieldObjectNumber,
+    (s) => s.field.kind === 'objectNumber' && s.field.objectNumber === expected.fieldObjectNumber,
   );
   if (!signature) throw refuse('lost the signature field');
   if (!signature.signed || signature.coverage !== 'whole-revision' || !signature.byteRange) {

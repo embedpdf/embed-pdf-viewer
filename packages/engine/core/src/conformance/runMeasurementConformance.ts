@@ -88,7 +88,7 @@ export function runMeasurementConformance(
     test('all three kinds derive labels, save, reopen and retain captions', async () => {
       let doc = await open();
       try {
-        const pageObjectNumber = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
+        const pageObjectNumber = (await doc.pages.list()).pages[0].ref.objectNumber;
         const drafts: AnnotationDraft[] = [
           {
             subtype: 'line',
@@ -154,7 +154,7 @@ export function runMeasurementConformance(
     test('calibration updates only viewports and emits one event per write', async () => {
       const doc = await open();
       try {
-        const pageObjectNumber = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
+        const pageObjectNumber = (await doc.pages.list()).pages[0].ref.objectNumber;
         const page = doc.page(toPageRef(pageObjectNumber));
         if (!page.measure) throw new Error('Measurement service is required');
         const listed = (await page.measure.listViewports()).viewports;
