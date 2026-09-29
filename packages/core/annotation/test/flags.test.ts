@@ -243,7 +243,13 @@ describe('flag-driven behavior in the model', () => {
   it('lockedContents blocks beginTextEdit', () => {
     const ft = square('ft1', flagsWith({ print: true, lockedContents: true }), {
       subtype: 'free-text',
-      geometry: { kind: 'text', rect: { x: 10, y: 10, width: 100, height: 40 } },
+      geometry: {
+        kind: 'text-box',
+        box: { x: 10, y: 10, width: 100, height: 40 },
+        rotation: 0,
+        calloutLine: null,
+        lineEnding: null,
+      },
     });
     const model = loaded([ft]);
     const [after] = step(model, { type: 'beginTextEdit', id: 'ft1' });
@@ -591,7 +597,13 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
   it('textBoxes culls /F-hidden free text', () => {
     const ft = square('ft', flagsWith({ print: true, hidden: true }), {
       subtype: 'free-text',
-      geometry: { kind: 'text', rect: { x: 10, y: 10, width: 100, height: 40 } },
+      geometry: {
+        kind: 'text-box',
+        box: { x: 10, y: 10, width: 100, height: 40 },
+        rotation: 0,
+        calloutLine: null,
+        lineEnding: null,
+      },
       source: 'vector',
     });
     const model = loaded([ft]);

@@ -5,6 +5,7 @@ import { DRAWN_FLAGS } from '../flags';
 import { transposedAboutCenter, uprightAnchoredRect, uprightRotation } from '../geometry';
 import { rectFromPoints, rotatedAabb } from '../rect';
 import { clampRectToBox } from '../placement';
+import { calloutShape } from '../shapes/text-box';
 import type { Draft, Effect, Model, Point, PointerInput, Rect } from '../types';
 import { newRecord } from './changes';
 import { MIN_DRAG } from './draw';
@@ -76,8 +77,8 @@ function slideCalloutFootprint(rect: Rect, rot: number, page: Rect | undefined):
  *   hover/move      → preview the leader to the cursor
  *   click 2 (down)  → set the `knee`, advance to the `box` step
  *   drag/click (up) → lay the text box (dragged, or a default box on a click)
- * Commit creates a `free-text` annotation with a `callout` geom and opens it for
- * editing — the connection point to the box is always derived, never stored.
+ * Commit creates a `free-text` callout and opens it for editing; the line's
+ * end is where it meets the box (`calloutShape`).
  */
 export function calloutPointer(
   model: Model,
@@ -144,12 +145,7 @@ export function calloutPointer(
   const annotation = newRecord(model, {
     page: draft.page,
     subtype: 'free-text',
-    geometry: {
-      kind: 'text',
-      rect,
-      callout: { tip: draft.tip, knee: draft.knee, ending },
-      ...(rot ? { rot } : {}),
-    },
+    geometry: calloutShape(rect, rot, draft.tip, draft.knee, ending),
     style: tool.style,
     text: tool.text,
     flags: { ...DRAWN_FLAGS, ...draft.flags },

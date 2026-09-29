@@ -113,7 +113,7 @@ export function createTextEditing(
       // same annotation; either should open it for editing.
       const id = target.kind === 'annot' || target.kind === 'handle' ? target.id : null;
       const annotation = id != null ? model.byId[id] : undefined;
-      if (annotation && fieldsOf(annotation).geometry.kind === 'text') {
+      if (annotation && fieldsOf(annotation).geometry.kind === 'text-box') {
         store.commit({ type: 'beginTextEdit', id: annotation.id });
         return true;
       }

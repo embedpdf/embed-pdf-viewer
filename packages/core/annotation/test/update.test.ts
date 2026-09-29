@@ -105,7 +105,13 @@ describe('update', () => {
     const box = record({
       ...fieldsOf(square('obj:3', 100)),
       subtype: 'free-text',
-      geometry: { kind: 'text', rect: { x: 100, y: 100, width: 100, height: 60 } },
+      geometry: {
+        kind: 'text-box',
+        box: { x: 100, y: 100, width: 100, height: 60 },
+        rotation: 0,
+        calloutLine: null,
+        lineEnding: null,
+      },
       annotation: undefined,
     });
     const result = update(modelWith([box]), { type: 'setText', id: 'obj:3', text: 'Hi\nthere' });

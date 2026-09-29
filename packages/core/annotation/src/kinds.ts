@@ -335,7 +335,7 @@ export const KINDS: Record<string, AnnotationKind> = {
   },
   'free-text': {
     subtype: 'free-text',
-    variant: 'text',
+    variant: 'text-box',
     caps: caps({
       selectable: true,
       movable: true,

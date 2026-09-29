@@ -72,7 +72,7 @@ const projectable = (geometry: ModelGeometry): boolean =>
   geometry.kind === 'line' ||
   geometry.kind === 'poly' ||
   geometry.kind === 'ink' ||
-  (geometry.kind === 'text' && !geometry.callout);
+  (geometry.kind === 'text-box' && !geometry.calloutLine);
 
 /** The fixed page point: the geometry's bounds top-left in page space
  *  (y-down) — which is the spec's "upper-left corner of the annotation

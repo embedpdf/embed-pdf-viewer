@@ -8,6 +8,9 @@
  * A cloudy border reaches out from the box, as the engine draws it: the box
  * is where the bumps start, and the engine's `rect` takes them in. The
  * handles sit on the box.
+ *
+ * Moving, turning, scaling and resizing work on any turned box
+ * ({@link TurnedBox}), so the text box family shares them.
  */
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
@@ -30,13 +33,17 @@ import {
 } from '../rect';
 import type { Border, Handle, Point, Rect, RenderNode } from '../types';
 
-/** A box family record's shape: the engine's box and its turn. */
-export interface BoxShape {
-  kind: 'box';
+/** A box and its turn, as the engine keeps them. */
+export interface TurnedBox {
   /** The box before any turn: the engine's `box`, or its `rect` for a kind that never turns. */
   box: Rect;
   /** Degrees clockwise about the middle of `box`; 0 when upright. */
   rotation: number;
+}
+
+/** A box family record's shape: the engine's box and its turn. */
+export interface BoxShape extends TurnedBox {
+  kind: 'box';
   /** Drawn as the ellipse in `box`: a circle. */
   ellipse: boolean;
 }
@@ -84,7 +91,7 @@ export function boxDrawnBounds(shape: BoxShape, strokeWidth: number, border?: Bo
 }
 
 /** The box's corners as the page shows them (nw, ne, se, sw), turned about its middle. */
-export function boxCorners(shape: BoxShape): [Point, Point, Point, Point] {
+export function boxCorners(shape: TurnedBox): [Point, Point, Point, Point] {
   const middle = rectCenter(shape.box);
   return rectCornerPoints(shape.box).map((corner) =>
     rotatePoint(corner, middle, shape.rotation),
@@ -92,7 +99,7 @@ export function boxCorners(shape: BoxShape): [Point, Point, Point, Point] {
 }
 
 /** The shape moved by `delta`. */
-export function boxTranslate(shape: BoxShape, delta: Point): BoxShape {
+export function boxTranslate<S extends TurnedBox>(shape: S, delta: Point): S {
   return { ...shape, box: { ...shape.box, x: shape.box.x + delta.x, y: shape.box.y + delta.y } };
 }
 
@@ -105,7 +112,7 @@ const boxAround = (middle: Point, size: { width: number; height: number }): Rect
 });
 
 /** The shape turned `degrees` clockwise about `pivot`: its middle orbits the pivot, and its turn grows. */
-export function boxRotateAbout(shape: BoxShape, pivot: Point, degrees: number): BoxShape {
+export function boxRotateAbout<S extends TurnedBox>(shape: S, pivot: Point, degrees: number): S {
   return {
     ...shape,
     box: boxAround(rotatePoint(rectCenter(shape.box), pivot, degrees), shape.box),
@@ -118,7 +125,12 @@ export function boxRotateAbout(shape: BoxShape, pivot: Point, degrees: number): 
  * scale and its size scales, and its turn stays (a turned member of a
  * selection scales the same in both directions).
  */
-export function boxScaleAbout(shape: BoxShape, anchor: Point, sx: number, sy: number): BoxShape {
+export function boxScaleAbout<S extends TurnedBox>(
+  shape: S,
+  anchor: Point,
+  sx: number,
+  sy: number,
+): S {
   const middle = rectCenter(shape.box);
   return {
     ...shape,
@@ -133,7 +145,7 @@ export function boxScaleAbout(shape: BoxShape, anchor: Point, sx: number, sy: nu
 }
 
 /** The eight resize handles, on the box as the page shows it; each cursor turns with the box. */
-export function boxHandles(shape: BoxShape): Handle[] {
+export function boxHandles(shape: TurnedBox): Handle[] {
   const middle = rectCenter(shape.box);
   return RECT_HANDLES.map((handle) => ({
     id: handle,
@@ -143,7 +155,7 @@ export function boxHandles(shape: BoxShape): Handle[] {
 }
 
 /** The shape resized by dragging `handle` to `to`: the opposite handle stays where it is. */
-export function boxResize(shape: BoxShape, handle: string, to: Point): BoxShape {
+export function boxResize<S extends TurnedBox>(shape: S, handle: string, to: Point): S {
   return { ...shape, box: resizeRotatedRect(shape.box, shape.rotation, handle as RectHandle, to) };
 }
 

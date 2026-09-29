@@ -1,7 +1,8 @@
 /**
- * Plain page-space rect math: corners, the eight resize handles, resizing
- * (upright or turned about the middle), and turning points about a pivot.
- * No annotation kinds: the shape families and `geometry.ts` share it.
+ * Plain page-space math: rect corners, the eight resize handles, resizing
+ * (upright or turned about the middle), turning points about a pivot, and
+ * point-in-polygon. No annotation kinds: the shape families and
+ * `geometry.ts` share it.
  */
 import { applyPoint, rotateAbout, type Mat2D, type PointIn } from '@embedpdf/core-geometry';
 import type { Cursor, Point, Rect } from './types';
@@ -110,6 +111,23 @@ export function segDist(point: Point, from: Point, to: Point): number {
       : Math.max(0, Math.min(1, ((point.x - from.x) * dx + (point.y - from.y) * dy) / len2));
   return Math.hypot(point.x - (from.x + fraction * dx), point.y - (from.y + fraction * dy));
 }
+/** Even-odd point-in-polygon. */
+export function pointInPoly(point: Point, points: readonly Point[]): boolean {
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const vertex = points[i];
+    const previousVertex = points[j];
+    if (
+      vertex.y > point.y !== previousVertex.y > point.y &&
+      point.x <
+        ((previousVertex.x - vertex.x) * (point.y - vertex.y)) / (previousVertex.y - vertex.y) +
+          vertex.x
+    )
+      inside = !inside;
+  }
+  return inside;
+}
+
 export function unionRect(points: Point[]): Rect {
   let x0 = Infinity;
   let y0 = Infinity;

@@ -14,7 +14,9 @@ export function geometryWithRotation(geometry: ModelGeometry, rotation: number):
       `'${geometry.kind}' annotations do not rotate`,
     );
   }
-  return geometry.kind === 'box' ? { ...geometry, rotation } : { ...geometry, rot: rotation };
+  return geometry.kind === 'box' || geometry.kind === 'text-box'
+    ? { ...geometry, rotation }
+    : { ...geometry, rot: rotation };
 }
 
 /** A record's rotation in degrees (0 for kinds without one). */

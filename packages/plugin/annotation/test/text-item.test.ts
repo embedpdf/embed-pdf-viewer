@@ -44,7 +44,7 @@ const FLAGS: AnnotationFlags = {
 
 const freeText = (
   id: string,
-  geometry: Extract<ModelGeometry, { kind: 'text' }>,
+  geometry: Extract<ModelGeometry, { kind: 'text-box' }>,
   strokeWidth: number,
 ): ModelAnnotation => {
   const fields = {
@@ -75,15 +75,27 @@ describe('buildTextItems — text plate mirrors the AP generator', () => {
     const callout = freeText(
       'C1',
       {
-        kind: 'text',
-        rect: { x: 200, y: 100, width: 120, height: 40 },
-        callout: { tip: { x: 40, y: 60 }, knee: { x: 120, y: 120 }, ending: 'open-arrow' },
+        kind: 'text-box',
+        box: { x: 200, y: 100, width: 120, height: 40 },
+        rotation: 0,
+        calloutLine: [
+          { x: 40, y: 60 },
+          { x: 120, y: 120 },
+          { x: 200, y: 120 },
+        ],
+        lineEnding: 'open-arrow',
       },
       6,
     );
     const plain = freeText(
       'P1',
-      { kind: 'text', rect: { x: 10, y: 10, width: 80, height: 30 } },
+      {
+        kind: 'text-box',
+        box: { x: 10, y: 10, width: 80, height: 30 },
+        rotation: 0,
+        calloutLine: null,
+        lineEnding: null,
+      },
       3,
     );
     // textBoxes only emits live text — edit each in turn.
@@ -101,7 +113,13 @@ describe('buildTextItems — the editor document', () => {
   it('renders paragraph alignment equal to the body as inherited', () => {
     const annotation = freeText(
       'A1',
-      { kind: 'text', rect: { x: 10, y: 10, width: 80, height: 30 } },
+      {
+        kind: 'text-box',
+        box: { x: 10, y: 10, width: 80, height: 30 },
+        rotation: 0,
+        calloutLine: null,
+        lineEnding: null,
+      },
       1,
     );
     (annotation as { annotation?: unknown }).annotation = {

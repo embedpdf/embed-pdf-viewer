@@ -59,7 +59,13 @@ const annot = (): ModelAnnotation => {
     ref: null,
     page: toPageRef(1),
     subtype: 'free-text',
-    geometry: { kind: 'text', rect: { x: 0, y: 0, width: 100, height: 20 } },
+    geometry: {
+      kind: 'text-box',
+      box: { x: 0, y: 0, width: 100, height: 20 },
+      rotation: 0,
+      calloutLine: null,
+      lineEnding: null,
+    },
     style: {
       color: '#000000',
       interiorColor: null,

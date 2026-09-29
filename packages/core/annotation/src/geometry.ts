@@ -14,7 +14,7 @@ import {
   type Quad,
 } from '@embedpdf/core-geometry';
 import { cloudyBorderExtent, cloudyPolyPath } from './cloudy';
-import { endingNodes, endingPoints } from './endings';
+import { endingNodes, endingNodesHit } from './endings';
 import {
   DEG2RAD,
   MIN_SIZE,
@@ -23,18 +23,15 @@ import {
   RECT_HANDLES,
   type RectHandle,
   expandRect,
-  insetRect,
   normalizeDeg,
+  pointInPoly,
   rectCenter,
   rectContains,
   rectCornerPoints,
   rectFromPoints,
   rectHandlePoint,
   resizeRect,
-  resizeRotatedRect,
   rotatePoint,
-  rotatedAabb,
-  rotatedHandleCursor,
   segDist,
   unionRect,
 } from './rect';
@@ -49,6 +46,18 @@ import {
   boxScene,
   boxTranslate,
 } from './shapes/box';
+import {
+  textBoxDrag,
+  textBoxDrawnBounds,
+  textBoxHandles,
+  textBoxHit,
+  textBoxRotateAbout,
+  textBoxScaleAbout,
+  textBoxScene,
+  textBoxSelectionBounds,
+  textBoxTranslate,
+  textBoxUpright,
+} from './shapes/text-box';
 import type {
   Border,
   ModelGeometry,
@@ -61,22 +70,6 @@ import type {
   Point,
 } from './types';
 
-/** Even-odd point-in-polygon. */
-export function pointInPoly(point: Point, points: readonly Point[]): boolean {
-  let inside = false;
-  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
-    const vertex = points[i];
-    const previousVertex = points[j];
-    if (
-      vertex.y > point.y !== previousVertex.y > point.y &&
-      point.x <
-        ((previousVertex.x - vertex.x) * (point.y - vertex.y)) / (previousVertex.y - vertex.y) +
-          vertex.x
-    )
-      inside = !inside;
-  }
-  return inside;
-}
 const polyPoints = (geometry: Extract<ModelGeometry, { kind: 'poly' }>): Point[] => geometry.points;
 
 /* ── rotation ──────────────────────────────────────────────────────────────
@@ -103,12 +96,11 @@ export const DEFAULT_CHROME_GEOMETRY = {
  *  here so the renderer and selection chrome follow it, while the caret's
  *  caps (not movable/resizable) keep every rotate gesture away from it. */
 export function geomRotation(geometry: ModelGeometry): number {
-  if (geometry.kind === 'box') return geometry.rotation;
+  if (geometry.kind === 'box' || geometry.kind === 'text-box') return geometry.rotation;
   if (
     geometry.kind === 'line' ||
     geometry.kind === 'poly' ||
     geometry.kind === 'ink' ||
-    geometry.kind === 'text' ||
     geometry.kind === 'caret'
   )
     return geometry.rot ?? 0;
@@ -117,8 +109,8 @@ export function geomRotation(geometry: ModelGeometry): number {
 
 /** A box's centre, or the mean of a shape's points. */
 export function centroidOf(geometry: ModelGeometry): Point {
-  if (geometry.kind === 'box') return rectCenter(geometry.box);
-  if (geometry.kind === 'text' || geometry.kind === 'caret') return rectCenter(geometry.rect);
+  if (geometry.kind === 'box' || geometry.kind === 'text-box') return rectCenter(geometry.box);
+  if (geometry.kind === 'caret') return rectCenter(geometry.rect);
   if (geometry.kind === 'line')
     return { x: (geometry.a.x + geometry.b.x) / 2, y: (geometry.a.y + geometry.b.y) / 2 };
   const points =
@@ -171,13 +163,13 @@ export function isRotatableGeom(geometry: ModelGeometry): boolean {
     geometry.kind === 'poly' ||
     geometry.kind === 'ink' ||
     geometry.kind === 'caret' ||
-    (geometry.kind === 'text' && !geometry.callout)
+    (geometry.kind === 'text-box' && !geometry.calloutLine)
   );
 }
 
 /**
  * Rotate a geom by `deltaDeg` (clockwise) about `pivot`.
- *  - box (`box`/plain `text`): orbit the box centre about the pivot (a rigid
+ *  - box (`box`/plain `text-box`): orbit the box centre about the pivot (a rigid
  *    translation of the unrotated box) and add the angle to its turn. When the
  *    pivot is the box centre this is a pure turn.
  *  - vertex (`line`/`poly`/`ink`): map every point through the rotation and bump
@@ -194,22 +186,8 @@ export function geomRotateAbout(
 ): ModelGeometry {
   if (deltaDeg === 0) return geometry;
   if (geometry.kind === 'box') return boxRotateAbout(geometry, pivot, deltaDeg);
+  if (geometry.kind === 'text-box') return textBoxRotateAbout(geometry, pivot, deltaDeg);
   const nextRot = normalizeDeg(geomRotation(geometry) + deltaDeg);
-  if (geometry.kind === 'text') {
-    // The rotate gesture stays out of scope for callouts (no knob/orbit); the
-    // box may still carry a creation-time `rot` from the upright policy.
-    if (geometry.callout) return geometry;
-    const point = rotatePoint(rectCenter(geometry.rect), pivot, deltaDeg);
-    return {
-      ...geometry,
-      rect: {
-        ...geometry.rect,
-        x: point.x - geometry.rect.width / 2,
-        y: point.y - geometry.rect.height / 2,
-      },
-      rot: nextRot,
-    };
-  }
   const rp = (point: Point) => rotatePoint(point, pivot, deltaDeg);
   if (geometry.kind === 'line')
     return { ...geometry, a: rp(geometry.a), b: rp(geometry.b), rot: nextRot };
@@ -227,8 +205,9 @@ export function geomRotateAbout(
  * Position is deliberately absent — a translation never invalidates a raster.
  */
 function apFrameSize(geometry: ModelGeometry): Size {
-  if (geometry.kind === 'box') return { width: geometry.box.width, height: geometry.box.height };
-  if (geometry.kind === 'text' || geometry.kind === 'caret')
+  if (geometry.kind === 'box' || geometry.kind === 'text-box')
+    return { width: geometry.box.width, height: geometry.box.height };
+  if (geometry.kind === 'caret')
     return { width: geometry.rect.width, height: geometry.rect.height };
   const points =
     geometry.kind === 'line'
@@ -349,7 +328,8 @@ export function geomResetRotation(geometry: ModelGeometry, pivot?: Point): Model
   const rot = geomRotation(geometry);
   if (!rot) return geometry;
   if (geometry.kind === 'box') return { ...geometry, rotation: 0 };
-  if (geometry.kind === 'text' || geometry.kind === 'caret') return { ...geometry, rot: 0 };
+  if (geometry.kind === 'text-box') return textBoxUpright(geometry);
+  if (geometry.kind === 'caret') return { ...geometry, rot: 0 };
   const point = pivot ?? turnPivotOf(geometry);
   const rotated = geomRotateAbout(geometry, point, -rot);
   // geomRotateAbout already set rot = normalize(rot - rot) = 0.
@@ -371,8 +351,9 @@ export function obbFromGeom(
 ): { corners: [Point, Point, Point, Point]; angle: number } | null {
   if (!isRotatableGeom(geometry)) return null;
   const rot = geomRotation(geometry);
-  if (geometry.kind === 'box') return { corners: boxCorners(geometry), angle: rot };
-  if (geometry.kind === 'text' || geometry.kind === 'caret') {
+  if (geometry.kind === 'box' || geometry.kind === 'text-box')
+    return { corners: boxCorners(geometry), angle: rot };
+  if (geometry.kind === 'caret') {
     const point = rectCenter(geometry.rect);
     const corners = rectCornerPoints(geometry.rect).map((corner) =>
       rotatePoint(corner, point, rot),
@@ -456,16 +437,7 @@ export function geomScaleAbout(
     y: anchor.y + (point.y - anchor.y) * sy,
   });
   if (geometry.kind === 'box') return boxScaleAbout(geometry, anchor, sx, sy);
-  if (geometry.kind === 'text') {
-    if (geometry.callout) return geometry;
-    const point = sp(rectCenter(geometry.rect));
-    const width = Math.max(MIN_SIZE, geometry.rect.width * Math.abs(sx));
-    const height = Math.max(MIN_SIZE, geometry.rect.height * Math.abs(sy));
-    return {
-      ...geometry,
-      rect: { x: point.x - width / 2, y: point.y - height / 2, width, height },
-    };
-  }
+  if (geometry.kind === 'text-box') return textBoxScaleAbout(geometry, anchor, sx, sy);
   if (geometry.kind === 'line') return { ...geometry, a: sp(geometry.a), b: sp(geometry.b) };
   if (geometry.kind === 'poly') return { ...geometry, points: geometry.points.map(sp) };
   if (geometry.kind === 'ink')
@@ -573,52 +545,6 @@ export function placeRotateKnob(
       y: Math.min(Math.max(top.at.y, pageBox.y), pageBox.y + pageBox.height),
     },
     from: top.from,
-  };
-}
-
-/* ── callout leader ───────────────────────────────────────────────────────────
- * A free-text callout draws a 2–3 point leader (`/CL`) from the called-out `tip`
- * to the text box, with an arrow (`/LE`) at the tip. The point where the leader
- * meets the box is derived — never stored — so it tracks the box and knee.
- */
-
-/** The box-edge midpoint the leader connects to: the side `ref` (the knee, else
- *  the tip) points toward, by horizontal/vertical dominance vs the box centre.
- *  With `rot` (a callout box tilted by the upright policy) the decision runs in
- *  the box's local frame and the midpoint lands back on the rotated edge — the
- *  edge the user actually sees. */
-export function calloutConnection(box: Rect, ref: Point, rot = 0): Point {
-  if (rot) {
-    const point = rectCenter(box);
-    return rotatePoint(calloutConnection(box, rotatePoint(ref, point, -rot)), point, rot);
-  }
-  const cx = box.x + box.width / 2;
-  const cy = box.y + box.height / 2;
-  const dx = ref.x - cx;
-  const dy = ref.y - cy;
-  if (Math.abs(dx) >= Math.abs(dy)) {
-    return dx >= 0 ? { x: box.x + box.width, y: cy } : { x: box.x, y: cy };
-  }
-  return dy >= 0 ? { x: cx, y: box.y + box.height } : { x: cx, y: box.y };
-}
-
-/** The leader polyline `[tip, knee?, conn]`, with `conn` derived from the box
- *  (its rotated footprint when the box carries `rot`). */
-export function calloutLinePoints(geometry: Extract<ModelGeometry, { kind: 'text' }>): Point[] {
-  const callout = geometry.callout;
-  if (!callout) return [];
-  const conn = calloutConnection(geometry.rect, callout.knee ?? callout.tip, geometry.rot ?? 0);
-  return callout.knee ? [callout.tip, callout.knee, conn] : [callout.tip, conn];
-}
-
-/** The leader's single ending segment (arrow at the tip), pointing out of the
- *  body into the tip — so the arrowhead opens back along the leader. */
-function calloutEndingSeg(points: Point[], ending: LineEnding): EndingSeg | null {
-  if (points.length < 2) return null;
-  return {
-    tip: points[0],
-    angle: Math.atan2(points[0].y - points[1].y, points[0].x - points[1].x),
-    ending,
   };
 }
 
@@ -864,23 +790,9 @@ export function geomVisualBounds(
       cloudyBorderExtent(border.intensity, strokeWidth, false),
     );
   }
-  if (geometry.kind === 'text' && geometry.callout) {
-    // The overall /Rect: the union of the text box (its rotated corners when the
-    // box carries an upright tilt), the leader points, and the arrow-ending
-    // polygon at the tip (same ending math as line/poly).
-    const points = calloutLinePoints(geometry);
-    const seg = calloutEndingSeg(points, geometry.callout.ending);
-    const rot = geometry.rot ?? 0;
-    const point = rectCenter(geometry.rect);
-    const corners = rectCornerPoints(geometry.rect).map((corner) =>
-      rot ? rotatePoint(corner, point, rot) : corner,
-    );
-    const all = [...corners, ...points];
-    if (seg) all.push(...endingPoints(seg.tip, seg.angle, seg.ending, strokeWidth));
-    return expandRect(unionRect(all), strokeWidth / 2);
-  }
   if (geometry.kind === 'box') return boxDrawnBounds(geometry, strokeWidth, border);
-  if (geometry.kind === 'text' || geometry.kind === 'caret') return geometry.rect;
+  if (geometry.kind === 'text-box') return textBoxDrawnBounds(geometry, strokeWidth);
+  if (geometry.kind === 'caret') return geometry.rect;
   if (geometry.kind === 'quads')
     return expandRect(unionRect(geometry.quads.flatMap(quadCorners)), strokeWidth / 2);
   // Ink is round-capped/round-joined: it never spikes, so a plain half-width grow of the
@@ -925,11 +837,7 @@ export function selectionBounds(
 ): Rect {
   if (geometry.kind === 'line' || geometry.kind === 'ink' || geometry.kind === 'poly')
     return geomVisualBounds(geometry, strokeWidth, border);
-  // A callout's tilted text box (the upright policy): the selection wraps the box
-  // the user sees — its rotated footprint. Exact for the quarter-turns upright
-  // produces (the footprint stays axis-aligned), so outline and handles agree.
-  if (geometry.kind === 'text' && geometry.callout && (geometry.rot ?? 0) !== 0)
-    return rotatedAabb(geometry.rect, geometry.rot!);
+  if (geometry.kind === 'text-box') return textBoxSelectionBounds(geometry);
   return geomBounds(geometry);
 }
 
@@ -1000,37 +908,6 @@ export function quadIntersectsRect(quad: [Point, Point, Point, Point], rect: Rec
   return true;
 }
 
-/**
- * Is the page point on a line/poly's drawn endings — so an arrowhead is as
- * clickable as the stroke. Uses the same ending nodes the renderer draws: a closed
- * shape (closed arrow, circle, square, diamond) hits inside or near its edge; an
- * open one (open arrow, butt, slash) hits near its stroke. `tol` is the stroke
- * band already widened by the hit margin.
- */
-function endingNodesHit(nodes: RenderNode[], point: Point, tol: number): boolean {
-  for (const node of nodes) {
-    if (node.kind === 'ellipse') {
-      const rect = node.rect;
-      const rx = rect.width / 2;
-      const ry = rect.height / 2;
-      if (rx <= 0 || ry <= 0) continue;
-      const nx = (point.x - (rect.x + rx)) / rx;
-      const ny = (point.y - (rect.y + ry)) / ry;
-      if (Math.hypot(nx, ny) <= 1 + tol / Math.min(rx, ry)) return true; // filled disc + band
-    } else if (node.kind === 'poly') {
-      const points = node.points;
-      for (let i = 0; i < points.length - 1; i++)
-        if (segDist(point, points[i], points[i + 1]) <= tol) return true;
-      if (node.closed) {
-        if (points.length > 2 && segDist(point, points[points.length - 1], points[0]) <= tol)
-          return true;
-        if (pointInPoly(point, points)) return true; // filled head interior
-      }
-    }
-  }
-  return false;
-}
-
 function endingHit(
   geometry: ModelGeometry,
   point: Point,
@@ -1046,8 +923,8 @@ function endingHit(
 /* ── geom ops ─────────────────────────────────────────────────────────────── */
 
 export function geomBounds(geometry: ModelGeometry): Rect {
-  if (geometry.kind === 'box') return geometry.box;
-  if (geometry.kind === 'text' || geometry.kind === 'caret') return geometry.rect;
+  if (geometry.kind === 'box' || geometry.kind === 'text-box') return geometry.box;
+  if (geometry.kind === 'caret') return geometry.rect;
   if (geometry.kind === 'line') return rectFromPoints(geometry.a, geometry.b);
   if (geometry.kind === 'poly') return unionRect(geometry.points);
   if (geometry.kind === 'ink') return unionRect(geometry.strokes.flat());
@@ -1068,38 +945,16 @@ export function geomHit(
   border?: Border,
 ): boolean {
   if (geometry.kind === 'box') return boxHit(geometry, point, margin, filled, strokeWidth, border);
+  if (geometry.kind === 'text-box') return textBoxHit(geometry, point, margin, strokeWidth);
   const tol = margin + strokeWidth / 2;
-  // A rotated box stores its unrotated `rect`; inverse-rotate the pointer into
-  // that local frame and run the normal axis-aligned tests. Vertex kinds carry
-  // already-rotated points, so they hit-test directly (rot is advisory). A
-  // callout is compound: only its box rotates (the leader is page-space), so the
-  // inverse rotation applies to the box test alone — see the text branch below.
-  if (
-    (geometry.kind === 'caret' || (geometry.kind === 'text' && !geometry.callout)) &&
-    (geometry.rot ?? 0) !== 0
-  ) {
-    point = rotatePoint(point, rectCenter(geometry.rect), -(geometry.rot ?? 0));
-  }
-  // A text box is a solid hit target anywhere inside it (+ the click margin).
-  if (geometry.kind === 'caret') return rectContains(expandRect(geometry.rect, margin), point);
-  if (geometry.kind === 'text') {
-    // Box test in the box's local frame (a tilted callout box); leader/arrow
-    // tests in the page frame (their points are already where they're drawn).
-    const rot = geometry.callout ? (geometry.rot ?? 0) : 0;
-    const pBox = rot ? rotatePoint(point, rectCenter(geometry.rect), -rot) : point;
-    if (rectContains(expandRect(geometry.rect, margin), pBox)) return true;
-    if (geometry.callout) {
-      const points = calloutLinePoints(geometry);
-      for (let i = 0; i < points.length - 1; i++)
-        if (segDist(point, points[i], points[i + 1]) <= tol) return true;
-      const seg = calloutEndingSeg(points, geometry.callout.ending);
-      if (
-        seg &&
-        endingNodesHit(endingNodes(seg.tip, seg.angle, seg.ending, strokeWidth), point, tol)
-      )
-        return true;
-    }
-    return false;
+  // A caret is a solid hit target anywhere in its box (+ the click margin),
+  // tested in the box's own frame. Vertex kinds carry already-rotated points,
+  // so they hit-test directly (rot is advisory).
+  if (geometry.kind === 'caret') {
+    const local = geometry.rot
+      ? rotatePoint(point, rectCenter(geometry.rect), -geometry.rot)
+      : point;
+    return rectContains(expandRect(geometry.rect, margin), local);
   }
   if (geometry.kind === 'line')
     return (
@@ -1130,28 +985,7 @@ export function geomHit(
 
 export function geomHandles(geometry: ModelGeometry): Handle[] {
   if (geometry.kind === 'box') return boxHandles(geometry);
-  if (geometry.kind === 'text') {
-    const rot = geometry.rot ?? 0;
-    const point = rectCenter(geometry.rect);
-    const handles: Handle[] = RECT_HANDLES.map((handle) => ({
-      id: handle,
-      // box handles sit on the unrotated rect; rotate each into place so they
-      // ride the tilted box. The cursor rotates with the handle (the visually
-      // right-edge handle of a 90°-tilted box resizes horizontally).
-      at: rot
-        ? rotatePoint(rectHandlePoint(geometry.rect, handle), point, rot)
-        : rectHandlePoint(geometry.rect, handle),
-      cursor: rotatedHandleCursor(handle, rot),
-    }));
-    // A callout adds vertex handles for the leader tip and (if present) knee, so
-    // the called-out point and the elbow can be dragged independently of the box.
-    if (geometry.callout) {
-      handles.push({ id: 'callout-tip', at: geometry.callout.tip, cursor: 'crosshair' });
-      if (geometry.callout.knee)
-        handles.push({ id: 'callout-knee', at: geometry.callout.knee, cursor: 'crosshair' });
-    }
-    return handles;
-  }
+  if (geometry.kind === 'text-box') return textBoxHandles(geometry);
   if (geometry.kind === 'line') {
     return [
       { id: 'v0', at: geometry.a, cursor: 'crosshair' },
@@ -1166,20 +1000,8 @@ export function geomHandles(geometry: ModelGeometry): Handle[] {
 
 export function geomTranslate(geometry: ModelGeometry, delta: Point): ModelGeometry {
   const mv = (vertex: Point): Point => ({ x: vertex.x + delta.x, y: vertex.y + delta.y });
-  if (geometry.kind === 'text') {
-    const rect = { ...geometry.rect, x: geometry.rect.x + delta.x, y: geometry.rect.y + delta.y };
-    if (!geometry.callout) return { ...geometry, rect };
-    return {
-      ...geometry,
-      rect,
-      callout: {
-        ...geometry.callout,
-        tip: mv(geometry.callout.tip),
-        knee: geometry.callout.knee ? mv(geometry.callout.knee) : undefined,
-      },
-    };
-  }
   if (geometry.kind === 'box') return boxTranslate(geometry, delta);
+  if (geometry.kind === 'text-box') return textBoxTranslate(geometry, delta);
   if (geometry.kind === 'caret')
     return {
       ...geometry,
@@ -1193,17 +1015,8 @@ export function geomTranslate(geometry: ModelGeometry, delta: Point): ModelGeome
 }
 
 export function geomDragHandle(geometry: ModelGeometry, handle: string, to: Point): ModelGeometry {
-  if (geometry.kind === 'text') {
-    if (handle === 'callout-tip' && geometry.callout)
-      return { ...geometry, callout: { ...geometry.callout, tip: to } };
-    if (handle === 'callout-knee' && geometry.callout)
-      return { ...geometry, callout: { ...geometry.callout, knee: to } };
-    return {
-      ...geometry,
-      rect: resizeRotatedRect(geometry.rect, geometry.rot ?? 0, handle as RectHandle, to),
-    };
-  }
   if (geometry.kind === 'box') return boxResize(geometry, handle, to);
+  if (geometry.kind === 'text-box') return textBoxDrag(geometry, handle, to);
   if (geometry.kind === 'line')
     return handle === 'v0' ? { ...geometry, a: to } : { ...geometry, b: to };
   if (geometry.kind === 'poly') {
@@ -1217,80 +1030,11 @@ export function geomDragHandle(geometry: ModelGeometry, handle: string, to: Poin
   return geometry;
 }
 
-/**
- * The text plate inset of a free-text box: twice the border width. The plate
- * — where text lays out, clips and scrolls — is the box deflated by this on
- * every side: the ink band and an equal breathing band, so the text never
- * touches the stroke. Acrobat's rule, measured 1–12 pt on plain boxes and
- * 1–7 pt on callouts; the engine's `FreeTextPlate` is the same formula, so
- * the live editor sits exactly where the baked text lands. Acrobat's thinnest
- * border is 1 pt; a width of 0 is ours alone and gives no inset (the plate is
- * the box).
- */
-export function textPlateInset(strokeWidth: number): number {
-  return 2 * Math.max(0, strokeWidth);
-}
-
-/** A callout's leader (open polyline, its connection point extended under
- *  the box border by half the stroke — the AP generator's `adjusted_conn` —
- *  so the leader meets the border ink without an angular gap) + the arrow at
- *  its tip. */
-function calloutLeaderNodes(
-  geometry: Extract<ModelGeometry, { kind: 'text' }>,
-  callout: NonNullable<Extract<ModelGeometry, { kind: 'text' }>['callout']>,
-  strokeWidth: number,
-): RenderNode[] {
-  const points = [...calloutLinePoints(geometry)];
-  if (strokeWidth > 0 && points.length >= 2) {
-    const last = points[points.length - 1];
-    const previous = points[points.length - 2];
-    const dx = last.x - previous.x;
-    const dy = last.y - previous.y;
-    const len = Math.hypot(dx, dy);
-    if (len > 0) {
-      points[points.length - 1] = {
-        x: last.x + (dx / len) * (strokeWidth / 2),
-        y: last.y + (dy / len) * (strokeWidth / 2),
-      };
-    }
-  }
-  const nodes: RenderNode[] = [{ kind: 'poly', points, closed: false }];
-  const seg = calloutEndingSeg(points, callout.ending);
-  if (seg) nodes.push(...endingNodes(seg.tip, seg.angle, seg.ending, strokeWidth));
-  return nodes;
-}
-
 export function geomScene(geometry: ModelGeometry, strokeWidth = 0, border?: Border): RenderNode[] {
   // A text box's box — its fill and its border — is the scene's, plain box and
   // callout alike, so the live view paints exactly what the AP generator
-  // bakes (`GenerateBorderAP`: the `/DA` colour at the `/BS` width, inset by
-  // half the stroke). The framework's editable element owns only the text: it
-  // sits on the plate inside the border band and paints no background. A
-  // callout adds its leader (open polyline) + arrow at the tip.
-  if (geometry.kind === 'text') {
-    const nodes: RenderNode[] = [];
-    if (geometry.callout)
-      nodes.push(...calloutLeaderNodes(geometry, geometry.callout, strokeWidth));
-    // The drawn path insets by half the stroke so the ink sits inside
-    // `geometry.rect` with its outer edge on the rect — never straddling the
-    // selection outline (the square/circle convention below). A tilted box
-    // (the upright policy) draws as its rotated corner ring — the scene stays
-    // plane-agnostic, so every framework painter gets the tilt for free (the
-    // leader is page-space and never rotates).
-    const rect = insetRect(geometry.rect, strokeWidth / 2);
-    const rot = geometry.rot ?? 0;
-    const point = rectCenter(geometry.rect);
-    nodes.push(
-      rot
-        ? {
-            kind: 'poly',
-            points: rectCornerPoints(rect).map((corner) => rotatePoint(corner, point, rot)),
-            closed: true,
-          }
-        : { kind: 'rect', rect },
-    );
-    return nodes;
-  }
+  // bakes. The framework's editable element owns only the text.
+  if (geometry.kind === 'text-box') return textBoxScene(geometry, strokeWidth);
   if (geometry.kind === 'caret') {
     const rect = geometry.rect;
     const midX = rect.x + rect.width / 2;

@@ -10,14 +10,11 @@ import {
   geomBounds,
   geomHit,
   geomScene,
-  textPlateInset,
   quadIntersectsRect,
   geomVisualBounds,
   geomHandles,
   geomTranslate,
   geomDragHandle,
-  calloutConnection,
-  calloutLinePoints,
   selectionBounds,
   caretGeomFromAnchor,
   caretRectFromAnchor,
@@ -38,6 +35,7 @@ import {
   apSizeChanged,
 } from '../src/geometry';
 import { normalizeDeg, rotatedAabb, rotatedHandleCursor } from '../src/rect';
+import { calloutEnd, calloutShape, textPlateInset } from '../src/shapes/text-box';
 import { expandGroups, groupKeyOf, groupMembers } from '../src/group';
 import { cursorAt, groupUnionBounds, hitTest, paintOrder } from '../src/hit';
 import { capsFor } from '../src/kinds';
@@ -1730,27 +1728,29 @@ describe('annotation-core callout', () => {
   });
   // A committed callout geom for the pure-geometry tests: box to the right of an
   // off-box tip, with an elbow between them.
-  const calloutGeom = (): Extract<ModelGeometry, { kind: 'text' }> => ({
-    kind: 'text',
-    rect: { x: 200, y: 100, width: 120, height: 40 },
-    callout: { tip: { x: 40, y: 60 }, knee: { x: 120, y: 120 }, ending: 'open-arrow' },
-  });
+  const calloutGeom = (): Extract<ModelGeometry, { kind: 'text-box' }> =>
+    calloutShape(
+      { x: 200, y: 100, width: 120, height: 40 },
+      0,
+      { x: 40, y: 60 },
+      { x: 120, y: 120 },
+      'open-arrow',
+    );
 
-  it('calloutConnection picks the box edge the reference point faces', () => {
+  it('calloutEnd picks the box edge the reference point faces', () => {
     const box = { x: 100, y: 100, width: 100, height: 60 }; // centre (150, 130)
     // ref to the right (dx dominates, positive) → right-edge midpoint
-    expect(calloutConnection(box, { x: 400, y: 130 })).toEqual({ x: 200, y: 130 });
+    expect(calloutEnd(box, { x: 400, y: 130 })).toEqual({ x: 200, y: 130 });
     // ref to the left → left-edge midpoint
-    expect(calloutConnection(box, { x: -50, y: 130 })).toEqual({ x: 100, y: 130 });
+    expect(calloutEnd(box, { x: -50, y: 130 })).toEqual({ x: 100, y: 130 });
     // ref above (dy dominates, negative) → top-edge midpoint
-    expect(calloutConnection(box, { x: 150, y: -20 })).toEqual({ x: 150, y: 100 });
+    expect(calloutEnd(box, { x: 150, y: -20 })).toEqual({ x: 150, y: 100 });
     // ref below → bottom-edge midpoint
-    expect(calloutConnection(box, { x: 150, y: 300 })).toEqual({ x: 150, y: 160 });
+    expect(calloutEnd(box, { x: 150, y: 300 })).toEqual({ x: 150, y: 160 });
   });
 
-  it('calloutLinePoints is [tip, knee, derived-conn]; conn rides the box, never stored', () => {
-    const geometry = calloutGeom();
-    const points = calloutLinePoints(geometry);
+  it("a new callout's line is [tip, knee, end]; the end is on the side the knee faces", () => {
+    const points = calloutGeom().calloutLine!;
     expect(points).toHaveLength(3);
     expect(points[0]).toEqual({ x: 40, y: 60 }); // tip
     expect(points[1]).toEqual({ x: 120, y: 120 }); // knee
@@ -1770,9 +1770,12 @@ describe('annotation-core callout', () => {
     // The live view paints what the AP generator bakes: the border inset by
     // half the stroke so its outer edge sits on the rect. The framework's
     // editable element owns only the text.
-    const plain: Extract<ModelGeometry, { kind: 'text' }> = {
-      kind: 'text',
-      rect: { x: 100, y: 100, width: 200, height: 60 },
+    const plain: Extract<ModelGeometry, { kind: 'text-box' }> = {
+      kind: 'text-box',
+      box: { x: 100, y: 100, width: 200, height: 60 },
+      rotation: 0,
+      calloutLine: null,
+      lineEnding: null,
     };
     expect(geomScene(plain, 2)).toEqual([
       { kind: 'rect', rect: { x: 101, y: 101, width: 198, height: 58 } },
@@ -1782,7 +1785,7 @@ describe('annotation-core callout', () => {
       { kind: 'rect', rect: { x: 100, y: 100, width: 200, height: 60 } },
     ]);
     // A tilted box draws as its rotated corner ring.
-    const tilted = geomScene({ ...plain, rot: 90 }, 2);
+    const tilted = geomScene({ ...plain, rotation: 90 }, 2);
     expect(tilted).toHaveLength(1);
     expect(tilted[0]!.kind).toBe('poly');
     // A callout: leader + arrow first, then the same box.
@@ -1807,7 +1810,8 @@ describe('annotation-core callout', () => {
     const id = model.order[0]!;
     const annotation = model.byId[id]!;
     const geometry = fieldsOf(annotation).geometry;
-    if (geometry.kind !== 'text' || geometry.callout) throw new Error('expected a plain text box');
+    if (geometry.kind !== 'text-box' || geometry.calloutLine)
+      throw new Error('expected a plain text box');
     model = step(model, { type: 'setText', id, text: 'hello' })[0];
     expect(model.byId[id]!.source).toBe('vector');
     const items = pageItems(model, PAGE);
@@ -1836,7 +1840,16 @@ describe('annotation-core callout', () => {
     expect(rect.x + rect.width).toBeGreaterThanOrEqual(320);
     // a plain text box (no callout) is just its rect
     expect(
-      geomVisualBounds({ kind: 'text', rect: { x: 0, y: 0, width: 10, height: 10 } }, 2),
+      geomVisualBounds(
+        {
+          kind: 'text-box',
+          box: { x: 0, y: 0, width: 10, height: 10 },
+          rotation: 0,
+          calloutLine: null,
+          lineEnding: null,
+        },
+        2,
+      ),
     ).toEqual({
       x: 0,
       y: 0,
@@ -1853,32 +1866,36 @@ describe('annotation-core callout', () => {
     expect(ids).toContain('callout-knee');
     expect(ids).toHaveLength(10);
     // a knee-less (2-point) callout exposes only the tip
-    const noKnee = geomHandles({
-      kind: 'text',
-      rect: { x: 0, y: 0, width: 50, height: 20 },
-      callout: { tip: { x: -20, y: 10 }, ending: 'open-arrow' },
-    }).map((handle) => handle.id);
+    const noKnee = geomHandles(
+      calloutShape(
+        { x: 0, y: 0, width: 50, height: 20 },
+        0,
+        { x: -20, y: 10 },
+        undefined,
+        'open-arrow',
+      ),
+    ).map((handle) => handle.id);
     expect(noKnee).toContain('callout-tip');
     expect(noKnee).not.toContain('callout-knee');
   });
 
   it('geomTranslate shifts the box, the tip, AND the knee together', () => {
     const geometry = geomTranslate(calloutGeom(), { x: 10, y: -5 });
-    if (geometry.kind !== 'text' || !geometry.callout) throw new Error('expected callout');
-    expect(geometry.rect).toMatchObject({ x: 210, y: 95 });
-    expect(geometry.callout.tip).toEqual({ x: 50, y: 55 });
-    expect(geometry.callout.knee).toEqual({ x: 130, y: 115 });
+    if (geometry.kind !== 'text-box' || !geometry.calloutLine) throw new Error('expected callout');
+    expect(geometry.box).toMatchObject({ x: 210, y: 95 });
+    expect(geometry.calloutLine[0]).toEqual({ x: 50, y: 55 });
+    expect(geometry.calloutLine[1]).toEqual({ x: 130, y: 115 });
   });
 
   it('geomDragHandle edits the tip / knee / box independently (conn re-derives)', () => {
     const tip = geomDragHandle(calloutGeom(), 'callout-tip', { x: 5, y: 5 });
-    expect(tip.kind === 'text' && tip.callout?.tip).toEqual({ x: 5, y: 5 });
+    expect(tip.kind === 'text-box' && tip.calloutLine?.[0]).toEqual({ x: 5, y: 5 });
     const knee = geomDragHandle(calloutGeom(), 'callout-knee', { x: 90, y: 90 });
-    expect(knee.kind === 'text' && knee.callout?.knee).toEqual({ x: 90, y: 90 });
+    expect(knee.kind === 'text-box' && knee.calloutLine?.[1]).toEqual({ x: 90, y: 90 });
     // a rect handle resizes the box; the leader's connection point is never stored,
     // so it simply re-derives off the new box on the next read.
     const box = geomDragHandle(calloutGeom(), 'se', { x: 400, y: 300 });
-    expect(box.kind === 'text' && box.rect).toMatchObject({
+    expect(box.kind === 'text-box' && box.box).toMatchObject({
       x: 200,
       y: 100,
       width: 200,
@@ -1897,9 +1914,18 @@ describe('annotation-core callout', () => {
     // and there is an arrow ending node beyond the bare leader + box
     expect(nodes.length).toBeGreaterThan(2);
     // a plain text box paints its box too (fill + border, no leader)
-    expect(geomScene({ kind: 'text', rect: { x: 0, y: 0, width: 10, height: 10 } }, 1)).toEqual([
-      { kind: 'rect', rect: { x: 0.5, y: 0.5, width: 9, height: 9 } },
-    ]);
+    expect(
+      geomScene(
+        {
+          kind: 'text-box',
+          box: { x: 0, y: 0, width: 10, height: 10 },
+          rotation: 0,
+          calloutLine: null,
+          lineEnding: null,
+        },
+        1,
+      ),
+    ).toEqual([{ kind: 'rect', rect: { x: 0.5, y: 0.5, width: 9, height: 9 } }]);
   });
 
   it('the 3-click flow (tip → knee → box) commits a callout and opens it for editing', () => {
@@ -1917,12 +1943,13 @@ describe('annotation-core callout', () => {
     const annotation = model.byId[model.order[0]];
     const geometry = fieldsOf(annotation).geometry;
     expect(annotation.subtype).toBe('free-text');
-    expect(geometry.kind).toBe('text');
-    if (geometry.kind !== 'text' || !geometry.callout) throw new Error('expected callout geom');
-    expect(geometry.callout.tip).toEqual({ x: 40, y: 60 });
-    expect(geometry.callout.knee).toEqual({ x: 120, y: 120 });
-    expect(geometry.callout.ending).toBe('open-arrow');
-    expect(geometry.rect).toMatchObject({ x: 200, y: 100, width: 120, height: 40 });
+    expect(geometry.kind).toBe('text-box');
+    if (geometry.kind !== 'text-box' || !geometry.calloutLine)
+      throw new Error('expected callout geom');
+    expect(geometry.calloutLine[0]).toEqual({ x: 40, y: 60 });
+    expect(geometry.calloutLine[1]).toEqual({ x: 120, y: 120 });
+    expect(geometry.lineEnding).toBe('open-arrow');
+    expect(geometry.box).toMatchObject({ x: 200, y: 100, width: 120, height: 40 });
     expect(model.selected).toEqual([annotation.id]);
     expect(model.editing).toBe(annotation.id);
     expect(annotation.source).toBe('vector');
@@ -1939,7 +1966,7 @@ describe('annotation-core callout', () => {
     ]);
     const annotation = model.byId[model.order[0]];
     const geometry = fieldsOf(annotation).geometry;
-    expect(geometry.kind === 'text' && geometry.rect).toMatchObject({
+    expect(geometry.kind === 'text-box' && geometry.box).toMatchObject({
       x: 200,
       y: 100,
       width: 150,
@@ -1960,7 +1987,7 @@ describe('annotation-core callout', () => {
   // The box-step ghost geom (the in-progress text box) — drives the no-bounce check.
   const ghostBox = (model: Model) => {
     const geometry = pageItems(model, PAGE).find((item) => item.source === 'ghost')?.geometry;
-    return geometry && geometry.kind === 'text' ? geometry.rect : null;
+    return geometry && geometry.kind === 'text-box' ? geometry.box : null;
   };
 
   it('pressing for the box keeps the DEFAULT box until a real drag (no bounce)', () => {
@@ -1991,7 +2018,7 @@ describe('annotation-core callout', () => {
     const committed = step(model, calloutPtr('up', 320, 150))[0];
     const annotation = committed.byId[committed.order[0]];
     const geometry = fieldsOf(annotation).geometry;
-    expect(geometry.kind === 'text' && geometry.rect).toMatchObject({
+    expect(geometry.kind === 'text-box' && geometry.box).toMatchObject({
       x: 200,
       y: 100,
       width: 120,
@@ -2023,7 +2050,7 @@ describe('annotation-core callout', () => {
     const committed = run(placed, [pointer('down', 600, 780), pointer('up', 600, 780)]);
     const annotation = committed.byId[committed.order[0]];
     const geometry = fieldsOf(annotation).geometry;
-    expect(geometry.kind === 'text' && geometry.rect).toEqual(ghostBox(placed));
+    expect(geometry.kind === 'text-box' && geometry.box).toEqual(ghostBox(placed));
   });
 
   it('a pointer past the page edge still slides the default box; a real drag does not', () => {
@@ -2049,7 +2076,7 @@ describe('annotation-core callout', () => {
     ]);
     const annotation = dragged.byId[dragged.order[0]];
     const geometry = fieldsOf(annotation).geometry;
-    expect(geometry.kind === 'text' && geometry.rect).toMatchObject({
+    expect(geometry.kind === 'text-box' && geometry.box).toMatchObject({
       x: 200,
       y: 100,
       width: 120,
@@ -2070,13 +2097,14 @@ describe('annotation-core callout', () => {
     model = { ...model, snap: { ...model.snap, guides: false } };
     const a0 = model.byId[model.order[0]];
     const a0Geometry = fieldsOf(a0).geometry;
-    if (a0Geometry.kind !== 'text' || !a0Geometry.callout) throw new Error('expected callout');
+    if (a0Geometry.kind !== 'text-box' || !a0Geometry.calloutLine)
+      throw new Error('expected callout');
     const visual = geomVisualBounds(
       a0Geometry,
       fieldsOf(a0).style.strokeWidth,
       fieldsOf(a0).style.border,
     );
-    const rect = a0Geometry.rect;
+    const rect = a0Geometry.box;
     const grab = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
     const edit = (phase: 'down' | 'move' | 'up', x: number, y: number): Message => ({
       type: 'editPointer',
@@ -2104,32 +2132,34 @@ describe('annotation-core callout — upright on a rotated page', () => {
   });
   // A committed upright callout: box {200,100,120,40} tilted 270° about its
   // centre (260,120) — its page-space footprint is the transposed {240,60,40,120}.
-  const rotCalloutGeom = (): Extract<ModelGeometry, { kind: 'text' }> => ({
-    kind: 'text',
-    rect: { x: 200, y: 100, width: 120, height: 40 },
-    rot: 270,
-    callout: { tip: { x: 40, y: 60 }, knee: { x: 120, y: 120 }, ending: 'open-arrow' },
-  });
+  const rotCalloutGeom = (): Extract<ModelGeometry, { kind: 'text-box' }> =>
+    calloutShape(
+      { x: 200, y: 100, width: 120, height: 40 },
+      270,
+      { x: 40, y: 60 },
+      { x: 120, y: 120 },
+      'open-arrow',
+    );
 
-  it('calloutConnection lands on the ROTATED edge midpoint (decided in the local frame)', () => {
+  it('calloutEnd lands on the ROTATED edge midpoint (decided in the local frame)', () => {
     const box = { x: 100, y: 100, width: 100, height: 60 }; // centre (150, 130)
     // At rot 90 the footprint is the transposed box: x∈[120,180], y∈[80,180].
     // A ref far right must connect to the footprint's right edge midpoint.
-    expect(calloutConnection(box, { x: 400, y: 130 }, 90)).toMatchObject({ x: 180, y: 130 });
+    expect(calloutEnd(box, { x: 400, y: 130 }, 90)).toMatchObject({ x: 180, y: 130 });
     // A ref far above → the footprint's top edge midpoint.
-    const above = calloutConnection(box, { x: 150, y: -200 }, 90);
+    const above = calloutEnd(box, { x: 150, y: -200 }, 90);
     expect(above.x).toBeCloseTo(150);
     expect(above.y).toBeCloseTo(80);
     // rot 0 keeps the classic rule bit-identically.
-    expect(calloutConnection(box, { x: 400, y: 130 }, 0)).toEqual({ x: 200, y: 130 });
+    expect(calloutEnd(box, { x: 400, y: 130 }, 0)).toEqual({ x: 200, y: 130 });
   });
 
-  it('calloutLinePoints derives conn off the rotated footprint', () => {
-    const points = calloutLinePoints(rotCalloutGeom());
+  it("a turned callout's line ends on the turned footprint", () => {
+    const points = rotCalloutGeom().calloutLine!;
     expect(points).toHaveLength(3);
     // knee (120,120) sits left of the footprint (x∈[240,280]) → left edge midpoint
-    expect(points[2].x).toBeCloseTo(240);
-    expect(points[2].y).toBeCloseTo(120);
+    expect(points[2]!.x).toBeCloseTo(240);
+    expect(points[2]!.y).toBeCloseTo(120);
   });
 
   it('the box drag commits the TRANSPOSED logical box + rot (footprint = what was drawn)', () => {
@@ -2144,20 +2174,21 @@ describe('annotation-core callout — upright on a rotated page', () => {
     ]);
     const annotation = model.byId[model.order[0]];
     const geometry = fieldsOf(annotation).geometry;
-    if (geometry.kind !== 'text' || !geometry.callout) throw new Error('expected callout geom');
+    if (geometry.kind !== 'text-box' || !geometry.calloutLine)
+      throw new Error('expected callout geom');
     // dragged {200,100,120,40}, centre (260,120) → transposed logical box
-    expect(geometry.rect).toMatchObject({ x: 240, y: 60, width: 40, height: 120 });
-    expect(geometry.rot).toBe(270);
+    expect(geometry.box).toMatchObject({ x: 240, y: 60, width: 40, height: 120 });
+    expect(geometry.rotation).toBe(270);
     // spinning the logical box by rot lands exactly back on the dragged region
-    expectRectClose(rotatedAabb(geometry.rect, geometry.rot!), {
+    expectRectClose(rotatedAabb(geometry.box, geometry.rotation!), {
       x: 200,
       y: 100,
       width: 120,
       height: 40,
     });
     // the leader anchors never turned
-    expect(geometry.callout.tip).toEqual({ x: 40, y: 60 });
-    expect(geometry.callout.knee).toEqual({ x: 120, y: 120 });
+    expect(geometry.calloutLine[0]).toEqual({ x: 40, y: 60 });
+    expect(geometry.calloutLine[1]).toEqual({ x: 120, y: 120 });
   });
 
   it('a box CLICK lays the default box upright-anchored at the press point', () => {
@@ -2171,10 +2202,10 @@ describe('annotation-core callout — upright on a rotated page', () => {
     ]);
     const annotation = model.byId[model.order[0]];
     const geometry = fieldsOf(annotation).geometry;
-    if (geometry.kind !== 'text') throw new Error('expected text geom');
+    if (geometry.kind !== 'text-box') throw new Error('expected text geom');
     // the same box uprightAnchoredRect places (its displayed top-left at the click)
-    expect(geometry.rect).toMatchObject(uprightAnchoredRect({ x: 200, y: 100 }, 150, 40, 90));
-    expect(geometry.rot).toBe(270);
+    expect(geometry.box).toMatchObject(uprightAnchoredRect({ x: 200, y: 100 }, 150, 40, 90));
+    expect(geometry.rotation).toBe(270);
   });
 
   it('the box-step ghost previews the SAME rot the commit applies', () => {
@@ -2187,7 +2218,7 @@ describe('annotation-core callout — upright on a rotated page', () => {
     ]);
     const ghost = pageItems(model, PAGE).find((item) => item.source === 'ghost');
     expect(ghost).toBeDefined();
-    expect(ghost!.geometry.kind === 'text' && ghost!.geometry.rot).toBe(270);
+    expect(ghost!.geometry.kind === 'text-box' && ghost!.geometry.rotation).toBe(270);
   });
 
   it('the default box slides by its displayed footprint, not its logical rect', () => {
@@ -2219,14 +2250,14 @@ describe('annotation-core callout — upright on a rotated page', () => {
       pointer('move', anchor.x, anchor.y),
     ]);
     const ghost = pageItems(model, PAGE).find((item) => item.source === 'ghost');
-    if (!ghost || ghost.geometry.kind !== 'text') throw new Error('expected text ghost');
-    const placed = rotatedAabb(ghost.geometry.rect, ghost.geometry.rot ?? 0);
+    if (!ghost || ghost.geometry.kind !== 'text-box') throw new Error('expected text ghost');
+    const placed = rotatedAabb(ghost.geometry.box, ghost.geometry.rotation ?? 0);
     expect(placed.y).toBeCloseTo(0);
     expect(placed.x).toBeCloseTo(foot.x);
     expect(placed.width).toBeCloseTo(foot.width);
     expect(placed.height).toBeCloseTo(foot.height);
-    expect(ghost.geometry.rect.x).toBeCloseTo(raw.x);
-    expect(ghost.geometry.rect.y).toBeCloseTo(raw.y - foot.y);
+    expect(ghost.geometry.box.x).toBeCloseTo(raw.x);
+    expect(ghost.geometry.box.y).toBeCloseTo(raw.y - foot.y);
   });
 
   it('an unrotated display (or a non-upright caller) keeps the classic commit — no rot', () => {
@@ -2246,9 +2277,9 @@ describe('annotation-core callout — upright on a rotated page', () => {
     ]);
     const annotation = model.byId[model.order[0]];
     const geometry = fieldsOf(annotation).geometry;
-    if (geometry.kind !== 'text') throw new Error('expected text geom');
-    expect(geometry.rect).toMatchObject({ x: 200, y: 100, width: 150, height: 40 });
-    expect(geometry.rot).toBeUndefined();
+    if (geometry.kind !== 'text-box') throw new Error('expected text geom');
+    expect(geometry.box).toMatchObject({ x: 200, y: 100, width: 150, height: 40 });
+    expect(geometry.rotation).toBe(0);
   });
 
   it('geomHit tests the box by its FOOTPRINT and the leader in page space', () => {
@@ -3835,7 +3866,7 @@ describe('upright creation (counter-rotating the display rotation)', () => {
     subtype,
     in: { page: PAGE, point: { x, y }, shift: false, ...extra },
   });
-  const textGeom = (geometry: ModelGeometry) => (geometry.kind === 'text' ? geometry : null);
+  const textGeom = (geometry: ModelGeometry) => (geometry.kind === 'text-box' ? geometry : null);
 
   it('helpers: a quarter-turn about the centre lands exactly back on the source box', () => {
     const dragged = { x: 50, y: 60, width: 120, height: 40 };
@@ -3879,10 +3910,10 @@ describe('upright creation (counter-rotating the display rotation)', () => {
       uprightPtr('free-text', 'up', 100, 200),
     ]);
     const geometry = textGeom(fieldsOf(model.byId[model.order[0]]).geometry)!;
-    expect(geometry.rot).toBe(270); // -90 → reads horizontally on the 90°-rotated page
-    expect(geometry.rect).toEqual({ x: 30, y: 90, width: 180, height: 40 }); // display-frame anchor
+    expect(geometry.rotation).toBe(270); // -90 → reads horizontally on the 90°-rotated page
+    expect(geometry.box).toEqual({ x: 30, y: 90, width: 180, height: 40 }); // display-frame anchor
     // its rotated footprint hangs off the click exactly like the 0° box does on screen
-    expectRectClose(rotatedAabb(geometry.rect, geometry.rot!), {
+    expectRectClose(rotatedAabb(geometry.box, geometry.rotation!), {
       x: 100,
       y: 20,
       width: 40,
@@ -3897,9 +3928,9 @@ describe('upright creation (counter-rotating the display rotation)', () => {
       uprightPtr('free-text', 'up', 170, 100),
     ]);
     const geometry = textGeom(fieldsOf(model.byId[model.order[0]]).geometry)!;
-    expect(geometry.rot).toBe(270);
-    expect(geometry.rect).toEqual({ x: 90, y: 20, width: 40, height: 120 }); // transposed about centre
-    expectRectClose(rotatedAabb(geometry.rect, geometry.rot!), {
+    expect(geometry.rotation).toBe(270);
+    expect(geometry.box).toEqual({ x: 90, y: 20, width: 40, height: 120 }); // transposed about centre
+    expectRectClose(rotatedAabb(geometry.box, geometry.rotation!), {
       x: 50,
       y: 60,
       width: 120,
@@ -3914,8 +3945,8 @@ describe('upright creation (counter-rotating the display rotation)', () => {
       uprightPtr('free-text', 'up', 170, 100),
     ]);
     const geometry = textGeom(fieldsOf(model.byId[model.order[0]]).geometry)!;
-    expect(geometry.rot).toBe(180);
-    expect(geometry.rect).toEqual({ x: 50, y: 60, width: 120, height: 40 });
+    expect(geometry.rotation).toBe(180);
+    expect(geometry.box).toEqual({ x: 50, y: 60, width: 120, height: 40 });
   });
 
   it('a box SHAPE tool opting in gets the same treatment (square under 270)', () => {
@@ -3936,13 +3967,13 @@ describe('upright creation (counter-rotating the display rotation)', () => {
       uprightPtr('free-text', 'down', 100, 200, { displayRotation: 90 }),
       uprightPtr('free-text', 'up', 100, 200),
     ]);
-    expect(textGeom(fieldsOf(noPolicy.byId[noPolicy.order[0]]).geometry)!.rot).toBeUndefined();
+    expect(textGeom(fieldsOf(noPolicy.byId[noPolicy.order[0]]).geometry)!.rotation).toBe(0);
     // upright at rotation 0 → plain commit (no stored draft noise)
     const flat = run(initialModel, [
       uprightPtr('free-text', 'down', 100, 200, { displayRotation: 0, upright: true }),
       uprightPtr('free-text', 'up', 100, 200),
     ]);
-    expect(textGeom(fieldsOf(flat.byId[flat.order[0]]).geometry)!.rect).toEqual({
+    expect(textGeom(fieldsOf(flat.byId[flat.order[0]]).geometry)!.box).toEqual({
       x: 100,
       y: 200,
       width: 180,
@@ -3953,7 +3984,7 @@ describe('upright creation (counter-rotating the display rotation)', () => {
       uprightPtr('free-text', 'down', 100, 200),
       uprightPtr('free-text', 'up', 100, 200, { displayRotation: 90, upright: true }),
     ]);
-    expect(textGeom(fieldsOf(lateUp.byId[lateUp.order[0]]).geometry)!.rot).toBeUndefined();
+    expect(textGeom(fieldsOf(lateUp.byId[lateUp.order[0]]).geometry)!.rotation).toBe(0);
   });
 });
 
@@ -4444,11 +4475,14 @@ describe('conversation plane — replies and review states never reach the page'
 describe('callout ↔ AP-generator mirror', () => {
   // Box (200,100)+120×40; tip far left; knee below-left of the box centre →
   // conn = left-edge midpoint (200,120). Same fixture as the callout describe.
-  const calloutGeom = (): Extract<ModelGeometry, { kind: 'text' }> => ({
-    kind: 'text',
-    rect: { x: 200, y: 100, width: 120, height: 40 },
-    callout: { tip: { x: 40, y: 60 }, knee: { x: 120, y: 120 }, ending: 'open-arrow' },
-  });
+  const calloutGeom = (): Extract<ModelGeometry, { kind: 'text-box' }> =>
+    calloutShape(
+      { x: 200, y: 100, width: 120, height: 40 },
+      0,
+      { x: 40, y: 60 },
+      { x: 120, y: 120 },
+      'open-arrow',
+    );
 
   it('the box border insets by half the stroke — ink INSIDE the rect, like squares', () => {
     const nodes = geomScene(calloutGeom(), 6);

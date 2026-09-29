@@ -1,22 +1,16 @@
 /**
- * Free text (plain box + callout). Owns the callout leader group — the text
- * box is the `box`, and the engine works out the `rect` around it, the line
- * and its arrow — and the `/DA` text-slice ingest. Font/size/colour lowerings
- * are the generic 1:1 keys (safe as singles since the engine's `/DA`
- * read-modify-write).
+ * Free text (plain box + callout). Its box, turn and callout line are read
+ * and written by the text box family (`shapes/text-box.ts`); what it adds
+ * here is its text: the `/DA` text-slice ingest and the formatting toggles.
+ * Font/size/colour lowerings are the generic 1:1 keys (safe as singles since
+ * the engine's `/DA` read-modify-write).
  */
-import type {
-  AnnotationDTO,
-  FreeTextDraft,
-  LineEnding,
-  PageBox,
-} from '@embedpdf/engine-core/runtime';
+import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
-import { calloutLinePoints, geomRotation } from '../../geometry';
 import { richDocOf } from '../../richtext';
+import { readTextBox, writeTextBox } from '../../shapes/text-box';
 import type { RecordFields, TextStyle } from '../../types';
 import type { KindProjection, Wire } from '../projection';
-import { boxGeomFields } from '../seam';
 
 type FreeTextDTO = Extract<AnnotationDTO, { subtype: 'free-text' }>;
 
@@ -60,75 +54,22 @@ const formattingBody = (annotation: RecordFields): Wire => {
   };
 };
 
-/**
- * The engine geometry for a callout: the text box (`box`, turned by
- * `rotation` about its middle), the `/CL` leader (`[tip, knee, conn]` with
- * the connection point derived) and the `/LE` ending, in page space. The
- * engine works out `rect`, the text box with the line and its
- * arrow. A turn tilts the text box only: the engine draws the box and its
- * text under an inline turn while the leader stays page-space. The turn is
- * total (null states the clear) like every box emission.
- */
-export function calloutFields(annotation: RecordFields): {
-  box: PageBox;
-  rotation: number | null;
-  calloutLine: NonNullable<FreeTextDraft['calloutLine']>;
-  lineEnding: LineEnding;
-} | null {
-  const geometry = annotation.geometry;
-  if (geometry.kind !== 'text' || !geometry.callout) return null;
-  const points = calloutLinePoints(geometry);
-  const calloutLine = (
-    points.length === 3 ? [points[0], points[1], points[2]] : [points[0], points[1]]
-  ) as NonNullable<FreeTextDraft['calloutLine']>;
-  return {
-    ...boxGeomFields(geometry.rect, geomRotation(geometry)),
-    calloutLine,
-    lineEnding: geometry.callout.ending,
-  };
-}
+/** Is the record a callout: a text box with a line? */
+const isCallout = (annotation: RecordFields): boolean =>
+  annotation.geometry.kind === 'text-box' && annotation.geometry.calloutLine !== null;
 
 export const freeText: KindProjection = {
   ingest: (dto) => {
     const freeTextDto = dto as FreeTextDTO;
-    // The text box is the `box`, turned by `rotation`. A callout (`/IT
-    // free-text-callout` + a `/CL` leader) adds its leader: the tip is
-    // `cl[0]` and the elbow `cl[1]` (a 3-point `/CL`). The connection point —
-    // `cl` last — is not stored; it's re-derived from the box.
-    const rot = freeTextDto.rotation ?? 0;
-    const box = freeTextDto.box;
-    const cl = freeTextDto.calloutLine;
-    if (freeTextDto.intent === 'free-text-callout' && cl && cl.length >= 2) {
-      return {
-        geometry: {
-          kind: 'text',
-          rect: box,
-          callout: {
-            tip: cl[0],
-            knee: cl.length === 3 ? cl[1] : undefined,
-            ending: freeTextDto.lineEnding ?? 'none',
-          },
-          ...(rot ? { rot } : {}),
-        },
-        text: textFromDTO(freeTextDto),
-      };
-    }
-    return {
-      geometry: { kind: 'text', rect: box, ...(rot ? { rot } : {}) },
-      text: textFromDTO(freeTextDto),
-    };
+    return { geometry: readTextBox(freeTextDto), text: textFromDTO(freeTextDto) };
   },
-  geometry: (annotation) => {
-    if (annotation.geometry.kind !== 'text') return null;
-    const cf = calloutFields(annotation);
-    if (cf) return { ...cf };
-    return boxGeomFields(annotation.geometry.rect, geomRotation(annotation.geometry));
-  },
+  geometry: (annotation) =>
+    annotation.geometry.kind === 'text-box' ? writeTextBox(annotation.geometry) : null,
   prop: { bold: formattingBody, italic: formattingBody, underline: formattingBody },
   // `/IT` + the initial `/Contents` are create-only statements; while typing,
   // the debounced text-edit write owns `contents`.
   draftExtras: (annotation) => ({
-    intent: calloutFields(annotation) ? 'free-text-callout' : 'free-text',
+    intent: isCallout(annotation) ? 'free-text-callout' : 'free-text',
     contents: annotation.annotation?.contents ?? '',
   }),
 };

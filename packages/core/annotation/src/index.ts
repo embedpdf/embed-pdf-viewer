@@ -106,15 +106,12 @@ export {
 } from './record/defaults';
 export {
   geomScene,
-  textPlateInset,
   geomBounds,
   geomVisualBounds,
   geomHit,
   geomHandles,
   geomTranslate,
   geomDragHandle,
-  calloutConnection,
-  calloutLinePoints,
   caretGeomFromAnchor,
   caretRectFromAnchor,
   caretRectFromTextEnd,
@@ -155,7 +152,15 @@ export {
   normalizeDeg,
   type RectHandle,
 } from './rect';
-export { readBox, writeBox, type BoxShape } from './shapes/box';
+export { readBox, writeBox, type BoxShape, type TurnedBox } from './shapes/box';
+export {
+  calloutEnd,
+  readTextBox,
+  textPlateInset,
+  writeTextBox,
+  type CalloutLine,
+  type TextBoxShape,
+} from './shapes/text-box';
 // The engine's record and the model's entry, both ways: the entry a record
 // reads as, the fields the core's gestures read off it, and the engine
 // fields a change of them writes.
@@ -187,7 +192,6 @@ export type {
   ChangeSet,
   ModelAnnotation,
   Border,
-  Callout,
   ChromeGeometry,
   ChromeNode,
   Cursor,

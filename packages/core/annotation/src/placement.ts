@@ -104,7 +104,7 @@ export function clickCreateGeom(
   }
   const { rect, rot } = placement;
   if (subtype === 'free-text') {
-    return { kind: 'text', rect, ...(rot ? { rot } : {}) };
+    return { kind: 'text-box', box: rect, rotation: rot, calloutLine: null, lineEnding: null };
   }
   if (subtype === 'square' || subtype === 'circle') {
     return { kind: 'box', box: rect, rotation: rot, ellipse: subtype === 'circle' };

@@ -18,6 +18,7 @@ import type {
 import type { DistanceAppearance, MeasurementAppearance } from './measurement';
 import type { ShapeMeasurementAppearance } from './measurement-shape';
 import type { BoxShape } from './shapes/box';
+import type { TextBoxShape } from './shapes/text-box';
 
 export type { Quad, QuadRing } from '@embedpdf/core-geometry';
 
@@ -83,26 +84,14 @@ export type Subtype =
  * polygon/polyline (poly), text markup (quads), and caret.
  */
 /**
- * A free-text callout's leader: the `/CL` line + `/LE` arrow. `tip` is the
- * called-out point (the arrow is drawn here); `knee` is the optional elbow. The
- * point where the leader meets the text box (the third `/CL` point) is never
- * stored — it is derived from the box + the knee (see `calloutConnection`), so it
- * can't drift when the box or knee moves. Page space (y-down).
- */
-export interface Callout {
-  tip: Point;
-  knee?: Point;
-  ending: LineEnding;
-}
-
-/**
- * The shape a gesture moves, one arm per family. The box family's arm is its
- * own shape, the engine's `box` and `rotation` ({@link BoxShape}); the other
- * arms still carry the core's older names until their family moves.
+ * The shape a gesture moves, one arm per family. The box and text box
+ * families' arms are their own shapes, the engine's fields ({@link BoxShape},
+ * {@link TextBoxShape}); the other arms still carry the core's older names
+ * until their family moves.
  *
  * Rotation is degrees clockwise in page space, normalized `[0,360)`:
  *
- * - **Box** (`box`, `text`): the box before its turn, and the turn about its
+ * - **Box** (`box`, `text-box`): the box before its turn, and the turn about its
  *   middle. The engine works out `/Rect` around the turned drawing, so PDFium
  *   bakes a portable `/AP`.
  * - **Vertex** (`line`, `poly`, `ink`): the points are already rotated (they are
@@ -118,9 +107,7 @@ export type ModelGeometry =
   | { kind: 'quads'; quads: Quad[] } // highlight / underline / squiggly / strikeout
   | { kind: 'caret'; rect: Rect; rot?: number } // caret insertion marker (rect = unrotated box; rot = its text's baseline tilt, authoring metadata — no gesture)
   | { kind: 'ink'; strokes: Point[][]; rot?: number } // freehand ink (pre-rotated; rot advisory)
-  | { kind: 'text'; rect: Rect; callout?: Callout; rot?: number }; // free-text box (`rect` is the unrotated text box);
-// a `callout` adds a leader line + arrow. The text is data (DTO `contents`),
-// rendered by the framework as an editable element, not by `scene()`.
+  | TextBoxShape; // free text; its text is data, rendered by the framework as an editable element
 
 /**
  * How a shape's outline is stroked. A discriminated union so illegal combinations
@@ -840,7 +827,7 @@ export interface RenderItem {
   label?: { text: string; repeat: boolean };
   measure?: MeasurementAppearance;
   /**
-   * Applied rotation (deg, CW), or 0/undefined. For box kinds (`box`/`text`)
+   * Applied rotation (deg, CW), or 0/undefined. For box kinds (`box`/`text-box`)
    * `box` is the unrotated visual box and the renderer applies this rotation
    * about its centre (CSS/SVG transform). For vertex kinds the geometry is
    * already rotated, so this is advisory only — the renderer must not re-apply it.

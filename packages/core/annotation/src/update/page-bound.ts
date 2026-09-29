@@ -47,7 +47,7 @@ function moveClampCorners(annotation: ModelAnnotation, view?: ViewEnv): Point[] 
   const mode = anchorModeOf(annotation);
   const { geometry: stored, style } = fieldsOf(annotation);
   const geometry = anchoredGeom(stored, mode, view);
-  if (geometry.kind === 'text' && geometry.callout) {
+  if (geometry.kind === 'text-box' && geometry.calloutLine) {
     const visual = geomVisualBounds(
       geometry,
       anchoredStrokeWidth(style.strokeWidth, mode, view),

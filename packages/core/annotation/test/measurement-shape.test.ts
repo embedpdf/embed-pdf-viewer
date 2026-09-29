@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 
 import { record, rounded, step, withoutLabel, STYLE } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
-import { DEFAULT_CHROME_GEOMETRY, geomTranslate, pointInPoly, turnPivotOf } from '../src/geometry';
-import { rotatePoint } from '../src/rect';
+import { DEFAULT_CHROME_GEOMETRY, geomTranslate, turnPivotOf } from '../src/geometry';
+import { pointInPoly, rotatePoint } from '../src/rect';
 import { hitTest } from '../src/hit';
 import {
   automaticShapeCaptionCenter,

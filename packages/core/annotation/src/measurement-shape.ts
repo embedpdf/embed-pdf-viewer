@@ -1,7 +1,7 @@
 import { isReadout, measurementReadout } from '@embedpdf/engine-core/runtime';
 import type { PdfMeasurement, ShapeDimensionCaption } from '@embedpdf/engine-core/runtime';
-import { geomRotation, pointInPoly, selectionQuad } from './geometry';
-import { rotatePoint, unionRect } from './rect';
+import { geomRotation, selectionQuad } from './geometry';
+import { pointInPoly, rotatePoint, unionRect } from './rect';
 import { DISTANCE_CAPTION_SIZE, distanceCaptionWidth } from './measurement-font';
 import { distanceLayout, distanceSelectionQuad, moveDistanceCaption } from './measurement';
 import type { DistanceCaptionLayout, MeasurementAppearance } from './measurement';

@@ -240,7 +240,13 @@ export function createPointer(
     const dragged = rectFromPoints(activeDraft.from, activeDraft.to);
     const isClick = dragged.width < MIN_DRAG && dragged.height < MIN_DRAG;
     if (!isClick) {
-      geometry = { kind: 'text', rect: uprightBox(dragged), ...(upRot ? { rot: upRot } : {}) };
+      geometry = {
+        kind: 'text-box',
+        box: uprightBox(dragged),
+        rotation: upRot,
+        calloutLine: null,
+        lineEnding: null,
+      };
     } else if (activeDraft.clickCreate !== false) {
       geometry = clickGeom(
         activeDraft.clickCreate && 'width' in activeDraft.clickCreate
@@ -293,7 +299,7 @@ export function createPointer(
     style,
     // A text kind carries its text styling from birth, so the tool's font
     // defaults actually apply to what you draw.
-    ...(geometry.kind === 'text' ? { text: tool.text } : {}),
+    ...(geometry.kind === 'text-box' ? { text: tool.text } : {}),
     // A drawn link starts at the tool preset's target ('docs-link' style
     // presets), or dead (`null` — the create-then-edit flow).
     ...(activeDraft.subtype === 'link' ? { link: tool.target } : {}),
@@ -309,7 +315,7 @@ export function createPointer(
       selected: [id],
       draft: null,
       // A freshly drawn free-text box opens straight into edit (type immediately).
-      editing: geometry.kind === 'text' ? id : model.editing,
+      editing: geometry.kind === 'text-box' ? id : model.editing,
     },
     [{ type: 'create', id }],
   ];

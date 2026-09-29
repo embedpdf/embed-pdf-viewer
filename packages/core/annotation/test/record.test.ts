@@ -492,21 +492,22 @@ describe('record — free-text callout mapping', () => {
   it('fromDTO: intent + /CL → a text geom with a leader (the box, conn dropped)', () => {
     const annotation = fromDTO(fromFile(calloutDTO()));
     const geometry = fieldsOf(annotation).geometry;
-    expect(geometry.kind).toBe('text');
-    if (geometry.kind !== 'text' || !geometry.callout) throw new Error('expected callout geom');
+    expect(geometry.kind).toBe('text-box');
+    if (geometry.kind !== 'text-box' || !geometry.calloutLine)
+      throw new Error('expected callout geom');
     // the text box, in page space
-    expect(geometry.rect).toMatchObject({ x: 200, y: 140, width: 120, height: 60 });
+    expect(geometry.box).toMatchObject({ x: 200, y: 140, width: 120, height: 60 });
     // tip / knee map to page space (y flips about the 800-pt crop)
-    expect(geometry.callout.tip).toEqual({ x: 40, y: 60 });
-    expect(geometry.callout.knee).toEqual({ x: 120, y: 100 });
-    expect(geometry.callout.ending).toBe('open-arrow');
+    expect(geometry.calloutLine[0]).toEqual({ x: 40, y: 60 });
+    expect(geometry.calloutLine[1]).toEqual({ x: 120, y: 100 });
+    expect(geometry.lineEnding).toBe('open-arrow');
   });
 
   it('fromDTO: a plain free-text (no /CL) has no callout', () => {
     const annotation = fromDTO(fromFile(plainFreeTextDTO()));
     const geometry = fieldsOf(annotation).geometry;
-    expect(geometry.kind).toBe('text');
-    expect(geometry.kind === 'text' && geometry.callout).toBeUndefined();
+    expect(geometry.kind).toBe('text-box');
+    expect(geometry.kind === 'text-box' && geometry.calloutLine).toBeNull();
   });
 
   it('toCreateDraft: a callout geom → intent + the text box + /CL + /LE', () => {
@@ -1049,7 +1050,7 @@ describe('record — every field a kind takes writes only fields its engine kind
   const geometryOf = (subtype: string): RecordFields['geometry'] => {
     switch (subtype) {
       case 'free-text':
-        return { kind: 'text', rect: box };
+        return { kind: 'text-box', box: box, rotation: 0, calloutLine: null, lineEnding: null };
       case 'line':
         return { kind: 'line', a: { x: 100, y: 100 }, b: { x: 200, y: 150 } };
       case 'polygon':

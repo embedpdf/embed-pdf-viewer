@@ -26,6 +26,7 @@ import {
   ROTATE_KNOB_OFFSET,
 } from './geometry';
 import { rectFromPoints, normalizeDeg, rotatePoint, unionRect } from './rect';
+import { calloutShape } from './shapes/text-box';
 import { groupCaps } from './group';
 import { isSelectable, paintOrder } from './hit';
 import { capsFor } from './kinds';
@@ -196,7 +197,7 @@ function effSource(model: Model, id: Id): 'baked' | 'vector' {
   // callout's leader — + DOM text): the flat baked raster can't hide just
   // its text, so any blend doubles it. Geometry gestures flip below; editing
   // joins them here.
-  if (model.editing === id && fieldsOf(annotation).geometry.kind === 'text') return 'vector';
+  if (model.editing === id && fieldsOf(annotation).geometry.kind === 'text-box') return 'vector';
   const draft = model.draft;
   // A live resize/rotate/group transform must render live — the baked raster
   // can't stretch or tilt — even before the commit flips `source`.
@@ -328,12 +329,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
     const geometry: ModelGeometry =
       draft.step === 'knee'
         ? { kind: 'line', a: draft.tip, b: draft.current, ends: { start: ending, end: 'none' } }
-        : {
-            kind: 'text',
-            rect: calloutBox(draft),
-            callout: { tip: draft.tip, knee: draft.knee, ending },
-            ...(rot ? { rot } : {}),
-          };
+        : calloutShape(calloutBox(draft), rot, draft.tip, draft.knee, ending);
     items.push({
       id: DRAFT_ID,
       ref: null,
@@ -384,16 +380,16 @@ export function textBoxes(model: Model, page: PageRef, view?: ViewEnv): TextBox[
     const annotation = model.byId[id];
     if (
       annotation.page.pageObjectNumber !== pageObjectNumber ||
-      fieldsOf(annotation).geometry.kind !== 'text'
+      fieldsOf(annotation).geometry.kind !== 'text-box'
     )
       continue;
     if (!viewable(annotation.annotation, model.selected.includes(id))) continue; // `/F`-hidden
     if (!textIsLive(model, id)) continue; // baked → rendered as the /AP image instead
     const geometry = effGeom(model, id, view);
-    if (geometry.kind !== 'text') continue;
+    if (geometry.kind !== 'text-box') continue;
     out.push({
       id,
-      box: geometry.rect,
+      box: geometry.box,
       editing: model.editing === id,
       rot: geomRotation(geometry),
     });
