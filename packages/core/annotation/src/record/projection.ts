@@ -1,8 +1,6 @@
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
-import { geomRotation } from '../geometry';
 import type { ModelGeometry, RecordFields } from '../types';
-import { boxGeomFields } from './seam';
 
 /** An untyped partial wire statement — merged fragments are cast to the
  *  concrete `AnnotationDraft`/`AnnotationPatch` at the derivation boundary. */
@@ -70,13 +68,3 @@ export interface KindProjection {
    *  binary source and use their own create path; widgets are form-plane). */
   createable?: false;
 }
-
-/** Box-kind geometry emission: the model's `rect` (its box before any turn) +
- *  its turn → `box` + `rotation`, total (null states the clear). */
-export const boxEmit = (annotation: RecordFields): Wire => {
-  const boxGeometry = annotation.geometry as Extract<
-    ModelGeometry,
-    { kind: 'rect' } | { kind: 'text' }
-  >;
-  return boxGeomFields(boxGeometry.rect, geomRotation(annotation.geometry));
-};

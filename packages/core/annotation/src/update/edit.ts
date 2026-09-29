@@ -10,8 +10,8 @@ import {
   geomRotation,
   groupResizeAnchor,
   groupResizeBox,
-  normalizeDeg,
 } from '../geometry';
+import { normalizeDeg } from '../rect';
 import { groupMembers } from '../group';
 import { canMove, hitTest } from '../hit';
 import { distanceLeaderLength } from '../measurement';

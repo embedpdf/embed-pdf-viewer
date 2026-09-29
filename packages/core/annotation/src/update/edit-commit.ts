@@ -4,13 +4,8 @@
  * A grab that changed nothing writes nothing.
  */
 import { anchorModeOf, unanchoredGeom } from '../anchor';
-import {
-  geomRotateAbout,
-  geomScaleAbout,
-  geomTranslate,
-  groupResizeFactors,
-  rotatePoint,
-} from '../geometry';
+import { geomRotateAbout, geomScaleAbout, geomTranslate, groupResizeFactors } from '../geometry';
+import { rotatePoint } from '../rect';
 import {
   moveMeasurementCaption,
   shapeMeasurementReadout,

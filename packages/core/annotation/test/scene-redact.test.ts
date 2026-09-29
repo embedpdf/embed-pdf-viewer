@@ -22,7 +22,7 @@ function redactItem(overrides: Partial<RenderItem> = {}): RenderItem {
     id: 'obj:1',
     ref: null,
     subtype: 'redact',
-    geometry: { kind: 'rect', rect: REGION, ellipse: false },
+    geometry: { kind: 'box', box: REGION, rotation: 0, ellipse: false },
     box: REGION,
     style: {
       color: '#e44234',

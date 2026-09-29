@@ -3,13 +3,8 @@ import { describe, expect, it } from 'vitest';
 
 import { record, rounded, step, type RecordInput, STYLE } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
-import {
-  DEFAULT_CHROME_GEOMETRY,
-  pointInQuad,
-  rotatePoint,
-  turnPivotOf,
-  unionRect,
-} from '../src/geometry';
+import { DEFAULT_CHROME_GEOMETRY, pointInQuad, turnPivotOf } from '../src/geometry';
+import { rotatePoint, unionRect } from '../src/rect';
 import { hitTest, groupUnionBounds } from '../src/hit';
 import { distanceLayout, type DistanceAppearance } from '../src/measurement';
 import { annotationSelectionFrame } from '../src/selection';
@@ -193,7 +188,12 @@ describe('measurement selection frame and rotation', () => {
       ...fieldsOf(measurement()),
       id: 'square',
       subtype: 'square',
-      geometry: { kind: 'rect', rect: { x: 400, y: 180, width: 80, height: 80 }, ellipse: false },
+      geometry: {
+        kind: 'box',
+        box: { x: 400, y: 180, width: 80, height: 80 },
+        rotation: 0,
+        ellipse: false,
+      },
       measure: undefined,
       annotation: undefined,
     });

@@ -70,10 +70,10 @@ async function boot(scope?: string[]) {
   const page = trigger.widgets[0]!.page!;
   await annotation.whenSynced();
 
-  // A square's geometry is the `rect` member of the geometry union.
+  // A square's geometry is the box family's shape: its `box`.
   const rectX = ({ geometry }: ReturnType<typeof annotation.listPageItems>[number]): number => {
-    if (geometry.kind !== 'rect') throw new Error(`square with ${geometry.kind} geometry`);
-    return geometry.rect.x;
+    if (geometry.kind !== 'box') throw new Error(`square with ${geometry.kind} geometry`);
+    return geometry.box.x;
   };
   const squareStyle = () => {
     // hoverSquare sits at x≈300; the bystander square at x≈450.

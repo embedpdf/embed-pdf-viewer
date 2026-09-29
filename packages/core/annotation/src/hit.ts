@@ -2,14 +2,8 @@ import type { PageRef } from '@embedpdf/engine-core/runtime';
 import { annotationSelectionFrame, annotationTurnPivot } from './selection';
 import { distanceCaptionHit, distanceHandles, distanceHit, distanceLayout } from './measurement';
 import { measurementLayout } from './measurement-shape';
-import {
-  geomHandles,
-  geomHit,
-  placeRotateKnob,
-  pointInQuad,
-  rectHandlesFor,
-  unionRect,
-} from './geometry';
+import { geomHandles, geomHit, placeRotateKnob, pointInQuad, rectHandlesFor } from './geometry';
+import { unionRect } from './rect';
 import { capsFor, isMarkup } from './kinds';
 import { groupCaps } from './group';
 import { isSubstrateOnly } from './plane';
@@ -325,7 +319,14 @@ export function hitTest(
         ? inBounds(annotation, point, view)
         : distance
           ? distanceHit(distance, point, strokeWidth, strokeMargin)
-          : geomHit(geometry, point, strokeMargin, isFilled(annotation), strokeWidth));
+          : geomHit(
+              geometry,
+              point,
+              strokeMargin,
+              isFilled(annotation),
+              strokeWidth,
+              style.border,
+            ));
 
     if (hit) {
       return { kind: 'annot', id };

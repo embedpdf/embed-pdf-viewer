@@ -9,7 +9,8 @@ import {
   toPageRef,
 } from '@embedpdf/engine-core/runtime';
 import { annotationSelectionFrame, shapeMeasurementLayout } from '../../../core/annotation/src';
-import { rotatePoint, turnPivotOf } from '../../../core/annotation/src/geometry';
+import { turnPivotOf } from '../../../core/annotation/src/geometry';
+import { rotatePoint } from '../../../core/annotation/src/rect';
 import { createLocalEngine } from '../src/index';
 import { fieldsOf, fromDTO } from '../../../core/annotation/src/record';
 import { annotationKey } from '@embedpdf/engine-core/runtime';

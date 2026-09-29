@@ -2,7 +2,8 @@
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 
 import { type ViewEnv } from '../anchor';
-import { quadIntersectsRect, rectFromPoints } from '../geometry';
+import { quadIntersectsRect } from '../geometry';
+import { rectFromPoints } from '../rect';
 import { expandGroups } from '../group';
 import { isSelectable } from '../hit';
 import { isSubstrateOnly } from '../plane';

@@ -7,13 +7,8 @@
 import type { AnnotationFlags, InkIntent } from '@embedpdf/engine-core/runtime';
 
 import { DRAWN_FLAGS } from '../flags';
-import {
-  rectFromPoints,
-  shapeRectFor,
-  transposedAboutCenter,
-  unionRect,
-  uprightRotation,
-} from '../geometry';
+import { transposedAboutCenter, uprightRotation } from '../geometry';
+import { rectFromPoints, unionRect } from '../rect';
 import { straightenInkStroke } from '../ink';
 import { type MeasurementAppearance } from '../measurement';
 import { shapeMeasurementReadout } from '../measurement-shape';
@@ -256,12 +251,12 @@ export function createPointer(
   } else if (activeDraft.kind === 'create-rect') {
     const dragged = rectFromPoints(activeDraft.from, activeDraft.to);
     if (dragged.width >= MIN_DRAG || dragged.height >= MIN_DRAG) {
-      // cloudy stores the outer box (dragged + extent) so the dragged box is its inner edge
+      // The dragged box is the shape's box; a cloud reaches out from it.
       geometry = {
-        kind: 'rect',
-        rect: shapeRectFor(uprightBox(dragged), activeDraft.ellipse, style),
+        kind: 'box',
+        box: uprightBox(dragged),
+        rotation: upRot,
         ellipse: activeDraft.ellipse,
-        ...(upRot ? { rot: upRot } : {}),
       };
     } else if (activeDraft.clickCreate && 'width' in activeDraft.clickCreate) {
       geometry = clickGeom(activeDraft.clickCreate);

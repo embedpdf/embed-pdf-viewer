@@ -420,10 +420,10 @@ describe('record — rotation round-trip', () => {
   it('box: fromDTO reads the box and the clockwise rot', () => {
     const annotation = fromDTO(fromFile(rotatedSquareDTO(90)));
     const geometry = fieldsOf(annotation).geometry;
-    if (geometry.kind !== 'rect') throw new Error('expected rect geom');
+    if (geometry.kind !== 'box') throw new Error('expected rect geom');
     // box {100,100,200,200} → content {x:100,y:600,w:100,h:100}
-    expect(geometry.rect).toMatchObject({ x: 100, y: 600, width: 100, height: 100 });
-    expect(geometry.rot).toBe(90);
+    expect(geometry.box).toMatchObject({ x: 100, y: 600, width: 100, height: 100 });
+    expect(geometry.rotation).toBe(90);
   });
 
   it('box: toPatch emits the box + rotation, and no rect', () => {
@@ -722,9 +722,9 @@ describe('record — withFields (a change is its write)', () => {
   const moved = (annotation: ModelAnnotation, dx: number): Partial<RecordFields> => {
     const geometry = fieldsOf(annotation).geometry as Extract<
       RecordFields['geometry'],
-      { kind: 'rect' }
+      { kind: 'box' }
     >;
-    return { geometry: { ...geometry, rect: { ...geometry.rect, x: geometry.rect.x + dx } } };
+    return { geometry: { ...geometry, box: { ...geometry.box, x: geometry.box.x + dx } } };
   };
   const patchOf = (annotation: ModelAnnotation, change: Partial<RecordFields>) =>
     toFile(writeOf(annotation, change)) as unknown as Record<string, unknown>;
@@ -751,14 +751,12 @@ describe('record — withFields (a change is its write)', () => {
     expect(patch).toEqual({ subtype: 'free-text', fontSize: 20 });
   });
 
-  it('strokeWidth on a CLOUDY square states the box the cloud leaves', () => {
+  it('strokeWidth on a CLOUDY square writes only the width: the box is where the cloud starts', () => {
     const cloudy = fromDTO(
       fromFile({ ...squareDTO(62), cloudyIntensity: 2 } as AnnotationDTO<PdfCoordinates>),
     );
     const patch = patchOf(cloudy, { style: { ...fieldsOf(cloudy).style, strokeWidth: 3 } });
-    expect(patch.strokeWidth).toBe(3);
-    // The cloud's reach follows the stroke width, so the box is stated again.
-    expect(patch.box).toBeDefined();
+    expect(patch).toEqual({ subtype: 'square', strokeWidth: 3 });
   });
 
   it('strokeWidth on a polygon sends no rect: the engine measures the stroke', () => {
@@ -886,14 +884,13 @@ describe('record — shape cloudy border tri-state', () => {
   const cloudySquare = (annotObjectNumber = 45): AnnotationDTO<PdfCoordinates> =>
     ({ ...squareDTO(annotObjectNumber), cloudyIntensity: 2 }) as AnnotationDTO<PdfCoordinates>;
 
-  it('fromDTO reads /BE intensity into a cloudy border, the model box around the cloud', () => {
+  it("fromDTO reads /BE intensity into a cloudy border; the shape's box is the engine's box", () => {
     const annotation = fromDTO(fromFile(cloudySquare()));
     const geometry = fieldsOf(annotation).geometry;
     expect(fieldsOf(annotation).style.border).toEqual({ kind: 'cloudy', intensity: 2 });
-    // The model keeps the outer box: the engine's box grown by the cloud's reach.
-    if (geometry.kind !== 'rect') throw new Error('expected rect geom');
-    expect(geometry.rect.x).toBeLessThan(100);
-    expect(geometry.rect.width).toBeGreaterThan(100);
+    if (geometry.kind !== 'box') throw new Error('expected a box');
+    const square = annotation.annotation as Extract<AnnotationDTO, { subtype: 'square' }>;
+    expect(geometry.box).toEqual(square.box);
   });
 
   it('toPatch on a cloudy square carries /BE and the box the cloud starts from', () => {
@@ -906,7 +903,7 @@ describe('record — shape cloudy border tri-state', () => {
     expect(patch.box!.top).toBeCloseTo(200);
   });
 
-  it('toPatch states the clear when the border is solid again, and the box fills the model box', () => {
+  it('toPatch states the clear when the border is solid again, and the box stays', () => {
     const annotation = fromDTO(fromFile(cloudySquare()));
     const solid = {
       ...fieldsOf(annotation),
@@ -918,7 +915,8 @@ describe('record — shape cloudy border tri-state', () => {
     >;
     // Tri-state remove: /BE is stated as null, never omitted.
     expect(patch.cloudyIntensity).toBe(null);
-    expect(patch.box!.left).toBeLessThan(100);
+    expect(patch.box!.left).toBeCloseTo(100);
+    expect(patch.box!.top).toBeCloseTo(200);
   });
 });
 
@@ -999,10 +997,10 @@ describe('record — attached links (fold + desired state + link kind mapping)',
     const rotated: RecordFields = {
       ...fieldsOf(square),
       geometry: {
-        kind: 'rect',
-        rect: { x: 100, y: 600, width: 100, height: 100 },
+        kind: 'box',
+        box: { x: 100, y: 600, width: 100, height: 100 },
         ellipse: false,
-        rot: 45,
+        rotation: 45,
       },
     };
     const [aabb] = linkChildRects(rotated);
@@ -1084,7 +1082,7 @@ describe('record — every field a kind takes writes only fields its engine kind
       case 'caret':
         return { kind: 'caret', rect: box };
       default:
-        return { kind: 'rect', rect: box, ellipse: subtype === 'circle' };
+        return { kind: 'box', box: box, rotation: 0, ellipse: subtype === 'circle' };
     }
   };
   /** The message a sidebar sends for one field spec: a field, a text format or a link. */

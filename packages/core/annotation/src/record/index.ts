@@ -33,16 +33,17 @@ import { fieldsFor } from '../kinds';
 import type { ModelAnnotation, ModelGeometry, RecordFields, Style, TextStyle } from '../types';
 import { freeText } from './kinds/freeText';
 import {
+  circle,
   fileAttachment,
   link,
+  square,
   stamp,
   textNote,
   unsupported,
   widget,
   widgetKindOf,
-} from './kinds/misc';
+} from './kinds/box';
 import { caret, highlight, redact, squiggly, strikeout, underline } from './kinds/quads';
-import { circle, square } from './kinds/shape';
 import { captionFieldsFor, ink, line, polygon, polyline } from './kinds/stroke';
 import type { KindProjection, LoweredKey, Wire } from './projection';
 import { GENERIC_PROPS } from './props';

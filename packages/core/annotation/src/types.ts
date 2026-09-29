@@ -17,6 +17,7 @@ import type {
 
 import type { DistanceAppearance, MeasurementAppearance } from './measurement';
 import type { ShapeMeasurementAppearance } from './measurement-shape';
+import type { BoxShape } from './shapes/box';
 
 export type { Quad, QuadRing } from '@embedpdf/core-geometry';
 
@@ -95,15 +96,15 @@ export interface Callout {
 }
 
 /**
- * Rotation (degrees, clockwise in page space, normalized `[0,360)`) carried by
- * the rotatable `ModelGeometry` variants. The semantics differ by family, which is exactly
- * the box-vs-vertex split:
+ * The shape a gesture moves, one arm per family. The box family's arm is its
+ * own shape, the engine's `box` and `rotation` ({@link BoxShape}); the other
+ * arms still carry the core's older names until their family moves.
  *
- * - **Box** (`rect`, `text`): `rect` is the unrotated local box and `rot` is the
- *   applied tilt — together they reconstruct the visual. They are written as
- *   the engine's `box` and `rotation` (both clockwise, so `rot` passes
- *   through); the engine works out `/Rect` around the turned drawing,
- *   so PDFium bakes a portable `/AP`.
+ * Rotation is degrees clockwise in page space, normalized `[0,360)`:
+ *
+ * - **Box** (`box`, `text`): the box before its turn, and the turn about its
+ *   middle. The engine works out `/Rect` around the turned drawing, so PDFium
+ *   bakes a portable `/AP`.
  * - **Vertex** (`line`, `poly`, `ink`): the points are already rotated (they are
  *   the portable visual), so `rot` is an advisory scalar — the cumulative tilt the
  *   user applied since authoring. It lets EmbedPDF reconstruct an oriented
@@ -111,7 +112,7 @@ export interface Callout {
  *   rendering (PDFium ignores a lone `Rotation` with no `UnrotatedRect`).
  */
 export type ModelGeometry =
-  | { kind: 'rect'; rect: Rect; ellipse: boolean; rot?: number } // square / circle (rect = unrotated box)
+  | BoxShape // square, circle, stamp, and the kinds whose shape is their rect
   | { kind: 'line'; a: Point; b: Point; ends?: LineEndings; rot?: number } // line (points pre-rotated; rot advisory)
   | { kind: 'poly'; points: Point[]; closed: boolean; ends?: LineEndings; rot?: number } // polygon/polyline (pre-rotated; rot advisory)
   | { kind: 'quads'; quads: Quad[] } // highlight / underline / squiggly / strikeout
@@ -839,7 +840,7 @@ export interface RenderItem {
   label?: { text: string; repeat: boolean };
   measure?: MeasurementAppearance;
   /**
-   * Applied rotation (deg, CW), or 0/undefined. For box kinds (`rect`/`text`)
+   * Applied rotation (deg, CW), or 0/undefined. For box kinds (`box`/`text`)
    * `box` is the unrotated visual box and the renderer applies this rotation
    * about its centre (CSS/SVG transform). For vertex kinds the geometry is
    * already rotated, so this is advisory only — the renderer must not re-apply it.

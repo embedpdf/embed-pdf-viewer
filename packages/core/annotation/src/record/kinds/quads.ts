@@ -2,14 +2,16 @@
  * The quad-bound kinds: text markup (highlight/underline/squiggly/strikeout),
  * caret, and redact. Their `/QuadPoints` are text-anchored — set at create and
  * never patched — so markup and text-redact have no editable geometry (the
- * full projection is their geometry fallback), while an area redact and a
- * caret are box-like and move by `/Rect`.
+ * full projection is their geometry fallback). A caret is box-like and moves
+ * by its `box`; an area redaction is a box family kind, moved by its `rect`.
  */
 import type { AnnotationDTO, PageBox, PageQuad } from '@embedpdf/engine-core/runtime';
 
+import { readBox } from '../../shapes/box';
 import type { ModelGeometry, RecordFields } from '../../types';
 import type { KindProjection } from '../projection';
 import { boxGeomFields } from '../seam';
+import { boxGeometry } from './box';
 
 /** Content quads as the engine's `quadPoints`; null off quads geom. */
 export function quadPointsFor(annotation: RecordFields): PageQuad[] | null {
@@ -100,7 +102,7 @@ export const redact: KindProjection = {
     const geometry: ModelGeometry =
       redactDto.quadPoints.length > 0
         ? { kind: 'quads', quads: redactDto.quadPoints }
-        : { kind: 'rect', rect: redactDto.rect, ellipse: false };
+        : readBox(redactDto);
     return {
       geometry,
       // The label is `/DA`-styled exactly like free text; `fontSize` 0 means
@@ -117,8 +119,7 @@ export const redact: KindProjection = {
     };
   },
   // Only an area mark's box moves/resizes; text-mark quads are create-only.
-  geometry: (annotation) =>
-    annotation.geometry.kind === 'rect' ? { rect: annotation.geometry.rect } : null,
+  geometry: boxGeometry,
   draftExtras: (annotation) => {
     const quads = quadPointsFor(annotation);
     // Text redaction: quads + the box around them as `rect` (the engine

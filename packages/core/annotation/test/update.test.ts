@@ -26,7 +26,12 @@ const square = (id: string, x: number): ModelAnnotation =>
     ref: { kind: 'objectNumber', page: PAGE, annotObjectNumber: Number(id.slice(4)) },
     page: PAGE,
     subtype: 'square',
-    geometry: { kind: 'rect', rect: { x, y: 100, width: 100, height: 60 }, ellipse: false },
+    geometry: {
+      kind: 'box',
+      box: { x, y: 100, width: 100, height: 60 },
+      rotation: 0,
+      ellipse: false,
+    },
     style: { ...STYLE, interiorColor: '#ffffff' },
     flags: DRAWN_FLAGS,
     source: 'baked',

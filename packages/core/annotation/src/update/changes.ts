@@ -37,7 +37,7 @@ export const toVector = (annotation: ModelAnnotation): ModelAnnotation =>
 export const ownGeometry = (annotation: ModelAnnotation): ModelAnnotation => {
   if (!capsFor(annotation.subtype).opaqueBody) return toVector(annotation);
   const { geometry } = fieldsOf(annotation);
-  return 'rect' in geometry ? { ...annotation, apBox: geometry.rect } : annotation;
+  return geometry.kind === 'box' ? { ...annotation, apBox: geometry.box } : annotation;
 };
 
 export const sub = (from: Point, to: Point): Point => ({ x: from.x - to.x, y: from.y - to.y });

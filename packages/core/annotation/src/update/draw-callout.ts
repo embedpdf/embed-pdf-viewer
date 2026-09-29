@@ -2,13 +2,8 @@
 import type { AnnotationFlags } from '@embedpdf/engine-core/runtime';
 
 import { DRAWN_FLAGS } from '../flags';
-import {
-  rectFromPoints,
-  rotatedAabb,
-  transposedAboutCenter,
-  uprightAnchoredRect,
-  uprightRotation,
-} from '../geometry';
+import { transposedAboutCenter, uprightAnchoredRect, uprightRotation } from '../geometry';
+import { rectFromPoints, rotatedAabb } from '../rect';
 import { clampRectToBox } from '../placement';
 import type { Draft, Effect, Model, Point, PointerInput, Rect } from '../types';
 import { newRecord } from './changes';

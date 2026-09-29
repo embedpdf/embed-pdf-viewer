@@ -19,7 +19,6 @@ import {
   calloutConnection,
   calloutLinePoints,
   selectionBounds,
-  shapeRectFor,
   caretGeomFromAnchor,
   caretRectFromAnchor,
   centroidOf,
@@ -30,9 +29,6 @@ import {
   placeRotateKnob,
   DEFAULT_CHROME_GEOMETRY,
   rotateKnob,
-  rotatedAabb,
-  normalizeDeg,
-  rotatedHandleCursor,
   selectionQuad,
   turnPivotOf,
   transposedAboutCenter,
@@ -41,6 +37,7 @@ import {
   fitStampBox,
   apSizeChanged,
 } from '../src/geometry';
+import { normalizeDeg, rotatedAabb, rotatedHandleCursor } from '../src/rect';
 import { expandGroups, groupKeyOf, groupMembers } from '../src/group';
 import { cursorAt, groupUnionBounds, hitTest, paintOrder } from '../src/hit';
 import { capsFor } from '../src/kinds';
@@ -56,7 +53,6 @@ import type {
   Model,
   Message,
   RenderItem,
-  Style,
   Subtype,
   Point,
   RecordFields,
@@ -112,7 +108,7 @@ const createPtr = (
 });
 const run = (model: Model, msgs: Message[]): Model =>
   msgs.reduce((acc, message) => step(acc, message)[0], model);
-const rectGeom = (geometry: ModelGeometry) => (geometry.kind === 'rect' ? geometry.rect : null);
+const rectGeom = (geometry: ModelGeometry) => (geometry.kind === 'box' ? geometry.box : null);
 /** The write a committed edit asks for: one `patch` effect stating at least `fields`. */
 const writes = (id: string, fields: Record<string, unknown>) => ({
   type: 'patch',
@@ -334,7 +330,7 @@ describe('annotation-core', () => {
       createPtr('square', 'up', 200, 160),
     ]);
     const annotation = sq.byId[sq.order[0]];
-    expect(fieldsOf(annotation).geometry).toMatchObject({ kind: 'rect', ellipse: false });
+    expect(fieldsOf(annotation).geometry).toMatchObject({ kind: 'box', ellipse: false });
     expect(rectGeom(fieldsOf(annotation).geometry)).toMatchObject({
       x: 100,
       y: 100,
@@ -348,7 +344,7 @@ describe('annotation-core', () => {
       createPtr('circle', 'move', 50, 50),
       createPtr('circle', 'up', 50, 50),
     ]);
-    expect(fieldsOf(ci.byId[ci.order[0]]).geometry).toMatchObject({ kind: 'rect', ellipse: true });
+    expect(fieldsOf(ci.byId[ci.order[0]]).geometry).toMatchObject({ kind: 'box', ellipse: true });
 
     const ln = run(initialModel, [
       createPtr('line', 'down', 10, 10),
@@ -664,7 +660,12 @@ describe('annotation-core', () => {
         ref: null,
         page: PAGE,
         subtype: 'square',
-        geometry: { kind: 'rect', rect: { x: 0, y: 0, width: 10, height: 10 }, ellipse: false },
+        geometry: {
+          kind: 'box',
+          box: { x: 0, y: 0, width: 10, height: 10 },
+          rotation: 0,
+          ellipse: false,
+        },
         style: STYLE,
         flags: DRAWN_FLAGS,
         source: 'vector',
@@ -684,8 +685,9 @@ describe('annotation-core', () => {
 
   it('an UNFILLED rect is hit only on its stroke; a filled one anywhere inside', () => {
     const geometry: ModelGeometry = {
-      kind: 'rect',
-      rect: { x: 100, y: 100, width: 100, height: 100 },
+      kind: 'box',
+      box: { x: 100, y: 100, width: 100, height: 100 },
+      rotation: 0,
       ellipse: false,
     };
     expect(geomHit(geometry, { x: 150, y: 150 }, 4, /* filled */ false, 2)).toBe(false); // centre, unfilled → miss
@@ -695,8 +697,9 @@ describe('annotation-core', () => {
 
   it('an UNFILLED circle is hit only near its outline', () => {
     const geometry: ModelGeometry = {
-      kind: 'rect',
-      rect: { x: 0, y: 0, width: 100, height: 100 },
+      kind: 'box',
+      box: { x: 0, y: 0, width: 100, height: 100 },
+      rotation: 0,
       ellipse: true,
     };
     expect(geomHit(geometry, { x: 50, y: 50 }, 4, false, 2)).toBe(false); // centre → miss
@@ -821,7 +824,12 @@ describe('annotation-core', () => {
         ref: null,
         page: PAGE,
         subtype: 'square',
-        geometry: { kind: 'rect', rect: { x: 10, y: 10, width: 50, height: 50 }, ellipse: false },
+        geometry: {
+          kind: 'box',
+          box: { x: 10, y: 10, width: 50, height: 50 },
+          rotation: 0,
+          ellipse: false,
+        },
         style: STYLE,
         flags,
         source: 'vector',
@@ -1010,22 +1018,24 @@ describe('annotation-core', () => {
     expect(open.some((node) => node.kind === 'poly' && node.closed)).toBe(false);
   });
 
-  it('a shape rect is its OUTER box: visual bounds equal the box, the drawn path insets by half the stroke', () => {
+  it("a box's stroke draws inside it: visual bounds equal the box, the drawn path insets by half the stroke", () => {
     const geometry: ModelGeometry = {
-      kind: 'rect',
-      rect: { x: 100, y: 100, width: 80, height: 60 },
+      kind: 'box',
+      box: { x: 100, y: 100, width: 80, height: 60 },
+      rotation: 0,
       ellipse: false,
     };
     // the box never grows with the stroke — the stroke lives inside it
-    expect(geomVisualBounds(geometry, 20)).toEqual(geometry.rect);
+    expect(geomVisualBounds(geometry, 20)).toEqual(geometry.box);
     const [node] = geomScene(geometry, 20);
     expect(node).toMatchObject({ kind: 'rect', rect: { x: 110, y: 110, width: 60, height: 40 } });
   });
 
   it('hit-testing follows the inset stroke: a thick stroke is clickable on its inner edge, the phantom band outside the box shrinks', () => {
     const geometry: ModelGeometry = {
-      kind: 'rect',
-      rect: { x: 100, y: 100, width: 100, height: 100 },
+      kind: 'box',
+      box: { x: 100, y: 100, width: 100, height: 100 },
+      rotation: 0,
       ellipse: false,
     };
     const sw = 24;
@@ -1039,9 +1049,9 @@ describe('annotation-core', () => {
     expect(geomHit(geometry, { x: 100, y: 150 }, margin, false, sw)).toBe(true);
   });
 
-  it('a cloudy border insets its scallops within g.rect (the outer box); too-small falls back to a plain outline', () => {
+  it("a cloudy border's scallops start on the box and reach out by the cloud's extent; an empty box draws the plain outline", () => {
     const box = { x: 100, y: 100, width: 120, height: 90 };
-    const geometry: ModelGeometry = { kind: 'rect', rect: box, ellipse: false };
+    const geometry: ModelGeometry = { kind: 'box', box, rotation: 0, ellipse: false };
     const [node] = geomScene(geometry, 2, { kind: 'cloudy', intensity: 2 });
     expect(node.kind).toBe('path');
     const pathData = node.kind === 'path' ? node.d : '';
@@ -1049,40 +1059,58 @@ describe('annotation-core', () => {
     const xs = nums.filter((_, i) => i % 2 === 0);
     const ys = nums.filter((_, i) => i % 2 === 1);
     const eps = 0.5;
-    // g.rect is the outer box; the scallops stay within it (outline is tight, like solid)
-    expect(Math.min(...xs)).toBeGreaterThanOrEqual(box.x - eps);
-    expect(Math.max(...xs)).toBeLessThanOrEqual(box.x + box.width + eps);
-    expect(Math.min(...ys)).toBeGreaterThanOrEqual(box.y - eps);
-    expect(Math.max(...ys)).toBeLessThanOrEqual(box.y + box.height + eps);
-    // a box too small to hold the scallops → plain rect node, never an inverted cloud
-    const tiny: ModelGeometry = {
-      kind: 'rect',
-      rect: { x: 0, y: 0, width: 4, height: 4 },
+    const reach = cloudyBorderExtent(2, 2, false);
+    // The scallops reach past the box, and no further than the cloud's extent.
+    expect(Math.min(...xs)).toBeLessThan(box.x);
+    expect(Math.min(...xs)).toBeGreaterThanOrEqual(box.x - reach - eps);
+    expect(Math.max(...xs)).toBeLessThanOrEqual(box.x + box.width + reach + eps);
+    expect(Math.min(...ys)).toBeGreaterThanOrEqual(box.y - reach - eps);
+    expect(Math.max(...ys)).toBeLessThanOrEqual(box.y + box.height + reach + eps);
+    // An empty box has nowhere to start the scallops: the plain outline, never a broken cloud.
+    const empty: ModelGeometry = {
+      kind: 'box',
+      box: { x: 0, y: 0, width: 0, height: 0 },
+      rotation: 0,
       ellipse: false,
     };
-    expect(geomScene(tiny, 2, { kind: 'cloudy', intensity: 2 })[0].kind).toBe('rect');
+    expect(geomScene(empty, 2, { kind: 'cloudy', intensity: 2 })[0].kind).toBe('rect');
   });
 
-  it('shapeRectFor stores the OUTER box for a cloudy shape (dragged + extent), the dragged box for solid', () => {
-    const dragged = { x: 50, y: 50, width: 40, height: 30 };
-    const solid: Style = {
-      color: '#000000',
-      interiorColor: null,
-      strokeWidth: 2,
-      opacity: 1,
-      blendMode: 'normal',
-      border: { kind: 'solid' },
-    };
-    expect(shapeRectFor(dragged, false, solid)).toEqual(dragged);
-    const extent = cloudyBorderExtent(2, 2, false);
-    expect(
-      shapeRectFor(dragged, false, { ...solid, border: { kind: 'cloudy', intensity: 2 } }),
-    ).toEqual({
-      x: 50 - extent,
-      y: 50 - extent,
-      width: 40 + 2 * extent,
-      height: 30 + 2 * extent,
+  it("a cloudy box's drawn bounds take in the cloud; its selection and handles stay on the box", () => {
+    const box = { x: 50, y: 50, width: 40, height: 30 };
+    const geometry: ModelGeometry = { kind: 'box', box, rotation: 0, ellipse: false };
+    const cloudy = { kind: 'cloudy', intensity: 2 } as const;
+    const reach = cloudyBorderExtent(2, 2, false);
+    expect(geomVisualBounds(geometry, 2, cloudy)).toEqual({
+      x: 50 - reach,
+      y: 50 - reach,
+      width: 40 + 2 * reach,
+      height: 30 + 2 * reach,
     });
+    expect(selectionBounds(geometry, 2, cloudy)).toEqual(box);
+    const corners = geomHandles(geometry).filter((handle) => handle.id.length === 2);
+    expect(corners.map((handle) => handle.at)).toEqual([
+      { x: 50, y: 50 },
+      { x: 90, y: 50 },
+      { x: 90, y: 80 },
+      { x: 50, y: 80 },
+    ]);
+  });
+
+  it("a cloudy box is hit on its scallops, outside the box, and not past the cloud's reach", () => {
+    const box = { x: 100, y: 100, width: 100, height: 100 };
+    const geometry: ModelGeometry = { kind: 'box', box, rotation: 0, ellipse: false };
+    const cloudy = { kind: 'cloudy', intensity: 2 } as const;
+    const reach = cloudyBorderExtent(2, 2, false);
+    const margin = 2;
+    // Halfway through the bumps, outside the box.
+    expect(geomHit(geometry, { x: 100 - reach / 2, y: 150 }, margin, false, 2, cloudy)).toBe(true);
+    // Past the bumps and the margin.
+    expect(
+      geomHit(geometry, { x: 100 - reach - margin - 1, y: 150 }, margin, false, 2, cloudy),
+    ).toBe(false);
+    // The middle of an unfilled cloud.
+    expect(geomHit(geometry, { x: 150, y: 150 }, margin, false, 2, cloudy)).toBe(false);
   });
 
   it('cloudyBorderExtent grows with intensity and stroke; circle scallops are larger than square', () => {
@@ -1173,7 +1201,12 @@ describe('annotation-core', () => {
       id: 's',
       ref: null,
       subtype: 'square',
-      geometry: { kind: 'rect', rect: { x: 0, y: 0, width: 50, height: 40 }, ellipse: false },
+      geometry: {
+        kind: 'box',
+        box: { x: 0, y: 0, width: 50, height: 40 },
+        rotation: 0,
+        ellipse: false,
+      },
       box: { x: 0, y: 0, width: 50, height: 40 },
       style: {
         color: '#000000',
@@ -1232,7 +1265,12 @@ describe('annotation-core', () => {
       id: 's',
       ref: null,
       subtype: 'square',
-      geometry: { kind: 'rect', rect: { x: 0, y: 0, width: 120, height: 100 }, ellipse: false },
+      geometry: {
+        kind: 'box',
+        box: { x: 0, y: 0, width: 120, height: 100 },
+        rotation: 0,
+        ellipse: false,
+      },
       box: { x: 0, y: 0, width: 120, height: 100 },
       style: cloudyStyle,
       source: 'vector',
@@ -1497,7 +1535,12 @@ describe('annotation-core', () => {
       ref: null,
       page: PAGE,
       subtype: 'square',
-      geometry: { kind: 'rect', rect: { x, y: x, width: 40, height: 40 }, ellipse: false },
+      geometry: {
+        kind: 'box',
+        box: { x, y: x, width: 40, height: 40 },
+        rotation: 0,
+        ellipse: false,
+      },
       style: {
         color: '#000000',
         interiorColor: '#eeeeee', // filled → hittable anywhere inside
@@ -1628,7 +1671,12 @@ describe('annotation-core', () => {
       ref: null,
       page: PAGE,
       subtype: 'square',
-      geometry: { kind: 'rect', rect: { x: 0, y: 0, width: 100, height: 100 }, ellipse: false },
+      geometry: {
+        kind: 'box',
+        box: { x: 0, y: 0, width: 100, height: 100 },
+        rotation: 0,
+        ellipse: false,
+      },
       style: {
         color: '#000000',
         interiorColor: '#eeeeee', // filled → hittable anywhere inside
@@ -2266,7 +2314,7 @@ describe('annotation-core — rotation', () => {
       } as ModelAnnotation['ref'],
       page: PAGE,
       subtype: 'square',
-      geometry: { kind: 'rect', rect, ellipse: false },
+      geometry: { kind: 'box', box: rect, rotation: 0, ellipse: false },
       style: STYLE,
       flags: DRAWN_FLAGS,
       source: 'baked',
@@ -2274,16 +2322,17 @@ describe('annotation-core — rotation', () => {
 
   it('box rotates about its own centre: rot adds, centre + size fixed', () => {
     const geometry: ModelGeometry = {
-      kind: 'rect',
-      rect: { x: 100, y: 100, width: 100, height: 50 },
+      kind: 'box',
+      box: { x: 100, y: 100, width: 100, height: 50 },
+      rotation: 0,
       ellipse: false,
     };
     const rotated = geomRotateAbout(geometry, centroidOf(geometry), 90);
     expect(geomRotation(rotated)).toBe(90);
-    if (rotated.kind !== 'rect') throw new Error('expected rect');
+    if (rotated.kind !== 'box') throw new Error('expected rect');
     expect(centroidOf(rotated)).toMatchObject({ x: 150, y: 125 }); // centre preserved
-    expect(rotated.rect.width).toBe(100); // stored box stays unrotated
-    expect(rotated.rect.height).toBe(50);
+    expect(rotated.box.width).toBe(100); // stored box stays unrotated
+    expect(rotated.box.height).toBe(50);
   });
 
   it("vertex rotation is additive about the upright points' middle and reset is exact", () => {
@@ -2315,10 +2364,10 @@ describe('annotation-core — rotation', () => {
 
   it('obbFromGeom reconstructs an oriented box from θ for both families', () => {
     const box: ModelGeometry = {
-      kind: 'rect',
-      rect: { x: 0, y: 0, width: 100, height: 100 },
+      kind: 'box',
+      box: { x: 0, y: 0, width: 100, height: 100 },
       ellipse: false,
-      rot: 90,
+      rotation: 90,
     };
     const obbBox = obbFromGeom(box, 0);
     expect(obbBox?.angle).toBe(90);
@@ -2401,8 +2450,9 @@ describe('annotation-core — rotation-aware selection (grab + menu + group)', (
       source: 'baked',
     });
   const rect = (x: number, y: number, width: number, height: number): ModelGeometry => ({
-    kind: 'rect',
-    rect: { x, y, width, height },
+    kind: 'box',
+    box: { x, y, width, height },
+    rotation: 0,
     ellipse: false,
   });
 
@@ -2480,8 +2530,9 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
 
   it('turnPivotOf of a box is the rect centre, before AND after a quarter-turn', () => {
     const geometry: ModelGeometry = {
-      kind: 'rect',
-      rect: { x: 100, y: 100, width: 100, height: 50 },
+      kind: 'box',
+      box: { x: 100, y: 100, width: 100, height: 50 },
+      rotation: 0,
       ellipse: false,
     };
     expect(turnPivotOf(geometry)).toMatchObject({ x: 150, y: 125 });
@@ -2595,8 +2646,9 @@ describe('annotation-core — selectionAnchor carries the knob alongside a centr
       source: 'baked',
     });
   const rect = (x: number, y: number, width: number, height: number): ModelGeometry => ({
-    kind: 'rect',
-    rect: { x, y, width, height },
+    kind: 'box',
+    box: { x, y, width, height },
+    rotation: 0,
     ellipse: false,
   });
 
@@ -2757,8 +2809,9 @@ describe('annotation-core — join-aware stroke bounds', () => {
       selected: false,
     });
     const square = mk('square', {
-      kind: 'rect',
-      rect: { x: 0, y: 0, width: 50, height: 40 },
+      kind: 'box',
+      box: { x: 0, y: 0, width: 50, height: 40 },
+      rotation: 0,
       ellipse: false,
     });
     const polyline = mk(
@@ -2809,7 +2862,7 @@ describe('annotation-core opaqueBody (stamp) gestures', () => {
       ref: { kind: 'objectNumber', page: PAGE, annotObjectNumber: 900 },
       page: PAGE,
       subtype: 'stamp',
-      geometry: { kind: 'rect', rect: { ...STAMP_RECT }, ellipse: false },
+      geometry: { kind: 'box', box: { ...STAMP_RECT }, rotation: 0, ellipse: false },
       style: {
         color: '#000000',
         interiorColor: null,
@@ -2979,7 +3032,7 @@ describe('page-bound gestures', () => {
     const model = run(nearBottom(), [edit('down', 350, 760), edit('move', 700, 900)]);
     expect(model.draft?.kind).toBe('handle');
     const current = model.draft?.kind === 'handle' ? model.draft.current : null;
-    const rect = current && 'rect' in current ? current.rect : null;
+    const rect = current?.kind === 'box' ? current.box : null;
     expect(rect).toBeTruthy();
     expect(rect!.x + rect!.width).toBe(612);
     expect(rect!.y + rect!.height).toBe(792);
@@ -3045,7 +3098,7 @@ describe('annotation-core — snapping', () => {
       } as ModelAnnotation['ref'],
       page: PAGE,
       subtype: 'square',
-      geometry: { kind: 'rect', rect, ellipse: false, ...(rot ? { rot } : {}) },
+      geometry: { kind: 'box', box: rect, ellipse: false, rotation: rot ?? 0 },
       style: STYLE,
       flags: DRAWN_FLAGS,
       source: 'baked',
@@ -3240,8 +3293,9 @@ describe('annotation-core — snapping', () => {
 
   it('geomHandles carries rotation-aware cursors (the hover-cursor fix)', () => {
     const geometry: ModelGeometry = {
-      kind: 'rect',
-      rect: { x: 0, y: 0, width: 100, height: 50 },
+      kind: 'box',
+      box: { x: 0, y: 0, width: 100, height: 50 },
+      rotation: 0,
       ellipse: false,
     };
     const flat = Object.fromEntries(
@@ -3249,7 +3303,7 @@ describe('annotation-core — snapping', () => {
     );
     expect(flat['e']).toBe('ew-resize');
     const turned = Object.fromEntries(
-      geomHandles({ ...geometry, rot: 90 }).map((handle) => [handle.id, handle.cursor]),
+      geomHandles({ ...geometry, rotation: 90 }).map((handle) => [handle.id, handle.cursor]),
     );
     expect(turned['e']).toBe('ns-resize'); // physically at the bottom now
     expect(turned['n']).toBe('ew-resize'); // physically at the right now
@@ -3290,7 +3344,7 @@ describe('page-bound rotate knob', () => {
       ref: { kind: 'objectNumber', page: PAGE, annotObjectNumber: objectNumber },
       page: PAGE,
       subtype: 'stamp',
-      geometry: { kind: 'rect', rect: { ...rect }, ellipse: false, ...(rot ? { rot } : {}) },
+      geometry: { kind: 'box', box: { ...rect }, ellipse: false, rotation: rot ?? 0 },
       style: {
         color: '#000000',
         interiorColor: null,
@@ -3475,7 +3529,7 @@ describe('rotate guides (live rotate chrome mode)', () => {
       ref: { kind: 'objectNumber', page: PAGE, annotObjectNumber: 900 },
       page: PAGE,
       subtype: 'stamp',
-      geometry: { kind: 'rect', rect: { ...rect }, ellipse: false },
+      geometry: { kind: 'box', box: { ...rect }, rotation: 0, ellipse: false },
       style: {
         color: '#000000',
         interiorColor: null,
@@ -3585,7 +3639,7 @@ describe('group chrome rides live gestures', () => {
       ref: { kind: 'objectNumber', page: PAGE, annotObjectNumber: objectNumber },
       page: PAGE,
       subtype: 'stamp',
-      geometry: { kind: 'rect', rect: { ...rect }, ellipse: false },
+      geometry: { kind: 'box', box: { ...rect }, rotation: 0, ellipse: false },
       style: {
         color: '#000000',
         interiorColor: null,
@@ -3692,10 +3746,10 @@ describe('marquee vs rotated shapes', () => {
     page: PAGE,
     subtype: 'square',
     geometry: {
-      kind: 'rect',
-      rect: { x: 100, y: 100, width: 200, height: 20 },
+      kind: 'box',
+      box: { x: 100, y: 100, width: 200, height: 20 },
       ellipse: false,
-      rot: 45,
+      rotation: 45,
     },
     style: {
       color: '#e5484d',
@@ -3754,8 +3808,9 @@ describe('marquee vs rotated shapes', () => {
     const flat = modelWith([
       withFields(bar, {
         geometry: {
-          kind: 'rect',
-          rect: { x: 100, y: 100, width: 200, height: 20 },
+          kind: 'box',
+          box: { x: 100, y: 100, width: 200, height: 20 },
+          rotation: 0,
           ellipse: false,
         },
       }),
@@ -3870,7 +3925,7 @@ describe('upright creation (counter-rotating the display rotation)', () => {
       uprightPtr('square', 'up', 110, 50),
     ]);
     const geometry = fieldsOf(model.byId[model.order[0]]).geometry;
-    expect(geometry.kind).toBe('rect');
+    expect(geometry.kind).toBe('box');
     expect(geomRotation(geometry)).toBe(90); // -270 ≡ 90
     expectRectClose(rotatedAabb(rectGeom(geometry)!, 90), { x: 10, y: 10, width: 100, height: 40 });
   });
@@ -3971,7 +4026,12 @@ describe('render source after an edit (what keeps a raster, what renders live)',
       ref: { kind: 'objectNumber', annotObjectNumber: 7, page: PAGE },
       page: PAGE,
       subtype,
-      geometry: { kind: 'rect', rect: { x: 100, y: 100, width: 100, height: 60 }, ellipse: false },
+      geometry: {
+        kind: 'box',
+        box: { x: 100, y: 100, width: 100, height: 60 },
+        rotation: 0,
+        ellipse: false,
+      },
       style: STYLE,
       flags: DRAWN_FLAGS,
       source: 'baked',
@@ -3993,7 +4053,7 @@ describe('render source after an edit (what keeps a raster, what renders live)',
       },
     ]);
     const geometry = fieldsOf(next.byId['A1']).geometry;
-    expect(geometry.kind === 'rect' && geometry.rect.x).toBe(140); // moved…
+    expect(geometry.kind === 'box' && geometry.box.x).toBe(140); // moved…
     expect(next.byId['A1'].source).toBe('baked'); // …and still baked
   });
 
@@ -4054,7 +4114,12 @@ describe('render source after an edit (what keeps a raster, what renders live)',
       ref: { kind: 'objectNumber', annotObjectNumber: 9, page: PAGE },
       page: PAGE,
       subtype: 'widget-text',
-      geometry: { kind: 'rect', rect: { x: 10, y: 10, width: 120, height: 24 }, ellipse: false },
+      geometry: {
+        kind: 'box',
+        box: { x: 10, y: 10, width: 120, height: 24 },
+        rotation: 0,
+        ellipse: false,
+      },
       style: STYLE,
       flags: DRAWN_FLAGS,
       source: 'baked',
@@ -4080,15 +4145,17 @@ describe('render source after an edit (what keeps a raster, what renders live)',
 
   it('apSizeChanged: translation and rotation preserve the frame; scaling changes it', () => {
     const box: ModelGeometry = {
-      kind: 'rect',
-      rect: { x: 10, y: 10, width: 80, height: 40 },
+      kind: 'box',
+      box: { x: 10, y: 10, width: 80, height: 40 },
+      rotation: 0,
       ellipse: false,
     };
     expect(apSizeChanged(box, geomTranslate(box, { x: 25, y: -5 }))).toBe(false);
     expect(apSizeChanged(box, geomRotateAbout(box, { x: 50, y: 30 }, 90))).toBe(false);
     const wider: ModelGeometry = {
-      kind: 'rect',
-      rect: { x: 10, y: 10, width: 120, height: 40 },
+      kind: 'box',
+      box: { x: 10, y: 10, width: 120, height: 40 },
+      rotation: 0,
       ellipse: false,
     };
     expect(apSizeChanged(box, wider)).toBe(true);
@@ -4115,7 +4182,12 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
       ref: REF,
       page: PAGE,
       subtype: 'square',
-      geometry: { kind: 'rect', rect: { x: 10, y: 10, width: 50, height: 40 }, ellipse: false },
+      geometry: {
+        kind: 'box',
+        box: { x: 10, y: 10, width: 50, height: 40 },
+        rotation: 0,
+        ellipse: false,
+      },
       style: { ...baseStyle },
       flags: DRAWN_FLAGS,
       source: 'baked',
@@ -4191,7 +4263,12 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
       ref: CHILD_REF,
       page: PAGE,
       subtype: 'link',
-      geometry: { kind: 'rect', rect: { x: 10, y: 10, width: 50, height: 40 }, ellipse: false },
+      geometry: {
+        kind: 'box',
+        box: { x: 10, y: 10, width: 50, height: 40 },
+        rotation: 0,
+        ellipse: false,
+      },
       style: { ...baseStyle },
       flags: DRAWN_FLAGS,
       source: 'baked',
@@ -4225,7 +4302,12 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
       ref: CHILD_REF,
       page: PAGE,
       subtype: 'link',
-      geometry: { kind: 'rect', rect: { x: 10, y: 10, width: 50, height: 40 }, ellipse: false },
+      geometry: {
+        kind: 'box',
+        box: { x: 10, y: 10, width: 50, height: 40 },
+        rotation: 0,
+        ellipse: false,
+      },
       style: { ...baseStyle },
       flags: DRAWN_FLAGS,
       source: 'baked',
@@ -4249,7 +4331,12 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
       ref: CHILD_REF,
       page: PAGE,
       subtype: 'link',
-      geometry: { kind: 'rect', rect: { x: 10, y: 10, width: 50, height: 40 }, ellipse: false },
+      geometry: {
+        kind: 'box',
+        box: { x: 10, y: 10, width: 50, height: 40 },
+        rotation: 0,
+        ellipse: false,
+      },
       style: { ...baseStyle },
       flags: DRAWN_FLAGS,
       source: 'baked',
@@ -4283,8 +4370,9 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
 
 describe('conversation plane — replies and review states never reach the page', () => {
   const at = (x: number, y: number): RecordFields['geometry'] => ({
-    kind: 'rect',
-    rect: { x, y, width: 40, height: 30 },
+    kind: 'box',
+    box: { x, y, width: 40, height: 30 },
+    rotation: 0,
     ellipse: false,
   });
   const annotation = (id: string, over: Partial<RecordInput>): ModelAnnotation =>

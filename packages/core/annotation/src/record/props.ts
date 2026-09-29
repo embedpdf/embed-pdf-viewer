@@ -2,8 +2,8 @@
  * Generic per-key prop lowerings — the 1:1 mappings from the flat props
  * vocabulary to wire fields that hold for every kind that declares the key.
  * Kind modules override only their exceptions (a coupling lives in its
- * owner's file: cloudy `/RD` in shape.ts, visual-bounds `/Rect` in stroke.ts,
- * the link target in link.ts).
+ * owner's file: a square's cloud in box.ts, visual-bounds `/Rect` in
+ * stroke.ts, the link target in box.ts).
  */
 import { initialTextStyle } from '../props';
 import type { RecordFields, Style } from '../types';

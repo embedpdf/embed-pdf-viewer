@@ -22,14 +22,10 @@ import {
   geomVisualBounds,
   groupResizeFactors,
   placeRotateKnob,
-  rectFromPoints,
   rectHandlesFor,
-  normalizeDeg,
-  rotatePoint,
-  shapeRectFor,
-  unionRect,
   ROTATE_KNOB_OFFSET,
 } from './geometry';
+import { rectFromPoints, normalizeDeg, rotatePoint, unionRect } from './rect';
 import { groupCaps } from './group';
 import { isSelectable, paintOrder } from './hit';
 import { capsFor } from './kinds';
@@ -167,7 +163,7 @@ function effAp(model: Model, id: Id, view: ViewEnv | undefined): { box?: Rect; r
   if (capsFor(annotation.subtype).opaqueBody) {
     const geometry = effGeom(model, id, view);
     return {
-      box: 'rect' in geometry ? geometry.rect : annotation.apBox,
+      box: geometry.kind === 'box' ? geometry.box : annotation.apBox,
       rot: geomRotation(geometry) || undefined,
     };
   }
@@ -275,9 +271,9 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
     draft.page.pageObjectNumber === pageObjectNumber
   ) {
     // Preview with the tool's resolved defaults (base + per-subtype override), so the
-    // ghost is a faithful WYSIWYG of what will commit — not the bare base style. A
-    // cloudy rect stores the outer box (see `shapeRectFor`), so the cloud grows out
-    // from the cursor; a 0-drag draws nothing (skipped, like a solid 0×0).
+    // ghost is a faithful WYSIWYG of what will commit — not the bare base style. The
+    // dragged box is the shape's box, and a cloud reaches out from it; a 0-drag
+    // draws nothing (skipped, like a solid 0×0).
     const tool = toolStyleOf(model, draft.subtype, draft.preset);
     const style = { ...tool.style };
     if (draft.kind === 'create-distance' && style.interiorColor == null) {
@@ -287,11 +283,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
     const geometry: ModelGeometry | null =
       draft.kind === 'create-rect'
         ? dragged && (dragged.width > 0 || dragged.height > 0)
-          ? {
-              kind: 'rect',
-              rect: shapeRectFor(dragged, draft.ellipse, style),
-              ellipse: draft.ellipse,
-            }
+          ? { kind: 'box', box: dragged, rotation: 0, ellipse: draft.ellipse }
           : null
         : draft.kind === 'create-line' || draft.kind === 'create-distance'
           ? { kind: 'line', a: draft.from, b: draft.to, ends: tool.lineEndings }

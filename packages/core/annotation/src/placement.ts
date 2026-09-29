@@ -9,18 +9,13 @@
  * the same result, so preview ≡ commit by construction.
  *
  * It deliberately returns logical geometry: no annotation visual semantics
- * (no cloudy-border outer-box expansion, no ellipse) — a form field takes
- * `rect` straight to `doc.forms.createField`. The annotation-only conversion
- * to a committable/renderable `ModelGeometry` is {@link clickCreateGeom} below; that
- * is where `shapeRectFor` and ellipse semantics apply.
+ * (no ellipse) — a form field takes `rect` straight to
+ * `doc.forms.createField`. The annotation-only conversion to a
+ * committable/renderable `ModelGeometry` is {@link clickCreateGeom} below; that
+ * is where ellipse semantics apply.
  */
-import {
-  rectFromPoints,
-  shapeRectFor,
-  transposedAboutCenter,
-  uprightAnchoredRect,
-  uprightRotation,
-} from './geometry';
+import { transposedAboutCenter, uprightAnchoredRect, uprightRotation } from './geometry';
+import { rectFromPoints } from './rect';
 import type { PageRotation } from '@embedpdf/core-geometry';
 import type { ToolStyle } from './record/defaults';
 import type { ClickCreate, ModelGeometry, Rect, Subtype, Point } from './types';
@@ -93,8 +88,8 @@ export function resolveClickPlacement(
 /**
  * Annotation-only: convert a placement into the `ModelGeometry` the commit stores and
  * the ghost paints, for a routing kind. This is where annotation visual
- * semantics live — ellipse for circles, the cloudy outer-box via
- * `shapeRectFor`. Forms never call this; a field box is the placement rect
+ * semantics live — the ellipse for circles; a cloud reaches out from the
+ * placed box. Forms never call this; a field box is the placement rect
  * itself. Null for kinds a click cannot author.
  */
 export function clickCreateGeom(
@@ -112,12 +107,7 @@ export function clickCreateGeom(
     return { kind: 'text', rect, ...(rot ? { rot } : {}) };
   }
   if (subtype === 'square' || subtype === 'circle') {
-    return {
-      kind: 'rect',
-      rect: shapeRectFor(rect, subtype === 'circle', tool.style),
-      ellipse: subtype === 'circle',
-      ...(rot ? { rot } : {}),
-    };
+    return { kind: 'box', box: rect, rotation: rot, ellipse: subtype === 'circle' };
   }
   return null;
 }

@@ -12,7 +12,8 @@
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 
 import { anchoredGeom, anchoredStrokeWidth, anchorModeOf, type ViewEnv } from '../anchor';
-import { geomVisualBounds, unionRect } from '../geometry';
+import { geomVisualBounds } from '../geometry';
+import { unionRect } from '../rect';
 import { annotationSelectionFrame } from '../selection';
 import type { Draft, Id, Model, ModelAnnotation, Point, PointerInput, Rect } from '../types';
 import { fieldsOf } from '../record';

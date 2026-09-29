@@ -171,7 +171,7 @@ function redactRegions(geometry: ModelGeometry): RedactRegion[] {
     }
     return out;
   }
-  if (geometry.kind === 'rect') return [{ ring: rectRing(geometry.rect), bounds: geometry.rect }];
+  if (geometry.kind === 'box') return [{ ring: rectRing(geometry.box), bounds: geometry.box }];
   return [];
 }
 

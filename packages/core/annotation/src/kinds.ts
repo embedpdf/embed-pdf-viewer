@@ -265,7 +265,7 @@ const READONLY: KindCaps = caps({});
 export const KINDS: Record<string, AnnotationKind> = {
   'widget-text': {
     subtype: 'widget-text',
-    variant: 'rect',
+    variant: 'box',
     caps: caps({
       selectable: true,
       movable: true,
@@ -279,7 +279,7 @@ export const KINDS: Record<string, AnnotationKind> = {
   },
   'widget-choice': {
     subtype: 'widget-choice',
-    variant: 'rect',
+    variant: 'box',
     caps: caps({
       selectable: true,
       movable: true,
@@ -293,7 +293,7 @@ export const KINDS: Record<string, AnnotationKind> = {
   },
   'widget-button': {
     subtype: 'widget-button',
-    variant: 'rect',
+    variant: 'box',
     caps: caps({
       selectable: true,
       movable: true,
@@ -307,7 +307,7 @@ export const KINDS: Record<string, AnnotationKind> = {
   },
   'widget-toggle': {
     subtype: 'widget-toggle',
-    variant: 'rect',
+    variant: 'box',
     caps: caps({
       selectable: true,
       movable: true,
@@ -321,7 +321,7 @@ export const KINDS: Record<string, AnnotationKind> = {
   },
   'widget-box': {
     subtype: 'widget-box',
-    variant: 'rect',
+    variant: 'box',
     caps: caps({
       selectable: true,
       movable: true,
@@ -352,7 +352,7 @@ export const KINDS: Record<string, AnnotationKind> = {
   },
   square: {
     subtype: 'square',
-    variant: 'rect',
+    variant: 'box',
     caps: caps({
       selectable: true,
       movable: true,
@@ -369,7 +369,7 @@ export const KINDS: Record<string, AnnotationKind> = {
   },
   circle: {
     subtype: 'circle',
-    variant: 'rect',
+    variant: 'box',
     caps: caps({
       selectable: true,
       movable: true,
@@ -506,7 +506,7 @@ export const KINDS: Record<string, AnnotationKind> = {
   // popup thread is the primary surface once comments land.
   text: {
     subtype: 'text',
-    variant: 'rect',
+    variant: 'box',
     caps: caps({
       selectable: true,
       movable: true,
@@ -523,7 +523,7 @@ export const KINDS: Record<string, AnnotationKind> = {
   // surface is the embedded file (open/download), not a popup.
   'file-attachment': {
     subtype: 'file-attachment',
-    variant: 'rect',
+    variant: 'box',
     caps: caps({
       selectable: true,
       movable: true,
@@ -542,7 +542,7 @@ export const KINDS: Record<string, AnnotationKind> = {
   // opacity re-bake the appearance natively on the engine side.
   stamp: {
     subtype: 'stamp',
-    variant: 'rect',
+    variant: 'box',
     caps: caps({
       selectable: true,
       movable: true,
@@ -564,7 +564,7 @@ export const KINDS: Record<string, AnnotationKind> = {
   // attached child. No rotate: a link has no reading orientation.
   link: {
     subtype: 'link',
-    variant: 'rect',
+    variant: 'box',
     caps: caps({
       selectable: true,
       movable: true,

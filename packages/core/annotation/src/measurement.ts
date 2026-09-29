@@ -6,7 +6,8 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 import { endingNodes, endingPoints } from './endings';
 import { DISTANCE_CAPTION_SIZE as CAPTION_SIZE, distanceCaptionWidth } from './measurement-font';
-import { geomHit, geomRotation, rotatePoint, selectionQuad, unionRect } from './geometry';
+import { geomHit, geomRotation, selectionQuad } from './geometry';
+import { rotatePoint, unionRect } from './rect';
 import type {
   ModelGeometry,
   Handle,
@@ -417,7 +418,7 @@ export function distanceHit(
       }
       if (ending.kind === 'ellipse') {
         return geomHit(
-          { kind: 'rect', rect: ending.rect, ellipse: true },
+          { kind: 'box', box: ending.rect, rotation: 0, ellipse: true },
           point,
           margin,
           true,

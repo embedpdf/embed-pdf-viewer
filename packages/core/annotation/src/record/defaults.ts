@@ -14,7 +14,7 @@ import {
 import { initialTextStyle } from '../props';
 import type { FieldValues, Style, TextStyle } from '../types';
 import { textFromDTO } from './kinds/freeText';
-import { widgetTextFromDTO } from './kinds/misc';
+import { widgetTextFromDTO } from './kinds/box';
 import { styleFromDTO } from './seam';
 
 /** The engine subtype a client kind creates: a callout is a free text, a form tool's kind a widget. */

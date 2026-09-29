@@ -19,7 +19,8 @@ import {
   flagsEqual,
   mergeFlags,
 } from '../flags';
-import { geomResetRotation, geomRotateAbout, geomRotation, rotatePoint } from '../geometry';
+import { geomResetRotation, geomRotateAbout, geomRotation } from '../geometry';
+import { rotatePoint } from '../rect';
 import { groupUnionBounds } from '../hit';
 import { capsFor, fieldsFor } from '../kinds';
 import { linkChildrenOf } from '../links';

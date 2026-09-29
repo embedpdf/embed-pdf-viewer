@@ -125,14 +125,14 @@ export function createRenderReads(
       const record = annotation.annotation;
       const { link, geometry } = fieldsOf(annotation);
       const target = link ?? (record.subtype === 'link' ? (record.target ?? null) : null);
-      if (target == null || geometry.kind !== 'rect') continue;
+      if (target == null || geometry.kind !== 'box') continue;
       const activate = record.actions?.activate;
       const ref = annotation.ref ?? undefined;
       const hoverEnter = Boolean(record.actions?.cursorEnter?.root);
       const hoverExit = Boolean(record.actions?.cursorExit?.root);
       items.push({
         id,
-        bounds: geometry.rect,
+        bounds: geometry.box,
         target,
         attached: annotation.group !== undefined,
         ...(activate ? { activate } : {}),

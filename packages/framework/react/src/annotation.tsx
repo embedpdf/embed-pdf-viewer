@@ -188,7 +188,7 @@ function Shape({ item, page }: { item: RenderItem; page: PageContextValue }) {
   // angle; rotate the whole <svg> about its centre. Vertex kinds (line/poly/ink)
   // are already rotated in their geometry, so `rot` is advisory there — never
   // re-applied.
-  const rot = item.geometry.kind === 'rect' || item.geometry.kind === 'caret' ? (item.rot ?? 0) : 0;
+  const rot = item.geometry.kind === 'box' || item.geometry.kind === 'caret' ? (item.rot ?? 0) : 0;
   return (
     <svg
       viewBox={vb}

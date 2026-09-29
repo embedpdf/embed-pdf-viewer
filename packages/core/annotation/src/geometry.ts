@@ -1,141 +1,66 @@
 /**
- * Pure page-space geometry, dispatched on the `ModelGeometry` union. This is the whole
- * per-kind surface: bounds, hit-testing (stroke + fill, with a configurable
- * margin), handles (with cursors), translate, handle-drag, and the dumb scene.
+ * Pure page-space geometry, dispatched on the `ModelGeometry` union: bounds,
+ * hit-testing (stroke + fill, with a configurable margin), handles (with
+ * cursors), translate, handle-drag, and the dumb scene. A family that has its
+ * own module (`shapes/`) answers for its arm; the rest are answered here.
  * The engine speaks page space too: the same numbers, nothing to convert.
  */
 import {
-  applyPoint,
   isQuarterTurn,
-  rotateAbout,
   quadCorners,
   quadRing,
-  type Mat2D,
   type PageRotation,
-  type PointIn,
   type Size,
   type Quad,
 } from '@embedpdf/core-geometry';
-import { cloudyBorderExtent, cloudyPath, cloudyPolyPath } from './cloudy';
+import { cloudyBorderExtent, cloudyPolyPath } from './cloudy';
 import { endingNodes, endingPoints } from './endings';
+import {
+  DEG2RAD,
+  MIN_SIZE,
+  OPPOSITE_HANDLE,
+  RECT_CURSOR,
+  RECT_HANDLES,
+  type RectHandle,
+  expandRect,
+  insetRect,
+  normalizeDeg,
+  rectCenter,
+  rectContains,
+  rectCornerPoints,
+  rectFromPoints,
+  rectHandlePoint,
+  resizeRect,
+  resizeRotatedRect,
+  rotatePoint,
+  rotatedAabb,
+  rotatedHandleCursor,
+  segDist,
+  unionRect,
+} from './rect';
+import {
+  boxCorners,
+  boxDrawnBounds,
+  boxHandles,
+  boxHit,
+  boxResize,
+  boxRotateAbout,
+  boxScaleAbout,
+  boxScene,
+  boxTranslate,
+} from './shapes/box';
 import type {
   Border,
-  Cursor,
   ModelGeometry,
   Handle,
   LineEnding,
   QuadRing,
   Rect,
   RenderNode,
-  Style,
   TextEndAnchor,
   Point,
 } from './types';
 
-const MIN_SIZE = 4;
-
-/* ── rect handles ─────────────────────────────────────────────────────────── */
-
-export type RectHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
-export const RECT_HANDLES: RectHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
-const RECT_CURSOR: Record<RectHandle, Cursor> = {
-  nw: 'nwse-resize',
-  se: 'nwse-resize',
-  ne: 'nesw-resize',
-  sw: 'nesw-resize',
-  n: 'ns-resize',
-  s: 'ns-resize',
-  e: 'ew-resize',
-  w: 'ew-resize',
-};
-/** Each handle's compass direction (deg CW from north) on the unrotated box. */
-const HANDLE_BASE_ANGLE: Record<RectHandle, number> = {
-  n: 0,
-  ne: 45,
-  e: 90,
-  se: 135,
-  s: 180,
-  sw: 225,
-  w: 270,
-  nw: 315,
-};
-/** The resize cursor per 45° compass sector (index = sector, 0 = north). */
-const SECTOR_CURSORS: Cursor[] = [
-  'ns-resize',
-  'nesw-resize',
-  'ew-resize',
-  'nwse-resize',
-  'ns-resize',
-  'nesw-resize',
-  'ew-resize',
-  'nwse-resize',
-];
-/** The resize cursor for a handle on a box tilted by `rot` deg: rotate the
- *  handle's compass direction with the box and pick the nearest 45° sector.
- *  At `rot = 0` this reproduces {@link RECT_CURSOR} exactly. */
-export const rotatedHandleCursor = (handle: RectHandle, rot: number): Cursor =>
-  SECTOR_CURSORS[Math.round(normalizeDeg(HANDLE_BASE_ANGLE[handle] + rot) / 45) % 8];
-const rectEdges = (handle: RectHandle) => ({
-  w: handle === 'nw' || handle === 'w' || handle === 'sw',
-  e: handle === 'ne' || handle === 'e' || handle === 'se',
-  n: handle === 'nw' || handle === 'n' || handle === 'ne',
-  s: handle === 'sw' || handle === 's' || handle === 'se',
-});
-const rectHandlePoint = (rect: Rect, handle: RectHandle): Point => {
-  const edges = rectEdges(handle);
-  return {
-    x: edges.w ? rect.x : edges.e ? rect.x + rect.width : rect.x + rect.width / 2,
-    y: edges.n ? rect.y : edges.s ? rect.y + rect.height : rect.y + rect.height / 2,
-  };
-};
-function resizeRect(base: Rect, handle: RectHandle, to: Point): Rect {
-  const edges = rectEdges(handle);
-  let left = base.x;
-  let right = base.x + base.width;
-  let top = base.y;
-  let bottom = base.y + base.height;
-  if (edges.w) left = to.x;
-  if (edges.e) right = to.x;
-  if (edges.n) top = to.y;
-  if (edges.s) bottom = to.y;
-  return {
-    x: Math.min(left, right),
-    y: Math.min(top, bottom),
-    width: Math.max(MIN_SIZE, Math.abs(right - left)),
-    height: Math.max(MIN_SIZE, Math.abs(bottom - top)),
-  };
-}
-
-/* ── small math ───────────────────────────────────────────────────────────── */
-
-export const rectFromPoints = (from: Point, to: Point): Rect => ({
-  x: Math.min(from.x, to.x),
-  y: Math.min(from.y, to.y),
-  width: Math.abs(to.x - from.x),
-  height: Math.abs(to.y - from.y),
-});
-export const rectsIntersect = (left: Rect, right: Rect): boolean =>
-  left.x <= right.x + right.width &&
-  left.x + left.width >= right.x &&
-  left.y <= right.y + right.height &&
-  left.y + left.height >= right.y;
-const rectContains = (rect: Rect, point: Point): boolean =>
-  point.x >= rect.x &&
-  point.x <= rect.x + rect.width &&
-  point.y >= rect.y &&
-  point.y <= rect.y + rect.height;
-
-/** Distance from point p to segment ab. */
-function segDist(point: Point, from: Point, to: Point): number {
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const len2 = dx * dx + dy * dy;
-  const fraction =
-    len2 === 0
-      ? 0
-      : Math.max(0, Math.min(1, ((point.x - from.x) * dx + (point.y - from.y) * dy) / len2));
-  return Math.hypot(point.x - (from.x + fraction * dx), point.y - (from.y + fraction * dy));
-}
 /** Even-odd point-in-polygon. */
 export function pointInPoly(point: Point, points: readonly Point[]): boolean {
   let inside = false;
@@ -154,34 +79,6 @@ export function pointInPoly(point: Point, points: readonly Point[]): boolean {
 }
 const polyPoints = (geometry: Extract<ModelGeometry, { kind: 'poly' }>): Point[] => geometry.points;
 
-export function unionRect(points: Point[]): Rect {
-  let x0 = Infinity;
-  let y0 = Infinity;
-  let x1 = -Infinity;
-  let y1 = -Infinity;
-  for (const point of points) {
-    x0 = Math.min(x0, point.x);
-    y0 = Math.min(y0, point.y);
-    x1 = Math.max(x1, point.x);
-    y1 = Math.max(y1, point.y);
-  }
-  return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
-}
-
-const expandRect = (rect: Rect, pad: number): Rect => ({
-  x: rect.x - pad,
-  y: rect.y - pad,
-  width: rect.width + 2 * pad,
-  height: rect.height + 2 * pad,
-});
-
-const rectCornerPoints = (rect: Rect): Point[] => [
-  { x: rect.x, y: rect.y },
-  { x: rect.x + rect.width, y: rect.y },
-  { x: rect.x + rect.width, y: rect.y + rect.height },
-  { x: rect.x, y: rect.y + rect.height },
-];
-
 /* ── rotation ──────────────────────────────────────────────────────────────
  * Annotation rotation, layered on the generic `@embedpdf/core-geometry` affine
  * primitives (`rotateAbout`). Box kinds carry an unrotated `rect` + a `rot`
@@ -189,8 +86,6 @@ const rectCornerPoints = (rect: Rect): Point[] => [
  * helpers know that split and compose the matrix builders — they never hand-roll
  * a rotation matrix. See `ModelGeometry` in types.ts.
  * ──────────────────────────────────────────────────────────────────────────── */
-
-const DEG2RAD = Math.PI / 180;
 
 /** How far (content units) the rotate knob hangs off the top edge of the box. */
 export const ROTATE_KNOB_OFFSET = 24;
@@ -203,16 +98,13 @@ export const DEFAULT_CHROME_GEOMETRY = {
   knobOffset: ROTATE_KNOB_OFFSET,
 } as const;
 
-/** Normalize degrees into `[0, 360)`. */
-export const normalizeDeg = (degrees: number): number => ((degrees % 360) + 360) % 360;
-
 /** A geom's applied rotation (deg), or 0 for the non-rotatable kinds. A
  *  caret's `rot` is authoring metadata (its text's baseline tilt): reported
  *  here so the renderer and selection chrome follow it, while the caret's
  *  caps (not movable/resizable) keep every rotate gesture away from it. */
 export function geomRotation(geometry: ModelGeometry): number {
+  if (geometry.kind === 'box') return geometry.rotation;
   if (
-    geometry.kind === 'rect' ||
     geometry.kind === 'line' ||
     geometry.kind === 'poly' ||
     geometry.kind === 'ink' ||
@@ -223,22 +115,10 @@ export function geomRotation(geometry: ModelGeometry): number {
   return 0;
 }
 
-const rectCenter = (rect: Rect): Point => ({
-  x: rect.x + rect.width / 2,
-  y: rect.y + rect.height / 2,
-});
-
-const rotateAboutM = (pivot: Point, deg: number): Mat2D<'page', 'page'> =>
-  rotateAbout(pivot as PointIn<'page'>, deg * DEG2RAD);
-
-/** Rotate one point about a pivot by `deg` (CW, page space). */
-export const rotatePoint = (point: Point, pivot: Point, deg: number): Point =>
-  applyPoint(rotateAboutM(pivot, deg), point as PointIn<'page'>);
-
 /** A box's centre, or the mean of a shape's points. */
 export function centroidOf(geometry: ModelGeometry): Point {
-  if (geometry.kind === 'rect' || geometry.kind === 'text' || geometry.kind === 'caret')
-    return rectCenter(geometry.rect);
+  if (geometry.kind === 'box') return rectCenter(geometry.box);
+  if (geometry.kind === 'text' || geometry.kind === 'caret') return rectCenter(geometry.rect);
   if (geometry.kind === 'line')
     return { x: (geometry.a.x + geometry.b.x) / 2, y: (geometry.a.y + geometry.b.y) / 2 };
   const points =
@@ -286,7 +166,7 @@ export function turnPivotOf(geometry: ModelGeometry): Point {
  *  offers no rotate gesture. */
 export function isRotatableGeom(geometry: ModelGeometry): boolean {
   return (
-    geometry.kind === 'rect' ||
+    geometry.kind === 'box' ||
     geometry.kind === 'line' ||
     geometry.kind === 'poly' ||
     geometry.kind === 'ink' ||
@@ -297,9 +177,9 @@ export function isRotatableGeom(geometry: ModelGeometry): boolean {
 
 /**
  * Rotate a geom by `deltaDeg` (clockwise) about `pivot`.
- *  - box (`rect`/plain `text`): orbit the box centre about the pivot (a rigid
- *    translation of the unrotated `rect`) and add the angle to `rot`. When the
- *    pivot is the box centre this is a pure `rot += delta`.
+ *  - box (`box`/plain `text`): orbit the box centre about the pivot (a rigid
+ *    translation of the unrotated box) and add the angle to its turn. When the
+ *    pivot is the box centre this is a pure turn.
  *  - vertex (`line`/`poly`/`ink`): map every point through the rotation and bump
  *    the advisory `rot` (the points stay the authoritative visual).
  * Kinds without a rotate verb are returned unchanged: quads and callouts, and
@@ -313,19 +193,8 @@ export function geomRotateAbout(
   deltaDeg: number,
 ): ModelGeometry {
   if (deltaDeg === 0) return geometry;
+  if (geometry.kind === 'box') return boxRotateAbout(geometry, pivot, deltaDeg);
   const nextRot = normalizeDeg(geomRotation(geometry) + deltaDeg);
-  if (geometry.kind === 'rect') {
-    const point = rotatePoint(rectCenter(geometry.rect), pivot, deltaDeg);
-    return {
-      ...geometry,
-      rect: {
-        ...geometry.rect,
-        x: point.x - geometry.rect.width / 2,
-        y: point.y - geometry.rect.height / 2,
-      },
-      rot: nextRot,
-    };
-  }
   if (geometry.kind === 'text') {
     // The rotate gesture stays out of scope for callouts (no knob/orbit); the
     // box may still carry a creation-time `rot` from the upright policy.
@@ -358,7 +227,8 @@ export function geomRotateAbout(
  * Position is deliberately absent — a translation never invalidates a raster.
  */
 function apFrameSize(geometry: ModelGeometry): Size {
-  if (geometry.kind === 'rect' || geometry.kind === 'text' || geometry.kind === 'caret')
+  if (geometry.kind === 'box') return { width: geometry.box.width, height: geometry.box.height };
+  if (geometry.kind === 'text' || geometry.kind === 'caret')
     return { width: geometry.rect.width, height: geometry.rect.height };
   const points =
     geometry.kind === 'line'
@@ -385,13 +255,6 @@ export function apSizeChanged(before: ModelGeometry, after: ModelGeometry): bool
   return (
     Math.abs(size.width - afterSize.width) > 0.01 || Math.abs(size.height - afterSize.height) > 0.01
   );
-}
-
-/** The AABB of `rect` rotated `deg` about its own centre. */
-export function rotatedAabb(rect: Rect, deg: number): Rect {
-  if (!deg) return rect;
-  const point = rectCenter(rect);
-  return unionRect(rectCornerPoints(rect).map((corner) => rotatePoint(corner, point, deg)));
 }
 
 /* ── upright placement (counter-rotating against the display rotation) ────────
@@ -479,14 +342,14 @@ export function fitStampBox(center: Point, desired: Size, page: Size, rotCW: num
   return { x: cx - width / 2, y: cy - height / 2, width, height };
 }
 
-/** Reset a geom to its as-authored orientation (`rot → 0`). Box: drop `rot`.
+/** Reset a geom to its as-authored orientation (turn → 0). Box: drop the turn.
  *  Vertex: spin the points by `-rot` about the supplied selection center.
  *  Geometry-only callers retain the centroid default. */
 export function geomResetRotation(geometry: ModelGeometry, pivot?: Point): ModelGeometry {
   const rot = geomRotation(geometry);
   if (!rot) return geometry;
-  if (geometry.kind === 'rect' || geometry.kind === 'text' || geometry.kind === 'caret')
-    return { ...geometry, rot: 0 };
+  if (geometry.kind === 'box') return { ...geometry, rotation: 0 };
+  if (geometry.kind === 'text' || geometry.kind === 'caret') return { ...geometry, rot: 0 };
   const point = pivot ?? turnPivotOf(geometry);
   const rotated = geomRotateAbout(geometry, point, -rot);
   // geomRotateAbout already set rot = normalize(rot - rot) = 0.
@@ -508,7 +371,8 @@ export function obbFromGeom(
 ): { corners: [Point, Point, Point, Point]; angle: number } | null {
   if (!isRotatableGeom(geometry)) return null;
   const rot = geomRotation(geometry);
-  if (geometry.kind === 'rect' || geometry.kind === 'text' || geometry.kind === 'caret') {
+  if (geometry.kind === 'box') return { corners: boxCorners(geometry), angle: rot };
+  if (geometry.kind === 'text' || geometry.kind === 'caret') {
     const point = rectCenter(geometry.rect);
     const corners = rectCornerPoints(geometry.rect).map((corner) =>
       rotatePoint(corner, point, rot),
@@ -577,7 +441,7 @@ export function groupResizeFactors(base: Rect, current: Rect): { sx: number; sy:
 
 /**
  * Scale a geom about `anchor` by `(sx, sy)`. For a rotated box (iso scale, so
- * `sx === sy`) the unrotated `rect` is scaled about the anchor and `rot` is
+ * `sx === sy`) the unrotated box is scaled about the anchor and its turn is
  * preserved (a uniform scale commutes with rotation). For unrotated members
  * (the anisotropic case) every point/extent scales directly.
  */
@@ -591,8 +455,9 @@ export function geomScaleAbout(
     x: anchor.x + (point.x - anchor.x) * sx,
     y: anchor.y + (point.y - anchor.y) * sy,
   });
-  if (geometry.kind === 'rect' || geometry.kind === 'text') {
-    if (geometry.kind === 'text' && geometry.callout) return geometry;
+  if (geometry.kind === 'box') return boxScaleAbout(geometry, anchor, sx, sy);
+  if (geometry.kind === 'text') {
+    if (geometry.callout) return geometry;
     const point = sp(rectCenter(geometry.rect));
     const width = Math.max(MIN_SIZE, geometry.rect.width * Math.abs(sx));
     const height = Math.max(MIN_SIZE, geometry.rect.height * Math.abs(sy));
@@ -755,40 +620,6 @@ function calloutEndingSeg(points: Point[], ending: LineEnding): EndingSeg | null
     angle: Math.atan2(points[0].y - points[1].y, points[0].x - points[1].x),
     ending,
   };
-}
-
-/** Shrink a rect inward by `pad` on every side, staying centred and never
- *  collapsing past zero (a thick stroke on a tiny shape just yields a 0-extent
- *  path rather than an inverted one). The inverse of `expandRect` for shapes. */
-const insetRect = (rect: Rect, pad: number): Rect => {
-  const width = Math.max(0, rect.width - 2 * pad);
-  const height = Math.max(0, rect.height - 2 * pad);
-  return {
-    x: rect.x + (rect.width - width) / 2,
-    y: rect.y + (rect.height - height) / 2,
-    width,
-    height,
-  };
-};
-
-/**
- * The stored `rect` for a freshly-drawn shape, given the box the user dragged. A
- * cloudy border stores the outer box (dragged + cloud extent), so the dragged box
- * is its inner edge and the scallops bulge out to the stored box — just like a
- * solid shape, whose /Rect is the dragged box. So `geometry.rect` is always the outer box;
- * the cloud-vs-solid difference lives only here, at creation.
- */
-export function shapeRectFor(dragged: Rect, ellipse: boolean, style: Style): Rect {
-  return style.border.kind === 'cloudy'
-    ? expandRect(dragged, cloudyBorderExtent(style.border.intensity, style.strokeWidth, ellipse))
-    : dragged;
-}
-
-/** The shape's own box inside a stored `rect`: the inverse of `shapeRectFor`. */
-export function shapeBoxOf(rect: Rect, ellipse: boolean, style: Style): Rect {
-  return style.border.kind === 'cloudy'
-    ? insetRect(rect, cloudyBorderExtent(style.border.intensity, style.strokeWidth, ellipse))
-    : rect;
 }
 
 export function caretRectFromTextEnd(lineRect: Rect): Rect {
@@ -1006,19 +837,18 @@ function endingSegs(geometry: ModelGeometry): EndingSeg[] {
 
 /**
  * A geom's visual bounds: the rect that encloses the drawn appearance, so the
- * baked /AP is never clipped and the selection outline wraps exactly what's drawn.
+ * baked /AP is never clipped.
  *
- * A shape's `rect` is its visual box (the PDF /Rect): solid/dashed strokes draw
- * inside it, and a cloudy border's scallops also inset back into it (the dragged
- * inner edge sits `/RD` in from it — see `shapeRectFor`). So growing the stroke or
- * the cloud thickens inward, never spilling past the handles. Lines / polylines /
- * ink have no box, so they expand by the stroke (+ endings) — the same math feeds
- * `geomScene`, so the visual box and what's drawn always agree.
+ * A box's strokes draw inside it; a cloudy border's bumps reach out from it,
+ * so its bounds grow by the cloud's reach (`boxDrawnBounds`), before its
+ * turn. Lines / polylines / ink have no box, so they expand by the stroke
+ * (+ endings) — the same math feeds `geomScene`, so the visual box and what's
+ * drawn always agree.
  *
- * `border` matters for one case: a closed poly with a cloudy border, whose curls
- * are centred on the vertex path and reach outward (there is no outer box to
- * inset into) — the bounds grow by the cloud extent, and the engine's `rect`
- * grows with them so the baked scallops are never clipped.
+ * `border` matters for the clouds: a box's, and a closed poly's, whose curls
+ * are centred on the vertex path and reach outward — the bounds grow by the
+ * cloud extent, and the engine's `rect` grows with them so the baked scallops
+ * are never clipped.
  */
 export function geomVisualBounds(
   geometry: ModelGeometry,
@@ -1049,8 +879,8 @@ export function geomVisualBounds(
     if (seg) all.push(...endingPoints(seg.tip, seg.angle, seg.ending, strokeWidth));
     return expandRect(unionRect(all), strokeWidth / 2);
   }
-  if (geometry.kind === 'rect' || geometry.kind === 'text' || geometry.kind === 'caret')
-    return geometry.rect;
+  if (geometry.kind === 'box') return boxDrawnBounds(geometry, strokeWidth, border);
+  if (geometry.kind === 'text' || geometry.kind === 'caret') return geometry.rect;
   if (geometry.kind === 'quads')
     return expandRect(unionRect(geometry.quads.flatMap(quadCorners)), strokeWidth / 2);
   // Ink is round-capped/round-joined: it never spikes, so a plain half-width grow of the
@@ -1083,8 +913,8 @@ export function geomVisualBounds(
  * from. Centre-line geometries (line / polyline / polygon / ink) straddle their path,
  * so this is their visual bounds (the join-aware stroke outline + endings) — a
  * polygon's outline wraps its stroke exactly like a polyline. Box kinds (square /
- * circle / free-text) sit tight on their `rect` (their stroke draws inside the box,
- * so the 8 resize handles land on the corners). The chrome outline and the selected
+ * circle / free-text) sit tight on their box (a stroke draws inside it, and a
+ * cloud's bumps reach past it), so the 8 resize handles land on its corners. The chrome outline and the selected
  * hit-test both call this, so what you see highlighted is exactly what you can grab —
  * they can never drift.
  */
@@ -1216,8 +1046,8 @@ function endingHit(
 /* ── geom ops ─────────────────────────────────────────────────────────────── */
 
 export function geomBounds(geometry: ModelGeometry): Rect {
-  if (geometry.kind === 'rect' || geometry.kind === 'text' || geometry.kind === 'caret')
-    return geometry.rect;
+  if (geometry.kind === 'box') return geometry.box;
+  if (geometry.kind === 'text' || geometry.kind === 'caret') return geometry.rect;
   if (geometry.kind === 'line') return rectFromPoints(geometry.a, geometry.b);
   if (geometry.kind === 'poly') return unionRect(geometry.points);
   if (geometry.kind === 'ink') return unionRect(geometry.strokes.flat());
@@ -1226,12 +1056,8 @@ export function geomBounds(geometry: ModelGeometry): Rect {
 
 /**
  * Is the page point on the annotation: within `margin` of the stroke, or
- * inside the fill (when `filled`). The stroke band widens with the stroke width.
- *
- * A shape's stroke is drawn inside its box, centred on `insetRect(rect, sw/2)`
- * (see `geomScene`), so the clickable band follows that inset centre-line — not
- * the box edge. The fill still reaches the box. (Cloudy scallops aren't modelled
- * here; with their typically thin stroke the inset is sub-pixel, so this matches.)
+ * inside the fill (when `filled`). The stroke band widens with the stroke
+ * width; a box's `border` says whether its cloud's bumps are what to hit.
  */
 export function geomHit(
   geometry: ModelGeometry,
@@ -1239,7 +1065,9 @@ export function geomHit(
   margin: number,
   filled: boolean,
   strokeWidth: number,
+  border?: Border,
 ): boolean {
+  if (geometry.kind === 'box') return boxHit(geometry, point, margin, filled, strokeWidth, border);
   const tol = margin + strokeWidth / 2;
   // A rotated box stores its unrotated `rect`; inverse-rotate the pointer into
   // that local frame and run the normal axis-aligned tests. Vertex kinds carry
@@ -1247,9 +1075,7 @@ export function geomHit(
   // callout is compound: only its box rotates (the leader is page-space), so the
   // inverse rotation applies to the box test alone — see the text branch below.
   if (
-    (geometry.kind === 'rect' ||
-      geometry.kind === 'caret' ||
-      (geometry.kind === 'text' && !geometry.callout)) &&
+    (geometry.kind === 'caret' || (geometry.kind === 'text' && !geometry.callout)) &&
     (geometry.rot ?? 0) !== 0
   ) {
     point = rotatePoint(point, rectCenter(geometry.rect), -(geometry.rot ?? 0));
@@ -1274,45 +1100,6 @@ export function geomHit(
         return true;
     }
     return false;
-  }
-  if (geometry.kind === 'rect') {
-    const rect = geometry.rect;
-    if (geometry.ellipse) {
-      const cx = rect.x + rect.width / 2;
-      const cy = rect.y + rect.height / 2;
-      const orx = rect.width / 2; // outer (box) radii — the fill reaches here
-      const ory = rect.height / 2;
-      if (orx <= 0 || ory <= 0) return false;
-      if (filled && Math.hypot((point.x - cx) / orx, (point.y - cy) / ory) <= 1) return true;
-      // stroke band centred on the inset path (its outer edge sits on the box)
-      const rx = Math.max(0.01, orx - strokeWidth / 2);
-      const ry = Math.max(0.01, ory - strokeWidth / 2);
-      const normalizedDistance = Math.hypot((point.x - cx) / rx, (point.y - cy) / ry);
-      const band = tol / Math.min(rx, ry); // approximate normalized stroke band
-      return Math.abs(normalizedDistance - 1) <= band;
-    }
-    if (filled && rectContains(rect, point)) return true;
-    // near any of the 4 edges of the inset (drawn) rectangle
-    const drawnRect = insetRect(rect, strokeWidth / 2);
-    const edges: [Point, Point][] = [
-      [
-        { x: drawnRect.x, y: drawnRect.y },
-        { x: drawnRect.x + drawnRect.width, y: drawnRect.y },
-      ],
-      [
-        { x: drawnRect.x + drawnRect.width, y: drawnRect.y },
-        { x: drawnRect.x + drawnRect.width, y: drawnRect.y + drawnRect.height },
-      ],
-      [
-        { x: drawnRect.x + drawnRect.width, y: drawnRect.y + drawnRect.height },
-        { x: drawnRect.x, y: drawnRect.y + drawnRect.height },
-      ],
-      [
-        { x: drawnRect.x, y: drawnRect.y + drawnRect.height },
-        { x: drawnRect.x, y: drawnRect.y },
-      ],
-    ];
-    return edges.some(([from, to]) => segDist(point, from, to) <= tol);
   }
   if (geometry.kind === 'line')
     return (
@@ -1342,7 +1129,8 @@ export function geomHit(
 }
 
 export function geomHandles(geometry: ModelGeometry): Handle[] {
-  if (geometry.kind === 'rect' || geometry.kind === 'text') {
+  if (geometry.kind === 'box') return boxHandles(geometry);
+  if (geometry.kind === 'text') {
     const rot = geometry.rot ?? 0;
     const point = rectCenter(geometry.rect);
     const handles: Handle[] = RECT_HANDLES.map((handle) => ({
@@ -1357,7 +1145,7 @@ export function geomHandles(geometry: ModelGeometry): Handle[] {
     }));
     // A callout adds vertex handles for the leader tip and (if present) knee, so
     // the called-out point and the elbow can be dragged independently of the box.
-    if (geometry.kind === 'text' && geometry.callout) {
+    if (geometry.callout) {
       handles.push({ id: 'callout-tip', at: geometry.callout.tip, cursor: 'crosshair' });
       if (geometry.callout.knee)
         handles.push({ id: 'callout-knee', at: geometry.callout.knee, cursor: 'crosshair' });
@@ -1391,7 +1179,8 @@ export function geomTranslate(geometry: ModelGeometry, delta: Point): ModelGeome
       },
     };
   }
-  if (geometry.kind === 'rect' || geometry.kind === 'caret')
+  if (geometry.kind === 'box') return boxTranslate(geometry, delta);
+  if (geometry.kind === 'caret')
     return {
       ...geometry,
       rect: { ...geometry.rect, x: geometry.rect.x + delta.x, y: geometry.rect.y + delta.y },
@@ -1401,52 +1190,6 @@ export function geomTranslate(geometry: ModelGeometry, delta: Point): ModelGeome
   if (geometry.kind === 'ink')
     return { ...geometry, strokes: geometry.strokes.map((stroke) => stroke.map(mv)) };
   return { ...geometry, quads: geometry.quads.map((quad) => mapQuad(quad, mv)) };
-}
-
-const OPPOSITE_HANDLE: Record<RectHandle, RectHandle> = {
-  nw: 'se',
-  ne: 'sw',
-  se: 'nw',
-  sw: 'ne',
-  n: 's',
-  s: 'n',
-  e: 'w',
-  w: 'e',
-};
-
-/**
- * Resize a rotated box by `handle`, keeping the opposite corner/edge fixed in
- * world space. The pointer is mapped into the box's local (unrotated) frame, the
- * axis-aligned `resizeRect` runs there, then the new box is repositioned so the
- * anchor (the opposite handle's point) lands back where it was — and the box
- * still rotates about its own centre. With `rot === 0` this is exactly the plain
- * `resizeRect`.
- */
-function resizeRotatedRect(base: Rect, rot: number, handle: RectHandle, to: Point): Rect {
-  if (!rot) return resizeRect(base, handle, to);
-  const c0 = rectCenter(base);
-  const localTo = rotatePoint(to, c0, -rot);
-  const next = resizeRect(base, handle, localTo);
-  const anchorLocal = rectHandlePoint(base, OPPOSITE_HANDLE[handle]);
-  const anchorWorld = rotatePoint(anchorLocal, c0, rot);
-  const nextCenterLocal = rectCenter(next);
-  // offset of the anchor from the new centre, in the local frame; rotate it to
-  // world orientation and place the new centre so the anchor stays put.
-  const offX = anchorLocal.x - nextCenterLocal.x;
-  const offY = anchorLocal.y - nextCenterLocal.y;
-  const rad = rot * DEG2RAD;
-  const cos = Math.cos(rad);
-  const sin = Math.sin(rad);
-  const rOffX = cos * offX - sin * offY;
-  const rOffY = sin * offX + cos * offY;
-  const cx = anchorWorld.x - rOffX;
-  const cy = anchorWorld.y - rOffY;
-  return {
-    x: cx - next.width / 2,
-    y: cy - next.height / 2,
-    width: next.width,
-    height: next.height,
-  };
 }
 
 export function geomDragHandle(geometry: ModelGeometry, handle: string, to: Point): ModelGeometry {
@@ -1460,11 +1203,7 @@ export function geomDragHandle(geometry: ModelGeometry, handle: string, to: Poin
       rect: resizeRotatedRect(geometry.rect, geometry.rot ?? 0, handle as RectHandle, to),
     };
   }
-  if (geometry.kind === 'rect')
-    return {
-      ...geometry,
-      rect: resizeRotatedRect(geometry.rect, geometry.rot ?? 0, handle as RectHandle, to),
-    };
+  if (geometry.kind === 'box') return boxResize(geometry, handle, to);
   if (geometry.kind === 'line')
     return handle === 'v0' ? { ...geometry, a: to } : { ...geometry, b: to };
   if (geometry.kind === 'poly') {
@@ -1564,27 +1303,7 @@ export function geomScene(geometry: ModelGeometry, strokeWidth = 0, border?: Bor
     ].join(' ');
     return [{ kind: 'path', d: pathData }];
   }
-  if (geometry.kind === 'rect') {
-    // A cloudy border's scallops inset back into `geometry.rect` (the outer box): the troughs
-    // land at the dragged inner edge (`geometry.rect` − extent) and the peaks on `geometry.rect`.
-    // Only drawn when the box can hold them — a box smaller than 2× the inset (e.g.
-    // a 0-drag, or after cranking intensity) falls through to the plain outline.
-    if (border?.kind === 'cloudy') {
-      const inset = cloudyBorderExtent(border.intensity, strokeWidth, geometry.ellipse);
-      if (geometry.rect.width > 2 * inset && geometry.rect.height > 2 * inset) {
-        return [
-          {
-            kind: 'path',
-            d: cloudyPath(geometry.rect, geometry.ellipse, border.intensity, strokeWidth),
-          },
-        ];
-      }
-    }
-    // Otherwise the stroke sits inside the box: inset the drawn path by half the
-    // stroke so its outer edge lands on `geometry.rect`, not straddling it.
-    const rect = insetRect(geometry.rect, strokeWidth / 2);
-    return [geometry.ellipse ? { kind: 'ellipse', rect } : { kind: 'rect', rect }];
-  }
+  if (geometry.kind === 'box') return boxScene(geometry, strokeWidth, border);
   if (geometry.kind === 'line') {
     const nodes: RenderNode[] = [{ kind: 'line', a: geometry.a, b: geometry.b }];
     for (const seg of endingSegs(geometry))

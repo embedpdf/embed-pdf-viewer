@@ -7,7 +7,8 @@
  */
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 import { anchorModeOf } from './anchor';
-import { selectionQuad, unionRect } from './geometry';
+import { selectionQuad } from './geometry';
+import { unionRect } from './rect';
 import { isSelectable } from './hit';
 import type { Guide, Id, Model, Rect, Point } from './types';
 import { fieldsOf } from './record';

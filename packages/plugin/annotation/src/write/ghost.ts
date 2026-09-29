@@ -83,7 +83,7 @@ export function createGhost(
     if (isIconPlaceKind(tool.subtype)) {
       const rot = tools.uprightRotFor(displayRotation);
       const box = fitStampBox(point, ICON_PLACE_SIZE, page, rot);
-      showVectorGhost(pageObjectNumber, toolId, { kind: 'rect', rect: box, ellipse: false });
+      showVectorGhost(pageObjectNumber, toolId, { kind: 'box', box, rotation: 0, ellipse: false });
       return;
     }
     // A click-create tool: the shared placement layer resolves where the click
@@ -128,7 +128,12 @@ export function createGhost(
       width: Math.max(0, Math.min(box.x + box.width, page.width) - x),
       height: Math.max(0, Math.min(box.y + box.height, page.height) - y),
     };
-    showVectorGhost(pageObjectNumber, toolId, { kind: 'rect', rect, ellipse: false });
+    showVectorGhost(pageObjectNumber, toolId, {
+      kind: 'box',
+      box: rect,
+      rotation: 0,
+      ellipse: false,
+    });
   };
 
   const api = {

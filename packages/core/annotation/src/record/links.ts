@@ -6,7 +6,8 @@
  */
 import { quadBounds } from '@embedpdf/core-geometry';
 
-import { selectionQuad, unionRect } from '../geometry';
+import { selectionQuad } from '../geometry';
+import { unionRect } from '../rect';
 import { fieldsFor } from '../kinds';
 import type { Rect, RecordFields } from '../types';
 import { annotationKey } from './seam';

@@ -8,10 +8,10 @@
  *
  * This is a pure function. It takes a page-space box plus
  * the border `intensity`/`strokeWidth` and returns SVG path data in absolute
- * content coordinates (the same space `geomScene`'s rect/ellipse nodes use). There
- * is no stored `/RD`, no border-style enum, no bbox bookkeeping — the inset is
- * derived (`cloudyBorderExtent`) and the outer edge of the scallops lands exactly
- * on the box, so the box stays the annotation's outer boundary (its `/Rect`).
+ * content coordinates (the same space `geomScene`'s rect/ellipse nodes use). The
+ * scallops start on the shape's box and reach out from it by
+ * `cloudyBorderExtent`, as the engine draws them: the engine's `rect` takes
+ * that reach in (its `/RD`).
  *
  * The internal math runs in PDFBox's y-up frame; `PathBuilder` flips back to
  * y-down and translates into the box's page-space origin on the way out.
@@ -490,10 +490,9 @@ function cloudyEllipseImpl(
 /* ── public API ────────────────────────────────────────────────────────────── */
 
 /**
- * The per-side inset (content units) from a shape's outer box to the cloud's
- * inner boundary — the scallop radius plus half the stroke. This is the `/RD`
- * the engine stores, and it's sized so the scallop peaks reach back out to the
- * box edge: the box remains the annotation's outer boundary.
+ * How far (content units) a cloud's scallops reach out from the shape's box
+ * on each side: the scallop radius plus half the stroke. This is the `/RD`
+ * the engine stores.
  */
 export function cloudyBorderExtent(
   intensity: number,
@@ -508,8 +507,7 @@ export function cloudyBorderExtent(
 
 /**
  * SVG path data for a cloudy polygon border, in absolute content coordinates.
- * Unlike the box kinds (whose scallops inset back into the outer box), a
- * polygon's curls are centred on the vertex path and reach outward by the cloud
+ * A polygon's curls are centred on the vertex path and reach outward by the cloud
  * radius — the same rule PDFium's `GenerateCloudyPolygonPath` bakes into the
  * /AP, so the live preview and the saved appearance agree. The visual therefore
  * extends `cloudyBorderExtent` beyond the vertices (see `geomVisualBounds`).
@@ -533,8 +531,8 @@ export function cloudyPolyPath(points: Point[], intensity: number, strokeWidth: 
 
 /**
  * SVG path data for a cloudy square (rect) or circle (ellipse), in absolute
- * content coordinates. The scallops are generated on the box inset by
- * `cloudyBorderExtent` and bulge back out to `box`'s edge.
+ * content coordinates. The scallops are generated on `box` and bulge out from
+ * it by `cloudyBorderExtent`.
  */
 export function cloudyPath(
   box: Rect,
@@ -542,12 +540,11 @@ export function cloudyPath(
   intensity: number,
   strokeWidth: number,
 ): string {
-  const inset = cloudyBorderExtent(intensity, strokeWidth, ellipse);
   const out = new PathBuilder(box.x, box.y);
-  const left = inset;
-  const top = inset;
-  const right = box.width - inset;
-  const bottom = box.height - inset;
+  const left = 0;
+  const top = 0;
+  const right = box.width;
+  const bottom = box.height;
   if (ellipse) {
     cloudyEllipseImpl(left, -bottom, right, -top, intensity, strokeWidth, out);
   } else {

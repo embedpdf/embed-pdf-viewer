@@ -43,7 +43,12 @@ const square = (
     },
     page: PAGE,
     subtype: 'square',
-    geometry: { kind: 'rect', rect: { x: 100, y: 100, width: 80, height: 60 }, ellipse: false },
+    geometry: {
+      kind: 'box',
+      box: { x: 100, y: 100, width: 80, height: 60 },
+      rotation: 0,
+      ellipse: false,
+    },
     style: STYLE,
     flags,
     source: 'vector',
@@ -248,7 +253,7 @@ describe('flag-driven behavior in the model', () => {
 
 describe('screen-anchored bodies (noZoom / noRotate)', () => {
   const rect = { x: 100, y: 100, width: 40, height: 20 };
-  const geom: ModelGeometry = { kind: 'rect', rect, ellipse: false };
+  const geom: ModelGeometry = { kind: 'box', box: rect, rotation: 0, ellipse: false };
 
   it('anchorModeOf reads flags OR kind caps', () => {
     expect(anchorModeOf(square('a', DRAWN_FLAGS))).toBeNull();
@@ -265,36 +270,36 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
   it('noZoom: the body scales 1/s about the rect top-left (the spec anchor)', () => {
     const view: ViewEnv = { zoom: 2, rotation: 0 };
     const geometry = anchoredGeom(geom, { zoom: true, upright: false }, view);
-    expect(geometry.kind).toBe('rect');
-    if (geometry.kind !== 'rect') return;
+    expect(geometry.kind).toBe('box');
+    if (geometry.kind !== 'box') return;
     // top-left fixed; size halved (screen size stays 40×20 px at 200%)
-    expect(geometry.rect).toEqual({ x: 100, y: 100, width: 20, height: 10 });
-    expect(geometry.rot ?? 0).toBe(0);
+    expect(geometry.box).toEqual({ x: 100, y: 100, width: 20, height: 10 });
+    expect(geometry.rotation ?? 0).toBe(0);
   });
 
   it('noRotate: the body counter-rotates about the anchor so it reads upright', () => {
     const view: ViewEnv = { zoom: 1, rotation: 90 };
     const geometry = anchoredGeom(geom, { zoom: false, upright: true }, view);
-    if (geometry.kind !== 'rect') throw new Error('expected rect');
-    expect(geometry.rot).toBe(270); // -90° normalized
+    if (geometry.kind !== 'box') throw new Error('expected rect');
+    expect(geometry.rotation).toBe(270); // -90° normalized
     // the box centre orbited the anchor by -90°: centre (120,110) → (110, 80)
-    expect(geometry.rect.x + geometry.rect.width / 2).toBeCloseTo(110);
-    expect(geometry.rect.y + geometry.rect.height / 2).toBeCloseTo(80);
+    expect(geometry.box.x + geometry.box.width / 2).toBeCloseTo(110);
+    expect(geometry.box.y + geometry.box.height / 2).toBeCloseTo(80);
     // width/height unchanged (only orientation compensates)
-    expect(geometry.rect.width).toBe(40);
-    expect(geometry.rect.height).toBe(20);
+    expect(geometry.box.width).toBe(40);
+    expect(geometry.box.height).toBe(20);
   });
 
   it('both flags compose: scaled about the anchor, then counter-rotated', () => {
     const view: ViewEnv = { zoom: 2, rotation: 180 };
     const geometry = anchoredGeom(geom, { zoom: true, upright: true }, view);
-    if (geometry.kind !== 'rect') throw new Error('expected rect');
-    expect(geometry.rect.width).toBe(20);
-    expect(geometry.rect.height).toBe(10);
-    expect(geometry.rot).toBe(180);
+    if (geometry.kind !== 'box') throw new Error('expected rect');
+    expect(geometry.box.width).toBe(20);
+    expect(geometry.box.height).toBe(10);
+    expect(geometry.rotation).toBe(180);
     // rotating the scaled box's centre (110,105) about the anchor by 180° → (90,95)
-    expect(geometry.rect.x + geometry.rect.width / 2).toBeCloseTo(90);
-    expect(geometry.rect.y + geometry.rect.height / 2).toBeCloseTo(95);
+    expect(geometry.box.x + geometry.box.width / 2).toBeCloseTo(90);
+    expect(geometry.box.y + geometry.box.height / 2).toBeCloseTo(95);
   });
 
   it('Adobe clamp: below 100% the body scales WITH the page (zoom exemption off)', () => {
@@ -304,9 +309,9 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
     expect(out).toBe(geom);
     // …while the rotation exemption still applies (it has no baseline).
     const both = anchoredGeom(geom, { zoom: true, upright: true }, { zoom: 0.5, rotation: 90 });
-    if (both.kind !== 'rect') throw new Error('expected rect');
-    expect(both.rect.width).toBe(40); // size untouched (clamped)
-    expect(both.rot).toBe(270); // counter-rotation applied
+    if (both.kind !== 'box') throw new Error('expected rect');
+    expect(both.box.width).toBe(40); // size untouched (clamped)
+    expect(both.rotation).toBe(270); // counter-rotation applied
     // …and the inverse honours the same clamp (round-trip stays exact).
     const back = unanchoredGeom(both, { zoom: true, upright: true }, { zoom: 0.5, rotation: 90 });
     expect(geomBounds(back).x).toBeCloseTo(geomBounds(geom).x, 6);
@@ -348,7 +353,7 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
     // Round-trip a plain box, a rotated box, and a polygon.
     const shapes: ModelGeometry[] = [
       geom,
-      { kind: 'rect', rect: { x: 100, y: 100, width: 40, height: 20 }, ellipse: false, rot: 30 },
+      { kind: 'box', box: { x: 100, y: 100, width: 40, height: 20 }, ellipse: false, rotation: 30 },
       {
         kind: 'poly',
         points: [
@@ -383,8 +388,8 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
     const model = loaded([annotation]);
     const view: ViewEnv = { zoom: 2, rotation: 0 };
     const [item] = pageItems(model, PAGE, view);
-    if (item.geometry.kind !== 'rect') throw new Error('expected rect');
-    expect(item.geometry.rect).toEqual({ x: 100, y: 100, width: 40, height: 30 });
+    if (item.geometry.kind !== 'box') throw new Error('expected rect');
+    expect(item.geometry.box).toEqual({ x: 100, y: 100, width: 40, height: 30 });
     expect(item.style.strokeWidth).toBe(STYLE.strokeWidth / 2);
     // a point inside the effective footprint but outside nothing else hits it…
     const inside = hitTest(
@@ -419,7 +424,12 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
     // being rotated. Both members take the same real rotation.
     const anchored = square('an', flagsWith({ print: true, noRotate: true, noZoom: true }));
     const plain = square('pl', DRAWN_FLAGS, {
-      geometry: { kind: 'rect', rect: { x: 300, y: 100, width: 80, height: 60 }, ellipse: false },
+      geometry: {
+        kind: 'box',
+        box: { x: 300, y: 100, width: 80, height: 60 },
+        rotation: 0,
+        ellipse: false,
+      },
     });
     let model = loaded([anchored, plain]);
     model = { ...model, selected: ['an', 'pl'] };
@@ -451,13 +461,13 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
     const anGeometry = fieldsOf(an).geometry;
     const pl = model.byId['pl'];
     const plGeometry = fieldsOf(pl).geometry;
-    if (anGeometry.kind !== 'rect' || plGeometry.kind !== 'rect') throw new Error('expected rects');
-    expect(anGeometry.rot).toBe(90); // the body turns — same as everyone
-    expect(plGeometry.rot).toBe(90);
+    if (anGeometry.kind !== 'box' || plGeometry.kind !== 'box') throw new Error('expected rects');
+    expect(anGeometry.rotation).toBe(90); // the body turns — same as everyone
+    expect(plGeometry.rotation).toBe(90);
     // its centre orbited the pivot rigidly: (140,130) about (240,130) by 90°
     // CW in y-down space → (240,30)
-    expect(anGeometry.rect.x + anGeometry.rect.width / 2).toBeCloseTo(240);
-    expect(anGeometry.rect.y + anGeometry.rect.height / 2).toBeCloseTo(30);
+    expect(anGeometry.box.x + anGeometry.box.width / 2).toBeCloseTo(240);
+    expect(anGeometry.box.y + anGeometry.box.height / 2).toBeCloseTo(30);
     expect(an.source).toBe('vector'); // a real rotation re-bakes, like any member
   });
 
@@ -476,7 +486,7 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
     // rotate90 turns the authored tilt (displayed directly at any page rotation)
     const [after, fx] = step(model, { type: 'rotate90' });
     const geometry = fieldsOf(after.byId['an']).geometry;
-    expect(geometry.kind === 'rect' && geometry.rot).toBe(90);
+    expect(geometry.kind === 'box' && geometry.rotation).toBe(90);
     expect(fx).toHaveLength(1);
   });
 
@@ -501,12 +511,12 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
       { type: 'editPointer', phase: 'up', in: input(180, 160) },
     ]);
     const geometry = fieldsOf(model.byId['nz2']).geometry;
-    if (geometry.kind !== 'rect') throw new Error('expected rect');
+    if (geometry.kind !== 'box') throw new Error('expected rect');
     // …so the stored /Rect (screen size at zoom 1) becomes 160×120, and its
     // own re-projection is exactly the released preview: {100,100,80,60}.
-    expect(geometry.rect).toEqual({ x: 100, y: 100, width: 160, height: 120 });
+    expect(geometry.box).toEqual({ x: 100, y: 100, width: 160, height: 120 });
     const shown = anchoredGeom(geometry, anchorModeOf(model.byId['nz2']), view);
-    expect(shown.kind === 'rect' && shown.rect).toEqual({ x: 100, y: 100, width: 80, height: 60 });
+    expect(shown.kind === 'box' && shown.box).toEqual({ x: 100, y: 100, width: 80, height: 60 });
   });
 
   it('screen-anchored annotations neither snap nor serve as snap references', () => {
@@ -514,7 +524,12 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
     // edge — no guides, the raw delta commits untouched.
     const anchored = square('an', flagsWith({ print: true, noZoom: true }));
     const plain = square('pl', DRAWN_FLAGS, {
-      geometry: { kind: 'rect', rect: { x: 300, y: 100, width: 80, height: 60 }, ellipse: false },
+      geometry: {
+        kind: 'box',
+        box: { x: 300, y: 100, width: 80, height: 60 },
+        rotation: 0,
+        ellipse: false,
+      },
     });
     let model = loaded([anchored, plain]);
     model = { ...model, selected: ['an'] };

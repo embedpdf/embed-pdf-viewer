@@ -49,7 +49,12 @@ describe('pending changes', () => {
       ref: null,
       page: toPageRef(1),
       subtype: 'square',
-      geometry: { kind: 'rect', rect: { x: 0, y: 0, width: 10, height: 10 }, ellipse: false },
+      geometry: {
+        kind: 'box',
+        box: { x: 0, y: 0, width: 10, height: 10 },
+        rotation: 0,
+        ellipse: false,
+      },
       style: {
         color: '#e5484d',
         interiorColor: null,

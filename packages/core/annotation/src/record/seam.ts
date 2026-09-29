@@ -15,7 +15,7 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 
 import { FLAG_KEYS } from '../flags';
-import type { Border, FieldValues, ModelGeometry, Rect, Style } from '../types';
+import type { Border, FieldValues, Rect, Style } from '../types';
 
 // The one annotation key (engine-core `annotationKey`): obj:<n> | nm:<page>:<name> | idx:<page>:<i>.
 export { annotationKey } from '@embedpdf/core';
@@ -46,23 +46,14 @@ export const rotFromDTO = (rotation?: number | null): { rot?: number } =>
   rotation ? { rot: rotation } : {};
 
 /**
- * The geometry of a box kind (square, circle, free text, stamp, caret): the
- * model's `rect` is its box before any turn and `rot` the turn. The engine
- * works out `/Rect`, the upright box around all it draws. The turn is stated
- * as `null` when there is none (total projection — the engine's tri-state
- * writes keep an omitted field, so an omission would keep a stale turn).
+ * The geometry of a turning box kind the core still keeps as `rect` + `rot`
+ * (free text, caret): its box before any turn and the turn. The engine works
+ * out `/Rect`, the upright box around all it draws. The turn is stated as
+ * `null` when there is none (total projection — the engine's tri-state writes
+ * keep an omitted field, so an omission would keep a stale turn).
  */
 export function boxGeomFields(rect: Rect, rot: number): { box: PageBox; rotation: number | null } {
   return { box: rect, rotation: rot || null };
-}
-
-/** A box geom (square/circle/stamp) from its DTO: its `box` and `rot` its turn. */
-export function boxGeomFromDTO(
-  dto: { box: PageBox; rotation: number | null },
-  ellipse: boolean,
-): ModelGeometry {
-  const rot = dto.rotation ?? 0;
-  return { kind: 'rect', rect: dto.box, ellipse, ...(rot ? { rot } : {}) };
 }
 
 /** Engine border fields (`/BS /S`, `/BS /D`, `/BE /I`) → the `Border` union. A

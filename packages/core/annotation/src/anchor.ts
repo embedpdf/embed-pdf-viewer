@@ -33,14 +33,8 @@
  * `pageBox`/`chrome` pattern) and captured on pointer drafts at down; it is
  * never stored on the model.
  */
-import {
-  geomBounds,
-  geomRotateAbout,
-  geomScaleAbout,
-  geomTranslate,
-  normalizeDeg,
-  rotatePoint,
-} from './geometry';
+import { geomBounds, geomRotateAbout, geomScaleAbout, geomTranslate } from './geometry';
+import { normalizeDeg, rotatePoint } from './rect';
 import { capsFor } from './kinds';
 import type { FlagBearer } from './flags';
 import type { ModelGeometry, Point, ViewEnv } from './types';
@@ -74,7 +68,7 @@ export function anchorModeOf(record: FlagBearer): AnchorMode | null {
  * flags still round-trip untouched.
  */
 const projectable = (geometry: ModelGeometry): boolean =>
-  geometry.kind === 'rect' ||
+  geometry.kind === 'box' ||
   geometry.kind === 'line' ||
   geometry.kind === 'poly' ||
   geometry.kind === 'ink' ||

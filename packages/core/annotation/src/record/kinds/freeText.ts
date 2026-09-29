@@ -15,7 +15,7 @@ import type {
 import { calloutLinePoints, geomRotation } from '../../geometry';
 import { richDocOf } from '../../richtext';
 import type { RecordFields, TextStyle } from '../../types';
-import { boxEmit, type KindProjection, type Wire } from '../projection';
+import type { KindProjection, Wire } from '../projection';
 import { boxGeomFields } from '../seam';
 
 type FreeTextDTO = Extract<AnnotationDTO, { subtype: 'free-text' }>;
@@ -122,7 +122,7 @@ export const freeText: KindProjection = {
     if (annotation.geometry.kind !== 'text') return null;
     const cf = calloutFields(annotation);
     if (cf) return { ...cf };
-    return boxEmit(annotation);
+    return boxGeomFields(annotation.geometry.rect, geomRotation(annotation.geometry));
   },
   prop: { bold: formattingBody, italic: formattingBody, underline: formattingBody },
   // `/IT` + the initial `/Contents` are create-only statements; while typing,
