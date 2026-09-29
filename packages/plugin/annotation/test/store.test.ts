@@ -236,6 +236,23 @@ describe('store.apply', () => {
     expect(harness.update).not.toHaveBeenCalled();
   });
 
+  it('a locked square unlocks from the sidebar and from the flags verb', async () => {
+    type Harness = ReturnType<typeof annotationHarness>;
+    const doors = [
+      (harness: Harness) => harness.capability.updateSelection({ locked: false }),
+      (harness: Harness) => harness.capability.updateSelectionFlags({ locked: false }),
+    ];
+    for (const unlock of doors) {
+      const harness = annotationHarness();
+      await harness.load([{ ...square(20), locked: true } as FileAnnotation]);
+      harness.capability.select(refOf(20));
+      harness.update.mockResolvedValueOnce({ annotation: square(20) });
+      await unlock(harness);
+      expect(harness.update.mock.calls[0]![1]).toEqual({ subtype: 'square', locked: false });
+      expect(dataOf(harness.capability.get(refOf(20))).locked).toBe(false);
+    }
+  });
+
   it('a refused update is dropped at once: the engine’s record shows again', async () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);

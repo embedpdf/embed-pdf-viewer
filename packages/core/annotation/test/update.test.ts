@@ -4,7 +4,7 @@
  * reports about them.
  */
 import { quadFromRect } from '@embedpdf/core-geometry';
-import { toPageRef } from '@embedpdf/engine-core/runtime';
+import { toPageRef, type AnnotationFlags } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
 import { modelWith, record, step, STYLE, restyle } from './support';
@@ -35,6 +35,27 @@ const square = (id: string, x: number): ModelAnnotation =>
     style: { ...STYLE, interiorColor: '#ffffff' },
     flags: DRAWN_FLAGS,
     source: 'baked',
+  });
+
+/** A square with these `/F` flags set. */
+const squareWith = (id: string, flags: Partial<AnnotationFlags>): ModelAnnotation => {
+  const base = square(id, 100);
+  return { ...base, annotation: { ...base.annotation, ...flags } };
+};
+
+/** A plain free text box, as its create predicts it. */
+const textBox = (id: string): ModelAnnotation =>
+  record({
+    ...fieldsOf(square(id, 100)),
+    subtype: 'free-text',
+    geometry: {
+      kind: 'text-box',
+      box: { x: 100, y: 100, width: 100, height: 60 },
+      rotation: 0,
+      calloutLine: null,
+      lineEnding: null,
+    },
+    annotation: undefined,
   });
 
 /** The last step of drawing a square from `from` to `to`: its result, with the new record in it. */
@@ -121,18 +142,7 @@ describe('update', () => {
   });
 
   it('typing puts the edited record and asks for a text write', () => {
-    const box = record({
-      ...fieldsOf(square('obj:3', 100)),
-      subtype: 'free-text',
-      geometry: {
-        kind: 'text-box',
-        box: { x: 100, y: 100, width: 100, height: 60 },
-        rotation: 0,
-        calloutLine: null,
-        lineEnding: null,
-      },
-      annotation: undefined,
-    });
+    const box = textBox('obj:3');
     const result = update(modelWith([box]), { type: 'setText', id: 'obj:3', text: 'Hi\nthere' });
     // As the engine reads it back: one paragraph per line, joined by `\r`.
     expect(result.change.put[0]!.annotation).toMatchObject({
@@ -141,6 +151,72 @@ describe('update', () => {
     });
     expect(result.change.put[0]!.source).toBe('vector');
     expect(result.effects).toEqual([{ type: 'text', id: 'obj:3' }]);
+  });
+});
+
+describe('which fields a write may change', () => {
+  const unlock = { subtype: 'square', locked: false };
+
+  it('a locked annotation unlocks from the sidebar and from the flags verb', () => {
+    const model = modelWith([squareWith('obj:1', { locked: true })], { selected: ['obj:1'] });
+    const fromSidebar = update(model, {
+      type: 'setFields',
+      patches: { 'obj:1': { locked: false } },
+    });
+    expect(fromSidebar.effects).toEqual([{ type: 'patch', id: 'obj:1', patch: unlock }]);
+    const fromVerb = update(model, { type: 'setFlags', patch: { locked: false } });
+    expect(fromVerb.effects).toEqual([{ type: 'patch', id: 'obj:1', patch: unlock }]);
+  });
+
+  it('locked keeps the annotation as it is; lockedContents keeps its text', () => {
+    const values = { color: '#ff0000', contents: 'note' };
+    const locked = modelWith([squareWith('obj:1', { locked: true })]);
+    expect(
+      update(locked, { type: 'setFields', patches: { 'obj:1': values } }).change.patches,
+    ).toEqual({ 'obj:1': { subtype: 'square', contents: 'note' } });
+    const textLocked = modelWith([squareWith('obj:1', { lockedContents: true })]);
+    expect(
+      update(textLocked, { type: 'setFields', patches: { 'obj:1': values } }).change.patches,
+    ).toEqual({ 'obj:1': { subtype: 'square', color: '#ff0000' } });
+  });
+
+  it('a flag needs update authority', () => {
+    const record = {
+      ...squareWith('obj:1', { locked: true }),
+      authority: { update: false, delete: false },
+    };
+    const model = modelWith([record], { selected: ['obj:1'] });
+    expect(update(model, { type: 'setFlags', patch: { locked: false } }).change).toBe(EMPTY_CHANGE);
+  });
+
+  it("a format is written as the free text's body, keeping the rest of it", () => {
+    const box = textBox('obj:3');
+    const richText = box.annotation.subtype === 'free-text' ? box.annotation.richText : undefined;
+    if (!richText) throw new Error('a free text holds its rich text');
+    const struck = {
+      ...box,
+      annotation: {
+        ...box.annotation,
+        richText: {
+          ...richText,
+          body: { ...richText.body, decoration: ['line-through' as const] },
+        },
+      },
+    };
+    const model = modelWith([struck], { selected: ['obj:3'] });
+    const result = update(model, { type: 'setTextFormat', format: 'underline', on: true });
+    expect(result.change.patches['obj:3']).toEqual({
+      subtype: 'free-text',
+      richText: {
+        body: { ...richText.body, decoration: ['line-through', 'underline'] },
+        paragraphs: richText.paragraphs,
+      },
+    });
+    // A format the body already has is no change.
+    const underlined = { ...model, byId: { 'obj:3': result.change.put[0]! } };
+    expect(
+      update(underlined, { type: 'setTextFormat', format: 'underline', on: true }).change,
+    ).toBe(EMPTY_CHANGE);
   });
 });
 

@@ -7,7 +7,7 @@ import { DEFAULT_CHROME_GEOMETRY, pointInQuad, turnPivotOf } from '../src/geomet
 import { rotatePoint, unionRect } from '../src/rect';
 import { drawnLineOf } from '../src/shapes/points';
 import { hitTest, groupUnionBounds } from '../src/hit';
-import { distanceLayout, type DistanceAppearance } from '../src/measurement';
+import { type DistanceAppearance, distanceLayout, measurementOf } from '../src/measurement';
 import { annotationSelectionFrame } from '../src/selection';
 import type { ModelAnnotation, Model, QuadRing, Point } from '../src/types';
 import { initialModel, annotsInBox } from '../src/update';
@@ -122,7 +122,7 @@ describe('measurement selection frame and rotation', () => {
     const armed = pointer(start, 'down', knob.at);
     const initialCaption = distanceLayout(
       fieldsOf(annotation).geometry,
-      fieldsOf(annotation).measure as DistanceAppearance,
+      measurementOf(annotation.annotation) as DistanceAppearance,
       2,
     )!.caption!;
     for (const angle of [30, 89, 91, 137, 180, 269, 271, 359]) {
@@ -147,7 +147,9 @@ describe('measurement selection frame and rotation', () => {
         annotationSelectionFrame(committed.byId.distance).center,
         rotatePoint(frameCenter, center, angle),
       );
-      expect(fieldsOf(committed.byId.distance).measure).toEqual(fieldsOf(annotation).measure);
+      expect(measurementOf(committed.byId.distance.annotation)).toEqual(
+        measurementOf(annotation.annotation),
+      );
       expect(fieldsOf(committed.byId.distance).geometry).toEqual(item.geometry);
     }
     expect(pointer(armed, 'move', knob.at).draft).toMatchObject({ pivot: center });

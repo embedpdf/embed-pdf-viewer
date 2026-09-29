@@ -5,8 +5,9 @@
  */
 import { anchorModeOf, unanchoredGeom } from '../anchor';
 import { geomRotateAbout, geomScaleAbout, geomTranslate, groupResizeFactors } from '../geometry';
+import { measurementOf } from '../measurement';
 import { moveMeasurementCaption, shapeMeasurementReadout } from '../measurement-shape';
-import { fieldsOf, withFields } from '../record';
+import { fieldsOf, withFields, withValues } from '../record';
 import type { Effect, Model } from '../types';
 import { commitViewGesture, geomEqual } from './changes';
 import { rotateDraftDelta } from './edit';
@@ -15,29 +16,26 @@ export function editUp(model: Model): [Model, Effect[]] {
   const draft = model.draft!;
   if (draft.kind === 'leader') {
     const annotation = model.byId[draft.id];
-    const measure = annotation && fieldsOf(annotation).measure;
+    const measure = annotation && measurementOf(annotation.annotation);
     if (measure?.intent !== 'line-dimension' || draft.delta === 0) {
       return [{ ...model, draft: null }, []];
     }
 
-    const updated = withFields(annotation!, {
-      measure: {
-        ...measure,
-        leader: { ...measure.leader, length: (measure.leader?.length ?? 0) + draft.delta },
-      },
+    const updated = withValues(annotation!, {
+      leader: { ...measure.leader, length: (measure.leader?.length ?? 0) + draft.delta },
     });
 
     return [{ ...model, draft: null, byId: { ...model.byId, [updated.id]: updated } }, []];
   }
   if (draft.kind === 'caption') {
     const annotation = model.byId[draft.id];
-    const fields = annotation && fieldsOf(annotation);
-    if (!fields?.measure || (!draft.delta.x && !draft.delta.y))
-      return [{ ...model, draft: null }, []];
+    const measure = annotation && measurementOf(annotation.annotation);
+    if (!measure || (!draft.delta.x && !draft.delta.y)) return [{ ...model, draft: null }, []];
     // A distance's caption offset, or a perimeter's or area's caption center.
+    const { geometry, style } = fieldsOf(annotation!);
     const moved = withFields(
       annotation!,
-      moveMeasurementCaption(fields.geometry, fields.measure, draft.delta, fields.style),
+      moveMeasurementCaption(geometry, measure, draft.delta, style),
     );
     return [{ ...model, draft: null, byId: { ...model.byId, [moved.id]: moved } }, []];
   }
@@ -48,7 +46,7 @@ export function editUp(model: Model): [Model, Effect[]] {
     // commit maps it back to stored space — the identity when un-flagged.
     const before = model.byId[draft.id];
     const stored = unanchoredGeom(draft.current, anchorModeOf(before), draft.view);
-    const { measure } = fieldsOf(before);
+    const measure = measurementOf(before.annotation);
     if (measure?.intent === 'polygon-dimension') {
       const readout = shapeMeasurementReadout(stored, measure);
       if ('unavailable' in readout && readout.unavailable === 'invalid-geometry') {

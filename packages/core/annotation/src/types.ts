@@ -262,9 +262,6 @@ export interface RecordFields extends Omit<ModelAnnotation, 'annotation'> {
   style: Style;
   /** Text styling — present only for text-editable kinds (free text). */
   text?: TextStyle;
-  /** Redaction label (`/OverlayText` + `/Repeat`) — redact kind only. The
-   *  hover preview scene draws it. */
-  label?: { text: string; repeat: boolean };
   measure?: MeasurementAppearance;
   /** `/Name` icon — present only for icon kinds (text note, file attachment). */
   icon?: string;

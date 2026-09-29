@@ -32,6 +32,37 @@ export type DistanceAppearance = { intent: 'line-dimension' } & Pick<
   'measure' | 'captionEnabled' | 'captionPosition' | 'captionOffset' | 'leader' | 'contents'
 >;
 
+/**
+ * The annotation's measurement, when it is one: a line measuring a
+ * distance, a polyline a perimeter, a polygon an area, as its intent says.
+ * Its measurement fields, read off it for drawing and hit-testing.
+ */
+export function measurementOf(annotation: AnnotationDTO): MeasurementAppearance | undefined {
+  if (annotation.subtype === 'line' && annotation.intent === 'line-dimension') {
+    return {
+      intent: annotation.intent,
+      measure: annotation.measure,
+      captionEnabled: annotation.captionEnabled,
+      captionPosition: annotation.captionPosition,
+      captionOffset: annotation.captionOffset,
+      leader: annotation.leader,
+      contents: annotation.contents,
+    };
+  }
+  if (
+    (annotation.subtype === 'polyline' || annotation.subtype === 'polygon') &&
+    (annotation.intent === 'polyline-dimension' || annotation.intent === 'polygon-dimension')
+  ) {
+    return {
+      intent: annotation.intent,
+      measure: annotation.measure,
+      captionEnabled: annotation.captionEnabled,
+      contents: annotation.contents,
+    };
+  }
+  return undefined;
+}
+
 type CaptionOffset = DistanceAppearance['captionOffset'];
 
 export interface DistanceSegment {

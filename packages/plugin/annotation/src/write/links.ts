@@ -163,9 +163,8 @@ export function createLinkWrites(
         const model = store.model();
         const annotation = model.byId[annotationKey(ref)];
         if (!annotation) return null;
-        return kindOf(annotation.annotation).name === 'link'
-          ? (fieldsOf(annotation).link ?? null)
-          : linkOf(model, annotation.id);
+        const record = annotation.annotation;
+        return record.subtype === 'link' ? (record.target ?? null) : linkOf(model, annotation.id);
       },
       // The verbs go straight to the reconciler chain (latest-wins per
       // parent) and resolve when the children are committed — `get` reads

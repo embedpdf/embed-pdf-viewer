@@ -1,6 +1,12 @@
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 import { annotationSelectionFrame, annotationTurnPivot } from './selection';
-import { distanceCaptionHit, distanceHandles, distanceHit, distanceLayout } from './measurement';
+import {
+  distanceCaptionHit,
+  distanceHandles,
+  distanceHit,
+  distanceLayout,
+  measurementOf,
+} from './measurement';
 import { measurementLayout } from './measurement-shape';
 import { geomHandles, geomHit, placeRotateKnob, pointInQuad, rectHandlesFor } from './geometry';
 import { unionRect } from './rect';
@@ -207,7 +213,8 @@ export function hitTest(
         }
       }
       if (hasHandles(model, annotation)) {
-        const { measure, style } = fieldsOf(annotation);
+        const { style } = fieldsOf(annotation);
+        const measure = measurementOf(annotation.annotation);
         const geometry = hitGeomOf(annotation, view);
         const distance =
           measure?.intent === 'line-dimension' &&
@@ -309,7 +316,8 @@ export function hitTest(
     // A selected annotation is sticky-grabbable from anywhere in its bounds, but
     // only if it can actually move; otherwise it's grabbed on its stroke/fill like
     // an unselected one (so a selectable-but-anchored kind still re-selects cleanly).
-    const { measure, style } = fieldsOf(annotation);
+    const { style } = fieldsOf(annotation);
+    const measure = measurementOf(annotation.annotation);
     const geometry = hitGeomOf(annotation, view);
     const strokeWidth = hitStrokeOf(annotation, view);
     const distance =

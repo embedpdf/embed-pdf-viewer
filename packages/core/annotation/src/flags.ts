@@ -95,3 +95,20 @@ export const annotContentsEditable = (record: FlagBearer): boolean =>
   annotInteractive(record) &&
   !record.annotation.lockedContents &&
   (record.authority?.update ?? true);
+
+/** An annotation's text: `lockedContents` guards it, not `locked`. */
+const TEXT_FIELDS: ReadonlySet<string> = new Set(['contents', 'richText']);
+
+/**
+ * May this session change the record's engine `field` now? The one table
+ * every write of engine fields asks (`withValues`):
+ *
+ *   a flag              always, given update authority: unlocking a locked
+ *                       annotation, or showing a hidden one, must work
+ *   contents, richText  unless `lockedContents`: its text
+ *   anything else       unless `locked`: the annotation itself
+ */
+export function mayWrite(record: FlagBearer, field: string): boolean {
+  if ((FLAG_KEYS as readonly string[]).includes(field)) return record.authority?.update ?? true;
+  return TEXT_FIELDS.has(field) ? annotContentsEditable(record) : annotTransformable(record);
+}

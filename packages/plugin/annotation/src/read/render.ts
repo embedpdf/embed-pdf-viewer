@@ -3,7 +3,6 @@ import {
   fieldsOf,
   groupOf,
   isSubstrateOnly,
-  kindOf,
   type Model,
   pageItems as corePageItems,
   refOf,
@@ -114,20 +113,16 @@ export function createRenderReads(
     const items: LinkNavItem[] = [];
     for (const id of model.order) {
       const annotation = model.byId[id];
-      if (
-        !annotation ||
-        annotation.annotation.page.objectNumber !== pageObjectNumber ||
-        kindOf(annotation.annotation).name !== 'link'
-      )
+      const record = annotation?.annotation;
+      if (!record || record.page.objectNumber !== pageObjectNumber || record.subtype !== 'link')
         continue;
-      if (!viewable(annotation.annotation, false)) continue; // hidden links don't navigate
-      // Standalone links carry their own model `link` (/A); attached children
-      // carry the target on their DTO. Rects are the child's own committed
-      // geometry — anchors render only in view contexts, where nothing is
-      // mid-gesture, so no live parent-derivation is needed.
-      const record = annotation.annotation;
-      const { link, geometry } = fieldsOf(annotation);
-      const target = link ?? (record.subtype === 'link' ? (record.target ?? null) : null);
+      if (!viewable(record, false)) continue; // hidden links don't navigate
+      // A standalone link and an attached child both carry their own target.
+      // Rects are the link's own committed geometry — anchors render only in
+      // view contexts, where nothing is mid-gesture, so no live
+      // parent-derivation is needed.
+      const target = record.target ?? null;
+      const { geometry } = fieldsOf(annotation);
       if (target == null || geometry.kind !== 'box') continue;
       const activate = record.actions?.activate;
       const ref = refOf(annotation) ?? undefined;

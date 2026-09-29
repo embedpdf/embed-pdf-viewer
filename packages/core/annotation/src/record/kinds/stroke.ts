@@ -9,13 +9,19 @@
  */
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
-import type { MeasurementAppearance } from '../../measurement';
+import { measurementOf, type MeasurementAppearance } from '../../measurement';
 import { readPoints, writePoints, type PointsShape } from '../../shapes/points';
 import type { RecordFields } from '../../types';
 import type { KindProjection, Wire } from '../projection';
 import { borderSlice } from '../props';
 
 type PointsDTO = Extract<AnnotationDTO, { subtype: 'line' | 'polyline' | 'polygon' | 'ink' }>;
+
+/** A measurement's fields, when the annotation is one. */
+const measureSlice = (dto: AnnotationDTO): { measure?: MeasurementAppearance } => {
+  const measure = measurementOf(dto);
+  return measure ? { measure } : {};
+};
 
 /** A points record's shape, or `undefined` for any other geometry. */
 const pointsOf = (annotation: RecordFields): PointsShape | undefined => {
@@ -56,25 +62,7 @@ const pointsGeometry = (annotation: RecordFields): Wire | null => {
 };
 
 export const line: KindProjection = {
-  ingest: (dto) => {
-    const lineDto = dto as Extract<AnnotationDTO, { subtype: 'line' }>;
-    return {
-      ...(lineDto.intent === 'line-dimension'
-        ? {
-            measure: {
-              intent: lineDto.intent,
-              measure: lineDto.measure,
-              captionEnabled: lineDto.captionEnabled,
-              captionPosition: lineDto.captionPosition,
-              captionOffset: lineDto.captionOffset,
-              leader: lineDto.leader,
-              contents: lineDto.contents,
-            },
-          }
-        : {}),
-      geometry: readPoints(lineDto),
-    };
-  },
+  ingest: (dto) => ({ ...measureSlice(dto), geometry: readPoints(dto as PointsDTO) }),
   geometry: pointsGeometry,
   prop: strokeProps,
   draftExtras: (annotation) =>
@@ -84,22 +72,7 @@ export const line: KindProjection = {
 };
 
 const polyProjection = (closed: boolean): KindProjection => ({
-  ingest: (dto) => {
-    const polyDto = dto as Extract<AnnotationDTO, { subtype: 'polygon' | 'polyline' }>;
-    return {
-      ...(polyDto.intent === 'polygon-dimension' || polyDto.intent === 'polyline-dimension'
-        ? {
-            measure: {
-              intent: polyDto.intent,
-              measure: polyDto.measure,
-              captionEnabled: polyDto.captionEnabled,
-              contents: polyDto.contents,
-            },
-          }
-        : {}),
-      geometry: readPoints(polyDto),
-    };
-  },
+  ingest: (dto) => ({ ...measureSlice(dto), geometry: readPoints(dto as PointsDTO) }),
   geometry: pointsGeometry,
   prop: strokeProps,
   draftExtras: (annotation) =>

@@ -1,6 +1,7 @@
 /** The complete annotation frame shared by selection and transform gestures. */
 import { anchoredGeom, anchoredStrokeWidth, anchorModeOf } from './anchor';
 import { geomRotation, isRotatableGeom, selectionQuad, turnPivotOf } from './geometry';
+import { measurementOf, type MeasurementAppearance } from './measurement';
 import { measurementSelectionQuad } from './measurement-shape';
 import { fieldsOf } from './record';
 import type { ModelAnnotation, QuadRing, Point, RecordFields, ViewEnv } from './types';
@@ -18,14 +19,15 @@ export interface SelectionFrame {
 export function annotationSelectionFrame(
   annotation: ModelAnnotation,
   view?: ViewEnv,
-  live?: Partial<Pick<RecordFields, 'geometry' | 'style' | 'measure'>>,
+  live?: Partial<Pick<RecordFields, 'geometry' | 'style'>> & { measure?: MeasurementAppearance },
 ): SelectionFrame {
   const fields = live ? { ...fieldsOf(annotation), ...live } : fieldsOf(annotation);
+  const measure = live?.measure ?? measurementOf(annotation.annotation);
   const mode = anchorModeOf(annotation);
   const geometry = anchoredGeom(fields.geometry, mode, view);
   const strokeWidth = anchoredStrokeWidth(fields.style.strokeWidth, mode, view);
-  const corners = fields.measure
-    ? measurementSelectionQuad(geometry, fields.measure, { ...fields.style, strokeWidth })
+  const corners = measure
+    ? measurementSelectionQuad(geometry, measure, { ...fields.style, strokeWidth })
     : selectionQuad(geometry, strokeWidth, fields.style.border);
 
   // PDF /Rect is a page-aligned rendering envelope. Its conservative padding

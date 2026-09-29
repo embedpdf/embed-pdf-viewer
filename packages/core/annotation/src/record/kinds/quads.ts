@@ -105,9 +105,6 @@ export const redact: KindProjection = {
         fontColor: redactDto.fontColor,
         textAlign: redactDto.textAlign,
       },
-      ...(redactDto.overlayText
-        ? { label: { text: redactDto.overlayText, repeat: redactDto.repeat } }
-        : {}),
     };
   },
   // Only an area mark's box moves/resizes; text-mark quads are create-only.

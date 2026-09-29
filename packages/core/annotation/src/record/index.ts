@@ -58,6 +58,7 @@ import { groupOf, irtOf, kindOf, refOf } from './identity';
 import { annotationKey, flagsOf, styleFromDTO } from './seam';
 
 export { groupOf, irtOf, kindOf, refOf } from './identity';
+export { withValues } from './values';
 
 export {
   boxGeomFields,

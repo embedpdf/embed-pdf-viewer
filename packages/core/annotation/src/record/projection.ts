@@ -32,7 +32,7 @@ export type LoweredKey =
 /** The kind-specific slice a DTO ingest contributes on top of the generic
  *  base (id/ref/flags/relationships) that `fromDTO` builds for every kind. */
 export type IngestSlice = { geometry: ModelGeometry } & Partial<
-  Pick<RecordFields, 'text' | 'icon' | 'label' | 'link' | 'intent' | 'measure'>
+  Pick<RecordFields, 'text' | 'icon' | 'link' | 'intent' | 'measure'>
 >;
 
 /**

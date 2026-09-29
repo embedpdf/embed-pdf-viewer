@@ -33,16 +33,14 @@ export function createSelectionFieldsReads(
 
   /** What a sidebar reads of one member: its fields, its text as shown, and its link. */
   const sourcesOf = (model: Model, annotation: ModelAnnotation): FieldSources => {
-    const { text, link } = fieldsOf(annotation);
+    const { text } = fieldsOf(annotation);
+    const record = annotation.annotation;
     return {
-      data: annotation.annotation as unknown as Record<string, unknown>,
+      data: record as unknown as Record<string, unknown>,
       ...(text ? { text } : {}),
       // Parents store no link: the committed children are the truth, read
-      // through the lens. The link kind reads its own target.
-      link:
-        kindOf(annotation.annotation).name === 'link'
-          ? (link ?? null)
-          : linkOf(model, annotation.id),
+      // through the lens. A link annotation reads its own target.
+      link: record.subtype === 'link' ? (record.target ?? null) : linkOf(model, annotation.id),
     };
   };
 

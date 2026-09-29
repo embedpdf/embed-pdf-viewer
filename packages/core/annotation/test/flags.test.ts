@@ -116,7 +116,7 @@ describe('flag predicates (ISO 32000 Table 167)', () => {
       },
     ]);
     const annotation = model.byId[model.order[0]];
-    expect(fieldsOf(annotation).flags).toEqual(DRAWN_FLAGS);
+    expect(annotation.annotation).toMatchObject(DRAWN_FLAGS);
     expect(annotation.annotation.print).toBe(true);
   });
 
@@ -143,7 +143,7 @@ describe('flag predicates (ISO 32000 Table 167)', () => {
       },
     ]);
     const annotation = model.byId[model.order[0]];
-    expect(fieldsOf(annotation).flags).toEqual(
+    expect(annotation.annotation).toMatchObject(
       flagsWith({ print: true, noZoom: true, noRotate: true }),
     );
   });

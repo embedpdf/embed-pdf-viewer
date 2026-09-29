@@ -3,169 +3,122 @@
  * links, flags, quarter turns, reset rotation, delete. Each changed record's
  * change is its own engine write (`update` derives it from the change set).
  */
-import {
-  ANNOTATION_FIELD_NAMES,
-  annotationPatchBetween,
-  mergeAnnotationPatch,
-  resolveRectCommand,
-  type AnnotationFlags,
-  type AnnotationPatch,
-  type PdfLinkTarget,
-} from '@embedpdf/engine-core/runtime';
+import type { AnnotationFlags, PdfLinkTarget, RichTextBody } from '@embedpdf/engine-core/runtime';
 
-import {
-  annotContentsEditable,
-  annotDeletable,
-  annotTransformable,
-  flagsEqual,
-  mergeFlags,
-} from '../flags';
+import { annotDeletable, annotTransformable } from '../flags';
 import { geomResetRotation, geomRotateAbout, geomRotation } from '../geometry';
 import { groupUnionBounds } from '../hit';
 import { linkChildrenOf } from '../links';
 import { kindTakesLink } from '../props';
-import { fieldsOf, kindOf, withFields } from '../record';
+import { fieldsOf, kindOf, withFields, withValues, writableTarget } from '../record';
 import { annotationTurnPivot } from '../selection';
 import type { Effect, FieldValues, Id, Model, ModelAnnotation, Point } from '../types';
 import { withoutRecords } from './changes';
 
-/** The text fields: `lockedContents` gates them, not `locked`. */
-const CONTENT_FIELDS: ReadonlySet<string> = new Set(['contents', 'richText']);
+type TextFormat = 'bold' | 'italic' | 'underline';
 
 /**
- * The fields of `patch` a record takes now: those its kind has, and of those
- * the ones it may change — its text unless `lockedContents`, the rest unless
- * `locked`. Flags unlock through their own message.
+ * The model with `change` applied to each record of `ids` (a record listed
+ * twice sees its first change). The same model when no record changes.
  */
-function writableFields(record: ModelAnnotation, patch: FieldValues): Record<string, unknown> {
-  const declared = ANNOTATION_FIELD_NAMES[record.annotation.subtype];
-  const fields: Record<string, unknown> = {};
-  for (const [name, value] of Object.entries(patch)) {
-    if (value === undefined || name === 'subtype' || !declared.includes(name)) continue;
-    const allowed = CONTENT_FIELDS.has(name)
-      ? annotContentsEditable(record)
-      : annotTransformable(record);
-    if (allowed) fields[name] = value;
+function changeRecords(
+  model: Model,
+  ids: readonly Id[],
+  change: (record: ModelAnnotation) => ModelAnnotation,
+): Model {
+  let byId: Model['byId'] | null = null;
+  for (const id of ids) {
+    const record = (byId ?? model.byId)[id];
+    if (!record) continue;
+    const next = change(record);
+    if (next === record) continue;
+    byId ??= { ...model.byId };
+    byId[id] = next;
   }
-  return fields;
+  return byId ? { ...model, byId } : model;
 }
 
 /**
- * Write engine fields to records, a patch per id. Each record takes the
- * fields its kind has and may change now (`writableFields`) and ignores the
- * rest, so one message restyles a mixed selection. A value set to what it
- * was is no change. A `rect` is a command, resolved as an update resolves it
- * (`resolveRectCommand`): one the engine would refuse throws, and nothing
- * changes. The tool defaults are never touched: editing existing annotations
- * doesn't change the next one drawn.
+ * Write engine fields to records, a patch per id, each through `withValues`:
+ * a record takes the fields its kind has and may change now, so one message
+ * restyles a mixed selection, and a `rect` the engine would refuse throws.
+ * The tool defaults are never touched: editing existing annotations doesn't
+ * change the next one drawn.
  */
 export function setFields(
   model: Model,
   patches: Readonly<Record<Id, FieldValues>>,
 ): [Model, Effect[]] {
-  let byId: Model['byId'] | null = null;
-  for (const [id, patch] of Object.entries(patches)) {
-    const record = model.byId[id];
-    if (!record) continue;
-    const fields = writableFields(record, patch);
-    if (!Object.keys(fields).length) continue;
-    // A `rect` is a command: the engine's own step turns it into the shape
-    // that puts the drawing there, or refuses it, exactly as an update does.
-    const stated = resolveRectCommand(record.annotation, {
-      ...fields,
-      subtype: record.annotation.subtype,
-    } as AnnotationPatch);
-    const annotation = mergeAnnotationPatch(record.annotation, stated);
-    if (!Object.keys(annotationPatchBetween(record.annotation, annotation)).length) continue;
-    byId ??= { ...model.byId };
-    byId[id] = { ...record, annotation };
-  }
-  return byId ? [{ ...model, byId }, []] : [model, []];
+  const next = changeRecords(model, Object.keys(patches), (record) =>
+    withValues(record, patches[record.id]!),
+  );
+  return [next, []];
+}
+
+/** Does a free text's body carry `format`, as the sidebar shows it? */
+function bodyHas(body: RichTextBody, format: TextFormat): boolean {
+  if (format === 'bold') return body.weight >= 600;
+  if (format === 'italic') return body.italic;
+  return body.decoration.includes('underline');
+}
+
+/** The body with `format` on or off, the rest of it as it was. */
+function bodyWith(body: RichTextBody, format: TextFormat, on: boolean): RichTextBody {
+  if (format === 'bold') return { ...body, weight: on ? 700 : 400 };
+  if (format === 'italic') return { ...body, italic: on };
+  const lines = body.decoration.filter((line) => line !== 'underline');
+  return { ...body, decoration: on ? [...lines, 'underline'] : lines };
 }
 
 /**
- * Bold, italic or underline on or off for the selection's text bodies: each
- * member whose kind takes the format. Runs keep their own formatting; the
- * editor's range edits them instead.
+ * Bold, italic or underline on or off for the selection's free texts. A
+ * format is the rich text's body, so every run that doesn't set its own
+ * follows; the editor's range formats runs instead.
  */
-export function setTextFormat(
-  model: Model,
-  format: 'bold' | 'italic' | 'underline',
-  on: boolean,
-): [Model, Effect[]] {
-  let byId: Model['byId'] | null = null;
-  for (const id of model.selected) {
-    const record = model.byId[id];
-    if (!record || !annotTransformable(record)) continue;
-    if (!kindOf(record.annotation).fields.some((spec) => spec.key === format)) continue;
-    const { text } = fieldsOf(record);
-    if (!text || (text[format] ?? false) === on) continue;
-    byId ??= { ...model.byId };
-    byId[id] = withFields(record, { text: { ...text, [format]: on } });
-  }
-  return byId ? [{ ...model, byId }, []] : [model, []];
+export function setTextFormat(model: Model, format: TextFormat, on: boolean): [Model, Effect[]] {
+  const next = changeRecords(model, model.selected, (record) => {
+    const annotation = record.annotation;
+    if (annotation.subtype !== 'free-text') return record;
+    const { body, paragraphs } = annotation.richText;
+    if (bodyHas(body, format) === on) return record;
+    return withValues(record, { richText: { body: bodyWith(body, format, on), paragraphs } });
+  });
+  return [next, []];
 }
 
 /**
- * Link the selection to `target`, or unlink it (`null`). The link kind's own
- * `/A` is a field of it; every other linkable kind's link lives in attached
- * child annotations, so it rides a `syncLink` effect and the plugin's
- * reconciler writes the children. Locked annotations refuse it.
+ * Link the selection to `target`, or unlink it (`null`). A link annotation's
+ * target is a field of it. Every other linkable kind's link lives in
+ * attached child annotations, so it rides a `syncLink` effect and the
+ * plugin's reconciler writes the children. Locked annotations refuse it.
  */
 export function setLink(model: Model, target: PdfLinkTarget | null): [Model, Effect[]] {
-  let byId: Model['byId'] | null = null;
   const fx: Effect[] = [];
+  const links: Id[] = [];
   for (const id of model.selected) {
     const record = model.byId[id];
     if (!record || !annotTransformable(record) || !kindTakesLink(kindOf(record.annotation)))
       continue;
-    if (kindOf(record.annotation).name !== 'link') {
-      fx.push({ type: 'syncLink', id, target });
-      continue;
-    }
-    const next = withFields(record, { link: target });
-    if (next === record) continue;
-    byId ??= { ...model.byId };
-    byId[id] = next;
+    if (record.annotation.subtype === 'link') links.push(id);
+    else fx.push({ type: 'syncLink', id, target });
   }
-  return [byId ? { ...model, byId } : model, fx];
+  // A read-only target (a script, a named action) is carried, never written.
+  if (target && !writableTarget(target)) return [model, fx];
+  return [changeRecords(model, links, (record) => withValues(record, { target })), fx];
 }
 
 /**
- * Merge a `/F` flags patch into the selection (or explicit ids). Not the props
- * path, on purpose: flags aren't appearance — members keep their render
- * `source` (a baked raster stays valid; nothing re-bakes) — and the write is
- * not gated by `locked`, because unlocking a locked annotation is the whole
- * point (Acrobat's Locked checkbox stays live). Each changed member writes the
- * flags that changed.
+ * Merge `/F` flags into the selection (or explicit ids), through
+ * `withValues`: a flag is writable with update authority alone, so a locked
+ * annotation unlocks and a hidden one shows. A flag changes no drawing: a
+ * baked raster stays baked.
  */
-/**
- * The actions plane's session-visibility write (Hide actions, script
- * `annot.hidden`): merge per-id hidden overrides into the session overlay.
- * Pure session state — zero effects, no engine write, no authority. Hiding
- * clears transient engagement so no orphaned selection chrome or text editor
- * survives on an invisible annotation. Identity-preserving no-op when nothing
- * changes (plugin memo caches key on model identity).
- */
-
 export function setFlags(
   model: Model,
   patch: Partial<AnnotationFlags>,
   ids?: Id[],
 ): [Model, Effect[]] {
-  const targets = ids ?? model.selected;
-  if (!targets.length) return [model, []];
-  let byId: Model['byId'] | null = null;
-  for (const id of targets) {
-    const annotation = (byId ?? model.byId)[id];
-    if (!annotation) continue;
-    const current = fieldsOf(annotation).flags;
-    const flags = mergeFlags(current, patch);
-    if (flagsEqual(flags, current)) continue; // no spurious engine writes
-    byId ??= { ...model.byId };
-    byId[id] = withFields(annotation, { flags });
-  }
-  return byId ? [{ ...model, byId }, []] : [model, []];
+  return [changeRecords(model, ids ?? model.selected, (record) => withValues(record, patch)), []];
 }
 
 /**

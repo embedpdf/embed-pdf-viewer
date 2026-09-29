@@ -6,13 +6,14 @@ import { DRAWN_FLAGS } from '../src/flags';
 import { DEFAULT_CHROME_GEOMETRY } from '../src/geometry';
 import { hitTest } from '../src/hit';
 import {
+  type DistanceAppearance,
   distanceCaptionAt,
+  distanceHit,
   distanceLabel,
   distanceLayout,
-  distanceHit,
   distanceScene,
+  measurementOf,
   moveDistanceCaption,
-  type DistanceAppearance,
 } from '../src/measurement';
 import type { LineShape } from '../src/shapes/points';
 import type { ModelGeometry, Model, Message } from '../src/types';
@@ -195,7 +196,9 @@ describe('distance gestures and captions', () => {
       expect(step(state, { type: 'cancel' })[0].byId.a).toBe(annotation);
 
       const [committed, effects] = step(state, pointer('up', point));
-      expect((fieldsOf(committed.byId.a).measure as DistanceAppearance).leader?.length).toBe(-60);
+      expect(
+        (measurementOf(committed.byId.a.annotation) as DistanceAppearance).leader?.length,
+      ).toBe(-60);
       expect(fieldsOf(committed.byId.a).geometry).toEqual(geom);
       // Only the leader is written, not the measured points.
       expect(effects).toEqual([
@@ -204,7 +207,7 @@ describe('distance gestures and captions', () => {
           id: 'a',
           patch: {
             subtype: 'line',
-            leader: (fieldsOf(committed.byId.a).measure as DistanceAppearance).leader,
+            leader: (measurementOf(committed.byId.a.annotation) as DistanceAppearance).leader,
           },
         },
       ]);
@@ -219,7 +222,7 @@ describe('distance gestures and captions', () => {
     expect(fieldsOf(committed.byId.a).geometry).toMatchObject({
       linePoints: { start: { x: 100, y: 100 }, end: { x: 240, y: 100 } },
     });
-    expect(withoutLabel(fieldsOf(committed.byId.a).measure)).toEqual(withoutLabel(measure));
+    expect(withoutLabel(measurementOf(committed.byId.a.annotation))).toEqual(withoutLabel(measure));
     // The write carries the points, never the label: the label is the
     // engine's, worked out from the new points, and the record shows it.
     expect(effects).toEqual([
@@ -232,7 +235,7 @@ describe('distance gestures and captions', () => {
         },
       },
     ]);
-    expect(fieldsOf(committed.byId.a).measure?.contents).toBe('2.80 m');
+    expect(measurementOf(committed.byId.a.annotation)?.contents).toBe('2.80 m');
     expect(distanceLabel(fieldsOf(committed.byId.a).geometry, measure)).toBe('2.80 m');
   });
 
@@ -247,7 +250,11 @@ describe('distance gestures and captions', () => {
         },
       }),
     };
-    const layout = distanceLayout(geom, fieldsOf(state.byId.a).measure as DistanceAppearance, 1)!;
+    const layout = distanceLayout(
+      geom,
+      measurementOf(state.byId.a.annotation) as DistanceAppearance,
+      1,
+    )!;
     const nodes = chrome(state, PAGE);
     const outline = nodes.find((node) => node.kind === 'outline')!;
     expect(outline.kind).toBe('outline');

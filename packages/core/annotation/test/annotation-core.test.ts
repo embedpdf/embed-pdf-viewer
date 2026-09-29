@@ -1359,7 +1359,7 @@ describe('annotation-core', () => {
     expect(model.order).toHaveLength(1);
     const annotation = model.byId[model.order[0]];
     const geometry = fieldsOf(annotation).geometry;
-    expect(fieldsOf(annotation).intent).toBe('ink-highlight');
+    expect(annotation.annotation).toMatchObject({ intent: 'ink-highlight' });
     expect(fieldsOf(annotation).style.blendMode).toBe('multiply');
     expect(geometry.kind).toBe('ink');
     if (geometry.kind === 'ink') {
@@ -4264,7 +4264,7 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
     const [next, fx] = step(model, { type: 'setLink', target: URI });
     // Parents store no link value — the committed children are the truth,
     // read back through `linkOf` once the reconciler's writes land.
-    expect(fieldsOf(next.byId[S1]).link).toBeUndefined();
+    expect(next.byId[S1]).toBe(model.byId[S1]);
     // A link-only change is not appearance: no patch, no vector flip.
     expect(next.byId[S1].source).toBe('baked');
     expect(fx).toEqual([{ type: 'syncLink', id: S1, target: URI }]);
@@ -4274,7 +4274,7 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
     const link = committedSquare({ id: 'L1', subtype: 'link', link: null });
     const model = withSelected(link);
     const [next, fx] = step(model, { type: 'setLink', target: URI });
-    expect(fieldsOf(next.byId['L1']).link).toEqual(URI);
+    expect(next.byId['L1'].annotation).toMatchObject({ target: URI });
     expect(fx).toEqual([{ type: 'patch', id: 'L1', patch: { subtype: 'link', target: URI } }]);
   });
 

@@ -19,6 +19,7 @@ import type { ModelAnnotation, ModelGeometry, Model, Message, Point } from '../s
 import { initialModel } from '../src/update';
 import { chrome, creationDraftAnchor, pageItems } from '../src/view';
 import { fieldsOf } from '../src/record';
+import { measurementOf } from '../src/measurement';
 
 const PAGE = toPageRef(1);
 const appearance: ShapeMeasurementAppearance = {
@@ -103,7 +104,7 @@ describe('area and perimeter authoring', () => {
     expect(effects).toMatchObject([{ type: 'create' }]);
     const created = committed.byId[committed.order[0]];
     expect(fieldsOf(created).geometry).toMatchObject({ closed, vertices: points.slice(0, 3) });
-    expect(fieldsOf(created).measure).toEqual({
+    expect(measurementOf(created.annotation)).toEqual({
       ...measure,
       contents: closed ? '4.00 m²' : '6.00 m',
     });
@@ -162,7 +163,9 @@ describe('area and perimeter authoring', () => {
       in: { page: toPageRef(1), point: center, shift: false },
     });
     expect(fieldsOf(committed.byId.shape).geometry).toEqual(withCenter({ x: 350, y: 50 }));
-    expect(withoutLabel(fieldsOf(committed.byId.shape).measure)).toEqual(withoutLabel(appearance));
+    expect(withoutLabel(measurementOf(committed.byId.shape.annotation))).toEqual(
+      withoutLabel(appearance),
+    );
     // Only the caption is written: its center, not the vertices.
     expect(effects).toEqual([
       {
@@ -198,7 +201,7 @@ describe('area and perimeter authoring', () => {
           annotationSelectionFrame(committed.byId.shape).center,
           rotatePoint(frame.center, pivot, angle),
         );
-        expect(rounded(withoutLabel(fieldsOf(committed.byId.shape).measure))).toEqual(
+        expect(rounded(withoutLabel(measurementOf(committed.byId.shape.annotation)))).toEqual(
           rounded(withoutLabel(item.measure)),
         );
         expect(committed.byId.shape.source).toBe('vector');
@@ -291,7 +294,7 @@ describe('area and perimeter authoring', () => {
     const preview = pageItems(model, PAGE).find((item) => item.id === 'shape')!;
     expectPoint((preview.geometry as PolyShape).captionCenter!, expected);
     const committed = pointer(model, 'up', target);
-    expect(withoutLabel(fieldsOf(committed.byId.shape).measure)).toEqual(
+    expect(withoutLabel(measurementOf(committed.byId.shape.annotation))).toEqual(
       withoutLabel(preview.measure),
     );
     expect(fieldsOf(committed.byId.shape).geometry).toEqual(preview.geometry);

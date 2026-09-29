@@ -1,4 +1,4 @@
-import type { PageRef } from '@embedpdf/engine-core/runtime';
+import type { AnnotationDTO, PageRef } from '@embedpdf/engine-core/runtime';
 import { rasterPlacement, sourceDuring } from './appearance';
 import { annotationSelectionFrame } from './selection';
 /**
@@ -6,7 +6,7 @@ import { annotationSelectionFrame } from './selection';
  * applied) for customRenderer wrapping; `chrome` is the selection overlay
  * (handles carry their resize cursor, group box, marquee).
  */
-import { distanceHandles, distanceLayout } from './measurement';
+import { distanceHandles, distanceLayout, measurementOf } from './measurement';
 import {
   measurementLayout,
   moveMeasurementCaption,
@@ -55,10 +55,16 @@ const polyPreviewPoints = (points: Point[], current: Point): Point[] => {
   return last && (current.x !== last.x || current.y !== last.y) ? [...points, current] : points;
 };
 
+/** A redaction's overlay text: the label its hover preview draws. */
+const redactionLabelOf = (annotation: AnnotationDTO): Pick<RenderItem, 'label'> =>
+  annotation.subtype === 'redact' && annotation.overlayText
+    ? { label: { text: annotation.overlayText, repeat: annotation.repeat } }
+    : {};
+
 function effMeasure(model: Model, id: Id) {
   const annotation = model.byId[id];
   const draft = model.draft;
-  const measure = fieldsOf(annotation).measure;
+  const measure = measurementOf(annotation.annotation);
 
   if (!measure || !draft) {
     return measure;
@@ -102,7 +108,8 @@ function effGeom(model: Model, id: Id, view: ViewEnv | undefined): ModelGeometry
     if (draft.kind === 'handle' && draft.id === id) return draft.current; // already view space
     if (draft.kind === 'caption' && draft.id === id) {
       // A perimeter's or area's caption center is its shape's.
-      const { measure, style } = fieldsOf(annotation);
+      const { style } = fieldsOf(annotation);
+      const measure = measurementOf(annotation.annotation);
       return measure
         ? moveMeasurementCaption(geometry, measure, draft.delta, style).geometry
         : geometry;
@@ -167,7 +174,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
       apBox: ap.box,
       style,
       ...(fields.text ? { text: fields.text } : {}),
-      ...(fields.label ? { label: fields.label } : {}),
+      ...redactionLabelOf(annotation.annotation),
       measure,
       source: sourceDuring(model, id),
       selected: model.selected.includes(id),
