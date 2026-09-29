@@ -99,7 +99,12 @@ export function clickCreateGeom(
 ): ModelGeometry | null {
   if (placement.kind === 'segment') {
     return subtype === 'line'
-      ? { kind: 'line', a: placement.a, b: placement.b, ends: tool.lineEndings }
+      ? {
+          kind: 'line',
+          linePoints: { start: placement.a, end: placement.b },
+          lineEndings: tool.lineEndings,
+          rotation: 0,
+        }
       : null;
   }
   const { rect, rot } = placement;

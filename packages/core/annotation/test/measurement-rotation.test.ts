@@ -1,10 +1,11 @@
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { record, rounded, step, type RecordInput, STYLE } from './support';
+import { record, step, type RecordInput, STYLE } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
 import { DEFAULT_CHROME_GEOMETRY, pointInQuad, turnPivotOf } from '../src/geometry';
 import { rotatePoint, unionRect } from '../src/rect';
+import { drawnLineOf } from '../src/shapes/points';
 import { hitTest, groupUnionBounds } from '../src/hit';
 import { distanceLayout, type DistanceAppearance } from '../src/measurement';
 import { annotationSelectionFrame } from '../src/selection';
@@ -30,9 +31,9 @@ function measurement(overrides: Partial<RecordInput> = {}): ModelAnnotation {
     subtype: 'line',
     geometry: {
       kind: 'line',
-      a: { x: 140, y: 180 },
-      b: { x: 340, y: 180 },
-      ends: { start: 'closed-arrow', end: 'closed-arrow' },
+      linePoints: { start: { x: 140, y: 180 }, end: { x: 340, y: 180 } },
+      lineEndings: { start: 'closed-arrow', end: 'closed-arrow' },
+      rotation: 0,
     },
     style: STYLE,
     source: 'vector',
@@ -90,7 +91,11 @@ describe('measurement selection frame and rotation', () => {
     {
       name: 'short dimension with outside arrows',
       annotation: measurement({
-        geometry: { kind: 'line', a: { x: 140, y: 180 }, b: { x: 170, y: 180 } },
+        geometry: {
+          kind: 'line',
+          linePoints: { start: { x: 140, y: 180 }, end: { x: 170, y: 180 } },
+          rotation: 0,
+        },
         measure: { ...appearance, caption: { enabled: true } },
       }),
     },
@@ -141,7 +146,7 @@ describe('measurement selection frame and rotation', () => {
         rotatePoint(frameCenter, center, angle),
       );
       expect(fieldsOf(committed.byId.distance).measure).toEqual(fieldsOf(annotation).measure);
-      expect(rounded(fieldsOf(committed.byId.distance).geometry)).toEqual(rounded(item.geometry));
+      expect(fieldsOf(committed.byId.distance).geometry).toEqual(item.geometry);
     }
     expect(pointer(armed, 'move', knob.at).draft).toMatchObject({ pivot: center });
     expect(step(armed, { type: 'cancel' })[0].byId.distance).toBe(annotation);
@@ -153,8 +158,8 @@ describe('measurement selection frame and rotation', () => {
     const once = step(initial, { type: 'rotate90' })[0];
     expectPoint(turnPivotOf(fieldsOf(once.byId.distance).geometry), center);
     const reset = step(once, { type: 'resetRotation' })[0];
-    expect(rounded(fieldsOf(reset.byId.distance).geometry)).toMatchObject(
-      rounded(fieldsOf(initial.byId.distance).geometry),
+    expect(fieldsOf(reset.byId.distance).geometry).toEqual(
+      fieldsOf(initial.byId.distance).geometry,
     );
 
     let state = initial;
@@ -164,8 +169,9 @@ describe('measurement selection frame and rotation', () => {
     }
     const geometry = fieldsOf(state.byId.distance).geometry;
     if (geometry.kind !== 'line') throw new Error('Expected line geometry');
-    expectPoint(geometry.a, { x: 140, y: 180 });
-    expectPoint(geometry.b, { x: 340, y: 180 });
+    const drawn = drawnLineOf(geometry);
+    expectPoint(drawn.start, { x: 140, y: 180 });
+    expectPoint(drawn.end, { x: 340, y: 180 });
   });
 
   it('keeps its frame after a native appearance with conservative bounds arrives', () => {

@@ -2,6 +2,7 @@ import { isReadout, measurementReadout } from '@embedpdf/engine-core/runtime';
 import type { PdfMeasurement, ShapeDimensionCaption } from '@embedpdf/engine-core/runtime';
 import { geomRotation, selectionQuad } from './geometry';
 import { pointInPoly, rotatePoint, unionRect } from './rect';
+import { drawnVerticesOf } from './shapes/points';
 import { DISTANCE_CAPTION_SIZE, distanceCaptionWidth } from './measurement-font';
 import { distanceLayout, distanceSelectionQuad, moveDistanceCaption } from './measurement';
 import type { DistanceCaptionLayout, MeasurementAppearance } from './measurement';
@@ -54,7 +55,7 @@ export function shapeMeasurementReadout(
     subtype: appearance.intent === 'polygon-dimension' ? 'polygon' : 'polyline',
     intent: appearance.intent,
     measure: appearance.measure,
-    vertices: geometry.kind === 'poly' ? geometry.points : [],
+    vertices: geometry.kind === 'poly' ? geometry.vertices : [],
   });
 }
 
@@ -140,9 +141,9 @@ export function shapeMeasurementLayout(
   appearance: ShapeMeasurementAppearance,
   style: Style,
 ): ShapeMeasurementLayout | null {
-  if (geometry.kind !== 'poly' || !geometry.points.length) return null;
+  if (geometry.kind !== 'poly' || !geometry.vertices.length) return null;
   const angle = geomRotation(geometry);
-  const localPoints = geometry.points.map((point) => rotatePoint(point, ORIGIN, -angle));
+  const localPoints = drawnVerticesOf(geometry).map((point) => rotatePoint(point, ORIGIN, -angle));
   const center =
     shapeCaptionPoint(appearance) ??
     rotatePoint(automaticShapeCaptionCenter(localPoints, geometry.closed), ORIGIN, angle);

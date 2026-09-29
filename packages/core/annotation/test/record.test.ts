@@ -37,6 +37,7 @@ import {
   toPatch,
   withFields,
 } from '../src/record';
+import { drawnStrokesOf } from '../src/shapes/points';
 
 const CROP: PdfRect = { left: 0, bottom: 0, right: 600, top: 800 };
 
@@ -448,17 +449,19 @@ describe('record — rotation round-trip', () => {
     expect(patch.rotation).toBe(null);
   });
 
-  it('vertex: the upright points are turned onto the page and turned back on the way out', () => {
+  it('vertex: the upright points and turn are read as the engine keeps them, and written back', () => {
     const dto = rotatedPolylineDTO(30);
     if (dto.subtype !== 'polyline') throw new Error('expected polyline');
     const annotation = fromDTO(fromFile(dto));
     const geometry = fieldsOf(annotation).geometry;
     if (geometry.kind !== 'poly') throw new Error('expected poly geom');
-    expect(geometry.rot).toBe(30);
-    // The model keeps the points as drawn: the upright ones turned about their box's middle.
+    expect(geometry.rotation).toBe(30);
+    // The model keeps the points upright; where they are drawn is worked out.
+    expect(geometry.vertices[0]!.x).toBeCloseTo(dto.vertices[0]!.x - CROP.left, 9);
+    expect(geometry.vertices[0]!.y).toBeCloseTo(CROP.top - dto.vertices[0]!.y, 9);
     const drawn = pdfPointTurned(dto.vertices[0]!, pdfTurnOfUpright(dto.vertices, 30));
-    expect(geometry.points[0]!.x).toBeCloseTo(drawn.x - CROP.left, 9);
-    expect(geometry.points[0]!.y).toBeCloseTo(CROP.top - drawn.y, 9);
+    expect(drawnStrokesOf(geometry)[0]![0]!.x).toBeCloseTo(drawn.x - CROP.left, 9);
+    expect(drawnStrokesOf(geometry)[0]![0]!.y).toBeCloseTo(CROP.top - drawn.y, 9);
 
     const patch = toFile(toPatch(fieldsOf(annotation))) as Extract<
       AnnotationPatch<PdfCoordinates>,
@@ -477,7 +480,7 @@ describe('record — rotation round-trip', () => {
   it('vertex: an unrotated polyline states the advisory clear explicitly', () => {
     const annotation = fromDTO(fromFile(rotatedPolylineDTO(0, 33)));
     const geometry = fieldsOf(annotation).geometry;
-    expect(geometry.kind === 'poly' && geometry.rot).toBeFalsy();
+    expect(geometry.kind === 'poly' && geometry.rotation).toBeFalsy();
     const patch = toFile(toPatch(fieldsOf(annotation))) as Extract<
       AnnotationPatch<PdfCoordinates>,
       { subtype?: 'polyline' }
@@ -860,7 +863,10 @@ describe('record — line endings leave /Rect to the engine', () => {
     const none = fromDTO(fromFile(lineDTO({ start: 'none', end: 'none' })));
     // The user's gesture: arrows on both ends.
     const arrows = {
-      geometry: { ...fieldsOf(none).geometry, ends: { start: 'open-arrow', end: 'open-arrow' } },
+      geometry: {
+        ...fieldsOf(none).geometry,
+        lineEndings: { start: 'open-arrow', end: 'open-arrow' },
+      },
     } as Partial<RecordFields>;
     const patch = toFile(writeOf(none, arrows)) as RectPatch;
     expect(patch.lineEndings).toEqual({ start: 'open-arrow', end: 'open-arrow' });
@@ -872,7 +878,7 @@ describe('record — line endings leave /Rect to the engine', () => {
     const arrows = {
       geometry: {
         ...fieldsOf(base).geometry,
-        ends: { start: 'closed-arrow', end: 'closed-arrow' },
+        lineEndings: { start: 'closed-arrow', end: 'closed-arrow' },
       },
     } as Partial<RecordFields>;
     const patch = toFile(writeOf(base, arrows)) as RectPatch;
@@ -1052,27 +1058,33 @@ describe('record — every field a kind takes writes only fields its engine kind
       case 'free-text':
         return { kind: 'text-box', box: box, rotation: 0, calloutLine: null, lineEnding: null };
       case 'line':
-        return { kind: 'line', a: { x: 100, y: 100 }, b: { x: 200, y: 150 } };
+        return {
+          kind: 'line',
+          linePoints: { start: { x: 100, y: 100 }, end: { x: 200, y: 150 } },
+          rotation: 0,
+        };
       case 'polygon':
       case 'polyline':
         return {
           kind: 'poly',
-          points: [
+          vertices: [
             { x: 100, y: 100 },
             { x: 200, y: 100 },
             { x: 150, y: 180 },
           ],
           closed: subtype === 'polygon',
+          rotation: 0,
         };
       case 'ink':
         return {
           kind: 'ink',
-          strokes: [
+          inkList: [
             [
               { x: 100, y: 100 },
               { x: 150, y: 120 },
             ],
           ],
+          rotation: 0,
         };
       case 'highlight':
       case 'underline':

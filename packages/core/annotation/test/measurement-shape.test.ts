@@ -34,7 +34,7 @@ const points = [
   { x: 300, y: 200 },
   { x: 100, y: 200 },
 ];
-const geometry: ModelGeometry = { kind: 'poly', closed: true, points };
+const geometry: ModelGeometry = { kind: 'poly', closed: true, vertices: points, rotation: 0 };
 
 function annotation(measure = appearance, geom = geometry): ModelAnnotation {
   return record({
@@ -101,7 +101,7 @@ describe('area and perimeter authoring', () => {
     const [committed, effects] = step(model, { type: 'finishCreationDraft' });
     expect(effects).toMatchObject([{ type: 'create' }]);
     const created = committed.byId[committed.order[0]];
-    expect(fieldsOf(created).geometry).toMatchObject({ closed, points: points.slice(0, 3) });
+    expect(fieldsOf(created).geometry).toMatchObject({ closed, vertices: points.slice(0, 3) });
     expect(fieldsOf(created).measure).toEqual({ ...measure, text: closed ? '4.00 m²' : '6.00 m' });
     expect(created.source).toBe('vector');
   });

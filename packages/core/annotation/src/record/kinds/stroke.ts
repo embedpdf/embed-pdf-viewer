@@ -1,50 +1,40 @@
 /**
- * The stroke family — line, polygon, polyline, ink. The engine takes their
- * points upright and `rotation` turns them about the middle of their box; it
- * works out `/Rect` from what it draws. The model keeps the points as drawn
- * (with `rot`, the turn they were drawn with), so the seam turns them: a read's
- * upright points are turned onto the page, and an emit turns the model's back
- * (`pageTurnOfDrawn` finds the middle from the drawing alone). A polygon's
- * caption center turns with its points.
+ * The points family's kinds — line, polygon, polyline, ink. Their points and
+ * turn are read and written by the family (`shapes/points.ts`) as the engine
+ * keeps them: upright, with `rotation` turning them about the middle of their
+ * box. What a kind adds here is beside its points: a polygon's cloud, the
+ * line endings, and a measurement's caption and label. The model keeps a
+ * polygon measurement's caption center where it is drawn; the engine takes
+ * it upright with the points, so it is turned back with them.
  */
 import {
   pagePointTurned,
   pagePointUnturned,
-  pageTurnOfDrawn,
   pageTurnOfUpright,
   type AnnotationDTO,
   type PagePoint,
   type PagePointTurn,
 } from '@embedpdf/engine-core/runtime';
 
-import { geomRotation } from '../../geometry';
 import { distanceLabel } from '../../measurement';
 import { shapeMeasurementLabel } from '../../measurement-shape';
-import type { ModelGeometry, RecordFields } from '../../types';
+import { readPoints, uprightStrokesOf, writePoints, type PointsShape } from '../../shapes/points';
+import type { RecordFields } from '../../types';
 import type { KindProjection, Wire } from '../projection';
 import { borderSlice } from '../props';
-import { rotFromDTO } from '../seam';
 
-/** The turn a read's upright points are drawn with, or `undefined` upright. */
-const turnOfRead = (
-  upright: readonly PagePoint[],
-  rotation: number | null,
-): PagePointTurn | undefined => (rotation ? pageTurnOfUpright(upright, rotation) : undefined);
+type PointsDTO = Extract<AnnotationDTO, { subtype: 'line' | 'polyline' | 'polygon' | 'ink' }>;
 
-/** The turn the model's points (as drawn) were drawn with, or `undefined` upright. */
-const turnOfModel = (drawn: readonly PagePoint[], rot: number): PagePointTurn | undefined =>
-  rot ? pageTurnOfDrawn(drawn, rot) : undefined;
+/** The turn that draws a shape's upright points, or `undefined` upright. */
+const turnOf = (shape: PointsShape): PagePointTurn | undefined =>
+  shape.rotation ? pageTurnOfUpright(uprightStrokesOf(shape).flat(), shape.rotation) : undefined;
 
-const turned = (point: PagePoint, turn: PagePointTurn | undefined): PagePoint =>
-  turn ? pagePointTurned(point, turn) : point;
-
-const unturned = (point: PagePoint, turn: PagePointTurn | undefined): PagePoint =>
-  turn ? pagePointUnturned(point, turn) : point;
-
-/** The turn, total: 0 states `null` (tri-state clear) — omission would keep a stale turn. */
-const rotationOf = (geometry: ModelGeometry): { rotation: number | null } => {
-  const rot = geomRotation(geometry);
-  return { rotation: rot ? rot : null };
+/** A points record's shape, or `undefined` for any other geometry. */
+const pointsOf = (annotation: RecordFields): PointsShape | undefined => {
+  const geometry = annotation.geometry;
+  return geometry.kind === 'line' || geometry.kind === 'poly' || geometry.kind === 'ink'
+    ? geometry
+    : undefined;
 };
 
 /** `/BE` intensity for a closed poly (polygon): the curls are generated from
@@ -58,7 +48,7 @@ const polyCloudy = (annotation: RecordFields): Wire =>
       }
     : {};
 
-/** Stroke-family prop exceptions: a polygon's border states its cloud. */
+/** Points-family prop exceptions: a polygon's border states its cloud. */
 const strokeProps: KindProjection['prop'] = {
   border: (annotation) => ({
     ...borderSlice(annotation.style),
@@ -66,9 +56,15 @@ const strokeProps: KindProjection['prop'] = {
   }),
   lineEndings: (annotation) =>
     (annotation.geometry.kind === 'line' || annotation.geometry.kind === 'poly') &&
-    annotation.geometry.ends
-      ? { lineEndings: annotation.geometry.ends }
+    annotation.geometry.lineEndings
+      ? { lineEndings: annotation.geometry.lineEndings }
       : {},
+};
+
+/** The engine fields that state a points record's shape. */
+const pointsGeometry = (annotation: RecordFields): Wire | null => {
+  const shape = pointsOf(annotation);
+  return shape ? writePoints(shape) : null;
 };
 
 export const line: KindProjection = {
@@ -90,20 +86,17 @@ export const line: KindProjection = {
             },
           }
         : {}),
-      geometry: lineGeometryFromDTO(lineDto),
+      geometry: readPoints(lineDto),
     };
   },
   geometry: (annotation) => {
     const geometry = annotation.geometry;
     if (geometry.kind !== 'line') return null;
-    const drawn = [geometry.a, geometry.b];
-    const turn = turnOfModel(drawn, geomRotation(geometry));
     return {
       ...(annotation.measure?.intent === 'line-dimension'
         ? { contents: distanceLabel(geometry, annotation.measure) }
         : {}),
-      linePoints: { start: unturned(drawn[0]!, turn), end: unturned(drawn[1]!, turn) },
-      ...rotationOf(geometry),
+      ...writePoints(geometry),
     };
   },
   prop: strokeProps,
@@ -125,7 +118,9 @@ export const line: KindProjection = {
 const polyProjection = (closed: boolean): KindProjection => ({
   ingest: (dto) => {
     const polyDto = dto as Extract<AnnotationDTO, { subtype: 'polygon' | 'polyline' }>;
-    const turn = turnOfRead(polyDto.vertices, polyDto.rotation);
+    const shape = readPoints(polyDto);
+    const turn = turnOf(shape);
+    const center = polyDto.captionCenter;
     return {
       ...(polyDto.intent === 'polygon-dimension' || polyDto.intent === 'polyline-dimension'
         ? {
@@ -134,35 +129,26 @@ const polyProjection = (closed: boolean): KindProjection => ({
               measure: polyDto.measure ?? null,
               caption: {
                 enabled: polyDto.captionEnabled ?? false,
-                ...(polyDto.captionCenter ? { center: turned(polyDto.captionCenter, turn) } : {}),
+                ...(center ? { center: turn ? pagePointTurned(center, turn) : center } : {}),
               },
               text: polyDto.contents ?? '',
             },
           }
         : {}),
-      geometry: {
-        kind: 'poly',
-        points: polyDto.vertices.map((point) => turned(point, turn)),
-        closed,
-        ...('lineEndings' in polyDto ? { ends: polyDto.lineEndings } : {}),
-        ...rotFromDTO(polyDto.rotation),
-      },
+      geometry: shape,
     };
   },
   geometry: (annotation) => {
     const geometry = annotation.geometry;
     if (geometry.kind !== 'poly') return null;
-    const drawn = geometry.points;
-    const turn = turnOfModel(drawn, geomRotation(geometry));
     return {
       ...(annotation.measure && annotation.measure.intent !== 'line-dimension'
         ? {
             contents: shapeMeasurementLabel(geometry, annotation.measure),
-            ...captionFieldsOf(annotation.measure, turn),
+            ...captionFieldsOf(annotation.measure, turnOf(geometry)),
           }
         : {}),
-      vertices: drawn.map((point) => unturned(point, turn)),
-      ...rotationOf(geometry),
+      ...writePoints(geometry),
     };
   },
   prop: strokeProps,
@@ -186,55 +172,23 @@ export const polyline: KindProjection = polyProjection(false);
 export const ink: KindProjection = {
   ingest: (dto) => {
     const inkDto = dto as Extract<AnnotationDTO, { subtype: 'ink' }>;
-    const turn = turnOfRead(inkDto.inkList.flat(), inkDto.rotation);
     return {
-      geometry: {
-        kind: 'ink',
-        strokes: inkDto.inkList.map((stroke) => stroke.map((point) => turned(point, turn))),
-        ...rotFromDTO(inkDto.rotation),
-      },
+      geometry: readPoints(inkDto as PointsDTO),
       ...(inkDto.intent ? { intent: inkDto.intent } : {}),
     };
   },
-  geometry: (annotation) => {
-    const geometry = annotation.geometry;
-    if (geometry.kind !== 'ink') return null;
-    const drawn = geometry.strokes;
-    const turn = turnOfModel(drawn.flat(), geomRotation(geometry));
-    return {
-      inkList: drawn.map((stroke) => stroke.map((point) => unturned(point, turn))),
-      ...rotationOf(geometry),
-    };
-  },
+  geometry: pointsGeometry,
   prop: strokeProps,
   // `/IT` is set at create and never patched (the engine preserves it).
   draftExtras: (annotation) =>
     annotation.intent === 'ink-highlight' ? { intent: annotation.intent } : {},
 };
 
-/** A line's model geometry from its read: the upright points turned onto the page. */
-function lineGeometryFromDTO(lineDto: Extract<AnnotationDTO, { subtype: 'line' }>): ModelGeometry {
-  const { start, end } = lineDto.linePoints;
-  const turn = turnOfRead([start, end], lineDto.rotation);
-  return {
-    kind: 'line',
-    a: turned(start, turn),
-    b: turned(end, turn),
-    ends: lineDto.lineEndings,
-    ...rotFromDTO(lineDto.rotation),
-  };
-}
-
-/** The turn a poly's model points were drawn with, or `undefined` upright. */
-function modelTurnOf(annotation: RecordFields): PagePointTurn | undefined {
-  const geometry = annotation.geometry;
-  if (geometry.kind !== 'poly') return undefined;
-  return turnOfModel(geometry.points, geomRotation(geometry));
-}
-
 /** A measurement's caption fields (none without a measurement), its center turned back upright. */
 export function captionFieldsFor(annotation: RecordFields): Record<string, unknown> {
-  return annotation.measure ? captionFieldsOf(annotation.measure, modelTurnOf(annotation)) : {};
+  if (!annotation.measure) return {};
+  const shape = pointsOf(annotation);
+  return captionFieldsOf(annotation.measure, shape && turnOf(shape));
 }
 
 /**
@@ -261,6 +215,6 @@ function captionFieldsOf(
   const center = caption.center as PagePoint | undefined;
   return {
     captionEnabled: caption.enabled,
-    captionCenter: center ? unturned(center, turn) : null,
+    captionCenter: center ? (turn ? pagePointUnturned(center, turn) : center) : null,
   };
 }

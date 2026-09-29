@@ -298,8 +298,7 @@ describe('click-create (a bare click places the tool default)', () => {
     ]);
     expect(fieldsOf(model.byId[model.order[0]]).geometry).toMatchObject({
       kind: 'line',
-      a: { x: 20, y: 30 },
-      b: { x: 100, y: 30 },
+      linePoints: { start: { x: 20, y: 30 }, end: { x: 100, y: 30 } },
     });
   });
 
@@ -351,8 +350,7 @@ describe('annotation-core', () => {
     ]);
     expect(fieldsOf(ln.byId[ln.order[0]]).geometry).toMatchObject({
       kind: 'line',
-      a: { x: 10, y: 10 },
-      b: { x: 90, y: 40 },
+      linePoints: { start: { x: 10, y: 10 }, end: { x: 90, y: 40 } },
     });
 
     const [, fx] = step(
@@ -375,13 +373,13 @@ describe('annotation-core', () => {
     const pg = polygon.byId[polygon.order[0]];
     expect(fieldsOf(pg).geometry).toEqual({
       kind: 'poly',
-      points: [
+      vertices: [
         { x: 10, y: 10 },
         { x: 80, y: 10 },
         { x: 40, y: 70 },
       ],
       closed: true,
-      ends: undefined,
+      rotation: 0,
     });
     expect(pg.source).toBe('vector');
     expect(polygon.selected).toEqual([pg.id]);
@@ -396,12 +394,13 @@ describe('annotation-core', () => {
     const pl = polyline.byId[polyline.order[0]];
     expect(fieldsOf(pl).geometry).toEqual({
       kind: 'poly',
-      points: [
+      vertices: [
         { x: 20, y: 20 },
         { x: 90, y: 45 },
       ],
       closed: false,
-      ends: { start: 'none', end: 'none' },
+      lineEndings: { start: 'none', end: 'none' },
+      rotation: 0,
     });
   });
 
@@ -414,13 +413,14 @@ describe('annotation-core', () => {
     const ghost = pageItems(drawing, PAGE).find((item) => item.source === 'ghost');
     expect(ghost?.geometry).toEqual({
       kind: 'poly',
-      points: [
+      vertices: [
         { x: 10, y: 10 },
         { x: 80, y: 10 },
         { x: 40, y: 70 },
       ],
       closed: true,
-      ends: undefined,
+      lineEndings: undefined,
+      rotation: 0,
     });
 
     const committed = run(drawing, [
@@ -428,7 +428,7 @@ describe('annotation-core', () => {
       createPtr('polygon', 'down', 80, 80, true),
     ]);
     const geometry = fieldsOf(committed.byId[committed.order[0]]).geometry;
-    expect(geometry.kind === 'poly' && geometry.points).toEqual([
+    expect(geometry.kind === 'poly' && geometry.vertices).toEqual([
       { x: 10, y: 10 },
       { x: 80, y: 10 },
       { x: 80, y: 80 },
@@ -728,9 +728,9 @@ describe('annotation-core', () => {
       subtype: 'line',
       geometry: {
         kind: 'line',
-        a: { x: 100, y: 100 },
-        b: { x: 300, y: 200 },
-        ends: { start: 'none', end: 'closed-arrow' },
+        linePoints: { start: { x: 100, y: 100 }, end: { x: 300, y: 200 } },
+        lineEndings: { start: 'none', end: 'closed-arrow' },
+        rotation: 0,
       },
       style: {
         color: '#000000',
@@ -915,9 +915,9 @@ describe('annotation-core', () => {
       subtype: 'line',
       geometry: {
         kind: 'line',
-        a: { x: 10, y: 10 },
-        b: { x: 90, y: 10 },
-        ends: { start: 'none', end: 'closed-arrow' },
+        linePoints: { start: { x: 10, y: 10 }, end: { x: 90, y: 10 } },
+        lineEndings: { start: 'none', end: 'closed-arrow' },
+        rotation: 0,
       },
       style: {
         color: '#000000',
@@ -949,9 +949,9 @@ describe('annotation-core', () => {
       subtype: 'line',
       geometry: {
         kind: 'line',
-        a: { x: 60, y: 75 },
-        b: { x: 545, y: 235 },
-        ends: { start: 'none', end: 'open-arrow' },
+        linePoints: { start: { x: 60, y: 75 }, end: { x: 545, y: 235 } },
+        lineEndings: { start: 'none', end: 'open-arrow' },
+        rotation: 0,
       },
       style: {
         color: '#000000',
@@ -988,15 +988,19 @@ describe('annotation-core', () => {
   it('the arrowhead is clickable, not just the stroke', () => {
     const geometry: ModelGeometry = {
       kind: 'line',
-      a: { x: 60, y: 75 },
-      b: { x: 545, y: 235 },
-      ends: { start: 'none', end: 'open-arrow' },
+      linePoints: { start: { x: 60, y: 75 }, end: { x: 545, y: 235 } },
+      lineEndings: { start: 'none', end: 'open-arrow' },
+      rotation: 0,
     };
     const sw = 8;
     const onArrow = { x: 510, y: 242 }; // on the lower wing, ~19px off the a→b stroke band
     expect(geomHit(geometry, onArrow, 6, /* filled */ false, sw)).toBe(true);
     // the hit comes from the ending, not the line: with no endings that point misses
-    const noEnds: ModelGeometry = { kind: 'line', a: geometry.a, b: geometry.b };
+    const noEnds: ModelGeometry = {
+      kind: 'line',
+      linePoints: { start: { x: 60, y: 75 }, end: { x: 545, y: 235 } },
+      rotation: 0,
+    };
     expect(geomHit(noEnds, onArrow, 6, false, sw)).toBe(false);
     // and a point off both the line and the arrowhead still misses
     expect(geomHit(geometry, { x: 300, y: 360 }, 6, false, sw)).toBe(false);
@@ -1005,9 +1009,9 @@ describe('annotation-core', () => {
   it('geomScene fills by closed-ness: closed arrow → closed poly, open arrow → open poly', () => {
     const line = (end: 'closed-arrow' | 'open-arrow'): ModelGeometry => ({
       kind: 'line',
-      a: { x: 0, y: 0 },
-      b: { x: 100, y: 0 },
-      ends: { start: 'none', end },
+      linePoints: { start: { x: 0, y: 0 }, end: { x: 100, y: 0 } },
+      lineEndings: { start: 'none', end },
+      rotation: 0,
     });
     const closed = geomScene(line('closed-arrow'), 2);
     expect(closed.some((node) => node.kind === 'poly' && node.closed)).toBe(true); // filled head
@@ -1242,12 +1246,13 @@ describe('annotation-core', () => {
       subtype: 'polygon',
       geometry: {
         kind: 'poly',
-        points: [
+        vertices: [
           { x: 20, y: 20 },
           { x: 180, y: 40 },
           { x: 100, y: 160 },
         ],
         closed: true,
+        rotation: 0,
       },
       box: { x: 0, y: 0, width: 200, height: 180 },
       style: cloudyStyle,
@@ -1295,7 +1300,7 @@ describe('annotation-core', () => {
     const annotation = model.byId[model.order[0]];
     const geometry = fieldsOf(annotation).geometry;
     expect(geometry).toMatchObject({ kind: 'ink' });
-    expect(geometry.kind === 'ink' && geometry.strokes[0].length).toBe(3);
+    expect(geometry.kind === 'ink' && geometry.inkList[0].length).toBe(3);
     expect(annotation.source).toBe('vector');
     // a short tap (no travel) is discarded, not committed
     const tap = run(initialModel, [ink('down', 5, 5), ink('up', 5, 5)]);
@@ -1346,9 +1351,9 @@ describe('annotation-core', () => {
     expect(fieldsOf(annotation).style.blendMode).toBe('multiply');
     expect(geometry.kind).toBe('ink');
     if (geometry.kind === 'ink') {
-      expect(geometry.strokes).toHaveLength(2);
-      expect(geometry.strokes[0]).toHaveLength(2);
-      expect(geometry.strokes[0][0].y).toBeCloseTo(geometry.strokes[0][1].y);
+      expect(geometry.inkList).toHaveLength(2);
+      expect(geometry.inkList[0]).toHaveLength(2);
+      expect(geometry.inkList[0][0].y).toBeCloseTo(geometry.inkList[0][1].y);
     }
   });
 
@@ -1360,12 +1365,13 @@ describe('annotation-core', () => {
       subtype: 'ink',
       geometry: {
         kind: 'ink',
-        strokes: [
+        inkList: [
           [
             { x: 20, y: 20 },
             { x: 80, y: 60 },
           ],
         ],
+        rotation: 0,
       },
       style: {
         color: '#1d4ed8',
@@ -1430,7 +1436,7 @@ describe('annotation-core', () => {
     expect(fieldsOf(next.byId[sq]).style.strokeWidth).toBe(7);
     expect(fieldsOf(next.byId[ln]).style.strokeWidth).toBe(7);
     const lnGeom = fieldsOf(next.byId[ln]).geometry;
-    expect(lnGeom.kind === 'line' && lnGeom.ends?.end).toBe('closed-arrow');
+    expect(lnGeom.kind === 'line' && lnGeom.lineEndings?.end).toBe('closed-arrow');
     expect(fx).toEqual([
       writes(sq, { subtype: 'square', strokeWidth: 7 }),
       writes(ln, {
@@ -2374,8 +2380,9 @@ describe('annotation-core — rotation', () => {
     ];
     const geometry: ModelGeometry = {
       kind: 'poly',
-      points: points.map((point) => ({ ...point })),
+      vertices: points.map((point) => ({ ...point })),
       closed: false,
+      rotation: 0,
     };
     const c0 = turnPivotOf(geometry);
     const r1 = geomRotateAbout(geometry, turnPivotOf(geometry), 30);
@@ -2387,7 +2394,7 @@ describe('annotation-core — rotation', () => {
     const reset = geomResetRotation(r2);
     expect(geomRotation(reset)).toBe(0);
     if (reset.kind !== 'poly') throw new Error('expected poly');
-    reset.points.forEach((point, i) => {
+    reset.vertices.forEach((point, i) => {
       expect(point.x).toBeCloseTo(points[i].x); // points return to as-authored
       expect(point.y).toBeCloseTo(points[i].y);
     });
@@ -2407,13 +2414,14 @@ describe('annotation-core — rotation', () => {
     // a vertex shape: spin the same points by 45° and the OBB tilts to match.
     const base: ModelGeometry = {
       kind: 'poly',
-      points: [
+      vertices: [
         { x: 0, y: 0 },
         { x: 100, y: 0 },
         { x: 100, y: 100 },
         { x: 0, y: 100 },
       ],
       closed: true,
+      rotation: 0,
     };
     const turned = geomRotateAbout(base, centroidOf(base), 45);
     const obbV = obbFromGeom(turned, 0);
@@ -2578,7 +2586,7 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
     // centre of the bounding rect.
     const geometry: ModelGeometry = {
       kind: 'poly',
-      points: [
+      vertices: [
         { x: 0, y: 0 },
         { x: 0, y: 100 },
         { x: 20, y: 100 },
@@ -2587,6 +2595,7 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
         { x: 100, y: 0 },
       ],
       closed: false,
+      rotation: 0,
     };
     const mean = centroidOf(geometry);
     const centre = turnPivotOf(geometry);
@@ -2608,7 +2617,7 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
   it('a rotate gesture on a vertex shape pivots about the middle of its upright points and keeps it fixed', () => {
     const geometry: ModelGeometry = {
       kind: 'poly',
-      points: [
+      vertices: [
         { x: 0, y: 0 },
         { x: 0, y: 100 },
         { x: 20, y: 100 },
@@ -2617,6 +2626,7 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
         { x: 100, y: 0 },
       ],
       closed: false,
+      rotation: 0,
     };
     const poly = square('s1', geometry, 'polyline');
     const base = modelWith([poly]);
@@ -2711,8 +2721,9 @@ describe('annotation-core — selectionAnchor carries the knob alongside a centr
 describe('annotation-core — join-aware stroke bounds', () => {
   const poly = (points: Point[], closed: boolean): ModelGeometry => ({
     kind: 'poly',
-    points,
+    vertices: points,
     closed,
+    rotation: 0,
   });
 
   it('a sharp join sticks out only on the spike side — the box is NOT symmetric', () => {
@@ -2786,13 +2797,14 @@ describe('annotation-core — join-aware stroke bounds', () => {
   it('ink bounds are unchanged — a plain half-width grow of the freehand hull (round, never spikes)', () => {
     const geometry: ModelGeometry = {
       kind: 'ink',
-      strokes: [
+      inkList: [
         [
           { x: 10, y: 10 },
           { x: 60, y: 15 },
           { x: 40, y: 90 },
         ],
       ],
+      rotation: 0,
     };
     const sw = 6;
     const halfWidth = sw / 2;
@@ -2810,9 +2822,9 @@ describe('annotation-core — join-aware stroke bounds', () => {
     // Horizontal line pointing right, closed arrow at the tip (100,0).
     const geometry: ModelGeometry = {
       kind: 'line',
-      a: { x: 0, y: 0 },
-      b: { x: 100, y: 0 },
-      ends: { start: 'none', end: 'closed-arrow' },
+      linePoints: { start: { x: 0, y: 0 }, end: { x: 100, y: 0 } },
+      lineEndings: { start: 'none', end: 'closed-arrow' },
+      rotation: 0,
     };
     const sw = 6;
     const rect = geomVisualBounds(geometry, sw);
@@ -2869,13 +2881,14 @@ describe('annotation-core — join-aware stroke bounds', () => {
     );
     const ink = mk('ink', {
       kind: 'ink',
-      strokes: [
+      inkList: [
         [
           { x: 0, y: 0 },
           { x: 20, y: 10 },
           { x: 40, y: 0 },
         ],
       ],
+      rotation: 0,
     });
 
     expect(scene(square)[0].paint.join).toBeUndefined();

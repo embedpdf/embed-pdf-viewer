@@ -339,18 +339,19 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
   it('VERTEX kinds project too: an ink body scales about its bounds top-left', () => {
     const ink: ModelGeometry = {
       kind: 'ink',
-      strokes: [
+      inkList: [
         [
           { x: 100, y: 100 },
           { x: 140, y: 120 },
         ],
       ],
+      rotation: 0,
     };
     const geometry = anchoredGeom(ink, { zoom: true, upright: false }, { zoom: 2, rotation: 0 });
     if (geometry.kind !== 'ink') throw new Error('expected ink');
     // bounds top-left (100,100) fixed; every point pulled halfway toward it
-    expect(geometry.strokes[0][0]).toEqual({ x: 100, y: 100 });
-    expect(geometry.strokes[0][1]).toEqual({ x: 120, y: 110 });
+    expect(geometry.inkList[0][0]).toEqual({ x: 100, y: 100 });
+    expect(geometry.inkList[0][1]).toEqual({ x: 120, y: 110 });
   });
 
   it('unanchoredGeom is the exact inverse: the commit re-projects to the preview', () => {
@@ -362,12 +363,13 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
       { kind: 'box', box: { x: 100, y: 100, width: 40, height: 20 }, ellipse: false, rotation: 30 },
       {
         kind: 'poly',
-        points: [
+        vertices: [
           { x: 100, y: 100 },
           { x: 160, y: 110 },
           { x: 130, y: 160 },
         ],
         closed: true,
+        rotation: 0,
       },
     ];
     for (const geometry of shapes) {

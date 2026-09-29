@@ -313,11 +313,13 @@ const TEXT_KEYS = [
 const sameValue = (left: unknown, right: unknown): boolean =>
   left === right || JSON.stringify(left) === JSON.stringify(right);
 
-const endsOf = (geometry: ModelGeometry) => ('ends' in geometry ? geometry.ends : undefined);
+const endsOf = (geometry: ModelGeometry) =>
+  'lineEndings' in geometry ? geometry.lineEndings : undefined;
 
 /** Whether the shape moved: its geometry other than its line endings (those are a prop). */
 const shapeMoved = (before: ModelGeometry, after: ModelGeometry): boolean =>
-  before !== after && !sameValue({ ...before, ends: undefined }, { ...after, ends: undefined });
+  before !== after &&
+  !sameValue({ ...before, lineEndings: undefined }, { ...after, lineEndings: undefined });
 
 /**
  * What the change from `before` to `after` means to the engine: the kind's

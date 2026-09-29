@@ -13,8 +13,6 @@ import {
   type Size,
   type Quad,
 } from '@embedpdf/core-geometry';
-import { cloudyBorderExtent, cloudyPolyPath } from './cloudy';
-import { endingNodes, endingNodesHit } from './endings';
 import {
   DEG2RAD,
   MIN_SIZE,
@@ -28,11 +26,9 @@ import {
   rectCenter,
   rectContains,
   rectCornerPoints,
-  rectFromPoints,
   rectHandlePoint,
   resizeRect,
   rotatePoint,
-  segDist,
   unionRect,
 } from './rect';
 import {
@@ -58,11 +54,26 @@ import {
   textBoxTranslate,
   textBoxUpright,
 } from './shapes/text-box';
+import {
+  drawnStrokesOf,
+  pointsBounds,
+  pointsCorners,
+  pointsDrag,
+  pointsDrawnBounds,
+  pointsHandles,
+  pointsHit,
+  pointsMiddleOf,
+  pointsRotateAbout,
+  pointsScaleAbout,
+  pointsScene,
+  pointsTranslate,
+  pointsUpright,
+  type PointsShape,
+} from './shapes/points';
 import type {
   Border,
   ModelGeometry,
   Handle,
-  LineEnding,
   QuadRing,
   Rect,
   RenderNode,
@@ -70,7 +81,9 @@ import type {
   Point,
 } from './types';
 
-const polyPoints = (geometry: Extract<ModelGeometry, { kind: 'poly' }>): Point[] => geometry.points;
+/** Is the geometry of the points family: a line, polyline, polygon or ink? */
+const isPoints = (geometry: ModelGeometry): geometry is PointsShape =>
+  geometry.kind === 'line' || geometry.kind === 'poly' || geometry.kind === 'ink';
 
 /* ── rotation ──────────────────────────────────────────────────────────────
  * Annotation rotation, layered on the generic `@embedpdf/core-geometry` affine
@@ -96,14 +109,9 @@ export const DEFAULT_CHROME_GEOMETRY = {
  *  here so the renderer and selection chrome follow it, while the caret's
  *  caps (not movable/resizable) keep every rotate gesture away from it. */
 export function geomRotation(geometry: ModelGeometry): number {
-  if (geometry.kind === 'box' || geometry.kind === 'text-box') return geometry.rotation;
-  if (
-    geometry.kind === 'line' ||
-    geometry.kind === 'poly' ||
-    geometry.kind === 'ink' ||
-    geometry.kind === 'caret'
-  )
-    return geometry.rot ?? 0;
+  if (geometry.kind === 'box' || geometry.kind === 'text-box' || isPoints(geometry))
+    return geometry.rotation;
+  if (geometry.kind === 'caret') return geometry.rot ?? 0;
   return 0;
 }
 
@@ -111,14 +119,9 @@ export function geomRotation(geometry: ModelGeometry): number {
 export function centroidOf(geometry: ModelGeometry): Point {
   if (geometry.kind === 'box' || geometry.kind === 'text-box') return rectCenter(geometry.box);
   if (geometry.kind === 'caret') return rectCenter(geometry.rect);
-  if (geometry.kind === 'line')
-    return { x: (geometry.a.x + geometry.b.x) / 2, y: (geometry.a.y + geometry.b.y) / 2 };
-  const points =
-    geometry.kind === 'poly'
-      ? geometry.points
-      : geometry.kind === 'ink'
-        ? geometry.strokes.flat()
-        : geometry.quads.flatMap(quadCorners);
+  const points = isPoints(geometry)
+    ? drawnStrokesOf(geometry).flat()
+    : geometry.quads.flatMap(quadCorners);
   let sx = 0;
   let sy = 0;
   for (const point of points) {
@@ -137,19 +140,7 @@ export function centroidOf(geometry: ModelGeometry): Point {
  * pivot.
  */
 export function turnPivotOf(geometry: ModelGeometry): Point {
-  const points =
-    geometry.kind === 'line'
-      ? [geometry.a, geometry.b]
-      : geometry.kind === 'poly'
-        ? geometry.points
-        : geometry.kind === 'ink'
-          ? geometry.strokes.flat()
-          : [];
-  if (points.length === 0) return centroidOf(geometry);
-  const rot = geomRotation(geometry);
-  const origin = { x: 0, y: 0 };
-  const upright = unionRect(points.map((point) => rotatePoint(point, origin, -rot)));
-  return rotatePoint(rectCenter(upright), origin, rot);
+  return isPoints(geometry) ? pointsMiddleOf(geometry) : centroidOf(geometry);
 }
 
 /** Does the geometry carry a meaningful `rot` (an oriented local box exists)?
@@ -172,8 +163,8 @@ export function isRotatableGeom(geometry: ModelGeometry): boolean {
  *  - box (`box`/plain `text-box`): orbit the box centre about the pivot (a rigid
  *    translation of the unrotated box) and add the angle to its turn. When the
  *    pivot is the box centre this is a pure turn.
- *  - vertex (`line`/`poly`/`ink`): map every point through the rotation and bump
- *    the advisory `rot` (the points stay the authoritative visual).
+ *  - points (`line`/`poly`/`ink`): the middle of the upright points orbits the
+ *    pivot and the turn grows, as for a box.
  * Kinds without a rotate verb are returned unchanged: quads and callouts, and
  * also the caret — oriented (`isRotatableGeom`) but text-anchored, so its tilt
  * is authoring metadata that no gesture edits (`geomResetRotation` still
@@ -187,14 +178,7 @@ export function geomRotateAbout(
   if (deltaDeg === 0) return geometry;
   if (geometry.kind === 'box') return boxRotateAbout(geometry, pivot, deltaDeg);
   if (geometry.kind === 'text-box') return textBoxRotateAbout(geometry, pivot, deltaDeg);
-  const nextRot = normalizeDeg(geomRotation(geometry) + deltaDeg);
-  const rp = (point: Point) => rotatePoint(point, pivot, deltaDeg);
-  if (geometry.kind === 'line')
-    return { ...geometry, a: rp(geometry.a), b: rp(geometry.b), rot: nextRot };
-  if (geometry.kind === 'poly')
-    return { ...geometry, points: geometry.points.map(rp), rot: nextRot };
-  if (geometry.kind === 'ink')
-    return { ...geometry, strokes: geometry.strokes.map((stroke) => stroke.map(rp)), rot: nextRot };
+  if (isPoints(geometry)) return pointsRotateAbout(geometry, pivot, deltaDeg);
   return geometry;
 }
 
@@ -209,15 +193,9 @@ function apFrameSize(geometry: ModelGeometry): Size {
     return { width: geometry.box.width, height: geometry.box.height };
   if (geometry.kind === 'caret')
     return { width: geometry.rect.width, height: geometry.rect.height };
-  const points =
-    geometry.kind === 'line'
-      ? [geometry.a, geometry.b]
-      : geometry.kind === 'poly'
-        ? geometry.points
-        : geometry.kind === 'ink'
-          ? geometry.strokes.flat()
-          : geometry.quads.flatMap(quadCorners);
-  const rect = unionRect(points);
+  const rect = isPoints(geometry)
+    ? pointsBounds(geometry)
+    : unionRect(geometry.quads.flatMap(quadCorners));
   return { width: rect.width, height: rect.height };
 }
 
@@ -322,26 +300,23 @@ export function fitStampBox(center: Point, desired: Size, page: Size, rotCW: num
 }
 
 /** Reset a geom to its as-authored orientation (turn → 0). Box: drop the turn.
- *  Vertex: spin the points by `-rot` about the supplied selection center.
- *  Geometry-only callers retain the centroid default. */
+ *  Points: turn back about `pivot` (the middle of the upright points by
+ *  default, which only clears the turn). */
 export function geomResetRotation(geometry: ModelGeometry, pivot?: Point): ModelGeometry {
   const rot = geomRotation(geometry);
   if (!rot) return geometry;
   if (geometry.kind === 'box') return { ...geometry, rotation: 0 };
   if (geometry.kind === 'text-box') return textBoxUpright(geometry);
   if (geometry.kind === 'caret') return { ...geometry, rot: 0 };
-  const point = pivot ?? turnPivotOf(geometry);
-  const rotated = geomRotateAbout(geometry, point, -rot);
-  // geomRotateAbout already set rot = normalize(rot - rot) = 0.
-  return rotated;
+  if (isPoints(geometry)) return pointsUpright(geometry, pivot);
+  return geometry;
 }
 
 /**
  * The oriented selection box (OBB) of a rotatable geom: four corners (in order
  * nw, ne, se, sw of the local box, transformed) + the angle. For a box this is
- * the `rect` rotated about its centre; for a vertex shape it is reconstructed
- * from the advisory `rot` — un-rotate the points to recover the as-authored
- * shape, take that tight local box, then rotate it back — giving the snug tilted
+ * the box rotated about its centre; for a points shape it is the drawn bounds
+ * of its upright points, turned about their middle — the snug tilted
  * rectangle. Returns null for non-rotatable kinds.
  */
 export function obbFromGeom(
@@ -360,12 +335,9 @@ export function obbFromGeom(
     );
     return { corners: corners as [Point, Point, Point, Point], angle: rot };
   }
-  // vertex: reconstruct the local (as-authored) box from rot about the centroid.
-  const centroid = centroidOf(geometry);
-  const unrotated = rot ? geomRotateAbout(geometry, centroid, -rot) : geometry;
-  const localBox = selectionBounds(unrotated, strokeWidth, border);
-  const corners = rectCornerPoints(localBox).map((point) => rotatePoint(point, centroid, rot));
-  return { corners: corners as [Point, Point, Point, Point], angle: rot };
+  if (isPoints(geometry))
+    return { corners: pointsCorners(geometry, strokeWidth, border), angle: rot };
+  return null;
 }
 
 /* ── group (multi-target) scaling ─────────────────────────────────────────────
@@ -438,10 +410,7 @@ export function geomScaleAbout(
   });
   if (geometry.kind === 'box') return boxScaleAbout(geometry, anchor, sx, sy);
   if (geometry.kind === 'text-box') return textBoxScaleAbout(geometry, anchor, sx, sy);
-  if (geometry.kind === 'line') return { ...geometry, a: sp(geometry.a), b: sp(geometry.b) };
-  if (geometry.kind === 'poly') return { ...geometry, points: geometry.points.map(sp) };
-  if (geometry.kind === 'ink')
-    return { ...geometry, strokes: geometry.strokes.map((stroke) => stroke.map(sp)) };
+  if (isPoints(geometry)) return pointsScaleAbout(geometry, anchor, sx, sy);
   if (geometry.kind === 'caret') {
     const point = sp(rectCenter(geometry.rect));
     const width = Math.max(MIN_SIZE, geometry.rect.width * Math.abs(sx));
@@ -629,138 +598,6 @@ function mapQuad(quad: Quad, mapPoint: (point: Point) => Point): Quad {
   };
 }
 
-/* ── line endings ─────────────────────────────────────────────────────────────
- * The breathing room a stroked line/poly needs beyond its vertices, as a factor
- * of the stroke width: the half-stroke under the centre-line plus a
- * little extra so caps/joins are never clipped by the engine `/Rect`.
- */
-/** Miter limit shared by the bounds math and the SVG renderer (`stroke-miterlimit`),
- *  so the computed box and the drawn stroke always agree on where a sharp join
- *  bevels instead of spiking. 10 = the PDF default (also what the baked /AP uses). */
-export const MITER_LIMIT = 10;
-
-/**
- * The outline points of a mitred, butt-capped polyline (open or closed) stroked
- * at `strokeWidth`: each segment's two side offsets (the straight extents + both
- * bevel corners) plus each interior join's outer miter tip — added only while the
- * join is within `MITER_LIMIT` (past that the renderer bevels it, and the segment
- * offsets already bound it). `unionRect` of these is the tight, asymmetric visual
- * box: a pointy join grows the box only on the side it actually spikes.
- *
- * Miter kinds only (line / polyline / polygon). Ink is round-capped/round-joined,
- * never spikes, and is bounded elsewhere by a plain half-width grow.
- */
-function strokeOutlinePoints(points: Point[], closed: boolean, strokeWidth: number): Point[] {
-  const halfWidth = strokeWidth / 2;
-  const pointCount = points.length;
-  if (pointCount === 0) return [];
-  if (pointCount === 1 || halfWidth === 0) return [...points];
-
-  const segCount = closed ? pointCount : pointCount - 1;
-  const dir: Point[] = [];
-  const nrm: Point[] = [];
-  for (let i = 0; i < segCount; i++) {
-    const start = points[i];
-    const end = points[(i + 1) % pointCount];
-    const len = Math.hypot(end.x - start.x, end.y - start.y) || 1;
-    const ux = (end.x - start.x) / len;
-    const uy = (end.y - start.y) / len;
-    dir.push({ x: ux, y: uy });
-    nrm.push({ x: -uy, y: ux }); // a unit normal (either side; sign is re-picked below)
-  }
-
-  const out: Point[] = [];
-  // Segment side offsets at both ends — covers the straight extents, the butt
-  // caps at open ends, and the bevel corners of any beveled join.
-  for (let i = 0; i < segCount; i++) {
-    const start = points[i];
-    const end = points[(i + 1) % pointCount];
-    const nx = nrm[i].x * halfWidth;
-    const ny = nrm[i].y * halfWidth;
-    out.push({ x: start.x + nx, y: start.y + ny }, { x: start.x - nx, y: start.y - ny });
-    out.push({ x: end.x + nx, y: end.y + ny }, { x: end.x - nx, y: end.y - ny });
-  }
-
-  // Interior joins: the outer miter tip, gated by the miter limit.
-  const joinStart = closed ? 0 : 1;
-  const joinEnd = closed ? pointCount : pointCount - 1; // vertices [joinStart, joinEnd)
-  for (let vertexIndex = joinStart; vertexIndex < joinEnd; vertexIndex++) {
-    const inIdx = closed ? (vertexIndex - 1 + pointCount) % pointCount : vertexIndex - 1;
-    const outIdx = vertexIndex; // the segment starting at vertexIndex, open or closed
-    const incoming = dir[inIdx]; // previous -> vertexIndex
-    const outgoing = dir[outIdx]; // vertexIndex -> next
-    const n1 = nrm[inIdx];
-    const n2 = nrm[outIdx];
-    // Outer bisector direction: opposite the interior bisector `outgoing - incoming`.
-    const bx = incoming.x - outgoing.x;
-    const by = incoming.y - outgoing.y;
-    if (Math.hypot(bx, by) < 1e-9) continue; // straight run: no spike beyond the offsets
-    let mhx = n1.x + n2.x;
-    let mhy = n1.y + n2.y;
-    const ml = Math.hypot(mhx, mhy);
-    if (ml < 1e-9) continue; // exact hairpin: renderer bevels
-    mhx /= ml;
-    mhy /= ml;
-    if (mhx * bx + mhy * by < 0) {
-      mhx = -mhx; // point the miter unit vector to the outer side
-      mhy = -mhy;
-    }
-    const cosHalf = Math.abs(mhx * n1.x + mhy * n1.y); // cos(deviation/2)
-    if (cosHalf < 1e-9) continue;
-    const miterLen = halfWidth / cosHalf;
-    if (miterLen > MITER_LIMIT * halfWidth) continue; // too sharp: renderer bevels → offsets bound it
-    const vertex = points[vertexIndex];
-    out.push({ x: vertex.x + mhx * miterLen, y: vertex.y + mhy * miterLen });
-  }
-  return out;
-}
-
-type EndingSeg = { tip: Point; angle: number; ending: LineEnding | undefined };
-
-/** The start/end tips of a line / open poly, each with the segment angle pointing
- *  Out of the body into the tip (so an arrowhead opens back toward the line). */
-function endingSegs(geometry: ModelGeometry): EndingSeg[] {
-  if (geometry.kind === 'line' && geometry.ends) {
-    return [
-      {
-        tip: geometry.a,
-        angle: Math.atan2(geometry.a.y - geometry.b.y, geometry.a.x - geometry.b.x),
-        ending: geometry.ends.start,
-      },
-      {
-        tip: geometry.b,
-        angle: Math.atan2(geometry.b.y - geometry.a.y, geometry.b.x - geometry.a.x),
-        ending: geometry.ends.end,
-      },
-    ];
-  }
-  if (
-    geometry.kind === 'poly' &&
-    !geometry.closed &&
-    geometry.ends &&
-    geometry.points.length >= 2
-  ) {
-    const points = geometry.points;
-    const count = points.length;
-    return [
-      {
-        tip: points[0],
-        angle: Math.atan2(points[0].y - points[1].y, points[0].x - points[1].x),
-        ending: geometry.ends.start,
-      },
-      {
-        tip: points[count - 1],
-        angle: Math.atan2(
-          points[count - 1].y - points[count - 2].y,
-          points[count - 1].x - points[count - 2].x,
-        ),
-        ending: geometry.ends.end,
-      },
-    ];
-  }
-  return [];
-}
-
 /**
  * A geom's visual bounds: the rect that encloses the drawn appearance, so the
  * baked /AP is never clipped.
@@ -781,43 +618,11 @@ export function geomVisualBounds(
   strokeWidth: number,
   border?: Border,
 ): Rect {
-  if (geometry.kind === 'poly' && geometry.closed && border?.kind === 'cloudy') {
-    // Corner curls are arcs of the cloud radius centred at the vertices, and the
-    // stroke straddles them — so ink reaches radius + strokeWidth/2 beyond the
-    // vertex hull on every side: exactly `cloudyBorderExtent`.
-    return expandRect(
-      unionRect(geometry.points),
-      cloudyBorderExtent(border.intensity, strokeWidth, false),
-    );
-  }
   if (geometry.kind === 'box') return boxDrawnBounds(geometry, strokeWidth, border);
+  if (isPoints(geometry)) return pointsDrawnBounds(geometry, strokeWidth, border);
   if (geometry.kind === 'text-box') return textBoxDrawnBounds(geometry, strokeWidth);
   if (geometry.kind === 'caret') return geometry.rect;
-  if (geometry.kind === 'quads')
-    return expandRect(unionRect(geometry.quads.flatMap(quadCorners)), strokeWidth / 2);
-  // Ink is round-capped/round-joined: it never spikes, so a plain half-width grow of the
-  // freehand hull is exact — left as-is (the freehand look must not change).
-  if (geometry.kind === 'ink')
-    return expandRect(unionRect(geometry.strokes.flat()), strokeWidth / 2);
-  // Line / polyline / polygon: the miter kinds. Wrap the actual stroke outline
-  // (per-join, asymmetric) instead of a flat pad — for the body and each ending,
-  // so a mitred arrowhead tip is enclosed exactly (not under-covered by a flat h).
-  const raw = geometry.kind === 'line' ? [geometry.a, geometry.b] : geometry.points;
-  const closed = geometry.kind === 'poly' && geometry.closed;
-  const outline = strokeOutlinePoints(raw, closed, strokeWidth);
-  for (const seg of endingSegs(geometry)) {
-    for (const node of endingNodes(seg.tip, seg.angle, seg.ending, strokeWidth)) {
-      if (node.kind === 'poly') {
-        // arrowheads / diamonds / squares are stroked polys: their sharp corners
-        // miter exactly like the body, so wrap the real outline (tip included).
-        outline.push(...strokeOutlinePoints(node.points, node.closed, strokeWidth));
-      } else if (node.kind === 'ellipse') {
-        // a stroked ellipse (circle ending) grows uniformly by h — no miters.
-        outline.push(...rectCornerPoints(expandRect(node.rect, strokeWidth / 2)));
-      }
-    }
-  }
-  return unionRect(outline);
+  return expandRect(unionRect(geometry.quads.flatMap(quadCorners)), strokeWidth / 2);
 }
 
 /**
@@ -835,8 +640,7 @@ export function selectionBounds(
   strokeWidth: number,
   border?: Border,
 ): Rect {
-  if (geometry.kind === 'line' || geometry.kind === 'ink' || geometry.kind === 'poly')
-    return geomVisualBounds(geometry, strokeWidth, border);
+  if (isPoints(geometry)) return pointsDrawnBounds(geometry, strokeWidth, border);
   if (geometry.kind === 'text-box') return textBoxSelectionBounds(geometry);
   return geomBounds(geometry);
 }
@@ -908,26 +712,12 @@ export function quadIntersectsRect(quad: [Point, Point, Point, Point], rect: Rec
   return true;
 }
 
-function endingHit(
-  geometry: ModelGeometry,
-  point: Point,
-  tol: number,
-  strokeWidth: number,
-): boolean {
-  for (const seg of endingSegs(geometry))
-    if (endingNodesHit(endingNodes(seg.tip, seg.angle, seg.ending, strokeWidth), point, tol))
-      return true;
-  return false;
-}
-
 /* ── geom ops ─────────────────────────────────────────────────────────────── */
 
 export function geomBounds(geometry: ModelGeometry): Rect {
   if (geometry.kind === 'box' || geometry.kind === 'text-box') return geometry.box;
   if (geometry.kind === 'caret') return geometry.rect;
-  if (geometry.kind === 'line') return rectFromPoints(geometry.a, geometry.b);
-  if (geometry.kind === 'poly') return unionRect(geometry.points);
-  if (geometry.kind === 'ink') return unionRect(geometry.strokes.flat());
+  if (isPoints(geometry)) return pointsBounds(geometry);
   return unionRect(geometry.quads.flatMap(quadCorners));
 }
 
@@ -946,36 +736,14 @@ export function geomHit(
 ): boolean {
   if (geometry.kind === 'box') return boxHit(geometry, point, margin, filled, strokeWidth, border);
   if (geometry.kind === 'text-box') return textBoxHit(geometry, point, margin, strokeWidth);
-  const tol = margin + strokeWidth / 2;
+  if (isPoints(geometry)) return pointsHit(geometry, point, margin, filled, strokeWidth);
   // A caret is a solid hit target anywhere in its box (+ the click margin),
-  // tested in the box's own frame. Vertex kinds carry already-rotated points,
-  // so they hit-test directly (rot is advisory).
+  // tested in the box's own frame.
   if (geometry.kind === 'caret') {
     const local = geometry.rot
       ? rotatePoint(point, rectCenter(geometry.rect), -geometry.rot)
       : point;
     return rectContains(expandRect(geometry.rect, margin), local);
-  }
-  if (geometry.kind === 'line')
-    return (
-      segDist(point, geometry.a, geometry.b) <= tol || endingHit(geometry, point, tol, strokeWidth)
-    );
-  if (geometry.kind === 'poly') {
-    if (filled && geometry.closed && pointInPoly(point, geometry.points)) return true;
-    const points = geometry.points;
-    const count = points.length;
-    for (let i = 0; i < count - 1; i++)
-      if (segDist(point, points[i], points[i + 1]) <= tol) return true;
-    if (geometry.closed && count > 2 && segDist(point, points[count - 1], points[0]) <= tol)
-      return true;
-    return endingHit(geometry, point, tol, strokeWidth);
-  }
-  if (geometry.kind === 'ink') {
-    // near any segment of any stroke (ink is stroke-only, never filled)
-    for (const stroke of geometry.strokes)
-      for (let i = 0; i < stroke.length - 1; i++)
-        if (segDist(point, stroke[i], stroke[i + 1]) <= tol) return true;
-    return false;
   }
   // quads (markup): oriented per-line cells — hit anywhere inside any quad.
   // Quad rings are simple (non-self-intersecting) by construction, so the
@@ -986,15 +754,7 @@ export function geomHit(
 export function geomHandles(geometry: ModelGeometry): Handle[] {
   if (geometry.kind === 'box') return boxHandles(geometry);
   if (geometry.kind === 'text-box') return textBoxHandles(geometry);
-  if (geometry.kind === 'line') {
-    return [
-      { id: 'v0', at: geometry.a, cursor: 'crosshair' },
-      { id: 'v1', at: geometry.b, cursor: 'crosshair' },
-    ];
-  }
-  if (geometry.kind === 'poly') {
-    return geometry.points.map((at, i) => ({ id: `v${i}`, at, cursor: 'crosshair' }));
-  }
+  if (isPoints(geometry)) return pointsHandles(geometry);
   return []; // markup: move only
 }
 
@@ -1007,26 +767,14 @@ export function geomTranslate(geometry: ModelGeometry, delta: Point): ModelGeome
       ...geometry,
       rect: { ...geometry.rect, x: geometry.rect.x + delta.x, y: geometry.rect.y + delta.y },
     };
-  if (geometry.kind === 'line') return { ...geometry, a: mv(geometry.a), b: mv(geometry.b) };
-  if (geometry.kind === 'poly') return { ...geometry, points: geometry.points.map(mv) };
-  if (geometry.kind === 'ink')
-    return { ...geometry, strokes: geometry.strokes.map((stroke) => stroke.map(mv)) };
+  if (isPoints(geometry)) return pointsTranslate(geometry, delta);
   return { ...geometry, quads: geometry.quads.map((quad) => mapQuad(quad, mv)) };
 }
 
 export function geomDragHandle(geometry: ModelGeometry, handle: string, to: Point): ModelGeometry {
   if (geometry.kind === 'box') return boxResize(geometry, handle, to);
   if (geometry.kind === 'text-box') return textBoxDrag(geometry, handle, to);
-  if (geometry.kind === 'line')
-    return handle === 'v0' ? { ...geometry, a: to } : { ...geometry, b: to };
-  if (geometry.kind === 'poly') {
-    const vertexIndex = Number(handle.slice(1));
-    if (!Number.isInteger(vertexIndex) || vertexIndex < 0 || vertexIndex >= geometry.points.length)
-      return geometry;
-    const points = geometry.points.slice();
-    points[vertexIndex] = to;
-    return { ...geometry, points };
-  }
+  if (isPoints(geometry)) return pointsDrag(geometry, handle, to);
   return geometry;
 }
 
@@ -1048,29 +796,7 @@ export function geomScene(geometry: ModelGeometry, strokeWidth = 0, border?: Bor
     return [{ kind: 'path', d: pathData }];
   }
   if (geometry.kind === 'box') return boxScene(geometry, strokeWidth, border);
-  if (geometry.kind === 'line') {
-    const nodes: RenderNode[] = [{ kind: 'line', a: geometry.a, b: geometry.b }];
-    for (const seg of endingSegs(geometry))
-      nodes.push(...endingNodes(seg.tip, seg.angle, seg.ending, strokeWidth));
-    return nodes;
-  }
-  if (geometry.kind === 'poly') {
-    // A closed poly takes a cloudy border: curls centred on the vertex path,
-    // reaching outward — the same geometry PDFium bakes (no /RD, unlike boxes).
-    if (geometry.closed && border?.kind === 'cloudy' && geometry.points.length >= 3) {
-      return [{ kind: 'path', d: cloudyPolyPath(geometry.points, border.intensity, strokeWidth) }];
-    }
-    const nodes: RenderNode[] = [
-      { kind: 'poly', points: geometry.points, closed: geometry.closed },
-    ];
-    for (const seg of endingSegs(geometry))
-      nodes.push(...endingNodes(seg.tip, seg.angle, seg.ending, strokeWidth));
-    return nodes;
-  }
-  if (geometry.kind === 'ink') {
-    // each pen stroke is an open polyline (stroke-only; `scene` paints it)
-    return geometry.strokes.map((stroke) => ({ kind: 'poly', points: stroke, closed: false }));
-  }
+  if (isPoints(geometry)) return pointsScene(geometry, strokeWidth, border);
   // markup fallback: a closed ring per quad (upper-left round to lower-left). The scene
   // painter renders these per-subtype; this keeps the generic scene correct
   // regardless, rotated text included.

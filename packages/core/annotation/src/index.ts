@@ -136,7 +136,6 @@ export {
   uprightAnchoredRect,
   fitStampBox,
   ROTATE_KNOB_OFFSET,
-  MITER_LIMIT,
   // group scaling
   geomScaleAbout,
   groupResizeAnchor,
@@ -153,6 +152,17 @@ export {
   type RectHandle,
 } from './rect';
 export { readBox, writeBox, type BoxShape, type TurnedBox } from './shapes/box';
+export {
+  MITER_LIMIT,
+  drawnStrokesOf,
+  readPoints,
+  uprightStrokesOf,
+  writePoints,
+  type InkShape,
+  type LineShape,
+  type PointsShape,
+  type PolyShape,
+} from './shapes/points';
 export {
   calloutEnd,
   readTextBox,

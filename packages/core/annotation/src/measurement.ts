@@ -4,10 +4,11 @@ import type {
   LineLeader,
   PdfMeasurement,
 } from '@embedpdf/engine-core/runtime';
-import { endingNodes, endingPoints } from './endings';
+import { endingNodes, endingNodesHit, endingPoints } from './endings';
 import { DISTANCE_CAPTION_SIZE as CAPTION_SIZE, distanceCaptionWidth } from './measurement-font';
-import { geomHit, geomRotation, selectionQuad } from './geometry';
-import { rotatePoint, unionRect } from './rect';
+import { geomRotation, selectionQuad } from './geometry';
+import { rotatePoint, segDist, unionRect } from './rect';
+import { drawnLineOf } from './shapes/points';
 import type {
   ModelGeometry,
   Handle,
@@ -105,7 +106,7 @@ export function distanceLabel(geometry: ModelGeometry, appearance: DistanceAppea
     subtype: 'line',
     intent: appearance.intent,
     measure: appearance.measure,
-    linePoints: { start: geometry.a, end: geometry.b },
+    linePoints: geometry.linePoints,
   });
 
   return isReadout(readout) ? readout.label : appearance.text;
@@ -216,10 +217,11 @@ export function distanceLayout(
     return null;
   }
 
-  const { along, normal, length } = lineAxes(geometry.a, geometry.b);
+  const { start: a, end: b } = drawnLineOf(geometry);
+  const { along, normal, length } = lineAxes(a, b);
   const leaderLength = appearance.leader?.length ?? 0;
-  const dimensionStart = offsetPoint(geometry.a, normal, leaderLength);
-  const dimensionEnd = offsetPoint(geometry.b, normal, leaderLength);
+  const dimensionStart = offsetPoint(a, normal, leaderLength);
+  const dimensionEnd = offsetPoint(b, normal, leaderLength);
   const midpoint = offsetPoint(dimensionStart, along, length / 2);
   const text = distanceLabel(geometry, appearance);
   const width = distanceCaptionWidth(text);
@@ -261,7 +263,7 @@ export function distanceLayout(
     const leaderOffset = side * (appearance.leader?.offset ?? 0);
     const leaderEnd = leaderLength + side * (appearance.leader?.extension ?? 0);
 
-    for (const endpoint of [geometry.a, geometry.b]) {
+    for (const endpoint of [a, b]) {
       leaderSegments.push({
         from: offsetPoint(endpoint, normal, leaderOffset),
         to: offsetPoint(endpoint, normal, leaderEnd),
@@ -288,17 +290,17 @@ export function distanceLayout(
   const startAngle = outside ? angle : angle + Math.PI;
   const endAngle = outside ? angle + Math.PI : angle;
   const endings = [
-    ...endingNodes(dimensionStart, startAngle, geometry.ends?.start, strokeWidth),
-    ...endingNodes(dimensionEnd, endAngle, geometry.ends?.end, strokeWidth),
+    ...endingNodes(dimensionStart, startAngle, geometry.lineEndings?.start, strokeWidth),
+    ...endingNodes(dimensionEnd, endAngle, geometry.lineEndings?.end, strokeWidth),
   ];
   const boundsPoints = [
-    geometry.a,
-    geometry.b,
+    a,
+    b,
     ...segments.flatMap((segment) => [segment.from, segment.to]),
     ...leaderSegments.flatMap((segment) => [segment.from, segment.to]),
     ...connector.flatMap((segment) => [segment.from, segment.to]),
-    ...endingPoints(dimensionStart, startAngle, geometry.ends?.start, strokeWidth),
-    ...endingPoints(dimensionEnd, endAngle, geometry.ends?.end, strokeWidth),
+    ...endingPoints(dimensionStart, startAngle, geometry.lineEndings?.start, strokeWidth),
+    ...endingPoints(dimensionEnd, endAngle, geometry.lineEndings?.end, strokeWidth),
     ...(caption?.bounds ?? []),
   ];
 
@@ -306,8 +308,8 @@ export function distanceLayout(
     along,
     normal,
     length,
-    measuredStart: geometry.a,
-    measuredEnd: geometry.b,
+    measuredStart: a,
+    measuredEnd: b,
     dimensionStart,
     dimensionEnd,
     dimensionSegments: segments,
@@ -340,12 +342,12 @@ export function distanceSelectionQuad(
     return selectionQuad(geometry, strokeWidth);
   }
 
-  // Vertex annotations recover their local frame using the advisory rotation.
-  // Include every measurement component before constructing that frame, then
-  // rotate its corners back. Reboxing the page-aligned bounds would grow and
-  // shift the selection as the annotation turns.
+  // The line's own frame is its turn. Include every measurement component
+  // before constructing that frame, then rotate its corners back. Reboxing the
+  // page-aligned bounds would grow and shift the selection as the annotation
+  // turns.
   const angle = geomRotation(geometry);
-  const origin = geometry.a;
+  const origin = drawnLineOf(geometry).start;
   const points = layout.selectionPoints.map((point) => rotatePoint(point, origin, -angle));
   const bounds = expandDistanceBounds(unionRect(points), strokeWidth / 2 + 1);
   const corner = (x: number, y: number) => rotatePoint({ x, y }, origin, angle);
@@ -402,31 +404,10 @@ export function distanceHit(
     ...layout.captionConnector,
   ];
 
+  const tolerance = margin + strokeWidth / 2;
   return (
-    segments.some((segment) =>
-      geomHit({ kind: 'line', a: segment.from, b: segment.to }, point, margin, false, strokeWidth),
-    ) ||
-    layout.endings.some((ending) => {
-      if (ending.kind === 'poly') {
-        return geomHit(
-          { kind: 'poly', points: ending.points, closed: ending.closed },
-          point,
-          margin,
-          true,
-          strokeWidth,
-        );
-      }
-      if (ending.kind === 'ellipse') {
-        return geomHit(
-          { kind: 'box', box: ending.rect, rotation: 0, ellipse: true },
-          point,
-          margin,
-          true,
-          strokeWidth,
-        );
-      }
-      return false;
-    })
+    segments.some((segment) => segDist(point, segment.from, segment.to) <= tolerance) ||
+    endingNodesHit(layout.endings, point, tolerance)
   );
 }
 
@@ -443,8 +424,9 @@ export function distanceLeaderLength(geometry: ModelGeometry, point: Point): num
     return 0;
   }
 
-  const { normal } = lineAxes(geometry.a, geometry.b);
-  return projectDelta(geometry.a, point, normal);
+  const { start, end } = drawnLineOf(geometry);
+  const { normal } = lineAxes(start, end);
+  return projectDelta(start, point, normal);
 }
 
 export function moveDistanceCaption(
@@ -456,7 +438,8 @@ export function moveDistanceCaption(
     return appearance;
   }
 
-  const { along, normal } = lineAxes(geometry.a, geometry.b);
+  const { start, end } = drawnLineOf(geometry);
+  const { along, normal } = lineAxes(start, end);
   const previous = appearance.caption.offset;
 
   return {

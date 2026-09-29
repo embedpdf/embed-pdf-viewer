@@ -287,15 +287,21 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
           ? { kind: 'box', box: dragged, rotation: 0, ellipse: draft.ellipse }
           : null
         : draft.kind === 'create-line' || draft.kind === 'create-distance'
-          ? { kind: 'line', a: draft.from, b: draft.to, ends: tool.lineEndings }
+          ? {
+              kind: 'line',
+              linePoints: { start: draft.from, end: draft.to },
+              lineEndings: tool.lineEndings,
+              rotation: 0,
+            }
           : draft.kind === 'create-poly'
             ? {
                 kind: 'poly',
-                points: polyPreviewPoints(draft.points, draft.current),
+                vertices: polyPreviewPoints(draft.points, draft.current),
                 closed: draft.closed,
-                ends: draft.closed ? undefined : tool.lineEndings,
+                lineEndings: draft.closed ? undefined : tool.lineEndings,
+                rotation: 0,
               }
-            : { kind: 'ink', strokes: draft.strokes };
+            : { kind: 'ink', inkList: draft.strokes, rotation: 0 };
     if (geometry) {
       const measure =
         draft.kind === 'create-line' ||
@@ -328,7 +334,12 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
     const rot = calloutUprightRot(draft);
     const geometry: ModelGeometry =
       draft.step === 'knee'
-        ? { kind: 'line', a: draft.tip, b: draft.current, ends: { start: ending, end: 'none' } }
+        ? {
+            kind: 'line',
+            linePoints: { start: draft.tip, end: draft.current },
+            lineEndings: { start: ending, end: 'none' },
+            rotation: 0,
+          }
         : calloutShape(calloutBox(draft), rot, draft.tip, draft.knee, ending);
     items.push({
       id: DRAFT_ID,
@@ -726,7 +737,7 @@ export function creationDraftAnchor(model: Model): CreationDraftAnchor | null {
         !(
           'unavailable' in
           shapeMeasurementReadout(
-            { kind: 'poly', points: draft.points, closed: draft.closed },
+            { kind: 'poly', vertices: draft.points, closed: draft.closed, rotation: 0 },
             draft.measure,
           )
         )),

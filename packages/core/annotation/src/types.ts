@@ -18,6 +18,7 @@ import type {
 import type { DistanceAppearance, MeasurementAppearance } from './measurement';
 import type { ShapeMeasurementAppearance } from './measurement-shape';
 import type { BoxShape } from './shapes/box';
+import type { PointsShape } from './shapes/points';
 import type { TextBoxShape } from './shapes/text-box';
 
 export type { Quad, QuadRing } from '@embedpdf/core-geometry';
@@ -84,29 +85,21 @@ export type Subtype =
  * polygon/polyline (poly), text markup (quads), and caret.
  */
 /**
- * The shape a gesture moves, one arm per family. The box and text box
+ * The shape a gesture moves, one arm per family. The box, text box and points
  * families' arms are their own shapes, the engine's fields ({@link BoxShape},
- * {@link TextBoxShape}); the other arms still carry the core's older names
- * until their family moves.
+ * {@link TextBoxShape}, {@link PointsShape}); the quads and caret arms still
+ * carry the core's older names until their family moves.
  *
- * Rotation is degrees clockwise in page space, normalized `[0,360)`:
- *
- * - **Box** (`box`, `text-box`): the box before its turn, and the turn about its
- *   middle. The engine works out `/Rect` around the turned drawing, so PDFium
- *   bakes a portable `/AP`.
- * - **Vertex** (`line`, `poly`, `ink`): the points are already rotated (they are
- *   the portable visual), so `rot` is an advisory scalar — the cumulative tilt the
- *   user applied since authoring. It lets EmbedPDF reconstruct an oriented
- *   selection box (`obbFromTheta`) and offer reset-to-0; it is inert for
- *   rendering (PDFium ignores a lone `Rotation` with no `UnrotatedRect`).
+ * Rotation is degrees clockwise in page space, normalized `[0,360)`, and
+ * works the same way for every family that turns: the shape is kept upright
+ * (a box, or points), and `rotation` turns it about its middle. The engine
+ * works out `/Rect` around the turned drawing, so PDFium bakes a portable `/AP`.
  */
 export type ModelGeometry =
   | BoxShape // square, circle, stamp, and the kinds whose shape is their rect
-  | { kind: 'line'; a: Point; b: Point; ends?: LineEndings; rot?: number } // line (points pre-rotated; rot advisory)
-  | { kind: 'poly'; points: Point[]; closed: boolean; ends?: LineEndings; rot?: number } // polygon/polyline (pre-rotated; rot advisory)
+  | PointsShape // line, polyline, polygon, ink
   | { kind: 'quads'; quads: Quad[] } // highlight / underline / squiggly / strikeout
   | { kind: 'caret'; rect: Rect; rot?: number } // caret insertion marker (rect = unrotated box; rot = its text's baseline tilt, authoring metadata — no gesture)
-  | { kind: 'ink'; strokes: Point[][]; rot?: number } // freehand ink (pre-rotated; rot advisory)
   | TextBoxShape; // free text; its text is data, rendered by the framework as an editable element
 
 /**

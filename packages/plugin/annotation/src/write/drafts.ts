@@ -29,8 +29,8 @@ export function createDrafts({ store, events }: Pick<AnnotationServices, 'store'
       events.draftCaptured.emit({
         tool: effect.tool,
         page: effect.page,
-        from: effect.geometry.a,
-        to: effect.geometry.b,
+        from: effect.geometry.linePoints.start,
+        to: effect.geometry.linePoints.end,
       });
     }
   });

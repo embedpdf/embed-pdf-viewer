@@ -80,9 +80,9 @@ export function distancePointer(
   const tool = toolStyleOf(model, draft.subtype, draft.preset);
   const geometry: ModelGeometry = {
     kind: 'line',
-    a: draft.from,
-    b: draft.to,
-    ends: tool.lineEndings,
+    linePoints: { start: draft.from, end: draft.to },
+    lineEndings: tool.lineEndings,
+    rotation: 0,
   };
   const appearance: DistanceAppearance = {
     ...draft.measure,

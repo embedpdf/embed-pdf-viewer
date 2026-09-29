@@ -274,9 +274,9 @@ export function createPointer(
     ) {
       geometry = {
         kind: 'line',
-        a: activeDraft.from,
-        b: activeDraft.to,
-        ends: tool.lineEndings,
+        linePoints: { start: activeDraft.from, end: activeDraft.to },
+        lineEndings: tool.lineEndings,
+        rotation: 0,
       };
     } else if (activeDraft.clickCreate && 'length' in activeDraft.clickCreate) {
       geometry = clickGeom(activeDraft.clickCreate);
@@ -334,7 +334,7 @@ export function finishInkCreate(model: Model): [Model, Effect[]] {
   const annotation = newRecord(model, {
     page: draft.page,
     subtype: draft.subtype,
-    geometry: { kind: 'ink', strokes: draft.strokes },
+    geometry: { kind: 'ink', inkList: draft.strokes, rotation: 0 },
     style: toolStyleOf(model, draft.subtype, draft.preset).style,
     ...(draft.intent ? { intent: draft.intent } : {}),
     flags: { ...DRAWN_FLAGS, ...draft.flags },
@@ -362,9 +362,10 @@ export function finishPolyCreate(model: Model): [Model, Effect[]] {
   const tool = toolStyleOf(model, draft.subtype, draft.preset);
   const geometry: ModelGeometry = {
     kind: 'poly',
-    points: draft.points,
+    vertices: draft.points,
     closed: draft.closed,
-    ends: draft.closed ? undefined : tool.lineEndings,
+    lineEndings: draft.closed ? undefined : tool.lineEndings,
+    rotation: 0,
   };
   if (draft.measure && 'unavailable' in shapeMeasurementReadout(geometry, draft.measure))
     return [model, []];

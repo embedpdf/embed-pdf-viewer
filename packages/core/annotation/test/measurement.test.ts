@@ -14,16 +14,17 @@ import {
   moveDistanceCaption,
   type DistanceAppearance,
 } from '../src/measurement';
+import type { LineShape } from '../src/shapes/points';
 import type { ModelGeometry, Model, Message } from '../src/types';
 import { initialModel } from '../src/update';
 import { pageItems, chrome } from '../src/view';
 import { fieldsOf, withFields } from '../src/record';
 const PAGE = toPageRef(1);
-const geom: ModelGeometry = {
+const geom: LineShape = {
   kind: 'line',
-  a: { x: 40, y: 100 },
-  b: { x: 240, y: 100 },
-  ends: { start: 'closed-arrow', end: 'closed-arrow' },
+  linePoints: { start: { x: 40, y: 100 }, end: { x: 240, y: 100 } },
+  lineEndings: { start: 'closed-arrow', end: 'closed-arrow' },
+  rotation: 0,
 };
 const measure: DistanceAppearance = {
   intent: 'line-dimension',
@@ -95,7 +96,11 @@ describe('distance gestures and captions', () => {
     ]);
   });
   it('keeps directed offset signs for a reversed diagonal', () => {
-    const geometry: ModelGeometry = { kind: 'line', a: { x: 100, y: 100 }, b: { x: 0, y: 0 } };
+    const geometry: ModelGeometry = {
+      kind: 'line',
+      linePoints: { start: { x: 100, y: 100 }, end: { x: 0, y: 0 } },
+      rotation: 0,
+    };
     const moved = moveDistanceCaption(geometry, measure, { x: -10, y: 0 });
     expect(moved.caption.offset?.along).toBeCloseTo(Math.sqrt(50));
     expect(moved.caption.offset?.perpendicular).toBeCloseTo(Math.sqrt(50));
@@ -144,7 +149,9 @@ describe('distance gestures and captions', () => {
 
     state = step(released, create('move', 190, 160))[0];
     const preview = pageItems(state, PAGE)[0];
-    expect(preview.geometry).toMatchObject({ a: { x: 40, y: 100 }, b: { x: 240, y: 100 } });
+    expect(preview.geometry).toMatchObject({
+      linePoints: { start: { x: 40, y: 100 }, end: { x: 240, y: 100 } },
+    });
     expect((preview.measure as DistanceAppearance).leader?.length).toBe(-60);
     expect(distanceLabel(preview.geometry, preview.measure as DistanceAppearance)).toBe('4.00 m');
     expect(step(state, { type: 'cancel' })[0].order).toEqual([]);
@@ -208,8 +215,7 @@ describe('distance gestures and captions', () => {
     state = step(state, pointer('move', { x: 100, y: 100 }))[0];
     const [committed] = step(state, pointer('up', { x: 100, y: 100 }));
     expect(fieldsOf(committed.byId.a).geometry).toMatchObject({
-      a: { x: 100, y: 100 },
-      b: { x: 240, y: 100 },
+      linePoints: { start: { x: 100, y: 100 }, end: { x: 240, y: 100 } },
     });
     expect(withoutLabel(fieldsOf(committed.byId.a).measure)).toEqual(withoutLabel(measure));
     expect(fieldsOf(committed.byId.a).measure?.text).toBe('2.80 m');
@@ -232,7 +238,7 @@ describe('distance gestures and captions', () => {
     expect(outline.kind).toBe('outline');
     if (outline.kind !== 'outline') return;
 
-    const points = [geom.a, geom.b, ...layout.caption!.bounds];
+    const points = [geom.linePoints.start, geom.linePoints.end, ...layout.caption!.bounds];
     for (const node of nodes) {
       if (node.kind === 'handle') points.push(node.at);
     }
@@ -253,7 +259,10 @@ describe('distance gestures and captions', () => {
       text: '1.75 m',
       leader: { length: -15, extension: 5 },
     };
-    const short: ModelGeometry = { ...geom, a: { x: 0, y: 0 }, b: { x: 49.7457, y: 0 } };
+    const short: LineShape = {
+      ...geom,
+      linePoints: { start: { x: 0, y: 0 }, end: { x: 49.7457, y: 0 } },
+    };
     const layout = distanceLayout(short, fixtureMeasure, 1)!;
     expect(layout.arrowPlacement).toBe('outside');
     expect(layout.dimensionSegments).toEqual([
@@ -263,14 +272,21 @@ describe('distance gestures and captions', () => {
     expect(layout.caption!.center.y).toBe(26.5);
     expect(distanceHit(layout, { x: 24, y: 15 }, 1, 1)).toBe(false);
 
-    const longer: ModelGeometry = { ...short, b: { x: 56.9457, y: 0 } };
+    const longer: LineShape = {
+      ...short,
+      linePoints: { ...short.linePoints, end: { x: 56.9457, y: 0 } },
+    };
     expect(distanceLayout(longer, { ...fixtureMeasure, text: '2.01 m' }, 1)!.arrowPlacement).toBe(
       'inside',
     );
   });
 
   it('hit-tests the rotated caption rectangle rather than a circle around it', () => {
-    const diagonal: ModelGeometry = { kind: 'line', a: { x: 50, y: 50 }, b: { x: 250, y: 250 } };
+    const diagonal: ModelGeometry = {
+      kind: 'line',
+      linePoints: { start: { x: 50, y: 50 }, end: { x: 250, y: 250 } },
+      rotation: 0,
+    };
     const appearance = {
       ...measure,
       caption: { enabled: true, offset: { along: 0, perpendicular: 80 } },
