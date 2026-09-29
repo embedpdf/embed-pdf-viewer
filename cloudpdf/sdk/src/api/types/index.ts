@@ -252,6 +252,8 @@ export * from "./DocHead200Response.js";
 export * from "./DocHead404Response.js";
 export * from "./DocManifest200Response.js";
 export * from "./DocManifest404Response.js";
+export * from "./DocMetadataCustomGet200Response.js";
+export * from "./DocMetadataCustomGet404Response.js";
 export * from "./DocMetadataGet200Response.js";
 export * from "./DocMetadataGet404Response.js";
 export * from "./DocPagesDelete200Response.js";

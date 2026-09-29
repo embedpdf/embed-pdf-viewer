@@ -658,6 +658,7 @@ export class CloudDocumentHandle implements DocumentHandle {
         this.absorbPageInsert(event.meta);
         return;
       case 'metadata.updated':
+      case 'metadata.customUpdated':
         this.absorbMutation(event.meta, ['metadata']);
         return;
       case 'attachments.created':

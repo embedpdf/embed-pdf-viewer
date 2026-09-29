@@ -24,6 +24,7 @@ import {
   type FormSetValueResult,
   type FormWidgetLinkResult,
   type MetadataUpdateResult,
+  type CustomMetadataUpdateResult,
   type PageDeleteResult,
   type PageFlattenResult,
   type PageInsertResult,
@@ -204,6 +205,12 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
         type: 'metadata.updated',
         origin,
         ...(row.payload as MetadataUpdateResult),
+      };
+    case 'metadata.updateCustom':
+      return {
+        type: 'metadata.customUpdated',
+        origin,
+        ...(row.payload as CustomMetadataUpdateResult),
       };
     case 'attachment.create':
       return {

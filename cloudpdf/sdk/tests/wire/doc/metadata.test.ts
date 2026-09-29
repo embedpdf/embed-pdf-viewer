@@ -19,7 +19,6 @@ describe("MetadataClient", () => {
             createdAt: "2024-01-15T09:30:00Z",
             modifiedAt: "2024-01-15T09:30:00Z",
             trapped: "true",
-            custom: { key: "value" },
         };
 
         server

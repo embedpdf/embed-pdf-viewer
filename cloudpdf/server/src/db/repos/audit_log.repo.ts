@@ -18,6 +18,7 @@ export type AuditMutationKind =
   | 'pages.flatten'
   | 'redaction.apply'
   | 'metadata.update'
+  | 'metadata.updateCustom'
   | 'attachment.create'
   | 'attachment.delete'
   | 'form.setValue'

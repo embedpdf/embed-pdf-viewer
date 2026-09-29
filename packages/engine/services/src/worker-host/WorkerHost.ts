@@ -56,6 +56,8 @@ import {
   type LayerCloseWorkerRequest,
   type MetadataReadWorkerRequest,
   type MetadataUpdateWorkerRequest,
+  type MetadataReadCustomWorkerRequest,
+  type MetadataUpdateCustomWorkerRequest,
   type ActionsReadWorkerRequest,
   type OpenWorkerRequest,
   type PagesListWorkerRequest,
@@ -416,6 +418,12 @@ export class WorkerHost {
           break;
         case 'metadata.update':
           resultPack = this.handleMetadataUpdate(msg, ctrl.signal);
+          break;
+        case 'metadata.readCustom':
+          resultPack = this.handleMetadataReadCustom(msg, ctrl.signal);
+          break;
+        case 'metadata.updateCustom':
+          resultPack = this.handleMetadataUpdateCustom(msg, ctrl.signal);
           break;
         case 'actions.read':
           resultPack = this.handleActionsRead(msg, ctrl.signal);
@@ -960,6 +968,25 @@ export class WorkerHost {
     const mutator = new MetadataMutator(this.runtime, session);
     const result = mutator.update(req.patch, signal);
     return this.finishMutation(session, { tag: 'metadata.update', result }, req.artifactPath);
+  }
+
+  private handleMetadataReadCustom(
+    req: MetadataReadCustomWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const custom = new MetadataReader(this.runtime, session).readCustom(signal);
+    return wirePack({ tag: 'metadata.readCustom', custom });
+  }
+
+  private handleMetadataUpdateCustom(
+    req: MetadataUpdateCustomWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const mutator = new MetadataMutator(this.runtime, session);
+    const result = mutator.updateCustom(req.patch, signal);
+    return this.finishMutation(session, { tag: 'metadata.updateCustom', result }, req.artifactPath);
   }
 
   private handleActionsRead(
@@ -2152,6 +2179,7 @@ const BASE_SESSION_SUFFIX = '__base__';
 /** Every request kind that writes to a session's document. */
 const MUTATING_KINDS: ReadonlySet<WorkerRequest['kind']> = new Set<WorkerRequest['kind']>([
   'metadata.update',
+  'metadata.updateCustom',
   'annotations.create',
   'annotations.update',
   'annotations.delete',

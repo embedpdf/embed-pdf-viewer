@@ -22,6 +22,7 @@ import type {
   FormSetValueResult,
   FormWidgetLinkResult,
 } from '../mutation/FormMutationResults';
+import type { CustomMetadataUpdateResult } from '../mutation/CustomMetadataUpdateResult';
 import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
 import type { AnnotationFlattenResult } from '../mutation/AnnotationFlattenResult';
 import type { PageDeleteResult } from '../mutation/PageDeleteResult';
@@ -173,6 +174,7 @@ export type DocumentEvent =
       deleted: AttachmentRef | null;
     } & AttachmentDeleteResult)
   | ({ type: 'metadata.updated'; origin: EventOrigin } & MetadataUpdateResult)
+  | ({ type: 'metadata.customUpdated'; origin: EventOrigin } & CustomMetadataUpdateResult)
   | ({ type: 'forms.valueSet'; origin: EventOrigin } & FormSetValueResult)
   | ({ type: 'forms.imported'; origin: EventOrigin } & FormImportResult)
   | ({ type: 'forms.repaired'; origin: EventOrigin } & FormRepairResult)

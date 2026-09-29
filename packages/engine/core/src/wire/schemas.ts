@@ -21,6 +21,8 @@ import { AttachmentRefSchema, AttachmentSchema } from '../dto/Attachment.schema'
 import type { CachePins } from '../dto/CachePins';
 import type { DocumentManifest, ManifestPage } from '../dto/DocumentManifest';
 import type { LayerScopes } from '../dto/LayerScopes';
+import type { CustomMetadata } from '../dto/CustomMetadata';
+import type { CustomMetadataPatch } from '../dto/CustomMetadataPatch';
 import type { DocumentMetadata } from '../dto/DocumentMetadata';
 import type { MetadataPatch } from '../dto/MetadataPatch';
 import type { AnalyzeInput, ChangeAnalysis } from '../signature/analysis/types';
@@ -90,6 +92,7 @@ import type {
   FormSetValueResult,
   FormWidgetLinkResult,
 } from '../mutation/FormMutationResults';
+import type { CustomMetadataUpdateResult } from '../mutation/CustomMetadataUpdateResult';
 import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
 import type { CacheDelta, MutationMeta } from '../mutation/MutationMeta';
 import type { PageDeleteInput } from '../mutation/PageDeleteInput';
@@ -153,13 +156,11 @@ export const DocumentMetadataSchema: z.ZodType<DocumentMetadata> = z.object({
   createdAt: IsoDateTimeSchema.nullable(),
   modifiedAt: IsoDateTimeSchema.nullable(),
   trapped: z.enum(['true', 'false', 'unknown']),
-  custom: z.record(z.string(), z.string()),
 });
 
 /**
  * Three-state metadata patch. Mirrors annotation patch semantics:
- * `undefined` leaves a field, `null` clears it, a value sets it. `custom`
- * is a per-key three-state map (string set / null clear / absent leave).
+ * `undefined` leaves a field, `null` clears it, a value sets it.
  */
 export const MetadataPatchSchema: z.ZodType<MetadataPatch> = z
   .object({
@@ -172,9 +173,21 @@ export const MetadataPatchSchema: z.ZodType<MetadataPatch> = z
     createdAt: DateInputSchema.nullable().optional(),
     modifiedAt: DateInputSchema.nullable().optional(),
     trapped: z.enum(['true', 'false', 'unknown']).optional(),
-    custom: z.record(z.string(), z.string().nullable()).optional(),
   })
   .strict();
+
+/** The Info dict's other keys, `{ key: value }`. */
+export const CustomMetadataSchema: z.ZodType<CustomMetadata> = z.record(z.string(), z.string());
+
+/**
+ * A custom-key patch: every key is a field (string sets, `null` removes, left
+ * out stays). Which keys a PDF can hold is the engine's check, so a refusal
+ * names the key the same way on both engines.
+ */
+export const CustomMetadataPatchSchema: z.ZodType<CustomMetadataPatch> = z.record(
+  z.string(),
+  z.string().nullable(),
+);
 
 export const OpenDocumentResponseSchema = z.object({
   id: z.string(),
@@ -1383,6 +1396,11 @@ export const AttachmentListSchema: z.ZodType<AttachmentList> = z.object({
  */
 export const MetadataUpdateResultSchema: z.ZodType<MetadataUpdateResult> = z.object({
   metadata: DocumentMetadataSchema,
+  meta: MutationMetaSchema,
+});
+
+export const CustomMetadataUpdateResultSchema: z.ZodType<CustomMetadataUpdateResult> = z.object({
+  custom: CustomMetadataSchema,
   meta: MutationMetaSchema,
 });
 

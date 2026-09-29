@@ -22,6 +22,8 @@ export type {
 } from './dto/OpenInput';
 export type { DocumentMetadata, DocumentMetadataTrapped } from './dto/DocumentMetadata';
 export type { MetadataPatch } from './dto/MetadataPatch';
+export type { CustomMetadata } from './dto/CustomMetadata';
+export type { CustomMetadataPatch } from './dto/CustomMetadataPatch';
 export type { PageListSnapshot } from './dto/PageListSnapshot';
 export type { NamedPageEntry, NamedPageTarget } from './dto/NamedPage';
 export type { PageLayout, PageBoxes } from './dto/PageLayout';
@@ -695,6 +697,7 @@ export type {
   RedactionApplyResult,
 } from './mutation/RedactionApplyResult';
 export type { MetadataUpdateResult } from './mutation/MetadataUpdateResult';
+export type { CustomMetadataUpdateResult } from './mutation/CustomMetadataUpdateResult';
 
 export type {
   AnnotationActor,

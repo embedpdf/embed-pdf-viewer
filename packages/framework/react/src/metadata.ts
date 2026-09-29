@@ -1,5 +1,8 @@
 import { MetadataToken, type MetadataCapability } from '@embedpdf/plugin-metadata';
 import type {
+  CustomMetadata,
+  CustomMetadataPatch,
+  CustomMetadataUpdateResult,
   DocumentMetadata,
   EventHook,
   MetadataPatch,
@@ -35,6 +38,35 @@ export function useMetadata(): {
     status,
     update: metadata.update,
     refresh: metadata.refresh,
+    canEdit: metadata.canEdit,
+  };
+}
+
+/**
+ * The document's custom Info-dict keys, live like `useMetadata`. A key left
+ * out of `update` stays, `null` removes it, a string sets it:
+ *
+ *   const { custom, update } = useCustomMetadata();
+ *   await update({ reviewedBy: 'dana', draftOwner: null });
+ */
+export function useCustomMetadata(): {
+  custom: CustomMetadata | null;
+  status: ResourceStatus;
+  update: (
+    patch: CustomMetadataPatch,
+    options?: OperationOptions,
+  ) => Promise<CustomMetadataUpdateResult>;
+  refresh: () => Promise<void>;
+  canEdit: () => boolean;
+} {
+  const metadata = useCapability(MetadataToken);
+  const snapshot = useSelector(MetadataToken, (current) => current.custom.getSnapshot());
+  const status = useSelector(MetadataToken, (current) => current.custom.getStatus());
+  return {
+    custom: snapshot,
+    status,
+    update: metadata.custom.update,
+    refresh: metadata.custom.refresh,
     canEdit: metadata.canEdit,
   };
 }

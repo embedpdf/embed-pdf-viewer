@@ -243,6 +243,7 @@ describe('cdnCoverageForScope', () => {
       'page-annotations',
       'layout',
       'metadata',
+      'metadata-custom',
       'actions',
       'attachments',
       'attachment-files',
@@ -336,6 +337,7 @@ describe('cdnCoverageForScope', () => {
       }),
     );
     expect(metadataOwned.has('metadata')).toBe(false);
+    expect(metadataOwned.has('metadata-custom')).toBe(false);
     expect(metadataOwned.has('page-render')).toBe(true);
   });
 
@@ -435,6 +437,7 @@ describe('cdnCoverageForScope', () => {
         'layer-manifest',
         'layer-layout',
         'layer-metadata',
+        'layer-metadata-custom',
         'layer-actions',
         'page-render',
         'page-render-annotated',
@@ -456,6 +459,7 @@ describe('cdnCoverageForScope', () => {
         // doc.download.
         'layout',
         'metadata',
+        'metadata-custom',
         'actions',
         'attachments',
         'layer-attachments',

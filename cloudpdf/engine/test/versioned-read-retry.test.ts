@@ -180,7 +180,6 @@ function metadataSnapshot(title: string | null) {
     createdAt: null,
     modifiedAt: null,
     trapped: 'unknown' as const,
-    custom: {},
   };
 }
 

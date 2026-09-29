@@ -32,6 +32,9 @@ import type {
   DocumentMetadata,
   MetadataPatch,
   MetadataUpdateResult,
+  CustomMetadata,
+  CustomMetadataPatch,
+  CustomMetadataUpdateResult,
   DocumentEvent,
   EngineRenderPolicy,
   PageDestination,
@@ -61,6 +64,9 @@ export type {
   DocumentMetadata,
   MetadataPatch,
   MetadataUpdateResult,
+  CustomMetadata,
+  CustomMetadataPatch,
+  CustomMetadataUpdateResult,
   DocumentEvent,
 };
 
