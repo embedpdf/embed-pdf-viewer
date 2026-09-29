@@ -6,7 +6,7 @@ import type {
   PdfCoordinates,
   PdfLinkTarget,
 } from '../../src/shared';
-import { checkAnnotationPatch } from '../../src/shared';
+import { pdfResolveAnnotationPatch } from '../../src/shared';
 import {
   AnnotationDraftSchema,
   AnnotationPatchSchema,
@@ -145,23 +145,23 @@ describe('link kind schemas', () => {
     expect(LinkPatchSchema.safeParse({ target: { kind: 'named', name: 'NextPage' } }).success).toBe(
       true,
     );
-    const kept = checkAnnotationPatch(current, {
+    const kept = pdfResolveAnnotationPatch(current, {
       subtype: 'link',
       contents: 'Next',
       target: { name: 'NextPage', kind: 'named' },
     });
     expect(kept).toEqual({ subtype: 'link', contents: 'Next' });
     expect(() =>
-      checkAnnotationPatch(current, {
+      pdfResolveAnnotationPatch(current, {
         subtype: 'link',
         target: { kind: 'named', name: 'PrevPage' },
       }),
     ).toThrow(expect.objectContaining({ code: 'InvalidArg', details: { field: 'target' } }));
     expect(() =>
-      checkAnnotationPatch(current, { subtype: 'link', target: { kind: 'javascript' } }),
+      pdfResolveAnnotationPatch(current, { subtype: 'link', target: { kind: 'javascript' } }),
     ).toThrow(expect.objectContaining({ code: 'InvalidArg' }));
     // A writable target replaces it.
-    const uri = checkAnnotationPatch(current, {
+    const uri = pdfResolveAnnotationPatch(current, {
       subtype: 'link',
       target: { kind: 'uri', uri: 'https://embedpdf.com' },
     });

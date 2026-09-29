@@ -1,4 +1,5 @@
 import {
+  assertNoteDraftState,
   EngineError,
   EngineErrorCode,
   type AnnotationDraft,
@@ -72,12 +73,7 @@ import {
   preflightStampDraft,
   preflightStampPatch,
 } from './writeStampAnnotation';
-import {
-  applyTextDraft,
-  applyTextPatch,
-  isTextSubtype,
-  preflightTextDraft,
-} from './writeTextAnnotation';
+import { applyTextDraft, applyTextPatch, isTextSubtype } from './writeTextAnnotation';
 import {
   applyTextMarkupDraft,
   applyTextMarkupPatch,
@@ -109,7 +105,7 @@ export function preflightDraft(
     preflightRedactDraft(draft as RedactDraft<PdfCoordinates>);
   }
   if (isTextSubtype(draft.subtype)) {
-    preflightTextDraft(draft as TextDraft<PdfCoordinates>);
+    assertNoteDraftState(draft as TextDraft<PdfCoordinates>);
   }
 }
 

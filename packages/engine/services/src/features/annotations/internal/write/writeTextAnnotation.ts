@@ -1,11 +1,4 @@
-import type {
-  AnnotationDTO,
-  AnnotationPatch,
-  Color,
-  TextDraft,
-  TextPatch,
-  PdfCoordinates,
-} from '@embedpdf/engine-core/runtime';
+import type { Color, TextDraft, TextPatch, PdfCoordinates } from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode, standardStateModelOf } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -26,41 +19,6 @@ const DEFAULT_NOTE_COLOR: Color = '#ffff00';
 const DEFAULT_OPACITY = 1;
 
 /**
- * A review state needs its model (ISO 32000 §12.5.6.3): a standard state
- * brings its own, so only a custom state with none is refused.
- */
-function stateNeedsModel(state: string): EngineError {
-  return new EngineError(
-    EngineErrorCode.InvalidArg,
-    `text: the custom state '${state}' needs a stateModel`,
-    { details: { field: 'stateModel' } },
-  );
-}
-
-/** Refuse a draft whose custom state has no model, before the first write. */
-export function preflightTextDraft(draft: TextDraft<PdfCoordinates>): void {
-  if (draft.state != null && draft.stateModel == null && !standardStateModelOf(draft.state)) {
-    throw stateNeedsModel(draft.state);
-  }
-}
-
-/**
- * The patch with a new state's model filled in: a standard state sets its
- * own; a custom one keeps the annotation's, and needs one.
- */
-export function prepareTextStatePatch(
-  current: AnnotationDTO<PdfCoordinates>,
-  patch: AnnotationPatch<PdfCoordinates>,
-): AnnotationPatch<PdfCoordinates> {
-  if (current.subtype !== 'text' || patch.subtype !== 'text') return patch;
-  if (patch.state == null || patch.stateModel !== undefined) return patch;
-  const model = standardStateModelOf(patch.state);
-  if (model) return { ...patch, stateModel: model };
-  if (!current.stateModel) throw stateNeedsModel(patch.state);
-  return patch;
-}
-
-/**
  * Apply a text (sticky-note) draft. The visual is entirely generator-owned:
  * the closing appearance pass (`generateAppearance`) draws the note icon from
  * `/C` + `/Name` (GenerateTextAP), filling `/Rect`, so this writer only
@@ -78,7 +36,7 @@ export function applyTextDraft(
   setAnnotColor(fn, annotPtr, draft.color ?? DEFAULT_NOTE_COLOR);
   setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULT_OPACITY);
   setNoteIcon(fn, annotPtr, draft.icon ?? 'note');
-  // `preflightTextDraft` refused a custom state without a model.
+  // `assertNoteDraftState` refused a custom state without a model.
   const stateModel =
     draft.stateModel ?? (draft.state != null ? standardStateModelOf(draft.state) : null);
   if (stateModel != null) {
@@ -106,7 +64,7 @@ export function applyTextPatch(
   if (patch.icon !== undefined) {
     setNoteIcon(fn, annotPtr, patch.icon);
   }
-  // Three-state; `prepareTextStatePatch` filled in a new state's model.
+  // Three-state; `pdfResolveAnnotationPatch` filled in a new state's model.
   if (patch.stateModel !== undefined) {
     writeAnnotStringOrClear(
       fn,

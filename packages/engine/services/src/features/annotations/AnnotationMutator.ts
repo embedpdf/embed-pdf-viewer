@@ -4,7 +4,7 @@ import {
   annotationKeysOf,
   assertAnnotationResources,
   appearanceImpactOf,
-  checkAnnotationPatch,
+  pdfResolveAnnotationPatch,
   deletedWith,
   EngineError,
   EngineErrorCode,
@@ -32,8 +32,7 @@ import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 import { pdfPageCountOf } from './internal/write/stampDrawing';
 import { AnnotationBatchApplier } from './AnnotationBatchApplier';
 import { blendModeFromCode } from './internal/blendMode';
-import { assertDeclaredFields } from './internal/mutations/prepareCreate';
-import { prepareMeasurementPatch } from './internal/mutations/prepareMeasurementMutation';
+import { assertCaptionMetadataWritable } from './internal/mutations/captionMetadata';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import type { FontRegistrar } from '../fonts';
@@ -47,12 +46,10 @@ import {
   resolveWidgetFieldObjectNumber,
 } from './internal/read/joinWidgetField';
 import { readAnnotationFromPtr } from './internal/read/readAnnotationFromPtr';
-import { assertRichTextAgreement } from './internal/richTextWire';
 import type { AnnotationWriteContext } from './internal/write/annotationWriteContext';
 import { applyPatch, preflightPatch } from './internal/write/annotationWriterRegistry';
 import { settleAnnotationTurn } from './internal/write/writeAnnotationTransformMetadata';
 import { RawAnnotationReader } from './RawAnnotationReader';
-import { prepareTextStatePatch } from './internal/write/writeTextAnnotation';
 import { generateAppearance } from './internal/write/generateAppearance';
 import { writeAnnotationModified } from './internal/write/writeAnnotationBase';
 import {
@@ -210,11 +207,15 @@ export class AnnotationMutator {
         readContextFor(this.session, this.fonts),
       );
 
-      patch = prepareTextStatePatch(currentDto, patchForTarget(currentDto, patch));
+      // What the patch means, stated whole: the one resolution a viewer's
+      // pending view shares (`applyAnnotationPatch`). The writers below write
+      // exactly this.
+      assertCaptionMetadataWritable(fn, annotPtr, currentDto, patch);
+      patch = pdfResolveAnnotationPatch(currentDto, patch, {
+        describeFont: writeCtx.describeRegisteredFont,
+      });
       assertAnnotationResources(currentDto.subtype, resources, 'update');
       preflightPatch(patch, writeCtx);
-      assertRichTextAgreement(patch);
-      patch = prepareMeasurementPatch(fn, annotPtr, currentDto, patch);
 
       // Apply boundary: validation and cancellation are complete before the
       // first possible document write (weak-id strengthening below).
@@ -864,37 +865,6 @@ export class AnnotationMutator {
     }
     return false;
   }
-}
-
-/**
- * The patch as the target's kind: its subtype filled in from the target, which
- * a caller may leave out. A different subtype, a changed name, or any change to
- * an annotation of a type the engine doesn't model is refused.
- */
-function patchForTarget(
-  current: AnnotationDTO<PdfCoordinates>,
-  patch: AnnotationPatch<PdfCoordinates>,
-): AnnotationPatch<PdfCoordinates> {
-  if (patch.subtype !== undefined && patch.subtype !== current.subtype) {
-    throw new EngineError(EngineErrorCode.InvalidArg, 'Annotation subtype cannot change');
-  }
-  if (current.subtype === 'unsupported') {
-    throw new EngineError(
-      EngineErrorCode.InvalidArg,
-      "an annotation of a type the engine doesn't model can't be updated",
-    );
-  }
-  if (patch.nm !== undefined && patch.nm !== current.nm) {
-    throw new EngineError(
-      EngineErrorCode.InvalidArg,
-      "an annotation's nm can't change after create",
-    );
-  }
-  assertDeclaredFields(current.subtype, patch);
-  return checkAnnotationPatch(current, {
-    ...patch,
-    subtype: current.subtype,
-  } as AnnotationPatch<PdfCoordinates>);
 }
 
 /** `NotFound` for a ref by number or name, `InvalidReference` for a position out of range. */

@@ -53,7 +53,7 @@ export function applyLinkPatch(
   if (patch.target === null) clearLinkTarget(fn, annotPtr);
   else if (patch.target !== undefined) {
     // A read-only target sent back unchanged was dropped before the write
-    // (`checkAnnotationPatch`); any other one was refused there.
+    // (`pdfResolveAnnotationPatch`); any other one was refused there.
     if (patch.target.kind !== 'goto' && patch.target.kind !== 'uri') {
       throw new EngineError(
         EngineErrorCode.InvalidArg,

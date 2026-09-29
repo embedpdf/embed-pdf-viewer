@@ -146,7 +146,11 @@ export type {
   RichTextRunStyle,
   RichTextScript,
 } from './dto/RichText';
-export { richTextPlainText, richTextParagraphsFromPlainText } from './dto/RichText';
+export {
+  DEFAULT_RICH_TEXT_BODY,
+  richTextPlainText,
+  richTextParagraphsFromPlainText,
+} from './dto/RichText';
 
 export { EngineError, serializeError, deserializeError } from './errors/EngineError';
 export type { SerializedEngineError, EngineErrorOptions } from './errors/EngineError';
@@ -443,7 +447,23 @@ export type {
 } from './annotation/appearance';
 export { appearanceImpactOf, semanticEqual } from './annotation/appearance';
 export { pdfAppearanceTurnOf } from './annotation/appearanceTurn';
-export { assertAnnotationDraft, checkAnnotationPatch } from './annotation/checkWrite';
+export { assertAnnotationDraft } from './annotation/checkWrite';
+export {
+  assertDeclaredFields,
+  assertNoteDraftState,
+  assertRichTextAgreement,
+  pdfResolveAnnotationPatch,
+  resolveMeasurementDraft,
+  touchesCaption,
+  type ResolveOptions,
+} from './annotation/resolve';
+export {
+  faceForFreeTextFont,
+  isStandardFontName,
+  STANDARD_FACES,
+  type DescribeFont,
+  type FaceRequest,
+} from './annotation/fontFaces';
 
 // Page space: positions from the top-left of a page's visible box, y down.
 export type { PageBox, PagePoint, PageQuad } from './geometry';

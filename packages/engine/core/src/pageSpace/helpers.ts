@@ -5,13 +5,19 @@
  * none of that math depends on where the origin is.
  */
 
-import { pageAnnotationPatchOf, pdfAnnotationOf } from './annotations';
+import { pageAnnotationPatchOf, pdfAnnotationOf, pdfAnnotationPatchOf } from './annotations';
 import type { PageCoordinates, PdfCoordinates } from './coordinates';
 import type { VisibleBoxOf } from './destinations';
 import { mirroredRun } from './text';
 import { pdfAppearanceTurnOf } from '../annotation/appearanceTurn';
 import { pdfDrawnPointsOf } from '../annotation/drawnPoints';
-import type { AnnotationDTO } from '../annotation/kinds';
+import { semanticEqual } from '../annotation/appearance';
+import type { AnnotationDTO, AnnotationPatch } from '../annotation/kinds';
+import { applyResolvedPatch } from '../annotation/resolve/applyAnnotationPatch';
+import {
+  pdfResolveAnnotationPatch,
+  type ResolveOptions,
+} from '../annotation/resolve/resolveAnnotationPatch';
 import { DRAWN_RECT_KINDS, pdfShapeForRect, shapeFieldsOf } from '../annotation/shapeForRect';
 import {
   glyphLooseBounds,
@@ -231,4 +237,61 @@ export function shapeForRect<A extends AnnotationDTO>(annotation: A, rect: PageB
     noOtherPage,
   );
   return fields as unknown as Partial<A>;
+}
+
+/**
+ * Every page's box is the mirror, so a link's destination makes the round
+ * trip into the file's coordinates and back unchanged, with no real page.
+ */
+const mirrorEveryPage: VisibleBoxOf = () => MIRROR;
+
+/**
+ * The patch the engine writes for `patch` on `current`: its subtype filled
+ * in, checked against its kind, and every field that follows from it stated.
+ * A drawn kind's new `rect` becomes the shape fields that put it there, a
+ * note's standard review state brings its state model, a free text's
+ * contents and rich text follow each other, a callout's line stays attached
+ * to its moved box, and a measurement's label follows its points and scale.
+ * Values `patch` gives come back as given.
+ *
+ * Throws `InvalidArg` for a patch the engine would refuse.
+ */
+export function resolveAnnotationPatch(
+  current: AnnotationDTO,
+  patch: AnnotationPatch,
+  options: ResolveOptions = {},
+): AnnotationPatch {
+  const resolved = pdfResolveAnnotationPatch(
+    pdfAnnotationOf(current, MIRROR, mirrorEveryPage),
+    pdfAnnotationPatchOf(
+      { ...patch, subtype: patch.subtype ?? current.subtype } as AnnotationPatch,
+      MIRROR,
+      mirrorEveryPage,
+    ),
+    options,
+  );
+  const back = pageAnnotationPatchOf(resolved, MIRROR, mirrorEveryPage) as Record<string, unknown>;
+  // The round trip through the file's edges can move a box's last digit: a
+  // value the caller gave, that no rule changed, is the caller's own.
+  const given = patch as Record<string, unknown>;
+  for (const name of Object.keys(back)) {
+    if (given[name] !== undefined && semanticEqual(back[name], given[name]))
+      back[name] = given[name];
+  }
+  return back as AnnotationPatch;
+}
+
+/**
+ * `current` as the engine will read it after `patch`: what a viewer shows
+ * while the write is on its way. Fields the engine works out or stamps itself
+ * (a drawn kind's `rect`, the modified date and author) keep their current
+ * value until the engine's answer brings the new one. A field `patch` leaves
+ * alone keeps its very value.
+ */
+export function applyAnnotationPatch<A extends AnnotationDTO>(
+  current: A,
+  patch: AnnotationPatch,
+  options: ResolveOptions = {},
+): A {
+  return applyResolvedPatch(current, resolveAnnotationPatch(current, patch, options));
 }

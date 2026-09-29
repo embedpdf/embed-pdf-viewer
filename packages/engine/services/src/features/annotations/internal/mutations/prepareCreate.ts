@@ -1,17 +1,14 @@
 import {
-  ANNOTATION_FIELD_NAMES,
   assertAnnotationDraft,
   assertAnnotationResources,
-  EngineError,
-  EngineErrorCode,
+  assertDeclaredFields,
+  assertRichTextAgreement,
+  resolveMeasurementDraft,
   type AnnotationDraft,
-  type AnnotationSubtype,
   type WireAnnotationResources,
   type PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 
-import { prepareMeasurementDraft } from './prepareMeasurementMutation';
-import { assertRichTextAgreement } from '../richTextWire';
 import type { AnnotationWriteContext } from '../write/annotationWriteContext';
 import { preflightDraft } from '../write/annotationWriterRegistry';
 
@@ -31,17 +28,5 @@ export function prepareCreate(
   assertAnnotationResources(draft.subtype, resources, 'create');
   preflightDraft(draft, ctx);
   assertRichTextAgreement(draft);
-  return prepareMeasurementDraft(draft);
-}
-
-/** A write names only fields its kind declares: a misspelled or foreign field is refused, never ignored. */
-export function assertDeclaredFields(subtype: AnnotationSubtype, write: object): void {
-  const known = ANNOTATION_FIELD_NAMES[subtype];
-  const unknown = Object.keys(write).filter((name) => name !== 'subtype' && !known.includes(name));
-  if (unknown.length > 0) {
-    throw new EngineError(
-      EngineErrorCode.InvalidArg,
-      `${subtype} has no field ${unknown.map((name) => `'${name}'`).join(', ')}`,
-    );
-  }
+  return resolveMeasurementDraft(draft);
 }

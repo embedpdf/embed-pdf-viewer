@@ -13,7 +13,7 @@ import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runti
 import { FPDFANNOT_COLORTYPE } from '../colorType';
 import { freeTextIntentToName } from '../freeTextIntent';
 import { readDefaultAppearance } from '../read/annotationReadPrimitives';
-import { engineRichTextJson, faceForFreeTextFont, readEngineRichText } from '../richTextWire';
+import { engineRichTextJson } from '../richTextWire';
 import { DEFAULT_STANDARD_FONT, standardFontFromCode } from '../standardFont';
 import { textAlignmentToCode } from '../textAlignment';
 import type { AnnotationWriteContext } from './annotationWriteContext';
@@ -57,9 +57,6 @@ function writeRichText(
     );
   }
 }
-
-/** `#RRGGBB` for a rich body colour, as Acrobat writes it. */
-const hexColor = (color: Color): string => color.toUpperCase();
 
 /**
  * Apply a free-text draft to a freshly-created annotation. Colour model:
@@ -131,15 +128,12 @@ export function applyFreeTextDraft(
 }
 
 /**
- * Apply a free-text patch to an existing annotation. Only present fields are
- * touched. `/DA` packs the font, size, and `color` into one string, so a
- * partial patch preserves the unpatched members by reading the current triple
- * first (the same read-modify-write as {@link applyBorderPatch}'s shared
- * `/BS` call) — a `{fontSize}` patch must never reset the font or colour.
- * Registered (embedded) fonts are the one caveat: the current `/DA` reads
- * back as a font code, so preserving a registered family requires the patch
- * to restate `fontFamily` (an unknown code falls back to the standard-font
- * default).
+ * Apply a resolved free-text patch (`pdfResolveAnnotationPatch`) to an
+ * existing annotation: only present fields are touched, and every text change
+ * arrives as the rich text to write. `/DA` packs the font, size and `color`
+ * into one string, so a `color` patch keeps the current font and size by
+ * reading the triple first (the same read-modify-write as
+ * {@link applyBorderPatch}'s shared `/BS` call).
  *
  * `fontColor` here only sets an override; clearing it back to "follow
  * `color`" is out of scope this iteration.
@@ -168,11 +162,11 @@ export function applyFreeTextPatch(
 
   applyBorderPatch(fn, mem, annotPtr, patch);
 
-  // Every text write goes through the rich document — the body style lives
-  // there and the engine derives /DA from it — so the /DA read-modify-write
-  // only carries the DA colour (the border and leader), and the font, size,
-  // text colour and alignment are body-style changes.
-  const current = readEngineRichText(fn, mem, annotPtr);
+  // Every text write goes through the rich document: the body style lives
+  // there and the engine derives /DA from it. `pdfResolveAnnotationPatch`
+  // already turned new contents, a new font, size, text color or alignment
+  // into the rich text to write, so the /DA read-modify-write below only
+  // carries the DA colour (the border and leader).
   if (patch.color !== undefined) {
     const cur = readDefaultAppearance(fn, mem, annotPtr);
     applyDefaultAppearance(
@@ -189,44 +183,9 @@ export function applyFreeTextPatch(
   } else if (patch.fontColor !== undefined) {
     setAnnotColor(fn, annotPtr, patch.fontColor, FPDFANNOT_COLORTYPE.TextColor);
   }
-  {
-    if (patch.richText !== undefined) {
-      // Rich replacement: everything regenerated. (`contents`, if also
-      // given, was checked against its projection before the write.)
-      writeRichText(fn, annotPtr, patch.richText, ctx);
-    } else if (patch.contents !== undefined) {
-      // Plain-text replacement: body-style paragraphs, one per line break.
-      // Run formatting is lost by design — a plain-text client cannot
-      // preserve what it cannot see.
-      writeRichText(
-        fn,
-        annotPtr,
-        { paragraphs: richTextParagraphsFromPlainText(patch.contents ?? '') },
-        ctx,
-      );
-    } else if (
-      current &&
-      (patch.fontFamily !== undefined ||
-        patch.fontSize !== undefined ||
-        patch.fontColor !== undefined ||
-        patch.textAlign !== undefined)
-    ) {
-      // Default-style change: the body moves; runs are deltas, so every run
-      // that did not override the property follows. Alignment is a body
-      // property too: the /RC body's text-align wins over /Q on
-      // regeneration, so /Q alone (set below) would not move a rich box.
-      const body = { ...current.body };
-      if (patch.fontFamily !== undefined) {
-        const face = faceForFreeTextFont(patch.fontFamily, ctx?.describeRegisteredFont);
-        body.family = face.family;
-        if (face.weight !== undefined) body.weight = face.weight;
-        if (face.italic !== undefined) body.italic = face.italic;
-      }
-      if (patch.fontSize !== undefined) body.size = patch.fontSize;
-      if (patch.fontColor != null) body.color = hexColor(patch.fontColor);
-      if (patch.textAlign !== undefined) body.align = patch.textAlign;
-      writeRichText(fn, annotPtr, { body, paragraphs: current.paragraphs }, ctx);
-    }
+  if (patch.richText !== undefined) {
+    // Everything regenerated: /RC, /DS, /DA, /Contents and the appearance.
+    writeRichText(fn, annotPtr, patch.richText, ctx);
   }
 
   if (patch.textAlign !== undefined) {

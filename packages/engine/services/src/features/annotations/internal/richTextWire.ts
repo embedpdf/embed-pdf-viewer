@@ -1,7 +1,6 @@
 import {
-  EngineError,
-  EngineErrorCode,
-  richTextPlainText,
+  faceForFreeTextFont,
+  STANDARD_FACES,
   type FontIdentityInfo,
   type FreeTextFont,
   type RichTextBody,
@@ -13,7 +12,6 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
-import { isStandardFont } from './standardFont';
 import { readUtf8String } from '../../../runtime/memory/strings';
 
 /**
@@ -25,42 +23,13 @@ import { readUtf8String } from '../../../runtime/memory/strings';
  * a PDF does (family, weight, italic). Both directions map here.
  */
 
-export interface FaceRequest {
-  family: string;
-  weight?: number;
-  italic?: boolean;
-}
-
-interface StandardFace {
-  family: 'Helvetica' | 'Times' | 'Courier' | 'Symbol' | 'ZapfDingbats';
-  weight: number;
-  italic: boolean;
-}
-
-const STANDARD_FACES: Record<StandardFont, StandardFace> = {
-  courier: { family: 'Courier', weight: 400, italic: false },
-  'courier-bold': { family: 'Courier', weight: 700, italic: false },
-  'courier-bold-oblique': { family: 'Courier', weight: 700, italic: true },
-  'courier-oblique': { family: 'Courier', weight: 400, italic: true },
-  helvetica: { family: 'Helvetica', weight: 400, italic: false },
-  'helvetica-bold': { family: 'Helvetica', weight: 700, italic: false },
-  'helvetica-bold-oblique': { family: 'Helvetica', weight: 700, italic: true },
-  'helvetica-oblique': { family: 'Helvetica', weight: 400, italic: true },
-  'times-roman': { family: 'Times', weight: 400, italic: false },
-  'times-bold': { family: 'Times', weight: 700, italic: false },
-  'times-bold-italic': { family: 'Times', weight: 700, italic: true },
-  'times-italic': { family: 'Times', weight: 400, italic: true },
-  symbol: { family: 'Symbol', weight: 400, italic: false },
-  'zapf-dingbats': { family: 'ZapfDingbats', weight: 400, italic: false },
-};
-
 /** Family names compare without case, spaces, hyphens and underscores
  *  (the engine's own rule): "Noto Sans" == "NotoSans" == "noto-sans". */
 export function familyKey(family: string): string {
   return family.toLowerCase().replace(/[\s\-_'"]/g, '');
 }
 
-const STANDARD_FAMILY_KEYS: Record<string, StandardFace['family']> = {
+const STANDARD_FAMILY_KEYS: Record<string, (typeof STANDARD_FACES)[StandardFont]['family']> = {
   helvetica: 'Helvetica',
   arial: 'Helvetica',
   arialmt: 'Helvetica',
@@ -80,27 +49,6 @@ const STANDARD_FAMILY_KEYS: Record<string, StandardFace['family']> = {
 };
 
 /**
- * The face a DTO `fontFamily` (or a rich run's `family`) asks for: a
- * standard font's family/weight/italic, a registered key's resolved
- * identity, or — for anything else — the string itself as a family name
- * (a face the document embeds, or one the engine will substitute).
- */
-export function faceForFreeTextFont(
-  font: FreeTextFont,
-  describe?: (fontKey: string) => FontIdentityInfo | undefined,
-): FaceRequest {
-  if (isStandardFont(font)) {
-    const face = STANDARD_FACES[font];
-    return { family: face.family, weight: face.weight, italic: face.italic };
-  }
-  const registered = describe?.(font);
-  if (registered) {
-    return { family: registered.familyName, weight: registered.weight, italic: registered.italic };
-  }
-  return { family: font };
-}
-
-/**
  * The DTO `fontFamily` for a body face: the registered `key` whose identity
  * matches, else the standard font's kebab name, else the family itself.
  */
@@ -113,13 +61,19 @@ export function freeTextFontForFace(
   const standard = STANDARD_FAMILY_KEYS[familyKey(face.family)];
   if (standard) {
     const bold = face.weight >= 600;
-    for (const [name, spec] of Object.entries(STANDARD_FACES) as [StandardFont, StandardFace][]) {
+    for (const [name, spec] of Object.entries(STANDARD_FACES) as [
+      StandardFont,
+      (typeof STANDARD_FACES)[StandardFont],
+    ][]) {
       if (spec.family === standard && spec.weight >= 600 === bold && spec.italic === face.italic) {
         return name;
       }
     }
     // Symbol / ZapfDingbats have no bold or italic faces.
-    for (const [name, spec] of Object.entries(STANDARD_FACES) as [StandardFont, StandardFace][]) {
+    for (const [name, spec] of Object.entries(STANDARD_FACES) as [
+      StandardFont,
+      (typeof STANDARD_FACES)[StandardFont],
+    ][]) {
       if (spec.family === standard) return name;
     }
   }
@@ -206,24 +160,4 @@ export function readEngineRichText(
 ): RichTextDocument | null {
   const json = readUtf8String(mem, (buf, cap) => fn.EPDFAnnot_GetRichTextJSON(annotPtr, buf, cap));
   return json ? parseEngineRichText(json) : null;
-}
-
-/**
- * A draft or patch that carries both `contents` and `richText` must agree:
- * `contents` is the plain projection of the rich text. A stale
- * DTO echo fails loud here instead of quietly restoring old text.
- */
-export function assertRichTextAgreement(input: {
-  subtype?: string;
-  contents?: string | null;
-  richText?: RichTextDocumentInput;
-}): void {
-  if (input.subtype !== 'free-text' || input.richText === undefined) return;
-  if (input.contents === undefined || input.contents === null) return;
-  if (input.contents !== richTextPlainText(input.richText)) {
-    throw new EngineError(
-      EngineErrorCode.InvalidArg,
-      'free-text: `contents` must equal the plain projection of `richText` when both are given',
-    );
-  }
 }
