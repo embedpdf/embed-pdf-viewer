@@ -52,23 +52,22 @@ the same whether the user is typing or has a box selected:
 ```ts
 const annotation = useAnnotation();
 
-// The flat property vocabulary — free text declares bold/italic/underline
-// next to fontFamily/fontSize/fontColor, so a schema-driven panel renders
-// the toggles from `getSelectionProps().specs` with no new code.
-annotation.updateSelection({ bold: true });
+// The engine's field names: free text declares bold/italic/underline next to
+// fontFamily/fontSize/fontColor, so a schema-driven panel renders the toggles
+// from `getSelectionFields().fields` with no new code.
 annotation.updateSelection({ fontSize: 24, fontColor: '#c00000' });
 
-// Flip a format: reads the state `getSelectionProps` reports, writes its inverse.
-annotation.toggleTextFormat('italic');
+// Flip a format: reads the state `getSelectionFields` reports, writes its inverse.
+annotation.toggleTextFormat('bold');
 ```
 
 The routing rule: **while the text editor holds a non-empty selection, the
-range keys — `fontFamily`, `fontSize`, `fontColor`, `bold`, `italic`,
-`underline` — restyle that range's runs; otherwise they restyle the body of
-every selected free text.** `getSelectionProps()` reports the same way: with a
-range held, `values.bold` is whether every selected run is bold and `mixed`
-lists the keys the runs disagree on; a bare caret and a selected box report the
-body. Keys that aren't text (opacity, border, background) always apply to
+font, size and colour (`fontFamily`, `fontSize`, `fontColor`) and the formats
+(`toggleTextFormat`) restyle that range's runs; otherwise they restyle the body
+of every selected free text.** `getSelectionFields()` reports the same way: with
+a range held, `values.bold` is whether every selected run is bold and `mixed`
+lists the fields the runs disagree on; a bare caret and a selected box report the
+body. Fields that aren't text (opacity, border, background) always apply to
 the annotation.
 
 A formatting change on the body is written as a rich body patch; a change on

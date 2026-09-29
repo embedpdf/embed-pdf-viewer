@@ -16,10 +16,9 @@ import {
   fieldsOf,
   locateOffset,
   richDocOf,
-  type AnnotationPropsPatch,
+  type FieldValues,
   type FontLookup,
   type ModelAnnotation,
-  type PropKey,
   type RichTextRange,
   type RichTextStyleDelta,
 } from '@embedpdf/core-annotation';
@@ -47,8 +46,8 @@ export interface Face {
   italic?: boolean;
 }
 
-/** The props keys a text range takes as run deltas. */
-export const RANGE_KEYS: readonly PropKey[] = [
+/** The fields a text range takes as run deltas: its font, size and colour, and the formats. */
+export const RANGE_KEYS: readonly string[] = [
   'fontFamily',
   'fontSize',
   'fontColor',
@@ -194,44 +193,44 @@ export function stripBodyDefaults(
 // ---- Props ↔ runs --------------------------------------------------------------
 
 /**
- * Split a props patch for an annotation whose editor holds a text range:
- * the run delta the range takes (font → face, size, colour, bold → weight,
- * italic, underline → decoration) and the keys that still go to the body.
+ * Split a patch for an annotation whose editor holds a text range: the run
+ * delta the range takes (font → face, size, colour, and the formats: bold →
+ * weight, italic, underline → decoration) and the fields that still go to the
+ * annotation.
  */
-export function runDeltaForProps(
-  patch: AnnotationPropsPatch,
+export function runDeltaForFields(
+  patch: FieldValues,
   fonts?: FontLookup,
-): { delta: RichTextStyleDelta; rest: AnnotationPropsPatch } {
+): { delta: RichTextStyleDelta; rest: Record<string, unknown> } {
   const delta: RichTextStyleDelta = {};
-  const rest: AnnotationPropsPatch = {};
-  for (const key of Object.keys(patch) as PropKey[]) {
-    const value = patch[key];
+  const rest: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(patch)) {
     if (value === undefined) continue;
     switch (key) {
       case 'fontFamily': {
-        const face = faceForFont(patch.fontFamily!, fonts);
+        const face = faceForFont(value as string, fonts);
         delta.family = face.family;
         if (face.weight !== undefined) delta.weight = face.weight;
         if (face.italic !== undefined) delta.italic = face.italic;
         break;
       }
       case 'fontSize':
-        delta.size = patch.fontSize;
+        delta.size = value as number;
         break;
       case 'fontColor':
-        delta.color = hex(patch.fontColor!);
+        delta.color = hex(value as string);
         break;
       case 'bold':
-        delta.weight = patch.bold ? 700 : 400;
+        delta.weight = value ? 700 : 400;
         break;
       case 'italic':
-        delta.italic = patch.italic;
+        delta.italic = value as boolean;
         break;
       case 'underline':
-        delta.decoration = patch.underline ? ['underline'] : [];
+        delta.decoration = value ? ['underline'] : [];
         break;
       default:
-        (rest as Record<string, unknown>)[key] = value;
+        rest[key] = value;
     }
   }
   return { delta, rest };
@@ -271,7 +270,7 @@ export function rangeProps(
   doc: RichTextDocument,
   range: RichTextRange,
   fonts?: FontLookup,
-): { values: Partial<Record<PropKey, unknown>>; mixed: PropKey[] } {
+): { values: Record<string, unknown>; mixed: string[] } {
   const runs = runsInRange(doc, range);
   const body = doc.body;
   const resolve = (delta: RichTextStyleDelta): Partial<RichTextRunStyle> => ({
@@ -283,9 +282,9 @@ export function rangeProps(
     decoration: delta.decoration ?? body.decoration,
   });
   const styles = (runs.length ? runs : [{}]).map(resolve);
-  const values: Partial<Record<PropKey, unknown>> = {};
-  const mixed: PropKey[] = [];
-  const read = (key: PropKey, of: (style: Partial<RichTextRunStyle>) => unknown) => {
+  const values: Record<string, unknown> = {};
+  const mixed: string[] = [];
+  const read = (key: string, of: (style: Partial<RichTextRunStyle>) => unknown) => {
     const first = of(styles[0]!);
     values[key] = first;
     if (styles.some((style) => JSON.stringify(of(style)) !== JSON.stringify(first)))

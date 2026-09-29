@@ -1,7 +1,7 @@
 import { measureFromKnownLength, toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { record, step, withoutLabel } from './support';
+import { record, step, withoutLabel, STYLE } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
 import { DEFAULT_CHROME_GEOMETRY } from '../src/geometry';
 import { hitTest } from '../src/hit';
@@ -15,7 +15,7 @@ import {
   type DistanceAppearance,
 } from '../src/measurement';
 import type { ModelGeometry, Model, Message } from '../src/types';
-import { initialModel, initialStyle } from '../src/update';
+import { initialModel } from '../src/update';
 import { pageItems, chrome } from '../src/view';
 import { fieldsOf, withFields } from '../src/record';
 const PAGE = toPageRef(1);
@@ -39,7 +39,7 @@ const annotation = record({
   subtype: 'line',
   geometry: geom,
   measure,
-  style: initialStyle,
+  style: STYLE,
   source: 'baked',
   flags: DRAWN_FLAGS,
 });
@@ -59,14 +59,14 @@ describe('distance gestures and captions', () => {
     expect(distanceLabel(geom, measure)).toBe('4.00 m');
     expect(distanceLabel(geom, { ...measure, measure: { subtype: 'geospatial' } })).toBe('stored');
     expect(
-      distanceScene(geom, measure, initialStyle).some(
+      distanceScene(geom, measure, STYLE).some(
         (node) => node.kind === 'text' && node.text === '4.00 m',
       ),
     ).toBe(true);
   });
   it('drags captions in PDF line axes without touching geometry, and can cancel', () => {
     let state = model();
-    const at = distanceCaptionAt(geom, measure, initialStyle.strokeWidth)!;
+    const at = distanceCaptionAt(geom, measure, STYLE.strokeWidth)!;
     expect(at).toEqual({ x: 140, y: 88 });
     expect(hitTest(state, PAGE, at, DEFAULT_CHROME_GEOMETRY, 6)).toMatchObject({
       kind: 'handle',

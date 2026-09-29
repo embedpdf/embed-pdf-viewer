@@ -12,7 +12,6 @@
  *   marquee.ts                  rubber-band selection
  *   draw*.ts                    pointer drawing of new annotations
  *   text-markup.ts              markup, carets and replace-text over selected text
- *   create.ts                   creation from the API
  *   selection-edits.ts          toolbar edits of the whole selection
  *   text.ts                     free-text typing
  *   session.ts                  the session itself: defaults, rekey, forget
@@ -36,7 +35,6 @@ import type {
   Session,
   UpdateResult,
 } from '../types';
-import { createAnnot } from './create';
 import { createPointer, finishInkCreate, finishPolyCreate } from './draw';
 import { editPointer } from './edit';
 import { marqueePointer } from './marquee';
@@ -44,8 +42,10 @@ import {
   deleteSelection,
   resetRotation,
   rotateSelection,
+  setFields,
   setFlags,
-  setProps,
+  setLink,
+  setTextFormat,
 } from './selection-edits';
 import { forget, initialSession, rekey, setDefaults } from './session';
 import { setRichText, setText } from './text';
@@ -85,7 +85,6 @@ const SESSION_FIELDS = {
   preview: true,
   seq: true,
   namePrefix: true,
-  style: true,
   defaults: true,
   hitMargin: true,
   editing: true,
@@ -101,7 +100,6 @@ const sessionOf = (model: Model): Session => ({
   preview: model.preview,
   seq: model.seq,
   namePrefix: model.namePrefix,
-  style: model.style,
   defaults: model.defaults,
   hitMargin: model.hitMargin,
   editing: model.editing,
@@ -188,8 +186,6 @@ function transition(model: Model, message: Message): [Model, Effect[]] {
         message.preset,
         message.flags,
       );
-    case 'createAnnot':
-      return createAnnot(model, message);
     case 'setMarkupPreview':
       return setMarkupPreview(model, message.subtype, message.quadsByPage, message.preset);
     case 'clearMarkupPreview':
@@ -212,12 +208,16 @@ function transition(model: Model, message: Message): [Model, Effect[]] {
       const selected = model.selected.filter((id) => !drop.has(id));
       return selected.length === model.selected.length ? [model, []] : [{ ...model, selected }, []];
     }
-    case 'setProps':
-      return setProps(model, message.patch);
+    case 'setFields':
+      return setFields(model, message.patches);
+    case 'setTextFormat':
+      return setTextFormat(model, message.format, message.on);
+    case 'setLink':
+      return setLink(model, message.target);
     case 'setFlags':
       return setFlags(model, message.patch, message.ids);
     case 'setDefaults':
-      return setDefaults(model, message.subtype, message.patch);
+      return setDefaults(model, message.preset, message.patch);
     case 'setSnap':
       return [{ ...model, snap: { ...model.snap, ...message.patch } }, []];
     case 'rotate90':
@@ -251,7 +251,7 @@ function transition(model: Model, message: Message): [Model, Effect[]] {
   }
 }
 
-export { initialSession, initialStyle, defaultsFor } from './session';
+export { initialSession, defaultsFor, toolStyleOf } from './session';
 export { rotateDraftDelta } from './edit';
 export { MIN_DRAG } from './draw';
 export { annotsInBox } from './marquee';

@@ -1,7 +1,7 @@
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { record, rounded, step, type RecordInput } from './support';
+import { record, rounded, step, type RecordInput, STYLE } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
 import {
   DEFAULT_CHROME_GEOMETRY,
@@ -14,7 +14,7 @@ import { hitTest, groupUnionBounds } from '../src/hit';
 import { distanceLayout, type DistanceAppearance } from '../src/measurement';
 import { annotationSelectionFrame } from '../src/selection';
 import type { ModelAnnotation, Model, QuadRing, Point } from '../src/types';
-import { initialModel, initialStyle, annotsInBox } from '../src/update';
+import { initialModel, annotsInBox } from '../src/update';
 import { chrome, pageItems } from '../src/view';
 import { fieldsOf } from '../src/record';
 
@@ -39,7 +39,7 @@ function measurement(overrides: Partial<RecordInput> = {}): ModelAnnotation {
       b: { x: 340, y: 180 },
       ends: { start: 'closed-arrow', end: 'closed-arrow' },
     },
-    style: initialStyle,
+    style: STYLE,
     source: 'vector',
     flags: DRAWN_FLAGS,
     measure: appearance,

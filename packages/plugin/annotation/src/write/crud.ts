@@ -5,8 +5,9 @@
  * with the engine's record once the engine answered.
  */
 import { PluginError, pageRefsEqual, type OperationOptions } from '@embedpdf/core';
-import { fieldsOf, withFields } from '@embedpdf/core-annotation';
+import { defaultsFor, fieldsOf, withFields } from '@embedpdf/core-annotation';
 import {
+  ANNOTATION_FIELD_NAMES,
   annotationKey,
   annotationPatchBetween,
   type AnnotationDraft,
@@ -24,7 +25,7 @@ import { geometryWithRotation } from './page-patch';
 
 export function createCrud(
   ctx: Pick<AnnotationContext, 'document'>,
-  { store, authority }: Pick<AnnotationServices, 'store' | 'authority'>,
+  { store, authority, tools }: Pick<AnnotationServices, 'store' | 'authority' | 'tools'>,
   annotations: Pick<AnnotationReads, 'get' | 'loadedOrThrow'>,
 ) {
   /** The annotation `ref` names, as the view holds it once its writes settled. */
@@ -36,11 +37,26 @@ export function createCrud(
     return { annotation };
   };
 
+  /**
+   * `draft` over a tool's defaults and flags: what it leaves out, the tool
+   * fills in, and the engine's defaults the rest. The tool's text body is
+   * left out: it formats text drawn with the tool, and a draft brings its own.
+   */
+  const withTool = (draft: AnnotationDraft, toolId: string): AnnotationDraft => {
+    const tool = tools.get(toolId);
+    if (!tool) throw new PluginError('not-found', 'annotation', `no tool '${toolId}'`);
+    const declared = ANNOTATION_FIELD_NAMES[draft.subtype];
+    const defaults = Object.entries(defaultsFor(store.model(), tool.preset)).filter(
+      ([name]) => name !== 'richText' && declared.includes(name),
+    );
+    return { ...tool.flags, ...Object.fromEntries(defaults), ...draft } as AnnotationDraft;
+  };
+
   const create = async (
     page: PageRef,
     draft: AnnotationDraft,
     resources?: AnnotationResources,
-    options: OperationOptions & { select?: boolean } = {},
+    options: OperationOptions & { tool?: string; select?: boolean } = {},
   ): Promise<{ annotation: AnnotationDTO }> => {
     if (!authority.canCreate()) {
       throw new PluginError(
@@ -56,8 +72,9 @@ export function createCrud(
         `page ${page.pageObjectNumber} is not in this document`,
       );
     }
+    const stated = options.tool ? withTool(draft, options.tool) : draft;
     const applied = store.apply([
-      { type: 'create', page, draft, ...(resources ? { resources } : {}) },
+      { type: 'create', page, draft: stated, ...(resources ? { resources } : {}) },
     ]);
     if (options.select) store.commit({ type: 'select', ids: [...applied.ids] });
     return settled(await appliedRefOf(applied));

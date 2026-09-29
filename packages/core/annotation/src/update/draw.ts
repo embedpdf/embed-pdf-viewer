@@ -18,7 +18,6 @@ import { straightenInkStroke } from '../ink';
 import { type MeasurementAppearance } from '../measurement';
 import { shapeMeasurementReadout } from '../measurement-shape';
 import { clickCreateGeom, resolveClickPlacement } from '../placement';
-import { styleFromProps, textStyleFromProps } from '../props';
 import type {
   ClickCreate,
   ModelGeometry,
@@ -34,7 +33,7 @@ import { isPolySubtype, newRecord } from './changes';
 import { calloutPointer } from './draw-callout';
 import { distancePointer } from './draw-distance';
 import { clampPointToBox } from './page-bound';
-import { defaultsFor } from './session';
+import { toolStyleOf } from './session';
 
 /** The click ↔ drag threshold (content units): a press-release whose width and
  *  height both stay under it is a click. Exported so every gesture owner (the
@@ -209,8 +208,8 @@ export function createPointer(
     return deferInkCommit ? [next, []] : finishInkCreate(next);
   }
 
-  const definition = defaultsFor(model, activeDraft.preset ?? activeDraft.subtype);
-  const style = styleFromProps(definition);
+  const tool = toolStyleOf(model, activeDraft.subtype, activeDraft.preset);
+  const style = tool.style;
   let geometry: ModelGeometry | null = null;
   // The upright counter-rotation for a box commit (0 when the tool/page don't
   // ask for one). A dragged box keeps the on-screen footprint the author drew:
@@ -236,7 +235,7 @@ export function createPointer(
         displayRotation:
           activeDraft.kind === 'create-rect' ? activeDraft.displayRotation : undefined,
       }),
-      definition,
+      tool,
     );
   if (activeDraft.kind === 'create-rect' && activeDraft.subtype === 'free-text') {
     // Free-text: a dragged box, or — on a mere click — a default box you can
@@ -276,7 +275,7 @@ export function createPointer(
         kind: 'line',
         a: activeDraft.from,
         b: activeDraft.to,
-        ends: definition.lineEndings,
+        ends: tool.lineEndings,
       };
     } else if (activeDraft.clickCreate && 'length' in activeDraft.clickCreate) {
       geometry = clickGeom(activeDraft.clickCreate);
@@ -299,10 +298,10 @@ export function createPointer(
     style,
     // A text kind carries its text styling from birth, so the tool's font
     // defaults actually apply to what you draw.
-    ...(geometry.kind === 'text' ? { text: textStyleFromProps(definition) } : {}),
+    ...(geometry.kind === 'text' ? { text: tool.text } : {}),
     // A drawn link starts at the tool preset's target ('docs-link' style
     // presets), or dead (`null` — the create-then-edit flow).
-    ...(activeDraft.subtype === 'link' ? { link: definition.link ?? null } : {}),
+    ...(activeDraft.subtype === 'link' ? { link: tool.target } : {}),
     flags: { ...DRAWN_FLAGS, ...activeDraft.flags },
   });
   const id = annotation.id;
@@ -335,7 +334,7 @@ export function finishInkCreate(model: Model): [Model, Effect[]] {
     page: draft.page,
     subtype: draft.subtype,
     geometry: { kind: 'ink', strokes: draft.strokes },
-    style: styleFromProps(defaultsFor(model, draft.preset ?? draft.subtype)),
+    style: toolStyleOf(model, draft.subtype, draft.preset).style,
     ...(draft.intent ? { intent: draft.intent } : {}),
     flags: { ...DRAWN_FLAGS, ...draft.flags },
   });
@@ -359,12 +358,12 @@ export function finishPolyCreate(model: Model): [Model, Effect[]] {
   const minPoints = draft.closed ? 3 : 2;
   if (draft.points.length < minPoints) return [{ ...model, draft: null }, []];
 
-  const definition = defaultsFor(model, draft.preset ?? draft.subtype);
+  const tool = toolStyleOf(model, draft.subtype, draft.preset);
   const geometry: ModelGeometry = {
     kind: 'poly',
     points: draft.points,
     closed: draft.closed,
-    ends: draft.closed ? undefined : definition.lineEndings,
+    ends: draft.closed ? undefined : tool.lineEndings,
   };
   if (draft.measure && 'unavailable' in shapeMeasurementReadout(geometry, draft.measure))
     return [model, []];
@@ -374,7 +373,7 @@ export function finishPolyCreate(model: Model): [Model, Effect[]] {
     subtype: draft.subtype,
     geometry,
     measure: draft.measure,
-    style: styleFromProps(definition),
+    style: tool.style,
     flags: { ...DRAWN_FLAGS, ...draft.flags },
   });
   const id = annotation.id;

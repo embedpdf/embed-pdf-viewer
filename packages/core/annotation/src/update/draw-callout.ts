@@ -10,11 +10,10 @@ import {
   uprightRotation,
 } from '../geometry';
 import { clampRectToBox } from '../placement';
-import { styleFromProps, textStyleFromProps } from '../props';
 import type { Draft, Effect, Model, Point, PointerInput, Rect } from '../types';
 import { newRecord } from './changes';
 import { MIN_DRAG } from './draw';
-import { defaultsFor } from './session';
+import { toolStyleOf } from './session';
 
 /** Default text-box size for a callout placed with a click (no box drag). */
 const CALLOUT_BOX = { width: 150, height: 40 };
@@ -145,8 +144,8 @@ export function calloutPointer(
   // The upright counter-rotation applies to the text box only (about its own
   // centre) — the leader tip/knee are page-space anchors and never turn.
   const rot = calloutUprightRot(draft);
-  const definition = defaultsFor(model, draft.preset ?? 'free-text-callout');
-  const ending = definition.lineEndings.end !== 'none' ? definition.lineEndings.end : 'open-arrow';
+  const tool = toolStyleOf(model, 'free-text-callout', draft.preset);
+  const ending = tool.lineEnding !== 'none' ? tool.lineEnding : 'open-arrow';
   const annotation = newRecord(model, {
     page: draft.page,
     subtype: 'free-text',
@@ -156,8 +155,8 @@ export function calloutPointer(
       callout: { tip: draft.tip, knee: draft.knee, ending },
       ...(rot ? { rot } : {}),
     },
-    style: styleFromProps(definition),
-    text: textStyleFromProps(definition),
+    style: tool.style,
+    text: tool.text,
     flags: { ...DRAWN_FLAGS, ...draft.flags },
   });
   const id = annotation.id;

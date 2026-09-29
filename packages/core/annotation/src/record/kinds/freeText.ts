@@ -22,7 +22,7 @@ type FreeTextDTO = Extract<AnnotationDTO, { subtype: 'free-text' }>;
 
 /** Free-text `/DA` fields → content {@link TextStyle}. An absent `fontColor`
  *  falls back to the `/DA` colour — the same rule the CPVT renderer applies. */
-function textFromDTO(dto: FreeTextDTO): TextStyle {
+export function textFromDTO(dto: FreeTextDTO): TextStyle {
   // The rich body carries the formatting the `/DA` cannot: its weight,
   // italic and decoration read back as the toggles (absent = off).
   const body = dto.richText?.body;

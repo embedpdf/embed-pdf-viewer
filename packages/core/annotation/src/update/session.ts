@@ -3,30 +3,8 @@
  * keeping its references to records right when a record is confirmed under a
  * new id (`rekey`) or leaves the view (`forget`).
  */
-import { initialTextStyle } from '../props';
-import type {
-  AnnotationProps,
-  AnnotationPropsPatch,
-  Draft,
-  Effect,
-  Id,
-  LineEndings,
-  Model,
-  Session,
-  Style,
-  Subtype,
-} from '../types';
-
-export const initialStyle: Style = {
-  color: '#e5484d',
-  interiorColor: null,
-  strokeWidth: 2,
-  opacity: 1,
-  blendMode: 'normal',
-  border: { kind: 'solid' },
-};
-
-export const NO_ENDINGS: LineEndings = { start: 'none', end: 'none' };
+import { styleOfDefaults, type ToolStyle } from '../record/defaults';
+import type { Draft, Effect, FieldValues, Id, Model, Session } from '../types';
 
 export const initialSession: Session = {
   selected: [],
@@ -35,7 +13,6 @@ export const initialSession: Session = {
   preview: null,
   seq: 0,
   namePrefix: 'new-',
-  style: initialStyle,
   defaults: {},
   hitMargin: 6,
   editing: null,
@@ -48,32 +25,20 @@ export const initialSession: Session = {
   },
 };
 
-/**
- * Resolve a tool's effective defaults as a full flat props bag: the base `style`
- * + the font/endings base, with the per-tool override layered on top. This is
- * what a defaults-editing UI reads, and what creation projects `style`/`text`
- * from (`styleFromProps` / `textStyleFromProps`).
- */
-export function defaultsFor(model: Model, subtype: Subtype): AnnotationProps {
-  const toolDefaults = model.defaults[subtype];
-  return {
-    ...model.style,
-    ...initialTextStyle,
-    ...toolDefaults,
-    lineEndings: { ...NO_ENDINGS, ...toolDefaults?.lineEndings },
-  };
-}
+const NO_DEFAULTS: FieldValues = {};
 
-export function setDefaults(
-  model: Model,
-  subtype: Subtype,
-  patch: AnnotationPropsPatch,
-): [Model, Effect[]] {
-  const previous = model.defaults[subtype] ?? {};
-  const next: AnnotationPropsPatch = { ...previous, ...patch };
-  // Endings merge per side, so `{ end: 'open-arrow' }` keeps a configured start.
-  if (patch.lineEndings) next.lineEndings = { ...previous.lineEndings, ...patch.lineEndings };
-  return [{ ...model, defaults: { ...model.defaults, [subtype]: next } }, []];
+/** A tool's defaults, by its preset: the engine fields its creates state. */
+export const defaultsFor = (model: Model, preset: string): FieldValues =>
+  model.defaults[preset] ?? NO_DEFAULTS;
+
+/** What a tool draws a `kind` with: its defaults (by its preset), read over the engine's. */
+export const toolStyleOf = (model: Model, kind: string, preset: string = kind): ToolStyle =>
+  styleOfDefaults(kind, defaultsFor(model, preset));
+
+/** Merge fields into a tool's defaults; each value is whole, as in a patch. */
+export function setDefaults(model: Model, preset: string, patch: FieldValues): [Model, Effect[]] {
+  const next = { ...defaultsFor(model, preset), ...patch };
+  return [{ ...model, defaults: { ...model.defaults, [preset]: next } }, []];
 }
 
 /** Ids a gesture in progress works on. */

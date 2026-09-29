@@ -6,8 +6,8 @@
  * the link target in link.ts).
  */
 import { initialTextStyle } from '../props';
-import type { PropKey, RecordFields, Style } from '../types';
-import type { Wire } from './projection';
+import type { RecordFields, Style } from '../types';
+import type { LoweredKey, Wire } from './projection';
 import { hexColorOf } from './seam';
 
 /** /BS slice of the style — a cloudy border keeps a solid underlying stroke
@@ -21,7 +21,7 @@ export const borderSlice = (style: Style): Wire => ({
  *  the old projections did (a fresh draft may not carry `text` yet). */
 const textOf = (annotation: RecordFields) => annotation.text ?? initialTextStyle;
 
-export const GENERIC_PROPS: Partial<Record<PropKey, (annotation: RecordFields) => Wire>> = {
+export const GENERIC_PROPS: Partial<Record<LoweredKey, (annotation: RecordFields) => Wire>> = {
   color: (annotation) => ({ color: hexColorOf(annotation.style.color) }),
   opacity: (annotation) => ({ opacity: annotation.style.opacity }),
   blendMode: (annotation) => ({ blendMode: annotation.style.blendMode }),

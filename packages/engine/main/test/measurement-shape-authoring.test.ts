@@ -47,7 +47,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
           scale,
         );
         for (const preset of annotation.listResolvedTools()) {
-          if (preset.defaults) annotation.setToolDefaults(preset.id, preset.defaults);
+          if (preset.defaults) annotation.updateToolDefaults(preset.id, preset.defaults);
         }
         for (const point of [
           { x: 100, y: 300 },

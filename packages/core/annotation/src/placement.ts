@@ -21,9 +21,9 @@ import {
   uprightAnchoredRect,
   uprightRotation,
 } from './geometry';
-import { styleFromProps } from './props';
 import type { PageRotation } from '@embedpdf/core-geometry';
-import type { AnnotationProps, ClickCreate, ModelGeometry, Rect, Subtype, Point } from './types';
+import type { ToolStyle } from './record/defaults';
+import type { ClickCreate, ModelGeometry, Rect, Subtype, Point } from './types';
 
 /** A resolved click placement: what the click will occupy, page-clamped. */
 export type ClickPlacement =
@@ -100,11 +100,11 @@ export function resolveClickPlacement(
 export function clickCreateGeom(
   subtype: Subtype,
   placement: ClickPlacement,
-  definition: AnnotationProps,
+  tool: ToolStyle,
 ): ModelGeometry | null {
   if (placement.kind === 'segment') {
     return subtype === 'line'
-      ? { kind: 'line', a: placement.a, b: placement.b, ends: definition.lineEndings }
+      ? { kind: 'line', a: placement.a, b: placement.b, ends: tool.lineEndings }
       : null;
   }
   const { rect, rot } = placement;
@@ -114,7 +114,7 @@ export function clickCreateGeom(
   if (subtype === 'square' || subtype === 'circle') {
     return {
       kind: 'rect',
-      rect: shapeRectFor(rect, subtype === 'circle', styleFromProps(definition)),
+      rect: shapeRectFor(rect, subtype === 'circle', tool.style),
       ellipse: subtype === 'circle',
       ...(rot ? { rot } : {}),
     };

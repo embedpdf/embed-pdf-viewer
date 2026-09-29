@@ -1,74 +1,132 @@
 /**
- * Edits the toolbar applies to the whole selection: restyle, flags, quarter
- * turns, reset rotation, delete. Each changed record's change is its own
- * engine write (`update` derives it from the change set).
+ * Edits the toolbar applies to the whole selection: fields, text formats,
+ * links, flags, quarter turns, reset rotation, delete. Each changed record's
+ * change is its own engine write (`update` derives it from the change set).
  */
-import type { AnnotationFlags } from '@embedpdf/engine-core/runtime';
+import {
+  ANNOTATION_FIELD_NAMES,
+  annotationPatchBetween,
+  mergeAnnotationPatch,
+  type AnnotationFlags,
+  type AnnotationPatch,
+  type PdfLinkTarget,
+} from '@embedpdf/engine-core/runtime';
 
-import { annotDeletable, annotTransformable, flagsEqual, mergeFlags } from '../flags';
+import {
+  annotContentsEditable,
+  annotDeletable,
+  annotTransformable,
+  flagsEqual,
+  mergeFlags,
+} from '../flags';
 import { geomResetRotation, geomRotateAbout, geomRotation, rotatePoint } from '../geometry';
 import { groupUnionBounds } from '../hit';
-import { capsFor } from '../kinds';
+import { capsFor, fieldsFor } from '../kinds';
 import { linkChildrenOf } from '../links';
 import { transformMeasurementCaption } from '../measurement-shape';
-import { applyProps, kindTakesLink } from '../props';
+import { kindTakesLink } from '../props';
 import { fieldsOf, withFields } from '../record';
 import { annotationTurnPivot } from '../selection';
-import type { AnnotationPropsPatch, Effect, Id, Model, Point } from '../types';
+import type { Effect, FieldValues, Id, Model, ModelAnnotation, Point } from '../types';
 import { ownGeometry, toVector, withoutRecords } from './changes';
 
+/** The text fields: `lockedContents` gates them, not `locked`. */
+const CONTENT_FIELDS: ReadonlySet<string> = new Set(['contents', 'richText']);
+
 /**
- * Apply a flat property patch to the current selection. Each member takes only
- * the keys its kind declares (see `applyProps` — routing to `style`, `geom.ends`
- * or `text` happens there) and ignores the rest, so one patch restyles a mixed
- * selection. Changed members flip to `vector` (we own the appearance now), and
- * each one's change is written. The base style / tool defaults are never touched:
- * editing existing annotations must not change what the next drawn one looks like.
+ * The fields of `patch` a record takes now: those its kind has, and of those
+ * the ones it may change — its text unless `lockedContents`, the rest unless
+ * `locked`. Flags unlock through their own message.
  */
-export function setProps(model: Model, patch: AnnotationPropsPatch): [Model, Effect[]] {
-  if (!model.selected.length) return [model, []];
-  const byId = { ...model.byId };
-  const fx: Effect[] = [];
-  let changed = false;
+function writableFields(record: ModelAnnotation, patch: FieldValues): Record<string, unknown> {
+  const declared = ANNOTATION_FIELD_NAMES[record.annotation.subtype];
+  const fields: Record<string, unknown> = {};
+  for (const [name, value] of Object.entries(patch)) {
+    if (value === undefined || name === 'subtype' || !declared.includes(name)) continue;
+    const allowed = CONTENT_FIELDS.has(name)
+      ? annotContentsEditable(record)
+      : annotTransformable(record);
+    if (allowed) fields[name] = value;
+  }
+  return fields;
+}
+
+/**
+ * Write engine fields to records, a patch per id. Each record takes the
+ * fields its kind has and may change now (`writableFields`) and ignores the
+ * rest, so one message restyles a mixed selection. A changed record flips to
+ * `vector` (we own the appearance now), except `opaqueBody` kinds (widgets):
+ * they have no vector render, and the engine's re-baked raster replaces
+ * theirs. A value set to what it was is no change. The tool defaults are
+ * never touched: editing existing annotations doesn't change the next one drawn.
+ */
+export function setFields(
+  model: Model,
+  patches: Readonly<Record<Id, FieldValues>>,
+): [Model, Effect[]] {
+  let byId: Model['byId'] | null = null;
+  for (const [id, patch] of Object.entries(patches)) {
+    const record = model.byId[id];
+    if (!record) continue;
+    const fields = writableFields(record, patch);
+    if (!Object.keys(fields).length) continue;
+    const annotation = mergeAnnotationPatch(record.annotation, {
+      ...fields,
+      subtype: record.annotation.subtype,
+    } as AnnotationPatch);
+    if (!Object.keys(annotationPatchBetween(record.annotation, annotation)).length) continue;
+    const next = { ...record, annotation };
+    byId ??= { ...model.byId };
+    byId[id] = capsFor(record.subtype).opaqueBody ? next : toVector(next);
+  }
+  return byId ? [{ ...model, byId }, []] : [model, []];
+}
+
+/**
+ * Bold, italic or underline on or off for the selection's text bodies: each
+ * member whose kind takes the format. Runs keep their own formatting; the
+ * editor's range edits them instead.
+ */
+export function setTextFormat(
+  model: Model,
+  format: 'bold' | 'italic' | 'underline',
+  on: boolean,
+): [Model, Effect[]] {
+  let byId: Model['byId'] | null = null;
   for (const id of model.selected) {
-    const annotation = byId[id];
-    if (!annotation) continue;
-    // The `link` slot is not appearance and not model state on a non-link
-    // kind: the value lives in attached child annotations (the `linkOf`
-    // lens reads them back), so the intent is read off the PATCH and rides
-    // the target-carrying `syncLink` — the shell's reconciler owns the child
-    // operations. Locked annotations refuse it like any other prop write.
-    const linkIntent =
-      patch.link !== undefined &&
-      annotation.subtype !== 'link' &&
-      kindTakesLink(annotation.subtype) &&
-      annotTransformable(annotation);
-    const fields = fieldsOf(annotation);
-    const next = applyProps(fields, patch);
-    if (!next) {
-      // Nothing applied to the model (link-only patch on a parent, or an
-      // undeclared key) — the link intent still materializes.
-      if (linkIntent) fx.push({ type: 'syncLink', id, target: patch.link ?? null });
+    const record = model.byId[id];
+    if (!record || !annotTransformable(record)) continue;
+    if (!fieldsFor(record.subtype).some((spec) => spec.key === format)) continue;
+    const { text } = fieldsOf(record);
+    if (!text || (text[format] ?? false) === on) continue;
+    byId ??= { ...model.byId };
+    byId[id] = toVector(withFields(record, { text: { ...text, [format]: on } }));
+  }
+  return byId ? [{ ...model, byId }, []] : [model, []];
+}
+
+/**
+ * Link the selection to `target`, or unlink it (`null`). The link kind's own
+ * `/A` is a field of it; every other linkable kind's link lives in attached
+ * child annotations, so it rides a `syncLink` effect and the plugin's
+ * reconciler writes the children. Locked annotations refuse it.
+ */
+export function setLink(model: Model, target: PdfLinkTarget | null): [Model, Effect[]] {
+  let byId: Model['byId'] | null = null;
+  const fx: Effect[] = [];
+  for (const id of model.selected) {
+    const record = model.byId[id];
+    if (!record || !annotTransformable(record) || !kindTakesLink(record.subtype)) continue;
+    if (record.subtype !== 'link') {
+      fx.push({ type: 'syncLink', id, target });
       continue;
     }
-    const linkChanged = next.link !== fields.link;
-    const otherChanged =
-      next.style !== fields.style ||
-      next.geometry !== fields.geometry ||
-      next.text !== fields.text ||
-      next.icon !== fields.icon;
-    const written = withFields(annotation, next);
-    // A restyle flips to vector (we own the appearance now) — except
-    // `opaqueBody` kinds (widgets), which have no vector render: they stay
-    // baked and the shell re-fetches the engine's re-baked raster on resolve.
-    // Flipping them would also drop them out of `appearanceEpoch`, freezing
-    // their raster forever.
-    byId[id] =
-      capsFor(annotation.subtype).opaqueBody || !otherChanged ? written : toVector(written);
-    changed ||= otherChanged || linkChanged;
-    if (linkIntent) fx.push({ type: 'syncLink', id, target: patch.link ?? null });
+    const next = withFields(record, { link: target });
+    if (next === record) continue;
+    byId ??= { ...model.byId };
+    byId[id] = next;
   }
-  return changed || fx.length ? [{ ...model, byId }, fx] : [model, []];
+  return [byId ? { ...model, byId } : model, fx];
 }
 
 /**

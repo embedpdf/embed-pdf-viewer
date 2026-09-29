@@ -11,12 +11,11 @@ import type {
   PageBox,
   PdfLinkTarget,
   PdfLinkTargetWritable,
-  StandardFont,
   WidgetAppearance,
 } from '@embedpdf/engine-core/runtime';
 
 import { FLAG_KEYS } from '../flags';
-import type { AnnotationPropsPatch, Border, ModelGeometry, Rect, Style } from '../types';
+import type { Border, FieldValues, ModelGeometry, Rect, Style } from '../types';
 
 // The one annotation key (engine-core `annotationKey`): obj:<n> | nm:<page>:<name> | idx:<page>:<i>.
 export { annotationKey } from '@embedpdf/core';
@@ -203,26 +202,27 @@ export function styleFromDTO(dto: AnnotationDTO): Style {
   };
 }
 
+const WIDGET_APPEARANCE_FIELDS = [
+  'color',
+  'interiorColor',
+  'strokeWidth',
+  'borderStyle',
+  'fontFamily',
+  'fontSize',
+  'fontColor',
+  'textAlign',
+] as const;
+
 /**
- * The flat props vocabulary (CSS colours, house keys) → the engine's widget
- * appearance for `doc.forms` authoring — the same mapping the widget patch
- * lowering uses, exported as a boundary utility so the form plugin can style
- * `placeField` from a tool's `currentDefaults` without growing a second CSS
- * parser. Absent keys stay absent (the engine writes nothing for them).
+ * A form tool's defaults as the engine's widget appearance for `doc.forms`
+ * authoring: the widget's style fields among them, as they are. Absent fields
+ * stay absent (the engine writes nothing for them).
  */
-export function widgetAppearanceFromProps(props: AnnotationPropsPatch): WidgetAppearance {
-  return {
-    ...(props.color !== undefined ? { color: hexColorOf(props.color) } : {}),
-    ...(props.interiorColor !== undefined
-      ? { interiorColor: props.interiorColor ? hexColorOf(props.interiorColor) : null }
-      : {}),
-    ...(props.strokeWidth !== undefined ? { strokeWidth: props.strokeWidth } : {}),
-    ...(props.border !== undefined
-      ? { borderStyle: props.border.kind === 'dashed' ? ('dashed' as const) : ('solid' as const) }
-      : {}),
-    ...(props.fontFamily !== undefined ? { fontFamily: props.fontFamily as StandardFont } : {}),
-    ...(props.fontSize !== undefined ? { fontSize: props.fontSize } : {}),
-    ...(props.fontColor !== undefined ? { fontColor: hexColorOf(props.fontColor) } : {}),
-    ...(props.textAlign !== undefined ? { textAlign: props.textAlign } : {}),
-  };
+export function widgetAppearanceOf(defaults: FieldValues): WidgetAppearance {
+  return Object.fromEntries(
+    WIDGET_APPEARANCE_FIELDS.filter((name) => defaults[name] !== undefined).map((name) => [
+      name,
+      defaults[name],
+    ]),
+  ) as WidgetAppearance;
 }

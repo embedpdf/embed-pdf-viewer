@@ -19,24 +19,31 @@
 import type { ModelGeometry, Subtype } from './types';
 
 /**
- * One editable property of a kind, as a UI contract: which {@link AnnotationProps}
- * key, rendered how (the union arm fixes the control + its constraints), labelled
- * what by default. A property sidebar is a `switch (spec.key)` over these — the
- * per-kind lists below are the property schema, kept in the library so every
- * consumer gets it for free.
+ * One editable field of a kind, as a UI contract: which engine field, rendered
+ * how (the union arm fixes the control and its constraints), labelled what by
+ * default. A property sidebar is a `switch (field.key)` over these; it reads
+ * `values[field.key]` and writes `{ [field.key]: value }`, so the per-kind
+ * lists below are the property schema, kept in the library so every consumer
+ * gets it for free.
+ *
+ * `key` is the engine's field name, with three exceptions: the border picker
+ * reads and writes `borderStyle`, `dashArray` and `cloudyIntensity` together;
+ * `bold`, `italic` and `underline` are the rich body's formatting; and `link`
+ * is an attached link, not a field of the annotation.
  *
  * `label` is a default (English) display name — apps with i18n map `key`s to
  * their own strings and ignore it. Array order is display order.
  */
-export type PropSpec =
+export type FieldSpec =
   | { key: 'color'; label: string }
   | { key: 'interiorColor'; label: string }
   | { key: 'fontColor'; label: string }
   | { key: 'opacity'; label: string; min: number; max: number; step: number }
   | { key: 'strokeWidth'; label: string; min: number; max: number; step: number }
   | { key: 'fontSize'; label: string; min: number; max: number; step: number }
-  /** Border style picker; `cloudy` says whether this kind honours a cloudy border. */
-  | { key: 'border'; label: string; cloudy: boolean }
+  /** Border picker over `borderStyle`, `dashArray` and `cloudyIntensity`;
+   *  `cloudy` says whether this kind takes a cloudy border. */
+  | { key: 'borderStyle'; label: string; cloudy: boolean }
   | { key: 'lineEndings'; label: string }
   | { key: 'fontFamily'; label: string }
   | { key: 'textAlign'; label: string }
@@ -51,7 +58,7 @@ export type PropSpec =
   /** Link-target editor (URL / page destination). Declared by the link kind
    *  (its own target) and by every kind that may carry an attached link;
    *  kinds that omit it (widgets, caret, redact…) simply cannot be links —
-   *  `applyProps` drops the key and menus never show the control. */
+   *  menus never show the control. */
   | { key: 'link'; label: string };
 
 /** Orthogonal capability flags. Static data — the annotation's `/F` flags are
@@ -111,14 +118,14 @@ export interface AnnotationKind {
   intent?: string;
   variant: ModelGeometry['kind'];
   caps: KindCaps;
-  /** The kind's editable properties, in display order — the contract a property
-   *  sidebar renders from (see {@link PropSpec}). Empty = nothing to edit. */
-  props: PropSpec[];
+  /** The kind's editable fields, in display order — the contract a property
+   *  sidebar renders from (see {@link FieldSpec}). Empty = nothing to edit. */
+  fields: FieldSpec[];
 }
 
 /* Shared spec entries — plain data, spread into the per-kind lists below. */
-const OPACITY: PropSpec = { key: 'opacity', label: 'Opacity', min: 0.1, max: 1, step: 0.05 };
-const ICON_COLOR: PropSpec = { key: 'color', label: 'Color' };
+const OPACITY: FieldSpec = { key: 'opacity', label: 'Opacity', min: 0.1, max: 1, step: 0.05 };
+const ICON_COLOR: FieldSpec = { key: 'color', label: 'Color' };
 
 /* `/Name` values per icon kind — mirrors the engine's NoteIcon /
  * FileAttachmentIcon unions (the appearance generator's vocabulary). */
@@ -132,31 +139,31 @@ const NOTE_ICONS = [
   'insert',
 ] as const;
 const FILE_ATTACHMENT_ICONS = ['push-pin', 'paperclip', 'graph', 'tag'] as const;
-const STROKE: PropSpec = { key: 'color', label: 'Stroke' };
-const FILL: PropSpec = { key: 'interiorColor', label: 'Fill' };
-const STROKE_WIDTH: PropSpec = {
+const STROKE: FieldSpec = { key: 'color', label: 'Stroke' };
+const FILL: FieldSpec = { key: 'interiorColor', label: 'Fill' };
+const STROKE_WIDTH: FieldSpec = {
   key: 'strokeWidth',
   label: 'Stroke width',
   min: 0.5,
   max: 30,
   step: 0.5,
 };
-const BORDER_CLOUDY: PropSpec = { key: 'border', label: 'Border', cloudy: true };
-const BORDER_PLAIN: PropSpec = { key: 'border', label: 'Border', cloudy: false };
-const LINE_ENDINGS: PropSpec = { key: 'lineEndings', label: 'Line endings' };
-const BLEND_MODE: PropSpec = { key: 'blendMode', label: 'Blend mode' };
+const BORDER_CLOUDY: FieldSpec = { key: 'borderStyle', label: 'Border', cloudy: true };
+const BORDER_PLAIN: FieldSpec = { key: 'borderStyle', label: 'Border', cloudy: false };
+const LINE_ENDINGS: FieldSpec = { key: 'lineEndings', label: 'Line endings' };
+const BLEND_MODE: FieldSpec = { key: 'blendMode', label: 'Blend mode' };
 
 /**
  * "This annotation links somewhere" — one spec, shared by every kind that can
- * carry an attached link (a grouped `/Link` child; see AnnotationProps.link).
+ * carry an attached link (a grouped `/Link` child; see RecordFields.link).
  * Deliberately absent from: widget-* (a widget's `/A` is forms-plane
  * behavior, not an attached link), caret (an anchored edit marker),
  * file-attachment (its click means "open the attachment"), and redact.
  */
-const LINKABLE: PropSpec = { key: 'link', label: 'Link' };
+const LINKABLE: FieldSpec = { key: 'link', label: 'Link' };
 
 /** Shapes with a fill + a (possibly cloudy) border: square / circle / polygon. */
-const SHAPE_PROPS: PropSpec[] = [STROKE, FILL, OPACITY, STROKE_WIDTH, BORDER_CLOUDY, LINKABLE];
+const SHAPE_PROPS: FieldSpec[] = [STROKE, FILL, OPACITY, STROKE_WIDTH, BORDER_CLOUDY, LINKABLE];
 
 // Widget-plane styling: every family has a box; text-bearing families add
 // the /DA vocabulary. Same flat keys as every other kind — the writer maps
@@ -164,13 +171,13 @@ const SHAPE_PROPS: PropSpec[] = [STROKE, FILL, OPACITY, STROKE_WIDTH, BORDER_CLO
 // kinds (the free-text/callout precedent): the field family picks the kind,
 // so a radio never offers a font and the schema-driven sidebar needs no
 // widget-specific code.
-const WIDGET_BOX_PROPS: PropSpec[] = [
+const WIDGET_BOX_PROPS: FieldSpec[] = [
   { key: 'color', label: 'Border color' },
   { key: 'interiorColor', label: 'Background' },
   { key: 'strokeWidth', label: 'Border width', min: 0, max: 12, step: 0.5 },
-  { key: 'border', label: 'Border style', cloudy: false },
+  { key: 'borderStyle', label: 'Border style', cloudy: false },
 ];
-const WIDGET_TEXT_PROPS: PropSpec[] = [
+const WIDGET_TEXT_PROPS: FieldSpec[] = [
   ...WIDGET_BOX_PROPS,
   { key: 'fontFamily', label: 'Font' },
   { key: 'fontSize', label: 'Font size', min: 0, max: 96, step: 1 },
@@ -179,7 +186,7 @@ const WIDGET_TEXT_PROPS: PropSpec[] = [
 ];
 /** Stroked vertex kinds with `/LE` endings: line / polyline. The fill colours a
  *  Closed ending (closed arrow / circle / square / diamond). */
-const LINE_PROPS: PropSpec[] = [
+const LINE_PROPS: FieldSpec[] = [
   STROKE,
   FILL,
   OPACITY,
@@ -189,10 +196,10 @@ const LINE_PROPS: PropSpec[] = [
   LINKABLE,
 ];
 /** Text markup: colour/opacity plus its appearance-stream blend mode. */
-const MARK_PROPS: PropSpec[] = [{ key: 'color', label: 'Color' }, OPACITY, BLEND_MODE, LINKABLE];
+const MARK_PROPS: FieldSpec[] = [{ key: 'color', label: 'Color' }, OPACITY, BLEND_MODE, LINKABLE];
 /** Carets are anchored text-edit markers, without a blend-mode control. */
-const CARET_PROPS: PropSpec[] = [{ key: 'color', label: 'Color' }, OPACITY];
-const INK_PROPS: PropSpec[] = [
+const CARET_PROPS: FieldSpec[] = [{ key: 'color', label: 'Color' }, OPACITY];
+const INK_PROPS: FieldSpec[] = [
   { key: 'color', label: 'Color' },
   OPACITY,
   STROKE_WIDTH,
@@ -201,7 +208,7 @@ const INK_PROPS: PropSpec[] = [
 ];
 /** Redaction marks: outline at rest; the fill + label are what apply paints.
  *  Label size 0 = auto-fit to the region (the engine's convention). */
-const REDACT_PROPS: PropSpec[] = [
+const REDACT_PROPS: FieldSpec[] = [
   { key: 'color', label: 'Outline' },
   FILL,
   OPACITY,
@@ -211,7 +218,7 @@ const REDACT_PROPS: PropSpec[] = [
   { key: 'textAlign', label: 'Align' },
 ];
 /** Free text: font first (the primary surface), then box background + border. */
-const TEXT_PROPS: PropSpec[] = [
+const TEXT_PROPS: FieldSpec[] = [
   { key: 'fontFamily', label: 'Font' },
   { key: 'fontSize', label: 'Font size', min: 4, max: 96, step: 1 },
   { key: 'fontColor', label: 'Text color' },
@@ -268,7 +275,7 @@ export const KINDS: Record<string, AnnotationKind> = {
       opaqueBody: true,
       ignoresReadOnly: true,
     }),
-    props: WIDGET_TEXT_PROPS,
+    fields: WIDGET_TEXT_PROPS,
   },
   'widget-choice': {
     subtype: 'widget-choice',
@@ -282,7 +289,7 @@ export const KINDS: Record<string, AnnotationKind> = {
       opaqueBody: true,
       ignoresReadOnly: true,
     }),
-    props: WIDGET_TEXT_PROPS,
+    fields: WIDGET_TEXT_PROPS,
   },
   'widget-button': {
     subtype: 'widget-button',
@@ -296,7 +303,7 @@ export const KINDS: Record<string, AnnotationKind> = {
       opaqueBody: true,
       ignoresReadOnly: true,
     }),
-    props: WIDGET_TEXT_PROPS,
+    fields: WIDGET_TEXT_PROPS,
   },
   'widget-toggle': {
     subtype: 'widget-toggle',
@@ -310,7 +317,7 @@ export const KINDS: Record<string, AnnotationKind> = {
       opaqueBody: true,
       ignoresReadOnly: true,
     }),
-    props: WIDGET_BOX_PROPS,
+    fields: WIDGET_BOX_PROPS,
   },
   'widget-box': {
     subtype: 'widget-box',
@@ -324,7 +331,7 @@ export const KINDS: Record<string, AnnotationKind> = {
       opaqueBody: true,
       ignoresReadOnly: true,
     }),
-    props: WIDGET_BOX_PROPS,
+    fields: WIDGET_BOX_PROPS,
   },
   'free-text': {
     subtype: 'free-text',
@@ -341,7 +348,7 @@ export const KINDS: Record<string, AnnotationKind> = {
       commentable: true,
       hasFill: true, // `/C` box background
     }),
-    props: TEXT_PROPS,
+    fields: TEXT_PROPS,
   },
   square: {
     subtype: 'square',
@@ -358,7 +365,7 @@ export const KINDS: Record<string, AnnotationKind> = {
       hasFill: true,
       hasCloudy: true,
     }),
-    props: SHAPE_PROPS,
+    fields: SHAPE_PROPS,
   },
   circle: {
     subtype: 'circle',
@@ -375,7 +382,7 @@ export const KINDS: Record<string, AnnotationKind> = {
       hasFill: true,
       hasCloudy: true,
     }),
-    props: SHAPE_PROPS,
+    fields: SHAPE_PROPS,
   },
   line: {
     subtype: 'line',
@@ -391,7 +398,7 @@ export const KINDS: Record<string, AnnotationKind> = {
       commentable: true,
       hasEndings: true,
     }),
-    props: LINE_PROPS,
+    fields: LINE_PROPS,
   },
   polygon: {
     subtype: 'polygon',
@@ -408,7 +415,7 @@ export const KINDS: Record<string, AnnotationKind> = {
       hasFill: true,
       hasCloudy: true,
     }),
-    props: SHAPE_PROPS,
+    fields: SHAPE_PROPS,
   },
   polyline: {
     subtype: 'polyline',
@@ -424,7 +431,7 @@ export const KINDS: Record<string, AnnotationKind> = {
       commentable: true,
       hasEndings: true,
     }),
-    props: LINE_PROPS,
+    fields: LINE_PROPS,
   },
   // Ink: freehand strokes. Selectable + movable as a whole; no single-shape
   // resize/vertex handles (the strokes are the geometry), but rotatable and
@@ -441,7 +448,7 @@ export const KINDS: Record<string, AnnotationKind> = {
       groupRotatable: true,
       commentable: true,
     }),
-    props: INK_PROPS,
+    fields: INK_PROPS,
   },
   // Text markup: selectable + anchored (bound to text — recolor/delete, never
   // move/resize). Created from a text selection, not a drag (see the markup tool).
@@ -449,25 +456,25 @@ export const KINDS: Record<string, AnnotationKind> = {
     subtype: 'highlight',
     variant: 'quads',
     caps: caps({ selectable: true, anchored: true, commentable: true }),
-    props: MARK_PROPS,
+    fields: MARK_PROPS,
   },
   underline: {
     subtype: 'underline',
     variant: 'quads',
     caps: caps({ selectable: true, anchored: true, commentable: true }),
-    props: MARK_PROPS,
+    fields: MARK_PROPS,
   },
   squiggly: {
     subtype: 'squiggly',
     variant: 'quads',
     caps: caps({ selectable: true, anchored: true, commentable: true }),
-    props: MARK_PROPS,
+    fields: MARK_PROPS,
   },
   strikeout: {
     subtype: 'strikeout',
     variant: 'quads',
     caps: caps({ selectable: true, anchored: true, commentable: true }),
-    props: MARK_PROPS,
+    fields: MARK_PROPS,
   },
   // Redaction mark (the non-destructive stage of the two-stage model): created
   // from a text selection (per-line quads) or an area drag (rect-only geometry).
@@ -485,13 +492,13 @@ export const KINDS: Record<string, AnnotationKind> = {
       commentable: true,
       hasFill: true,
     }),
-    props: REDACT_PROPS,
+    fields: REDACT_PROPS,
   },
   caret: {
     subtype: 'caret',
     variant: 'caret',
     caps: caps({ selectable: true, anchored: true, commentable: true }),
-    props: CARET_PROPS,
+    fields: CARET_PROPS,
   },
   // Sticky note ("comment"): a fixed 20x20 icon whose visual is the
   // engine-baked /AP (generated from /C + /Name). Screen-constant and
@@ -510,7 +517,7 @@ export const KINDS: Record<string, AnnotationKind> = {
       noZoom: true,
       noRotate: true,
     }),
-    props: [{ key: 'icon', label: 'Icon', options: NOTE_ICONS }, ICON_COLOR, OPACITY, LINKABLE],
+    fields: [{ key: 'icon', label: 'Icon', options: NOTE_ICONS }, ICON_COLOR, OPACITY, LINKABLE],
   },
   // File attachment: the same fixed-icon shape as the note, but its primary
   // surface is the embedded file (open/download), not a popup.
@@ -526,7 +533,7 @@ export const KINDS: Record<string, AnnotationKind> = {
       noZoom: true,
       noRotate: true,
     }),
-    props: [{ key: 'icon', label: 'Icon', options: FILE_ATTACHMENT_ICONS }, ICON_COLOR, OPACITY],
+    fields: [{ key: 'icon', label: 'Icon', options: FILE_ATTACHMENT_ICONS }, ICON_COLOR, OPACITY],
   },
   // Stamp: a rect-variant kind whose visual is always the engine-baked /AP
   // (image or vector appearance authored at create time) — never a vector
@@ -547,7 +554,7 @@ export const KINDS: Record<string, AnnotationKind> = {
       commentable: true,
       opaqueBody: true,
     }),
-    props: [OPACITY, LINKABLE],
+    fields: [OPACITY, LINKABLE],
   },
   // Link: an invisible hit rectangle that navigates somewhere. Paints nothing
   // of its own (scene() skips it; any /AP a PDF baked shows via the page
@@ -565,18 +572,18 @@ export const KINDS: Record<string, AnnotationKind> = {
       groupMovable: true,
       opaqueBody: true,
     }),
-    props: [LINKABLE],
+    fields: [LINKABLE],
   },
 };
 
 /** The capabilities of a subtype, or the read-only default for unknown kinds. */
 export const capsFor = (subtype: string): KindCaps => KINDS[subtype]?.caps ?? READONLY;
 
-const NO_PROPS: PropSpec[] = [];
+const NO_FIELDS: FieldSpec[] = [];
 
-/** A kind's editable properties in display order — empty for unknown kinds.
+/** A kind's editable fields in display order — empty for unknown kinds.
  *  Stable references, so selectors can compare by identity. */
-export const propsFor = (subtype: string): PropSpec[] => KINDS[subtype]?.props ?? NO_PROPS;
+export const fieldsFor = (subtype: string): FieldSpec[] => KINDS[subtype]?.fields ?? NO_FIELDS;
 
 /** A text-markup kind (highlight/underline/squiggly/strikeout). These are drawn
  *  on the text layer, which always sits beneath every other annotation. */

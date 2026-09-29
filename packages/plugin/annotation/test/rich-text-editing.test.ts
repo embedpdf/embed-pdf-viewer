@@ -162,7 +162,8 @@ describe('the property surface while editing', () => {
     const harness = await loaded(freeTextDTO('hello world'));
     harness.capability.beginTextEdit(REF);
     harness.capability.setTextSelection(REF, { start: 0, end: 5 });
-    harness.capability.updateSelection({ bold: true, fontColor: '#ff0000' });
+    harness.capability.toggleTextFormat('bold');
+    harness.capability.updateSelection({ fontColor: '#ff0000' });
     // As the engine will read it back: colours in lowercase.
     expect(harness.data().richText.paragraphs).toEqual([
       {
@@ -170,12 +171,12 @@ describe('the property surface while editing', () => {
       },
     ]);
     expect(fieldsOf(harness.model().byId[harness.id]!).text!.bold).toBeUndefined(); // the body is untouched
-    const props = harness.capability.getSelectionProps();
+    const props = harness.capability.getSelectionFields();
     expect(props.values).toMatchObject({ bold: true, fontColor: '#ff0000', italic: false });
     expect(props.mixed).toEqual([]);
     harness.capability.setTextSelection(REF, { start: 3, end: 8 });
-    const across = harness.capability.getSelectionProps();
-    expect(across.mixed.sort()).toEqual(['bold', 'fontColor']);
+    const across = harness.capability.getSelectionFields();
+    expect([...across.mixed].sort()).toEqual(['bold', 'fontColor']);
     vi.advanceTimersByTime(300);
     expect(harness.update).toHaveBeenCalledTimes(1);
     expect(harness.update.mock.calls[0]![1]).toMatchObject({
@@ -202,7 +203,7 @@ describe('the property surface while editing', () => {
     harness.capability.setTextSelection(REF, { start: 2, end: 2 });
     harness.capability.toggleTextFormat('bold');
     expect(fieldsOf(harness.model().byId[harness.id]!).text!.bold).toBe(true);
-    expect(harness.capability.getSelectionProps().values.bold).toBe(true);
+    expect(harness.capability.getSelectionFields().values.bold).toBe(true);
     expect(harness.capability.listTextItems(PAGE)[0]!.css.fontWeight).toBe(700);
     const bodyWrite = harness.update.mock.calls.find((call) => call[1].richText?.body);
     // The complete body rides along: a partial one would mean engine
@@ -220,7 +221,8 @@ describe('the property surface while editing', () => {
     harness.capability.beginTextEdit(REF);
     harness.capability.draftRichText(REF, { paragraphs: [{ runs: [{ text: 'typed' }] }] });
     harness.capability.setTextSelection(REF, { start: 0, end: 5 });
-    harness.capability.updateSelection({ opacity: 0.5, underline: true });
+    harness.capability.toggleTextFormat('underline');
+    harness.capability.updateSelection({ opacity: 0.5 });
     expect(fieldsOf(harness.model().byId[harness.id]!).style.opacity).toBe(0.5);
     // order: the (flushed) text write, then the opacity write
     expect(harness.update.mock.calls.map((call) => Object.keys(call[1]).sort().join(','))).toEqual([

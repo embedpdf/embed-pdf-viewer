@@ -85,7 +85,7 @@ export const widgetKindOf = (family: string): string =>
   WIDGET_KIND_BY_FAMILY[family] ?? 'widget-box';
 const WIDGET_TEXT_KINDS = new Set(['widget-text', 'widget-choice', 'widget-button']);
 
-function widgetTextFromDTO(dto: Extract<AnnotationDTO, { subtype: 'widget' }>): TextStyle {
+export function widgetTextFromDTO(dto: Extract<AnnotationDTO, { subtype: 'widget' }>): TextStyle {
   return {
     fontFamily: dto.fontFamily ?? 'helvetica',
     fontSize: dto.fontSize ?? 0, // 0 = auto-size

@@ -7,14 +7,14 @@
 import { quadBounds } from '@embedpdf/core-geometry';
 
 import { selectionQuad, unionRect } from '../geometry';
-import { propsFor } from '../kinds';
+import { fieldsFor } from '../kinds';
 import type { Rect, RecordFields } from '../types';
 import { annotationKey } from './seam';
 
 /** Does this kind's table declare the `link` prop (may it carry an attached
  *  link)? Widgets/caret/redact/file-attachment deliberately don't. */
 const takesLink = (subtype: string): boolean =>
-  propsFor(subtype).some((spec) => spec.key === 'link');
+  fieldsFor(subtype).some((spec) => spec.key === 'link');
 
 /**
  * The desired hit rects (page space) of a parent's attached link

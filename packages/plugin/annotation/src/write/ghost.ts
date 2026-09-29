@@ -1,10 +1,9 @@
 import {
   clickCreateGeom,
-  defaultsFor,
   fitStampBox,
   geomVisualBounds,
   resolveClickPlacement,
-  styleFromProps,
+  toolStyleOf,
   type ModelGeometry,
   type Rect,
   type Point,
@@ -39,7 +38,7 @@ export function createGhost(
     geometry: ModelGeometry,
   ): void => {
     const tool = tools.get(toolId);
-    const style = styleFromProps(defaultsFor(store.model(), tool?.preset ?? toolId));
+    const { style } = toolStyleOf(store.model(), tool?.subtype ?? toolId, tool?.preset);
     ctx.state.update(setToolGhost, {
       page: toPageRef(pageObjectNumber),
       box: geomVisualBounds(geometry, style.strokeWidth, style.border),
@@ -103,7 +102,7 @@ export function createGhost(
     const ghostGeometry = clickCreateGeom(
       tool.subtype,
       placement,
-      defaultsFor(store.model(), tool.preset),
+      toolStyleOf(store.model(), tool.subtype, tool.preset),
     );
     if (!ghostGeometry) {
       clearGhost();

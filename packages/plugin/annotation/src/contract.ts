@@ -17,13 +17,11 @@ import type {
 } from '@embedpdf/core';
 import type {
   AnnotationFlags,
-  AnnotationProps,
-  AnnotationPropsPatch,
   CreationDraftAnchor,
+  FieldSpec,
+  FieldValues,
   ModelGeometry,
   Id,
-  PropKey,
-  PropSpec,
   Rect,
   SnapSettings,
   Subtype,
@@ -67,15 +65,12 @@ export type {
 } from '@embedpdf/engine-core/runtime';
 export type {
   AnnotationFlags,
-  AnnotationProps,
-  AnnotationPropsPatch,
   BlendMode,
-  Border,
   ClickCreate,
+  FieldSpec,
+  FieldValues,
   LineEnding,
   LineEndings,
-  PropKey,
-  PropSpec,
   SnapSettings,
   TextAlign,
 } from '@embedpdf/core-annotation';
@@ -188,7 +183,7 @@ export interface AnnotationConfig {
    * Add or configure authoring tools at load. Entries merge over the built-ins by
    * id (configure one — `{ id: 'ink', defaults: { strokeWidth: 6 } }`), add a new
    * tool (a fresh id), or make a preset with `extends`
-   * (`{ id: 'arrow', extends: 'line', defaults: { lineEndings: { end: 'open-arrow' } } }`).
+   * (`{ id: 'arrow', extends: 'line', defaults: { lineEndings: { start: 'none', end: 'open-arrow' } } }`).
    * See {@link AnnotationToolDef}. The runtime equivalent is
    * {@link AnnotationCapability.registerTool}.
    */
@@ -235,16 +230,23 @@ export interface Behavior {
 }
 
 /**
- * The current selection's editable properties, ready to render: the ordered
- * {@link PropSpec}s every selected kind declares (a mixed selection shows the
- * shared subset, in the first kind's order), the first member's `values`, and
- * which keys differ across members (`mixed` — render an indeterminate control).
- * Empty `specs` = nothing selected / nothing editable.
+ * Editable fields, ready to render: the ordered {@link FieldSpec}s, their
+ * `values` by field name, and which fields differ across the selection
+ * (`mixed` — render an indeterminate control).
+ *
+ * For the selection, the fields are the ones every selected kind declares (a
+ * mixed selection shows the shared subset, in the first kind's order), and
+ * the values the first member's; empty `fields` = nothing selected or nothing
+ * editable. For a tool, they are its kind's fields and its defaults over the
+ * engine's. The border picker's value is three fields (`borderStyle`,
+ * `dashArray`, `cloudyIntensity`); a text's font, size, colour and alignment
+ * read as the text shows (a free text's `fontColor` follows its `color` when
+ * it has none).
  */
-export interface SelectionProps {
-  specs: PropSpec[];
-  values: Partial<AnnotationProps>;
-  mixed: PropKey[];
+export interface EditableFields {
+  readonly fields: readonly FieldSpec[];
+  readonly values: FieldValues;
+  readonly mixed: readonly string[];
 }
 
 /**
@@ -369,7 +371,7 @@ export interface AnnotationTool {
   readonly preset: string;
   readonly cursor: string;
   readonly enables: readonly string[];
-  readonly defaults?: AnnotationPropsPatch;
+  readonly defaults?: FieldValues;
   readonly flags?: Partial<AnnotationFlags>;
   readonly upright: boolean;
 }
@@ -471,15 +473,16 @@ export interface AnnotationCapability {
   // ── creating, updating and deleting, in the engine's own terms ──
   /**
    * Create an annotation from an engine draft: what the draft leaves out takes
-   * the engine's defaults. Bytes travel beside it (a stamp's `appearance`, a
-   * file attachment's `file`). It shows at once; resolves with the engine's
-   * record. `select` selects it, as a tool does.
+   * the `tool`'s defaults when one is named, then the engine's. Bytes travel
+   * beside it (a stamp's `appearance`, a file attachment's `file`). It shows
+   * at once; resolves with the engine's record. `select` selects it, as a
+   * tool does.
    */
   create(
     page: PageRef,
     draft: AnnotationDraft,
     resources?: AnnotationResources,
-    options?: OperationOptions & { select?: boolean },
+    options?: OperationOptions & { tool?: string; select?: boolean },
   ): Promise<{ annotation: AnnotationDTO }>;
   /**
    * Text markup, an insert-text caret, a replace-text pair or redaction marks
@@ -533,8 +536,8 @@ export interface AnnotationCapability {
   clearSelection(): void;
   getSelection(): readonly AnnotationRef[];
   listSelected(): readonly AnnotationDTO[];
-  /** Editable property specs, values and mixed keys for the selection. Reference-stable. */
-  getSelectionProps(): SelectionProps;
+  /** The selection's editable fields, values and mixed fields. Reference-stable. */
+  getSelectionFields(): EditableFields;
   /** The selection's `/F` flags (null for a mixed key). Reference-stable. */
   getSelectionFlags(): SelectionFlags | null;
   /** Where selection UI attaches, in page space; a view env projects the knob for a rotated view. */
@@ -543,8 +546,19 @@ export interface AnnotationCapability {
     rotation?: PageRotation;
     zoom?: number;
   }): AnnotationSelectionAnchor | null;
+  /**
+   * Change the selection's fields: each member takes the ones its kind has.
+   * A function patches each member relative to itself (one line ending
+   * across a mixed selection). While the text editor holds a range, the
+   * font, size and colour restyle that range instead.
+   */
   updateSelection(
-    patch: AnnotationPropsPatch,
+    patch: AnnotationPatch | ((annotation: AnnotationDTO) => AnnotationPatch),
+    options?: OperationOptions,
+  ): Promise<BatchResult<AnnotationRef, AnnotationRef>>;
+  /** Link the selection somewhere, or unlink it (`null`): the link's own target, or an attached link. */
+  updateSelectionLink(
+    target: PdfLinkTarget | null,
     options?: OperationOptions,
   ): Promise<BatchResult<AnnotationRef, AnnotationRef>>;
   updateSelectionFlags(
@@ -584,11 +598,15 @@ export interface AnnotationCapability {
   getTool(id: string): AnnotationTool | null;
   /** Add or replace a tool at runtime (the config equivalent is `tools`). */
   registerTool(definition: AnnotationToolInput): Unsubscribe;
-  /** A tool's resolved defaults (local drawing preferences — never collaborative). */
-  getToolDefaults(toolId: string): AnnotationProps;
-  setToolDefaults(toolId: string, patch: AnnotationPropsPatch): void;
-  /** Property specs the tool's target kind declares — the "what can I edit here". */
-  listPropSpecs(toolId: string): readonly PropSpec[];
+  /**
+   * A tool's defaults over the engine's for its kind: a draft without its
+   * shape (local drawing preferences — never collaborative).
+   */
+  getToolDefaults(toolId: string): FieldValues;
+  /** Merge fields into a tool's defaults; each value is whole, as in a patch. */
+  updateToolDefaults(toolId: string, patch: FieldValues): void;
+  /** The fields a tool's style panel edits, with the tool's current values. */
+  getToolFields(toolId: string): EditableFields;
 
   // ── settings (live) ──
   getSnapSettings(): SnapSettings;

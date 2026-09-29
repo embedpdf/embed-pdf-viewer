@@ -7,10 +7,9 @@ import type { AnnotationFlags, PageRef } from '@embedpdf/engine-core/runtime';
 
 import { DRAWN_FLAGS } from '../flags';
 import { caretGeomFromAnchor } from '../geometry';
-import { styleFromProps } from '../props';
 import type { Effect, Model, Subtype, TextEndAnchor, Quad } from '../types';
 import { newRecord } from './changes';
-import { defaultsFor } from './session';
+import { toolStyleOf } from './session';
 
 /** Drop degenerate segment quads (zero-length baseline or ink extent). Area is
  *  the cross product of the two edge vectors — orientation-safe. */
@@ -42,7 +41,7 @@ export function createMarkup(
     page,
     subtype,
     geometry: { kind: 'quads', quads },
-    style: styleFromProps(defaultsFor(model, preset)),
+    style: toolStyleOf(model, subtype, preset).style,
     flags: { ...DRAWN_FLAGS, ...flags },
   });
   const id = annotation.id;
@@ -75,7 +74,7 @@ export function createReplaceText(
 ): [Model, Effect[]] {
   const quads = usableQuads(segmentQuads);
   if (!quads.length) return [model, []];
-  const style = styleFromProps(defaultsFor(model, preset));
+  const style = toolStyleOf(model, 'strikeout', preset).style;
   const caret = newRecord(model, {
     page,
     subtype: 'caret',
@@ -122,12 +121,11 @@ export function createCaret(
 ): [Model, Effect[]] {
   const caretGeom = caretGeomFromAnchor(anchor);
   if (caretGeom.rect.width <= 0 || caretGeom.rect.height <= 0) return [model, []];
-  const definition = defaultsFor(model, 'caret');
   const annotation = newRecord(model, {
     page,
     subtype: 'caret',
     geometry: caretGeom,
-    style: styleFromProps(definition),
+    style: toolStyleOf(model, 'caret').style,
     flags: { ...DRAWN_FLAGS, ...flags },
   });
   const id = annotation.id;

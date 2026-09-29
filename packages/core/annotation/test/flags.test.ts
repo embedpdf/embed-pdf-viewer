@@ -2,7 +2,7 @@ import { quadFromRect } from '@embedpdf/core-geometry';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { modelWith, record, step, type RecordInput } from './support';
+import { modelWith, record, step, type RecordInput, STYLE, restyle } from './support';
 import { anchoredGeom, anchorModeOf, anchorOf, unanchoredGeom, type ViewEnv } from '../src/anchor';
 import {
   DRAWN_FLAGS,
@@ -44,7 +44,7 @@ const square = (
     page: PAGE,
     subtype: 'square',
     geometry: { kind: 'rect', rect: { x: 100, y: 100, width: 80, height: 60 }, ellipse: false },
-    style: initialModel.style,
+    style: STYLE,
     flags,
     source: 'vector',
     ...over,
@@ -190,7 +190,7 @@ describe('flag-driven behavior in the model', () => {
     expect(nodes.some((node) => node.kind === 'handle')).toBe(false);
     expect(nodes.some((node) => node.kind === 'rotate-knob')).toBe(false);
     // restyle is blocked, silently (no effect emitted)
-    const [afterProps, propsFx] = step(model, { type: 'setProps', patch: { color: '#00ff00' } });
+    const [afterProps, propsFx] = step(model, restyle(model, { color: '#00ff00' }));
     expect(fieldsOf(afterProps.byId['l1']).style.color).toBe(
       fieldsOf(model.byId['l1']).style.color,
     );
@@ -385,7 +385,7 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
     const [item] = pageItems(model, PAGE, view);
     if (item.geometry.kind !== 'rect') throw new Error('expected rect');
     expect(item.geometry.rect).toEqual({ x: 100, y: 100, width: 40, height: 30 });
-    expect(item.style.strokeWidth).toBe(initialModel.style.strokeWidth / 2);
+    expect(item.style.strokeWidth).toBe(STYLE.strokeWidth / 2);
     // a point inside the effective footprint but outside nothing else hits it…
     const inside = hitTest(
       model,

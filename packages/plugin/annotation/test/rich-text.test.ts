@@ -15,7 +15,7 @@ import {
   cssFontFamilyForFont,
   fontForFace,
   rangeProps,
-  runDeltaForProps,
+  runDeltaForFields,
   textCommitPatch,
 } from '../src/rich-text';
 
@@ -120,7 +120,7 @@ describe('documents', () => {
 describe('props ↔ runs', () => {
   it('turns the range keys into a run delta and leaves the rest for the body', () => {
     expect(
-      runDeltaForProps(
+      runDeltaForFields(
         {
           bold: true,
           italic: false,
@@ -135,12 +135,12 @@ describe('props ↔ runs', () => {
       delta: { weight: 700, italic: false, decoration: ['underline'], size: 9, color: '#00FF00' },
       rest: { opacity: 0.5 },
     });
-    expect(runDeltaForProps({ fontFamily: 'roboto-bold' }, fonts).delta).toEqual({
+    expect(runDeltaForFields({ fontFamily: 'roboto-bold' }, fonts).delta).toEqual({
       family: 'Roboto',
       weight: 700,
       italic: false,
     });
-    expect(runDeltaForProps({ bold: false, underline: false }).delta).toEqual({
+    expect(runDeltaForFields({ bold: false, underline: false }).delta).toEqual({
       weight: 400,
       decoration: [],
     });

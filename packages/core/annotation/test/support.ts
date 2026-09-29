@@ -8,11 +8,13 @@ import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 import { annotationOfRecord, recordOf } from '../src/record';
 import type {
   Effect,
+  FieldValues,
   Message,
   Model,
   ModelAnnotation,
   RecordFields,
   Session,
+  Style,
   UpdateResult,
 } from '../src/types';
 import { initialModel, sameSession, update } from '../src/update';
@@ -95,3 +97,19 @@ export function withoutLabel<M extends { text: string }>(
   const { text: _label, ...rest } = measure;
   return rest;
 }
+
+/** A plain style for fixtures: red, two points wide. */
+export const STYLE: Style = {
+  color: '#e5484d',
+  interiorColor: null,
+  strokeWidth: 2,
+  opacity: 1,
+  blendMode: 'normal',
+  border: { kind: 'solid' },
+};
+
+/** A sidebar edit of the selection: the same fields for every selected record. */
+export const restyle = (model: Model, patch: FieldValues): Message => ({
+  type: 'setFields',
+  patches: Object.fromEntries(model.selected.map((id) => [id, patch])),
+});

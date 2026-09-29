@@ -43,8 +43,7 @@ import {
   type ViewEnv,
 } from './anchor';
 import { blendFor } from './scene';
-import { styleFromProps } from './props';
-import { calloutBox, calloutUprightRot, defaultsFor, rotateDraftDelta } from './update';
+import { calloutBox, calloutUprightRot, rotateDraftDelta, toolStyleOf } from './update';
 import type {
   ModelAnnotation,
   ChromeNode,
@@ -279,8 +278,8 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
     // ghost is a faithful WYSIWYG of what will commit — not the bare base style. A
     // cloudy rect stores the outer box (see `shapeRectFor`), so the cloud grows out
     // from the cursor; a 0-drag draws nothing (skipped, like a solid 0×0).
-    const definition = defaultsFor(model, draft.preset ?? draft.subtype);
-    const style = styleFromProps(definition);
+    const tool = toolStyleOf(model, draft.subtype, draft.preset);
+    const style = { ...tool.style };
     if (draft.kind === 'create-distance' && style.interiorColor == null) {
       style.interiorColor = style.color;
     }
@@ -295,13 +294,13 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
             }
           : null
         : draft.kind === 'create-line' || draft.kind === 'create-distance'
-          ? { kind: 'line', a: draft.from, b: draft.to, ends: definition.lineEndings }
+          ? { kind: 'line', a: draft.from, b: draft.to, ends: tool.lineEndings }
           : draft.kind === 'create-poly'
             ? {
                 kind: 'poly',
                 points: polyPreviewPoints(draft.points, draft.current),
                 closed: draft.closed,
-                ends: draft.closed ? undefined : definition.lineEndings,
+                ends: draft.closed ? undefined : tool.lineEndings,
               }
             : { kind: 'ink', strokes: draft.strokes };
     if (geometry) {
@@ -328,10 +327,9 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
   // Callout creation ghost: the in-progress leader (tip → cur, then tip → knee →
   // box) and the text-box preview, painted through the same vector scene.
   if (draft?.kind === 'create-callout' && draft.page.pageObjectNumber === pageObjectNumber) {
-    const definition = defaultsFor(model, draft.preset ?? draft.subtype);
-    const style = styleFromProps(definition);
-    const ending =
-      definition.lineEndings.end !== 'none' ? definition.lineEndings.end : 'open-arrow';
+    const tool = toolStyleOf(model, draft.subtype, draft.preset);
+    const style = tool.style;
+    const ending = tool.lineEnding !== 'none' ? tool.lineEnding : 'open-arrow';
     // The box preview carries the same upright rot the commit will apply, so
     // the ghost box (and its leader connection) is what you actually get.
     const rot = calloutUprightRot(draft);
@@ -366,7 +364,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
       subtype: model.preview.subtype,
       geometry,
       box: geomVisualBounds(geometry, 0),
-      style: styleFromProps(defaultsFor(model, model.preview.preset)),
+      style: toolStyleOf(model, model.preview.subtype, model.preview.preset).style,
       source: 'ghost',
       selected: false,
     });

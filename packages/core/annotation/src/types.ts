@@ -173,41 +173,11 @@ export interface TextStyle {
 }
 
 /**
- * The one flat vocabulary for editable appearance properties — what property
- * sidebars/toolbars read and write, regardless of where each property is stored
- * internally (`style`, `geom.ends`, or `text`). Which keys apply to a kind, and
- * in what UI order, is declared per kind in the kind table (`propsFor`).
+ * Engine fields by name, as a create or an update states them: a tool's
+ * defaults (a draft without its shape), or what a selection edit writes to
+ * each member. The kind table's {@link FieldSpec}s say which a sidebar edits.
  */
-export interface AnnotationProps extends Style, TextStyle {
-  /** `/LE` endings (line / polyline). */
-  lineEndings: LineEndings;
-  /**
-   * `/Name` icon of an icon kind (text note, file attachment). Optional in
-   * the bag — each kind falls back to its own spec default ('comment',
-   * 'paperclip') at creation, so one flat vocabulary needs no per-kind base
-   * value. Valid values are the `options` of the kind's `icon` PropSpec.
-   */
-  icon?: string;
-  /**
-   * Where this annotation links to, or `null` for none. Optional in the bag
-   * like `icon`. One key, two storages (the props.ts routing rule): on the
-   * link kind it is the annotation's own target (`/A`); on every other
-   * linkable kind it is the target of the attached link child(ren) —
-   * grouped `/Link` annotations the model folds into their parent (the
-   * serialization the PDF spec forces, since only Link annotations are
-   * clickable). Writing it creates/retargets/deletes those children through
-   * the one `syncLink` seam.
-   */
-  link?: PdfLinkTarget | null;
-}
-
-export type PropKey = keyof AnnotationProps;
-
-/** A partial property write. `lineEndings` merges per side (set just `end`
- *  without knowing `start`); every other key overwrites. */
-export type AnnotationPropsPatch = {
-  [K in PropKey]?: K extends 'lineEndings' ? Partial<LineEndings> : AnnotationProps[K];
-};
+export type FieldValues = Readonly<Record<string, unknown>>;
 
 /**
  * One annotation as the core works on it: the engine's record, and how it is
@@ -314,8 +284,7 @@ export interface RecordFields extends Omit<ModelAnnotation, 'annotation'> {
   /** Normalized PDF `/IT` for intent-bearing annotations authored before a DTO exists. */
   intent?: CaretIntent | StrikeoutIntent | InkIntent;
   /**
-   * The link kind's own `/A` target (see {@link AnnotationProps.link}) —
-   * present only on `subtype: 'link'`. Every other kind's link is an
+   * The link kind's own `/A` target — present only on `subtype: 'link'`. Every other kind's link is an
    * attached child annotation in the substrate, read through the `linkOf`
    * lens and materialized by the shell's `syncLink` reconciler; parents
    * store nothing.
@@ -553,12 +522,12 @@ export interface Session {
    * its own, so two sessions never name two annotations alike.
    */
   namePrefix: string;
-  /** The base style new annotations inherit (per-tool `defaults` layer on top). */
-  style: Style;
-  /** Per-tool (keyed by subtype / tool id) property overrides for newly drawn
-   *  annotations — the same flat vocabulary `setProps` uses. `lineEndings` is
-   *  stored fully resolved (merged at `setDefaults` time). */
-  defaults: Record<string, AnnotationPropsPatch>;
+  /**
+   * Each tool's defaults for the annotations it draws, keyed by the tool's
+   * preset: the engine fields its creates state. The engine's own defaults
+   * fill in what they leave out.
+   */
+  defaults: Record<string, FieldValues>;
   /** Extra clickable margin (content units) around a stroke — bump it for touch. */
   hitMargin: number;
   /** The free-text annotation currently in text-edit mode (its `contentEditable`
@@ -718,23 +687,6 @@ export type Message =
     }
   | { type: 'finishInkDraft' }
   | { type: 'finishCreationDraft' }
-  /**
-   * Programmatic creation from page-space geometry — the data API's `create`.
-   * Adds the same `new:` record a draw tool commits, from the preset's
-   * defaults with `props` layered on top, and emits the same `create` effect:
-   * one commit path for pointer and API. `preset` defaults to `subtype`.
-   */
-  | {
-      type: 'createAnnot';
-      page: PageRef;
-      subtype: Subtype;
-      geometry: ModelGeometry;
-      preset?: string;
-      props?: AnnotationPropsPatch;
-      flags?: Partial<AnnotationFlags>;
-      /** Select the new annotation (a tool would); default false for API creates. */
-      select?: boolean;
-    }
   | {
       type: 'createCaret';
       page: PageRef;
@@ -779,10 +731,16 @@ export type Message =
   // a freshly placed form widget). Unknown/unselectable ids are dropped;
   // selecting a group member takes the whole group, like a click would.
   | { type: 'select'; ids: Id[]; add?: boolean }
-  // Apply a flat property patch to the current selection. Each member takes the
-  // keys its kind declares (`propsFor`) and ignores the rest, so one message
-  // restyles a mixed selection. Members flip to `vector`; one patch effect each.
-  | { type: 'setProps'; patch: AnnotationPropsPatch }
+  // Write engine fields to records, a patch per id: each takes the fields its
+  // kind has and ignores the rest, so one message restyles a mixed selection.
+  // A locked record takes none (`contents` and `richText` follow
+  // `lockedContents` instead). Members flip to `vector`.
+  | { type: 'setFields'; patches: Readonly<Record<Id, FieldValues>> }
+  // Bold, italic or underline on the selection's text bodies.
+  | { type: 'setTextFormat'; format: 'bold' | 'italic' | 'underline'; on: boolean }
+  // Link the selection somewhere, or unlink it (`null`): the link kind's own
+  // target, or every other linkable kind's attached link.
+  | { type: 'setLink'; target: PdfLinkTarget | null }
   // Merge a `/F` flags patch into the selection (or explicit ids). Flags are
   // not appearance: members keep their render `source` (no /AP re-bake), and —
   // deliberately — the write is not gated by `locked`: this is how you unlock
@@ -790,7 +748,8 @@ export type Message =
   // `flags` effect per changed committed member; an uncommitted draft just
   // merges (its create draft carries the flags when it commits).
   | { type: 'setFlags'; patch: Partial<AnnotationFlags>; ids?: Id[] }
-  | { type: 'setDefaults'; subtype: Subtype; patch: AnnotationPropsPatch }
+  // Merge fields into a tool's defaults (keyed by its preset).
+  | { type: 'setDefaults'; preset: string; patch: FieldValues }
   // Live-adjust snapping (a UI toggle) — merges into `Model.snap`.
   | { type: 'setSnap'; patch: Partial<SnapSettings> }
   // Rotate the current selection by a fixed quarter-turn (clockwise) about its

@@ -50,7 +50,14 @@ describe('pending changes', () => {
       page: toPageRef(1),
       subtype: 'square',
       geometry: { kind: 'rect', rect: { x: 0, y: 0, width: 10, height: 10 }, ellipse: false },
-      style: initialSession.style,
+      style: {
+        color: '#e5484d',
+        interiorColor: null,
+        strokeWidth: 2,
+        opacity: 1,
+        blendMode: 'normal',
+        border: { kind: 'solid' },
+      },
       flags: DRAWN_FLAGS,
       source: 'baked',
     } as const;

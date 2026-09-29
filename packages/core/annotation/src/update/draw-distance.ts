@@ -3,11 +3,10 @@ import type { AnnotationFlags } from '@embedpdf/engine-core/runtime';
 
 import { DRAWN_FLAGS } from '../flags';
 import { distanceLeaderLength, type DistanceAppearance } from '../measurement';
-import { styleFromProps } from '../props';
 import type { ModelGeometry, Effect, Model, PointerInput } from '../types';
 import { newRecord } from './changes';
 import { MIN_DRAG } from './draw';
-import { defaultsFor } from './session';
+import { toolStyleOf } from './session';
 
 /**
  * Distance creation has two stages. Releasing the endpoint drag only advances
@@ -78,12 +77,12 @@ export function distancePointer(
     return [model, []];
   }
 
-  const defaults = defaultsFor(model, draft.preset);
+  const tool = toolStyleOf(model, draft.subtype, draft.preset);
   const geometry: ModelGeometry = {
     kind: 'line',
     a: draft.from,
     b: draft.to,
-    ends: defaults.lineEndings,
+    ends: tool.lineEndings,
   };
   const appearance: DistanceAppearance = {
     ...draft.measure,
@@ -103,8 +102,8 @@ export function distancePointer(
     geometry,
     measure: appearance,
     style: {
-      ...styleFromProps(defaults),
-      interiorColor: defaults.interiorColor ?? defaults.color,
+      ...tool.style,
+      interiorColor: tool.style.interiorColor ?? tool.style.color,
     },
     flags: { ...DRAWN_FLAGS, ...draft.flags },
   });

@@ -1,7 +1,7 @@
 import { measureFromKnownLength, toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { record, rounded, step, withoutLabel } from './support';
+import { record, rounded, step, withoutLabel, STYLE } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
 import {
   DEFAULT_CHROME_GEOMETRY,
@@ -22,7 +22,7 @@ import {
 import { scene } from '../src/scene';
 import { annotationSelectionFrame } from '../src/selection';
 import type { ModelAnnotation, ModelGeometry, Model, Message, Point } from '../src/types';
-import { initialModel, initialStyle } from '../src/update';
+import { initialModel } from '../src/update';
 import { chrome, creationDraftAnchor, pageItems } from '../src/view';
 import { fieldsOf } from '../src/record';
 
@@ -49,7 +49,7 @@ function annotation(measure = appearance, geom = geometry): ModelAnnotation {
     subtype: geom.kind === 'poly' && geom.closed ? 'polygon' : 'polyline',
     geometry: geom,
     measure,
-    style: initialStyle,
+    style: STYLE,
     flags: DRAWN_FLAGS,
     source: 'baked',
   });
@@ -143,7 +143,7 @@ describe('area and perimeter authoring', () => {
 
   it('drags text directly, preserves vertices, and emits only a caption patch', () => {
     let model = selected();
-    const center = shapeMeasurementLayout(geometry, appearance, initialStyle)!.caption!.center;
+    const center = shapeMeasurementLayout(geometry, appearance, STYLE)!.caption!.center;
     expect(hitTest(model, PAGE, center, DEFAULT_CHROME_GEOMETRY, 6)).toMatchObject({
       handle: 'caption',
     });
@@ -182,7 +182,7 @@ describe('area and perimeter authoring', () => {
       const initial = selected(annotation(measure));
       const frame = annotationSelectionFrame(initial.byId.shape);
       const pivot = turnPivotOf(fieldsOf(initial.byId.shape).geometry);
-      const caption = shapeMeasurementLayout(geometry, measure, initialStyle)!.caption!;
+      const caption = shapeMeasurementLayout(geometry, measure, STYLE)!.caption!;
       const knob = chrome(initial, PAGE).find((node) => node.kind === 'rotate-knob');
       if (knob?.kind !== 'rotate-knob') throw new Error('Missing rotation knob');
       const armed = pointer(initial, 'down', knob.at);

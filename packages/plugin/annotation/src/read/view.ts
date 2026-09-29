@@ -219,7 +219,7 @@ export function createView(
           ? draft
           : null,
       preview: whole.preview?.byPage[pageObjectNumber] ? whole.preview : null,
-      settings: [whole.style, whole.defaults, whole.hitMargin, whole.snap],
+      settings: [whole.defaults, whole.hitMargin, whole.snap],
     };
     if (cached && samePageParts(cached.parts, parts)) {
       pageSlices.set(pageObjectNumber, { whole, parts: cached.parts, model: cached.model });

@@ -1,8 +1,8 @@
 import { quadFromRect } from '@embedpdf/core-geometry';
-import { toPageRef, type AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import { ANNOTATION_DEFAULTS, toPageRef, type AnnotationDTO } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { modelWith, record, step, type RecordInput } from './support';
+import { modelWith, record, step, type RecordInput, STYLE, restyle } from './support';
 import { cloudyBorderExtent } from '../src/cloudy';
 import { annotDeletable, annotTransformable, DRAWN_FLAGS } from '../src/flags';
 import {
@@ -63,13 +63,12 @@ import type {
 } from '../src/types';
 import {
   annotsInBox,
-  defaultsFor,
   initialModel,
-  initialStyle,
   rotateDraftDelta,
   update,
   EMPTY_CHANGE,
   sameSession,
+  toolStyleOf,
 } from '../src/update';
 import {
   chrome,
@@ -231,7 +230,7 @@ describe('resolveClickPlacement — the shared placement layer', () => {
       const ghost = clickCreateGeom(
         subtype,
         resolveClickPlacement(point, policy, { pageBox }),
-        defaultsFor(initialModel, subtype),
+        toolStyleOf(initialModel, subtype),
       );
       expect(ghost).toEqual(committed);
     }
@@ -599,14 +598,15 @@ describe('annotation-core', () => {
     expect(fx[0]).toMatchObject({ type: 'create', id: annotation.id });
     expect(scene(pageItems(model, PAGE)[0])[0]).toMatchObject({
       kind: 'path',
-      paint: { fill: initialModel.style.color, stroke: initialModel.style.color },
+      // No tool defaults: the engine's own caret colour.
+      paint: { fill: ANNOTATION_DEFAULTS.caret.color, stroke: ANNOTATION_DEFAULTS.caret.color },
     });
   });
 
   it('creates Replace Text as a Caret primary + grouped StrikeOut subordinate', () => {
     let seeded = step(initialModel, {
       type: 'setDefaults',
-      subtype: 'replace-text',
+      preset: 'replace-text',
       patch: { color: '#f97316', opacity: 0.8 },
     })[0];
     const rects = [
@@ -665,7 +665,7 @@ describe('annotation-core', () => {
         page: PAGE,
         subtype: 'square',
         geometry: { kind: 'rect', rect: { x: 0, y: 0, width: 10, height: 10 }, ellipse: false },
-        style: initialStyle,
+        style: STYLE,
         flags: DRAWN_FLAGS,
         source: 'vector',
       });
@@ -822,7 +822,7 @@ describe('annotation-core', () => {
         page: PAGE,
         subtype: 'square',
         geometry: { kind: 'rect', rect: { x: 10, y: 10, width: 50, height: 50 }, ellipse: false },
-        style: initialModel.style,
+        style: STYLE,
         flags,
         source: 'vector',
       });
@@ -1276,7 +1276,7 @@ describe('annotation-core', () => {
     const options = { deviationThreshold: 0.15, axisSnapDegrees: 15 };
     let model = step(initialModel, {
       type: 'setDefaults',
-      subtype: 'ink-highlight',
+      preset: 'ink-highlight',
       patch: { color: '#ffcd45', strokeWidth: 14, blendMode: 'multiply' },
     })[0];
     const ink = (phase: 'down' | 'move' | 'up', x: number, y: number): Message => ({
@@ -1353,13 +1353,13 @@ describe('annotation-core', () => {
   it('the draft ghost previews the tool defaults, not the bare base style', () => {
     let model = step(initialModel, {
       type: 'setDefaults',
-      subtype: 'square',
+      preset: 'square',
       patch: { color: '#123456' },
     })[0];
     // mid-draw (down + move, no up yet) → the ghost is live
     model = run(model, [createPtr('square', 'down', 10, 10), createPtr('square', 'move', 60, 60)]);
     const ghost = pageItems(model, PAGE).find((item) => item.source === 'ghost');
-    expect(ghost?.style.color).toBe('#123456'); // tool default, not initialStyle red
+    expect(ghost?.style.color).toBe('#123456'); // the tool's default, not the fixture red
   });
 
   it('restyling a selection updates the annotation but never the base default', () => {
@@ -1368,13 +1368,13 @@ describe('annotation-core', () => {
       createPtr('square', 'move', 60, 60),
       createPtr('square', 'up', 60, 60),
     ]);
-    const baseBefore = model.style.color;
-    model = step(model, { type: 'setProps', patch: { color: '#00ff00' } })[0];
+    const defaultsBefore = model.defaults;
+    model = step(model, restyle(model, { color: '#00ff00' }))[0];
     expect(fieldsOf(model.byId[model.order[0]]).style.color).toBe('#00ff00'); // the selected square changed
-    expect(model.style.color).toBe(baseBefore); // …the base/default is untouched
+    expect(model.defaults).toBe(defaultsBefore); // …the tool defaults are untouched
   });
 
-  it('setProps routes each key by kind: a mixed selection takes what applies', () => {
+  it('setFields routes each field by kind: a mixed selection takes what applies', () => {
     // a square + a line, both selected
     let model = run(initialModel, [
       createPtr('square', 'down', 10, 10),
@@ -1386,10 +1386,10 @@ describe('annotation-core', () => {
     ]);
     const [sq, ln] = model.order;
     model = { ...model, selected: [sq, ln] };
-    const [next, fx] = step(model, {
-      type: 'setProps',
-      patch: { strokeWidth: 7, lineEndings: { end: 'closed-arrow' } },
-    });
+    const [next, fx] = step(
+      model,
+      restyle(model, { strokeWidth: 7, lineEndings: { start: 'none', end: 'closed-arrow' } }),
+    );
     // strokeWidth applies to both; endings only to the line (the square ignores it)
     expect(fieldsOf(next.byId[sq]).style.strokeWidth).toBe(7);
     expect(fieldsOf(next.byId[ln]).style.strokeWidth).toBe(7);
@@ -1409,7 +1409,7 @@ describe('annotation-core', () => {
     expect(line).not.toHaveProperty('linePoints');
   });
 
-  it('setProps skips locked annotations and keys the kind does not declare', () => {
+  it('setFields skips locked annotations and fields the kind does not have', () => {
     let model = run(initialModel, [
       createPtr('square', 'down', 10, 10),
       createPtr('square', 'move', 60, 60),
@@ -1423,7 +1423,7 @@ describe('annotation-core', () => {
         [id]: withFields(model.byId[id], { flags: { ...DRAWN_FLAGS, locked: true } }),
       },
     };
-    const [locked, lockedFx] = step(model, { type: 'setProps', patch: { color: '#00ff00' } });
+    const [locked, lockedFx] = step(model, restyle(model, { color: '#00ff00' }));
     expect(fieldsOf(locked.byId[id]).style.color).not.toBe('#00ff00');
     expect(lockedFx).toEqual([]);
     // a font key on a square: not declared → no change, no effect
@@ -1431,7 +1431,7 @@ describe('annotation-core', () => {
       ...model,
       byId: { ...model.byId, [id]: withFields(model.byId[id], { flags: DRAWN_FLAGS }) },
     };
-    const [next, fx] = step(model, { type: 'setProps', patch: { fontSize: 24 } });
+    const [next, fx] = step(model, restyle(model, { fontSize: 24 }));
     expect(next).toBe(model);
     expect(fx).toEqual([]);
   });
@@ -1439,7 +1439,7 @@ describe('annotation-core', () => {
   it('a drawn free-text box carries the tool font defaults from birth', () => {
     let model = step(initialModel, {
       type: 'setDefaults',
-      subtype: 'free-text',
+      preset: 'free-text',
       patch: { fontSize: 22, fontColor: '#112233' },
     })[0];
     model = run(model, [
@@ -1449,8 +1449,8 @@ describe('annotation-core', () => {
     const annotation = model.byId[model.order[0]];
     expect(fieldsOf(annotation).text?.fontSize).toBe(22);
     expect(fieldsOf(annotation).text?.fontColor).toBe('#112233');
-    // …and setProps edits it (free-text declares font keys)
-    const [next] = step(model, { type: 'setProps', patch: { textAlign: 'center' } });
+    // …and setFields edits it (free text has font fields)
+    const [next] = step(model, restyle(model, { textAlign: 'center' }));
     expect(fieldsOf(next.byId[model.order[0]]).text?.textAlign).toBe('center');
   });
 
@@ -2267,7 +2267,7 @@ describe('annotation-core — rotation', () => {
       page: PAGE,
       subtype: 'square',
       geometry: { kind: 'rect', rect, ellipse: false },
-      style: initialModel.style,
+      style: STYLE,
       flags: DRAWN_FLAGS,
       source: 'baked',
     });
@@ -2396,7 +2396,7 @@ describe('annotation-core — rotation-aware selection (grab + menu + group)', (
       page: PAGE,
       subtype,
       geometry,
-      style: initialModel.style,
+      style: STYLE,
       flags: DRAWN_FLAGS,
       source: 'baked',
     });
@@ -2473,7 +2473,7 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
       page: PAGE,
       subtype,
       geometry,
-      style: initialModel.style,
+      style: STYLE,
       flags: DRAWN_FLAGS,
       source: 'baked',
     });
@@ -2590,7 +2590,7 @@ describe('annotation-core — selectionAnchor carries the knob alongside a centr
       page: PAGE,
       subtype,
       geometry,
-      style: initialModel.style,
+      style: STYLE,
       flags: DRAWN_FLAGS,
       source: 'baked',
     });
@@ -3046,7 +3046,7 @@ describe('annotation-core — snapping', () => {
       page: PAGE,
       subtype: 'square',
       geometry: { kind: 'rect', rect, ellipse: false, ...(rot ? { rot } : {}) },
-      style: initialModel.style,
+      style: STYLE,
       flags: DRAWN_FLAGS,
       source: 'baked',
     });
@@ -3972,7 +3972,7 @@ describe('render source after an edit (what keeps a raster, what renders live)',
       page: PAGE,
       subtype,
       geometry: { kind: 'rect', rect: { x: 100, y: 100, width: 100, height: 60 }, ellipse: false },
-      style: initialStyle,
+      style: STYLE,
       flags: DRAWN_FLAGS,
       source: 'baked',
       apBox: { x: 100, y: 100, width: 100, height: 60 },
@@ -4048,14 +4048,14 @@ describe('render source after an edit (what keeps a raster, what renders live)',
     expect([...model.selected].sort()).toEqual(['A1', 'B1']);
   });
 
-  it('setProps keeps opaque-body kinds BAKED (a widget restyle re-fetches, never flips)', () => {
+  it('setFields keeps opaque-body kinds BAKED (a widget restyle re-fetches, never flips)', () => {
     const annotation = record({
       id: 'W1',
       ref: { kind: 'objectNumber', annotObjectNumber: 9, page: PAGE },
       page: PAGE,
       subtype: 'widget-text',
       geometry: { kind: 'rect', rect: { x: 10, y: 10, width: 120, height: 24 }, ellipse: false },
-      style: initialStyle,
+      style: STYLE,
       flags: DRAWN_FLAGS,
       source: 'baked',
       apBox: { x: 10, y: 10, width: 120, height: 24 },
@@ -4066,7 +4066,7 @@ describe('render source after an edit (what keeps a raster, what renders live)',
       order: ['W1'],
       selected: ['W1'],
     };
-    const [next, fx] = step(model, { type: 'setProps', patch: { interiorColor: '#ffd500' } });
+    const [next, fx] = step(model, restyle(model, { interiorColor: '#ffd500' }));
     expect(fx).toEqual([
       { type: 'patch', id: 'W1', patch: { subtype: 'widget', interiorColor: '#ffd500' } },
     ]);
@@ -4074,7 +4074,7 @@ describe('render source after an edit (what keeps a raster, what renders live)',
     // would drop it from appearanceEpoch — its raster would freeze forever.
     expect(next.byId['W1'].source).toBe('baked');
     // …while a square restyle still flips to vector (renders live).
-    const [sq] = step(committed('square'), { type: 'setProps', patch: { color: '#112233' } });
+    const [sq] = step(committed('square'), restyle(committed('square'), { color: '#112233' }));
     expect(sq.byId['A1'].source).toBe('vector');
   });
 
@@ -4127,9 +4127,9 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
     return { ...model, selected: [annotation.id] };
   };
 
-  it('setProps { link } on a non-link kind emits target-carrying syncLink, writes NOTHING to the model', () => {
+  it('setLink on a non-link kind emits target-carrying syncLink, writes NOTHING to the model', () => {
     const model = withSelected(committedSquare());
-    const [next, fx] = step(model, { type: 'setProps', patch: { link: URI } });
+    const [next, fx] = step(model, { type: 'setLink', target: URI });
     // Parents store no link value — the committed children are the truth,
     // read back through `linkOf` once the reconciler's writes land.
     expect(fieldsOf(next.byId['S1']).link).toBeUndefined();
@@ -4138,29 +4138,18 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
     expect(fx).toEqual([{ type: 'syncLink', id: 'S1', target: URI }]);
   });
 
-  it('setProps { link } plus a style key emits both syncLink and a patch', () => {
-    const model = withSelected(committedSquare());
-    const [next, fx] = step(model, { type: 'setProps', patch: { link: URI, color: '#00ff00' } });
-    expect(fieldsOf(next.byId['S1']).style.color).toBe('#00ff00');
-    // The children follow the target; the square writes only its colour.
-    expect(fx).toEqual([
-      { type: 'syncLink', id: 'S1', target: URI },
-      { type: 'patch', id: 'S1', patch: { subtype: 'square', color: '#00ff00' } },
-    ]);
-  });
-
-  it('the link KIND routes its link prop to a plain engine patch (its own /A)', () => {
+  it('the link KIND takes setLink as a plain engine patch (its own /A)', () => {
     const link = committedSquare({ id: 'L1', subtype: 'link', link: null });
     const model = withSelected(link);
-    const [next, fx] = step(model, { type: 'setProps', patch: { link: URI } });
+    const [next, fx] = step(model, { type: 'setLink', target: URI });
     expect(fieldsOf(next.byId['L1']).link).toEqual(URI);
     expect(fx).toEqual([{ type: 'patch', id: 'L1', patch: { subtype: 'link', target: URI } }]);
   });
 
-  it('widgets do not take the link key: no change, no effect', () => {
+  it('widgets do not take a link: no change, no effect', () => {
     const widget = committedSquare({ id: 'W1', subtype: 'widget-text' });
     const model = withSelected(widget);
-    const [next, fx] = step(model, { type: 'setProps', patch: { link: URI } });
+    const [next, fx] = step(model, { type: 'setLink', target: URI });
     expect(next).toBe(model);
     expect(fx).toEqual([]);
   });
@@ -4305,7 +4294,7 @@ describe('conversation plane — replies and review states never reach the page'
       page: PAGE,
       subtype: 'square',
       geometry: at(10, 10),
-      style: initialModel.style,
+      style: STYLE,
       flags: DRAWN_FLAGS,
       source: 'vector',
       ...over,

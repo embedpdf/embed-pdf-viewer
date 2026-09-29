@@ -14,7 +14,7 @@ export * from './contract';
 // sibling commit plane (the form plugin's place handler) resolves clicks with
 // the exact call the annotation core and the footprint ghost use.
 export { MIN_DRAG, resolveClickPlacement, type ClickPlacement } from '@embedpdf/core-annotation';
-export { widgetAppearanceFromProps } from './authoring';
+export { widgetAppearanceOf } from './authoring';
 // The comments lens's thread shapes (composed in engine-core per
 // ISO 32000 §12.5.6.3) + the annotation identity type its verbs take — re-exported
 // so consumers type against this package alone.
@@ -32,6 +32,6 @@ export type {
   ToolAuthoringKind,
   ToolDefaultsFor,
 } from './tools/definitions';
-// The property vocabulary + schema (defined in the portable core; re-exported so
+// The editable-field schema (defined in the portable core; re-exported so
 // app code building property UIs needs only this package).
-export { propsFor } from '@embedpdf/core-annotation';
+export { fieldsFor } from '@embedpdf/core-annotation';

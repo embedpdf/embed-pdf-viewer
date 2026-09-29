@@ -24,7 +24,7 @@
  * overlap browser UI (anti-spoofing), which is fine mid-viewport.
  */
 import { useToolCursor, useTool } from '@embedpdf/react/interaction';
-import { useAnnotationDefaults } from '@embedpdf/react/annotation';
+import { useToolDefaults } from '@embedpdf/react/annotation';
 import { TOOL_ICONS } from '../config/commands';
 import { ICON_PATHS } from './icons';
 import type { IconAccent, PathSpec } from './icons';
@@ -123,15 +123,14 @@ const GLYPHS: Record<string, Glyph> = {
  *  with its toolbar icon + live defaults. */
 export function ArmedToolCursor() {
   const { activeToolId } = useTool();
-  // Live accent: a `setDefaults` recolor re-renders us and rebuilds the cursor.
-  const props = useAnnotationDefaults(activeToolId);
+  // Live accent: an `updateToolDefaults` recolor re-renders us and rebuilds the cursor.
+  const defaults = useToolDefaults(activeToolId);
   const entry = TOOL_ICONS[activeToolId];
+  const colorOf = (key: string) => (defaults[key] as string | null | undefined) ?? undefined;
   const accent = entry?.accent
     ? {
-        primary: props[entry.accent.primary] ?? undefined,
-        secondary: entry.accent.secondary
-          ? (props[entry.accent.secondary] ?? undefined)
-          : undefined,
+        primary: colorOf(entry.accent.primary),
+        secondary: entry.accent.secondary ? colorOf(entry.accent.secondary) : undefined,
       }
     : undefined;
   useToolCursor(

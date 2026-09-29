@@ -1,15 +1,11 @@
-import type { AnnotationProps, Subtype } from '@embedpdf/core-annotation';
+import type { FieldValues, Subtype } from '@embedpdf/core-annotation';
 import type {
   AnnotationDraft,
   AnnotationFlags,
   AnnotationResources,
   AttachmentFileSource,
-  FileAttachmentIcon,
-  NoteIcon,
   PageBox,
 } from '@embedpdf/engine-core/runtime';
-
-import { hexColorOf } from '@embedpdf/core-annotation';
 
 /**
  * Per-kind code for the click-to-place icon kinds (note / file attachment)
@@ -33,38 +29,29 @@ export const isIconPlaceKind = (subtype: Subtype): subtype is IconPlaceKind =>
 /**
  * Build the engine create for a placed icon annotation: its data, and for a
  * file attachment the file's bytes as the `file` resource. `geometry` is the
- * icon's `rect`; `defaults` is the tool's resolved flat props bag
- * (`defaultsFor`); the icon falls back to the kind's own default when the
- * bag carries none.
+ * icon's `rect`; `defaults` are the tool's (`defaultsFor`): its icon, colour
+ * and opacity. What they leave out takes the engine's defaults.
  */
 export function iconPlacement(
   subtype: IconPlaceKind,
   geometry: { rect: PageBox },
-  defaults: AnnotationProps,
+  defaults: FieldValues,
   flags: Partial<AnnotationFlags> | undefined,
   file: AttachmentFileSource | null,
 ): { data: AnnotationDraft; resources?: AnnotationResources } {
-  const shared = {
-    ...geometry,
-    color: hexColorOf(defaults.color),
-    opacity: defaults.opacity,
-    // The tool's seed (the note/attachment tools pass noZoom + noRotate); a
-    // new annotation prints by the engine's default.
-    ...flags,
-  };
-  if (subtype === 'text') {
-    return { data: { subtype: 'text', icon: (defaults.icon as NoteIcon) ?? 'comment', ...shared } };
-  }
+  // The tool's seed (the note/attachment tools pass noZoom + noRotate); a
+  // new annotation prints by the engine's default.
+  const shared = { ...defaults, ...geometry, ...flags };
+  if (subtype === 'text') return { data: { ...shared, subtype: 'text' } as AnnotationDraft };
   if (!file) {
     throw new Error('[annotation] a file-attachment placement requires a file payload');
   }
   return {
     data: {
-      subtype: 'file-attachment',
-      icon: (defaults.icon as FileAttachmentIcon) ?? 'paperclip',
-      file: attachmentMetadataOf(file),
       ...shared,
-    },
+      subtype: 'file-attachment',
+      file: attachmentMetadataOf(file),
+    } as AnnotationDraft,
     resources: { file: file.data instanceof ArrayBuffer ? new Uint8Array(file.data) : file.data },
   };
 }

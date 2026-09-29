@@ -2,11 +2,23 @@
 import { PluginError, annotationKey, toPluginError, toPluginErrorInfo } from '@embedpdf/core';
 import type { BatchResult } from '@embedpdf/core';
 import type { Rect } from '@embedpdf/core-geometry';
-import type { AnnotationRef, PageRef, SearchQuery, StandardFont } from '@embedpdf/engine-core';
+import type {
+  AnnotationDraft,
+  AnnotationRef,
+  PageRef,
+  SearchQuery,
+  StandardFont,
+} from '@embedpdf/engine-core';
 
 import type { RedactionCapability, RedactionConfig, RedactionLabelPatch } from '../contract';
 import type { RedactionPendingReads } from '../read/pending';
 import type { RedactionContext, RedactionServices } from '../services';
+
+/** The redact tool's defaults: the fields a mark draft takes from them. */
+type RedactDefaults = Pick<
+  Extract<AnnotationDraft, { subtype: 'redact' }>,
+  'color' | 'interiorColor' | 'opacity' | 'fontFamily' | 'fontSize' | 'fontColor' | 'textAlign'
+>;
 
 export function createMarking(
   ctx: RedactionContext,
@@ -32,7 +44,7 @@ export function createMarking(
    * over them.
    */
   const markStyle = () => {
-    const tool = annotation.getToolDefaults('redact');
+    const tool = annotation.getToolDefaults('redact') as RedactDefaults;
     const overlay = config.overlay;
     return {
       color: tool.color,

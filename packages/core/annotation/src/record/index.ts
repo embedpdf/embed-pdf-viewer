@@ -1,7 +1,7 @@
 /**
  * The boundary between the engine's annotation DTOs and the core's
  * `ModelAnnotation`, both in page space — organized kind-major like the rest of the stack
- * (engine-core `kinds/`, the services writer registry, the core PropSpec
+ * (engine-core `kinds/`, the services writer registry, the core FieldSpec
  * table): each family declares one {@link KindProjection} and every wire
  * statement shape derives from it here:
  *
@@ -12,7 +12,7 @@
  * The derivation is sound because of the engine's tri-state law ("a patch
  * touches what it states, preserves what it omits"): a statement never has to
  * restate what it didn't change, and the emitted key set is the editable set
- * (`propsFor` — the same table that routes `setProps`), so anything outside
+ * (`fieldsFor` — the same table a sidebar edits from), so anything outside
  * it can never change in the model. Any key a kind cannot lower degrades to
  * the full patch — verbose, never a dropped write.
  */
@@ -29,15 +29,8 @@ import {
 
 import { FLAG_KEYS } from '../flags';
 import { geomRotation, geomVisualBounds } from '../geometry';
-import { propsFor } from '../kinds';
-import type {
-  ModelAnnotation,
-  ModelGeometry,
-  PropKey,
-  RecordFields,
-  Style,
-  TextStyle,
-} from '../types';
+import { fieldsFor } from '../kinds';
+import type { ModelAnnotation, ModelGeometry, RecordFields, Style, TextStyle } from '../types';
 import { freeText } from './kinds/freeText';
 import {
   fileAttachment,
@@ -51,7 +44,7 @@ import {
 import { caret, highlight, redact, squiggly, strikeout, underline } from './kinds/quads';
 import { circle, square } from './kinds/shape';
 import { captionFieldsFor, ink, line, polygon, polyline } from './kinds/stroke';
-import type { KindProjection, Wire } from './projection';
+import type { KindProjection, LoweredKey, Wire } from './projection';
 import { GENERIC_PROPS } from './props';
 import { annotationKey, flagsOf, styleFromDTO } from './seam';
 
@@ -59,7 +52,7 @@ export {
   boxGeomFields,
   hexColorOf,
   styleFromDTO,
-  widgetAppearanceFromProps,
+  widgetAppearanceOf,
   writableTarget,
 } from './seam';
 export { linkChildRects } from './links';
@@ -212,7 +205,7 @@ export function withFields(
 
 /** Lower `keys` through the kind's overrides + the generic table. `null` =
  *  some key has no lowering — the caller degrades to the full projection. */
-function emitProps(annotation: RecordFields, keys: readonly PropKey[]): Wire | null {
+function emitProps(annotation: RecordFields, keys: readonly LoweredKey[]): Wire | null {
   const kind = projectionOf(annotation.subtype);
   const out: Wire = {};
   for (const key of keys) {
@@ -223,7 +216,9 @@ function emitProps(annotation: RecordFields, keys: readonly PropKey[]): Wire | n
   return out;
 }
 
-const editableKeys = (subtype: string): PropKey[] => propsFor(subtype).map((spec) => spec.key);
+/** The parts of its fields a kind's editable fields lower from: its border picker is its `border`. */
+const editableKeys = (subtype: string): LoweredKey[] =>
+  fieldsFor(subtype).map((spec) => (spec.key === 'borderStyle' ? 'border' : spec.key));
 
 /** ModelAnnotation → the full engine patch: the kind's geometry group plus every
  *  prop it declares editable. The reference statement — scoped emission and
@@ -331,8 +326,8 @@ const shapeMoved = (before: ModelGeometry, after: ModelGeometry): boolean =>
  */
 function patchFor(before: RecordFields, after: RecordFields): AnnotationPatch | null {
   const takes = new Set(editableKeys(after.subtype));
-  const keys: PropKey[] = [];
-  const compare = (key: PropKey, was: unknown, now: unknown) => {
+  const keys: LoweredKey[] = [];
+  const compare = (key: LoweredKey, was: unknown, now: unknown) => {
     if (takes.has(key) && !sameValue(was, now)) keys.push(key);
   };
   if (before.style !== after.style) {

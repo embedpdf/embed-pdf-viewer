@@ -7,10 +7,10 @@ import { quadFromRect } from '@embedpdf/core-geometry';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { modelWith, record, step } from './support';
+import { modelWith, record, step, STYLE, restyle } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
-import type { Message, ModelAnnotation } from '../src/types';
-import { EMPTY_CHANGE, initialStyle, update } from '../src/update';
+import type { Message, Model, ModelAnnotation, Point } from '../src/types';
+import { EMPTY_CHANGE, update } from '../src/update';
 import { fieldsOf } from '../src/record';
 
 const PAGE = toPageRef(1);
@@ -27,10 +27,22 @@ const square = (id: string, x: number): ModelAnnotation =>
     page: PAGE,
     subtype: 'square',
     geometry: { kind: 'rect', rect: { x, y: 100, width: 100, height: 60 }, ellipse: false },
-    style: { ...initialStyle, interiorColor: '#ffffff' },
+    style: { ...STYLE, interiorColor: '#ffffff' },
     flags: DRAWN_FLAGS,
     source: 'baked',
   });
+
+/** The last step of drawing a square from `from` to `to`: its result, with the new record in it. */
+function drawSquare(model: Model, from: Point, to: Point) {
+  const draw = (phase: 'down' | 'move' | 'up', point: Point): Message => ({
+    type: 'createPointer',
+    phase,
+    subtype: 'square',
+    in: { page: PAGE, point, shift: false },
+  });
+  const [drawing] = step(step(model, draw('down', from))[0], draw('move', to));
+  return update(drawing, draw('up', to));
+}
 
 describe('update', () => {
   it('a pointer move during a drag changes the session only', () => {
@@ -78,12 +90,7 @@ describe('update', () => {
   });
 
   it('a new record gets a new: id from the session', () => {
-    const result = update(modelWith([]), {
-      type: 'createAnnot',
-      page: PAGE,
-      subtype: 'square',
-      geometry: { kind: 'rect', rect: { x: 0, y: 0, width: 10, height: 10 }, ellipse: false },
-    });
+    const result = drawSquare(modelWith([]), { x: 0, y: 0 }, { x: 10, y: 10 });
     expect(result.change.put.map((record) => record.id)).toEqual(['new:1']);
     expect(result.session.seq).toBe(1);
     expect(result.effects).toEqual([{ type: 'create', id: 'new:1' }]);
@@ -109,13 +116,14 @@ describe('update', () => {
 
 describe('every record holds its annotation', () => {
   const created = (namePrefix: string) =>
-    update(modelWith([square('obj:1', 400)], { namePrefix }), {
-      type: 'createAnnot',
-      page: PAGE,
-      subtype: 'square',
-      geometry: { kind: 'rect', rect: { x: 10, y: 20, width: 30, height: 40 }, ellipse: false },
-      props: { color: '#123456', strokeWidth: 3 },
-    }).change.put[0]!;
+    drawSquare(
+      modelWith([square('obj:1', 400)], {
+        namePrefix,
+        defaults: { square: { color: '#123456', strokeWidth: 3 } },
+      }),
+      { x: 10, y: 20 },
+      { x: 40, y: 60 },
+    ).change.put[0]!;
 
   it('a new record predicts its annotation, named with the session’s prefix', () => {
     const record = created('session-a-');
@@ -144,11 +152,10 @@ describe('every record holds its annotation', () => {
     const moved = update(dragged, editPtr('up', 190, 160)).change.put[0]!;
     expect(moved.annotation).toMatchObject({
       box: { x: 140, y: 130, width: 100, height: 60 },
-      color: initialStyle.color,
+      color: STYLE.color,
     });
 
-    const restyled = update(model, { type: 'setProps', patch: { color: '#00ff00' } }).change
-      .put[0]!;
+    const restyled = update(model, restyle(model, { color: '#00ff00' })).change.put[0]!;
     expect(restyled.annotation).toMatchObject({ color: '#00ff00', box: { x: 100, y: 100 } });
 
     const hidden = update(model, { type: 'setFlags', patch: { hidden: true } }).change.put[0]!;
@@ -157,7 +164,7 @@ describe('every record holds its annotation', () => {
 
   it('an edit that changes nothing changes nothing: no record, no write', () => {
     const model = modelWith([square('obj:1', 100)], { selected: ['obj:1'] });
-    const same = update(model, { type: 'setProps', patch: { color: initialStyle.color } });
+    const same = update(model, restyle(model, { color: STYLE.color }));
     expect(same.change).toBe(EMPTY_CHANGE);
     expect(same.effects).toEqual([]);
     // A click on the selected square: grabbed and let go where it was.

@@ -160,7 +160,7 @@ export interface ScriptAnnotEffect {
  * The writable-property validity matrix, keyed by engine subtype — the one
  * exported table (the prelude inlines an identical copy; a parity test pins
  * them together, and plugin-annotation drift-guards this against the kind
- * registry's PropSpecs). Flags + contents are writable everywhere
+ * registry's FieldSpecs). Flags + contents are writable everywhere
  * script-addressable; appearance keys vary by kind.
  */
 export const ANNOT_WRITABLE_KEYS: Readonly<Record<string, readonly string[]>> = Object.freeze({

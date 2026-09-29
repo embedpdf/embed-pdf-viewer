@@ -1,13 +1,12 @@
 /**
  * The annotation style panel. The plugin owns the schema and the state; this
- * file owns only how each PropSpec renders and the flat patch it writes back.
- * There is no per-subtype branching here: a new annotation kind that declares
- * its `PropSpec[]` in the kind table gets a working style panel for free.
+ * file owns only how each FieldSpec renders and the engine fields it writes
+ * back. There is no per-subtype branching here: a new annotation kind that
+ * declares its `FieldSpec[]` in the kind table gets a working style panel for free.
  *
  * Data flow (mirrors examples/react's AnnotationSidebar):
- *   selection present → useSelectionProps() specs/values, write updateSelection()
- *   nothing selected  → propsForTool(tool) specs + useAnnotationDefaults(tool)
- *                        values, write setDefaults(tool, …)
+ *   selection present → useSelectionFields(), write updateSelection()
+ *   nothing selected  → useToolFields(tool), write updateToolDefaults(tool, …)
  *
  * The look: a six-column swatch grid, range slider, SVG stroke / line-ending
  * dropdowns, font-size combo and align toggles, styled with this app's
@@ -18,14 +17,14 @@ import { annotationKey } from '@embedpdf/react/annotation';
 import type { ReactNode } from 'react';
 import {
   useAnnotation,
-  useSelectionProps,
-  useAnnotationDefaults,
   useAnnotationSelected,
-  type PropKey,
-  type PropSpec,
-  type AnnotationPropsPatch,
-  type Border,
+  useSelectionFields,
+  useToolDefaults,
+  useToolFields,
+  type AnnotationPatch,
   type BlendMode,
+  type FieldSpec,
+  type FieldValues,
   type LineEnding,
   type LineEndings,
   type TextAlign,
@@ -65,6 +64,12 @@ const FONT_OPTIONS: { v: string; label: string }[] = [
 
 const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 24, 36, 48, 72];
 
+/** A border as the picker draws it; the engine keeps it as three fields. */
+type Border =
+  | { kind: 'solid' }
+  | { kind: 'dashed'; dash: number[] }
+  | { kind: 'cloudy'; intensity: number };
+
 const BORDER_OPTS: { key: string; make: () => Border }[] = [
   { key: 'solid', make: () => ({ kind: 'solid' }) },
   { key: 'dashed-6-2', make: () => ({ kind: 'dashed', dash: [6, 2] }) },
@@ -79,6 +84,23 @@ const borderKey = (border: Border): string =>
     : border.kind === 'dashed'
       ? `dashed-${border.dash.join('-')}`
       : 'solid';
+
+/** The border the three engine fields describe: a cloud wins over the style under it. */
+const borderOf = (values: FieldValues): Border => {
+  const intensity = values.cloudyIntensity as number | null | undefined;
+  if (intensity) return { kind: 'cloudy', intensity };
+  const dash = values.dashArray as number[] | null | undefined;
+  return values.borderStyle === 'dashed'
+    ? { kind: 'dashed', dash: dash?.length ? dash : [3, 3] }
+    : { kind: 'solid' };
+};
+
+/** The engine fields that state a border, every one of them (a patch replaces each whole). */
+const borderFields = (border: Border): FieldValues => ({
+  borderStyle: border.kind === 'dashed' ? 'dashed' : 'solid',
+  dashArray: border.kind === 'dashed' ? border.dash : null,
+  cloudyIntensity: border.kind === 'cloudy' ? border.intensity : null,
+});
 
 const LINE_ENDINGS: { v: LineEnding; label: string }[] = [
   { v: 'none', label: 'None' },
@@ -589,26 +611,27 @@ function Toggle({
 }
 
 // ── rich-text formatting: bold / italic / underline in one row ──────────────
-type FormatSpec = Extract<PropSpec, { key: 'bold' | 'italic' | 'underline' }>;
-const isFormatSpec = (spec: PropSpec): spec is FormatSpec =>
+type FormatSpec = Extract<FieldSpec, { key: 'bold' | 'italic' | 'underline' }>;
+type Format = FormatSpec['key'];
+const isFormatSpec = (spec: FieldSpec): spec is FormatSpec =>
   spec.key === 'bold' || spec.key === 'italic' || spec.key === 'underline';
 
 /**
  * The format toggles a free-text kind declares, in one row. While the text
  * editor holds a range they read and write that range's runs (the plugin
- * routes `updateSelection`); otherwise the annotation's body. The buttons
+ * routes `toggleTextFormat`); otherwise the annotation's body. The buttons
  * keep focus in the editor so the range survives the click.
  */
 function FormatToggles({
   specs,
   values,
   mixed,
-  onChange,
+  onToggle,
 }: {
   specs: FormatSpec[];
-  values: Partial<Record<PropKey, unknown>>;
-  mixed: PropKey[];
-  onChange: (patch: AnnotationPropsPatch) => void;
+  values: FieldValues;
+  mixed: readonly string[];
+  onToggle: (format: Format, on: boolean) => void;
 }) {
   const t = useT();
   return (
@@ -625,7 +648,7 @@ function FormatToggles({
               title={spec.label}
               active={active}
               keepFocus
-              onClick={() => onChange({ [spec.key]: !active } as AnnotationPropsPatch)}
+              onClick={() => onToggle(spec.key, !active)}
             >
               <Icon name={spec.key} size={18} />
             </Toggle>
@@ -636,18 +659,22 @@ function FormatToggles({
   );
 }
 
-// ── one control per PropSpec — the entire surface an app customizes ──────────
-function PropControl({
+// ── one control per FieldSpec — the entire surface an app customizes ─────────
+function FieldControl({
   spec,
-  value,
+  values,
   mixed,
   onChange,
+  onChangeEach,
 }: {
-  spec: PropSpec;
-  value: unknown;
+  spec: FieldSpec;
+  values: FieldValues;
   mixed: boolean;
-  onChange: (patch: AnnotationPropsPatch) => void;
+  onChange: (patch: FieldValues) => void;
+  /** Patch each target relative to itself: one side of its line endings. */
+  onChangeEach: (patchOf: (current: FieldValues) => FieldValues) => void;
 }) {
+  const value = values[spec.key];
   switch (spec.key) {
     case 'color':
     case 'fontColor':
@@ -655,7 +682,7 @@ function PropControl({
         <Field label={spec.label} mixed={mixed}>
           <SwatchGrid
             value={value as string}
-            onSelect={(color) => onChange({ [spec.key]: color } as AnnotationPropsPatch)}
+            onSelect={(color) => onChange({ [spec.key]: color })}
           />
         </Field>
       );
@@ -710,13 +737,13 @@ function PropControl({
           />
         </Field>
       );
-    case 'border':
+    case 'borderStyle':
       return (
         <Field label={spec.label} mixed={mixed}>
           <BorderSelect
-            value={(value as Border) ?? { kind: 'solid' }}
+            value={borderOf(values)}
             cloudy={spec.cloudy}
-            onChange={(border) => onChange({ border })}
+            onChange={(border) => onChange(borderFields(border))}
           />
         </Field>
       );
@@ -730,7 +757,11 @@ function PropControl({
               <LineEndingSelect
                 side="start"
                 value={le.start}
-                onChange={(ending) => onChange({ lineEndings: { start: ending } })}
+                onChange={(ending) =>
+                  onChangeEach((current) => ({
+                    lineEndings: { ...(current.lineEndings as LineEndings), start: ending },
+                  }))
+                }
               />
             </div>
             <div>
@@ -738,7 +769,11 @@ function PropControl({
               <LineEndingSelect
                 side="end"
                 value={le.end}
-                onChange={(ending) => onChange({ lineEndings: { end: ending } })}
+                onChange={(ending) =>
+                  onChangeEach((current) => ({
+                    lineEndings: { ...(current.lineEndings as LineEndings), end: ending },
+                  }))
+                }
               />
             </div>
           </div>
@@ -815,6 +850,13 @@ function EmptyState() {
   );
 }
 
+/** The rich body a format on or off is, merged over a tool's current one. */
+const FORMAT_BODY: Record<Format, (on: boolean) => Record<string, unknown>> = {
+  bold: (on) => ({ weight: on ? 700 : 400 }),
+  italic: (on) => ({ italic: on }),
+  underline: (on) => ({ decoration: on ? ['underline'] : [] }),
+};
+
 /**
  * The schema-driven style panel. Rendered inside the right sidebar's
  * `annotation-style` surface (see ui/panels.tsx). Owns its own scroll.
@@ -822,19 +864,34 @@ function EmptyState() {
 export function AnnotationStylePanel() {
   const annotation = useAnnotation();
   const { activeToolId } = useTool();
-  const selection = useSelectionProps();
-  const defaults = useAnnotationDefaults(activeToolId);
+  const selection = useSelectionFields();
+  const tool = useToolFields(activeToolId);
+  const toolDefaults = useToolDefaults(activeToolId);
   const selected = useAnnotationSelected();
 
-  const hasSel = selection.specs.length > 0;
-  const specs = hasSel ? selection.specs : annotation.listPropSpecs(activeToolId);
-  const values = hasSel ? selection.values : defaults;
-  const write = (patch: AnnotationPropsPatch) =>
-    hasSel ? annotation.updateSelection(patch) : annotation.setToolDefaults(activeToolId, patch);
+  const hasSel = selection.fields.length > 0;
+  const { fields, values, mixed } = hasSel ? selection : tool;
+  const write = (patch: FieldValues) =>
+    hasSel
+      ? annotation.updateSelection(patch as AnnotationPatch)
+      : annotation.updateToolDefaults(activeToolId, patch);
+  const writeEach = (patchOf: (current: FieldValues) => FieldValues) =>
+    hasSel
+      ? annotation.updateSelection(
+          (member) => patchOf(member as unknown as FieldValues) as AnnotationPatch,
+        )
+      : annotation.updateToolDefaults(activeToolId, patchOf(toolDefaults));
+  const toggleFormat = (format: Format, on: boolean) => {
+    if (hasSel) return void annotation.toggleTextFormat(format);
+    const body = (toolDefaults.richText as { body?: Record<string, unknown> } | undefined)?.body;
+    annotation.updateToolDefaults(activeToolId, {
+      richText: { body: { ...body, ...FORMAT_BODY[format](on) } },
+    });
+  };
 
-  // A selection with no editable props (e.g. a stamp, or a locked annotation —
+  // A selection with no editable fields (e.g. a stamp, or a locked annotation —
   // its style is frozen) still shows its flags: that's how you unlock it.
-  if (specs.length === 0 && selected.length === 0) return <EmptyState />;
+  if (fields.length === 0 && selected.length === 0) return <EmptyState />;
 
   const context = hasSel ? `${selected.length} selected` : `${activeToolId} defaults`;
 
@@ -843,27 +900,28 @@ export function AnnotationStylePanel() {
       <p className="text-fg-muted mb-4 text-[11px] font-semibold uppercase tracking-wide">
         {context}
       </p>
-      {specs.map((spec) =>
+      {fields.map((spec) =>
         spec.key === 'bold' ? (
           <FormatToggles
             key="format"
-            specs={specs.filter((spec): spec is FormatSpec => isFormatSpec(spec))}
+            specs={fields.filter((spec): spec is FormatSpec => isFormatSpec(spec))}
             values={values}
-            mixed={hasSel ? selection.mixed : []}
-            onChange={write}
+            mixed={mixed}
+            onToggle={toggleFormat}
           />
         ) : (
-          <PropControl
+          <FieldControl
             key={spec.key}
             spec={spec}
-            value={values[spec.key]}
-            mixed={hasSel && selection.mixed.includes(spec.key)}
+            values={values}
+            mixed={mixed.includes(spec.key)}
             onChange={write}
+            onChangeEach={writeEach}
           />
         ),
       )}
       {/* Redaction label (`/OverlayText` + `/Repeat`) — kind content, not a
-          style prop, so it writes through the redaction plugin's updateLabel. */}
+          style field, so it writes through the redaction plugin's updateLabel. */}
       <RedactionLabelSection />
       {/* `/F` flags for whatever is selected — the live flags test surface. */}
       <AnnotationFlagsSection />

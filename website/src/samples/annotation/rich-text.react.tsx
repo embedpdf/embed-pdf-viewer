@@ -8,7 +8,7 @@ import {
   AnnotationLayer,
   annotationPlugin,
   useAnnotation,
-  useSelectionProps,
+  useSelectionFields,
 } from '@embedpdf/react/annotation';
 import { localEngine } from '@embedpdf/engine';
 
@@ -34,10 +34,10 @@ type Format = 'bold' | 'italic' | 'underline';
 
 function RichTextToolbar() {
   const annotation = useAnnotation();
-  // The selection's editable properties: while the text editor holds a range
+  // The selection's editable fields: while the text editor holds a range
   // these describe the RANGE (bold true = every selected run is bold, `mixed`
   // when they disagree); otherwise the selected boxes' body style.
-  const props = useSelectionProps();
+  const props = useSelectionFields();
   const { currentPage } = usePages();
   const { pages } = usePageList();
   const page = pages[currentPage];
@@ -77,7 +77,7 @@ function RichTextToolbar() {
     setStatus('added — double-click the box to edit its text');
   };
 
-  const hasText = props.specs.some((spec) => spec.key === 'bold');
+  const hasText = props.fields.some((spec) => spec.key === 'bold');
   const isOn = (format: Format) => props.values[format] === true && !props.mixed.includes(format);
 
   return (

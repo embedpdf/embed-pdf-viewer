@@ -9,7 +9,7 @@ import type { AnnotationFlags, AnnotationRef } from '@embedpdf/engine-core/runti
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { fieldsOf } from '@embedpdf/core-annotation';
+import { fieldsOf, type Message } from '@embedpdf/core-annotation';
 
 import { createdRefOf } from '../src/write/outcomes';
 import {
@@ -24,16 +24,17 @@ import {
 const PAGE = toPageRef(1);
 
 /** A square drawn through the gesture door, as a tool makes it; resolves with its confirmed ref. */
-const drawSquare = (harness: AnnotationHarness) =>
-  createdRefOf(
-    harness.commit({
-      type: 'createAnnot',
-      page: PAGE,
-      subtype: 'square',
-      geometry: { kind: 'rect', rect: { x: 10, y: 10, width: 50, height: 40 }, ellipse: false },
-      select: true,
-    }),
-  );
+const drawSquare = (harness: AnnotationHarness) => {
+  const draw = (phase: 'down' | 'move' | 'up', x: number, y: number): Message => ({
+    type: 'createPointer',
+    phase,
+    subtype: 'square',
+    in: { page: PAGE, point: { x, y }, shift: false },
+  });
+  harness.commit(draw('down', 10, 10));
+  harness.commit(draw('move', 60, 50));
+  return createdRefOf(harness.commit(draw('up', 60, 50)));
+};
 const NO_FLAGS: AnnotationFlags = {
   invisible: false,
   hidden: false,
@@ -832,16 +833,16 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     harness.update.mockResolvedValueOnce({
-      annotation: square(60, { color: '#ff0000' }),
+      annotation: square(60, { color: '#00ff00' }),
     });
-    const restyled = harness.capability.updateSelection({ color: '#ff0000' });
+    const restyled = harness.capability.updateSelection({ color: '#00ff00' });
     expect(harness.update).toHaveBeenCalledWith(ref(60), expect.anything());
 
     load.resolve(snapshotOf([]));
     await refreshed;
     await created;
     expect(await restyled).toMatchObject({ applied: [ref(60)], failed: [] });
-    expect(dataOf(harness.capability.get(ref(60))).color).toBe('#ff0000');
+    expect(dataOf(harness.capability.get(ref(60))).color).toBe('#00ff00');
   });
 
   it("a link set on a new record is written once the record's create is confirmed", async () => {
@@ -851,7 +852,7 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     harness.create.mockReturnValueOnce(create.promise);
     const TARGET = { kind: 'uri', uri: 'https://www.embedpdf.com/' } as const;
     const created = drawSquare(harness);
-    const linked = harness.capability.updateSelection({ link: TARGET });
+    const linked = harness.capability.updateSelectionLink(TARGET);
     harness.create.mockResolvedValueOnce({
       annotation: square(61, {
         subtype: 'link',

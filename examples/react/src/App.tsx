@@ -15,8 +15,9 @@ import {
   useAnnotationSelected,
   type CreationDraftAnchor,
   useAnnotationSelection,
-  useAnnotationDefaults,
-  useSelectionProps,
+  useSelectionFields,
+  useToolDefaults,
+  useToolFields,
   usePage,
   useTool,
   useZoom,
@@ -68,11 +69,10 @@ import {
   type PaneInfo,
 } from '@embedpdf/react';
 import type {
-  AnnotationProps,
-  AnnotationPropsPatch,
-  Border,
+  AnnotationPatch,
+  FieldSpec,
+  FieldValues,
   LineEndings,
-  PropSpec,
   TextAlign,
 } from '@embedpdf/react';
 import type { DocumentMetadata, MetadataPatch, OpenInput, PdfSaveMode } from '@embedpdf/core';
@@ -425,17 +425,36 @@ const LINE_ENDINGS: { v: LineEndingName; label: string }[] = [
 ];
 const DRAW_TOOLS = new Set(['square', 'circle', 'line', 'ink']);
 
-// Border styles a square/circle can take. The model is a discriminated union, so
-// each option just constructs the variant it means — no enum + intensity to keep
-// in sync. Cloudy bulges its scallops back out to the box edge (see plugin-render).
-const BORDER_OPTS: { key: string; label: string; make: () => Border }[] = [
-  { key: 'solid', label: '▭ solid', make: () => ({ kind: 'solid' }) },
-  { key: 'dashed', label: '┄ dashed', make: () => ({ kind: 'dashed', dash: [6, 3] }) },
-  { key: 'cloudy1', label: '◌ cloud 1', make: () => ({ kind: 'cloudy', intensity: 1 }) },
-  { key: 'cloudy2', label: '◌ cloud 2', make: () => ({ kind: 'cloudy', intensity: 2 }) },
+// Border styles a square/circle can take. A border is three engine fields, so
+// each option states all of them (a patch replaces each whole); a cloud bulges
+// out from the shape's box.
+const BORDER_OPTS: { key: string; label: string; fields: FieldValues }[] = [
+  {
+    key: 'solid',
+    label: '▭ solid',
+    fields: { borderStyle: 'solid', dashArray: null, cloudyIntensity: null },
+  },
+  {
+    key: 'dashed',
+    label: '┄ dashed',
+    fields: { borderStyle: 'dashed', dashArray: [6, 3], cloudyIntensity: null },
+  },
+  {
+    key: 'cloudy1',
+    label: '◌ cloud 1',
+    fields: { borderStyle: 'solid', dashArray: null, cloudyIntensity: 1 },
+  },
+  {
+    key: 'cloudy2',
+    label: '◌ cloud 2',
+    fields: { borderStyle: 'solid', dashArray: null, cloudyIntensity: 2 },
+  },
 ];
-const borderKey = (b: Border): string =>
-  b.kind === 'cloudy' ? `cloudy${b.intensity >= 2 ? 2 : 1}` : b.kind;
+const borderKey = (values: FieldValues): string => {
+  const intensity = values.cloudyIntensity as number | null | undefined;
+  if (intensity) return `cloudy${intensity >= 2 ? 2 : 1}`;
+  return values.borderStyle === 'dashed' ? 'dashed' : 'solid';
+};
 const NO_ENDS = { start: 'none', end: 'none' } as const;
 
 const TOOLS: { id: string; label: string; title: string }[] = [
@@ -630,7 +649,7 @@ function AnnotationBar({
   // default makes a CLOSED ending (closed arrow / circle / square) solid out of the
   // box; stroke and fill stay independently editable.
   useEffect(() => {
-    annotation.setToolDefaults('line', {
+    annotation.updateToolDefaults('line', {
       interiorColor: '#e5484d',
       lineEndings: { start: 'none', end: 'open-arrow' },
     });
@@ -755,23 +774,28 @@ const FONT_OPTIONS: { v: string; label: string }[] = [
 ];
 
 /**
- * ONE control for ONE property spec — the entire per-property UI. The spec's
- * `key` fixes the control type and its constraints (min/max/step, cloudy);
- * `onChange` emits a flat `{ [key]: value }` patch. This switch is the whole
- * surface an app customizes — the plugin decides WHICH controls show, in what
- * order, per kind (see `useSelectionProps` / `propsForTool`).
+ * ONE control for ONE field spec — the entire per-field UI. The spec's `key`
+ * is the engine field (the border picker states three), and fixes the control
+ * type and its constraints (min/max/step, cloudy); `onChange` emits
+ * `{ [key]: value }`. This switch is the whole surface an app customizes — the
+ * plugin decides WHICH controls show, in what order, per kind (see
+ * `useSelectionFields` / `useToolFields`).
  */
-function PropControl({
+function FieldControl({
   spec,
-  value,
+  values,
   mixed,
   onChange,
+  onChangeEach,
 }: {
-  spec: PropSpec;
-  value: AnnotationProps[PropSpec['key']] | undefined;
+  spec: FieldSpec;
+  values: FieldValues;
   mixed: boolean;
-  onChange: (patch: AnnotationPropsPatch) => void;
+  onChange: (patch: FieldValues) => void;
+  /** Patch each target relative to itself: one side of its line endings. */
+  onChangeEach: (patchOf: (current: FieldValues) => FieldValues) => void;
 }) {
+  const value = values[spec.key];
   const colorInput = (v: string, set: (c: string) => void) => (
     <input
       type="color"
@@ -836,8 +860,7 @@ function PropControl({
           />
         </SideField>
       );
-    case 'border': {
-      const border = (value as Border) ?? { kind: 'solid' };
+    case 'borderStyle': {
       const opts = spec.cloudy
         ? BORDER_OPTS
         : BORDER_OPTS.filter((o) => !o.key.startsWith('cloudy'));
@@ -847,8 +870,8 @@ function PropControl({
             {opts.map((o) => (
               <button
                 key={o.key}
-                onClick={() => onChange({ border: o.make() })}
-                style={toolBtn(borderKey(border) === o.key)}
+                onClick={() => onChange(o.fields)}
+                style={toolBtn(borderKey(values) === o.key)}
               >
                 {o.label}
               </button>
@@ -862,7 +885,14 @@ function PropControl({
       const side = (which: 'start' | 'end') => (
         <select
           value={ends[which]}
-          onChange={(e) => onChange({ lineEndings: { [which]: e.target.value as LineEndingName } })}
+          onChange={(e) =>
+            onChangeEach((current) => ({
+              lineEndings: {
+                ...(current.lineEndings as LineEndings),
+                [which]: e.target.value as LineEndingName,
+              },
+            }))
+          }
           style={{ ...tbSelect, width: '100%' }}
         >
           {LINE_ENDINGS.map((o) => (
@@ -1000,24 +1030,32 @@ function FieldPanel() {
 
 /**
  * The annotation style inspector — a right-docked sidebar, opened from the tool
- * band. FULLY SCHEMA-DRIVEN: with a selection it renders the properties every
- * selected kind shares (`useSelectionProps`) and writes via `updateSelection`;
- * with none it renders the active tool's properties (`propsForTool`) over the
- * live defaults (`useAnnotationDefaults`) and writes via `setDefaults`. No
- * per-subtype branching here — new kinds get a working sidebar for free.
+ * band. FULLY SCHEMA-DRIVEN: with a selection it renders the fields every
+ * selected kind shares (`useSelectionFields`) and writes via `updateSelection`;
+ * with none it renders the active tool's fields over its live defaults
+ * (`useToolFields`) and writes via `updateToolDefaults`. No per-subtype
+ * branching here — new kinds get a working sidebar for free.
  */
 function AnnotationSidebar({ onClose }: { onClose: () => void }) {
   const annotation = useAnnotation();
   const { activeToolId } = useTool();
-  const sel = useSelectionProps();
-  const defaults = useAnnotationDefaults(activeToolId);
+  const sel = useSelectionFields();
+  const tool = useToolFields(activeToolId);
+  const defaults = useToolDefaults(activeToolId);
   const selCount = useAnnotationSelection().length;
 
-  const hasSel = sel.specs.length > 0;
-  const specs = hasSel ? sel.specs : annotation.listPropSpecs(activeToolId);
-  const values: Partial<AnnotationProps> = hasSel ? sel.values : defaults;
-  const write = (patch: AnnotationPropsPatch) =>
-    hasSel ? annotation.updateSelection(patch) : annotation.setToolDefaults(activeToolId, patch);
+  const hasSel = sel.fields.length > 0;
+  const { fields: specs, values, mixed } = hasSel ? sel : tool;
+  const write = (patch: FieldValues) =>
+    hasSel
+      ? annotation.updateSelection(patch as AnnotationPatch)
+      : annotation.updateToolDefaults(activeToolId, patch);
+  const writeEach = (patchOf: (current: FieldValues) => FieldValues) =>
+    hasSel
+      ? annotation.updateSelection(
+          (member) => patchOf(member as unknown as FieldValues) as AnnotationPatch,
+        )
+      : annotation.updateToolDefaults(activeToolId, patchOf(defaults));
 
   return (
     <aside style={annoSidebar}>
@@ -1036,12 +1074,13 @@ function AnnotationSidebar({ onClose }: { onClose: () => void }) {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: 12 }}>
           {specs.map((spec) => (
-            <PropControl
+            <FieldControl
               key={spec.key}
               spec={spec}
-              value={values[spec.key]}
-              mixed={hasSel && sel.mixed.includes(spec.key)}
+              values={values}
+              mixed={mixed.includes(spec.key)}
               onChange={write}
+              onChangeEach={writeEach}
             />
           ))}
           {!hasSel && MARKUP_SUBTYPES.has(activeToolId) && (

@@ -2,21 +2,30 @@ import { pageRefsEqual } from '@embedpdf/core';
 import {
   applyStyleToRange,
   expandGroups,
+  fieldsOf,
   geomVisualBounds,
   groupKeyOf,
   isSelectable,
   richDocOf,
+  type FieldValues,
+  type Id,
   type ModelAnnotation,
   type AnnotationFlags,
-  type AnnotationPropsPatch,
   type Rect,
 } from '@embedpdf/core-annotation';
 import { intersectRects } from '@embedpdf/core-geometry';
-import { annotationKey, type AnnotationRef, type PageRef } from '@embedpdf/engine-core/runtime';
+import {
+  annotationKey,
+  type AnnotationDTO,
+  type AnnotationPatch,
+  type AnnotationRef,
+  type PageRef,
+  type PdfLinkTarget,
+} from '@embedpdf/engine-core/runtime';
 
 import type { AnnotationReads } from '../read/annotations';
-import type { SelectionPropsReads } from '../read/selection-props';
-import { runDeltaForProps, type TextFormat } from '../rich-text';
+import type { SelectionFieldsReads } from '../read/selection-fields';
+import { runDeltaForFields, type TextFormat } from '../rich-text';
 import type { AnnotationServices } from '../services';
 import type { Crud } from './crud';
 import type { LinkWrites } from './links';
@@ -24,17 +33,16 @@ import { batchResultOf, throwIfFailed } from './outcomes';
 import { rotationOf } from './page-patch';
 import type { TextEditing } from './text-editing';
 import { refsOfIn, type Commit } from '../services/store';
-import { fieldsOf } from '@embedpdf/core-annotation';
 
 /**
- * The selection: what is selected, and the verbs that restyle, flag, delete,
- * rotate, group and ungroup it as one — every member through the same
- * `update → patch effect → toPatch` path a gesture takes.
+ * The selection: what is selected, and the verbs that change its fields,
+ * link, flag, delete, rotate, group and ungroup it as one — every member
+ * through the same `update → patch effect` path a gesture takes.
  */
 export function createSelectionWrites(
   { store, authority, fonts }: Pick<AnnotationServices, 'store' | 'authority' | 'fonts'>,
   annotations: Pick<AnnotationReads, 'loadedOrThrow' | 'selectedCommitted'>,
-  selectionProps: Pick<SelectionPropsReads, 'activeTextRange' | 'selectionPropsOf'>,
+  selectionFields: Pick<SelectionFieldsReads, 'activeTextRange' | 'selectionFieldsOf'>,
   text: Pick<TextEditing, 'flushAllText'>,
   links: Pick<LinkWrites, 'writeRelationship'>,
   crud: Pick<Crud, 'setRotation'>,
@@ -51,38 +59,46 @@ export function createSelectionWrites(
     });
   };
 
-  // Restyle the selection: one flat props patch through the pure core (the
-  // same `update → patch effect → toPatch` path every gesture takes). Each
-  // member takes the keys its kind declares and ignores the rest; the change
-  // shows at once and one engine write runs per member.
-  const restyle = (patch: AnnotationPropsPatch): Commit[] => {
+  /**
+   * Change the selection's fields, a patch per member (a function patches
+   * each relative to itself), through the pure core like every gesture: each
+   * member takes the fields its kind has, the change shows at once and one
+   * engine write runs per member. While the text editor holds a range, the
+   * font, size, colour and formats restyle the runs it covers (a delta over
+   * the body, through the pure run algebra) and the rest goes to the
+   * annotation.
+   */
+  const restyle = (patch: FieldValues | ((annotation: AnnotationDTO) => FieldValues)): Commit[] => {
     const model = store.model();
-    const range = selectionProps.activeTextRange(model);
-    if (range) {
-      // The editor holds a range: font/size/colour/format restyle the
-      // runs it covers (a delta over the body, through the pure run
-      // algebra); whatever is left restyles the annotation as usual.
-      const annotation = model.byId[range.id]!;
-      const { delta, rest } = runDeltaForProps(patch, fonts);
-      const commits: Commit[] = [];
+    const range = selectionFields.activeTextRange(model);
+    const commits: Commit[] = [];
+    const patches: Record<Id, FieldValues> = {};
+    for (const id of model.selected) {
+      const annotation = model.byId[id];
+      if (!annotation) continue;
+      const own = typeof patch === 'function' ? patch(annotation.annotation) : patch;
+      if (range?.id !== id) {
+        patches[id] = own;
+        continue;
+      }
+      const { delta, rest } = runDeltaForFields(own, fonts);
       if (Object.keys(delta).length) {
         const next = applyStyleToRange(
           { paragraphs: richDocOf(fieldsOf(annotation), fonts).paragraphs },
           range,
           delta,
         );
-        commits.push(store.commit({ type: 'setRichText', id: range.id, doc: next }));
+        commits.push(store.commit({ type: 'setRichText', id, doc: next }));
       }
-      if (Object.keys(rest).length) {
-        text.flushAllText(); // the props write must not overtake the text
-        commits.push(store.commit({ type: 'setProps', patch: rest }));
-      }
-      return commits;
+      patches[id] = rest;
     }
-    // A body restyle of the annotation being typed in: land the text first
-    // so the engine's body rewrite carries the latest paragraphs.
-    if (model.editing) text.flushAllText();
-    return [store.commit({ type: 'setProps', patch })];
+    if (Object.values(patches).some((fields) => Object.keys(fields).length)) {
+      // A body restyle of the annotation being typed in: land the text first
+      // so the engine's body rewrite carries the latest paragraphs.
+      if (model.editing) text.flushAllText();
+      commits.push(store.commit({ type: 'setFields', patches }));
+    }
+    return commits;
   };
 
   const api = {
@@ -124,7 +140,10 @@ export function createSelectionWrites(
     clearSelection: () => {
       store.commit({ type: 'deselect' });
     },
-    updateSelection: (patch: AnnotationPropsPatch) => commitOverSelection(() => restyle(patch)),
+    updateSelection: (patch: AnnotationPatch | ((annotation: AnnotationDTO) => AnnotationPatch)) =>
+      commitOverSelection(() => restyle(patch as FieldValues)),
+    updateSelectionLink: (target: PdfLinkTarget | null) =>
+      commitOverSelection(() => [store.commit({ type: 'setLink', target })]),
     updateSelectionFlags: (patch: Partial<AnnotationFlags>) =>
       commitOverSelection(() => [store.commit({ type: 'setFlags', patch })]),
     deleteSelection: () => commitOverSelection(() => [store.commit({ type: 'delete' })]),
@@ -142,10 +161,16 @@ export function createSelectionWrites(
       throwIfFailed(await store.commit({ type: 'resetRotation' }).written);
     },
     toggleTextFormat: async (format: TextFormat) => {
-      const current = selectionProps.selectionPropsOf().values[format];
-      const outcomes = await Promise.all(
-        restyle({ [format]: !current } as AnnotationPropsPatch).map((commit) => commit.written),
-      );
+      const on = selectionFields.selectionFieldsOf().values[format] !== true;
+      const model = store.model();
+      const range = selectionFields.activeTextRange(model);
+      // A held range takes the format as a run delta; otherwise each body
+      // does, once the text being typed has landed.
+      if (!range && model.editing) text.flushAllText();
+      const commits = range
+        ? restyle({ [format]: on })
+        : [store.commit({ type: 'setTextFormat', format, on })];
+      const outcomes = await Promise.all(commits.map((commit) => commit.written));
       outcomes.forEach(throwIfFailed);
     },
     // Grouping writes a relationship (`/IRT` + `/RT /Group`) onto every

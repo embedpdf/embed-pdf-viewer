@@ -12,8 +12,8 @@ export {
   initialSession,
   sameSession,
   EMPTY_CHANGE,
-  initialStyle,
   defaultsFor,
+  toolStyleOf,
   rotateDraftDelta,
   MIN_DRAG,
 } from './update';
@@ -92,19 +92,18 @@ export {
 export {
   KINDS,
   capsFor,
-  propsFor,
+  fieldsFor,
   type KindCaps,
   type AnnotationKind,
-  type PropSpec,
+  type FieldSpec,
 } from './kinds';
+export { initialTextStyle, kindTakesLink, sharedFields } from './props';
 export {
-  applyProps,
-  initialTextStyle,
-  readProp,
-  sharedProps,
-  styleFromProps,
-  textStyleFromProps,
-} from './props';
+  engineSubtypeOf,
+  readOfDefaults,
+  styleOfDefaults,
+  type ToolStyle,
+} from './record/defaults';
 export {
   geomScene,
   textPlateInset,
@@ -171,7 +170,7 @@ export {
   withFields,
   toCreateDraft,
   toPatch,
-  widgetAppearanceFromProps,
+  widgetAppearanceOf,
   writableTarget,
   type AnnotationPlace,
 } from './record';
@@ -186,8 +185,6 @@ export type {
   AnnotationView,
   ChangeSet,
   ModelAnnotation,
-  AnnotationProps,
-  AnnotationPropsPatch,
   Border,
   Callout,
   ChromeGeometry,
@@ -205,7 +202,7 @@ export type {
   Message,
   ClickCreate,
   PointerInput,
-  PropKey,
+  FieldValues,
   QuadRing,
   Rect,
   RecordFields,

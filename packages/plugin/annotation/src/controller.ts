@@ -15,7 +15,7 @@ import type { AnnotationHostCapability } from './host-contract';
 import { createAnnotationReads } from './read/annotations';
 import { createChromeReads } from './read/chrome';
 import { createRenderReads } from './read/render';
-import { createSelectionPropsReads } from './read/selection-props';
+import { createSelectionFieldsReads } from './read/selection-fields';
 import { createServices, type AnnotationContext } from './services';
 import { createAnnouncer } from './services/announce';
 import { followConfirmedChanges } from './sync/confirmed';
@@ -42,7 +42,7 @@ export function createAnnotationController(ctx: AnnotationContext, config: Annot
   const annotations = createAnnotationReads(ctx, services);
   const chrome = createChromeReads(ctx, services);
   const render = createRenderReads(ctx, services);
-  const selectionProps = createSelectionPropsReads(ctx, services);
+  const selectionFields = createSelectionFieldsReads(ctx, services);
 
   // Sync: what follows when the engine confirms a change.
   followConfirmedChanges(ctx, services, createAnnouncer(events));
@@ -56,7 +56,14 @@ export function createAnnotationController(ctx: AnnotationContext, config: Annot
   const stamps = createStamps(ctx, services);
   const ghost = createGhost(ctx, services, stamps);
   const icons = createIcons(ctx, services, annotations, stamps);
-  const selection = createSelectionWrites(services, annotations, selectionProps, text, links, crud);
+  const selection = createSelectionWrites(
+    services,
+    annotations,
+    selectionFields,
+    text,
+    links,
+    crud,
+  );
   const measurement = createMeasurement(ctx, services, crud);
   const pointer = createPointer(ctx, services, chrome, measurement);
   const drafts = createDrafts(services);
@@ -72,7 +79,7 @@ export function createAnnotationController(ctx: AnnotationContext, config: Annot
     annotations.api,
     chrome.api,
     render.api,
-    selectionProps.api,
+    selectionFields.api,
     tools.api,
     behaviors.api,
     text.api,

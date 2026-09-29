@@ -16,7 +16,7 @@ describe('annotation tool registry', () => {
       id: 'replace-text',
       subtype: 'strikeout',
       preset: 'replace-text',
-      propsKind: 'strikeout',
+      fieldsKind: 'strikeout',
       selection: { kind: 'text-edit', operation: 'replace' },
       defaults: { color: '#ef4444' },
     });

@@ -35,7 +35,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       );
       for (const tool of annotation.listResolvedTools()) {
         if (tool.defaults) {
-          annotation.setToolDefaults(tool.id, tool.defaults);
+          annotation.updateToolDefaults(tool.id, tool.defaults);
         }
       }
       annotation.createPointer('distance', 'down', page.ref, { x: 50, y: 100 });

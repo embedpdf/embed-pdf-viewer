@@ -1,9 +1,9 @@
 import { CONTINUOUS_RENDER_POLICY, snapAppearanceScale } from '@embedpdf/core';
 import {
-  defaultsFor,
+  fieldsOf,
   isSubstrateOnly,
   pageItems as corePageItems,
-  styleFromProps,
+  toolStyleOf,
   viewable,
   type Model,
   type RenderItem,
@@ -15,7 +15,6 @@ import type { LinkNavItem, TextItem } from '../contract';
 import type { AnnotationState } from '../model';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import { buildTextItems } from '../text-item';
-import { fieldsOf } from '@embedpdf/core-annotation';
 
 /**
  * What a page paints: the vector items (drafts, previews and the tool ghost
@@ -54,7 +53,7 @@ export function createRenderReads(
     // every draft preview (image ghosts blit through the framework instead).
     if (ghost && ghost.page.pageObjectNumber === pageObjectNumber && ghost.kind === 'vector') {
       const tool = tools.get(ghost.toolId);
-      const style = styleFromProps(defaultsFor(model, tool?.preset ?? ghost.toolId));
+      const { style } = toolStyleOf(model, tool?.subtype ?? ghost.toolId, tool?.preset);
       items.push({
         id: 'tool-ghost',
         ref: null,

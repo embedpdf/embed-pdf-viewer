@@ -25,10 +25,10 @@ import { describe, expect, it } from 'vitest';
 import { DRAWN_FLAGS } from '../src/flags';
 import { linkChildrenOf, linkOf } from '../src/links';
 import { isAttachedLink } from '../src/plane';
-import type { AnnotationPropsPatch, Model, ModelAnnotation, RecordFields } from '../src/types';
-import { record } from './support';
-import { KINDS } from '../src/kinds';
-import { applyProps } from '../src/props';
+import type { Message, Model, ModelAnnotation, RecordFields } from '../src/types';
+import { modelWith, record } from './support';
+import { KINDS, type FieldSpec } from '../src/kinds';
+import { update } from '../src/update';
 import {
   fieldsOf,
   fromDTO,
@@ -1045,7 +1045,7 @@ describe('record — attached links (fold + desired state + link kind mapping)',
   });
 });
 
-describe('record — every prop a kind takes writes only fields its engine kind has', () => {
+describe('record — every field a kind takes writes only fields its engine kind has', () => {
   const PAGE = toPageRef(1);
   const box = { x: 100, y: 100, width: 80, height: 40 };
   const geometryOf = (subtype: string): RecordFields['geometry'] => {
@@ -1087,26 +1087,47 @@ describe('record — every prop a kind takes writes only fields its engine kind 
         return { kind: 'rect', rect: box, ellipse: subtype === 'circle' };
     }
   };
-  const values: AnnotationPropsPatch = {
+  /** The message a sidebar sends for one field spec: a field, a text format or a link. */
+  const messageFor = (spec: FieldSpec, id: string): Message => {
+    switch (spec.key) {
+      case 'bold':
+      case 'italic':
+      case 'underline':
+        return { type: 'setTextFormat', format: spec.key, on: true };
+      case 'link':
+        return { type: 'setLink', target: { kind: 'uri', uri: 'https://example.com' } };
+      case 'borderStyle':
+        return {
+          type: 'setFields',
+          patches: {
+            [id]: {
+              borderStyle: 'dashed',
+              dashArray: [4, 2],
+              ...(spec.cloudy ? { cloudyIntensity: 2 } : {}),
+            },
+          },
+        };
+      case 'icon':
+        return { type: 'setFields', patches: { [id]: { icon: spec.options[1] } } };
+      default:
+        return { type: 'setFields', patches: { [id]: { [spec.key]: VALUES[spec.key] } } };
+    }
+  };
+  const VALUES: Record<string, unknown> = {
     color: '#123456',
     interiorColor: '#654321',
+    fontColor: '#abcdef',
     opacity: 0.5,
     strokeWidth: 3,
-    blendMode: 'multiply',
-    border: { kind: 'dashed', dash: [4, 2] },
-    lineEndings: { end: 'open-arrow' },
-    fontFamily: 'times-roman',
     fontSize: 20,
-    fontColor: '#abcdef',
+    lineEndings: { start: 'none', end: 'open-arrow' },
+    fontFamily: 'times-roman',
     textAlign: 'center',
-    bold: true,
-    italic: true,
-    underline: true,
-    link: { kind: 'uri', uri: 'https://example.com' },
+    blendMode: 'multiply',
   };
 
   for (const [subtype, kind] of Object.entries(KINDS)) {
-    for (const spec of kind.props) {
+    for (const spec of kind.fields) {
       it(`${subtype}: ${spec.key}`, () => {
         const before = record({
           id: 'obj:1',
@@ -1137,16 +1158,19 @@ describe('record — every prop a kind takes writes only fields its engine kind 
           flags: DRAWN_FLAGS,
           source: 'baked',
         });
-        const value = spec.key === 'icon' ? spec.options[1] : values[spec.key];
-        const after = applyProps(fieldsOf(before), { [spec.key]: value } as AnnotationPropsPatch);
-        if (!after) return;
-        // `withFields` refuses a field the engine kind doesn't have…
-        const written = withFields(before, after);
-        const patch = writeOf(before, after);
-        if (!patch) return;
-        // …and the engine takes what it wrote, so the record's annotation follows.
-        expect(() => applyAnnotationPatch(before.annotation, patch)).not.toThrow();
-        expect(written.annotation).not.toBe(before.annotation);
+        const result = update(
+          modelWith([before], { selected: [before.id] }),
+          messageFor(spec, before.id),
+        );
+        // The change is written (a link rides its own effect)…
+        const patch = result.change.patches[before.id];
+        if (spec.key === 'link' && subtype !== 'link') {
+          expect(result.effects).toContainEqual(expect.objectContaining({ type: 'syncLink' }));
+          return;
+        }
+        expect(patch).toBeDefined();
+        // …and the engine takes it, so the record's annotation follows.
+        expect(() => applyAnnotationPatch(before.annotation, patch!)).not.toThrow();
       });
     }
   }
