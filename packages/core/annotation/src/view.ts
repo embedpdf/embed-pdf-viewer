@@ -1,4 +1,5 @@
 import type { PageRef } from '@embedpdf/engine-core/runtime';
+import { rasterPlacement, sourceDuring } from './appearance';
 import { annotationSelectionFrame } from './selection';
 /**
  * Pure view selectors. `pageItems` is the per-annotation render list (live gesture
@@ -24,20 +25,13 @@ import {
   rectHandlesFor,
   ROTATE_KNOB_OFFSET,
 } from './geometry';
-import { rectFromPoints, normalizeDeg, rotatePoint, unionRect } from './rect';
+import { rectFromPoints, rotatePoint, unionRect } from './rect';
 import { calloutShape } from './shapes/text-box';
 import { groupCaps } from './group';
 import { isSelectable, paintOrder } from './hit';
 import { capsFor } from './kinds';
 import { annotTransformable, viewable } from './flags';
-import {
-  anchoredBox,
-  anchoredGeom,
-  anchoredStrokeWidth,
-  anchorModeOf,
-  anchorOf,
-  type ViewEnv,
-} from './anchor';
+import { anchoredGeom, anchoredStrokeWidth, anchorModeOf, type ViewEnv } from './anchor';
 import { blendFor } from './scene';
 import { calloutBox, calloutUprightRot, rotateDraftDelta, toolStyleOf } from './update';
 import type {
@@ -135,75 +129,11 @@ function effStyle(annotation: ModelAnnotation, view: ViewEnv | undefined): Style
   return { ...style, strokeWidth: anchoredStrokeWidth(style.strokeWidth, mode, view) };
 }
 
-/** The blit placement for a baked raster: its box (view space, live move
- *  applied) + the rotation to re-apply about the box centre.
- *
- *  `opaqueBody` kinds (stamp images): the raster is the visual, so the box
- *  follows every live gesture — the unrotated rect of the effective geometry
- *  covers move, resize, and group-scale in one rule, and the effective
- *  rotation drives the blit transform (a stamp spins with the gesture).
- *
- *  Everyone else blits by the AP `/Rect`: for a screen-anchored annotation
- *  that box rides the same similarity the geometry projects through
- *  (`anchoredBox`), composing its counter-rotation with any engine-stripped
- *  `apRot` — so a baked noZoom/noRotate body renders screen-constant too. */
-function effAp(model: Model, id: Id, view: ViewEnv | undefined): { box?: Rect; rot?: number } {
-  const annotation = model.byId[id];
-  if (capsFor(kindOf(annotation.annotation)).opaqueBody) {
-    const geometry = effGeom(model, id, view);
-    return {
-      box: geometry.kind === 'box' ? geometry.box : annotation.apBox,
-      rot: geomRotation(geometry) || undefined,
-    };
-  }
-  if (!annotation.apBox) return { rot: annotation.apRot };
-  const projected = anchoredBox(
-    annotation.apBox,
-    anchorOf(fieldsOf(annotation).geometry),
-    anchorModeOf(annotation),
-    view,
-  );
-  let box = projected?.box ?? annotation.apBox;
-  const rot = normalizeDeg((annotation.apRot ?? 0) + (projected?.rot ?? 0)) || undefined;
-  const draft = model.draft;
-  if (draft?.kind === 'move' && draft.ids.includes(id)) {
-    box = { ...box, x: box.x + draft.delta.x, y: box.y + draft.delta.y };
-  }
-  return { box, rot };
-}
-
-/** Render source for one annotation: an in-progress resize renders live (the
- *  baked raster can't stretch), even though the commit hasn't flipped `source`
- *  yet — so the drag is crisp and a no-op grab can revert to baked. */
-function effSource(model: Model, id: Id): 'baked' | 'vector' {
-  const annotation = model.byId[id];
-  // `opaqueBody` kinds have no vector render: they stay baked through every
-  // gesture — the bitmap stretches with `effApBox` and tilts via the item's
-  // live `rot`, then the engine's re-fit appearance replaces it on commit.
-  if (capsFor(kindOf(annotation.annotation)).opaqueBody) return annotation.source;
-  // A text box under text edit renders fully live (scene fill/border — and a
-  // callout's leader — + DOM text): the flat baked raster can't hide just
-  // its text, so any blend doubles it. Geometry gestures flip below; editing
-  // joins them here.
-  if (model.editing === id && fieldsOf(annotation).geometry.kind === 'text-box') return 'vector';
-  const draft = model.draft;
-  // A live resize/rotate/group transform must render live — the baked raster
-  // can't stretch or tilt — even before the commit flips `source`.
-  if (
-    (draft?.kind === 'handle' || draft?.kind === 'caption' || draft?.kind === 'leader') &&
-    draft.id === id
-  )
-    return 'vector';
-  if ((draft?.kind === 'rotate' || draft?.kind === 'group') && draft.ids.includes(id))
-    return 'vector';
-  return annotation.source;
-}
-
 /** A free-text box renders as a live element (editable / reflowing) while it's
  *  being edited or while its source is vector (a resize, in-progress or committed);
  *  otherwise it renders as the engine's baked /AP image, exactly like a shape. */
 function textIsLive(model: Model, id: Id): boolean {
-  return model.editing === id || effSource(model, id) === 'vector';
+  return model.editing === id || sourceDuring(model, id) === 'vector';
 }
 
 export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderItem[] {
@@ -224,11 +154,9 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
     // and background the moment it is touched.
     const geometry = effGeom(model, id, view);
     const style = effStyle(annotation, view);
-    // Blit box + rotation for the baked raster (see `effAp`): opaqueBody kinds
-    // follow the live effective geometry; everyone else blits by the AP /Rect,
-    // projected through the anchor similarity for screen-anchored bodies and
-    // composed with any engine-stripped `apRot`.
-    const ap = effAp(model, id, view);
+    // Where the baked raster is drawn (appearance.ts): a stamp's where its
+    // shape is, everyone else's at its raster box, carried along by a move.
+    const ap = rasterPlacement(model, id, view, geometry);
     const measure = effMeasure(model, id);
     const distance = measure && measurementLayout(geometry, measure, style);
     items.push({
@@ -242,7 +170,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
       ...(fields.text ? { text: fields.text } : {}),
       ...(fields.label ? { label: fields.label } : {}),
       measure,
-      source: effSource(model, id),
+      source: sourceDuring(model, id),
       selected: model.selected.includes(id),
       ...(model.hovered === id ? { hovered: true } : {}),
       rot: geomRotation(geometry),

@@ -19,11 +19,9 @@
 import { annotContentsEditable } from '../flags';
 import { expandGroups } from '../group';
 import { isSelectable } from '../hit';
-import {
-  annotationPatchBetween,
-  applyAnnotationPatch,
-  type AnnotationPatch,
-} from '@embedpdf/engine-core/runtime';
+import { annotationPatchBetween, type AnnotationPatch } from '@embedpdf/engine-core/runtime';
+
+import { applyChange } from '../appearance';
 
 import type {
   ChangeSet,
@@ -115,9 +113,11 @@ export const EMPTY_CHANGE: ChangeSet = { put: [], drop: [], patches: {} };
 
 /**
  * The records a transition changed, each with the patch its change means (the
- * annotation fields it changed) and its annotation brought up to date as the
- * engine will apply that patch. A new record already carries the annotation
- * it predicts. Cheap when nothing changed: `byId` keeps its identity.
+ * annotation fields it changed), its annotation brought up to date as the
+ * engine will apply that patch, and drawn as the appearance rule says
+ * (`applyChange`): a transition changes annotations, never how they are
+ * drawn. A new record already carries the annotation it predicts. Cheap when
+ * nothing changed: `byId` keeps its identity.
  */
 function changeBetween(before: Model, after: Model): ChangeSet {
   if (before.byId === after.byId) return EMPTY_CHANGE;
@@ -132,17 +132,10 @@ function changeBetween(before: Model, after: Model): ChangeSet {
       continue;
     }
     const fields = annotationPatchBetween(previous.annotation, record.annotation);
-    if (!Object.keys(fields).length) {
-      put.push(
-        record.annotation === previous.annotation
-          ? record
-          : { ...record, annotation: previous.annotation },
-      );
-      continue;
-    }
+    if (!Object.keys(fields).length) continue;
     const patch = { ...fields, subtype: previous.annotation.subtype } as AnnotationPatch;
     patches[id] = patch;
-    put.push({ ...record, annotation: applyAnnotationPatch(previous.annotation, patch) });
+    put.push(applyChange(previous, patch));
   }
   const drop = before.order.filter((id) => before.byId[id] && !after.byId[id]);
   return put.length || drop.length ? { put, drop, patches } : EMPTY_CHANGE;

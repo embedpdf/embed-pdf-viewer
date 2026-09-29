@@ -112,6 +112,41 @@ describe('store.apply', () => {
     expect(dataOf(harness.capability.get(refOf(20))).color).toBe('#00ff00');
   });
 
+  it('a code move keeps the raster and moves it with the shape; a code restyle draws live', async () => {
+    const harness = annotationHarness();
+    await harness.load([square(20)]);
+    const before = harness.capability.listPageItems(PAGE)[0]!;
+    expect(before.source).toBe('baked');
+    const box = dataOf(harness.capability.get(refOf(20))).box as {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    };
+
+    const moveWrite = held();
+    harness.update.mockReturnValueOnce(moveWrite.promise);
+    const moving = harness.capability.update(refOf(20), {
+      subtype: 'square',
+      box: { ...box, x: box.x + 200 },
+    });
+    // The pending view: the same raster, drawn at the moved box, never left behind.
+    const moved = harness.capability.listPageItems(PAGE)[0]!;
+    expect(moved.source).toBe('baked');
+    expect(moved.apBox).toEqual({ ...before.apBox!, x: before.apBox!.x + 200 });
+    const shifted = {
+      ...square(20),
+      rect: { left: 300, bottom: 600, right: 400, top: 660 },
+      box: { left: 300, bottom: 600, right: 400, top: 660 },
+    } as unknown as FileAnnotation;
+    moveWrite.resolve({ annotation: shifted });
+    await moving;
+
+    harness.update.mockResolvedValueOnce({ annotation: { ...shifted, color: '#00ff00' } });
+    await harness.capability.update(refOf(20), { subtype: 'square', color: '#00ff00' });
+    expect(harness.capability.listPageItems(PAGE)[0]!.source).toBe('vector');
+  });
+
   it('a refused update is dropped at once: the engine’s record shows again', async () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);

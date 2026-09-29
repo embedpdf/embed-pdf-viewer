@@ -27,7 +27,7 @@ import { kindTakesLink } from '../props';
 import { fieldsOf, kindOf, withFields } from '../record';
 import { annotationTurnPivot } from '../selection';
 import type { Effect, FieldValues, Id, Model, ModelAnnotation, Point } from '../types';
-import { ownGeometry, toVector, withoutRecords } from './changes';
+import { withoutRecords } from './changes';
 
 /** The text fields: `lockedContents` gates them, not `locked`. */
 const CONTENT_FIELDS: ReadonlySet<string> = new Set(['contents', 'richText']);
@@ -53,11 +53,9 @@ function writableFields(record: ModelAnnotation, patch: FieldValues): Record<str
 /**
  * Write engine fields to records, a patch per id. Each record takes the
  * fields its kind has and may change now (`writableFields`) and ignores the
- * rest, so one message restyles a mixed selection. A changed record flips to
- * `vector` (we own the appearance now), except `opaqueBody` kinds (widgets):
- * they have no vector render, and the engine's re-baked raster replaces
- * theirs. A value set to what it was is no change. The tool defaults are
- * never touched: editing existing annotations doesn't change the next one drawn.
+ * rest, so one message restyles a mixed selection. A value set to what it
+ * was is no change. The tool defaults are never touched: editing existing
+ * annotations doesn't change the next one drawn.
  */
 export function setFields(
   model: Model,
@@ -74,9 +72,8 @@ export function setFields(
       subtype: record.annotation.subtype,
     } as AnnotationPatch);
     if (!Object.keys(annotationPatchBetween(record.annotation, annotation)).length) continue;
-    const next = { ...record, annotation };
     byId ??= { ...model.byId };
-    byId[id] = capsFor(kindOf(record.annotation)).opaqueBody ? next : toVector(next);
+    byId[id] = { ...record, annotation };
   }
   return byId ? [{ ...model, byId }, []] : [model, []];
 }
@@ -99,7 +96,7 @@ export function setTextFormat(
     const { text } = fieldsOf(record);
     if (!text || (text[format] ?? false) === on) continue;
     byId ??= { ...model.byId };
-    byId[id] = toVector(withFields(record, { text: { ...text, [format]: on } }));
+    byId[id] = withFields(record, { text: { ...text, [format]: on } });
   }
   return byId ? [{ ...model, byId }, []] : [model, []];
 }
@@ -204,9 +201,7 @@ export function rotateSelection(model: Model, deltaDeg: number): [Model, Effect[
   for (const id of ids) {
     const annotation = byId[id];
     const { geometry } = fieldsOf(annotation);
-    byId[id] = ownGeometry(
-      withFields(annotation, { geometry: geomRotateAbout(geometry, pivot, deltaDeg) }),
-    );
+    byId[id] = withFields(annotation, { geometry: geomRotateAbout(geometry, pivot, deltaDeg) });
   }
   return [{ ...model, byId }, []];
 }
@@ -223,9 +218,7 @@ export function resetRotation(model: Model): [Model, Effect[]] {
     const { geometry } = fieldsOf(annotation);
     if (geomRotation(geometry) === 0) continue;
     const pivot = annotationTurnPivot(annotation);
-    byId[id] = ownGeometry(
-      withFields(annotation, { geometry: geomResetRotation(geometry, pivot) }),
-    );
+    byId[id] = withFields(annotation, { geometry: geomResetRotation(geometry, pivot) });
     turned = true;
   }
   return turned ? [{ ...model, byId }, []] : [model, []];

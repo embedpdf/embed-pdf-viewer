@@ -17,16 +17,16 @@
  */
 import { PluginError, toPluginError } from '@embedpdf/core';
 import {
-  capsFor,
   creationDraftAnchor,
+  drawnAfter,
   type Effect,
   fromDTO,
   type Id,
-  kindOf,
   type Message,
   type Model,
   type ModelAnnotation,
   refOf,
+  sourceOfNew,
   update,
 } from '@embedpdf/core-annotation';
 import {
@@ -175,7 +175,7 @@ function statedChangeOf(
     const record: ModelAnnotation = {
       ...fromDTO(annotation),
       unconfirmed: true,
-      source: capsFor(kindOf(annotation)).opaqueBody ? 'baked' : 'vector',
+      source: sourceOfNew(annotation),
     };
     const id = record.id;
     return { id, change: { ...change, draft }, pending: { kind: 'create', record } };
@@ -189,13 +189,13 @@ function statedChangeOf(
   // A patch that says nothing, with no bytes, is no write at all.
   if (noFields && !change.resources) return { id: record.id, change, pending: null };
   // The engine's resolve rules, run now: a patch it would refuse throws
-  // before anything shows. Code doesn't take the appearance over: the record
-  // renders as it did, and a raster is fetched again once the engine re-bakes it.
-  applyAnnotationPatch(record.annotation, change.patch);
+  // before anything shows. The record is then drawn as the appearance rule
+  // says, exactly as after a gesture (core `appearance.ts`).
+  const after = applyAnnotationPatch(record.annotation, change.patch);
   return {
     id: record.id,
     change,
-    pending: { kind: 'edit', patch: change.patch, fields: { source: record.source } },
+    pending: { kind: 'edit', patch: change.patch, fields: drawnAfter(record, after) },
   };
 }
 

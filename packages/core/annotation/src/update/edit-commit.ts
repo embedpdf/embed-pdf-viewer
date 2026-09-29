@@ -8,7 +8,7 @@ import { geomRotateAbout, geomScaleAbout, geomTranslate, groupResizeFactors } fr
 import { moveMeasurementCaption, shapeMeasurementReadout } from '../measurement-shape';
 import { fieldsOf, withFields } from '../record';
 import type { Effect, Model } from '../types';
-import { commitViewGesture, geomEqual, ownGeometry, translateRect } from './changes';
+import { commitViewGesture, geomEqual } from './changes';
 import { rotateDraftDelta } from './edit';
 
 export function editUp(model: Model): [Model, Effect[]] {
@@ -20,15 +20,12 @@ export function editUp(model: Model): [Model, Effect[]] {
       return [{ ...model, draft: null }, []];
     }
 
-    const updated = withFields(
-      { ...annotation!, source: 'vector' },
-      {
-        measure: {
-          ...measure,
-          leader: { ...measure.leader, length: (measure.leader?.length ?? 0) + draft.delta },
-        },
+    const updated = withFields(annotation!, {
+      measure: {
+        ...measure,
+        leader: { ...measure.leader, length: (measure.leader?.length ?? 0) + draft.delta },
       },
-    );
+    });
 
     return [{ ...model, draft: null, byId: { ...model.byId, [updated.id]: updated } }, []];
   }
@@ -39,17 +36,14 @@ export function editUp(model: Model): [Model, Effect[]] {
       return [{ ...model, draft: null }, []];
     // A distance's caption offset, or a perimeter's or area's caption center.
     const moved = withFields(
-      { ...annotation!, source: 'vector' },
+      annotation!,
       moveMeasurementCaption(fields.geometry, fields.measure, draft.delta, fields.style),
     );
     return [{ ...model, draft: null, byId: { ...model.byId, [moved.id]: moved } }, []];
   }
   if (draft.kind === 'handle') {
-    // A grab that didn't actually resize leaves the appearance untouched → keep
-    // it baked, no engine write.
+    // A grab that didn't actually resize writes nothing.
     if (geomEqual(draft.base, draft.current)) return [{ ...model, draft: null }, []];
-    // A resize changes the appearance: we own it now → live (vector) render
-    // (opaque-body kinds stay baked; the engine re-fits their AP natively).
     // `cur` is view-space (the projected geometry the user dragged); the
     // commit maps it back to stored space — the identity when un-flagged.
     const before = model.byId[draft.id];
@@ -61,7 +55,7 @@ export function editUp(model: Model): [Model, Effect[]] {
         return [{ ...model, draft: null }, []];
       }
     }
-    const annotation = ownGeometry(withFields(before, { geometry: stored }));
+    const annotation = withFields(before, { geometry: stored });
     return [{ ...model, byId: { ...model.byId, [draft.id]: annotation }, draft: null }, []];
   }
   if (draft.kind === 'rotate') {
@@ -71,15 +65,14 @@ export function editUp(model: Model): [Model, Effect[]] {
     for (const id of draft.ids) {
       const annotation = byId[id];
       if (!annotation) continue;
-      // rotation re-bakes the appearance → live (vector) render + patch. The
-      // gesture composed in view space (`effGeom`); the commit replays the
+      // The gesture composed in view space (`effGeom`); the commit replays the
       // same composition and unprojects — a screen-anchored member's authored
       // tilt turns WYSIWYG, exactly as previewed. A measurement's caption
       // center turns with its shape.
       const rotated = commitViewGesture(annotation, draft.view, (geometry) =>
         geomRotateAbout(geometry, draft.pivot, delta),
       );
-      byId[id] = ownGeometry(withFields(annotation, { geometry: rotated }));
+      byId[id] = withFields(annotation, { geometry: rotated });
     }
     return [{ ...model, byId, draft: null }, []];
   }
@@ -93,7 +86,7 @@ export function editUp(model: Model): [Model, Effect[]] {
       const scaled = commitViewGesture(annotation, draft.view, (geometry) =>
         geomScaleAbout(geometry, draft.anchor, sx, sy),
       );
-      byId[id] = ownGeometry(withFields(annotation, { geometry: scaled }));
+      byId[id] = withFields(annotation, { geometry: scaled });
     }
     return [{ ...model, byId, draft: null }, []];
   }
@@ -103,15 +96,7 @@ export function editUp(model: Model): [Model, Effect[]] {
     for (const id of draft.ids) {
       const annotation = byId[id];
       const { geometry } = fieldsOf(annotation);
-      // A move is a rigid translation — the appearance is unchanged, so a baked
-      // annotation stays baked and its raster box rides along. Source preserved.
-      byId[id] = withFields(
-        {
-          ...annotation,
-          apBox: annotation.apBox ? translateRect(annotation.apBox, draft.delta) : undefined,
-        },
-        { geometry: geomTranslate(geometry, draft.delta) },
-      );
+      byId[id] = withFields(annotation, { geometry: geomTranslate(geometry, draft.delta) });
     }
     return [{ ...model, byId, draft: null }, []];
   }

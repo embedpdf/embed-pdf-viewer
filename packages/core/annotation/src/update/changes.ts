@@ -8,15 +8,14 @@ import { annotationKey } from '@embedpdf/core';
 import type { AnnotationRef, PageRef } from '@embedpdf/engine-core/runtime';
 
 import { anchoredGeom, anchorModeOf, unanchoredGeom, type ViewEnv } from '../anchor';
-import { capsFor } from '../kinds';
-import { annotationOfRecord, type AnnotationPlace, fieldsOf, kindOf, recordOf } from '../record';
+import { sourceOfNew } from '../appearance';
+import { annotationOfRecord, type AnnotationPlace, fieldsOf, recordOf } from '../record';
 import type {
   ModelGeometry,
   Id,
   Model,
   ModelAnnotation,
   Point,
-  Rect,
   RecordFields,
   Subtype,
 } from '../types';
@@ -25,31 +24,7 @@ import { forget } from './session';
 export const isPolySubtype = (subtype: Subtype): subtype is 'polygon' | 'polyline' =>
   subtype === 'polygon' || subtype === 'polyline';
 
-/** Flip an annotation to live (vector) rendering — we now own its appearance, so
- *  the engine's baked AP is no longer authoritative. Idempotent. */
-export const toVector = (annotation: ModelAnnotation): ModelAnnotation =>
-  annotation.source === 'vector' ? annotation : { ...annotation, source: 'vector' };
-
-/**
- * Take ownership of the appearance after a geometry edit. Vector kinds flip to
- * live rendering; `opaqueBody` kinds (stamp images) have no vector render — they
- * stay `baked`, with the raster box following the committed geometry (the bitmap
- * shows stretched until the engine's natively re-fit appearance arrives with the
- * DTO sync). Call with the new geometry already applied.
- */
-export const ownGeometry = (annotation: ModelAnnotation): ModelAnnotation => {
-  if (!capsFor(kindOf(annotation.annotation)).opaqueBody) return toVector(annotation);
-  const { geometry } = fieldsOf(annotation);
-  return geometry.kind === 'box' ? { ...annotation, apBox: geometry.box } : annotation;
-};
-
 export const sub = (from: Point, to: Point): Point => ({ x: from.x - to.x, y: from.y - to.y });
-
-export const translateRect = (rect: Rect, point: Point): Rect => ({
-  ...rect,
-  x: rect.x + point.x,
-  y: rect.y + point.y,
-});
 
 /**
  * Commit a view-space gesture result for one annotation: apply `op` to the
@@ -97,7 +72,7 @@ export type NewRecordFields = Omit<RecordFields, 'id' | 'ref' | 'source' | 'irt'
 
 /**
  * The `offset`-th record a message creates: keyed by the `nm` ref it will be
- * written under, drawn live, and holding the annotation its fields predict,
+ * written under, drawn as a new record is (`sourceOfNew`), and holding the annotation its fields predict,
  * appended after the page's other records. `reply` ties it to the annotation
  * it belongs to.
  */
@@ -123,7 +98,7 @@ export function newRecord(
     index: onPage + offset - 1,
     ...(options.reply ? { reply: options.reply } : {}),
   });
-  return recordOf(record, annotation);
+  return recordOf({ ...record, source: sourceOfNew(annotation) }, annotation);
 }
 
 /** The model without these records, and without any session reference to them. */

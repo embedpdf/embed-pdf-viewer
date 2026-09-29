@@ -6,7 +6,6 @@ import type { RichTextDocumentInput } from '@embedpdf/engine-core/runtime';
 
 import { normalizeRuns, paragraphsFromPlainText, plainTextOf } from '../richtext';
 import type { Effect, Id, Model } from '../types';
-import { toVector } from './changes';
 
 /** Apply the editor's plain text. Updates `contents` on the record's
  *  annotation and flips the box to `vector` so the live text shows. The `text`
@@ -26,8 +25,10 @@ export function setText(model: Model, id: Id, text: string): [Model, Effect[]] {
           richText: { ...record.annotation.richText, paragraphs },
         }
       : { ...record.annotation, contents: text };
-  const next = toVector({ ...record, annotation });
-  return [{ ...model, byId: { ...model.byId, [id]: next } }, [{ type: 'text', id }]];
+  return [
+    { ...model, byId: { ...model.byId, [id]: { ...record, annotation } } },
+    [{ type: 'text', id }],
+  ];
 }
 
 /** Apply the editor's rich document, like `setText`. The annotation's body is
@@ -40,9 +41,9 @@ export function setRichText(model: Model, id: Id, doc: RichTextDocumentInput): [
     body: { ...record.annotation.richText.body, ...(normalized.body ?? {}) },
     paragraphs: normalized.paragraphs,
   };
-  const next = toVector({
+  const next = {
     ...record,
     annotation: { ...record.annotation, richText, contents: plainTextOf(richText) },
-  });
+  };
   return [{ ...model, byId: { ...model.byId, [id]: next } }, [{ type: 'text', id }]];
 }

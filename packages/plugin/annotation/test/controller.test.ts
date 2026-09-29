@@ -1060,19 +1060,19 @@ describe.each([
     actions: null,
   } as unknown as FileAnnotation;
 
-  it('a programmatic update keeps the raster and fetches the one the engine re-baked', async () => {
+  it('a programmatic restyle draws live, like the same edit made by hand, and stays live', async () => {
     const harness = createHarness();
     await harness.load([dto]);
     expect(harness.capability.listPageItems(PAGE)[0].source).toBe('baked');
-    const epoch = harness.capability.getAppearanceEpoch(PAGE);
 
     const updated = { ...dto, strokeWidth: 2 };
     harness.update.mockResolvedValueOnce({ annotation: updated, appearance: { changed: true } });
     await harness.capability.update(dto.ref, { subtype, strokeWidth: 2 });
 
     expect(harness.capability.get(dto.ref)).toEqual(harness.read(updated));
-    expect(harness.capability.listPageItems(PAGE)[0].source).toBe('baked');
-    expect(harness.capability.getAppearanceEpoch(PAGE)).not.toBe(epoch);
+    expect(harness.capability.listPageItems(PAGE)[0].source).toBe('vector');
+    // A record drawn live is no part of the page's raster.
+    expect(harness.capability.getAppearanceEpoch(PAGE)).toBe('');
   });
 
   it('preserves vector rendering through consecutive local edits and engine responses', async () => {

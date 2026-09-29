@@ -2944,18 +2944,18 @@ describe('annotation-core opaqueBody (stamp) gestures', () => {
     expect(item.apBox).toMatchObject({ x: 100, y: 100, width: 160, height: 80 });
   });
 
-  it('stays baked AFTER the resize commits, apBox at the new rect', () => {
+  it('stays baked AFTER the resize commits, its raster drawn at the new box', () => {
     let model = run(loadStamp(), [editPtr('down', 150, 125), editPtr('up', 150, 125)]);
     model = run(model, [
       editPtr('down', 200, 150),
       editPtr('move', 260, 180),
       editPtr('up', 260, 180),
     ]);
-    const annotation = model.byId['S1'];
-    expect(annotation.source).toBe('baked');
-    expect(annotation.apBox).toMatchObject({ x: 100, y: 100, width: 160, height: 80 });
+    expect(model.byId['S1'].source).toBe('baked');
     const item = pageItems(model, PAGE).find((pageItem) => pageItem.subtype === 'stamp')!;
     expect(item.source).toBe('baked');
+    // A stamp's raster is drawn where its shape is (appearance.ts `rasterPlacement`).
+    expect(item.apBox).toMatchObject({ x: 100, y: 100, width: 160, height: 80 });
   });
 
   it('stays baked MID-rotate with the live rotation exposed as apRot (view transform)', () => {
@@ -4114,7 +4114,7 @@ describe('render source after an edit (what keeps a raster, what renders live)',
     expect(next.byId['A1'].source).toBe('baked'); // …and still baked
   });
 
-  it('a stamp RESIZE stays baked, its raster box following the new geometry', () => {
+  it('a stamp RESIZE stays baked, its raster drawn at the new box', () => {
     let model = committed('stamp');
     [model] = step(model, editPtr('down', 200, 160)); // grab the SE handle
     [model] = step(model, editPtr('move', 240, 190));
@@ -4129,7 +4129,8 @@ describe('render source after an edit (what keeps a raster, what renders live)',
       },
     ]);
     expect(next.byId['A1'].source).toBe('baked'); // opaque-body: no vector render
-    expect(next.byId['A1'].apBox).toEqual({ x: 100, y: 100, width: 140, height: 90 });
+    const item = pageItems(next, PAGE).find((pageItem) => pageItem.id === 'A1')!;
+    expect(item.apBox).toEqual({ x: 100, y: 100, width: 140, height: 90 });
   });
 
   it('a stamp rotate90 commits a bare patch — rotation is stripped at the blit', () => {

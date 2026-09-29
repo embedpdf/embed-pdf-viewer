@@ -456,10 +456,11 @@ export type {
 export { deletedAnnotationsOf } from './mutation/AnnotationMutationResults';
 export type {
   AppearanceAction,
+  AppearanceChange,
   AppearanceImpact,
   AppearanceOutcome,
 } from './annotation/appearance';
-export { appearanceImpactOf, semanticEqual } from './annotation/appearance';
+export { appearanceChangeOf, appearanceImpactOf, semanticEqual } from './annotation/appearance';
 export { pdfAppearanceTurnOf } from './annotation/appearanceTurn';
 export { assertAnnotationDraft } from './annotation/checkWrite';
 export {
