@@ -533,9 +533,20 @@ parentPort.on('message', (msg) => {
             createdAt: null,
             modifiedAt: null,
             trapped: 'unknown',
-            custom: {},
           },
         },
+      });
+      return;
+    }
+    case 'metadata.readCustom': {
+      if (!openDocs.get(sessionKey(msg))) {
+        rejectNotOpen(msg);
+        return;
+      }
+      parentPort.postMessage({
+        kind: 'resolve',
+        jobId: msg.jobId,
+        result: { tag: 'metadata.readCustom', custom: {} },
       });
       return;
     }

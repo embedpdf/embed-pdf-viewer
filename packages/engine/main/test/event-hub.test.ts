@@ -17,7 +17,6 @@ function metadataEvent(
       createdAt: null,
       modifiedAt: null,
       trapped: 'unknown',
-      custom: {},
     },
     meta: { affectedPages: [], cacheDelta: null },
     origin: { kind: 'local', sessionId: 's', sub: null, ts: 1, serverId },

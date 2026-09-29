@@ -10,7 +10,6 @@ export interface DocMetadataGet200Response {
     createdAt: string | null;
     modifiedAt: string | null;
     trapped: DocMetadataGet200Response.Trapped;
-    custom: Record<string, string>;
 }
 
 export namespace DocMetadataGet200Response {

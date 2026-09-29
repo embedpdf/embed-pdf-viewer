@@ -63,7 +63,8 @@ By the time `await page.annotations.create(…)` returns, your listeners have ru
 | `forms.created`, `.updated`, `.deleted`, `.widgetAdded`, `.widgetRemoved` | A field's structure changed.                                                              |
 | `forms.imported`, `forms.repaired`, `forms.effectsApplied`                | Many values or fields changed at once.                                                    |
 | `attachments.created`, `.deleted`                                         | An attached file was added or removed.                                                    |
-| `metadata.updated`                                                        | The title, author or other metadata.                                                      |
+| `metadata.updated`                                                        | The title, author or another standard metadata field.                                     |
+| `metadata.customUpdated`                                                  | Your own metadata keys.                                                                   |
 | `redaction.applied`                                                       | Redactions were applied.                                                                  |
 | `signatures.prepared`, `.completed`, `.cancelled`                         | A signature was started or finished.                                                      |
 | `document.versioned`                                                      | A new version of the document was saved, such as after signing. Read what you show again. |

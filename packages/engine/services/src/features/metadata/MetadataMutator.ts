@@ -1,6 +1,12 @@
-import type { MetadataPatch, MetadataUpdateResult } from '@embedpdf/engine-core/runtime';
+import type {
+  CustomMetadataPatch,
+  CustomMetadataUpdateResult,
+  MetadataPatch,
+  MetadataUpdateResult,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
+import { applyCustomMetadataPatch } from './internal/write/applyCustomMetadataPatch';
 import { applyMetadataPatch } from './internal/write/applyMetadataPatch';
 import { MetadataReader } from './MetadataReader';
 import type { DocumentSession } from '../../document-session/DocumentSession';
@@ -36,5 +42,15 @@ export class MetadataMutator {
     // local engines have no manifest/CDN; the server adds its own.
     const metadata = new MetadataReader(this.runtime, this.session).read(signal);
     return { metadata, meta: { affectedPages: [], cacheDelta: null } };
+  }
+
+  /** Set and remove custom keys, then re-read them the same way. */
+  updateCustom(patch: CustomMetadataPatch, signal: AbortSignal): CustomMetadataUpdateResult {
+    throwIfAborted(signal);
+    const { fn, mem } = this.runtime;
+    applyCustomMetadataPatch(fn, mem, this.session.requireDocPtr(), patch);
+    throwIfAborted(signal);
+    const custom = new MetadataReader(this.runtime, this.session).readCustom(signal);
+    return { custom, meta: { affectedPages: [], cacheDelta: null } };
   }
 }

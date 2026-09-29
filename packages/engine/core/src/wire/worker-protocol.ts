@@ -8,6 +8,8 @@ import type {
   AnnotationAppearancesResult,
 } from '../dto/AnnotationRender';
 import type { Attachment, AttachmentRef, WireAttachmentFile } from '../dto/Attachment';
+import type { CustomMetadata } from '../dto/CustomMetadata';
+import type { CustomMetadataPatch } from '../dto/CustomMetadataPatch';
 import type { DocumentMetadata } from '../dto/DocumentMetadata';
 import type { FontIdentityInfo } from '../dto/FontSpec';
 import type { PdfMeasure, PageMeasurementViewport } from '../dto/Measure';
@@ -42,6 +44,7 @@ import type {
   AttachmentCreateResult,
   AttachmentDeleteResult,
 } from '../mutation/AttachmentMutationResults';
+import type { CustomMetadataUpdateResult } from '../mutation/CustomMetadataUpdateResult';
 import type {
   FormFieldCreateResult,
   FormFieldDeleteResult,
@@ -276,6 +279,22 @@ export interface MetadataUpdateWorkerRequest {
   docId: string;
   layerName?: string;
   patch: MetadataPatch;
+  artifactPath?: string;
+}
+
+export interface MetadataReadCustomWorkerRequest {
+  kind: 'metadata.readCustom';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+}
+
+export interface MetadataUpdateCustomWorkerRequest {
+  kind: 'metadata.updateCustom';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  patch: CustomMetadataPatch;
   artifactPath?: string;
 }
 
@@ -1155,6 +1174,8 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | OpenWorkerRequest
   | MetadataReadWorkerRequest
   | MetadataUpdateWorkerRequest
+  | MetadataReadCustomWorkerRequest
+  | MetadataUpdateCustomWorkerRequest
   | ActionsReadWorkerRequest
   | AnnotationsListWorkerRequest
   | AnnotationsRenderAppearancesWorkerRequest
@@ -1279,6 +1300,13 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
   | {
       tag: 'metadata.update';
       result: MetadataUpdateResult;
+      artifact?: LayerArtifactWorkerPayload;
+      artifactFile?: LayerArtifactFileWorkerPayload;
+    }
+  | { tag: 'metadata.readCustom'; custom: CustomMetadata }
+  | {
+      tag: 'metadata.updateCustom';
+      result: CustomMetadataUpdateResult;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }

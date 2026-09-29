@@ -53,6 +53,9 @@ export type DocResourceId =
   | 'annotations-export'
   | 'layout'
   | 'metadata'
+  // The Info dict's custom keys: their own path under `/metadata/`, so
+  // their own entry (the `metadata@` prefix doesn't cover `metadata/custom@`).
+  | 'metadata-custom'
   | 'actions'
   | 'attachments'
   | 'attachment-files'
@@ -64,6 +67,7 @@ export type DocResourceId =
   | 'layer-manifest'
   | 'layer-layout'
   | 'layer-metadata'
+  | 'layer-metadata-custom'
   // Digital signatures: the layer's snapshot and analysis (pinned by
   // docVersion, like the manifest), and the version-scoped families —
   // content-addressed by base sha, each under its own prefix (the CDN
@@ -289,6 +293,16 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
+  'metadata-custom': {
+    id: 'metadata-custom',
+    pathPattern: '/v1/docs/{docId}/metadata/custom@*',
+    resolvePathPattern: (docId) => `/v1/docs/${docId}/metadata/custom@*`,
+    pathPrefix: '/v1/docs/{docId}/metadata/custom@',
+    resolvePathPrefix: (docId) => `/v1/docs/${docId}/metadata/custom@`,
+    requirement: { kind: 'single', capability: 'doc.open' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
   actions: {
     id: 'actions',
     pathPattern: '/v1/docs/{docId}/actions@*',
@@ -323,6 +337,18 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
       `/v1/docs/${docId}/layers/${layerName}/metadata@`,
     // Metadata is the same session-level read as the manifest; gate it
     // behind `doc.open` just like `layer-manifest` / `layer-layout`.
+    requirement: { kind: 'single', capability: 'doc.open' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'layer-metadata-custom': {
+    id: 'layer-metadata-custom',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/metadata/custom@*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/metadata/custom@*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/metadata/custom@',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/metadata/custom@`,
     requirement: { kind: 'single', capability: 'doc.open' },
     routeKind: 'versioned-read',
     cdnCacheable: true,

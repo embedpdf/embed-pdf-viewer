@@ -46,6 +46,8 @@ import {
   type Identity,
   type MetadataPatch,
   type MetadataUpdateResult,
+  type CustomMetadataPatch,
+  type CustomMetadataUpdateResult,
   type CacheDelta,
   type MutationMeta,
   type PageDeleteResult,
@@ -1297,6 +1299,45 @@ export class LayerService {
           );
         }
         return this.persistMetadataUpdate(ctx, input.docId, input.layerName, layer, {
+          kind: 'metadata.update',
+          result: payload.result,
+          artifact: requireLayerArtifact(payload as unknown),
+        });
+      });
+    });
+  }
+
+  /** The Info dict's custom keys: the same Info-dict write as `updateMetadata`. */
+  async updateCustomMetadata(
+    ctx: LayerWriteContext,
+    input: {
+      docId: string;
+      layerName: string;
+      patch: CustomMetadataPatch;
+    },
+    signal?: AbortSignal,
+  ): Promise<CustomMetadataUpdateResult> {
+    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
+      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
+      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
+        const build = (jobId: WorkerJobId) =>
+          wirePack({
+            kind: 'metadata.updateCustom' as const,
+            jobId,
+            docId: input.docId,
+            layerName: input.layerName,
+            patch: input.patch,
+            artifactPath,
+          });
+        const payload = await this.requirePool().run(input.docId, build, signal);
+        if (payload.tag !== 'metadata.updateCustom') {
+          throw new EngineError(
+            EngineErrorCode.WireFormat,
+            `unexpected metadata.updateCustom payload: ${payload.tag}`,
+          );
+        }
+        return this.persistMetadataUpdate(ctx, input.docId, input.layerName, layer, {
+          kind: 'metadata.updateCustom',
           result: payload.result,
           artifact: requireLayerArtifact(payload as unknown),
         });
@@ -2391,16 +2432,18 @@ export class LayerService {
     return committed.result;
   }
 
-  private async persistMetadataUpdate(
+  /** Both halves of the Info dict (standard fields, custom keys) commit the same way. */
+  private async persistMetadataUpdate<R extends MetadataUpdateResult | CustomMetadataUpdateResult>(
     ctx: LayerWriteContext,
     docId: string,
     layerName: string,
     layer: LayerRow,
     input: {
-      result: MetadataUpdateResult;
+      kind: 'metadata.update' | 'metadata.updateCustom';
+      result: R;
       artifact: LayerArtifactInput;
     },
-  ): Promise<MetadataUpdateResult> {
+  ): Promise<R> {
     const nextVersion = layer.currentVersion + 1;
     const artifactKey = this.nextArtifactKey(ctx, docId, layerName, nextVersion);
     const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
@@ -2412,7 +2455,8 @@ export class LayerService {
       docId,
       layerName,
       layer,
-      metadata: input.result.metadata,
+      kind: input.kind,
+      result: input.result,
       artifactKey,
       artifactSha: uploaded.sha256,
       artifactSize: uploaded.size,
@@ -4480,18 +4524,21 @@ export class LayerService {
     return key;
   }
 
-  private async commitMetadataUpdate(input: {
+  private async commitMetadataUpdate<
+    R extends MetadataUpdateResult | CustomMetadataUpdateResult,
+  >(input: {
     ctx: LayerWriteContext;
     docId: string;
     layerName: string;
     layer: LayerRow;
-    /** The worker's re-read metadata — becomes `result.metadata`. */
-    metadata: MetadataUpdateResult['metadata'];
+    kind: 'metadata.update' | 'metadata.updateCustom';
+    /** The worker's result: its re-read data is kept, its `meta` replaced. */
+    result: R;
     artifactKey: string;
     artifactSha: string;
     artifactSize: number;
     nextVersion: number;
-  }): Promise<{ result: MetadataUpdateResult; auditId: number }> {
+  }): Promise<{ result: R; auditId: number }> {
     return this.requireDb()
       .transaction()
       .execute(async (trx) => {
@@ -4519,8 +4566,8 @@ export class LayerService {
 
         // The finalized result — audited and returned identically: what we
         // tell the caller is what we tell history (and remote subscribers).
-        const result: MetadataUpdateResult = {
-          metadata: input.metadata,
+        const result: R = {
+          ...input.result,
           meta: planeMeta({
             previousDocVersion: previousLayerDocVersion,
             docVersion: layerDocVersion,
@@ -4533,7 +4580,7 @@ export class LayerService {
           docId: input.docId,
           layer: input.layer,
           layerName: input.layerName,
-          kind: 'metadata.update',
+          kind: input.kind,
           pageObjectNumber: null,
           affectedPages: [],
           artifactVersion: input.nextVersion,
