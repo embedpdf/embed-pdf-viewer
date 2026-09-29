@@ -14876,6 +14876,96 @@
             "required": ["content", "annotations", "layout", "attachments", "metadata", "actions"],
             "additionalProperties": false
           },
+          "protection": {
+            "type": "object",
+            "properties": {
+              "enforced": {
+                "type": "string",
+                "enum": ["none", "lta", "fill", "annotate"],
+                "nullable": true
+              },
+              "judged": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/DocManifest200Response/properties/protection/properties/enforced"
+                  }
+                ],
+                "nullable": true
+              },
+              "certification": {
+                "type": "object",
+                "properties": {
+                  "signatureIndex": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "permission": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "enum": [1]
+                      },
+                      {
+                        "type": "number",
+                        "enum": [2]
+                      },
+                      {
+                        "type": "number",
+                        "enum": [3]
+                      }
+                    ]
+                  }
+                },
+                "required": ["signatureIndex", "permission"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "fieldLocks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "signatureIndex": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": ["fieldmdp", "lock"]
+                    },
+                    "spec": {
+                      "type": "object",
+                      "properties": {
+                        "action": {
+                          "type": "string",
+                          "enum": ["all", "include", "exclude"]
+                        },
+                        "fields": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "permission": {
+                          "$ref": "#/components/schemas/DocManifest200Response/properties/protection/properties/certification/properties/permission"
+                        }
+                      },
+                      "required": ["action", "fields"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["signatureIndex", "source", "spec"],
+                  "additionalProperties": false
+                }
+              },
+              "policyVersion": {
+                "type": "integer"
+              }
+            },
+            "required": ["enforced", "judged", "certification", "fieldLocks", "policyVersion"],
+            "additionalProperties": false,
+            "nullable": true
+          },
           "pages": {
             "type": "array",
             "items": {
@@ -14913,6 +15003,7 @@
           "metadataVersion",
           "auditHead",
           "baseSha",
+          "protection",
           "pages"
         ],
         "additionalProperties": false

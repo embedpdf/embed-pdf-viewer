@@ -5,13 +5,19 @@ import {
   checkCapability,
   checkCollab,
   collabTargetOf,
+  describeProtection,
+  EngineError,
+  EngineErrorCode,
+  protectedCapabilities,
   type AnnotationOwner,
   type AnnotationRef,
   type CollabAction,
   type CollabTarget,
   type DocCapability,
+  type DocumentProtection,
   type Identity,
   type PdfBits,
+  type ProtectableCapability,
   PermissionDenied,
 } from '@embedpdf/engine-core/runtime';
 import { checkResourceAccess, DOC_RESOURCES, type DocResourceId } from '@embedpdf/engine-core/wire';
@@ -463,22 +469,55 @@ export function requireDocAccessOnly(
   return { tenantId: t.id, sub: t.sub, mode: 'tenant', jwt: requestJwtContext(req, t.claims) };
 }
 
+/** A capability no signature can take away: its check never needs the document's protection. */
+export type UnprotectableCapability = Exclude<DocCapability, ProtectableCapability>;
+
+/**
+ * The protection a capability's check takes: required exactly when a
+ * signature can take the capability away, so a route can't forget it.
+ */
+type ProtectionArg<C extends DocCapability> = C extends ProtectableCapability
+  ? [protection: DocumentProtection | null]
+  : [];
+
+const protectionOf = (rest: readonly unknown[]): DocumentProtection | null =>
+  (rest[0] as DocumentProtection | null | undefined) ?? null;
+
+/**
+ * `ProtectedDocument` when the document's signatures forbid `capability`.
+ * Document-derived, like the file's own permission bits: it binds every
+ * caller, tenant tokens included, and comes before the scope, exactly as the
+ * local engine's scope guard orders it.
+ */
+function refuseProtected(capability: DocCapability, protection: DocumentProtection | null): void {
+  if (protection && protectedCapabilities(protection).has(capability)) {
+    throw new EngineError(
+      EngineErrorCode.ProtectedDocument,
+      describeProtection(capability, protection),
+    );
+  }
+}
+
 /**
  * Assert the bearer's scope grants the named capability for the given
  * document. Throws `Forbidden` on deny.
  *
- * Tenant tokens bypass the capability check entirely (existing policy:
+ * A capability a signature can take away also takes the document's
+ * protection (`DocumentService.getProtection`), checked first, for every
+ * caller. Tenant tokens then bypass the scope check (existing policy:
  * tenant owns every doc in the tenant). Doc-scoped tokens evaluate the
  * capability against their JWT scope array + the document's PDF bits
  * (the bits matter for `pdf.permissions` expansion only).
  */
-export function requireCapability(
+export function requireCapability<C extends DocCapability>(
   req: FastifyRequest,
   docId: string,
-  capability: DocCapability,
+  capability: C,
   pdfBits: PdfBits,
+  ...protection: ProtectionArg<C>
 ): { tenantId: string; sub: string; mode: DocAccessMode; jwt: RequestJwtContext } {
   const ctx = requireDocAccessOnly(req, docId);
+  refuseProtected(capability, protectionOf(protection));
   if (ctx.mode === 'tenant') return ctx;
   if (!checkCapability(capability, ctx.jwt.scope, pdfBits)) {
     throw new PermissionDenied(capability);
@@ -494,7 +533,7 @@ export function requireCapability(
 export function requireAnyCapability(
   req: FastifyRequest,
   docId: string,
-  capabilities: ReadonlyArray<DocCapability>,
+  capabilities: ReadonlyArray<UnprotectableCapability>,
   pdfBits: PdfBits,
 ): { tenantId: string; sub: string; mode: DocAccessMode; jwt: RequestJwtContext } {
   const ctx = requireDocAccessOnly(req, docId);
@@ -530,6 +569,8 @@ export function requireResource(
  * annotation's `userId` / `groupId` from the EMBD_Metadata reader
  * first, then call this. POST (create) passes the caller's own
  * identity as the target since creators always act as themselves.
+ * A signature that forbids annotation writes refuses them first, for
+ * every caller.
  */
 export function requireCollabAction(
   req: FastifyRequest,
@@ -537,8 +578,10 @@ export function requireCollabAction(
   action: CollabAction,
   target: CollabTarget,
   pdfBits: PdfBits,
+  protection: DocumentProtection | null,
 ): { tenantId: string; sub: string; mode: DocAccessMode; jwt: RequestJwtContext } {
   const ctx = requireDocAccessOnly(req, docId);
+  refuseProtected('doc.annotate.modify', protection);
   if (ctx.mode === 'tenant') return ctx;
   if (!checkCollab(action, target, ctx.jwt.scope, ctx.jwt.identity, pdfBits)) {
     throw new PermissionDenied(`annotations:${action}`, 'target');
@@ -567,20 +610,29 @@ export function requireLayerDocAccessOnly(
   return ctx;
 }
 
-export function requireLayerCapability(
-  req: FastifyRequest,
-  docId: string,
-  layerName: string,
-  capability: DocCapability,
-  pdfBits: PdfBits,
-): {
+type LayerGuardContext = {
   tenantId: string;
   sub: string;
   mode: DocAccessMode;
   jwt: RequestJwtContext;
   originSessionId: string | null;
-} {
-  const ctx = requireCapability(req, docId, capability, pdfBits);
+};
+
+export function requireLayerCapability<C extends DocCapability>(
+  req: FastifyRequest,
+  docId: string,
+  layerName: string,
+  capability: C,
+  pdfBits: PdfBits,
+  ...protection: ProtectionArg<C>
+): LayerGuardContext {
+  const ctx = requireCapability(
+    req,
+    docId,
+    capability as ProtectableCapability,
+    pdfBits,
+    protectionOf(protection),
+  );
   enforceLayerPin(req, layerName);
   // The mutating client's engine-instance id (X-Engine-Session-Id). Stored on
   // the audit row so SSE subscribers can drop their own echoes. Advisory only
@@ -599,7 +651,7 @@ export function requireLayerAnyCapability(
   req: FastifyRequest,
   docId: string,
   layerName: string,
-  capabilities: ReadonlyArray<DocCapability>,
+  capabilities: ReadonlyArray<UnprotectableCapability>,
   pdfBits: PdfBits,
 ): {
   tenantId: string;
@@ -638,14 +690,9 @@ export function requireLayerCollabAction(
   action: CollabAction,
   target: CollabTarget,
   pdfBits: PdfBits,
-): {
-  tenantId: string;
-  sub: string;
-  mode: DocAccessMode;
-  jwt: RequestJwtContext;
-  originSessionId: string | null;
-} {
-  const ctx = requireCollabAction(req, docId, action, target, pdfBits);
+  protection: DocumentProtection | null,
+): LayerGuardContext {
+  const ctx = requireCollabAction(req, docId, action, target, pdfBits, protection);
   enforceLayerPin(req, layerName);
   return { ...ctx, originSessionId: originSessionIdFromRequest(req) };
 }
@@ -662,8 +709,10 @@ export function requireLayerCollabActionEach(
   action: CollabAction,
   annotations: readonly (AnnotationOwner & { ref: AnnotationRef })[],
   pdfBits: PdfBits,
-): ReturnType<typeof requireLayerCollabAction> {
+  protection: DocumentProtection | null,
+): LayerGuardContext {
   const ctx = requireLayerDocAccessOnly(req, docId, layerName);
+  refuseProtected('doc.annotate.modify', protection);
   if (ctx.mode !== 'tenant') {
     const refused = annotations.filter(
       (annotation) =>

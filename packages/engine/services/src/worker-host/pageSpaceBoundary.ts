@@ -2,6 +2,7 @@ import {
   mapDocumentActions,
   pageAnnotationOf,
   pageAppearancesOf,
+  pageBoxOf,
   pageDestinationOf,
   pageFormFieldOf,
   pageFormSnapshotOf,
@@ -59,6 +60,8 @@ export function resultInPageSpace(
       } as WorkerResultPayload;
     case 'pages.geometry':
       return { ...payload, snapshot: pageGeometryOf(payload.snapshot, boxOf(payload.page)) };
+    case 'pages.render':
+      return { ...payload, area: pageBoxOf(payload.area, boxOf(payload.page)) };
     case 'search.query':
       return { ...payload, slice: pageSearchSliceOf(payload.slice, boxOf) };
     case 'annotations.renderAppearances': {

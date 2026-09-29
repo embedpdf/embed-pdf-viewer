@@ -1475,13 +1475,13 @@ export class WorkerHost {
   ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>> {
     const session = this.requireSession(req);
     const reader = new PageRenderReader(this.runtime, session);
-    const raster = await reader.render(
+    const { raster, area } = await reader.render(
       session.resolvePageRef(req.page).pageObjectNumber,
       req.options ?? {},
       signal,
       this.renderSlices,
     );
-    return wirePack({ tag: 'pages.render', raster }, [raster.data]);
+    return wirePack({ tag: 'pages.render', page: req.page, area, raster }, [raster.data]);
   }
 
   /**
@@ -1766,7 +1766,7 @@ export class WorkerHost {
       }
       // No session carried this document to the boundary, so the target
       // converts here, on the page it opened.
-      const raster = await new PageRenderReader(this.runtime, session).render(
+      const { raster } = await new PageRenderReader(this.runtime, session).render(
         page.ref.pageObjectNumber,
         renderOptionsInFileSpace(req.options ?? {}, () => page.pdfCropBox),
         signal,

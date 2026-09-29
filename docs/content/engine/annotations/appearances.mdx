@@ -41,12 +41,12 @@ for (const appearance of appearances) {
 `renderAppearances()` draws every annotation of the page that has an appearance, each as its own
 image:
 
-| Field   | What it is                                                 |
-| :------ | :--------------------------------------------------------- |
-| `ref`   | Which annotation it is.                                    |
-| `rect`  | Where the image goes, in page space.                       |
-| `mode`  | Which look it is: `'normal'` unless you asked for others.  |
-| `image` | The image; `image.objectUrl()` gives a URL for an `<img>`. |
+| Field   | What it is                                                                           |
+| :------ | :----------------------------------------------------------------------------------- |
+| `ref`   | Which annotation it is.                                                              |
+| `rect`  | Where the image goes, in page space.                                                 |
+| `mode`  | Which look it is: `'normal'` unless you asked for others.                            |
+| `image` | The image; `image.objectUrl()` gives a URL for an `<img>`, `image.blob()` its bytes. |
 
 | Option     | What it is                                                                                                                                                         | Default   |
 | :--------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------- |

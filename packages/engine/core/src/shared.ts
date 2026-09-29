@@ -79,6 +79,11 @@ export {
   pdfTurnOfDrawn,
   pdfTurnOfUpright,
   renderSize,
+  pageTransform,
+  renderAreaTransform,
+  renderMatrix,
+  renderTargetArea,
+  renderTransform,
   DEFAULT_MEDIA_BOX,
   pageBoxesOf,
   pageRotationOf,
@@ -105,7 +110,9 @@ export type {
   PageRenderBackground,
   PageRenderEncodedFormat,
   PageRenderFormat,
+  PageRenderImage,
   PageRenderOptions,
+  PageRenderRaster,
   PageRenderQuery,
   PageRenderTarget,
   PageRenderViewport,
@@ -449,6 +456,14 @@ export { assertAnnotationDraft, checkAnnotationPatch } from './annotation/checkW
 
 // Page space: positions from the top-left of a page's visible box, y down.
 export type { PageBox, PagePoint, PageQuad } from './geometry';
+export type {
+  PageRenderMatrix,
+  PageRenderTransform,
+  PageTransformOptions,
+  PixelBox,
+  PixelPoint,
+  PixelQuad,
+} from './geometry';
 export { pageBoxOf, pagePointOf, pageQuadOf, pdfPointOf, pdfQuadOf, pdfRectOf } from './geometry';
 export * from './pageSpace';
 export type { FormFieldRef, FormWidget } from './identity/FormFieldRef';
@@ -578,9 +593,12 @@ export {
 } from './signature/analysis';
 export type { EdgeResolverBudget, ResolvedUsage } from './signature/analysis';
 export {
+  PROTECTABLE_CAPABILITIES,
   SIGNATURE_POLICY_VERSION,
   deriveProtection,
+  describeProtection,
   fieldLockFor,
+  isProtectableCapability,
   levelAllows,
   levelFromPermission,
   lockCovers,
@@ -588,6 +606,7 @@ export {
   minLevel,
   protectedCapabilities,
 } from './signature/protection';
+export type { ProtectableCapability } from './signature/protection';
 export { deletedFieldOf } from './mutation/FormMutationResults';
 export type {
   FormMutationMeta,

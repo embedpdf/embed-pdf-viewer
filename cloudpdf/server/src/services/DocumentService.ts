@@ -30,6 +30,7 @@ import {
   type AnalyzeInput,
   type ChangeAnalysis,
   type SignatureSnapshot,
+  type DocumentProtection,
 } from '@embedpdf/engine-core/runtime';
 import { DEFAULT_LAYER_NAME, wirePaths } from '@embedpdf/engine-core/wire';
 import type { DocumentManifest, LayerScopes } from '@embedpdf/engine-core/wire';
@@ -202,6 +203,12 @@ export class DocumentService {
   private readonly cdnAccessRequired: boolean;
   private readonly heads = new Map<string, DocumentHead>();
   private readonly opens = new Map<string, Promise<DocumentHead>>();
+  /**
+   * What each base version's signatures forbid, by the version's sha. The
+   * worker reports it whenever it opens a version's bytes; it belongs to the
+   * bytes, so an entry never goes stale.
+   */
+  private readonly protections = new Map<string, DocumentProtection | null>();
   private readonly baseHandles = new Map<string, LocalFileHandle>();
   private readonly layerArtifactHandles = new Map<string, LocalFileHandle>();
   /**
@@ -476,6 +483,7 @@ export class DocumentService {
       if (result.tag !== 'open') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected open payload: ${result.tag}`);
       }
+      this.recordProtection(baseSha, result);
       const head = buildHead(row, this.cdnAccessRequired);
       this.replaceBaseHandle(docId, baseSha, handle);
       handle = null;
@@ -501,7 +509,12 @@ export class DocumentService {
       head.baseSha,
       head.storageSizeBytes,
     );
-    return this.layerState.buildBaseManifest(head, pages, version);
+    const protection = await this.protectionOf(
+      ctx,
+      await this.requireReadyRow(ctx, docId),
+      head.baseSha,
+    );
+    return this.layerState.buildBaseManifest(head, pages, version, protection);
   }
 
   async getLayerHead(ctx: OpenContext, docId: string, layerName: string): Promise<DocumentHead> {
@@ -560,6 +573,7 @@ export class DocumentService {
       return this.layerState.buildLayerManifest(
         docId,
         headVersion,
+        await this.protectionOf(ctx, row, head.baseSha),
         layerName,
         {
           docVersion: head.docVersion,
@@ -594,6 +608,7 @@ export class DocumentService {
     return this.layerState.buildLayerManifest(
       docId,
       layerVersion,
+      await this.protectionOf(ctx, row, layerBaseSha),
       layerName,
       layer,
       pages,
@@ -2050,6 +2065,19 @@ export class DocumentService {
     build: (sessionId: string, jobId: WorkerJobId) => WirePack<WorkerRequest>,
     signal?: AbortSignal,
   ): Promise<WorkerResultPayload> {
+    return this.withVersionSession(ctx, docId, sha, signal, (sessionId) =>
+      this.pool.run(sessionId, (jobId: WorkerJobId) => build(sessionId, jobId), signal),
+    );
+  }
+
+  /** `sha`'s bytes opened into a private transient session for `run`, then closed. */
+  private async withVersionSession<T>(
+    ctx: OpenContext,
+    docId: string,
+    sha: string,
+    signal: AbortSignal | undefined,
+    run: (sessionId: string) => Promise<T>,
+  ): Promise<T> {
     const row = await this.requireReadyRow(ctx, docId);
     const version = await this.requireVersion(ctx, docId, sha);
     const password = await this.passwordForOpen(ctx, row, pinnedLayerName(ctx));
@@ -2075,15 +2103,58 @@ export class DocumentService {
       if (opened.tag !== 'open') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected open payload: ${opened.tag}`);
       }
-      return await this.pool.run(
-        sessionId,
-        (jobId: WorkerJobId) => build(sessionId, jobId),
-        signal,
-      );
+      this.recordProtection(version.sha256, opened);
+      return await run(sessionId);
     } finally {
       await this.pool.close(sessionId).catch(() => undefined);
       handle.release();
     }
+  }
+
+  /**
+   * What the signatures in a layer's base version forbid (`null` when it has
+   * none): the protection the route guards and `/access` subtract from every
+   * caller, as the local engine's scope guard does.
+   */
+  async getProtection(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string = pinnedLayerName(ctx),
+  ): Promise<DocumentProtection | null> {
+    const row = await this.requireReadyRow(ctx, docId);
+    const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
+    return this.protectionOf(ctx, row, layer?.baseSha ?? requireBaseSha(row));
+  }
+
+  /** What a version a signing just published forbids, as the signing reported it. */
+  rememberProtection(sha: string, protection: DocumentProtection | null): void {
+    this.protections.set(sha, protection);
+  }
+
+  /**
+   * `sha`'s protection: known once the worker has opened its bytes. The head
+   * is opened as every read opens it; a version behind the head (a layer a
+   * sibling's signature left behind) is opened on its own.
+   */
+  private async protectionOf(
+    ctx: OpenContext,
+    row: DocumentRow,
+    sha: string,
+  ): Promise<DocumentProtection | null> {
+    const known = this.protections.get(sha);
+    if (known !== undefined) return known;
+    if (sha === row.baseSha) {
+      await this.openOnPool(ctx, row.id);
+    } else {
+      await this.withVersionSession(ctx, row.id, sha, undefined, async () => undefined);
+    }
+    // An open that couldn't read the signatures (a locked one) reports none.
+    return this.protections.get(sha) ?? null;
+  }
+
+  /** Keep what an open of `sha`'s bytes reported its signatures forbid. */
+  private recordProtection(sha: string, opened: { protection?: DocumentProtection | null }): void {
+    if (opened.protection !== undefined) this.protections.set(sha, opened.protection);
   }
 
   /** The local file of one base version of a document the caller may read (signing rebuilds a candidate from it). */

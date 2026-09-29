@@ -35,15 +35,16 @@ export class PageRenderReader {
   ) {}
 
   /**
-   * Renders a page in slices. Until it settles, PDFium holds the page's render:
-   * the caller must not let anything else use PDFium between slices.
+   * Renders a page in slices, and says which area of it the pixels show.
+   * Until it settles, PDFium holds the page's render: the caller must not let
+   * anything else use PDFium between slices.
    */
   async render(
     pageObjectNumber: PageObjectNumber,
     options: PageRenderOptions<PdfCoordinates>,
     signal: AbortSignal,
     slices: RenderSlices,
-  ): Promise<PageRaster> {
+  ): Promise<{ raster: PageRaster; area: PdfRect }> {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const pool = this.session.pagePool();
@@ -99,7 +100,7 @@ export class PageRenderReader {
           `failed to render page object ${pageObjectNumber}`,
         );
       }
-      return raster;
+      return { raster, area: target };
     } finally {
       pool.release(pageObjectNumber);
     }

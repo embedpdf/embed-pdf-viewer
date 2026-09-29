@@ -122,6 +122,33 @@ export function fieldLockFor(
 }
 
 /**
+ * Every capability a protection can remove: the most it ever takes away.
+ * A check of any other capability never needs the document's protection.
+ */
+export const PROTECTABLE_CAPABILITIES = [
+  'doc.download.flattened',
+  'doc.pages.modify',
+  'doc.pages.assemble',
+  'doc.redact',
+  'doc.attachments.modify',
+  'doc.forms.modify',
+  'doc.annotate.modify',
+  'doc.annotate.import',
+  'doc.forms.fill',
+] as const satisfies readonly DocCapability[];
+
+export type ProtectableCapability = (typeof PROTECTABLE_CAPABILITIES)[number];
+
+const PROTECTABLE: ReadonlySet<DocCapability> = new Set(PROTECTABLE_CAPABILITIES);
+
+/** Whether a protection can ever remove `capability`. */
+export function isProtectableCapability(
+  capability: DocCapability,
+): capability is ProtectableCapability {
+  return PROTECTABLE.has(capability);
+}
+
+/**
  * The capabilities a protection removes from every caller, admin scope
  * included — document-derived authority, exactly like encryption bits.
  *
@@ -151,4 +178,15 @@ export function protectedCapabilities(protection: DocumentProtection | null): Se
   }
   if (!levelAllows(protection.enforced, 'fill')) out.add('doc.forms.fill');
   return out;
+}
+
+/** Why `protection` refuses `capability`: the message of a `ProtectedDocument` refusal. */
+export function describeProtection(
+  capability: DocCapability,
+  protection: DocumentProtection,
+): string {
+  const cause = protection.certification
+    ? `certification signature ${protection.certification.signatureIndex} (permission ${protection.certification.permission})`
+    : `an existing signature (declared level '${protection.enforced ?? 'none declared'}')`;
+  return `the document is signed: ${cause} forbids '${capability}'`;
 }

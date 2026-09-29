@@ -332,7 +332,7 @@ PageEditToken [VariableDeclaration] (from packages/plugin/page-edit/src/token.ts
 PageFrame [InterfaceDeclaration] (from packages/core/geometry/src/index.ts): export interface PageFrame{ top: number; right: number; bottom: number; left: number; }
 PageHandle [InterfaceDeclaration] (from packages/engine/core/src/engine/PageHandle.ts): export interface PageHandle{ readonly ref: PageRef; readonly annotations: PageAnnotationsService; readonly text: PageTextService; readonly render: PageRenderService; readonly pieceInfo?: PieceInfoService; readonly measure: PageMeasureService; }
 PageImage [TypeAliasDeclaration] (from packages/plugin/render/src/contract.ts): export type PageImage = PageImageHandle;
-PageImageHandle [InterfaceDeclaration] (from packages/engine/core/src/dto/PageRender.ts): export interface PageImageHandle extends PageImageResult{ objectUrl(): AbortablePromise<PageImageObjectUrl>; }
+PageImageHandle [InterfaceDeclaration] (from packages/engine/core/src/dto/PageRender.ts): export interface PageImageHandle extends PageImageResult{ objectUrl(): AbortablePromise<PageImageObjectUrl>; blob(): AbortablePromise<Blob>; }
 PageImageObjectUrl [InterfaceDeclaration] (from packages/engine/core/src/dto/PageRender.ts): export interface PageImageObjectUrl{ url: string; revoke(): void; }
 PageImageOptions [InterfaceDeclaration] (from packages/engine/core/src/dto/PageRender.ts): export interface PageImageOptions< C extends Coordinates = PageCoordinates, > extends PageRenderOptions<C>{ format?: PageRenderEncodedFormat; quality?: number; }
 PageInfo [TypeAliasDeclaration] (from packages/core/main/src/types.ts): export type PageInfo = PageLayout;

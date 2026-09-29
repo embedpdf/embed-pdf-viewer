@@ -119,6 +119,7 @@ export class CloudDocumentHandle implements DocumentHandle {
   private pendingInitialHead: DocumentHead | null;
 
   private readonly manifestAccessor: ManifestAccessor;
+  private readonly cloudSecurity: CloudDocumentSecurityService;
 
   constructor(
     private readonly http: HttpClient,
@@ -148,6 +149,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       initialToken,
     );
     this.security = security;
+    this.cloudSecurity = security;
     // The deployment's render lattice rides /v1/access (mutable policy
     // never lives in immutable manifests). Reuse the cached access block
     // when present; otherwise establish access on demand — the same call
@@ -324,6 +326,21 @@ export class CloudDocumentHandle implements DocumentHandle {
   }
 
   /**
+   * Learn what the document's signatures forbid before the caller's first
+   * question: the manifest carries it, so `open()` fetches it up front and
+   * `security.allows()` answers as the server would from the start. A locked
+   * document, which the server won't describe yet, learns it from `unlock()`.
+   */
+  async learnProtection(signal: AbortSignal): Promise<void> {
+    try {
+      await this.getManifest(signal);
+    } catch (error) {
+      if (EngineError.is(error, EngineErrorCode.DocPasswordRequired)) return;
+      throw error;
+    }
+  }
+
+  /**
    * Return the cached manifest, fetching cold-cache once if needed.
    * Concurrent callers share a single inflight request (singleflight)
    * so an N-page handle that opens N services in parallel still
@@ -494,6 +511,7 @@ export class CloudDocumentHandle implements DocumentHandle {
           (!this.manifestCache || manifest.docVersion >= this.manifestCache.docVersion)
         ) {
           this.manifestCache = manifest;
+          this.cloudSecurity.setProtection(manifest.protection);
         }
       })
       .catch(() => undefined)

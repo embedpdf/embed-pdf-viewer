@@ -3890,7 +3890,12 @@ export class LayerService {
               throw err;
             }
 
-            // 5. Sessions over the old base are garbage, here and everywhere.
+            // 5. Sessions over the old base are garbage, here and everywhere;
+            //    the new version's protection is the signing's own.
+            documentService.rememberProtection(
+              committed.result.version.sha256,
+              committed.result.protection,
+            );
             await documentService.onBaseVersionPublished(input.docId);
             this.publishMutation(ctx, input.docId, committed.auditId);
             this.publishBaseChanged(ctx, input.docId);

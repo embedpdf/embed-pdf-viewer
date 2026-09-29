@@ -1,6 +1,7 @@
 import type { CachePins } from './CachePins';
 import type { LayerScopes } from './LayerScopes';
 import type { PageState } from '../revision/PageState';
+import type { DocumentProtection } from '../signature/types';
 
 /**
  * Per-page envelope inside `DocumentManifest`.
@@ -85,5 +86,12 @@ export interface DocumentManifest {
    * every emission point, never stored. See {@link LayerScopes}.
    */
   scopes?: LayerScopes;
+  /**
+   * What the signatures in `baseSha` forbid from now on (`null` when the
+   * version has none): the protection every capability check subtracts,
+   * as the local engine's does. It belongs to the version's bytes, so it
+   * changes only when a signature publishes a new version.
+   */
+  protection: DocumentProtection | null;
   pages: ManifestPage[];
 }
