@@ -10,7 +10,7 @@ import { geomResetRotation, geomRotateAbout, geomRotation } from '../geometry';
 import { groupUnionBounds } from '../hit';
 import { linkChildrenOf } from '../links';
 import { kindTakesLink } from '../props';
-import { fieldsOf, kindOf, withFields, withValues, writableTarget } from '../record';
+import { kindOf, shapeOf, withShape, withValues, writableTarget } from '../record';
 import { annotationTurnPivot } from '../selection';
 import type { Effect, FieldValues, Id, Model, ModelAnnotation, Point } from '../types';
 import { withoutRecords } from './changes';
@@ -156,8 +156,8 @@ export function rotateSelection(model: Model, deltaDeg: number): [Model, Effect[
   const byId = { ...model.byId };
   for (const id of ids) {
     const annotation = byId[id];
-    const { geometry } = fieldsOf(annotation);
-    byId[id] = withFields(annotation, { geometry: geomRotateAbout(geometry, pivot, deltaDeg) });
+    const geometry = shapeOf(annotation.annotation);
+    byId[id] = withShape(annotation, geomRotateAbout(geometry, pivot, deltaDeg));
   }
   return [{ ...model, byId }, []];
 }
@@ -171,10 +171,10 @@ export function resetRotation(model: Model): [Model, Effect[]] {
   for (const id of model.selected) {
     const annotation = byId[id];
     if (!annotation || !annotTransformable(annotation)) continue;
-    const { geometry } = fieldsOf(annotation);
+    const geometry = shapeOf(annotation.annotation);
     if (geomRotation(geometry) === 0) continue;
     const pivot = annotationTurnPivot(annotation);
-    byId[id] = withFields(annotation, { geometry: geomResetRotation(geometry, pivot) });
+    byId[id] = withShape(annotation, geomResetRotation(geometry, pivot));
     turned = true;
   }
   return turned ? [{ ...model, byId }, []] : [model, []];

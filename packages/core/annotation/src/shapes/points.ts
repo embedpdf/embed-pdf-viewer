@@ -39,6 +39,7 @@ import {
   unionRect,
 } from '../rect';
 import type { Border, Handle, LineEnding, Point, Rect, RenderNode } from '../types';
+import type { ShapeFamily } from './family';
 
 /** A line: its two ends upright, and their endings. */
 export interface LineShape {
@@ -78,7 +79,8 @@ type PointsAnnotation = Extract<
 >;
 
 /** A points kind's shape, read off its annotation. */
-export function readPoints(annotation: PointsAnnotation): PointsShape {
+function readPoints(read: AnnotationDTO): PointsShape {
+  const annotation = read as PointsAnnotation;
   const rotation = annotation.rotation ?? 0;
   switch (annotation.subtype) {
     case 'line':
@@ -119,7 +121,7 @@ export function readPoints(annotation: PointsAnnotation): PointsShape {
  * upright, so a turn is cleared rather than kept). The endings are a field
  * of their own, written when they change.
  */
-export function writePoints(shape: PointsShape) {
+function writePoints(shape: PointsShape) {
   const rotation = shape.rotation || null;
   if (shape.kind === 'line') return { linePoints: shape.linePoints, rotation };
   if (shape.kind === 'poly')
@@ -132,7 +134,7 @@ export function writePoints(shape: PointsShape) {
 }
 
 /** The shape's upright points, one list per stroke: a line's two ends, a poly's vertices, each ink stroke. */
-export function uprightStrokesOf(shape: PointsShape): Point[][] {
+function uprightStrokesOf(shape: PointsShape): Point[][] {
   if (shape.kind === 'line') return [[shape.linePoints.start, shape.linePoints.end]];
   if (shape.kind === 'poly') return [shape.vertices];
   return shape.inkList;
@@ -204,14 +206,14 @@ export const drawnVerticesOf = (shape: PolyShape): Point[] => drawnStrokesOf(sha
  * turn leaves it where it is, so it is also the drawing's middle; a caption or
  * an arrowhead never moves it.
  */
-export const pointsMiddleOf = (shape: PointsShape): Point =>
+const pointsMiddleOf = (shape: PointsShape): Point =>
   rectCenter(unionRect(uprightStrokesOf(shape).flat()));
 
 /** The box around the drawn points. */
-export const pointsBounds = (shape: PointsShape): Rect => unionRect(drawnStrokesOf(shape).flat());
+const pointsBounds = (shape: PointsShape): Rect => unionRect(drawnStrokesOf(shape).flat());
 
 /** The shape moved by `delta`. */
-export function pointsTranslate<S extends PointsShape>(shape: S, delta: Point): S {
+function pointsTranslate<S extends PointsShape>(shape: S, delta: Point): S {
   if (!delta.x && !delta.y) return shape;
   return mapUpright(shape, (point) => ({ x: point.x + delta.x, y: point.y + delta.y }));
 }
@@ -224,11 +226,7 @@ const NOISE = 1e-9;
  * pivot (the upright points move with it), and its turn grows. About its own
  * middle, only the turn changes.
  */
-export function pointsRotateAbout<S extends PointsShape>(
-  shape: S,
-  pivot: Point,
-  degrees: number,
-): S {
+function pointsRotateAbout<S extends PointsShape>(shape: S, pivot: Point, degrees: number): S {
   const middle = pointsMiddleOf(shape);
   const moved = rotatePoint(middle, pivot, degrees);
   const delta = { x: moved.x - middle.x, y: moved.y - middle.y };
@@ -243,7 +241,7 @@ export function pointsRotateAbout<S extends PointsShape>(
  * directions), the upright points scale about their middle, which moves with
  * the scale, and the turn stays.
  */
-export function pointsScaleAbout<S extends PointsShape>(
+function pointsScaleAbout<S extends PointsShape>(
   shape: S,
   anchor: Point,
   sx: number,
@@ -260,19 +258,19 @@ export function pointsScaleAbout<S extends PointsShape>(
 }
 
 /** The shape straightened: turned back about `pivot` (its own middle by default). */
-export function pointsUpright<S extends PointsShape>(shape: S, pivot?: Point): S {
+function pointsUpright<S extends PointsShape>(shape: S, pivot?: Point): S {
   if (!shape.rotation) return shape;
   return pointsRotateAbout(shape, pivot ?? pointsMiddleOf(shape), -shape.rotation);
 }
 
 /** The vertex handles, where the points are drawn; ink has none. */
-export function pointsHandles(shape: PointsShape): Handle[] {
+function pointsHandles(shape: PointsShape): Handle[] {
   if (shape.kind === 'ink') return [];
   return drawnStrokesOf(shape)[0]!.map((at, i) => ({ id: `v${i}`, at, cursor: 'crosshair' }));
 }
 
 /** The shape with vertex `handle` (`v<i>`) dragged to the drawn point `to`; the upright points follow. */
-export function pointsDrag<S extends PointsShape>(shape: S, handle: string, to: Point): S {
+function pointsDrag<S extends PointsShape>(shape: S, handle: string, to: Point): S {
   if (shape.kind === 'ink') return shape;
   const index = Number(handle.slice(1));
   const points = drawnStrokesOf(shape)[0]!;
@@ -402,7 +400,7 @@ function endingSegs(shape: PointsShape): EndingSeg[] {
  * mitred arrowhead tip is enclosed exactly. A closed poly's cloud reaches past
  * its vertices by the cloud's extent.
  */
-export function pointsDrawnBounds(shape: PointsShape, strokeWidth: number, border?: Border): Rect {
+function pointsDrawnBounds(shape: PointsShape, strokeWidth: number, border?: Border): Rect {
   const strokes = drawnStrokesOf(shape);
   if (shape.kind === 'ink') return expandRect(unionRect(strokes.flat()), strokeWidth / 2);
   const points = strokes[0]!;
@@ -433,7 +431,7 @@ export function pointsDrawnBounds(shape: PointsShape, strokeWidth: number, borde
  * The oriented box around what the shape draws: the drawn bounds of its
  * upright points, turned about its middle — the snug tilted rectangle.
  */
-export function pointsCorners(
+function pointsCorners(
   shape: PointsShape,
   strokeWidth: number,
   border?: Border,
@@ -454,7 +452,7 @@ export function pointsCorners(
  * Is `point` on the shape: within `margin` of a stroke or an ending, or
  * inside a filled polygon. The stroke band widens with the stroke width.
  */
-export function pointsHit(
+function pointsHit(
   shape: PointsShape,
   point: Point,
   margin: number,
@@ -485,7 +483,7 @@ export function pointsHit(
  * cloud as PDFium bakes it: curls on the vertex path, reaching out), each
  * ink stroke as an open polyline, and the endings.
  */
-export function pointsScene(shape: PointsShape, strokeWidth = 0, border?: Border): RenderNode[] {
+function pointsScene(shape: PointsShape, strokeWidth = 0, border?: Border): RenderNode[] {
   const strokes = drawnStrokesOf(shape);
   if (shape.kind === 'ink')
     return strokes.map((stroke) => ({ kind: 'poly', points: stroke, closed: false }));
@@ -500,3 +498,23 @@ export function pointsScene(shape: PointsShape, strokeWidth = 0, border?: Border
     nodes.push(...endingNodes(seg.tip, seg.angle, seg.ending, strokeWidth));
   return nodes;
 }
+
+/** The points family: points kept upright and the turn that draws them. */
+export const pointsFamily: ShapeFamily<PointsShape> = {
+  read: readPoints,
+  write: writePoints,
+  bounds: pointsBounds,
+  drawnBounds: pointsDrawnBounds,
+  selectionBounds: pointsDrawnBounds,
+  oriented: () => true,
+  turnedCorners: pointsCorners,
+  pivot: pointsMiddleOf,
+  translate: pointsTranslate,
+  rotateAbout: pointsRotateAbout,
+  scaleAbout: pointsScaleAbout,
+  upright: pointsUpright,
+  handles: pointsHandles,
+  drag: pointsDrag,
+  hit: pointsHit,
+  scene: pointsScene,
+};

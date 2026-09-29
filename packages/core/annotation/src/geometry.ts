@@ -1,11 +1,10 @@
 /**
- * Pure page-space geometry, dispatched on the `ModelGeometry` union: bounds,
- * hit-testing (stroke + fill, with a configurable margin), handles (with
- * cursors), translate, handle-drag, and the dumb scene. Each family answers
- * for its own arm (`shapes/`); what spans families lives here: the selection
- * outline, the rotate knob, a multi-selection's resize, and upright
- * placement. The engine speaks page space too: the same numbers, nothing to
- * convert.
+ * Pure page-space geometry for any shape. What one shape does — its bounds,
+ * hit test, handles, moves and drawing — its family answers (`shapes/`,
+ * found by `familyOf`); these functions ask it. What spans families lives
+ * here: the selection outline, the rotate knob, a multi-selection's resize,
+ * and upright placement. The engine speaks page space too: the same
+ * numbers, nothing to convert.
  */
 import { isQuarterTurn, type PageRotation, type Size } from '@embedpdf/core-geometry';
 import {
@@ -22,59 +21,8 @@ import {
   rectHandlePoint,
   resizeRect,
 } from './rect';
-import {
-  boxCorners,
-  boxDrawnBounds,
-  boxHandles,
-  boxHit,
-  boxResize,
-  boxRotateAbout,
-  boxScaleAbout,
-  boxScene,
-  boxTranslate,
-} from './shapes/box';
-import {
-  textBoxDrag,
-  textBoxDrawnBounds,
-  textBoxHandles,
-  textBoxHit,
-  textBoxRotateAbout,
-  textBoxScaleAbout,
-  textBoxScene,
-  textBoxSelectionBounds,
-  textBoxTranslate,
-  textBoxUpright,
-} from './shapes/text-box';
-import { caretHit, caretScene } from './shapes/caret';
-import {
-  quadsBounds,
-  quadsCentroid,
-  quadsDrawnBounds,
-  quadsHit,
-  quadsScene,
-  quadsTranslate,
-} from './shapes/quads';
-import {
-  drawnStrokesOf,
-  pointsBounds,
-  pointsCorners,
-  pointsDrag,
-  pointsDrawnBounds,
-  pointsHandles,
-  pointsHit,
-  pointsMiddleOf,
-  pointsRotateAbout,
-  pointsScaleAbout,
-  pointsScene,
-  pointsTranslate,
-  pointsUpright,
-  type PointsShape,
-} from './shapes/points';
+import { familyOf } from './shapes';
 import type { Border, ModelGeometry, Handle, Rect, RenderNode, Point } from './types';
-
-/** Is the geometry of the points family: a line, polyline, polygon or ink? */
-const isPoints = (geometry: ModelGeometry): geometry is PointsShape =>
-  geometry.kind === 'line' || geometry.kind === 'poly' || geometry.kind === 'ink';
 
 /* ── rotation ──────────────────────────────────────────────────────────────
  * Annotation rotation, layered on the generic `@embedpdf/core-geometry` affine
@@ -103,22 +51,6 @@ export function geomRotation(geometry: ModelGeometry): number {
   return geometry.kind === 'quads' ? 0 : geometry.rotation;
 }
 
-/** A box's centre, or the mean of a shape's points. */
-export function centroidOf(geometry: ModelGeometry): Point {
-  if (geometry.kind === 'box' || geometry.kind === 'text-box' || geometry.kind === 'caret')
-    return rectCenter(geometry.box);
-  if (geometry.kind === 'quads') return quadsCentroid(geometry);
-  const points = drawnStrokesOf(geometry).flat();
-  let sx = 0;
-  let sy = 0;
-  for (const point of points) {
-    sx += point.x;
-    sy += point.y;
-  }
-  const count = points.length || 1;
-  return { x: sx / count, y: sy / count };
-}
-
 /**
  * Where a turn of a single shape pivots, as the engine turns it: a box about
  * its own `rect` centre; a line, polygon, polyline or ink about the middle of
@@ -126,75 +58,28 @@ export function centroidOf(geometry: ModelGeometry): Point {
  * where the upright points are, and a caption or an arrowhead never moves the
  * pivot.
  */
-export function turnPivotOf(geometry: ModelGeometry): Point {
-  return isPoints(geometry) ? pointsMiddleOf(geometry) : centroidOf(geometry);
-}
+export const turnPivotOf = (geometry: ModelGeometry): Point => familyOf(geometry).pivot(geometry);
 
 /** Does the geometry carry a meaningful `rot` (an oriented local box exists)?
  *  Orientation is a geometry fact; whether the user may rotate is the separate
  *  `caps.rotatable` gate — a caret is oriented (it rides its text's tilt) yet
  *  offers no rotate gesture. */
-export function isRotatableGeom(geometry: ModelGeometry): boolean {
-  return (
-    geometry.kind === 'box' ||
-    geometry.kind === 'line' ||
-    geometry.kind === 'poly' ||
-    geometry.kind === 'ink' ||
-    geometry.kind === 'caret' ||
-    (geometry.kind === 'text-box' && !geometry.calloutLine)
-  );
-}
+export const isRotatableGeom = (geometry: ModelGeometry): boolean =>
+  familyOf(geometry).oriented(geometry);
 
 /**
- * Rotate a geom by `deltaDeg` (clockwise) about `pivot`.
- *  - box (`box`/plain `text-box`): orbit the box centre about the pivot (a rigid
- *    translation of the unrotated box) and add the angle to its turn. When the
- *    pivot is the box centre this is a pure turn.
- *  - points (`line`/`poly`/`ink`): the middle of the upright points orbits the
- *    pivot and the turn grows, as for a box.
- * Kinds without a rotate verb are returned unchanged: quads and callouts, and
- * also the caret — oriented (`isRotatableGeom`) but text-anchored, so its tilt
- * is authoring metadata that no gesture edits (`geomResetRotation` still
- * clears it).
+ * Rotate a geom by `deltaDeg` (clockwise) about `pivot`: a box's middle
+ * orbits the pivot and its turn grows, and so does a points shape's. A shape
+ * without a rotate verb comes back unchanged: quads, a callout, and the
+ * caret (oriented, but it follows its text; `geomResetRotation` still clears
+ * its turn).
  */
 export function geomRotateAbout(
   geometry: ModelGeometry,
   pivot: Point,
   deltaDeg: number,
 ): ModelGeometry {
-  if (deltaDeg === 0) return geometry;
-  if (geometry.kind === 'box') return boxRotateAbout(geometry, pivot, deltaDeg);
-  if (geometry.kind === 'text-box') return textBoxRotateAbout(geometry, pivot, deltaDeg);
-  if (isPoints(geometry)) return pointsRotateAbout(geometry, pivot, deltaDeg);
-  return geometry;
-}
-
-/**
- * The size of the frame an engine-baked `/AP` is authored into: the unrotated
- * box for box kinds (rotation is stripped to `apRot` and re-applied at the
- * blit), the point bounds for vertex kinds (their points are the visual).
- * Position is deliberately absent — a translation never invalidates a raster.
- */
-function apFrameSize(geometry: ModelGeometry): Size {
-  if (geometry.kind === 'box' || geometry.kind === 'text-box' || geometry.kind === 'caret')
-    return { width: geometry.box.width, height: geometry.box.height };
-  const rect = isPoints(geometry) ? pointsBounds(geometry) : quadsBounds(geometry);
-  return { width: rect.width, height: rect.height };
-}
-
-/**
- * Did an edit change the size of the geometry's `/AP` authoring frame — i.e.
- * will the engine's re-bake produce new raster content? One rule for every
- * gesture, so the commit sites never enumerate kinds: a move/rotate preserves
- * the frame (false), a resize/scale changes it (true). The 0.01pt tolerance
- * absorbs float noise from the gesture math.
- */
-export function apSizeChanged(before: ModelGeometry, after: ModelGeometry): boolean {
-  const size = apFrameSize(before);
-  const afterSize = apFrameSize(after);
-  return (
-    Math.abs(size.width - afterSize.width) > 0.01 || Math.abs(size.height - afterSize.height) > 0.01
-  );
+  return deltaDeg === 0 ? geometry : familyOf(geometry).rotateAbout(geometry, pivot, deltaDeg);
 }
 
 /* ── upright placement (counter-rotating against the display rotation) ────────
@@ -286,12 +171,7 @@ export function fitStampBox(center: Point, desired: Size, page: Size, rotCW: num
  *  Points: turn back about `pivot` (the middle of the upright points by
  *  default, which only clears the turn). */
 export function geomResetRotation(geometry: ModelGeometry, pivot?: Point): ModelGeometry {
-  const rot = geomRotation(geometry);
-  if (!rot) return geometry;
-  if (geometry.kind === 'box' || geometry.kind === 'caret') return { ...geometry, rotation: 0 };
-  if (geometry.kind === 'text-box') return textBoxUpright(geometry);
-  if (isPoints(geometry)) return pointsUpright(geometry, pivot);
-  return geometry;
+  return geomRotation(geometry) ? familyOf(geometry).upright(geometry, pivot) : geometry;
 }
 
 /**
@@ -306,13 +186,8 @@ export function obbFromGeom(
   strokeWidth: number,
   border?: Border,
 ): { corners: [Point, Point, Point, Point]; angle: number } | null {
-  if (!isRotatableGeom(geometry)) return null;
-  const rot = geomRotation(geometry);
-  if (geometry.kind === 'box' || geometry.kind === 'text-box' || geometry.kind === 'caret')
-    return { corners: boxCorners(geometry), angle: rot };
-  if (isPoints(geometry))
-    return { corners: pointsCorners(geometry, strokeWidth, border), angle: rot };
-  return null;
+  const corners = familyOf(geometry).turnedCorners(geometry, strokeWidth, border);
+  return corners ? { corners, angle: geomRotation(geometry) } : null;
 }
 
 /* ── group (multi-target) scaling ─────────────────────────────────────────────
@@ -379,11 +254,7 @@ export function geomScaleAbout(
   sx: number,
   sy: number,
 ): ModelGeometry {
-  if (geometry.kind === 'box' || geometry.kind === 'caret')
-    return boxScaleAbout(geometry, anchor, sx, sy);
-  if (geometry.kind === 'text-box') return textBoxScaleAbout(geometry, anchor, sx, sy);
-  if (isPoints(geometry)) return pointsScaleAbout(geometry, anchor, sx, sy);
-  return geometry; // quads follow their text
+  return familyOf(geometry).scaleAbout(geometry, anchor, sx, sy);
 }
 
 /** Where the rotate knob sits, given the OBB corners (nw, ne, se, sw) and the
@@ -500,11 +371,7 @@ export function geomVisualBounds(
   strokeWidth: number,
   border?: Border,
 ): Rect {
-  if (geometry.kind === 'box') return boxDrawnBounds(geometry, strokeWidth, border);
-  if (isPoints(geometry)) return pointsDrawnBounds(geometry, strokeWidth, border);
-  if (geometry.kind === 'text-box') return textBoxDrawnBounds(geometry, strokeWidth);
-  if (geometry.kind === 'caret') return geometry.box;
-  return quadsDrawnBounds(geometry, strokeWidth);
+  return familyOf(geometry).drawnBounds(geometry, strokeWidth, border);
 }
 
 /**
@@ -522,9 +389,7 @@ export function selectionBounds(
   strokeWidth: number,
   border?: Border,
 ): Rect {
-  if (isPoints(geometry)) return pointsDrawnBounds(geometry, strokeWidth, border);
-  if (geometry.kind === 'text-box') return textBoxSelectionBounds(geometry);
-  return geomBounds(geometry);
+  return familyOf(geometry).selectionBounds(geometry, strokeWidth, border);
 }
 
 /**
@@ -596,12 +461,8 @@ export function quadIntersectsRect(quad: [Point, Point, Point, Point], rect: Rec
 
 /* ── geom ops ─────────────────────────────────────────────────────────────── */
 
-export function geomBounds(geometry: ModelGeometry): Rect {
-  if (geometry.kind === 'box' || geometry.kind === 'text-box' || geometry.kind === 'caret')
-    return geometry.box;
-  if (isPoints(geometry)) return pointsBounds(geometry);
-  return quadsBounds(geometry);
-}
+/** The box around the shape's own box or points, the stroke left out. */
+export const geomBounds = (geometry: ModelGeometry): Rect => familyOf(geometry).bounds(geometry);
 
 /**
  * Is the page point on the annotation: within `margin` of the stroke, or
@@ -616,41 +477,27 @@ export function geomHit(
   strokeWidth: number,
   border?: Border,
 ): boolean {
-  if (geometry.kind === 'box') return boxHit(geometry, point, margin, filled, strokeWidth, border);
-  if (geometry.kind === 'text-box') return textBoxHit(geometry, point, margin, strokeWidth);
-  if (isPoints(geometry)) return pointsHit(geometry, point, margin, filled, strokeWidth);
-  if (geometry.kind === 'caret') return caretHit(geometry, point, margin);
-  return quadsHit(geometry, point);
+  return familyOf(geometry).hit(geometry, point, margin, filled, strokeWidth, border);
 }
 
-export function geomHandles(geometry: ModelGeometry): Handle[] {
-  if (geometry.kind === 'box') return boxHandles(geometry);
-  if (geometry.kind === 'text-box') return textBoxHandles(geometry);
-  if (isPoints(geometry)) return pointsHandles(geometry);
-  return []; // markup: move only
-}
+/** The shape's handles: resize corners and sides, a callout's tip and knee, or vertices. */
+export const geomHandles = (geometry: ModelGeometry): Handle[] =>
+  familyOf(geometry).handles(geometry);
 
-export function geomTranslate(geometry: ModelGeometry, delta: Point): ModelGeometry {
-  if (geometry.kind === 'box' || geometry.kind === 'caret') return boxTranslate(geometry, delta);
-  if (geometry.kind === 'text-box') return textBoxTranslate(geometry, delta);
-  if (isPoints(geometry)) return pointsTranslate(geometry, delta);
-  return quadsTranslate(geometry, delta);
-}
+export const geomTranslate = (geometry: ModelGeometry, delta: Point): ModelGeometry =>
+  familyOf(geometry).translate(geometry, delta);
 
-export function geomDragHandle(geometry: ModelGeometry, handle: string, to: Point): ModelGeometry {
-  if (geometry.kind === 'box') return boxResize(geometry, handle, to);
-  if (geometry.kind === 'text-box') return textBoxDrag(geometry, handle, to);
-  if (isPoints(geometry)) return pointsDrag(geometry, handle, to);
-  return geometry;
-}
+export const geomDragHandle = (geometry: ModelGeometry, handle: string, to: Point): ModelGeometry =>
+  familyOf(geometry).drag(geometry, handle, to);
 
-export function geomScene(geometry: ModelGeometry, strokeWidth = 0, border?: Border): RenderNode[] {
-  // A text box's box — its fill and its border — is the scene's, plain box and
-  // callout alike, so the live view paints exactly what the AP generator
-  // bakes. The framework's editable element owns only the text.
-  if (geometry.kind === 'text-box') return textBoxScene(geometry, strokeWidth);
-  if (geometry.kind === 'caret') return caretScene(geometry);
-  if (geometry.kind === 'box') return boxScene(geometry, strokeWidth, border);
-  if (isPoints(geometry)) return pointsScene(geometry, strokeWidth, border);
-  return quadsScene(geometry);
-}
+/**
+ * What the shape draws for the live view. A text box's box — its fill and
+ * its border — is the scene's, plain box and callout alike, so the live view
+ * paints exactly what the AP generator bakes; the framework's editable
+ * element owns only the text.
+ */
+export const geomScene = (
+  geometry: ModelGeometry,
+  strokeWidth = 0,
+  border?: Border,
+): RenderNode[] => familyOf(geometry).scene(geometry, strokeWidth, border);

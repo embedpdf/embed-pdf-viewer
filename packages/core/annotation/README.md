@@ -59,7 +59,7 @@ entry and the message switch.
 | `draw-distance.ts`   | the distance measurement gesture                                           |
 | `text-markup.ts`     | `createMarkup`, `createCaret`, `createReplaceText`, the markup preview     |
 | `create.ts`          | `createAnnot`: creation from the API                                       |
-| `selection-edits.ts` | `setProps`, `setFlags`, `rotate90`, `resetRotation`, `delete`              |
+| `selection-edits.ts` | `setProps`, `setFlags`, `rotateSelection`, `resetRotation`, `delete`       |
 | `text.ts`            | `setText`, `setRichText`                                                   |
 | `session.ts`         | the initial session, tool defaults, `rekey`, `forget`                      |
 | `changes.ts`         | what every record-changing transition shares                               |

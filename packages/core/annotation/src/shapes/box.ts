@@ -32,6 +32,7 @@ import {
   type RectHandle,
 } from '../rect';
 import type { Border, Handle, Point, Rect, RenderNode } from '../types';
+import type { ShapeFamily } from './family';
 
 /** A box and its turn, as the engine keeps them. */
 export interface TurnedBox {
@@ -54,7 +55,7 @@ const TURNING_KINDS: ReadonlySet<string> = new Set(['square', 'circle', 'stamp']
 type TurningAnnotation = Extract<AnnotationDTO, { subtype: 'square' | 'circle' | 'stamp' }>;
 
 /** A box kind's shape, read off its annotation. */
-export function readBox(annotation: AnnotationDTO): BoxShape {
+function readBox(annotation: AnnotationDTO): BoxShape {
   if (!TURNING_KINDS.has(annotation.subtype)) {
     return { kind: 'box', box: annotation.rect, rotation: 0, ellipse: false };
   }
@@ -66,7 +67,7 @@ export function readBox(annotation: AnnotationDTO): BoxShape {
  * The engine fields that state `shape` for a kind: its `box` and `rotation`
  * (`null` when upright, so a turn is cleared rather than kept), or its `rect`.
  */
-export function writeBox(
+function writeBox(
   shape: BoxShape,
   subtype: string,
 ): { box: Rect; rotation: number | null } | { rect: Rect } {
@@ -86,7 +87,7 @@ function cloudReach(shape: BoxShape, strokeWidth: number, border: Border | undef
  * What the shape draws, before its turn: the box, grown by a cloud's reach.
  * A plain stroke draws inside the box.
  */
-export function boxDrawnBounds(shape: BoxShape, strokeWidth: number, border?: Border): Rect {
+function boxDrawnBounds(shape: BoxShape, strokeWidth: number, border?: Border): Rect {
   return expandRect(shape.box, cloudReach(shape, strokeWidth, border));
 }
 
@@ -165,7 +166,7 @@ export function boxResize<S extends TurnedBox>(shape: S, handle: string, to: Poi
  * A plain stroke draws inside the box, centred half its width in; a cloud's
  * bumps fill the band between the box and its reach.
  */
-export function boxHit(
+function boxHit(
   shape: BoxShape,
   point: Point,
   margin: number,
@@ -208,7 +209,7 @@ export function boxHit(
  * box's middle): a cloud around the box, or the box's outline, inset half
  * the stroke so the ink lies inside the box.
  */
-export function boxScene(shape: BoxShape, strokeWidth = 0, border?: Border): RenderNode[] {
+function boxScene(shape: BoxShape, strokeWidth = 0, border?: Border): RenderNode[] {
   if (border?.kind === 'cloudy' && shape.box.width > 0 && shape.box.height > 0) {
     return [
       {
@@ -220,3 +221,23 @@ export function boxScene(shape: BoxShape, strokeWidth = 0, border?: Border): Ren
   const rect = insetRect(shape.box, strokeWidth / 2);
   return [shape.ellipse ? { kind: 'ellipse', rect } : { kind: 'rect', rect }];
 }
+
+/** The box family: a box and its turn, drawn as a rectangle, an ellipse or a cloud. */
+export const boxFamily: ShapeFamily<BoxShape> = {
+  read: readBox,
+  write: writeBox,
+  bounds: (shape) => shape.box,
+  drawnBounds: boxDrawnBounds,
+  selectionBounds: (shape) => shape.box,
+  oriented: () => true,
+  turnedCorners: boxCorners,
+  pivot: (shape) => rectCenter(shape.box),
+  translate: boxTranslate,
+  rotateAbout: boxRotateAbout,
+  scaleAbout: boxScaleAbout,
+  upright: (shape) => ({ ...shape, rotation: 0 }),
+  handles: boxHandles,
+  drag: boxResize,
+  hit: boxHit,
+  scene: boxScene,
+};

@@ -8,7 +8,6 @@
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
 import { richDocOf } from '../../richtext';
-import { readTextBox, writeTextBox } from '../../shapes/text-box';
 import type { RecordFields, TextStyle } from '../../types';
 import type { KindProjection, Wire } from '../projection';
 
@@ -61,12 +60,7 @@ const isCallout = (annotation: RecordFields): boolean =>
   annotation.geometry.kind === 'text-box' && annotation.geometry.calloutLine !== null;
 
 export const freeText: KindProjection = {
-  ingest: (dto) => {
-    const freeTextDto = dto as FreeTextDTO;
-    return { geometry: readTextBox(freeTextDto), text: textFromDTO(freeTextDto) };
-  },
-  geometry: (annotation) =>
-    annotation.geometry.kind === 'text-box' ? writeTextBox(annotation.geometry) : null,
+  ingest: (dto) => ({ text: textFromDTO(dto as FreeTextDTO) }),
   prop: { bold: formattingBody, italic: formattingBody, underline: formattingBody },
   // `/IT` + the initial `/Contents` are create-only statements; while typing,
   // the debounced text-edit write owns `contents`.

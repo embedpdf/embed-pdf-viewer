@@ -10,7 +10,6 @@ import {
 import { measurementLayout } from './measurement-shape';
 import { geomHandles, geomHit, placeRotateKnob, pointInQuad, rectHandlesFor } from './geometry';
 import { unionRect } from './rect';
-import { isMarkup } from './kinds';
 import { groupCaps } from './group';
 import { isSubstrateOnly } from './plane';
 import { annotInteractive, annotTransformable, viewable } from './flags';
@@ -25,7 +24,7 @@ import {
   type Rect,
   type Point,
 } from './types';
-import { fieldsOf, kindOf } from './record';
+import { fieldsOf, kindOf, shapeOf } from './record';
 
 export type Target =
   | { kind: 'handle'; id: Id; handle: string; cursor: Cursor }
@@ -54,7 +53,7 @@ export function paintOrder(model: Model, page: PageRef): Id[] {
     if (!annotation || annotation.annotation.page.objectNumber !== pageObjectNumber) continue;
     if (!viewable(annotation.annotation, model.selected.includes(id))) continue;
     if (isSubstrateOnly(annotation)) continue;
-    (isMarkup(kindOf(annotation.annotation)) ? markup : other).push(id);
+    (kindOf(annotation.annotation).caps.paintsBeneath ? markup : other).push(id);
   }
   return [...markup, ...other];
 }
@@ -75,7 +74,7 @@ export const isSelectable = (model: Model, id: Id): boolean => {
  *  as fixed as classic markup. Markup kinds themselves have `movable: false`
  *  and never reach this gate. */
 const textBound = (annotation: ModelAnnotation): boolean =>
-  kindOf(annotation.annotation).caps.anchored && fieldsOf(annotation).geometry.kind === 'quads';
+  kindOf(annotation.annotation).caps.anchored && shapeOf(annotation.annotation).kind === 'quads';
 
 /** Can this annotation be dragged by its body to move? (`locked` freezes it.) */
 export const canMove = (model: Model, id: Id): boolean => {
@@ -102,7 +101,7 @@ const hasHandles = (model: Model, annotation: ModelAnnotation): boolean => {
  *  projection for `noZoom`/`noRotate` annotations, the stored geom otherwise.
  *  The same projection `pageItems` renders, so click matches paint. */
 const hitGeomOf = (annotation: ModelAnnotation, view: ViewEnv | undefined): ModelGeometry =>
-  anchoredGeom(fieldsOf(annotation).geometry, anchorModeOf(annotation), view);
+  anchoredGeom(shapeOf(annotation.annotation), anchorModeOf(annotation), view);
 
 /** Stroke width in effective content units (a noZoom body's line weight scales
  *  with its geometry). */
@@ -114,7 +113,8 @@ const hitStrokeOf = (annotation: ModelAnnotation, view: ViewEnv | undefined): nu
 // loaded from a PDF starts baked, and an unfilled square must still be grabbed
 // only on its outline.
 const isFilled = (annotation: ModelAnnotation): boolean => {
-  const { style, geometry } = fieldsOf(annotation);
+  const geometry = shapeOf(annotation.annotation);
+  const { style } = fieldsOf(annotation);
   return (
     style.interiorColor != null ||
     geometry.kind === 'quads' ||

@@ -1,14 +1,7 @@
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import {
-  boxCorners,
-  boxHandles,
-  boxResize,
-  readBox,
-  writeBox,
-  type BoxShape,
-} from '../../src/shapes/box';
+import { boxCorners, boxFamily, boxHandles, boxResize, type BoxShape } from '../../src/shapes/box';
 
 const BOX = { x: 100, y: 200, width: 80, height: 40 };
 
@@ -29,26 +22,26 @@ const close = (actual: { x: number; y: number }, expected: { x: number; y: numbe
 
 describe('the box family reads and writes the engine fields', () => {
   it("a square's shape is its engine box and turn, written back unchanged", () => {
-    const shape = readBox(square(30));
+    const shape = boxFamily.read(square(30));
     expect(shape).toEqual({ kind: 'box', box: BOX, rotation: 30, ellipse: false });
-    expect(writeBox(shape, 'square')).toEqual({ box: BOX, rotation: 30 });
+    expect(boxFamily.write(shape, 'square')).toEqual({ box: BOX, rotation: 30 });
   });
 
   it('an upright square writes its turn as null, so a stored turn is cleared', () => {
-    const shape = readBox(square(null));
+    const shape = boxFamily.read(square(null));
     expect(shape.rotation).toBe(0);
-    expect(writeBox(shape, 'square')).toEqual({ box: BOX, rotation: null });
+    expect(boxFamily.write(shape, 'square')).toEqual({ box: BOX, rotation: null });
   });
 
   it("a circle's shape is drawn as the ellipse in its box", () => {
     const circle = { ...square(0), subtype: 'circle' } as unknown as AnnotationDTO;
-    expect(readBox(circle).ellipse).toBe(true);
+    expect(boxFamily.read(circle).ellipse).toBe(true);
   });
 
   it("a link's shape is its rect, written back as its rect", () => {
-    const shape = readBox(link);
+    const shape = boxFamily.read(link);
     expect(shape).toEqual({ kind: 'box', box: BOX, rotation: 0, ellipse: false });
-    expect(writeBox(shape, 'link')).toEqual({ rect: BOX });
+    expect(boxFamily.write(shape, 'link')).toEqual({ rect: BOX });
   });
 });
 

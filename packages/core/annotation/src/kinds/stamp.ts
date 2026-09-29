@@ -1,3 +1,4 @@
+import { boxFamily } from '../shapes';
 import { defineKind, NO_CAPS } from './define';
 import { LINKABLE, OPACITY } from './fields';
 
@@ -9,7 +10,7 @@ import { LINKABLE, OPACITY } from './fields';
  */
 export const stamp = defineKind({
   name: 'stamp',
-  family: 'box',
+  family: boxFamily,
   caps: {
     ...NO_CAPS,
     selectable: true,

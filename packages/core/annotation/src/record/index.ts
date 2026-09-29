@@ -29,6 +29,7 @@ import {
 
 import { FLAG_KEYS } from '../flags';
 import { geomRotation, geomVisualBounds } from '../geometry';
+import { familyOf } from '../shapes';
 import { kindNamed } from '../kinds';
 import type {
   Id,
@@ -55,9 +56,11 @@ import { captionFieldsFor, ink, line, polygon, polyline } from './kinds/stroke';
 import type { KindProjection, LoweredKey, Wire } from './projection';
 import { GENERIC_PROPS } from './props';
 import { groupOf, irtOf, kindOf, refOf } from './identity';
+import { shapeOf } from './shape';
 import { annotationKey, flagsOf, styleFromDTO } from './seam';
 
 export { groupOf, irtOf, kindOf, refOf } from './identity';
+export { shapeOf, withShape } from './shape';
 export { withValues } from './values';
 
 export {
@@ -125,7 +128,7 @@ export function fromDTO(dto: AnnotationDTO): ModelAnnotation {
     source: 'baked',
     annotation: dto,
     apBox: strippedRect ?? dto.rect,
-    ...(strippedRect ? { apRot: geomRotation(projected(dto).geometry) } : {}),
+    ...(strippedRect ? { apRot: geomRotation(shapeOf(dto)) } : {}),
   };
 }
 
@@ -149,7 +152,8 @@ function projected(dto: AnnotationDTO): Projected {
     // is answered by the core's flag predicates, never derived here.
     flags: flagsOf(dto),
     style: styleFromDTO(dto),
-    ...projectionOf(kindOf(dto).name).ingest(dto),
+    geometry: shapeOf(dto),
+    ...projectionOf(kindOf(dto).name).ingest?.(dto),
   };
   projections.set(dto, fields);
   return fields;
@@ -222,15 +226,13 @@ function emitProps(annotation: RecordFields, keys: readonly LoweredKey[]): Wire 
 const editableKeys = (subtype: string): LoweredKey[] =>
   kindNamed(subtype).fields.map((spec) => (spec.key === 'borderStyle' ? 'border' : spec.key));
 
-/** ModelAnnotation → the full engine patch: the kind's geometry group plus every
- *  prop it declares editable. The reference statement — scoped emission and
- *  drafts both build on it. */
-export function toPatch(annotation: RecordFields): AnnotationPatch | null {
-  const kind = projectionOf(annotation.subtype);
-  const geo = kind.geometry(annotation);
+/** ModelAnnotation → the full engine patch: the fields that state its shape
+ *  (its family's) plus every prop it declares editable. The reference
+ *  statement — scoped emission and drafts both build on it. */
+export function toPatch(annotation: RecordFields): AnnotationPatch {
+  const shape = familyOf(annotation.geometry).write(annotation.geometry, annotation.subtype);
   const props = emitProps(annotation, editableKeys(annotation.subtype)) ?? {};
-  if (!geo && Object.keys(props).length === 0) return null;
-  return { subtype: wireSubtypeOf(annotation), ...geo, ...props } as AnnotationPatch;
+  return { subtype: wireSubtypeOf(annotation), ...shape, ...props } as AnnotationPatch;
 }
 
 /** ModelAnnotation → engine create draft: the full statement plus the kind's
@@ -241,7 +243,6 @@ export function toCreateDraft(annotation: RecordFields): AnnotationDraft | null 
   const kind = projectionOf(annotation.subtype);
   if (kind.createable === false) return null;
   const base = toPatch(annotation);
-  if (!base) return null;
   const extras = kind.draftExtras?.(annotation);
   if (kind.draftExtras && extras === null) return null;
   // The /NM is the name the record's annotation was predicted under
@@ -346,7 +347,7 @@ function patchFor(before: RecordFields, after: RecordFields): AnnotationPatch | 
 
   const out: Wire = {};
   if (shapeMoved(before.geometry, after.geometry)) {
-    Object.assign(out, projectionOf(after.subtype).geometry(after));
+    Object.assign(out, familyOf(after.geometry).write(after.geometry, after.subtype));
   }
   // A measurement's caption and leader, as it has them: the write carries what
   // changed. Its label is the engine's.

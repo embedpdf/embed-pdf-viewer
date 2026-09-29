@@ -164,9 +164,9 @@ export type FieldValues = Readonly<Record<string, unknown>>;
 /**
  * One annotation as the core works on it: the engine's record, and how it is
  * drawn right now. The record is the only data: its ref, page, kind and
- * relationships are read off it (`refOf`, `kindOf`, `irtOf`, `groupOf`), and
- * the core's gestures read its fields through `fieldsOf` and change them
- * through `withFields` (record/).
+ * relationships are read off it (`refOf`, `kindOf`, `irtOf`, `groupOf`), so
+ * is its shape (`shapeOf`), and an edit writes engine fields back
+ * (`withShape`, `withValues`; record/).
  */
 export interface ModelAnnotation {
   /**
@@ -237,11 +237,11 @@ export interface ModelAnnotation {
 }
 
 /**
- * A record as the core's gestures read and write it: its annotation's
- * geometry, style and text in the core's own shapes. `fieldsOf` works them
- * out from the annotation, and `withFields` turns changed ones back into the
- * annotation's fields (record/). A new record has no annotation yet: its
- * create is what predicts one.
+ * A record's style and text in the core's own vocabulary, beside its shape
+ * (`shapeOf`): `fieldsOf` works them out from the annotation, and
+ * `withFields` turns changed ones back into the annotation's fields
+ * (record/). A new record has no annotation yet: its create is what
+ * predicts one.
  */
 export interface RecordFields extends Omit<ModelAnnotation, 'annotation'> {
   /** The engine's ref; `null` for a record this session created that the engine hasn't confirmed. */
@@ -727,30 +727,27 @@ export type Message =
   // selecting a group member takes the whole group, like a click would.
   | { type: 'select'; ids: Id[]; add?: boolean }
   // Write engine fields to records, a patch per id: each takes the fields its
-  // kind has and ignores the rest, so one message restyles a mixed selection.
-  // A locked record takes none (`contents` and `richText` follow
-  // `lockedContents` instead). Members flip to `vector`.
+  // kind has and may change now (`mayWrite`), so one message restyles a mixed
+  // selection. How each is drawn after follows appearance.ts.
   | { type: 'setFields'; patches: Readonly<Record<Id, FieldValues>> }
   // Bold, italic or underline on the selection's text bodies.
   | { type: 'setTextFormat'; format: 'bold' | 'italic' | 'underline'; on: boolean }
   // Link the selection somewhere, or unlink it (`null`): the link kind's own
   // target, or every other linkable kind's attached link.
   | { type: 'setLink'; target: PdfLinkTarget | null }
-  // Merge a `/F` flags patch into the selection (or explicit ids). Flags are
-  // not appearance: members keep their render `source` (no /AP re-bake), and —
-  // deliberately — the write is not gated by `locked`: this is how you unlock
-  // (Acrobat keeps its Locked checkbox live on a locked annotation). One
-  // `flags` effect per changed committed member; an uncommitted draft just
-  // merges (its create draft carries the flags when it commits).
+  // Merge a `/F` flags patch into the selection (or explicit ids). A flag
+  // needs update authority only, never an unlocked record: this is how you
+  // unlock (Acrobat keeps its Locked checkbox live on a locked annotation).
+  // Flags are not appearance: a baked raster stays baked.
   | { type: 'setFlags'; patch: Partial<AnnotationFlags>; ids?: Id[] }
   // Merge fields into a tool's defaults (keyed by its preset).
   | { type: 'setDefaults'; preset: string; patch: FieldValues }
   // Live-adjust snapping (a UI toggle) — merges into `Model.snap`.
   | { type: 'setSnap'; patch: Partial<SnapSettings> }
-  // Rotate the current selection by a fixed quarter-turn (clockwise) about its
-  // centre — the toolbar "rotate 90°" affordance. Works for a single shape or a
-  // multi-target group (about the union-box centre).
-  | { type: 'rotate90' }
+  // Turn the selection a quarter turn, clockwise (90) or back (-90): the
+  // toolbar's rotate buttons. A single shape turns about its own pivot, a
+  // multi-selection about the middle of the box around it; locked members stay.
+  | { type: 'rotateSelection'; degrees: 90 | -90 }
   // Reset rotation to the as-authored orientation: box `rot → 0`; vertex points
   // spun by `-rot` about their centroid, `rot → 0`. One patch effect per member.
   | { type: 'resetRotation' }

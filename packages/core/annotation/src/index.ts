@@ -120,7 +120,6 @@ export {
   pointInQuad,
   quadIntersectsRect,
   // rotation
-  centroidOf,
   geomRotation,
   geomRotateAbout,
   geomResetRotation,
@@ -150,34 +149,30 @@ export {
   normalizeDeg,
   type RectHandle,
 } from './rect';
-export { readBox, writeBox, type BoxShape, type TurnedBox } from './shapes/box';
+// The shape families: everything the core does with one kind of shape.
 export {
-  caretFromAnchor,
-  caretRectFromAnchor,
-  readCaret,
-  writeCaret,
-  type CaretShape,
-} from './shapes/caret';
-export { readQuads, type QuadsShape } from './shapes/quads';
+  boxFamily,
+  caretFamily,
+  familyChosenBy,
+  familyOf,
+  pointsFamily,
+  quadsFamily,
+  textBoxFamily,
+  type Corners,
+  type ShapeFamily,
+} from './shapes';
+export type { BoxShape, TurnedBox } from './shapes/box';
+export { caretFromAnchor, caretRectFromAnchor, type CaretShape } from './shapes/caret';
+export type { QuadsShape } from './shapes/quads';
 export {
   MITER_LIMIT,
   drawnStrokesOf,
-  readPoints,
-  uprightStrokesOf,
-  writePoints,
   type InkShape,
   type LineShape,
   type PointsShape,
   type PolyShape,
 } from './shapes/points';
-export {
-  calloutEnd,
-  readTextBox,
-  textPlateInset,
-  writeTextBox,
-  type CalloutLine,
-  type TextBoxShape,
-} from './shapes/text-box';
+export { calloutEnd, textPlateInset, type CalloutLine, type TextBoxShape } from './shapes/text-box';
 // The engine's record and the model's entry, both ways: the entry a record
 // reads as, who it is (its ref, kind and relationships), the fields the
 // core's gestures read off it, and the engine fields a change of them writes.
@@ -193,8 +188,10 @@ export {
   linkChildRects,
   recordOf,
   refOf,
+  shapeOf,
   styleFromDTO,
   withFields,
+  withShape,
   toCreateDraft,
   toPatch,
   widgetAppearanceOf,

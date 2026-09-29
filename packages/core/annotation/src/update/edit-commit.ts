@@ -7,7 +7,7 @@ import { anchorModeOf, unanchoredGeom } from '../anchor';
 import { geomRotateAbout, geomScaleAbout, geomTranslate, groupResizeFactors } from '../geometry';
 import { measurementOf } from '../measurement';
 import { moveMeasurementCaption, shapeMeasurementReadout } from '../measurement-shape';
-import { fieldsOf, withFields, withValues } from '../record';
+import { fieldsOf, shapeOf, withShape, withValues } from '../record';
 import type { Effect, Model } from '../types';
 import { commitViewGesture, geomEqual } from './changes';
 import { rotateDraftDelta } from './edit';
@@ -31,12 +31,19 @@ export function editUp(model: Model): [Model, Effect[]] {
     const annotation = model.byId[draft.id];
     const measure = annotation && measurementOf(annotation.annotation);
     if (!measure || (!draft.delta.x && !draft.delta.y)) return [{ ...model, draft: null }, []];
-    // A distance's caption offset, or a perimeter's or area's caption center.
-    const { geometry, style } = fieldsOf(annotation!);
-    const moved = withFields(
-      annotation!,
-      moveMeasurementCaption(geometry, measure, draft.delta, style),
+    const { style } = fieldsOf(annotation!);
+    const caption = moveMeasurementCaption(
+      shapeOf(annotation!.annotation),
+      measure,
+      draft.delta,
+      style,
     );
+    // A distance's caption offset is a field of its own; a perimeter's or
+    // area's caption center is its shape's.
+    const moved =
+      caption.measure.intent === 'line-dimension'
+        ? withValues(annotation!, { captionOffset: caption.measure.captionOffset })
+        : withShape(annotation!, caption.geometry);
     return [{ ...model, draft: null, byId: { ...model.byId, [moved.id]: moved } }, []];
   }
   if (draft.kind === 'handle') {
@@ -53,7 +60,7 @@ export function editUp(model: Model): [Model, Effect[]] {
         return [{ ...model, draft: null }, []];
       }
     }
-    const annotation = withFields(before, { geometry: stored });
+    const annotation = withShape(before, stored);
     return [{ ...model, byId: { ...model.byId, [draft.id]: annotation }, draft: null }, []];
   }
   if (draft.kind === 'rotate') {
@@ -70,7 +77,7 @@ export function editUp(model: Model): [Model, Effect[]] {
       const rotated = commitViewGesture(annotation, draft.view, (geometry) =>
         geomRotateAbout(geometry, draft.pivot, delta),
       );
-      byId[id] = withFields(annotation, { geometry: rotated });
+      byId[id] = withShape(annotation, rotated);
     }
     return [{ ...model, byId, draft: null }, []];
   }
@@ -84,7 +91,7 @@ export function editUp(model: Model): [Model, Effect[]] {
       const scaled = commitViewGesture(annotation, draft.view, (geometry) =>
         geomScaleAbout(geometry, draft.anchor, sx, sy),
       );
-      byId[id] = withFields(annotation, { geometry: scaled });
+      byId[id] = withShape(annotation, scaled);
     }
     return [{ ...model, byId, draft: null }, []];
   }
@@ -93,8 +100,8 @@ export function editUp(model: Model): [Model, Effect[]] {
     const byId = { ...model.byId };
     for (const id of draft.ids) {
       const annotation = byId[id];
-      const { geometry } = fieldsOf(annotation);
-      byId[id] = withFields(annotation, { geometry: geomTranslate(geometry, draft.delta) });
+      const geometry = shapeOf(annotation.annotation);
+      byId[id] = withShape(annotation, geomTranslate(geometry, draft.delta));
     }
     return [{ ...model, byId, draft: null }, []];
   }

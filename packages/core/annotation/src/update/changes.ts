@@ -9,7 +9,7 @@ import type { AnnotationRef, PageRef } from '@embedpdf/engine-core/runtime';
 
 import { anchoredGeom, anchorModeOf, unanchoredGeom, type ViewEnv } from '../anchor';
 import { sourceOfNew } from '../appearance';
-import { annotationOfRecord, type AnnotationPlace, fieldsOf, recordOf } from '../record';
+import { annotationOfRecord, type AnnotationPlace, recordOf, shapeOf } from '../record';
 import type {
   ModelGeometry,
   Id,
@@ -40,7 +40,7 @@ export const commitViewGesture = (
   op: (geometry: ModelGeometry) => ModelGeometry,
 ): ModelGeometry => {
   const mode = anchorModeOf(annotation);
-  return unanchoredGeom(op(anchoredGeom(fieldsOf(annotation).geometry, mode, view)), mode, view);
+  return unanchoredGeom(op(anchoredGeom(shapeOf(annotation.annotation), mode, view)), mode, view);
 };
 
 export const geomEqual = (left: ModelGeometry, right: ModelGeometry): boolean =>

@@ -11,7 +11,7 @@ import { selectionQuad } from './geometry';
 import { unionRect } from './rect';
 import { isSelectable } from './hit';
 import type { Guide, Id, Model, Rect, Point } from './types';
-import { fieldsOf } from './record';
+import { fieldsOf, shapeOf } from './record';
 
 export interface SnapResult {
   delta: Point;
@@ -40,7 +40,8 @@ const shift = (bounds: Bounds, point: Point): Bounds => ({
 /** An annotation's visual footprint corners — the oriented quad, so a rotated
  *  shape snaps by what's actually drawn, not its unrotated box. */
 const annotQuad = (model: Model, id: Id): Point[] => {
-  const { geometry, style } = fieldsOf(model.byId[id]);
+  const geometry = shapeOf(model.byId[id].annotation);
+  const { style } = fieldsOf(model.byId[id]);
   return selectionQuad(geometry, style.strokeWidth, style.border);
 };
 

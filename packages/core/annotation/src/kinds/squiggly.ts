@@ -1,3 +1,4 @@
+import { quadsFamily } from '../shapes';
 import { defineKind, NO_CAPS } from './define';
 import { MARKUP_FIELDS } from './fields';
 
@@ -8,7 +9,7 @@ import { MARKUP_FIELDS } from './fields';
  */
 export const squiggly = defineKind({
   name: 'squiggly',
-  family: 'quads',
-  caps: { ...NO_CAPS, selectable: true, anchored: true, commentable: true },
+  family: quadsFamily,
+  caps: { ...NO_CAPS, paintsBeneath: true, selectable: true, anchored: true, commentable: true },
   fields: MARKUP_FIELDS,
 });

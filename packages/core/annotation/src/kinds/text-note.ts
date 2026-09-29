@@ -1,3 +1,4 @@
+import { boxFamily } from '../shapes';
 import { defineKind, NO_CAPS } from './define';
 import { COLOR, LINKABLE, OPACITY } from './fields';
 
@@ -19,7 +20,7 @@ const NOTE_ICONS = [
  */
 export const textNote = defineKind({
   name: 'text',
-  family: 'box',
+  family: boxFamily,
   caps: {
     ...NO_CAPS,
     selectable: true,

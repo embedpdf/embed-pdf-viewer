@@ -38,7 +38,7 @@ import {
 import { anchoredBox, anchorModeOf, anchorOf } from './anchor';
 import { geomRotation } from './geometry';
 import { normalizeDeg } from './rect';
-import { fieldsOf, kindOf } from './record';
+import { kindOf, shapeOf } from './record';
 import type { Id, Model, ModelAnnotation, ModelGeometry, Rect, ViewEnv } from './types';
 
 /** The part of a record that says how it is drawn. */
@@ -91,7 +91,7 @@ export function sourceDuring(model: Model, id: Id): ModelAnnotation['source'] {
   if (!drawsLive(record.annotation)) return record.source;
   // A text box being typed into: the raster can't hide just its text, so a
   // blend would show it twice.
-  if (model.editing === id && fieldsOf(record).geometry.kind === 'text-box') return 'vector';
+  if (model.editing === id && shapeOf(record.annotation).kind === 'text-box') return 'vector';
   const draft = model.draft;
   if (
     (draft?.kind === 'handle' || draft?.kind === 'caption' || draft?.kind === 'leader') &&
@@ -130,7 +130,7 @@ export function rasterPlacement(
   if (!record.apBox) return { rot: record.apRot };
   const projected = anchoredBox(
     record.apBox,
-    anchorOf(fieldsOf(record).geometry),
+    anchorOf(shapeOf(record.annotation)),
     anchorModeOf(record),
     view,
   );

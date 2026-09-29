@@ -1,3 +1,4 @@
+import { pointsFamily } from '../shapes';
 import { defineKind, NO_CAPS } from './define';
 import { BLEND_MODE, COLOR, LINKABLE, OPACITY, STROKE_WIDTH } from './fields';
 
@@ -7,7 +8,7 @@ import { BLEND_MODE, COLOR, LINKABLE, OPACITY, STROKE_WIDTH } from './fields';
  */
 export const ink = defineKind({
   name: 'ink',
-  family: 'ink',
+  family: pointsFamily,
   caps: {
     ...NO_CAPS,
     selectable: true,

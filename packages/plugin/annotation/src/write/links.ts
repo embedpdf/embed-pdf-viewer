@@ -6,6 +6,7 @@ import {
   linkOf,
   type ModelAnnotation,
   refOf,
+  shapeOf,
 } from '@embedpdf/core-annotation';
 import {
   annotationKey,
@@ -68,7 +69,10 @@ export function createLinkWrites(
     // Read-only target arms can't be (re)written: children keep their /A and
     // only their rects follow the parent.
     const target = writableTarget(desired);
-    const rects = desired == null ? [] : linkChildRects(fieldsOf(annotation));
+    const rects =
+      desired == null
+        ? []
+        : linkChildRects(shapeOf(annotation.annotation), fieldsOf(annotation).style);
     const current = linkChildrenOf(store.model(), id);
     const changes: StoreChange[] = [];
     const paired = Math.min(current.length, rects.length);

@@ -11,7 +11,7 @@ import { modelWith, record, step, STYLE, restyle } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
 import type { Message, Model, ModelAnnotation, Point } from '../src/types';
 import { EMPTY_CHANGE, update } from '../src/update';
-import { fieldsOf, refOf } from '../src/record';
+import { fieldsOf, refOf, shapeOf } from '../src/record';
 
 const PAGE = toPageRef(1);
 const editPtr = (phase: 'down' | 'move' | 'up', x: number, y: number): Message => ({
@@ -102,8 +102,8 @@ describe('update', () => {
     const [write] = result.effects;
     expect(write?.type === 'patch' && write.patch).toBe(result.change.patches['obj:1']);
     // The records it was given are untouched: the core keeps nothing.
-    expect(fieldsOf(dragged.byId['obj:1']!).geometry).toEqual(
-      fieldsOf(model.byId['obj:1']!).geometry,
+    expect(shapeOf(dragged.byId['obj:1']!.annotation)).toEqual(
+      shapeOf(model.byId['obj:1']!.annotation),
     );
   });
 

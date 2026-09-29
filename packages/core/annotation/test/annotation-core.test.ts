@@ -26,7 +26,6 @@ import {
   geomTranslate,
   geomDragHandle,
   selectionBounds,
-  centroidOf,
   geomRotation,
   geomRotateAbout,
   geomResetRotation,
@@ -40,7 +39,6 @@ import {
   uprightAnchoredRect,
   uprightRotation,
   fitStampBox,
-  apSizeChanged,
 } from '../src/geometry';
 import { normalizeDeg, rotatedAabb, rotatedHandleCursor } from '../src/rect';
 import { caretFromAnchor, caretRectFromAnchor } from '../src/shapes/caret';
@@ -82,7 +80,7 @@ import {
   selectionKnob,
   textBoxes,
 } from '../src/view';
-import { fieldsOf, kindOf, withFields } from '../src/record';
+import { fieldsOf, kindOf, shapeOf, withFields, withShape } from '../src/record';
 
 const PON = 1;
 const PAGE = toPageRef(PON);
@@ -228,7 +226,7 @@ describe('resolveClickPlacement — the shared placement layer', () => {
           in: { page: PAGE, point, shift: false, pageBox },
         },
       ]);
-      const committed = fieldsOf(model.byId[model.order[0]]!).geometry;
+      const committed = shapeOf(model.byId[model.order[0]]!.annotation);
       // Exactly the call the hover ghost makes (capability ghostHoverAt):
       const ghost = clickCreateGeom(
         subtype,
@@ -261,7 +259,7 @@ describe('click-create (a bare click places the tool default)', () => {
       clickMsg('square', 'down', 100, 100, { width: 80, height: 60 }),
       clickMsg('square', 'up', 100, 100, { width: 80, height: 60 }),
     ]);
-    expect(rectGeom(fieldsOf(model.byId[model.order[0]]).geometry)).toMatchObject({
+    expect(rectGeom(shapeOf(model.byId[model.order[0]].annotation))).toMatchObject({
       x: 60,
       y: 70,
       width: 80,
@@ -275,7 +273,10 @@ describe('click-create (a bare click places the tool default)', () => {
       clickMsg('square', 'down', 295, 5, { width: 80, height: 60 }, page),
       clickMsg('square', 'up', 295, 5, { width: 80, height: 60 }, page),
     ]);
-    expect(rectGeom(fieldsOf(model.byId[model.order[0]]).geometry)).toMatchObject({ x: 220, y: 0 });
+    expect(rectGeom(shapeOf(model.byId[model.order[0]].annotation))).toMatchObject({
+      x: 220,
+      y: 0,
+    });
   });
 
   it('square: a real drag still wins over the click policy', () => {
@@ -294,7 +295,7 @@ describe('click-create (a bare click places the tool default)', () => {
         in: { page: PAGE, point: { x: 90, y: 50 }, shift: false },
       },
     ]);
-    expect(rectGeom(fieldsOf(model.byId[model.order[0]]).geometry)).toMatchObject({
+    expect(rectGeom(shapeOf(model.byId[model.order[0]].annotation))).toMatchObject({
       width: 80,
       height: 40,
     });
@@ -305,7 +306,7 @@ describe('click-create (a bare click places the tool default)', () => {
       clickMsg('line', 'down', 20, 30, { length: 80 }),
       clickMsg('line', 'up', 20, 30, { length: 80 }),
     ]);
-    expect(fieldsOf(model.byId[model.order[0]]).geometry).toMatchObject({
+    expect(shapeOf(model.byId[model.order[0]].annotation)).toMatchObject({
       kind: 'line',
       linePoints: { start: { x: 20, y: 30 }, end: { x: 100, y: 30 } },
     });
@@ -336,8 +337,8 @@ describe('annotation-core', () => {
       createPtr('square', 'up', 200, 160),
     ]);
     const annotation = sq.byId[sq.order[0]];
-    expect(fieldsOf(annotation).geometry).toMatchObject({ kind: 'box', ellipse: false });
-    expect(rectGeom(fieldsOf(annotation).geometry)).toMatchObject({
+    expect(shapeOf(annotation.annotation)).toMatchObject({ kind: 'box', ellipse: false });
+    expect(rectGeom(shapeOf(annotation.annotation))).toMatchObject({
       x: 100,
       y: 100,
       width: 100,
@@ -350,14 +351,14 @@ describe('annotation-core', () => {
       createPtr('circle', 'move', 50, 50),
       createPtr('circle', 'up', 50, 50),
     ]);
-    expect(fieldsOf(ci.byId[ci.order[0]]).geometry).toMatchObject({ kind: 'box', ellipse: true });
+    expect(shapeOf(ci.byId[ci.order[0]].annotation)).toMatchObject({ kind: 'box', ellipse: true });
 
     const ln = run(initialModel, [
       createPtr('line', 'down', 10, 10),
       createPtr('line', 'move', 90, 40),
       createPtr('line', 'up', 90, 40),
     ]);
-    expect(fieldsOf(ln.byId[ln.order[0]]).geometry).toMatchObject({
+    expect(shapeOf(ln.byId[ln.order[0]].annotation)).toMatchObject({
       kind: 'line',
       linePoints: { start: { x: 10, y: 10 }, end: { x: 90, y: 40 } },
     });
@@ -380,7 +381,7 @@ describe('annotation-core', () => {
       createPtr('polygon', 'down', 40, 70, true),
     ]);
     const pg = polygon.byId[polygon.order[0]];
-    expect(fieldsOf(pg).geometry).toEqual({
+    expect(shapeOf(pg.annotation)).toEqual({
       kind: 'poly',
       vertices: [
         { x: 10, y: 10 },
@@ -402,7 +403,7 @@ describe('annotation-core', () => {
       createPtr('polyline', 'down', 90, 45, true),
     ]);
     const pl = polyline.byId[polyline.order[0]];
-    expect(fieldsOf(pl).geometry).toEqual({
+    expect(shapeOf(pl.annotation)).toEqual({
       kind: 'poly',
       vertices: [
         { x: 20, y: 20 },
@@ -438,7 +439,7 @@ describe('annotation-core', () => {
       createPtr('polygon', 'down', 80, 80),
       createPtr('polygon', 'down', 80, 80, true),
     ]);
-    const geometry = fieldsOf(committed.byId[committed.order[0]]).geometry;
+    const geometry = shapeOf(committed.byId[committed.order[0]].annotation);
     expect(geometry.kind === 'poly' && geometry.vertices).toEqual([
       { x: 10, y: 10 },
       { x: 80, y: 10 },
@@ -471,7 +472,7 @@ describe('annotation-core', () => {
     model = step(model, { type: 'finishCreationDraft' })[0];
     expect(model.draft).toBeNull();
     expect(model.order).toHaveLength(1);
-    expect(fieldsOf(model.byId[model.order[0]]).geometry).toMatchObject({
+    expect(shapeOf(model.byId[model.order[0]].annotation)).toMatchObject({
       kind: 'poly',
       closed: true,
     });
@@ -528,7 +529,7 @@ describe('annotation-core', () => {
     };
     const [model] = step(initialModel, { type: 'createCaret', page: PAGE, anchor });
     const annotation = model.byId[model.order[0]];
-    expect(fieldsOf(annotation).geometry).toMatchObject({
+    expect(shapeOf(annotation.annotation)).toMatchObject({
       kind: 'caret',
       rotation: expect.closeTo(270, 5),
     });
@@ -729,7 +730,7 @@ describe('annotation-core', () => {
       editPtr('move', 180, 170),
       editPtr('up', 180, 170),
     ]);
-    expect(rectGeom(fieldsOf(model.byId[id]).geometry)).toMatchObject({ x: 130, y: 120 });
+    expect(rectGeom(shapeOf(model.byId[id].annotation))).toMatchObject({ x: 130, y: 120 });
   });
 
   it('a selected arrow is grabbable anywhere inside its outline box, not just on the thin stroke', () => {
@@ -767,8 +768,8 @@ describe('annotation-core', () => {
       kind: 'annot',
       id: 'A1',
     });
-    expect(selectionBounds(fieldsOf(arrow).geometry, 6)).toEqual(
-      geomVisualBounds(fieldsOf(arrow).geometry, 6),
+    expect(selectionBounds(shapeOf(arrow.annotation), 6)).toEqual(
+      geomVisualBounds(shapeOf(arrow.annotation), 6),
     ); // line: outline == visual bounds
   });
 
@@ -884,7 +885,7 @@ describe('annotation-core', () => {
       editPtr('move', 260, 240),
       editPtr('up', 260, 240),
     ]);
-    expect(rectGeom(fieldsOf(model.byId[id]).geometry)).toMatchObject({
+    expect(rectGeom(shapeOf(model.byId[id].annotation))).toMatchObject({
       x: 100,
       y: 100,
       width: 160,
@@ -983,8 +984,8 @@ describe('annotation-core', () => {
       return outline && outline.kind === 'outline' ? outline.rect : null;
     };
     const lineOutline = outlineRect(selection)!;
-    const tight = geomBounds(fieldsOf(selection.byId['L1']).geometry);
-    expect(lineOutline).toEqual(geomVisualBounds(fieldsOf(selection.byId['L1']).geometry, 8));
+    const tight = geomBounds(shapeOf(selection.byId['L1'].annotation));
+    expect(lineOutline).toEqual(geomVisualBounds(shapeOf(selection.byId['L1'].annotation), 8));
     expect(lineOutline.width).toBeGreaterThan(tight.width);
     expect(lineOutline.height).toBeGreaterThan(tight.height);
 
@@ -1310,7 +1311,7 @@ describe('annotation-core', () => {
       ink('up', 40, 30),
     ]);
     const annotation = model.byId[model.order[0]];
-    const geometry = fieldsOf(annotation).geometry;
+    const geometry = shapeOf(annotation.annotation);
     expect(geometry).toMatchObject({ kind: 'ink' });
     expect(geometry.kind === 'ink' && geometry.inkList[0].length).toBe(3);
     expect(annotation.source).toBe('vector');
@@ -1358,7 +1359,7 @@ describe('annotation-core', () => {
     model = step(model, { type: 'finishInkDraft' })[0];
     expect(model.order).toHaveLength(1);
     const annotation = model.byId[model.order[0]];
-    const geometry = fieldsOf(annotation).geometry;
+    const geometry = shapeOf(annotation.annotation);
     expect(annotation.annotation).toMatchObject({ intent: 'ink-highlight' });
     expect(fieldsOf(annotation).style.blendMode).toBe('multiply');
     expect(geometry.kind).toBe('ink');
@@ -1447,7 +1448,7 @@ describe('annotation-core', () => {
     // strokeWidth applies to both; endings only to the line (the square ignores it)
     expect(fieldsOf(next.byId[sq]).style.strokeWidth).toBe(7);
     expect(fieldsOf(next.byId[ln]).style.strokeWidth).toBe(7);
-    const lnGeom = fieldsOf(next.byId[ln]).geometry;
+    const lnGeom = shapeOf(next.byId[ln].annotation);
     expect(lnGeom.kind === 'line' && lnGeom.lineEndings?.end).toBe('closed-arrow');
     expect(fx).toEqual([
       writes(sq, { subtype: 'square', strokeWidth: 7 }),
@@ -1607,9 +1608,9 @@ describe('annotation-core', () => {
       editPtr('up', 135, 145),
     ]);
     // all three translate by the same delta (+20, +30)
-    expect(rectGeom(fieldsOf(model.byId[P]).geometry)).toMatchObject({ x: 120, y: 130 });
-    expect(rectGeom(fieldsOf(model.byId[C1]).geometry)).toMatchObject({ x: 220, y: 230 });
-    expect(rectGeom(fieldsOf(model.byId[C2]).geometry)).toMatchObject({ x: 320, y: 330 });
+    expect(rectGeom(shapeOf(model.byId[P].annotation))).toMatchObject({ x: 120, y: 130 });
+    expect(rectGeom(shapeOf(model.byId[C1].annotation))).toMatchObject({ x: 220, y: 230 });
+    expect(rectGeom(shapeOf(model.byId[C2].annotation))).toMatchObject({ x: 320, y: 330 });
   });
 
   it('deleting with a member selected removes the whole group', () => {
@@ -1659,9 +1660,9 @@ describe('annotation-core', () => {
       editPtr('up', 190, 200),
     ]);
     // every member translated by the same delta (+20, +30)
-    expect(rectGeom(fieldsOf(model.byId[P]).geometry)).toMatchObject({ x: 120, y: 130 });
-    expect(rectGeom(fieldsOf(model.byId[C1]).geometry)).toMatchObject({ x: 220, y: 230 });
-    expect(rectGeom(fieldsOf(model.byId[C2]).geometry)).toMatchObject({ x: 320, y: 330 });
+    expect(rectGeom(shapeOf(model.byId[P].annotation))).toMatchObject({ x: 120, y: 130 });
+    expect(rectGeom(shapeOf(model.byId[C1].annotation))).toMatchObject({ x: 220, y: 230 });
+    expect(rectGeom(shapeOf(model.byId[C2].annotation))).toMatchObject({ x: 320, y: 330 });
   });
 
   it('the gap inside a multi-selection shows the move cursor; outside the union still clears', () => {
@@ -1828,7 +1829,7 @@ describe('annotation-core callout', () => {
     let model = run(initialModel, [pointer('down'), pointer('up')]);
     const id = model.order[0]!;
     const annotation = model.byId[id]!;
-    const geometry = fieldsOf(annotation).geometry;
+    const geometry = shapeOf(annotation.annotation);
     if (geometry.kind !== 'text-box' || geometry.calloutLine)
       throw new Error('expected a plain text box');
     model = step(model, { type: 'setText', id, text: 'hello' })[0];
@@ -1960,7 +1961,7 @@ describe('annotation-core callout', () => {
       calloutPtr('up', 320, 140), // commit
     ]);
     const annotation = model.byId[model.order[0]];
-    const geometry = fieldsOf(annotation).geometry;
+    const geometry = shapeOf(annotation.annotation);
     expect(kindOf(annotation.annotation).name).toBe('free-text');
     expect(geometry.kind).toBe('text-box');
     if (geometry.kind !== 'text-box' || !geometry.calloutLine)
@@ -1984,7 +1985,7 @@ describe('annotation-core callout', () => {
       calloutPtr('up', 200, 100),
     ]);
     const annotation = model.byId[model.order[0]];
-    const geometry = fieldsOf(annotation).geometry;
+    const geometry = shapeOf(annotation.annotation);
     expect(geometry.kind === 'text-box' && geometry.box).toMatchObject({
       x: 200,
       y: 100,
@@ -2036,7 +2037,7 @@ describe('annotation-core callout', () => {
     expect(ghostBox(model)).toMatchObject({ x: 200, y: 100, width: 120, height: 50 });
     const committed = step(model, calloutPtr('up', 320, 150))[0];
     const annotation = committed.byId[committed.order[0]];
-    const geometry = fieldsOf(annotation).geometry;
+    const geometry = shapeOf(annotation.annotation);
     expect(geometry.kind === 'text-box' && geometry.box).toMatchObject({
       x: 200,
       y: 100,
@@ -2068,7 +2069,7 @@ describe('annotation-core callout', () => {
     });
     const committed = run(placed, [pointer('down', 600, 780), pointer('up', 600, 780)]);
     const annotation = committed.byId[committed.order[0]];
-    const geometry = fieldsOf(annotation).geometry;
+    const geometry = shapeOf(annotation.annotation);
     expect(geometry.kind === 'text-box' && geometry.box).toEqual(ghostBox(placed));
   });
 
@@ -2094,7 +2095,7 @@ describe('annotation-core callout', () => {
       pointer('up', 320, 150),
     ]);
     const annotation = dragged.byId[dragged.order[0]];
-    const geometry = fieldsOf(annotation).geometry;
+    const geometry = shapeOf(annotation.annotation);
     expect(geometry.kind === 'text-box' && geometry.box).toMatchObject({
       x: 200,
       y: 100,
@@ -2115,7 +2116,7 @@ describe('annotation-core callout', () => {
     ]);
     model = { ...model, snap: { ...model.snap, guides: false } };
     const a0 = model.byId[model.order[0]];
-    const a0Geometry = fieldsOf(a0).geometry;
+    const a0Geometry = shapeOf(a0.annotation);
     if (a0Geometry.kind !== 'text-box' || !a0Geometry.calloutLine)
       throw new Error('expected callout');
     const visual = geomVisualBounds(
@@ -2192,7 +2193,7 @@ describe('annotation-core callout — upright on a rotated page', () => {
       rotPtr('up', 320, 140), // commit
     ]);
     const annotation = model.byId[model.order[0]];
-    const geometry = fieldsOf(annotation).geometry;
+    const geometry = shapeOf(annotation.annotation);
     if (geometry.kind !== 'text-box' || !geometry.calloutLine)
       throw new Error('expected callout geom');
     // dragged {200,100,120,40}, centre (260,120) → transposed logical box
@@ -2220,7 +2221,7 @@ describe('annotation-core callout — upright on a rotated page', () => {
       rotPtr('up', 200, 100),
     ]);
     const annotation = model.byId[model.order[0]];
-    const geometry = fieldsOf(annotation).geometry;
+    const geometry = shapeOf(annotation.annotation);
     if (geometry.kind !== 'text-box') throw new Error('expected text geom');
     // the same box uprightAnchoredRect places (its displayed top-left at the click)
     expect(geometry.box).toMatchObject(uprightAnchoredRect({ x: 200, y: 100 }, 150, 40, 90));
@@ -2295,7 +2296,7 @@ describe('annotation-core callout — upright on a rotated page', () => {
       plainPtr('up', 200, 100),
     ]);
     const annotation = model.byId[model.order[0]];
-    const geometry = fieldsOf(annotation).geometry;
+    const geometry = shapeOf(annotation.annotation);
     if (geometry.kind !== 'text-box') throw new Error('expected text geom');
     expect(geometry.box).toMatchObject({ x: 200, y: 100, width: 150, height: 40 });
     expect(geometry.rotation).toBe(0);
@@ -2377,10 +2378,10 @@ describe('annotation-core — rotation', () => {
       rotation: 0,
       ellipse: false,
     };
-    const rotated = geomRotateAbout(geometry, centroidOf(geometry), 90);
+    const rotated = geomRotateAbout(geometry, turnPivotOf(geometry), 90);
     expect(geomRotation(rotated)).toBe(90);
     if (rotated.kind !== 'box') throw new Error('expected rect');
-    expect(centroidOf(rotated)).toMatchObject({ x: 150, y: 125 }); // centre preserved
+    expect(turnPivotOf(rotated)).toMatchObject({ x: 150, y: 125 }); // centre preserved
     expect(rotated.box.width).toBe(100); // stored box stays unrotated
     expect(rotated.box.height).toBe(50);
   });
@@ -2436,7 +2437,7 @@ describe('annotation-core — rotation', () => {
       closed: true,
       rotation: 0,
     };
-    const turned = geomRotateAbout(base, centroidOf(base), 45);
+    const turned = geomRotateAbout(base, turnPivotOf(base), 45);
     const obbV = obbFromGeom(turned, 0);
     expect(obbV?.angle).toBe(45);
     expect(obbV?.corners).toHaveLength(4);
@@ -2454,34 +2455,61 @@ describe('annotation-core — rotation', () => {
     expect(normalizeDeg(360)).toBe(0);
   });
 
-  it('rotate90 turns a single selected shape about its centre (one patch)', () => {
+  it('a quarter turn turns a single selected shape about its centre (one patch)', () => {
     const base = modelWith([seededSquare('s1', { x: 100, y: 100, width: 100, height: 50 })]);
-    const [model, fx] = step({ ...base, selected: ['s1'] }, { type: 'rotate90' });
+    const [model, fx] = step(
+      { ...base, selected: ['s1'] },
+      { type: 'rotateSelection', degrees: 90 },
+    );
     expect(fx).toEqual([writes('s1', { subtype: 'square', rotation: 90 })]);
-    const geometry = fieldsOf(model.byId['s1']).geometry;
+    const geometry = shapeOf(model.byId['s1'].annotation);
     expect(geomRotation(geometry)).toBe(90);
-    expect(centroidOf(geometry)).toMatchObject({ x: 150, y: 125 });
+    expect(turnPivotOf(geometry)).toMatchObject({ x: 150, y: 125 });
   });
 
-  it('rotate90 on a group turns every member about the union centre (one patch each)', () => {
+  it('a quarter turn on a group turns every member about the union centre (one patch each)', () => {
     const base = modelWith([
       seededSquare('s1', { x: 0, y: 0, width: 100, height: 100 }),
       seededSquare('s2', { x: 200, y: 0, width: 100, height: 100 }),
     ]);
-    const [model, fx] = step({ ...base, selected: ['s1', 's2'] }, { type: 'rotate90' });
+    const [model, fx] = step(
+      { ...base, selected: ['s1', 's2'] },
+      { type: 'rotateSelection', degrees: 90 },
+    );
     expect(fx).toHaveLength(2);
-    expect(geomRotation(fieldsOf(model.byId['s1']).geometry)).toBe(90);
-    expect(geomRotation(fieldsOf(model.byId['s2']).geometry)).toBe(90);
+    expect(geomRotation(shapeOf(model.byId['s1'].annotation))).toBe(90);
+    expect(geomRotation(shapeOf(model.byId['s2'].annotation))).toBe(90);
     // the two boxes orbit the union centre, so their centres swap places vertically
-    expect(centroidOf(fieldsOf(model.byId['s1']).geometry).x).not.toBe(50);
+    expect(turnPivotOf(shapeOf(model.byId['s1'].annotation)).x).not.toBe(50);
+  });
+
+  it('a quarter turn back works the same way: about the union centre, a locked member stays', () => {
+    const locked = seededSquare('s3', { x: 400, y: 0, width: 100, height: 100 });
+    const base = modelWith([
+      seededSquare('s1', { x: 0, y: 0, width: 100, height: 100 }),
+      seededSquare('s2', { x: 200, y: 0, width: 100, height: 100 }),
+      { ...locked, annotation: { ...locked.annotation, locked: true } },
+    ]);
+    const [model, fx] = step(
+      { ...base, selected: ['s1', 's2', 's3'] },
+      { type: 'rotateSelection', degrees: -90 },
+    );
+    expect(fx.map((effect) => effect.type === 'patch' && effect.id)).toEqual(['s1', 's2']);
+    expect(geomRotation(shapeOf(model.byId['s1'].annotation))).toBe(270);
+    // Turned about the middle of the two it turns, not each about its own.
+    expect(turnPivotOf(shapeOf(model.byId['s1'].annotation))).toMatchObject({ x: 150, y: 150 });
+    expect(model.byId['s3']).toBe(base.byId['s3']);
   });
 
   it('resetRotation clears rotation on the selection (one patch per rotated member)', () => {
     const base = modelWith([seededSquare('s1', { x: 100, y: 100, width: 100, height: 50 })]);
-    const rotated = step({ ...base, selected: ['s1'] }, { type: 'rotate90' })[0];
+    const rotated = step(
+      { ...base, selected: ['s1'] },
+      { type: 'rotateSelection', degrees: 90 },
+    )[0];
     const [model, fx] = step(rotated, { type: 'resetRotation' });
     expect(fx).toEqual([writes('s1', { subtype: 'square', rotation: null })]);
-    expect(geomRotation(fieldsOf(model.byId['s1']).geometry)).toBe(0);
+    expect(geomRotation(shapeOf(model.byId['s1'].annotation))).toBe(0);
   });
 });
 
@@ -2513,7 +2541,10 @@ describe('annotation-core — rotation-aware selection (grab + menu + group)', (
     // 50×100 box spanning x[125,175], y[75,175]. The unrotated footprint was
     // x[100,200], y[100,150].
     const base = modelWith([square('s1', rect(100, 100, 100, 50))]);
-    const rotated = step({ ...base, selected: ['s1'] }, { type: 'rotate90' })[0];
+    const rotated = step(
+      { ...base, selected: ['s1'] },
+      { type: 'rotateSelection', degrees: 90 },
+    )[0];
 
     // (150,90): inside the tilted box but above the old footprint (y<100) — now grabs.
     expect(hitTest(rotated, PAGE, { x: 150, y: 90 }, DEFAULT_CHROME_GEOMETRY, 3)).toEqual({
@@ -2531,7 +2562,10 @@ describe('annotation-core — rotation-aware selection (grab + menu + group)', (
     const before = selectionBoundsOnPage({ ...base, selected: ['s1'] }, PAGE);
     expect(before).toMatchObject({ x: 100, y: 100, width: 100, height: 50 }); // upright = the box
 
-    const rotated = step({ ...base, selected: ['s1'] }, { type: 'rotate90' })[0];
+    const rotated = step(
+      { ...base, selected: ['s1'] },
+      { type: 'rotateSelection', degrees: 90 },
+    )[0];
     const after = selectionBoundsOnPage(rotated, PAGE);
     // 90° → the AABB is the box's transpose, recentred on (150,125).
     expect(after?.x).toBeCloseTo(125);
@@ -2543,7 +2577,7 @@ describe('annotation-core — rotation-aware selection (grab + menu + group)', (
   });
 
   it('groupUnionBounds encloses a rotated member’s tilted corners', () => {
-    const tilted = geomRotateAbout(rect(0, 0, 100, 100), centroidOf(rect(0, 0, 100, 100)), 45);
+    const tilted = geomRotateAbout(rect(0, 0, 100, 100), turnPivotOf(rect(0, 0, 100, 100)), 45);
     const model = modelWith([square('s1', tilted), square('s2', rect(200, 0, 100, 100))]);
     const union = groupUnionBounds({ ...model, selected: ['s1', 's2'] }, PAGE);
     // a 100×100 box turned 45° about its centre (50,50) reaches out to ~−20.7.
@@ -2610,7 +2644,11 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
       closed: false,
       rotation: 0,
     };
-    const mean = centroidOf(geometry);
+    const vertices = geometry.vertices;
+    const mean = {
+      x: vertices.reduce((sum, point) => sum + point.x, 0) / vertices.length,
+      y: vertices.reduce((sum, point) => sum + point.y, 0) / vertices.length,
+    };
     const centre = turnPivotOf(geometry);
     // the two are genuinely different for an asymmetric shape (the whole bug).
     expect(Math.hypot(mean.x - centre.x, mean.y - centre.y)).toBeGreaterThan(5);
@@ -2676,10 +2714,10 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
       phase: 'up',
       in: { page: PAGE, point: { x: knob.x + 40, y: knob.y + 40 }, shift: false },
     })[0];
-    const after = turnPivotOf(fieldsOf(up.byId['s1']).geometry);
+    const after = turnPivotOf(shapeOf(up.byId['s1'].annotation));
     expect(after.x).toBeCloseTo(centre.x, 4);
     expect(after.y).toBeCloseTo(centre.y, 4);
-    expect(geomRotation(fieldsOf(up.byId['s1']).geometry)).not.toBe(0);
+    expect(geomRotation(shapeOf(up.byId['s1'].annotation))).not.toBe(0);
   });
 });
 
@@ -3061,7 +3099,7 @@ describe('page-bound gestures', () => {
     expect(draft.delta.y).toBeGreaterThan(0);
     expect(draft.delta.y).toBeLessThan(40); // pinned at the edge, not 190
     const [done, fx] = step(model, edit('up', 320, 900));
-    const rect = rectGeom(fieldsOf(done.byId[done.selected[0]]).geometry)!;
+    const rect = rectGeom(shapeOf(done.byId[done.selected[0]].annotation))!;
     expect(fx).toEqual([writes(done.selected[0], { box: rect })]);
     expect(rect.x).toBe(300); // slid right by the full 50
     // Bottom rests on the page edge (± the stroke's visual inflation).
@@ -3077,7 +3115,7 @@ describe('page-bound gestures', () => {
       edit('up', 270, 900),
     );
     expect(done.draft).toBeNull();
-    const rect = rectGeom(fieldsOf(done.byId[done.selected[0]]).geometry)!;
+    const rect = rectGeom(shapeOf(done.byId[done.selected[0]].annotation))!;
     expect(fx).toEqual([writes(done.selected[0], { box: rect })]);
     expect(rect.y).toBeGreaterThan(700); // it moved…
     expect(rect.y + rect.height).toBeLessThanOrEqual(792); // …but stayed on the page
@@ -3101,7 +3139,7 @@ describe('page-bound gestures', () => {
       create('move', 700, 900),
       create('up', 700, 900),
     ]);
-    const rect = rectGeom(fieldsOf(model.byId[model.order[0]]).geometry)!;
+    const rect = rectGeom(shapeOf(model.byId[model.order[0]].annotation))!;
     expect(rect.x + rect.width).toBe(612);
     expect(rect.y + rect.height).toBe(792);
   });
@@ -3236,7 +3274,7 @@ describe('annotation-core — snapping', () => {
     expect(moveDraft(dragging)!.guides).toHaveLength(1);
     expect(chrome(dragging, PAGE).some((node) => node.kind === 'guide')).toBe(true);
     const model = run(dragging, [editPtr('up', 203, 325)]);
-    expect(rectGeom(fieldsOf(model.byId['s2']).geometry)).toMatchObject({ x: 200, y: 300 });
+    expect(rectGeom(shapeOf(model.byId['s2'].annotation))).toMatchObject({ x: 200, y: 300 });
     expect(chrome(model, PAGE).some((node) => node.kind === 'guide')).toBe(false); // cleared
   });
 
@@ -3308,7 +3346,7 @@ describe('annotation-core — snapping', () => {
     expect(chip).toMatchObject({ kind: 'angle-chip', angle: 90 });
     const [model, fx] = step(live, editPtr('up', 0, 0));
     expect(fx).toEqual([writes('s1', { rotation: expect.closeTo(90) })]);
-    expect(geomRotation(fieldsOf(model.byId['s1']).geometry)).toBeCloseTo(90);
+    expect(geomRotation(shapeOf(model.byId['s1'].annotation))).toBeCloseTo(90);
     expect(chrome(model, PAGE).some((node) => node.kind === 'angle-chip')).toBe(false);
   });
 
@@ -3863,13 +3901,11 @@ describe('marquee vs rotated shapes', () => {
 
   it('unrotated shapes behave exactly as before', () => {
     const flat = modelWith([
-      withFields(bar, {
-        geometry: {
-          kind: 'box',
-          box: { x: 100, y: 100, width: 200, height: 20 },
-          rotation: 0,
-          ellipse: false,
-        },
+      withShape(bar, {
+        kind: 'box',
+        box: { x: 100, y: 100, width: 200, height: 20 },
+        rotation: 0,
+        ellipse: false,
       }),
     ]);
     expect(annotsInBox(flat, PAGE, { x: 90, y: 90 }, { x: 110, y: 110 })).toEqual(['R1']); // corner overlap
@@ -3935,7 +3971,7 @@ describe('upright creation (counter-rotating the display rotation)', () => {
       uprightPtr('free-text', 'down', 100, 200, { displayRotation: 90, upright: true }),
       uprightPtr('free-text', 'up', 100, 200),
     ]);
-    const geometry = textGeom(fieldsOf(model.byId[model.order[0]]).geometry)!;
+    const geometry = textGeom(shapeOf(model.byId[model.order[0]].annotation))!;
     expect(geometry.rotation).toBe(270); // -90 → reads horizontally on the 90°-rotated page
     expect(geometry.box).toEqual({ x: 30, y: 90, width: 180, height: 40 }); // display-frame anchor
     // its rotated footprint hangs off the click exactly like the 0° box does on screen
@@ -3953,7 +3989,7 @@ describe('upright creation (counter-rotating the display rotation)', () => {
       uprightPtr('free-text', 'move', 170, 100),
       uprightPtr('free-text', 'up', 170, 100),
     ]);
-    const geometry = textGeom(fieldsOf(model.byId[model.order[0]]).geometry)!;
+    const geometry = textGeom(shapeOf(model.byId[model.order[0]].annotation))!;
     expect(geometry.rotation).toBe(270);
     expect(geometry.box).toEqual({ x: 90, y: 20, width: 40, height: 120 }); // transposed about centre
     expectRectClose(rotatedAabb(geometry.box, geometry.rotation!), {
@@ -3970,7 +4006,7 @@ describe('upright creation (counter-rotating the display rotation)', () => {
       uprightPtr('free-text', 'move', 170, 100),
       uprightPtr('free-text', 'up', 170, 100),
     ]);
-    const geometry = textGeom(fieldsOf(model.byId[model.order[0]]).geometry)!;
+    const geometry = textGeom(shapeOf(model.byId[model.order[0]].annotation))!;
     expect(geometry.rotation).toBe(180);
     expect(geometry.box).toEqual({ x: 50, y: 60, width: 120, height: 40 });
   });
@@ -3981,7 +4017,7 @@ describe('upright creation (counter-rotating the display rotation)', () => {
       uprightPtr('square', 'move', 110, 50),
       uprightPtr('square', 'up', 110, 50),
     ]);
-    const geometry = fieldsOf(model.byId[model.order[0]]).geometry;
+    const geometry = shapeOf(model.byId[model.order[0]].annotation);
     expect(geometry.kind).toBe('box');
     expect(geomRotation(geometry)).toBe(90); // -270 ≡ 90
     expectRectClose(rotatedAabb(rectGeom(geometry)!, 90), { x: 10, y: 10, width: 100, height: 40 });
@@ -3993,13 +4029,13 @@ describe('upright creation (counter-rotating the display rotation)', () => {
       uprightPtr('free-text', 'down', 100, 200, { displayRotation: 90 }),
       uprightPtr('free-text', 'up', 100, 200),
     ]);
-    expect(textGeom(fieldsOf(noPolicy.byId[noPolicy.order[0]]).geometry)!.rotation).toBe(0);
+    expect(textGeom(shapeOf(noPolicy.byId[noPolicy.order[0]].annotation))!.rotation).toBe(0);
     // upright at rotation 0 → plain commit (no stored draft noise)
     const flat = run(initialModel, [
       uprightPtr('free-text', 'down', 100, 200, { displayRotation: 0, upright: true }),
       uprightPtr('free-text', 'up', 100, 200),
     ]);
-    expect(textGeom(fieldsOf(flat.byId[flat.order[0]]).geometry)!.box).toEqual({
+    expect(textGeom(shapeOf(flat.byId[flat.order[0]].annotation))!.box).toEqual({
       x: 100,
       y: 200,
       width: 180,
@@ -4010,7 +4046,7 @@ describe('upright creation (counter-rotating the display rotation)', () => {
       uprightPtr('free-text', 'down', 100, 200),
       uprightPtr('free-text', 'up', 100, 200, { displayRotation: 90, upright: true }),
     ]);
-    expect(textGeom(fieldsOf(lateUp.byId[lateUp.order[0]]).geometry)!.rotation).toBe(0);
+    expect(textGeom(shapeOf(lateUp.byId[lateUp.order[0]].annotation))!.rotation).toBe(0);
   });
 });
 
@@ -4109,7 +4145,7 @@ describe('render source after an edit (what keeps a raster, what renders live)',
         patch: { subtype: 'stamp', box: { x: 140, y: 130, width: 100, height: 60 } },
       },
     ]);
-    const geometry = fieldsOf(next.byId['A1']).geometry;
+    const geometry = shapeOf(next.byId['A1'].annotation);
     expect(geometry.kind === 'box' && geometry.box.x).toBe(140); // moved…
     expect(next.byId['A1'].source).toBe('baked'); // …and still baked
   });
@@ -4133,8 +4169,8 @@ describe('render source after an edit (what keeps a raster, what renders live)',
     expect(item.apBox).toEqual({ x: 100, y: 100, width: 140, height: 90 });
   });
 
-  it('a stamp rotate90 commits a bare patch — rotation is stripped at the blit', () => {
-    const [next, fx] = step(committed('stamp'), { type: 'rotate90' });
+  it('a stamp quarter turn commits a bare patch — rotation is stripped at the blit', () => {
+    const [next, fx] = step(committed('stamp'), { type: 'rotateSelection', degrees: 90 });
     expect(fx).toEqual([writes('A1', { subtype: 'stamp', rotation: 90 })]);
     expect(next.byId['A1'].source).toBe('baked');
   });
@@ -4146,7 +4182,7 @@ describe('render source after an edit (what keeps a raster, what renders live)',
     const [afterResize, fx1] = step(model, editPtr('up', 260, 200));
     expect(fx1).toEqual([writes('A1', { subtype: 'square', box: expect.anything() })]);
     expect(afterResize.byId['A1'].source).toBe('vector');
-    const [afterRotate, fx2] = step(committed('square'), { type: 'rotate90' });
+    const [afterRotate, fx2] = step(committed('square'), { type: 'rotateSelection', degrees: 90 });
     expect(fx2).toEqual([writes('A1', { subtype: 'square', rotation: 90 })]);
     expect(afterRotate.byId['A1'].source).toBe('vector');
   });
@@ -4199,24 +4235,6 @@ describe('render source after an edit (what keeps a raster, what renders live)',
     // …while a square restyle still flips to vector (renders live).
     const [sq] = step(committed('square'), restyle(committed('square'), { color: '#112233' }));
     expect(sq.byId['A1'].source).toBe('vector');
-  });
-
-  it('apSizeChanged: translation and rotation preserve the frame; scaling changes it', () => {
-    const box: ModelGeometry = {
-      kind: 'box',
-      box: { x: 10, y: 10, width: 80, height: 40 },
-      rotation: 0,
-      ellipse: false,
-    };
-    expect(apSizeChanged(box, geomTranslate(box, { x: 25, y: -5 }))).toBe(false);
-    expect(apSizeChanged(box, geomRotateAbout(box, { x: 50, y: 30 }, 90))).toBe(false);
-    const wider: ModelGeometry = {
-      kind: 'box',
-      box: { x: 10, y: 10, width: 120, height: 40 },
-      rotation: 0,
-      ellipse: false,
-    };
-    expect(apSizeChanged(box, wider)).toBe(true);
   });
 });
 

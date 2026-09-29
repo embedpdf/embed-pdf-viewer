@@ -56,14 +56,7 @@ export function createAnnotationController(ctx: AnnotationContext, config: Annot
   const stamps = createStamps(ctx, services);
   const ghost = createGhost(ctx, services, stamps);
   const icons = createIcons(ctx, services, annotations, stamps);
-  const selection = createSelectionWrites(
-    services,
-    annotations,
-    selectionFields,
-    text,
-    links,
-    crud,
-  );
+  const selection = createSelectionWrites(services, annotations, selectionFields, text, links);
   const measurement = createMeasurement(ctx, services, crud);
   const pointer = createPointer(ctx, services, chrome, measurement);
   const drafts = createDrafts(services);

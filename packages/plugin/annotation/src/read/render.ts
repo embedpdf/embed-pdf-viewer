@@ -1,12 +1,12 @@
 import { CONTINUOUS_RENDER_POLICY, snapAppearanceScale } from '@embedpdf/core';
 import {
-  fieldsOf,
   groupOf,
   isSubstrateOnly,
   type Model,
   pageItems as corePageItems,
   refOf,
   type RenderItem,
+  shapeOf,
   toolStyleOf,
   viewable,
   type ViewEnv,
@@ -122,7 +122,7 @@ export function createRenderReads(
       // view contexts, where nothing is mid-gesture, so no live
       // parent-derivation is needed.
       const target = record.target ?? null;
-      const { geometry } = fieldsOf(annotation);
+      const geometry = shapeOf(annotation.annotation);
       if (target == null || geometry.kind !== 'box') continue;
       const activate = record.actions?.activate;
       const ref = refOf(annotation) ?? undefined;

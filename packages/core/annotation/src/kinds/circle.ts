@@ -1,10 +1,11 @@
+import { boxFamily } from '../shapes';
 import { defineKind, NO_CAPS } from './define';
 import { SHAPE_FIELDS } from './fields';
 
 /** An ellipse in its box, stroked and optionally filled, with a plain or cloudy border (`/Circle`). */
 export const circle = defineKind({
   name: 'circle',
-  family: 'box',
+  family: boxFamily,
   caps: {
     ...NO_CAPS,
     selectable: true,

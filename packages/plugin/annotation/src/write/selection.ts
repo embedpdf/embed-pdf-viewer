@@ -14,6 +14,7 @@ import {
   type Rect,
   refOf,
   richDocOf,
+  shapeOf,
 } from '@embedpdf/core-annotation';
 import { intersectRects } from '@embedpdf/core-geometry';
 import {
@@ -29,10 +30,8 @@ import type { AnnotationReads } from '../read/annotations';
 import type { SelectionFieldsReads } from '../read/selection-fields';
 import { runDeltaForFields, type TextFormat } from '../rich-text';
 import type { AnnotationServices } from '../services';
-import type { Crud } from './crud';
 import type { LinkWrites } from './links';
 import { batchResultOf, throwIfFailed } from './outcomes';
-import { rotationOf } from './page-patch';
 import type { TextEditing } from './text-editing';
 import { refsOfIn, type Commit } from '../services/store';
 
@@ -43,11 +42,10 @@ import { refsOfIn, type Commit } from '../services/store';
  */
 export function createSelectionWrites(
   { store, authority, fonts }: Pick<AnnotationServices, 'store' | 'authority' | 'fonts'>,
-  annotations: Pick<AnnotationReads, 'loadedOrThrow' | 'selectedCommitted'>,
+  annotations: Pick<AnnotationReads, 'selectedCommitted'>,
   selectionFields: Pick<SelectionFieldsReads, 'activeTextRange' | 'selectionFieldsOf'>,
   text: Pick<TextEditing, 'flushAllText'>,
   links: Pick<LinkWrites, 'writeRelationship'>,
-  crud: Pick<Crud, 'setRotation'>,
 ) {
   const selectedRefs = () => refsOfIn(store.model(), store.model().selected);
 
@@ -133,7 +131,8 @@ export function createSelectionWrites(
           !isSelectable(model, id)
         )
           return false;
-        const { geometry, style } = fieldsOf(annotation);
+        const geometry = shapeOf(annotation.annotation);
+        const { style } = fieldsOf(annotation);
         const hit = intersectRects(
           geomVisualBounds(geometry, style.strokeWidth, style.border),
           rect,
@@ -153,14 +152,7 @@ export function createSelectionWrites(
       commitOverSelection(() => [store.commit({ type: 'setFlags', patch })]),
     deleteSelection: () => commitOverSelection(() => [store.commit({ type: 'delete' })]),
     rotateSelectionBy: async (delta: 90 | -90) => {
-      if (delta === 90) {
-        throwIfFailed(await store.commit({ type: 'rotate90' }).written);
-        return;
-      }
-      for (const ref of selectedRefs()) {
-        const annotation = annotations.loadedOrThrow(ref);
-        await crud.setRotation(ref, rotationOf(fieldsOf(annotation).geometry) - 90);
-      }
+      throwIfFailed(await store.commit({ type: 'rotateSelection', degrees: delta }).written);
     },
     resetSelectionRotation: async () => {
       throwIfFailed(await store.commit({ type: 'resetRotation' }).written);

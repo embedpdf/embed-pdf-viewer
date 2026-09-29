@@ -30,8 +30,9 @@ export type LoweredKey =
   | 'link';
 
 /** The kind-specific slice a DTO ingest contributes on top of the generic
- *  base (id/ref/flags/relationships) that `fromDTO` builds for every kind. */
-export type IngestSlice = { geometry: ModelGeometry } & Partial<
+ *  base (flags, style, and the shape its family reads) that `fromDTO` builds
+ *  for every kind. */
+export type IngestSlice = Partial<
   Pick<RecordFields, 'text' | 'icon' | 'link' | 'intent' | 'measure'>
 >;
 
@@ -50,15 +51,8 @@ export type IngestSlice = { geometry: ModelGeometry } & Partial<
  * didn't change.
  */
 export interface KindProjection {
-  /** DTO → the kind's model slice (geom + text/icon/label/link/intent). */
-  ingest(dto: AnnotationDTO): IngestSlice;
-  /**
-   * The committed-geometry wire group: the primary geometry plus every field
-   * the engine writers couple to it (the box transform trio, a callout's
-   * leader group, advisory rotation). `null` = the kind has no editable
-   * geometry (text markup) — geometry statements fall back to the full patch.
-   */
-  geometry(annotation: RecordFields): Wire | null;
+  /** DTO → the kind's model slice beside its shape (text/icon/link/intent/measure). */
+  ingest?(dto: AnnotationDTO): IngestSlice;
   /** Kind-specific prop lowerings — only the exceptions; `props.ts` generic
    *  covers every 1:1 key. A kind's couplings live here, in its owner's file. */
   prop?: Partial<Record<LoweredKey, (annotation: RecordFields) => Wire>>;

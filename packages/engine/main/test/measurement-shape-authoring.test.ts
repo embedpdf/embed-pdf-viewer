@@ -12,7 +12,7 @@ import { annotationSelectionFrame, shapeMeasurementLayout } from '../../../core/
 import { turnPivotOf } from '../../../core/annotation/src/geometry';
 import { rotatePoint } from '../../../core/annotation/src/rect';
 import { createLocalEngine } from '../src/index';
-import { fieldsOf, fromDTO } from '../../../core/annotation/src/record';
+import { fieldsOf, fromDTO, shapeOf } from '../../../core/annotation/src/record';
 import { annotationKey } from '@embedpdf/engine-core/runtime';
 import { annotationShell } from './helpers/annotation-shell';
 
@@ -106,7 +106,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         expectVector();
 
         const before = current();
-        const pivot = turnPivotOf(fieldsOf(fromDTO(before)).geometry);
+        const pivot = turnPivotOf(shapeOf(fromDTO(before).annotation));
         const rotatedCaption = rotatePoint(target, pivot, 90);
         await annotation.rotateSelectionBy(90);
         await vi.waitFor(() => {
@@ -124,7 +124,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
           );
           expect(drawnCaption.x).toBeCloseTo(rotatedCaption.x, 3);
           expect(drawnCaption.y).toBeCloseTo(rotatedCaption.y, 3);
-          const after = turnPivotOf(fieldsOf(fromDTO(current())).geometry);
+          const after = turnPivotOf(shapeOf(fromDTO(current()).annotation));
           expect(after.x).toBeCloseTo(pivot.x, 3);
           expect(after.y).toBeCloseTo(pivot.y, 3);
         });

@@ -9,7 +9,8 @@ import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
 import { expandRect, normalizeDeg, rectCenter, rectContains, rotatePoint } from '../rect';
 import type { Point, Rect, RenderNode, TextEndAnchor } from '../types';
-import type { TurnedBox } from './box';
+import { boxCorners, boxScaleAbout, boxTranslate, type TurnedBox } from './box';
+import type { ShapeFamily } from './family';
 
 /** A caret record's shape: the engine's box and its turn. */
 export interface CaretShape extends TurnedBox {
@@ -17,12 +18,13 @@ export interface CaretShape extends TurnedBox {
 }
 
 /** A caret's shape, read off its annotation. */
-export function readCaret(annotation: Extract<AnnotationDTO, { subtype: 'caret' }>): CaretShape {
-  return { kind: 'caret', box: annotation.box, rotation: annotation.rotation ?? 0 };
+function readCaret(annotation: AnnotationDTO): CaretShape {
+  const { box, rotation } = annotation as Extract<AnnotationDTO, { subtype: 'caret' }>;
+  return { kind: 'caret', box, rotation: rotation ?? 0 };
 }
 
 /** The engine fields that state `shape`: its `box` and `rotation` (`null` when upright). */
-export const writeCaret = (shape: CaretShape): { box: Rect; rotation: number | null } => ({
+const writeCaret = (shape: CaretShape): { box: Rect; rotation: number | null } => ({
   box: shape.box,
   rotation: shape.rotation || null,
 });
@@ -78,13 +80,13 @@ export function caretFromAnchor(anchor: TextEndAnchor): CaretShape {
 }
 
 /** Is `point` anywhere in the caret's box (plus `margin`), tested in the box's own frame? */
-export function caretHit(shape: CaretShape, point: Point, margin: number): boolean {
+function caretHit(shape: CaretShape, point: Point, margin: number): boolean {
   const local = shape.rotation ? rotatePoint(point, rectCenter(shape.box), -shape.rotation) : point;
   return rectContains(expandRect(shape.box, margin), local);
 }
 
 /** The caret mark in its box, before its turn (the renderer turns it about the box's middle). */
-export function caretScene(shape: CaretShape): RenderNode[] {
+function caretScene(shape: CaretShape): RenderNode[] {
   const { x, y, width, height } = shape.box;
   const midX = x + width / 2;
   const bottom = y + height;
@@ -96,3 +98,26 @@ export function caretScene(shape: CaretShape): RenderNode[] {
   ].join(' ');
   return [{ kind: 'path', d: pathData }];
 }
+
+/**
+ * The caret family: a mark in a turned box that follows its text. It moves
+ * and scales with a selection, but no gesture turns, resizes or drags it.
+ */
+export const caretFamily: ShapeFamily<CaretShape> = {
+  read: readCaret,
+  write: writeCaret,
+  bounds: (shape) => shape.box,
+  drawnBounds: (shape) => shape.box,
+  selectionBounds: (shape) => shape.box,
+  oriented: () => true,
+  turnedCorners: boxCorners,
+  pivot: (shape) => rectCenter(shape.box),
+  translate: boxTranslate,
+  rotateAbout: (shape) => shape,
+  scaleAbout: boxScaleAbout,
+  upright: (shape) => ({ ...shape, rotation: 0 }),
+  handles: () => [],
+  drag: (shape) => shape,
+  hit: (shape, point, margin) => caretHit(shape, point, margin),
+  scene: caretScene,
+};

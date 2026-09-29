@@ -25,7 +25,7 @@ import { describe, expect, it } from 'vitest';
 import { DRAWN_FLAGS } from '../src/flags';
 import { linkChildrenOf, linkOf } from '../src/links';
 import { isAttachedLink } from '../src/plane';
-import type { Message, Model, ModelAnnotation, RecordFields } from '../src/types';
+import type { Message, Model, ModelAnnotation, ModelGeometry, RecordFields } from '../src/types';
 import { answering, modelWith, record } from './support';
 import { KINDS, type FieldSpec } from '../src/kinds';
 import { update } from '../src/update';
@@ -36,6 +36,7 @@ import {
   irtOf,
   kindOf,
   linkChildRects,
+  shapeOf,
   toCreateDraft,
   toPatch,
   withFields,
@@ -276,7 +277,7 @@ describe('record — Replace Text authoring', () => {
       flags: DRAWN_FLAGS,
       source: 'vector',
     });
-    const caretGeometry = fieldsOf(caret).geometry;
+    const caretGeometry = shapeOf(caret.annotation);
     // Clockwise 270° passes through with the box; the engine works out `rect`.
     const draft = draftToFile(toCreateDraft(fieldsOf(caret)));
     expect(draft).toMatchObject({
@@ -423,7 +424,7 @@ function rotatedPolylineDTO(rotation: number, objectNumber = 31): AnnotationDTO<
 describe('record — rotation round-trip', () => {
   it('box: fromDTO reads the box and the clockwise rot', () => {
     const annotation = fromDTO(fromFile(rotatedSquareDTO(90)));
-    const geometry = fieldsOf(annotation).geometry;
+    const geometry = shapeOf(annotation.annotation);
     if (geometry.kind !== 'box') throw new Error('expected rect geom');
     // box {100,100,200,200} → content {x:100,y:600,w:100,h:100}
     expect(geometry.box).toMatchObject({ x: 100, y: 600, width: 100, height: 100 });
@@ -456,7 +457,7 @@ describe('record — rotation round-trip', () => {
     const dto = rotatedPolylineDTO(30);
     if (dto.subtype !== 'polyline') throw new Error('expected polyline');
     const annotation = fromDTO(fromFile(dto));
-    const geometry = fieldsOf(annotation).geometry;
+    const geometry = shapeOf(annotation.annotation);
     if (geometry.kind !== 'poly') throw new Error('expected poly geom');
     expect(geometry.rotation).toBe(30);
     // The model keeps the points upright; where they are drawn is worked out.
@@ -482,7 +483,7 @@ describe('record — rotation round-trip', () => {
 
   it('vertex: an unrotated polyline states the advisory clear explicitly', () => {
     const annotation = fromDTO(fromFile(rotatedPolylineDTO(0, 33)));
-    const geometry = fieldsOf(annotation).geometry;
+    const geometry = shapeOf(annotation.annotation);
     expect(geometry.kind === 'poly' && geometry.rotation).toBeFalsy();
     const patch = toFile(toPatch(fieldsOf(annotation))) as Extract<
       AnnotationPatch<PdfCoordinates>,
@@ -497,7 +498,7 @@ describe('record — rotation round-trip', () => {
 describe('record — free-text callout mapping', () => {
   it('fromDTO: intent + /CL → a text geom with a leader (the box, conn dropped)', () => {
     const annotation = fromDTO(fromFile(calloutDTO()));
-    const geometry = fieldsOf(annotation).geometry;
+    const geometry = shapeOf(annotation.annotation);
     expect(geometry.kind).toBe('text-box');
     if (geometry.kind !== 'text-box' || !geometry.calloutLine)
       throw new Error('expected callout geom');
@@ -511,7 +512,7 @@ describe('record — free-text callout mapping', () => {
 
   it('fromDTO: a plain free-text (no /CL) has no callout', () => {
     const annotation = fromDTO(fromFile(plainFreeTextDTO()));
-    const geometry = fieldsOf(annotation).geometry;
+    const geometry = shapeOf(annotation.annotation);
     expect(geometry.kind).toBe('text-box');
     expect(geometry.kind === 'text-box' && geometry.calloutLine).toBeNull();
   });
@@ -727,7 +728,7 @@ describe('record — polygon cloudy border', () => {
 
 describe('record — withFields (a change is its write)', () => {
   const moved = (annotation: ModelAnnotation, dx: number): Partial<RecordFields> => {
-    const geometry = fieldsOf(annotation).geometry as Extract<
+    const geometry = shapeOf(annotation.annotation) as Extract<
       RecordFields['geometry'],
       { kind: 'box' }
     >;
@@ -808,7 +809,8 @@ describe('record — withFields (a change is its write)', () => {
 
   it('writes only what changed: each changed flag, and nothing for a change the engine keeps nothing of', () => {
     const annotation = fromDTO(fromFile(squareDTO(64)));
-    const { flags, style, geometry } = fieldsOf(annotation);
+    const geometry = shapeOf(annotation.annotation);
+    const { flags, style } = fieldsOf(annotation);
     expect(patchOf(annotation, { flags: { ...flags, hidden: true } })).toEqual({
       subtype: 'square',
       hidden: true,
@@ -896,7 +898,7 @@ describe('record — shape cloudy border tri-state', () => {
 
   it("fromDTO reads /BE intensity into a cloudy border; the shape's box is the engine's box", () => {
     const annotation = fromDTO(fromFile(cloudySquare()));
-    const geometry = fieldsOf(annotation).geometry;
+    const geometry = shapeOf(annotation.annotation);
     expect(fieldsOf(annotation).style.border).toEqual({ kind: 'cloudy', intensity: 2 });
     if (geometry.kind !== 'box') throw new Error('expected a box');
     const square = annotation.annotation as Extract<AnnotationDTO, { subtype: 'square' }>;
@@ -1004,16 +1006,13 @@ describe('record — attached links (fold + desired state + link kind mapping)',
     // centre — not the 100×100 unrotated box. (Stroke handling follows
     // `selectionQuad`'s own convention — the same envelope the chrome
     // outlines.)
-    const rotated: RecordFields = {
-      ...fieldsOf(square),
-      geometry: {
-        kind: 'box',
-        box: { x: 100, y: 600, width: 100, height: 100 },
-        ellipse: false,
-        rotation: 45,
-      },
+    const rotated: ModelGeometry = {
+      kind: 'box',
+      box: { x: 100, y: 600, width: 100, height: 100 },
+      ellipse: false,
+      rotation: 45,
     };
-    const [aabb] = linkChildRects(rotated);
+    const [aabb] = linkChildRects(rotated, fieldsOf(square).style);
     const side = 100 * Math.SQRT2;
     expect(aabb.width).toBeCloseTo(side, 6);
     expect(aabb.height).toBeCloseTo(side, 6);
@@ -1023,19 +1022,16 @@ describe('record — attached links (fold + desired state + link kind mapping)',
 
   it('linkChildRects: one rect per markup quad, one visual-bounds rect otherwise', () => {
     const square = fromDTO(fromFile(squareDTO(10)));
-    expect(linkChildRects(fieldsOf(square))).toHaveLength(1);
-    const markup: RecordFields = {
-      ...fieldsOf(square),
-      subtype: 'highlight',
-      geometry: {
-        kind: 'quads',
-        quadPoints: [
-          quadFromRect({ x: 0, y: 0, width: 50, height: 10 }),
-          quadFromRect({ x: 0, y: 20, width: 30, height: 10 }),
-        ],
-      },
+    const { style } = fieldsOf(square);
+    expect(linkChildRects(shapeOf(square.annotation), style)).toHaveLength(1);
+    const quads: ModelGeometry = {
+      kind: 'quads',
+      quadPoints: [
+        quadFromRect({ x: 0, y: 0, width: 50, height: 10 }),
+        quadFromRect({ x: 0, y: 20, width: 30, height: 10 }),
+      ],
     };
-    const rects = linkChildRects(markup);
+    const rects = linkChildRects(quads, style);
     expect(rects).toHaveLength(2);
     expect(rects[0]).toEqual({ x: 0, y: 0, width: 50, height: 10 });
   });

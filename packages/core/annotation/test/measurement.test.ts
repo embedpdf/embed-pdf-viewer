@@ -19,7 +19,7 @@ import type { LineShape } from '../src/shapes/points';
 import type { ModelGeometry, Model, Message } from '../src/types';
 import { initialModel } from '../src/update';
 import { pageItems, chrome } from '../src/view';
-import { fieldsOf, withFields } from '../src/record';
+import { shapeOf, withFields } from '../src/record';
 const PAGE = toPageRef(1);
 const geom: LineShape = {
   kind: 'line',
@@ -88,7 +88,7 @@ describe('distance gestures and captions', () => {
     expect(handles.some((node) => node.at.x === at.x + 20 && node.at.y === at.y - 30)).toBe(false);
     expect(step(state, { type: 'cancel' })[0].byId.a).toBe(annotation);
     const [committed, effects] = step(state, pointer('up', at));
-    expect(fieldsOf(committed.byId.a).geometry).toEqual(geom);
+    expect(shapeOf(committed.byId.a.annotation)).toEqual(geom);
     // Only the caption is written, not the measured points.
     expect(effects).toEqual([
       {
@@ -199,7 +199,7 @@ describe('distance gestures and captions', () => {
       expect(
         (measurementOf(committed.byId.a.annotation) as DistanceAppearance).leader?.length,
       ).toBe(-60);
-      expect(fieldsOf(committed.byId.a).geometry).toEqual(geom);
+      expect(shapeOf(committed.byId.a.annotation)).toEqual(geom);
       // Only the leader is written, not the measured points.
       expect(effects).toEqual([
         {
@@ -219,7 +219,7 @@ describe('distance gestures and captions', () => {
     state = step(state, pointer('down', { x: 40, y: 100 }))[0];
     state = step(state, pointer('move', { x: 100, y: 100 }))[0];
     const [committed, effects] = step(state, pointer('up', { x: 100, y: 100 }));
-    expect(fieldsOf(committed.byId.a).geometry).toMatchObject({
+    expect(shapeOf(committed.byId.a.annotation)).toMatchObject({
       linePoints: { start: { x: 100, y: 100 }, end: { x: 240, y: 100 } },
     });
     expect(withoutLabel(measurementOf(committed.byId.a.annotation))).toEqual(withoutLabel(measure));
@@ -236,7 +236,7 @@ describe('distance gestures and captions', () => {
       },
     ]);
     expect(measurementOf(committed.byId.a.annotation)?.contents).toBe('2.80 m');
-    expect(distanceLabel(fieldsOf(committed.byId.a).geometry, measure)).toBe('2.80 m');
+    expect(distanceLabel(shapeOf(committed.byId.a.annotation), measure)).toBe('2.80 m');
   });
 
   it('encloses leaders, displaced captions, connectors and handles in the selection', () => {

@@ -6,11 +6,10 @@
  * change still on its way.
  */
 import { PluginError, pageRefsEqual, type OperationOptions } from '@embedpdf/core';
-import { defaultsFor, fieldsOf, withFields } from '@embedpdf/core-annotation';
+import { defaultsFor } from '@embedpdf/core-annotation';
 import {
   ANNOTATION_FIELD_NAMES,
   annotationKey,
-  annotationPatchBetween,
   type AnnotationDraft,
   type AnnotationDTO,
   type AnnotationPatch,
@@ -22,12 +21,11 @@ import {
 import type { AnnotationReads } from '../read/annotations';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import { appliedAnnotationOf, appliedOrThrow } from './outcomes';
-import { geometryWithRotation } from './page-patch';
 
 export function createCrud(
   ctx: Pick<AnnotationContext, 'document'>,
   { store, authority, tools }: Pick<AnnotationServices, 'store' | 'authority' | 'tools'>,
-  annotations: Pick<AnnotationReads, 'get' | 'loadedOrThrow'>,
+  annotations: Pick<AnnotationReads, 'get'>,
 ) {
   /** The annotation `ref` names, as the view holds it: for a change that wrote nothing. */
   const current = (ref: AnnotationRef): { annotation: AnnotationDTO } => {
@@ -100,25 +98,13 @@ export function createCrud(
     return annotation ? { annotation } : current(ref);
   };
 
-  /** Turn one annotation to `degrees`: the patch the turn means. The selection's quarter turns use it. */
-  const setRotation = async (ref: AnnotationRef, degrees: number): Promise<void> => {
-    const annotation = annotations.loadedOrThrow(ref);
-    const turned = withFields(annotation, {
-      geometry: geometryWithRotation(fieldsOf(annotation).geometry, degrees),
-    });
-    const patch = annotationPatchBetween(annotation.annotation, turned.annotation);
-    if (Object.keys(patch).length) {
-      await update(ref, { ...patch, subtype: annotation.annotation.subtype } as AnnotationPatch);
-    }
-  };
-
   const remove = async (ref: AnnotationRef): Promise<void> => {
     await appliedOrThrow(store.apply([{ type: 'delete', ref }]));
   };
 
   const api = { create, update, delete: remove };
 
-  return { update, setRotation, api };
+  return { update, api };
 }
 
 export type Crud = ReturnType<typeof createCrud>;

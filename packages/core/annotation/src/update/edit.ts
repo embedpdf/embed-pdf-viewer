@@ -20,7 +20,7 @@ import type { Draft, Effect, Id, Model, Point, PointerInput } from '../types';
 import { sub } from './changes';
 import { editUp } from './edit-commit';
 import { clampMoveDelta, clampPointToBox, editDraftPage, viewOf } from './page-bound';
-import { fieldsOf } from '../record';
+import { shapeOf } from '../record';
 
 const RAD2DEG = 180 / Math.PI;
 
@@ -49,7 +49,7 @@ export function rotateDraftDelta(
   // un-flagged): the chip and the snap targets speak about what the user sees
   // — a noRotate shape's on-screen tilt, not its stored one.
   const base = one
-    ? geomRotation(anchoredGeom(fieldsOf(one).geometry, anchorModeOf(one), draft.view))
+    ? geomRotation(anchoredGeom(shapeOf(one.annotation), anchorModeOf(one), draft.view))
     : 0;
   const angle = normalizeDeg(base + raw);
   if (!model.snap.rotation || draft.free) return { delta: raw, angle, snapped: false };
@@ -67,7 +67,7 @@ export function rotateDraftDelta(
 const selectionHasRotation = (model: Model, ids: Id[]): boolean =>
   ids.some((id) => {
     const annotation = model.byId[id];
-    return !!annotation && geomRotation(fieldsOf(annotation).geometry) !== 0;
+    return !!annotation && geomRotation(shapeOf(annotation.annotation)) !== 0;
   });
 
 export function editPointer(
@@ -119,7 +119,7 @@ export function editDown(model: Model, input: PointerInput): [Model, Effect[]] {
     // maps the result back via `unanchoredGeom` with the same captured view.
     const annotation = model.byId[hit.id];
     const view = viewOf(input);
-    const base = anchoredGeom(fieldsOf(annotation).geometry, anchorModeOf(annotation), view);
+    const base = anchoredGeom(shapeOf(annotation.annotation), anchorModeOf(annotation), view);
     return [
       {
         ...model,
@@ -229,7 +229,7 @@ export function editMove(model: Model, input: PointerInput): [Model, Effect[]] {
   }
   const point = clampPointToBox(input.point, input.pageBox);
   if (draft.kind === 'leader') {
-    const { geometry } = fieldsOf(model.byId[draft.id]);
+    const geometry = shapeOf(model.byId[draft.id].annotation);
     const start = distanceLeaderLength(geometry, draft.start);
     const current = distanceLeaderLength(geometry, point);
 

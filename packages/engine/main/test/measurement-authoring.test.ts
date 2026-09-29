@@ -5,7 +5,7 @@ import { describe, expect, test, vi } from 'vitest';
 import { drawnPointsOf, measureFromKnownLength, toPageRef } from '@embedpdf/engine-core/runtime';
 import { turnPivotOf } from '../../../core/annotation/src';
 import { createLocalEngine } from '../src/index';
-import { fieldsOf, fromDTO } from '../../../core/annotation/src/record';
+import { fromDTO, shapeOf } from '../../../core/annotation/src/record';
 import { annotationKey } from '@embedpdf/engine-core/runtime';
 import { annotationShell } from './helpers/annotation-shell';
 
@@ -106,7 +106,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       // and survives the native appearance echo.
       const beforeRotation = annotation.get(created.ref)!;
       if (beforeRotation.subtype !== 'line') throw new Error('Expected distance annotation');
-      const pivot = turnPivotOf(fieldsOf(fromDTO(beforeRotation)).geometry);
+      const pivot = turnPivotOf(shapeOf(fromDTO(beforeRotation).annotation));
       const start = beforeRotation.linePoints.start;
       const rotatedStart = {
         x: pivot.x - (start.y - pivot.y),
@@ -123,7 +123,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
         const drawnStart = drawnPointsOf(rotated)![0]![0]!;
         expect(drawnStart.x).toBeCloseTo(rotatedStart.x, 3);
         expect(drawnStart.y).toBeCloseTo(rotatedStart.y, 3);
-        const actual = turnPivotOf(fieldsOf(fromDTO(rotated)).geometry);
+        const actual = turnPivotOf(shapeOf(fromDTO(rotated).annotation));
         expect(actual.x).toBeCloseTo(pivot.x, 3);
         expect(actual.y).toBeCloseTo(pivot.y, 3);
       });
@@ -188,7 +188,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
           leader: { length: 36 },
           captionOffset: { along: 15, perpendicular: 25 },
         });
-        const restoredPivot = turnPivotOf(fieldsOf(fromDTO(restored)).geometry);
+        const restoredPivot = turnPivotOf(shapeOf(fromDTO(restored).annotation));
         expect(restoredPivot.x).toBeCloseTo(pivot.x, 3);
         expect(restoredPivot.y).toBeCloseTo(pivot.y, 3);
         expect(restored.subtype === 'line' && restored.rotation).toBe(90);

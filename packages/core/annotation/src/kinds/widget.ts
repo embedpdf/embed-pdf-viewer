@@ -8,6 +8,7 @@
  * A widget ignores the `ReadOnly` flag here: a form designer must still move a
  * read-only field; the form-filling layer enforces it itself.
  */
+import { boxFamily } from '../shapes';
 import { defineKind, NO_CAPS, type FieldSpec, type KindCaps } from './define';
 
 const WIDGET_CAPS: KindCaps = {
@@ -39,7 +40,7 @@ const TEXT_FIELDS: readonly FieldSpec[] = [
 /** A text field. */
 export const widgetText = defineKind({
   name: 'widget-text',
-  family: 'box',
+  family: boxFamily,
   caps: WIDGET_CAPS,
   fields: TEXT_FIELDS,
 });
@@ -47,7 +48,7 @@ export const widgetText = defineKind({
 /** A combo box or a list box. */
 export const widgetChoice = defineKind({
   name: 'widget-choice',
-  family: 'box',
+  family: boxFamily,
   caps: WIDGET_CAPS,
   fields: TEXT_FIELDS,
 });
@@ -55,7 +56,7 @@ export const widgetChoice = defineKind({
 /** A push button: its caption is text. */
 export const widgetButton = defineKind({
   name: 'widget-button',
-  family: 'box',
+  family: boxFamily,
   caps: WIDGET_CAPS,
   fields: TEXT_FIELDS,
 });
@@ -63,7 +64,7 @@ export const widgetButton = defineKind({
 /** A checkbox or a radio button: no text. */
 export const widgetToggle = defineKind({
   name: 'widget-toggle',
-  family: 'box',
+  family: boxFamily,
   caps: WIDGET_CAPS,
   fields: BOX_FIELDS,
 });
@@ -71,7 +72,7 @@ export const widgetToggle = defineKind({
 /** Any other widget (a signature field, one in no field): a box. */
 export const widgetBox = defineKind({
   name: 'widget-box',
-  family: 'box',
+  family: boxFamily,
   caps: WIDGET_CAPS,
   fields: BOX_FIELDS,
 });

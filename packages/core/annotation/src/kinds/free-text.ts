@@ -1,3 +1,4 @@
+import { textBoxFamily } from '../shapes';
 import { defineKind, NO_CAPS } from './define';
 import { LINKABLE, OPACITY } from './fields';
 
@@ -8,7 +9,7 @@ import { LINKABLE, OPACITY } from './fields';
  */
 export const freeText = defineKind({
   name: 'free-text',
-  family: 'text-box',
+  family: textBoxFamily,
   caps: {
     ...NO_CAPS,
     selectable: true,

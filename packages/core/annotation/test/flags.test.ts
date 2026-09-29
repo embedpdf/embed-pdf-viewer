@@ -20,7 +20,7 @@ import { hitTest, isSelectable, paintOrder } from '../src/hit';
 import { initialModel, DEFAULT_CHROME_GEOMETRY } from '../src/index';
 import type { ModelAnnotation, ModelGeometry, Model, Message, Point } from '../src/types';
 import { pageItems, chrome, textBoxes } from '../src/view';
-import { fieldsOf } from '../src/record';
+import { fieldsOf, shapeOf } from '../src/record';
 
 const PON = 1;
 const PAGE = toPageRef(PON);
@@ -466,9 +466,9 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
       },
     ]);
     const an = model.byId['an'];
-    const anGeometry = fieldsOf(an).geometry;
+    const anGeometry = shapeOf(an.annotation);
     const pl = model.byId['pl'];
-    const plGeometry = fieldsOf(pl).geometry;
+    const plGeometry = shapeOf(pl.annotation);
     if (anGeometry.kind !== 'box' || plGeometry.kind !== 'box') throw new Error('expected rects');
     expect(anGeometry.rotation).toBe(90); // the body turns — same as everyone
     expect(plGeometry.rotation).toBe(90);
@@ -479,7 +479,7 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
     expect(an.source).toBe('vector'); // a real rotation re-bakes, like any member
   });
 
-  it('an anchored annotation keeps its resize handles + rotate knob, and rotate90 turns it', () => {
+  it('an anchored annotation keeps its resize handles + rotate knob, and a quarter turn turns it', () => {
     const annotation = square('an', flagsWith({ print: true, noZoom: true, noRotate: true }));
     let model = loaded([annotation]);
     model = { ...model, selected: ['an'] };
@@ -491,9 +491,9 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
       .filter((node) => node.kind === 'handle')
       .map((node) => (node as { at: Point }).at.x);
     expect(Math.max(...handleXs)).toBeLessThanOrEqual(100 + 80 / 2 + 2);
-    // rotate90 turns the authored tilt (displayed directly at any page rotation)
-    const [after, fx] = step(model, { type: 'rotate90' });
-    const geometry = fieldsOf(after.byId['an']).geometry;
+    // a quarter turn turns the authored tilt (displayed directly at any page rotation)
+    const [after, fx] = step(model, { type: 'rotateSelection', degrees: 90 });
+    const geometry = shapeOf(after.byId['an'].annotation);
     expect(geometry.kind === 'box' && geometry.rotation).toBe(90);
     expect(fx).toHaveLength(1);
   });
@@ -518,7 +518,7 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
       { type: 'editPointer', phase: 'move', in: input(180, 160) },
       { type: 'editPointer', phase: 'up', in: input(180, 160) },
     ]);
-    const geometry = fieldsOf(model.byId['nz2']).geometry;
+    const geometry = shapeOf(model.byId['nz2'].annotation);
     if (geometry.kind !== 'box') throw new Error('expected rect');
     // …so the stored /Rect (screen size at zoom 1) becomes 160×120, and its
     // own re-projection is exactly the released preview: {100,100,80,60}.

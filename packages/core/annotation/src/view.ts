@@ -45,7 +45,7 @@ import type {
   Point,
 } from './types';
 import type { CreationDraftAnchor } from './types';
-import { fieldsOf, kindOf, refOf } from './record';
+import { fieldsOf, kindOf, refOf, shapeOf } from './record';
 
 const DRAFT_ID = '__draft__';
 const PREVIEW_ID = '__markup_preview__';
@@ -71,7 +71,8 @@ function effMeasure(model: Model, id: Id) {
   }
 
   if (draft.kind === 'caption' && draft.id === id) {
-    const { geometry, style } = fieldsOf(annotation);
+    const geometry = shapeOf(annotation.annotation);
+    const { style } = fieldsOf(annotation);
     return moveMeasurementCaption(geometry, measure, draft.delta, style).measure;
   }
 
@@ -100,7 +101,7 @@ function effMeasure(model: Model, id: Id) {
  */
 function effGeom(model: Model, id: Id, view: ViewEnv | undefined): ModelGeometry {
   const annotation = model.byId[id];
-  const geometry = anchoredGeom(fieldsOf(annotation).geometry, anchorModeOf(annotation), view);
+  const geometry = anchoredGeom(shapeOf(annotation.annotation), anchorModeOf(annotation), view);
   const draft = model.draft;
   if (draft) {
     if (draft.kind === 'move' && draft.ids.includes(id))
@@ -313,7 +314,7 @@ export function textBoxes(model: Model, page: PageRef, view?: ViewEnv): TextBox[
     const annotation = model.byId[id];
     if (
       annotation.annotation.page.objectNumber !== pageObjectNumber ||
-      fieldsOf(annotation).geometry.kind !== 'text-box'
+      shapeOf(annotation.annotation).kind !== 'text-box'
     )
       continue;
     if (!viewable(annotation.annotation, model.selected.includes(id))) continue; // `/F`-hidden
@@ -457,7 +458,7 @@ export function selectionKnob(
       page,
       pageBox,
       knobOffset,
-      (id) => anchoredGeom(fieldsOf(model.byId[id]).geometry, anchorModeOf(model.byId[id]), view),
+      (id) => anchoredGeom(shapeOf(model.byId[id].annotation), anchorModeOf(model.byId[id]), view),
       view,
     );
     if (!rest) return null;

@@ -1,13 +1,7 @@
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import {
-  calloutShape,
-  readTextBox,
-  textBoxDrag,
-  textBoxTranslate,
-  writeTextBox,
-} from '../../src/shapes/text-box';
+import { calloutShape, textBoxFamily } from '../../src/shapes/text-box';
 
 const BOX = { x: 200, y: 100, width: 120, height: 40 };
 const TIP = { x: 40, y: 60 };
@@ -33,7 +27,7 @@ const callout = freeText({
 
 describe('the text box family reads and writes the engine fields', () => {
   it("a callout's line is read as stored, end and all, and written back unchanged", () => {
-    const shape = readTextBox(callout);
+    const shape = textBoxFamily.read(callout);
     expect(shape).toEqual({
       kind: 'text-box',
       box: BOX,
@@ -41,7 +35,7 @@ describe('the text box family reads and writes the engine fields', () => {
       calloutLine: [TIP, KNEE, STORED_END],
       lineEnding: 'open-arrow',
     });
-    expect(writeTextBox(shape)).toEqual({
+    expect(textBoxFamily.write(shape, 'free-text')).toEqual({
       box: BOX,
       rotation: null,
       calloutLine: [TIP, KNEE, STORED_END],
@@ -50,15 +44,15 @@ describe('the text box family reads and writes the engine fields', () => {
   });
 
   it('a plain text box has no line, and writes none', () => {
-    const shape = readTextBox(freeText({ calloutLine: [TIP, STORED_END] }));
+    const shape = textBoxFamily.read(freeText({ calloutLine: [TIP, STORED_END] }));
     expect(shape.calloutLine).toBeNull();
-    expect(writeTextBox(shape)).toEqual({ box: BOX, rotation: null });
+    expect(textBoxFamily.write(shape, 'free-text')).toEqual({ box: BOX, rotation: null });
   });
 });
 
 describe("a callout's end follows its box", () => {
   it('a move carries the whole line with the box', () => {
-    const moved = textBoxTranslate(readTextBox(callout), { x: 10, y: 5 });
+    const moved = textBoxFamily.translate(textBoxFamily.read(callout), { x: 10, y: 5 });
     expect(moved.box).toEqual({ ...BOX, x: 210, y: 105 });
     expect(moved.calloutLine).toEqual([
       { x: 50, y: 65 },
@@ -68,7 +62,7 @@ describe("a callout's end follows its box", () => {
   });
 
   it('a resize puts the end on the middle of the side the knee faces', () => {
-    const resized = textBoxDrag(readTextBox(callout), 'se', { x: 340, y: 160 });
+    const resized = textBoxFamily.drag(textBoxFamily.read(callout), 'se', { x: 340, y: 160 });
     expect(resized.box).toEqual({ x: 200, y: 100, width: 140, height: 60 });
     expect(resized.calloutLine![2]).toEqual({ x: 200, y: 130 });
   });
@@ -76,7 +70,7 @@ describe("a callout's end follows its box", () => {
   it('a tip drag on a straight line moves the end to the side the tip now faces', () => {
     const straight = calloutShape(BOX, 0, TIP, undefined, 'open-arrow');
     expect(straight.calloutLine).toEqual([TIP, { x: 200, y: 120 }]);
-    const dragged = textBoxDrag(straight, 'callout-tip', { x: 260, y: 0 });
+    const dragged = textBoxFamily.drag(straight, 'callout-tip', { x: 260, y: 0 });
     expect(dragged.calloutLine).toEqual([
       { x: 260, y: 0 },
       { x: 260, y: 100 },

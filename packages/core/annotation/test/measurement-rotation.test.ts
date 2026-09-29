@@ -12,7 +12,7 @@ import { annotationSelectionFrame } from '../src/selection';
 import type { ModelAnnotation, Model, QuadRing, Point } from '../src/types';
 import { initialModel, annotsInBox } from '../src/update';
 import { chrome, pageItems } from '../src/view';
-import { fieldsOf } from '../src/record';
+import { fieldsOf, shapeOf } from '../src/record';
 
 const PAGE = toPageRef(1);
 const appearance: DistanceAppearance = {
@@ -108,7 +108,7 @@ describe('measurement selection frame and rotation', () => {
     const outline = outlineCorners(start);
     // The pivot is where the engine turns the line: its own middle, not the
     // middle of the frame the caption and leaders widen.
-    const center = turnPivotOf(fieldsOf(annotation).geometry);
+    const center = turnPivotOf(shapeOf(annotation.annotation));
     const frameCenter = annotationSelectionFrame(annotation).center;
     const knob = chrome(start, PAGE).find((node) => node.kind === 'rotate-knob');
     if (knob?.kind !== 'rotate-knob') throw new Error('Missing rotation handle');
@@ -121,7 +121,7 @@ describe('measurement selection frame and rotation', () => {
 
     const armed = pointer(start, 'down', knob.at);
     const initialCaption = distanceLayout(
-      fieldsOf(annotation).geometry,
+      shapeOf(annotation.annotation),
       measurementOf(annotation.annotation) as DistanceAppearance,
       2,
     )!.caption!;
@@ -142,7 +142,7 @@ describe('measurement selection frame and rotation', () => {
       expect(guides).toMatchObject({ center });
 
       const committed = pointer(moving, 'up', at);
-      expectPoint(turnPivotOf(fieldsOf(committed.byId.distance).geometry), center);
+      expectPoint(turnPivotOf(shapeOf(committed.byId.distance.annotation)), center);
       expectPoint(
         annotationSelectionFrame(committed.byId.distance).center,
         rotatePoint(frameCenter, center, angle),
@@ -150,7 +150,7 @@ describe('measurement selection frame and rotation', () => {
       expect(measurementOf(committed.byId.distance.annotation)).toEqual(
         measurementOf(annotation.annotation),
       );
-      expect(fieldsOf(committed.byId.distance).geometry).toEqual(item.geometry);
+      expect(shapeOf(committed.byId.distance.annotation)).toEqual(item.geometry);
     }
     expect(pointer(armed, 'move', knob.at).draft).toMatchObject({ pivot: center });
     expect(step(armed, { type: 'cancel' })[0].byId.distance).toBe(annotation);
@@ -158,20 +158,20 @@ describe('measurement selection frame and rotation', () => {
 
   it('uses the same center for quarter turns and reset, without moving the annotation', () => {
     const initial = selected();
-    const center = turnPivotOf(fieldsOf(initial.byId.distance).geometry);
-    const once = step(initial, { type: 'rotate90' })[0];
-    expectPoint(turnPivotOf(fieldsOf(once.byId.distance).geometry), center);
+    const center = turnPivotOf(shapeOf(initial.byId.distance.annotation));
+    const once = step(initial, { type: 'rotateSelection', degrees: 90 })[0];
+    expectPoint(turnPivotOf(shapeOf(once.byId.distance.annotation)), center);
     const reset = step(once, { type: 'resetRotation' })[0];
-    expect(fieldsOf(reset.byId.distance).geometry).toEqual(
-      fieldsOf(initial.byId.distance).geometry,
+    expect(shapeOf(reset.byId.distance.annotation)).toEqual(
+      shapeOf(initial.byId.distance.annotation),
     );
 
     let state = initial;
     for (let turn = 0; turn < 4; turn++) {
-      state = step(state, { type: 'rotate90' })[0];
-      expectPoint(turnPivotOf(fieldsOf(state.byId.distance).geometry), center);
+      state = step(state, { type: 'rotateSelection', degrees: 90 })[0];
+      expectPoint(turnPivotOf(shapeOf(state.byId.distance.annotation)), center);
     }
-    const geometry = fieldsOf(state.byId.distance).geometry;
+    const geometry = shapeOf(state.byId.distance.annotation);
     if (geometry.kind !== 'line') throw new Error('Expected line geometry');
     const drawn = drawnLineOf(geometry);
     expectPoint(drawn.start, { x: 140, y: 180 });
@@ -179,7 +179,7 @@ describe('measurement selection frame and rotation', () => {
   });
 
   it('keeps its frame after a native appearance with conservative bounds arrives', () => {
-    const state = step(selected(), { type: 'rotate90' })[0];
+    const state = step(selected(), { type: 'rotateSelection', degrees: 90 })[0];
     const annotation = state.byId.distance;
     const baked: ModelAnnotation = {
       ...annotation,
@@ -213,7 +213,7 @@ describe('measurement selection frame and rotation', () => {
     const bounds = groupUnionBounds(state, toPageRef(1))!;
     const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
     const before = annotationSelectionFrame(state.byId.distance).center;
-    const rotated = step(state, { type: 'rotate90' })[0];
+    const rotated = step(state, { type: 'rotateSelection', degrees: 90 })[0];
     expectPoint(
       annotationSelectionFrame(rotated.byId.distance).center,
       rotatePoint(before, center, 90),

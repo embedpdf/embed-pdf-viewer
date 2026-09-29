@@ -15,7 +15,7 @@ import {
   sourceOfNew,
 } from '../src/appearance';
 import { DRAWN_FLAGS } from '../src/flags';
-import { fieldsOf } from '../src/record';
+import { shapeOf } from '../src/record';
 import type { Message, ModelAnnotation } from '../src/types';
 
 const PAGE = toPageRef(1);
@@ -99,7 +99,7 @@ describe('after a change', () => {
       modelWith([resized]),
       resized.id,
       undefined,
-      fieldsOf(resized).geometry,
+      shapeOf(resized.annotation),
     );
     expect(placed.box).toEqual({ ...BOX, width: 160 });
     const restyled = applyChange(stamp, { subtype: 'stamp', opacity: 0.5 } as AnnotationPatch);
@@ -123,7 +123,7 @@ describe('during a gesture', () => {
     const model = modelWith([baked('square')]);
     const [moving] = step(step(model, editPtr('down', 150, 130))[0], editPtr('move', 170, 140));
     expect(sourceDuring(moving, 'obj:1')).toBe('baked');
-    const shape = fieldsOf(moving.byId['obj:1']).geometry;
+    const shape = shapeOf(moving.byId['obj:1'].annotation);
     expect(rasterPlacement(moving, 'obj:1', undefined, shape).box).toEqual({
       ...BOX,
       x: 120,

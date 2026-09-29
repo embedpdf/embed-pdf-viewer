@@ -6,7 +6,7 @@
  * when editing ends) and sends the latest text, so it carries every keystroke
  * that waited for it: they settle together, accepted or refused.
  */
-import { type Id, type Point, refOf, richDocOf } from '@embedpdf/core-annotation';
+import { type Id, type Point, refOf, richDocOf, shapeOf } from '@embedpdf/core-annotation';
 import {
   annotationKey,
   type AnnotationRef,
@@ -113,7 +113,7 @@ export function createTextEditing(
       // same annotation; either should open it for editing.
       const id = target.kind === 'annot' || target.kind === 'handle' ? target.id : null;
       const annotation = id != null ? model.byId[id] : undefined;
-      if (annotation && fieldsOf(annotation).geometry.kind === 'text-box') {
+      if (annotation && shapeOf(annotation.annotation).kind === 'text-box') {
         store.commit({ type: 'beginTextEdit', id: annotation.id });
         return true;
       }

@@ -7,6 +7,7 @@
  * in the plugin). Many tools can make one kind: ink and the ink highlighter,
  * a line and an arrow.
  */
+import { boxFamily } from '../shapes';
 import { caret } from './caret';
 import { circle } from './circle';
 import { NO_CAPS, type AnnotationKind } from './define';
@@ -68,11 +69,8 @@ export function kindNamed(name: string): AnnotationKind {
   if (kind) return kind;
   let shown = shownOnly.get(name);
   if (!shown) {
-    shown = { name, family: 'box', caps: NO_CAPS, fields: [] };
+    shown = { name, family: boxFamily, caps: NO_CAPS, fields: [] };
     shownOnly.set(name, shown);
   }
   return shown;
 }
-
-/** Text markup and redaction marks: drawn on the text, beneath every other annotation. */
-export const isMarkup = (kind: AnnotationKind): boolean => kind.family === 'quads';

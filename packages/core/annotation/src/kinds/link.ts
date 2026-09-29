@@ -1,3 +1,4 @@
+import { boxFamily } from '../shapes';
 import { defineKind, NO_CAPS } from './define';
 import { LINKABLE } from './fields';
 
@@ -10,7 +11,7 @@ import { LINKABLE } from './fields';
  */
 export const link = defineKind({
   name: 'link',
-  family: 'box',
+  family: boxFamily,
   caps: {
     ...NO_CAPS,
     selectable: true,

@@ -9,21 +9,14 @@
  */
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
-import { readBox, writeBox } from '../../shapes/box';
-import type { RecordFields, TextStyle } from '../../types';
+import type { TextStyle } from '../../types';
 import type { KindProjection, Wire } from '../projection';
 import { borderSlice } from '../props';
 import { widgetKindOf } from '../../kinds';
 import { writableTarget } from '../seam';
 
-/** The engine fields that state a box kind's shape. */
-export const boxGeometry = (annotation: RecordFields): Wire | null =>
-  annotation.geometry.kind === 'box' ? writeBox(annotation.geometry, annotation.subtype) : null;
-
-/** Square and circle: the box and its turn; the border picker states the cloud (`null` when plain). */
+/** Square and circle: the border picker states the cloud (`null` when plain). */
 const shape: KindProjection = {
-  ingest: (dto) => ({ geometry: readBox(dto) }),
-  geometry: boxGeometry,
   prop: {
     border: (annotation) => ({
       ...borderSlice(annotation.style),
@@ -39,13 +32,9 @@ export const circle = shape;
 const iconProjection = (subtype: 'text' | 'file-attachment'): KindProjection => ({
   ingest: (dto) => {
     const iconDto = dto as Extract<AnnotationDTO, { subtype: typeof subtype }>;
-    return {
-      geometry: readBox(iconDto),
-      // The /Name icon is a content projection like `style` — icon kinds only.
-      icon: iconDto.icon,
-    };
+    // The /Name icon is a content projection like `style` — icon kinds only.
+    return { icon: iconDto.icon };
   },
-  geometry: boxGeometry,
   // Creates go through the click-to-place path (placement.ts), which also
   // carries the attached file for file-attachment — never `toCreateDraft`.
   createable: false,
@@ -54,29 +43,21 @@ const iconProjection = (subtype: 'text' | 'file-attachment'): KindProjection => 
 export const textNote = iconProjection('text');
 export const fileAttachment = iconProjection('file-attachment');
 
-export const stamp: KindProjection = {
-  ingest: (dto) => ({ geometry: readBox(dto) }),
-  // Geometry only — the visual is the engine-baked /AP, re-fit natively (with
-  // the stamp's recorded fit) when its box changes. A new drawing is bytes: it
-  // goes to the engine as the `appearance` resource, never through this path.
-  geometry: boxGeometry,
-  createable: false,
-};
+/** A stamp is its shape alone: the visual is the engine-baked /AP, re-fit
+ *  natively (with the stamp's recorded fit) when its box changes. A new
+ *  drawing is bytes: it goes to the engine as the `appearance` resource,
+ *  never through this path. */
+export const stamp: KindProjection = { createable: false };
 
 export const link: KindProjection = {
   ingest: (dto) => {
     const linkDto = dto as Extract<AnnotationDTO, { subtype: 'link' }>;
-    return {
-      geometry: readBox(linkDto),
-      // The link kind's own target — attached links (grouped children of
-      // another kind) fold onto their parent's `link` slot instead, in
-      // `foldAttachedLinks`.
-      link: linkDto.target,
-    };
+    // The link kind's own target — attached links (grouped children of
+    // another kind) fold onto their parent's `link` slot instead, in
+    // `foldAttachedLinks`. A move writes its shape alone, never `target`: a
+    // foreign read-only /A (javascript/named/…) survives every drag.
+    return { link: linkDto.target };
   },
-  // A geometry-only move deliberately omits `target`: a foreign read-only /A
-  // (javascript/named/…) survives every drag untouched.
-  geometry: boxGeometry,
   prop: {
     // Three-state target: a writable value replaces `/A`; an explicit model
     // `null` clears it (the engine removes /A + /Dest); a read-only arm is
@@ -104,14 +85,10 @@ export function widgetTextFromDTO(dto: Extract<AnnotationDTO, { subtype: 'widget
 export const widget: KindProjection = {
   ingest: (dto) => {
     const widgetDto = dto as Extract<AnnotationDTO, { subtype: 'widget' }>;
-    return {
-      geometry: readBox(widgetDto),
-      ...(WIDGET_TEXT_KINDS.has(widgetKindOf(widgetDto.fieldFamily))
-        ? { text: widgetTextFromDTO(widgetDto) }
-        : {}),
-    };
+    return WIDGET_TEXT_KINDS.has(widgetKindOf(widgetDto.fieldFamily))
+      ? { text: widgetTextFromDTO(widgetDto) }
+      : {};
   },
-  geometry: boxGeometry,
   prop: {
     // A widget's border has a style but no dash pattern of its own.
     border: (annotation) => ({
@@ -121,8 +98,4 @@ export const widget: KindProjection = {
   createable: false,
 };
 
-export const unsupported: KindProjection = {
-  ingest: (dto) => ({ geometry: readBox(dto) }),
-  geometry: () => null,
-  createable: false,
-};
+export const unsupported: KindProjection = { createable: false };

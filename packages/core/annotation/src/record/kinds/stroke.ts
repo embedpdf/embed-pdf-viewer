@@ -10,25 +10,14 @@
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
 import { measurementOf, type MeasurementAppearance } from '../../measurement';
-import { readPoints, writePoints, type PointsShape } from '../../shapes/points';
 import type { RecordFields } from '../../types';
 import type { KindProjection, Wire } from '../projection';
 import { borderSlice } from '../props';
-
-type PointsDTO = Extract<AnnotationDTO, { subtype: 'line' | 'polyline' | 'polygon' | 'ink' }>;
 
 /** A measurement's fields, when the annotation is one. */
 const measureSlice = (dto: AnnotationDTO): { measure?: MeasurementAppearance } => {
   const measure = measurementOf(dto);
   return measure ? { measure } : {};
-};
-
-/** A points record's shape, or `undefined` for any other geometry. */
-const pointsOf = (annotation: RecordFields): PointsShape | undefined => {
-  const geometry = annotation.geometry;
-  return geometry.kind === 'line' || geometry.kind === 'poly' || geometry.kind === 'ink'
-    ? geometry
-    : undefined;
 };
 
 /** `/BE` intensity for a closed poly (polygon): the curls are generated from
@@ -55,15 +44,8 @@ const strokeProps: KindProjection['prop'] = {
       : {},
 };
 
-/** The engine fields that state a points record's shape. */
-const pointsGeometry = (annotation: RecordFields): Wire | null => {
-  const shape = pointsOf(annotation);
-  return shape ? writePoints(shape) : null;
-};
-
 export const line: KindProjection = {
-  ingest: (dto) => ({ ...measureSlice(dto), geometry: readPoints(dto as PointsDTO) }),
-  geometry: pointsGeometry,
+  ingest: measureSlice,
   prop: strokeProps,
   draftExtras: (annotation) =>
     annotation.measure?.intent === 'line-dimension'
@@ -72,8 +54,7 @@ export const line: KindProjection = {
 };
 
 const polyProjection = (closed: boolean): KindProjection => ({
-  ingest: (dto) => ({ ...measureSlice(dto), geometry: readPoints(dto as PointsDTO) }),
-  geometry: pointsGeometry,
+  ingest: measureSlice,
   prop: strokeProps,
   draftExtras: (annotation) =>
     annotation.measure && annotation.measure.intent !== 'line-dimension'
@@ -87,12 +68,8 @@ export const polyline: KindProjection = polyProjection(false);
 export const ink: KindProjection = {
   ingest: (dto) => {
     const inkDto = dto as Extract<AnnotationDTO, { subtype: 'ink' }>;
-    return {
-      geometry: readPoints(inkDto as PointsDTO),
-      ...(inkDto.intent ? { intent: inkDto.intent } : {}),
-    };
+    return inkDto.intent ? { intent: inkDto.intent } : {};
   },
-  geometry: pointsGeometry,
   prop: strokeProps,
   // `/IT` is set at create and never patched (the engine preserves it).
   draftExtras: (annotation) =>

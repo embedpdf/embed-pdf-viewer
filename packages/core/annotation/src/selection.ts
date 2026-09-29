@@ -3,8 +3,8 @@ import { anchoredGeom, anchoredStrokeWidth, anchorModeOf } from './anchor';
 import { geomRotation, isRotatableGeom, selectionQuad, turnPivotOf } from './geometry';
 import { measurementOf, type MeasurementAppearance } from './measurement';
 import { measurementSelectionQuad } from './measurement-shape';
-import { fieldsOf } from './record';
-import type { ModelAnnotation, QuadRing, Point, RecordFields, ViewEnv } from './types';
+import { fieldsOf, shapeOf } from './record';
+import type { ModelAnnotation, ModelGeometry, QuadRing, Point, Style, ViewEnv } from './types';
 
 export interface SelectionFrame {
   corners: QuadRing;
@@ -19,16 +19,16 @@ export interface SelectionFrame {
 export function annotationSelectionFrame(
   annotation: ModelAnnotation,
   view?: ViewEnv,
-  live?: Partial<Pick<RecordFields, 'geometry' | 'style'>> & { measure?: MeasurementAppearance },
+  live?: { geometry?: ModelGeometry; style?: Style; measure?: MeasurementAppearance },
 ): SelectionFrame {
-  const fields = live ? { ...fieldsOf(annotation), ...live } : fieldsOf(annotation);
+  const style = live?.style ?? fieldsOf(annotation).style;
   const measure = live?.measure ?? measurementOf(annotation.annotation);
   const mode = anchorModeOf(annotation);
-  const geometry = anchoredGeom(fields.geometry, mode, view);
-  const strokeWidth = anchoredStrokeWidth(fields.style.strokeWidth, mode, view);
+  const geometry = anchoredGeom(live?.geometry ?? shapeOf(annotation.annotation), mode, view);
+  const strokeWidth = anchoredStrokeWidth(style.strokeWidth, mode, view);
   const corners = measure
-    ? measurementSelectionQuad(geometry, measure, { ...fields.style, strokeWidth })
-    : selectionQuad(geometry, strokeWidth, fields.style.border);
+    ? measurementSelectionQuad(geometry, measure, { ...style, strokeWidth })
+    : selectionQuad(geometry, strokeWidth, style.border);
 
   // PDF /Rect is a page-aligned rendering envelope. Its conservative padding
   // must not change the editor's frame or rotation center after an engine echo.
@@ -44,5 +44,5 @@ export function annotationSelectionFrame(
 
 /** Where a turn of `annotation` pivots (`turnPivotOf`), in its frame's space. */
 export function annotationTurnPivot(annotation: ModelAnnotation, view?: ViewEnv): Point {
-  return turnPivotOf(anchoredGeom(fieldsOf(annotation).geometry, anchorModeOf(annotation), view));
+  return turnPivotOf(anchoredGeom(shapeOf(annotation.annotation), anchorModeOf(annotation), view));
 }

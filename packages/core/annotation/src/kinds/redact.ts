@@ -1,5 +1,13 @@
+import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+
+import { boxFamily, familyChosenBy, quadsFamily } from '../shapes';
 import { defineKind, NO_CAPS } from './define';
 import { FILL, OPACITY } from './fields';
+
+/** A mark over text has its quads; an area mark has none, and its shape is its rect, a box. */
+const markShape = familyChosenBy((annotation: AnnotationDTO) =>
+  annotation.subtype === 'redact' && annotation.quadPoints.length > 0 ? quadsFamily : boxFamily,
+);
 
 /**
  * A redaction mark (`/Redact`): the stage before content is removed. Made from
@@ -12,9 +20,10 @@ import { FILL, OPACITY } from './fields';
  */
 export const redact = defineKind({
   name: 'redact',
-  family: 'quads',
+  family: markShape,
   caps: {
     ...NO_CAPS,
+    paintsBeneath: true,
     selectable: true,
     movable: true,
     resizable: true,

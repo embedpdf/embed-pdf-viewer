@@ -34,6 +34,7 @@ import {
   boxTranslate,
   type TurnedBox,
 } from './box';
+import type { ShapeFamily } from './family';
 
 type FreeTextAnnotation = Extract<AnnotationDTO, { subtype: 'free-text' }>;
 
@@ -50,7 +51,8 @@ export interface TextBoxShape extends TurnedBox {
 }
 
 /** A free text's shape, read off its annotation. A line counts only on a callout. */
-export function readTextBox(annotation: FreeTextAnnotation): TextBoxShape {
+function readTextBox(read: AnnotationDTO): TextBoxShape {
+  const annotation = read as FreeTextAnnotation;
   const line = annotation.intent === 'free-text-callout' ? (annotation.calloutLine ?? null) : null;
   return {
     kind: 'text-box',
@@ -66,7 +68,7 @@ export function readTextBox(annotation: FreeTextAnnotation): TextBoxShape {
  * upright, so a turn is cleared rather than kept), and a callout's line and
  * ending.
  */
-export function writeTextBox(shape: TextBoxShape): {
+function writeTextBox(shape: TextBoxShape): {
   box: Rect;
   rotation: number | null;
   calloutLine?: CalloutLine;
@@ -126,7 +128,7 @@ function endFollows(shape: TextBoxShape): TextBoxShape {
 }
 
 /** The shape moved by `delta`: the box and the whole line. */
-export function textBoxTranslate(shape: TextBoxShape, delta: Point): TextBoxShape {
+function textBoxTranslate(shape: TextBoxShape, delta: Point): TextBoxShape {
   const moved = boxTranslate(shape, delta);
   const line = shape.calloutLine;
   if (!line) return moved;
@@ -135,22 +137,22 @@ export function textBoxTranslate(shape: TextBoxShape, delta: Point): TextBoxShap
 }
 
 /** A plain text box turned `degrees` about `pivot`; a callout stays as it is. */
-export function textBoxRotateAbout(shape: TextBoxShape, pivot: Point, degrees: number) {
+function textBoxRotateAbout(shape: TextBoxShape, pivot: Point, degrees: number) {
   return shape.calloutLine ? shape : boxRotateAbout(shape, pivot, degrees);
 }
 
 /** A plain text box scaled about `anchor`; a callout stays as it is. */
-export function textBoxScaleAbout(shape: TextBoxShape, anchor: Point, sx: number, sy: number) {
+function textBoxScaleAbout(shape: TextBoxShape, anchor: Point, sx: number, sy: number) {
   return shape.calloutLine ? shape : boxScaleAbout(shape, anchor, sx, sy);
 }
 
 /** The shape upright: its turn cleared, and a callout's end back on the upright box. */
-export function textBoxUpright(shape: TextBoxShape): TextBoxShape {
+function textBoxUpright(shape: TextBoxShape): TextBoxShape {
   return endFollows({ ...shape, rotation: 0 });
 }
 
 /** The box's eight resize handles, and a callout's tip and knee. */
-export function textBoxHandles(shape: TextBoxShape): Handle[] {
+function textBoxHandles(shape: TextBoxShape): Handle[] {
   const handles = boxHandles(shape);
   const line = shape.calloutLine;
   if (line) {
@@ -161,7 +163,7 @@ export function textBoxHandles(shape: TextBoxShape): Handle[] {
 }
 
 /** The shape with `handle` dragged to `to`: the tip, the knee, or a side of the box. */
-export function textBoxDrag(shape: TextBoxShape, handle: string, to: Point): TextBoxShape {
+function textBoxDrag(shape: TextBoxShape, handle: string, to: Point): TextBoxShape {
   const line = shape.calloutLine;
   if (line && handle === 'callout-tip') {
     return endFollows({
@@ -186,7 +188,7 @@ const tipAngle = (line: CalloutLine): number =>
  * the page shows it, its line and the arrow at its tip, grown by half the
  * stroke.
  */
-export function textBoxDrawnBounds(shape: TextBoxShape, strokeWidth: number): Rect {
+function textBoxDrawnBounds(shape: TextBoxShape, strokeWidth: number): Rect {
   const line = shape.calloutLine;
   if (!line) return shape.box;
   const points = [...boxCorners(shape), ...line];
@@ -197,7 +199,7 @@ export function textBoxDrawnBounds(shape: TextBoxShape, strokeWidth: number): Re
 }
 
 /** What a selection wraps: the box, or a turned callout box as the page shows it. */
-export function textBoxSelectionBounds(shape: TextBoxShape): Rect {
+function textBoxSelectionBounds(shape: TextBoxShape): Rect {
   return shape.calloutLine && shape.rotation ? rotatedAabb(shape.box, shape.rotation) : shape.box;
 }
 
@@ -205,7 +207,7 @@ export function textBoxSelectionBounds(shape: TextBoxShape): Rect {
  * Is `point` on the shape: anywhere in its box (plus `margin`), tested in the
  * box's own frame, or on a callout's line or the arrow at its tip.
  */
-export function textBoxHit(
+function textBoxHit(
   shape: TextBoxShape,
   point: Point,
   margin: number,
@@ -235,7 +237,7 @@ export function textBoxHit(
  * (the generator's `adjusted_conn`), so the two meet without a gap. The text
  * itself is the framework's editable element, not part of the scene.
  */
-export function textBoxScene(shape: TextBoxShape, strokeWidth = 0): RenderNode[] {
+function textBoxScene(shape: TextBoxShape, strokeWidth = 0): RenderNode[] {
   const nodes: RenderNode[] = [];
   const line = shape.calloutLine;
   if (line) {
@@ -268,6 +270,31 @@ export function textBoxScene(shape: TextBoxShape, strokeWidth = 0): RenderNode[]
   );
   return nodes;
 }
+
+/**
+ * The text box family: a free text's box and turn, and a callout's line.
+ * Only a plain box turns; a callout's box keeps the turn it was made with,
+ * so a selection outlines it upright.
+ */
+export const textBoxFamily: ShapeFamily<TextBoxShape> = {
+  read: readTextBox,
+  write: writeTextBox,
+  bounds: (shape) => shape.box,
+  drawnBounds: textBoxDrawnBounds,
+  selectionBounds: textBoxSelectionBounds,
+  oriented: (shape) => !shape.calloutLine,
+  turnedCorners: (shape) => (shape.calloutLine ? null : boxCorners(shape)),
+  pivot: (shape) => rectCenter(shape.box),
+  translate: textBoxTranslate,
+  rotateAbout: textBoxRotateAbout,
+  scaleAbout: textBoxScaleAbout,
+  upright: textBoxUpright,
+  handles: textBoxHandles,
+  drag: textBoxDrag,
+  hit: (shape, point, margin, _filled, strokeWidth) =>
+    textBoxHit(shape, point, margin, strokeWidth),
+  scene: textBoxScene,
+};
 
 /**
  * The text plate inset of a free-text box: twice the border width. The plate

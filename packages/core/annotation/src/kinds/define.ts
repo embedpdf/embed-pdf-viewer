@@ -4,7 +4,7 @@
  * Each kind is declared in its own file in this folder; `index.ts` lists
  * them all.
  */
-import type { ModelGeometry } from '../types';
+import type { ShapeFamily } from '../shapes';
 
 /**
  * One editable field of a kind, as a UI contract: which engine field, rendered
@@ -79,6 +79,8 @@ export interface KindCaps {
   hasPopup: boolean;
   /** Bound to underlying text (markup, caret) — never freely moved/resized. */
   anchored: boolean;
+  /** Paints with the page's text, beneath every other kind (text markup, redaction marks). */
+  paintsBeneath: boolean;
   /** Has an interior fill (`/IC`). */
   hasFill: boolean;
   /** Has line endings (`/LE` — line, polyline). */
@@ -114,6 +116,7 @@ export const NO_CAPS: KindCaps = {
   commentable: false,
   hasPopup: false,
   anchored: false,
+  paintsBeneath: false,
   hasFill: false,
   hasEndings: false,
   hasCloudy: false,
@@ -128,10 +131,10 @@ export interface AnnotationKind {
   /** Its name: the PDF subtype, or a widget's field family (`widget-text`…). */
   readonly name: string;
   /**
-   * The shape family its geometry belongs to (`shapes/`): how it is read
-   * from the annotation, hit, handled, moved and drawn.
+   * The shape family that reads its shape off the annotation (`shapes/`).
+   * The shape's family then hits, handles, moves and draws it.
    */
-  readonly family: ModelGeometry['kind'];
+  readonly family: ShapeFamily;
   /** What a user can do to it. The annotation's `/F` flags override these at runtime (flags.ts). */
   readonly caps: KindCaps;
   /** What a sidebar edits, in display order, keyed by the engine's field names. */

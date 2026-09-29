@@ -18,7 +18,7 @@ import { annotationSelectionFrame } from '../src/selection';
 import type { ModelAnnotation, ModelGeometry, Model, Message, Point } from '../src/types';
 import { initialModel } from '../src/update';
 import { chrome, creationDraftAnchor, pageItems } from '../src/view';
-import { fieldsOf } from '../src/record';
+import { shapeOf } from '../src/record';
 import { measurementOf } from '../src/measurement';
 
 const PAGE = toPageRef(1);
@@ -103,7 +103,7 @@ describe('area and perimeter authoring', () => {
     const [committed, effects] = step(model, { type: 'finishCreationDraft' });
     expect(effects).toMatchObject([{ type: 'create' }]);
     const created = committed.byId[committed.order[0]];
-    expect(fieldsOf(created).geometry).toMatchObject({ closed, vertices: points.slice(0, 3) });
+    expect(shapeOf(created.annotation)).toMatchObject({ closed, vertices: points.slice(0, 3) });
     expect(measurementOf(created.annotation)).toEqual({
       ...measure,
       contents: closed ? '4.00 m²' : '6.00 m',
@@ -153,7 +153,7 @@ describe('area and perimeter authoring', () => {
     const preview = pageItems(model, PAGE)[0];
     expect(preview.source).toBe('vector');
     expect(preview.geometry).toMatchObject({ captionCenter: { x: 350, y: 50 } });
-    expect(fieldsOf(step(model, { type: 'cancel' })[0].byId.shape).geometry).toEqual({
+    expect(shapeOf(step(model, { type: 'cancel' })[0].byId.shape.annotation)).toEqual({
       ...geometry,
       captionCenter: null,
     });
@@ -162,7 +162,7 @@ describe('area and perimeter authoring', () => {
       phase: 'up',
       in: { page: toPageRef(1), point: center, shift: false },
     });
-    expect(fieldsOf(committed.byId.shape).geometry).toEqual(withCenter({ x: 350, y: 50 }));
+    expect(shapeOf(committed.byId.shape.annotation)).toEqual(withCenter({ x: 350, y: 50 }));
     expect(withoutLabel(measurementOf(committed.byId.shape.annotation))).toEqual(
       withoutLabel(appearance),
     );
@@ -182,7 +182,7 @@ describe('area and perimeter authoring', () => {
       const shape = manual ? withCenter({ x: 420, y: 80 }) : geometry;
       const initial = selected(annotation(appearance, shape));
       const frame = annotationSelectionFrame(initial.byId.shape);
-      const pivot = turnPivotOf(fieldsOf(initial.byId.shape).geometry);
+      const pivot = turnPivotOf(shapeOf(initial.byId.shape.annotation));
       const caption = shapeMeasurementLayout(shape, appearance, STYLE)!.caption!;
       const knob = chrome(initial, PAGE).find((node) => node.kind === 'rotate-knob');
       if (knob?.kind !== 'rotate-knob') throw new Error('Missing rotation knob');
@@ -196,7 +196,7 @@ describe('area and perimeter authoring', () => {
         const layout = shapeMeasurementLayout(item.geometry, item.measure, item.style)!;
         expectPoint(layout.caption!.center, rotatePoint(caption.center, pivot, angle));
         const committed = pointer(moving, 'up', at);
-        expectPoint(turnPivotOf(fieldsOf(committed.byId.shape).geometry), pivot);
+        expectPoint(turnPivotOf(shapeOf(committed.byId.shape.annotation)), pivot);
         expectPoint(
           annotationSelectionFrame(committed.byId.shape).center,
           rotatePoint(frame.center, pivot, angle),
@@ -206,7 +206,7 @@ describe('area and perimeter authoring', () => {
         );
         expect(committed.byId.shape.source).toBe('vector');
       }
-      const quarter = step(initial, { type: 'rotate90' })[0];
+      const quarter = step(initial, { type: 'rotateSelection', degrees: 90 })[0];
       const reset = step(quarter, { type: 'resetRotation' })[0];
       expectPoint(annotationSelectionFrame(reset.byId.shape).center, frame.center);
     },
@@ -217,11 +217,13 @@ describe('area and perimeter authoring', () => {
     let model = pointer(original, 'down', points[0]);
     model = pointer(model, 'move', { x: 80, y: 90 });
     model = pointer(model, 'up', { x: 80, y: 90 });
-    expect(fieldsOf(model.byId.shape).geometry).toMatchObject({ captionCenter: { x: 420, y: 80 } });
+    expect(shapeOf(model.byId.shape.annotation)).toMatchObject({
+      captionCenter: { x: 420, y: 80 },
+    });
     model = pointer(model, 'down', { x: 200, y: 150 });
     model = pointer(model, 'move', { x: 220, y: 175 });
     model = pointer(model, 'up', { x: 220, y: 175 });
-    expect(fieldsOf(model.byId.shape).geometry).toMatchObject({
+    expect(shapeOf(model.byId.shape.annotation)).toMatchObject({
       captionCenter: { x: 440, y: 105 },
     });
   });
@@ -297,7 +299,7 @@ describe('area and perimeter authoring', () => {
     expect(withoutLabel(measurementOf(committed.byId.shape.annotation))).toEqual(
       withoutLabel(preview.measure),
     );
-    expect(fieldsOf(committed.byId.shape).geometry).toEqual(preview.geometry);
+    expect(shapeOf(committed.byId.shape.annotation)).toEqual(preview.geometry);
     expect(committed.byId.shape.source).toBe('vector');
   });
 });

@@ -213,8 +213,8 @@ function transition(model: Model, message: Message): [Model, Effect[]] {
       return setDefaults(model, message.preset, message.patch);
     case 'setSnap':
       return [{ ...model, snap: { ...model.snap, ...message.patch } }, []];
-    case 'rotate90':
-      return rotateSelection(model, 90);
+    case 'rotateSelection':
+      return rotateSelection(model, message.degrees);
     case 'resetRotation':
       return resetRotation(model);
     case 'delete':
