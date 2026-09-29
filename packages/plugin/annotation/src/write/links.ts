@@ -8,7 +8,7 @@ import {
   type PdfLinkTarget,
 } from '@embedpdf/engine-core/runtime';
 
-import { linkChildRects, writableTarget } from '../repository';
+import { linkChildRects, writableTarget } from '@embedpdf/core-annotation';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import { named } from './named';
 

@@ -3,7 +3,7 @@ import type { AnnotationFlags } from '@embedpdf/engine-core/runtime';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { annotationHarness, type FileAnnotation } from './harness';
-import { annotationKey } from '../src/repository';
+import { annotationKey } from '@embedpdf/core';
 
 /**
  * The public page-space `create()` takes the same optimistic path the draw

@@ -5,12 +5,6 @@
  * are the generic 1:1 keys (safe as singles since the engine's `/DA`
  * read-modify-write).
  */
-import {
-  calloutLinePoints,
-  geomRotation,
-  type ModelAnnotation,
-  type TextStyle,
-} from '@embedpdf/core-annotation';
 import type {
   AnnotationDTO,
   FreeTextDraft,
@@ -18,7 +12,9 @@ import type {
   PageBox,
 } from '@embedpdf/engine-core/runtime';
 
-import { richDocOf } from '../../rich-text';
+import { calloutLinePoints, geomRotation } from '../../geometry';
+import { richDocOf } from '../../richtext';
+import type { ModelAnnotation, TextStyle } from '../../types';
 import { boxEmit, type KindProjection, type Wire } from '../projection';
 import { boxGeomFields } from '../seam';
 

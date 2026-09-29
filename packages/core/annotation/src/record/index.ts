@@ -17,19 +17,15 @@
  * the full patch — verbose, never a dropped write.
  */
 import {
-  propsFor,
-  type ModelAnnotation,
-  type PatchScope,
-  type PropKey,
-} from '@embedpdf/core-annotation';
-import { geomRotation } from '@embedpdf/core-annotation';
-import {
   appearanceTurnOf,
   type AnnotationDraft,
   type AnnotationDTO,
   type AnnotationPatch,
 } from '@embedpdf/engine-core/runtime';
 
+import { geomRotation } from '../geometry';
+import { propsFor } from '../kinds';
+import type { ModelAnnotation, PatchScope, PropKey } from '../types';
 import { freeText } from './kinds/freeText';
 import {
   fileAttachment,
@@ -50,14 +46,11 @@ import { annotationKey, flagsOf, styleFromDTO } from './seam';
 export {
   boxGeomFields,
   hexColorOf,
-  annotationKey,
   styleFromDTO,
   widgetAppearanceFromProps,
   writableTarget,
 } from './seam';
 export { linkChildRects } from './links';
-export { boxEmit } from './projection';
-export type { KindProjection } from './projection';
 
 /** Every wire subtype declares exactly one projection — a missing kind is a
  *  Compile error, not a silent fall-through. */

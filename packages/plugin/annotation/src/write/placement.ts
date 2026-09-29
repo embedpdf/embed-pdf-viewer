@@ -9,11 +9,11 @@ import type {
   PageBox,
 } from '@embedpdf/engine-core/runtime';
 
-import { hexColorOf } from '../repository';
+import { hexColorOf } from '@embedpdf/core-annotation';
 
 /**
  * Per-kind code for the click-to-place icon kinds (note / file attachment)
- * — the `props.ts`/`repository.ts` pattern: all tool config stays in the
+ * — the `props.ts` pattern: all tool config stays in the
  * tool table; this module only interprets it. The stamp keeps its own
  * sizing/sniffing path in the capability; everything funnels through the
  * one `placeAt` entry there.

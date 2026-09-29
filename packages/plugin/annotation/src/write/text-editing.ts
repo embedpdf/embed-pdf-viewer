@@ -6,7 +6,7 @@
  * when editing ends) and sends the latest text, so it carries every keystroke
  * that waited for it: they settle together, accepted or refused.
  */
-import type { Id, Point } from '@embedpdf/core-annotation';
+import { richDocOf, type Id, type Point } from '@embedpdf/core-annotation';
 import {
   annotationKey,
   type AnnotationRef,
@@ -17,7 +17,7 @@ import {
 import { setTextSelection } from '../model';
 import type { AnnotationReads } from '../read/annotations';
 import type { ChromeReads } from '../read/chrome';
-import { cssFontFamilyForFace, richDocOf, textCommitPatch, type TextSelection } from '../rich-text';
+import { cssFontFamilyForFace, textCommitPatch, type TextSelection } from '../rich-text';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import { throwIfFailed } from './outcomes';
 import type { Commit } from '../services/store';

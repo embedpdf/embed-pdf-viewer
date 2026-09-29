@@ -5,8 +5,8 @@
  * owner's file: cloudy `/RD` in shape.ts, visual-bounds `/Rect` in stroke.ts,
  * the link target in link.ts).
  */
-import { initialTextStyle, type ModelAnnotation, type PropKey } from '@embedpdf/core-annotation';
-
+import { initialTextStyle } from '../props';
+import type { ModelAnnotation, PropKey } from '../types';
 import type { Wire } from './projection';
 import { hexColorOf } from './seam';
 

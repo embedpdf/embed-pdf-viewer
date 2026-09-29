@@ -19,7 +19,7 @@ import {
 import type { ArmedStampInfo } from '../contract';
 import { previewBucket } from '../host-contract';
 import { setToolGhost } from '../model';
-import { boxGeomFields } from '../repository';
+import { boxGeomFields } from '@embedpdf/core-annotation';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import { named } from './named';
 import { ARMED_STAMP_TOOL_ID } from '../tools/definitions';
@@ -151,7 +151,7 @@ export function createStamps(
    *  The size is fit to the page and clamped fully onto it (the rubber-stamp
    *  rule: never larger than the page, aspect preserved), and never spills off
    *  the edge. `rotCW` (the tool's upright counter-rotation, CW content degrees)
-   *  emits the repository's box rotation fields — the engine bakes the tilted
+   *  becomes the box's `rotation` — the engine bakes the tilted
    *  /AP exactly as an interactively rotated stamp round-trips, and the fit uses
    *  the rotated footprint. Returns null when the page/document isn't ready. */
   const createStampAt = (

@@ -1,9 +1,9 @@
 import type { Mirror } from '@embedpdf/core';
+import type { FontLookup } from '@embedpdf/core-annotation';
 
 import type { AnnotationConfig } from '../contract';
 import { createAuthority, type Authority } from './authority';
 import { createView, type View } from '../read/view';
-import type { FontLookup } from '../rich-text';
 import type { AnnotationContext } from './context';
 import { createAnnotationEvents, type AnnotationEvents } from './events';
 import { createFilePickerPort, type FilePickerPort } from './file-picker';

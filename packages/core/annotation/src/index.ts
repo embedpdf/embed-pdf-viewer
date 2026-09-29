@@ -40,16 +40,20 @@ export { hitTest, cursorAt, isSelectable, canMove, type Target } from './hit';
 // selection styling compute with.
 export {
   applyStyleToRange,
+  bodyFromTextStyle,
+  faceForFont,
   isPlainRichText,
   locateOffset,
   normalizeRuns,
   paragraphsFromPlainText,
   plainTextOf,
   rangeHasStyle,
+  richDocOf,
   richTextLength,
   sameStyleDelta,
   splitRunsAt,
   styleAt,
+  type FontLookup,
   type RichTextRange,
   type RichTextStyleDelta,
 } from './richtext';
@@ -152,6 +156,20 @@ export {
   groupResizeBox,
   groupResizeFactors,
 } from './geometry';
+// The engine's record and the model's entry, both ways: the entry a record
+// reads as, and the engine writes an entry states.
+export {
+  boxGeomFields,
+  fromDTO,
+  hexColorOf,
+  linkChildRects,
+  styleFromDTO,
+  toCreateDraft,
+  toPatch,
+  toScopedPatch,
+  widgetAppearanceFromProps,
+  writableTarget,
+} from './record';
 export { cloudyPath, cloudyBorderExtent } from './cloudy';
 export * from './measurement';
 export * from './measurement-shape';

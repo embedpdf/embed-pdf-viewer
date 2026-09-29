@@ -5,6 +5,7 @@ import {
   geomVisualBounds,
   groupKeyOf,
   isSelectable,
+  richDocOf,
   type ModelAnnotation,
   type AnnotationFlags,
   type AnnotationPropsPatch,
@@ -15,7 +16,7 @@ import { annotationKey, type AnnotationRef, type PageRef } from '@embedpdf/engin
 
 import type { AnnotationReads } from '../read/annotations';
 import type { SelectionPropsReads } from '../read/selection-props';
-import { richDocOf, runDeltaForProps, type TextFormat } from '../rich-text';
+import { runDeltaForProps, type TextFormat } from '../rich-text';
 import type { AnnotationServices } from '../services';
 import type { Crud } from './crud';
 import type { LinkWrites } from './links';

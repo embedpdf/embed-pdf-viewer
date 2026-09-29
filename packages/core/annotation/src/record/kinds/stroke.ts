@@ -8,12 +8,6 @@
  * caption center turns with its points.
  */
 import {
-  distanceLabel,
-  shapeMeasurementLabel,
-  geomRotation,
-  type ModelAnnotation,
-} from '@embedpdf/core-annotation';
-import {
   pagePointTurned,
   pagePointUnturned,
   pageTurnOfDrawn,
@@ -23,6 +17,10 @@ import {
   type PagePointTurn,
 } from '@embedpdf/engine-core/runtime';
 
+import { geomRotation } from '../../geometry';
+import { distanceLabel } from '../../measurement';
+import { shapeMeasurementLabel } from '../../measurement-shape';
+import type { ModelAnnotation } from '../../types';
 import type { KindProjection, Wire } from '../projection';
 import { borderSlice } from '../props';
 import { rotFromDTO } from '../seam';

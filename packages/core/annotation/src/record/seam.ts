@@ -3,14 +3,6 @@
  * measure places in page space and spell colors as hex, so values pass
  * through as they are.
  */
-import {
-  FLAG_KEYS,
-  type AnnotationPropsPatch,
-  type Border,
-  type ModelGeometry,
-  type Rect,
-  type Style,
-} from '@embedpdf/core-annotation';
 import type {
   AnnotationDTO,
   AnnotationFlags,
@@ -22,6 +14,9 @@ import type {
   StandardFont,
   WidgetAppearance,
 } from '@embedpdf/engine-core/runtime';
+
+import { FLAG_KEYS } from '../flags';
+import type { AnnotationPropsPatch, Border, ModelGeometry, Rect, Style } from '../types';
 
 // The one annotation key (engine-core `annotationKey`): obj:<n> | nm:<page>:<name> | idx:<page>:<i>.
 export { annotationKey } from '@embedpdf/core';

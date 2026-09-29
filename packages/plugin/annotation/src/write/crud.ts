@@ -24,7 +24,7 @@ import {
 import type { AnnotationPatch as AnnotationPagePatch } from '../contract';
 import { geometryFromInput, type CreateAnnotationInput } from '../create-input';
 import type { AnnotationReads } from '../read/annotations';
-import { toPatch, toScopedPatch } from '../repository';
+import { toPatch, toScopedPatch } from '@embedpdf/core-annotation';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import { named } from './named';
 import { batchOver, createdRefOf, throwIfFailed } from './outcomes';

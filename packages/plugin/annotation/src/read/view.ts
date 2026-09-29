@@ -19,7 +19,7 @@ import {
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
 import type { PendingChange } from '../model';
-import { fromDTO } from '../repository';
+import { fromDTO } from '@embedpdf/core-annotation';
 import type { AnnotationContext } from '../services/context';
 import type { AnnotationRecord, AnnotationRecords } from '../sync/records';
 

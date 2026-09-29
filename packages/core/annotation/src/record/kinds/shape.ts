@@ -7,14 +7,10 @@
  * width states the box again. The non-cloudy state is stated as a `null`
  * intensity (tri-state remove), never omitted.
  */
-import {
-  geomRotation,
-  shapeBoxOf,
-  shapeRectFor,
-  type ModelAnnotation,
-} from '@embedpdf/core-annotation';
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
+import { geomRotation, shapeBoxOf, shapeRectFor } from '../../geometry';
+import type { ModelAnnotation } from '../../types';
 import type { KindProjection, Wire } from '../projection';
 import { borderSlice } from '../props';
 import { boxGeomFields, boxGeomFromDTO, styleFromDTO } from '../seam';

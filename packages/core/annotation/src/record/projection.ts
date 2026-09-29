@@ -1,6 +1,7 @@
-import { geomRotation, type ModelAnnotation, type PropKey } from '@embedpdf/core-annotation';
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
+import { geomRotation } from '../geometry';
+import type { ModelAnnotation, PropKey } from '../types';
 import { boxGeomFields } from './seam';
 
 /** An untyped partial wire statement — merged fragments are cast to the
@@ -15,7 +16,7 @@ export type IngestSlice = { geometry: ModelAnnotation['geometry'] } & Partial<
 
 /**
  * One declaration per kind family; every wire statement shape derives from it
- * (see `repository/index.ts`):
+ * (see `record/index.ts`):
  *
  *   full patch    =  geometry(a)  ∪  props(a, every key the kind declares)
  *   create draft  =  full patch   ∪  draftExtras(a)
@@ -42,7 +43,7 @@ export interface KindProjection {
   prop?: Partial<Record<PropKey, (annotation: ModelAnnotation) => Wire>>;
   /** Create-only statement extras (intent, quadPoints, contents seeds…). */
   draftExtras?(annotation: ModelAnnotation): Wire | null;
-  /** Kinds whose creates do not go through the repository (stamps carry a
+  /** Kinds whose creates do not go through `toCreateDraft` (stamps carry a
    *  binary source and use their own create path; widgets are form-plane). */
   createable?: false;
 }

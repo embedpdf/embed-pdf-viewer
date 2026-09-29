@@ -2,6 +2,7 @@ import {
   FLAG_KEYS,
   linkOf,
   readProp,
+  richDocOf,
   sharedProps,
   type ModelAnnotation,
   type AnnotationProps,
@@ -10,7 +11,7 @@ import {
 } from '@embedpdf/core-annotation';
 
 import type { SelectionFlags, SelectionProps } from '../contract';
-import { RANGE_KEYS, rangeProps, richDocOf, type TextSelection } from '../rich-text';
+import { RANGE_KEYS, rangeProps, type TextSelection } from '../rich-text';
 import type { AnnotationContext, AnnotationServices } from '../services';
 
 /**

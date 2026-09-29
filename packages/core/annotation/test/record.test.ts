@@ -1,11 +1,4 @@
-import {
-  DRAWN_FLAGS,
-  isAttachedLink,
-  linkChildrenOf,
-  linkOf,
-  type ModelAnnotation,
-  type Model,
-} from '@embedpdf/core-annotation';
+import { annotationKey } from '@embedpdf/core';
 import { textQuadFromRect } from '@embedpdf/core-geometry';
 import type {
   AnnotationDraft,
@@ -27,14 +20,11 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import {
-  fromDTO,
-  linkChildRects,
-  annotationKey,
-  toCreateDraft,
-  toPatch,
-  toScopedPatch,
-} from '../src/repository';
+import { DRAWN_FLAGS } from '../src/flags';
+import { linkChildrenOf, linkOf } from '../src/links';
+import { isAttachedLink } from '../src/plane';
+import type { Model, ModelAnnotation } from '../src/types';
+import { fromDTO, linkChildRects, toCreateDraft, toPatch, toScopedPatch } from '../src/record';
 
 const CROP: PdfRect = { left: 0, bottom: 0, right: 600, top: 800 };
 
@@ -106,7 +96,7 @@ function squareDTO(
   } as AnnotationDTO<PdfCoordinates>;
 }
 
-describe('repository.fromDTO — group/relationship mapping', () => {
+describe('fromDTO — group/relationship mapping', () => {
   it('leaves irt/group undefined for a top-level annotation', () => {
     const annotation = fromDTO(fromFile(squareDTO(10)));
     expect(annotation.irt).toBeUndefined();
@@ -136,7 +126,7 @@ describe('repository.fromDTO — group/relationship mapping', () => {
   });
 });
 
-describe('repository — Ink Highlight intent and blend', () => {
+describe('record — Ink Highlight intent and blend', () => {
   const dto = (): AnnotationDTO<PdfCoordinates> => ({
     ref: { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber: 20 },
     page: toPageRef(1),
@@ -192,7 +182,7 @@ describe('repository — Ink Highlight intent and blend', () => {
   });
 });
 
-describe('repository — Replace Text authoring', () => {
+describe('record — Replace Text authoring', () => {
   const style = {
     color: '#e44234',
     interiorColor: null,
@@ -342,7 +332,7 @@ function plainFreeTextDTO(annotObjectNumber = 21): AnnotationDTO<PdfCoordinates>
 
 /* ── rotation round-trip ───────────────────────────────────────────────────────
  * The model's `rot` and the engine DTO's `rotation` are both degrees clockwise,
- * so the repository passes the angle through. Box kinds carry their `box`
+ * so the angle passes through. Box kinds carry their `box`
  * before the turn (`rect` is the engine's upright box around it); vertex
  * kinds keep an advisory scalar only (the points are already rotated).
  */
@@ -397,7 +387,7 @@ function rotatedPolylineDTO(
   } as AnnotationDTO<PdfCoordinates>;
 }
 
-describe('repository — rotation round-trip', () => {
+describe('record — rotation round-trip', () => {
   it('box: fromDTO reads the box and the clockwise rot', () => {
     const annotation = fromDTO(fromFile(rotatedSquareDTO(90)));
     if (annotation.geometry.kind !== 'rect') throw new Error('expected rect geom');
@@ -466,7 +456,7 @@ describe('repository — rotation round-trip', () => {
   });
 });
 
-describe('repository — free-text callout mapping', () => {
+describe('record — free-text callout mapping', () => {
   it('fromDTO: intent + /CL → a text geom with a leader (the box, conn dropped)', () => {
     const annotation = fromDTO(fromFile(calloutDTO()));
     expect(annotation.geometry.kind).toBe('text');
@@ -528,7 +518,7 @@ describe('repository — free-text callout mapping', () => {
   });
 });
 
-describe('repository — free-text style + font round-trip', () => {
+describe('record — free-text style + font round-trip', () => {
   it('fromDTO projects the /DA font fields into `text` (fontColor falls back to /DA colour)', () => {
     const annotation = fromDTO(fromFile(calloutDTO()));
     expect(annotation.text).toEqual({
@@ -642,7 +632,7 @@ function polygonDTO(
   } as AnnotationDTO<PdfCoordinates>;
 }
 
-describe('repository — polygon cloudy border', () => {
+describe('record — polygon cloudy border', () => {
   it('fromDTO reads /BE intensity into a cloudy border', () => {
     const annotation = fromDTO(fromFile(polygonDTO(2)));
     expect(annotation.style.border).toEqual({ kind: 'cloudy', intensity: 2 });
@@ -688,7 +678,7 @@ describe('repository — polygon cloudy border', () => {
   });
 });
 
-describe('repository — toScopedPatch (sparse emission)', () => {
+describe('record — toScopedPatch (sparse emission)', () => {
   it('geometry scope on a square emits ONLY the box group (no style biography)', () => {
     const annotation = fromDTO(fromFile(squareDTO(60)));
     const patch = toFile(toScopedPatch(annotation, { kind: 'geometry' })) as unknown as Record<
@@ -801,7 +791,7 @@ describe('repository — toScopedPatch (sparse emission)', () => {
   });
 });
 
-describe('repository — line endings leave /Rect to the engine', () => {
+describe('record — line endings leave /Rect to the engine', () => {
   const lineDTO = (lineEndings: { start: string; end: string }): AnnotationDTO<PdfCoordinates> =>
     ({
       ref: { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber: 77 },
@@ -866,7 +856,7 @@ describe('repository — line endings leave /Rect to the engine', () => {
   });
 });
 
-describe('repository — shape cloudy border tri-state', () => {
+describe('record — shape cloudy border tri-state', () => {
   const cloudySquare = (annotObjectNumber = 45): AnnotationDTO<PdfCoordinates> =>
     ({ ...squareDTO(annotObjectNumber), cloudyIntensity: 2 }) as AnnotationDTO<PdfCoordinates>;
 
@@ -905,7 +895,7 @@ describe('repository — shape cloudy border tri-state', () => {
   });
 });
 
-describe('repository — attached links (fold + desired state + link kind mapping)', () => {
+describe('record — attached links (fold + desired state + link kind mapping)', () => {
   const linkDTO = (
     annotObjectNumber: number,
     target: import('@embedpdf/engine-core/runtime').PdfLinkTarget | null,

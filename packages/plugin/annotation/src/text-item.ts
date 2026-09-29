@@ -7,6 +7,7 @@
  */
 import {
   initialTextStyle,
+  richDocOf,
   textBoxes,
   textPlateInset,
   type Model,
@@ -15,7 +16,7 @@ import {
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 
 import type { TextItem } from './contract';
-import { cssFontFamilyForFont, richDocOf, stripBodyDefaults } from './rich-text';
+import { cssFontFamilyForFont, stripBodyDefaults } from './rich-text';
 
 /** Project the model's free-text boxes into render-ready {@link TextItem}s — the
  *  core geometry (`textBoxes`) joined with the DTO-derived CSS. Pure; memoized by

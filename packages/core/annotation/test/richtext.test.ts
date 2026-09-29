@@ -1,17 +1,23 @@
+import type { FontHandle } from '@embedpdf/engine-core/runtime';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
 import {
   applyStyleToRange,
+  bodyFromTextStyle,
+  faceForFont,
   isPlainRichText,
   locateOffset,
   normalizeRuns,
   paragraphsFromPlainText,
   plainTextOf,
   rangeHasStyle,
+  richDocOf,
   richTextLength,
   splitRunsAt,
   styleAt,
 } from '../src/richtext';
+import type { ModelAnnotation, TextStyle } from '../src/types';
 
 const doc = () => ({
   paragraphs: [
@@ -117,5 +123,62 @@ describe('rich text algebra', () => {
     expect(isPlainRichText({ body: { size: 12 }, paragraphs: [{ runs: [{ text: 'x' }] }] })).toBe(
       false,
     );
+  });
+});
+
+describe('a free text’s document', () => {
+  const text: TextStyle = {
+    fontFamily: 'helvetica',
+    fontSize: 12,
+    fontColor: '#000000',
+    textAlign: 'left',
+  };
+  const roboto: FontHandle = {
+    key: 'roboto-bold',
+    familyName: 'Roboto',
+    weight: 700,
+    italic: false,
+    embeddingPermission: 'installable',
+    editingAuthorized: true,
+    instanced: false,
+  };
+
+  it('names the face of a standard font, a registered key, and an unknown family', () => {
+    expect(faceForFont('helvetica-bold-oblique')).toEqual({
+      family: 'Helvetica',
+      weight: 700,
+      italic: true,
+    });
+    expect(faceForFont('roboto-bold', () => [roboto])).toEqual({
+      family: 'Roboto',
+      weight: 700,
+      italic: false,
+    });
+    expect(faceForFont('Mystery')).toEqual({ family: 'Mystery' });
+  });
+
+  it('synthesises a body from the /DA text style for a draft without a DTO', () => {
+    expect(bodyFromTextStyle({ ...text, fontFamily: 'times-bold', underline: true })).toMatchObject(
+      { family: 'Times', weight: 700, italic: false, size: 12, decoration: ['underline'] },
+    );
+    expect(
+      bodyFromTextStyle({ ...text, bold: true, italic: true, fontColor: '#ff0000' }),
+    ).toMatchObject({
+      family: 'Helvetica',
+      weight: 700,
+      italic: true,
+      color: '#FF0000',
+    });
+    const annotation = {
+      id: 'a',
+      ref: null,
+      page: toPageRef(1),
+      subtype: 'free-text',
+      text,
+      data: { subtype: 'free-text', contents: 'a\rb' },
+    } as unknown as ModelAnnotation;
+    const doc = richDocOf(annotation);
+    expect(doc.paragraphs).toEqual([{ runs: [{ text: 'a' }] }, { runs: [{ text: 'b' }] }]);
+    expect(doc.body.family).toBe('Helvetica');
   });
 });

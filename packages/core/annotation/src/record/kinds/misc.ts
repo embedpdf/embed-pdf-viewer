@@ -2,13 +2,13 @@
  * The remaining small families: icon kinds (text note / file attachment),
  * stamps, links, widgets, and the unsupported fallback. Icon kinds (whose
  * icon fills `rect`) and links move by `rect`, with tiny prop surfaces;
- * stamps and widgets emit patches here but are not createable through the
- * repository (stamps carry a binary source through their own create path;
+ * stamps and widgets emit patches here but are not created through
+ * `toCreateDraft` (stamps carry a binary source through their own create path;
  * widgets are form-plane).
  */
-import type { ModelAnnotation, TextStyle } from '@embedpdf/core-annotation';
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
+import type { ModelAnnotation, TextStyle } from '../../types';
 import { boxEmit, type KindProjection } from '../projection';
 import { boxGeomFromDTO, writableTarget } from '../seam';
 
@@ -26,7 +26,7 @@ const iconProjection = (subtype: 'text' | 'file-attachment'): KindProjection => 
   },
   geometry: rectGeometry,
   // Creates go through the click-to-place path (placement.ts), which also
-  // carries the attached file for file-attachment — never this repository.
+  // carries the attached file for file-attachment — never `toCreateDraft`.
   createable: false,
 });
 

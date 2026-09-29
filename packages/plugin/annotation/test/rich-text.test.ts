@@ -4,13 +4,10 @@ import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
 import {
-  bodyFromTextStyle,
   cssFontFamilyForFace,
   cssFontFamilyForFont,
-  faceForFont,
   fontForFace,
   rangeProps,
-  richDocOf,
   runDeltaForProps,
   textCommitPatch,
 } from '../src/rich-text';
@@ -70,18 +67,7 @@ const annot = (extra: Partial<ModelAnnotation> = {}): ModelAnnotation =>
   }) as unknown as ModelAnnotation;
 
 describe('faces', () => {
-  it('maps standard fonts, registered keys and unknown families both ways', () => {
-    expect(faceForFont('helvetica-bold-oblique')).toEqual({
-      family: 'Helvetica',
-      weight: 700,
-      italic: true,
-    });
-    expect(faceForFont('roboto-bold', fonts)).toEqual({
-      family: 'Roboto',
-      weight: 700,
-      italic: false,
-    });
-    expect(faceForFont('Mystery')).toEqual({ family: 'Mystery' });
+  it('maps a face to the font that names it: a registered key, a standard name, else the family', () => {
     expect(fontForFace({ family: 'Helvetica', weight: 700, italic: true })).toBe(
       'helvetica-bold-oblique',
     );
@@ -102,23 +88,6 @@ describe('faces', () => {
 });
 
 describe('documents', () => {
-  it('synthesises a body from the /DA text style for a draft without a DTO', () => {
-    expect(bodyFromTextStyle({ ...text, fontFamily: 'times-bold', underline: true })).toMatchObject(
-      { family: 'Times', weight: 700, italic: false, size: 12, decoration: ['underline'] },
-    );
-    expect(
-      bodyFromTextStyle({ ...text, bold: true, italic: true, fontColor: '#ff0000' }),
-    ).toMatchObject({
-      family: 'Helvetica',
-      weight: 700,
-      italic: true,
-      color: '#FF0000',
-    });
-    const doc = richDocOf(annot({ data: { subtype: 'free-text', contents: 'a\rb' } } as never));
-    expect(doc.paragraphs).toEqual([{ runs: [{ text: 'a' }] }, { runs: [{ text: 'b' }] }]);
-    expect(doc.body.family).toBe('Helvetica');
-  });
-
   it('commits the rich paragraphs, with paragraph properties equal to the body stripped', () => {
     const plain = [{ runs: [{ text: 'hello' }] }];
     const styled = [{ runs: [{ text: 'hel', style: { weight: 700 } }, { text: 'lo' }] }];

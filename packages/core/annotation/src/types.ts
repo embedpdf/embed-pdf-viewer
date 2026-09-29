@@ -102,9 +102,9 @@ export interface Callout {
  * the box-vs-vertex split:
  *
  * - **Box** (`rect`, `text`): `rect` is the unrotated local box and `rot` is the
- *   applied tilt — together they reconstruct the visual. The repository emits
- *   `rect` as the engine's `box` and `rot` as `rotation` (both clockwise, so it
- *   passes through); the engine works out `/Rect` around the turned drawing,
+ *   applied tilt — together they reconstruct the visual. They are written as
+ *   the engine's `box` and `rotation` (both clockwise, so `rot` passes
+ *   through); the engine works out `/Rect` around the turned drawing,
  *   so PDFium bakes a portable `/AP`.
  * - **Vertex** (`line`, `poly`, `ink`): the points are already rotated (they are
  *   the portable visual), so `rot` is an advisory scalar — the cumulative tilt the
@@ -154,7 +154,7 @@ export type TextAlign = 'left' | 'center' | 'right';
  * Page-space text styling for a text-editable kind (free text) — the text
  * counterpart of {@link Style}, projected from the DTO's `/DA` fields the same
  * way `style` is projected from `/C`/`/CA`/`/BS`. CSS colour string; the engine
- * `Color` seam is crossed only in the plugin repository.
+ * `Color` seam is crossed only in record/.
  */
 export interface TextStyle {
   /** A PDF standard font name or a registered font key. */
@@ -207,7 +207,7 @@ export type PropKey = keyof AnnotationProps;
 
 /**
  * What a committed edit changed — carried on the `patch` effect so the shell
- * emits exactly that intent (repository `toScopedPatch`) instead of
+ * emits exactly that intent (`toScopedPatch`) instead of
  * reconstructing a full projection. `geometry` covers every gesture commit
  * (move/resize/rotate/vertex edit); `props` forwards the user's patch keys
  * verbatim. Text content never rides this effect (the debounced text-edit

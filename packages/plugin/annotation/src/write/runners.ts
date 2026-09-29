@@ -19,7 +19,7 @@ import {
   type AnnotationRef,
 } from '@embedpdf/engine-core/runtime';
 
-import { toCreateDraft, toScopedPatch } from '../repository';
+import { toCreateDraft, toScopedPatch } from '@embedpdf/core-annotation';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import type { LinkWrites } from './links';
 import { named } from './named';
