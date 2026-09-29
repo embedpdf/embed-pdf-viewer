@@ -9,10 +9,12 @@ import {
   decodePdfBits,
   expandRawScope,
   passwordPromptFromState,
+  protectedCapabilities,
   securityStateFromHead,
   type AnnotationOwner,
   type DocCapability,
   type DocumentAccessInfo,
+  type DocumentProtection,
   type DocumentSecurityService,
   type DocumentSecurityState,
   type DocumentUnlockInput,
@@ -37,6 +39,13 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
    */
   private readonly tokenScope: ReadonlyArray<string>;
   private readonly tokenIdentity: Identity | null;
+
+  /**
+   * What the document's signatures forbid, as the server reports it with
+   * each manifest and each `/access`: taken away from every capability
+   * check, exactly as the server's route guards take it away.
+   */
+  private protection: DocumentProtection | null = null;
 
   constructor(
     private readonly http: HttpClient,
@@ -68,21 +77,26 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
    */
   get scope(): ReadonlyArray<string> {
     if (this.access) return this.access.effectiveScope;
-    const bits = decodePdfBits(this.securityState.permissions.bits);
-    return Array.from(expandRawScope(this.tokenScope, bits)).sort();
+    return Array.from(expandRawScope(this.tokenScope, this.pdfBits(), this.protection)).sort();
   }
 
   /**
-   * Wildcard-aware authorization check — mirrors what the server route layer
-   * enforces with. `scope` alone can't gate UI: it enumerates concrete
-   * grants and drops the `*` admin wildcard. So we honor a server-canonical
-   * concrete grant when present, then fall back to the same `checkCapability`
-   * predicate (which short-circuits `*`) against the JWT scope + /head bits.
+   * The server route guards' own predicate over the same inputs: what the
+   * document's signatures forbid first, then the scope (the server's copy
+   * once `/access` answered, else the JWT's), wildcard included, against the
+   * PDF bits. `scope` alone can't gate UI: it enumerates concrete grants and
+   * drops the `*` admin wildcard.
    */
   allows(cap: DocCapability): boolean {
-    if (this.access?.effectiveScope.includes(cap)) return true;
-    const bits = decodePdfBits(this.securityState.permissions.bits);
-    return checkCapability(cap, this.tokenScope, bits);
+    return checkCapability(cap, this.rawScope(), this.pdfBits(), this.protection);
+  }
+
+  /**
+   * Cloud-internal: what the document's signatures forbid, from the latest
+   * manifest (it changes only when a signature publishes a new version).
+   */
+  setProtection(protection: DocumentProtection | null): void {
+    this.protection = protection;
   }
 
   /**
@@ -103,8 +117,12 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
     target?: AnnotationOwner | { groupId: string },
   ): boolean {
     const id = this.identity ?? {};
+    // A signature that forbids annotation writes outranks the caller's collab
+    // authority, as on the server and in the local engine.
+    const annotationsProtected = protectedCapabilities(this.protection).has('doc.annotate.modify');
     switch (action) {
       case 'create':
+        if (annotationsProtected) return false;
         return checkCollab('create', selfTarget(id), this.rawScope(), id, this.pdfBits());
       case 'set-group':
         return checkSetGroup(
@@ -114,6 +132,7 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
           this.pdfBits(),
         );
       default: {
+        if (annotationsProtected) return false;
         const owner = collabTargetOf((target ?? {}) as AnnotationOwner);
         return checkCollab(action, owner, this.rawScope(), id, this.pdfBits());
       }
@@ -226,12 +245,14 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
       signal,
     );
     this.securityState = response.security;
+    this.protection = response.protection;
     this.access = {
       cdn: response.cdn,
       passwordGrant: response.passwordGrant,
       pdfPermissions: response.pdfPermissions,
       scope: response.scope,
       effectiveScope: response.effectiveScope,
+      protection: response.protection,
       identity: response.identity,
       originPasswordPolicy: response.originPasswordPolicy,
       expiresAt: response.expiresAt,

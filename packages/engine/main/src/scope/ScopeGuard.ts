@@ -10,6 +10,7 @@ import {
   checkSetGroup,
   collabTargetOf,
   decodePdfBits,
+  describeProtection,
   expandRawScope,
   type AnnotationActor,
   type AnnotationOwner,
@@ -268,11 +269,4 @@ export class ScopeGuard {
     };
     return actor.userId || actor.groupId || actor.displayName ? actor : undefined;
   }
-}
-
-function describeProtection(cap: DocCapability, protection: DocumentProtection): string {
-  const cause = protection.certification
-    ? `certification signature ${protection.certification.signatureIndex} (permission ${protection.certification.permission})`
-    : `an existing signature (declared level '${protection.enforced ?? 'none declared'}')`;
-  return `the document is signed: ${cause} forbids '${cap}'`;
 }

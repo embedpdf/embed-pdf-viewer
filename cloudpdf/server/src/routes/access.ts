@@ -6,6 +6,7 @@ import {
   permissionInfoWithAdvisory,
   type AnnotationBundleLimits,
   type DocumentAccessInfo,
+  type DocumentProtection,
   type PdfBits,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -103,10 +104,14 @@ export async function registerAccessRoutes(
     // guards enforce (the origin is the truth; this grant is the
     // optimization, TTL-bounded by `expiresAt` after a divergence flip).
     const layerScopes = await service.getLayerScopes(docId, layerName);
+    // What the document's signatures forbid: subtracted from the scope for
+    // every caller, as every route guard subtracts it.
+    const protection = await service.getProtection(ctx, docId, layerName);
     const access = buildAccessResponse(
       unlocked,
       ctx.jwt,
       pdfBits,
+      protection,
       cdnSigner,
       ctx.tenantId,
       docId,
@@ -159,6 +164,7 @@ function buildAccessResponse(
   unlocked: Awaited<ReturnType<DocumentService['unlockLayerAccess']>>,
   jwt: RequestJwtContext,
   pdfBits: PdfBits,
+  protection: DocumentProtection | null,
   cdnSigner: CdnSigner,
   tenantId: string,
   docId: string,
@@ -177,8 +183,9 @@ function buildAccessResponse(
   // what the client should drive UI off — `pdf.permissions` is opaque
   // until expanded against the document's PDF bits, and the resolver
   // also applies implication rules (e.g. annotations collab scopes
-  // imply doc.annotate.read).
-  const effectiveScope = [...expandRawScope(jwt.scope, pdfBits)].sort();
+  // imply doc.annotate.read) and takes away what the document's
+  // signatures forbid.
+  const effectiveScope = [...expandRawScope(jwt.scope, pdfBits, protection)].sort();
 
   const coverage = cdnCoverageForScope(jwt.scope, pdfBits, {
     docId,
@@ -203,6 +210,7 @@ function buildAccessResponse(
     pdfPermissions: permissionInfoWithAdvisory(unlocked.probe, pdfBits),
     scope: [...jwt.scope],
     effectiveScope,
+    protection,
     // Explicit identity construction (rather than spreading
     // jwt.identity) so the readonly `groups` array doesn't leak into a
     // mutable-typed slot. Each field is copied only when present.

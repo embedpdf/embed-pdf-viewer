@@ -94,6 +94,7 @@ function headPayload(docVersion: number) {
   return {
     id: DOC_ID,
     baseSha: 'stub-sha',
+    protection: null,
     storageSizeBytes: 1024,
     docVersion,
     state: 'ready',
@@ -160,6 +161,7 @@ function buildStub(overrides: Partial<StubState> = {}): Stub {
         annotationsVersion: state.annotationsVersion,
         auditHead: state.auditHead,
         baseSha: 'stub-sha',
+        protection: null,
         pages: PAGE_OBJECT_NUMBERS.map((pageObjectNumber) => ({
           state: pageState(pageObjectNumber),
           cache: {

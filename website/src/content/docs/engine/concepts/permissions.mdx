@@ -147,6 +147,21 @@ Put `pdf.permissions` in the token's scope, next to the other permissions.
 When the user unlocks the file with its owner password, the file's restrictions no longer apply.
 See [Opening documents](/docs/engine/documents/opening#password-protected-files).
 
+## What signatures forbid
+
+A signed document can forbid changes itself: a certification says which changes may follow. That
+binds every user, whatever their permissions. `allows()` answers no, and the call fails with
+`ProtectedDocument` rather than `Forbidden`:
+
+```ts
+// On a document certified at level 2: filling in the form, but no new comments.
+doc.security.allows('doc.forms.fill'); // true
+doc.security.allows('doc.annotate.modify'); // false
+```
+
+See [Certify a document](/docs/engine/forms/signatures#certify-a-document) for what each level
+allows.
+
 ## When a call is refused
 
 A refused call fails with an `EngineError` whose code is `Forbidden`. It names the permission that

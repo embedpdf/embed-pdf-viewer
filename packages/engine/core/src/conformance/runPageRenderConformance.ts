@@ -1,12 +1,13 @@
 import { decodePng, type Raster } from './appearanceRasters';
 import { pdfOf } from './pdfOf';
 import type { ConformanceTestRunner } from './runMetadataConformance';
+import type { PageLayout } from '../dto/PageLayout';
 import type { PageImageHandle, PageImageOptions } from '../dto/PageRender';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import type { PageHandle } from '../engine/PageHandle';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
-import type { PdfRect } from '../geometry/primitives';
+import { pageTransform } from '../geometry/pageTransform';
 import { annotationKey } from '../identity/annotationKey';
 
 const SQUARE_CONTENT = '0 g 200 300 100 100 re f';
@@ -23,7 +24,6 @@ export const CROP_OFFSET_PDF = pdfOf([
   `<< /Length ${SQUARE_CONTENT.length} >>\nstream\n${SQUARE_CONTENT}\nendstream`,
 ]);
 
-const SQUARE: PdfRect = { left: 200, bottom: 300, right: 300, top: 400 };
 /** The square in page space: from the crop box's top-left (100, 600), y down. */
 const SQUARE_ON_PAGE = { x: 100, y: 200, width: 100, height: 100 };
 
@@ -36,10 +36,11 @@ export interface PageRenderConformanceOptions {
 }
 
 /**
- * Page images on both engines: an image reports the size of its pixels, a
- * target rect is in page space like every other place (so a page whose crop
- * box doesn't start at 0,0 renders the area asked for), and quality goes
- * from 0 to 1.
+ * Page images on both engines: an image reports the size of its pixels and
+ * where they are on the page (its transform, the one `pageTransform` gives
+ * without rendering), a target rect is in page space like every other place
+ * (so a page whose crop box doesn't start at 0,0 renders the area asked
+ * for), `blob()` is the image's bytes, and quality goes from 0 to 1.
  */
 export function runPageRenderConformance(
   runner: ConformanceTestRunner,
@@ -51,12 +52,14 @@ export function runPageRenderConformance(
     let engine: Engine;
     let doc: DocumentHandle;
     let page: PageHandle;
+    let layout: PageLayout;
 
     beforeAll(async () => {
       engine = await opts.makeEngine();
       doc = await opts.open(engine);
       const { pages } = await doc.pages.list();
-      page = doc.page(pages[0]!.ref);
+      layout = pages[0]!;
+      page = doc.page(layout.ref);
     });
 
     afterAll(async () => {
@@ -156,6 +159,60 @@ export function runPageRenderConformance(
       }
     });
 
+    test("an image's transform is pageTransform's, and puts the page where its pixels are", async () => {
+      const cases: PageImageOptions[] = [
+        { viewport: { kind: 'scale', scale: 0.5 } },
+        { viewport: { kind: 'scale', scale: 0.5 }, rotation: 90 },
+        { viewport: { kind: 'width', width: 150 }, rotation: 180 },
+        { viewport: { kind: 'width', width: 150 }, rotation: 270 },
+        {
+          target: { kind: 'rect', rect: { x: 50, y: 150, width: 200, height: 160 } },
+          viewport: { kind: 'width', width: 100 },
+          rotation: 90,
+        },
+      ];
+      for (const options of cases) {
+        const image = await page.render.image({ format: 'png', ...options });
+        const { transform } = image;
+        expect([transform.width, transform.height]).toEqual([image.width, image.height]);
+        const expected = pageTransform(layout, options);
+        expect([expected.width, expected.height]).toEqual([image.width, image.height]);
+        expect(transform.matrix.every((n, i) => Math.abs(n - expected.matrix[i]!) < 1e-9)).toBe(
+          true,
+        );
+
+        // The square's middle is dark in the pixels the transform names; a
+        // spot away from it is not.
+        const raster = await decode(image);
+        const inside = transform.pageToPixels({ x: 150, y: 250 });
+        expect(isDark(pixel(raster, Math.floor(inside.x), Math.floor(inside.y)))).toBe(true);
+        const outside = transform.pageToPixels({ x: 70, y: 250 });
+        expect(isDark(pixel(raster, Math.floor(outside.x), Math.floor(outside.y)))).toBe(false);
+        const back = transform.pixelsToPage(inside);
+        expect(Math.abs(back.x - 150) < 1e-9 && Math.abs(back.y - 250) < 1e-9).toBe(true);
+      }
+    });
+
+    test('blob() is the image, the same bytes its object URL serves', async () => {
+      const image = await page.render.image({
+        format: 'png',
+        viewport: { kind: 'scale', scale: 0.25 },
+      });
+      const blob = await image.blob();
+      expect(blob.type).toBe(image.contentType);
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      const decoded = await decodePng(bytes);
+      expect([decoded.width, decoded.height]).toEqual([image.width, image.height]);
+
+      const { url, revoke } = await image.objectUrl();
+      try {
+        const served = new Uint8Array(await (await fetch(url)).arrayBuffer());
+        expect(served.length === bytes.length && served.every((b, i) => b === bytes[i])).toBe(true);
+      } finally {
+        revoke();
+      }
+    });
+
     test('quality goes from 0 to 1', async () => {
       for (const quality of [0, 0.5, 1]) {
         const image = await page.render.image({
@@ -174,14 +231,9 @@ export function runPageRenderConformance(
   });
 }
 
-/** The image's pixels, fetched the way an app would: through its object URL. */
+/** The image's pixels, read the way an app would on either engine: through `blob()`. */
 async function decode(image: PageImageHandle): Promise<Raster> {
-  const { url, revoke } = await image.objectUrl();
-  try {
-    return await decodePng(new Uint8Array(await (await fetch(url)).arrayBuffer()));
-  } finally {
-    revoke();
-  }
+  return decodePng(new Uint8Array(await (await image.blob()).arrayBuffer()));
 }
 
 function pixel(raster: Raster, x: number, y: number): [number, number, number, number] {

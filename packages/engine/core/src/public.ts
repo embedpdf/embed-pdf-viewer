@@ -40,6 +40,7 @@ export {
 
 // Rendering.
 export { snapFullPageViewport } from './engine/DocumentRenderService';
+export { pageTransform } from './geometry/pageTransform';
 
 // Page space and PDF space: for working beside a tool that reads the file's own numbers.
 export {
@@ -111,6 +112,14 @@ export type {
   PageImageOptions,
   PageImageHandle,
   PageRaster,
+  PageRenderImage,
+  PageRenderRaster,
+  PageRenderTransform,
+  PageRenderMatrix,
+  PageTransformOptions,
+  PixelPoint,
+  PixelBox,
+  PixelQuad,
   AnnotationRef,
   AnnotationDTO,
   AnnotationDraft,

@@ -241,6 +241,7 @@ function buildStub(initial: ServerState): StubbedFixture {
           metadataVersion: state.metadataVersion,
           auditHead: 0,
           baseSha: 'stub-sha',
+          protection: null,
           pages: [
             {
               state: pageState(),
@@ -570,13 +571,23 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
   });
 
   test('stale open seed falls back to /head before surfacing pages.list', async () => {
+    // A change lands between open()'s /head and its first manifest read (the
+    // manifest it fetches up front for the document's protection).
+    let raced = false;
+    const racingFetch: typeof globalThis.fetch = async (input, init) => {
+      const response = await fx.fetch(input, init);
+      if (!raced && String(input).endsWith('/head')) {
+        raced = true;
+        fx.bump({ docVersion: 2, pageContentVersion: 2, pageAnnotationVersion: 2 });
+      }
+      return response;
+    };
     const engine = cloudEngine({
       baseUrl: 'http://stub',
-      fetch: fx.fetch,
+      fetch: racingFetch,
     });
     const doc = await engine.open({ kind: 'token', token: docToken() });
     try {
-      fx.bump({ docVersion: 2, pageContentVersion: 2, pageAnnotationVersion: 2 });
       const list = await doc.pages.list();
       expect(list.pages.map((page) => page.ref.pageObjectNumber)).toEqual([PAGE_OBJECT_NUMBER]);
       const paths = fx.calls.map((call) => call.path);
@@ -892,6 +903,7 @@ describe('CloudEngine schema parity — DocumentHeadSchema / DocumentManifestSch
       metadataVersion: 1,
       auditHead: 0,
       baseSha: 'sha',
+      protection: null,
       pages: [
         {
           state: {

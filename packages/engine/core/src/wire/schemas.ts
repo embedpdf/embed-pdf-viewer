@@ -351,6 +351,8 @@ export const AccessResponseSchema = z.object({
    * detection.
    */
   effectiveScope: z.array(z.string()),
+  /** What the document's signatures forbid; `effectiveScope` already leaves it out. */
+  protection: z.lazy(() => DocumentProtectionSchema).nullable(),
   identity: IdentitySchema,
   originPasswordPolicy: z.object({
     mode: z.enum(['not-needed', 'client-retry', 'server-session']),
@@ -515,6 +517,8 @@ export const DocumentManifestSchema = z.object({
   baseByteLength: z.number().int().nonnegative().default(0),
   // Plane scopes: layer manifests only; absent = all-'layer'.
   scopes: LayerScopesSchema.optional(),
+  // Defined further down; lazy so this schema can come first.
+  protection: z.lazy(() => DocumentProtectionSchema).nullable(),
   pages: z.array(ManifestPageSchema),
 }) as unknown as z.ZodType<DocumentManifest>;
 export type { DocumentManifest } from '../dto/DocumentManifest';

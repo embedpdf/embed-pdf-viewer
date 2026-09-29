@@ -8,11 +8,14 @@ import {
   type PageImageResult,
   type PageLayout,
   type PageNetworkRenderFormat,
-  type PageRaster,
   type PageRef,
+  type PageRenderImage,
   type PageRenderOptions,
+  type PageRenderRaster,
   type PageRenderService,
-  renderSize,
+  type PageRenderTransform,
+  renderAreaTransform,
+  renderTargetArea,
   checkImageQuality,
 } from '@embedpdf/engine-core/runtime';
 import { renderImageOptionsToWire, wirePaths } from '@embedpdf/engine-core/wire';
@@ -32,13 +35,13 @@ export class CloudPageRenderService implements PageRenderService {
     private readonly layout: (signal: AbortSignal) => Promise<PageLayout>,
   ) {}
 
-  image(options: PageImageOptions = {}): AbortablePromise<PageImageHandle> {
+  image(options: PageImageOptions = {}): AbortablePromise<PageRenderImage> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
-    return AbortablePromise.run<PageImageHandle>(async (signal) => {
+    return AbortablePromise.run<PageRenderImage>(async (signal) => {
       checkImageQuality(options.quality);
       const format = normalizeFormat(options.format);
       const includeAnnotations = options.includeAnnotations ?? true;
@@ -91,13 +94,14 @@ export class CloudPageRenderService implements PageRenderService {
       // re-resolves per fetch through the 404 → manifest-refresh rail, so a
       // scope flip (e.g. this layer's first annotation write) self-heals
       // instead of failing on a stale path family.
-      const [requestPath, size] = await Promise.all([
+      const [requestPath, transform] = await Promise.all([
         buildPath(signal),
-        this.imageSize(options, signal),
+        this.transformOf(options, signal),
       ]);
-      return createCloudPageImageHandle(
+      const handle = createCloudPageImageHandle(
         {
-          ...size,
+          width: transform.width,
+          height: transform.height,
           format,
           contentType: `image/${format}`,
           source: { kind: 'url', url: this.http.absoluteUrl(requestPath) },
@@ -108,27 +112,28 @@ export class CloudPageRenderService implements PageRenderService {
           await this.manifest.refresh(s);
         },
       );
+      return { ...handle, transform };
     });
   }
 
   /**
-   * The image's pixel size, computed like the server's render (the same
-   * `renderSize`) from the page's layout, so the handle knows it before
-   * any pixels are fetched.
+   * The image's transform, computed like the server's render (the same
+   * `renderSize` and matrix), so the handle knows its size and its pixels
+   * before any are fetched. Only a full page needs the page's layout.
    */
-  private async imageSize(
+  private async transformOf(
     options: PageImageOptions,
     signal: AbortSignal,
-  ): Promise<{ width: number; height: number }> {
-    const target = options.target ?? { kind: 'page' };
+  ): Promise<PageRenderTransform> {
+    const target = options.target;
     const area =
-      target.kind === 'rect'
-        ? { width: target.rect.width, height: target.rect.height }
-        : (await this.layout(signal)).size;
-    return renderSize(area, options.rotation ?? 0, options.viewport ?? { kind: 'scale' });
+      target?.kind === 'rect'
+        ? renderTargetArea(target.rect)
+        : { x: 0, y: 0, ...(await this.layout(signal)).size };
+    return renderAreaTransform(area, options);
   }
 
-  raw(_options?: PageRenderOptions): AbortablePromise<PageRaster> {
+  raw(_options?: PageRenderOptions): AbortablePromise<PageRenderRaster> {
     return AbortablePromise.rejectReason(
       new EngineError(
         EngineErrorCode.NotImplemented,

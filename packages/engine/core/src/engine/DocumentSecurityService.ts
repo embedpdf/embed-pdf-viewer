@@ -1,6 +1,7 @@
 import type { Identity } from '../auth/scope/types';
 import type { DocCapability, PdfBits } from '../auth/scope';
 import type { AbortablePromise } from '../promise/AbortablePromise';
+import type { DocumentProtection } from '../signature/types';
 import type { AnnotationBundleLimits } from '../transfer/bundleLimits';
 
 export type DocumentOpenMode = 'none' | 'user' | 'owner';
@@ -133,6 +134,12 @@ export interface DocumentAccessInfo {
    * Sorted alphabetically for stable display.
    */
   readonly effectiveScope: string[];
+  /**
+   * What the document's signatures forbid (`null` when it has none): a
+   * certification or a signed lock takes capabilities away from every
+   * caller, and `effectiveScope` already leaves them out.
+   */
+  readonly protection: DocumentProtection | null;
   readonly identity: Identity;
   readonly originPasswordPolicy: {
     readonly mode: 'not-needed' | 'client-retry' | 'server-session';

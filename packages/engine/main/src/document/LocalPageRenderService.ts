@@ -4,13 +4,13 @@ import {
   EngineError,
   EngineErrorCode,
   createPageImageHandle,
+  renderTransform,
   wirePack,
   type EngineRenderPolicy,
-  type PageImageHandle,
   type PageImageOptions,
-  type PageObjectNumber,
-  type PageRaster,
+  type PageRenderImage,
   type PageRenderOptions,
+  type PageRenderRaster,
   type PageRenderService,
   type PageRef,
   checkImageQuality,
@@ -38,7 +38,7 @@ export class LocalPageRenderService implements PageRenderService {
     private readonly policy: EngineRenderPolicy = CONTINUOUS_RENDER_POLICY,
   ) {}
 
-  raw(options?: PageRenderOptions): AbortablePromise<PageRaster> {
+  raw(options?: PageRenderOptions): AbortablePromise<PageRenderRaster> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -74,7 +74,7 @@ export class LocalPageRenderService implements PageRenderService {
       },
       { priority: Priority.HIGH },
     );
-    return AbortablePromise.run<PageRaster>(async (signal) => {
+    return AbortablePromise.run<PageRenderRaster>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
@@ -82,12 +82,16 @@ export class LocalPageRenderService implements PageRenderService {
       if (payload.tag !== 'pages.render') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      return payload.raster;
+      const { raster, area } = payload;
+      return {
+        ...raster,
+        transform: renderTransform(area, options?.rotation ?? 0, raster.width, raster.height),
+      };
     });
   }
 
-  image(options: PageImageOptions = {}): AbortablePromise<PageImageHandle> {
-    return AbortablePromise.run<PageImageHandle>(async (signal) => {
+  image(options: PageImageOptions = {}): AbortablePromise<PageRenderImage> {
+    return AbortablePromise.run<PageRenderImage>(async (signal) => {
       checkImageQuality(options.quality);
       const raw = this.raw(options);
       const onAbort = () => raw.abort(signal.reason);
@@ -104,13 +108,14 @@ export class LocalPageRenderService implements PageRenderService {
         );
       }
       const bytes = result.source.bytes;
-      return createPageImageHandle(result, {
+      const handle = createPageImageHandle(result, {
         async blob() {
           return new Blob([copyToExactArrayBuffer(bytes)], {
             type: result.contentType,
           });
         },
       });
+      return { ...handle, transform: raster.transform };
     });
   }
 }

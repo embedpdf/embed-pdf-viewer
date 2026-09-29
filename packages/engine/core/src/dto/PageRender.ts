@@ -1,5 +1,6 @@
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
+import type { PageRenderTransform } from '../geometry/pageTransform';
 import type { PdfRotation } from '../geometry/primitives';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 import { AbortablePromise } from '../promise/AbortablePromise';
@@ -124,6 +125,22 @@ export interface PageImageHandle extends PageImageResult {
    * `.abort()`: a URL made after the cancel is revoked, never leaked.
    */
   objectUrl(): AbortablePromise<PageImageObjectUrl>;
+  /**
+   * The encoded image, typed `contentType`. The same call on both engines:
+   * the cloud engine fetches it with the document's token. Cancel with
+   * `.abort()`.
+   */
+  blob(): AbortablePromise<Blob>;
+}
+
+/** What `render.image()` gives: the image, and how its pixels map to page space. */
+export interface PageRenderImage extends PageImageHandle {
+  transform: PageRenderTransform;
+}
+
+/** What `render.raw()` gives: the pixels, and how they map to page space. */
+export interface PageRenderRaster extends PageRaster {
+  transform: PageRenderTransform;
 }
 
 export interface PageImageBlobSource {
@@ -136,6 +153,19 @@ export function createPageImageHandle(
 ): PageImageHandle {
   return {
     ...result,
+    blob() {
+      return AbortablePromise.run(async (signal) => {
+        if (typeof Blob === 'undefined') {
+          throw new EngineError(
+            EngineErrorCode.RuntimeUnavailable,
+            'Blob is not available in this environment',
+          );
+        }
+        const blob = await blobSource.blob(signal);
+        if (signal.aborted) throw signal.reason;
+        return blob;
+      });
+    },
     objectUrl() {
       return AbortablePromise.run(async (signal) => {
         if (typeof Blob === 'undefined' || typeof URL === 'undefined' || !URL.createObjectURL) {

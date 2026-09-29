@@ -1499,7 +1499,13 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
     }
   | { tag: 'pages.text'; snapshot: PageTextSnapshot }
   | { tag: 'pages.geometry'; page: PageRef; snapshot: PageGeometrySnapshot<C> }
-  | { tag: 'pages.render'; raster: PageRaster }
+  | {
+      tag: 'pages.render';
+      page: PageRef;
+      /** The area of the page the pixels show. */
+      area: C['box'];
+      raster: PageRaster;
+    }
   | { tag: 'pages.renderEncoded'; image: EncodedImageWire }
   | { tag: 'search.query'; slice: SearchSlice<C> }
   | { tag: 'document.saveBuffer'; bytes: ArrayBuffer; size: number }

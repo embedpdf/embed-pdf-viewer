@@ -1,12 +1,12 @@
 import type {
-  PageImageHandle,
   PageImageOptions,
+  PageRenderImage,
   PageRenderOptions,
-  PageRaster,
+  PageRenderRaster,
 } from '../dto/PageRender';
 import { AbortablePromise } from '../promise/AbortablePromise';
 
 export interface PageRenderService {
-  image(options?: PageImageOptions): AbortablePromise<PageImageHandle>;
-  raw(options?: PageRenderOptions): AbortablePromise<PageRaster>;
+  image(options?: PageImageOptions): AbortablePromise<PageRenderImage>;
+  raw(options?: PageRenderOptions): AbortablePromise<PageRenderRaster>;
 }

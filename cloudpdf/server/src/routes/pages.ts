@@ -458,7 +458,15 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     };
     const access = requireLayerDocAccessOnly(req, docId, layerName);
     const bits = await documentService.getEffectivePdfBits(access, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', bits);
+    const protection = await documentService.getProtection(access, docId, layerName);
+    const ctx = requireLayerCapability(
+      req,
+      docId,
+      layerName,
+      'doc.annotate.modify',
+      bits,
+      protection,
+    );
     const body = parseOrInvalidArg(PageScaleInputSchema, req.body, 'request body');
     setNoStore(reply);
     return layerService.setPageScale(
@@ -475,7 +483,15 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.pages.assemble', pdfBits);
+    const protection = await documentService.getProtection(accessCtx, docId, layerName);
+    const ctx = requireLayerCapability(
+      req,
+      docId,
+      layerName,
+      'doc.pages.assemble',
+      pdfBits,
+      protection,
+    );
     const body = parseOrInvalidArg<PageMoveInput>(
       PageMoveInputSchema as unknown as SchemaLike<PageMoveInput>,
       req.body,
@@ -502,7 +518,15 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.pages.assemble', pdfBits);
+    const protection = await documentService.getProtection(accessCtx, docId, layerName);
+    const ctx = requireLayerCapability(
+      req,
+      docId,
+      layerName,
+      'doc.pages.assemble',
+      pdfBits,
+      protection,
+    );
     const body = parseOrInvalidArg<PageRotateInput>(
       PageRotateInputSchema as unknown as SchemaLike<PageRotateInput>,
       req.body,
@@ -529,7 +553,15 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.pages.assemble', pdfBits);
+    const protection = await documentService.getProtection(accessCtx, docId, layerName);
+    const ctx = requireLayerCapability(
+      req,
+      docId,
+      layerName,
+      'doc.pages.assemble',
+      pdfBits,
+      protection,
+    );
     const body = parseOrInvalidArg<PageDeleteInput>(
       PageDeleteInputSchema as unknown as SchemaLike<PageDeleteInput>,
       req.body,
@@ -558,7 +590,15 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.pages.assemble', pdfBits);
+    const protection = await documentService.getProtection(accessCtx, docId, layerName);
+    const ctx = requireLayerCapability(
+      req,
+      docId,
+      layerName,
+      'doc.pages.assemble',
+      pdfBits,
+      protection,
+    );
     const body = parseOrInvalidArg<PageNameInput>(
       PageNameInputSchema as unknown as SchemaLike<PageNameInput>,
       req.body,
@@ -576,7 +616,15 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.pages.assemble', pdfBits);
+    const protection = await documentService.getProtection(accessCtx, docId, layerName);
+    const ctx = requireLayerCapability(
+      req,
+      docId,
+      layerName,
+      'doc.pages.assemble',
+      pdfBits,
+      protection,
+    );
     const body = parseOrInvalidArg<PageRemoveNameInput>(
       PageRemoveNameInputSchema as unknown as SchemaLike<PageRemoveNameInput>,
       req.body,
@@ -598,7 +646,15 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.pages.assemble', pdfBits);
+    const protection = await documentService.getProtection(accessCtx, docId, layerName);
+    const ctx = requireLayerCapability(
+      req,
+      docId,
+      layerName,
+      'doc.pages.assemble',
+      pdfBits,
+      protection,
+    );
     // Multipart mutation envelope: `body` JSON part + a `resource:source`
     // part carrying the standalone PDF. Policy 'any', not the strict sniff:
     // the worker's FPDF_LoadMemDocument is the real gate here, and the
@@ -638,7 +694,15 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.pages.assemble', pdfBits);
+    const protection = await documentService.getProtection(accessCtx, docId, layerName);
+    const ctx = requireLayerCapability(
+      req,
+      docId,
+      layerName,
+      'doc.pages.assemble',
+      pdfBits,
+      protection,
+    );
     const body = parseOrInvalidArg<{
       size: { width: number; height: number };
       count?: number;
@@ -700,11 +764,19 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.pages.modify', pdfBits);
+    const protection = await documentService.getProtection(accessCtx, docId, layerName);
+    const ctx = requireLayerCapability(
+      req,
+      docId,
+      layerName,
+      'doc.pages.modify',
+      pdfBits,
+      protection,
+    );
     // Flatten deletes page annotations as it paints them, so page-content
     // authority alone is insufficient. This deliberately excludes collab-
     // scoped annotation writers from the bulk page endpoint.
-    requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', pdfBits);
+    requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', pdfBits, protection);
     const raw = (req.body ?? {}) as { pages?: unknown; usage?: unknown };
     const body = parseOrInvalidArg<PageFlattenInput>(
       PageFlattenInputSchema as unknown as SchemaLike<PageFlattenInput>,
