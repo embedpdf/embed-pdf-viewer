@@ -1,7 +1,7 @@
 import {
+  ANNOTATION_DEFAULTS,
   EngineError,
   EngineErrorCode,
-  type Color,
   type HighlightDraft,
   type HighlightPatch,
   type PdfQuad,
@@ -26,20 +26,6 @@ import { shiftAnnotRect, shiftBetween } from './shiftAnnotRect';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 import { readQuadPoints } from '../read/annotationReadPrimitives';
 import { strikeoutIntentToName } from '../textEditIntent';
-
-/**
- * Default opacity when a draft omits `opacity`. PDFium's /CA defaults to
- * 1.0 if absent from the dict, but we set it explicitly so reads always
- * round-trip the same value.
- */
-const DEFAULT_OPACITY = 1;
-
-/**
- * Default fill colour per text-markup subtype. Matches the read-side
- * fallback in `readers/annotations/text-markup.ts`.
- */
-const DEFAULT_HIGHLIGHT_COLOR: Color = '#ffff00';
-const DEFAULT_TEXT_MARKUP_COLOR: Color = '#000000';
 
 export type TextMarkupDraft =
   | HighlightDraft<PdfCoordinates>
@@ -76,10 +62,9 @@ export function applyTextMarkupDraft(
   appendQuadPoints(fn, mem, annotPtr, quadPoints);
   setRectFromQuadPoints(fn, mem, annotPtr, quadPoints);
 
-  const fallback =
-    draft.subtype === 'highlight' ? DEFAULT_HIGHLIGHT_COLOR : DEFAULT_TEXT_MARKUP_COLOR;
-  setAnnotColor(fn, annotPtr, draft.color ?? fallback);
-  setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULT_OPACITY);
+  const defaults = ANNOTATION_DEFAULTS[draft.subtype];
+  setAnnotColor(fn, annotPtr, draft.color ?? defaults.color);
+  setAnnotOpacity(fn, annotPtr, draft.opacity ?? defaults.opacity);
   if (draft.subtype === 'strikeout' && draft.intent != null) {
     setIntent(fn, annotPtr, strikeoutIntentToName(draft.intent));
   }

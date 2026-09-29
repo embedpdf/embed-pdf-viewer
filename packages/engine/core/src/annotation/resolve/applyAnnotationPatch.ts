@@ -13,7 +13,7 @@ import { declarationOf, type AnnotationDTO, type AnnotationPatch } from '../kind
  * A resolved patch's fields as a read spells them. Most fields read as they
  * are written; these take a different shape on the way in.
  */
-function readValueOf(name: string, value: unknown, current: unknown): unknown {
+export function readValueOf(name: string, value: unknown, current: unknown): unknown {
   if (value === null) return null;
   switch (name) {
     case 'reply': {
@@ -26,16 +26,18 @@ function readValueOf(name: string, value: unknown, current: unknown): unknown {
       const body = input.body
         ? { ...DEFAULT_RICH_TEXT_BODY, ...input.body }
         : (read?.body ?? DEFAULT_RICH_TEXT_BODY);
-      // A read spells every rich color in lowercase.
+      // A read spells every rich color in lowercase, and keeps no empty run.
       return {
         body: { ...body, color: body.color.toLowerCase() },
         paragraphs: input.paragraphs.map((paragraph) => ({
           ...paragraph,
-          runs: paragraph.runs.map((run) =>
-            run.style?.color
-              ? { ...run, style: { ...run.style, color: run.style.color.toLowerCase() } }
-              : run,
-          ),
+          runs: paragraph.runs
+            .filter((run) => run.text !== '')
+            .map((run) =>
+              run.style?.color
+                ? { ...run, style: { ...run.style, color: run.style.color.toLowerCase() } }
+                : run,
+            ),
         })),
       } satisfies RichTextDocument;
     }
@@ -104,7 +106,7 @@ function followingReads(
 }
 
 /** The action tree the engine writes for a link target: one URI or GoTo action. */
-function actionTreeOf(
+export function actionTreeOf(
   target: { kind: 'uri'; uri: string } | { kind: 'goto'; destination: unknown },
 ): PdfActionTree<unknown> {
   const root: PdfActionNode<unknown> =

@@ -10,7 +10,7 @@ import type { Engine } from '../engine/Engine';
 import type { PageBox } from '../geometry/pageSpace';
 import { toPageRef } from '../identity/PageRef';
 import { measureFromRatio } from '../measure/calibrate';
-import { applyAnnotationPatch } from '../pageSpace/helpers';
+import { annotationOfDraft, applyAnnotationPatch } from '../pageSpace/helpers';
 
 /** One blank US Letter page. */
 export const PREDICTION_FIXTURE_PDF = pdfOf([
@@ -243,6 +243,11 @@ const CASES: PredictionCase[] = [
     patch: { overlayText: 'CONFIDENTIAL', repeat: true },
   },
   {
+    name: 'redaction: a new label size keeps the label color and font',
+    draft: { subtype: 'redact', rect: BOX, fontColor: '#ff0000', fontFamily: 'courier' },
+    patch: { fontSize: 20 },
+  },
+  {
     name: 'stamp: a new drawing and nothing else',
     draft: { subtype: 'stamp', box: BOX },
     resources: { appearance: PNG_1X1 },
@@ -261,6 +266,158 @@ const CASES: PredictionCase[] = [
   },
 ];
 
+/** A create whose outcome is predicted with `annotationOfDraft`. */
+interface CreateCase {
+  name: string;
+  draft: AnnotationDraft;
+  resources?: AnnotationResources;
+}
+
+const QUAD = {
+  p1: { x: 72, y: 300 },
+  p2: { x: 192, y: 300 },
+  p3: { x: 72, y: 320 },
+  p4: { x: 192, y: 320 },
+};
+
+const STAMP_BYTES = { appearance: PNG_1X1 };
+const FILE_BYTES = { file: new TextEncoder().encode('attached') };
+
+const CREATE_CASES: CreateCase[] = [
+  // Each kind with only what it requires: the rest is its defaults.
+  { name: 'square, as little as it takes', draft: { subtype: 'square', box: BOX } },
+  { name: 'circle, as little as it takes', draft: { subtype: 'circle', box: BOX } },
+  {
+    name: 'line, as little as it takes',
+    draft: { subtype: 'line', linePoints: { start: { x: 80, y: 400 }, end: { x: 300, y: 450 } } },
+  },
+  { name: 'polygon, as little as it takes', draft: { subtype: 'polygon', vertices: TRIANGLE } },
+  { name: 'polyline, as little as it takes', draft: { subtype: 'polyline', vertices: TRIANGLE } },
+  { name: 'ink, as little as it takes', draft: { subtype: 'ink', inkList: [TRIANGLE] } },
+  { name: 'highlight, as little as it takes', draft: { subtype: 'highlight', quadPoints: [QUAD] } },
+  { name: 'underline, as little as it takes', draft: { subtype: 'underline', quadPoints: [QUAD] } },
+  { name: 'squiggly, as little as it takes', draft: { subtype: 'squiggly', quadPoints: [QUAD] } },
+  { name: 'strikeout, as little as it takes', draft: { subtype: 'strikeout', quadPoints: [QUAD] } },
+  { name: 'caret, as little as it takes', draft: { subtype: 'caret', box: BOX } },
+  { name: 'free text, as little as it takes', draft: { ...FREE_TEXT, contents: undefined } },
+  { name: 'note, as little as it takes', draft: { subtype: 'text', rect: iconRect(400, 72) } },
+  { name: 'link, as little as it takes', draft: { subtype: 'link', rect: BOX, target: null } },
+  { name: 'redaction, as little as it takes', draft: { subtype: 'redact', rect: BOX } },
+  { name: 'widget, as little as it takes', draft: { subtype: 'widget', rect: BOX } },
+  {
+    name: 'stamp, as little as it takes',
+    draft: { subtype: 'stamp', box: BOX },
+    resources: STAMP_BYTES,
+  },
+  {
+    name: 'file attachment, as little as it takes',
+    draft: { subtype: 'file-attachment', rect: iconRect(450, 72), file: { name: 'a.txt' } },
+    resources: FILE_BYTES,
+  },
+  // What a draft states, and what follows from it.
+  {
+    name: 'square, styled',
+    draft: {
+      subtype: 'square',
+      box: BOX,
+      color: '#1a2b3c',
+      interiorColor: '#ffeecc',
+      opacity: 0.5,
+      strokeWidth: 3,
+      borderStyle: 'dashed',
+      dashArray: [4, 2],
+      rotation: 30,
+      contents: 'A square',
+      print: true,
+    },
+  },
+  {
+    name: 'free text in a bold face, colored, centered',
+    draft: {
+      ...FREE_TEXT,
+      fontFamily: 'times-bold',
+      fontSize: 20,
+      color: '#0000ff',
+      fontColor: '#ff0000',
+      textAlign: 'center',
+    } as AnnotationDraft,
+  },
+  {
+    name: 'free text over two lines',
+    draft: { ...FREE_TEXT, contents: 'First line\nSecond line' },
+  },
+  {
+    name: 'free text from rich text',
+    draft: {
+      ...FREE_TEXT,
+      contents: undefined,
+      richText: {
+        paragraphs: [{ runs: [{ text: 'Rich ' }, { text: 'text', style: { weight: 700 } }] }],
+      },
+    },
+  },
+  { name: 'a callout', draft: CALLOUT },
+  {
+    name: 'a distance',
+    draft: {
+      subtype: 'line',
+      linePoints: { start: { x: 80, y: 500 }, end: { x: 280, y: 500 } },
+      intent: 'line-dimension',
+      measure: MEASURE,
+      captionEnabled: true,
+    },
+  },
+  {
+    name: 'an area with its caption placed',
+    draft: {
+      subtype: 'polygon',
+      vertices: TRIANGLE,
+      intent: 'polygon-dimension',
+      measure: MEASURE,
+      captionEnabled: true,
+      captionCenter: { x: 160, y: 270 },
+    },
+  },
+  {
+    name: 'a note with a review state',
+    draft: { subtype: 'text', rect: iconRect(400, 72), state: 'accepted', icon: 'comment' },
+  },
+  {
+    name: 'a link to a page',
+    draft: {
+      subtype: 'link',
+      rect: BOX,
+      target: { kind: 'uri', uri: 'https://embedpdf.com' },
+    },
+  },
+  {
+    name: 'a redaction with a label, over text',
+    draft: {
+      subtype: 'redact',
+      quadPoints: [QUAD],
+      overlayText: 'CONFIDENTIAL',
+      repeat: true,
+      fontColor: '#ffffff',
+      interiorColor: '#000000',
+    },
+  },
+  {
+    name: 'a named stamp',
+    draft: { subtype: 'stamp', box: BOX, name: 'Approved', opacity: 0.5, fit: 'fill' },
+    resources: STAMP_BYTES,
+  },
+  {
+    name: 'a file with its type and description',
+    draft: {
+      subtype: 'file-attachment',
+      rect: iconRect(450, 72),
+      file: { name: 'note.txt', mimeType: 'text/plain', description: 'A note' },
+      icon: 'tag',
+    },
+    resources: FILE_BYTES,
+  },
+];
+
 /**
  * Fields a prediction leaves as they were: the engine works them out from its
  * drawing, or stamps them on every write.
@@ -268,8 +425,13 @@ const CASES: PredictionCase[] = [
 function unpredicted(annotation: AnnotationDTO): Set<string> {
   const names = new Set(['modifiedAt', 'modifiedBy']);
   if (DRAWN_RECT_KINDS.has(annotation.subtype)) names.add('rect');
+  // A widget without its own font reads the form's default appearance, which
+  // is the document's, not the draft's.
+  if (annotation.subtype === 'widget') for (const name of WIDGET_FONT) names.add(name);
   return names;
 }
+
+const WIDGET_FONT = ['fontFamily', 'fontSize', 'fontColor'];
 
 /** Values equal within the file's precision: numbers to a thousandth of a point. */
 function sameValue(left: unknown, right: unknown): boolean {
@@ -283,8 +445,28 @@ function sameValue(left: unknown, right: unknown): boolean {
   );
 }
 
+/** A file's metadata without what its bytes say (size, checksum, dates). */
+const metadataOf = (file: unknown) =>
+  file && typeof file === 'object'
+    ? {
+        name: (file as { name: unknown }).name,
+        mimeType: (file as { mimeType: unknown }).mimeType,
+        description: (file as { description: unknown }).description,
+      }
+    : file;
+
 /** The fields where the engine's answer differs from the prediction. */
 function differences(predicted: AnnotationDTO, actual: AnnotationDTO) {
+  if (predicted.subtype === 'file-attachment' && actual.subtype === 'file-attachment') {
+    return fieldDifferences(
+      { ...predicted, file: metadataOf(predicted.file) } as AnnotationDTO,
+      { ...actual, file: metadataOf(actual.file) } as AnnotationDTO,
+    );
+  }
+  return fieldDifferences(predicted, actual);
+}
+
+function fieldDifferences(predicted: AnnotationDTO, actual: AnnotationDTO) {
   const skip = unpredicted(actual);
   const names = new Set([...Object.keys(predicted), ...Object.keys(actual)]);
   return [...names]
@@ -304,9 +486,11 @@ function differences(predicted: AnnotationDTO, actual: AnnotationDTO) {
 }
 
 /**
- * What a patch does, predicted: `applyAnnotationPatch(read, patch)` equals the
- * annotation the engine reads back after `update(ref, patch)`, on every field
- * but the ones the engine works out from its drawing or stamps on each write.
+ * What a write does, predicted: `applyAnnotationPatch(read, patch)` equals the
+ * annotation the engine reads back after `update(ref, patch)`, and
+ * `annotationOfDraft(draft, context)` the one it reads back after
+ * `create(draft)`, on every field but the ones the engine works out from its
+ * drawing or stamps on each write.
  * A viewer shows a pending change this way, so the prediction is what the
  * user sees until the engine answers.
  */
@@ -347,6 +531,31 @@ export function runAnnotationPredictionConformance(
           patch,
           scenario.updateResources,
         );
+        expect(differences(predicted, actual)).toEqual([]);
+      });
+    }
+
+    for (const scenario of CREATE_CASES) {
+      test(`create: ${scenario.name}`, async () => {
+        const { annotation: actual } = await page.annotations.create(
+          scenario.draft,
+          scenario.resources,
+        );
+        // What the draft can't say: the ref, place and author the engine
+        // gives, and the drawing's box, which the engine works out.
+        const predicted = annotationOfDraft(scenario.draft, {
+          ref: actual.ref,
+          index: actual.index,
+          attribution: {
+            ...(actual.author !== null ? { author: actual.author } : {}),
+            ...(actual.userId !== null ? { userId: actual.userId } : {}),
+            ...(actual.createdBy !== null ? { createdBy: actual.createdBy } : {}),
+            ...(actual.modifiedBy !== null ? { modifiedBy: actual.modifiedBy } : {}),
+            ...(actual.createdAt !== null ? { createdAt: actual.createdAt } : {}),
+            ...(actual.modifiedAt !== null ? { modifiedAt: actual.modifiedAt } : {}),
+          },
+          ...(DRAWN_RECT_KINDS.has(actual.subtype) ? { rect: actual.rect } : {}),
+        });
         expect(differences(predicted, actual)).toEqual([]);
       });
     }

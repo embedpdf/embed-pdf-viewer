@@ -5,4 +5,5 @@ export {
   pdfResolveAnnotationPatch,
   type ResolveOptions,
 } from './resolveAnnotationPatch';
-export { assertNoteDraftState, assertRichTextAgreement } from './text';
+export { pdfResolveAnnotationDraft, type DraftResolveOptions } from './resolveAnnotationDraft';
+export { assertRichTextAgreement } from './text';

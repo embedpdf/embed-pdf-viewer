@@ -1,5 +1,5 @@
-import type { Color, TextDraft, TextPatch, PdfCoordinates } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode, standardStateModelOf } from '@embedpdf/engine-core/runtime';
+import type { TextDraft, TextPatch, PdfCoordinates } from '@embedpdf/engine-core/runtime';
+import { ANNOTATION_DEFAULTS, EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { NOTE_ICON_TO_NAME } from '../annotationIcon';
@@ -13,10 +13,8 @@ import {
 } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 
-/** Default `/C` — the generator's yellow note fill, set explicitly so reads round-trip. */
-const DEFAULT_NOTE_COLOR: Color = '#ffff00';
-
-const DEFAULT_OPACITY = 1;
+/** A note's defaults: the generator's yellow fill, set explicitly so reads round-trip. */
+const DEFAULTS = ANNOTATION_DEFAULTS.text;
 
 /**
  * Apply a text (sticky-note) draft. The visual is entirely generator-owned:
@@ -33,14 +31,12 @@ export function applyTextDraft(
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
   setAnnotRect(fn, mem, annotPtr, draft.rect);
-  setAnnotColor(fn, annotPtr, draft.color ?? DEFAULT_NOTE_COLOR);
-  setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULT_OPACITY);
-  setNoteIcon(fn, annotPtr, draft.icon ?? 'note');
-  // `assertNoteDraftState` refused a custom state without a model.
-  const stateModel =
-    draft.stateModel ?? (draft.state != null ? standardStateModelOf(draft.state) : null);
-  if (stateModel != null) {
-    writeAnnotString(fn, mem, annotPtr, 'StateModel', stateModelToPdf(stateModel));
+  setAnnotColor(fn, annotPtr, draft.color ?? DEFAULTS.color);
+  setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULTS.opacity);
+  setNoteIcon(fn, annotPtr, draft.icon ?? DEFAULTS.icon);
+  // `pdfResolveAnnotationDraft` filled in a standard state's model.
+  if (draft.stateModel != null) {
+    writeAnnotString(fn, mem, annotPtr, 'StateModel', stateModelToPdf(draft.stateModel));
   }
   if (draft.state != null) {
     writeAnnotString(fn, mem, annotPtr, 'State', stateToPdf(draft.state));

@@ -5,14 +5,28 @@
  * none of that math depends on where the origin is.
  */
 
-import { pageAnnotationPatchOf, pdfAnnotationOf, pdfAnnotationPatchOf } from './annotations';
+import {
+  pageAnnotationDraftOf,
+  pageAnnotationPatchOf,
+  pdfAnnotationDraftOf,
+  pdfAnnotationOf,
+  pdfAnnotationPatchOf,
+} from './annotations';
 import type { PageCoordinates, PdfCoordinates } from './coordinates';
 import type { VisibleBoxOf } from './destinations';
 import { mirroredRun } from './text';
 import { pdfAppearanceTurnOf } from '../annotation/appearanceTurn';
 import { pdfDrawnPointsOf } from '../annotation/drawnPoints';
 import { semanticEqual } from '../annotation/appearance';
-import type { AnnotationDTO, AnnotationPatch } from '../annotation/kinds';
+import type { AnnotationDraft, AnnotationDTO, AnnotationPatch } from '../annotation/kinds';
+import {
+  annotationOfResolvedDraft,
+  type DraftContext,
+} from '../annotation/resolve/annotationOfDraft';
+import {
+  pdfResolveAnnotationDraft,
+  type DraftResolveOptions,
+} from '../annotation/resolve/resolveAnnotationDraft';
 import { applyResolvedPatch } from '../annotation/resolve/applyAnnotationPatch';
 import {
   pdfResolveAnnotationPatch,
@@ -294,4 +308,44 @@ export function applyAnnotationPatch<A extends AnnotationDTO>(
   options: ResolveOptions = {},
 ): A {
   return applyResolvedPatch(current, resolveAnnotationPatch(current, patch, options));
+}
+
+/**
+ * The draft the engine writes for `draft`: checked against its kind, and
+ * every field that follows from it stated. A note's standard review state
+ * brings its state model, a free text's rich text and contents follow each
+ * other, and a measurement's label follows its points and scale. Fields left
+ * out stay out: the kind's defaults (`ANNOTATION_DEFAULTS`) say what they
+ * read back. Values `draft` gives come back as given.
+ *
+ * Throws `InvalidArg` for a draft the engine would refuse.
+ */
+export function resolveAnnotationDraft(
+  draft: AnnotationDraft,
+  options: DraftResolveOptions = {},
+): AnnotationDraft {
+  const resolved = pdfResolveAnnotationDraft(
+    pdfAnnotationDraftOf(draft, MIRROR, mirrorEveryPage),
+    options,
+  );
+  const back = pageAnnotationDraftOf(resolved, MIRROR, mirrorEveryPage) as Record<string, unknown>;
+  const given = draft as Record<string, unknown>;
+  for (const name of Object.keys(back)) {
+    if (given[name] !== undefined && semanticEqual(back[name], given[name]))
+      back[name] = given[name];
+  }
+  return back as AnnotationDraft;
+}
+
+/**
+ * The annotation the engine will read back after creating `draft`: what a
+ * viewer shows while the create is on its way. `context` says what the draft
+ * doesn't: the ref and place it will have, who creates it, and, for a kind
+ * whose `rect` the engine works out from its drawing, that box.
+ */
+export function annotationOfDraft(
+  draft: AnnotationDraft,
+  context: DraftContext<PageBox>,
+): AnnotationDTO {
+  return annotationOfResolvedDraft(resolveAnnotationDraft(draft), context);
 }

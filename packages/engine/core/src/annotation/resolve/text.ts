@@ -3,7 +3,7 @@ import { EngineErrorCode } from '../../errors/EngineErrorCode';
 import { richTextPlainText, type RichTextDocumentInput } from '../../dto/RichText';
 import type { PdfCoordinates } from '../../pageSpace/coordinates';
 import { standardStateModelOf } from '../comments';
-import type { AnnotationDTO, AnnotationPatch } from '../kinds';
+import type { AnnotationDraft, AnnotationDTO, AnnotationPatch } from '../kinds';
 
 /**
  * A review state needs its model (ISO 32000 §12.5.6.3): a standard state
@@ -17,14 +17,17 @@ function stateNeedsModel(state: string): EngineError {
   );
 }
 
-/** Refuse a note draft whose custom state has no model, before the first write. */
-export function assertNoteDraftState(draft: {
-  state?: string | null;
-  stateModel?: string | null;
-}): void {
-  if (draft.state != null && draft.stateModel == null && !standardStateModelOf(draft.state)) {
-    throw stateNeedsModel(draft.state);
-  }
+/**
+ * A note draft's state with its model filled in: a standard state brings its
+ * own; a custom state without one is refused, before the first write.
+ */
+export function noteDraftStateFollows(
+  draft: AnnotationDraft<PdfCoordinates>,
+): AnnotationDraft<PdfCoordinates> {
+  if (draft.subtype !== 'text' || draft.state == null || draft.stateModel != null) return draft;
+  const model = standardStateModelOf(draft.state);
+  if (!model) throw stateNeedsModel(draft.state);
+  return { ...draft, stateModel: model };
 }
 
 /**

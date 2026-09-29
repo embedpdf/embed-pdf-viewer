@@ -1,8 +1,7 @@
 import {
+  ANNOTATION_DEFAULTS,
   EngineError,
   EngineErrorCode,
-  richTextParagraphsFromPlainText,
-  type Color,
   type FreeTextDraft,
   type FreeTextPatch,
   type RichTextDocumentInput,
@@ -29,14 +28,10 @@ import {
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 import { applyAnnotationBoxPatch, writeAnnotationBox } from './writeAnnotationBox';
 import { applyDefaultAppearance } from './writeDefaultAppearance';
-import { applyBorderDraft, applyBorderPatch, DEFAULT_OPACITY } from './writeStyle';
+import { applyBorderDraft, applyBorderPatch } from './writeStyle';
 
-/**
- * Default `/DA` colour for free text: black (border + default text). Unlike
- * the geometric families (which default to red `/C`), a text box reads best
- * with a black mark.
- */
-const DEFAULT_FREETEXT_COLOR: Color = '#000000';
+/** A free text's defaults (`annotation/defaults.ts`): a black border and text. */
+const DEFAULTS = ANNOTATION_DEFAULTS['free-text'];
 
 /**
  * Write rich text through the engine's rich writer: `/RC`, `/DS`, `/DA`,
@@ -93,11 +88,11 @@ export function applyFreeTextDraft(
   } else {
     setAnnotColor(fn, annotPtr, background, FPDFANNOT_COLORTYPE.Color);
   }
-  setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULT_OPACITY);
+  setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULTS.opacity);
 
   applyBorderDraft(fn, mem, annotPtr, draft);
 
-  const daColor = draft.color ?? DEFAULT_FREETEXT_COLOR;
+  const daColor = draft.color ?? DEFAULTS.color;
   applyDefaultAppearance(fn, annotPtr, draft.fontFamily, draft.fontSize, daColor, ctx);
   if (draft.fontColor != null) {
     setAnnotColor(fn, annotPtr, draft.fontColor, FPDFANNOT_COLORTYPE.TextColor);
@@ -114,17 +109,12 @@ export function applyFreeTextDraft(
   }
 
   // Rich text last, always: a box is born with all four forms (/RC, /DS,
-  // /DA, /Contents) and its appearance, Acrobat's shape — from the draft's
-  // rich document, else from its plain contents as body-style paragraphs.
-  // The body becomes the body style (the /DA font and size follow it; the
-  // /DA colour written above is kept). Must come after the geometry, which
-  // the layout needs.
-  writeRichText(
-    fn,
-    annotPtr,
-    draft.richText ?? { paragraphs: richTextParagraphsFromPlainText(draft.contents ?? '') },
-    ctx,
-  );
+  // /DA, /Contents) and its appearance, Acrobat's shape. The resolved draft
+  // states it (`pdfResolveAnnotationDraft`: the draft's rich document, else
+  // its plain contents as body-style paragraphs). A body becomes the body
+  // style (the /DA font and size follow it; the /DA colour written above is
+  // kept). Must come after the geometry, which the layout needs.
+  writeRichText(fn, annotPtr, draft.richText!, ctx);
 }
 
 /**

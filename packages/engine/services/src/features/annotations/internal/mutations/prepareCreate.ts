@@ -1,9 +1,6 @@
 import {
-  assertAnnotationDraft,
   assertAnnotationResources,
-  assertDeclaredFields,
-  assertRichTextAgreement,
-  resolveMeasurementDraft,
+  pdfResolveAnnotationDraft,
   type AnnotationDraft,
   type WireAnnotationResources,
   type PdfCoordinates,
@@ -22,11 +19,11 @@ export function prepareCreate(
   resources: WireAnnotationResources | undefined,
   ctx: AnnotationWriteContext,
 ): AnnotationDraft<PdfCoordinates> {
-  assertDeclaredFields(draft.subtype, draft);
-  // A change set carries `reply` and a popup's `parent` beside the draft.
-  assertAnnotationDraft(draft, { linked: ['reply', 'parent'] });
-  assertAnnotationResources(draft.subtype, resources, 'create');
-  preflightDraft(draft, ctx);
-  assertRichTextAgreement(draft);
-  return resolveMeasurementDraft(draft);
+  // What the draft means, stated whole: the one resolution a viewer's
+  // pending create shares (`annotationOfDraft`). A change set carries
+  // `reply` and a popup's `parent` beside the draft.
+  const resolved = pdfResolveAnnotationDraft(draft, { linked: ['reply', 'parent'] });
+  assertAnnotationResources(resolved.subtype, resources, 'create');
+  preflightDraft(resolved, ctx);
+  return resolved;
 }

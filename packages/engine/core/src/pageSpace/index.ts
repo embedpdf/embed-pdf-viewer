@@ -39,6 +39,7 @@ export {
 export { pageMeasureOf, pageViewportsOf, pdfMeasureOf } from './measure';
 export type { PagePointTurn } from './helpers';
 export {
+  annotationOfDraft,
   appearanceTurnOf,
   applyAnnotationPatch,
   drawnPointsOf,
@@ -52,6 +53,7 @@ export {
   pageQuadFromCorners,
   pageTurnOfDrawn,
   pageTurnOfUpright,
+  resolveAnnotationDraft,
   resolveAnnotationPatch,
   shapeForRect,
 } from './helpers';

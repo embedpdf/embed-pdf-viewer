@@ -6,7 +6,7 @@ import {
 import type { PdfCoordinates } from '../../pageSpace/coordinates';
 import { pdfCalloutEnd } from '../calloutEnd';
 import { faceForFreeTextFont, type DescribeFont } from '../fontFaces';
-import type { AnnotationDTO, AnnotationPatch } from '../kinds';
+import type { AnnotationDraft, AnnotationDTO, AnnotationPatch } from '../kinds';
 
 type FreeTextPatch = Extract<AnnotationPatch<PdfCoordinates>, { subtype?: 'free-text' }>;
 
@@ -95,4 +95,21 @@ export function calloutEndFollows(
   const knee = line.length === 3 ? line[1] : undefined;
   const end = pdfCalloutEnd(box, knee ?? line[0], rotation);
   return { ...text, calloutLine: knee ? [line[0], knee, end] : [line[0], end] };
+}
+
+/**
+ * A free text draft's text, stated both ways: its rich text, else body-style
+ * paragraphs from its `contents` (one per line break, an empty box without
+ * any), and `contents` as the rich text's plain projection. A rich text
+ * without a body takes the body the draft's font, size and colors make.
+ */
+export function freeTextDraftFollows(
+  draft: AnnotationDraft<PdfCoordinates>,
+): AnnotationDraft<PdfCoordinates> {
+  if (draft.subtype !== 'free-text') return draft;
+  const richText = draft.richText ?? {
+    paragraphs: richTextParagraphsFromPlainText(draft.contents ?? ''),
+  };
+  // The engine writes `/Contents` from the rich text: a line break reads back as `\r`.
+  return { ...draft, richText, contents: richTextPlainText(richText) };
 }

@@ -1,4 +1,9 @@
-import type { LineDraft, LinePatch, PdfCoordinates } from '@embedpdf/engine-core/runtime';
+import {
+  ANNOTATION_DEFAULTS,
+  type LineDraft,
+  type LinePatch,
+  type PdfCoordinates,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { setLine, setLineEndings } from './annotationWritePrimitives';
@@ -8,7 +13,6 @@ import { writeMeasurementFields } from './writeMeasurementFields';
 import { applyFilledStyleDraft, applyFilledStylePatch } from './writeStyle';
 
 /** Default line endings when a line draft omits them. */
-const DEFAULT_LINE_ENDINGS = { start: 'none', end: 'none' } as const;
 
 /**
  * Apply a line draft to a freshly-created annotation. Order:
@@ -30,7 +34,7 @@ export function applyLineDraft(
   const { start, end } = draft.linePoints;
   const [drawn] = writeNewPoints(fn, mem, annotPtr, [[start, end]], draft.rotation).drawn;
   setLine(fn, mem, annotPtr, { start: drawn![0]!, end: drawn![1]! });
-  setLineEndings(fn, annotPtr, draft.lineEndings ?? DEFAULT_LINE_ENDINGS);
+  setLineEndings(fn, annotPtr, draft.lineEndings ?? ANNOTATION_DEFAULTS.line.lineEndings);
 }
 
 export function applyLinePatch(

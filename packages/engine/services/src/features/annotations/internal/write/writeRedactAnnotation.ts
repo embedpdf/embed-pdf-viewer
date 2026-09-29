@@ -1,4 +1,5 @@
 import {
+  ANNOTATION_DEFAULTS,
   EngineError,
   EngineErrorCode,
   type Color,
@@ -9,7 +10,8 @@ import {
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { FPDFANNOT_COLORTYPE } from '../colorType';
-import { DEFAULT_STANDARD_FONT } from '../standardFont';
+import { readDefaultAppearance } from '../read/annotationReadPrimitives';
+import { standardFontFromCode } from '../standardFont';
 import { textAlignmentToCode } from '../textAlignment';
 import type { AnnotationWriteContext } from './annotationWriteContext';
 import {
@@ -23,23 +25,14 @@ import {
 } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 import { applyDefaultAppearance } from './writeDefaultAppearance';
-import { DEFAULT_OPACITY } from './writeStyle';
 import {
   appendQuadPoints,
   replaceQuadPoints,
   setRectFromQuadPoints,
 } from './writeTextMarkupAnnotation';
 
-/** Default `/C` marking outline: red — the redaction marking convention (and
- *  the AP generator's default). */
-const DEFAULT_REDACT_COLOR: Color = '#ff0000';
-
-/** Default `/DA` label colour: black, mirroring free text. Tools that pair a
- *  label with a dark `interiorColor` should set a light `fontColor`
- *  explicitly. */
-const DEFAULT_LABEL_COLOR: Color = '#000000';
-
-const DEFAULT_FONT_SIZE = 12;
+/** A redaction's defaults (`annotation/defaults.ts`): a red outline, a black 12 pt label. */
+const DEFAULTS = ANNOTATION_DEFAULTS.redact;
 
 /**
  * True when the draft/patch carries the label or any `/DA` member — i.e. the
@@ -102,8 +95,8 @@ export function applyRedactDraft(
   if (draft.rect) setAnnotRect(fn, mem, annotPtr, draft.rect);
   else setRectFromQuadPoints(fn, mem, annotPtr, quads);
 
-  setAnnotColor(fn, annotPtr, draft.color ?? DEFAULT_REDACT_COLOR, FPDFANNOT_COLORTYPE.Color);
-  setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULT_OPACITY);
+  setAnnotColor(fn, annotPtr, draft.color ?? DEFAULTS.color, FPDFANNOT_COLORTYPE.Color);
+  setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULTS.opacity);
   const fill = draft.interiorColor ?? null;
   if (fill !== null) {
     setAnnotColor(fn, annotPtr, fill, FPDFANNOT_COLORTYPE.InteriorColor);
@@ -119,9 +112,9 @@ export function applyRedactDraft(
     applyDefaultAppearance(
       fn,
       annotPtr,
-      draft.fontFamily ?? DEFAULT_STANDARD_FONT,
-      draft.fontSize ?? DEFAULT_FONT_SIZE,
-      draft.fontColor ?? DEFAULT_LABEL_COLOR,
+      draft.fontFamily ?? DEFAULTS.fontFamily,
+      draft.fontSize ?? DEFAULTS.fontSize,
+      draft.fontColor ?? DEFAULTS.fontColor,
       ctx,
     );
   }
@@ -179,12 +172,16 @@ export function applyRedactPatch(
     setOverlayTextRepeat(fn, annotPtr, patch.repeat);
   }
   if (touchesLabelStyle(patch)) {
+    // `/DA` packs the label's font, size and color into one string: a patch
+    // that names some keeps the others as they are (a size of 0 fits the
+    // label to the region, so it is kept too).
+    const current = readDefaultAppearance(fn, mem, annotPtr);
     applyDefaultAppearance(
       fn,
       annotPtr,
-      patch.fontFamily ?? DEFAULT_STANDARD_FONT,
-      patch.fontSize ?? DEFAULT_FONT_SIZE,
-      patch.fontColor ?? DEFAULT_LABEL_COLOR,
+      patch.fontFamily ?? (current ? standardFontFromCode(current.fontCode) : DEFAULTS.fontFamily),
+      patch.fontSize ?? current?.fontSize ?? DEFAULTS.fontSize,
+      patch.fontColor ?? current?.color ?? DEFAULTS.fontColor,
       ctx,
     );
   }

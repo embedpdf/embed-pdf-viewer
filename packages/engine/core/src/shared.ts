@@ -450,13 +450,19 @@ export { pdfAppearanceTurnOf } from './annotation/appearanceTurn';
 export { assertAnnotationDraft } from './annotation/checkWrite';
 export {
   assertDeclaredFields,
-  assertNoteDraftState,
   assertRichTextAgreement,
+  pdfResolveAnnotationDraft,
   pdfResolveAnnotationPatch,
   resolveMeasurementDraft,
   touchesCaption,
+  type DraftResolveOptions,
   type ResolveOptions,
 } from './annotation/resolve';
+export {
+  ANNOTATION_DEFAULTS,
+  annotationDefaultsOf,
+  type AnnotationDefaults,
+} from './annotation/defaults';
 export {
   faceForFreeTextFont,
   isStandardFontName,

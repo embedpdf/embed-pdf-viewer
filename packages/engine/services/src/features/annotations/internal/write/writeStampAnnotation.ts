@@ -1,4 +1,5 @@
 import {
+  ANNOTATION_DEFAULTS,
   EngineError,
   EngineErrorCode,
   sniffBinaryMetadata,
@@ -83,7 +84,7 @@ export function applyStampDraft(
   if (draft.opacity !== undefined) setAnnotOpacity(fn, annotPtr, draft.opacity);
   // A create records the fit it used. Data that records none (`null`, as a
   // stamp another tool made reads) is fit as such a stamp is shown: `fill`.
-  const fit = draft.fit === null ? 'fill' : (draft.fit ?? 'contain');
+  const fit = draft.fit === null ? 'fill' : (draft.fit ?? ANNOTATION_DEFAULTS.stamp.fit);
   const appearance = requireStampAppearance(ctx);
   authorStampAppearance(fn, mem, annotPtr, appearance, requireDrawingTarget(ctx), fit, {
     box: draft.box,

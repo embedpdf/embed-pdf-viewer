@@ -1,5 +1,4 @@
 import {
-  assertNoteDraftState,
   EngineError,
   EngineErrorCode,
   type AnnotationDraft,
@@ -103,9 +102,6 @@ export function preflightDraft(
   }
   if (isRedactSubtype(draft.subtype)) {
     preflightRedactDraft(draft as RedactDraft<PdfCoordinates>);
-  }
-  if (isTextSubtype(draft.subtype)) {
-    assertNoteDraftState(draft as TextDraft<PdfCoordinates>);
   }
 }
 
